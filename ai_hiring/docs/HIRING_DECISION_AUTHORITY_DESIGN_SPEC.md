@@ -1,259 +1,258 @@
 # Hiring Decision Authority — Enterprise Design Specification
 
-**Status:** Design specification (implementation-ready)
-**Supersedes:** the "AI Hiring" / universal candidate-scoring framing
-**Governance alignment:** Ugence Decision Governance — Decision Authority,
-ActionGate, Truth Assurance Pipeline (TAP), Runtime Assurance, Decision
-Contracts, Evidence Lineage, Reconciliation, Execution Receipt, Policy
-Compiler, RiskDecisionCase.
+**Status:** Design specification (implementation-ready) · **Revision:** 2 (governance-first: PWC → IR → Contract → ActionGate → Runtime Assurance → Receipt → Reconciliation)
+**Supersedes:** the "AI Hiring" / universal candidate-scoring framing, and Revision 1's hand-authored Role Compatibility Profile as a runtime artifact.
+**Governance alignment:** Ugence Decision Governance — **Policy Workflow Compiler (PWC)**, **WorkflowIR**, **Decision Contract**, **Decision Authority**, **ActionGate**, **Runtime Assurance**, **Truth Assurance Pipeline (TAP)**, **Evidence Lineage**, **Execution Receipt**, **Reconciliation**, **RiskDecisionCase**.
 
 ---
 
 ## 0. Reading guide
 
-This document is the reconstruction specification for the hiring vertical. It
-is **not** an incremental edit of the prior "AI Hiring" module; it re-founds the
-module as an **Enterprise Hiring Decision Authority** and states the contracts,
-components, flows, schemas, and controls needed to implement it.
+This document reconstructs the hiring vertical as one **governed Decision
+Authority domain** on the shared Ugence governance kernel — not a standalone AI
+recruiting application. The unit of value is a **compiled, signed, reproducible
+hiring policy** whose decisions are **gated, runtime-assured, receipted, and
+reconciled** — identical in shape to Procurement, Financial, Clinical, and Agent
+Decision Authority.
 
-Machine-readable contracts live beside this file in
-[`schemas/`](schemas/) and are the normative source for field names, types,
-and required-ness. Where prose and schema disagree, the schema wins.
+Machine-readable contracts in [`schemas/`](schemas/) are the normative source;
+where prose and schema disagree, the schema wins.
 
-| Section | What it establishes |
+| § | Establishes |
 |---|---|
-| 1 | Product reframe and the one architectural invariant |
-| 2 | Concept model: Compatibility ≠ Eligibility ≠ Decision |
-| 3 | Role Compatibility Profile (per-role, versioned) |
-| 4 | Dimensions — including the two replacements (Operating Environment, Role Sustainability) |
+| 1 | Reframe, the one invariant, portfolio positioning |
+| 2 | Concept model: Policy → Compiler → Contract → Decision → Action → Reconciliation |
+| 3 | **Hiring Policy Compiler (PWC) → HiringWorkflowIR → Hiring Decision Contract** |
+| 4 | Dimensions — Operating Environment Compatibility, Role Sustainability & Adaptation |
 | 5 | Evidence model + TAP admission |
-| 6 | Non-compensatory Mandatory Gates (ActionGate parity) |
-| 7 | Overall Fit Index — non-binding by construction |
-| 8 | Hiring Decision Contract |
-| 9 | Decision Authority and the Hiring Recommendation |
-| 10 | Review lifecycle + closed-loop calibration |
-| 11 | Component architecture |
-| 12 | Runtime flow (sequence) |
-| 13 | State machines |
-| 14 | API design |
-| 15 | Audit model, Evidence Lineage, Execution Receipt |
-| 16 | Governance alignment map |
-| 17 | Security model |
-| 18 | Enterprise deployment |
-| 19 | Migration from the current module |
-| 20 | Glossary |
+| 6 | Non-compensatory Mandatory Gates |
+| 7 | Overall Fit Index — **analytics-only**, never enters Decision Authority |
+| 8 | Decision Authority and the Hiring Recommendation |
+| 9 | **Hiring ActionGate** — action must match the contract |
+| 10 | **Hiring Runtime Assurance** — pre-write validation |
+| 11 | **Execution Receipt + Hiring Reconciliation Record** |
+| 12 | Review lifecycle + closed-loop contract calibration |
+| 13 | Component architecture |
+| 14 | Runtime flow (sequence) |
+| 15 | State machines |
+| 16 | API design |
+| 17 | Audit, Evidence Lineage, receipts |
+| 18 | Governance alignment map |
+| 19 | Security model |
+| 20 | Enterprise deployment |
+| 21 | Migration plan |
+| 22 | Glossary |
 
 ---
 
-## 1. Product reframe
+## 1. Reframe
 
-### 1.1 Rename
+### 1.1 Rename and portfolio position
 
-> **AI Hiring → Hiring Decision Authority** (product surface: *Hiring Decision
-> Governance*).
+> **AI Hiring → Hiring Decision Authority.**
 
-The rename is not cosmetic. It changes the unit of value from *a score about a
-person* to *a governed, auditable hiring recommendation produced under an
-explicit decision contract*. AI **assists**; the Decision Authority **decides**
-what the governed recommendation is; a human **holds** binding authority.
+Hiring becomes one domain instance of a common architecture:
+
+```
+              ┌──────────────── shared governance kernel ────────────────┐
+              │ PWC → WorkflowIR → Decision Contract → Decision Authority │
+              │ → ActionGate → Runtime Assurance → Execution Receipt      │
+              │ → Reconciliation                                          │
+              └──────────────────────────────────────────────────────────┘
+  Procurement DA    Hiring DA    Financial DA    Clinical DA    Agent DA
+     (only the domain evidence models, policy compilers, and contracts differ)
+```
+
+The engine is identical across domains; only **domain-specific evidence models,
+policy compilers, and decision contracts** change. That cross-domain consistency
+is the differentiator: incumbents (ServiceNow, Eightfold, Workday, SAP
+SuccessFactors, Oracle Recruiting) provide workflow orchestration and AI
+scoring; Ugence provides **governed decision execution** with the same
+architecture everywhere.
 
 ### 1.2 The one invariant
 
-> **AI interprets admitted evidence into structured, explainable, confidence-
-> qualified dimension assessments. The Decision Authority evaluates a versioned
-> Hiring Decision Contract over that evidence to produce a governed
-> recommendation. Only an authenticated human actor may record a binding
-> employment decision.**
+> **A hiring policy is authored declaratively, compiled by the Hiring Policy
+> Compiler into a signed, content-addressed HiringWorkflowIR, and projected into
+> a versioned Hiring Decision Contract. The Decision Authority evaluates that
+> contract over TAP-admitted dimension evidence and mandatory gates — never over
+> a fit score. The resulting action is gated (ActionGate) and runtime-assured
+> before any HRIS/ATS write, receipted on execution, and reconciled against
+> observed outcomes. Only an authenticated human may bind.**
 
-Everything below is a consequence of this invariant. Three collapses are
-explicitly forbidden:
+Four collapses are forbidden and blocked in the compiler/kernel:
 
-1. **Score → policy.** No path may read `overall_fit > T ⇒ hire`.
-2. **Compatibility → eligibility.** High fit can never satisfy a mandatory gate.
-3. **AI → authority.** No AI or service principal may author a binding decision
-   or drive a binding workflow transition.
+1. **Score → policy.** No path reads a fit score into a gate, eligibility, or action decision. The Overall Fit Index is analytics-only (§7).
+2. **Compatibility → eligibility.** Fit can never satisfy a mandatory gate (§6).
+3. **Recommendation → write.** No recommendation reaches an HRIS/ATS without passing ActionGate **and** Runtime Assurance (§9–§10).
+4. **AI → authority.** No AI/service principal binds a decision or drives a binding transition (§8).
 
 ### 1.3 What is removed
 
-The **Universal Candidate Scoring** model is removed:
+- **Universal Candidate Scoring** (fixed role-agnostic weighted layers → one decisive score).
+- **Hand-authored Role Compatibility Profile as the runtime artifact.** HR no longer edits JSON weights directly; they declare requirements and the **PWC compiles** them (§3). The compiled dimension model still exists — as an *output of the compiler embedded in the IR*, not a hand-maintained config.
+
+### 1.4 The commercial difference
 
 ```
-        REMOVED (universal, role-agnostic, compensatory)
-        Resume → [Technical, Behavior, Leadership, Industry,
-                  Growth, Culture, Resilience] → Overall Score → Hire
+Incumbents:   Resume → AI → Score → Workflow
+Ugence:       Policy → Compiled Decision Contract → Evidence → Decision Authority
+              → ActionGate → Runtime Assurance → Execution Receipt → Reconciliation
 ```
 
-It is replaced by the pipeline in §2.4. There is no fixed, role-agnostic set of
-weighted layers feeding a single decisive score.
+Not another recruiting platform — **governed hiring decision infrastructure.**
 
 ---
 
 ## 2. Concept model
 
-### 2.1 Three distinct questions
+Three questions, three objects, three authorities — plus the governed action spine:
 
-The platform keeps three questions in three different objects, decided by three
-different authorities:
-
-| Question | Object | Decided by | Compensatory? |
+| Question | Object | Authority | Compensatory? |
 |---|---|---|---|
-| *How well does the evidence fit this role's operating reality?* | **Compatibility Assessment** | AI (advisory) | within a dimension only |
-| *Are the non-negotiable requirements met?* | **Eligibility Determination** | Decision Authority over Mandatory Gates | **never** |
+| *Does the evidence fit this role's operating reality?* | **Compatibility Assessment** (dimension evidence) | Professional Compatibility Engine (AI, advisory) | within a dimension only |
+| *Are the non-negotiables met?* | **Eligibility** over Mandatory Gates | Decision Authority | **never** |
 | *What should we do?* | **Hiring Recommendation** → **Employment Decision** | Decision Authority (recommend) / Human (bind) | n/a |
-
-### 2.2 Compatibility ≠ Eligibility
-
-Compatibility is a graded, evidence-backed, confidence-qualified statement of
-*fit*. Eligibility is a boolean conjunction of **mandatory gates** that a
-graded fit can never buy back. A candidate can be *highly compatible* and
-*not eligible*; the recommendation must then be **NOT_ELIGIBLE**.
-
-### 2.3 Evidence in the middle
-
-The prior model went `Compatibility → Decision`. The reconstruction inserts the
-governed spine:
-
-```
-Compatibility  →  Evidence (admitted, lineage-tracked)
-               →  Decision Authority (evaluates the Decision Contract)
-               →  Eligibility (mandatory gates)
-               →  Recommendation (governed, explainable)
-```
-
-### 2.4 Canonical pipeline
+| *May this exact action execute?* | **ActionGate** verdict + **Runtime Assurance** | kernel gate + pre-write checks | n/a |
+| *Did the prediction hold?* | **Reconciliation Record** | Reconciliation | n/a |
 
 ```mermaid
 flowchart LR
-    JD[Job Definition] --> RCP[Role Compatibility Profile v]
-    RCP --> HDC[Hiring Decision Contract v]
-    EV[Evidence Sources] --> TAP{TAP Admission}
-    TAP -- admitted --> AS[Dimension Assessment<br/>score+confidence+evidence]
-    TAP -- rejected --> QZ[Quarantine / no effect]
-    AS --> DA[Decision Authority]
+    HP[Hiring Policy<br/>declarative] --> PWC[Hiring Policy Compiler]
+    PWC --> IR[HiringWorkflowIR<br/>signed · content-addressed]
+    IR --> HDC[Hiring Decision Contract v]
+    EV[Evidence] --> TAP{TAP Admission}
+    TAP -- admitted --> PCE[Professional Compatibility Engine<br/>dimension evidence only]
+    TAP -- rejected --> QZ[Quarantine / inert]
+    PCE --> DA[Hiring Decision Authority]
     HDC --> DA
     DA --> GATES[Mandatory Gate Evaluation]
-    DA --> OFI[Overall Fit Index<br/>NON-BINDING range]
-    GATES --> ELIG[Eligibility Determination]
+    GATES --> ELIG[Eligibility]
     ELIG --> REC[Hiring Recommendation]
-    OFI -. advisory .-> REC
-    REC --> HUM[Human Employment Decision<br/>binding]
-    HUM --> EXEC[Governed Action → CER → ActionGate → Execution → Reconciliation]
-    HUM --> CAL[Review Lifecycle → Calibration]
-    CAL -. improves .-> HDC
+    REC --> HUM[Human Employment Decision]
+    HUM --> AG[Hiring ActionGate<br/>action == contract?]
+    AG -- DENY --> RAUTH[Reauthorization]
+    AG -- ALLOW --> RA[Hiring Runtime Assurance]
+    RA -- pass --> HRIS[HRIS / ATS write]
+    RA -- block --> HOLD2[Hold + remediate]
+    HRIS --> RCPT[Hiring Execution Receipt]
+    RCPT --> REV[1/3/6/12-month Reviews]
+    REV --> RCN[Hiring Reconciliation Record]
+    RCN -. calibrates .-> HP
+    PCE -. analytics only .-> OFI[Overall Fit Index<br/>Hiring Analytics]
 ```
+
+The Overall Fit Index branches **out to Analytics** and never re-enters the
+decision path.
 
 ---
 
-## 3. Role Compatibility Profile (RCP)
+## 3. Hiring Policy Compiler (PWC) → HiringWorkflowIR → Hiring Decision Contract
 
-### 3.1 Purpose
+### 3.1 Replace the Role Compatibility Profile with a compiler
 
-Every **Job Definition owns a versioned Role Compatibility Profile.** There is
-**no universal weighting model.** The RCP is the role-specific parameterization
-of what "fit" means and which evidence is required to claim it.
-
-### 3.2 Contents
-
-An RCP contains exactly:
-
-- **`dimension_weights`** — weights over the role's *compatibility* dimensions
-  (must sum to 1.0). Weights shape the **advisory** Overall Fit Index only; they
-  never gate.
-- **`mandatory_gates`** — the non-compensatory requirements (defined once,
-  referenced by the Decision Contract). See §6.
-- **`required_evidence`** — per dimension, the evidence types that must be
-  *admitted* before a dimension may be scored at all.
-- **`minimum_confidence`** — per dimension, the confidence floor below which the
-  dimension is reported as **INSUFFICIENT_EVIDENCE** rather than scored.
-- **`decision_contract_version`** — the Hiring Decision Contract version this
-  profile binds to.
-
-### 3.3 Role divergence is the norm
-
-Two roles, deliberately different weightings (illustrative):
+HR does **not** configure JSON weights. They author a **declarative Hiring
+Policy**:
 
 ```
-Software Architect                    Sales Executive
-  Technical            0.35             Behavior             0.25
-  Leadership           0.20             Domain               0.20
-  Domain               0.15             Operating Env.       0.20
-  Behavior             0.10             Leadership           0.15
-  Learning             0.10             Learning             0.10
-  Operating Env.       0.05             Technical            0.05
-  Role Sustainability  0.05             Role Sustainability  0.05
+Senior Architect
+  requires: AWS, Kubernetes, Leadership, Healthcare domain, Security Clearance
+  seniority: L5
+  compensation ceiling: $220K
+  location policy: US-remote or on-site NYC
+  approval chain: Hiring Manager → Director → VP Eng
 ```
 
-The weights are **role property, not platform property.** They live in the RCP,
-are versioned, are reviewed/approved before publication (§3.4), and are cited by
-every recommendation that used them.
+The **Hiring Policy Compiler (PWC)** — the hiring instance of the platform's
+Policy Workflow Compiler — compiles that into a canonical, typed
+**HiringWorkflowIR (`hiring_workflow_ir.v1`)**, from which a **Hiring Decision
+Contract** is projected.
 
-### 3.4 RCP lifecycle
+```mermaid
+flowchart TB
+    HP[Hiring Policy<br/>human-authored, declarative] --> PWC[Hiring Policy Compiler]
+    PWC --> IR[HiringWorkflowIR v1<br/>normalized · versioned · signed · content-addressed]
+    IR --> HDC[Hiring Decision Contract<br/>deployable projection]
+    PWC -. compile errors .-> HP
+    subgraph IR emits
+      W[dimension weights]:::o
+      G[mandatory gates]:::o
+      E[required evidence]:::o
+      C[confidence thresholds]:::o
+      AC[action constraints:<br/>salary · level · role · location · approvals]:::o
+      RS[review schedule]:::o
+      AS[runtime-assurance checks]:::o
+    end
+    IR --- W & G & E & C & AC & RS & AS
+    classDef o fill:#f4f4f4,stroke:#bbb;
+```
 
-RCPs move through the same author→review→approve→publish lifecycle as rubrics
-and Decision Contracts. Only a **PUBLISHED** RCP may parameterize a live
-assessment; published RCPs are immutable; a change is a new version. See §13.3.
+Every hiring policy is therefore **versioned, signed, content-addressed,
+auditable, and reproducible** — recompiling the same policy yields the same IR
+digest.
 
-**Schema:** [`schemas/role_compatibility_profile.schema.json`](schemas/role_compatibility_profile.schema.json)
+### 3.2 What the compiler guarantees (compile-time rejections)
+
+The PWC **rejects** a policy that:
+
+- (a) references the Overall Fit Index in any gate, eligibility, or action rule;
+- (b) makes a mandatory gate compensable by fit/confidence;
+- (c) weights a dimension without declaring its required evidence;
+- (d) admits a non-human principal into the approval chain;
+- (e) declares action constraints (salary/level/role/location) that the approval
+  chain is not authorized to grant;
+- (f) omits a required runtime-assurance check for a constrained action.
+
+### 3.3 The three artifacts
+
+| Artifact | Nature | Schema |
+|---|---|---|
+| **Hiring Policy** | human-authored declarative source | [`schemas/hiring_policy_source.schema.json`](schemas/hiring_policy_source.schema.json) |
+| **HiringWorkflowIR** | compiled, signed, content-addressed | [`schemas/hiring_workflow_ir.schema.json`](schemas/hiring_workflow_ir.schema.json) |
+| **Hiring Decision Contract** | deployable projection of one IR digest | [`schemas/hiring_decision_contract.schema.json`](schemas/hiring_decision_contract.schema.json) |
+
+A recommendation always cites the exact **contract version and IR digest** it
+was produced under; an action always cites the **action constraints** it was
+checked against.
 
 ---
 
 ## 4. Dimensions
 
-Dimensions are **role-scoped compatibility axes**, not universal layers. The RCP
-selects and weights them. Two dimensions from the legacy model are explicitly
-replaced.
+Dimensions are **role-scoped compatibility axes** emitted by the compiler into
+the IR — not universal layers. Two legacy dimensions are replaced.
 
-### 4.1 Replace *Culture Fit* → **Operating Environment Compatibility**
+### 4.1 *Culture Fit* → **Operating Environment Compatibility**
 
-Culture Fit is **deleted.** It measured *personal similarity*, which is neither
-job-related nor defensible. Its replacement measures **operating-model
-compatibility**: can this person operate effectively in *this environment's
-operating reality?*
+Culture Fit (personal similarity — neither job-related nor defensible) is
+**deleted**. Its replacement measures **operating-model compatibility**: can this
+person operate effectively in *this environment's operating reality?*
 
-| Environment | Operating reality evaluated (examples) |
+| Environment | Operating reality evaluated |
 |---|---|
 | Startup | ambiguity tolerance, rapid change, experimentation |
 | Bank | governance, documentation discipline, regulatory controls |
 | Healthcare | patient safety, evidence orientation, compliance |
 
-This is **operating model compatibility, not personal similarity.** Evidence is
-behavioral and situational (worked-samples, structured-interview behavioral
-probes, references keyed to operating conditions) — never affinity or
-demographic proxy.
+Evidence is behavioral/situational (work samples, structured-interview behavioral
+probes, references keyed to operating conditions) — never affinity or demographic
+proxy.
 
-### 4.2 Replace *Resilience* → **Role Sustainability & Adaptation**
+### 4.2 *Resilience* → **Role Sustainability & Adaptation**
 
-Resilience (a psychological inference) is **deleted.** Its replacement is
-**Role Sustainability & Adaptation**, and it is **primarily measured *after*
-hiring** against observed outcomes, not inferred pre-hire:
+Resilience (a psychological inference) is **deleted**. Its replacement is
+**Role Sustainability & Adaptation**, measured **primarily post-hire** at 1/3/6/12
+months against observed outcomes (onboarding, manager reviews, performance-goal
+attainment, collaboration, delivery, retention). **No psychological inference.**
+Pre-hire it is typically `INSUFFICIENT_EVIDENCE`; its real signal is the
+reconciliation loop (§11–§12).
 
-```
-Hiring → 1-Month → 3-Month → 6-Month → 12-Month  (§10)
-```
+### 4.3 Dimension evidence — the only thing the Authority sees
 
-Evidence: onboarding progress, manager reviews, performance-goal attainment,
-collaboration signals, delivery, retention. **No psychological inference.**
-Pre-hire, this dimension is typically `INSUFFICIENT_EVIDENCE` and contributes a
-small advisory weight at most; its real signal is the calibration loop.
-
-### 4.3 Every dimension carries evidence and confidence
-
-There are no bare scores. Each dimension assessment is the tuple:
-
-```
-{ dimension, score, confidence, evidence[], reason_codes[], gaps[] }
-```
-
-Example:
-
-```
-Technical    score 92  confidence 0.97  evidence[Assessment, Portfolio, Projects, Certifications]
-Leadership   score 81  confidence 0.54  evidence[Structured Interview, Manager References]
-```
-
-The Decision Authority reasons over **(evidence, confidence)**, not over score
-alone. A high score at low confidence is a *request for more evidence*, never a
-license to decide. Confidence below the RCP floor ⇒ `INSUFFICIENT_EVIDENCE`.
+Each dimension is the tuple `{dimension, score, confidence, evidence[], reason_codes[], gaps[]}`.
+The Decision Authority reasons over **(evidence, confidence, mandatory gates,
+contract)** — never a fit score (§7). Confidence below the IR floor ⇒
+`INSUFFICIENT_EVIDENCE`.
 
 **Schema:** [`schemas/dimension_assessment.schema.json`](schemas/dimension_assessment.schema.json)
 
@@ -261,45 +260,17 @@ license to decide. Confidence below the RCP floor ⇒ `INSUFFICIENT_EVIDENCE`.
 
 ## 5. Evidence model and TAP admission
 
-### 5.1 Admission gate
+Evidence enters scoring **only if admitted** by the Truth Assurance Pipeline
+(E1 Intent · E2 Trusted Retrieval · E3 Relationship Truth · E4 Governance
+Resolution · E5 Evidence Assembly). Rejected evidence is provably **inert** —
+it may not be cited by any dimension, gate, recommendation, or action. Protected
+/ prohibited fields are quarantined at admission (fail-closed) and can never
+reach scoring. Every admitted item is an append-only **Evidence Lineage** node;
+every score and gate result cites the exact nodes it consumed.
 
-Evidence enters scoring **only if admitted** by the Truth Assurance Pipeline.
-Admission is per-item and produces an **admission decision** with reason. Only
-admitted evidence may influence any dimension; **rejected evidence must have no
-effect on any assessment, gate, index, or recommendation**, and its rejection is
-itself recorded.
-
-Evidence classes (admissible set is role-configurable):
-
-```
-Resume · Portfolio · Interview · Coding Assessment · Reference Check ·
-Background Check · Certification · Employment History
-```
-
-### 5.2 TAP stages (reused, not reinvented)
-
-The hiring vertical reuses the platform TAP stages rather than defining its own:
-
-| TAP stage | Hiring meaning |
-|---|---|
-| E1 Intent | what claim the evidence is offered to support |
-| E2 Trusted Retrieval | source authenticity / chain-of-custody |
-| E3 Relationship Truth | does the evidence actually support the claimed dimension |
-| E4 Governance Resolution | admissibility under the RCP's `required_evidence` + prohibited-field policy |
-| E5 Evidence Assembly | assemble the admitted bundle with lineage |
-
-### 5.3 Evidence Lineage
-
-Every admitted item is a node in an append-only **Evidence Lineage DAG**:
-`raw submission → normalization → admission → dimension citation`. Every
-dimension score cites the exact lineage node IDs it consumed, so any score is
-reconstructable to its sources (§15.2).
-
-### 5.4 Prohibited fields
-
-Protected-attribute and other prohibited fields are quarantined at admission and
-can never reach a dimension, a gate, or the index. Quarantine is fail-closed and
-audited.
+Evidence classes: `RESUME · PORTFOLIO · INTERVIEW · CODING_ASSESSMENT ·
+REFERENCE_CHECK · BACKGROUND_CHECK · CERTIFICATION · EMPLOYMENT_HISTORY`
+(admissible set is compiled per role into the IR).
 
 **Schema:** [`schemas/evidence_record.schema.json`](schemas/evidence_record.schema.json)
 
@@ -307,493 +278,508 @@ audited.
 
 ## 6. Mandatory Gates — non-compensatory
 
-### 6.1 Principle (ActionGate parity)
-
-Mandatory gates mirror the platform **ActionGate**: a conjunction of hard
-predicates that must **all** pass. **Failure of any one gate cannot be
-compensated by high compatibility, high confidence, or a high Overall Fit
-Index.** This is the eligibility firewall.
+Mandatory gates mirror the platform **ActionGate** predicate model: a
+conjunction of hard predicates over **admitted evidence** that must **all**
+pass. **No fit, confidence, or Overall Fit Index can buy back a failed gate.**
 
 ```
 Overall Fit 96 · Security Clearance FAILED  ⇒  NOT_ELIGIBLE
 ```
 
-### 6.2 Gate catalog (examples)
+Catalog (examples): `REQUIRED_SKILLS · REQUIRED_CERTIFICATIONS · WORK_AUTHORIZATION
+· SECURITY_CLEARANCE · INTERVIEW_COMPLETED · ASSESSMENT_COMPLETED · REQUIRED_EXPERIENCE`.
+Each gate has an explicit fail-closed `INDETERMINATE` (deciding evidence never
+admitted), which blocks eligibility exactly as `FAILED` and is resolvable only by
+admitting evidence.
 
 ```
-Required Skills · Required Certifications · Work Authorization ·
-Security Clearance · Interview Completed · Assessment Completed ·
-Required Experience
+eligibility = ELIGIBLE            iff ∀g: PASSED
+            = NOT_ELIGIBLE        if  ∃g: FAILED
+            = ELIGIBILITY_PENDING if  ∃g: INDETERMINATE (and none FAILED)
 ```
-
-Each gate is a typed predicate over **admitted evidence** with an explicit
-`unknown` outcome (fail-closed): a gate whose deciding evidence was never
-admitted is `INDETERMINATE`, and an `INDETERMINATE` mandatory gate blocks
-eligibility exactly as a `FAILED` gate does (it may be resolved by admitting the
-missing evidence, never by fit).
-
-### 6.3 Evaluation semantics
-
-```
-eligibility = ELIGIBLE          iff  ∀ g ∈ mandatory_gates: g.status == PASSED
-            = NOT_ELIGIBLE      if   ∃ g: g.status == FAILED
-            = ELIGIBILITY_PENDING if ∃ g: g.status == INDETERMINATE  (and none FAILED)
-```
-
-Gates are evaluated by the Decision Authority against the Decision Contract, are
-independent of dimension weights, and each gate result carries the evidence
-lineage that decided it.
 
 **Schema:** [`schemas/mandatory_gate.schema.json`](schemas/mandatory_gate.schema.json)
 
 ---
 
-## 7. Overall Fit Index — non-binding
+## 7. Overall Fit Index — analytics only
 
-### 7.1 Construction
+### 7.1 It never enters the Decision Authority
 
-The **Overall Fit Index (OFI)** is the RCP-weighted aggregation of *scored*
-dimensions. It exists for triage and communication and is **NON-BINDING by
-construction.** It is surfaced only as a **range**:
+The **Overall Fit Index (OFI)** is the weighted aggregation of scored dimensions,
+used for **Hiring Analytics only**:
 
 ```
-OFI 91 → HIGH        OFI 62 → MEDIUM        OFI 38 → LOW
+Hiring Funnel · Department Heatmap · Average Candidate Quality ·
+Role Distribution · Historical Comparison
 ```
 
-### 7.2 Hard prohibitions
+It is **not** passed to the Decision Authority in any form. The Decision
+Authority's inputs are exactly: **Dimension Evidence · Mandatory Gates ·
+Confidence · Decision Contract.** There is no "range label on the policy path"
+compromise (Revision 1) — the OFI is architecturally separated into the
+Analytics plane and the compiler rejects any contract that references it (§3.2a).
 
-- No policy, gate, or recommendation rule may read the numeric OFI.
-- The Decision Authority receives the **range label only**, never the number, on
-  its decision path (the number is display metadata).
-- `overall_fit > T ⇒ ADVANCE` is a **forbidden construction** and is blocked in
-  the Policy Compiler (§16) — a Decision Contract that references OFI in a gate
-  or eligibility rule fails compilation.
+### 7.2 Analytics plane
 
-### 7.3 Confidence-aware ranges
-
-The range is qualified by aggregate confidence: an OFI computed largely from
-low-confidence dimensions is reported as e.g. `MEDIUM (low confidence)` so a
-reviewer never reads a crisp band off soft evidence.
+The Analytics plane consumes dimension assessments (post-decision or in parallel)
+to produce cohort/funnel/heatmap metrics. It has **read-only** access to
+assessments and **no write path** into contracts, gates, recommendations, or
+actions.
 
 ---
 
-## 8. Hiring Decision Contract (HDC)
+## 8. Decision Authority and the Hiring Recommendation
 
-### 8.1 Role
-
-The Decision Authority evaluates a **Decision Contract, not scores.** The HDC is
-the versioned, compiled, auditable policy object for a role. It is the hiring
-specialization of the platform's Decision Contract / RiskDecisionCase pattern.
-
-### 8.2 Contents
-
-```
-Hiring Decision Contract
-├── role_ref                 (job definition + RCP version it binds)
-├── mandatory_gates[]        (references into the RCP gate catalog; §6)
-├── dimension_weights        (references RCP; advisory OFI only; §7)
-├── evidence_requirements[]  (per dimension required + admissibility; §5)
-├── confidence_thresholds    (per dimension minimum_confidence; §4.3)
-├── review_schedule          (1/3/6/12-month cadence; §10)
-├── approval_chain           (who may approve the recommendation → binding decision)
-└── version                  (immutable once PUBLISHED)
-```
-
-### 8.3 Compilation and enforcement
-
-The HDC is compiled by the **Policy Compiler** into an executable evaluation
-plan. Compilation **rejects** any contract that (a) references the numeric OFI in
-a gate/eligibility rule, (b) makes a mandatory gate compensable, (c) omits
-required evidence for a weighted dimension, or (d) permits an AI principal in the
-approval chain. A recommendation always cites the exact HDC version it was
-produced under.
-
-**Schema:** [`schemas/hiring_decision_contract.schema.json`](schemas/hiring_decision_contract.schema.json)
-
----
-
-## 9. Decision Authority and the Hiring Recommendation
-
-### 9.1 Decision Authority
-
-The Decision Authority is the policy-driven evaluator. Given `(admitted evidence,
-dimension assessments, HDC version)` it produces the **Hiring Recommendation** —
-deterministically, explainably, and without any black-box ranking. It never
-mutates evidence or assessments; it *reads* them and *evaluates the contract.*
-
-### 9.2 Recommendation payload
-
-A Hiring Recommendation contains, and an audit consumer can reconstruct from it:
+Given `(admitted dimension evidence, mandatory-gate results, confidence,
+compiled contract)` the Decision Authority produces the **Hiring Recommendation**
+deterministically and explainably — no black-box ranking, no fit score input.
 
 ```
 Hiring Recommendation
 ├── compatibility_assessment   (dimension tuples; §4.3)
 ├── eligibility                (ELIGIBLE / NOT_ELIGIBLE / ELIGIBILITY_PENDING)
-├── mandatory_gates[]          (per-gate status + deciding lineage; §6)
-├── evidence_lineage           (DAG node refs backing every claim; §15.2)
-├── confidence                 (per-dimension + aggregate; §4.3)
-├── decision_contract_version  (§8)
-├── approval_chain             (required approvers; §8.2)
-├── overall_fit_range          (label only; §7)
+├── mandatory_gates[]          (status + deciding lineage; §6)
+├── evidence_lineage           (DAG node refs backing every claim)
+├── confidence                 (per-dimension + aggregate)
+├── decision_contract_version  (+ compiled_from IR digest)
+├── proposed_action            (level, salary, role, location — within contract constraints)
+├── approval_chain             (human approvers)
 ├── recommendation             (ADVANCE / HOLD / DECLINE / NOT_ELIGIBLE)
-└── explanation                (structured reason tree, human-readable)
+└── explanation                (structured reason tree)
 ```
 
-The `recommendation` value is **advisory**. `NOT_ELIGIBLE` is forced whenever
-eligibility ≠ ELIGIBLE regardless of fit. `ADVANCE/HOLD/DECLINE` are only
-proposed among eligible candidates.
-
-### 9.3 Binding decision
-
-A binding **Employment Decision** is recorded only by an **authenticated human**
-in the HDC's approval chain. The decision references the recommendation and HDC
-version, carries a job-related rationale, and — if it departs from the
-recommendation — an explicit **Override** that *preserves* (never rewrites) the
-recommendation. An AI/service principal attempting to author a decision is
-rejected and audited as a security violation.
+`NOT_ELIGIBLE` is forced whenever eligibility ≠ ELIGIBLE. A binding **Employment
+Decision** is recorded only by an authenticated human in the contract's approval
+chain, references the recommendation + contract version, carries a job-related
+rationale, and — if it departs from the recommendation — an explicit **Override**
+that preserves the recommendation. AI/service principals are rejected and audited.
 
 **Schema:** [`schemas/hiring_recommendation.schema.json`](schemas/hiring_recommendation.schema.json)
 
 ---
 
-## 10. Review lifecycle and closed-loop calibration
+## 9. Hiring ActionGate
 
-### 10.1 Every decision becomes a prediction
+### 9.1 The action must match the contract
 
-A hiring decision is a **prediction** to be measured against observed outcomes:
+Before any HRIS/ATS write, the **Hiring ActionGate** verifies the **final
+action exactly matches the approved contract's action constraints** — salary,
+level, role, location, and approvals. Any deviation is **DENIED** and requires
+**reauthorization** (a new/updated decision within an authorized contract).
+
+```
+Contract: salary ≤ $220K   →  Offer $250K   ⇒  DENY (reauthorization required)
+Contract: approved level L5 →  Offer L6      ⇒  DENY
+Contract: role = Architect  →  Offer = EM     ⇒  DENY
+Contract: location ∈ {NYC}  →  Offer = Remote-EU ⇒ DENY
+```
+
+### 9.2 Semantics
+
+```
+ActionGate(action, contract) =
+  ALLOW               if action ⊑ contract.action_constraints  ∧ approvals complete
+  DENY_REAUTH         if action ⊄ contract.action_constraints  (deviation)
+  DENY_APPROVAL       if approvals incomplete/expired
+```
+
+Each verdict carries the offending field(s), the constraint it violated, and the
+contract/IR it was checked against, and is audited. ActionGate is the platform
+ActionGate specialized to hiring actions — same deny-by-deviation model.
+
+**Schema:** [`schemas/hiring_actiongate.schema.json`](schemas/hiring_actiongate.schema.json)
+
+---
+
+## 10. Hiring Runtime Assurance
+
+Immediately **before writing to the HRIS/ATS** (ServiceNow, Workday, SAP,
+Oracle), **Runtime Assurance** re-validates that the world still satisfies the
+contract at write time — catching drift between decision and execution:
+
+- approvals still valid (not rescinded/expired);
+- references completed;
+- background check still current (not stale/expired);
+- offer not expired;
+- salary policy still satisfied (bands unchanged since approval);
+- headcount/requisition still open.
+
+A failed check **blocks the write** (hold + remediate), never a silent write.
+Runtime Assurance is the same platform pattern used before any governed external
+write — hiring is one consumer.
 
 ```mermaid
 flowchart LR
-    P[Prediction at hire<br/>dimension scores + OFI range] --> H[Hiring]
-    H --> R1[1-Month Review] --> R3[3-Month] --> R6[6-Month] --> R12[12-Month]
-    R12 --> C[Calibration]
-    C -. adjusts .-> HDC[Decision Contract / RCP weights & thresholds]
+    D[Employment Decision] --> AG[ActionGate: action==contract]
+    AG -- ALLOW --> RA{Runtime Assurance}
+    RA -->|approvals valid| c1
+    RA -->|references complete| c2
+    RA -->|bg check current| c3
+    RA -->|offer not expired| c4
+    RA -->|salary policy ok| c5
+    RA -->|req still open| c6
+    c1 & c2 & c3 & c4 & c5 & c6 --> PASS{all pass?}
+    PASS -- yes --> W[HRIS/ATS write]
+    PASS -- no --> H[Block + remediate]
 ```
 
-### 10.2 Predicted vs observed
+**Schema:** [`schemas/hiring_runtime_assurance.schema.json`](schemas/hiring_runtime_assurance.schema.json)
 
-At each review, observed outcomes are recorded and compared to prediction:
+---
+
+## 11. Execution Receipt + Hiring Reconciliation Record
+
+### 11.1 Execution Receipt
+
+The HRIS/ATS write is dispatched through a provider-neutral port and produces an
+immutable **Hiring Execution Receipt**: what was attempted vs what was observed,
+the target system, the contract/IR/decision it realized, and the outcome
+(`SUCCEEDED / FAILED / OUTCOME_UNKNOWN`). Authorization ≠ execution; a timeout is
+`OUTCOME_UNKNOWN`, not success; compensation is a governed proposal, never an
+automatic rollback.
+
+**Schema:** [`schemas/hiring_execution_receipt.schema.json`](schemas/hiring_execution_receipt.schema.json)
+
+### 11.2 Reconciliation — identical shape to Runtime Assurance
+
+Reconciliation closes the governance loop, mirroring the platform Reconciliation
+pattern (predicted → actual → calibration):
+
+```mermaid
+flowchart LR
+    HDC[Decision Contract] --> HIRE[Hire]
+    HIRE --> RCPT[Execution Receipt]
+    RCPT --> R90[1/3/6/12-month Reviews<br/>incl. 90-day trajectory]
+    R90 --> TRJ[Trajectory]
+    TRJ --> RCN[Hiring Reconciliation Record]
+    RCN --> Q{answers}
+    Q --> q1[Why was this candidate hired?]
+    Q --> q2[Did the prediction hold?]
+    Q --> q3[Which evidence was wrong?]
+    Q --> q4[Which dimension failed?]
+    Q --> q5[Change policy / weight / gate?]
+    RCN -. calibrate .-> PWC[Recompile → new Contract version]
+```
+
+The **Hiring Reconciliation Record** links a decision's *predicted* dimension
+compatibility to *actual* outcomes and yields a governed calibration proposal
+that **recompiles the policy into a new contract version** — never tunes hidden
+model weights, never edits history.
+
+**Schema:** [`schemas/hiring_reconciliation_record.schema.json`](schemas/hiring_reconciliation_record.schema.json)
+
+---
+
+## 12. Review lifecycle and closed-loop calibration
+
+Every decision is a prediction measured at 1/3/6/12 months (§11.2). Predicted vs
+observed per dimension:
 
 ```
 Technical   predicted 92   observed 95    Δ +3   (well-calibrated)
 Growth      predicted 86   observed 62    Δ -24  (over-predicted → recalibrate)
 ```
 
-### 10.3 What calibration changes
-
-Calibration improves **explicit, versioned artifacts** — RCP weights,
-confidence thresholds, evidence requirements, gate definitions — via the
-governed author→approve→publish path. It **never** tunes hidden neural weights,
-and it never edits a past recommendation (history is immutable; calibration
-produces the *next* contract version).
+Calibration edits **explicit, versioned artifacts** via the governed
+author→compile→sign→publish path — RCP dimension weights, confidence thresholds,
+evidence requirements, gate definitions, action constraints. It **never** tunes
+hidden neural weights and **never** edits a past recommendation; it produces the
+*next* IR digest and contract version.
 
 **Schema:** [`schemas/review_and_calibration.schema.json`](schemas/review_and_calibration.schema.json)
 
 ---
 
-## 11. Component architecture
+## 13. Component architecture
 
 ```mermaid
 flowchart TB
+    subgraph Author [Policy plane]
+      HP[Hiring Policy source] --> PWC[Hiring Policy Compiler] --> IR[HiringWorkflowIR] --> HDC[Decision Contract]
+    end
     subgraph Ingest [Evidence plane]
       IN[Intake] --> NORM[Normalization] --> TAPADM[TAP Admission] --> LIN[Evidence Lineage]
     end
-    subgraph Assess [Assessment plane — AI, advisory]
-      DA1[Dimension Assessor] --> OFIc[OFI Range Computer]
+    subgraph Assess [Compatibility plane — AI, advisory]
+      PCE[Professional Compatibility Engine<br/>dimension evidence]
     end
-    subgraph Author [Contract plane]
-      RCPsvc[RCP Service] --> HDCsvc[Decision Contract Service] --> PC[Policy Compiler]
+    subgraph Analytics [Analytics plane — read only]
+      OFI[Overall Fit Index<br/>funnels · heatmaps]
     end
     subgraph Decide [Authority plane]
-      DAUTH[Decision Authority] --> GATE[Mandatory Gate Evaluator]
-      DAUTH --> ELG[Eligibility] --> RECsvc[Recommendation Service]
-      HUM[Human Decision Service — binding]
+      DAUTH[Decision Authority] --> GATE[Mandatory Gate Evaluator] --> ELG[Eligibility] --> RECsvc[Recommendation]
+      HUM[Human Decision — binding]
     end
-    subgraph Act [Execution plane — reused kernel]
-      AR[Action Request] --> CER[CER Binding] --> AG[ActionGate] --> EXE[Execution] --> RCN[Reconciliation] --> RCPT[Execution Receipt]
+    subgraph Act [Action + assurance plane]
+      AG[Hiring ActionGate] --> RA[Runtime Assurance] --> WR[HRIS/ATS port] --> RCPT[Execution Receipt]
     end
-    subgraph Learn [Calibration plane]
-      REV[Review Lifecycle] --> CALIB[Calibration]
+    subgraph Learn [Reconciliation plane]
+      REV[Reviews 1/3/6/12] --> RCN[Reconciliation Record] --> CAL[Calibration proposal]
     end
-    LIN --> DA1
+    HDC --> DAUTH
+    LIN --> PCE
     LIN --> GATE
-    OFIc --> RECsvc
-    DA1 --> DAUTH
-    PC --> DAUTH
-    RECsvc --> HUM --> AR
-    HUM --> REV
-    CALIB -. next version .-> RCPsvc
+    PCE --> DAUTH
+    PCE -. read-only .-> OFI
+    RECsvc --> HUM --> AG
+    RCPT --> REV
+    CAL -. recompile .-> PWC
     AUD[(Append-only Audit + Lineage)]:::a
+    Author -.-> AUD
     Ingest -.-> AUD
-    Assess -.-> AUD
     Decide -.-> AUD
     Act -.-> AUD
     Learn -.-> AUD
     classDef a fill:#eee,stroke:#999;
 ```
 
-The **Execution plane** is the already-proven, domain-neutral governance kernel
-(action request → CER → ActionGate → execution → reconciliation → receipt). The
-hiring vertical **produces decisions into it**, it does not re-implement it.
+The Action + assurance plane and the kernel primitives (PWC, IR, Contract,
+Authority, ActionGate, Runtime Assurance, Receipt, Reconciliation) are the shared
+governance kernel; hiring supplies only domain models.
 
 ---
 
-## 12. Runtime flow
+## 14. Runtime flow
 
 ```mermaid
 sequenceDiagram
     autonumber
+    participant HR as HR (author)
+    participant PWC as Hiring Policy Compiler
     participant ATS as ATS / Source
     participant TAP as TAP Admission
-    participant AI as Dimension Assessor (AI)
+    participant PCE as Compatibility Engine (AI)
     participant DA as Decision Authority
-    participant HDC as Decision Contract (compiled)
     participant HM as Hiring Manager (human)
-    participant K as Governance Kernel
+    participant AG as Hiring ActionGate
+    participant RA as Runtime Assurance
+    participant HRIS as HRIS/ATS
+    participant RCN as Reconciliation
     participant AU as Audit + Lineage
 
-    ATS->>TAP: submit evidence (resume, assessment, references…)
-    TAP->>AU: admission decision per item (admitted / rejected + reason)
-    TAP->>AI: admitted evidence bundle (+lineage)
-    AI->>AU: dimension assessments {score, confidence, evidence, gaps}
-    AI->>DA: assessments + OFI range (label only)
-    DA->>HDC: load compiled contract vN
-    DA->>DA: evaluate mandatory gates over admitted evidence
-    DA->>DA: derive eligibility (non-compensatory)
-    DA->>AU: gate results + eligibility (+deciding lineage)
-    DA->>HM: Hiring Recommendation (compat, eligibility, lineage, explanation)
-    Note over HM: AI cannot author a binding decision
+    HR->>PWC: author Hiring Policy (declarative)
+    PWC->>AU: HiringWorkflowIR (signed, content-addressed) + Decision Contract vN
+    ATS->>TAP: submit evidence
+    TAP->>AU: admission per item (admitted/rejected + reason + lineage)
+    TAP->>PCE: admitted bundle
+    PCE->>AU: dimension assessments {score, confidence, evidence, gaps}
+    PCE-->>DA: dimension evidence + confidence (NO fit score)
+    PCE-->>AU: OFI emitted to Analytics only
+    DA->>DA: evaluate contract vN: gates → eligibility (non-compensatory)
+    DA->>HM: Hiring Recommendation (+lineage, +explanation, +proposed action within constraints)
+    Note over HM: AI cannot bind
     HM->>DA: binding Employment Decision (+rationale, +Override?)
-    DA->>AU: decision recorded (human actor, contract vN)
-    HM->>K: authorized action (offer/reject) → CER → ActionGate → execute → reconcile
-    K->>AU: Execution Receipt (attempted vs observed)
-    Note over HM,DA: 1/3/6/12-month reviews feed Calibration → HDC vN+1
+    HM->>AG: final action (salary, level, role, location, approvals)
+    AG->>AU: verdict ALLOW / DENY_REAUTH / DENY_APPROVAL
+    alt ALLOW
+      AG->>RA: proceed
+      RA->>AU: checks (approvals, references, bg-check, offer, salary policy, req)
+      alt all pass
+        RA->>HRIS: write
+        HRIS->>AU: Hiring Execution Receipt (attempted vs observed)
+      else blocked
+        RA->>HM: hold + remediate
+      end
+    else DENY
+      AG->>HM: reauthorization required
+    end
+    RCN->>AU: 1/3/6/12-month Reconciliation → calibration → recompile (Contract vN+1)
 ```
 
 ---
 
-## 13. State machines
+## 15. State machines
 
-### 13.1 Candidate workflow
+### 15.1 Candidate workflow
 
 ```mermaid
 stateDiagram-v2
     [*] --> PLANNED
     PLANNED --> SOURCED
     SOURCED --> EVIDENCE_ADMITTED : TAP admission
-    EVIDENCE_ADMITTED --> ASSESSED : AI dimension assessment
-    ASSESSED --> AUTHORITY_EVALUATED : Decision Authority (gates+eligibility)
-    AUTHORITY_EVALUATED --> RECOMMENDED : recommendation produced
-    RECOMMENDED --> IN_REVIEW : routed to approval chain
-    IN_REVIEW --> ADVANCED : human decision (eligible only)
+    EVIDENCE_ADMITTED --> ASSESSED : compatibility engine
+    ASSESSED --> AUTHORITY_EVALUATED : gates + eligibility
+    AUTHORITY_EVALUATED --> NOT_ELIGIBLE : any gate FAILED
+    AUTHORITY_EVALUATED --> RECOMMENDED
+    RECOMMENDED --> IN_REVIEW : approval chain
+    IN_REVIEW --> DECIDED_ADVANCE : human decision (eligible only)
     IN_REVIEW --> HOLD : human decision
     IN_REVIEW --> DECLINED : human decision
-    AUTHORITY_EVALUATED --> NOT_ELIGIBLE : any mandatory gate FAILED
-    HOLD --> IN_REVIEW
-    ADVANCED --> OFFERED --> ONBOARDED
+    DECIDED_ADVANCE --> ACTION_GATED : ActionGate
+    ACTION_GATED --> REAUTHORIZING : DENY (deviation/approval)
+    REAUTHORIZING --> ACTION_GATED : corrected action
+    ACTION_GATED --> RUNTIME_ASSURED : ALLOW
+    RUNTIME_ASSURED --> WRITE_BLOCKED : assurance check failed
+    WRITE_BLOCKED --> RUNTIME_ASSURED : remediated
+    RUNTIME_ASSURED --> HRIS_WRITTEN : write + receipt
+    HRIS_WRITTEN --> ONBOARDED
     ONBOARDED --> IN_LIFECYCLE_REVIEW : 1/3/6/12-month
+    IN_LIFECYCLE_REVIEW --> RECONCILED
+    HOLD --> IN_REVIEW
     NOT_ELIGIBLE --> [*]
     DECLINED --> [*]
-    IN_LIFECYCLE_REVIEW --> [*]
+    RECONCILED --> [*]
 ```
 
-- AI drives **no** binding transition.
-- `NOT_ELIGIBLE` is reachable directly from authority evaluation and is terminal
-  for the requisition (re-entry requires new admitted evidence resolving the
-  gate).
-- Only a human decision drives `ADVANCED/HOLD/DECLINED`.
-
-### 13.2 Eligibility sub-state
+### 15.2 Policy → contract lifecycle (PWC)
 
 ```mermaid
 stateDiagram-v2
-    [*] --> ELIGIBILITY_PENDING
-    ELIGIBILITY_PENDING --> ELIGIBLE : all gates PASSED
-    ELIGIBILITY_PENDING --> NOT_ELIGIBLE : any gate FAILED
-    ELIGIBILITY_PENDING --> ELIGIBILITY_PENDING : gate INDETERMINATE (await evidence)
-    NOT_ELIGIBLE --> ELIGIBILITY_PENDING : new admitted evidence resolves the gate
+    [*] --> AUTHORED : Hiring Policy drafted
+    AUTHORED --> COMPILING
+    COMPILING --> COMPILE_FAILED : rejected (§3.2)
+    COMPILE_FAILED --> AUTHORED
+    COMPILING --> IR_SIGNED : HiringWorkflowIR content-addressed + signed
+    IR_SIGNED --> CONTRACT_PUBLISHED : Decision Contract projected, immutable
+    CONTRACT_PUBLISHED --> DEPRECATED : superseded by recompiled version
 ```
 
-### 13.3 Contract / RCP publication lifecycle
-
-```mermaid
-stateDiagram-v2
-    [*] --> DRAFT
-    DRAFT --> IN_REVIEW
-    IN_REVIEW --> APPROVED
-    IN_REVIEW --> DRAFT : changes requested
-    APPROVED --> PUBLISHED : immutable, usable
-    PUBLISHED --> DEPRECATED : superseded by next version
-```
-
-Only `PUBLISHED` RCPs/HDCs may parameterize a live assessment or recommendation.
+### 15.3 Eligibility sub-state — as Revision 1 (§6): PENDING → ELIGIBLE / NOT_ELIGIBLE, INDETERMINATE self-loops until evidence admitted.
 
 ---
 
-## 14. API design
+## 16. API design
 
-Resource-oriented, versioned (`/v1`), every write audited, every read
-authorization-scoped by tenant/requisition. Illustrative surface:
+Resource-oriented, versioned (`/v1`), every write audited, reads tenant-scoped.
 
 | Method & path | Purpose | Authority |
 |---|---|---|
-| `POST /v1/roles/{role}/compatibility-profiles` | create RCP draft | author |
-| `POST /v1/compatibility-profiles/{id}:publish` | publish RCP version | approver |
-| `POST /v1/roles/{role}/decision-contracts` | create HDC draft | author |
-| `POST /v1/decision-contracts/{id}:compile` | Policy Compiler validation | system |
-| `POST /v1/decision-contracts/{id}:publish` | publish HDC version | approver |
+| `POST /v1/roles/{role}/policies` | author Hiring Policy | author |
+| `POST /v1/policies/{id}:compile` | PWC → HiringWorkflowIR (+digest, +signature) | system |
+| `GET  /v1/workflow-ir/{digest}` | fetch compiled IR by content address | reviewer |
+| `POST /v1/policies/{id}:publish-contract` | project + publish Decision Contract | approver |
 | `POST /v1/candidates/{id}/evidence` | submit evidence → TAP admission | service |
 | `GET  /v1/candidates/{id}/assessment` | dimension assessments (advisory) | reviewer |
 | `POST /v1/candidates/{id}/recommendation` | Decision Authority evaluation | system |
 | `GET  /v1/candidates/{id}/recommendation` | recommendation (+lineage +explanation) | reviewer |
-| `POST /v1/candidates/{id}/decision` | **binding** employment decision | **human** in approval chain |
-| `POST /v1/candidates/{id}/reviews` | record 1/3/6/12-month observed outcome | manager |
-| `GET  /v1/candidates/{id}/audit` | evidence lineage + audit trail | auditor |
+| `POST /v1/candidates/{id}/decision` | **binding** employment decision | **human** in chain |
+| `POST /v1/candidates/{id}/action:gate` | ActionGate verdict on final action | system |
+| `POST /v1/candidates/{id}/action:assure` | Runtime Assurance pre-write checks | system |
+| `POST /v1/candidates/{id}/action:write` | dispatch HRIS/ATS write → Receipt | system (post-gate+assure) |
+| `POST /v1/candidates/{id}/reviews` | record 1/3/6/12-month outcome | manager |
+| `GET  /v1/candidates/{id}/reconciliation` | reconciliation record + calibration proposal | auditor |
+| `GET  /v1/analytics/*` | OFI funnels/heatmaps (read-only) | analyst |
 
-**Enforcement rules baked into the API:**
+Enforcement baked in: the `decision` endpoint rejects non-human principals
+(401/403 + audited security event); `action:write` refuses unless a passing
+ActionGate **and** Runtime Assurance result exist; recommendation/authority
+responses **never** carry the OFI.
 
-- The `decision` endpoint rejects any non-human principal (401/403 + audited
-  security event) and requires the actor to be in the HDC approval chain.
-- The `recommendation` response carries the OFI **range label only**; the number
-  is a separate display field never consumed by policy.
-- Every mutating endpoint emits a correlation-/causation-linked audit event.
-
-**Schema:** request/response envelopes in
-[`schemas/api_contracts.schema.json`](schemas/api_contracts.schema.json)
-
----
-
-## 15. Audit model, lineage, receipts
-
-### 15.1 Append-only audit
-
-Every stage (admission, assessment, gate evaluation, eligibility, recommendation,
-decision, action, reconciliation, review, calibration) emits an immutable
-`AuditEvent` with `correlation_id`, `causation_id`, `actor`, and a
-`payload_hash`. Events are hash-chainable (`previous_event_hash`) for tamper
-evidence.
-
-### 15.2 Evidence Lineage
-
-The Evidence Lineage DAG lets any claim be reconstructed: given a recommendation,
-an auditor can walk each dimension score → cited lineage nodes → admission
-decision → normalized artifact → raw submission. Rejected evidence appears in
-lineage as rejected-with-reason and provably influenced nothing downstream.
-
-### 15.3 Execution Receipt
-
-When a binding decision drives an enterprise action (offer, reject letter, ATS
-status change) through the kernel, the **Execution Receipt** records *attempted
-vs observed* outcome. Authorization ≠ execution; a timeout is `OUTCOME_UNKNOWN`,
-not success; compensation is a governed proposal, never an automatic rollback.
+**Schema:** [`schemas/api_contracts.schema.json`](schemas/api_contracts.schema.json)
 
 ---
 
-## 16. Governance alignment map
+## 17. Audit, lineage, receipts
 
-| Ugence artifact | Hiring Decision Authority usage |
+Every stage emits an immutable, hash-chainable `AuditEvent` (`correlation_id`,
+`causation_id`, `actor`, `payload_hash`). Any claim reconstructs via the Evidence
+Lineage DAG (dimension score → cited nodes → admission → normalized → raw).
+Rejected evidence appears as rejected-with-reason and provably influenced
+nothing. The Execution Receipt records attempted-vs-observed for every HRIS/ATS
+write; the Reconciliation Record links prediction to outcome. IR digests make
+policy provenance reproducible.
+
+---
+
+## 18. Governance alignment map
+
+| Ugence artifact | Hiring usage |
 |---|---|
-| **Decision Authority** | evaluates the HDC to produce the governed recommendation |
-| **ActionGate** | pattern for non-compensatory mandatory gates; and the runtime gate for the resulting action |
-| **Decision Contract / RiskDecisionCase** | the Hiring Decision Contract is the hiring specialization |
+| **Policy Workflow Compiler (PWC)** | Hiring Policy Compiler → HiringWorkflowIR |
+| **WorkflowIR** | `hiring_workflow_ir.v1` — signed, content-addressed |
+| **Decision Contract / RiskDecisionCase** | Hiring Decision Contract (projection of an IR digest) |
+| **Decision Authority** | evaluates the contract over dimension evidence + gates |
 | **TAP** | evidence admission (E1–E5) |
 | **Evidence Lineage** | per-claim reconstructable DAG |
-| **Runtime Assurance** | guards the AI assessor's outputs (schema-valid, in-range, confidence-qualified) before the Authority consumes them |
-| **Policy Compiler** | compiles/validates the HDC; blocks the forbidden `OFI→policy` construction |
-| **Reconciliation** | attempted-vs-observed for post-decision actions |
-| **Execution Receipt** | immutable record of action outcome |
+| **ActionGate** | Hiring ActionGate — action == contract or DENY |
+| **Runtime Assurance** | pre-write validation before HRIS/ATS |
+| **Execution Receipt** | Hiring Execution Receipt (attempted vs observed) |
+| **Reconciliation** | Hiring Reconciliation Record → contract calibration |
 
-Same terminology, same artifacts, same authority boundaries as the rest of the
-platform — the hiring vertical is a *producer of governed decisions into the
-shared kernel*, not a parallel stack.
-
----
-
-## 17. Security model
-
-- **Authority separation.** AI principal type can hold `RECOMMEND` capability
-  but never `DECIDE`; the type system and the API both enforce it.
-- **Fail-closed evidence.** Unadmitted/ambiguous evidence never scores; missing
-  gate evidence ⇒ `INDETERMINATE` ⇒ blocks eligibility.
-- **Prohibited-field quarantine.** Protected attributes are stripped at
-  admission and cannot reach any dimension, gate, or index.
-- **Tenant isolation.** Evidence, assessments, and recommendations are scoped by
-  tenant/requisition; search is authorization-aware and non-leaking.
-- **Immutability.** Published contracts, recommendations, decisions, audit events
-  are immutable; changes are new versions.
-- **Tamper evidence.** Hash-chained audit; lineage reconstruction for every claim.
-- **Least authority in the approval chain.** Only named human approvers can bind;
-  the chain is part of the compiled, versioned contract.
+Same terminology, same artifacts, same authority boundaries as every other
+Decision Authority domain.
 
 ---
 
-## 18. Enterprise deployment
+## 19. Security model
 
-- **Isolation.** The module deploys as an isolated vertical over the shared
-  governance kernel; no hard dependency on the platform's research code paths.
-- **Persistence.** Ports are defined for evidence artifacts, lineage, contracts,
-  recommendations, decisions, reviews; in-memory adapters for dev/test, durable
-  adapters (RDBMS + object store for artifacts) for production.
-- **Integrations.** ATS/HRIS attach as evidence *sources* (into TAP) and action
-  *sinks* (out of the kernel via provider-neutral ports); no vendor SDK in the
-  core.
-- **Configuration.** RCPs and HDCs are data, authored per role/tenant; no code
-  change to onboard a new role.
-- **Observability.** Every plane emits audit + metrics; calibration dashboards
-  compare predicted vs observed across cohorts.
-- **Rollout.** Shadow mode first (assessments + recommendations produced, no
-  binding path enabled), then human-in-the-loop binding, then calibration loop
-  activation.
+- **Authority separation** — AI may `RECOMMEND`, never `DECIDE`; enforced in types + API.
+- **Signed, reproducible policy** — IR is content-addressed and signed; a contract cites its IR digest; tampering is detectable.
+- **Deny-by-deviation** — ActionGate denies any action outside contract constraints; Runtime Assurance blocks stale-world writes.
+- **Fail-closed evidence** — unadmitted/ambiguous evidence never scores; missing gate evidence ⇒ INDETERMINATE ⇒ blocks eligibility.
+- **Prohibited-field quarantine** — protected attributes stripped at admission.
+- **OFI isolation** — analytics plane has no write path into decisions/actions.
+- **Tenant isolation + immutability + hash-chained audit** — as the platform.
 
 ---
 
-## 19. Migration from the current module
+## 20. Enterprise deployment
+
+- **Isolation** — deploys as one Decision Authority domain over the shared kernel.
+- **Persistence** — ports for policy/IR/contract, evidence artifacts + lineage, recommendations, decisions, gate/assurance results, receipts, reviews, reconciliation; in-memory for dev, durable (RDBMS + object store) for prod.
+- **Integrations** — ATS/HRIS attach as evidence *sources* (into TAP) and write *sinks* (ServiceNow, Workday, SAP, Oracle) behind provider-neutral ports; no vendor SDK in core.
+- **Configuration is policy, not code** — new roles onboard by authoring + compiling a policy.
+- **Rollout** — shadow (assess + recommend, no write), then human-bound writes behind ActionGate + Runtime Assurance, then activate reconciliation calibration.
+
+---
+
+## 21. Migration plan
 
 The existing module already implements the governed spine (advisory/binding
-separation, evidence pipeline, decision cases, action requests, CER,
-reconciliation, TAP hooks). Reconstruction is therefore a **re-founding of the
-assessment and contract planes on top of the kept kernel**, not a rewrite of the
-kernel.
+split, evidence pipeline, decision cases, action requests, CER, reconciliation,
+TAP hooks). Reconstruction re-founds the **policy, action-assurance, and
+reconciliation planes**; it does not rewrite the kernel.
 
 | Current | Target |
 |---|---|
-| Fixed 10 `CapabilityLayer` universal layers | role-scoped RCP dimensions; no universal set |
-| `LayerScore` (score+confidence+evidence) | `DimensionAssessment` — kept and generalized |
-| `weighted_summary (non-binding)` | Overall Fit Index **range** (label-only on policy path) |
-| implicit eligibility | explicit **Mandatory Gates** + `Eligibility` object |
-| `DecisionCase` aggregate | retained; gains HDC-version + gate/eligibility records |
-| `Recommendation`/`Decision` split | retained (this is already the invariant) |
-| n/a | **Role Compatibility Profile**, **Hiring Decision Contract**, **Calibration** planes (new) |
+| Fixed 10 universal `CapabilityLayer` | role-scoped dimensions emitted by the PWC into the IR |
+| hand-authored Role Compatibility Profile | **Hiring Policy (declared) → PWC → HiringWorkflowIR → Decision Contract** |
+| `LayerScore` | `DimensionAssessment` (kept, generalized) |
+| `weighted_summary` on decision path | **OFI in Analytics plane only**; removed from Authority inputs |
+| implicit eligibility | explicit Mandatory Gates + Eligibility |
+| action request → CER → authorization | + **Hiring ActionGate** (action==contract) + **Runtime Assurance** (pre-write) |
+| execution + reconciliation | + **Execution Receipt** + **Reconciliation Record** → recompile |
 
-**Sequencing:** (1) land RCP + HDC contracts and the Policy Compiler checks;
-(2) generalize `LayerScore`→`DimensionAssessment` and remove the universal layer
-enum in favor of RCP-selected dimensions; (3) add the Mandatory Gate evaluator +
-Eligibility object; (4) make OFI range-only on the policy path; (5) add the
-review/calibration plane; (6) deprecate the universal-scoring surfaces.
+**Sequencing:**
+1. Land the **Hiring Policy source** schema + **PWC** producing a signed
+   **HiringWorkflowIR**; project the **Decision Contract** from the IR; wire the
+   compile-time rejections (§3.2).
+2. Generalize `LayerScore`→`DimensionAssessment`; remove the universal layer enum
+   in favor of IR-emitted dimensions; add Operating Environment Compatibility and
+   Role Sustainability & Adaptation.
+3. Add the **Mandatory Gate evaluator** + **Eligibility** object; make the
+   Decision Authority consume only `(dimension evidence, gates, confidence,
+   contract)`.
+4. Move OFI into the **Analytics plane**; remove it from all decision/authority
+   inputs; add compiler check (§3.2a).
+5. Add **Hiring ActionGate** + **Runtime Assurance** in front of the HRIS/ATS
+   write ports.
+6. Add **Execution Receipt** + **Reconciliation Record**; wire the 1/3/6/12-month
+   reviews to a calibration proposal that recompiles the policy.
+7. Deprecate universal-scoring surfaces and hand-authored profiles.
 
 ---
 
-## 20. Glossary
+## 22. Glossary
 
-- **Compatibility Assessment** — advisory, evidence-backed, per-dimension fit.
-- **Eligibility** — boolean conjunction of mandatory gates; non-compensatory.
-- **Role Compatibility Profile (RCP)** — versioned, per-role weights + required
-  evidence + confidence floors + gate refs + HDC version.
-- **Hiring Decision Contract (HDC)** — versioned, compiled policy the Decision
-  Authority evaluates.
+- **Hiring Policy** — declarative, human-authored role requirements (compiler source).
+- **Hiring Policy Compiler (PWC)** — compiles a policy into a signed IR.
+- **HiringWorkflowIR** — versioned, content-addressed, signed compiled artifact.
+- **Hiring Decision Contract** — deployable projection of one IR digest.
+- **Professional Compatibility Engine** — AI engine producing dimension evidence.
 - **Mandatory Gate** — hard, non-compensatory requirement predicate.
-- **Overall Fit Index (OFI)** — advisory, non-binding, surfaced as a range.
-- **Decision Authority** — policy-driven evaluator that produces the governed
-  recommendation.
-- **Employment Decision** — the binding, human-authored outcome.
-- **Evidence Lineage** — append-only DAG making every claim reconstructable.
-- **Calibration** — governed adjustment of RCP/HDC from predicted-vs-observed.
+- **Overall Fit Index (OFI)** — analytics-only aggregate; never enters the Authority.
+- **Decision Authority** — evaluates the contract over dimension evidence + gates.
+- **Hiring ActionGate** — denies any action deviating from contract constraints.
+- **Runtime Assurance** — pre-write validation of approvals/references/checks/offer/policy.
+- **Execution Receipt** — immutable attempted-vs-observed record of the HRIS/ATS write.
+- **Hiring Reconciliation Record** — predicted-vs-actual outcome linkage driving recompilation.
 
 ---
 
-*This specification reconstructs the hiring vertical as a Hiring Decision
-Authority: AI produces structured, explainable, evidence-backed recommendations,
-while a policy-driven Decision Authority makes the governed hiring recommendation
-through explicit, auditable decision contracts, and only a human holds binding
-authority. It is intended to be read alongside the machine-readable schemas in
-[`schemas/`](schemas/).*
+*Hiring becomes another governed Decision Authority domain — Policy → Compiled
+Decision Contract → Evidence → Decision Authority → ActionGate → Runtime
+Assurance → Execution Receipt → Reconciliation — on the same kernel as
+Procurement, Financial, Clinical, and Agent Decision Authority. Read alongside
+the normative schemas in [`schemas/`](schemas/).*

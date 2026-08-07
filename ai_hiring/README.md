@@ -8,18 +8,34 @@
 > human holds binding authority.**
 >
 > The reconstruction specification is
-> [`docs/HIRING_DECISION_AUTHORITY_DESIGN_SPEC.md`](docs/HIRING_DECISION_AUTHORITY_DESIGN_SPEC.md),
-> with normative data contracts in [`docs/schemas/`](docs/schemas/). It removes
-> universal candidate scoring; introduces per-role **Role Compatibility
-> Profiles** and **Hiring Decision Contracts**; replaces *Culture Fit* with
-> **Operating Environment Compatibility** and *Resilience* with **Role
-> Sustainability & Adaptation**; separates **Compatibility from Eligibility**;
-> makes the **Overall Fit Index non-binding**; enforces **non-compensatory
-> mandatory gates**; admits evidence only through **TAP**; and closes the loop
-> with **1/3/6/12-month calibration**. The Phase 1–4C notes below document the
+> [`docs/HIRING_DECISION_AUTHORITY_DESIGN_SPEC.md`](docs/HIRING_DECISION_AUTHORITY_DESIGN_SPEC.md)
+> (Revision 2, governance-first), with normative data contracts in
+> [`docs/schemas/`](docs/schemas/). Hiring becomes one **Decision Authority
+> domain** on the shared kernel — the same shape as Procurement, Financial,
+> Clinical, and Agent Decision Authority:
+>
+> ```
+> Hiring Policy → Hiring Policy Compiler (PWC) → HiringWorkflowIR (signed,
+> content-addressed) → Hiring Decision Contract → Evidence Admission (TAP) →
+> Professional Compatibility Engine → Decision Authority (dimension evidence +
+> mandatory gates only) → Hiring ActionGate → Runtime Assurance → HRIS/ATS →
+> Execution Receipt → 1/3/6/12-month Reviews → Reconciliation → recompile
+> ```
+>
+> It removes universal candidate scoring and hand-authored profiles; HR declares
+> requirements and the **PWC compiles** them into a signed, reproducible IR and
+> **Decision Contract**. It replaces *Culture Fit* with **Operating Environment
+> Compatibility** and *Resilience* with **Role Sustainability & Adaptation**
+> (post-hire); separates **Compatibility from Eligibility**; makes the **Overall
+> Fit Index analytics-only** (it never enters the Decision Authority); enforces
+> **non-compensatory mandatory gates**; adds a **Hiring ActionGate**
+> (action must match the contract or DENY) and **Runtime Assurance** (pre-write
+> validation before Workday/SAP/ServiceNow/Oracle); and closes the loop with an
+> **Execution Receipt** and **Reconciliation Record** that recompile contracts —
+> not hidden model weights. The Phase 1–4C notes below document the
 > already-implemented governed spine (advisory/binding split, evidence pipeline,
-> decision cases, action requests, CER, reconciliation) that the reconstruction
-> builds on; see spec §19 for the migration mapping.
+> decision cases, action requests, CER, reconciliation) the reconstruction
+> builds on; see spec §21 for the migration plan.
 
 # AI-Assisted Hiring Framework — Module (Phase 1: Foundation)
 

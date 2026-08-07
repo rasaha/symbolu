@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://ugence.ai/schemas/hiring/role_compatibility_profile.schema.json",
   "title": "RoleCompatibilityProfile",
-  "description": "Versioned, per-role parameterization of hiring compatibility. There is NO universal weighting model; every Job Definition owns its own profile. Weights shape only the advisory Overall Fit Index and never gate eligibility.",
+  "description": "SUPERSEDED AS AN AUTHORING SURFACE (Revision 2). HR no longer hand-authors this profile. The equivalent parameterization — dimensions, weights, mandatory gates, required evidence, confidence floors — is now DERIVED by the Hiring Policy Compiler (PWC) from a declarative Hiring Policy (hiring_policy_source.schema.json) and emitted into the signed HiringWorkflowIR (hiring_workflow_ir.schema.json). This schema is retained as the shape of the compiler's compiled dimension model for reference and backward compatibility; it is not authored directly. There is NO universal weighting model. Weights shape only the analytics-only Overall Fit Index and never gate eligibility and never enter the Decision Authority.",
   "type": "object",
   "additionalProperties": false,
   "required": [

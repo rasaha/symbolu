@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ugence.ai/schemas/hiring/hiring_execution_receipt.schema.json",
+  "title": "HiringExecutionReceipt",
+  "description": "Immutable record of a governed HRIS/ATS write. Dispatched only after a passing ActionGate AND Runtime Assurance. Records attempted vs observed. Authorization != execution: a timeout yields OUTCOME_UNKNOWN, not success; compensation is a governed proposal, never an automatic rollback.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["receipt_id", "candidate_id", "decision_id", "action_gate_verdict_id", "assurance_id", "contract_ref", "target_system", "attempted", "observed_outcome"],
+  "properties": {
+    "receipt_id": { "type": "string" },
+    "candidate_id": { "type": "string" },
+    "decision_id": { "type": "string" },
+    "action_gate_verdict_id": { "type": "string" },
+    "assurance_id": { "type": "string" },
+    "contract_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_id", "version", "ir_digest"],
+      "properties": {
+        "contract_id": { "type": "string" },
+        "version": { "type": "integer", "minimum": 1 },
+        "ir_digest": { "type": "string" }
+      }
+    },
+    "target_system": { "type": "string", "enum": ["SERVICENOW", "WORKDAY", "SAP_SUCCESSFACTORS", "ORACLE_RECRUITING", "OTHER"] },
+    "attempted": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation", "payload_hash"],
+      "properties": {
+        "operation": { "type": "string", "examples": ["CREATE_OFFER", "UPDATE_CANDIDATE_STATUS", "CREATE_WORKER"] },
+        "payload_hash": { "type": "string" },
+        "external_ref": { "type": "string", "description": "Idempotency key / external correlation id." }
+      }
+    },
+    "observed_outcome": {
+      "type": "string",
+      "enum": ["SUCCEEDED", "FAILED", "OUTCOME_UNKNOWN"],
+      "description": "OUTCOME_UNKNOWN on timeout/ack-without-confirmation; never coerced to SUCCEEDED."
+    },
+    "observed_detail": { "type": "string" },
+    "external_record_id": { "type": "string", "description": "System-of-record id when SUCCEEDED (e.g. Workday worker id)." },
+    "compensation": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Governed proposal when reconciliation of the write is required; never an automatic rollback.",
+      "properties": {
+        "required": { "type": "boolean" },
+        "proposal": { "type": "string" },
+        "status": { "type": "string", "enum": ["NONE", "PROPOSED", "APPROVED", "APPLIED", "REJECTED"], "default": "NONE" }
+      }
+    }
+  }
+}
