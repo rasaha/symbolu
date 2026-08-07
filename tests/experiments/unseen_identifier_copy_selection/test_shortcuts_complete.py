@@ -12,11 +12,15 @@ from experiments.unseen_identifier_copy_selection.config import CANDIDATE_COUNT,
 from experiments.unseen_identifier_copy_selection.shortcuts import (
     BASELINE_NAMES,
     SHORTCUT_BOUND,
+    SHORTCUT_FWER,
     _baseline_counts_on,
     _baselines_on,
+    _decide,
     _pickers,
     _selection_examples,
     aggregate_shortcuts,
+    binom_sf_ge,
+    holm_reject,
     shortcut_scores,
 )
 from experiments.unseen_identifier_copy_selection.tasks import generate_split
@@ -137,3 +141,77 @@ def test_zero_applicable_is_an_error():
     with pytest.raises(ValueError):
         aggregate_shortcuts([{"chance": 1.0 / CANDIDATE_COUNT, "bound": 0.38,
                               "per_split": {"C2": {"counts": {"b": [0, 0]}, "baselines": {"b": 0.0}}}}])
+
+
+# ---- corrective-PR: sampling-aware gate (exact binomial + Holm-Bonferroni) ----
+
+CHANCE = 1.0 / CANDIDATE_COUNT
+SPLITS = ("C2", "C3", "C4", "C5", "C6", "C7")
+
+
+def _family(at_chance_n: int = 180, override=None):
+    """A realistic family of 6 selection splits x 12 baselines. Every baseline sits at chance
+    (k = round(n/3)); `override=(split, baseline, k, n)` injects one comparison for a test."""
+    k_chance = round(at_chance_n * CHANCE)
+    per_split_counts = {}
+    for s in SPLITS:
+        per_split_counts[s] = {name: [k_chance, at_chance_n] for name in BASELINE_NAMES}
+    if override:
+        s, b, k, n = override
+        per_split_counts[s][b] = [k, n]
+    return per_split_counts
+
+
+def test_binom_sf_ge_known_values():
+    assert binom_sf_ge(0, 10, 0.3) == 1.0            # P(X>=0) = 1
+    assert binom_sf_ge(11, 10, 0.3) == 0.0           # impossible
+    assert binom_sf_ge(10, 10, 0.5) == pytest.approx(0.5 ** 10)  # all-heads tail
+    # monotone non-increasing in k
+    tails = [binom_sf_ge(k, 180, CHANCE) for k in range(50, 90)]
+    assert all(tails[i] >= tails[i + 1] for i in range(len(tails) - 1))
+
+
+def test_holm_reject_step_down():
+    assert holm_reject([1e-10, 0.5, 0.9], 0.05) == [True, False, False]
+    assert holm_reject([0.02, 0.03], 0.05) == [True, True]      # 0.02<=.025 then 0.03<=.05
+    assert holm_reject([0.04, 0.04], 0.05) == [False, False]    # 0.04>.025 -> step-down stops
+    assert holm_reject([], 0.05) == []
+
+
+def test_marginal_noise_does_not_block():
+    # 0.4056 (=73/180) is ~+2 sigma above chance -- pure noise across 72 comparisons. MUST NOT block.
+    dec = _decide(_family(override=("C2", "first_target", 73, 180)), CHANCE)
+    assert dec["n_comparisons"] == 72
+    assert dec["all_pass"] is True
+    assert dec["per_split"]["C2"]["blocked"] == []
+
+
+def test_injected_leak_blocks():
+    # 0.60 (=108/180) is a genuine leak; it must block even after Holm correction over 72 comparisons.
+    dec = _decide(_family(override=("C2", "first_target", 108, 180)), CHANCE)
+    assert dec["all_pass"] is False
+    assert "first_target" in dec["per_split"]["C2"]["blocked"]
+
+
+def test_multiplicity_matters():
+    # The SAME modest exceedance (73/180) blocks when tested alone (family of 1) but not within the
+    # full family of 72 -- demonstrating the multiple-comparison control does real work.
+    alone = _decide({"C2": {"first_target": [73, 180]}}, CHANCE)
+    assert alone["n_comparisons"] == 1
+    assert alone["all_pass"] is False
+    full = _decide(_family(override=("C2", "first_target", 73, 180)), CHANCE)
+    assert full["all_pass"] is True
+
+
+def test_practical_leg_required():
+    # A tiny effect can be statistically significant at huge n yet fall below the +0.05 practical
+    # margin; the dual condition must NOT block it (0.36 > chance but < chance+0.05).
+    dec = _decide(_family(override=("C2", "first_target", 3600, 10000)), CHANCE)
+    assert dec["per_split"]["C2"]["baselines"]["first_target"] == pytest.approx(0.36)
+    assert dec["all_pass"] is True
+
+
+def test_all_at_chance_passes():
+    dec = _decide(_family(), CHANCE)
+    assert dec["all_pass"] is True
+    assert dec["fwer"] == SHORTCUT_FWER

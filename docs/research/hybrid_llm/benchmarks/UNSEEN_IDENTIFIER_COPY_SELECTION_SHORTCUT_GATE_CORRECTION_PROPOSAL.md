@@ -1,10 +1,16 @@
-# PROPOSAL (Option B) — sampling-aware shortcut gate correction
+# Shortcut-gate correction (Option B) — corrective PR
 
-**Status: DRAFT PROPOSAL FOR REVIEW. Nothing here is applied, merged, executed, or re-run.** This
-document proposes a single, bounded correction to the shortcut-precheck **decision rule** and states
-the governance chain that must follow before any re-run. It changes no numeric science value and makes
-no capability claim. Standing invariants preserved: `ORIGINAL_BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED` ·
-`E1_TEMPORAL_TRANSFER_PARTIAL` · `KDA_VALIDATION_BLOCKED`.
+**Status: CORRECTIVE PR — CODE APPLIED, AWAITING INDEPENDENT AUDIT. No reserved seed run; not merged.**
+This is a single, bounded correction to the shortcut-precheck **decision rule** plus fixture tests. It
+changes no numeric science value, touches no reserved seed, and makes no capability claim. The prior
+development evidence is superseded on merge (see §8). Standing invariants preserved:
+`ORIGINAL_BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED` · `E1_TEMPORAL_TRANSFER_PARTIAL` ·
+`KDA_VALIDATION_BLOCKED`.
+
+**Statistical method (as implemented, refined from the original draft):** the statistical leg uses an
+**exact one-sided binomial upper-tail test** of `H0: p = chance` with **Holm–Bonferroni** family-wise
+error control across all 72 comparisons — replacing the draft's normal-approximation z + Šidák. This is
+defensible without any normal-approximation or independence-among-comparisons assumption.
 
 ## 1. Summary
 The development phase returned `DEVELOPMENT_SHORTCUT_BLOCKED` because the frozen shortcut gate compares
@@ -45,67 +51,52 @@ The rule conflates a **point estimate** with a **population value** and applies 
 threshold to a **family** of 72 comparisons. It has no notion of the estimate's sampling error and no
 multiple-comparison correction, so ordinary sampling noise crosses it.
 
-## 4. Proposed change (exact)
-Add a sampling-aware, multiple-comparison-corrected decision. A baseline **blocks** iff it is
-practically **and** statistically above the practical bound `p0 = chance + 0.05`:
-
+## 4. The change (as implemented)
+A baseline **blocks** iff it clears BOTH legs:
 ```
-p0        = chance + 0.05                         # unchanged practical-equivalence margin
-se0       = sqrt(p0*(1-p0)/n)                      # binomial SE under the boundary null, at observed n
-z         = (score - p0) / se0                     # one-sided
-m         = number of (split,baseline) comparisons in the cohort
-alpha_per = 1 - (1 - 0.05)**(1/m)                  # Šidák correction, family-wise error rate 0.05
-z_crit    = Phi^{-1}(1 - alpha_per)
-BLOCK     = (score > p0) AND (z > z_crit)
+practical leg    : p_hat > chance + 0.05                       # unchanged practical-equivalence margin
+statistical leg  : exact one-sided binomial upper tail P(X >= k | n, chance)
+                   rejected under Holm-Bonferroni at FWER = 0.05, over ALL (split,baseline) comparisons
+BLOCK            = practical AND statistically-significant
 ```
+Implemented in `experiments/unseen_identifier_copy_selection/shortcuts.py`:
+- `binom_sf_ge(k, n, p)` — exact upper-tail P(X≥k) via a stable iterative PMF (no SciPy/NumPy, no
+  normal approximation);
+- `holm_reject(pvalues, fwer)` — Holm–Bonferroni step-down (uniformly more powerful than Bonferroni,
+  valid without independence assumptions);
+- `_decide(per_split_counts, chance)` — builds the family of (split,baseline) comparisons, computes an
+  exact binomial p-value against the **chance** null for each, applies Holm across the whole family,
+  and blocks a baseline only when it is also practically above `chance+0.05`.
+`shortcut_scores` (per seed) and `aggregate_shortcuts` (pooled across dev seeds) both route their
+decision through `_decide`. Reported scores, counts, `chance`, `bound`, and per-seed views are
+unchanged; the pooled aggregation remains the count-weighted mean; only the boolean `pass`/`all_pass`
+decision is now sampling-aware. New reported fields: per-baseline `pvalues`, per-split `blocked`,
+top-level `fwer` and `n_comparisons`.
 
-### Exact patch to `experiments/unseen_identifier_copy_selection/shortcuts.py`
-```python
-# --- new imports / constants ---
-from statistics import NormalDist
+The **0.05 practical margin is unchanged**. The statistical leg is the only addition.
 
-SHORTCUT_BOUND = 0.05     # practical-equivalence margin (UNCHANGED)
-SHORTCUT_FWER  = 0.05     # family-wise error rate for the multiple-comparison correction (NEW)
+## 5. Validation
+**Unit tests** (`tests/experiments/unseen_identifier_copy_selection/test_shortcuts_complete.py`,
+fixture-only, all green — full suite 120 passed): `binom_sf_ge` known values + monotonicity; Holm
+step-down; **marginal noise 0.4056 (73/180) does NOT block** in the 72-comparison family;
+**injected leak 0.60 (108/180) DOES block**; **multiplicity matters** (73/180 blocks alone, m=1, but
+not within m=72); **practical leg required** (0.36 at n=10000 is significant vs chance yet below the
++0.05 margin → does not block); all-at-chance passes.
 
-def _sidak_zcrit(m: int, fwer: float = SHORTCUT_FWER) -> float:
-    """One-sided z critical value after a Šidák correction over m comparisons."""
-    alpha_per = 1.0 - (1.0 - fwer) ** (1.0 / max(1, m))
-    return NormalDist().inv_cdf(1.0 - alpha_per)
+**Synthetic demonstrator** (`results/unseen_identifier_copy_selection/optionb_gate_validation.py`,
+no reserved seed built or run):
 
-def _baseline_blocks(score: float, n: int, chance: float, m: int) -> bool:
-    """Block a baseline ONLY if it is BOTH practically (> chance+0.05) AND statistically (beyond
-    Šidák-corrected sampling noise at the observed n) above the practical bound. On uniformly-random
-    opaque identifiers this rejects chance-level noise while still catching a genuine leak."""
-    p0 = chance + SHORTCUT_BOUND
-    if score <= p0 or n <= 0:
-        return False
-    se0 = (p0 * (1.0 - p0) / n) ** 0.5
-    if se0 == 0.0:
-        return score > p0
-    return (score - p0) / se0 > _sidak_zcrit(m)
-```
-Then replace the two flat comparisons:
-- in `shortcut_scores`, per split (n = len(sel), m = 12 × #selection-splits):
-  `split_pass = not any(_baseline_blocks(v, len(sel), chance, m) for v in baselines.values())`
-- in `aggregate_shortcuts`, per split (n = pooled applicable count, m = total comparisons):
-  `passes[name] = not _baseline_blocks(score, applicable, chance, m)`
+| Scenario | corrected gate |
+|---|---|
+| all baselines at chance (m=72) | `all_pass=True` |
+| marginal noise 0.4056 = 73/180 (m=72) | **`all_pass=True`** (rejected: chance-level noise) |
+| same 73/180 tested alone (m=1) | `all_pass=False` (multiplicity does real work) |
+| genuine leak 0.60 = 108/180 (m=72) | **`all_pass=False`** (blocks) |
+| tiny 0.36 at n=10000 (significant, sub-margin) | `all_pass=True` (practical leg required) |
 
-The reported per-split/per-seed scores, counts, `chance`, and `bound` fields are **unchanged**; only
-the boolean `pass`/`all_pass` decision becomes sampling-aware. (`competence_floor = chance+0.05` stays
-as a reported field.)
-
-## 5. Validation (reproducible: `results/unseen_identifier_copy_selection/optionb_gate_validation.py`)
-Computed on already-generated data; parameters (FWER 0.05, Šidák, one-sided normal) fixed a priori:
-
-| Cohort | frozen gate | proposed gate | proposed blocks (real data) | control: inject a 0.60 leak |
-|---|---|---|---|---|
-| seen | `all_pass=False` | **`all_pass=True`** (m=72, z_crit=3.19) | NONE | **blocks** (z=5.98) |
-| unseen | `all_pass=False` | **`all_pass=True`** (m=72, z_crit=3.19) | NONE | **blocks** (z=5.98) |
-
-→ The proposed rule **rejects the chance-level noise** that falsely blocked development (worst real
-exceedance 0.4056 → z≈0.6 ≪ 3.19) while **still catching a genuine leak** (a baseline reliably above
-`chance+0.05` yields z≈6 and blocks). It does not "rubber-stamp" — it is strictly a correction of the
-test's statistical validity.
+The worst real exceedance observed in the (now-superseded) development run was 0.4056 — exactly the
+`73/180` case above — so the corrected gate rejects the noise that falsely blocked development while
+still catching a genuine leak. It is a correction of statistical validity, not a rubber stamp.
 
 ## 6. Alternatives considered (and why rejected)
 - **Flat wider margin (e.g. `chance+0.10`).** Simpler but unprincipled: it would mask a genuine ~0.09
@@ -137,12 +128,14 @@ development evidence** and requires, in order:
 5. **Final seeds 90760–90764 remain PROHIBITED** and separately gated — this proposal does not touch
    the final authorization chain.
 
-## 9. Test plan (fixture-only)
-- Update `tests/experiments/unseen_identifier_copy_selection/test_shortcuts_complete.py`: assert
-  `_baseline_blocks` blocks a clear leak (e.g. 0.60 at n=180) and does **not** block chance-level
-  values (e.g. 0.40 at n=60/180); assert `z_crit` monotonic in `m`.
-- `PYTHONPATH=. pytest -q tests/experiments/unseen_identifier_copy_selection` must stay green.
-- No reserved seed appears in any test (fixture 993000–993004 only).
+## 9. Test plan (fixture-only) — done
+- `test_shortcuts_complete.py` extended with: `binom_sf_ge` known values + monotonicity; Holm
+  step-down; marginal-noise-does-not-block (73/180 in m=72); injected-leak-blocks (108/180);
+  multiplicity-matters (blocks at m=1, not m=72); practical-leg-required (0.36 @ n=10000); all-at-chance.
+- `PYTHONPATH=. pytest -q tests/experiments/unseen_identifier_copy_selection` → **120 passed**;
+  `tests/experiments/single_hop_typed_vs_prose` → **23 passed**. No top-level torch import in
+  `shortcuts.py`.
+- No reserved seed appears in any test (fixture 993000–993004 only); no reserved seed was run.
 
 ## 10. Claim boundary
 This proposal is a **test-validity correction**, not a capability change. It emits no verdict, consumes
