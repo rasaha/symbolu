@@ -46,7 +46,9 @@ Authority → ActionGate → Runtime Assurance → Execution Receipt → Reconci
 | Schema | Contract | Spec §|
 |---|---|---|
 | [`hiring_reconciliation_record.schema.json`](hiring_reconciliation_record.schema.json) | **Execution Reconciliation Record** — authorized vs executed action + HRIS state → RECONCILED/DEVIATION/PARTIAL/FAILED/UNKNOWN (shared engine stays external via `ReconciliationPort`). | 11 |
-| [`review_and_calibration.schema.json`](review_and_calibration.schema.json) | **Post-hire** 1/3/6/12-month predicted-vs-actual reviews + calibration proposal (recompiles the policy). Distinct from execution reconciliation above. | 12 |
+| [`hiring_calibration_report.schema.json`](hiring_calibration_report.schema.json) | **Cohort calibration report** — aggregates hires by role/policy/contract version × dimension × horizon × confidence band; deltas, reliability, missing-evidence, optional descriptive retention/OFI. | 12 |
+| [`hiring_calibration_proposal.schema.json`](hiring_calibration_proposal.schema.json) | **Governed calibration proposal** — declarative policy-artifact targets + evidence/approver/next-version; approved → recompile via PWC. | 12 |
+| [`review_and_calibration.schema.json`](review_and_calibration.schema.json) | Design-era post-hire review + calibration shape (superseded for the proposal by `hiring_calibration_proposal.schema.json`). | 12 |
 
 ## API
 

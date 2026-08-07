@@ -7,6 +7,53 @@ the **distribution** (wheel packaging) version, which is distinct from the
 The format follows [Keep a Changelog](https://keepachangelog.com/); the
 distribution uses pre-1.0 semantic versioning.
 
+## [Unreleased] — Hiring Decision Authority: post-hire calibration loop (1/3/6/12-month)
+
+Implements spec §21 step 6 — the closed-loop policy-improvement path. Additive
+only: new `ugence_ai_hiring.hiring_calibration` package (canonical re-export at
+`ugence_ai_hiring.hiring.calibration`); the existing `CalibrationProposal` gained
+optional governance-context fields; no existing API removed; no product behavior
+changed; `production_certified` remains `False`. Full suite 889 passed / 12
+skipped (25 new tests); `python -m ugence_ai_hiring verify` PASS.
+
+### Added
+- **`PostHireReviewService`** — records structured 1/3/6/12-month reviews with
+  timing windows; **job-related, observable evidence only** (no personality /
+  culture-fit / psychological-resilience / health / protected-attribute
+  inference); append-only (never mutates the historical decision). Role
+  Sustainability & Adaptation accumulates as a post-hire observed dimension.
+- **`HiringCalibrationReport`** + `build_calibration_report` — cohort aggregation
+  by role/policy version × contract version × dimension × horizon × confidence
+  band; predicted-vs-observed deltas, over/underprediction, missing-evidence
+  patterns, dimension reliability, optional descriptive retention/OFI. Preserves
+  predicted-compatibility / observed-outcome / calibration-error as distinct
+  quantities. The cohort key is governance-scoped (role/policy/contract) with no
+  demographics, so calibration data cannot proxy a protected attribute.
+- **`generate_calibration_proposal`** → governed `CalibrationProposal` (affected
+  role/policy, current IR/contract version, supporting evidence, proposed change,
+  rationale, impact summary, required approver, next-version target). Reads
+  deltas + missing-evidence only — never the Overall Fit Index.
+- **`CalibrationApprovalService`** — approval-before-recompile; routes an APPROVED
+  proposal's human-edited policy back through the Step-1 `HiringPolicyCompiler` to
+  produce a NEW versioned `HiringWorkflowIR` + `HiringDecisionContract`. Never
+  mutates an active contract; enforces version advancement and required approver.
+- **`CalibrationProvenance`** + `build_provenance` — links decision case →
+  execution receipt → post-hire reviews → calibration report → proposal → next
+  policy version.
+- **`CalibrationSinkPort`** — optional integration boundary to a shared
+  analytics/reconciliation system (aggregation itself is local and standalone).
+- 25 tests (`tests/test_hiring_calibration.py`).
+
+### Changed
+- `ugence_ai_hiring.hiring_decision.reviews.CalibrationProposal` — additive
+  optional fields (affected_role_id, source_case_ids, report_id,
+  supporting_evidence, proposed_change, impact_summary, required_approver,
+  approved_by). Existing construction is unaffected.
+- Docs: new `docs/schemas/hiring_calibration_report.schema.json` and
+  `hiring_calibration_proposal.schema.json`; spec §21.1 marks step 6 done and the
+  core architecture functionally complete (remaining work is packaging/
+  integration, not core decision logic).
+
 ## [Unreleased] — Hiring Decision Authority: action-assurance orchestration spine
 
 Implements spec §21 step 5. Additive only: new orchestrator + artifacts inside

@@ -806,17 +806,44 @@ until step 7.
     distinct from the post-hire predicted-vs-actual reconciliation of step 6.
     The shared cross-system reconciliation engine stays external
     (`ReconciliationPort`); this record is the hiring-domain view.
+- **Step 6 — DONE (post-hire calibration loop).**
+  `ugence_ai_hiring.hiring_calibration`: the 1/3/6/12-month closed loop.
+  - `PostHireReviewService` — records structured reviews at each checkpoint with
+    timing windows; **job-related, observable evidence only** (no personality /
+    culture-fit / psychological-resilience / health / protected-attribute
+    inference); append-only (never mutates the historical decision). Role
+    Sustainability & Adaptation accumulates as a post-hire observed dimension.
+  - `HiringCalibrationReport` + `build_calibration_report` — cohort aggregation by
+    role/policy version × contract version × dimension × horizon × confidence
+    band; predicted-vs-observed deltas, over/underprediction, missing-evidence
+    patterns, dimension reliability, optional descriptive retention/OFI. Overall
+    Fit is descriptive-only here and never a policy input; the cohort key carries
+    no demographics.
+  - `generate_calibration_proposal` → governed `CalibrationProposal` (affected
+    role/policy, current IR/contract version, supporting evidence, proposed
+    change, rationale, impact summary, required approver, next-version target).
+  - `CalibrationApprovalService` — approval-before-recompile; routes an APPROVED
+    proposal's human-edited policy back through the Step-1 PWC to produce a NEW
+    versioned IR + contract. Never mutates an active contract; enforces version
+    advancement. `CalibrationProvenance` links case → receipt → reviews → report →
+    proposal → next version.
 - **Integration ports (interfaces only).** `EvidenceAdmissionPort` → TAP;
   `DecisionAuthorityPort`; `ActionAuthorizationPort` → ActionGate;
   `RuntimeAssurancePort` → Runtime Assurance / ACP; `HRISExecutionPort` → HRIS/ATS
-  (execution handoff); `ReconciliationPort`. Shared capabilities are
-  **referenced, never copied**; the package imports and runs standalone with test
-  adapters (no platform required at import).
-- **Not yet built (later increments):** the shared-side ActionGate/Runtime
-  Assurance/Execution/Reconciliation *implementations* (platform services behind
-  the ports), production HRIS/ATS provider connectors, the **post-hire
-  1/3/6/12-month closed-loop calibration path** (step 6 — the recommended next
-  major work), and the deprecation of the legacy universal-scoring surfaces
+  (execution handoff); `ReconciliationPort`; `CalibrationSinkPort` → shared
+  analytics/reconciliation (optional). Shared capabilities are **referenced,
+  never copied**; the package imports and runs standalone with test adapters (no
+  platform required at import).
+- **Core architecture functionally complete.** The Hiring Decision Authority spine
+  — policy compile → contract → evidence admission → assessment → gates →
+  eligibility → advisory recommendation → external binding → ActionGate → runtime
+  assurance → execution receipt → reconciliation → post-hire calibration →
+  recompile — is implemented as hiring-domain models + ports. **Remaining work is
+  packaging/integration, not core decision logic:** the shared-side
+  ActionGate/Runtime-Assurance/Execution/Reconciliation *implementations*
+  (platform services behind the ports), production HRIS/ATS connectors
+  (ServiceNow/Workday/SAP/Oracle), pilot workflows, dashboards, customer policy
+  packs, and the eventual deprecation of the legacy universal-scoring surfaces
   (step 7).
 
 ---

@@ -61,7 +61,11 @@ class CalibrationProposal(DomainModel):
     """A governed proposal to recompile the policy into the next contract version.
 
     Proposes/versions contract or role-policy changes only. Never retrains hidden
-    weights; never edits history. Applies to a *future* contract version.
+    weights; never edits history. Applies to a *future* contract version. The
+    additive fields (affected role, supporting evidence, proposed change, impact
+    summary, required approver, cohort case ids, approval record) carry the full
+    governance context; all default to empty so the minimal single-case form
+    still constructs.
     """
 
     proposal_id: str = Field(default_factory=lambda: new_id("hcal"))
@@ -72,6 +76,15 @@ class CalibrationProposal(DomainModel):
     recompile_policy_id: str
     proposed_contract_version: int
     status: str = "PROPOSED"
+    # --- governance context (additive, optional) ---
+    affected_role_id: str = ""
+    source_case_ids: tuple[str, ...] = ()
+    report_id: str = ""
+    supporting_evidence: tuple[str, ...] = ()
+    proposed_change: str = ""
+    impact_summary: str = ""
+    required_approver: str = ""
+    approved_by: str = ""
 
     @model_validator(mode="after")
     def _validate(self) -> "CalibrationProposal":

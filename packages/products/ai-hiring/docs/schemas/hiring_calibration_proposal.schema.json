@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ugence.ai/schemas/hiring/hiring_calibration_proposal.schema.json",
+  "title": "CalibrationProposal",
+  "description": "A governed proposal to recompile a role policy into the NEXT contract version. Calibration NEVER directly modifies weights, gates, thresholds, or model parameters and NEVER retrains hidden weights: it proposes declarative policy-artifact changes (targets) with rationale/evidence, and an APPROVED proposal is routed back through the Hiring Policy Compiler on a human-edited policy to produce a new versioned HiringWorkflowIR + Hiring Decision Contract. The active contract is never mutated in place. Tracks ugence_ai_hiring.hiring_decision.reviews.CalibrationProposal (enriched).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["proposal_id", "source_case_id", "contract_ref", "targets", "rationale", "recompile_policy_id", "proposed_contract_version", "status"],
+  "properties": {
+    "proposal_id": { "type": "string" },
+    "source_case_id": { "type": "string" },
+    "source_case_ids": { "type": "array", "items": { "type": "string" }, "description": "Full cohort the proposal draws on." },
+    "contract_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_id", "version", "ir_digest"],
+      "description": "The current WorkflowIR / Decision Contract version being calibrated.",
+      "properties": {
+        "contract_id": { "type": "string" },
+        "version": { "type": "integer", "minimum": 1 },
+        "ir_digest": { "type": "string" }
+      }
+    },
+    "targets": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "enum": ["DIMENSION_WEIGHTS", "CONFIDENCE_THRESHOLDS", "EVIDENCE_REQUIREMENTS", "MANDATORY_GATES", "ACTION_CONSTRAINTS"] },
+      "description": "Declarative policy artifacts proposed for change — never model parameters."
+    },
+    "rationale": { "type": "string" },
+    "recompile_policy_id": { "type": "string", "description": "The policy to recompile — calibration recompiles a policy, it never retrains hidden weights." },
+    "proposed_contract_version": { "type": "integer", "minimum": 2, "description": "Must exceed the current version." },
+    "status": { "type": "string", "enum": ["PROPOSED", "IN_REVIEW", "APPROVED", "REJECTED", "RECOMPILED"] },
+    "affected_role_id": { "type": "string" },
+    "report_id": { "type": "string" },
+    "supporting_evidence": { "type": "array", "items": { "type": "string" }, "description": "Report id + review ids + receipt ids backing the proposal." },
+    "proposed_change": { "type": "string" },
+    "impact_summary": { "type": "string" },
+    "required_approver": { "type": "string" },
+    "approved_by": { "type": "string" }
+  }
+}
