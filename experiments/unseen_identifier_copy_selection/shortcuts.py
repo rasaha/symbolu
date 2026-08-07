@@ -1,9 +1,21 @@
 """Structure-blind shortcut baselines for the unseen-identifier diagnostic.
 
 Each baseline predicts an answer WITHOUT reading the queried relation. On opaque, randomly-drawn
-identifiers every baseline should sit at chance; a baseline exceeding chance + 0.05 on its relevant
-split is a leakage signal that must be resolved BEFORE reserved execution (a hard pre-reserved
-gate). This module only *computes* the baselines; the runner enforces the gate.
+identifiers every baseline sits at chance in expectation; a baseline that is BOTH practically and
+statistically above chance on its relevant split is a leakage signal that must be resolved BEFORE
+reserved execution (a hard pre-reserved gate). This module only *computes* the baselines and the
+gate decision; the runner enforces the block.
+
+Gate decision (corrective-PR calibration). A baseline blocks only when it clears BOTH legs:
+  * practical leg  — point estimate exceeds the practical-equivalence margin: ``p_hat > chance + 0.05``;
+  * statistical leg — an EXACT one-sided binomial upper-tail test of H0: p = chance is rejected under
+    Holm-Bonferroni family-wise-error control across ALL (split, baseline) comparisons in the gate.
+On uniformly-random opaque identifiers (protocol-lock Decision 3) every baseline is at chance, so the
+family of finite-sample estimates scatters around chance; the previous flat ``<= chance + 0.05`` rule
+compared point estimates to a fixed line with no sampling-error allowance and no multiplicity control,
+which false-blocks under the null. The practical 0.05 margin is unchanged; only the decision is now
+sampling-aware. A genuine leak (a baseline whose true rate is meaningfully above chance) still yields a
+tiny binomial tail and blocks.
 """
 from __future__ import annotations
 
@@ -14,7 +26,8 @@ from dataclasses import dataclass
 from .config import ABSTENTION_TOKEN, CANDIDATE_COUNT
 from .tasks import Example
 
-SHORTCUT_BOUND = 0.05  # frozen: threshold is chance + 0.05
+SHORTCUT_BOUND = 0.05  # frozen practical-equivalence margin: the practical leg is chance + 0.05
+SHORTCUT_FWER = 0.05   # family-wise error rate for the Holm-Bonferroni multiple-comparison correction
 
 # The frozen twelve structure-blind baselines (protocol-lock Decision 9; completed here to 12).
 BASELINE_NAMES: tuple[str, ...] = (
@@ -36,6 +49,51 @@ BASELINE_NAMES: tuple[str, ...] = (
 # The frozen output contract places the answer at no fixed candidate position; index 0 is the
 # frozen probe position for the output-template-leakage baseline (verifies the template leaks nothing).
 FROZEN_OUTPUT_POSITION: int = 0
+
+
+# --------------------------------------------------------------------------------------------------
+# Statistics: exact one-sided binomial tail + Holm-Bonferroni FWER control (dependency-free).
+# --------------------------------------------------------------------------------------------------
+def binom_sf_ge(k: int, n: int, p: float) -> float:
+    """Exact one-sided upper tail P(X >= k) for X ~ Binomial(n, p), via a stable iterative PMF.
+
+    No SciPy/NumPy dependency and no normal approximation, so the statistical leg is defensible
+    independently of any sample size or independence assumption among comparisons."""
+    if n <= 0 or k <= 0:
+        return 1.0
+    if k > n:
+        return 0.0
+    if p <= 0.0:
+        return 0.0
+    if p >= 1.0:
+        return 1.0
+    ratio = p / (1.0 - p)
+    pmf = (1.0 - p) ** n  # P(X = 0)
+    tail = 0.0
+    for i in range(1, n + 1):
+        pmf *= (n - i + 1) / i * ratio  # P(X=i) from P(X=i-1)
+        if i >= k:
+            tail += pmf
+    return min(1.0, tail)
+
+
+def holm_reject(pvalues: list[float], fwer: float = SHORTCUT_FWER) -> list[bool]:
+    """Holm-Bonferroni step-down rejections at family-wise error rate `fwer`.
+
+    Uniformly more powerful than plain Bonferroni and valid without independence assumptions. Returns
+    a boolean per input hypothesis (True = rejected = significant)."""
+    m = len(pvalues)
+    if m == 0:
+        return []
+    order = sorted(range(m), key=lambda i: pvalues[i])
+    reject = [False] * m
+    for rank, idx in enumerate(order):
+        threshold = fwer / (m - rank)
+        if pvalues[idx] <= threshold:
+            reject[idx] = True
+        else:
+            break  # step-down: once one hypothesis fails, all larger p-values fail too
+    return reject
 
 
 def _char_overlap(a: str, b: str) -> int:
@@ -126,48 +184,71 @@ def _baselines_on(sel: list[Example]) -> dict[str, float]:
     return {name: (correct / n if n else 0.0) for name, (correct, _n) in counts.items()}
 
 
-def shortcut_scores(examples: list[Example]) -> dict:
-    """Compute the twelve structure-blind baselines PER SPLIT for ONE seed's cohort.
+def _decide(per_split_counts: dict[str, dict[str, list[int]]], chance: float) -> dict:
+    """Apply the dual-condition (practical + Holm-corrected exact-binomial) gate across a whole family.
 
-    Returns per-split baselines (means), per-split [correct, applicable] counts, and an overall pass
-    flag. Each baseline must be <= chance + 0.05 on its own split; combining splits would create
-    artificial cross-split frequency, so we never do. Threshold equality passes (`<=`)."""
+    `per_split_counts[split][baseline] = [correct, applicable]`. Returns per-split baselines, p-values,
+    blocked names, pass flags, and the overall all_pass, plus the family size for transparency."""
+    bound = chance + SHORTCUT_BOUND
+    # Flatten the family of comparisons; compute exact binomial p-values against the chance null.
+    flat: list[tuple[str, str, int, int]] = []
+    for split in sorted(per_split_counts):
+        for name, (k, n) in per_split_counts[split].items():
+            flat.append((split, name, k, n))
+    pvalues = [binom_sf_ge(k, n, chance) for (_s, _b, k, n) in flat]
+    rejected = holm_reject(pvalues, SHORTCUT_FWER)
+
+    per_split: dict[str, dict] = {}
+    all_pass = True
+    for i, (split, name, k, n) in enumerate(flat):
+        p_hat = (k / n) if n else 0.0
+        practical = p_hat > bound
+        blocks = bool(practical and rejected[i])
+        d = per_split.setdefault(split, {"n": 0, "baselines": {}, "counts": {}, "pvalues": {},
+                                         "blocked": [], "competence_floor": bound, "pass": True})
+        d["n"] = n
+        d["baselines"][name] = p_hat
+        d["counts"][name] = [k, n]
+        d["pvalues"][name] = pvalues[i]
+        if blocks:
+            d["blocked"].append(name)
+            d["pass"] = False
+            all_pass = False
+    return {"chance": chance, "bound": bound, "fwer": SHORTCUT_FWER,
+            "n_comparisons": len(flat), "per_split": per_split, "all_pass": all_pass}
+
+
+def shortcut_scores(examples: list[Example]) -> dict:
+    """Compute the twelve structure-blind baselines PER SPLIT for ONE seed's cohort and decide the gate.
+
+    Each baseline is scored per split (combining splits would create artificial cross-split frequency,
+    so we never do). The block decision is the dual condition documented at module top; the family for
+    the Holm correction is all (split, baseline) comparisons in this cohort."""
     chance = 1.0 / CANDIDATE_COUNT
     by_split: dict[str, list[Example]] = {}
     for e in _selection_examples(examples):
         by_split.setdefault(e.split, []).append(e)
-    per_split: dict[str, dict] = {}
-    all_pass = True
-    for split, sel in sorted(by_split.items()):
-        baselines = _baselines_on(sel)
-        counts = _baseline_counts_on(sel)
-        split_pass = all(v <= chance + SHORTCUT_BOUND for v in baselines.values())
-        all_pass = all_pass and split_pass
-        per_split[split] = {"n": len(sel), "baselines": baselines, "counts": counts,
-                            "competence_floor": chance + SHORTCUT_BOUND, "pass": split_pass}
-    return {"chance": chance, "bound": chance + SHORTCUT_BOUND, "per_split": per_split,
-            "all_pass": all_pass}
+    per_split_counts = {split: _baseline_counts_on(sel) for split, sel in by_split.items()}
+    return _decide(per_split_counts, chance)
 
 
 def aggregate_shortcuts(per_seed_scores: list[dict]) -> dict:
     """Aggregate per-seed shortcut results across development seeds (protocol-lock Decision 9).
 
-    Aggregation is an example-count-weighted mean of seed-local scores:
-    `sum(seed-local correct) / sum(seed-local applicable)` per (split, baseline). Frequency state is
-    NEVER recomputed over a combined multi-seed pool — only the seed-local counts are summed here.
-    Threshold equality passes; per-seed values are preserved descriptively; any applicable split
-    whose aggregate exceeds its competence floor blocks execution (`all_pass=False`)."""
+    Aggregation sums the seed-local integer counts per (split, baseline): pooled score =
+    `sum(seed-local correct) / sum(seed-local applicable)`. Frequency state is NEVER recomputed over a
+    combined multi-seed pool — only the seed-local counts are summed. The pooled counts then feed the
+    same dual-condition gate (exact binomial + Holm) so the multiplicity-aware decision is evaluated on
+    the pooled per-split estimates. Per-seed values are preserved descriptively."""
     if not per_seed_scores:
         raise ValueError("aggregate_shortcuts requires at least one per-seed result")
     chance = per_seed_scores[0]["chance"]
-    floor = chance + SHORTCUT_BOUND
-    # collect the set of splits present across seeds
     splits = sorted({split for r in per_seed_scores for split in r["per_split"]})
-    per_split: dict[str, dict] = {}
-    all_pass = True
+    per_split_counts: dict[str, dict[str, list[int]]] = {}
+    per_seed_view: dict[str, dict[str, list[float]]] = {}
     for split in splits:
         summed: dict[str, list[int]] = {}
-        per_seed_scores_view: dict[str, list[float]] = {}
+        view: dict[str, list[float]] = {}
         for result in per_seed_scores:
             entry = result["per_split"].get(split)
             if entry is None:
@@ -176,27 +257,17 @@ def aggregate_shortcuts(per_seed_scores: list[dict]) -> dict:
                 acc = summed.setdefault(name, [0, 0])
                 acc[0] += correct
                 acc[1] += applicable
-                per_seed_scores_view.setdefault(name, []).append(
-                    entry["baselines"][name]
-                )
-        baselines: dict[str, float] = {}
-        passes: dict[str, bool] = {}
-        for name, (correct, applicable) in summed.items():
+                view.setdefault(name, []).append(entry["baselines"][name])
+        for name, (_correct, applicable) in summed.items():
             if applicable == 0:
                 raise ValueError(f"baseline {name!r} on split {split} has zero applicable examples")
-            score = correct / applicable
-            baselines[name] = score
-            passes[name] = score <= floor
-        split_pass = all(passes.values())
-        all_pass = all_pass and split_pass
-        per_split[split] = {
-            "counts": summed,
-            "baselines": baselines,
-            "per_seed_scores": per_seed_scores_view,
-            "competence_floor": floor,
-            "pass": split_pass,
-        }
-    return {"chance": chance, "bound": floor, "per_split": per_split, "all_pass": all_pass}
+        per_split_counts[split] = summed
+        per_seed_view[split] = view
+
+    decided = _decide(per_split_counts, chance)
+    for split, d in decided["per_split"].items():
+        d["per_seed_scores"] = per_seed_view.get(split, {})
+    return decided
 
 
 @dataclass(frozen=True)
