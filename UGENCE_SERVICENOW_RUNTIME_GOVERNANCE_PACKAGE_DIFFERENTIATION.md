@@ -2,11 +2,15 @@
 
 ## Package-Grounded Differentiation & Workflow Architecture Comparison
 
-**Version:** 2.2 (Package-Grounded Edition)
+**Version:** 2.3 (Package-Grounded Edition)
 **Supersedes:** v2.1 partner-facing positioning document and the v2.0 workflow-comparison draft
 **Scope:** Maps every conceptual Ugence module to the concrete distributable package that
 implements it under `symbolu/packages/`, and states, module-by-module, how each package
 *differentiates from and enhances* ServiceNow workflow capabilities.
+**v2.3 correction:** **Risk Authority is not a shipped package** — it is a design baseline
+(Risk Authority Architecture Spec v1.1). It is now labeled **PLANNED** throughout, given a
+dedicated design-spec section (§D2), and no longer conflated with the shipped
+`ugence-decision-authority` kernel. See the build-status legend below and Appendix B.
 
 > **ServiceNow can remain the system of record and enterprise workflow platform.
 > Ugence becomes the system of runtime AI authority.**
@@ -110,7 +114,19 @@ package — they are individually installable and vendor-neutral. Every distribu
 `ugence-`; every module ships a logic-free legacy-compatibility facade that preserves object
 identity, so adoption is non-breaking.
 
+> **Build-status legend.** Every package named in the spine diagram above is **shipped** —
+> it exists under `symbolu/packages/`, is independently installable, and is offline-verifiable.
+> One module in this document, **Risk Authority** (§D2), is **not yet a package**: it is a
+> *design baseline* (Architecture Spec v1.1) that would *compose* the shipped packages into an
+> executable-GRC control plane. It is labeled **PLANNED** wherever it appears, and its artifacts
+> (`RiskDecisionCase`, `RiskDecision`, the signed `RiskAuthorizationEnvelope`, `TrajectoryState`,
+> `OperationalClearance`, `ReconciliationRecord`) are design-spec contracts, not shipped code.
+
 ### Overall runtime architecture
+
+The flow below is the *target* runtime path. Boxes drawn from shipped packages are marked
+`[shipped]`; the Risk Authority control plane that would orchestrate them end-to-end is marked
+`[planned]`.
 
 ```
 Enterprise Platform  (ServiceNow / Microsoft / Salesforce / SAP / Workday / Oracle)
@@ -119,28 +135,31 @@ Enterprise Platform  (ServiceNow / Microsoft / Salesforce / SAP / Workday / Orac
 Workflow  ·  Approvals  ·  CMDB  ·  AI Inventory  ·  Human Processes
         │
         ▼
-════════════════════════════════════════════════════════════
+══════════════════════════════════════════════════════════════════
    UGENCE RUNTIME GOVERNANCE / AUTHORITY  (symbolu/packages)
-════════════════════════════════════════════════════════════
-   Policy Workflow Compiler   → deterministic WorkflowIR
+   orchestrated end-to-end by → Risk Authority control plane [PLANNED §D2]
+══════════════════════════════════════════════════════════════════
+   Policy Workflow Compiler   → deterministic WorkflowIR                     [shipped]
         ▼
-   Evidence (TAP)             → SUPPORTED / CONSTRAINED / INDETERMINATE
+   Evidence (TAP)             → SUPPORTED / CONSTRAINED / INDETERMINATE      [shipped]
         ▼
-   Risk / Decision Authority  → binding DecisionCase (AI cannot self-authorize)
+   Decision Authority         → binding DecisionCase (AI cannot self-auth.)  [shipped]
+        ▼   (Risk Authority would mint a signed RiskAuthorizationEnvelope here [planned])
+   Model Authority / Agent Eligibility → ALLOW / DENY / HOLD / ESCALATE      [shipped]
         ▼
-   Model Authority / Agent Eligibility → ALLOW / DENY / HOLD / ESCALATE
+   ActionGate                 → AUTHORIZED / DENIED / INDETERMINATE          [shipped]
         ▼
-   ActionGate                 → AUTHORIZED / DENIED / INDETERMINATE (exact payload)
+   Sequence Risk (StoryGraph) → OBSERVE / ESCALATE (advisory)               [shipped]
         ▼
-   Sequence Risk (StoryGraph) → OBSERVE / ESCALATE (advisory)
+   Trajectory Control         → CONTINUE / CONSTRAIN / ESCALATE / REVOKE    [planned]
         ▼
-   Operational Clearance (ACP / Action Clearance) → CLEAR / HOLD / BLOCK / ESCALATE
+   Operational Clearance (ACP / Action Clearance) → CLEAR / HOLD / BLOCK    [shipped]
         ▼
-   Authorized Execution (Agent Runtime CER)
+   Authorized Execution (Agent Runtime CER)                                 [shipped]
         ▼
-   Runtime Assurance + Reconciliation
+   Runtime Assurance + Reconciliation                                       [planned]
         ▼
-   Story Graph / Calibration / Revocation
+   Story Graph / Calibration / Revocation                                   [planned]
 ```
 
 ### Governance verb vocabularies (the differentiator ServiceNow's generic approve/reject lacks)
@@ -368,7 +387,7 @@ and unverifiable evidence before the model is allowed to rely on it?"*
 
 ## D. Decision & Authority Kernel
 
-### D1. Decision Authority (AI Decision Authority / Risk Authority kernel)
+### D1. Decision Authority (AI Decision / Binding-Decision Kernel)
 
 | | |
 |---|---|
@@ -400,10 +419,13 @@ DecisionCase
   ├─ assessment / reasoning     └─ resulting authorization
 ```
 
-This is **AI Decision Authority**, not AI recommendation governance. When Decision Authority
-consumes upstream policy/risk outputs, it becomes the **Risk Authority / executable GRC** layer:
-it converts an approved ServiceNow risk/approval outcome into a binding `RiskDecisionCase` and
-authorization envelope that ActionGate, sequence-risk and clearance controls then enforce.
+This is **AI Decision Authority**, not AI recommendation governance. Decision Authority is the
+*shipped binding-decision kernel*; it is the principal that the **planned Risk Authority control
+plane** (§D2) would call to issue a binding `RiskDecision` before minting a signed
+`RiskAuthorizationEnvelope`. The kernel itself does not compile GRC policy, mint signed
+envelopes, or manage an authority registry — those are Risk Authority responsibilities still in
+design (§D2). Keeping them separate is deliberate: the kernel stays domain-neutral and frozen at
+v1.0.0 while the executable-GRC layer is built around it.
 
 **How it enhances ServiceNow workflow capability.** When an enterprise removes the human
 approver, Decision Authority supplies the *authoritative decision artifact* ServiceNow lacks at
@@ -415,6 +437,130 @@ produces the machine-consumable decision object that record refers to.
 **Discovery question.** *"If an enterprise removes the human approver and allows an AI to make a
 consequential decision, what becomes the authoritative decision artifact in ServiceNow, and how
 does that artifact constrain the downstream action?"*
+
+### D2. Risk Authority — Executable GRC Control Plane · **PLANNED (Design Baseline v1.1)**
+
+| | |
+|---|---|
+| **Status** | 🚧 **Not yet a package** — design baseline for implementation planning (Risk Authority Architecture Spec v1.1, Aug 2026) |
+| **Intended package** | `packages/risk_authority` (per the spec's recommended repository layout) |
+| **Vocabulary** | `RiskDecisionCase` → binding `RiskDecision` → signed, scoped, time-bound `RiskAuthorizationEnvelope` |
+| **Authority** | Executable authority — the "System of Authority" between systems of record and systems of action |
+
+> **This module is not built.** Everything in this subsection describes the v1.1 *design
+> specification*, not shipped code. It is included so the portfolio story is complete and so the
+> shipped packages are correctly positioned as its future building blocks. Do not present Risk
+> Authority as available today.
+
+**What the design specifies.** Risk Authority is an **executable governance, risk & compliance
+control plane** positioned between enterprise systems of record and systems of action. It does
+**not** replace GRC platforms (OneTrust, ServiceNow GRC, Archer, Credo AI, Holistic AI). Instead
+it *consumes* approved policy and risk decisions, compiles them into deterministic controls,
+binds those controls to admissible evidence and authority, and enforces the resulting
+authorization at runtime. Its product thesis: *"Your GRC system tells you what your AI policy is;
+Ugence makes it executable."*
+
+**How it composes the shipped packages.** Risk Authority is largely an *orchestration and
+binding* layer over modules that already exist, plus a set of new authority/runtime services. The
+spec's own service boundary maps directly onto this document's packages:
+
+| Spec service | Build status | This document |
+|---|---|---|
+| `policy-workflow-compiler` | ✅ shipped | §B1 (`ugence-policy-workflow-compiler`) |
+| `evidence-admission` (TAP-compatible) | ✅ shipped | §C1 (`ugence-tap-provider`) |
+| `decision-authority` (binding ruling) | ✅ shipped | §D1 (`ugence-decision-authority`) |
+| `context-minimization` | ✅ shipped | §F3 (`ugence-context-minimization`) |
+| `actiongate` (exact-action) | ✅ shipped | §E1 (`ugence-actiongate-provider`) |
+| `action-clearance` (ACP) | ✅ shipped | §E2 (`ugence-action-clearance`) |
+| `risk-authority` (case eval, `RiskDecision`, envelope construction) | 🚧 planned | *this section* |
+| `authority-registry` (principal/delegation scope, key IDs) | 🚧 planned | — |
+| `control-assurance` (control resolution + freshness) | 🚧 planned | — |
+| `third-party-ai-gateway` (external model/data boundary) | 🚧 planned | — |
+| `trajectory-control` (stateful multi-action policy, OCC, locks) | 🚧 planned | (advisory precursor: `storygraph`, §G2) |
+| `reconciliation` (intended vs actual) | 🚧 planned | — |
+| `risk-escalation` (suspend/revoke/notify) | 🚧 planned | — |
+
+**Four-plane reference architecture (design).**
+
+```
+GOVERNANCE PLANE   GRC / Policy Sources → PWC → WorkflowIR → Risk Engine
+                   TAP / Evidence Admission → Control Assurance
+        │ evaluated governance
+        ▼
+AUTHORITY PLANE    Decision Authority → Authority Registry
+                   Envelope Issue / Reauthorize / Revoke / Epoch Propagate
+        │ signed compact authority
+        ▼
+RUNTIME PLANE      Context Control → ActionGate → Trajectory → ACP
+                   Canonical action digest + local revocation state
+        │ execute
+        ▼
+ASSURANCE PLANE    Reconciliation → Trajectory Update → Escalation
+                   Feedback → evidence / controls / authority
+```
+
+**Execution invariant (design).** Execution is permitted only when *every* independent gate
+passes — a non-compensatory, fail-closed conjunction:
+
+```
+P ∧ E ∧ R ∧ A ∧ T ∧ O ∧ B  →  X
+  P = correct policy/version binding      A = exact requested action is authorized
+  E = admissible & current evidence       T = trajectory within permitted state
+  R = binding risk decision permits op    O = operational environment is clear
+  B = tenant/session/model/payload bindings intact         X = execution
+Fail-closed form:  ¬P ∨ ¬E ∨ ¬R ∨ ¬A ∨ ¬T ∨ ¬O ∨ ¬B  →  ¬X
+```
+
+**ServiceNow adjacency / strength.** ServiceNow GRC / AI Risk & Compliance: policy libraries,
+risk registers, control assessments, AI cases, approval workflows, audit management.
+
+**Ugence differentiation (target).** This is the module that ties the architecture together:
+ServiceNow (or any GRC system) remains the system of record for governance; Risk Authority would
+convert an approved governance state into **cryptographically bound, evidence-backed,
+state-aware machine authority** — a signed `RiskAuthorizationEnvelope` (Ed25519, SHA-256 action
+digests, tenant/subject/model/version/validity-window bindings) that ActionGate, Trajectory
+Control and ACP consume on a hot path (target p50 ≤ 5 ms) whose cost scales with the compact
+envelope, not the size of the policy corpus.
+
+```
+ServiceNow current / adjacent           Risk Authority runtime workflow  [PLANNED]
+──────────────────────────────          ───────────────────────────────────────────
+Compliance team                         Workflow / AI use case
+        │                                        │
+        ▼                                        ▼
+Risk register                           RiskDecisionCase
+        │                                        │
+        ▼                                        ▼
+Questionnaires / assessments            Admissible evidence (TAP) + control assurance
+        │                                        │
+        ▼                                        ▼
+Approval / case                         Binding RiskDecision (Decision Authority)
+                                                 │
+                                                 ▼
+                                        Signed RiskAuthorizationEnvelope (scoped, time-bound)
+                                                 │
+                                                 ▼
+                                        ActionGate → Trajectory Control → ACP → Execution
+                                                 │
+                                                 ▼
+                                        Reconciliation → revoke / constrain / escalate
+```
+
+**How it would enhance ServiceNow workflow capability.** It answers the question *"what
+machine-consumable runtime artifact represents a ServiceNow risk/approval outcome after the human
+workflow is complete?"* — today, nothing; the design's answer is the signed envelope. ServiceNow
+records and orchestrates risk governance; Risk Authority would turn an approved risk outcome into
+executable, revocable authority and feed decision/enforcement/reconciliation events back to the
+GRC system for its audit dashboards.
+
+**Recommended starting point (from the spec).** Phase 1 + Phase 2: `WorkflowIR → RiskDecisionCase
+→ Decision Authority → RiskAuthorizationEnvelope → canonical action digest → ActionGate` — proving
+that an approved governance decision becomes bounded machine authority and that an off-scope
+action cannot execute.
+
+**Discovery question.** *"What machine-consumable runtime artifact represents a ServiceNow
+risk/approval outcome after the human workflow is complete — and can it be cryptographically
+bound, scoped, time-bound and revocable?"*
 
 ---
 
@@ -739,6 +885,12 @@ OBSERVE / ESCALATE  →  downstream ActionGate or policy owns the binding conseq
 signal that a ServiceNow workflow can subscribe to — so prior behavior can change the permission
 posture of the next action, which per-step approval workflows cannot express.
 
+> **Relationship to Trajectory Control (planned §D2).** StoryGraph is the *shipped, advisory*
+> sequence-risk signal (`OBSERVE`/`ESCALATE` only). The *binding* Trajectory Control described in
+> the Risk Authority spec — stateful `TrajectoryState`, optimistic-concurrency locks, and
+> `CONTINUE/CONSTRAIN/ESCALATE/REVOKE` enforcement — is a **planned** module, not this package.
+> StoryGraph is its advisory precursor.
+
 **Discovery question.** *"Does prior behavior change permission — can the platform flag when a
 sequence of individually-approved actions assembles a prohibited capability?"*
 
@@ -966,7 +1118,7 @@ express only as human routing.
 | What AI do we have? | Very strong | Do not compete; consume AI inventory |
 | Who owns it? | Very strong | Bind runtime decisions to ownership/authority (`decision-authority`) |
 | What regulations apply? | Strong | Compile approved constraints (`policy-workflow-compiler`) |
-| What is its risk classification? | Strong | Convert classification into executable constraints (`decision-authority`) |
+| What is its risk classification? | Strong | Convert classification into executable authority (Risk Authority, planned §D2, on `decision-authority`) |
 | Is the agent/model approved? | Strong | Per-request eligibility for *this* decision (`model-selection`) |
 | Can AI make this decision? | Governance / approval workflows | Delegated machine authority (`decision-authority`; AI barred as principal) |
 | What evidence may it rely on? | Risk/compliance records | Evidence admission at decision time (`tap`) |
@@ -982,7 +1134,7 @@ express only as human routing.
 | Workflow platform | Runtime governance / authority platform |
 | AI inventory | AI decision / execution authority |
 | Provider configuration | Per-request Model Authority |
-| Risk register / assessment | Executable `RiskDecision` + authorization envelope |
+| Risk register / assessment | Executable `RiskDecision` + signed authorization envelope (Risk Authority, planned §D2) |
 | Compliance dashboard | Runtime enforcement and reconciliation |
 | Policy / workflow configuration | Compiled `workflow_ir` constraints |
 | Workflow execution | Authorized execution (CER) |
@@ -1031,8 +1183,8 @@ Prompt → Evidence → DecisionCase → Model/Agent Authority → ActionGate
 |---|---|---|
 | Policy / WorkflowIR | Policy version, compiled rule, control requirement | `policy-workflow-compiler` |
 | Evidence | Document, evaluation, attestation, freshness state | `tap` |
-| DecisionCase | RiskDecisionCase, HiringDecisionCase, ProcurementDecisionCase | `decision-authority`, products |
-| Authority | RiskDecision, ModelAuthorizationDecision, ActionAuthorization | `decision-authority`, `model-selection`, `actiongate` |
+| DecisionCase | HiringDecisionCase, ProcurementDecisionCase (RiskDecisionCase → planned §D2) | `decision-authority`, products |
+| Authority | ModelAuthorizationDecision, ActionAuthorization (RiskDecision + envelope → planned §D2) | `model-selection`, `actiongate` (Risk Authority planned) |
 | Actor / Model / Agent | Human principal, AI model/version, agent/workforce | `agent-workforce-composer`, `agent-runtime` |
 | Action | Canonical proposed/attempted/executed action (CER) | `agent-runtime`, `actiongate` |
 | ExecutionReceipt | Attempt, execution, actual side effect | `decision-authority` execution/reconciliation |
@@ -1204,25 +1356,35 @@ while preserving the governance core.
 
 # Appendix B — Master Map: Package ↔ Module ↔ ServiceNow Adjacency
 
-| `symbolu/packages/…` | Distribution | Conceptual module | Decision vocabulary | ServiceNow adjacency |
-|---|---|---|---|---|
-| `governance-contracts` | `ugence-governance-contracts` | Contract spine | request/result/outcome types | Data model / table schema |
-| `governance-provider-framework` | `ugence-governance-provider-framework` | Provider mechanics | register/resolve/invoke | IntegrationHub / spokes |
-| `tooling/policy-workflow-compiler` | `ugence-policy-workflow-compiler` | Policy Workflow Compiler | → `workflow_ir` + digest | Flow Designer / policy config |
-| `providers/tap` | `ugence-tap-provider` | TAP (Truth Assurance) | `SUPPORTED/CONSTRAINED/INDETERMINATE` | AI guardrails / risk records |
-| `capabilities/decision-authority` | `ugence-decision-authority` | AI Decision / Risk Authority | binding `DecisionOutcome` | AI risk assessments / cases |
-| `providers/actiongate` | `ugence-actiongate-provider` | ActionGate | `AUTHORIZED/DENIED/INDETERMINATE` | Tool/MCP + access governance |
-| `capabilities/action-clearance` | `ugence-action-clearance` | ACP / Operational Clearance | `CLEAR/HOLD/BLOCK/ESCALATE` | ITSM/ITOM / change state |
-| `capabilities/model-selection` | `ugence-model-selection` | Model Authority | selection / `NO_ELIGIBLE_MODEL` | AI/model inventory |
-| `capabilities/llm-steering-controller` | `ugence-llm-steering-controller` | LLM Steering Controller | `RECOMMENDED` (not executed) | Now Assist guardrails |
-| `capabilities/context-minimization` | `ugence-context-minimization` | Context Minimization | `minimize_context` (fail-closed) | Data access / privacy controls |
-| `capabilities/agent-workforce-composer` | `ugence-agent-workforce-composer` | Agent Workforce Composer | `AgentTeamPlan` (zero new authority) | Agent orchestration / skills |
-| `capabilities/storygraph` | `ugence-storygraph` | Sequence-Risk / Trajectory | `OBSERVE/ESCALATE/UNAVAILABLE` | Cases / CMDB relationships |
-| `runtime/agent-runtime` | `ugence-agent-runtime` | Agent Runtime / CER | consumes `CLEAR/HOLD/BLOCK/ESCALATE` | Agent platform / runtime |
-| `capabilities/cloud-scaling-controller` | `ugence-cloud-scaling-controller` | Scaling (advisory) | recommendation (`advisory_only`) | ITOM event management |
-| `capabilities/cloud-scaling-operations` | `ugence-cloud-scaling-operations` | Scaling (controlled exec.) | gated `CONTROLLED_EXECUTION` | Remediation runbooks |
-| `products/ai-hiring` | `ugence-ai-hiring` | Hiring Governance Authority | human-only binding decision | HR / ATS workflows |
-| `products/procurement` | `ugence-procurement` | Governed Procurement | graduated decision rights | Procurement / approval chains |
+**Status key:** ✅ shipped (independently installable, offline-verifiable under `symbolu/packages/`)
+· 🚧 planned (design baseline, not yet a package).
+
+| Status | `symbolu/packages/…` | Distribution | Conceptual module | Decision vocabulary | ServiceNow adjacency |
+|---|---|---|---|---|---|
+| ✅ | `governance-contracts` | `ugence-governance-contracts` | Contract spine | request/result/outcome types | Data model / table schema |
+| ✅ | `governance-provider-framework` | `ugence-governance-provider-framework` | Provider mechanics | register/resolve/invoke | IntegrationHub / spokes |
+| ✅ | `tooling/policy-workflow-compiler` | `ugence-policy-workflow-compiler` | Policy Workflow Compiler | → `workflow_ir` + digest | Flow Designer / policy config |
+| ✅ | `providers/tap` | `ugence-tap-provider` | TAP (Truth Assurance) | `SUPPORTED/CONSTRAINED/INDETERMINATE` | AI guardrails / risk records |
+| ✅ | `capabilities/decision-authority` | `ugence-decision-authority` | AI Decision / Binding-Decision Kernel | binding `DecisionOutcome` | AI risk assessments / cases |
+| ✅ | `providers/actiongate` | `ugence-actiongate-provider` | ActionGate | `AUTHORIZED/DENIED/INDETERMINATE` | Tool/MCP + access governance |
+| ✅ | `capabilities/action-clearance` | `ugence-action-clearance` | ACP / Operational Clearance | `CLEAR/HOLD/BLOCK/ESCALATE` | ITSM/ITOM / change state |
+| ✅ | `capabilities/model-selection` | `ugence-model-selection` | Model Authority | selection / `NO_ELIGIBLE_MODEL` | AI/model inventory |
+| ✅ | `capabilities/llm-steering-controller` | `ugence-llm-steering-controller` | LLM Steering Controller | `RECOMMENDED` (not executed) | Now Assist guardrails |
+| ✅ | `capabilities/context-minimization` | `ugence-context-minimization` | Context Minimization | `minimize_context` (fail-closed) | Data access / privacy controls |
+| ✅ | `capabilities/agent-workforce-composer` | `ugence-agent-workforce-composer` | Agent Workforce Composer | `AgentTeamPlan` (zero new authority) | Agent orchestration / skills |
+| ✅ | `capabilities/storygraph` | `ugence-storygraph` | Sequence-Risk (advisory) | `OBSERVE/ESCALATE/UNAVAILABLE` | Cases / CMDB relationships |
+| ✅ | `runtime/agent-runtime` | `ugence-agent-runtime` | Agent Runtime / CER | consumes `CLEAR/HOLD/BLOCK/ESCALATE` | Agent platform / runtime |
+| ✅ | `capabilities/cloud-scaling-controller` | `ugence-cloud-scaling-controller` | Scaling (advisory) | recommendation (`advisory_only`) | ITOM event management |
+| ✅ | `capabilities/cloud-scaling-operations` | `ugence-cloud-scaling-operations` | Scaling (controlled exec.) | gated `CONTROLLED_EXECUTION` | Remediation runbooks |
+| ✅ | `products/ai-hiring` | `ugence-ai-hiring` | Hiring Governance Authority | human-only binding decision | HR / ATS workflows |
+| ✅ | `products/procurement` | `ugence-procurement` | Governed Procurement | graduated decision rights | Procurement / approval chains |
+| 🚧 | `risk_authority` *(planned §D2)* | — *(design baseline v1.1)* | Risk Authority / Executable GRC control plane | `RiskDecisionCase` → `RiskDecision` → signed `RiskAuthorizationEnvelope` | ServiceNow GRC / AI Risk & Compliance |
+| 🚧 | `authority-registry` *(planned)* | — | Principal / delegation scope, key IDs | authority lifecycle | GRC ownership / delegation |
+| 🚧 | `control-assurance` *(planned)* | — | Control resolution + freshness | `PASS/FAIL/MISSING/STALE/UNKNOWN` | Control assessments |
+| 🚧 | `trajectory-control` *(planned)* | — | Stateful multi-action policy (OCC, locks) | `CONTINUE/CONSTRAIN/ESCALATE/REVOKE` | Workflow history / cases |
+| 🚧 | `third-party-ai-gateway` *(planned)* | — | External model/data boundary | governed external invocation | Third-party AI configuration |
+| 🚧 | `reconciliation` *(planned)* | — | Intended vs actual + side-effects | `ReconciliationRecord` | Monitoring / cases |
+| 🚧 | `risk-escalation` *(planned)* | — | Suspend / revoke / notify | revocation propagation | Incident / case response |
 
 ---
 
