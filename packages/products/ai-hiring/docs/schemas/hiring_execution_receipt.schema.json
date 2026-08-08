@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ugence.ai/schemas/hiring/hiring_execution_receipt.schema.json",
+  "title": "HiringExecutionReceipt",
+  "description": "Immutable record of a governed HRIS/ATS execution attempt, produced by the orchestrator ONLY after action authorization (ActionGate) AND runtime assurance both passed. Authorization != execution: a timeout yields OUTCOME_UNKNOWN, never SUCCEEDED. Tracks the implemented domain model ugence_ai_hiring.hiring_decision.execution.HiringExecutionReceipt.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["receipt_id", "decision_case_id", "contract_ref", "binding_decision_id", "binding_authority_id", "action_request_id", "action_request_digest", "authorization_ref", "assurance_ref", "hris_execution_ref", "actor", "authorized_at", "assured_at", "executed_at", "execution_status"],
+  "properties": {
+    "receipt_id": { "type": "string" },
+    "decision_case_id": { "type": "string" },
+    "contract_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_id", "version", "ir_digest"],
+      "properties": {
+        "contract_id": { "type": "string" },
+        "version": { "type": "integer", "minimum": 1 },
+        "ir_digest": { "type": "string" }
+      }
+    },
+    "binding_decision_id": { "type": "string", "description": "The binding Employment Decision this action realizes." },
+    "binding_authority_id": { "type": "string", "description": "The HUMAN Decision Authority that bound the decision." },
+    "action_request_id": { "type": "string" },
+    "action_request_digest": { "type": "string", "description": "SHA-256 over the semantic action payload; binds the receipt to the exact authorized action." },
+    "authorization_ref": { "type": "string", "description": "ActionGate authorization reference (authorization_id)." },
+    "assurance_ref": { "type": "string", "description": "Runtime Assurance clearance reference (assurance_id)." },
+    "hris_execution_ref": { "type": "string", "description": "HRIS/ATS execution reference returned by the execution port." },
+    "actor": { "type": "string" },
+    "authorized_at": { "type": "string", "format": "date-time" },
+    "assured_at": { "type": "string", "format": "date-time" },
+    "executed_at": { "type": "string", "format": "date-time" },
+    "execution_status": { "type": "string", "enum": ["SUCCEEDED", "FAILED", "OUTCOME_UNKNOWN"] },
+    "result_digest": { "type": "string", "default": "" }
+  }
+}

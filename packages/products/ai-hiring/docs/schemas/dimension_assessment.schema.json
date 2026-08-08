@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ugence.ai/schemas/hiring/dimension_assessment.schema.json",
+  "title": "DimensionAssessment",
+  "description": "AI-produced, advisory assessment of one role-scoped compatibility dimension. There are no bare scores: every scored dimension carries confidence, the admitted evidence it consumed (by lineage node), an assessment version, and rationale/provenance. The Decision Authority reasons over (evidence, confidence), not score alone. This schema tracks the implemented domain model ugence_ai_hiring.hiring_decision.assessment.DimensionAssessment.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["dimension", "outcome", "confidence", "evidence_refs", "assessment_version", "provenance", "advisory_only"],
+  "properties": {
+    "dimension": { "type": "string", "description": "Role-scoped dimension id, e.g. TECHNICAL, OPERATING_ENVIRONMENT_COMPATIBILITY. CULTURE_FIT and RESILIENCE are forbidden." },
+    "outcome": {
+      "type": "string",
+      "enum": ["SCORED", "INSUFFICIENT_EVIDENCE"],
+      "description": "SCORED when required evidence admitted AND confidence >= floor; otherwise INSUFFICIENT_EVIDENCE."
+    },
+    "score": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Present only when outcome==SCORED. Null when INSUFFICIENT_EVIDENCE."
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "How much the assessor trusts this dimension's score. Low confidence is a request for more evidence, never a reason to lower the score."
+    },
+    "evidence_refs": {
+      "type": "array",
+      "minItems": 0,
+      "items": { "type": "string" },
+      "description": "Admitted Evidence Lineage node ids this assessment consumed. A SCORED assessment must cite at least one."
+    },
+    "assessment_version": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 1,
+      "description": "Version of this candidate/dimension assessment; a re-assessment increments it."
+    },
+    "rationale": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Structured reasons supporting the outcome."
+    },
+    "gaps": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "What evidence, if admitted, would raise confidence or resolve INSUFFICIENT_EVIDENCE."
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["engine"],
+      "description": "Where the assessment came from (engine/model identity + time).",
+      "properties": {
+        "engine": { "type": "string" },
+        "model_id": { "type": "string" },
+        "model_version": { "type": "string" },
+        "produced_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "pre_hire_justified": {
+      "type": "boolean",
+      "default": false,
+      "description": "ROLE_SUSTAINABILITY_AND_ADAPTATION is post-hire-oriented; it may be SCORED pre-hire only when this is true, backed by job-relevant evidence."
+    },
+    "advisory_only": {
+      "const": true,
+      "description": "Hard invariant: a dimension assessment is advisory and can never be a decision."
+    }
+  }
+}

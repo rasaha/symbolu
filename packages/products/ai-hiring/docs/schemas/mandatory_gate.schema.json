@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ugence.ai/schemas/hiring/mandatory_gate.schema.json",
+  "title": "MandatoryGate",
+  "description": "A non-compensatory hard requirement (ActionGate parity). Failure of ANY mandatory gate cannot be compensated by high compatibility, confidence, or Overall Fit Index. A gate whose deciding evidence was never admitted is INDETERMINATE (fail-closed) and blocks eligibility exactly as FAILED does.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["gate_id", "gate_type", "predicate", "status"],
+  "properties": {
+    "gate_id": { "type": "string" },
+    "gate_type": {
+      "type": "string",
+      "enum": [
+        "REQUIRED_SKILLS",
+        "REQUIRED_CERTIFICATIONS",
+        "WORK_AUTHORIZATION",
+        "SECURITY_CLEARANCE",
+        "INTERVIEW_COMPLETED",
+        "ASSESSMENT_COMPLETED",
+        "REQUIRED_EXPERIENCE"
+      ]
+    },
+    "predicate": {
+      "type": "object",
+      "description": "Typed predicate over ADMITTED evidence. Interpreted by the Decision Authority; never reads the Overall Fit Index.",
+      "additionalProperties": false,
+      "required": ["expression", "evidence_types"],
+      "properties": {
+        "expression": { "type": "string", "description": "Declarative predicate, e.g. \"has(CERTIFICATION where name in required_certs)\"." },
+        "evidence_types": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Evidence types whose admission this gate depends on."
+        }
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": ["PASSED", "FAILED", "INDETERMINATE"],
+      "description": "INDETERMINATE when deciding evidence was not admitted; blocks eligibility (resolvable only by admitting evidence, never by fit)."
+    },
+    "deciding_evidence": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Evidence Lineage node ids that produced this status."
+    },
+    "x-invariants": {
+      "type": "object",
+      "const": {
+        "non_compensatory": "A FAILED or INDETERMINATE mandatory gate cannot be overridden by any dimension score, confidence, or OFI.",
+        "no_ofi_dependency": "predicate MUST NOT reference the Overall Fit Index."
+      }
+    }
+  }
+}

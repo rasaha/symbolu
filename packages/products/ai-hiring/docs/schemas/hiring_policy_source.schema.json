@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ugence.ai/schemas/hiring/hiring_policy_source.schema.json",
+  "title": "HiringPolicy",
+  "description": "Declarative, human-authored hiring policy source. HR declares requirements; they do NOT hand-configure dimension weights or JSON contracts. The Hiring Policy Compiler (PWC) compiles this into a signed HiringWorkflowIR from which a Hiring Decision Contract is projected. This replaces the hand-authored Role Compatibility Profile as the authoring surface.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["policy_id", "role", "requirements", "action_constraints", "approval_chain", "authored_by"],
+  "properties": {
+    "policy_id": { "type": "string" },
+    "role": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["job_definition_id", "title", "seniority_level"],
+      "properties": {
+        "job_definition_id": { "type": "string" },
+        "title": { "type": "string", "examples": ["Senior Architect"] },
+        "seniority_level": { "type": "string", "examples": ["L5"] }
+      }
+    },
+    "requirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "What the role requires, declared plainly. The compiler derives dimensions, weights, gates, required evidence, and confidence thresholds from these.",
+      "required": ["required_skills", "mandatory"],
+      "properties": {
+        "required_skills": { "type": "array", "items": { "type": "string" }, "examples": [["AWS", "Kubernetes", "Leadership"]] },
+        "required_domain": { "type": "array", "items": { "type": "string" }, "examples": [["Healthcare"]] },
+        "mandatory": {
+          "type": "array",
+          "description": "Non-negotiables that become non-compensatory Mandatory Gates.",
+          "items": {
+            "type": "string",
+            "enum": ["REQUIRED_SKILLS", "REQUIRED_CERTIFICATIONS", "WORK_AUTHORIZATION", "SECURITY_CLEARANCE", "INTERVIEW_COMPLETED", "ASSESSMENT_COMPLETED", "REQUIRED_EXPERIENCE"]
+          }
+        },
+        "operating_environment": {
+          "type": "string",
+          "description": "Drives the Operating Environment Compatibility dimension (operating-model, not personal similarity).",
+          "examples": ["STARTUP", "BANK", "HEALTHCARE"]
+        },
+        "emphasis": {
+          "type": "object",
+          "description": "Optional relative emphasis hints per dimension the compiler normalizes into weights; NOT raw weights.",
+          "additionalProperties": { "type": "string", "enum": ["PRIMARY", "SECONDARY", "SUPPORTING"] }
+        }
+      }
+    },
+    "action_constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The approved bounds an offer/action must satisfy; compiled into the contract and enforced by the Hiring ActionGate.",
+      "required": ["salary_ceiling", "approved_level"],
+      "properties": {
+        "salary_ceiling": { "type": "number", "minimum": 0, "examples": [220000] },
+        "salary_currency": { "type": "string", "default": "USD" },
+        "approved_level": { "type": "string", "examples": ["L5"] },
+        "approved_roles": { "type": "array", "items": { "type": "string" } },
+        "allowed_locations": { "type": "array", "items": { "type": "string" }, "examples": [["US-REMOTE", "NYC"]] }
+      }
+    },
+    "approval_chain": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Ordered HUMAN approver roles. The compiler rejects any non-human principal.",
+      "items": { "type": "string", "examples": ["Hiring Manager", "Director", "VP Eng"] }
+    },
+    "review_schedule_months": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 1 },
+      "default": [1, 3, 6, 12]
+    },
+    "authored_by": { "type": "string" }
+  }
+}

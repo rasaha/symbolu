@@ -7,6 +7,7 @@ recursive-include src/ugence_ai_hiring *.py
 include src/ugence_ai_hiring/py.typed
 recursive-include src/ai_hiring *.py
 recursive-include docs *.md
+recursive-include docs/schemas *.json
 recursive-include tests *.py
 recursive-include scripts *.py
 recursive-include artifacts *.json

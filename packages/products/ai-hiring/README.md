@@ -87,8 +87,36 @@ authorization response / execution are distinct records; the package prepares
 and requests authorization for governed actions but never executes downstream
 enterprise effects; and it makes no legal, fairness, or production claim.
 
+## Reconstruction: Hiring Decision Authority
+
+The forward design that re-founds this product as one governed **Decision
+Authority** domain on the shared Ugence kernel — the same shape as Procurement,
+Financial, Clinical, and Agent Decision Authority — is specified in
+[`docs/HIRING_DECISION_AUTHORITY_DESIGN_SPEC.md`](docs/HIRING_DECISION_AUTHORITY_DESIGN_SPEC.md),
+with normative JSON Schemas in [`docs/schemas/`](docs/schemas/). The governed
+spine is:
+
+```
+Hiring Policy → Hiring Policy Compiler (PWC) → HiringWorkflowIR (signed,
+content-addressed) → Hiring Decision Contract → Evidence Admission (TAP) →
+Professional Compatibility Engine → Decision Authority (dimension evidence +
+mandatory gates only) → Hiring ActionGate → Runtime Assurance → HRIS/ATS →
+Execution Receipt → 1/3/6/12-month Reviews → Reconciliation → recompile
+```
+
+It removes universal candidate scoring; replaces *Culture Fit* with **Operating
+Environment Compatibility** and *Resilience* with **Role Sustainability &
+Adaptation**; makes the **Overall Fit Index analytics-only** (never enters the
+Decision Authority); enforces **non-compensatory mandatory gates**, a **Hiring
+ActionGate** (action must match the contract or DENY), and **Runtime Assurance**
+before any Workday/SAP/ServiceNow/Oracle write; and closes the loop with an
+**Execution Receipt** and **Reconciliation Record** that recompile contracts —
+not hidden model weights. See spec §21 for the migration plan onto the current
+package layers.
+
 ## Documentation
 
-Install, quickstart, API reference, architecture, configuration, security,
-governance boundaries, deployment, operations, known limitations, versioning,
-migration, packaging, and provenance guides live under [`docs/`](docs/).
+Install, quickstart, API reference, architecture, the Hiring Decision Authority
+design spec and schemas, configuration, security, governance boundaries,
+deployment, operations, known limitations, versioning, migration, packaging, and
+provenance guides live under [`docs/`](docs/).

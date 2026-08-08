@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ugence.ai/schemas/hiring/hiring_actiongate.schema.json",
+  "title": "HiringActionGateVerdict",
+  "description": "Specialization of the platform ActionGate for hiring actions. Verifies the final hiring action (salary, level, role, location, approvals) EXACTLY matches the approved Hiring Decision Contract's action constraints. Any deviation is DENIED and requires reauthorization. Deny-by-deviation: high compatibility can never buy back an out-of-contract action.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["verdict_id", "candidate_id", "decision_id", "checked_action", "contract_ref", "verdict", "evaluated_constraints"],
+  "properties": {
+    "verdict_id": { "type": "string" },
+    "candidate_id": { "type": "string" },
+    "decision_id": { "type": "string", "description": "The binding Employment Decision this action realizes." },
+    "checked_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["salary", "level", "role", "location"],
+      "properties": {
+        "salary": { "type": "number", "minimum": 0 },
+        "salary_currency": { "type": "string", "default": "USD" },
+        "level": { "type": "string" },
+        "role": { "type": "string" },
+        "location": { "type": "string" },
+        "approvals": { "type": "array", "items": { "type": "string" }, "description": "Approver ids that have signed off." }
+      }
+    },
+    "contract_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_id", "version", "ir_digest"],
+      "properties": {
+        "contract_id": { "type": "string" },
+        "version": { "type": "integer", "minimum": 1 },
+        "ir_digest": { "type": "string" }
+      }
+    },
+    "verdict": {
+      "type": "string",
+      "enum": ["ALLOW", "DENY_REAUTH", "DENY_APPROVAL"],
+      "description": "ALLOW: action within constraints and approvals complete. DENY_REAUTH: action deviates from constraints. DENY_APPROVAL: approvals incomplete/expired."
+    },
+    "evaluated_constraints": {
+      "type": "array",
+      "description": "Per-field check against the contract action constraints.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["field", "action_value", "constraint", "satisfied"],
+        "properties": {
+          "field": { "type": "string", "enum": ["SALARY", "LEVEL", "ROLE", "LOCATION", "APPROVALS"] },
+          "action_value": {},
+          "constraint": {},
+          "satisfied": { "type": "boolean" }
+        }
+      }
+    },
+    "violations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["field", "detail"],
+        "properties": {
+          "field": { "type": "string" },
+          "detail": { "type": "string", "examples": ["offer 250000 exceeds ceiling 220000", "offered L6 above approved L5"] }
+        }
+      }
+    },
+    "reauthorization_required": { "type": "boolean", "description": "True whenever verdict != ALLOW." }
+  }
+}

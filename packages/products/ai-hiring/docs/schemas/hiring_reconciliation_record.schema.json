@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ugence.ai/schemas/hiring/hiring_reconciliation_record.schema.json",
+  "title": "HiringReconciliationRecord",
+  "description": "Execution-time reconciliation: the hiring-domain comparison of the AUTHORIZED action against the EXECUTED action and the resulting HRIS state, emitting RECONCILED / DEVIATION / PARTIAL / FAILED / UNKNOWN. The shared cross-system reconciliation ENGINE stays external (ReconciliationPort); this record is the hiring-domain view only, optionally referencing the external run. (Post-hire 1/3/6/12-month predicted-vs-actual reconciliation and calibration is a separate concern — see review_and_calibration.schema.json.) Tracks ugence_ai_hiring.hiring_decision.execution.HiringReconciliationRecord.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["record_id", "decision_case_id", "contract_ref", "receipt_id", "authorized_action", "status"],
+  "$defs": {
+    "actionSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level", "salary", "role_id", "location", "employment_type"],
+      "properties": {
+        "level": { "type": "string" },
+        "salary": { "type": "number", "minimum": 0 },
+        "salary_currency": { "type": "string", "default": "USD" },
+        "role_id": { "type": "string" },
+        "location": { "type": "string" },
+        "employment_type": { "type": "string", "enum": ["FULL_TIME", "PART_TIME", "CONTRACT", "INTERN", "TEMPORARY"] }
+      }
+    }
+  },
+  "properties": {
+    "record_id": { "type": "string" },
+    "decision_case_id": { "type": "string" },
+    "contract_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_id", "version", "ir_digest"],
+      "properties": {
+        "contract_id": { "type": "string" },
+        "version": { "type": "integer", "minimum": 1 },
+        "ir_digest": { "type": "string" }
+      }
+    },
+    "receipt_id": { "type": "string" },
+    "authorized_action": { "$ref": "#/$defs/actionSnapshot" },
+    "executed_action": { "anyOf": [{ "$ref": "#/$defs/actionSnapshot" }, { "type": "null" }] },
+    "hris_state": { "type": "object" },
+    "status": {
+      "type": "string",
+      "enum": ["RECONCILED", "DEVIATION", "PARTIAL", "FAILED", "UNKNOWN"],
+      "description": "RECONCILED: executed == authorized and HRIS state confirms. DEVIATION: executed differs. PARTIAL: executed matches but HRIS state unconfirmed. FAILED: execution failed. UNKNOWN: outcome unknown / no executed action."
+    },
+    "external_reconciliation_ref": { "type": ["string", "null"], "description": "Reference from the shared Reconciliation engine (ReconciliationPort), when invoked." },
+    "reconciled_at": { "type": "string", "format": "date-time" }
+  }
+}

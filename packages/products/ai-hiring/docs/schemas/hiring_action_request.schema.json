@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ugence.ai/schemas/hiring/hiring_action_request.schema.json",
+  "title": "HiringActionRequest",
+  "description": "The hiring-domain action contract. Carries candidate, role, level, compensation bounds, location, employment type, and decision/contract provenance. Translated by an adapter into the platform CER / shared ActionGate contract (see to_cer_payload). This package neither authorizes nor executes the action — that is the shared ActionGate + Runtime Assurance + HRIS, reached through ports. Tracks ugence_ai_hiring.hiring_decision.action_request.HiringActionRequest.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["action_request_id", "candidate_id", "role_id", "level", "compensation", "location", "employment_type", "contract_ref", "decision_id", "recommendation_id"],
+  "properties": {
+    "action_request_id": { "type": "string" },
+    "candidate_id": { "type": "string" },
+    "role_id": { "type": "string" },
+    "level": { "type": "string" },
+    "compensation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["salary_ceiling"],
+      "properties": {
+        "salary_ceiling": { "type": "number", "minimum": 0 },
+        "salary_floor": { "type": "number", "minimum": 0, "default": 0 },
+        "currency": { "type": "string", "default": "USD" }
+      }
+    },
+    "location": { "type": "string" },
+    "employment_type": {
+      "type": "string",
+      "enum": ["FULL_TIME", "PART_TIME", "CONTRACT", "INTERN", "TEMPORARY"]
+    },
+    "contract_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_id", "version", "ir_digest"],
+      "properties": {
+        "contract_id": { "type": "string" },
+        "version": { "type": "integer", "minimum": 1 },
+        "ir_digest": { "type": "string" }
+      }
+    },
+    "decision_id": { "type": "string", "description": "The binding Employment Decision this action realizes." },
+    "recommendation_id": { "type": "string" }
+  },
+  "$comment": "to_cer_payload() emits { action_type: HIRING_OFFER, subject, action, provenance{contract_id,contract_version,ir_digest,decision_id,recommendation_id}, action_request_id } for the shared ActionGate / CER."
+}
