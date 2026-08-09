@@ -1,0 +1,119 @@
+{
+  "schema": "bounded_typed_relational_reasoning/preregistration/v1",
+  "status": "BTRR_PREREGISTRATION_DRAFT",
+  "preserved_invariants": [
+    "ORIGINAL_BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED",
+    "E1_TEMPORAL_TRANSFER_PARTIAL",
+    "KDA_VALIDATION_BLOCKED"
+  ],
+  "roadmap_item": "HYBRID_LLM_ENTERPRISE_RELATIONAL_REASONING_V1_1 #4 (structured relational benchmark)",
+  "scientific_question": {
+    "Q0_prerequisite": "base copy/select/emit/abstain capability of the frozen recipe",
+    "Q2a_path_execution": "execute a supplied relational/temporal/policy plan",
+    "Q2b_path_discovery": "discover the relevant path/events/policy and execute it",
+    "not_tested": ["Q1 neural memory retrieval (true by construction)", "database/RLS/tenant authorization"]
+  },
+  "model": {
+    "reuse": "experiments/single_hop_typed_vs_prose/model.py::StructuredOutputModel",
+    "backbone": "symbolu_neural/clean_softmax/backbone.py::SoftmaxTransformerLM",
+    "recipe": {"d_model": 64, "n_layers": 2, "n_heads": 4, "d_ff": 256, "max_seq": 1024, "dropout": 0.0},
+    "train": {"batch_size": 8, "max_updates": 2000, "lr": 3e-4, "beta1": 0.9, "beta2": 0.95, "weight_decay": 0.01, "grad_clip": 1.0},
+    "objective": "output_only_next_token_cross_entropy",
+    "representation": "single_arm_canonical_typed",
+    "forbidden_components": ["BindingSlots", "E1", "Phase", "KDA", "JEPA", "GNN", "pointer_copy_head", "constrained_decoder", "external_retrieval", "capacity_increase"]
+  },
+  "single_checkpoint_invariant": {
+    "one_checkpoint_per_seed": true,
+    "evaluated_on": ["P0", "R1_R12"],
+    "byte_identical_parameter_digest_required": true,
+    "forbidden": ["separate_p0_model", "p0_fine_tuning", "optimizer_step_between_p0_and_r", "checkpoint_selection_by_p0", "post_p0_modification", "separate_p0_architecture_or_tokenizer"],
+    "flow": "TRAIN(seed) -> freeze + parameter_digest -> eval P0 -> eval R1_R12 on byte-identical checkpoint",
+    "on_p0_failure": "R1_R12 stamped NON_ADMISSIBLE_FOR_REASONING_INTERPRETATION; excluded from every reasoning verdict",
+    "final_seed_is": "one paired evidence unit: checkpoint + P0 + R1_R12"
+  },
+  "base_capability_P0": {
+    "subtasks": {
+      "B1_copy_entity_id": 0.98,
+      "B2_select_one_of_set": 0.98,
+      "B3_copy_evidence_id": 0.98,
+      "B4_reproduce_event_id": 0.98,
+      "B5_emit_exact_schema": 0.99,
+      "B6_return_supplied_token": 0.98,
+      "B7_instructed_trivial_abstention": 0.98
+    },
+    "block_threshold": 0.95,
+    "block_verdict": "RELATIONAL_REASONING_BLOCKED_BY_BASE_CAPABILITY",
+    "block_co_emit": "BASE_COPY_SELECTION_CAPABILITY_NOT_ESTABLISHED"
+  },
+  "splits": {
+    "R1": {"capability": "direct_entity_fact", "path_mode": "NOT_APPLICABLE"},
+    "R2": {"capability": "single_relation_hop", "path_mode": "PATH_GIVEN"},
+    "R3": {"capability": "multi_hop_relation", "path_mode": "PATH_GIVEN"},
+    "R4": {"capability": "multi_hop_relation", "path_mode": "PATH_DISCOVERY"},
+    "R5": {"capability": "temporal_latest_state", "path_mode": "NOT_APPLICABLE"},
+    "R6": {"capability": "relation_plus_temporal", "path_mode": "PATH_GIVEN"},
+    "R7": {"capability": "relation_plus_temporal", "path_mode": "PATH_DISCOVERY"},
+    "R8": {"capability": "policy_application", "path_mode": "NOT_APPLICABLE"},
+    "R9": {"capability": "full_composite", "path_mode": "PATH_DISCOVERY"},
+    "R10": {"capability": "authorized_absence_cross_tenant_non_fabrication", "path_mode": "PATH_DISCOVERY", "gold": "abstain", "non_claim": "does_not_validate_db_rls_tenant_authorization"},
+    "R11": {"capability": "insufficient_evidence", "path_mode": "PATH_DISCOVERY", "gold": "abstain"},
+    "R12": {"capability": "confusable_records", "path_mode": "PATH_DISCOVERY"}
+  },
+  "path_discovery_validator": {
+    "PATH_DISCOVERY": "relation_chain == [] AND no intermediate entity_id, target policy_id, or outcome token in query",
+    "PATH_GIVEN": "relation_chain non-empty (plan supplied, not answer)",
+    "query_labels_answer_independent": true
+  },
+  "numeric_gates_per_final_seed": {
+    "structured_output_validity": 0.98,
+    "R1_direct_attribute": 0.95,
+    "R2_path_given_1hop": 0.90,
+    "R3_path_given_multihop": 0.85,
+    "R4_path_discovery_multihop": 0.75,
+    "entity_selection": 0.90,
+    "relation_path_exact_ordered": 0.80,
+    "latest_event": 0.85,
+    "latest_event_effect_over_global_most_recent": 0.20,
+    "policy_condition": 0.85,
+    "evidence_precision": 0.90,
+    "evidence_recall": 0.85,
+    "abstention_R10_R11": 0.85,
+    "false_abstention_on_answerable_max": 0.10,
+    "hallucinated_entity_max": 0.02,
+    "hallucinated_relation_max": 0.02,
+    "hallucinated_evidence_max": 0.02,
+    "R7_path_discovery_temporal": 0.72,
+    "R9_composite_final_answer": 0.70,
+    "R9_full_chain_correct": 0.60,
+    "R12_confusable_min_relative_to_R9": -0.10
+  },
+  "structure_blind_baselines": ["shuffled_context", "query_only", "majority_class", "most_recent_token", "global_most_recent", "policy_id_to_outcome"],
+  "structure_blind_margin": 0.10,
+  "final_seeds_required_to_pass": 4,
+  "final_seeds_total": 5,
+  "non_compensation": "VALIDATED requires ALL critical gates incl R4/R7 discovery and R9 composite/full-chain; PATH_GIVEN cannot offset discovery/temporal/policy/evidence/abstention failure",
+  "verdict_precedence": [
+    "PROTOCOL_VIOLATED",
+    "RELATIONAL_REASONING_BLOCKED_BY_BASE_CAPABILITY",
+    "SHORTCUT_OR_LEAKAGE_DETECTED",
+    "RESOURCE_BLOCKED",
+    "ABSTENTION_FAILED",
+    "EVIDENCE_GROUNDING_FAILED",
+    "TEMPORAL_REASONING_FAILED",
+    "POLICY_REASONING_FAILED",
+    "RELATIONAL_REASONING_VALIDATED",
+    "RELATIONAL_REASONING_PARTIAL",
+    "RELATIONAL_REASONING_NOT_FOUND"
+  ],
+  "forbidden_verdicts": ["ENTERPRISE_READY", "PRODUCTION_READY", "DATABASE_REPLACEMENT_VALIDATED", "BINDINGSLOTS_RESOLVED", "KDA_VALIDATION_ELIGIBLE", "AGI_VALIDATED"],
+  "bounded_positive_claim": "A non-memory neural model can, under the tested synthetic conditions, both execute and discover relational/temporal/policy reasoning over a correctly retrieved bounded typed working set.",
+  "seeds": {
+    "smoke": [8100],
+    "development": [8101, 8102, 8103],
+    "final": [81600, 81601, 81602, 81603, 81604],
+    "unit_fixtures_inadmissible": [883000, 883001, 883002, 883003, 883004],
+    "state": "RESERVED_FAIL_CLOSED_UNCONSUMED",
+    "disjoint_from": ["typed_vs_prose", "unseen_identifier", "e1_lineage"]
+  },
+  "execution_authorization": "experiments/relational_reasoning_bounded_context/EXECUTION_AUTHORIZATION.md (UNSIGNED)"
+}
