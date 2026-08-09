@@ -2,8 +2,8 @@
 
 ## Partner Architecture, Product Differentiation and Package Evidence
 
-**Version:** 2.4
-**Supersedes:** v2.3 package-grounded edition (and the v2.1 / v2.0 positioning drafts)
+**Version:** 2.5 (partner-ready candidate)
+**Supersedes:** v2.4 (and the v2.3 / v2.1 / v2.0 drafts)
 **Audience:** ServiceNow architecture, product, risk & compliance, and partnership teams
 **How to read this document:** Parts 0–I are the partner-facing narrative and can be read on
 their own. Part II onward and the appendices carry the package-level evidence (distribution
@@ -30,6 +30,18 @@ proposed product layer over the shipped Decision Authority kernel; added a Runti
 status section; renamed the proposed causal graph to **Governance Story Graph** (distinct from the
 shipped **StoryGraph Sequence Risk** analyzer); softened ServiceNow statements to reflect its
 current AI Control Tower / Now Assist Guardian runtime-governance capabilities.
+
+**v2.5 changes (partner-review pass):** fixed the top-level runtime diagram so the Model Authority
+verbs are marked `[near-term]` over the shipped `[shipped]` Model Selection kernel; disambiguated
+the Appendix B Model Selection and Procurement rows (current vs target); replaced two overly
+categorical ServiceNow claims ("artifact ServiceNow lacks", "today, nothing") with defensible
+Ugence-scoped statements plus comparison discovery questions; distinguished the shipped TAP
+assertion-support semantics (`SUPPORTED/CONSTRAINED/INDETERMINATE`) from the target TAP-compatible
+Evidence Admission service (`ADMITTED/REJECTED/STALE/CONFLICTING`); corrected the Governance Story
+Graph authority node to show current `Selection` vs target `ModelAuthorizationDecision`; added the
+five-question meeting spine to Part 0. This is the intended freeze point for the technical
+document — the recommended next artifact is a shorter ServiceNow executive/meeting deck derived
+from it, not further prose.
 
 ---
 
@@ -71,6 +83,28 @@ Now Assist / agent platform)           model · exact action · clearance  APIs 
 5. **Distinct, fail-closed decision vocabularies.** Evidence support, model eligibility, binding
    decision, exact-action authorization, sequence-risk advisory, operational clearance and
    execution each speak a different verb — and uncertainty is never promoted to a favorable one.
+
+## The five-question spine for the conversation
+
+The full portfolio is 15+ modules, but the *spoken* ServiceNow story should follow one
+progression of five questions. Each question is owned by one module, with PWC + TAP supplying
+policy and evidence underneath, and the Governance Story Graph explaining the lifecycle
+afterward. Everything else is evidence that this authority architecture generalizes.
+
+```
+Can AI make this decision?              →  Decision Authority        (delegated, never self-auth)
+        ↓
+Which model is allowed to make it?      →  Model Authority           (current kernel → target contract)
+        ↓
+What exact action is authorized?        →  ActionGate                (exact payload digest)
+        ↓
+Is that action safe to execute now?     →  Action Clearance (ACP)    (independent live gate)
+        ↓
+Did execution remain within authority?  →  Runtime Assurance (RTA)   (intent ↔ effect reconciliation)
+
+        underneath:  Policy Workflow Compiler (policy) + TAP (evidence)
+        afterward:   Governance Story Graph (causal lifecycle lineage)
+```
 
 ## Integration architecture (vendor-neutral)
 
@@ -206,10 +240,11 @@ identity, so adoption is non-breaking.
 ### Overall runtime architecture
 
 The flow below is the *target* runtime path. Boxes are marked `[shipped]` (a shipped package),
-`[composed]` (realized today by composing shipped packages; standalone package near-term — e.g.
-Runtime Assurance, §H2), or `[planned]` (design baseline, not yet a package — e.g. the Risk
-Authority control plane that would orchestrate the path end-to-end, and the Governance Story
-Graph).
+`[near-term]` (a target contract being evolved from a shipped kernel — e.g. the Model Authority
+verbs on top of the shipped Model Selection kernel), `[composed]` (realized today by composing
+shipped packages; standalone package near-term — e.g. Runtime Assurance, §H2), or `[planned]`
+(design baseline, not yet a package — e.g. the Risk Authority control plane that would orchestrate
+the path end-to-end, and the Governance Story Graph).
 
 ```
 Enterprise Platform  (ServiceNow / Microsoft / Salesforce / SAP / Workday / Oracle)
@@ -228,7 +263,8 @@ Workflow  ·  Approvals  ·  CMDB  ·  AI Inventory  ·  Human Processes
         ▼
    Decision Authority         → binding DecisionCase (AI cannot self-auth.)  [shipped]
         ▼   (Risk Authority would mint a signed RiskAuthorizationEnvelope here [planned])
-   Model Authority / Agent Eligibility → ALLOW / DENY / HOLD / ESCALATE      [shipped]
+   Model Selection / Eligibility → Selection / NO_ELIGIBLE_MODEL            [shipped]
+     ↳ Model Authority → ALLOW / DENY / HOLD / ESCALATE                     [near-term]
         ▼
    ActionGate                 → AUTHORIZED / DENIED / INDETERMINATE          [shipped]
         ▼
@@ -438,37 +474,49 @@ invariant:** uncertainty, missing evidence, or infrastructure failure is *never*
 **ServiceNow adjacency / strength.** AI governance and guardrails, input/output safety controls,
 risk/compliance records.
 
-**Ugence differentiation.** TAP is not primarily content moderation. It governs whether the
-*factual basis* used in this individual decision is admissible and sufficient — provenance,
-subject match, freshness, contradiction — before the model is allowed to rely on it.
+**Ugence differentiation.** TAP is not primarily content moderation. It governs whether an
+individual assertion's *factual basis* is **supported** by the supplied evidence before the model
+is allowed to rely on it.
+
+> **Current TAP vs target Evidence Admission — keep these distinct.** The shipped
+> `ugence-tap-provider` performs **assertion support / coverage**: given an assertion and evidence
+> references it returns `SUPPORTED / CONSTRAINED / INDETERMINATE`. The broader **Evidence
+> Admission** service described in the Risk Authority spec (§D2) — source admissibility, staleness/
+> freshness, subject binding, contradiction, and authorized-source checks that yield an
+> `ADMITTED / REJECTED / STALE / CONFLICTING` verdict — is **"TAP-compatible" but not the current
+> package**. Do not present admission-service semantics as shipped TAP behavior.
 
 ```
-ServiceNow current / adjacent           Ugence runtime workflow (TAP)
-──────────────────────────────          ─────────────────────────────
-AI / workflow receives available        Evidence / claim
-enterprise content                              │
-        │                                        ▼
-        ▼                               Provenance + subject + freshness + contradiction
-Platform guardrails / security                   │
-        │                                        ▼
-        ▼                               ADMITTED / CONSTRAINED / INDETERMINATE
-AI processing                                    │
-                                                 ▼
-                                        Evidence snapshot → Decision Authority
+Current TAP (shipped)                    Target Evidence Admission (TAP-compatible, planned)
+─────────────────────                    ───────────────────────────────────────────────────
+Assertion + evidence refs                Evidence / claim
+        │                                        │
+        ▼                                        ▼
+Support / coverage evaluation            Provenance + subject + freshness + contradiction +
+        │                                authorized-source
+        ▼                                        │
+SUPPORTED / CONSTRAINED / INDETERMINATE          ▼
+        │                                ADMITTED / REJECTED / STALE / CONFLICTING
+        ▼                                        │
+(feeds assessment / recommendation)              ▼
+                                         Evidence snapshot → Decision Authority
 ```
 
-> AI claim: *"Vendor X should win because its certification is current."* → TAP checks: source
-> exists? belongs to Vendor X? still valid? authorized source? contradictory record? →
-> `SUPPORTED` / `CONSTRAINED` / `INDETERMINATE`. The decision engine cannot overcome missing
-> evidence merely because the model is confident.
+> AI claim: *"Vendor X should win because its certification is current."* → current TAP asks: do
+> the supplied references *support* the claim? → `SUPPORTED` / `CONSTRAINED` / `INDETERMINATE`. The
+> decision engine cannot overcome missing evidence merely because the model is confident. The
+> target admission service would additionally rule on source authority, staleness, and
+> contradiction.
 
 **How it enhances ServiceNow workflow capability.** A ServiceNow decision workflow can call TAP
-to gate the *evidence* an autonomous step relies on, so a confident-but-unsupported model claim
-never advances the workflow. ServiceNow governs the AI system; TAP governs whether the evidence
-used in *this* decision is admissible.
+today to gate whether the *evidence supports* an autonomous step's claim, so a
+confident-but-unsupported model claim never advances the workflow; the target Evidence Admission
+service would extend that to full admissibility. ServiceNow governs the AI system; TAP governs
+whether the evidence used in *this* decision supports it.
 
-**Discovery question.** *"Can a runtime AI decision distinguish admissible, stale, contradictory
-and unverifiable evidence before the model is allowed to rely on it?"*
+**Discovery question.** *"Can a runtime AI decision gate whether the evidence *supports* a claim
+today (shipped TAP), and — as the target admission service — distinguish admissible, stale,
+contradictory and unverifiable evidence before the model relies on it?"*
 
 ---
 
@@ -534,10 +582,11 @@ design (§D2). Keeping them separate is deliberate: the kernel stays domain-neut
 v1.0.0 while the executable-GRC layer is built around it.
 
 **How it enhances ServiceNow workflow capability.** When an enterprise removes the human
-approver, Decision Authority supplies the *authoritative decision artifact* ServiceNow lacks at
-that point — an immutable record that captures which evidence was admitted, which authority
-basis applied, and what downstream authorization it produced — while structurally guaranteeing
-that AI never authorizes itself. ServiceNow remains the system of record; Decision Authority
+approver, Decision Authority supplies Ugence's explicit machine-consumable *authoritative decision
+artifact* for that transition — an immutable record that captures which evidence was admitted,
+which authority basis applied, and what downstream authorization it produced — while structurally
+guaranteeing that AI never authorizes itself. ServiceNow remains the system of record; Decision
+Authority
 produces the machine-consumable decision object that record refers to.
 
 **Discovery question.** *"If an enterprise removes the human approver and allows an AI to make a
@@ -664,9 +713,11 @@ Approval / case                         Binding RiskDecision (Decision Authority
 ```
 
 **How it would enhance ServiceNow workflow capability.** It answers the question *"what
-machine-consumable runtime artifact represents a ServiceNow risk/approval outcome after the human
-workflow is complete?"* — today, nothing; the design's answer is the signed envelope. ServiceNow
-records and orchestrates risk governance; Risk Authority would turn an approved risk outcome into
+machine-consumable runtime artifact represents a risk/approval outcome after the human workflow is
+complete?"* — the Ugence design's answer is a signed, scoped, time-bound and revocable
+`RiskAuthorizationEnvelope`; the discovery question then asks ServiceNow for the closest
+corresponding runtime artifact in its own architecture. ServiceNow records and orchestrates risk
+governance; Risk Authority would turn an approved risk outcome into
 executable, revocable authority and feed decision/enforcement/reconciliation events back to the
 GRC system for its audit dashboards.
 
@@ -675,9 +726,10 @@ GRC system for its audit dashboards.
 that an approved governance decision becomes bounded machine authority and that an off-scope
 action cannot execute.
 
-**Discovery question.** *"What machine-consumable runtime artifact represents a ServiceNow
-risk/approval outcome after the human workflow is complete — and can it be cryptographically
-bound, scoped, time-bound and revocable?"*
+**Discovery question.** *"After the human workflow is complete, what is the closest corresponding
+runtime artifact in your architecture that represents the risk/approval outcome — and can it be
+cryptographically bound, scoped, time-bound and revocable, the way the Ugence
+`RiskAuthorizationEnvelope` is designed to be?"*
 
 ---
 
@@ -1438,7 +1490,7 @@ Prompt → Evidence → DecisionCase → Model/Agent Authority → ActionGate
 | Policy / WorkflowIR | Policy version, compiled rule, control requirement | `policy-workflow-compiler` |
 | Evidence | Document, evaluation, attestation, freshness state | `tap` |
 | DecisionCase | HiringDecisionCase, ProcurementDecisionCase (RiskDecisionCase → planned §D2) | `decision-authority`, products |
-| Authority | ModelAuthorizationDecision, ActionAuthorization (RiskDecision + envelope → planned §D2) | `model-selection`, `actiongate` (Risk Authority planned) |
+| Authority | Model Selection / Model Authority artifact (current `Selection`; target `ModelAuthorizationDecision`), ActionAuthorization (RiskDecision + envelope → planned §D2) | `model-selection`, `actiongate` (Risk Authority planned) |
 | Actor / Model / Agent | Human principal, AI model/version, agent/workforce | `agent-workforce-composer`, `agent-runtime` |
 | Action | Canonical proposed/attempted/executed action (CER) | `agent-runtime`, `actiongate` |
 | ExecutionReceipt | Attempt, execution, actual side effect | `decision-authority` execution/reconciliation |
@@ -1627,7 +1679,7 @@ while preserving the governance core.
 | ✅ | `capabilities/decision-authority` | `ugence-decision-authority` | AI Decision / Binding-Decision Kernel | binding `DecisionOutcome` | AI risk assessments / cases |
 | ✅ | `providers/actiongate` | `ugence-actiongate-provider` | ActionGate | `AUTHORIZED/DENIED/INDETERMINATE` | Tool/MCP + access governance |
 | ✅ | `capabilities/action-clearance` | `ugence-action-clearance` | ACP / Operational Clearance | `CLEAR/HOLD/BLOCK/ESCALATE` | ITSM/ITOM / change state |
-| ✅ | `capabilities/model-selection` | `ugence-model-selection` | Model Authority | selection / `NO_ELIGIBLE_MODEL` | AI/model inventory |
+| ✅ | `capabilities/model-selection` | `ugence-model-selection` | Model Selection kernel → Model Authority (target) | current: selection / `NO_ELIGIBLE_MODEL`; target: `ALLOW/DENY/HOLD/ESCALATE` | AI/model inventory |
 | ✅ | `capabilities/llm-steering-controller` | `ugence-llm-steering-controller` | LLM Steering Controller | `RECOMMENDED` (not executed) | Now Assist guardrails |
 | ✅ | `capabilities/context-minimization` | `ugence-context-minimization` | Context Minimization | `minimize_context` (fail-closed) | Data access / privacy controls |
 | ✅ | `capabilities/agent-workforce-composer` | `ugence-agent-workforce-composer` | Agent Workforce Composer | `AgentTeamPlan` (zero new authority) | Agent orchestration / skills |
@@ -1637,7 +1689,7 @@ while preserving the governance core.
 | ✅ | `capabilities/cloud-scaling-controller` | `ugence-cloud-scaling-controller` | Scaling (advisory) | recommendation (`advisory_only`) | ITOM event management |
 | ✅ | `capabilities/cloud-scaling-operations` | `ugence-cloud-scaling-operations` | Scaling (controlled exec.) | gated `CONTROLLED_EXECUTION` | Remediation runbooks |
 | ✅ | `products/ai-hiring` | `ugence-ai-hiring` | Hiring Governance Authority | human-only binding decision | HR / ATS workflows |
-| ✅ | `products/procurement` | `ugence-procurement` | Governed Procurement | graduated decision rights | Procurement / approval chains |
+| ✅ | `products/procurement` | `ugence-procurement` | Governed Procurement | current: advisory recommendation → human `PurchaseApproval` → governed action; **target:** graduated delegated decision rights | Procurement / approval chains |
 | 🚧 | `risk_authority` *(planned §D2)* | — *(design baseline v1.1)* | Risk Authority / Executable GRC control plane | `RiskDecisionCase` → `RiskDecision` → signed `RiskAuthorizationEnvelope` | ServiceNow GRC / AI Risk & Compliance |
 | 🚧 | `authority-registry` *(planned)* | — | Principal / delegation scope, key IDs | authority lifecycle | GRC ownership / delegation |
 | 🚧 | `control-assurance` *(planned)* | — | Control resolution + freshness | `PASS/FAIL/MISSING/STALE/UNKNOWN` | Control assessments |
