@@ -1,0 +1,106 @@
+{
+  "schema": "bounded_typed_relational_reasoning/protocol_amendment/v1",
+  "amendment_id": "BTRR_PROTOCOL_AMENDMENT_001",
+  "status": "BTRR_PROTOCOL_AMENDMENT_001_READY_FOR_OWNER_REVIEW",
+  "kind": "representation_capacity_only",
+  "execution_authorized": false,
+  "preserved_invariants": [
+    "ORIGINAL_BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED",
+    "E1_TEMPORAL_TRANSFER_PARTIAL",
+    "KDA_VALIDATION_BLOCKED"
+  ],
+  "cites": {
+    "preregistration": "docs/research/hybrid_llm/benchmarks/BOUNDED_TYPED_RELATIONAL_REASONING_PREREGISTRATION.md",
+    "preregistration_json": "docs/research/hybrid_llm/benchmarks/BOUNDED_TYPED_RELATIONAL_REASONING_PREREGISTRATION.json",
+    "protocol_lock": "docs/research/hybrid_llm/benchmarks/BOUNDED_TYPED_RELATIONAL_REASONING_PROTOCOL_LOCK.md",
+    "implementation_blocker": "docs/research/hybrid_llm/benchmarks/BOUNDED_TYPED_RELATIONAL_REASONING_IMPLEMENTATION_BLOCKER.md",
+    "implementation_blocker_commit": "f8dd65c5e734bc1f31eaf100e4069c050d014e8c"
+  },
+  "conflicting_clauses_resolved": [
+    "reuse single_hop frozen tokenizer (vocab 200, 69/69 lexeme slots used) vs BTRR schema/output vocab",
+    "frozen input_token_limit 512 / max_seq 1024 vs upper-range R9/R12 serialization (measured 1348 tokens)",
+    "frozen config STATUS_VALUES/OUTPUT_FIELDS vs BTRR 4-status output contract with reasoning_path"
+  ],
+  "changed_clauses": {
+    "btrr_tokenizer": "new BTRR-specific frozen tokenizer (same longest-match algorithm; NOT the single-hop tokenizer)",
+    "vocab_size": {"old": 200, "new": 211},
+    "lexeme_count": {"old": 69, "new": 80},
+    "input_token_limit": {"old": 512, "new": 1664},
+    "max_seq_len": {"old": 1024, "new": 2048},
+    "output_token_limit": {"old": 384, "new": 384, "note": "UNCHANGED"},
+    "output_schema_lexical_support": "added lexemes for the 4 BTRR statuses and JSON output scaffold; fields unchanged"
+  },
+  "unchanged_clauses": [
+    "scientific_question_Q0_Q2a_Q2b", "model_depth_n_layers_2", "d_model_64", "n_heads_4", "d_ff_256",
+    "attention_architecture_causal_sdpa", "optimizer_adamw", "learning_rate_3e-4", "batch_size_8",
+    "max_updates_2000", "dropout_0", "loss_output_only_next_token_ce", "decoding_greedy_argmax",
+    "P0_definition_B1_B7", "R1_R12_task_semantics", "entity_density_6_12", "event_density_2_4_per_entity",
+    "PATH_GIVEN_vs_PATH_DISCOVERY", "all_metrics", "all_numeric_gates", "structure_blind_shortcut_gates",
+    "verdict_precedence", "final_seeds_required_4_of_5", "reserved_seeds",
+    "single_checkpoint_paired_evidence_invariant", "R10_authorized_absence_non_claim",
+    "forbidden_verdicts", "bounded_positive_claim"
+  ],
+  "btrr_tokenizer_spec": {
+    "algorithm": "identical deterministic longest-match lexical tokenizer as single_hop_typed_vs_prose (ids 0-127 ASCII, 128 PAD, 129 BOS, 130 EOS, lexemes from 131, ascii fallback, lossless, reversible)",
+    "lexeme_id_assignment": "131 + list_index (insertion order below); encoding uses longest-match ordering",
+    "vocab_size": 211,
+    "lexemes_in_id_order": [
+      "\n<OUTPUT>\n", "CTX ", "QRY ", "ENT ", "REL ", "EVT ", "POL ", "EVD ", " COND ", " OUT ",
+      "resolve_attribute", "resolve_path_target", "latest_event_value", "path_then_latest", "apply_policy",
+      "PATH_GIVEN", "PATH_DISCOVERY", "NOT_APPLICABLE",
+      "invoice", "contract", "vendor", "employee", "department",
+      "governed_by", "approved_vendor", "assigned_to", "member_of", "belongs_to_contract", "supplies",
+      "risk", "status", "tier", "amount", "region", "value",
+      "EQ", "GT", "GE", "LT", "LE", "NE",
+      "LOW", "MEDIUM", "HIGH", "CRITICAL", "ACTIVE", "EXPIRED", "PENDING",
+      "supports", "contradicts",
+      "approval_requirement", "target_attribute", "latest_state",
+      "vendor_risk", "contract_state", "assignment",
+      "VP_APPROVAL_REQUIRED", "DIRECTOR_APPROVAL_REQUIRED", "AUTO_APPROVED", "MANUAL_REVIEW",
+      "REJECTED", "ESCALATE_RISK", "HOLD_PENDING_EVIDENCE", "NO_ACTION",
+      "Entity:", "Event:", "Policy:", "Relation:",
+      "{\"answer\":\"", "{\"answer\":null", "\",\"reasoning_path\":[", "],\"evidence_ids\":[",
+      "],\"status\":\"", "\"}", "\",\"",
+      "\"SUPPORTED\"", "\"INSUFFICIENT_EVIDENCE\"", "\"POLICY_NOT_APPLICABLE\"", "\"INVALID_RELATION_PATH\"",
+      "null"
+    ],
+    "id_leakage_controls": [
+      "opaque entity/event/evidence/tenant IDs are ASCII char-level (mechanically copyable, not lexemes, not label-encoded)",
+      "all 8 outcome tokens are symmetric lexemes; no single outcome is privileged by tokenization",
+      "requested_property and policy_scope labels are uniform across outcomes (mutual information with answer approx 0)"
+    ]
+  },
+  "context_measurements_tokenizer_only": {
+    "method": "handcrafted schema fixtures encoded with the BTRR tokenizer; no model, no training, no seeds",
+    "min_R9_input_tokens": 169,
+    "max_R9_R12_input_tokens": 1348,
+    "max_reasoning_output_tokens": 62,
+    "p0_abstain_output_tokens": 45,
+    "input_plus_output_worst": 1410,
+    "margin_policy": "20% over measured worst input, rounded up to a multiple of 64; no truncation permitted",
+    "chosen_input_token_limit": 1664,
+    "chosen_output_token_limit": 384,
+    "chosen_max_seq_len": 2048
+  },
+  "parameter_count": {
+    "d_model": 64,
+    "weight_tied_head": true,
+    "old": {"vocab": 200, "max_seq": 1024, "total": 209728, "tok_emb": 12800, "pos_emb": 65536, "reasoning_blocks": 131392},
+    "new": {"vocab": 211, "max_seq": 2048, "total": 275968, "tok_emb": 13504, "pos_emb": 131072, "reasoning_blocks": 131392},
+    "delta_total": 66240,
+    "delta_pct": 31.6,
+    "delta_from_vocab_weight_tied": 704,
+    "delta_from_context_pos_emb": 65536,
+    "reasoning_block_delta": 0,
+    "classification": "representation_capacity_increase_not_reasoning_depth_increase"
+  },
+  "amended_capacity_claim": "Transformer reasoning depth/width/heads/FFN and training recipe are held fixed; only lexical representation capacity and sequence capacity are increased to encode the preregistered BTRR state without truncation.",
+  "gate_recheck": {
+    "all_numeric_gates": "unchanged_and_still_valid (derived from chance/competence/structure-blind baselines; independent of vocab and context length)",
+    "structured_output_validity_gate": "unchanged threshold 0.98; only lexical support of the same output contract changed",
+    "shortcut_gates": "unchanged",
+    "verdict_precedence": "unchanged",
+    "invalidated_gates": [],
+    "outcome": "BTRR_PROTOCOL_AMENDMENT_001_READY_FOR_OWNER_REVIEW"
+  }
+}

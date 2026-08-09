@@ -50,3 +50,14 @@ neither a P0 success nor a P0 failure):
 ## No gate may change after reserved inspection
 Once a final seed is read, no gate, threshold, split definition, or verdict rule may be altered. Any
 change requires a new preregistration with new reserved seeds.
+
+## Amendments (append-only index)
+- **Amendment 001** — `BOUNDED_TYPED_RELATIONAL_REASONING_PROTOCOL_AMENDMENT_001.md` (+ `.json`),
+  status `BTRR_PROTOCOL_AMENDMENT_001_READY_FOR_OWNER_REVIEW`. Representation-capacity only: introduces a
+  separate frozen BTRR tokenizer (80 lexemes, `vocab_size = 211`) and raises `input_token_limit`
+  512 → 1664 and `max_seq_len` 1024 → 2048 to encode the preregistered BTRR state without truncation.
+  Reasoning architecture, training recipe, task semantics, densities, metrics, numeric gates, shortcut
+  gates, verdict precedence, final-seed requirement, and reserved seeds are **unchanged**. Resolves the
+  `..._IMPLEMENTATION_BLOCKER.md` conflicts (commit `f8dd65c5e734bc1f31eaf100e4069c050d014e8c`). This
+  index pointer does not rewrite the original preregistration; both remain on record. Pending owner
+  approval; execution remains unauthorized.
