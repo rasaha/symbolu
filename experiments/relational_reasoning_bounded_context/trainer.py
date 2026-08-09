@@ -8,7 +8,7 @@ those require torch which is absent here.
 from __future__ import annotations
 
 from .config import (BATCH_SIZE, GRADIENT_CLIP, LEARNING_RATE, MAX_UPDATES, OUTPUT_MARKER)
-from .execution import guard_seed
+from .execution import assert_generation_allowed
 
 
 def train_checkpoint(seed: int, examples, *, authorization_token: str | None = None):
@@ -16,7 +16,7 @@ def train_checkpoint(seed: int, examples, *, authorization_token: str | None = N
 
     Returns an object exposing `.digest()` for the single-checkpoint invariant. Requires torch.
     """
-    guard_seed(seed, authorization_token)  # fail-closed; reserved seeds raise here
+    assert_generation_allowed(seed, authorization_token)  # centralized fail-closed guard (same as generators)
     import torch  # lazy
     from .model import build_model, parameter_digest
     from .tokenizer import BTRRTokenizer

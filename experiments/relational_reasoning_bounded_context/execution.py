@@ -42,6 +42,19 @@ def guard_seed(seed: int, token: str | None = None) -> GrantedAuthorization:
     return GrantedAuthorization(role, True)
 
 
+def assert_generation_allowed(seed: int, token: str | None = None) -> int:
+    """Centralized fail-closed guard for EVERY scientific primitive (generation/training/eval/replay).
+
+    Raises ExecutionNotAuthorized before any cohort is materialized when `seed` is a reserved scientific
+    seed and no valid execution-authorization token is supplied (the token registry is empty, so reserved
+    seeds always fail closed). Non-reserved seeds (including inadmissible fixtures 883000-883004) pass.
+    There is deliberately NO bypassable `authorized=True` flag: authorization can only come from a real
+    token that does not exist until EXECUTION_AUTHORIZATION.md is signed.
+    """
+    guard_seed(int(seed), token)  # raises for reserved seeds; returns for non-reserved
+    return int(seed)
+
+
 def is_unit_fixture(seed: int) -> bool:
     return int(seed) in UNIT_FIXTURE_SEEDS
 

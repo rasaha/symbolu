@@ -39,6 +39,7 @@ def compute(cohort: list[tuple[ReasoningContext, str]]) -> dict:
     input_lengths = []
     r9 = {"n": 0, "wrong_entity": 0, "wrong_relation": 0, "wrong_temporal": 0,
           "wrong_policy": 0, "wrong_outcome": 0, "fabricated": 0, "invalid": 0, "abstain_wrong": 0}
+    r9_full_chain = 0
     for ctx, text in cohort:
         g: ReasoningOutput = ctx.authoritative_output
         input_lengths.append(input_token_count(ctx))
@@ -87,11 +88,19 @@ def compute(cohort: list[tuple[ReasoningContext, str]]) -> dict:
             hall_r += 1
         if any(x not in vevd for x in p.evidence_ids):
             hall_v += 1
-        # R9 decomposition (failing composite items)
+        # R9 full-chain correctness = conjunction of the frozen components (no compensation):
+        #   final answer AND exact ordered relation path AND correct latest event AND correct policy.
         if ctx.split == "R9":
             r9["n"] += 1
-            correct = (p.answer == g.answer and tuple(p.reasoning_path) == tuple(g.reasoning_path)
-                       and p.status == g.status)
+            answer_ok = p.answer == g.answer
+            path_ok = _nodes("Relation:", p.reasoning_path) == _nodes("Relation:", g.reasoning_path) \
+                and _nodes("Entity:", p.reasoning_path) == _nodes("Entity:", g.reasoning_path)
+            temporal_ok = (not gv) or (pv and pv[-1] == gv[-1])
+            policy_ok = p.status == g.status and pp == gp
+            full_chain = bool(answer_ok and path_ok and temporal_ok and policy_ok
+                              and tuple(p.reasoning_path) == tuple(g.reasoning_path))
+            r9_full_chain += int(full_chain)
+            correct = full_chain
             if not correct:
                 if pe and ge and pe[0] != ge[0]:
                     r9["wrong_entity"] += 1
@@ -127,6 +136,7 @@ def compute(cohort: list[tuple[ReasoningContext, str]]) -> dict:
         "hallucinated_relation": rate(hall_r),
         "hallucinated_evidence": rate(hall_v),
         "r9_decomposition": r9,
+        "r9_full_chain_correct": (r9_full_chain / r9["n"]) if r9["n"] else None,
         "input_length_min": min(input_lengths),
         "input_length_max": max(input_lengths),
         "input_length_mean": sum(input_lengths) / n,

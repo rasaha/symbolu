@@ -168,8 +168,12 @@ def test_absence_genuinely_unanswerable():
         for ctx in gen.generate_split(s, FIXT, 6):
             assert ctx.authoritative_output.status == "INSUFFICIENT_EVIDENCE"
             assert ctx.authoritative_output.answer is None
-            # no relation originates from the root invoice -> query path unresolved by construction
-            assert all(r.source_entity_id != ctx.query.root_entity_id for r in ctx.relations)
+    # R10 authorized-absence: no relation originates from the root (required fact absent)
+    for ctx in gen.generate_split("R10", FIXT, 6):
+        assert all(r.source_entity_id != ctx.query.root_entity_id for r in ctx.relations)
+    # R11 insufficient-evidence: the root path exists but no applicable policy supports a conclusion
+    for ctx in gen.generate_split("R11", FIXT, 6):
+        assert any(r.source_entity_id == ctx.query.root_entity_id for r in ctx.relations)
 
 def test_latest_by_sequence_not_position():
     for ctx in gen.generate_split("R5", FIXT, 6):

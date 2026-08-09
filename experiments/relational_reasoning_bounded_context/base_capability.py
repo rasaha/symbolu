@@ -9,6 +9,7 @@ from __future__ import annotations
 import random
 
 from .config import P0_BLOCK_THRESHOLD, P0_SUBTASK_GATE
+from .execution import assert_generation_allowed
 from .generator import P0_SUBTASKS, _Mint, _amount, _rng, _ROLE_ALPHABET
 from .schema_ext import (Constraints, Entity, Evidence, Event, ReasoningContext,
                          ReasoningOutput, ReasoningQuery)
@@ -19,9 +20,11 @@ def _entities(rng, mint, tenant, n):
     return [Entity("vendor", mint.new(), tenant, (("amount", _amount(rng)),)) for _ in range(n)]
 
 
-def generate_p0_episode(subtask: str, seed: int, index: int, role: str = "unit") -> ReasoningContext:
+def generate_p0_episode(subtask: str, seed: int, index: int, role: str = "unit",
+                        authorization_token: str | None = None) -> ReasoningContext:
     if subtask not in P0_SUBTASKS:
         raise ValueError(f"unknown P0 subtask {subtask}")
+    assert_generation_allowed(seed, authorization_token)  # fail-closed BEFORE any P0 cohort materializes
     rng = _rng(seed, "P0:" + subtask, index)
     tenant = "T" + "".join(rng.choice(_ROLE_ALPHABET.get(role, "STUVWXYZ")) for _ in range(3))
     mint = _Mint(rng, role)
@@ -81,8 +84,10 @@ def _finish(mint, tenant, q, ents, rels, events, pols, evd, gold, split):
     return ctx
 
 
-def generate_p0(subtask: str, seed: int, n: int, role: str = "unit") -> list[ReasoningContext]:
-    return [generate_p0_episode(subtask, seed, i, role) for i in range(n)]
+def generate_p0(subtask: str, seed: int, n: int, role: str = "unit",
+                authorization_token: str | None = None) -> list[ReasoningContext]:
+    assert_generation_allowed(seed, authorization_token)  # fail-closed at the P0 entry too
+    return [generate_p0_episode(subtask, seed, i, role, authorization_token) for i in range(n)]
 
 
 def p0_gate(subtask_accuracies: dict[str, float]) -> dict:

@@ -5,8 +5,16 @@ and identical fact_hash. This underpins the protocol-step-0 deterministic-replay
 """
 from __future__ import annotations
 
+import hashlib
+import json
+
 from .generator import generate_episode
 from .serializer import serialize_input
+
+
+def digest_of(obj) -> str:
+    """Deterministic sha256 of a JSON-serializable artifact (predictions, metrics, verdict)."""
+    return hashlib.sha256(json.dumps(obj, sort_keys=True, default=str).encode("utf-8")).hexdigest()
 
 
 def replay_matches(split: str, seed: int, index: int, role: str = "unit") -> bool:

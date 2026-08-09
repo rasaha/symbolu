@@ -14,6 +14,7 @@ import random
 from typing import Callable
 
 from .config import CAPS, OUTCOME_VOCAB
+from .execution import assert_generation_allowed
 from .schema_ext import (Condition, Constraints, Entity, Event, Evidence, Policy, Relation,
                          ReasoningContext, ReasoningOutput, ReasoningQuery)
 from .serializer import assert_zero_truncation
@@ -212,32 +213,50 @@ def _gen_composite(rng, mint, tenant, split, confusable: bool):  # R9 / R12
             pols[:CAPS["max_policies"]], evd[:CAPS["max_evidence"]], Constraints(2, True, True), q, gold)
 
 
-def _gen_absence(rng, mint, tenant, split):  # R10 authorized-absence, R11 insufficient-evidence
-    # Length-preserving: root invoice + distractor vendors carrying risk events, distractor relations
-    # AMONG distractors, and a distractor policy -- but NO relation/event/policy chain that resolves the
-    # ROOT invoice's approval query. The required fact is genuinely absent (unanswerable by construction),
-    # while the serialized length overlaps the answerable composite splits (defeats a length shortcut).
+def _gen_r10(rng, mint, tenant, split):
+    """R10 AUTHORIZED_ABSENCE: the necessary fact is UNAVAILABLE in the authorized working set. The root
+    invoice has NO relation/path to any vendor-risk at all (the required fact is genuinely absent).
+    Unauthorized/cross-tenant data stays completely model-invisible (tenant purity holds by construction).
+    Length-preserving via distractor vendors/events/relations that never connect to the root."""
     root = Entity("invoice", mint.new(), tenant, (("amount", _amount(rng)),))
     ents = [root]
     rels: list[Relation] = []
     evs: list[Event] = []
-    pols: list[Policy] = []
-    ndist = rng.randint(5, 9)
-    for _ in range(ndist):
+    for _ in range(rng.randint(5, 9)):
         d = Entity("vendor", mint.new(), tenant, (("amount", _amount(rng)),))
         ents.append(d)
-        de, _ = _events_for(rng, mint, tenant, d.entity_id, "risk", CAPS["max_events_per_entity"])
-        evs += de
-    # relations only BETWEEN distractor vendors (never from the root invoice) -> root path unresolved
+        evs += _events_for(rng, mint, tenant, d.entity_id, "risk", CAPS["max_events_per_entity"])[0]
     dvend = [e for e in ents if e.entity_type == "vendor"]
     for _ in range(rng.randint(2, min(CAPS["max_relations"], 8))):
         a, b = rng.sample(dvend, 2)
-        r = Relation("supplies", a.entity_id, b.entity_id, tenant)
+        r = Relation("supplies", a.entity_id, b.entity_id, tenant)   # never from the root invoice
         if r.key() not in {x.key() for x in rels}:
             rels.append(r)
-    pols.append(Policy(mint.new(), (Condition("risk", "EQ", "LOW"),),
-                       OUTCOME_VOCAB[rng.randrange(1, len(OUTCOME_VOCAB))], tenant))
+    pols = [Policy(mint.new(), (Condition("risk", "EQ", "LOW"),),
+                   OUTCOME_VOCAB[rng.randrange(1, len(OUTCOME_VOCAB))], tenant)]
     q = ReasoningQuery("apply_policy", "PATH_DISCOVERY", root.entity_id,
+                       requested_property="approval_requirement", policy_scope="vendor_risk",
+                       event_type="risk")
+    gold = ReasoningOutput(None, (), (), "INSUFFICIENT_EVIDENCE")
+    return (ents[:CAPS["max_entities"]], rels[:CAPS["max_relations"]], evs[:CAPS["max_events_total"]],
+            pols[:CAPS["max_policies"]], [], Constraints(2, True, True), q, gold)
+
+
+def _gen_r11(rng, mint, tenant, split):
+    """R11 INSUFFICIENT_EVIDENCE: the relevant entity/path DOES exist (root invoice -> contract -> vendor
+    with risk events, so the vendor's latest risk is knowable), but the required SUPPORTING policy is
+    deliberately MISSING (no policy covers the approval question), so the conclusion is not supported.
+    Distinct construction from R10 (there the path itself is absent)."""
+    ents, rels, rtypes, tail = _chain(rng, mint, tenant, 2)          # root DOES connect to a vendor
+    evs, _ = _events_for(rng, mint, tenant, tail.entity_id, "risk", CAPS["max_events_per_entity"])
+    while len(ents) < rng.randint(6, 10):
+        d = Entity("vendor", mint.new(), tenant, (("amount", _amount(rng)),))
+        ents.append(d)
+        evs += _events_for(rng, mint, tenant, d.entity_id, "risk", 2)[0]
+    # NO applicable policy is supplied (only an off-topic LOW-risk policy) -> approval unsupported
+    pols = [Policy(mint.new(), (Condition("status", "EQ", "ACTIVE"),),
+                   OUTCOME_VOCAB[rng.randrange(1, len(OUTCOME_VOCAB))], tenant)]
+    q = ReasoningQuery("apply_policy", "PATH_DISCOVERY", ents[0].entity_id,
                        requested_property="approval_requirement", policy_scope="vendor_risk",
                        event_type="risk")
     gold = ReasoningOutput(None, (), (), "INSUFFICIENT_EVIDENCE")
@@ -255,15 +274,17 @@ _DISPATCH: dict[str, Callable] = {
     "R7": lambda r, m, t, s: _gen_rel_temporal(r, m, t, s, False),
     "R8": lambda r, m, t, s: _gen_policy(r, m, t, s),
     "R9": lambda r, m, t, s: _gen_composite(r, m, t, s, False),
-    "R10": lambda r, m, t, s: _gen_absence(r, m, t, s),
-    "R11": lambda r, m, t, s: _gen_absence(r, m, t, s),
+    "R10": lambda r, m, t, s: _gen_r10(r, m, t, s),
+    "R11": lambda r, m, t, s: _gen_r11(r, m, t, s),
     "R12": lambda r, m, t, s: _gen_composite(r, m, t, s, True),
 }
 
 
-def generate_episode(split: str, seed: int, index: int, role: str = "unit") -> ReasoningContext:
+def generate_episode(split: str, seed: int, index: int, role: str = "unit",
+                     authorization_token: str | None = None) -> ReasoningContext:
     if split not in _DISPATCH:
         raise ValueError(f"unknown split {split}")
+    assert_generation_allowed(seed, authorization_token)  # fail-closed BEFORE any cohort materializes
     rng = _rng(seed, split, index)
     tenant = "T" + "".join(rng.choice(_ROLE_ALPHABET.get(role, "STUVWXYZ")) for _ in range(3))
     mint = _Mint(rng, role)
@@ -276,5 +297,7 @@ def generate_episode(split: str, seed: int, index: int, role: str = "unit") -> R
     return ctx
 
 
-def generate_split(split: str, seed: int, n: int, role: str = "unit") -> list[ReasoningContext]:
-    return [generate_episode(split, seed, i, role) for i in range(n)]
+def generate_split(split: str, seed: int, n: int, role: str = "unit",
+                   authorization_token: str | None = None) -> list[ReasoningContext]:
+    assert_generation_allowed(seed, authorization_token)  # fail-closed at the split entry too
+    return [generate_episode(split, seed, i, role, authorization_token) for i in range(n)]

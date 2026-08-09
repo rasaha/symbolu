@@ -50,9 +50,11 @@ def decide(*, protocol_valid: bool, base_capability_established: bool, shortcut_
         primary = "ABSTENTION_FAILED"; co = ()
     elif failed("evidence_precision") or failed("evidence_recall"):
         primary = "EVIDENCE_GROUNDING_FAILED"; co = ()
-    elif failed("latest_event") or failed("R7_path_discovery_temporal"):
+    elif (failed("latest_event") or failed("R7_path_discovery_temporal")
+          or failed("latest_event_effect_over_global_most_recent")):
         primary = "TEMPORAL_REASONING_FAILED"; co = ()
-    elif failed("policy_condition") or failed("R9_composite_final_answer"):
+    elif (failed("policy_condition") or failed("R9_composite_final_answer")
+          or failed("R9_full_chain_correct")):
         primary = "POLICY_REASONING_FAILED"; co = ()
     else:
         all_pass = all(v.get("pass") for v in gates.values() if v.get("pass") is not None)
