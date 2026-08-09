@@ -61,3 +61,16 @@ change requires a new preregistration with new reserved seeds.
   `..._IMPLEMENTATION_BLOCKER.md` conflicts (commit `f8dd65c5e734bc1f31eaf100e4069c050d014e8c`). This
   index pointer does not rewrite the original preregistration; both remain on record. Pending owner
   approval; execution remains unauthorized.
+- **Amendment 002** — `BOUNDED_TYPED_RELATIONAL_REASONING_PROTOCOL_AMENDMENT_002.md` (+ `.json`),
+  status `BTRR_PROTOCOL_AMENDMENT_002_READY_FOR_INDEPENDENT_AUDIT`. Corrective, accepting the independent
+  audit verdict `BTRR_AMENDMENT_001_REQUIRES_CORRECTION`. Freezes explicit numeric caps on every
+  serialization-size-driving dimension (relations 20, hops 3, policies 4, conditions/policy 4, evidence
+  16, attrs/entity 3, id length 6, value ≤9 tokens, sequence ≤2 digits, path nodes 8; entity 6–12 and
+  events 2–4/entity unchanged), then **proves** the legal maximum input = 2901 tokens and supersedes
+  Amendment 001's capacity limits with `input_token_limit` 1664 → **3520** and `max_seq_len` 2048 →
+  **3904** (worst input +20% margin; `output_token_limit` 384 unchanged; no truncation). Parameters
+  209,728 → 394,752 (reasoning blocks unchanged at 131,392). Also reconciles two documentation items: the
+  `capacity_increase` override (lexical + sequence capacity only) and the P0 tokenizer naming (same
+  BTRR-specific frozen tokenizer + same checkpoint for P0 and R1–R12). No scientific gate changed.
+  Amendment 001 and the original preregistration are preserved unaltered. Pending independent audit;
+  execution remains unauthorized.
