@@ -30,7 +30,11 @@ from ..models.workflow import (
     WorkflowStatus,
 )
 from ..runtime.errors import RecoveryError
-from .checkpoints import Checkpoint
+from .checkpoints import (
+    LEGACY_CHECKPOINT_VERSION,
+    SUPPORTED_CHECKPOINT_VERSIONS,
+    Checkpoint,
+)
 
 
 @dataclass(frozen=True)
@@ -58,19 +62,42 @@ def recover_instance(
     original definition. No provider or governance calls are made here."""
     if checkpoint is None:
         raise RecoveryError("no checkpoint available for recovery")
+    # Version gate: never interpret an unknown future checkpoint schema under today's rules.
+    if checkpoint.checkpoint_version not in SUPPORTED_CHECKPOINT_VERSIONS:
+        raise RecoveryError(
+            f"unsupported checkpoint_version {checkpoint.checkpoint_version!r} for instance "
+            f"{checkpoint.instance_id!r} (supported: {sorted(SUPPORTED_CHECKPOINT_VERSIONS)})"
+        )
     if not checkpoint.verify():
-        # Corrupted / tampered checkpoint: fail closed.
+        # Corrupted / tampered base coordination payload: fail closed.
         raise RecoveryError(
             f"checkpoint for instance {checkpoint.instance_id!r} failed integrity check"
         )
-    states_ok, states_reason = checkpoint.validate_execution_states()
-    if not states_ok:
-        # Tampered / inconsistent canonical execution-state lineage: fail closed rather
-        # than restore a snapshot whose digest or cross-object binding does not hold.
-        raise RecoveryError(
-            f"checkpoint for instance {checkpoint.instance_id!r} carries canonical "
-            f"execution state that failed integrity check: {states_reason}"
-        )
+    if checkpoint.checkpoint_version == LEGACY_CHECKPOINT_VERSION:
+        # A legacy (pre-canonical-state) checkpoint must not carry extension data. If it
+        # does, the version tag is inconsistent with the contents — fail closed.
+        if checkpoint.has_extension_data():
+            raise RecoveryError(
+                f"legacy checkpoint for instance {checkpoint.instance_id!r} unexpectedly "
+                "carries canonical execution-state extension data"
+            )
+    else:
+        # v1: the canonical-state extension is covered by its OWN digest (the base digest
+        # deliberately excludes it). Verify that digest first — it protects the lineage
+        # source and the snapshot-collection membership — then the per-snapshot binding.
+        if not checkpoint.verify_extension():
+            raise RecoveryError(
+                f"checkpoint for instance {checkpoint.instance_id!r} canonical execution-"
+                "state extension failed integrity check (extension_digest mismatch)"
+            )
+        states_ok, states_reason = checkpoint.validate_execution_states()
+        if not states_ok:
+            # Inconsistent canonical execution-state lineage: fail closed rather than
+            # restore a snapshot whose digest or cross-object binding does not hold.
+            raise RecoveryError(
+                f"checkpoint for instance {checkpoint.instance_id!r} carries canonical "
+                f"execution state that failed integrity check: {states_reason}"
+            )
     if checkpoint.workflow_id != definition.workflow_id:
         raise RecoveryError(
             "checkpoint workflow_id does not match supplied definition"

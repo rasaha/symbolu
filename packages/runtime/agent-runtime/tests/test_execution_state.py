@@ -278,6 +278,11 @@ def test_checkpoint_round_trip_preserves_execution_state():
     inst = rt.start_workflow(wf)
     original = execution_state(rt, inst.instance_id, "t")
 
+    # A genuine v1 checkpoint carries a valid extension digest.
+    saved = ss.load(inst.instance_id)
+    assert saved.checkpoint_version == "1"
+    assert saved.verify() and saved.verify_extension()
+
     rt2 = create_runtime(AgentRuntimeConfig(state_store=ss))
     result = recover_runtime(rt2, inst.instance_id, wf)
     restored = result.execution_states["t"]
@@ -299,12 +304,16 @@ def test_legacy_checkpoint_without_lineage_recovers_unavailable():
     inst.status = WorkflowStatus.COMPLETED
     cp = Checkpoint.of(inst, "agent-runtime", "0.1.2")  # no execution_states supplied
 
-    # Simulate a pre-canonical-state serialized checkpoint: drop the new keys entirely.
+    # Simulate a pre-canonical-state serialized checkpoint: drop all the new keys entirely.
     d = cp.to_dict()
-    d.pop("checkpoint_version", None)
-    d.pop("execution_states", None)
+    for k in (
+        "checkpoint_version", "execution_states", "execution_state_journal",
+        "workflow_lineage", "task_lineage", "extension_digest",
+    ):
+        d.pop(k, None)
     legacy = Checkpoint.from_dict(d)
     assert legacy.checkpoint_version == "0"
+    assert not legacy.has_extension_data()
     assert legacy.verify()  # base digest semantics unchanged
     assert legacy.verify_execution_states()  # vacuously intact
 
@@ -336,6 +345,96 @@ def test_tampered_execution_state_fails_closed_on_recovery():
     assert not tampered.verify_execution_states()  # but lineage integrity fails
     with pytest.raises(RecoveryError):
         recover_instance(tampered, wf, "agent-runtime", "0.1.2")
+
+
+def test_lineage_source_tampering_fails_recovery():
+    # The reviewer's scenario: tamper ONLY the persisted lineage source. The base digest
+    # excludes it and the snapshots/journal are untouched — so both older checks pass — but
+    # the extension digest must catch it, or a resumed run would attribute a forged agent.
+    ss = InMemoryRuntimeStateStore()
+    hold = DispositionHook(GovernanceDisposition.HOLD)
+    rt = create_runtime(AgentRuntimeConfig(state_store=ss, governance_hook=hold))
+    register_provider(rt, RecordingProvider("p"))
+    wf = WorkflowDefinition(
+        workflow_id="wf",
+        tasks=(TaskDefinition(task_id="t", operation="op", provider_id="p"),),
+    )
+    inst = rt.start_workflow(
+        wf, task_lineage={"t": ExecutionLineage(assigned_agent_ref="risk-agent-7",
+                                                evidence_refs=["EV-44"])}
+    )
+    cp = ss.load(inst.instance_id)
+    assert cp.verify() and cp.verify_extension()
+
+    tl = dict(cp.task_lineage)
+    tl["t"] = {**tl["t"], "assigned_agent_ref": "execution-agent-9", "evidence_refs": ["EV-99"]}
+    tampered = dataclasses.replace(cp, task_lineage=tl)
+    assert tampered.verify()                       # base digest unaffected (the old gap)
+    assert tampered.validate_execution_states()[0]  # snapshots/journal untouched (the old gap)
+    assert not tampered.verify_extension()          # NEW: extension digest catches it
+    with pytest.raises(RecoveryError):
+        recover_instance(tampered, wf, cp.runtime_id, cp.runtime_version)
+
+
+def test_journal_omission_caught_even_when_extension_resealed():
+    # An adversary who can recompute the extension digest still cannot omit a journal entry
+    # that a latest snapshot points to — the latest<->journal consistency check catches it.
+    ss = InMemoryRuntimeStateStore()
+    rt = create_runtime(AgentRuntimeConfig(state_store=ss, governance_hook=_clear_hook()))
+    register_provider(rt, RecordingProvider("p"))
+    wf = WorkflowDefinition(
+        workflow_id="wf",
+        tasks=(TaskDefinition(task_id="t", operation="op", provider_id="p"),),
+    )
+    inst = rt.start_workflow(wf)
+    cp = ss.load(inst.instance_id)
+
+    latest_digest = cp.execution_states["t"]["state_digest"]
+    journal = {k: v for k, v in cp.execution_state_journal.items() if k != latest_digest}
+    stripped = dataclasses.replace(cp, execution_state_journal=journal)
+    resealed = dataclasses.replace(stripped, extension_digest=stripped.compute_extension_digest())
+    assert resealed.verify_extension()  # digest re-sealed, so it passes
+    ok, reason = resealed.validate_execution_states()
+    assert not ok and "journal" in reason.lower()
+    with pytest.raises(RecoveryError):
+        recover_instance(resealed, wf, cp.runtime_id, cp.runtime_version)
+
+
+def test_unknown_checkpoint_version_fails_recovery():
+    ss = InMemoryRuntimeStateStore()
+    rt = create_runtime(AgentRuntimeConfig(state_store=ss, governance_hook=_clear_hook()))
+    register_provider(rt, RecordingProvider("p"))
+    wf = WorkflowDefinition(
+        workflow_id="wf",
+        tasks=(TaskDefinition(task_id="t", operation="op", provider_id="p"),),
+    )
+    inst = rt.start_workflow(wf)
+    cp = ss.load(inst.instance_id)
+    bumped = dataclasses.replace(cp, checkpoint_version="2")
+    with pytest.raises(RecoveryError):
+        recover_instance(bumped, wf, cp.runtime_id, cp.runtime_version)
+
+
+def test_malformed_task_lineage_key_fails_closed():
+    ss = InMemoryRuntimeStateStore()
+    rt = create_runtime(AgentRuntimeConfig(state_store=ss, governance_hook=_clear_hook()))
+    register_provider(rt, RecordingProvider("p"))
+    wf = WorkflowDefinition(
+        workflow_id="wf",
+        tasks=(TaskDefinition(task_id="t", operation="op", provider_id="p"),),
+    )
+    inst = rt.start_workflow(
+        wf, task_lineage={"t": ExecutionLineage(assigned_agent_ref="a")}
+    )
+    cp = ss.load(inst.instance_id)
+    # A persisted lineage entry for a task the workflow does not contain must fail closed,
+    # not be silently ignored.
+    tl = dict(cp.task_lineage)
+    tl["ghost"] = {"assigned_agent_ref": "x"}
+    stripped = dataclasses.replace(cp, task_lineage=tl)
+    resealed = dataclasses.replace(stripped, extension_digest=stripped.compute_extension_digest())
+    ok, reason = resealed.validate_execution_states()
+    assert not ok and "ghost" in reason
 
 
 def test_base_checkpoint_digest_unchanged_by_lineage_addition():

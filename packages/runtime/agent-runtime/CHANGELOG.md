@@ -55,10 +55,22 @@ adapter beyond a minimal neutral lineage seam.
   coordination `digest` is computed over exactly the original payload, so pre-existing
   checkpoints verify byte-identically; a checkpoint deserialized without a version tag is
   treated as legacy `"0"` with lineage unavailable.
-- **Strict cross-binding on recovery** — `Checkpoint.validate_execution_states()` enforces,
+- **Versioned extension integrity boundary** — a second digest, `extension_digest`, covers
+  the whole canonical-state extension (`checkpoint_version` + `execution_states` +
+  `execution_state_journal` + `workflow_lineage` + `task_lineage`). The base `digest` is
+  deliberately unchanged (legacy compatibility) and therefore does not cover the extension,
+  so `extension_digest` is what protects the **lineage source** and the snapshot-collection
+  **membership** — closing the gap where a tampered lineage source passed both the base
+  digest and per-snapshot digests. Legacy (`"0"`) checkpoints carry no extension.
+- **Strict cross-binding & consistency on recovery** — recovery rejects an unknown
+  `checkpoint_version` (fail closed, never interpret a future schema under today's rules);
+  for `"1"` it requires base digest + extension digest + cross-binding valid; for `"0"` it
+  requires the base digest and no extension data. `validate_execution_states()` enforces,
   beyond each snapshot's own digest, that the map key equals the snapshot's own key field
   (task id / state digest), that instance/workflow/runtime/correlation identity match the
-  checkpoint, that the referenced task exists, and that the schema version is supported. An
+  checkpoint, that the referenced task exists, that the schema version is supported, that
+  every latest snapshot is resolvable in the journal (latest↔journal consistency), and that
+  the lineage source is structural (keys reference known tasks, values deserialize). An
   inconsistent canonical state fails closed with a precise reason — never silently accepted
   or discarded. Recovery restores the lineage source and journal
   (`RuntimeRecoveryResult.execution_states` / `.execution_state_journal`) and never

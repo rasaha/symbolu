@@ -200,25 +200,47 @@ resolvable via `runtime.execution_state_by_digest(instance_id, state_digest)`. T
   `GOVERNANCE_EVALUATION_REQUESTED`, `GOVERNANCE_DISPOSITION_RECEIVED`, `TASK_STARTED`,
   `PROVIDER_INVOKED`, `PROVIDER_COMPLETED`, `TASK_COMPLETED`, `TASK_FAILED`. Digest
   references only — the full state never bloats the event stream; sequencing is unchanged.
-- **Checkpoints.** `Checkpoint` gains `checkpoint_version` (`"1"`), a self-verifying
-  per-task `execution_states` section, the digest-keyed `execution_state_journal`, and the
-  typed **lineage source** (`workflow_lineage` + `task_lineage`) — the latter preserved
-  *separately* from historical snapshots so future snapshots after recovery keep the same
-  references, including for tasks that had not yet run. The base coordination `digest` is
-  computed over exactly the original payload, so **pre-existing checkpoints verify
-  byte-identically** and their digest semantics are unchanged. A checkpoint deserialized
-  without a version tag is treated as legacy `"0"` with execution-state lineage unavailable.
-- **Cross-binding.** `validate_execution_states()` enforces — beyond each snapshot's own
-  digest — that the map key equals the snapshot's own key field, that instance / workflow /
-  runtime / correlation identity match the checkpoint, that the referenced task exists, and
-  that the schema version is supported. An inconsistent canonical state fails closed with a
-  precise reason; it is never silently accepted *or* silently discarded.
-- **Recovery.** Restores the lineage source, the per-task latest snapshots, and the
-  journal; fails closed on tampering or inconsistent cross-binding; and **never fabricates**
-  a missing decision reference, authorization, clearance, proposal fingerprint, execution
-  reference, or agent provenance. Recovery still performs no provider or governance call,
-  and recovered non-terminal work still requires explicit continuation (a fresh governance
-  evaluation), so a stored `valid_until` is never consumed as a live grant.
+- **Checkpoints — two integrity boundaries.** `Checkpoint` gains `checkpoint_version`
+  (`"1"`), a self-verifying per-task `execution_states` section, the digest-keyed
+  `execution_state_journal`, and the typed **lineage source** (`workflow_lineage` +
+  `task_lineage`) — the latter preserved *separately* from historical snapshots so future
+  snapshots after recovery keep the same references, including for tasks that had not yet
+  run. Two independent digests protect it:
+  - `digest` — the **base coordination digest**, computed over exactly the original payload.
+    Unchanged, so **pre-existing checkpoints verify byte-identically**.
+  - `extension_digest` — a **separate v1 boundary** over the entire canonical-state
+    extension (`checkpoint_version` + `execution_states` + `execution_state_journal` +
+    `workflow_lineage` + `task_lineage`). The base digest deliberately does *not* cover the
+    extension, so `extension_digest` is what protects the **lineage source** and the
+    **collection membership** — closing the gap where the lineage source rode along
+    unprotected by either the base digest or the per-snapshot digests. A legacy (`"0"`)
+    checkpoint carries no extension and no `extension_digest`.
+- **Cross-binding & consistency.** `validate_execution_states()` enforces — beyond each
+  snapshot's own digest — that the map key equals the snapshot's own key field; that
+  instance / workflow / runtime / correlation identity match the checkpoint; that the
+  referenced task exists; that the schema version is supported; that **every latest
+  snapshot is resolvable in the journal by its own digest and is the same snapshot** (the
+  public "every digest resolvable" guarantee); and that the **lineage source is structural**
+  (keys reference known tasks, values deserialize). An inconsistent canonical state fails
+  closed with a precise reason — never silently accepted *or* silently discarded.
+- **Recovery — versioned gate.** Recovery first rejects an **unknown `checkpoint_version`**
+  (fail closed rather than interpret a future schema under today's rules). For `"1"` it
+  requires the base digest valid, the **extension digest valid**, and cross-binding valid;
+  for `"0"` (legacy) it requires the base digest valid and no extension data present. It
+  then restores the lineage source, the per-task latest snapshots, and the journal; and
+  **never fabricates** a missing decision reference, authorization, clearance, proposal
+  fingerprint, execution reference, or agent provenance. Recovery still performs no provider
+  or governance call, and recovered non-terminal work still requires explicit continuation
+  (a fresh governance evaluation), so a stored `valid_until` is never consumed as a live
+  grant.
+
+> **Threat-model note.** These digests protect against corruption, partial writes, and any
+> intermediary that tampers without recomputing the digest — bringing the lineage source to
+> parity with the base coordination data. They are *not* signatures: an actor with full
+> write access to the checkpoint store who recomputes a digest is out of scope (that
+> requires keyed signing, which this neutral, stdlib-only package deliberately does not
+> embed). The structural and latest↔journal consistency checks still catch a class of
+> re-sealed tampering (e.g. omitting a journal entry a latest snapshot points to).
 
 ## What is enforced mechanically
 
@@ -242,6 +264,12 @@ resolvable via `runtime.execution_state_by_digest(instance_id, state_digest)`. T
   historical digests stay resolvable after recovery; cross-binding rejects a relabelled or
   foreign-instance snapshot and an unsupported version with a precise reason; tampering
   fails closed; recovery has no side effects (tests: checkpoint/recovery/cross-binding).
+- The `extension_digest` covers the lineage source and snapshot-collection membership, so
+  tampering the persisted lineage fails recovery even though the base digest and the
+  per-snapshot digests still pass (test: lineage-source tampering); an unknown
+  `checkpoint_version` fails closed; omitting a journal entry a latest snapshot points to is
+  caught even when the extension digest is re-sealed; a lineage entry for an unknown task
+  fails closed (tests: checkpoint integrity boundary).
 - Unsupported `state_version` and non-finite `valid_until` fail closed (tests: hardening).
 
 ## Current limitations / remaining gaps

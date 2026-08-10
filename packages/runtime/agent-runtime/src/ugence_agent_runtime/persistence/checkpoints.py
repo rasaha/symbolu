@@ -39,11 +39,34 @@ from ..models.workflow import WorkflowInstance, WorkflowStatus
 # without a version tag (no execution-state lineage).
 CHECKPOINT_VERSION = "1"
 LEGACY_CHECKPOINT_VERSION = "0"
+# Checkpoint schema versions this build can recover. An unknown future version must fail
+# closed rather than be interpreted under today's semantics.
+SUPPORTED_CHECKPOINT_VERSIONS = frozenset({LEGACY_CHECKPOINT_VERSION, CHECKPOINT_VERSION})
 
 
 def _digest(payload: Dict[str, Any]) -> str:
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _extension_payload(
+    checkpoint_version: str,
+    execution_states: Dict[str, Any],
+    execution_state_journal: Dict[str, Any],
+    workflow_lineage: Optional[Dict[str, Any]],
+    task_lineage: Dict[str, Any],
+) -> Dict[str, Any]:
+    """The canonical-state extension payload covered by ``extension_digest``. Covers the
+    version, both snapshot collections (so membership — additions/removals/relabels — is
+    bound), and the typed lineage source (so a tampered agent/artifact reference is
+    detected). Deterministic under ``sort_keys``."""
+    return {
+        "checkpoint_version": checkpoint_version,
+        "execution_states": execution_states,
+        "execution_state_journal": execution_state_journal,
+        "workflow_lineage": workflow_lineage,
+        "task_lineage": task_lineage,
+    }
 
 
 @dataclass(frozen=True)
@@ -72,6 +95,12 @@ class Checkpoint:
     # the checkpoint was written. Neutral references only; never authority.
     workflow_lineage: Optional[Dict[str, Any]] = None
     task_lineage: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    # Additive (v1): a SEPARATE integrity digest over the entire canonical-state extension
+    # (checkpoint_version + execution_states + execution_state_journal + workflow_lineage +
+    # task_lineage). The base ``digest`` is deliberately unchanged (legacy compatibility)
+    # and therefore does NOT cover this extension; ``extension_digest`` is what protects the
+    # lineage source and the collection membership. Empty for a legacy ("0") checkpoint.
+    extension_digest: str = ""
 
     @classmethod
     def of(
@@ -103,19 +132,26 @@ class Checkpoint:
             digest: state.to_dict()
             for digest, state in (execution_state_journal or {}).items()
         }
+        workflow_lineage = (
+            instance.lineage.to_dict() if instance.lineage is not None else None
+        )
+        task_lineage = {
+            tid: ti.lineage.to_dict()
+            for tid, ti in instance.tasks.items()
+            if ti.lineage is not None
+        }
+        extension = _extension_payload(
+            CHECKPOINT_VERSION, serialized_states, serialized_journal,
+            workflow_lineage, task_lineage,
+        )
         return cls(
             digest=_digest(payload),
             checkpoint_version=CHECKPOINT_VERSION,
             execution_states=serialized_states,
             execution_state_journal=serialized_journal,
-            workflow_lineage=(
-                instance.lineage.to_dict() if instance.lineage is not None else None
-            ),
-            task_lineage={
-                tid: ti.lineage.to_dict()
-                for tid, ti in instance.tasks.items()
-                if ti.lineage is not None
-            },
+            workflow_lineage=workflow_lineage,
+            task_lineage=task_lineage,
+            extension_digest=_digest(extension),
             **payload,
         )
 
@@ -133,6 +169,32 @@ class Checkpoint:
 
     def verify(self) -> bool:
         return self.digest == _digest(self.payload())
+
+    def extension_payload(self) -> Dict[str, Any]:
+        return _extension_payload(
+            self.checkpoint_version, self.execution_states, self.execution_state_journal,
+            self.workflow_lineage, self.task_lineage,
+        )
+
+    def compute_extension_digest(self) -> str:
+        return _digest(self.extension_payload())
+
+    def verify_extension(self) -> bool:
+        """True when the canonical-state extension digest matches its contents.
+
+        This is what protects the lineage source and the *membership* of the snapshot
+        collections — neither of which the base ``digest`` covers. Only meaningful for a v1
+        checkpoint (a legacy checkpoint carries no extension and no ``extension_digest``)."""
+        return bool(self.extension_digest) and self.extension_digest == self.compute_extension_digest()
+
+    def has_extension_data(self) -> bool:
+        """True if any canonical-state extension data is present."""
+        return bool(
+            self.execution_states
+            or self.execution_state_journal
+            or self.workflow_lineage
+            or self.task_lineage
+        )
 
     def verify_execution_states(self) -> bool:
         """True when every persisted canonical execution state is digest-intact.
@@ -197,6 +259,31 @@ class Checkpoint:
             reasons += self._bind_errors(key, snap, journal=False)
         for key, snap in self.execution_state_journal.items():
             reasons += self._bind_errors(key, snap, journal=True)
+        # Latest <-> journal consistency: every latest per-task snapshot must be resolvable
+        # in the journal by its own digest, and be the SAME snapshot — upholding the public
+        # guarantee that every canonical-state digest is resolvable.
+        for key, snap in self.execution_states.items():
+            digest = snap.get("state_digest")
+            if digest not in self.execution_state_journal:
+                reasons.append(f"execution_states[{key!r}] digest {digest!r} missing from journal")
+            elif self.execution_state_journal[digest] != snap:
+                reasons.append(
+                    f"execution_states[{key!r}] does not match journal[{digest!r}]"
+                )
+        # Lineage source structural validity: keys must reference known tasks and every
+        # value must deserialize. An unknown/malformed persisted lineage entry fails closed.
+        if self.workflow_lineage is not None:
+            try:
+                ExecutionLineage.from_dict(self.workflow_lineage)
+            except Exception as exc:
+                reasons.append(f"workflow_lineage is malformed: {exc}")
+        for tid, lin in self.task_lineage.items():
+            if tid not in self.tasks:
+                reasons.append(f"task_lineage[{tid!r}] references unknown task")
+            try:
+                ExecutionLineage.from_dict(lin)
+            except Exception as exc:
+                reasons.append(f"task_lineage[{tid!r}] is malformed: {exc}")
         if reasons:
             return False, reasons[0]
         return True, None
@@ -236,6 +323,7 @@ class Checkpoint:
         d["execution_state_journal"] = self.execution_state_journal
         d["workflow_lineage"] = self.workflow_lineage
         d["task_lineage"] = self.task_lineage
+        d["extension_digest"] = self.extension_digest
         return d
 
     @classmethod
@@ -255,4 +343,5 @@ class Checkpoint:
             execution_state_journal=dict(d.get("execution_state_journal", {})),
             workflow_lineage=d.get("workflow_lineage"),
             task_lineage=dict(d.get("task_lineage", {})),
+            extension_digest=d.get("extension_digest", ""),
         )
