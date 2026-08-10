@@ -15,7 +15,7 @@ from ugence_agent_runtime import api
 
 def test_version_accessible():  # check 7
     assert isinstance(ugence_agent_runtime.__version__, str)
-    assert ugence_agent_runtime.__version__ == "0.1.2"
+    assert ugence_agent_runtime.__version__ == "0.2.0"
 
 
 def test_py_typed_shipped():  # check 5
@@ -57,8 +57,12 @@ def test_public_api_surface_is_curated():
         "GovernanceDisposition",
         "ExecutionContext",
         "CorrelationContext",
+        "CanonicalExecutionState",
+        "ExecutionLineage",
         "create_runtime",
         "start_workflow",
+        "execution_state",
+        "execution_state_by_digest",
         "resume_workflow",
         "pause_workflow",
         "cancel_workflow",

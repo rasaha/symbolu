@@ -62,8 +62,22 @@ All transitions are checked against the tables in `models/transitions.py`. An il
 change raises `InvalidTransitionError`. The tables are the single source of truth and
 are exported as an artifact for external auditing.
 
+## Canonical execution state
+
+Alongside the status machine above, the runtime derives an immutable
+`CanonicalExecutionState` snapshot at each meaningful trajectory point (task ready,
+governance evaluated, clearance validated, provider invoked, provider completed, task
+completed/failed). Each snapshot has a deterministic `state_digest`; important events
+carry that digest via `execution_state_digest` so the event stream is anchored to a real
+snapshot without embedding the whole state. Snapshots are runtime-derived (never
+caller-authored), reference the active proposal fingerprint (never a second action
+payload), and carry external authority/artifact references only. See
+[`AGENT_RUNTIME_CANONICAL_EXECUTION_STATE.md`](AGENT_RUNTIME_CANONICAL_EXECUTION_STATE.md).
+
 ## Determinism
 
 - Task selection is registration order among dependency-satisfied tasks.
 - Events carry a monotonic `seq`, not a timestamp.
 - The clock and id generator are injected, so runs are reproducible.
+- Canonical execution-state snapshots are deterministic: semantically equal construction
+  yields an identical `state_digest`.

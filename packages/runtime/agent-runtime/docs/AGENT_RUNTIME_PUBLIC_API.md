@@ -38,6 +38,8 @@ Machine-readable form: [`../artifacts/agent_runtime_public_api.json`](../artifac
 | `NoopGovernanceHook` | class | Deprecated alias of `AllowAllGovernanceHook`; emits `DeprecationWarning`. |
 | `TransitionProposal` | dataclass | Immutable exact-invocation description + deterministic fingerprint. |
 | `validate_clearance` | function | Exact-action clearance gate (fail closed). |
+| `CanonicalExecutionState` | dataclass | Deterministic, versioned, integrity-protected, runtime-owned execution-trajectory snapshot (SHA-256 `state_digest`). References the proposal fingerprint; never a second action payload. |
+| `ExecutionLineage` | dataclass | Optional, typed, neutral seam for causation/parent/agent-plan/artifact **references** supplied at workflow boundaries. Never fabricated; never used for agent selection. |
 | `ExecutionContext` / `CorrelationContext` | dataclass | Neutral context passed to governance. |
 | `RetryPolicy` | dataclass | Deterministic attempt-counting policy. |
 | `AgentRuntimeError` + subclasses | exception | Curated error taxonomy. |
@@ -47,7 +49,9 @@ Machine-readable form: [`../artifacts/agent_runtime_public_api.json`](../artifac
 | Function | Purpose |
 | --- | --- |
 | `create_runtime(config=None)` / `open_runtime(config=None)` | Build a runtime. No I/O. |
-| `start_workflow(runtime, definition, correlation_id=None)` | Start and drive a workflow. |
+| `start_workflow(runtime, definition, correlation_id=None, lineage=None, task_lineage=None)` | Start and drive a workflow (optional workflow-common and per-task `ExecutionLineage`). |
+| `execution_state(runtime, instance_id, task_id=None)` | Read the latest canonical execution-state snapshot (read-only). |
+| `execution_state_by_digest(runtime, instance_id, state_digest)` | Resolve a historical snapshot by its digest (read-only). |
 | `resume_workflow(runtime, instance_id)` | Explicitly continue a `WAITING`/`PAUSED` workflow. |
 | `pause_workflow(runtime, instance_id)` | Explicitly pause a `RUNNING` workflow. |
 | `cancel_workflow(runtime, instance_id)` | Cancel a workflow and its non-terminal tasks. |

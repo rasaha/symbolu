@@ -3,6 +3,99 @@
 All notable changes to the independent Agent Runtime distribution are recorded here.
 This project follows semantic versioning for the distribution.
 
+## 0.2.0 — canonical execution state
+
+Establishes the Agent Runtime as the canonical owner of **execution-trajectory
+identity**: a deterministic, versioned, integrity-protected, runtime-owned snapshot of
+what execution trajectory is being coordinated, what caused it, what immutable action
+identity is involved, and which external authority/artifact references are associated.
+Additive only — no change to exact-action fingerprint semantics, governance ownership,
+task scheduling, retries, timeout, cancellation, recovery behavior, or the digest
+semantics of existing serialized checkpoints. Not H22, not Runtime Assurance, not an AWC
+adapter beyond a minimal neutral lineage seam.
+
+### Added
+- **`CanonicalExecutionState`** (`models/execution_state.py`) — a frozen, stdlib-only
+  dataclass with deterministic canonical serialization and a SHA-256 `state_digest`
+  (excludes itself; identity-bearing changes change the digest; semantically equal
+  construction yields an identical digest). Flat, typed identity fields only — it
+  references the active proposal by `proposal_fingerprint` and never re-canonicalizes the
+  proposal's argument payload. `to_dict()`/`from_dict()`/`compute_digest()`/`sealed()`/
+  `is_intact()`.
+- **`ExecutionLineage`** — a typed, optional, neutral seam for causation / parent /
+  agent-plan / artifact *references* (never untyped metadata; never fabricated; defaults
+  to unavailable). Agent references are lineage constraints only — carrying one never
+  causes the runtime to select or re-rank an agent. Supplied at **two levels**:
+  workflow-common lineage (`start_workflow(lineage=…)`) and **per-task** lineage
+  (`start_workflow(task_lineage={task_id: …})`, stored on `TaskInstance.lineage`).
+  `overlay()` combines them so sibling tasks driven by different agents are attributed to
+  their own agent/artifacts/causation while inheriting workflow-common references — the
+  multi-agent case (Task 1 → Research, Task 2 → Risk, Task 3 → Execution).
+- **Runtime derivation** (`runtime/execution_state.py`, `build_execution_state`) — the
+  sole in-runtime author of snapshots, deriving them from config / instance / task /
+  proposal / (optional) governance evaluation. Authority-lineage fields are copied
+  verbatim from what governance returned and are `None` when governance produced nothing.
+- **Read-only access** — `AgentRuntime.execution_state(instance_id, task_id=None)` and the
+  `execution_state(runtime, …)` convenience function. No mutation API.
+- **Trajectory journal** — every snapshot the runtime records (not only the latest per
+  task) is retained by digest, so an `execution_state_digest` anchored on any earlier
+  event stays resolvable via `AgentRuntime.execution_state_by_digest` /
+  `execution_state_by_digest(runtime, …)`. The journal is persisted and restored across
+  recovery.
+- **Event anchoring** — `execution_state_digest=<digest>` added to `TASK_READY`,
+  `GOVERNANCE_EVALUATION_REQUESTED`, `GOVERNANCE_DISPOSITION_RECEIVED`, `TASK_STARTED`,
+  `PROVIDER_INVOKED`, `PROVIDER_COMPLETED`, `TASK_COMPLETED`, and `TASK_FAILED`. Digest
+  references only — the full state is never stuffed into the event stream. No new event
+  types; sequencing is unchanged.
+- **Checkpoint lineage** — `Checkpoint` gains `checkpoint_version` (`"1"`), a
+  self-verifying per-task `execution_states` section, the digest-keyed
+  `execution_state_journal`, and the typed **lineage source** (`workflow_lineage` +
+  `task_lineage`) preserved separately from historical snapshots so future snapshots after
+  recovery keep the same references — including for tasks that had not yet run. The base
+  coordination `digest` is computed over exactly the original payload, so pre-existing
+  checkpoints verify byte-identically; a checkpoint deserialized without a version tag is
+  treated as legacy `"0"` with lineage unavailable.
+- **Versioned extension integrity boundary** — a second digest, `extension_digest`, covers
+  the whole canonical-state extension (`checkpoint_version` + `execution_states` +
+  `execution_state_journal` + `workflow_lineage` + `task_lineage`). The base `digest` is
+  deliberately unchanged (legacy compatibility) and therefore does not cover the extension,
+  so `extension_digest` is what protects the **lineage source** and the snapshot-collection
+  **membership** — closing the gap where a tampered lineage source passed both the base
+  digest and per-snapshot digests. Legacy (`"0"`) checkpoints carry no extension.
+- **Strict cross-binding & consistency on recovery** — recovery rejects an unknown
+  `checkpoint_version` (fail closed, never interpret a future schema under today's rules);
+  for `"1"` it requires base digest + extension digest + cross-binding valid; for `"0"` it
+  requires the base digest and no extension data. `validate_execution_states()` enforces,
+  beyond each snapshot's own digest, that the map key equals the snapshot's own key field
+  (task id / state digest), that instance/workflow/runtime/correlation identity match the
+  checkpoint, that the referenced task exists, that the schema version is supported, that
+  every latest snapshot is resolvable in the journal (latest↔journal consistency), and that
+  the lineage source is structural (keys reference known tasks, values deserialize). An
+  inconsistent canonical state fails closed with a precise reason — never silently accepted
+  or discarded. Recovery restores the lineage source and journal
+  (`RuntimeRecoveryResult.execution_states` / `.execution_state_journal`) and never
+  fabricates missing references. **`runtime_id`/`runtime_version` on a snapshot are *origin*
+  provenance** (the runtime that created that historical state) and are intentionally NOT
+  required to equal the checkpoint writer, so recovery across a runtime upgrade — which is
+  permitted with `config_mismatch=True` — yields a mixed-version journal that still recovers
+  cleanly. Those fields stay integrity-protected by the snapshot's `state_digest` and the
+  `extension_digest`.
+- **Self-recoverability invariant** — the engine validates every checkpoint (base digest +
+  extension digest + canonical-state binding) *before* persisting it, so the runtime never
+  writes a checkpoint its own recovery validator would reject (fails closed with
+  `CheckpointError` on an internal inconsistency instead of emitting an unrecoverable
+  checkpoint).
+- **Hardening** — unsupported `state_version` fails closed (`SUPPORTED_STATE_VERSIONS`);
+  `valid_until` must be finite (NaN/Infinity rejected); digest serialization uses
+  `allow_nan=False`.
+- `ExecutionStateError`; canonical-execution-state test suite; docs
+  `AGENT_RUNTIME_CANONICAL_EXECUTION_STATE.md`.
+
+### Public API
+- Added `CanonicalExecutionState`, `ExecutionLineage`, `execution_state`, and
+  `execution_state_by_digest` to the curated surface; `start_workflow` gains optional
+  `lineage=` and `task_lineage=` arguments (additive).
+
 ## 0.1.2 — exact-action contract hardening
 
 Corrects three remaining gaps in the exact-action governance contract. Bounded

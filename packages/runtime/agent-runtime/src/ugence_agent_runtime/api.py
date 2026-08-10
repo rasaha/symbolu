@@ -26,6 +26,7 @@ from .governance.interfaces import (
 )
 from .models.agent import AgentDescriptor
 from .models.events import RuntimeEvent
+from .models.execution_state import CanonicalExecutionState, ExecutionLineage
 from .models.proposal import TransitionProposal
 from .models.results import FailureCategory, RuntimeFailure, RuntimeResult
 from .models.task import TaskDefinition, TaskInstance, TaskStatus
@@ -68,8 +69,31 @@ def start_workflow(
     runtime: AgentRuntime,
     definition: WorkflowDefinition,
     correlation_id: Optional[str] = None,
+    lineage: Optional[ExecutionLineage] = None,
+    task_lineage: Optional[dict] = None,
 ) -> WorkflowInstance:
-    return runtime.start_workflow(definition, correlation_id)
+    return runtime.start_workflow(definition, correlation_id, lineage, task_lineage)
+
+
+def execution_state(
+    runtime: AgentRuntime,
+    instance_id: str,
+    task_id: Optional[str] = None,
+) -> Optional[CanonicalExecutionState]:
+    """Return the latest canonical execution-state snapshot for a task (or a
+    workflow-level snapshot when ``task_id`` is None). Read-only; there is no API to
+    overwrite runtime-owned execution truth."""
+    return runtime.execution_state(instance_id, task_id)
+
+
+def execution_state_by_digest(
+    runtime: AgentRuntime,
+    instance_id: str,
+    state_digest: str,
+) -> Optional[CanonicalExecutionState]:
+    """Resolve a historical canonical execution-state snapshot by its digest, so an
+    ``execution_state_digest`` anchored on any earlier event stays reconstructable."""
+    return runtime.execution_state_by_digest(instance_id, state_digest)
 
 
 def resume_workflow(runtime: AgentRuntime, instance_id: str) -> WorkflowInstance:
@@ -140,6 +164,9 @@ __all__ = [
     "GovernanceDisposition",
     "TransitionProposal",
     "ProposalError",
+    # canonical execution state
+    "CanonicalExecutionState",
+    "ExecutionLineage",
     "UnconfiguredGovernanceHook",
     "AllowAllGovernanceHook",
     "NoopGovernanceHook",
@@ -163,6 +190,8 @@ __all__ = [
     "create_runtime",
     "open_runtime",
     "start_workflow",
+    "execution_state",
+    "execution_state_by_digest",
     "resume_workflow",
     "pause_workflow",
     "cancel_workflow",

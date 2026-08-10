@@ -7,21 +7,66 @@ checkpoint can be detected and rejected (fail closed) on recovery.
 
 Checkpoints hold no credentials, no provider outputs, and no governance authority —
 only coordination state needed to resume.
+
+## Compatibility discipline for canonical execution-state lineage
+
+Canonical execution-state lineage (``execution_states``) is an **additive** section
+introduced with ``checkpoint_version`` ``"1"``. The base ``digest`` continues to be
+computed over exactly the original coordination payload (instance/workflow/runtime
+identity, status, tasks, correlation) and **only** that payload — so checkpoints
+written before this field existed verify byte-identically and their digest semantics
+are unchanged. A checkpoint deserialized without ``checkpoint_version`` is treated as
+legacy version ``"0"`` and simply carries no execution-state lineage (unavailable,
+never fabricated). Each persisted execution state is *self-verifying* via its own
+``state_digest``; :meth:`verify_execution_states` fails closed on any tampering.
 """
 from __future__ import annotations
 
 import hashlib
 import json
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
+from ..models.execution_state import (
+    SUPPORTED_STATE_VERSIONS,
+    CanonicalExecutionState,
+    ExecutionLineage,
+)
 from ..models.task import TaskStatus
 from ..models.workflow import WorkflowInstance, WorkflowStatus
+
+# Current checkpoint schema version. "0" denotes a legacy checkpoint deserialized
+# without a version tag (no execution-state lineage).
+CHECKPOINT_VERSION = "1"
+LEGACY_CHECKPOINT_VERSION = "0"
+# Checkpoint schema versions this build can recover. An unknown future version must fail
+# closed rather than be interpreted under today's semantics.
+SUPPORTED_CHECKPOINT_VERSIONS = frozenset({LEGACY_CHECKPOINT_VERSION, CHECKPOINT_VERSION})
 
 
 def _digest(payload: Dict[str, Any]) -> str:
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _extension_payload(
+    checkpoint_version: str,
+    execution_states: Dict[str, Any],
+    execution_state_journal: Dict[str, Any],
+    workflow_lineage: Optional[Dict[str, Any]],
+    task_lineage: Dict[str, Any],
+) -> Dict[str, Any]:
+    """The canonical-state extension payload covered by ``extension_digest``. Covers the
+    version, both snapshot collections (so membership — additions/removals/relabels — is
+    bound), and the typed lineage source (so a tampered agent/artifact reference is
+    detected). Deterministic under ``sort_keys``."""
+    return {
+        "checkpoint_version": checkpoint_version,
+        "execution_states": execution_states,
+        "execution_state_journal": execution_state_journal,
+        "workflow_lineage": workflow_lineage,
+        "task_lineage": task_lineage,
+    }
 
 
 @dataclass(frozen=True)
@@ -34,6 +79,28 @@ class Checkpoint:
     tasks: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     correlation_id: Optional[str] = None
     digest: str = ""
+    # Additive (v1): per-task canonical execution-state lineage, each entry a
+    # self-verifying CanonicalExecutionState.to_dict(). Intentionally EXCLUDED from the
+    # base ``digest`` so legacy digest semantics are preserved; integrity of this section
+    # is checked separately via each state's own state_digest.
+    checkpoint_version: str = CHECKPOINT_VERSION
+    execution_states: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    # Additive (v1): the full trajectory journal, keyed by state_digest, so an event that
+    # references a historical snapshot digest stays resolvable after restart (not only the
+    # latest per task). Each entry is a self-verifying CanonicalExecutionState.to_dict().
+    execution_state_journal: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    # Additive (v1): the typed lineage *source* (workflow-common + per-task), preserved
+    # separately from historical snapshots so future snapshots after recovery keep the same
+    # agent/artifact/causation references — including for tasks that had not yet run when
+    # the checkpoint was written. Neutral references only; never authority.
+    workflow_lineage: Optional[Dict[str, Any]] = None
+    task_lineage: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    # Additive (v1): a SEPARATE integrity digest over the entire canonical-state extension
+    # (checkpoint_version + execution_states + execution_state_journal + workflow_lineage +
+    # task_lineage). The base ``digest`` is deliberately unchanged (legacy compatibility)
+    # and therefore does NOT cover this extension; ``extension_digest`` is what protects the
+    # lineage source and the collection membership. Empty for a legacy ("0") checkpoint.
+    extension_digest: str = ""
 
     @classmethod
     def of(
@@ -41,6 +108,8 @@ class Checkpoint:
         instance: WorkflowInstance,
         runtime_id: str,
         runtime_version: str,
+        execution_states: Optional[Dict[str, CanonicalExecutionState]] = None,
+        execution_state_journal: Optional[Dict[str, CanonicalExecutionState]] = None,
     ) -> "Checkpoint":
         tasks = {
             tid: {"status": ti.status.value, "attempts": ti.attempts}
@@ -55,9 +124,39 @@ class Checkpoint:
             "tasks": tasks,
             "correlation_id": instance.correlation_id,
         }
-        return cls(digest=_digest(payload), **payload)
+        serialized_states = {
+            tid: state.to_dict()
+            for tid, state in (execution_states or {}).items()
+        }
+        serialized_journal = {
+            digest: state.to_dict()
+            for digest, state in (execution_state_journal or {}).items()
+        }
+        workflow_lineage = (
+            instance.lineage.to_dict() if instance.lineage is not None else None
+        )
+        task_lineage = {
+            tid: ti.lineage.to_dict()
+            for tid, ti in instance.tasks.items()
+            if ti.lineage is not None
+        }
+        extension = _extension_payload(
+            CHECKPOINT_VERSION, serialized_states, serialized_journal,
+            workflow_lineage, task_lineage,
+        )
+        return cls(
+            digest=_digest(payload),
+            checkpoint_version=CHECKPOINT_VERSION,
+            execution_states=serialized_states,
+            execution_state_journal=serialized_journal,
+            workflow_lineage=workflow_lineage,
+            task_lineage=task_lineage,
+            extension_digest=_digest(extension),
+            **payload,
+        )
 
     def payload(self) -> Dict[str, Any]:
+        # The base digest payload — unchanged across the v1 addition on purpose.
         return {
             "instance_id": self.instance_id,
             "workflow_id": self.workflow_id,
@@ -71,9 +170,166 @@ class Checkpoint:
     def verify(self) -> bool:
         return self.digest == _digest(self.payload())
 
+    def extension_payload(self) -> Dict[str, Any]:
+        return _extension_payload(
+            self.checkpoint_version, self.execution_states, self.execution_state_journal,
+            self.workflow_lineage, self.task_lineage,
+        )
+
+    def compute_extension_digest(self) -> str:
+        return _digest(self.extension_payload())
+
+    def verify_extension(self) -> bool:
+        """True when the canonical-state extension digest matches its contents.
+
+        This is what protects the lineage source and the *membership* of the snapshot
+        collections — neither of which the base ``digest`` covers. Only meaningful for a v1
+        checkpoint (a legacy checkpoint carries no extension and no ``extension_digest``)."""
+        return bool(self.extension_digest) and self.extension_digest == self.compute_extension_digest()
+
+    def has_extension_data(self) -> bool:
+        """True if any canonical-state extension data is present."""
+        return bool(
+            self.execution_states
+            or self.execution_state_journal
+            or self.workflow_lineage
+            or self.task_lineage
+        )
+
+    def verify_execution_states(self) -> bool:
+        """True when every persisted canonical execution state is digest-intact.
+
+        Empty (legacy or no-lineage) checkpoints are vacuously intact. A tampered state
+        — fields changed without recomputing its ``state_digest``, or vice versa — fails
+        closed. This is the digest-only self-check; :meth:`validate_execution_states` also
+        enforces cross-object binding to this checkpoint."""
+        ok, _ = self.validate_execution_states()
+        return ok
+
+    def _bind_errors(self, key: str, snap: Dict[str, Any], *, journal: bool) -> List[str]:
+        """Cross-object binding + integrity checks for one persisted snapshot. Returns a
+        list of human-readable reasons (empty when the snapshot is fully consistent)."""
+        where = "journal" if journal else "execution_states"
+        errs: List[str] = []
+        # Version first, so an unknown schema version yields a precise reason rather than a
+        # generic construction failure.
+        version = snap.get("state_version")
+        if version not in SUPPORTED_STATE_VERSIONS:
+            return [f"{where}[{key!r}] unsupported state_version {version!r}"]
+        try:
+            state = CanonicalExecutionState.from_dict(snap)
+        except Exception as exc:  # malformed persisted snapshot
+            return [f"{where}[{key!r}] is not a valid canonical execution state: {exc}"]
+        if not state.is_intact():
+            errs.append(f"{where}[{key!r}] failed digest integrity")
+        # The dictionary key must match the field it is keyed by (task_id for the latest
+        # map, state_digest for the journal) — a mismatch is a swapped/relabeled snapshot.
+        if journal:
+            if key != state.state_digest:
+                errs.append(f"journal key {key!r} != state_digest {state.state_digest!r}")
+        else:
+            if key != state.task_id:
+                errs.append(f"execution_states key {key!r} != task_id {state.task_id!r}")
+        # Bind identity to THIS checkpoint. NOTE: runtime_id / runtime_version are
+        # deliberately NOT required to equal the checkpoint writer's. They are *origin*
+        # provenance — the runtime that CREATED this historical snapshot — and after a
+        # recovery across a runtime upgrade a single checkpoint legitimately carries a
+        # mixed-version journal (older states from the previous runtime, newer states from
+        # the current one). That mix is desirable provenance, not corruption; those fields
+        # remain integrity-protected by the snapshot's own state_digest and by the
+        # checkpoint's extension_digest, they simply need not match the writer's identity.
+        if state.instance_id != self.instance_id:
+            errs.append(f"{where}[{key!r}] instance_id {state.instance_id!r} != {self.instance_id!r}")
+        if state.workflow_id != self.workflow_id:
+            errs.append(f"{where}[{key!r}] workflow_id {state.workflow_id!r} != {self.workflow_id!r}")
+        if state.correlation_id != self.correlation_id:
+            errs.append(f"{where}[{key!r}] correlation_id {state.correlation_id!r} != {self.correlation_id!r}")
+        if state.task_id is None or state.task_id not in self.tasks:
+            errs.append(f"{where}[{key!r}] task_id {state.task_id!r} not present in checkpoint tasks")
+        return errs
+
+    def validate_execution_states(self) -> Tuple[bool, Optional[str]]:
+        """Strictly validate the canonical execution-state lineage against THIS checkpoint.
+
+        Beyond each snapshot's own digest, this enforces cross-object binding: the map key
+        equals the snapshot's own key field; instance/workflow/correlation identity match
+        the checkpoint; the referenced task exists; the schema version is supported; every
+        latest snapshot is resolvable in the journal; and the lineage source is structural.
+        ``runtime_id``/``runtime_version`` are origin provenance and are intentionally NOT
+        required to equal the writer (so a post-upgrade mixed-version journal recovers).
+        Returns ``(ok, reason)`` — a precise reason on the first failure. An inconsistent
+        canonical state is never silently accepted or discarded.
+        """
+        reasons: List[str] = []
+        for key, snap in self.execution_states.items():
+            reasons += self._bind_errors(key, snap, journal=False)
+        for key, snap in self.execution_state_journal.items():
+            reasons += self._bind_errors(key, snap, journal=True)
+        # Latest <-> journal consistency: every latest per-task snapshot must be resolvable
+        # in the journal by its own digest, and be the SAME snapshot — upholding the public
+        # guarantee that every canonical-state digest is resolvable.
+        for key, snap in self.execution_states.items():
+            digest = snap.get("state_digest")
+            if digest not in self.execution_state_journal:
+                reasons.append(f"execution_states[{key!r}] digest {digest!r} missing from journal")
+            elif self.execution_state_journal[digest] != snap:
+                reasons.append(
+                    f"execution_states[{key!r}] does not match journal[{digest!r}]"
+                )
+        # Lineage source structural validity: keys must reference known tasks and every
+        # value must deserialize. An unknown/malformed persisted lineage entry fails closed.
+        if self.workflow_lineage is not None:
+            try:
+                ExecutionLineage.from_dict(self.workflow_lineage)
+            except Exception as exc:
+                reasons.append(f"workflow_lineage is malformed: {exc}")
+        for tid, lin in self.task_lineage.items():
+            if tid not in self.tasks:
+                reasons.append(f"task_lineage[{tid!r}] references unknown task")
+            try:
+                ExecutionLineage.from_dict(lin)
+            except Exception as exc:
+                reasons.append(f"task_lineage[{tid!r}] is malformed: {exc}")
+        if reasons:
+            return False, reasons[0]
+        return True, None
+
+    def canonical_execution_states(self) -> Dict[str, CanonicalExecutionState]:
+        """Reconstruct the per-task (latest) canonical execution states (unverified —
+        callers should have already run :meth:`validate_execution_states`)."""
+        return {
+            tid: CanonicalExecutionState.from_dict(snap)
+            for tid, snap in self.execution_states.items()
+        }
+
+    def canonical_execution_journal(self) -> Dict[str, CanonicalExecutionState]:
+        """Reconstruct the digest-keyed trajectory journal (unverified)."""
+        return {
+            digest: CanonicalExecutionState.from_dict(snap)
+            for digest, snap in self.execution_state_journal.items()
+        }
+
+    def workflow_execution_lineage(self) -> Optional[ExecutionLineage]:
+        """Reconstruct the workflow-common lineage source, if any was persisted."""
+        if self.workflow_lineage is None:
+            return None
+        return ExecutionLineage.from_dict(self.workflow_lineage)
+
+    def task_execution_lineage(self) -> Dict[str, ExecutionLineage]:
+        """Reconstruct the per-task lineage source, keyed by task id."""
+        return {
+            tid: ExecutionLineage.from_dict(d) for tid, d in self.task_lineage.items()
+        }
+
     def to_dict(self) -> Dict[str, Any]:
         d = self.payload()
         d["digest"] = self.digest
+        d["checkpoint_version"] = self.checkpoint_version
+        d["execution_states"] = self.execution_states
+        d["execution_state_journal"] = self.execution_state_journal
+        d["workflow_lineage"] = self.workflow_lineage
+        d["task_lineage"] = self.task_lineage
+        d["extension_digest"] = self.extension_digest
         return d
 
     @classmethod
@@ -87,4 +343,11 @@ class Checkpoint:
             tasks=dict(d.get("tasks", {})),
             correlation_id=d.get("correlation_id"),
             digest=d.get("digest", ""),
+            # Absent version tag => legacy checkpoint with no execution-state lineage.
+            checkpoint_version=d.get("checkpoint_version", LEGACY_CHECKPOINT_VERSION),
+            execution_states=dict(d.get("execution_states", {})),
+            execution_state_journal=dict(d.get("execution_state_journal", {})),
+            workflow_lineage=d.get("workflow_lineage"),
+            task_lineage=dict(d.get("task_lineage", {})),
+            extension_digest=d.get("extension_digest", ""),
         )

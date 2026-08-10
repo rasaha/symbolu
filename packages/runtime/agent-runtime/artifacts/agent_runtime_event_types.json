@@ -21,5 +21,15 @@
     "CHECKPOINT_COMMITTED",
     "RECOVERY_PERFORMED"
   ],
-  "notes": "Deterministic; monotonic seq, not a timestamp. No credentials, raw prompts, secret args, or full provider responses by default."
+  "notes": "Deterministic; monotonic seq, not a timestamp. No credentials, raw prompts, secret args, or full provider responses by default. Task-lifecycle and governance events additionally carry execution_state_digest referencing the canonical execution-state snapshot (digest reference only; the full state is never embedded).",
+  "execution_state_anchored_events": [
+    "TASK_READY",
+    "GOVERNANCE_EVALUATION_REQUESTED",
+    "GOVERNANCE_DISPOSITION_RECEIVED",
+    "TASK_STARTED",
+    "PROVIDER_INVOKED",
+    "PROVIDER_COMPLETED",
+    "TASK_COMPLETED",
+    "TASK_FAILED"
+  ]
 }

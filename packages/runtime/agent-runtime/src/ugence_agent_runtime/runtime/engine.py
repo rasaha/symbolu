@@ -21,6 +21,7 @@ from ..config import AgentRuntimeConfig
 from ..governance.decisions import RuntimeDirective, directive_for, validate_clearance
 from ..governance.interfaces import GovernanceEvaluation
 from ..models import events as ev
+from ..models.execution_state import CanonicalExecutionState, ExecutionLineage
 from ..models.proposal import TransitionProposal, compute_fingerprint
 from ..models.results import FailureCategory, RuntimeFailure, RuntimeResult
 from ..models.task import TaskInstance, TaskStatus
@@ -35,8 +36,9 @@ from ..persistence.checkpoints import Checkpoint
 from ..persistence.recovery import RuntimeRecoveryResult, recover_instance
 from ..providers.interfaces import ToolInvocation
 from .cancellation import CancellationToken
-from .errors import AgentRuntimeError
+from .errors import AgentRuntimeError, CheckpointError
 from .execution import execute_with_policy
+from .execution_state import build_execution_state
 
 
 class AgentRuntime:
@@ -54,6 +56,13 @@ class AgentRuntime:
         self._traces: Dict[str, RunTrace] = {}
         self._tokens: Dict[str, CancellationToken] = {}
         self._failures: Dict[str, list] = {}
+        # Latest canonical execution-state snapshot per (instance_id, task_id). The
+        # runtime is the canonical owner of execution-trajectory identity; these are the
+        # anchors persisted into checkpoints and referenced (by digest) from events.
+        self._exec_states: Dict[str, Dict[str, CanonicalExecutionState]] = {}
+        # The full trajectory journal per instance, keyed by state_digest, so a historical
+        # snapshot referenced by an event stays resolvable (not only the latest per task).
+        self._exec_journal: Dict[str, Dict[str, CanonicalExecutionState]] = {}
         # Runtime-level trace (records RUNTIME_CREATED); no I/O performed here.
         self._runtime_trace = RunTrace(
             instance_id=self._config.runtime_id,
@@ -96,15 +105,21 @@ class AgentRuntime:
         self,
         definition: WorkflowDefinition,
         correlation_id: Optional[str] = None,
+        lineage: Optional[ExecutionLineage] = None,
+        task_lineage: Optional[Dict[str, ExecutionLineage]] = None,
     ) -> WorkflowInstance:
         instance_id = self._config.id_generator()
         correlation_id = correlation_id or instance_id
-        instance = WorkflowInstance.create(instance_id, definition, correlation_id)
+        instance = WorkflowInstance.create(
+            instance_id, definition, correlation_id, lineage, task_lineage
+        )
         trace = RunTrace(instance_id=instance_id, sink=self._make_sink(instance_id))
         self._instances[instance_id] = instance
         self._traces[instance_id] = trace
         self._tokens[instance_id] = CancellationToken()
         self._failures[instance_id] = []
+        self._exec_states[instance_id] = {}
+        self._exec_journal[instance_id] = {}
         trace.emit(ev.WORKFLOW_CREATED, workflow_id=definition.workflow_id, instance_id=instance_id)
 
         self._set_wf(instance, WorkflowStatus.READY, trace, None)
@@ -181,6 +196,10 @@ class AgentRuntime:
         self._traces[instance_id] = trace
         self._tokens[instance_id] = CancellationToken()
         self._failures[instance_id] = []
+        # Restore previously-established canonical execution-state lineage (empty for a
+        # legacy checkpoint — unavailable, never fabricated).
+        self._exec_states[instance_id] = dict(result.execution_states)
+        self._exec_journal[instance_id] = dict(result.execution_state_journal)
         trace.emit(
             ev.RECOVERY_PERFORMED,
             instance_id=instance_id,
@@ -189,6 +208,35 @@ class AgentRuntime:
             config_mismatch=result.config_mismatch,
         )
         return result
+
+    def execution_state(
+        self, instance_id: str, task_id: Optional[str] = None
+    ) -> Optional[CanonicalExecutionState]:
+        """Return the latest canonical execution-state snapshot for a task, or a
+        workflow-level snapshot when ``task_id`` is None.
+
+        This is a read-only accessor: there is no API to overwrite runtime-owned
+        execution truth. A per-task snapshot is returned only if one has been recorded
+        (or restored from a checkpoint); otherwise ``None``. The workflow-level snapshot
+        is derived on demand from current instance state and carries no task/proposal/
+        governance references."""
+        if task_id is not None:
+            return self._exec_states.get(instance_id, {}).get(task_id)
+        instance = self._instances.get(instance_id)
+        if instance is None:
+            return None
+        return build_execution_state(self._config, instance)
+
+    def execution_state_by_digest(
+        self, instance_id: str, state_digest: str
+    ) -> Optional[CanonicalExecutionState]:
+        """Resolve a historical canonical execution-state snapshot by its digest.
+
+        Every snapshot the runtime records — not only the latest per task — is retained in
+        a per-instance journal, so a digest anchored on any earlier event
+        (``execution_state_digest``) remains resolvable. Returns ``None`` if the digest is
+        unknown for this instance."""
+        return self._exec_journal.get(instance_id, {}).get(state_digest)
 
     def result(self, instance_id: str) -> RuntimeResult:
         instance = self._instances[instance_id]
@@ -241,11 +289,15 @@ class AgentRuntime:
         )
 
     def _run_task(self, instance: WorkflowInstance, ti: TaskInstance, trace: RunTrace) -> None:
-        self._set_task(instance, ti, TaskStatus.READY, trace, ev.TASK_READY)
         proposal = self._build_proposal(instance, ti)
+        # S0 — task ready / proposal constructed (pre-governance). The transition is
+        # applied first so the snapshot reflects READY, then TASK_READY is anchored to it.
+        self._set_task(instance, ti, TaskStatus.READY, trace, None)
+        s0 = self._record_state(instance, ti, proposal=proposal)
+        self._emit_task(trace, ti, ev.TASK_READY, s0)
 
         if ti.definition.consequential:
-            evaluation = self._evaluate(proposal, ti, trace)
+            evaluation = self._evaluate(instance, proposal, ti, trace, s0)
             directive = directive_for(evaluation)
             ti.governance_reference = evaluation.binding_reference() if evaluation else None
         else:
@@ -254,16 +306,18 @@ class AgentRuntime:
             directive = RuntimeDirective.CONTINUE
 
         if directive is RuntimeDirective.WAIT:  # HOLD
-            self._set_task(instance, ti, TaskStatus.WAITING, trace, ev.TASK_WAITING,
-                           disposition="HOLD")
+            self._set_task(instance, ti, TaskStatus.WAITING, trace, None)
+            sw = self._record_state(instance, ti, proposal=proposal, evaluation=evaluation)
+            self._emit_task(trace, ti, ev.TASK_WAITING, sw, disposition="HOLD")
             self._set_wf(instance, WorkflowStatus.WAITING, trace, ev.WORKFLOW_WAITING,
                          reason="governance_hold")
             self._checkpoint(instance, trace)
             return
 
         if directive is RuntimeDirective.PAUSE:  # ESCALATE
-            self._set_task(instance, ti, TaskStatus.WAITING, trace, ev.TASK_WAITING,
-                           disposition="ESCALATE")
+            self._set_task(instance, ti, TaskStatus.WAITING, trace, None)
+            sw = self._record_state(instance, ti, proposal=proposal, evaluation=evaluation)
+            self._emit_task(trace, ti, ev.TASK_WAITING, sw, disposition="ESCALATE")
             self._set_wf(instance, WorkflowStatus.PAUSED, trace, ev.WORKFLOW_PAUSED,
                          reason="governance_escalate")
             self._checkpoint(instance, trace)
@@ -272,7 +326,8 @@ class AgentRuntime:
         if directive is RuntimeDirective.STOP:  # BLOCK (or fail-closed unknown)
             reasons = evaluation.reason_codes if evaluation else ("GOVERNANCE_STOP",)
             self._fail_task_governance(instance, ti, trace, reasons,
-                                       "governance blocked the transition", disposition="BLOCK")
+                                       "governance blocked the transition", disposition="BLOCK",
+                                       proposal=proposal, evaluation=evaluation)
             return
 
         # CONTINUE (CLEAR): for consequential tasks, the CLEAR must be bound to the
@@ -284,13 +339,18 @@ class AgentRuntime:
                     instance, ti, trace, reasons,
                     "governance CLEAR not bound to the exact proposal (fail closed)",
                     disposition="CLEAR_REJECTED",
+                    proposal=proposal, evaluation=evaluation,
                 )
                 return
 
-        self._set_task(instance, ti, TaskStatus.RUNNING, trace, ev.TASK_STARTED)
-        self._execute(instance, ti, proposal, trace)
+        # S2 — provider invocation about to occur (clearance validated).
+        self._set_task(instance, ti, TaskStatus.RUNNING, trace, None)
+        s2 = self._record_state(instance, ti, proposal=proposal, evaluation=evaluation)
+        self._emit_task(trace, ti, ev.TASK_STARTED, s2)
+        self._execute(instance, ti, proposal, trace, evaluation)
 
-    def _fail_task_governance(self, instance, ti, trace, reason_codes, message, *, disposition):
+    def _fail_task_governance(self, instance, ti, trace, reason_codes, message, *, disposition,
+                              proposal=None, evaluation=None):
         failure = RuntimeFailure(
             category=FailureCategory.GOVERNANCE_BLOCK,
             message=message,
@@ -299,26 +359,34 @@ class AgentRuntime:
         )
         self._failures[instance.instance_id].append(failure)
         ti.failure = failure
-        self._set_task(instance, ti, TaskStatus.FAILED, trace, ev.TASK_FAILED,
-                       disposition=disposition, reason_codes=list(reason_codes))
+        self._set_task(instance, ti, TaskStatus.FAILED, trace, None)
+        sf = self._record_state(instance, ti, proposal=proposal, evaluation=evaluation)
+        self._emit_task(trace, ti, ev.TASK_FAILED, sf,
+                        disposition=disposition, reason_codes=list(reason_codes))
         self._set_wf(instance, WorkflowStatus.FAILED, trace, ev.WORKFLOW_FAILED,
                      reason="governance_block")
         self._checkpoint(instance, trace)
 
     def _evaluate(
-        self, proposal: TransitionProposal, ti: TaskInstance, trace: RunTrace
+        self, instance: WorkflowInstance, proposal: TransitionProposal, ti: TaskInstance,
+        trace: RunTrace, pre_state: CanonicalExecutionState,
     ) -> GovernanceEvaluation:
         trace.emit(ev.GOVERNANCE_EVALUATION_REQUESTED, task_id=ti.task_id,
-                   operation=proposal.operation, fingerprint=proposal.fingerprint[:12])
+                   operation=proposal.operation, fingerprint=proposal.fingerprint[:12],
+                   execution_state_digest=pre_state.state_digest)
         evaluation = self._config.governance_hook.evaluate(proposal, self._config.clock())
+        # S1 — governance disposition returned (references, if any, now attached).
+        s1 = self._record_state(instance, ti, proposal=proposal, evaluation=evaluation)
         trace.emit(ev.GOVERNANCE_DISPOSITION_RECEIVED, task_id=ti.task_id,
                    disposition=evaluation.disposition.value,
                    reason_codes=list(evaluation.reason_codes),
-                   fingerprint_bound=(evaluation.proposal_fingerprint == proposal.fingerprint))
+                   fingerprint_bound=(evaluation.proposal_fingerprint == proposal.fingerprint),
+                   execution_state_digest=s1.state_digest)
         return evaluation
 
     def _execute(self, instance: WorkflowInstance, ti: TaskInstance,
-                 proposal: TransitionProposal, trace: RunTrace) -> None:
+                 proposal: TransitionProposal, trace: RunTrace,
+                 evaluation: Optional[GovernanceEvaluation] = None) -> None:
         d = ti.definition
         # Re-materialize arguments as a FRESH mutable structure only now, after
         # clearance validation — the frozen proposal identity is never handed out.
@@ -344,9 +412,16 @@ class AgentRuntime:
                 instance, ti, trace, ("PROPOSAL_INVOCATION_MISMATCH",),
                 "provider invocation does not match the evaluated proposal (fail closed)",
                 disposition="INTEGRITY",
+                proposal=proposal, evaluation=evaluation,
             )
             return
-        trace.emit(ev.PROVIDER_INVOKED, task_id=ti.task_id, provider_id=invocation.provider_id)
+        # PROVIDER_INVOKED — anchored to the same S2 identity (task RUNNING, proposal +
+        # evaluation), which is exactly the trajectory point whose exact-action check
+        # just passed. The canonical state references the proposal fingerprint; it never
+        # re-canonicalizes the invocation arguments (the proposal remains canonical).
+        s_inv = self._record_state(instance, ti, proposal=proposal, evaluation=evaluation)
+        trace.emit(ev.PROVIDER_INVOKED, task_id=ti.task_id, provider_id=invocation.provider_id,
+                   execution_state_digest=s_inv.state_digest)
         outcome = execute_with_policy(
             self._config.provider_registry,
             invocation,
@@ -356,12 +431,16 @@ class AgentRuntime:
             ti.task_id,
         )
         ti.attempts = outcome.attempts
+        # S(provider-completed) — attempt count now reflects the outcome.
+        s_done = self._record_state(instance, ti, proposal=proposal, evaluation=evaluation)
         trace.emit(ev.PROVIDER_COMPLETED, task_id=ti.task_id, ok=outcome.ok,
-                   attempts=outcome.attempts)
+                   attempts=outcome.attempts, execution_state_digest=s_done.state_digest)
 
         if outcome.ok:
             ti.result = outcome.result.output if outcome.result else None
-            self._set_task(instance, ti, TaskStatus.COMPLETED, trace, ev.TASK_COMPLETED)
+            self._set_task(instance, ti, TaskStatus.COMPLETED, trace, None)
+            s_final = self._record_state(instance, ti, proposal=proposal, evaluation=evaluation)
+            self._emit_task(trace, ti, ev.TASK_COMPLETED, s_final)
             self._checkpoint(instance, trace)
             return
 
@@ -380,8 +459,9 @@ class AgentRuntime:
             )
         ti.failure = failure
         self._failures[instance.instance_id].append(failure)
-        self._set_task(instance, ti, TaskStatus.FAILED, trace, ev.TASK_FAILED,
-                       category=failure.category.value)
+        self._set_task(instance, ti, TaskStatus.FAILED, trace, None)
+        s_final = self._record_state(instance, ti, proposal=proposal, evaluation=evaluation)
+        self._emit_task(trace, ti, ev.TASK_FAILED, s_final, category=failure.category.value)
         self._set_wf(instance, WorkflowStatus.FAILED, trace, ev.WORKFLOW_FAILED,
                      reason=failure.category.value)
         self._checkpoint(instance, trace)
@@ -389,6 +469,24 @@ class AgentRuntime:
     def _retry_for(self, max_attempts: int):
         from .retry import RetryPolicy
         return RetryPolicy(max_attempts=max_attempts)
+
+    # -- canonical execution state -----------------------------------------
+    def _record_state(self, instance, ti, *, proposal=None, evaluation=None):
+        """Derive and store the latest canonical execution-state snapshot for a task.
+
+        The snapshot is runtime-derived (never caller-authored) and sealed with its
+        digest. It becomes the anchor persisted into checkpoints and referenced from
+        events."""
+        state = build_execution_state(self._config, instance, ti, proposal, evaluation)
+        self._exec_states.setdefault(instance.instance_id, {})[ti.task_id] = state
+        # Retain every snapshot by digest so an event anchored on a historical digest stays
+        # resolvable, not only the latest per task.
+        self._exec_journal.setdefault(instance.instance_id, {})[state.state_digest] = state
+        return state
+
+    def _emit_task(self, trace, ti, event_type, state, **detail):
+        trace.emit(event_type, task_id=ti.task_id, status=ti.status.value,
+                   execution_state_digest=state.state_digest, **detail)
 
     # -- state transition helpers ------------------------------------------
     def _set_task(self, instance, ti, new_status, trace, event_type, **detail):
@@ -406,8 +504,20 @@ class AgentRuntime:
 
     def _checkpoint(self, instance: WorkflowInstance, trace: RunTrace) -> None:
         checkpoint = Checkpoint.of(
-            instance, self._config.runtime_id, self._config.runtime_version
+            instance, self._config.runtime_id, self._config.runtime_version,
+            execution_states=self._exec_states.get(instance.instance_id),
+            execution_state_journal=self._exec_journal.get(instance.instance_id),
         )
+        # Self-recoverability invariant: the runtime must never persist a checkpoint its own
+        # recovery validator would reject. Verify the two integrity boundaries and the
+        # canonical-state binding BEFORE writing to any store (fail closed on an internal
+        # inconsistency rather than emit an unrecoverable checkpoint).
+        states_ok, states_reason = checkpoint.validate_execution_states()
+        if not (checkpoint.verify() and checkpoint.verify_extension() and states_ok):
+            raise CheckpointError(
+                f"refusing to persist a non-self-recoverable checkpoint for instance "
+                f"{instance.instance_id!r}: {states_reason or 'digest verification failed'}"
+            )
         if self._config.checkpoint_store is not None:
             self._config.checkpoint_store.put(checkpoint)
         if self._config.state_store is not None:
