@@ -748,7 +748,7 @@ pilot are the next scheduled steps.
   harness ingests JSON dumps the Runner already produces, so
   this is execution work, not research.
 - **LLM-domain transfer is not claimed.** An internal research
-  track (`docs/design/BCVF_LLM_TRUST_ROUTING_DESIGN.md` §13)
+  track (`Project_documentation/repository/docs/design/BCVF_LLM_TRUST_ROUTING_DESIGN.md` §13)
   tested whether the same BCVF math applies to LLM
   hallucination detection. The N=100 TruthfulQA probe across
   11 candidate observables returned AUC in [0.476, 0.527] —

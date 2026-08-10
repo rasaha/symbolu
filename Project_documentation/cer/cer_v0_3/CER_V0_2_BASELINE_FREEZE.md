@@ -11,9 +11,9 @@ Labels: `FACT` (measured at git HEAD `10ef4d1`).
 
 ### CER V0.1 / V0.2 specification & schemas
 ```
-cf41e7381a3ae6cd  cer_v0_1/CER_V0_1_SPEC.md
-ae97be97f791e6b1  cer_v0_2/CER_PROFILE_ARCHITECTURE.md
-26c7e806b4240c5a  cer_v0_2/CER_KUBERNETES_ROLLOUT_PROFILE.md
+cf41e7381a3ae6cd  Project_documentation/cer/cer_v0_1/CER_V0_1_SPEC.md
+ae97be97f791e6b1  Project_documentation/cer/cer_v0_2/CER_PROFILE_ARCHITECTURE.md
+26c7e806b4240c5a  Project_documentation/cer/cer_v0_2/CER_KUBERNETES_ROLLOUT_PROFILE.md
 41ca69d40149339c  cer_v0_1/cer_v0_1.schema.json
 fe80b2d50f5a3e40  cer_v0_2/cer_v0_2.schema.json
 8da0b5bb2ed8062e  cer_v0_2/profiles/kubernetes.scale.v1.schema.json

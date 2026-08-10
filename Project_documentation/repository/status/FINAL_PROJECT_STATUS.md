@@ -97,7 +97,7 @@ available.** No further research, architecture, ontology, or synthetic-experimen
 work should be performed on this track. The next step is external: secure a real
 enterprise partner and one real cross-vertical workflow, then execute the pilot
 per [`RESUME_GUIDE.md`](../../governance/docs/enterprise_governance_archive/RESUME_GUIDE.md) and
-[`docs/enterprise_pilot/REAL_ENTERPRISE_PILOT_CHECKLIST.md`](../../governance/docs/enterprise_pilot/REAL_ENTERPRISE_PILOT_CHECKLIST.md).
+[`Project_documentation/governance/docs/enterprise_pilot/REAL_ENTERPRISE_PILOT_CHECKLIST.md`](../../governance/docs/enterprise_pilot/REAL_ENTERPRISE_PILOT_CHECKLIST.md).
 
 ## 4. Archival package index
 

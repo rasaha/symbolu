@@ -1,7 +1,7 @@
 # Security & Threat Closure
 
 **Status:** PROPOSED · `action_clearance.prerequisites.v0.1`. Expands the merged Action Clearance threat
-model (`docs/design/action_clearance/THREAT_MODEL.md`) for the four prerequisites. For each threat:
+model (`Project_documentation/repository/docs/design/action_clearance/THREAT_MODEL.md`) for the four prerequisites. For each threat:
 control, owner, failure state, MVP requirement, production hardening.
 
 ## Threat table

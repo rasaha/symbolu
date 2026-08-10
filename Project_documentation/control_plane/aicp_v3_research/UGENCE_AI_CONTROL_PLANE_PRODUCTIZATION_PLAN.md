@@ -15,7 +15,7 @@ confidentiality: "Confidential — shared for investor and design-partner evalua
   the content survives any converter that does not render Mermaid.
 
   This document is the commercial productization plan. The internal engineering
-  source it draws on — ACP/UGENCE_UNIFIED_CONSOLE_PLAN.md — is preserved
+  source it draws on — Project_documentation/control_plane/ACP/UGENCE_UNIFIED_CONSOLE_PLAN.md — is preserved
   separately and is NOT superseded by this document.
 -->
 
@@ -588,7 +588,7 @@ enforcement across workflows.
   / `HOLD`.
 - **Detailed contract.** Field-by-field DTO ↔ module-type mappings, the CER
   identity computation, and the non-compensatory gate logic are documented in
-  `ACP/PHASE1_GOVERNED_LOOP_DTO_CONTRACT.md`. Local run instructions are in the
+  `Project_documentation/control_plane/ACP/PHASE1_GOVERNED_LOOP_DTO_CONTRACT.md`. Local run instructions are in the
   service and console READMEs.
 - **Durable audit store (v1 reference).** PostgreSQL, an append-only,
   hash-chained, tenant-scoped audit-event model. The design includes: append-only

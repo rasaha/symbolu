@@ -25,7 +25,7 @@ identity**, which four findings undermine:
 2. **The authority definition is architecturally unresolved.** The audit's own definition — *ACP evaluates
    whether an already-authorized action remains valid; it never authorizes* — is contradicted by the live
    **robotics V1** core, which is documented as a *"decision-**and-authorization** runtime"* that mints a
-   one-shot `ControlAuthorization` grant (`acp/ACP_ARCHITECTURE.md:20,110`). The *cloud/console* framing
+   one-shot `ControlAuthorization` grant (`Project_documentation/control_plane/acp/ACP_ARCHITECTURE.md:20,110`). The *cloud/console* framing
    agrees with the audit definition (*"never authorizes… ActionGate decides whether; ACP decides whether
    now"*, `ugence_console_api/capabilities/operational_safety.py:11-12`). The product cannot be packaged
    until it picks one meaning. See `AUTHORITY_BOUNDARY.md`.
@@ -38,7 +38,7 @@ identity**, which four findings undermine:
 
 4. **It is uniformly shadow-only.** Every results doc leads with a shadow disclaimer; the one live robotics
    path runs on a *stub* planner; no live cluster is ever contacted; *"no production enforcement is
-   recommended"* (`acp/ACP_V2_1_RESULTS.md:117-118`). Overall maturity: **SHADOW_ONLY / PARTIAL_PROTOTYPE**.
+   recommended"* (`Project_documentation/control_plane/acp/ACP_V2_1_RESULTS.md:117-118`). Overall maturity: **SHADOW_ONLY / PARTIAL_PROTOTYPE**.
    See `MATURITY_ASSESSMENT.md`.
 
 ## What *is* real and reusable

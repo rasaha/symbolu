@@ -7,7 +7,7 @@ changed by this audit.
 correction). Competitive documents (`UGENCE_CODE_GOVERNANCE_COMPETITIVE_POSITIONING.md`,
 `UGENCE_CODE_GOVERNANCE_BATTLECARD.md`) are positioning material and do not override repository
 contracts or technical evidence.
-**Terminology:** follows `docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`
+**Terminology:** follows `Project_documentation/repository/docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`
 (Ugence Decision Governance umbrella; Decision Authority capability; Model Selection is the tenth
 capability; AI Control Plane and orchestrator are optional).
 

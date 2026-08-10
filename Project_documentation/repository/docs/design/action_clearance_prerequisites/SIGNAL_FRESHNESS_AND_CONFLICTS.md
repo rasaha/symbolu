@@ -1,7 +1,7 @@
 # Signal Freshness & Conflict Resolution
 
 **Status:** PROPOSED · `action_clearance.prerequisites.v0.1`. Extends
-`docs/design/action_clearance/TIME_AND_FRESHNESS.md` and the merged condition table in
+`Project_documentation/repository/docs/design/action_clearance/TIME_AND_FRESHNESS.md` and the merged condition table in
 `TRUSTED_SIGNAL_MODEL.md`. Introduces no new status; all outcomes map to the four merged statuses.
 
 ## Part 1 — Freshness
@@ -76,7 +76,7 @@ positive facts. There is no score.
 ### Source precedence
 
 Precedence is declared **only where an authoritative owner exists** (see
-`docs/design/action_clearance/SIGNAL_OWNERSHIP_MATRIX.md`): identity provider owns `ACTOR_STATUS`,
+`Project_documentation/repository/docs/design/action_clearance/SIGNAL_OWNERSHIP_MATRIX.md`): identity provider owns `ACTOR_STATUS`,
 incident system owns `ACTIVE_INCIDENT`, change-management owns `CHANGE_FREEZE`, execution ledger owns
 `PRIOR_CONSUMPTION`. Where two *distinct* authoritative owners assert *different facts*, both facts hold
 (intersection). Where two sources assert the *same fact type* and disagree, and neither is the declared

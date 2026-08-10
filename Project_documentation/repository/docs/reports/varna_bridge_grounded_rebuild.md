@@ -360,7 +360,7 @@ The system still contains heuristic mappings in production code. Full compliance
 | File | Change |
 |------|--------|
 | `symbolu/formulas/varna_bridge_loader.py` | NEW - Central data authority |
-| `docs/reports/varna_bridge_grounded_rebuild.md` | NEW - This report |
+| `Project_documentation/repository/docs/reports/varna_bridge_grounded_rebuild.md` | NEW - This report |
 
 ---
 

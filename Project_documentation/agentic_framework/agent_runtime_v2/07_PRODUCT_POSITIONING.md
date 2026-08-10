@@ -74,7 +74,7 @@ Labels: `FACT` (from the product's own brief) / `INTERPRETATION` / `RECOMMENDATI
 **FACT-anchored interaction points:**
 - **Runtime → Hybrid LLM / LLM Steering Controller.** The runtime is model-agnostic (FACT: `llm_adapters` for OpenAI/Anthropic/Mistral + `MistralCGAdapter`). It can run on Hybrid LLM (better long-context) and enrich generation with the LLM Steering Controller (frame control + the 32-D signal — now *advisory* per the falsification finding, useful as evidence not governance).
 - **Runtime → Control Plane.** The Execution Proposal (Deliverable 3) is the single seam. Context Minimization optionally compresses the runtime's context; ActionGate authorizes; ACP safety-checks.
-- **Control Plane → Infrastructure.** ACP already *consumes* the Cloud Scaling Controller as its cloud operational-safety evaluator (FACT: `acp/AI_CONTROL_PLANE_ARCHITECTURE.md` — "ACP (frozen core + cloud_controller)"). KVPro sits under all model inference.
+- **Control Plane → Infrastructure.** ACP already *consumes* the Cloud Scaling Controller as its cloud operational-safety evaluator (FACT: `Project_documentation/control_plane/acp/AI_CONTROL_PLANE_ARCHITECTURE.md` — "ACP (frozen core + cloud_controller)"). KVPro sits under all model inference.
 - **Infrastructure is beneath everything.** KVPro reduces serving cost for every model call the runtime makes; the Cloud Scaling Controller scales the serving fleet — itself governed by ACP.
 
 **INTERPRETATION — the platform story in one line.** *Infrastructure makes AI cheap and fast; Specialized Systems do the applied work; the Control Plane makes the work safe and authorized.* The Agent Runtime is the demand-generator that ties the three together: it consumes models (Specialized/Infra), and it feeds the Control Plane.

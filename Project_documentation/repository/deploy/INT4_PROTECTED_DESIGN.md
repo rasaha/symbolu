@@ -209,7 +209,7 @@ It runs (each guarded, honest framing):
   shared-prefix workload, swept by prefix length, **quality-gated**.
 
 …and prints a consolidated **SAVINGS REPORT** with the honest cost disclosed. See
-`deploy/QUICKSTART.md` for the step-by-step and the read-out guide.
+`Project_documentation/repository/deploy/QUICKSTART.md` for the step-by-step and the read-out guide.
 
 ---
 

@@ -316,7 +316,7 @@ Therefore: **The architecture is an ILLUSION.**
 1. `tests/cognitive_evaluation/test_symbolu_cognition_simple.py` - Test suite
 2. `tests/cognitive_evaluation/EVALUATION_REPORT.txt` - Detailed test report
 3. `tests/cognitive_evaluation/EVALUATION_EVIDENCE.json` - Test evidence data
-4. `tests/cognitive_evaluation/EXECUTIVE_SUMMARY.md` - This document
+4. `Project_documentation/repository/tests/cognitive_evaluation/EXECUTIVE_SUMMARY.md` - This document
 
 ---
 

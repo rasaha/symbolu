@@ -806,7 +806,7 @@ The ten core components above describe the *interaction-level* framework.
 Underneath them, the governance stack has evolved into a layered architecture
 with deeper semantic awareness. This section provides a brief overview; see
 `docs/governance/AGENTIC_ARCHITECTURE.md` for the full technical specification
-and `agentic/AGENTIC_ARCHITECTURE.md` for the sovereign integration
+and `Project_documentation/agentic_framework/agentic/AGENTIC_ARCHITECTURE.md` for the sovereign integration
 architecture (S1–S4 phases + activation patch).
 
 ### Semantic State Layer (JEPA Governance)
@@ -863,7 +863,7 @@ Key capabilities:
 All sovereign effects are stricter-only (penalties ≥ 0, escalation only
 bumps up) with an aggregate cap of 0.20 on sovereign-derived penalties.
 
-See `agentic/AGENTIC_ARCHITECTURE.md` for the full sovereign integration
+See `Project_documentation/agentic_framework/agentic/AGENTIC_ARCHITECTURE.md` for the full sovereign integration
 architecture, including the activation patch that made S3/S4 live.
 
 ### Shadow AI Control

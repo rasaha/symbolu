@@ -18,7 +18,7 @@ work; it changes no frozen tree.
 - **External systems own:** ATS mutation, email, calendar, offer-document generation,
   HRIS, background checks.
 
-See `docs/ai-hiring/PLATFORM_BOUNDARY.md` for the authoritative table.
+See `Project_documentation/ai_hiring/docs/ai-hiring/PLATFORM_BOUNDARY.md` for the authoritative table.
 
 ## Wiring pattern
 

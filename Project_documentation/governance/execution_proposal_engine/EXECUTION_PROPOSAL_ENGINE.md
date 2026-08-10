@@ -68,7 +68,7 @@ See `EXECUTION_PROPOSAL_SCHEMA.md`. Summary: a vendor-neutral object whose MANDA
 | Owned | Why it must stay (FACT/INTERPRETATION) |
 |---|---|
 | **Reasoning** | Probabilistic intelligence generation; the Control Plane is deterministic and reads none of it (`FACT`: grep-clean decision paths). It cannot live anywhere else. |
-| **Planning / decomposition** | ACP "consumes a planner, is not one" (`FACT`: `acp/ACP_ARCHITECTURE.md`). Planning is the runtime's core value. |
+| **Planning / decomposition** | ACP "consumes a planner, is not one" (`FACT`: `Project_documentation/control_plane/acp/ACP_ARCHITECTURE.md`). Planning is the runtime's core value. |
 | **Tool selection** | *Which* tool to attempt is a reasoning act; *whether* it's allowed is ActionGate's. F3 confirmed the split is clean. |
 | **Memory** | Stateful across turns (`FACT`: `memory_store`, `agent.py`); the Control Plane is stateless-per-call. Memory has no other home. |
 | **Reflection / self-correction** | Consumes execution *observations* (F1) to re-plan; inherently post-execution runtime work. |
@@ -102,7 +102,7 @@ See `EXECUTION_PROPOSAL_SCHEMA.md`. Summary: a vendor-neutral object whose MANDA
 | **ACP** | receipt of the authorized action + live domain world-state | emitting operational verdict (PROCEED/HOLD/REOBSERVE) | operational safety against live state, blast radius, readiness, freeze, rollback | never authorizes; mints no token (`FACT`: imports only an opaque verdict, `composition.py:28`) |
 | **Composition** | both verdicts present, identity-bound | one eligibility class + (if eligible) release of the token to the runtime's adapter | linking verdicts | never overrides either (`FACT`) |
 
-**No duplicated ownership (FACT-anchored):** the prior audits proved "duplicated-logic count 0, ownership violations 0" for these layers (`acp/RESPONSIBILITY_MATRIX.md`), and that each consumes a *disjoint* slice of the proposal (Context-Min ← `context_bundle`; ActionGate ← `action`+`authority`+`policy_ref`; ACP ← authorized action + world-state pulled from the domain). The boundary object's field partition *is* the ownership partition.
+**No duplicated ownership (FACT-anchored):** the prior audits proved "duplicated-logic count 0, ownership violations 0" for these layers (`Project_documentation/control_plane/acp/RESPONSIBILITY_MATRIX.md`), and that each consumes a *disjoint* slice of the proposal (Context-Min ← `context_bundle`; ActionGate ← `action`+`authority`+`policy_ref`; ACP ← authorized action + world-state pulled from the domain). The boundary object's field partition *is* the ownership partition.
 
 ---
 

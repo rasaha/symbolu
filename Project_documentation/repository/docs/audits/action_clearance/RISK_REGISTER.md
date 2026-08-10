@@ -5,7 +5,7 @@ Class: MIGRATION_BLOCKER · PREREQUISITE · PILOT_RISK · PRODUCTION_RISK · FUT
 
 | # | Pri | Risk | Class | Evidence | Mitigation |
 |---|---|---|---|---|---|
-| R1 | P0 | **ACP↔ActionGate boundary ambiguity** — robotics V1 mints an authorization grant while cloud/console never authorizes | **MIGRATION_BLOCKER** | `acp/ACP_ARCHITECTURE.md:20,110` vs `operational_safety.py:11-12` | Decide one meaning before naming a package "clearance" |
+| R1 | P0 | **ACP↔ActionGate boundary ambiguity** — robotics V1 mints an authorization grant while cloud/console never authorizes | **MIGRATION_BLOCKER** | `Project_documentation/control_plane/acp/ACP_ARCHITECTURE.md:20,110` vs `operational_safety.py:11-12` | Decide one meaning before naming a package "clearance" |
 | R2 | P0 | **No stable request/result contract** — three divergent shapes; consumers couple to enum `.value` | **MIGRATION_BLOCKER** | `REQUEST_RESULT_CONTRACTS.md` | Define one `Clearance*`/reuse `ActionGovernance*` family |
 | R3 | P0 | **No single product core** — discipline split across robotics core, console reimpl, DA seam | **MIGRATION_BLOCKER** | `CANONICAL_SOURCE_DECISION.md` | Choose the served world; factor a neutral kernel |
 | R4 | P0 | **Shadow-only maturity presented as production** — overstated readiness risk | **PRODUCTION_RISK** | `ACP_V2_1_RESULTS.md:117-118`; live path on a stub | Keep shadow discipline; no "validated/production" claims |

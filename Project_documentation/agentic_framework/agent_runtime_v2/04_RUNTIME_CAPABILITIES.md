@@ -46,7 +46,7 @@ Design rule enforced throughout: **a capability that is really a governance conc
 | **Multi-agent coordination** | Handoff, shared/scoped memory, sub-agent spawning | Runtime orchestration; see Deliverable 5 |
 | **Compensation (saga) at the plan level** | Undo a *sequence* of authorized steps when a later step fails | Runtime workflow concern — note: *infra* rollback of a single action is ACP's; *plan-level* compensation across steps is the runtime's |
 
-**INTERPRETATION — the compensation boundary (subtle, important).** ACP owns "rollback-available now" for a *single infrastructure action* (FACT: `acp/ACP_ACTIONGATE_BOUNDARY.md`). But undoing a *multi-step workflow* (e.g., "step 3 failed, so semantically reverse steps 1–2") is a reasoning/plan concern the Control Plane cannot own — it has no notion of the runtime's plan. So the runtime owns **saga-style compensation across steps**, implemented by *proposing compensating actions back through the Control Plane* (each of which ActionGate/ACP authorize independently). The runtime never executes an un-authorized rollback.
+**INTERPRETATION — the compensation boundary (subtle, important).** ACP owns "rollback-available now" for a *single infrastructure action* (FACT: `Project_documentation/control_plane/acp/ACP_ACTIONGATE_BOUNDARY.md`). But undoing a *multi-step workflow* (e.g., "step 3 failed, so semantically reverse steps 1–2") is a reasoning/plan concern the Control Plane cannot own — it has no notion of the runtime's plan. So the runtime owns **saga-style compensation across steps**, implemented by *proposing compensating actions back through the Control Plane* (each of which ActionGate/ACP authorize independently). The runtime never executes an un-authorized rollback.
 
 ---
 

@@ -9,7 +9,7 @@ Labels: `FACT` / `INTERPRETATION` / `RECOMMENDATION` / `SPECULATION`.
 ## 1. Where the runtime is today
 
 **FACT.** The current framework is strictly single-agent by design:
-- `agentic/agentic_framework/README.md`: "Not a multi-agent platform. Governs a single agent's execution path. No agent-to-agent handoffs or orchestration."
+- `Project_documentation/agentic_framework/agentic/agentic_framework/README.md`: "Not a multi-agent platform. Governs a single agent's execution path. No agent-to-agent handoffs or orchestration."
 - `FRAMEWORK_STATUS.md`: multi-agent orchestration is "Intentionally deferred… Out of scope."
 - No agent registry, no agent identity, no capability registry (confirmed absent in the prior review).
 - The independent readiness audit: "a single-generation, plan-then-execute loop, not a multi-step agent."
@@ -58,7 +58,7 @@ Layer 2  HIERARCHICAL (compose Layer 1)
 **RECOMMENDATION — the invariants that keep multi-agent clean:**
 
 1. **Every agent has a distinct principal.** Each sub-agent's Execution Proposals carry its own `agent_principal` (FACT: ActionGate binds identity per action; multiple agents = multiple principals, no change to ActionGate).
-2. **Authority is never delegated between agents.** A parent agent cannot pass a token to a child; each agent re-proposes and gets its own token. This prevents privilege escalation via delegation — the exact concern ActionGate's single-use nonce + SoD already guard (FACT: `acp/ACP_ACTIONGATE_BOUNDARY.md`).
+2. **Authority is never delegated between agents.** A parent agent cannot pass a token to a child; each agent re-proposes and gets its own token. This prevents privilege escalation via delegation — the exact concern ActionGate's single-use nonce + SoD already guard (FACT: `Project_documentation/control_plane/acp/ACP_ACTIONGATE_BOUNDARY.md`).
 3. **Coordination is a runtime concern; authorization is per-action.** Handoff, shared memory, and orchestration live entirely in the runtime. The Control Plane still sees only a stream of identity-bound proposals — it does not know or care whether one agent or ten produced them.
 4. **Shared memory is scoped, not global.** Memory sharing is a runtime capability with per-agent read/write scopes; it never bypasses Context Minimization for what any single agent's model reads.
 

@@ -99,7 +99,7 @@ interpretation of existing code, without changing any runtime behavior.
   `build_jepa_composite`
 - `agentic/chitta_vritti/coupling.py` — docstring on
   `get_aspect_weights`, module docstring
-- `agentic/AGENTIC_ARCHITECTURE.md` — new subsection under JEPA
+- `Project_documentation/agentic_framework/agentic/AGENTIC_ARCHITECTURE.md` — new subsection under JEPA
 - `agentic/guna_modulation/guna_derivation.py` — docstring noting
   CSR is the structural cause of guna, not vice versa
 

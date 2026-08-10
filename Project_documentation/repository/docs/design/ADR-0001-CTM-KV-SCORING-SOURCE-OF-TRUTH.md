@@ -3,7 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-04-10
 **Owners:** CTM+ / PCAM architecture
-**Supersedes:** `docs/design/CTM_PLUS_LIMITATIONS_AND_DESIGN_UPDATES.md` § 2.1 (scoring formula only)
+**Supersedes:** `Project_documentation/repository/docs/design/CTM_PLUS_LIMITATIONS_AND_DESIGN_UPDATES.md` § 2.1 (scoring formula only)
 
 ---
 
@@ -19,7 +19,7 @@ score = 0.25·recency
       + 0.10·sequence_priority
       + 0.05·reuse
 ```
-(`docs/design/CTM_PLUS_LIMITATIONS_AND_DESIGN_UPDATES.md:67`)
+(`Project_documentation/repository/docs/design/CTM_PLUS_LIMITATIONS_AND_DESIGN_UPDATES.md:67`)
 
 The reference implementation at `CTM_plus/KVPolicy/kv_policy/attention_evictor.py` — which is 506 lines, wired into `kv_policy/__init__.py:20-26`, and already consumed by `vllm_evictor.py` and `vllm_adapter.py` — uses a **four-signal** phase-aware formula:
 
@@ -137,7 +137,7 @@ Rejected as the default path, but preserved as an escape hatch. If the CTM+ owne
   - Filler fast path — lines 431-439
 - **Package wiring:** `CTM_plus/KVPolicy/kv_policy/__init__.py:20-26`
 - **Consumers:** `CTM_plus/KVPolicy/kv_policy/vllm_evictor.py`, `CTM_plus/KVPolicy/kv_policy/vllm_adapter.py`
-- **Superseded design note:** `docs/design/CTM_PLUS_LIMITATIONS_AND_DESIGN_UPDATES.md:61-89`
+- **Superseded design note:** `Project_documentation/repository/docs/design/CTM_PLUS_LIMITATIONS_AND_DESIGN_UPDATES.md:61-89`
 - **Follow-up:** PCAM update PR scope (ADR-0002 or PR description), to be written against this ADR.
 
 ---
@@ -159,7 +159,7 @@ port this ADR contracts for.
 
 When the upstream reference changes, maintainers follow the ritual
 at
-[`simulator/pcam/docs/VENDORED_REFERENCE_UPDATE_RITUAL.md`](../../../simulator/simulator/pcam/docs/VENDORED_REFERENCE_UPDATE_RITUAL.md):
+[`Project_documentation/simulator/simulator/pcam/docs/VENDORED_REFERENCE_UPDATE_RITUAL.md`](../../../simulator/simulator/pcam/docs/VENDORED_REFERENCE_UPDATE_RITUAL.md):
 re-copy the file, re-apply the vendoring header, run the parity
 harness, update the runtime port only if behavior diverged, and
 commit the bump with the new pinned commit hash in the header.

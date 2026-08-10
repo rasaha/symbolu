@@ -176,7 +176,7 @@ SafeMCPGateway(mcp_client, confidence_gate, classifier, ...)
 # the gateway calls build_governance_enrichment_kwargs() and attaches
 # canonical entropy_result + vritti_result to the MCPToolCall before
 # the normal governance path runs. See
-# agentic/AGENTIC_ARCHITECTURE.md § "Inference CG Metadata ↔ MCP Gateway".
+# Project_documentation/agentic_framework/agentic/AGENTIC_ARCHITECTURE.md § "Inference CG Metadata ↔ MCP Gateway".
 
 # Data Classes
 MCPToolCall(tool_name, parameters, quality_score, coherence_score, ...)

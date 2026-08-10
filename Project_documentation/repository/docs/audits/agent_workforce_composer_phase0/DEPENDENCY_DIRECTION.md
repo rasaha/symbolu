@@ -70,6 +70,6 @@ coordination, budget, and (via `LLMRouter`) nondeterministic runtime code — a
 prohibited upward/sideways edge that also destroys AWC's offline determinism and
 independent packaging. This is a primary reason the ADR selects Option A.
 
-> Note: `docs/architecture/BOUNDARIES.md` is a *different* contract (the
+> Note: `Project_documentation/repository/docs/architecture/BOUNDARIES.md` is a *different* contract (the
 > Core/Substrate ↔ Observer data-flow boundary for the `symbolu/` cognition
 > pipeline) and does not govern package layering.

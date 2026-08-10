@@ -55,7 +55,7 @@ Result states: **`CLEAR` / `HOLD` / `BLOCK` / `ESCALATE`** (four); `STALE`/`EXPI
 | execution_gate / execution_gate_shadow | **25 / 23 passed** |
 | `platform_freeze/tests` | 19 passed, **2 pre-existing failures** |
 | `bounded_shadow_pilot` | 44 passed, **1 pre-existing failure** |
-| Robotics local freeze (`acp/ACP_V1_FREEZE.md`) | **byte-accurate** — 13/13 module hashes match; combined `8f8660e293308cf94c983a26a2ae69c9` |
+| Robotics local freeze (`Project_documentation/control_plane/acp/ACP_V1_FREEZE.md`) | **byte-accurate** — 13/13 module hashes match; combined `8f8660e293308cf94c983a26a2ae69c9` |
 
 Pre-existing failures (`test_classify_change_reports_evidence`, `test_hiring_baseline_discovery`,
 `test_ground_truth_two_class_and_deterministic`) are the same as recorded in prior audit baselines and

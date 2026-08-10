@@ -331,7 +331,7 @@ Phase-9 must preserve all existing pipeline invariants:
 
 ## Appendix B: Related Documents
 
-- `docs/architecture/BOUNDARIES.md` — Core/Substrate and Observer Boundary Contract
+- `Project_documentation/repository/docs/architecture/BOUNDARIES.md` — Core/Substrate and Observer Boundary Contract
 - `docs/phases/` — Phase-specific documentation
 - `docs/specs/` — Formal specifications
 

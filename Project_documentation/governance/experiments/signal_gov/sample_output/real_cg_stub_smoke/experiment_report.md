@@ -37,4 +37,4 @@
 
 `results.json` · `metrics.csv` · `signal_importance.csv` · `roc_overlay.png` · `catch_at_budget.png`
 
-See `experiments/signal_gov/README.md` for the pre-registered success/failure criteria the *real* experiment is judged against.
+See `Project_documentation/governance/experiments/signal_gov/README.md` for the pre-registered success/failure criteria the *real* experiment is judged against.

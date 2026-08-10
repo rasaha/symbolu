@@ -20,7 +20,7 @@
 | GitHub Execution Provider | **MISSING** | only the framework `DeterministicExecutionProvider` test-double exists |
 | Repository policy engine | **DOCUMENTED_ONLY** | `POLICY_PACK_GOVERNED_WORKFLOW_COMPILER_SPEC.md`; StoryGraph policypack compiler is domain-specific |
 | Identity integration | **PARTIAL_PROTOTYPE** | DA `ActorIdentity`/`ActorType` + `authenticate()`; no enterprise OIDC/SSO; no GitHub identity mapping; SoD off by default |
-| Code Governance UI | **DOCUMENTED_ONLY** | `ACP/UGENCE_UNIFIED_CONSOLE_PLAN.md`; no PR check-run UI |
+| Code Governance UI | **DOCUMENTED_ONLY** | `Project_documentation/control_plane/ACP/UGENCE_UNIFIED_CONSOLE_PLAN.md`; no PR check-run UI |
 | Competitive Code Adjudication | **MISSING** | no patch-pair capability; reusable analogues only (model-selection `Selection`, `comparative_governance_benchmark`, `StoryVerdict`, `reviewer_ready_pilot` `AdjudicationResult`) |
 | Deployment Governance | **DOCUMENTED_ONLY** | MVP3; reuses ACP+ActionGate K8s surface (shadow); no provenance/digest binding |
 

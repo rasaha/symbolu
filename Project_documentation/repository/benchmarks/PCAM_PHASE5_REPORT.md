@@ -140,11 +140,11 @@ python -c "from benchmarks.vllm_active_bridge import check_vllm_active_mode_supp
 
 **Run `benchmarks/pcam_vllm_perf.py --policy both` on a GPU machine with vLLM 0.7.0+ installed.**
 
-See `simulator/pcam/docs/PHASE5_ACTIVE_MODE.md` "How to run the perf harness" for the exact install and command sequence. Expected engineer-time: ~30 minutes once the environment is available.
+See `Project_documentation/simulator/simulator/pcam/docs/PHASE5_ACTIVE_MODE.md` "How to run the perf harness" for the exact install and command sequence. Expected engineer-time: ~30 minutes once the environment is available.
 
 After the first live run, the engineer should:
 
-1. Append the result to `benchmarks/PHASE4_CLOSURE_RUN_LOG.md`'s Run log using the same entry format as the Phase 4 closure entry.
+1. Append the result to `Project_documentation/repository/benchmarks/PHASE4_CLOSURE_RUN_LOG.md`'s Run log using the same entry format as the Phase 4 closure entry.
 2. Update the "What has actually been measured" section of this file with the real throughput / latency table and the PCAM vs default-LRU delta percentage.
 3. Update the status line at the top of this file from "pending" to "closed".
 4. Commit as one atomic change with the message `Phase 5 closure: first live active-mode vllm run`.

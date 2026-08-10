@@ -1,7 +1,7 @@
 # Ugence Inter-Module I/O, Authority & Composition Audit
 
 > **Terminology update — Ugence Decision Governance (2026-08-01).** Canonical vocabulary per
-> [`docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](../docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md).
+> [`Project_documentation/repository/docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](../docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md).
 > **Ugence Decision Governance** is the umbrella; the "Decision Governance" authority discussed
 > below is the **Decision Authority** capability (`decision_governance` package, name unchanged).
 > **Model Selection** is a distinct capability (tenth), not a Hybrid LLM submodule. The optional

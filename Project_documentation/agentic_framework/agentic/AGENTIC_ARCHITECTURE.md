@@ -1867,7 +1867,7 @@ build_governance_enrichment_kwargs(
   torch-free.
 
 **Request-boundary rules** (pinned by the helper; see
-`agentic/docs/REQUEST_BOUNDARY_CONVENTION.md`):
+`Project_documentation/agentic_framework/agentic/docs/REQUEST_BOUNDARY_CONVENTION.md`):
 
 1. Attach `entropy_result` and `vritti_result` when live CG metadata
    is available.
@@ -1994,9 +1994,9 @@ other wiring changes — same `SafetyGate`, same `_execute_actions`,
 same dispatcher, same gateway, same audit log.
 
 For the concrete end-to-end runtime diagram see
-`agentic/docs/RUNTIME_MCP_PATH.md`. For the
+`Project_documentation/agentic_framework/agentic/docs/RUNTIME_MCP_PATH.md`. For the
 runnable `inference_mistral.py --cg` CLI see
-`agentic/docs/CG_RUNTIME_RUNBOOK.md`.
+`Project_documentation/agentic_framework/agentic/docs/CG_RUNTIME_RUNBOOK.md`.
 
 ### Stub adapter vs real adapter
 
@@ -2132,7 +2132,7 @@ Rules:
   dispatch are proved here; **real local inference** requires an
   external torch + checkpoint + GPU environment and is
   operator-validated, not repo-validated. See
-  `agentic/docs/CG_RUNTIME_RUNBOOK.md` and `scripts/run_cg_gpu.sh`.
+  `Project_documentation/agentic_framework/agentic/docs/CG_RUNTIME_RUNBOOK.md` and `scripts/run_cg_gpu.sh`.
 
 **Intentionally deferred**:
 
@@ -2165,7 +2165,7 @@ Rules:
 ## Running the CG Runtime on GPU
 
 This section is the operational companion to
-`agentic/docs/CG_RUNTIME_RUNBOOK.md`. It shows the exact steps to stand up
+`Project_documentation/agentic_framework/agentic/docs/CG_RUNTIME_RUNBOOK.md`. It shows the exact steps to stand up
 `inference_mistral.py --cg` against a **real** `MistralCGAdapter`
 (local inference through `MistralCGWrapper`) on a CUDA host, plus
 the canonical helper script `scripts/run_cg_gpu.sh`.

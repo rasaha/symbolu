@@ -71,7 +71,7 @@ enforcement is insufficient.
 ### 2.1 Maturity
 
 **SHADOW_ONLY / design-first / partially implemented — never production, never enforcing**
-(`acp/ACP_ARCHITECTURE.md:3`; `acp/ACP_PHASE1_READINESS.md:4`; `symbolu_robotics/autonomous_control_plane/cloud/outcomes.py:8-10`). The only enforcing mode is DISABLED (`control_plane/modes.py:53-63`).
+(`Project_documentation/control_plane/acp/ACP_ARCHITECTURE.md:3`; `Project_documentation/control_plane/acp/ACP_PHASE1_READINESS.md:4`; `symbolu_robotics/autonomous_control_plane/cloud/outcomes.py:8-10`). The only enforcing mode is DISABLED (`control_plane/modes.py:53-63`).
 Code domains: **robotics, Kubernetes/cloud, database** — **no GitHub/software-merge domain exists**.
 
 ### 2.2 Request / result surfaces (actual code)
@@ -91,7 +91,7 @@ A **deterministic, fail-closed operational-safety verdict on an already-authoriz
 against a snapshot of environment signals, that never actuates and never mints a token.** "Live" is
 aspirational: signals are passed in / mocked; no live cluster call in this environment.
 
-### 2.4 ACP vs ActionGate (`acp/ACP_ACTIONGATE_BOUNDARY.md`)
+### 2.4 ACP vs ActionGate (`Project_documentation/control_plane/acp/ACP_ACTIONGATE_BOUNDARY.md`)
 
 | | ActionGate | ACP |
 |---|---|---|

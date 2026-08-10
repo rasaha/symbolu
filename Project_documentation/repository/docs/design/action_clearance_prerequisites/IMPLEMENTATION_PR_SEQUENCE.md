@@ -2,7 +2,7 @@
 
 **Status:** PROPOSED · `action_clearance.prerequisites.v0.1`. The concrete PR sequence that turns the
 closed prerequisites into a package, aligned to the merged Phases A–I
-(`docs/design/action_clearance/IMPLEMENTATION_SEQUENCE.md`). Each PR lists its blocking stage and
+(`Project_documentation/repository/docs/design/action_clearance/IMPLEMENTATION_SEQUENCE.md`). Each PR lists its blocking stage and
 acceptance criterion. **None is executed in this phase.**
 
 | PR | Scope | Prereqs required | Blocking stage | Acceptance criterion |

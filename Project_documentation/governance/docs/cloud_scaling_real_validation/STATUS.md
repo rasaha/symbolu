@@ -18,8 +18,8 @@ produced**; the four labels are never conflated._
 | Rung | Label | Status | Evidence |
 |---|---|---|---|
 | 1. Simulation (19 scenarios) | `simulated` | ✅ **Done** | 0 catastrophic/severe/SLO regressions; guard blocked 87/649 scale-outs (13.4%). `cloud_controller/observability/edge_cases.py` |
-| 2. Real production-trace replay (offline) | `real-trace-replay` | ✅ **Done (self-run)** | Azure LLM/LMM inference traces; multimodal 1M requests/7 days: 80/2,537 blocked, +0.01pp SLO, 0.74% replica-cycles saved. `artifacts/cloud_controller_real_validation/track_b_trace_replay.md` |
-| 2.5 Estimator/guard calibration vs **real system dynamics** (non-k8s) | `real-dynamics-calibration` | ✅ **Done (self-run)** | Real concurrent service; tail latency emerges from real queuing. 0 harmful FP / 0 SLO regressions; guard caught real futility only at *severe* over-provisioning. `artifacts/cloud_controller_real_validation/realdyn_calibration.md` |
+| 2. Real production-trace replay (offline) | `real-trace-replay` | ✅ **Done (self-run)** | Azure LLM/LMM inference traces; multimodal 1M requests/7 days: 80/2,537 blocked, +0.01pp SLO, 0.74% replica-cycles saved. `Project_documentation/repository/artifacts/cloud_controller_real_validation/track_b_trace_replay.md` |
+| 2.5 Estimator/guard calibration vs **real system dynamics** (non-k8s) | `real-dynamics-calibration` | ✅ **Done (self-run)** | Real concurrent service; tail latency emerges from real queuing. 0 harmful FP / 0 SLO regressions; guard caught real futility only at *severe* over-provisioning. `Project_documentation/repository/artifacts/cloud_controller_real_validation/realdyn_calibration.md` |
 | 3. Live shadow on a real cluster under fault injection (self-run) | `live-shadow-self-run` | 🔴 **NOT done — impossible in this sandbox.** Harness built + wiring proven only | `deploy/local-shadow/` + `tests/cloud_controller/test_shadow_integration.py` (real-HTTP stub); container registries are egress-blocked, so no cluster can be created here |
 | 4. Independent third-party telemetry | `third-party` | ❌ **PENDING** | none — requires an external design partner |
 

@@ -43,7 +43,7 @@ Adapter is **not** implemented in Phase 0.
 
 ## H22 Multi-Workflow Orchestration — `agentic.agentic_framework` (v1.22.0)
 
-- Code: `agentic/agentic_framework/multi_workflow_orchestration.py`; doc `agentic/docs/H22_MULTI_WORKFLOW_ORCHESTRATION.md`; runtime-side readiness `packages/runtime/agent-runtime/docs/AGENT_RUNTIME_H22_READINESS.md`.
+- Code: `agentic/agentic_framework/multi_workflow_orchestration.py`; doc `Project_documentation/agentic_framework/agentic/docs/H22_MULTI_WORKFLOW_ORCHESTRATION.md`; runtime-side readiness `packages/runtime/agent-runtime/docs/AGENT_RUNTIME_H22_READINESS.md`.
 - `PortfolioWorkflowEntry` carries all five listed fields as **fixed given inputs**:
   - `budget_estimate` (`:852`), `resource_claims` (`:854`), `authority_scope` (`:855`), `assigned_agent` (`:856`), `resource_class` (`:857`).
   - Workflow dependencies via `WorkflowDependency`/`DependencyGraph` (acyclic), kinds `REQUIRES_COMPLETION/SUCCESS/MILESTONE/REVIEW_DECISION/OUTPUT`.

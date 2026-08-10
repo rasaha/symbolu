@@ -6,7 +6,7 @@
 - **Relationship to §15.14:** captures candidate downstream design
   directions discussed alongside §15.14's sealing. **None of these
   ideas modify §15.14's sealed v1 spec** at
-  `docs/design/15_14_STICKY_FRAMING_DESIGN_SPEC.md`. They sit at
+  `Project_documentation/repository/docs/design/15_14_STICKY_FRAMING_DESIGN_SPEC.md`. They sit at
   least one fresh top-level §0.X downstream of §15.14 and require
   §15.14 to land signal (PARTIAL or STRONG) before any of them
   becomes a candidate worth pursuing.
@@ -692,7 +692,7 @@ possible without resolving the full Part B governor.
 ### C.5 Why none of this modifies §15.14 v1
 
 §15.14 v1 is sealed at
-`docs/design/15_14_STICKY_FRAMING_DESIGN_SPEC.md` and tests one
+`Project_documentation/repository/docs/design/15_14_STICKY_FRAMING_DESIGN_SPEC.md` and tests one
 mechanism class (state-side R_framing) on a single composite
 benchmark with one pinned annotation protocol. Folding any portion
 of Parts A or B into v1 would:

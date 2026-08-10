@@ -40,7 +40,7 @@ Labels: `FACT` / `INTERPRETATION` / `RECOMMENDATION`.
                           └──────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**FACT — this is the ACP pipeline's own shape, read from the runtime side.** `acp/AI_CONTROL_PLANE_ARCHITECTURE.md`: `Original Context → Context Minimization → LLM reader → Proposed Action → ActionGate → ACP → Compose → (eligible) Execution`. Steps 1–9 above *are* the "LLM reader → Proposed Action" box, expanded into a real agent loop; steps A–C are the Control Plane unchanged; steps 10–14 are the runtime consuming the verdict.
+**FACT — this is the ACP pipeline's own shape, read from the runtime side.** `Project_documentation/control_plane/acp/AI_CONTROL_PLANE_ARCHITECTURE.md`: `Original Context → Context Minimization → LLM reader → Proposed Action → ActionGate → ACP → Compose → (eligible) Execution`. Steps 1–9 above *are* the "LLM reader → Proposed Action" box, expanded into a real agent loop; steps A–C are the Control Plane unchanged; steps 10–14 are the runtime consuming the verdict.
 
 ---
 
@@ -83,7 +83,7 @@ Labels: `FACT` / `INTERPRETATION` / `RECOMMENDATION`.
 
 ## 4. Control flow for the non-ALLOW verdicts
 
-**RECOMMENDATION.** The runtime must handle every ActionGate/ACP outcome as a first-class branch (FACT: outcomes enumerated in `action_gate_ref/gate.py` and `acp/ACP_ACTIONGATE_BOUNDARY.md`):
+**RECOMMENDATION.** The runtime must handle every ActionGate/ACP outcome as a first-class branch (FACT: outcomes enumerated in `action_gate_ref/gate.py` and `Project_documentation/control_plane/acp/ACP_ACTIONGATE_BOUNDARY.md`):
 
 | Verdict from Control Plane | Runtime behavior |
 |---|---|

@@ -5,7 +5,7 @@ thing the build sandbox lacked: `docker pull` there is 403 on image blobs, so no
 cluster could start). This runs the **read-only** controller in shadow next to a
 real HPA under real faults and emits a real proof-of-value report. Treat the first
 run as a **calibration**, not a savings demo (see §4). Detail/background:
-`deploy/local-shadow/README.md`.
+`Project_documentation/repository/deploy/local-shadow/README.md`.
 
 ---
 

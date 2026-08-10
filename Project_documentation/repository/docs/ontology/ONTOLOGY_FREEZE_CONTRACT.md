@@ -182,7 +182,7 @@ File protection via `.github/CODEOWNERS`:
 ```
 docs/data/*                          @ontology-core
 symbolu/ontology/phase4a/*           @ontology-core
-docs/ontology/ONTOLOGY_FREEZE_CONTRACT.md  @ontology-core
+Project_documentation/repository/docs/ontology/ONTOLOGY_FREEZE_CONTRACT.md  @ontology-core
 ```
 
 ### 8.3 Checksums

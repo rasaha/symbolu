@@ -24,7 +24,7 @@ a retry controller.
 - **Never authorizes, never executes.** `ugence_console_api/…/operational_safety.py:11-12`: *"It never
   authorizes — ActionGate already decided whether the action may run; ACP decides whether now."*
   `symbolu_robotics/…/cloud/adapter.py:14-16,25`: *"Never actuates… ACP never mints a real execution
-  credential — that is ActionGate's job."* `acp/RESPONSIBILITY_MATRIX.md:12-13` splits *authorization*
+  credential — that is ActionGate's job."* `Project_documentation/control_plane/acp/RESPONSIBILITY_MATRIX.md:12-13` splits *authorization*
   (ActionGate, sole) from *operational safety* (ACP, sole; "never authorizes").
 - **Narrow-only, never broaden.** Two hard invariants in `cloud/composition.py`: an ActionGate `DENY` ⇒
   `BLOCKED_BY_AUTHORIZATION` (ACP cannot override, `:98-102`); a permissive ACP result on a denied/pending
@@ -35,7 +35,7 @@ a retry controller.
 
 ### Contradicted — the robotics V1 framing
 
-- `acp/ACP_ARCHITECTURE.md:20`: ACP is the *"deterministic **decision-and-authorization** runtime."*
+- `Project_documentation/control_plane/acp/ACP_ARCHITECTURE.md:20`: ACP is the *"deterministic **decision-and-authorization** runtime."*
   `:28-31`: *"it does not do the work, it decides **and authorizes** what work is allowed to happen."*
   Stage 9 *"mint[s] a one-shot execution grant"* (`:110`). The code does mint `ControlAuthorization`
   (`authorization.py:34`) with a `grant_id`.

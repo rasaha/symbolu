@@ -1,7 +1,7 @@
 # Ugence Modularity & Product-Packaging Audit
 
 > **Terminology update — Ugence Decision Governance (2026-08-01).** Canonical vocabulary per
-> [`docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](../docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md).
+> [`Project_documentation/repository/docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](../docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md).
 > **Ugence Decision Governance** is the umbrella. The capability referred to below as "Decision
 > Governance" is the **Decision Authority** capability, still implemented under the
 > **`decision_governance`** package (name unchanged this phase). The capability inventory is
@@ -142,7 +142,7 @@ imports `action_gate_ref` for its invariance proof; the wired dedup path imports
 | Relationship | Class | Evidence |
 |---|---|---|
 | Agent Runtime → ActionGate/ACP | `REQ` for *governed consequential* actions (optional for read-only) | migration runs `LOCAL_READ_ONLY` tools ungoverned; any `GOVERNED_CONSEQUENTIAL` tool requires the control plane |
-| ActionGate → ACP | `REC` (orthogonal layers; an op should pass both) | `acp/ACP_ACTIONGATE_BOUNDARY.md` + `composition.py`: ActionGate authorizes, ACP clears live-safety; DENY final, ACP can only HOLD |
+| ActionGate → ACP | `REC` (orthogonal layers; an op should pass both) | `Project_documentation/control_plane/acp/ACP_ACTIONGATE_BOUNDARY.md` + `composition.py`: ActionGate authorizes, ACP clears live-safety; DENY final, ACP can only HOLD |
 | Decision Governance ← TAP | `OPT/REC` (TAP assessment feeds a recommendation) | `tests/conftest.py`: coverage→advisory `ADVANCE/HOLD/REJECT` cited by `CaseRecommendationService` |
 | StoryGraph → ActionGate | `OPT` (advisory evidence a gate *could* consume) | StoryGraph emits advisory records; ActionGate adapter is `CONTRACT ONLY` |
 | Context Min → everything downstream | `OPT` (gateway that reduces context before other stages) | console loop runs it as first "Gateway" stage |
@@ -470,10 +470,10 @@ Grouped by whether it blocks *independence* or *productization*. Complexity ∈ 
   `assertion_governance/engine.py`; tests (38 pass).
 - **ActionGate:** provider `actiongate_provider/{provider,core}.py` (30 pass); engine
   `cyber_security/action_gate_reference/`, `action_gateway/`, `action_gateway_mcp/`, `action_gateway_k8s/`,
-  `action_gateway_isolated/`, `action_gate_policy_schemas/` (~322 pass); `acp/ACP_ACTIONGATE_BOUNDARY.md`.
+  `action_gateway_isolated/`, `action_gate_policy_schemas/` (~322 pass); `Project_documentation/control_plane/acp/ACP_ACTIONGATE_BOUNDARY.md`.
 - **ACP:** console `ugence_console_api/capabilities/operational_safety.py`; engine
   `symbolu_robotics/autonomous_control_plane/` (112 pass), `.../cloud/`; `acp/` (~60 markdown, 0 `.py`);
-  `acp/ACP_V1_FREEZE.md`.
+  `Project_documentation/control_plane/acp/ACP_V1_FREEZE.md`.
 - **StoryGraph:** `cyber_security/composite_threat_detector/composite_threat_detector/{storygraph,storyverdict,
   contradictions,legitimate,matcher,analyzer,cli}.py`, `policypack/`, `evaluation/{freeze,evidence_chain}.py`
   (289 pass).

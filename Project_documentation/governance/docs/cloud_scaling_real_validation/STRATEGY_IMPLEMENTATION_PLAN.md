@@ -32,7 +32,7 @@ because it depends on partner data — so outreach in Weeks 1–2 gates everythi
 ## 3. Week-by-week 90-day plan
 | Window | Track A (real cluster) | Track B (replay → APCY) | Track C (partners) |
 |---|---|---|---|
-| **Weeks 1–2** | Execute **one** real Track-A run on a registry-egress host via `deploy/local-shadow/RUNBOOK.md`; run the §2.8 pre-flight (HPA replicas readable); capture report. | Stand up replay ingestion; **pre-register** Tier-A/Tier-B definitions, cost model, and all thresholds (so we can't move goalposts). | Build target list (§4); open outreach to 6–10 candidates; send NDA + data-request checklist (§5). |
+| **Weeks 1–2** | Execute **one** real Track-A run on a registry-egress host via `Project_documentation/repository/deploy/local-shadow/RUNBOOK.md`; run the §2.8 pre-flight (HPA replicas readable); capture report. | Stand up replay ingestion; **pre-register** Tier-A/Tier-B definitions, cost model, and all thresholds (so we can't move goalposts). | Build target list (§4); open outreach to 6–10 candidates; send NDA + data-request checklist (§5). |
 | **Weeks 3–4** | Re-run the 3 scenarios (capacity / external-bottleneck / noisy) on the real cluster; adjudicate flags; lock the Track-A precision read. | Ingest first partner histories; first **directional APCY**; SRE-adjudicate replayed Tier-A candidates. | Sign **≥3** design partners (pilot LOI); secure historical exports. |
 | **Weeks 5–8** | Deploy read-only live shadow on partner (or representative) clusters; accumulate live cluster-months + adjudicated flags toward ≥40–50. | Scale replay to **≥150 retrospective cluster-months across ≥6 orgs**; refine APCY with real partner cost data; lock Tier-A frequency estimate. | Measure pull signals (§8); push toward expansion + paid conversion. |
 | **Weeks 9–12** | Finalize Gate-2 precision (sustained ≤5% FP; 0 harmful FP on helpful cases). | Finalize Gate-1 APCY vs thresholds (§9). | Convert intent to **paid LOIs**; finalize Gate-3. Assemble go/no-go packet; write the decision. |
@@ -83,7 +83,7 @@ frequency estimate.
   trusting any frequency number (avoid single-workload bias).
 
 ## 7. Live-shadow-self-run procedure (Track A)
-- **Use the existing runbook** (`deploy/local-shadow/RUNBOOK.md`): kind +
+- **Use the existing runbook** (`Project_documentation/repository/deploy/local-shadow/RUNBOOK.md`): kind +
   kube-prometheus-stack + Online Boutique + frontend HPA + Chaos Mesh + k6; run the
   pre-flight that confirms the kube-state-metrics fix returns real HPA replicas; run
   capacity / external-bottleneck / noisy scenarios; capture `track_a_live_shadow.*`.

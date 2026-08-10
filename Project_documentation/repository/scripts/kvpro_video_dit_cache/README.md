@@ -59,7 +59,7 @@ existing method. Report **C−B, D−C, E−D, E-vs-F**.
 Every result carries one: `Measured — CPU tensor analysis` · `Measured — GPU profiling` · `Measured —
 end-to-end generation` · `Modeled — capacity projection` · `Inferred — not workload validated` · `Not
 measured` · `Requires external patent review`. Results sheet:
-[`artifacts/video_dit_cache/RESULTS_TEMPLATE.md`](../../artifacts/video_dit_cache/RESULTS_TEMPLATE.md)
+[`Project_documentation/repository/artifacts/video_dit_cache/RESULTS_TEMPLATE.md`](../../artifacts/video_dit_cache/RESULTS_TEMPLATE.md)
 (all fields start `NOT RUN`/`REQUIRES GPU`).
 
 ## Scope guard

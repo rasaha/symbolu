@@ -44,7 +44,7 @@ no-KV-cache generation loop — keep the decision-point prompts short, which the
 - `--cg-state-dict` (env `CG_STATE_DICT`) — the **trained CG state-dict** holding the
   `state_projector` / `intent_projector` / `phase_adapter` weights (e.g.
   `checkpoints_unified/best_model.pt`, produced by unified `--model_type mistral_cg` training;
-  see `agentic/docs/VALIDATION_GUIDE_MISTRAL.md`). A companion `*_aux.pt` is auto-merged if present.
+  see `Project_documentation/agentic_framework/agentic/docs/VALIDATION_GUIDE_MISTRAL.md`). A companion `*_aux.pt` is auto-merged if present.
 
 The harness **fails closed** if `--cg-state-dict` has no CG-head keys, or a zero
 `phase_adapter` output (vanilla/untrained) — pass `--allow-untrained-cg-head` to override
@@ -229,7 +229,7 @@ instability points at the checkpoint or environment.
 ## 10. Troubleshooting
 
 - `ImportError: torch required` / `MistralCGWrapper` not importable → install the heavy stack
-  (`torch`, `transformers`, `symbolu_training`); see `agentic/docs/CG_RUNTIME_RUNBOOK.md`.
+  (`torch`, `transformers`, `symbolu_training`); see `Project_documentation/agentic_framework/agentic/docs/CG_RUNTIME_RUNBOOK.md`.
 - OOM → add `--cg-quantize 4bit` (needs `bitsandbytes`) or use a bigger GPU.
 - Gated checkpoint → set `HF_TOKEN`.
 - Want to confirm wiring without a GPU first → `make signal-gov-realcg-smoke` (stub path) and

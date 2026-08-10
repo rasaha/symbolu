@@ -17,7 +17,7 @@ There was **no canonical LLM *routing / steering* package** in the repository be
 phase. The documented architecture is a three-stage boundary:
 
 > **Model Selection chooses within policy → routing dispatches (STEERING) → provider execution invokes.**
-> (`docs/migrations/model_selection/RESEARCH_SEPARATION.md`)
+> (`Project_documentation/repository/docs/migrations/model_selection/RESEARCH_SEPARATION.md`)
 
 - The **selection leaf** ("chooses within policy") is already canonically packaged as
   **`ugence-model-selection`** (`packages/capabilities/model-selection/`), which explicitly

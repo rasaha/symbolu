@@ -5,7 +5,7 @@
 *Version 1.2 — July 2026*
 
 > **Terminology update — Ugence Decision Governance (2026-08-01).** Canonical vocabulary per
-> [`docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](../docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md).
+> [`Project_documentation/repository/docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](../docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md).
 > The canonical **umbrella** name for the platform and product family is **Ugence Decision
 > Governance**. The bounded binding-decision capability is **Decision Authority** (`decision_governance`
 > package). **"AI Control Plane" now has a single canonical current meaning:** an **optional,

@@ -211,7 +211,7 @@ SignalReconciliation ── blends multiple Guna/Vritti sources → reconciled s
 
 ## 5. Design-vs-Code Mismatch List
 
-The design document (`docs/design/CONSCIOUS_GENERATION_DESIGN.md`) explicitly acknowledges these gaps in its own Appendix A and Appendix F:
+The design document (`Project_documentation/repository/docs/design/CONSCIOUS_GENERATION_DESIGN.md`) explicitly acknowledges these gaps in its own Appendix A and Appendix F:
 
 | # | Design Claim | Code Reality | Source |
 |---|---|---|---|

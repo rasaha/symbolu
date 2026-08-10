@@ -1,7 +1,7 @@
 # Cloud-controller real-validation artifacts
 
 Outputs of the Track A / Track B real-validation work. **Read
-`docs/cloud_scaling_real_validation/STATUS.md` first** — it defines the labels and
+`Project_documentation/governance/docs/cloud_scaling_real_validation/STATUS.md` first** — it defines the labels and
 the maturity ladder. Every number here is labelled by how it was produced.
 
 | file | label | what it is |
@@ -10,7 +10,7 @@ the maturity ladder. Every number here is labelled by how it was produced.
 | `realdyn_calibration.md` / `.json` | `real-dynamics-calibration` | **Real, executed.** Estimator + guard run against a real concurrent service whose tail latency emerges from real queuing (NOT k8s, NOT real HPA). Calibration result: 0 harmful false positives / 0 SLO regressions across 4 scenarios; the guard caught real futility only at severe over-provisioning. Produced by `experiments/cloud_scaling_realdyn/run_calibration.py`. |
 | `track_a_live_shadow.STUB_EXAMPLE.md` / `.json` | ⚠️ **stub wiring demo — NOT a cluster** | The *shape* of the live-shadow report, produced by the real-HTTP Prometheus stub in `test_shadow_integration.py`. Numbers are from a synthetic stub, not a cluster. Proves the wiring; carries **no** real-cluster claim. |
 | `track_a_live_shadow.md` / `.json` | `live-shadow-self-run` | **Produced when you run it** on a Docker host via `deploy/local-shadow/`. Not committed (no cluster in the build env). |
-| `tier_a_selftest.STUB_EXAMPLE.md` / `.json` | ⚠️ **tooling self-test — synthetic fixture** | Output of the pre-registered **Tier-A detector** (`cloud_controller/replay/tier_a.py`) on the committed schema fixture, via `scripts/run_tier_a_replay.py`. Validates the tooling end-to-end; the APCY coverage trip-wire **refuses it as evidence by design**. Carries **no** market claim. Spec: `docs/cloud_scaling_real_validation/TIER_A_DETECTOR_SPEC.md`. |
+| `tier_a_selftest.STUB_EXAMPLE.md` / `.json` | ⚠️ **tooling self-test — synthetic fixture** | Output of the pre-registered **Tier-A detector** (`cloud_controller/replay/tier_a.py`) on the committed schema fixture, via `scripts/run_tier_a_replay.py`. Validates the tooling end-to-end; the APCY coverage trip-wire **refuses it as evidence by design**. Carries **no** market claim. Spec: `Project_documentation/governance/docs/cloud_scaling_real_validation/TIER_A_DETECTOR_SPEC.md`. |
 | `tier_a_partner_replay.md` / `.json` | `real-trace-replay (estimate pending live adjudication)` | **Produced when you run real partner exports** (`scripts/run_tier_a_replay.py --manifest ...`): per-cluster Tier-A candidates, APCY (gated by the coverage floor), and one SRE-adjudication worksheet per candidate. Not committed (no partner data here); every number is gated on SRE adjudication before it counts. |
 
 ## Reproduce

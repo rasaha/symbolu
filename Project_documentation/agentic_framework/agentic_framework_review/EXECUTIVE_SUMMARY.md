@@ -24,7 +24,7 @@ Labels: `FACT` / `INTERPRETATION` / `RECOMMENDATION` / `SPECULATION`.
 
 ## 2. Why not "AI Control Plane" — the five decisive facts
 
-1. **The repo already has an AI Control Plane, and it is a different kind of thing.** `FACT`: ACP V2.2 is deterministic, non-compensatory, fail-closed, cross-domain (robotics + K8s on one frozen core), shadow-only, with disjoint ownership and "duplicated-logic 0, ownership violations 0" (`acp/RESPONSIBILITY_MATRIX.md`). The Agentic Framework is probabilistic, confidence-threshold-based, single-agent, and enforces-nothing-on-its-own. Reclassifying it into ACP's category would inject the exact scalar-scoring and duplicated ownership ACP is architected to forbid ("no scalar 'allow score' exists," `acp/ACP_INTERFACE_CONTRACTS.md`).
+1. **The repo already has an AI Control Plane, and it is a different kind of thing.** `FACT`: ACP V2.2 is deterministic, non-compensatory, fail-closed, cross-domain (robotics + K8s on one frozen core), shadow-only, with disjoint ownership and "duplicated-logic 0, ownership violations 0" (`Project_documentation/control_plane/acp/RESPONSIBILITY_MATRIX.md`). The Agentic Framework is probabilistic, confidence-threshold-based, single-agent, and enforces-nothing-on-its-own. Reclassifying it into ACP's category would inject the exact scalar-scoring and duplicated ownership ACP is architected to forbid ("no scalar 'allow score' exists," `Project_documentation/control_plane/acp/ACP_INTERFACE_CONTRACTS.md`).
 
 2. **The two bodies of work don't reference each other.** `FACT`: the ACP corpus (57 files) never names the Agentic Framework; no framework doc names ACP/ActionGate/Context-Min. Their only stated link is portfolio-level. There is no architectural claim that the framework *is* the control plane — that would be a new construction, not an existing truth.
 
@@ -95,17 +95,17 @@ Ugence Labs
 
 | Claim | Type | Source |
 |---|---|---|
-| ACP is deterministic, non-compensatory, cross-domain, shadow-only, disjoint-ownership | FACT | `acp/ACP_ARCHITECTURE.md`, `acp/RESPONSIBILITY_MATRIX.md`, `acp/ACP_V1_FREEZE.md`, `symbolu_robotics/.../cloud/adapter.py` |
+| ACP is deterministic, non-compensatory, cross-domain, shadow-only, disjoint-ownership | FACT | `Project_documentation/control_plane/acp/ACP_ARCHITECTURE.md`, `Project_documentation/control_plane/acp/RESPONSIBILITY_MATRIX.md`, `Project_documentation/control_plane/acp/ACP_V1_FREEZE.md`, `symbolu_robotics/.../cloud/adapter.py` |
 | ActionGate = deterministic pre-commit authorization; mints single-use token; accepts scrutiny-only evidence | FACT | `ACTIONGATE_VC_BRIEF.md`, `cyber_security/action_gate_reference/action_gate_ref/gate.py` |
 | Context Minimization = authorization-preserving deterministic compression | FACT | `CONTEXT_MINIMIZATION_VC_BRIEF.md`, `experiments/actiongate_context_ablation/` |
 | Framework is two disconnected worlds; World B not called by the agent | FACT | import-graph of `agentic/agentic_framework/`; `governance_service.py`, `governance_api.py` |
-| Framework governs a single agent; no multi-agent/registry/identity | FACT | `agentic/agentic_framework/README.md`, `__init__.py`, `WHAT_IS_AGENTIC_FRAMEWORK.md` |
+| Framework governs a single agent; no multi-agent/registry/identity | FACT | `Project_documentation/agentic_framework/agentic/agentic_framework/README.md`, `__init__.py`, `WHAT_IS_AGENTIC_FRAMEWORK.md` |
 | CG signal moat falsified (0.457 vs 0.857); "kill" JEPA/vritti/guna | FACT | `signal_config.py`, `AGENTIC_FRAMEWORK_INTERNAL_SIGNAL_THESIS.md`, `AGENTIC_FRAMEWORK_FOUNDER_NOTES.md`, `AGENTIC_FRAMEWORK_TRUST_OBSERVABLE_ARCHITECTURE.md` |
 | "Replayable trace / hard cost caps / token streaming / CI-passing" overstated | FACT | `AGENTIC_FRAMEWORK_READINESS_AUDIT.md` |
 | "JEPA" is deterministic heuristic, not a neural net; stricter-only | FACT | `jepa_governance.py:29–32,1145` |
 | ActionGate/ACP corpus and framework docs never reference each other | FACT | cross-corpus scans |
 | "AI Control Plane" not a pitchbook category; "Specialized AI Systems" absent from repo | FACT | `docs/UGENCE_PITCHBOOK.md`, repo-wide grep |
-| Cloud Controller is a full control-plane pipeline reused by ACP as cloud safety evaluator | FACT | `cloud_controller/`, `acp/AI_CONTROL_PLANE_ARCHITECTURE.md` |
+| Cloud Controller is a full control-plane pipeline reused by ACP as cloud safety evaluator | FACT | `cloud_controller/`, `Project_documentation/control_plane/acp/AI_CONTROL_PLANE_ARCHITECTURE.md` |
 | Framework should be an Agent Runtime, not a control plane | INTERPRETATION/RECOMMENDATION | this review, Parts 2–9 |
 | Splitting + folding authz into ActionGate eliminates all duplicated ownership | RECOMMENDATION | `DUPLICATION_ANALYSIS.md` §7 |
 | Multi-agent/identity/registry would elevate it to "Agent Orchestrator" | SPECULATION | Part 6 (target state, not built) |

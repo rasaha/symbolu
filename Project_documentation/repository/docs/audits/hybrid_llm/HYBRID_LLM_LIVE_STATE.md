@@ -97,7 +97,7 @@ model-related):
 - `platform/api-snapshots/` — API stability registry snapshots.
 - `SYMBOL_U_THEORY_V1_FREEZE.md`, `ONTOLOGY_FREEZE_CONTRACT.md` — theory/ontology freezes.
 - `execution_gate/frozen/`, `evidence_assurance/verify_frozen.py`, `claim_integrity/verify_frozen.py`, `governed_inference_pilot/verify_frozen.py` — governance/evidence freeze verifiers (unrelated to the model family).
-- `acp/ACP_V1_FREEZE.md`, `cer_v0_2/…`, `cer_v0_3/…` — protocol/baseline freezes.
+- `Project_documentation/control_plane/acp/ACP_V1_FREEZE.md`, `cer_v0_2/…`, `cer_v0_3/…` — protocol/baseline freezes.
 
 The Hybrid LLM / Phase model family has **no dedicated freeze manifest** — its
 checkpoints and saved metrics are ordinary tracked files, catalogued in the

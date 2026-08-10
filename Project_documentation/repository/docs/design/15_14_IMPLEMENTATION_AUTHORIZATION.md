@@ -43,7 +43,7 @@ under `--strict` mode against the labels artifact at
 | `calibration_labels_sha` | `e9776ff223ef913b2e404d2cf90203e9615c01640bc8fc5c42ffabf2d49b0d6c` |
 | Annotator ID | `rasaha-2026-04-30` |
 | Labels artifact commit | `4ba0c27d` on `claude/sticky-framing-spec-r6U1j` |
-| §15.14 spec source | `docs/design/15_14_STICKY_FRAMING_DESIGN_SPEC.md` (current branch state) |
+| §15.14 spec source | `Project_documentation/repository/docs/design/15_14_STICKY_FRAMING_DESIGN_SPEC.md` (current branch state) |
 | §15.14-A1 amendment | EFFECTIVE (per spec amendment block, sign-off recorded in commit `8ba407f`) |
 | Implementation script path | `scripts/probe_framing_15_14.py` |
 
@@ -119,7 +119,7 @@ amendment block:
 
 Per the user's authorization message:
 
-- Does NOT alter the spec (`docs/design/15_14_STICKY_FRAMING_DESIGN_SPEC.md`).
+- Does NOT alter the spec (`Project_documentation/repository/docs/design/15_14_STICKY_FRAMING_DESIGN_SPEC.md`).
 - Does NOT alter §15.14-A1 (the source-enum amendment).
 - Does NOT alter the calibration labels artifact.
 - Does NOT alter any sealed §0.8 threshold.
@@ -143,7 +143,7 @@ IMPLEMENTATION_§0.X_AUTHORIZED → IMPLEMENTATION_IN_PROGRESS_I-1
 
 ## Provenance
 
-- Spec sealed at `docs/design/15_14_STICKY_FRAMING_DESIGN_SPEC.md` (most recent EFFECTIVE-flip commit `8ba407f`).
+- Spec sealed at `Project_documentation/repository/docs/design/15_14_STICKY_FRAMING_DESIGN_SPEC.md` (most recent EFFECTIVE-flip commit `8ba407f`).
 - Stimulus JSON + amendment + frame-positive curation: see C-1..C-7 commits + `8ba407f` (EFFECTIVE).
 - Labels artifact split + validator infrastructure: C-8a..C-8e (commits `1322bab`..`b3e848a`).
 - Calibration response collection script (`scripts/collect_calibration_responses_15_14.py`): commits `2ca7896` + `d72f299` (fix).

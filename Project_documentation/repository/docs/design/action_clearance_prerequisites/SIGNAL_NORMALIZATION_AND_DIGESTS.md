@@ -1,7 +1,7 @@
 # Signal Normalization & Digest Rules
 
 **Status:** PROPOSED · `action_clearance.prerequisites.v0.1`. Extends
-`docs/design/action_clearance/DETERMINISM_AND_FINGERPRINTS.md`; introduces no new algorithm, reuses the
+`Project_documentation/repository/docs/design/action_clearance/DETERMINISM_AND_FINGERPRINTS.md`; introduces no new algorithm, reuses the
 merged `action_clearance` domain-separated SHA-256 pattern.
 
 ## Canonical normalization (deterministic, total)

@@ -54,7 +54,7 @@ implementation.
 | `python scripts/validate_terminology.py` | **PASS** (8 governed docs) |
 | `python scripts/check_doc_links.py` | **PASS** (21 links) |
 | `platform_freeze.dependencies.dependency_report()` | **passed=True, 0 violations** |
-| Robotics local freeze (`acp/ACP_V1_FREEZE.md`) | **13/13 module hashes byte-accurate**; combined `8f8660e293308cf94c983a26a2ae69c9` (**unchanged**) |
+| Robotics local freeze (`Project_documentation/control_plane/acp/ACP_V1_FREEZE.md`) | **13/13 module hashes byte-accurate**; combined `8f8660e293308cf94c983a26a2ae69c9` (**unchanged**) |
 | Governance Contracts / GPF / Decision Authority / Robotics Autonomous Control Plane | **45 / 84 / 79 / 112 passed** |
 | Action Clearance runtime package | **does not exist** (module unimportable) |
 

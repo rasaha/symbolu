@@ -51,7 +51,7 @@ ClearanceReceiptRepository (Protocol)
 and persistence lifecycle.** The **Action Clearance package defines only the receipt schema and the
 reference requirements** (which fields, which fingerprints, immutability) — it does **not** import or
 depend on a concrete database. This matches the merged persistence boundary
-(`docs/design/action_clearance/PERSISTENCE_BOUNDARY.md`): "The Workflow Service persists the
+(`Project_documentation/repository/docs/design/action_clearance/PERSISTENCE_BOUNDARY.md`): "The Workflow Service persists the
 ClearanceReceipt."
 
 ## No concrete-database dependency
@@ -61,7 +61,7 @@ The Action Clearance package may define the **schema** (`clearance_receipt.schem
 `InMemoryExecutionRepository`. It must **never** depend on SQL, a document store, or any durable backend;
 that dependency lives entirely in the Workflow Service implementation. This preserves the package
 dependency floor (`ugence-governance-contracts` only) from
-`docs/design/action_clearance/PACKAGE_BOUNDARY.md`.
+`Project_documentation/repository/docs/design/action_clearance/PACKAGE_BOUNDARY.md`.
 
 ## Closure
 

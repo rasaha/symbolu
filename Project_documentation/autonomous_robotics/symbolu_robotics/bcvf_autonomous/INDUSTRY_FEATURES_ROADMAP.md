@@ -339,7 +339,7 @@ DESIGN DOC FIRST
 Following the pattern from HIERARCHICAL_BCVF_DESIGN.md and
 MULTI_MODAL_PREDICTORS_DESIGN.md, write the design doc BEFORE
 the implementation. The doc lives at
-  symbolu_robotics/bcvf_autonomous/SAFETY_STATE_MACHINE_DESIGN.md
+  Project_documentation/autonomous_robotics/symbolu_robotics/bcvf_autonomous/SAFETY_STATE_MACHINE_DESIGN.md
 and covers:
   §1 Why this exists (kernel = runtime layer; state machine =
      behavioural contract; the architectural piece that turns

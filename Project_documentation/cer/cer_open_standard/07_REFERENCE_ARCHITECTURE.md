@@ -73,7 +73,7 @@ Labels: `FACT` · `INTERPRETATION` · `RECOMMENDATION`.
 | Inference efficiency / safe autoscale | **Infrastructure (KVPro / Cloud Controller)** | `FACT` |
 | Observation, reflection, memory update | **Runtime** (return path) | `FACT`: F1 |
 
-**No duplicated ownership:** each row has exactly one owner, and the CER field-partition *is* the ownership partition — the runtime supplies the action+authority-request; the enterprise supplies policy; the domain supplies world-state; the control plane decides; the execution layer acts. (`FACT`: the disjointness of the CP layers is source-verified, "duplicated-logic count 0," `acp/RESPONSIBILITY_MATRIX.md`.)
+**No duplicated ownership:** each row has exactly one owner, and the CER field-partition *is* the ownership partition — the runtime supplies the action+authority-request; the enterprise supplies policy; the domain supplies world-state; the control plane decides; the execution layer acts. (`FACT`: the disjointness of the CP layers is source-verified, "duplicated-logic count 0," `Project_documentation/control_plane/acp/RESPONSIBILITY_MATRIX.md`.)
 
 ---
 

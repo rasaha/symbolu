@@ -5,7 +5,7 @@ Per-module recommendation with justification. Verdict vocabulary (from the task)
 
 Labels: `FACT` (basis) / `RECOMMENDATION` / `INTERPRETATION`. Every recommendation names its evidence.
 
-> This matrix is distinct from `acp/RESPONSIBILITY_MATRIX.md` (which governs the ACP layers). This one governs the Agentic Framework modules.
+> This matrix is distinct from `Project_documentation/control_plane/acp/RESPONSIBILITY_MATRIX.md` (which governs the ACP layers). This one governs the Agentic Framework modules.
 
 ---
 

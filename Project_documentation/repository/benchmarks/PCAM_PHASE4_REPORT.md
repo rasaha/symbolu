@@ -32,7 +32,7 @@ pytest simulator/pcam/tests/test_sketch_conformance.py
 - 6 sketch parity scenarios (including event-driven halving)
 - 10 policy parity scenarios (scoring, phase-aware weights, sink pinning, filler fast path, sampled path determinism, randomized end-to-end)
 
-The reference is the vendored `simulator/pcam/reference/attention_evictor_vendored.py` at pinned commit `e4bbb68bb53...`. Any behavioral drift between the runtime and the reference fails the harness loudly. See `simulator/pcam/docs/VENDORED_REFERENCE_UPDATE_RITUAL.md` for the update procedure.
+The reference is the vendored `simulator/pcam/reference/attention_evictor_vendored.py` at pinned commit `e4bbb68bb53...`. Any behavioral drift between the runtime and the reference fails the harness loudly. See `Project_documentation/simulator/simulator/pcam/docs/VENDORED_REFERENCE_UPDATE_RITUAL.md` for the update procedure.
 
 ### Replay-only comparison on the built-in demo trace
 
@@ -77,7 +77,7 @@ python benchmarks/pcam_trace_replay.py
 
 ### RTL parity via cosimulation
 
-The cocotb harness at `simulator/pcam/rtl/tests/` is landed and ready to execute. It is **not** currently green in this environment because neither `cocotb` nor a SystemVerilog simulator (Verilator / Icarus) is installed. The pytest wrapper skips cleanly with an actionable install hint. Full runbook at `simulator/pcam/rtl/tests/FIRST_LIVE_RUN.md`.
+The cocotb harness at `simulator/pcam/rtl/tests/` is landed and ready to execute. It is **not** currently green in this environment because neither `cocotb` nor a SystemVerilog simulator (Verilator / Icarus) is installed. The pytest wrapper skips cleanly with an actionable install hint. Full runbook at `Project_documentation/simulator/simulator/pcam/rtl/tests/FIRST_LIVE_RUN.md`.
 
 Summary of what the harness proves when it runs green:
 
@@ -212,4 +212,4 @@ The next milestone that would move this report from "Phase 4 complete" to "Phase
 4. Appends the resulting numbers to this report's "What has actually been measured" section
 
 Pattern identical to the Phase 2.5 RTL closure runbook at
-`simulator/pcam/rtl/tests/FIRST_LIVE_RUN.md`. The first engineer with the right dev environment should need under an hour to close all three.
+`Project_documentation/simulator/simulator/pcam/rtl/tests/FIRST_LIVE_RUN.md`. The first engineer with the right dev environment should need under an hour to close all three.

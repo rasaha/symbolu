@@ -73,7 +73,7 @@ retire these shims entirely, a **purely additive, backward-compatible** option i
   mutable internal tables. Consumers and the historical tests could then depend on the public
   predicate rather than the internal table.
 - This would be a **MINOR** platform change (additive surface), to be filed via
-  `docs/platform-v1/MIGRATION_POLICY.md` and evaluated on its own merits. It is **not** a
+  `Project_documentation/repository/docs/platform-v1/MIGRATION_POLICY.md` and evaluated on its own merits. It is **not** a
   prerequisite for H1–H6.
 
 Until then, the compat shims remain the correct, tested home for these internal references.

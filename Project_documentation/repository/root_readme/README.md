@@ -8,7 +8,7 @@ The **Agentic Framework** is a code-first Python library for building
 governed agentic applications on top of any LLM. Every action an agent
 takes is observable, auditable, and controllable.
 
-See [agentic/agentic_framework/README.md](../../agentic_framework/agentic/agentic_framework/README.md)
+See [Project_documentation/agentic_framework/agentic/agentic_framework/README.md](../../agentic_framework/agentic/agentic_framework/README.md)
 for full documentation, quickstart, and examples.
 
 ### Quick install
@@ -48,11 +48,11 @@ wiring changes needed.
 
 | Doc | Path |
 |-----|------|
-| Framework README | [agentic/agentic_framework/README.md](../../agentic_framework/agentic/agentic_framework/README.md) |
-| Quickstart | [agentic/docs/QUICKSTART.md](../../agentic_framework/agentic/docs/QUICKSTART.md) |
-| First Governed Agent | [agentic/docs/FIRST_GOVERNED_AGENT.md](../../agentic_framework/agentic/docs/FIRST_GOVERNED_AGENT.md) |
-| Mock → Real LLM | [agentic/docs/MOCK_TO_REAL_LLM.md](../../agentic_framework/agentic/docs/MOCK_TO_REAL_LLM.md) |
-| Goal Decomposition & Action Mapping | [agentic/docs/GOAL_DECOMPOSITION_AND_ACTION_MAPPING.md](../../agentic_framework/agentic/docs/GOAL_DECOMPOSITION_AND_ACTION_MAPPING.md) |
-| Examples Overview | [agentic/docs/EXAMPLES_OVERVIEW.md](../../agentic_framework/agentic/docs/EXAMPLES_OVERVIEW.md) |
-| Framework Status | [agentic/docs/FRAMEWORK_STATUS.md](../../agentic_framework/agentic/docs/FRAMEWORK_STATUS.md) |
-| External Validation Guide | [agentic/docs/EXTERNAL_DEVELOPER_VALIDATION.md](../../agentic_framework/agentic/docs/EXTERNAL_DEVELOPER_VALIDATION.md) |
+| Framework README | [Project_documentation/agentic_framework/agentic/agentic_framework/README.md](../../agentic_framework/agentic/agentic_framework/README.md) |
+| Quickstart | [Project_documentation/agentic_framework/agentic/docs/QUICKSTART.md](../../agentic_framework/agentic/docs/QUICKSTART.md) |
+| First Governed Agent | [Project_documentation/agentic_framework/agentic/docs/FIRST_GOVERNED_AGENT.md](../../agentic_framework/agentic/docs/FIRST_GOVERNED_AGENT.md) |
+| Mock → Real LLM | [Project_documentation/agentic_framework/agentic/docs/MOCK_TO_REAL_LLM.md](../../agentic_framework/agentic/docs/MOCK_TO_REAL_LLM.md) |
+| Goal Decomposition & Action Mapping | [Project_documentation/agentic_framework/agentic/docs/GOAL_DECOMPOSITION_AND_ACTION_MAPPING.md](../../agentic_framework/agentic/docs/GOAL_DECOMPOSITION_AND_ACTION_MAPPING.md) |
+| Examples Overview | [Project_documentation/agentic_framework/agentic/docs/EXAMPLES_OVERVIEW.md](../../agentic_framework/agentic/docs/EXAMPLES_OVERVIEW.md) |
+| Framework Status | [Project_documentation/agentic_framework/agentic/docs/FRAMEWORK_STATUS.md](../../agentic_framework/agentic/docs/FRAMEWORK_STATUS.md) |
+| External Validation Guide | [Project_documentation/agentic_framework/agentic/docs/EXTERNAL_DEVELOPER_VALIDATION.md](../../agentic_framework/agentic/docs/EXTERNAL_DEVELOPER_VALIDATION.md) |

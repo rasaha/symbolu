@@ -258,184 +258,184 @@ Each entry includes the **file path** relative to the repository root for locati
 
 ## Architecture
 
-### `docs/architecture/AI_HUMAN_COGNITION_GAPS_ANALYSIS.md`
+### `Project_documentation/repository/docs/architecture/AI_HUMAN_COGNITION_GAPS_ANALYSIS.md`
 **AI-Human Cognition Gaps: Phase-Quad Analysis and Implementation Roadmap**
 
 > **Document Version**: 1.0.0 **Date**: January 2026 **Status**: Design Analysis
 
-### `docs/architecture/BOUNDARIES.md`
+### `Project_documentation/repository/docs/architecture/BOUNDARIES.md`
 **Core/Substrate and Observer Boundary Contract**
 
 > These module paths contain authoritative decision logic:
 
-### `docs/architecture/CANONICAL_HYBRID_FORMULAS_PHASES_MAPPING.md`
+### `Project_documentation/repository/docs/architecture/CANONICAL_HYBRID_FORMULAS_PHASES_MAPPING.md`
 **Canonical Architecture Mapping: Hybrid ↔ Formulas ↔ Phases**
 
 > This document shows how `symbolu/hybrid/` (Phoneme-Transformer Optimization) connects to the existing Symbol-U architecture: `symbolu/formulas/` (Core/Substrate utilities) and the pipeline phases (PO1–P55).
 
-### `docs/architecture/CAUSAL_WORLD_MODEL_DESIGN.md`
+### `Project_documentation/repository/docs/architecture/CAUSAL_WORLD_MODEL_DESIGN.md`
 **Causal World Model Architecture for Phase-Quad**
 
 > **Author**: Claude (Architecture Design) **Date**: February 2026 **Version**: 1.0 **Depends On**: Phase-Quad, HP-Quad, Reflective Phase-Quad
 
-### `docs/architecture/CROSS_DOMAIN_ENTROPY_ENGINE.md`
+### `Project_documentation/repository/docs/architecture/CROSS_DOMAIN_ENTROPY_ENGINE.md`
 **Cross-Domain Entropy Engine & Configurable Decision Posture**
 
 > This document covers two complementary features implemented for the SymbolU/STL architecture:
 
-### `docs/architecture/HIERARCHICAL_PHASE_QUAD_DESIGN.md`
+### `Project_documentation/repository/docs/architecture/HIERARCHICAL_PHASE_QUAD_DESIGN.md`
 **Hierarchical Phase-Quad (HP-Quad) Architecture**
 
 > **Author**: Claude (Architecture Design) **Date**: January 2026 **Version**: 1.0 **Based on**: HM-RNN (Chung et al., 2016) - Hierarchical Multiscale RNN
 
-### `docs/architecture/MOE_QUAD_PROPOSAL_DESIGN.md`
+### `Project_documentation/repository/docs/architecture/MOE_QUAD_PROPOSAL_DESIGN.md`
 **Mixture of Experts (MoE) for Phase-Quad Architecture**
 
 > **Author**: Claude (Architecture Design) **Date**: January 2026 **Version**: 1.1
 
-### `docs/architecture/NAME_RESONANCE_SYSTEM_DESIGN.md`
+### `Project_documentation/repository/docs/architecture/NAME_RESONANCE_SYSTEM_DESIGN.md`
 **Name Resonance System Design**
 
 > **Author**: Claude Code **Date**: 2025-12-21 **Status**: Design Document **Extends**: SYMBOLU_ENGINE_ARCHITECTURE.md
 
-### `docs/architecture/ONTOLOGICAL_LAYER_MODEL.md`
+### `Project_documentation/repository/docs/architecture/ONTOLOGICAL_LAYER_MODEL.md`
 **Symbol-U 5+5 Ontological Layer Model**
 
 > Symbol-U uses a **12-layer ontological architecture** divided into two groups: - **Lower 5 (O1-O5):** Execution / Manifestation Layers - **Upper 5 (O6-O10):** Governance / Coherence Layers
 
-### `docs/architecture/PHASE_MINUS_ONE_SESSION_CONTEXT.md`
+### `Project_documentation/repository/docs/architecture/PHASE_MINUS_ONE_SESSION_CONTEXT.md`
 **Phase -1 Session Context Architecture**
 
 > **Version**: 2.1 **Date**: 2025-12-20 **Status**: Implemented
 
-### `docs/architecture/PHASE_QUAD_EXPLAINABILITY_ENTERPRISE.md`
+### `Project_documentation/repository/docs/architecture/PHASE_QUAD_EXPLAINABILITY_ENTERPRISE.md`
 **Phase Quad Explainability: Enterprise Architecture & Telemetry**
 
 > **Document Version**: 2.0.0 **Date**: February 2026 **Status**: Implemented (V11.1.0) **Companion Doc**: `PHASE_QUAD_PARAMETER_INTERPRETABILITY.md` (research directions) **Codebase**: `symbolu/mechanical/logging/` + integration in `symbolu/phase_transformer.py`
 
-### `docs/architecture/PHASE_QUAD_PARAMETER_INTERPRETABILITY.md`
+### `Project_documentation/repository/docs/architecture/PHASE_QUAD_PARAMETER_INTERPRETABILITY.md`
 **Phase-Quad Parameter Interpretability: Design Directions**
 
 > **Document Version**: 1.0.0 **Date**: January 2026 **Status**: Research Proposal **Purpose**: Bridge the parameter interpretability gap in Phase-Quad architecture
 
-### `docs/architecture/PHASE_QUAD_SUPPLEMENTARY_ARCHITECTURES.md`
+### `Project_documentation/repository/docs/architecture/PHASE_QUAD_SUPPLEMENTARY_ARCHITECTURES.md`
 **Phase-Quad Supplementary Architectures Compendium**
 
 > **Author**: Claude (Architecture Documentation) **Date**: January 2026 **Version**: 1.0
 
-### `docs/architecture/PHASE_QUAD_SYMBOLIC_REASONING_FILTERS.md`
+### `Project_documentation/repository/docs/architecture/PHASE_QUAD_SYMBOLIC_REASONING_FILTERS.md`
 **Phase-Quad Symbolic Reasoning Filters: Comprehensive Architecture Guide**
 
 > **Document Version**: 1.0.0 **Date**: January 2026 **Status**: Architecture Specification **Purpose**: Complete reference for all symbolic reasoning mechanisms in Phase-Quad
 
-### `docs/architecture/PHONEME_TRANSFORMER_HYBRID_ARCHITECTURE.md`
+### `Project_documentation/repository/docs/architecture/PHONEME_TRANSFORMER_HYBRID_ARCHITECTURE.md`
 **Phoneme-Transformer Hybrid Optimization Architecture**
 
 > This document describes the **Symbolic Transformer Engine (STE)** - a deterministic computational system that uses 10-dimensional phoneme vectors for ontological processing.
 
-### `docs/architecture/PIPELINE_STAGE_AUDIT.md`
+### `Project_documentation/repository/docs/architecture/PIPELINE_STAGE_AUDIT.md`
 **Pipeline Stage Audit: Three Questions Analysis**
 
 > For every stage, only three questions matter: 1. **Does this stage have a single, unique responsibility?** 2. **Does it mutate state or only annotate?** 3. **Does it have authority, or is it advisory?**
 
-### `docs/architecture/REFLECTIVE_PHASE_QUAD_DESIGN.md`
+### `Project_documentation/repository/docs/architecture/REFLECTIVE_PHASE_QUAD_DESIGN.md`
 **Reflective Phase-Quad Architecture**
 
 > **Author**: Claude (Architecture Design) **Date**: January 2026 **Version**: 1.0
 
-### `docs/architecture/RLM_PHASE_QUAD_INTEGRATION_DESIGN.md`
+### `Project_documentation/repository/docs/architecture/RLM_PHASE_QUAD_INTEGRATION_DESIGN.md`
 **RLM-Phase-Quad Integration Architecture**
 
 > **Author**: Claude (Architecture Design) **Date**: January 2026 **Version**: 1.0 **Based on**: - Recursive Language Models (Zhang, Kraska, Khattab - MIT, 2025) - Phase-Quad Architecture (Internal) - Hierarchical Phase-Quad (HP-Quad) - Reflective Phase-Quad
 
-### `docs/architecture/SOVEREIGN_EMBEDDING_TRAINING_DESIGN.md`
+### `Project_documentation/repository/docs/architecture/SOVEREIGN_EMBEDDING_TRAINING_DESIGN.md`
 **Sovereign Embedding Training Design**
 
 > The **Sovereign Embedding** architecture solves the "Representational Ceiling" problem encountered in language model training by physically separating semantic, phonetic, and ontological signals into distinct embedding dimensions.
 
-### `docs/architecture/SOVEREIGN_REASONING_KERNEL_DESIGN.md`
+### `Project_documentation/repository/docs/architecture/SOVEREIGN_REASONING_KERNEL_DESIGN.md`
 **Sovereign Reasoning Kernel (SRK) Design Document**
 
 > The **Sovereign Reasoning Kernel (SRK)** represents the transition from retrieval-based intelligence to reasoning-based intelligence. While standard LLMs retrieve patterns from training data, the SRK ensures the **32D Ontological State** becomes the primary driver of generation, forcing the model to satisfy logical structures before selecting words...
 
-### `docs/architecture/SPATIAL_CAUSAL_MODULE_DESIGN.md`
+### `Project_documentation/repository/docs/architecture/SPATIAL_CAUSAL_MODULE_DESIGN.md`
 **Spatial-Causal Module Design (V10.11)**
 
 > The Spatial-Causal Module extends the Causal World Model (V10.10) with spatial reasoning capabilities, enabling the Phase-Quad LLM to understand how spatial configurations cause effects in the physical world.
 
-### `docs/architecture/STITCHING_ENCODER_CROSS_DOMAIN_REASONING.md`
+### `Project_documentation/repository/docs/architecture/STITCHING_ENCODER_CROSS_DOMAIN_REASONING.md`
 **Stitching Encoder: Cross-Domain Reasoning Architecture**
 
 > The **Stitching Encoder** implements controlled cross-domain reasoning for Symbol-U, enabling the system to transfer structural insights across domains (finance, psychology, medicine, etc.) while maintaining quality, preventing hallucination, and ensuring full auditability.
 
-### `docs/architecture/STITCHING_FUSION_SPECIFICATION.md`
+### `Project_documentation/repository/docs/architecture/STITCHING_FUSION_SPECIFICATION.md`
 **Stitching & Fusion: Implementation-Ready Specification**
 
 > This document resolves the architectural ambiguity between Stitching and Fusion by defining clear, non-overlapping responsibilities. The design is deterministic, Tier-1 safe, and implementation-ready.
 
-### `docs/architecture/STRUCTURED_REASONING_ENGINEERING_SPEC.md`
+### `Project_documentation/repository/docs/architecture/STRUCTURED_REASONING_ENGINEERING_SPEC.md`
 **Phase Quad Structured Reasoning: Engineering Specification**
 
 > **Goal:** Model-internal structural awareness for tables, JSON, CSV, config — without code-mediated manipulation
 
-### `docs/architecture/SYMBOLIC_AI_EMOTIONAL_REASONING_GAPS.md`
+### `Project_documentation/repository/docs/architecture/SYMBOLIC_AI_EMOTIONAL_REASONING_GAPS.md`
 **Symbolic AI Emotional Reasoning: Gap Analysis and Design Directions**
 
 > **Document Version**: 2.0.0 **Date**: January 2026 **Status**: Design Proposal **Purpose**: Evaluate missing emotional/affective symbolic AI components in Phase-Quad
 
-### `docs/architecture/SYMBOL_U_ARCHITECTURE_OVERVIEW.md`
+### `Project_documentation/repository/docs/architecture/SYMBOL_U_ARCHITECTURE_OVERVIEW.md`
 **Symbol-U Architecture Overview**
 
 > Symbol-U is a **deterministic cognitive constraint system** that governs how responses are generated through a multi-phase pipeline. It is NOT an LLM, NOT a search engine, and NOT a generative system. It is a **governance and routing architecture** that:
 
-### `docs/architecture/VARIABLE_BINDING_UNIFICATION_DESIGN.md`
+### `Project_documentation/repository/docs/architecture/VARIABLE_BINDING_UNIFICATION_DESIGN.md`
 **Variable Binding and Unification: The Missing Symbolic Core**
 
 > **Document Version**: 1.0.0 **Date**: January 2026 **Status**: Critical Design Specification **Purpose**: Bridge the fundamental gap between neural and symbolic reasoning in Phase-Quad
 
-### `docs/architecture/core_substrate_observer_boundary.md`
+### `Project_documentation/repository/docs/architecture/core_substrate_observer_boundary.md`
 **Core/Substrate → Observer → Governance Boundary Specification**
 
 > Symbol-U implements a strict **three-tier architectural separation** that isolates:
 
-### `docs/architecture/core_vs_pipeline.md`
+### `Project_documentation/repository/docs/architecture/core_vs_pipeline.md`
 **Core/Substrate vs Pipeline Architecture**
 
 > Symbol-U maintains a strict separation between two architectural layers:
 
-### `docs/architecture/expression_modulation.md`
+### `Project_documentation/repository/docs/architecture/expression_modulation.md`
 **Expression Modulation System**
 
 > This document formally describes the **Expression Modulation System** in Symbol-U, which converts TTOR/MLCR routing signals into **presentation-layer modulation** via MapperProfile.
 
-### `docs/architecture/ontological_layer_projection_design.md`
+### `Project_documentation/repository/docs/architecture/ontological_layer_projection_design.md`
 **Ontological Layer Projection Design Specification**
 
 > Ontological layers in this system are **projection lenses**, not containers or abstraction levels. The same invariant structural configuration, when projected through different layers, produces different influence patterns—affecting reachability, constraint propagation, and stabilization behavior—without any semantic transformation occurring intern...
 
-### `docs/architecture/phase_9_graph_rewriting_design.md`
+### `Project_documentation/repository/docs/architecture/phase_9_graph_rewriting_design.md`
 **Phase-9 Graph Rewriting Design Specification**
 
 > Graph rewriting in this system must operate as a **structural simplification and canonicalization engine**, not a generative or interpretive mechanism. The appropriate model is closer to term-rewriting systems and compiler optimization passes than to any attention-based or probabilistic framework.
 
-### `docs/architecture/routing_contract.md`
+### `Project_documentation/repository/docs/architecture/routing_contract.md`
 **Routing Contract v2.0**
 
 > This document defines the **Routing Contract** between the TTOR (Two-Tier Ontology Router), MLCR (Multi-Layer Coherence Router), mapper engines (HRM/LCM/LAM), and the Symbol-U pipeline.
 
-### `docs/architecture/symbolu_v3_cognitive_architecture.md`
+### `Project_documentation/repository/docs/architecture/symbolu_v3_cognitive_architecture.md`
 ****Symbol-U v3.0 Cognitive Architecture — Master Specification****
 
 > - 2.1 [TTOR Router](#21-ttor-router) - 2.2 [MLCR Mapper Logic](#22-mlcr-mapper-logic) - 2.3 [Mapper Profile Builder](#23-mapper-profile-builder) - 2.4 [Fusion Renderer](#24-fusion-renderer) - 2.5 [DHA Engine](#25-dha-engine) - 2.6 [LLM Enhancement Renderer](#26-llm-enhancement-renderer) - 3.1 [Coherence Engine](#31-coherence-engine) - 3.
 
-### `docs/architecture/system_atlas_v1.md`
+### `Project_documentation/repository/docs/architecture/system_atlas_v1.md`
 **Symbol-U System Atlas v1.0**
 
 > This document catalogs everything that currently exists in the Symbol-U codebase. It is: - **Neutral** — no recommendations or improvements - **Implementation-faithful** — reflects code, not intent - **Archival** — a snapshot, not a design document
 
 ## Design Documents
 
-### `docs/design/12D_MIGRATION_DESIGN.md`
+### `Project_documentation/repository/docs/design/12D_MIGRATION_DESIGN.md`
 **12D Ontological Architecture Migration Design Document**
 
 > This document outlines the comprehensive migration from the legacy 10-dimensional (10D) ontological system to the new 12-dimensional (12D) architecture. The migration affects approximately **80+ files** across the Symbol-U codebase, including core resonance modules, phoneme mappings, hybrid routing, training pipelines, and documentation.
@@ -455,122 +455,122 @@ Each entry includes the **file path** relative to the repository root for locati
 
 > **Author**: Claude (Architecture Design) **Date**: February 2026 **Version**: 1.0.0
 
-### `docs/design/C3M_VS_CTM_COMPARATIVE_EVALUATION.md`
+### `Project_documentation/repository/docs/design/C3M_VS_CTM_COMPARATIVE_EVALUATION.md`
 **C³M vs CTM: Comparative Evaluation**
 
 > This document provides a head-to-head evaluation of two coherence-based memory framework proposals:
 
-### `docs/design/CHITTA_VRITTI_EVOLUTION_v2.7_to_v2.8.md`
+### `Project_documentation/repository/docs/design/CHITTA_VRITTI_EVOLUTION_v2.7_to_v2.8.md`
 **Chitta-Vṛtti Integration: Evolution from v2.7 to v2.8**
 
 > This document establishes the conceptual bridge between the existing v2.7 architecture and the proposed Chitta-Vṛtti layer for v2.8. It identifies what exists, what's missing, and how the pieces connect to form a coherent reasoning system.
 
-### `docs/design/COHERENCE_FORMULA_SPECIFICATION_v1.0.md`
+### `Project_documentation/repository/docs/design/COHERENCE_FORMULA_SPECIFICATION_v1.0.md`
 **Symbol-U Coherence Formula Specification v1.0**
 
 > This document provides the complete formal specification for Symbol-U's three core coherence patents:
 
-### `docs/design/CTM_COHERENCE_TIER_MEMORY_EVALUATION.md`
+### `Project_documentation/repository/docs/design/CTM_COHERENCE_TIER_MEMORY_EVALUATION.md`
 **Coherence-Tier Memory (CTM) Design Evaluation**
 
 > This document evaluates the proposed Coherence-Tier Memory (CTM) design for production readiness. CTM applies the Symbol-U coherence frameworks (Phase/USE/BCVF/SCC) as control laws for a memory controller that bridges DRAM and NAND performance/cost characteristics.
 
-### `docs/design/CTM_PLUS_COMPETITIVE_LANDSCAPE.md`
+### `Project_documentation/repository/docs/design/CTM_PLUS_COMPETITIVE_LANDSCAPE.md`
 **CTM+ Competitive Landscape**
 
 > CTM+ is a memory tiering controller. Here's how it compares to what already exists:
 
-### `docs/design/CTM_PLUS_COMPREHENSIVE_SPECIFICATION.md`
+### `Project_documentation/repository/docs/design/CTM_PLUS_COMPREHENSIVE_SPECIFICATION.md`
 **CTM+ Comprehensive Specification**
 
 > **The innovation is in the controller, not the memory.**
 
-### `docs/design/CTM_PLUS_HARDWARE_PROTOTYPE_SPEC.md`
+### `Project_documentation/repository/docs/design/CTM_PLUS_HARDWARE_PROTOTYPE_SPEC.md`
 **CTM+ Hardware Prototype Specification**
 
 > This document specifies a practical FPGA-based hardware prototype for CTM+. The goal is to prove that CTM+ can meet real-world timing constraints, not just algorithmic correctness (which the simulator already proves).
 
-### `docs/design/CTM_PLUS_VALIDATION_RESULTS.md`
+### `Project_documentation/repository/docs/design/CTM_PLUS_VALIDATION_RESULTS.md`
 **CTM+ Validation Results: Honest Assessment**
 
 > **Verdict:** Algorithm works correctly but doesn't outperform ARC on generic workloads
 
-### `docs/design/EVOLUTIONARY_FLOW_SYSTEM_DESIGN.md`
+### `Project_documentation/repository/docs/design/EVOLUTIONARY_FLOW_SYSTEM_DESIGN.md`
 **Evolutionary Flow System Design Document**
 
 > The Evolutionary Flow System implements the insight that **evolutionary intelligence transcends all layer transitions**, not just the toroidal O12→O1 bridge. Every transition from O(n)→O(n+1) represents an opportunity for cognitive evolution, with bidirectional resonance enabling top-down influence from higher layers back to lower ones.
 
-### `docs/design/GUNA_ENTROPY_MODULATION_DESIGN.md`
+### `Project_documentation/repository/docs/design/GUNA_ENTROPY_MODULATION_DESIGN.md`
 **Guna Entropy Modulation — Comprehensive Design Document**
 
 > **Symbol-U v2.6 — Deterministic, Zero-Parameter, Non-Learning System**
 
-### `docs/design/HYBRID_PHASE_JEPA_DESIGN.md`
+### `Project_documentation/repository/docs/design/HYBRID_PHASE_JEPA_DESIGN.md`
 **Hybrid Phase-JEPA Architecture Design Specification**
 
 > **Origin:** Google Gemini Proposals + Meta JEPA + SymbolU Phase Attention Integration
 
-### `docs/design/HYBRID_VOICE_SDK_DESIGN.md`
+### `Project_documentation/repository/docs/design/HYBRID_VOICE_SDK_DESIGN.md`
 **Hybrid Voice SDK Design Document**
 
 > **Author**: Claude (Architecture Design) **Date**: February 2026 **Version**: 1.0.0
 
-### `docs/design/IMAGE_GENERATION_DESIGN.md`
+### `Project_documentation/repository/docs/design/IMAGE_GENERATION_DESIGN.md`
 **Image Generation Design Specification**
 
 > This document specifies the **Image Generation Architecture** for Symbol-U, integrating diffusion-based image synthesis with the 12-layer ontological model and patent formulas (BCVF, USE, SCC). It provides architecture selection rationale, layer mapping strategy, and implementation guidance.
 
-### `docs/design/INVERTED_CURRICULUM_EVOLUTION_DESIGN.md`
+### `Project_documentation/repository/docs/design/INVERTED_CURRICULUM_EVOLUTION_DESIGN.md`
 **Inverted Curriculum Evolution Design**
 
 > **Version**: 1.7.0 **Status**: IMPLEMENTED **Author**: Claude Code **Date**: 2026-01-13
 
-### `docs/design/KOSHA_GYROSCOPE_DESIGN.md`
+### `Project_documentation/repository/docs/design/KOSHA_GYROSCOPE_DESIGN.md`
 **Kosha Gyroscope: Homeostatic Self-Regulation System**
 
 > **Curriculum:** Instructor-Led (Gyroscope ON) → Self-Learning (Gyroscope OFF at PPL < 30) **Hierarchy:** PRIMARY (Bhava + Kosha) from step 0 → EMERGENT (Vritti + Guna) after grounding
 
-### `simulator/pcam/docs/PCAM_CHIP_SPECIFICATION.md`
+### `Project_documentation/simulator/simulator/pcam/docs/PCAM_CHIP_SPECIFICATION.md`
 **PCAM: Phase-Coherent Attention Memory**
 
 > **Status**: Draft **Authors**: Symbol-U Research **Date**: 2026-01-31
 
-### `docs/design/PHASE_QUAD_IMAGE_GENERATOR_DESIGN.md`
+### `Project_documentation/repository/docs/design/PHASE_QUAD_IMAGE_GENERATOR_DESIGN.md`
 **Phase-Quad Image Generator Design Specification**
 
 > This document specifies a **Phase-Quad Image Generator** that adapts the proven Phase Integrator + Quad Proposal architecture (from language) to latent-space diffusion for image generation. The design preserves the core "no-write contract" while enabling efficient O(N) phase accumulation with sparse O(N·K) global retrieval for coherent image synthe...
 
-### `docs/design/PHASE_QUAD_VIDEO_DESIGN.md`
+### `Project_documentation/repository/docs/design/PHASE_QUAD_VIDEO_DESIGN.md`
 **Phase-Quad Video Generator Design**
 
 > This document extends Phase-Quad architecture from image generation to video generation. The key insight is that Phase accumulation naturally handles temporal coherence—the same mechanism that provides spatial memory extends to temporal memory with minimal architectural changes.
 
-### `docs/design/PRESENTATION_LAYER_v1.0.md`
+### `Project_documentation/repository/docs/design/PRESENTATION_LAYER_v1.0.md`
 **Presentation Layer Design Specification v1.0**
 
 > This document specifies the **Presentation Layer** — a Layer 4 component that consumes all system signals and produces UX directives. It translates complex metacognitive state into simple, actionable presentation instructions.
 
-### `docs/design/QUAD_PROPOSAL_PHASE_INTEGRATOR_EVALUATION.md`
+### `Project_documentation/repository/docs/design/QUAD_PROPOSAL_PHASE_INTEGRATOR_EVALUATION.md`
 **Design Evaluation: Quad-as-Proposer + Phase-as-Integrator Architecture**
 
 > This document evaluates a proposed architectural reversal where **quadratic attention becomes a proposal generator** and **phase becomes the state integrator that decides meaning**. The goal is to prevent quad from "overpowering" phase through softmax dominance.
 
-### `docs/design/ROBOTICS_AUTONOMOUS_TIER_DESIGN.md`
+### `Project_documentation/repository/docs/design/ROBOTICS_AUTONOMOUS_TIER_DESIGN.md`
 **Symbolu Robotics & Autonomous AI Tier Design**
 
 > **Version**: 1.6.0 **Date**: 2025-12-26 **Status**: Implementation Complete (with Symbol-U Vision Transformer) **Parent**: Symbolu Enterprise Architecture (v2.7+)
 
-### `docs/design/V9.8.5_ENTROPY_COHERENCE_FIXES.md`
+### `Project_documentation/repository/docs/design/V9.8.5_ENTROPY_COHERENCE_FIXES.md`
 **V9.8.5: Entropy and Coherence Integration Fixes**
 
 > V9.8.5 addresses three critical issues where physical signals (entropy, gradient, coherence) were disconnected from the ontological control systems (PID controller, Kosha steering, Vital energy management).
 
-### `docs/design/V9_4_6_H200_UPGRADES.md`
+### `Project_documentation/repository/docs/design/V9_4_6_H200_UPGRADES.md`
 **V9.4.6 Sovereign Intelligence Upgrades (H200 Deployment)**
 
 > **Status**: PENDING - Awaiting H200 migration **Target GPU**: NVIDIA H200 141GB **Current Testing**: A100 80GB
 
-### `docs/design/ontological-layer-influence-contracts.md`
+### `Project_documentation/repository/docs/design/ontological-layer-influence-contracts.md`
 **Ontological Layer Influence Contracts**
 
 > 1. **Ontological layers are NOT pipeline stages.** They are relational projection lenses that change how influence propagates through the same underlying structural substrate.
@@ -639,78 +639,78 @@ Each entry includes the **file path** relative to the repository root for locati
 
 ## Audits
 
-### `docs/audits/INTEGRATION_FLOW_E2E.md`
+### `Project_documentation/repository/docs/audits/INTEGRATION_FLOW_E2E.md`
 **Symbol-U Integration Flow: End-to-End Query Processing**
 
 > This document describes the complete end-to-end flow of how a user query enters Symbol-U, passes through all phases, and produces a response. It covers:
 
-### `docs/audits/P10_P11_P12_ACTIVATION_PREREQUISITES.md`
+### `Project_documentation/repository/docs/audits/P10_P11_P12_ACTIVATION_PREREQUISITES.md`
 **P10/P11/P12 Activation Prerequisites**
 
 > P10 (Acoustic Parameterization), P11 (Prosodic Evidence), and P12 (Consistency Validation) form the **acoustic governance chain**. These phases ensure that Symbol-U's output "sounds" consistent with its governance decisions.
 
-### `docs/audits/P34_P37_SPECIFICATION.md`
+### `Project_documentation/repository/docs/audits/P34_P37_SPECIFICATION.md`
 **P34 (Identity Harmonics) & P37 (Narrative Continuity) Specification**
 
 > P34 (Identity Harmonics Layer) and P37 (Narrative Continuity / Adaptive Continuity Engine) are **currently implemented as formulas** but lack **pipeline integration wrappers**. This specification defines what exists, what's missing, why these phases are needed, and what implementation entails.
 
-### `docs/audits/PHASE_ARCHITECTURE_AUDIT_REPORT.md`
+### `Project_documentation/repository/docs/audits/PHASE_ARCHITECTURE_AUDIT_REPORT.md`
 **Symbol-U Phase Architecture Comprehensive Audit Report**
 
 > See `symbolu/mechanical/pipeline/PHASE_STATUS.yaml` for the authoritative phase status configuration.
 
-### `docs/audits/STL_LLM_CAPABILITY_EVALUATION.md`
+### `Project_documentation/repository/docs/audits/STL_LLM_CAPABILITY_EVALUATION.md`
 **STL (Symbolic Transformer Engine) vs LLM Capability Evaluation**
 
 > **Verdict: STL is NOT an LLM. STL is a "transformer-class" symbolic computation engine.**
 
 ## Benchmarks
 
-### `docs/benchmarks/ENGINE_BENCHMARK_RESULTS.md`
+### `Project_documentation/repository/docs/benchmarks/ENGINE_BENCHMARK_RESULTS.md`
 **Symbolu Engine Architecture - Benchmark Results**
 
 > This document presents benchmark results for the three-tier Symbolu engine architecture:
 
-### `docs/benchmarks/PHASE_ATTENTION_VALIDATION.md`
+### `Project_documentation/repository/docs/benchmarks/PHASE_ATTENTION_VALIDATION.md`
 **Phase Attention Transformer - Validation Results**
 
 > This document summarizes the validation results for the SymbolU Phase Attention Transformer, tested on RunPod A100 80GB GPU. The tests validate the O(n) memory complexity and long-context capabilities of the Phase Attention architecture.
 
 ## Analysis
 
-### `docs/analysis/ARPABET_VS_VARNA_COMPARISON.md`
+### `Project_documentation/repository/docs/analysis/ARPABET_VS_VARNA_COMPARISON.md`
 **Comparison: ARPABET Phoneme Map vs Varṇa Bridge Map**
 
 > > Does using `acoustic_unit_mapper_expressive_delta_v3_1.py` and `varna*.json` files > (from experimental phases p1b-14) produce better results than the current > `resonance/phoneme_map.py` implementation?
 
-### `docs/analysis/MLCR_TEST_ANALYSIS.md`
+### `Project_documentation/repository/docs/analysis/MLCR_TEST_ANALYSIS.md`
 **MLCR Ontology Computation Test Analysis**
 
 > **Date**: 2025-12-20 **Branch**: `claude/analyze-mlcr-tests-QHyfd` **Status**: ✅ ALL ISSUES FIXED
 
-### `docs/analysis/SYMBOL_U_CLASSIFICATION_ANALYSIS.md`
+### `Project_documentation/repository/docs/analysis/SYMBOL_U_CLASSIFICATION_ANALYSIS.md`
 **Symbol-U: Complete Classification & Analysis**
 
 > *A comprehensive analysis of Symbol-U's architectural category, optimal pairings, and relationship to Large Language Models.*
 
 ## Data Specifications
 
-### `docs/data/README.md`
+### `Project_documentation/repository/docs/data/README.md`
 **Ontology Data Files — FROZEN SUBSTRATE**
 
 > **STATUS: FROZEN — NO INFERENCE, NO MODIFICATION, NO GAP-FILLING**
 
-### `docs/data/generative_model_feasibility_and_requirements.md`
+### `Project_documentation/repository/docs/data/generative_model_feasibility_and_requirements.md`
 **Graph-Based Generative Model: Feasibility Assessment & Requirements**
 
 > **Bottom Line:** - **Minimum viable:** ~70% rule-based, needs G2P tool and pronunciation dictionary - **Production quality:** ~30% learned components for naturalness - **Training data:** 10-50 hours of aligned speech (not millions of tokens)
 
-### `docs/data/graph_generative_model_spec.md`
+### `Project_documentation/repository/docs/data/graph_generative_model_spec.md`
 **Graph-Based Generative Model Specification**
 
 > This specification defines a **graph-based generative model** for Symbol-U that leverages the existing acoustic-phonetic foundation. The design explicitly rejects transformer-based attention mechanisms in favor of:
 
-### `docs/data/typed_semantic_calculus_spec.md`
+### `Project_documentation/repository/docs/data/typed_semantic_calculus_spec.md`
 **Typed Semantic Calculus for Generative Model**
 
 > The generative model is **not** a phoneme-level statistical model. It is a **type-directed constraint satisfaction system** where meaning emerges from typed composition.
@@ -744,7 +744,7 @@ Each entry includes the **file path** relative to the repository root for locati
 
 ## Governance
 
-### `docs/governance/DOCUMENTATION_RULES.md`
+### `Project_documentation/governance/docs/governance/DOCUMENTATION_RULES.md`
 **Documentation Rules**
 
 > All authoritative documentation lives under `/docs`.
@@ -793,17 +793,17 @@ Each entry includes the **file path** relative to the repository root for locati
 
 ## Migration
 
-### `docs/migration/DIRECTORY_NORMALIZATION_PLAN.md`
+### `Project_documentation/repository/docs/migration/DIRECTORY_NORMALIZATION_PLAN.md`
 **Symbolu Repository — Directory & File Normalization Plan**
 
 > This document provides a comprehensive analysis of the `rasaha/symbolu` repository structure, identifying: - **711 total Python files** (471 production, 240 test modules) - **1 confirmed naming conflict** requiring resolution (phase15_regression_guard) - **1 confirmed code duplicate** (DriftRiskBand enum) - **78 orphaned modules** (never imported) ...
 
-### `docs/migration/EXTRACTION_MANIFEST.md`
+### `Project_documentation/repository/docs/migration/EXTRACTION_MANIFEST.md`
 **SOULPI v2.8.3 Component Extraction Manifest**
 
 > - **Source:** `/mnt/project/FINAL_canonical_soulpi_v2_7_1_py.docx` - **Extracted to:** `/home/claude/components_v2_8_3/core/soulpi_core_v2_7.py` - **Status:** Complete and functional - **Contents:** - CONSONANT_TO_KOSHA_MAP (44 consonants → 5 Koshas) - KOSHA_LAYERS (5 consciousness layers) - ONTOLOGY_LAYERS (10 symbolic ladder layers) - SoulpiCoreE...
 
-### `docs/migration/REPO_REFACTOR_PLAN.md`
+### `Project_documentation/repository/docs/migration/REPO_REFACTOR_PLAN.md`
 **Repository Refactoring Plan: Phase Structure Normalization**
 
 > This document describes the targeted refactoring performed to normalize phase directory naming and eliminate duplication/conflicts without changing runtime behavior.
@@ -815,134 +815,134 @@ Each entry includes the **file path** relative to the repository root for locati
 
 > All notable changes to the frozen ontology files are documented in this file.
 
-### `docs/ontology/ONTOLOGY_FREEZE_CONTRACT.md`
+### `Project_documentation/repository/docs/ontology/ONTOLOGY_FREEZE_CONTRACT.md`
 **ONTOLOGY FREEZE CONTRACT**
 
 > The ontology is the **deterministic substrate** of the Symbol-U pipeline. It is NOT configuration. It is NOT adjustable at runtime. It is NOT subject to interpretation, inference, smoothing, or gap-filling.
 
 ## Patent
 
-### `docs/patent/patent_formula_coverage_matrix.md`
+### `Project_documentation/repository/docs/patent/patent_formula_coverage_matrix.md`
 **Patent Formula Coverage Matrix v1.0**
 
 > This document maps patent formulas from the Symbol-U intellectual property to their current implementation status in the Symbol-U v3.0 codebase. It serves as an alignment and audit layer to track:
 
 ## Phase Reports
 
-### `docs/phases/INTEGRATION_PROGRESS_REPORT.md`
+### `Project_documentation/repository/docs/phases/INTEGRATION_PROGRESS_REPORT.md`
 **Phase 13, 19, 31 Integration - Progress Report**
 
 > **Status**: ✅ **COMPLETE** - Fixed duplicate `candidate.py` conflict - Neutralized scaffold version at `symbolu/mechanical/schemas/candidate.py` - Canonical version remains at `symbolu/mechanical/fusion/schemas/candidate.py`
 
-### `docs/phases/MERGE_SAFETY_AUDIT_PHASES_13_19_31.md`
+### `Project_documentation/repository/docs/phases/MERGE_SAFETY_AUDIT_PHASES_13_19_31.md`
 **MERGE-SAFETY AUDIT REPORT**
 
 > **Branch**: `claude/merge-safety-audit-phases-01WEqu5poUPPwi84Aow2Eihm` **Date**: 2025-12-10 **Auditor**: Claude (Automated Analysis) **Phases Under Review**: - **Phase 13**: Enhanced SMI (Patent-Level Coefficients) - **Phase 19**: Semantic–Temporal Drift Fusion - **Phase 31**: Adaptive Persona Echo Layer (APEL)
 
-### `docs/phases/PHASE_10_COMMIT_MESSAGES.md`
+### `Project_documentation/repository/docs/phases/PHASE_10_COMMIT_MESSAGES.md`
 **Phase 10: Commit Messages**
 
 > All commits follow the Conventional Commits specification:
 
-### `docs/phases/PHASE_11B_STRUCTURAL_ANALYSIS_CHART_SUMMARY.md`
+### `Project_documentation/repository/docs/phases/PHASE_11B_STRUCTURAL_ANALYSIS_CHART_SUMMARY.md`
 **Phase-11B Structural Analysis Chart Summary**
 
 > **All dimensions equal at 0.375 hash divergence (3 bands / 8 values)**
 
-### `docs/phases/PHASE_13_19_31_INTEGRATION_SUMMARY.md`
+### `Project_documentation/repository/docs/phases/PHASE_13_19_31_INTEGRATION_SUMMARY.md`
 **Phase 13, 19, 31 Integration - Complete Summary**
 
 > This document provides a comprehensive summary of the integration work required for: - **Phase 13**: Enhanced SMI - **Phase 19**: Semantic-Temporal Drift Fusion - **Phase 31**: Adaptive Persona Echo Layer (APEL)
 
-### `docs/phases/PHASE_44_FIX_PLAN.md`
+### `Project_documentation/repository/docs/phases/PHASE_44_FIX_PLAN.md`
 **Phase 44 Test Fix Plan**
 
 > **The Phase 44 implementation is correct and requires no modifications.**
 
-### `docs/phases/PHASE_49_CI_WORKFLOW_PATCH.md`
+### `Project_documentation/repository/docs/phases/PHASE_49_CI_WORKFLOW_PATCH.md`
 **Phase 49 CI Workflow Integration**
 
 > Phase 49 tests have been successfully integrated into `.github/workflows/pipeline-ci.yml`.
 
-### `docs/phases/PHASE_55_FORMAL_SAFETY_CERTIFICATION.md`
+### `Project_documentation/repository/docs/phases/PHASE_55_FORMAL_SAFETY_CERTIFICATION.md`
 **PHASE 55 FORMAL SAFETY CERTIFICATION**
 
 > **Document Type**: Formal Safety Certification **Version**: 1.0.0 **Date**: 2025-12-12 **Status**: CERTIFIED **Certification Authority**: Symbol-U Safety Verification System
 
-### `docs/phases/coherence_v3_formula_draft.md`
+### `Project_documentation/repository/docs/phases/coherence_v3_formula_draft.md`
 **Coherence v3 Formula Draft**
 
 > Coherence v3 is the first formula-layer megafusion in Symbol-U v3.0, integrating all prior formula phases into a unified coherence metric. This experimental score combines temporal dynamics, resonance patterns, and modulation biases to provide a holistic measure of conversation coherence.
 
-### `docs/phases/phase-55-agent-handoff-safety-contract.md`
+### `Project_documentation/repository/docs/phases/phase-55-agent-handoff-safety-contract.md`
 **Phase 55: Agent-Handoff Safety Contract (AHSC)**
 
 > **Version**: 1.0.0 **Date**: 2025-12-12 **Status**: Design Specification **Author**: Symbolu Architecture Team
 
-### `docs/phases/phase12_acoustic_safety.md`
+### `Project_documentation/repository/docs/phases/phase12_acoustic_safety.md`
 **Why Acoustic Diagnostics Cannot Open Gates**
 
 > Phase 12 is responsible for **quality gating**, not truth computation. Acoustic diagnostics from observer phases (P22, P23, P24) can **only reduce quality** or **leave it unchanged**. They can **never increase quality** or **open a gate that was closed**.
 
-### `docs/phases/phase32_acoustic_safety.md`
+### `Project_documentation/repository/docs/phases/phase32_acoustic_safety.md`
 **Phase 32 Acoustic Safety: Why Observer-Only Acoustic Cannot Open Insight Windows**
 
 > This document explains the governance-critical design principle that ensures observer-only acoustic diagnostics can NEVER open insight windows in Phase 32 (Insight Window Gating).
 
 ## Plans
 
-### `docs/plans/DUAL_CODEBASE_ARCHITECTURES_PLAN.md`
+### `Project_documentation/repository/docs/plans/DUAL_CODEBASE_ARCHITECTURES_PLAN.md`
 **Symbol-U Architecture Plan: Enterprise vs Consumer**
 
 > This document presents two architectural approaches for supporting both Enterprise (symbolic/auditable) and Consumer (pre-trained/semantic) use cases:
 
 ## Reports
 
-### `docs/reports/experiment_pack_v1/experiment_pack_v1_report.md`
+### `Project_documentation/repository/docs/reports/experiment_pack_v1/experiment_pack_v1_report.md`
 **Experiment Pack v1: Phoneme-Only Ontological Routing Validation**
 
 > > Phonemes do not carry semantics, but acquire word character through > deterministic ontological routing.
 
-### `docs/reports/varna_bridge_grounded_rebuild.md`
+### `Project_documentation/repository/docs/reports/varna_bridge_grounded_rebuild.md`
 **Varna Bridge Grounded Rebuild Report**
 
 > Previous implementations incorrectly substituted heuristics where a ground-truth data file existed. This report documents the violations found, corrections made, and outstanding issues.
 
 ## Reviews
 
-### `docs/reviews/experiment_pack_v1_adversarial_evaluation.md`
+### `Project_documentation/repository/docs/reviews/experiment_pack_v1_adversarial_evaluation.md`
 **Critical Adversarial Evaluation of Experiment Pack v1**
 
 > This document provides a critical, adversarial evaluation of Experiment Pack v1's central claim:
 
-### `docs/reviews/phase12_14_forensic_review.md`
+### `Project_documentation/repository/docs/reviews/phase12_14_forensic_review.md`
 **Phase-12–14 Forensic Architecture Review**
 
 > **Scope:** Phase-12 (Governed Generative Pipeline), Phase-13 (K1 Knowledge Layer), Phase-14 (Phonemic-Ontological Accumulator)
 
 ## Specifications
 
-### `docs/specs/phase2_modifier_layer_spec_v3_2.md`
+### `Project_documentation/repository/docs/specs/phase2_modifier_layer_spec_v3_2.md`
 **Phase-2 Modifier Layer Specification**
 
 > Phase-2 is a **structural modifier layer** that operates exclusively on the output of Phase-1b (`List[AcousticBridgeUnit]`). It annotates **structural relationships** between adjacent acoustic units without introducing semantic interpretation.
 
-### `docs/specs/rag_database_reasoning_spec.md`
+### `Project_documentation/repository/docs/specs/rag_database_reasoning_spec.md`
 **RAG Database Update and Reasoning Generation Specification**
 
 > This specification defines strategies for: - **Effective RAG database updates** in a typed graph LLM system - **Reasoning generation** from retrieved knowledge - **Integration with PPV** and ontological layers - **Deterministic knowledge retrieval** compatible with GOVERNED mode
 
-### `docs/specs/symbolu_master_specification.md`
+### `Project_documentation/repository/docs/specs/symbolu_master_specification.md`
 **Symbolu Architecture Master Specification**
 
 > This master specification consolidates the complete Symbol-U (Soulpi) architecture, integrating:
 
-### `docs/specs/typed_graph_llm_design_spec.md`
+### `Project_documentation/repository/docs/specs/typed_graph_llm_design_spec.md`
 **Typed Graph LLM Design Specification**
 
 > This specification defines a **Typed Graph LLM** architecture that integrates: - **Phonemic Propensity Vectors (PPV)** for structural acoustic signals - **Ontological layer mapping** for semantic organization - **Graph-based knowledge representation** for reasoning - **RAG (Retrieval-Augmented Generation)** for dynamic knowledge updates
 
-### `docs/specs/typed_graph_llm_implementation_spec.md`
+### `Project_documentation/repository/docs/specs/typed_graph_llm_implementation_spec.md`
 **Typed Graph LLM Implementation Specification**
 
 > This document provides detailed implementation specifications for the Typed Graph LLM architecture, including code structures, algorithms, and integration patterns.
@@ -1028,17 +1028,17 @@ Each entry includes the **file path** relative to the repository root for locati
 
 ## Validation
 
-### `docs/validation/REALITY_INTERACTION_VALIDATION_STRATEGY.md`
+### `Project_documentation/repository/docs/validation/REALITY_INTERACTION_VALIDATION_STRATEGY.md`
 **Reality Interaction Validation Strategy — Symbol-U**
 
 > This document defines a comprehensive strategy for validating Symbol-U's behavior under **real human interaction patterns**. It answers the central question:
 
-### `docs/validation/REALITY_VALIDATION_CHECKLIST.md`
+### `Project_documentation/repository/docs/validation/REALITY_VALIDATION_CHECKLIST.md`
 **Reality Interaction Validation Checklist — Symbol-U**
 
 > Quick-reference checklist for executing the Reality Interaction Validation Strategy.
 
-### `docs/validation/TESTING.md`
+### `Project_documentation/repository/docs/validation/TESTING.md`
 **Symbol-U Testing Standard**
 
 > This document defines the testing standard for all **new** tests and test modifications in the Symbol-U repository. It does not apply retroactively to existing tests.
@@ -1089,53 +1089,53 @@ Each entry includes the **file path** relative to the repository root for locati
 
 ## Scripts
 
-### `scripts/phase_probes/README.md`
+### `Project_documentation/repository/scripts/phase_probes/README.md`
 **PhaseAttention Diagnostic Probe Suite**
 
 > A comprehensive suite of diagnostic tools to scientifically test what PhaseAttention layers are learning and whether they provide advantages over standard quadratic attention.
 
-### `scripts/phase_probes/hard_probes/README.md`
+### `Project_documentation/repository/scripts/phase_probes/hard_probes/README.md`
 **Hard Diagnostic Probe Dataset for PhaseAttention**
 
 > This benchmark tests whether PhaseAttention performs **true relational reasoning** rather than pattern memorization. The key insight is that quadratic attention can achieve high training accuracy through token-specific memorization, but should fail on held-out tokens that require the same relational structure.
 
 ## Simulator
 
-### `simulator/README.md`
+### `Project_documentation/simulator/simulator/README.md`
 **CTM+ Simulator**
 
 > Validation framework for Coherence-Tier Memory Plus (CTM+) algorithm.
 
-### `simulator/pcam/docs/PCAM_BENCHMARK_TEST_REPORT.md`
+### `Project_documentation/simulator/simulator/pcam/docs/PCAM_BENCHMARK_TEST_REPORT.md`
 **PCAM Comprehensive Benchmark & Test Report**
 
 > **Framework Version:** 0.8.0 (K=256 silicon sizing + section centroid ranking + slot reservation)
 
-### `simulator/pcam/docs/RTL_DESIGN.md`
+### `Project_documentation/simulator/simulator/pcam/docs/RTL_DESIGN.md`
 **PCAM FPGA RTL Design Specification**
 
 > **Version**: 3.0 (K=256 silicon sizing) **Date**: 2026-02-11 **Status**: Implementation Complete **Target**: Xilinx Alveo U280 / AMD Versal / Intel Agilex
 
-### `simulator/pcam/docs/VALIDATION_REPORT.md`
+### `Project_documentation/simulator/simulator/pcam/docs/VALIDATION_REPORT.md`
 **PCAM Validation Report**
 
 > This report documents the comprehensive validation of the PCAM (Phase-Coherent Attention Memory) simulation framework as specified in Appendix H of the PCAM Chip Specification.
 
 ## Trading
 
-### `trading/README.md`
+### `Project_documentation/trading/trading/README.md`
 **SymbolU Trading Framework (Experimental)**
 
 > **Tick-based trading system built on v2.7 State Evolution concepts.**
 
-### `trading/pinescript/README.md`
+### `Project_documentation/trading/trading/pinescript/README.md`
 **SymbolU State Evolution - Pine Script v6**
 
 > TradingView indicators converted from the QuantConnect trading module.
 
 ## Tests
 
-### `tests/cognitive_evaluation/EXECUTIVE_SUMMARY.md`
+### `Project_documentation/repository/tests/cognitive_evaluation/EXECUTIVE_SUMMARY.md`
 **Symbol-U Cognitive Evaluation: Executive Summary**
 
 > Symbol-U is **over-structured but not intelligent**. The system produces structured outputs without causal cognitive work.

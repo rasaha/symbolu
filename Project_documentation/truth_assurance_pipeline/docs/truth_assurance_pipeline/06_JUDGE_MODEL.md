@@ -45,7 +45,7 @@ for the Claim Validation Layer. Its measured ablation shows each role removes a 
 failure class** (challenger → contradictions; adjudicator → equally-explicit
 conflicts). That is a **synthetic, construction-validated** demonstration of the role
 decomposition — not evidence that any LLM-judge instantiation works. See its
-`docs/relationship_claim_validation/JUDGE_PROTOCOL.md` and `FINAL_VERDICT.md`.
+`Project_documentation/governance/docs/relationship_claim_validation/JUDGE_PROTOCOL.md` and `FINAL_VERDICT.md`.
 
 ## 5. LLM vs deterministic judges
 

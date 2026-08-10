@@ -70,8 +70,8 @@ All formulas in this directory MUST maintain:
 ## Related Documentation
 
 For the complete architectural specification, see:
-- `docs/architecture/core_vs_pipeline.md`
-- `docs/architecture/core_substrate_observer_boundary.md`
+- `Project_documentation/repository/docs/architecture/core_vs_pipeline.md`
+- `Project_documentation/repository/docs/architecture/core_substrate_observer_boundary.md`
 
 ## Flow Diagram
 

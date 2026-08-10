@@ -98,7 +98,7 @@ legitimate first-use. This is a test-harness property; the enforcement is correc
 
 ## Remediation of the independent architectural validation (N1–N11)
 
-The independent review (`cyber_security/INDEPENDENT_ARCHITECTURAL_VALIDATION.md`) was
+The independent review (`Project_documentation/action_gate_cyber/cyber_security/INDEPENDENT_ARCHITECTURAL_VALIDATION.md`) was
 treated as authoritative. Each finding was addressed with executable evidence; the
 scope was limited to those findings (no redesign, no new features).
 

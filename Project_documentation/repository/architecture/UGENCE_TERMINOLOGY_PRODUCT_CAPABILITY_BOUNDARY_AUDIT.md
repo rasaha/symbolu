@@ -4,7 +4,7 @@
 **Scope:** documentation and naming only — no code, package, API, schema, freeze
 artifact, or historical record is renamed or changed.
 **Companion decision record:**
-[`docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](../docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md)
+[`Project_documentation/repository/docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](../docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md)
 
 > **Provenance note (read this first).** An earlier hand-off referenced this audit as
 > pre-existing commit `4cb3f1e`. Direct verification against the repository (local refs,

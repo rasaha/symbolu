@@ -73,7 +73,7 @@ snapshot (the pattern the three prior migrations achieved).
 - `ugence_console_api/capabilities/{action_control.py:26, truth_evidence.py:18}` (lazy, inside try/except)
 - `packaging/verify_tap_provider_distribution.py:50,65,68`; `packaging/verify_provider_heterogeneity_distribution.py:56,64`
 - `packages/governance-contracts/tests/compatibility/test_legacy_compat.py:16-24` (deep-import compat matrix)
-- `docs/platform-v1/PROVIDER_DEVELOPMENT_GUIDE.md:32` (documentation example)
+- `Project_documentation/repository/docs/platform-v1/PROVIDER_DEVELOPMENT_GUIDE.md:32` (documentation example)
 
 ## 3. Consumer reliance characteristics (migration impact)
 

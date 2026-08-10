@@ -1,6 +1,6 @@
 # Agentic Framework vs AI Control Plane — Comparative Analysis (Part 2)
 
-**Reference architecture:** ACP V2.2 (the "AI Control Plane"), as frozen in `acp/ACP_V2_2_PREREGISTRATION.md`, `acp/AI_CONTROL_PLANE_ARCHITECTURE.md`, `acp/RESPONSIBILITY_MATRIX.md`, `acp/ACP_ACTIONGATE_BOUNDARY.md`.
+**Reference architecture:** ACP V2.2 (the "AI Control Plane"), as frozen in `Project_documentation/control_plane/acp/ACP_V2_2_PREREGISTRATION.md`, `Project_documentation/control_plane/acp/AI_CONTROL_PLANE_ARCHITECTURE.md`, `Project_documentation/control_plane/acp/RESPONSIBILITY_MATRIX.md`, `Project_documentation/control_plane/acp/ACP_ACTIONGATE_BOUNDARY.md`.
 **Subject:** the Agentic Framework as decomposed in `AGENTIC_FRAMEWORK_ARCHITECTURE_AUDIT.md`.
 
 Labels: `FACT` / `INTERPRETATION` / `RECOMMENDATION` / `SPECULATION`.
@@ -9,7 +9,7 @@ Labels: `FACT` / `INTERPRETATION` / `RECOMMENDATION` / `SPECULATION`.
 
 ## 1. What "AI Control Plane" means in *this* repo (not the generic industry term)
 
-**FACT.** In this codebase the "AI Control Plane" is a **specific, narrow, deterministic, shadow-only** composition of three independent layers over one identity-bound action (`acp/AI_CONTROL_PLANE_ARCHITECTURE.md`, `acp/RESPONSIBILITY_MATRIX.md`):
+**FACT.** In this codebase the "AI Control Plane" is a **specific, narrow, deterministic, shadow-only** composition of three independent layers over one identity-bound action (`Project_documentation/control_plane/acp/AI_CONTROL_PLANE_ARCHITECTURE.md`, `Project_documentation/control_plane/acp/RESPONSIBILITY_MATRIX.md`):
 
 ```
 Original Context
@@ -21,11 +21,11 @@ Original Context
 ```
 
 **FACT — defining properties** (from the ACP corpus):
-- **Deterministic, non-compensatory, fail-closed.** "No probabilistic authorization. `ActionDecision` is a closed enum; no scalar 'allow score' exists" (`acp/ACP_INTERFACE_CONTRACTS.md`). "Same inputs → same decision, bit-for-bit" (`acp/ACP_ARCHITECTURE.md` A2).
-- **Disjoint ownership, zero duplication.** "relevance ⟂ proposal ⟂ authorization ⟂ operational safety"; "duplicated-logic count 0, ownership violations 0" (`acp/RESPONSIBILITY_MATRIX.md`).
-- **Cross-domain.** The frozen ACP decision core (SHA-256 `8f8660e2…`) runs byte-for-byte unchanged over both robot actions and Kubernetes operations (`acp/ACP_V1_FREEZE.md`, `symbolu_robotics/autonomous_control_plane/cloud/adapter.py`).
-- **Not an executor / planner / agent runtime.** "it does not do the work, it decides and authorizes what work is allowed to happen" (`acp/ACP_ARCHITECTURE.md`).
-- **Shadow-only, non-authoritative today.** Everything beyond V1 design is shadow (`acp/ACP_V2_2_PREREGISTRATION.md`).
+- **Deterministic, non-compensatory, fail-closed.** "No probabilistic authorization. `ActionDecision` is a closed enum; no scalar 'allow score' exists" (`Project_documentation/control_plane/acp/ACP_INTERFACE_CONTRACTS.md`). "Same inputs → same decision, bit-for-bit" (`Project_documentation/control_plane/acp/ACP_ARCHITECTURE.md` A2).
+- **Disjoint ownership, zero duplication.** "relevance ⟂ proposal ⟂ authorization ⟂ operational safety"; "duplicated-logic count 0, ownership violations 0" (`Project_documentation/control_plane/acp/RESPONSIBILITY_MATRIX.md`).
+- **Cross-domain.** The frozen ACP decision core (SHA-256 `8f8660e2…`) runs byte-for-byte unchanged over both robot actions and Kubernetes operations (`Project_documentation/control_plane/acp/ACP_V1_FREEZE.md`, `symbolu_robotics/autonomous_control_plane/cloud/adapter.py`).
+- **Not an executor / planner / agent runtime.** "it does not do the work, it decides and authorizes what work is allowed to happen" (`Project_documentation/control_plane/acp/ACP_ARCHITECTURE.md`).
+- **Shadow-only, non-authoritative today.** Everything beyond V1 design is shadow (`Project_documentation/control_plane/acp/ACP_V2_2_PREREGISTRATION.md`).
 
 **FACT — the ACP corpus contains ZERO references to the Agentic Framework** (case-insensitive scan of all 57 `acp/` files). Symmetrically, **no Agentic Framework doc references ACP, ActionGate, or Context Minimization by name.** The two bodies of work are architecturally disjoint in their own documentation; the only stated linkage is portfolio-level ("part of a broader SymbolU / Conscious Generation portfolio … each brief describes a distinct product boundary," `AGENTIC_FRAMEWORK_VC_BRIEF.md`).
 
@@ -102,7 +102,7 @@ For each Agentic Framework component: its primary category, and **why**, with th
 
 ## 4. Determinism & layer alignment — the decisive mismatch
 
-**FACT.** ACP's foundational axiom is that the control plane is **deterministic and non-compensatory** — "no probabilistic scoring where a deterministic decision exists" (`acp/ACP_ARCHITECTURE.md` A2). ActionGate is stdlib-only, "no AI" (`gate.py` header). Context Minimization's *safety property* is deterministic (a trainable detector's misses are caught by a deterministic fail-closed check).
+**FACT.** ACP's foundational axiom is that the control plane is **deterministic and non-compensatory** — "no probabilistic scoring where a deterministic decision exists" (`Project_documentation/control_plane/acp/ACP_ARCHITECTURE.md` A2). ActionGate is stdlib-only, "no AI" (`gate.py` header). Context Minimization's *safety property* is deterministic (a trainable detector's misses are caught by a deterministic fail-closed check).
 
 **FACT.** The Agentic Framework's authorization decisions are **confidence-threshold and risk-score based** — exactly the "scalar allow score" ACP forbids. `mcp_gateway` computes `effective_confidence = gate + jepa_adj − raw_entropy_penalty − cg_entropy_penalty` and compares to thresholds (`mcp_gateway.py:1356–1362`). `governance_service` returns ALLOW/DENY/DEFER from aggregated soft signals.
 

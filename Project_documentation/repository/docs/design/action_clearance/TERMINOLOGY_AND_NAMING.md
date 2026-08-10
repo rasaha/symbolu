@@ -58,7 +58,7 @@ The new capability must **not** alias, re-export, or claim object identity with
 - no `import ... as` alias binding either name to the other,
 - no `sys.modules` identity preservation between them,
 - no shared class objects,
-- the robotics `acp/ACP_V1_FREEZE.md` digest and the `acp_k8s_integrated` pin are untouched.
+- the robotics `Project_documentation/control_plane/acp/ACP_V1_FREEZE.md` digest and the `acp_k8s_integrated` pin are untouched.
 
 Robotics keeps "Autonomous Control Plane" and its existing compatibility surface; Action Clearance is a
 sibling capability, related only as an *engineering-pattern reference* (see

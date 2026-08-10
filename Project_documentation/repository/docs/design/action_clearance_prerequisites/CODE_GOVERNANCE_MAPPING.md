@@ -2,7 +2,7 @@
 
 **Status:** PROPOSED · `action_clearance.prerequisites.v0.1`. Maps the four closed prerequisites onto the
 first Code Governance profile (`github_exact_merge`,
-`docs/design/action_clearance/GITHUB_MERGE_PROFILE.md`), for **direct** and **squash** merge only.
+`Project_documentation/repository/docs/design/action_clearance/GITHUB_MERGE_PROFILE.md`), for **direct** and **squash** merge only.
 Rebase and merge queue stay out of the first enforcement profile (they are deferred / Phase I in the
 merged design).
 

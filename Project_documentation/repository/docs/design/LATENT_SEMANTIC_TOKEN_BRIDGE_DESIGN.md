@@ -1128,12 +1128,12 @@ The risk is that this complexity is premature — that a simpler system (like Co
 | `scripts/causal_subspace/train_bridge.py` | Bridge training + 8 sanity tests |
 | `scripts/causal_subspace/run_phase2.py` | Real-data validation pipeline |
 | `symbolu/resonance/varna_bridge.py` | Phoneme → ontology mapping |
-| `docs/design/HYBRID_PHASE_JEPA_DESIGN.md` | Master architecture spec (Phase-JEPA) |
-| `docs/design/KOSHA_GYROSCOPE_DESIGN.md` | Kosha homeostatic regulation |
-| `docs/design/CHITTA_VRITTI_EVOLUTION_v2.7_to_v2.8.md` | Vritti integration spec |
-| `docs/architecture/PHONEME_TRANSFORMER_HYBRID_ARCHITECTURE.md` | Phoneme CSR system |
-| `scripts/causal_subspace/DESIGN_ontology_alignment.md` | Ontology discovery protocol |
-| `scripts/causal_subspace/DESIGN_jepa_observatory_integration.md` | JEPA-Observatory integration |
+| `Project_documentation/repository/docs/design/HYBRID_PHASE_JEPA_DESIGN.md` | Master architecture spec (Phase-JEPA) |
+| `Project_documentation/repository/docs/design/KOSHA_GYROSCOPE_DESIGN.md` | Kosha homeostatic regulation |
+| `Project_documentation/repository/docs/design/CHITTA_VRITTI_EVOLUTION_v2.7_to_v2.8.md` | Vritti integration spec |
+| `Project_documentation/repository/docs/architecture/PHONEME_TRANSFORMER_HYBRID_ARCHITECTURE.md` | Phoneme CSR system |
+| `Project_documentation/repository/scripts/causal_subspace/DESIGN_ontology_alignment.md` | Ontology discovery protocol |
+| `Project_documentation/repository/scripts/causal_subspace/DESIGN_jepa_observatory_integration.md` | JEPA-Observatory integration |
 
 ## Appendix B: External Research References
 
@@ -3136,7 +3136,7 @@ Per-token logit temperature control with:
 
 **Relation to proposal**: The ConfidenceScaler is a learned module operating on the emission path only. It's trained, while the proposed governor is deterministic. However, the Vritti risk gating pattern (P(Viparyaya) + P(Nidra) -> increase uncertainty) demonstrates the same auxiliary-signal -> control-knob pattern the proposal formalizes.
 
-#### E.2.4 Kosha Gyroscope — `docs/design/KOSHA_GYROSCOPE_DESIGN.md` / `symbolu/losses/kosha_gyroscope.py`
+#### E.2.4 Kosha Gyroscope — `Project_documentation/repository/docs/design/KOSHA_GYROSCOPE_DESIGN.md` / `symbolu/losses/kosha_gyroscope.py`
 
 Homeostatic self-regulation that:
 - Enforces balance across 5 Kosha dimensions via R-T Quadrant Geometry

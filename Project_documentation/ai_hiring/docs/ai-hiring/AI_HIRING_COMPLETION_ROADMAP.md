@@ -3,7 +3,7 @@
 Bounded roadmap to complete AI Hiring as a consuming application of the frozen
 Platform v1.0. **Not executed in this phase.** The roadmap must not reopen the
 platform architecture unless a real hiring workflow exposes a reproducible defect
-(filed per `docs/platform-v1/MIGRATION_POLICY.md`).
+(filed per `Project_documentation/repository/docs/platform-v1/MIGRATION_POLICY.md`).
 
 ## 1. Capability gap analysis
 

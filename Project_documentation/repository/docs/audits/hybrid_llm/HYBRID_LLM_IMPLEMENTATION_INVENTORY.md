@@ -29,7 +29,7 @@ The label is overloaded. These must **not** be merged into one product identity:
 | H-misc | RAG / renderer plumbing | `symbolu/mechanical/renderer/varna_hybrid_renderer.py`, `.../pipeline/rag_hybrid_integration.py` | DOCUMENTATION/PLUMBING |
 
 The repo's own terminology audit already draws this boundary:
-`docs/audits/model_selection/HYBRID_LLM_AND_CONTROL_PLANE_BOUNDARY.md` fixes **"Hybrid LLM = capability
+`Project_documentation/repository/docs/audits/model_selection/HYBRID_LLM_AND_CONTROL_PLANE_BOUNDARY.md` fixes **"Hybrid LLM = capability
 #9 (local/frontier handover)"**, distinct from **"Model Selection = capability #8 (policy-bounded
 provider selection)."** Similarly, **"Phase"** the attention mechanism is distinct from the hundreds of
 project-"Phase 2/3/47" governance references (`test_phase47_*`, `AGENT_RUNTIME_PHASE3_*`,

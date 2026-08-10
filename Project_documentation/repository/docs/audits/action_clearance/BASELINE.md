@@ -61,7 +61,7 @@ the audit, since this phase changes no code.
 
 ## 5. ACP freeze digest — verified byte-accurate against live code
 
-The ACP V1 local freeze (`acp/ACP_V1_FREEZE.md`) asserts per-module `SHA-256[:16]` digests. Recomputed
+The ACP V1 local freeze (`Project_documentation/control_plane/acp/ACP_V1_FREEZE.md`) asserts per-module `SHA-256[:16]` digests. Recomputed
 directly from the live modules in `symbolu_robotics/autonomous_control_plane/`, **all 13 match**:
 
 ```
@@ -75,7 +75,7 @@ __init__.py          56938a4a4de42611
 ```
 
 Combined digest of the 10 reusable-core modules: `8f8660e293308cf94c983a26a2ae69c9` (per
-`acp/ACP_V1_FREEZE.md:34`). The freeze is real and current; see `FREEZE_IMPLICATIONS.md`.
+`Project_documentation/control_plane/acp/ACP_V1_FREEZE.md:34`). The freeze is real and current; see `FREEZE_IMPLICATIONS.md`.
 
 ## 6. Conclusion
 

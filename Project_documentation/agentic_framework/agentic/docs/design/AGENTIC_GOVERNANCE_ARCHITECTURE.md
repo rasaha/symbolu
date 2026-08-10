@@ -13,7 +13,7 @@
 >
 > For the detailed sovereign integration architecture (S1–S4 phases, bridge
 > pipeline, activation patch, live-vs-conditional analysis), see
-> [`agentic/AGENTIC_ARCHITECTURE.md`](../../agentic/AGENTIC_ARCHITECTURE.md).
+> [`Project_documentation/agentic_framework/agentic/AGENTIC_ARCHITECTURE.md`](../../agentic/AGENTIC_ARCHITECTURE.md).
 
 ---
 
@@ -172,7 +172,7 @@ The governance system is organized into eight built layers:
   │           sovereign_diagnostics.py, sovereign_guna_anomaly.py    │
   │           sovereign_bhava_priors.py                               │
   │                                                                  │
-  │  See: agentic/AGENTIC_ARCHITECTURE.md for full S1–S4 details    │
+  │  See: Project_documentation/agentic_framework/agentic/AGENTIC_ARCHITECTURE.md for full S1–S4 details    │
   └──────────────────────────┬──────────────────────────────────────┘
                              │
                              ▼
@@ -575,7 +575,7 @@ agentic/
 > **Updated 2026-04-04:** Safety integration track S0–S5 has been completed.
 > This section reflects the current activation status of each safety layer.
 > For the authoritative safety architecture description, see
-> [`agentic/AGENTIC_ARCHITECTURE.md`](../../agentic/AGENTIC_ARCHITECTURE.md).
+> [`Project_documentation/agentic_framework/agentic/AGENTIC_ARCHITECTURE.md`](../../agentic/AGENTIC_ARCHITECTURE.md).
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -1067,7 +1067,7 @@ The residual determines the `GovernanceRegime`:
 
 JEPA in this governance layer is **not** a temporal trajectory predictor in the
 sense of Meta's JEPA (Joint Embedding Predictive Architecture). The Hybrid
-Phase-JEPA training architecture (see `docs/design/HYBRID_PHASE_JEPA_DESIGN.md`)
+Phase-JEPA training architecture (see `Project_documentation/repository/docs/design/HYBRID_PHASE_JEPA_DESIGN.md`)
 does implement latent-space prediction for the model training pathway. The
 governance layer borrows the name to describe its composite signal integration,
 not to claim trajectory forecasting capability.
@@ -1424,7 +1424,7 @@ were added in Phases 0-4.
                            → counterfactual bridge (replay/simulation-only)
 
   Aggregate penalty cap: min(0.20, sum_of_all_adapter_penalties)
-  See: agentic/AGENTIC_ARCHITECTURE.md for full details
+  See: Project_documentation/agentic_framework/agentic/AGENTIC_ARCHITECTURE.md for full details
 
   Mode gating:
     FULL / SAFE      → reconciliation + bridge + diagnostics
@@ -1591,7 +1591,7 @@ inference runtime (32D) and enables multi-source signal reconciliation.
 > signal reconciliation, diagnostic hooks, mode gating). For the deeper
 > signal-to-governance integration covering both the sovereign track
 > (S1–S4 + activation patch) and the core pipeline track (C1–C4 + closure
-> patch), see [`agentic/AGENTIC_ARCHITECTURE.md`](../../agentic/AGENTIC_ARCHITECTURE.md).
+> patch), see [`Project_documentation/agentic_framework/agentic/AGENTIC_ARCHITECTURE.md`](../../agentic/AGENTIC_ARCHITECTURE.md).
 
 ### Sovereign → Inference Bridge
 
@@ -1764,7 +1764,7 @@ not bugs.
     When absent, all S3/S4 resolvers return safe neutral defaults (zero
     penalty, no escalation, None audit fields). S1/S2 signals (vritti,
     entropy, health, insight) are always active regardless of metadata.
-    See `agentic/AGENTIC_ARCHITECTURE.md` for the full sovereign integration
+    See `Project_documentation/agentic_framework/agentic/AGENTIC_ARCHITECTURE.md` for the full sovereign integration
     architecture.
 
 14. **Sovereign-derived penalties have an aggregate cap (Activation Patch).**

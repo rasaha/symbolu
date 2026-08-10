@@ -186,7 +186,7 @@ Replace dense FFN with Mixture of Experts for **~2x compute savings** while main
 ### Implementation Location
 
 - **Module**: `symbolu/moe_ffn.py`
-- **Design Doc**: `docs/architecture/MOE_QUAD_PROPOSAL_DESIGN.md`
+- **Design Doc**: `Project_documentation/repository/docs/architecture/MOE_QUAD_PROPOSAL_DESIGN.md`
 - **CLI**: `--test-moe-ffn`, `--moe-num-experts`, `--moe-top-k`
 
 ### Integration with Phase-Quad
@@ -264,7 +264,7 @@ Phase-Quad Block:
 ### Implementation Location
 
 - **Module**: `symbolu/hp_quad.py`
-- **Design Doc**: `docs/architecture/HIERARCHICAL_PHASE_QUAD_DESIGN.md`
+- **Design Doc**: `Project_documentation/repository/docs/architecture/HIERARCHICAL_PHASE_QUAD_DESIGN.md`
 - **CLI**: `--test-hp-quad`, `--hp-num-levels`, `--hp-boundary-ablation`
 
 ---
@@ -344,7 +344,7 @@ Phase-Quad Block:
 
 ### Implementation Location
 
-- **Design Doc**: `docs/architecture/REFLECTIVE_PHASE_QUAD_DESIGN.md`
+- **Design Doc**: `Project_documentation/repository/docs/architecture/REFLECTIVE_PHASE_QUAD_DESIGN.md`
 - **Module**: Integrated into `symbolu/rlm_phase_quad.py`
 
 ---
@@ -431,7 +431,7 @@ Combine **Recursive Language Models** (unlimited context) with **Phase-Quad** (e
 ### Implementation Location
 
 - **Module**: `symbolu/rlm_phase_quad.py`
-- **Design Doc**: `docs/architecture/RLM_PHASE_QUAD_INTEGRATION_DESIGN.md`
+- **Design Doc**: `Project_documentation/repository/docs/architecture/RLM_PHASE_QUAD_INTEGRATION_DESIGN.md`
 - **CLI**: `--test-rlm-phase-quad`, `--rlm-pq-max-context`, `--rlm-pq-scalability-test`
 
 ---
@@ -539,7 +539,7 @@ Combine **Recursive Language Models** (unlimited context) with **Phase-Quad** (e
 
 ### Implementation Location
 
-- **Design Doc**: `docs/architecture/SOVEREIGN_REASONING_KERNEL_DESIGN.md`
+- **Design Doc**: `Project_documentation/repository/docs/architecture/SOVEREIGN_REASONING_KERNEL_DESIGN.md`
 - **Integration**: Layer hooks in `train_hard_probes.py`
 
 ---

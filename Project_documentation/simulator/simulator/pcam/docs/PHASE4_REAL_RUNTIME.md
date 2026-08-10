@@ -15,7 +15,7 @@
 | `benchmarks/pcam_vllm_demo.py` (upgraded) | Adds a real `--real-vllm` path that calls the bridge, replays the derived trace through `KVCachePolicy`, and reports shadow-mode results. | Synthetic walkthrough: yes. `--real-vllm`: **fails clean** with install hint. |
 | `benchmarks/pcam_trace_extract.py` | HuggingFace-based real attention-trace extractor using `AutoModelForCausalLM(output_attentions=True)`. | Pure-Python helpers: yes. Full model run: **fails clean** (torch + transformers absent). |
 | `benchmarks/pcam_compare_baselines.py` (upgraded) | Adds `InRepoBaselineAdapter` + `--include-inrepo-baselines` flag. Wires `SinkLRU`, `H2O`, `IndustryStyle` from `simulator/pcam/baselines/` through the Phase 1 trace path. | **Yes.** Fully live and verified. |
-| `benchmarks/PCAM_PHASE4_REPORT.md` | Acquisition-facing static report summarizing every measurement Phase 4 could produce. | N/A (read-only artifact). |
+| `Project_documentation/repository/benchmarks/PCAM_PHASE4_REPORT.md` | Acquisition-facing static report summarizing every measurement Phase 4 could produce. | N/A (read-only artifact). |
 | `simulator/pcam/tests/test_phase4_realtime.py` | 22 focused tests covering the new surfaces, with mock attention tensors for the HF extractor helpers. | **Yes.** 22/22 green. |
 
 ## Three honesty tiers

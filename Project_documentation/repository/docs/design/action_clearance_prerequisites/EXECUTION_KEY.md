@@ -15,7 +15,7 @@ execution_key = ( tenant_id,
 ```
 
 This is exactly the merged replay key
-(`docs/design/action_clearance/ONE_TIME_USE_AND_REPLAY.md`), promoted here to the canonical execution
+(`Project_documentation/repository/docs/design/action_clearance/ONE_TIME_USE_AND_REPLAY.md`), promoted here to the canonical execution
 reservation key. It **must be stable across retries** (an idempotent retry of the same authorized action
 produces the same key) and **unique across distinct authorized actions** (any change to tenant,
 authorization, action fingerprint, target, or operation yields a distinct key).

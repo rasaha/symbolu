@@ -89,7 +89,7 @@ Stated narrowly so a reviewer cannot mistake "landed" for "proven":
 1. **Performance overhead.** Active-mode `popleft_n` is O(num_free_blocks) per call because it walks the entire free list to let PCAM rank candidates. vLLM's default is O(n). The overhead is measured directly by `benchmarks/pcam_vllm_perf.py` and reported alongside the throughput delta; optimization is a follow-up workstream.
 2. **Attention data is block-id-only.** vLLM's v1 core `BlockPool` does not expose per-block attention mass — the attention tensors are consumed inside the paged-attention kernel. PCAM scoring in active mode uses only recency, frequency sketch, and position signals. For attention-rich scoring, the Phase 4 `benchmarks/pcam_trace_extract.py` HuggingFace hook path remains the authoritative source of trained-attention data.
 3. **Single synthetic sequence id.** Active mode operates at the physical-block level; blocks are admitted under a single synthetic `sequence_id=0`. Per-sequence phase (`PREFILL` / `DECODE`) is not tracked from the vLLM side. This is a known simplification; a more faithful multi-sequence integration would require deeper hooks into vLLM's `SequenceGroup` lifecycle.
-4. **Live execution pending.** The bridge is landed and unit-tested against a mock `FreeKVCacheBlockQueue` (23/23 tests). The perf harness is ready to run but has NOT been executed against a real vLLM + GPU in the sandbox where Phase 5 was authored. Same closure pattern as Phase 2.5 / Phase 4 — documented in `benchmarks/PHASE4_CLOSURE_RUN_LOG.md` (the Phase 5 runbook appends to the same file).
+4. **Live execution pending.** The bridge is landed and unit-tested against a mock `FreeKVCacheBlockQueue` (23/23 tests). The perf harness is ready to run but has NOT been executed against a real vLLM + GPU in the sandbox where Phase 5 was authored. Same closure pattern as Phase 2.5 / Phase 4 — documented in `Project_documentation/repository/benchmarks/PHASE4_CLOSURE_RUN_LOG.md` (the Phase 5 runbook appends to the same file).
 
 ## How to run the perf harness
 
@@ -130,7 +130,7 @@ Expected output structure: a `REAL SERVING METRICS` banner, a table with `policy
 
 ## What remains after Phase 5
 
-- **One live run of `pcam_vllm_perf.py --policy both` on a GPU machine.** Same closure pattern as Phase 2.5 / Phase 4. Documented in `benchmarks/PHASE4_CLOSURE_RUN_LOG.md` (Phase 5 closure commands will be appended alongside the existing runbook).
-- **Real throughput / latency numbers for the acquisition report.** Once the live run happens, numbers get appended to `benchmarks/PCAM_PHASE5_REPORT.md` in the "What has actually been measured" section.
+- **One live run of `pcam_vllm_perf.py --policy both` on a GPU machine.** Same closure pattern as Phase 2.5 / Phase 4. Documented in `Project_documentation/repository/benchmarks/PHASE4_CLOSURE_RUN_LOG.md` (Phase 5 closure commands will be appended alongside the existing runbook).
+- **Real throughput / latency numbers for the acquisition report.** Once the live run happens, numbers get appended to `Project_documentation/repository/benchmarks/PCAM_PHASE5_REPORT.md` in the "What has actually been measured" section.
 - **Phase 6 — parameter tuning and multi-sequence integration.** After Phase 5 produces baseline active-mode numbers, the natural next phase is (a) auto-tuning `PCAMConfig` based on observed workload and (b) plumbing per-sequence phase information from vLLM's `SequenceGroup` lifecycle into PCAM so scoring can differentiate prefill-heavy vs decode-heavy workloads at runtime.
 - **Phase 2.5 RTL closure** remains independent. One live cocotb run on any machine with `pip install cocotb && apt install verilator`.

@@ -123,4 +123,4 @@ synthetic suite because they are properties of the controller, not the cluster.
   outside a simulator. Reproducible.
 - **Does not prove:** independent value. These are **our** faults on **our**
   cluster (`live-shadow-self-run`). Independent third-party telemetry is the next
-  rung and is still pending — see `docs/cloud_scaling_real_validation/STATUS.md`.
+  rung and is still pending — see `Project_documentation/governance/docs/cloud_scaling_real_validation/STATUS.md`.

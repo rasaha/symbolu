@@ -12,7 +12,7 @@ the strategy docs and the shipped tooling; it does not restate them:
 - ingestion tooling: `cloud_controller/replay/adapters/partner_prometheus.py`,
   `cloud_controller/replay/tier_a.py`, `scripts/run_tier_a_replay.py`
 - Track-A runbook + this host's egress blocker:
-  `deploy/local-shadow/RUNBOOK.md`, `artifacts/cloud_controller_real_validation/track_a_egress_probe.md`
+  `Project_documentation/repository/deploy/local-shadow/RUNBOOK.md`, `Project_documentation/repository/artifacts/cloud_controller_real_validation/track_a_egress_probe.md`
 
 **Product framing (unchanged):** Autoscaling Safety Interlock — **read-only first**. Core
 primitive: a causal verdict for every scale-out — **HELPING / NEUTRAL / NOT_HELPING /

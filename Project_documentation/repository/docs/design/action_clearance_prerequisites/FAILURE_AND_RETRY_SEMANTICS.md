@@ -2,7 +2,7 @@
 
 **Status:** PROPOSED · `action_clearance.prerequisites.v0.1`. Classifies every failure mode across the
 four prerequisites. Extends the merged failure classification
-(`docs/design/action_clearance/STATUS_AND_REASON_SEMANTICS.md`).
+(`Project_documentation/repository/docs/design/action_clearance/STATUS_AND_REASON_SEMANTICS.md`).
 
 ## Classification legend
 

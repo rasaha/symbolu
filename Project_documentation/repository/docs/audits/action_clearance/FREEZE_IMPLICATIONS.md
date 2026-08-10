@@ -13,7 +13,7 @@
   **blocking** `platform_freeze.verify` step. This audit's docs will trigger that workflow, but the verifier
   still PASSES (ACP isn't frozen), so there is no platform-freeze impact.
 
-### 2. ACP V1 local freeze (`acp/ACP_V1_FREEZE.md`) — WOULD be affected by a source move
+### 2. ACP V1 local freeze (`Project_documentation/control_plane/acp/ACP_V1_FREEZE.md`) — WOULD be affected by a source move
 
 - The ACP core carries its **own** doc-asserted digest contract: per-module `SHA-256[:16]` for 13 modules
   and a combined digest **`8f8660e293308cf94c983a26a2ae69c9`** over the 10 reusable-core modules.
@@ -34,13 +34,13 @@
 
 **Conclusion:** a byte-identical migration is **not** feasible (see `DETERMINISM_AND_EQUIVALENCE.md`); any
 real migration changes the ACP core content and therefore **requires a freeze amendment / replay
-re-baseline** of `acp/ACP_V1_FREEZE.md` and the `acp_k8s_integrated` pin. That amendment is **out of scope
+re-baseline** of `Project_documentation/control_plane/acp/ACP_V1_FREEZE.md` and the `acp_k8s_integrated` pin. That amendment is **out of scope
 for this audit** and must not be performed here.
 
 ## What this audit does NOT do
 
 - Does not re-baseline or modify `platform/PLATFORM_FREEZE_V1.json` or any `platform/api-snapshots/*`.
-- Does not modify `acp/ACP_V1_FREEZE.md` or recompute/replace its digests.
+- Does not modify `Project_documentation/control_plane/acp/ACP_V1_FREEZE.md` or recompute/replace its digests.
 - Does not move any source, so no freeze evidence changes. `git status` confirms only
   `docs/audits/action_clearance/**` changes.
 

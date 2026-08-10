@@ -6,7 +6,7 @@ recommended enhancements for a new customer-facing product that governs software
 changes. **Documentation only** — no code, package, API, schema, or frozen artifact
 is changed by this document.
 **Canonical vocabulary:** this document follows
-[`docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](../../repository/docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md)
+[`Project_documentation/repository/docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](../../repository/docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md)
 and the
 [`UGENCE_TERMINOLOGY_PRODUCT_CAPABILITY_BOUNDARY_AUDIT.md`](../../repository/architecture/UGENCE_TERMINOLOGY_PRODUCT_CAPABILITY_BOUNDARY_AUDIT.md).
 **Competitive landscape & market positioning** (how Ugence differs from CodeRabbit,
@@ -1007,7 +1007,7 @@ and the adjudicator can prefer the more deterministic candidate.
 Approvers need one place to see: the candidate diff(s), the side-by-side
 `requirement_comparison`, admitted vs. contradicted claims, residual risks, and the
 exact artifact they are authorizing. Integrate with the planned unified console
-([`ACP/UGENCE_UNIFIED_CONSOLE_PLAN.md`](../../control_plane/ACP/UGENCE_UNIFIED_CONSOLE_PLAN.md)); render
+([`Project_documentation/control_plane/ACP/UGENCE_UNIFIED_CONSOLE_PLAN.md`](../../control_plane/ACP/UGENCE_UNIFIED_CONSOLE_PLAN.md)); render
 the decision inline on the GitHub PR (check-run + summary) so reviewers stay in their
 workflow. Segregation-of-duties (author ≠ final approver) is enforced in the UI, not
 just the record.
@@ -1090,7 +1090,7 @@ from satisfying `required_roles`.
 | Code Governance Workflow Service | **new product component** (no authority) |
 | Competitive adjudication | `packages/capabilities/competitive-adjudication/` (**new, optional**) |
 | Policy pack compilation | [`POLICY_PACK_GOVERNED_WORKFLOW_COMPILER_SPEC.md`](../policy_pack/POLICY_PACK_GOVERNED_WORKFLOW_COMPILER_SPEC.md) |
-| Console / review UX | [`ACP/UGENCE_UNIFIED_CONSOLE_PLAN.md`](../../control_plane/ACP/UGENCE_UNIFIED_CONSOLE_PLAN.md) |
+| Console / review UX | [`Project_documentation/control_plane/ACP/UGENCE_UNIFIED_CONSOLE_PLAN.md`](../../control_plane/ACP/UGENCE_UNIFIED_CONSOLE_PLAN.md) |
 
 ---
 

@@ -32,7 +32,7 @@ authorization (ActionGovernanceResult, ActionGate)
 | reconciliation → observation | `observation_ref`, `reconciliation_ref` |
 
 Reconstruction is a **walk of content-addressed references**, not a shared mutable store
-(`docs/design/action_clearance/PERSISTENCE_BOUNDARY.md`). Each hop is verified: the referenced
+(`Project_documentation/repository/docs/design/action_clearance/PERSISTENCE_BOUNDARY.md`). Each hop is verified: the referenced
 fingerprint/hash must match the value recorded downstream.
 
 ## Failure semantics

@@ -11,7 +11,7 @@ divergence) proposed as a security application of the autonomy BCVF.
 
 The reformulation cites two prior-work claims. Both are accurate against the repository:
 
-- **Second-order invariance.** `symbolu_robotics/bcvf_autonomous/DESIGN.md` implements the
+- **Second-order invariance.** `Project_documentation/autonomous_robotics/symbolu_robotics/bcvf_autonomous/DESIGN.md` implements the
   operator `a_ij(k) = [e(k+1) − 2·e(k) + e(k−1)] / dt²` (Def 3) with a
   `test_linear_drift_zero_cost` unit test (§2.4.1). Constant and linear-drift disagreement
   produce zero cost; only acceleration produces a positive signal ("Lemma 1 invariance").

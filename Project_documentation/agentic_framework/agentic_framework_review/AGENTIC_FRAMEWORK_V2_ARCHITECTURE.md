@@ -60,7 +60,7 @@ For each mature-control-plane capability: **Already exists / Partially exists / 
 
 ## Part 7 — The strict ACP ↔ Agentic Framework boundary
 
-**FACT (from ACP's own boundary docs).** ACP already draws hard internal boundaries: Context Minimization ⟂ ActionGate ⟂ ACP, "duplicated-logic 0, ownership violations 0" (`acp/RESPONSIBILITY_MATRIX.md`). The Agentic Framework must slot into this *without adding a fifth overlapping owner*.
+**FACT (from ACP's own boundary docs).** ACP already draws hard internal boundaries: Context Minimization ⟂ ActionGate ⟂ ACP, "duplicated-logic 0, ownership violations 0" (`Project_documentation/control_plane/acp/RESPONSIBILITY_MATRIX.md`). The Agentic Framework must slot into this *without adding a fifth overlapping owner*.
 
 ### The boundary
 
@@ -151,7 +151,7 @@ Agentic Framework V2
 ### Control-plane integration seams (new in V2)
 - **ContextMinimizationClient** — optional pre-read compression before the LLM reads.
 - **ActionGateClient** — submit proposed action + evidence; receive the 6-outcome verdict + token; the framework executes *only* with a minted token.
-- **ACP is reached through ActionGate composition** (the framework does not call ACP directly; ACP evaluates the same identity-bound action downstream, per `acp/ACP_ACTIONGATE_BOUNDARY.md`).
+- **ACP is reached through ActionGate composition** (the framework does not call ACP directly; ACP evaluates the same identity-bound action downstream, per `Project_documentation/control_plane/acp/ACP_ACTIONGATE_BOUNDARY.md`).
 
 ### What can be reused unchanged (FACT-grounded)
 - **Entire reasoning tier** — goal decomposition, reflective loop, reasoning workflows, adaptive prompts, local critics: unchanged. This is the differentiated value and touches no control-plane concern.

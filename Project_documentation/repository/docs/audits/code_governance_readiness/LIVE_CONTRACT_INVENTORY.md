@@ -5,7 +5,7 @@
 > the cited `path:line`. No contract, schema, provider, API snapshot, or frozen artifact is
 > changed by this document. Authoritative technical source: `UGENCE_CODE_GOVERNANCE_DESIGN_SPEC.md`
 > (v0.2). Terminology follows
-> `docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`.
+> `Project_documentation/repository/docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`.
 
 Audited commit: `3ec11e4ecbc209eabc69d3c0d8a75ecaa10f6def` (default branch tip).
 

@@ -278,7 +278,7 @@ New `deploy/local-shadow/`:
   replace the bare "19 scenarios" claim with the explicit **maturity ladder**,
   every number labeled `simulated / real-trace-replay / live-shadow-self-run /
   third-party`.
-- `docs/cloud_scaling_real_validation/STATUS.md`: what is now real, what is still
+- `Project_documentation/governance/docs/cloud_scaling_real_validation/STATUS.md`: what is now real, what is still
   synthetic, and the exact remaining step (a free third-party design partner).
 
 ### Labeling discipline (non-negotiable)

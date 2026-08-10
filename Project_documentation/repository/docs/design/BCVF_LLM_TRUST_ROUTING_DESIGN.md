@@ -1415,7 +1415,7 @@ float64 arrays of shape (M, T, L, V) where:
     L = forward-lookahead horizon (V1: L = 5, see §2.3.4)
     V = vocabulary size (shared across sources for V1, see §2.7.5)
 
-Design anchor: ``docs/design/BCVF_LLM_TRUST_ROUTING_DESIGN.md``
+Design anchor: ``Project_documentation/repository/docs/design/BCVF_LLM_TRUST_ROUTING_DESIGN.md``
 §2.4-§2.7. Mathematical specification: V3.1 Lemma 1 (autonomy)
 restated in §2.6 with the vector-path proof in §2.6.4.
 
@@ -4120,7 +4120,7 @@ Pre-committed command sequence for executing §6 on a GPU-equipped RunPod pod (o
 3. `pip install torch transformers datasets accelerate` on the pod.
 4. `huggingface-cli login` with a token that has accepted the Llama 3.1 license at <https://huggingface.co/meta-llama/Meta-Llama-3.1-8B-Instruct>.
 
-Full operational runbook lives at `scripts/BCVF_LLM_RUNPOD.md`; this addendum records only the three-command sequence so the design doc carries the canonical invocation.
+Full operational runbook lives at `Project_documentation/repository/scripts/BCVF_LLM_RUNPOD.md`; this addendum records only the three-command sequence so the design doc carries the canonical invocation.
 
 **Step 1 — Plumbing smoke** (< 30 s, any small HF model):
 
@@ -4304,7 +4304,7 @@ V2 proceeds under §0.8 discipline: one bounded experiment at a time, each with 
 - `symbolu_bcvf_llm/benchmark/` — harness is benchmark-agnostic; reusable.
 - `symbolu_bcvf_llm/analysis/` — diagnostic tool works on any future §6 run.
 - `scripts/verify_hf_source.py`, `scripts/analyze_seed_results.py` — reusable.
-- `scripts/BCVF_LLM_RUNPOD.md` — runbook; needs update for V2A cross-model setup.
+- `Project_documentation/repository/scripts/BCVF_LLM_RUNPOD.md` — runbook; needs update for V2A cross-model setup.
 
 #### 10.V1.5 Decision (final — confirmed by §10.V1.8 Experiment Zero)
 
@@ -5854,7 +5854,7 @@ This null **does not** reject:
 - **The BCVF autonomy runtime.** The autonomy-domain
   validation (§6.1 N=21 sign-test p=0.0072 on
   `S3_map_error_accel`, N=19 p=0.0192 on `S3_map_error`,
-  `symbolu_robotics/bcvf_autonomous/DESIGN.md` §6.11) is
+  `Project_documentation/autonomous_robotics/symbolu_robotics/bcvf_autonomous/DESIGN.md` §6.11) is
   independent of this LLM-domain test and stands.
 
 This narrower framing replaces the earlier blanket "§0
@@ -7245,7 +7245,7 @@ its outcome is independent of theirs.
 
 **Background — and why this probe is structurally different from
 §13.10–§13.13.** The BCVF framework's autonomy-domain validation
-(`symbolu_robotics/bcvf_autonomous/DESIGN.md` §6.1, §6.7) cleared
+(`Project_documentation/autonomous_robotics/symbolu_robotics/bcvf_autonomous/DESIGN.md` §6.1, §6.7) cleared
 its pre-committed gates on `S3_map_error_accel` — *the second
 derivative of the divergence between the robot's internal map and
 ground truth, evaluated as the robot moves through its

@@ -1,6 +1,6 @@
 # CTM+ (Coherence-Tier Memory Plus) — Explainer
 
-**Source:** `simulator/ctm_plus/`, `CTM_plus/`, `docs/design/CTM_PLUS_VALIDATION_RESULTS.md`
+**Source:** `simulator/ctm_plus/`, `CTM_plus/`, `Project_documentation/repository/docs/design/CTM_PLUS_VALIDATION_RESULTS.md`
 **Purpose:** Explains CTM+ to someone who knows systems/ML but hasn't
 seen the codebase.
 

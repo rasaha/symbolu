@@ -78,7 +78,7 @@ Legend: **AR**=Agent Runtime · **CM**=Context Minimization · **AG**=ActionGate
 | Reason about the maintenance task | **AR** | Runtime plans the sequence |
 | Propose a physical actuation | **AR → AG → ACP** | Proposal enters the Control Plane |
 | Authorization | **AG** | Who/what may command the robot (identity, RBAC) |
-| **Operational safety — the core** | **ACP** | This is ACP's *native* domain: "deterministic decision-and-authorization runtime between a robot's perception/prediction stack and its actuators" (FACT: `acp/ACP_ARCHITECTURE.md`); non-compensatory hard constraints, `NO_SAFE_ACTION` fallback |
+| **Operational safety — the core** | **ACP** | This is ACP's *native* domain: "deterministic decision-and-authorization runtime between a robot's perception/prediction stack and its actuators" (FACT: `Project_documentation/control_plane/acp/ACP_ARCHITECTURE.md`); non-compensatory hard constraints, `NO_SAFE_ACTION` fallback |
 | Execute / abstain | **AR / ACP** | ACP may return `NO_SAFE_ACTION`; runtime must accept and re-plan |
 | Recover on fault | **ACP** | Deterministic failure-state machine (FACT) |
 

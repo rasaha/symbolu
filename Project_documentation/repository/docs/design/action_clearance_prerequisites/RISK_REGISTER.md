@@ -2,7 +2,7 @@
 
 **Status:** PROPOSED · `action_clearance.prerequisites.v0.1`. Risks introduced or clarified by closing the
 four prerequisites, ranked, each with owner, blocking stage, and mitigation. Complements the merged
-`docs/design/action_clearance/RISK_REGISTER.md` (not duplicated).
+`Project_documentation/repository/docs/design/action_clearance/RISK_REGISTER.md` (not duplicated).
 
 | ID | Risk | Sev | Class | Owner | Blocking stage | Mitigation |
 |---|---|---|---|---|---|---|

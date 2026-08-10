@@ -17,7 +17,7 @@ appear in any implementation file outside this tree.
 
 No. Two other trees contain a `route(...)` function, but each is a **distinct research algorithm**
 with different I/O and semantics, self-declared as separate (per
-`docs/migrations/model_selection/RESEARCH_SEPARATION.md`), and **none carries the canonical
+`Project_documentation/repository/docs/migrations/model_selection/RESEARCH_SEPARATION.md`), and **none carries the canonical
 controller's typed contracts or class symbols**:
 
 | Tree | Engine | Why it is not a duplicate of the canonical controller |

@@ -33,6 +33,6 @@ utilization collapsing while replicas climb past M=20) overlapping the committed
 incident window — exercising every classification branch. They are **not** real
 partner data and produce **no market number**: any Tier-A count or APCY computed on
 them is a *tooling self-test*, and the pre-registered coverage trip-wire
-(`docs/cloud_scaling_real_validation/TIER_A_DETECTOR_SPEC.md` §5c) deliberately refuses
+(`Project_documentation/governance/docs/cloud_scaling_real_validation/TIER_A_DETECTOR_SPEC.md` §5c) deliberately refuses
 to report it as evidence. Real partner runs are labelled `real-trace-replay (estimate
 pending live adjudication)` and gated on SRE adjudication.

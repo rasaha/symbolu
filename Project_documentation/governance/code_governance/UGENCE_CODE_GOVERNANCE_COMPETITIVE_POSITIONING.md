@@ -6,7 +6,7 @@
 (how the product works). This document explains **what category it belongs to, how
 it differs, and how to sell it.**
 **Canonical vocabulary:** per
-[`docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](../../repository/docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md).
+[`Project_documentation/repository/docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](../../repository/docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md).
 
 > **Central message.** *Code-review tools identify problems. Ugence determines
 > whether an exact software change is sufficiently evidenced, properly approved,

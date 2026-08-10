@@ -1,6 +1,6 @@
 # Tier-A replay — TOOLING SELF-TEST (synthetic fixture)
 
-> **Label: `real-trace-replay (estimate pending live adjudication)`.** Detector + cost model are frozen in `docs/cloud_scaling_real_validation/TIER_A_DETECTOR_SPEC.md`. The replay surfaces Tier-A **candidates**; an SRE confirms true/false + cost before anything counts. **Tier-B is never market evidence.**
+> **Label: `real-trace-replay (estimate pending live adjudication)`.** Detector + cost model are frozen in `Project_documentation/governance/docs/cloud_scaling_real_validation/TIER_A_DETECTOR_SPEC.md`. The replay surfaces Tier-A **candidates**; an SRE confirms true/false + cost before anything counts. **Tier-B is never market evidence.**
 
 > ⚠️ **This is a synthetic schema fixture — a tooling self-test, NOT a market number.** The coverage trip-wire below refuses it as evidence by design. Real numbers require real partner data + SRE adjudication.
 
@@ -20,7 +20,7 @@
 
 ## SRE-adjudication worksheets
 
-_One per Tier-A candidate. Full template: `docs/cloud_scaling_real_validation/track_c_design_partner/04_SRE_ADJUDICATION_WORKSHEET.md`._
+_One per Tier-A candidate. Full template: `Project_documentation/governance/docs/cloud_scaling_real_validation/track_c_design_partner/04_SRE_ADJUDICATION_WORKSHEET.md`._
 
 ### SRE Adjudication — `fixture-cluster-ep1`
 *Source: replay (Track B) · label: `real-trace-replay (estimate pending live adjudication)`*

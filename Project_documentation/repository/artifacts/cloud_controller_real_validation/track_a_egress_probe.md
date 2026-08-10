@@ -8,7 +8,7 @@ applies to it. Rung 3 (`live-shadow-self-run`) **remains NOT done** — see §6.
 - **Branch:** `claude/eloquent-thompson-wjybsd`
 - **Host:** managed remote execution container (Claude Code on the web), `linux/amd64`.
 - **Egress note:** this host is **not** the "GitHub-only, all-registries-403" sandbox
-  described in `docs/cloud_scaling_real_validation/STATUS.md`. Egress here is
+  described in `Project_documentation/governance/docs/cloud_scaling_real_validation/STATUS.md`. Egress here is
   **selective** (PyPI installs work; `gcr.io` pulls work; other registries vary), so
   the result was probed directly rather than assumed. This artifact refines — and does
   not edit — the STATUS.md environment note.
@@ -116,6 +116,6 @@ A host that can complete Track A needs all of:
 - Machine size per `RUNBOOK.md` §1: **8 vCPU / 16 GB RAM / 40 GB disk** (4 vCPU / 8 GB
   with the lighter app subset in §2.6).
 
-With those, follow `deploy/local-shadow/RUNBOOK.md` from §2.1, run the §2.8 pre-flight,
+With those, follow `Project_documentation/repository/deploy/local-shadow/RUNBOOK.md` from §2.1, run the §2.8 pre-flight,
 then the capacity-bound / external-bottleneck / noisy scenarios, and capture
 `artifacts/cloud_controller_real_validation/track_a_live_shadow.{md,json}`.

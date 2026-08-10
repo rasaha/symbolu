@@ -29,7 +29,7 @@ pattern used by the prior migrations:
 
 1. Revert the consumer-migration commits so `cer_v0_*` import the legacy `.cloud.*` paths again.
 2. Remove the `packages/capabilities/action-clearance/` package and its legacy shim.
-3. Restore `acp/ACP_V1_FREEZE.md` and the `acp_k8s_integrated` frozen-core pin to their pre-migration digests
+3. Restore `Project_documentation/control_plane/acp/ACP_V1_FREEZE.md` and the `acp_k8s_integrated` frozen-core pin to their pre-migration digests
    (the freeze was verified byte-accurate in this audit, so the pre-migration digests are known:
    combined `8f8660e293308cf94c983a26a2ae69c9`).
 4. Re-run the baseline in `BASELINE.md` and confirm the same PASS results and the same three pre-existing

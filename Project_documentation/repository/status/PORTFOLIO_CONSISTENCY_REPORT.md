@@ -68,19 +68,19 @@ as the canonical portfolio architecture.
 
 | Document | What was corrected |
 |---|---|
-| `agent_runtime_migration/README.md` | Canonical taxonomy pointer added (already labeled a Specialized AI System). |
+| `Project_documentation/agentic_framework/agent_runtime_migration/README.md` | Canonical taxonomy pointer added (already labeled a Specialized AI System). |
 
 ### Internal positioning / review docs (6)
 
 | Document | What was corrected |
 |---|---|
-| `agent_runtime_v2/07_PRODUCT_POSITIONING.md` | Taxonomy table: "CG LLM" → "LLM Steering Controller" + Autonomous Runtime added; removed "Hybrid LLM's substrate" from the AI-Infrastructure characterization; CG LLM → LLM Steering Controller in prose, sub-stack, and the ASCII box; canonical pointer. |
-| `agent_runtime_v2/08_ENTERPRISE_USE_CASES.md` | Legend + all use-case rows: "CG LLM" → "LLM Steering Controller" (abbreviation "CG" retained); canonical pointer in legend. |
-| `agent_runtime_v2/10_FUTURE_ROADMAP.md` | Roadmap timeline: split the "Infra" track so **HybridLLM + LLM Steering Controller** sit in a Specialized ("Spec'd") row, leaving **KVPro + CSC** in Infra; "CG LLM" → "LLM Steering Controller" in the milestone table; canonical family note added. |
-| `agentic_framework_review/EXECUTIVE_SUMMARY.md` | Portfolio diagram: removed Hybrid LLM from AI Infrastructure, reordered to canonical layer order, Specialized AI Systems = canonical four; "(that is KV Pro / Hybrid LLM / Cloud Controller)" → "(KV Pro / Cloud Scaling Controller)". |
-| `agentic_framework_review/PRODUCT_POSITIONING.md` | Same portfolio-diagram correction; "AI Infrastructure = (KV Pro, Hybrid LLM, Cloud Scaling Controller)" → "(KV Pro, Cloud Scaling Controller)". |
-| `ai_control_plane_v3/04_OWNERSHIP_BOUNDARY.md` | Ownership row: "Infrastructure/Specialized (Hybrid LLM, CG LLM)" → "Specialized (Hybrid LLM, LLM Steering Controller)"; canonical pointer. |
-| `execution_proposal_engine/EXECUTION_PROPOSAL_ENGINE.md` | Specialized AI Systems diagram: "CG LLM" → "LLM Steering Controller" + Autonomous Runtime added; canonical pointer. |
+| `Project_documentation/agentic_framework/agent_runtime_v2/07_PRODUCT_POSITIONING.md` | Taxonomy table: "CG LLM" → "LLM Steering Controller" + Autonomous Runtime added; removed "Hybrid LLM's substrate" from the AI-Infrastructure characterization; CG LLM → LLM Steering Controller in prose, sub-stack, and the ASCII box; canonical pointer. |
+| `Project_documentation/agentic_framework/agent_runtime_v2/08_ENTERPRISE_USE_CASES.md` | Legend + all use-case rows: "CG LLM" → "LLM Steering Controller" (abbreviation "CG" retained); canonical pointer in legend. |
+| `Project_documentation/agentic_framework/agent_runtime_v2/10_FUTURE_ROADMAP.md` | Roadmap timeline: split the "Infra" track so **HybridLLM + LLM Steering Controller** sit in a Specialized ("Spec'd") row, leaving **KVPro + CSC** in Infra; "CG LLM" → "LLM Steering Controller" in the milestone table; canonical family note added. |
+| `Project_documentation/agentic_framework/agentic_framework_review/EXECUTIVE_SUMMARY.md` | Portfolio diagram: removed Hybrid LLM from AI Infrastructure, reordered to canonical layer order, Specialized AI Systems = canonical four; "(that is KV Pro / Hybrid LLM / Cloud Controller)" → "(KV Pro / Cloud Scaling Controller)". |
+| `Project_documentation/agentic_framework/agentic_framework_review/PRODUCT_POSITIONING.md` | Same portfolio-diagram correction; "AI Infrastructure = (KV Pro, Hybrid LLM, Cloud Scaling Controller)" → "(KV Pro, Cloud Scaling Controller)". |
+| `Project_documentation/control_plane/ai_control_plane_v3/04_OWNERSHIP_BOUNDARY.md` | Ownership row: "Infrastructure/Specialized (Hybrid LLM, CG LLM)" → "Specialized (Hybrid LLM, LLM Steering Controller)"; canonical pointer. |
+| `Project_documentation/governance/execution_proposal_engine/EXECUTION_PROPOSAL_ENGINE.md` | Specialized AI Systems diagram: "CG LLM" → "LLM Steering Controller" + Autonomous Runtime added; canonical pointer. |
 
 *(Count of 19 files; the review-doc table lists 7 rows because two `agentic_framework_review`
 documents plus five others were touched — 6 distinct internal docs are enumerated above; the 19th file

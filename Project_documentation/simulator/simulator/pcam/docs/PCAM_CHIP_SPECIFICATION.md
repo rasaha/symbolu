@@ -870,7 +870,7 @@ A: PARTIALLY.
 **Scoring model — source of truth (ADR-0001).**
 
 PCAM's importance scoring, sink pinning, entity bonus, and frequency
-tracking are governed by ADR-0001 (`docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md`).
+tracking are governed by ADR-0001 (`Project_documentation/repository/docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md`).
 The canonical behavioral reference is `CTM_plus/KVPolicy/kv_policy/attention_evictor.py`,
 and the Python port that PCAM's simulator and RTL must match bit-for-bit
 on a fixed RNG seed is `simulator/pcam/kv_policy.py`. The scoring model

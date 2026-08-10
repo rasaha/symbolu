@@ -4659,7 +4659,7 @@ without touching the kernel.
 extraction. At least one non-MPPI adapter (MPC is the natural first
 target) is shipped with its own integration tests. The API contract
 for the adapter is documented in
-`symbolu_robotics/bcvf_autonomous/integrations/README.md`.
+`Project_documentation/autonomous_robotics/symbolu_robotics/bcvf_autonomous/integrations/README.md`.
 
 **Effort.** ~3 weeks of focused refactoring + testing. Prerequisite
 for §6.4 / §6.5 / §6.6 / §6.7.

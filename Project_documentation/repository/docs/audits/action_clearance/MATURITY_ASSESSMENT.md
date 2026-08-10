@@ -24,12 +24,12 @@ production readiness.
 
 ## Explicit maturity ceilings in the docs
 
-- `acp/ACP_EXECUTIVE_SUMMARY.md:3-4` — "Design-first; documentation only; no production code modified."
-- `acp/ACP_PHASE1_RESULTS.md:7` — "Shadow-only. Production BCVF remained authoritative. Zero production
+- `Project_documentation/control_plane/acp/ACP_EXECUTIVE_SUMMARY.md:3-4` — "Design-first; documentation only; no production code modified."
+- `Project_documentation/control_plane/acp/ACP_PHASE1_RESULTS.md:7` — "Shadow-only. Production BCVF remained authoritative. Zero production
   edits." (later phases walked the gated-canary aspiration back to `SHADOW_CONTINUE`.)
-- `acp/ACP_LIVE_PATH_AUDIT.md:41-44` — the single live robotics path runs on a **stub** planner emitting a
+- `Project_documentation/control_plane/acp/ACP_LIVE_PATH_AUDIT.md:41-44` — the single live robotics path runs on a **stub** planner emitting a
   fixed velocity; verdict `LIVE_TRAJECTORY_INTEGRATION_LIMITED`.
-- `acp/ACP_V2_1_RESULTS.md:117-118` — "PLATFORM_CLAIM_PREMATURE remains the honest ceiling… no production
+- `Project_documentation/control_plane/acp/ACP_V2_1_RESULTS.md:117-118` — "PLATFORM_CLAIM_PREMATURE remains the honest ceiling… no production
   enforcement is recommended."
 - Console: `capabilities/registry.py:65` labels the Clear stage "Implemented (shadow-mode) · Internally
   Validated"; the governed loop defaults to `DeploymentMode.SHADOW`.

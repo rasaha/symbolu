@@ -1,14 +1,14 @@
 # Prerequisite A — Trusted-Signal Provenance & Integrity
 
 **Status:** PROPOSED · `action_clearance.prerequisites.v0.1`. Closes design open question **Q3**
-(`docs/design/action_clearance/OPEN_QUESTIONS.md`). This document defines *how Action Clearance decides
+(`Project_documentation/repository/docs/design/action_clearance/OPEN_QUESTIONS.md`). This document defines *how Action Clearance decides
 that a current-state signal is trustworthy enough to evaluate*. It changes no runtime code and adds no
 field to the merged `TrustedSignal` neutral core — it **extends** that model with an integrity/provenance
 projection consumed by the evaluator's fail-closed rules.
 
 ## A.1 The question this answers
 
-The merged `TrustedSignal` model (`docs/design/action_clearance/TRUSTED_SIGNAL_MODEL.md`) is
+The merged `TrustedSignal` model (`Project_documentation/repository/docs/design/action_clearance/TRUSTED_SIGNAL_MODEL.md`) is
 tenant-bound, subject-bound, time-bound, source-identified, integrity-verifiable, freshness-evaluable,
 and immutable. It does **not** yet say *how* `integrity_digest` and `provenance_ref` are produced and
 verified per `source_kind`. That is the gap this document closes. The evaluator itself performs **no**

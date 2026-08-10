@@ -26,7 +26,7 @@ Labels: `FACT` (repo evidence) · `INTERPRETATION` · `EXTERNAL KNOWLEDGE` (comp
 
 **The engineering gap (FACT).** Authorization answers "may this be done?" It does **not** answer "is it safe against the live system *right now*?" ACP owns exactly that second key:
 
-- A scale-out that is fully authorized can still be unsafe because a prior scaling happened 30s ago (< the 120s cooldown) — "ActionGate has no concept of live readiness; **only ACP catches this**" (FACT: `acp/ACP_ACTIONGATE_BOUNDARY.md`, the `ag_allows_acp_holds` case).
+- A scale-out that is fully authorized can still be unsafe because a prior scaling happened 30s ago (< the 120s cooldown) — "ActionGate has no concept of live readiness; **only ACP catches this**" (FACT: `Project_documentation/control_plane/acp/ACP_ACTIONGATE_BOUNDARY.md`, the `ag_allows_acp_holds` case).
 - ACP derives operational blast radius from **live** cluster state, not from a fact the caller supplied (FACT: same doc, "same word, two different computations at two different layers").
 - ACP provides a `NO_SAFE_ACTION` / `HOLD` outcome and a deterministic failure-state machine (FACT: `interfaces.py`, robotics ACP).
 

@@ -116,7 +116,7 @@ The strongest form of this section is the case **against** building AWC, answere
   concepts AWC needs largely already exist.**
 - **F2 — It duplicates Model Selection.** Both are constraint-first selectors over a frozen registry snapshot.
 - **F3 — It becomes a covert orchestrator.** The ADR record (`ADR_MODEL_SELECTION_POLICY_PLACEMENT.md` §Options,
-  `model_selection_experiment/ARCHITECTURE_NOTE.md` Q3) `[EXISTING]` explicitly rejected framing Model Selection as
+  `Project_documentation/model_selection/model_selection_experiment/ARCHITECTURE_NOTE.md` Q3) `[EXISTING]` explicitly rejected framing Model Selection as
   an "AI Orchestrator." A "workforce composer" invites the same taxonomy-inflating, authority-accreting failure the
   repo has repeatedly guarded against.
 - **F4 — No validated customer demand.** `[UNVALIDATED]` There is no repository evidence of a customer asking for

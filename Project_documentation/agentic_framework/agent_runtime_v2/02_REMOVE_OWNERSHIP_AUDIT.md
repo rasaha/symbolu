@@ -5,7 +5,7 @@ Every Agentic Framework subsystem classified for Agent Runtime V2:
 
 "MOVE TO X" means *the responsibility belongs to X; the runtime stops owning it and instead consumes X.* Because the milestone forbids duplicating anything ActionGate/ACP/Context-Min already provide, "MOVE" usually means **delete the framework's copy and call the Control Plane** — not port code into it.
 
-Labels: `FACT` (module behavior verified in the prior review's source reads) / `RECOMMENDATION` / `INTERPRETATION`. Line references are from the source reads in `agentic_framework_review/AGENTIC_FRAMEWORK_ARCHITECTURE_AUDIT.md`.
+Labels: `FACT` (module behavior verified in the prior review's source reads) / `RECOMMENDATION` / `INTERPRETATION`. Line references are from the source reads in `Project_documentation/agentic_framework/agentic_framework_review/AGENTIC_FRAMEWORK_ARCHITECTURE_AUDIT.md`.
 
 ---
 

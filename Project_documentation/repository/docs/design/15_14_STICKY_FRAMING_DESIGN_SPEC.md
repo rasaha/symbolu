@@ -229,7 +229,7 @@ No other source changes. The existing fallback wiring in
 
 **Provenance after a Llama-fallback run.**
 
-The implementation §0.X authorization (`docs/design/15_14_IMPLEMENTATION_AUTHORIZATION.md`)
+The implementation §0.X authorization (`Project_documentation/repository/docs/design/15_14_IMPLEMENTATION_AUTHORIZATION.md`)
 already records `final_stimulus_sha` and `calibration_labels_sha`.
 A successful Llama-fallback cascade verdict will produce a JSON
 output with:

@@ -7,7 +7,7 @@ add an eleventh canonical platform module. Every factual claim is traceable to a
 cited inline.*
 
 > **Terminology reconciliation (2026-08-01).** Per
-> [`docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](../../repository/docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md),
+> [`Project_documentation/repository/docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](../../repository/docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md),
 > "AI Control Plane" now denotes **only** the optional, bypassable administration & coordination
 > component. Where this ADR says Model Selection is "provisionally owned by the AI Control Plane,"
 > read that as the **Governance Services Layer** (the governance neighborhood that governs the AI
@@ -61,7 +61,7 @@ layer owns it.
   logically *upstream* of the existing control-plane components.
 - **Evidence and maturity status.** The capability is synthetic-evaluated and shadow-blocked (see
   *Maturity*), which itself argues against promoting it to a first-class product module today.
-- **The repository's own product-framing verdict.** `model_selection_experiment/ARCHITECTURE_NOTE.md`
+- **The repository's own product-framing verdict.** `Project_documentation/model_selection/model_selection_experiment/ARCHITECTURE_NOTE.md`
   (Q3) concludes: **not a standalone AI Orchestrator**; primary framing is a **governance capability
   — "the pre-reasoning analogue of ActionGate — with model-selection optimization layered on top."**
   This is direct repository evidence for a *governance* (control-plane-affiliated), not
@@ -296,10 +296,10 @@ Assigned strictly from repository evidence; no maturity is invented.
 
 | Stage | Present? | Evidence |
 |---|---|---|
-| Architectural specification | ✅ | `docs/execution_eligibility/EXECUTION_ELIGIBILITY_SPEC.md`, `EXECUTIONGATE_MODELPOLICY_CONTRACT.md`, `ARCHITECTURE_NOTE.md` |
+| Architectural specification | ✅ | `Project_documentation/governance/docs/execution_eligibility/EXECUTION_ELIGIBILITY_SPEC.md`, `EXECUTIONGATE_MODELPOLICY_CONTRACT.md`, `ARCHITECTURE_NOTE.md` |
 | Prototype selector (runnable code) | ✅ | `execution_gate/`, `model_selection_experiment/policy.py` (deterministic, tested) |
 | Synthetic evaluation | ✅ | 37-task deterministic experiment: mean regret **0.016** vs 0.055 best simple baseline, **0% constraint violations**, 100% complete decision records — *conditional on synthetic assumptions* (`ARCHITECTURE_NOTE.md`, `FALSIFICATION_ASSESSMENT.md`) |
-| Real-provider integration | ❌ **blocked** | real-model shadow pilot "fully built and one command from running" but **BLOCKED on credentials** (all provider keys empty; Vertex token invalid) — `model_selection_pilot/PILOT_STATUS.md`; live-shadow verdict **LIMITED GO** contingent on retention + access-control decisions — `docs/execution_eligibility/LIVE_SHADOW_GO_NO_GO.md` |
+| Real-provider integration | ❌ **blocked** | real-model shadow pilot "fully built and one command from running" but **BLOCKED on credentials** (all provider keys empty; Vertex token invalid) — `Project_documentation/model_selection/model_selection_pilot/PILOT_STATUS.md`; live-shadow verdict **LIMITED GO** contingent on retention + access-control decisions — `Project_documentation/governance/docs/execution_eligibility/LIVE_SHADOW_GO_NO_GO.md` |
 | Calibrated production routing | ❌ | no non-synthetic calibration exists |
 | Post-response feedback learning (closed loop) | ⚠️ partial | a **bounded advisory/telemetry prior** exists and helps at cold start (decaying to ~0 as telemetry matures); this is **not** a trained closed-loop routing policy |
 
@@ -362,7 +362,7 @@ code, evidence, maturity, or benchmark claim is modified.
 
 *Sources: `UGENCE_PLATFORM_OVERVIEW.md`, `UGENCE_PLATFORM_VALUE_PROPOSITIONS.md`,
 `UGENCE_PLATFORM_COST_SAVINGS.md`, `WHY_ENTERPRISE_AI_NEEDS_A_RUNTIME_PLATFORM.md`,
-`model_selection_experiment/ARCHITECTURE_NOTE.md`, `model_selection_experiment/FALSIFICATION_ASSESSMENT.md`,
-`model_selection_pilot/PILOT_STATUS.md`, `docs/execution_eligibility/EXECUTIONGATE_MODELPOLICY_CONTRACT.md`,
-`docs/execution_eligibility/LIVE_SHADOW_GO_NO_GO.md`, `execution_gate/policy.py`, `model_selection_experiment/policy.py`.
+`Project_documentation/model_selection/model_selection_experiment/ARCHITECTURE_NOTE.md`, `Project_documentation/model_selection/model_selection_experiment/FALSIFICATION_ASSESSMENT.md`,
+`Project_documentation/model_selection/model_selection_pilot/PILOT_STATUS.md`, `Project_documentation/governance/docs/execution_eligibility/EXECUTIONGATE_MODELPOLICY_CONTRACT.md`,
+`Project_documentation/governance/docs/execution_eligibility/LIVE_SHADOW_GO_NO_GO.md`, `execution_gate/policy.py`, `model_selection_experiment/policy.py`.
 No production code, benchmark result, or evidence/maturity claim was modified in producing this ADR.*

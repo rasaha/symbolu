@@ -26,7 +26,7 @@ layers built on top of it.
   `ai_hiring.__version__`.
 - CLI: `python -m ai_hiring.product` (`version` / `demo` / `report` / `verify`).
 - Product version source of truth: `ai_hiring/product/version.py` (`PRODUCT_VERSION="0.6.0"`).
-- Release-manifest source of truth: `docs/ai-hiring/release/RELEASE_MANIFEST.md`.
+- Release-manifest source of truth: `Project_documentation/ai_hiring/docs/ai-hiring/release/RELEASE_MANIFEST.md`.
 
 ## Downstream consumers of `import ai_hiring` (outside `ai_hiring/`)
 6 files, all monorepo composition/domain layers, **classified

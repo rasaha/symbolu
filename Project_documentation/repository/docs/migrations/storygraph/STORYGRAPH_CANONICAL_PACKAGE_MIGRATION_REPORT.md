@@ -43,7 +43,7 @@ All moves are git-tracked **renames** (history preserved).
 - `cyber_security/composite_threat_detector/composite_threat_detector/__init__.py`
   — logic-free redirect shim (meta-path finder + public re-export).
 - `cyber_security/composite_threat_detector/conftest.py` — legacy path bootstrap.
-- `cyber_security/composite_threat_detector/README.md` — "moved" pointer.
+- `Project_documentation/action_gate_cyber/cyber_security/composite_threat_detector/README.md` — "moved" pointer.
 
 ## Files classified as non-StoryGraph
 

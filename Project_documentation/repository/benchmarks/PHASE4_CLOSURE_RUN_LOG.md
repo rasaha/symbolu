@@ -2,7 +2,7 @@
 
 **Status:** Partial live closure achieved. Extractor path verified live; vLLM path remains hard-blocked by this environment's sandbox (no CUDA, HF Hub proxy-blocked, vllm wheel version conflicts).
 
-This file is the operational run log for Phase 4 closure attempts, following the same pattern as `simulator/pcam/rtl/tests/FIRST_LIVE_RUN.md`. Future closure attempts should append to the "Run log" section at the bottom.
+This file is the operational run log for Phase 4 closure attempts, following the same pattern as `Project_documentation/simulator/simulator/pcam/rtl/tests/FIRST_LIVE_RUN.md`. Future closure attempts should append to the "Run log" section at the bottom.
 
 ---
 
@@ -157,7 +157,7 @@ A new positive test `test_ensure_transformers_available_succeeds_when_installed`
 |---|---|
 | `benchmarks/pcam_trace_extract.py` | Added `attn_implementation="eager"` to the `AutoModelForCausalLM.from_pretrained` call so `output_attentions=True` works on transformers ≥4.36. Inline comment explains the SDPA-vs-eager distinction. |
 | `simulator/pcam/tests/test_phase4_realtime.py` | Added a `_transformers_stack_installed()` helper and `@pytest.mark.skipif` decorators on the two extractor fail-clean tests so they skip cleanly when the stack is installed. Added a new `test_ensure_transformers_available_succeeds_when_installed` covering the complementary positive case. |
-| `simulator/pcam/rtl/tests/FIRST_LIVE_RUN.md` pattern | This file (new) — Phase 4 closure runbook. |
+| `Project_documentation/simulator/simulator/pcam/rtl/tests/FIRST_LIVE_RUN.md` pattern | This file (new) — Phase 4 closure runbook. |
 
 ## Can Phase 4 be considered fully closed?
 
@@ -576,7 +576,7 @@ Append an entry to the Run log below following the template:
 - **Phase 5 closure state:** CLOSED (first live active-mode run completed)
 ```
 
-Also update `benchmarks/PCAM_PHASE5_REPORT.md`:
+Also update `Project_documentation/repository/benchmarks/PCAM_PHASE5_REPORT.md`:
 
 1. Flip the header status line from "pending one live run" to "CLOSED on YYYY-MM-DD".
 2. Add a "Live active-mode serving results" section under "What has actually been measured" with the real throughput table, the delta percentage, and the bridge stats.

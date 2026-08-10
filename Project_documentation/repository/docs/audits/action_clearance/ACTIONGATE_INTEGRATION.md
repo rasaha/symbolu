@@ -36,7 +36,7 @@ provider framework and Decision Authority**, not owned by ActionGate and not own
 
 ## Intended ACP↔ActionGate composition (from the specs, realized in the benches)
 
-Per `acp/ACP_ACTIONGATE_BOUNDARY.md` and `acp/ACTIONGATE_ACP_COMPOSITION_SPEC.md`, and realized in
+Per `Project_documentation/control_plane/acp/ACP_ACTIONGATE_BOUNDARY.md` and `Project_documentation/control_plane/acp/ACTIONGATE_ACP_COMPOSITION_SPEC.md`, and realized in
 `symbolu_robotics/.../cloud/composition.py` and `robotics_reliability_bench/acp_k8s_integrated/`:
 
 | Question | Point of integration |

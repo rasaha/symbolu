@@ -13,7 +13,7 @@ This document is grounded in the prior review (`agentic_framework_review/`) and 
 
 **RECOMMENDATION.** *The Agent Runtime decides **what to attempt, how to reason about it, and how confident it is** — and executes only what the AI Control Plane authorizes. It never mints authority, never judges operational safety, never enforces deterministic policy, and never governs context relevance.*
 
-This mirrors the ACP pipeline's own ownership split — "relevance ⟂ proposal ⟂ authorization ⟂ operational safety" (`FACT`, `acp/RESPONSIBILITY_MATRIX.md`) — and makes the runtime the explicit, sole owner of **proposal** (the "LLM reader → Proposed Action" box in `acp/AI_CONTROL_PLANE_ARCHITECTURE.md`).
+This mirrors the ACP pipeline's own ownership split — "relevance ⟂ proposal ⟂ authorization ⟂ operational safety" (`FACT`, `Project_documentation/control_plane/acp/RESPONSIBILITY_MATRIX.md`) — and makes the runtime the explicit, sole owner of **proposal** (the "LLM reader → Proposed Action" box in `Project_documentation/control_plane/acp/AI_CONTROL_PLANE_ARCHITECTURE.md`).
 
 ---
 
@@ -65,8 +65,8 @@ Each row names the sole owner in the AI Control Plane, with the evidence that th
 | **Credential brokering** | **ActionGate** | single-use scoped credential the agent never holds (`broker.py`, real ServiceAccount/TokenRequest in K8s) |
 | **Approver quorum / four-eyes authority** | **ActionGate** | `ESCALATE_TO_HUMAN` + approvals bound to action_hash + policy_hash (`gate.py`) |
 | **Deterministic hard-policy enforcement** | **ActionGate** | signed policy bundle of hard invariants (REQUIRE/FORBID/MAX_SCOPE/MAX_BLAST_RADIUS…) (`gate.py`) |
-| **Operational safety** — "is it safe against live state now?" | **ACP** | readiness/cooldown/blast-radius/capacity/freeze/rollback (`acp/ACP_ACTIONGATE_BOUNDARY.md`, real `ReadinessChecker`/`SafetyBounds`) |
-| **Live-state action selection over admissible candidates** | **ACP** | `filter_admissible` + `LexicographicActionSelector`, non-compensatory (`acp/ACP_V1_FREEZE.md`) |
+| **Operational safety** — "is it safe against live state now?" | **ACP** | readiness/cooldown/blast-radius/capacity/freeze/rollback (`Project_documentation/control_plane/acp/ACP_ACTIONGATE_BOUNDARY.md`, real `ReadinessChecker`/`SafetyBounds`) |
+| **Live-state action selection over admissible candidates** | **ACP** | `filter_admissible` + `LexicographicActionSelector`, non-compensatory (`Project_documentation/control_plane/acp/ACP_V1_FREEZE.md`) |
 | **Infrastructure rollback** | **ACP** | rollback-availability gating + `cloud_controller` rollback watch |
 | **Context governance** — "what may the model read?" | **Context Minimization** | authorization-preserving deterministic compression, fail-closed span preservation (`CONTEXT_MINIMIZATION_VC_BRIEF.md`) |
 | **Tamper-evident authorization audit** | **ActionGate** | hash-chained audit record (`audit.py`) |
@@ -95,7 +95,7 @@ ExecutionProposal {
 }
 ```
 
-The Control Plane returns a verdict + (on ALLOW) a single-use token; the runtime executes **only** with that token. `FACT`: this matches ActionGate's `submit_action → evaluate_action → execute_action` shape (`action_gateway/README.md`) and ACP's identity-bound composition (`acp/ACP_V2_2_PREREGISTRATION.md` §4).
+The Control Plane returns a verdict + (on ALLOW) a single-use token; the runtime executes **only** with that token. `FACT`: this matches ActionGate's `submit_action → evaluate_action → execute_action` shape (`action_gateway/README.md`) and ACP's identity-bound composition (`Project_documentation/control_plane/acp/ACP_V2_2_PREREGISTRATION.md` §4).
 
 ---
 

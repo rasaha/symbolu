@@ -79,7 +79,7 @@ Full detail for every section below lives in the companion set under
 
 Both prerequisites are satisfied: PR #1275 (ACP product-core audit) is integrated, and the Code
 Governance readiness audit (PR #1274) is integrated. The design proceeds. Baseline reproduction and
-freeze verification are in §36 and [`docs/design/action_clearance/EXECUTIVE_SUMMARY.md`](../../repository/docs/design/action_clearance/EXECUTIVE_SUMMARY.md).
+freeze verification are in §36 and [`Project_documentation/repository/docs/design/action_clearance/EXECUTIVE_SUMMARY.md`](../../repository/docs/design/action_clearance/EXECUTIVE_SUMMARY.md).
 
 ---
 

@@ -1090,7 +1090,7 @@ FINAL STATE:
 | **SRK** | `symbolu/sovereign/reasoning_kernel.py` | `symbolu/phase_transformer.py` |
 | **Phase-JEPA** | `symbolu/jepa/predictor.py` | `symbolu/jepa/losses.py`, `symbolu/jepa/curriculum.py` |
 | **Kosha Gyroscope** | `symbolu/losses/kosha_gyroscope.py` | - |
-| **HP-Quad** | `symbolu/phase_transformer.py` | `docs/architecture/HIERARCHICAL_PHASE_QUAD_DESIGN.md` |
+| **HP-Quad** | `symbolu/phase_transformer.py` | `Project_documentation/repository/docs/architecture/HIERARCHICAL_PHASE_QUAD_DESIGN.md` |
 | **OPB** | `symbolu/sovereign/reasoning_kernel.py` (OPBDimensionLock) | - |
 | **Vritti Gate** | `symbolu/sovereign/reasoning_kernel.py` (VrittiGate) | `symbolu/jepa/predictor.py` (VrittiValidatedPredictor) |
 

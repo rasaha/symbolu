@@ -1,7 +1,7 @@
 # Prerequisite C — Receipt Lifecycle Ownership
 
 **Status:** PROPOSED · `action_clearance.prerequisites.v0.1`. Closes design open question **Q2**
-(lifecycle half) and completes `docs/design/action_clearance/STATE_MACHINE.md`. Separates the
+(lifecycle half) and completes `Project_documentation/repository/docs/design/action_clearance/STATE_MACHINE.md`. Separates the
 *evaluator status* (transient, in the pure core) from the *durable receipt lifecycle* (in the workflow
 layer), and forbids the evaluator from mutating stored receipts.
 

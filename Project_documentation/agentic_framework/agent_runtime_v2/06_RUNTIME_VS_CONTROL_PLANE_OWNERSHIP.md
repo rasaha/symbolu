@@ -51,7 +51,7 @@ These are the places the current framework *does* overlap the Control Plane. Eac
 ### 2.1 "Policy" (appears in both)
 - **Agent-behavior policy** (interaction mode, revision budget, response style, domain profile) → **Runtime** (`policy_bundle`, `domain_policy`).
 - **Action-authorization policy** (may this operation run, under what hard invariants) → **ActionGate** (signed policy bundle).
-- **FACT — same word, different objects:** the ACP corpus already flags this pattern ("Same word, two different computations at two different layers," `acp/ACP_ACTIONGATE_BOUNDARY.md`). RECOMMENDATION: namespace the runtime's policy as "behavior policy" to prevent drift.
+- **FACT — same word, different objects:** the ACP corpus already flags this pattern ("Same word, two different computations at two different layers," `Project_documentation/control_plane/acp/ACP_ACTIONGATE_BOUNDARY.md`). RECOMMENDATION: namespace the runtime's policy as "behavior policy" to prevent drift.
 
 ### 2.2 "Approval" (appears in both)
 - **Approval UX / routing / record** → **Runtime** (`approval`, `approval_workflow`).
@@ -67,7 +67,7 @@ These are the places the current framework *does* overlap the Control Plane. Eac
 
 ## 3. Overlap check — proof of no double ownership
 
-**RECOMMENDATION — the falsifiable test** (mirrors ACP's own "duplicated-logic count 0" method, FACT: `acp/RESPONSIBILITY_MATRIX.md`):
+**RECOMMENDATION — the falsifiable test** (mirrors ACP's own "duplicated-logic count 0" method, FACT: `Project_documentation/control_plane/acp/RESPONSIBILITY_MATRIX.md`):
 
 For every responsibility 1–31, exactly one system's code makes the decision. In V2 this is enforceable structurally:
 - The runtime imports an `ActionGateClient` / `ContextMinimizationClient` but **contains no authorization, credential, operational-safety, or compression logic of its own** (the "MOVE/DELETE" verdicts in Deliverable 2 remove the existing copies).

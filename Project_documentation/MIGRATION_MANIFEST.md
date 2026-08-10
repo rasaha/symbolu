@@ -5,6 +5,51 @@
 > this change are under `Project_documentation/`. This manifest is the
 > authoritative artifact to be **independently audited before any migration**.
 
+---
+
+## Phase 2 execution record (relocation performed)
+
+Stage 1 was approved and **Phase 2 relocation has now been executed** on branch
+`claude/symbolu-docs-migration-phase2` (base `2aea95f0`, the Stage-1 HEAD). The
+authoritative per-file outcome is [`manifests/PHASE2_LEDGER.md`](manifests/PHASE2_LEDGER.md).
+
+**Scope correction applied in Phase 2:** `apps/**` and `products/**` are ACTIVE
+implementation boundaries, not legacy. Stage-1 `MOVE` entries under `products/**`
+(118 files) were overridden to `ACTIVE_PRODUCT_KEEP`; `apps/**` docs remain
+colocated (`ACTIVE_APP_KEEP`). Neither tree was migrated.
+
+Outcome totals (all 3437 discovered Markdown files accounted for):
+
+```text
+MOVED ................. 1646     EXCLUDED_HYBRID ...... 982
+STUBBED_AND_MOVED ....   94      EXCLUDED_PACKAGE ..... 259
+JUSTIFIED_DEVIATION ..    5      ACTIVE_PRODUCT_KEEP .. 118
+DEFERRED_REVIEW ......  251      ACTIVE_APP_KEEP ......  72
+KEPT (infra/tooling) .   10
+------------------------------------------------------------
+Relocated (MOVED + STUBBED_AND_MOVED) = 1740
+Sum = 1646+94+5+251+10+982+259+118+72 = 3437
+```
+
+**Justified deviations** — kept at canonical path because a CI/operational
+consumer references them by exact path (moving would break enforcement):
+`ONTOLOGY_FREEZE_CONTRACT.md`, `docs/governance/PROTECTED_BRANCHES.md`,
+`docs/ontology/CHANGELOG.md`,
+`docs/architecture/ADR_AGENT_WORKFORCE_COMPOSER_H16_CANONICALIZATION.md`,
+`docs/audits/bindingslots_persistence_preregistration/ADAPTIVE_EXECUTION_AMENDMENT.md`.
+
+**Reference repair:** relative Markdown links in moved files (and links pointing
+to moved files) were recomputed, and exact repo-relative documentation paths in
+scripts/CI/config/code-comments were updated. Internal-link validation after
+migration found **0 regressions** (all remaining dangling links pre-existed the
+migration). Path-only edits inside `packages/**`/`products/**` were limited to
+doc-reference pointers in comments/docstrings/package docs; no source behavior
+changed.
+
+The Stage-1 plan and verification record below are retained unchanged for audit.
+
+---
+
 ## Provenance
 
 ```text

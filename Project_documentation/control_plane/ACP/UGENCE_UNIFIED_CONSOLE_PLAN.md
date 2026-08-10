@@ -8,7 +8,7 @@ Status of this document: **living plan.** Phase 0 and a Phase-1 vertical slice
 are **built and merged** on `claude/unified-web-interface-en7t8w`
 (`ugence_console_api/` + `apps/console/`). The remaining phases are specified but
 not yet built. The exact request/response contracts for the Phase-1 endpoints are
-in the companion spec `ACP/PHASE1_GOVERNED_LOOP_DTO_CONTRACT.md`.
+in the companion spec `Project_documentation/control_plane/ACP/PHASE1_GOVERNED_LOOP_DTO_CONTRACT.md`.
 
 ---
 

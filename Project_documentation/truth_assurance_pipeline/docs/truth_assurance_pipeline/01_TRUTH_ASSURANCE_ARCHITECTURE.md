@@ -140,7 +140,7 @@ has a self-contained prototype**, and it is on **synthetic** data:
 | Layer 1 Relationship Analysis | **proposed only** (no code) |
 | Layer 2 Governance Resolution | **proposed only** (no code) |
 | Layer 3 Evidence Assembly | **proposed only** (no code) |
-| Layer 4 Claim Validation | **synthetic prototype exists** → `relationship_claim_validation/` (v0.1), deterministic judges, self-authored synthetic corpus; construction-validated only. See its `docs/relationship_claim_validation/FINAL_VERDICT.md`. |
+| Layer 4 Claim Validation | **synthetic prototype exists** → `relationship_claim_validation/` (v0.1), deterministic judges, self-authored synthetic corpus; construction-validated only. See its `Project_documentation/governance/docs/relationship_claim_validation/FINAL_VERDICT.md`. |
 | Layer 5 Response Validation | **proposed only** (no code) |
 | Safety / Policy | **proposed only** here (a separate ActionGate/enforcement line exists elsewhere in the monorepo and is out of TAP scope) |
 

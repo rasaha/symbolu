@@ -4,7 +4,7 @@
 **Source read:** `ACTIONGATE_VC_BRIEF.md`, `cyber_security/action_gate_reference/`
 (the pure decision machine `action_gate_ref/`), the isolated broker
 (`action_gateway_isolated/`), and ActionGate's own generalization study
-`cyber_security/action_gate_reference/architecture_study/ACTIONGATE_DOMAIN_GENERALIZATION.md`.
+`Project_documentation/action_gate_cyber/cyber_security/action_gate_reference/architecture_study/ACTIONGATE_DOMAIN_GENERALIZATION.md`.
 **Rule honored:** do **not** port ActionGate's enterprise policies into robotics.
 
 ---

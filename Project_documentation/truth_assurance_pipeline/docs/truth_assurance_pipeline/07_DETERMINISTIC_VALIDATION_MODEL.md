@@ -50,7 +50,7 @@ The `relationship_claim_validation/` prototype runs deterministic pre-judge chec
 (legality, schema, duplicate, direction, document existence, citation validity)
 before any judge; in its measured run, **6 of 48** claims were resolved
 deterministically before adjudication. See its
-`docs/relationship_claim_validation/DETERMINISTIC_VALIDATION.md`. This validates the
+`Project_documentation/governance/docs/relationship_claim_validation/DETERMINISTIC_VALIDATION.md`. This validates the
 *ordering and authority* pattern on synthetic data only.
 
 ## 6. Boundary

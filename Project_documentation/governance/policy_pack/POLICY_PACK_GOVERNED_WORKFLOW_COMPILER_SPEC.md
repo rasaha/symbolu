@@ -5,7 +5,7 @@
 *Version 0.1 (design spec) — August 2026 — Status: DESIGN / pre-implementation*
 
 > **Terminology note — Ugence Decision Governance (2026-08-02).** Per
-> [`docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](../../repository/docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md):
+> [`Project_documentation/repository/docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](../../repository/docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md):
 > the canonical **umbrella** is **Ugence Decision Governance**. This spec composes existing
 > bounded capabilities — **TAP**, **Decision Authority** (`decision_governance` package, name
 > unchanged), **ActionGate**, **ACP**, **StoryGraph**, and **Model Selection** (a distinct

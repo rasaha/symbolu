@@ -13,4 +13,4 @@ The report is structured around 5 decision questions:
 
 After answering, choose one decision outcome (A/B/C/D) and one follow-up action.
 
-See `docs/runbooks/RUNBOOK_COMBINED_GATE_EVAL.md` for full instructions.
+See `Project_documentation/repository/docs/runbooks/RUNBOOK_COMBINED_GATE_EVAL.md` for full instructions.

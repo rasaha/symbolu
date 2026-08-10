@@ -58,33 +58,33 @@ the frozen architecture
 |---|---|
 | `FINAL_PROJECT_STATUS.md` | Canonical top-level status entry point for the track. |
 | `ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md` | The frozen architectural position (governs the freeze). |
-| `docs/enterprise_governance_archive/RESEARCH_TIMELINE.md` | Phase-by-phase record. |
-| `docs/enterprise_governance_archive/FINAL_CONCLUSIONS.md` | Validated / partially supported / rejected / unknown. |
-| `docs/enterprise_governance_archive/LESSONS_LEARNED.md` | Wrong assumptions, surprises, what mattered. |
-| `docs/enterprise_governance_archive/FUTURE_WORK.md` | Immediate / requires-real-enterprise / new. |
-| `docs/enterprise_governance_archive/ARCHITECTURE_FREEZE.md` | What is frozen and the change bar. |
-| `docs/enterprise_governance_archive/DECISION_LOG.md` | Major decisions with reason/evidence/status. |
-| `docs/enterprise_governance_archive/KNOWN_LIMITATIONS.md` | Every explicit limitation. |
-| `docs/enterprise_governance_archive/RESUME_GUIDE.md` | How to resume later. |
-| `docs/enterprise_governance_archive/REPOSITORY_INDEX.md` | This index. |
-| `docs/enterprise_pilot/ENTERPRISE_PILOT_ONBOARDING_GUIDE.md` | What a real pilot provides / how onboarding runs. |
-| `docs/enterprise_pilot/SOURCE_ADAPTER_SPECIFICATION.md` | Read-only adapter contract for real sources. |
-| `docs/enterprise_pilot/GROUND_TRUTH_PROTOCOL.md` | Enterprise-authored labels for judging findings. |
-| `docs/enterprise_pilot/BASELINE_COMPARISON_FRAMEWORK.md` | Net-new vs the enterprise's real controls. |
-| `docs/enterprise_pilot/ENTERPRISE_METRICS.md` | Metric definitions (values `TBD`). |
-| `docs/enterprise_pilot/SHADOW_MODE_OPERATION.md` | How the pilot is operated read-only. |
-| `docs/enterprise_pilot/REAL_ENTERPRISE_PILOT_CHECKLIST.md` | Phase A–I operational checklist. |
-| `docs/enterprise_pilot/RESEARCH_BOUNDARY.md` | The honesty contract (read first). |
-| `docs/enterprise_pilot/ENTERPRISE_READINESS_REPORT.md` | Readiness-to-begin self-assessment. |
+| `Project_documentation/governance/docs/enterprise_governance_archive/RESEARCH_TIMELINE.md` | Phase-by-phase record. |
+| `Project_documentation/governance/docs/enterprise_governance_archive/FINAL_CONCLUSIONS.md` | Validated / partially supported / rejected / unknown. |
+| `Project_documentation/governance/docs/enterprise_governance_archive/LESSONS_LEARNED.md` | Wrong assumptions, surprises, what mattered. |
+| `Project_documentation/governance/docs/enterprise_governance_archive/FUTURE_WORK.md` | Immediate / requires-real-enterprise / new. |
+| `Project_documentation/governance/docs/enterprise_governance_archive/ARCHITECTURE_FREEZE.md` | What is frozen and the change bar. |
+| `Project_documentation/governance/docs/enterprise_governance_archive/DECISION_LOG.md` | Major decisions with reason/evidence/status. |
+| `Project_documentation/governance/docs/enterprise_governance_archive/KNOWN_LIMITATIONS.md` | Every explicit limitation. |
+| `Project_documentation/governance/docs/enterprise_governance_archive/RESUME_GUIDE.md` | How to resume later. |
+| `Project_documentation/governance/docs/enterprise_governance_archive/REPOSITORY_INDEX.md` | This index. |
+| `Project_documentation/governance/docs/enterprise_pilot/ENTERPRISE_PILOT_ONBOARDING_GUIDE.md` | What a real pilot provides / how onboarding runs. |
+| `Project_documentation/governance/docs/enterprise_pilot/SOURCE_ADAPTER_SPECIFICATION.md` | Read-only adapter contract for real sources. |
+| `Project_documentation/governance/docs/enterprise_pilot/GROUND_TRUTH_PROTOCOL.md` | Enterprise-authored labels for judging findings. |
+| `Project_documentation/governance/docs/enterprise_pilot/BASELINE_COMPARISON_FRAMEWORK.md` | Net-new vs the enterprise's real controls. |
+| `Project_documentation/governance/docs/enterprise_pilot/ENTERPRISE_METRICS.md` | Metric definitions (values `TBD`). |
+| `Project_documentation/governance/docs/enterprise_pilot/SHADOW_MODE_OPERATION.md` | How the pilot is operated read-only. |
+| `Project_documentation/governance/docs/enterprise_pilot/REAL_ENTERPRISE_PILOT_CHECKLIST.md` | Phase A–I operational checklist. |
+| `Project_documentation/governance/docs/enterprise_pilot/RESEARCH_BOUNDARY.md` | The honesty contract (read first). |
+| `Project_documentation/governance/docs/enterprise_pilot/ENTERPRISE_READINESS_REPORT.md` | Readiness-to-begin self-assessment. |
 
 ## Templates (blank mapping templates)
 
 | File | Purpose |
 |---|---|
-| `docs/enterprise_pilot/templates/MAPPING_TEMPLATE_IAM.md` | Blank IAM role/access mapping. |
-| `docs/enterprise_pilot/templates/MAPPING_TEMPLATE_DISCOUNT_APPROVAL.md` | Blank discount-approval mapping (recommended first workflow). |
-| `docs/enterprise_pilot/templates/MAPPING_TEMPLATE_CONTRACT_LIFECYCLE.md` | Blank contract-lifecycle mapping. |
-| `docs/enterprise_pilot/templates/MAPPING_TEMPLATE_EMPLOYEE_ONBOARDING.md` | Blank employee-onboarding mapping. |
+| `Project_documentation/governance/docs/enterprise_pilot/templates/MAPPING_TEMPLATE_IAM.md` | Blank IAM role/access mapping. |
+| `Project_documentation/governance/docs/enterprise_pilot/templates/MAPPING_TEMPLATE_DISCOUNT_APPROVAL.md` | Blank discount-approval mapping (recommended first workflow). |
+| `Project_documentation/governance/docs/enterprise_pilot/templates/MAPPING_TEMPLATE_CONTRACT_LIFECYCLE.md` | Blank contract-lifecycle mapping. |
+| `Project_documentation/governance/docs/enterprise_pilot/templates/MAPPING_TEMPLATE_EMPLOYEE_ONBOARDING.md` | Blank employee-onboarding mapping. |
 
 ## Tests
 

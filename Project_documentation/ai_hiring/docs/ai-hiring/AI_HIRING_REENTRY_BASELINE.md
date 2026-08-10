@@ -77,7 +77,7 @@ Candidate-facing product surface: job requisition/definition contracts, candidat
 application entities, evidence-collection intake, assessment workspace + structured
 observations, AI recommendation *generation* (deliberately excluded to date),
 offer/rejection execution workflows, and audit reconstruction reporting. Classified
-in `docs/ai-hiring/AI_HIRING_COMPLETION_ROADMAP.md` and the gap table below is
+in `Project_documentation/ai_hiring/docs/ai-hiring/AI_HIRING_COMPLETION_ROADMAP.md` and the gap table below is
 summarised there.
 
 ## Test baseline

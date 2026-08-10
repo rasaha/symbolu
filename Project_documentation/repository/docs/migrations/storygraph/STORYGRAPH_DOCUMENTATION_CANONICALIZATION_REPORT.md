@@ -45,7 +45,7 @@ New docs added: `docs/README.md` (index), `docs/DOCUMENT_OWNERSHIP.md`,
 
 ## Documents intentionally retained elsewhere (not moved)
 
-- `cyber_security/composite_threat_detector/README.md` — legacy-compatibility pointer.
+- `Project_documentation/action_gate_cyber/cyber_security/composite_threat_detector/README.md` — legacy-compatibility pointer.
 - ActionGate docs at `cyber_security/` (`ACTION_GATE_SPECIFICATION.md`,
   `artifact_story_policy.schema.json`, …) — ActionGate-owned; cross-referenced but
   not StoryGraph-owned.
@@ -74,7 +74,7 @@ verbatim" note with the current CLI equivalent; nothing in its body was altered.
 - **Docs:** current docs' `composite_threat_detector` → `ugence_storygraph` (CLI,
   imports, module paths). Frozen `ctd.*` semantic identifiers left untouched.
 - **Links:** 9 broken relative Markdown links fixed (reorg + rename); ActionGate
-  cross-references repointed to `cyber_security/ACTION_GATE_SPECIFICATION.md`.
+  cross-references repointed to `Project_documentation/action_gate_cyber/cyber_security/ACTION_GATE_SPECIFICATION.md`.
   `check_doc_links.py` reports **all 30 doc links resolve**.
 
 ## Examples added

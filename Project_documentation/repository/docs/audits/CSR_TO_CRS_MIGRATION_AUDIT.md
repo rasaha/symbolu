@@ -95,9 +95,9 @@ Classifications:
 
 | Component | File | Current Role | Class. | Migration Note |
 |-----------|------|-------------|--------|----------------|
-| `CONSCIOUS_GENERATION_DESIGN.md` | `docs/design/CONSCIOUS_GENERATION_DESIGN.md` | Master design doc. References `S_csr`, `R_tok`, `M_csr`, `CSRTokenScorer` extensively (50+ references). | **D** | Must update to CRS terminology after migration. |
-| `CG_MISTRAL_SIGNAL_AUDIT.md` | `docs/audits/CG_MISTRAL_SIGNAL_AUDIT.md` | Signal audit referencing `csr_scorer`, `S_csr`. | **D** | Update references. |
-| `CSR_GUNA_INFERENCE_DESIGN_SPEC.md` | `docs/specs/CSR_GUNA_INFERENCE_DESIGN_SPEC.md` | Inference design spec for CSR + Guna. | **D/E** | Update terminology. Inference-side. |
+| `CONSCIOUS_GENERATION_DESIGN.md` | `Project_documentation/repository/docs/design/CONSCIOUS_GENERATION_DESIGN.md` | Master design doc. References `S_csr`, `R_tok`, `M_csr`, `CSRTokenScorer` extensively (50+ references). | **D** | Must update to CRS terminology after migration. |
+| `CG_MISTRAL_SIGNAL_AUDIT.md` | `Project_documentation/repository/docs/audits/CG_MISTRAL_SIGNAL_AUDIT.md` | Signal audit referencing `csr_scorer`, `S_csr`. | **D** | Update references. |
+| `CSR_GUNA_INFERENCE_DESIGN_SPEC.md` | `Project_documentation/repository/docs/specs/CSR_GUNA_INFERENCE_DESIGN_SPEC.md` | Inference design spec for CSR + Guna. | **D/E** | Update terminology. Inference-side. |
 | `TRAINING_DIAGNOSIS_FIX_v9.9.0.md` | Root | References CSR engagement/disengagement thresholds. | **D** | Historical doc. Low priority. |
 
 ---
@@ -447,8 +447,8 @@ class CRSCombinedScorer(nn.Module):
 | `tests/test_sovereign_handshake.py` | **No change** | Tests phoneme injection. |
 | `tests/test_sanskrit_g2p.py` | **No change** | G2P utility test. |
 | `tests/test_varna_mapping.py` | **No change** | Varna utility test. |
-| `docs/design/CONSCIOUS_GENERATION_DESIGN.md` | **Defer** | Update after CRS is validated and promoted. |
-| `docs/audits/CG_MISTRAL_SIGNAL_AUDIT.md` | **Defer** | Update after migration. |
+| `Project_documentation/repository/docs/design/CONSCIOUS_GENERATION_DESIGN.md` | **Defer** | Update after CRS is validated and promoted. |
+| `Project_documentation/repository/docs/audits/CG_MISTRAL_SIGNAL_AUDIT.md` | **Defer** | Update after migration. |
 | `symbolu_core/phase_transformer.py` | **No change** | `enable_csr` flag is dead. Ignore for now. |
 
 ### Files safe to ignore

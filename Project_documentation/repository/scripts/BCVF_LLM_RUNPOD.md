@@ -1,6 +1,6 @@
 # BCVF LLM on RunPod — real-model run guide
 
-Prerequisites to clear before §6 Phase 4 execution against a real model. All gates come from `docs/design/BCVF_LLM_TRUST_ROUTING_DESIGN.md`.
+Prerequisites to clear before §6 Phase 4 execution against a real model. All gates come from `Project_documentation/repository/docs/design/BCVF_LLM_TRUST_ROUTING_DESIGN.md`.
 
 ## 0. Before anything
 

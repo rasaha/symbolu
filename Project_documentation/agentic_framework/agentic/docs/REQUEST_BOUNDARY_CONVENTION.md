@@ -143,5 +143,5 @@ if md is not None:
 - `agentic/agentic_framework/sovereign_bridge.py` — the translators.
 - `agentic/agentic_framework/cg_tool_dispatcher.py` — the owner
   component that applies this convention for MCP tool calls.
-- `agentic/AGENTIC_ARCHITECTURE.md` § "Inference CG Metadata ↔ MCP
+- `Project_documentation/agentic_framework/agentic/AGENTIC_ARCHITECTURE.md` § "Inference CG Metadata ↔ MCP
   Gateway: Enrichment Seam" — the architectural frame.
