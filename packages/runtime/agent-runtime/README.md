@@ -16,10 +16,12 @@ A **domain-neutral execution-coordination kernel** for agent and workflow execut
 > API-stability registry, and safety-case checks all green). The additive `0.5.0` **H22-C durable
 > multi-workflow orchestration** layer (durable portfolio checkpoint/recovery, append-only audit
 > event store, bounded failure propagation, cooperative cancellation scopes) is
-> `IMPLEMENTED_AND_CI_VERIFIED` — after its final audit corrections, all scoped `agent-runtime-ci`
-> checks (package suite, isolated wheel-install verification, platform-freeze) plus terminology,
-> API-stability registry, and safety-case were observed green on the corrected head. Not
-> live-verified, pilot-validated, distributed-safe, enforcement-ready, or production-ready.
+> `IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED` after its final correctness corrections (real
+> runtime-bound pre-persist self-recoverability, immutable canonical-JSON event records, explicit
+> torn cross-store state detection); promotes to `IMPLEMENTED_AND_CI_VERIFIED` once scoped
+> `agent-runtime-ci` (package suite, isolated wheel-install verification, platform-freeze) plus
+> terminology, API-stability registry, and safety-case are observed green on its exact final head.
+> Not live-verified, pilot-validated, distributed-safe, enforcement-ready, or production-ready.
 
 The kernel drives task and workflow lifecycle, invokes providers/tools, and applies
 retry, timeout, cancellation, checkpointing, and durable recovery. Before any
@@ -245,11 +247,16 @@ exactly the uninterrupted one. Final audit corrections make the audit trace dura
 append-only `PortfolioEventStore` (crash-safe checkpoint/commit-event sequencing), bind the
 **full** runtime checkpoint across both the base and canonical-execution-state extension
 integrity domains, add semantic failure/cancellation/lifecycle cross-binding after recovery, and
-make the recovered failure policy a typed, first-class continuity contract. Maturity
-`IMPLEMENTED_AND_CI_VERIFIED` — scoped Agent Runtime CI (package suite **234 passed, 2 skipped**;
-isolated wheel-install verification **PASS** at `0.5.0`; platform-freeze, terminology,
-API-stability registry, and safety-case) observed green on the corrected head. Not production /
-pilot / distributed / exactly-once / runtime-assurance validated. **True
+make the recovered failure policy a typed, first-class continuity contract. Final correctness
+corrections make the pre-persist self-recoverability check **runtime-bound** (the same validator
+recovery uses, so a checkpoint recovery would reject can never be persisted), make durable event
+records genuinely immutable (canonical-JSON snapshots), and define an explicit **torn cross-store
+state** contract (`PORTFOLIO_RUNTIME_CHECKPOINT_DIVERGENCE` fails closed when runtime state is
+ahead of the portfolio snapshot — no rollback, no re-run, no fabrication; recovery succeeds once
+resynchronized). Maturity `IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED` (package suite **246 passed,
+2 skipped**; isolated wheel-install **PASS** at `0.5.0`; platform-freeze green) — promotes to
+`IMPLEMENTED_AND_CI_VERIFIED` once scoped CI is observed green on the exact new head. Not
+production / pilot / distributed / exactly-once / runtime-assurance validated. **True
 concurrency, resource/budget coordination, and compensation remain H22-D, not implemented
 here.**
 

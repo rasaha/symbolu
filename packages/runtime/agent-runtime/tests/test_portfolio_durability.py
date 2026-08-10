@@ -58,13 +58,17 @@ from ugence_agent_runtime.orchestration.persistence import (
 )
 from ugence_agent_runtime.orchestration.portfolio import PortfolioStatus
 from ugence_agent_runtime.orchestration.recovery import (
+    PORTFOLIO_RUNTIME_CHECKPOINT_DIVERGENCE,
     build_portfolio_checkpoint,
     validate_portfolio_checkpoint,
+    validate_portfolio_checkpoint_bound,
 )
 from ugence_agent_runtime.orchestration.scheduling import PortfolioScheduler
 from ugence_agent_runtime.orchestration.tracing import (
     InMemoryPortfolioEventStore,
     PortfolioTrace,
+    PortfolioTraceEncodingError,
+    PortfolioTraceEntry,
     PortfolioTraceSequenceError,
 )
 from ugence_agent_runtime.persistence.checkpoints import Checkpoint
@@ -1116,3 +1120,169 @@ def test_audit_swrr_continuity_unchanged_with_durable_trace():
         [{"name": "A", "n": n, "weight": 2}, {"name": "B", "n": n, "weight": 1}], 20, 10
     )
     assert unint == split
+
+
+# =========================================================================== #
+# FINAL CORRECTNESS CORRECTIONS — real pre-persist self-recoverability,        #
+# immutable event records, explicit torn cross-store state                     #
+# =========================================================================== #
+
+def _assert_persist_rejected(env):
+    """controller.checkpoint() must fail closed and leave the store generation unchanged."""
+    gen_before = env["pcp"].generation(env["pid"])
+    with pytest.raises(CheckpointError):
+        env["controller"].checkpoint()
+    assert env["pcp"].generation(env["pid"]) == gen_before
+    assert env["pcp"].load(env["pid"]) is None
+
+
+# --- 1: pre-persist path enforces the FULL (runtime-bound) recovery validator #
+def test_persist_rejected_failure_state_without_runtime_failed():
+    env = build([{"name": "A", "n": 3}, {"name": "B", "n": 3}])
+    env["controller"].step()  # A/B still RUNNING (not FAILED)
+    env["portfolio"].record_failure(env["ids"]["A"])  # inconsistent claim
+    _assert_persist_rejected(env)
+
+
+def test_persist_rejected_cancellation_state_without_runtime_cancelled():
+    env = build([{"name": "A", "n": 3}])
+    env["controller"].step()
+    env["portfolio"].record_cancellation(env["ids"]["A"], "WORKFLOW_ONLY")  # A not cancelled
+    _assert_persist_rejected(env)
+
+
+def test_persist_rejected_terminal_portfolio_with_nonterminal_workflow():
+    env = build([{"name": "A", "n": 3}, {"name": "B", "n": 3}])
+    env["controller"].step()  # portfolio ACTIVE; workflows RUNNING
+    env["portfolio"]._mark_completed()  # claim COMPLETED while workflows are non-terminal
+    assert env["portfolio"].status is PortfolioStatus.COMPLETED
+    _assert_persist_rejected(env)
+
+
+def test_persist_rejected_underlying_bad_base_digest():
+    env = build([{"name": "A", "n": 3}])
+    run_scheduler(env["rt"], env["portfolio"], 2)
+    a = env["ids"]["A"]
+    good = env["ss"].load(a)
+    env["ss"].save(Checkpoint.from_dict({**good.to_dict(), "digest": "0" * 64}))  # bad base
+    _assert_persist_rejected(env)
+
+
+def test_persist_rejected_underlying_bad_extension_digest():
+    env = build([{"name": "A", "n": 3}])
+    run_scheduler(env["rt"], env["portfolio"], 2)
+    a = env["ids"]["A"]
+    good = env["ss"].load(a)
+    env["ss"].save(Checkpoint.from_dict({**good.to_dict(), "extension_digest": "0" * 64}))
+    _assert_persist_rejected(env)
+
+
+def test_good_checkpoint_persists_and_recovers():
+    env = build([{"name": "A", "n": 3}, {"name": "B", "n": 3}])
+    ctrl = env["controller"]
+    ctrl.step(); ctrl.step()
+    gen0 = env["pcp"].generation(env["pid"])
+    ctrl.checkpoint()
+    assert env["pcp"].generation(env["pid"]) == gen0 + 1
+    rt2, prov2, result = recover(env)
+    assert result.requires_continuation is True
+    assert set(result.recovered_workflow_ids) == set(env["ids"].values())
+
+
+def test_bound_validator_equivalence_persist_and_recovery():
+    # The same validator gates persistence and recovery: whatever the pre-persist path accepts,
+    # recovery accepts; whatever it rejects, recovery would reject.
+    env = build([{"name": "A", "n": 3}])
+    run_scheduler(env["rt"], env["portfolio"], 2)
+    cp = build_portfolio_checkpoint(env["portfolio"], env["rt"],
+                                    failure_policy="ISOLATE_WORKFLOW", trace_sequence=0)
+    ok, _ = validate_portfolio_checkpoint_bound(cp, env["rt"])
+    assert ok
+    # Break runtime truth (A not FAILED) and re-validate the same cp against it.
+    env["portfolio"].record_failure(env["ids"]["A"])
+    cp2 = build_portfolio_checkpoint(env["portfolio"], env["rt"],
+                                     failure_policy="ISOLATE_WORKFLOW", trace_sequence=0)
+    ok2, reason2 = validate_portfolio_checkpoint_bound(cp2, env["rt"])
+    assert not ok2 and "failure_state" in reason2
+
+
+# --- 2: event records are genuinely immutable (no shared mutable aliasing)     #
+def test_event_record_immutable_against_original_and_returned_mutation():
+    es = InMemoryPortfolioEventStore()
+    t = PortfolioTrace("P", event_store=es)
+    targets = ["A", "B"]
+    t.emit(PortfolioEventType.CANCELLATION_REQUESTED, instance_id="A", scope="X", targets=targets)
+    # Mutating the ORIGINAL nested list after append must not change stored history.
+    targets.append("C")
+    stored = es.events("P")[0]
+    assert stored.detail["targets"] == ["A", "B"]
+    # Mutating a nested value in a RETURNED event must not change stored history.
+    stored.detail["targets"].append("Z")
+    again = es.events("P")[0]
+    assert again.detail["targets"] == ["A", "B"]
+
+
+def test_event_store_rejects_nan_inf_and_opaque_objects():
+    es = InMemoryPortfolioEventStore()
+    t = PortfolioTrace("P", event_store=es)
+    t.emit(PortfolioEventType.PORTFOLIO_CREATED)  # seq 1
+    with pytest.raises(PortfolioTraceEncodingError):
+        es.append(PortfolioTraceEntry("P", 2, "PORTFOLIO_CREATED", {"v": float("nan")}))
+    with pytest.raises(PortfolioTraceEncodingError):
+        es.append(PortfolioTraceEntry("P", 2, "PORTFOLIO_CREATED", {"v": float("inf")}))
+
+    class Opaque:
+        pass
+
+    with pytest.raises(PortfolioTraceEncodingError):
+        es.append(PortfolioTraceEntry("P", 2, "PORTFOLIO_CREATED", {"o": Opaque()}))
+    # A bad append never corrupts the log: the store is still at sequence 1.
+    assert es.last_sequence("P") == 1
+    assert [e.event_type for e in es.events("P")] == ["PORTFOLIO_CREATED"]
+
+
+# --- 3: torn cross-store state (runtime ahead of the portfolio snapshot)       #
+def test_torn_state_runtime_ahead_of_portfolio_fails_closed():
+    env = build([{"name": "A", "n": 5}, {"name": "B", "n": 5}])
+    run_scheduler(env["rt"], env["portfolio"], 4)
+    checkpoint_now(env)  # portfolio snapshot P references the CURRENT workflow checkpoints
+    a = env["ids"]["A"]
+    w_before = env["ss"].load(a).digest
+    # One workflow durably receives another H22-A quantum AFTER the portfolio snapshot.
+    advance_workflow(env["rt"], a)
+    w_after = env["ss"].load(a).digest
+    assert w_after != w_before  # runtime state advanced (W11)
+
+    # Recovery from the stale portfolio snapshot must fail closed with the divergence token,
+    # NOT roll back to W10, rerun W11, or silently accept W11.
+    with pytest.raises(RecoveryError) as ei:
+        recover(env)
+    assert PORTFOLIO_RUNTIME_CHECKPOINT_DIVERGENCE in str(ei.value)
+    # The runtime checkpoint on record is untouched (no rollback) and no re-execution occurred.
+    assert env["ss"].load(a).digest == w_after
+
+
+def test_torn_state_recovers_once_resynchronized():
+    # The contract: automatic recovery is guaranteed from a synchronized committed boundary.
+    env = build([{"name": "A", "n": 5}, {"name": "B", "n": 5}])
+    run_scheduler(env["rt"], env["portfolio"], 4)
+    checkpoint_now(env)
+    advance_workflow(env["rt"], env["ids"]["A"])  # divergence introduced
+    with pytest.raises(RecoveryError):
+        recover(env)
+    # Re-checkpoint the portfolio at the new synchronized boundary, then recovery succeeds.
+    checkpoint_now(env)
+    rt2, prov2, result = recover(env)
+    assert set(result.recovered_workflow_ids) == set(env["ids"].values())
+
+
+def test_torn_state_divergence_makes_no_provider_or_governance_call():
+    env = build([{"name": "A", "n": 5}])
+    run_scheduler(env["rt"], env["portfolio"], 3)
+    checkpoint_now(env)
+    advance_workflow(env["rt"], env["ids"]["A"])  # runtime ahead
+    rt2 = create_runtime(AgentRuntimeConfig(state_store=env["ss"], governance_hook=ExplodingHook()))
+    register_provider(rt2, ExplodingProvider("p"))
+    with pytest.raises(RecoveryError):
+        recover_portfolio(store=env["pcp"], portfolio_id=env["pid"], runtime=rt2,
+                          definitions=env["defs"])  # detection is side-effect free

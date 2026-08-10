@@ -29,6 +29,7 @@ appended" and the "commit-event appended, then crash" windows.
 """
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Protocol, Tuple, runtime_checkable
@@ -66,6 +67,11 @@ PORTFOLIO_EVENT_TYPES: Tuple[str, ...] = tuple(e.value for e in PortfolioEventTy
 
 class PortfolioTraceSequenceError(Exception):
     """Raised when an event would violate the append-only monotonic sequence contract."""
+
+
+class PortfolioTraceEncodingError(Exception):
+    """Raised when an event's ``detail`` is not a canonically-serializable structure (an opaque
+    Python object, or a NaN/±Inf), so it cannot be stored as an immutable durable record."""
 
 
 @dataclass(frozen=True)
@@ -119,33 +125,58 @@ class PortfolioEventStore(Protocol):
         ...
 
 
+def _canonical_record(entry: "PortfolioTraceEntry") -> str:
+    """Encode an event to a canonical JSON string — a genuine deep, immutable snapshot.
+
+    ``allow_nan=False`` makes a NaN/±Inf in the detail fail closed; a non-serializable (opaque)
+    object raises ``TypeError``. Both are surfaced as :class:`PortfolioTraceEncodingError`. The
+    detail must therefore be composed only of JSON-supported structured values (str/int/float/
+    bool/None and nested list/dict) — no opaque object identity is ever stored."""
+    try:
+        return json.dumps(entry.to_dict(), allow_nan=False, sort_keys=True, separators=(",", ":"))
+    except (TypeError, ValueError) as exc:
+        raise PortfolioTraceEncodingError(
+            f"portfolio event {entry.sequence} for {entry.portfolio_id!r} is not canonically "
+            f"serializable (opaque object or NaN/Inf): {exc}"
+        ) from exc
+
+
 class InMemoryPortfolioEventStore:
     """Deterministic, dependency-free append-only reference event store (NOT durable backend).
 
-    Portfolio-scoped and append-only: it stores immutable serialized records and enforces a
-    contiguous monotonic sequence per portfolio (the first event must be sequence 1, each
-    subsequent event exactly one greater). A duplicate or out-of-order sequence is rejected
-    fail-closed. History is never mutated in place."""
+    Portfolio-scoped and append-only: it stores each event as a canonical JSON string — a deep,
+    immutable snapshot — and enforces a contiguous monotonic sequence per portfolio (the first
+    event must be sequence 1, each subsequent event exactly one greater). A duplicate or
+    out-of-order sequence is rejected (`PortfolioTraceSequenceError`); a non-serializable detail
+    (opaque object) or NaN/±Inf is rejected (`PortfolioTraceEncodingError`). Because records are
+    stored and re-parsed as strings, neither mutating the original ``entry.detail`` after append
+    nor mutating a nested value in an event returned by :meth:`events` can ever change stored
+    history — there is no shared mutable aliasing in either direction."""
 
     def __init__(self) -> None:
-        self._events: Dict[str, List[dict]] = {}
+        self._events: Dict[str, List[Tuple[int, str]]] = {}
 
     def append(self, entry: PortfolioTraceEntry) -> None:
         history = self._events.setdefault(entry.portfolio_id, [])
-        expected = (history[-1]["sequence"] + 1) if history else 1
+        expected = (history[-1][0] + 1) if history else 1
         if entry.sequence != expected:
             raise PortfolioTraceSequenceError(
                 f"non-contiguous portfolio event for {entry.portfolio_id!r}: got sequence "
                 f"{entry.sequence}, expected {expected} (append-only, no gaps/duplicates)"
             )
-        history.append(entry.to_dict())  # immutable serialized record
+        record = _canonical_record(entry)  # deep, immutable snapshot (fails closed on bad detail)
+        history.append((entry.sequence, record))
 
     def events(self, portfolio_id: str) -> List[PortfolioTraceEntry]:
-        return [PortfolioTraceEntry.from_dict(d) for d in self._events.get(portfolio_id, [])]
+        # Parse fresh each call, so returned (possibly nested) structures never alias the store.
+        return [
+            PortfolioTraceEntry.from_dict(json.loads(rec))
+            for _, rec in self._events.get(portfolio_id, [])
+        ]
 
     def last_sequence(self, portfolio_id: str) -> int:
         history = self._events.get(portfolio_id)
-        return history[-1]["sequence"] if history else 0
+        return history[-1][0] if history else 0
 
 
 class PortfolioTrace:

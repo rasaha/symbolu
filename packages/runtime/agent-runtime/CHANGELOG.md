@@ -93,8 +93,28 @@ peer-to-peer agent messaging, and no agent/model selection (those are H22-D).
    recovered policy by default (a `FAIL_DEPENDENTS` portfolio resumes as `FAIL_DEPENDENTS`, not the
    constructor default `ISOLATE_WORKFLOW`).
 
+### Final correctness corrections (applied on the H22-C PR)
+1. **Real (runtime-bound) self-recoverability.** `PortfolioController.checkpoint()` now runs the
+   **same** side-effect-free `validate_portfolio_checkpoint_bound(cp, runtime)` that recovery uses
+   *before* any store write — verifying the referenced current workflow checkpoints across both
+   integrity domains and the H22-C semantic state (failure/cancellation/terminal-lifecycle)
+   against current runtime truth, not merely the structural shape. A checkpoint recovery would
+   reject can no longer be persisted; the store is left unchanged. No provider/governance/advance/
+   resume/continuation call during validation.
+2. **Genuinely immutable event records.** `InMemoryPortfolioEventStore` stores each event as a
+   canonical JSON snapshot and re-parses on read, so nested detail (e.g. cancellation `targets`,
+   `recovered_workflow_ids`) can no longer alias stored history in either direction. Non-
+   serializable (opaque) detail or NaN/±Inf fails closed (`PortfolioTraceEncodingError`).
+3. **Explicit torn cross-store state.** The runtime workflow store, portfolio checkpoint store,
+   and portfolio event store are independent — **no atomic distributed transaction is claimed**. A
+   torn state where a workflow's runtime checkpoint has advanced beyond the one the latest
+   portfolio checkpoint references is detected and **fails closed** with the diagnostic token
+   `PORTFOLIO_RUNTIME_CHECKPOINT_DIVERGENCE` (no rollback, no re-run of the committed action, no
+   silent acceptance, no fabricated state). Documented as the explicit v0.5.0 cross-store recovery
+   contract; recovery succeeds once resynchronized.
+
 ### Tests
-`tests/test_portfolio_durability.py` — **56 tests** across the H22-C matrix: checkpoint roundtrip /
+`tests/test_portfolio_durability.py` — **68 tests** across the H22-C matrix: checkpoint roundtrip /
 digest determinism / field sensitivity / tamper + resealed-inconsistency rejection; recovery
 zero-side-effects / explicit-continuation / no-repeat / fresh-governance / canonical-state
 resolvability; SWRR (2:1 and 3:1) + aging + registration-order scheduler continuity;
@@ -106,7 +126,7 @@ the self-recoverability invariant; multiple sequential recoveries; and runtime-u
 compatibility.
 
 ### Verification (scoped, local)
-- `python -m pytest packages/runtime/agent-runtime/tests -q` → **234 passed, 2 skipped**.
+- `python -m pytest packages/runtime/agent-runtime/tests -q` → **246 passed, 2 skipped**.
 - `scripts/verify_isolated_install.py` → **ISOLATED INSTALL VERIFICATION: PASS** at `0.5.0`.
 - Import-boundary / governance-binding / compatibility suites green; platform-freeze **PASS**.
 

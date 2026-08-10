@@ -57,10 +57,12 @@ from .portfolio import (
     priority_rank,
 )
 from .recovery import (
+    PORTFOLIO_RUNTIME_CHECKPOINT_DIVERGENCE,
     PortfolioRecoveryResult,
     build_portfolio_checkpoint,
     recover_portfolio,
     validate_portfolio_checkpoint,
+    validate_portfolio_checkpoint_bound,
 )
 from .scheduling import (
     PortfolioScheduler,
@@ -76,6 +78,7 @@ from .tracing import (
     PortfolioEventStore,
     PortfolioEventType,
     PortfolioTrace,
+    PortfolioTraceEncodingError,
     PortfolioTraceEntry,
     PortfolioTraceSequenceError,
 )
@@ -111,6 +114,8 @@ __all__ = [
     "recover_portfolio",
     "build_portfolio_checkpoint",
     "validate_portfolio_checkpoint",
+    "validate_portfolio_checkpoint_bound",
+    "PORTFOLIO_RUNTIME_CHECKPOINT_DIVERGENCE",
     # H22-C audit trace + durable event store
     "PortfolioTrace",
     "PortfolioTraceEntry",
@@ -119,6 +124,7 @@ __all__ = [
     "PortfolioEventStore",
     "InMemoryPortfolioEventStore",
     "PortfolioTraceSequenceError",
+    "PortfolioTraceEncodingError",
     # H22-C failure propagation + cancellation control
     "PortfolioController",
     "PortfolioFailurePolicy",

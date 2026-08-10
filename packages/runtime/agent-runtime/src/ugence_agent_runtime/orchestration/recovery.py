@@ -352,92 +352,37 @@ def recover_portfolio(
     if cp is None:
         raise RecoveryError(f"no portfolio checkpoint found for {portfolio_id!r}")
 
-    ok, reason = validate_portfolio_checkpoint(cp)
+    # The SAME runtime-bound validator the pre-persist path uses (structural + cross-binding +
+    # runtime-checkpoint integrity + semantic state vs. current runtime truth). If this passes,
+    # everything checkable without actually recovering has been checked; a torn cross-store state
+    # (runtime ahead of the portfolio snapshot) is detected here and fails closed.
+    ok, reason = validate_portfolio_checkpoint_bound(cp, runtime)
     if not ok:
         raise RecoveryError(f"portfolio checkpoint for {portfolio_id!r} failed validation: {reason}")
-
-    rt_store = _runtime_checkpoint_store(runtime)
-    if rt_store is None:
-        raise RecoveryError(
-            "runtime has no state_store/checkpoint_store: cannot bind or recover the "
-            "referenced workflow checkpoints"
-        )
 
     refs_by_id = {r.instance_id: r for r in cp.workflow_checkpoint_refs}
     recovered_ids: List[str] = []
     wf_meta: Dict[str, Any] = {}
-    recovered_status: Dict[str, WorkflowStatus] = {}
 
     for iid in cp.instance_ids:
         ref = refs_by_id[iid]
         definition = definitions.get(iid)
         if definition is None:
             raise RecoveryError(f"no WorkflowDefinition supplied for workflow {iid!r}")
-        # Cross-binding: prove the referenced runtime checkpoint belongs to this registration,
-        # across BOTH integrity domains. NOTE: runtime_id / runtime_version are origin
-        # provenance and are deliberately NOT required to match — an upgrade must recover.
-        wf_cp = _load_runtime_checkpoint(rt_store, iid)
-        if wf_cp is None:
-            raise RecoveryError(f"no runtime checkpoint found for referenced workflow {iid!r}")
-        if wf_cp.instance_id != ref.instance_id:
-            raise RecoveryError(f"workflow checkpoint instance_id mismatch for {iid!r}")
-        if wf_cp.workflow_id != ref.workflow_id:
-            raise RecoveryError(
-                f"workflow checkpoint workflow_id {wf_cp.workflow_id!r} != referenced "
-                f"{ref.workflow_id!r} for {iid!r}"
-            )
-        if wf_cp.correlation_id != ref.correlation_id:
-            raise RecoveryError(f"workflow checkpoint correlation_id mismatch for {iid!r}")
-        if wf_cp.digest != ref.checkpoint_digest:
-            raise RecoveryError(
-                f"workflow checkpoint base digest for {iid!r} does not match the portfolio "
-                "reference (the reference does not bind the runtime checkpoint on record)"
-            )
-        if wf_cp.checkpoint_version != ref.checkpoint_version:
-            raise RecoveryError(
-                f"workflow checkpoint_version {wf_cp.checkpoint_version!r} != referenced "
-                f"{ref.checkpoint_version!r} for {iid!r}"
-            )
-        # The base digest EXCLUDES the canonical-execution-state extension, so bind the
-        # extension digest too — a resealed extension (base unchanged) is caught here.
-        if wf_cp.extension_digest != ref.extension_digest:
-            raise RecoveryError(
-                f"workflow checkpoint extension digest for {iid!r} does not match the "
-                "portfolio reference (canonical-execution-state extension altered/resealed)"
-            )
-        # Verify the runtime checkpoint's OWN integrity across both domains before accepting.
-        if not wf_cp.verify():
-            raise RecoveryError(f"referenced runtime checkpoint for {iid!r} failed base integrity")
-        if wf_cp.checkpoint_version != "0":
-            states_ok, states_reason = wf_cp.validate_execution_states()
-            if not (wf_cp.verify_extension() and states_ok):
-                raise RecoveryError(
-                    f"referenced runtime checkpoint for {iid!r} failed canonical-execution-"
-                    f"state integrity: {states_reason or 'extension_digest mismatch'}"
-                )
-        elif wf_cp.has_extension_data():
-            raise RecoveryError(
-                f"legacy (v0) runtime checkpoint for {iid!r} unexpectedly carries extension data"
-            )
         if definition.workflow_id != ref.workflow_id:
             raise RecoveryError(
                 f"supplied definition workflow_id {definition.workflow_id!r} != referenced "
                 f"{ref.workflow_id!r} for {iid!r}"
             )
         # Reconstruct the workflow through the EXISTING runtime recovery contract (no exec).
+        # Cross-binding + integrity were already proven by the bound validator above.
         rec = runtime.recover_runtime(iid, definition)
         recovered_ids.append(iid)
-        recovered_status[iid] = runtime.instance(iid).status
         wf_meta[iid] = {
             "resumed_from_status": rec.resumed_from_status,
             "requires_continuation": rec.requires_continuation,
             "config_mismatch": rec.config_mismatch,
         }
-
-    # Semantic cross-binding: the orchestration state H22-C claims must match underlying
-    # runtime truth AFTER recovery. A resealed checkpoint whose outer digest was recomputed
-    # but whose claimed state contradicts the recovered workflows must still fail closed.
-    _semantic_cross_bind(cp, recovered_status)
 
     # Rebuild the portfolio orchestration aggregate from the validated snapshot.
     entries: List[PortfolioWorkflowEntry] = []
@@ -504,43 +449,128 @@ def recover_portfolio(
     )
 
 
-def _semantic_cross_bind(
-    cp: PortfolioCheckpoint, recovered_status: Mapping[str, WorkflowStatus]
-) -> None:
-    """Prove the portfolio's claimed orchestration state matches recovered runtime truth.
+# A precise, grep-able diagnostic token for a torn cross-store state: the runtime workflow
+# checkpoint on record differs from (typically is ahead of) the one the portfolio snapshot
+# references. Reconciliation is required; automatic recovery from the stale snapshot is refused.
+PORTFOLIO_RUNTIME_CHECKPOINT_DIVERGENCE = "PORTFOLIO_RUNTIME_CHECKPOINT_DIVERGENCE"
 
-    Fails closed (``RecoveryError``) if the claim contradicts the workflows actually
-    reconstructed from their runtime checkpoints — even when the outer portfolio digest was
-    validly resealed. Intermediate ``CREATED``/``ACTIVE`` portfolios are not over-constrained."""
-    # failure_state[iid] ⇒ that workflow really is FAILED; cancellation_state[iid] ⇒ CANCELLED.
-    for iid in cp.failure_state:
-        if recovered_status.get(iid) is not WorkflowStatus.FAILED:
-            raise RecoveryError(
-                f"failure_state claims {iid!r} failed, but its recovered runtime status is "
-                f"{recovered_status.get(iid)!r}"
+
+def _semantic_reason(
+    cp: PortfolioCheckpoint, statuses: Mapping[str, WorkflowStatus]
+) -> Optional[str]:
+    """Return a reason string if the portfolio's claimed orchestration state contradicts the
+    per-workflow runtime statuses (``statuses``), else ``None``. ``statuses`` are read from the
+    referenced runtime checkpoints (persisted workflow status), which for terminal states equals
+    what recovery reconstructs — so this is evaluable *without* performing recovery. Intermediate
+    ``CREATED`` / ``ACTIVE`` portfolios are not over-constrained."""
+    for iid, label in cp.failure_state.items():
+        if statuses.get(iid) is not WorkflowStatus.FAILED:
+            return (
+                f"failure_state claims {iid!r} failed, but its runtime checkpoint status is "
+                f"{getattr(statuses.get(iid), 'value', statuses.get(iid))!r}"
             )
-    for iid in cp.cancellation_state:
-        if recovered_status.get(iid) is not WorkflowStatus.CANCELLED:
-            raise RecoveryError(
-                f"cancellation_state claims {iid!r} cancelled, but its recovered runtime status "
-                f"is {recovered_status.get(iid)!r}"
+    for iid, label in cp.cancellation_state.items():
+        if statuses.get(iid) is not WorkflowStatus.CANCELLED:
+            return (
+                f"cancellation_state claims {iid!r} cancelled, but its runtime checkpoint status "
+                f"is {getattr(statuses.get(iid), 'value', statuses.get(iid))!r}"
             )
-    # Terminal portfolio lifecycle invariants created by the H22-C controller: COMPLETED,
-    # FAILED, and CANCELLED all imply every registered workflow is terminal (FAIL_PORTFOLIO and
-    # PORTFOLIO_ALL cancel every non-terminal workflow; COMPLETED means all workflows finished).
     status = PortfolioStatus(cp.portfolio_status)
     if status in TERMINAL_PORTFOLIO_STATUSES:
         non_terminal = [
-            iid for iid, st in recovered_status.items()
-            if st not in TERMINAL_WORKFLOW_STATUSES
+            iid for iid, st in statuses.items() if st not in TERMINAL_WORKFLOW_STATUSES
         ]
         if non_terminal:
-            raise RecoveryError(
-                f"portfolio_status {status.value} but recovered workflows are non-terminal: "
+            return (
+                f"portfolio_status {status.value} but referenced workflows are non-terminal: "
                 f"{sorted(non_terminal)}"
             )
-        # FAILED additionally implies at least one observed workflow failure was recorded.
         if status is PortfolioStatus.FAILED and not cp.failure_state:
-            raise RecoveryError(
-                "portfolio_status FAILED but no workflow failure was recorded"
+            return "portfolio_status FAILED but no workflow failure was recorded"
+    return None
+
+
+def validate_portfolio_checkpoint_bound(
+    cp: PortfolioCheckpoint, runtime: object
+) -> Tuple[bool, Optional[str]]:
+    """The single **side-effect-free, runtime-bound** validator used by BOTH the pre-persist
+    path (:meth:`PortfolioController.checkpoint`) and :func:`recover_portfolio`.
+
+    It layers everything that can be checked *without actually performing recovery* on top of the
+    structural :func:`validate_portfolio_checkpoint`:
+
+    * every referenced runtime checkpoint exists in the runtime's own store and matches the
+      reference across BOTH integrity domains — identity, base ``checkpoint_digest``,
+      ``checkpoint_version``, and canonical-execution-state ``extension_digest`` (a base-digest or
+      extension-digest mismatch is reported as ``PORTFOLIO_RUNTIME_CHECKPOINT_DIVERGENCE``: the
+      runtime state on record is ahead of / differs from the portfolio snapshot);
+    * each referenced runtime checkpoint passes its OWN integrity (``verify`` / ``verify_extension``
+      / ``validate_execution_states``; a v0 checkpoint must carry no extension data);
+    * the H22-C semantic state (``failure_state`` / ``cancellation_state`` / terminal lifecycle)
+      is consistent with the referenced workflows' persisted runtime statuses.
+
+    Performs **no** provider, governance, advance, resume, or continuation call. Returns
+    ``(ok, reason)``. The invariant this enforces: *every checkpoint emitted by
+    ``PortfolioController.checkpoint()`` satisfies, at the instant it is persisted, all H22-C
+    recovery validation that can be evaluated without actually performing recovery.*"""
+    ok, reason = validate_portfolio_checkpoint(cp)
+    if not ok:
+        return False, reason
+    store = _runtime_checkpoint_store(runtime)
+    if store is None:
+        return False, "runtime has no state_store/checkpoint_store to bind workflow checkpoints"
+    statuses: Dict[str, WorkflowStatus] = {}
+    for ref in cp.workflow_checkpoint_refs:
+        wf_cp = _load_runtime_checkpoint(store, ref.instance_id)
+        if wf_cp is None:
+            return False, f"no runtime checkpoint on record for referenced workflow {ref.instance_id!r}"
+        if wf_cp.instance_id != ref.instance_id:
+            return False, f"runtime checkpoint instance_id mismatch for {ref.instance_id!r}"
+        if wf_cp.workflow_id != ref.workflow_id:
+            return False, (
+                f"runtime checkpoint workflow_id {wf_cp.workflow_id!r} != referenced "
+                f"{ref.workflow_id!r} for {ref.instance_id!r}"
             )
+        if wf_cp.correlation_id != ref.correlation_id:
+            return False, f"runtime checkpoint correlation_id mismatch for {ref.instance_id!r}"
+        # NOTE: runtime_id / runtime_version are origin provenance and are NOT required to match.
+        if wf_cp.digest != ref.checkpoint_digest:
+            return False, (
+                f"{PORTFOLIO_RUNTIME_CHECKPOINT_DIVERGENCE}: runtime checkpoint for "
+                f"{ref.instance_id!r} (base {wf_cp.digest[:12]}) is ahead of / differs from the "
+                f"portfolio reference (base {ref.checkpoint_digest[:12]}); reconciliation required"
+            )
+        if wf_cp.checkpoint_version != ref.checkpoint_version:
+            return False, (
+                f"runtime checkpoint_version {wf_cp.checkpoint_version!r} != referenced "
+                f"{ref.checkpoint_version!r} for {ref.instance_id!r}"
+            )
+        if wf_cp.extension_digest != ref.extension_digest:
+            return False, (
+                f"{PORTFOLIO_RUNTIME_CHECKPOINT_DIVERGENCE}: runtime checkpoint extension for "
+                f"{ref.instance_id!r} differs from the portfolio reference (canonical-execution-"
+                "state extension altered/advanced); reconciliation required"
+            )
+        # The referenced runtime checkpoint must be internally intact across both domains.
+        if not wf_cp.verify():
+            return False, f"referenced runtime checkpoint for {ref.instance_id!r} failed base integrity"
+        if wf_cp.checkpoint_version != "0":
+            states_ok, states_reason = wf_cp.validate_execution_states()
+            if not (wf_cp.verify_extension() and states_ok):
+                return False, (
+                    f"referenced runtime checkpoint for {ref.instance_id!r} failed canonical-"
+                    f"execution-state integrity: {states_reason or 'extension_digest mismatch'}"
+                )
+        elif wf_cp.has_extension_data():
+            return False, (
+                f"legacy (v0) runtime checkpoint for {ref.instance_id!r} unexpectedly carries "
+                "extension data"
+            )
+        try:
+            statuses[ref.instance_id] = WorkflowStatus(wf_cp.status)
+        except ValueError:
+            return False, f"runtime checkpoint for {ref.instance_id!r} has corrupt status {wf_cp.status!r}"
+    semantic = _semantic_reason(cp, statuses)
+    if semantic is not None:
+        return False, semantic
+    return True, None

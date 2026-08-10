@@ -84,14 +84,26 @@ semantics). Serialization uses `allow_nan=False`, so a NaN/±Inf that reached a 
 `fair_credit` **fails closed** rather than being accepted. Recovery rejects a malformed,
 tampered, or unsupported-version checkpoint.
 
-### Portfolio self-recoverability invariant
+### Portfolio self-recoverability invariant (runtime-bound)
 
-Before persisting, a checkpoint is validated by **the same validator recovery uses**
-(`validate_portfolio_checkpoint`): version → digest → structural invariants → workflow
-references → orchestration consistency. A checkpoint that would not recover is **refused**
-(fail closed) and the store is left unchanged — H22-C never writes a checkpoint its own recovery
-would reject. This is the portfolio-level analogue of the single-workflow checkpoint
-self-recoverability invariant.
+Both the pre-persist path (`PortfolioController.checkpoint()`) and `recover_portfolio()` run the
+**same side-effect-free, runtime-bound validator** — `validate_portfolio_checkpoint_bound(cp,
+runtime)` — so nothing that recovery would reject can ever be persisted. Beyond the structural
+`validate_portfolio_checkpoint` (version → digest → structural invariants → references →
+label/contiguity), it checks everything evaluable *without actually performing recovery*:
+
+- every referenced runtime checkpoint **exists** in the runtime's own store and matches the
+  reference across **both** integrity domains (base `checkpoint_digest`, `checkpoint_version`,
+  `extension_digest`) — a mismatch is `PORTFOLIO_RUNTIME_CHECKPOINT_DIVERGENCE`;
+- each referenced runtime checkpoint passes its **own** integrity (`verify` / `verify_extension`
+  / `validate_execution_states`);
+- the H22-C **semantic** state (`failure_state` / `cancellation_state` / terminal lifecycle) is
+  consistent with the referenced workflows' persisted runtime statuses.
+
+**Invariant:** every checkpoint emitted by `PortfolioController.checkpoint()` satisfies, at the
+instant it is persisted, all H22-C recovery validation that can be evaluated without performing
+recovery. Validation makes **no** provider / governance / advance / resume / continuation call. A
+checkpoint that would not recover is **refused** (fail closed) and the store is left unchanged.
 
 ### Cross-binding to workflow checkpoints (both integrity domains)
 
@@ -177,8 +189,13 @@ append-only, portfolio-scoped; reference implementation `InMemoryPortfolioEventS
 event is also appended to that durable store — so **pre-crash audit history survives recovery**,
 not just the last sequence number (`trace.history()` returns the full durable log). The store
 enforces a contiguous monotonic sequence and **rejects duplicate/out-of-order events**
-(`PortfolioTraceSequenceError`). Without a store the trace degrades to an in-process log (only
-the checkpoint anchor is then durable). No SQL/Redis/filesystem/cloud backend is included.
+(`PortfolioTraceSequenceError`). Records are stored as **canonical JSON snapshots**, so they are
+genuinely immutable — mutating the original `entry.detail` after append, or a nested value in an
+event returned by `events()`, can never change stored history (no shared mutable aliasing in
+either direction). Event detail must be composed only of JSON-supported structured values; an
+opaque object or a NaN/±Inf **fails closed** (`PortfolioTraceEncodingError`). Without a store the
+trace degrades to an in-process log (only the checkpoint anchor is then durable). No
+SQL/Redis/filesystem/cloud backend is included.
 
 Event vocabulary (`PortfolioEventType`): `PORTFOLIO_CREATED`, `WORKFLOW_REGISTERED`,
 `DEPENDENCY_ADDED`, `QUANTUM_GRANTED`, `NO_ELIGIBLE_WORKFLOW`, `WORKFLOW_FAILURE_OBSERVED`,
@@ -208,6 +225,33 @@ The portfolio checkpoint store and the event store are **two independent stores*
 **not** pretend they form one atomic distributed transaction. The reconciliation above is the
 honest in-process/reference guarantee; a production deployment supplies durable backends and the
 same `max(anchor, last-event) + 1` invariant holds.
+
+### Torn cross-store state (workflow runtime ahead of the portfolio snapshot)
+
+There are three independent persistence layers — the runtime workflow checkpoint/state store,
+the H22-C portfolio checkpoint store, and the portfolio event store. H22-C makes **no** claim of
+an atomic distributed transaction across them. A *torn* state is therefore possible:
+
+```
+portfolio checkpoint P10 references workflow checkpoint W10
+one workflow receives another H22-A quantum → runtime durably reaches W11
+crash BEFORE a new portfolio checkpoint is committed
+```
+
+**v0.5.0 cross-store recovery contract.** *Automatic H22-C recovery is guaranteed from
+synchronized committed portfolio-checkpoint boundaries. A torn cross-store state — where a
+workflow's runtime state has advanced beyond the checkpoint referenced by the latest portfolio
+checkpoint — is detected and **fails closed**; the reference implementation does not claim
+exactly-once cross-store transactions or automatic reconciliation.*
+
+Recovering from the stale `P10` is **refused** with the diagnostic token
+`PORTFOLIO_RUNTIME_CHECKPOINT_DIVERGENCE` (the runtime checkpoint on record, `W11`, no longer
+matches the reference to `W10`). Recovery deliberately does **not**: roll the runtime back to
+`W10`; rerun the already-committed `W11` provider action; silently accept `W11` as though `P10`
+referenced it; or fabricate scheduler state. Reconciliation (commit a fresh portfolio checkpoint
+at the new synchronized boundary) is required; once resynchronized, recovery succeeds normally.
+Loading an older workflow checkpoint and continuing from it is explicitly **not** done — it could
+repeat an already-committed provider action.
 
 ## Bounded failure propagation
 
@@ -297,11 +341,14 @@ consequential action is permitted.
 
 ## Maturity
 
-`IMPLEMENTED_AND_CI_VERIFIED` after the final audit corrections (durable trace event store;
-crash-window sequencing; full base+extension checkpoint binding; semantic lifecycle / failure /
-cancellation cross-binding; contiguous-registration validation; typed failure-policy continuity).
-Package suite **234 passed, 2 skipped**; isolated wheel-install **PASS** at `0.5.0`; all scoped
-`agent-runtime-ci` checks (package suite, isolated wheel-install, platform-freeze) plus
-terminology, API-stability registry, and safety-case observed green on the corrected head. No
-claim of production / pilot / live-environment / distributed / exactly-once / runtime-assurance /
-cluster-safe validation.
+`IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED` after the final correctness corrections (real
+runtime-bound pre-persist self-recoverability shared with recovery; genuinely immutable
+canonical-JSON event records; explicit torn cross-store state detection and contract) on top of
+the earlier audit corrections (durable trace event store; crash-window sequencing; full
+base+extension checkpoint binding; semantic lifecycle/failure/cancellation cross-binding;
+contiguous-registration validation; typed failure-policy continuity). Package suite **246 passed,
+2 skipped** (`tests/test_portfolio_durability.py` = 68); isolated wheel-install **PASS** at
+`0.5.0`; platform-freeze **PASS**. Promotes to `IMPLEMENTED_AND_CI_VERIFIED` only once all scoped
+`agent-runtime-ci` checks are observed green on the exact new final head. No claim of production /
+pilot / live-environment / distributed / exactly-once / runtime-assurance / cluster-safe
+validation.

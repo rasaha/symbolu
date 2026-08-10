@@ -129,11 +129,13 @@ continuity contract; and cooperative, idempotent cancellation scopes (`WORKFLOW_
 `DEPENDENT_SUBGRAPH` / `PORTFOLIO_ALL`). SWRR `fair_credit`, aging, registration order, `round`,
 dependencies, and failure/cancellation state all survive recovery, so the next scheduler
 decision is exactly the uninterrupted one. Governance stays entirely below H22-C; recovery
-performs no execution and reuses no historical CLEAR. Maturity `IMPLEMENTED_AND_CI_VERIFIED` —
-scoped `agent-runtime-ci` (package suite, isolated wheel-install, platform-freeze) plus
-terminology, API-stability registry, and safety-case observed green on the corrected head after
-the final audit corrections. See
-[`AGENT_RUNTIME_H22C_DURABILITY.md`](AGENT_RUNTIME_H22C_DURABILITY.md).
+performs no execution and reuses no historical CLEAR. The pre-persist self-recoverability check is
+**runtime-bound** (the same validator recovery uses), durable event records are immutable
+canonical-JSON snapshots, and a **torn cross-store state** (runtime ahead of the portfolio
+snapshot) is detected and fails closed (`PORTFOLIO_RUNTIME_CHECKPOINT_DIVERGENCE`) — no atomic
+distributed transaction is claimed. Maturity `IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED` after the
+final correctness corrections (promotes to `IMPLEMENTED_AND_CI_VERIFIED` on scoped CI green at the
+exact final head). See [`AGENT_RUNTIME_H22C_DURABILITY.md`](AGENT_RUNTIME_H22C_DURABILITY.md).
 
 ## What the later H22 phase builds on this base (not now)
 

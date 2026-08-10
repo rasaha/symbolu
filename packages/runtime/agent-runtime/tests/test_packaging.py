@@ -78,6 +78,7 @@ def test_public_api_surface_is_curated():
         "PortfolioEventStore",
         "InMemoryPortfolioEventStore",
         "PortfolioTraceSequenceError",
+        "PortfolioTraceEncodingError",
         "PortfolioController",
         "PortfolioFailurePolicy",
         "CancellationScope",

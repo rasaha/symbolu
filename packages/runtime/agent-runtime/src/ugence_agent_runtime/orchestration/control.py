@@ -23,7 +23,7 @@ from ..models.workflow import TERMINAL_WORKFLOW_STATUSES, WorkflowStatus
 from ..runtime.errors import CheckpointError
 from .persistence import PortfolioCheckpoint
 from .portfolio import WorkflowPortfolio
-from .recovery import build_portfolio_checkpoint, validate_portfolio_checkpoint
+from .recovery import build_portfolio_checkpoint, validate_portfolio_checkpoint_bound
 from .scheduling import PortfolioScheduler, PortfolioStepReason, PortfolioStepResult, SchedulingPolicy
 from .tracing import PortfolioEventType, PortfolioTrace
 
@@ -355,12 +355,15 @@ class PortfolioController:
     def checkpoint(self, *, expected_generation: Optional[int] = None) -> PortfolioCheckpoint:
         """Build, self-validate, and persist a durable portfolio checkpoint.
 
-        Enforces the **portfolio self-recoverability invariant**: the checkpoint is validated
-        by the same validator recovery uses, BEFORE any write. A checkpoint that would not
-        recover is refused (fail closed) and the store is left unchanged. On success a
-        ``PORTFOLIO_CHECKPOINT_COMMITTED`` event is recorded. The checkpoint captures the trace
-        sequence anchor as it stands *before* the commit event, so a recovered portfolio
-        continues the sequence without collision."""
+        Enforces the **portfolio self-recoverability invariant**: the checkpoint is validated by
+        the SAME runtime-bound validator recovery uses (`validate_portfolio_checkpoint_bound`),
+        BEFORE any write — so it verifies the referenced current workflow checkpoints across both
+        integrity domains and the H22-C semantic state against current runtime truth, not merely
+        the structural shape. A checkpoint that recovery would reject is refused (fail closed) and
+        the store is left unchanged. Validation performs no provider/governance/advance/resume
+        call. On success a ``PORTFOLIO_CHECKPOINT_COMMITTED`` event is recorded. The checkpoint
+        captures the trace sequence anchor as it stands *before* the commit event, so a recovered
+        portfolio continues the sequence without collision."""
         if self._store is None:
             raise CheckpointError("no portfolio checkpoint store configured")
         cp = build_portfolio_checkpoint(
@@ -369,7 +372,7 @@ class PortfolioController:
             failure_policy=self._policy.value,
             trace_sequence=self._trace.last_sequence,
         )
-        ok, reason = validate_portfolio_checkpoint(cp)
+        ok, reason = validate_portfolio_checkpoint_bound(cp, self._runtime)
         if not ok:
             raise CheckpointError(
                 f"refusing to persist a non-self-recoverable portfolio checkpoint for "
