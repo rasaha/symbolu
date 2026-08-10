@@ -68,6 +68,16 @@ class TapOutcome(str, Enum):
     UNKNOWN = "UNKNOWN"
 
 
+#: Reason code stamped when the reference engine's evidence-derived ``SUPPORTED``
+#: rests on the **default** stance (no per-assertion rule and no explicit
+#: ``stance:<id>`` context) — i.e. it presumes support from mere evidence
+#: *presence*, rather than an explicit affirmative determination. Downstream
+#: consumers that require an explicit determination (e.g. the RA-5 production
+#: Control-Assurance adapter) must treat presumptive support as *not* a PASS
+#: (RA-5 audit H-1). It is additive metadata; it never changes the native outcome.
+PRESUMPTIVE_SUPPORT_REASON = "presumptive_support"
+
+
 class TapEvidenceClass(str, Enum):
     """Provenance class of an evidence item (kept separate from support)."""
 
@@ -253,6 +263,12 @@ class TapEngine:
 
     # --- evidence-derived default ------------------------------------------
 
+    def _has_explicit_stance(
+        self, request: TapEvaluationRequest, item: TapEvidenceItem
+    ) -> bool:
+        key = f"stance:{item.evidence_id}"
+        return bool(request.context) and key in request.context
+
     def _stance(self, request: TapEvaluationRequest, item: TapEvidenceItem) -> str:
         key = f"stance:{item.evidence_id}"
         val = request.context.get(key) if request.context else None
@@ -271,6 +287,9 @@ class TapEngine:
         contradicting = [e for e in evidence if self._stance(request, e) == "contradicts"]
         coverage = round(len(supporting) / len(evidence), 4)
         covered_ids = tuple(e.evidence_id for e in supporting)
+        # Support is "presumptive" when NO supporting item carried an explicit
+        # stance — the reference engine is presuming support from mere presence.
+        presumptive = not any(self._has_explicit_stance(request, e) for e in supporting)
 
         if contradicting:
             return TapEvaluationResult(
@@ -280,11 +299,16 @@ class TapEngine:
                 covered_evidence_ids=covered_ids,
                 reason_codes=("contradicting_evidence",), trace_id=trace)
         if coverage >= 1.0:
+            reason_codes = ("evidence_supports",)
+            if presumptive:
+                # No explicit rule matched (we are in the derive path) and no
+                # explicit stance was given ⇒ presumptive support (RA-5 audit H-1).
+                reason_codes = reason_codes + (PRESUMPTIVE_SUPPORT_REASON,)
             return TapEvaluationResult(
                 outcome=TapOutcome.SUPPORTED, evidence_coverage=1.0,
                 supported_components=covered_ids, covered_evidence_ids=covered_ids,
                 obligations=self._default_obligations,
-                reason_codes=("evidence_supports",), trace_id=trace)
+                reason_codes=reason_codes, trace_id=trace)
         if coverage <= 0.0:
             return TapEvaluationResult(
                 outcome=TapOutcome.INDETERMINATE, evidence_coverage=0.0,

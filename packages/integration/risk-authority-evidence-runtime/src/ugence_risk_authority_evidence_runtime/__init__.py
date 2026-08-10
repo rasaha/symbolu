@@ -37,6 +37,7 @@ See ``docs/architecture/RISK_AUTHORITY_RA5_SPEC.md`` (ratified).
 from __future__ import annotations
 
 from .admission import ProductionEvidenceAdmission, stamp_admitted_evidence
+from .ingress import StaticTrustedIngress
 from .outcome_mapping import FULL_COVERAGE, map_assertion_outcome
 from .runtime import RiskAuthorityEvidenceRuntime
 from .tap_control_assurance import TapControlAssurance
@@ -46,6 +47,7 @@ __all__ = [
     "__version__",
     "ProductionEvidenceAdmission",
     "stamp_admitted_evidence",
+    "StaticTrustedIngress",
     "TapControlAssurance",
     "map_assertion_outcome",
     "FULL_COVERAGE",

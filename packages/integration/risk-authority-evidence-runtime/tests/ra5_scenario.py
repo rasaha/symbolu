@@ -31,12 +31,16 @@ from risk_authority.domain import (
 )
 from risk_authority.integrations import InMemoryWorkflowIRSource
 
+import dataclasses
+
 from ugence_risk_authority_evidence_runtime import (
     ProductionEvidenceAdmission,
     RiskAuthorityEvidenceRuntime,
+    StaticTrustedIngress,
     TapControlAssurance,
     stamp_admitted_evidence,
 )
+from risk_authority.domain.evidence import ControlEvidenceRecord
 
 FIXED_NOW = datetime(2026, 8, 10, 12, 0, 0, tzinfo=timezone.utc)
 TENANT = "tenant_123"
@@ -106,14 +110,30 @@ def build_grant() -> AuthorityGrant:
     )
 
 
-def make_tap_provider(outcomes: Optional[Mapping[str, TapRule]] = None):
+def make_tap_provider(
+    outcomes: Optional[Mapping[str, TapRule]] = None,
+    *,
+    explicit_support: bool = True,
+):
     """A real in-process TAP provider. ``outcomes`` maps control_id → TapRule.
 
-    Absent a rule for a control, the engine derives SUPPORTED @ coverage 1.0 from
-    the supplied (supporting) evidence — the natural full-support path.
+    Production GRANT requires an EXPLICIT affirmative determination (RA-5 audit
+    H-1), never support presumed from mere evidence presence. So by default this
+    installs an explicit ``SUPPORTED @ coverage 1.0`` rule for every required
+    control, and overlays any ``outcomes`` on top. Pass ``explicit_support=False``
+    to build a rule-less engine whose evidence-derived SUPPORTED is *presumptive*
+    (used by the adversarial no-determination test).
     """
 
-    engine = TapEngine(rules=dict(outcomes or {}))
+    rules: dict[str, TapRule] = {}
+    if explicit_support:
+        rules = {
+            c: TapRule(outcome=TapOutcome.SUPPORTED, evidence_coverage=1.0)
+            for c in REQUIRED_CONTROLS
+        }
+    if outcomes:
+        rules.update(dict(outcomes))
+    engine = TapEngine(rules=rules)
     return build_tap_provider(engine)
 
 
@@ -129,6 +149,7 @@ def build_runtime(
     tap_provider=None,
     control_assurance=None,
     evidence_admission=None,
+    evidence_ingress=None,
     clock=lambda: FIXED_NOW,
 ) -> RiskAuthorityEvidenceRuntime:
     source = InMemoryWorkflowIRSource()
@@ -143,9 +164,24 @@ def build_runtime(
         clock=clock,
         evidence_admission=evidence_admission or ProductionEvidenceAdmission(),
         control_assurance=control_assurance,
+        # The finance scenario's evidence arrives over an authenticated producer
+        # channel (RA-5 §13; audit H-2). Adversarial tests override this with an
+        # untrusted-channel ingress to prove fabricated caller evidence is dropped.
+        evidence_ingress=evidence_ingress or StaticTrustedIngress(trusted=True),
     )
     runtime.application.authority.add_grant(build_grant())
     return runtime
+
+
+def tamper(record: ControlEvidenceRecord, **changes: object) -> ControlEvidenceRecord:
+    """Return a copy of ``record`` with fields changed but digests left intact.
+
+    Adversarial-test helper (moved out of the production ``admission`` module,
+    RA-5 audit INFO-2): the returned record's content no longer matches its
+    ``digest``/``admission_digest``, so the production admitter rejects it.
+    """
+
+    return dataclasses.replace(record, **changes)  # type: ignore[arg-type]
 
 
 def make_evidence(

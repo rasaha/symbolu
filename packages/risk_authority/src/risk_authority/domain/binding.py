@@ -118,10 +118,45 @@ def binding_violations(
         if not admitted.evidence_current(eid, now):
             reasons.append(f"backing evidence {eid!r} is stale")
 
+    # Freshness monotonicity (§7.1), enforced AUTHORITATIVELY here — RA does not
+    # trust the evaluator's own ``bind_control_result`` clamp. A trusted result
+    # may never claim a validity window that outlives the earliest ``valid_until``
+    # of its admitted backing evidence; a result that does is treated as a binding
+    # violation (fail closed), so a non-clamping or malicious ControlAssurancePort
+    # cannot extend a result's life beyond its evidence.
+    if not _freshness_is_monotonic(result, admitted):
+        reasons.append(
+            "trusted result valid_until outlives its backing evidence "
+            "(freshness monotonicity §7.1)"
+        )
+
     if not result.is_current(now):
         reasons.append("trusted result validity window has elapsed")
 
     return tuple(reasons)
+
+
+def _freshness_is_monotonic(result: ControlResult, admitted: AdmittedContext) -> bool:
+    """True iff ``result.valid_until <= min(valid_until of admitted backing)``.
+
+    Evidence with ``valid_until is None`` never expires and does not constrain the
+    floor. If any admitted backing evidence *does* expire while the result claims a
+    later window (or claims a non-expiring window, ``None``), monotonicity is
+    violated. Equality is allowed (the exact-expiry boundary is monotonic).
+    """
+
+    floors = [
+        admitted.valid_until_by_id.get(eid)
+        for eid in result.evidence_ids
+        if admitted.admitted(eid)
+    ]
+    finite_floors = [vu for vu in floors if vu is not None]
+    if not finite_floors:
+        return True  # no backing evidence expires ⇒ nothing to outlive
+    evidence_floor = min(finite_floors)
+    if result.valid_until is None:
+        return False  # a non-expiring result outlives expiring evidence
+    return result.valid_until <= evidence_floor
 
 
 def usable_control_results(

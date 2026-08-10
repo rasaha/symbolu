@@ -29,6 +29,12 @@ keywords = ["governance", "risk", "authority", "evidence", "control-assurance", 
 dependencies = [
     "ugence-risk-authority>=0.1.0",
     "ugence-tap-provider>=0.1.0",
+    # Directly imported by the TAP Control-Assurance adapter + outcome mapping
+    # (AssertionGovernanceRequest/Result/Coverage, AssertionGovernanceProvider).
+    # Declared explicitly rather than relied upon transitively via the TAP
+    # provider (RA-5 audit M-1: depend on what you import).
+    "ugence-governance-contracts>=0.1.0",
+    "ugence-governance-provider-framework>=0.1.0",
 ]
 
 [project.optional-dependencies]

@@ -53,10 +53,14 @@ def map_assertion_outcome(
 
 
 def _as_ratio(value: object) -> "float | None":
-    """Coerce a coverage value to a sane ratio in [0, 1], else ``None``.
+    """Coerce a coverage value to a valid ratio in [0, 1], else ``None``.
 
-    Rejects ``None``, non-numerics and NaN/inf fail-closed: an unquantified or
-    malformed coverage can never clear the full-support gate.
+    Fail-closed on every malformed value — ``None``, booleans, non-numerics,
+    NaN/±inf, and **out-of-range** values (``< 0.0`` or ``> 1.0``). A coverage
+    outside the unit interval is not "almost full support" to be clamped up to
+    PASS; it is a malformed provider value and must resolve to ``UNKNOWN``
+    (RA-5 audit L-2). Only a finite ratio genuinely within ``[0.0, 1.0]`` is
+    returned.
     """
 
     if value is None or isinstance(value, bool):
@@ -66,8 +70,6 @@ def _as_ratio(value: object) -> "float | None":
     ratio = float(value)
     if ratio != ratio or ratio in (float("inf"), float("-inf")):  # NaN / inf
         return None
-    if ratio < 0.0:
-        return 0.0
-    if ratio > 1.0:
-        return 1.0
+    if ratio < 0.0 or ratio > 1.0:  # out of range ⇒ malformed, never clamp to PASS
+        return None
     return ratio

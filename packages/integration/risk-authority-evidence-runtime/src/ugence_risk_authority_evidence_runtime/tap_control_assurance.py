@@ -36,6 +36,7 @@ from ugence_governance_contracts.contracts.assertion import (
     AssertionGovernanceResult,
 )
 from ugence_governance_provider_framework.contracts import AssertionGovernanceProvider
+from ugence_tap_provider.core import PRESUMPTIVE_SUPPORT_REASON
 
 from risk_authority.domain.enums import ControlStatus
 from risk_authority.integrations.control_assurance import (
@@ -53,6 +54,11 @@ __all__ = ["TapControlAssurance"]
 #: ``indeterminate_result``). Its presence means "evaluator did not really run".
 _PROVIDER_ERROR_MARK = "reason:provider_error"
 
+#: Marker for a *presumptive* support outcome — support presumed from mere
+#: evidence presence, with no explicit rule/stance determination (RA-5 audit H-1).
+#: In production this is never a PASS.
+_PRESUMPTIVE_MARK = f"reason:{PRESUMPTIVE_SUPPORT_REASON}"
+
 
 class TapControlAssurance:
     """A ``ControlAssurancePort`` backed by a real assertion-governance provider."""
@@ -64,11 +70,28 @@ class TapControlAssurance:
         control_assertions: Optional[Mapping[str, str]] = None,
         engine_id: str = "tap-control-assurance",
         engine_version: str = "1",
+        require_explicit_determination: bool = True,
     ) -> None:
         self._provider = provider
         self._control_assertions = dict(control_assertions or {})
         self._engine_id = engine_id
         self._engine_version = engine_version
+        # H-1: in production, a PASS requires an *explicit* affirmative
+        # determination (an evaluated rule/stance), never support presumed from
+        # mere evidence presence. When True, a presumptive SUPPORTED is downgraded
+        # to UNKNOWN and this port declares itself production-authoritative.
+        self._require_explicit_determination = bool(require_explicit_determination)
+
+    @property
+    def is_production_authoritative(self) -> bool:
+        """True iff this port refuses presumptive support as PASS (production-safe).
+
+        The RA production composition (``RiskAuthorityApplication`` in production
+        mode) rejects a Control-Assurance port that is not production-authoritative
+        — a permissive/reference evaluator cannot silently mint PASS (RA-5 H-1).
+        """
+
+        return self._require_explicit_determination
 
     def evaluate(self, request: ControlAssuranceRequest) -> ControlAssuranceResult:
         # No admitted evidence for the control ⇒ MISSING (never PASS), without
@@ -119,15 +142,31 @@ class TapControlAssurance:
             # provider — never a control determination; force UNKNOWN and flag it.
             status = ControlStatus.UNKNOWN
 
+        presumptive = _looks_presumptive(provider_result)
+        reason = (
+            f"tap outcome={provider_result.coverage.value} "
+            f"coverage={provider_result.evidence_coverage}"
+        )
+        if (
+            self._require_explicit_determination
+            and status is ControlStatus.PASS
+            and presumptive
+        ):
+            # H-1: support presumed from mere evidence presence (no explicit
+            # rule/stance) is NOT an explicit affirmative determination and can
+            # never satisfy a mandatory control in production ⇒ UNKNOWN.
+            status = ControlStatus.UNKNOWN
+            reason = (
+                "presumptive support (no explicit determination) downgraded to "
+                "UNKNOWN in production (RA-5 audit H-1); " + reason
+            )
+
         result = bind_control_result(
             request,
             status=status,
             engine_id=self._engine_id,
             engine_version=self._engine_version,
-            reason=(
-                f"tap outcome={provider_result.coverage.value} "
-                f"coverage={provider_result.evidence_coverage}"
-            ),
+            reason=reason,
         )
         return ControlAssuranceResult(
             control_result=result,
@@ -169,3 +208,15 @@ class TapControlAssurance:
 
 def _looks_like_infrastructure_failure(result: AssertionGovernanceResult) -> bool:
     return any(ref.startswith(_PROVIDER_ERROR_MARK) for ref in result.explanation_refs)
+
+
+def _looks_presumptive(result: AssertionGovernanceResult) -> bool:
+    """True iff the outcome is support presumed from presence, not determined.
+
+    The reference engine stamps ``reason:presumptive_support`` into
+    ``explanation_refs`` when it derives ``SUPPORTED`` from the default stance
+    (no per-assertion rule, no explicit ``stance:<id>``). A production-grade
+    evaluator that makes an explicit determination never sets this marker.
+    """
+
+    return _PRESUMPTIVE_MARK in result.explanation_refs

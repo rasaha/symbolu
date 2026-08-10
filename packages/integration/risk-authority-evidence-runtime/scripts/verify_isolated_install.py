@@ -12,8 +12,11 @@ package from it (no third-party runtime dependency is required at all).
 It then proves, inside that clean env:
 
   * ``ugence_risk_authority_evidence_runtime`` imports from site-packages;
-  * the PRODUCTION path GRANTs on full trusted support and DENYs a forged PASS
-    (no admitted evidence) — the RA-5 acceptance anchor;
+  * the PRODUCTION path GRANTs only on an EXPLICIT full-support determination over
+    an authenticated producer channel, and DENYs: a forged PASS (no evidence),
+    presumptive support from a rule-less evaluator (audit H-1), and evidence from
+    an untrusted channel (audit H-2); production also refuses to construct with a
+    permissive evaluator or a missing trusted-ingress seam;
   * ``risk_authority`` remains a stdlib-only leaf (importable, no provider dep);
   * NO out-of-scope monorepo package is importable — including the RA-4.5 runtime
     and the two governance kernels (RA-5 is upstream of the envelope).
@@ -51,10 +54,10 @@ loc = pathlib.Path(rt.__file__).resolve()
 assert "site-packages" in loc.parts, f"not installed from site-packages: {loc}"
 
 from ugence_risk_authority_evidence_runtime import (
-    ProductionEvidenceAdmission, TapControlAssurance, RiskAuthorityEvidenceRuntime,
-    stamp_admitted_evidence,
+    ProductionEvidenceAdmission, StaticTrustedIngress, TapControlAssurance,
+    RiskAuthorityEvidenceRuntime, stamp_admitted_evidence,
 )
-from ugence_tap_provider.api import TapEngine, build_tap_provider
+from ugence_tap_provider.api import TapEngine, TapOutcome, TapRule, build_tap_provider
 from risk_authority.crypto import SigningKey, SigningKeyRecord
 from risk_authority.api.schemas import CreateCaseRequest
 from risk_authority.domain import (
@@ -78,36 +81,83 @@ scope = Scope(purposes=("P",), tools_allow=("crm.read",), models=(MODEL,), actor
               max_autonomy_level=2, max_transaction_minor_units=1000)
 source = InMemoryWorkflowIRSource(); source.register(wf)
 key = SigningKeyRecord("k", SigningKey.from_seed(bytes(range(32))))
-runtime = RiskAuthorityEvidenceRuntime(
-    workflow_source=source, key_record=key, clock=lambda: NOW,
-    evidence_admission=ProductionEvidenceAdmission(),
-    control_assurance=TapControlAssurance(build_tap_provider(TapEngine())))
-runtime.application.authority.add_grant(AuthorityGrant(
-    principal_id=PRINCIPAL, tenant_id=TENANT, authority_type=AuthorityType.RISK_APPROVAL,
-    domains=("FINANCE",), allowed_risk_classes=(RiskClass.HIGH,), max_autonomy=2,
-    delegated_by="x", grantable_scope=scope))
 
-def new_case(cid):
+def build_runtime(control_assurance, ingress):
+    r = RiskAuthorityEvidenceRuntime(
+        workflow_source=source, key_record=key, clock=lambda: NOW,
+        evidence_admission=ProductionEvidenceAdmission(),
+        control_assurance=control_assurance, evidence_ingress=ingress)
+    r.application.authority.add_grant(AuthorityGrant(
+        principal_id=PRINCIPAL, tenant_id=TENANT, authority_type=AuthorityType.RISK_APPROVAL,
+        domains=("FINANCE",), allowed_risk_classes=(RiskClass.HIGH,), max_autonomy=2,
+        delegated_by="x", grantable_scope=scope))
+    return r
+
+def new_case(runtime, cid):
     runtime.create_case(CreateCaseRequest(
         tenant_id=TENANT, case_id=cid, subject_id=ACTOR, model_id=MODEL, purpose="P",
         domain="FINANCE", jurisdictions=("US",), tools=("crm.read",), autonomy_level=2,
         data_classes=(), workflow_ir_id="wf", inherent_risk=RiskClass.HIGH,
         residual_risk=RiskClass.MEDIUM))
 
-# 2. GRANT path — full trusted support.
-new_case("grant")
-ev_ok = stamp_admitted_evidence(
-    evidence_id="ev1", tenant_id=TENANT, source_type="attestation",
-    source_identity="prov", subject=ACTOR, workflow_ir_digest=wf.digest,
-    policy_digest=wf.digest, observed_at=NOW, valid_until=NOW + timedelta(hours=1),
-    admitted_at=NOW, producer="prod", producer_version="1")
-g = runtime.submit_evidence_and_evaluate(TENANT, "grant", (ev_ok,), control_evidence={"C1": ("ev1",)})
+def evidence(eid="ev1"):
+    return stamp_admitted_evidence(
+        evidence_id=eid, tenant_id=TENANT, source_type="attestation",
+        source_identity="prov", subject=ACTOR, workflow_ir_digest=wf.digest,
+        policy_digest=wf.digest, observed_at=NOW, valid_until=NOW + timedelta(hours=1),
+        admitted_at=NOW, producer="prod", producer_version="1")
+
+# An EXPLICIT full-support determination (rule) + authenticated producer channel.
+supported = {"C1": TapRule(outcome=TapOutcome.SUPPORTED, evidence_coverage=1.0)}
+prod_assurance = TapControlAssurance(build_tap_provider(TapEngine(rules=supported)))
+trusted_ingress = StaticTrustedIngress(trusted=True)
+
+# 2. GRANT path — explicit full support + trusted channel.
+runtime = build_runtime(prod_assurance, trusted_ingress)
+new_case(runtime, "grant")
+g = runtime.submit_evidence_and_evaluate(TENANT, "grant", (evidence(),), control_evidence={"C1": ("ev1",)})
 assert g.recommendation in (RiskRecommendation.ALLOW, RiskRecommendation.ALLOW_WITH_CONDITIONS), g.recommendation
 
-# 3. DENY path — forged PASS, no admitted evidence.
-new_case("forged")
+# 3. DENY — forged PASS, no admitted evidence.
+new_case(runtime, "forged")
 d = runtime.submit_evidence_and_evaluate(TENANT, "forged", ())
 assert d.recommendation is RiskRecommendation.DENY, d.recommendation
+
+# 3b. H-1 DENY — a rule-less (presumptive) evaluator cannot mint PASS from mere
+# evidence presence, even over a trusted channel with full evidence.
+presumptive_runtime = build_runtime(
+    TapControlAssurance(build_tap_provider(TapEngine())), StaticTrustedIngress(trusted=True))
+new_case(presumptive_runtime, "presumptive")
+p = presumptive_runtime.submit_evidence_and_evaluate(
+    TENANT, "presumptive", (evidence(),), control_evidence={"C1": ("ev1",)})
+assert p.recommendation is RiskRecommendation.DENY, p.recommendation
+
+# 3c. H-2 DENY — evidence from an UNTRUSTED producer channel never admits, even
+# with an explicit full-support determination and a valid self-computed digest.
+untrusted_runtime = build_runtime(
+    TapControlAssurance(build_tap_provider(TapEngine(rules=supported))),
+    StaticTrustedIngress(trusted=False))
+new_case(untrusted_runtime, "untrusted")
+u = untrusted_runtime.submit_evidence_and_evaluate(
+    TENANT, "untrusted", (evidence(),), control_evidence={"C1": ("ev1",)})
+assert u.recommendation is RiskRecommendation.DENY, u.recommendation
+
+# 3d. H-1/H-2 fail-closed construction — production refuses a permissive evaluator
+# and refuses a missing trusted-ingress seam.
+from risk_authority.domain.errors import RiskAuthorityError
+for bad in ("permissive", "no_ingress"):
+    try:
+        if bad == "permissive":
+            build_runtime(TapControlAssurance(build_tap_provider(TapEngine()),
+                          require_explicit_determination=False), trusted_ingress)
+        else:
+            RiskAuthorityEvidenceRuntime(
+                workflow_source=source, key_record=key, clock=lambda: NOW,
+                evidence_admission=ProductionEvidenceAdmission(),
+                control_assurance=prod_assurance, evidence_ingress=None)
+    except RiskAuthorityError:
+        continue
+    raise SystemExit(f"FAIL: production did not fail closed for {bad}")
 
 # 4. risk_authority stays a stdlib-only leaf (imports fine, no provider dep pulled).
 import risk_authority  # noqa: F401

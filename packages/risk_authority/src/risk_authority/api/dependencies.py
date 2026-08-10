@@ -41,6 +41,7 @@ from ..integrations.control_assurance import (
     ControlAssuranceRequest,
     bind_control_result,
 )
+from ..integrations.ingress import TrustedEvidenceIngressPort
 from ..integrations.pwc import WorkflowIRSource
 from ..integrations.tap import EvidenceAdmissionPort
 from ..observability.events import EventBus
@@ -103,22 +104,45 @@ class RiskAuthorityApplication:
         ids: Optional[_Ids] = None,
         evidence_admission: Optional[EvidenceAdmissionPort] = None,
         control_assurance: Optional[ControlAssurancePort] = None,
+        evidence_ingress: Optional[TrustedEvidenceIngressPort] = None,
         production_mode: bool = False,
     ) -> None:
-        # RA-5 mode selection (RISK_AUTHORITY_RA5_SPEC.md §12). Mode is EXPLICIT:
-        # production mode is only entered when the caller both sets
-        # ``production_mode=True`` and injects the two trusted-evidence ports.
-        # It never silently falls back to the reference (caller-asserted) path;
-        # an incomplete production configuration fails closed at construction.
-        if production_mode and (evidence_admission is None or control_assurance is None):
-            raise RiskAuthorityError(
-                "production_mode requires both an EvidenceAdmissionPort and a "
-                "ControlAssurancePort (RA-5 §12: fail closed on incomplete "
-                "production configuration)"
-            )
+        # RA-5 mode selection (RISK_AUTHORITY_RA5_SPEC.md §12; audit H-1/H-2).
+        # Mode is EXPLICIT: production mode is only entered when the caller sets
+        # ``production_mode=True`` and injects the trusted-evidence ports. It never
+        # silently falls back to the reference (caller-asserted) path; an
+        # incomplete or fail-open production configuration fails closed here.
+        if production_mode:
+            if evidence_admission is None or control_assurance is None:
+                raise RiskAuthorityError(
+                    "production_mode requires both an EvidenceAdmissionPort and a "
+                    "ControlAssurancePort (RA-5 §12: fail closed on incomplete "
+                    "production configuration)"
+                )
+            # H-2: evidence must arrive over an authenticated producer channel; a
+            # self-computable integrity digest is not producer authenticity (§13).
+            # Production fails closed without an explicit trusted-ingress seam.
+            if evidence_ingress is None:
+                raise RiskAuthorityError(
+                    "production_mode requires a TrustedEvidenceIngressPort: a valid "
+                    "integrity digest proves content tamper-detection, not producer "
+                    "authenticity (RA-5 §13; audit H-2). Inject an authenticated "
+                    "producer-channel verifier."
+                )
+            # H-1: a permissive/reference/default evaluator must not silently
+            # satisfy control assurance in production. A production-authoritative
+            # port must explicitly opt in; anything else fails closed.
+            if getattr(control_assurance, "is_production_authoritative", False) is not True:
+                raise RiskAuthorityError(
+                    "production ControlAssurancePort must be production-authoritative "
+                    "(is_production_authoritative=True): a permissive/reference "
+                    "evaluator whose support is presumptive cannot mint PASS in "
+                    "production (RA-5 audit H-1)."
+                )
         self._production_mode = bool(production_mode)
         self._evidence_admission = evidence_admission
         self._control_assurance = control_assurance
+        self._evidence_ingress = evidence_ingress
         self._workflow_source = workflow_source
         self._key_record = key_record
         self._key_ring = KeyRing.from_records([key_record])
@@ -326,21 +350,31 @@ class RiskAuthorityApplication:
     ) -> RiskEvaluation:
         """Evaluate a case from admitted evidence and trusted control assurance.
 
-        Fail-closed at every step (RA-5 §11): admission unavailable / evidence
-        rejected / stale / wrong-context ⇒ the backed control is ``MISSING``;
-        assurance unavailable / evaluator error ⇒ ``UNKNOWN``; neither can mint a
-        ``PASS``. The RA state machine only advances on the *real* artifacts
-        produced here — never on an actor label (§10).
+        ``raw_evidence`` MUST be presented over an authenticated producer channel
+        (RA-5 §13; audit H-2): a valid integrity digest proves only content
+        tamper-detection, never producer authenticity, so each record is first
+        gated through the injected ``TrustedEvidenceIngressPort`` — a record the
+        deployment's channel verifier does not trust never reaches admission.
+
+        Fail-closed at every step (RA-5 §11): untrusted-channel / admission
+        unavailable / evidence rejected / stale / wrong-context ⇒ the backed
+        control is ``MISSING``; assurance unavailable / evaluator error ⇒
+        ``UNKNOWN``; neither can mint a ``PASS``. The RA state machine only
+        advances on the *real* artifacts produced here — never on an actor label
+        (§10; audit L-1): a case with missing/stale/untrusted required evidence is
+        never represented as evidence-complete and cannot reach AUTHORITY_REVIEW.
         """
 
         if not (
             self._production_mode
             and self._evidence_admission is not None
             and self._control_assurance is not None
+            and self._evidence_ingress is not None
         ):
             raise RiskAuthorityError(
                 "evaluate_with_evidence() requires production mode with an "
-                "EvidenceAdmissionPort and a ControlAssurancePort (RA-5 §12)"
+                "EvidenceAdmissionPort, a ControlAssurancePort, and a "
+                "TrustedEvidenceIngressPort (RA-5 §12, §13; audit H-2)"
             )
 
         now = self._clock()
@@ -363,6 +397,16 @@ class RiskAuthorityApplication:
             if record.workflow_ir_digest != case.workflow_ir_digest:
                 continue
             if record.policy_digest != policy_digest:
+                continue
+            # H-2: authenticated-producer-channel gate BEFORE admission. A
+            # self-computable integrity digest is not producer authenticity (§13);
+            # a record the deployment's channel verifier does not trust never
+            # enters the admitted set, so it can back no control (fail closed).
+            try:
+                channel_trusted = self._evidence_ingress.is_trusted(record, now=now)
+            except Exception:  # noqa: BLE001 - ingress failure ⇒ untrusted
+                channel_trusted = False
+            if not channel_trusted:
                 continue
             try:
                 admissible = self._evidence_admission.is_admissible(record, now=now)
@@ -434,36 +478,55 @@ class RiskAuthorityApplication:
         )
         self.controls.put(tenant_id, case_id, results)
 
-        # --- 4. State machine, bound to the real artifacts above (§10). ------
+        # --- 4. State machine, GATED on the real artifacts above (§10; L-1). --
+        # A transition may only be taken when it corresponds to a real artifact,
+        # not an actor label. A case with missing/stale/untrusted required
+        # evidence must never be represented as evidence-complete, and must not
+        # reach AUTHORITY_REVIEW — so no authority can be minted from it. The
+        # recommendation below is still computed (and will DENY) for observability.
+        result_control_ids = {r.control_id for r in results}
+        evidence_complete = all(
+            self._evidence_for_control(c, control_evidence, admitted_by_id)
+            for c in required
+        )
+        controls_evaluated = evidence_complete and all(
+            c in result_control_ids for c in required
+        )
+
         case.transition(
             target=RiskCaseState.EVIDENCE_PENDING,
             actor="risk-authority",
             reason="evidence intake",
             now=now,
         )
-        # EVIDENCE_PENDING → EVIDENCE_COMPLETE: admission actually ran (the
-        # admitted-in-context set is a real artifact, not a label).
-        case.transition(
-            target=RiskCaseState.EVIDENCE_COMPLETE,
-            actor="evidence-admission",
-            reason=f"admitted {len(admitted_by_id)} evidence record(s)",
-            now=now,
-        )
-        # EVIDENCE_COMPLETE → CONTROL_EVALUATED: real Control-Assurance results
-        # were produced and RA-re-checked (not an actor label).
-        case.transition(
-            target=RiskCaseState.CONTROL_EVALUATED,
-            actor="control-assurance",
-            reason=f"assured {len(required)} control(s); {len(results)} trusted",
-            now=now,
-            event_type=GovernanceEventType.CONTROL_EVALUATED,
-        )
-        case.transition(
-            target=RiskCaseState.AUTHORITY_REVIEW,
-            actor="risk-authority",
-            reason="ready for authority review",
-            now=now,
-        )
+        if evidence_complete:
+            # EVIDENCE_PENDING → EVIDENCE_COMPLETE only when every required control
+            # actually has admitted-in-context backing evidence (a real artifact).
+            case.transition(
+                target=RiskCaseState.EVIDENCE_COMPLETE,
+                actor="evidence-admission",
+                reason=(
+                    f"admitted {len(admitted_by_id)} evidence record(s); every "
+                    f"required control has in-context backing"
+                ),
+                now=now,
+            )
+            if controls_evaluated:
+                # EVIDENCE_COMPLETE → CONTROL_EVALUATED only when a real, RA-re-
+                # checked trusted result exists for every required control.
+                case.transition(
+                    target=RiskCaseState.CONTROL_EVALUATED,
+                    actor="control-assurance",
+                    reason=f"assured {len(required)} control(s); {len(results)} trusted",
+                    now=now,
+                    event_type=GovernanceEventType.CONTROL_EVALUATED,
+                )
+                case.transition(
+                    target=RiskCaseState.AUTHORITY_REVIEW,
+                    actor="risk-authority",
+                    reason="ready for authority review",
+                    now=now,
+                )
 
         evaluation = self._engine.evaluate(
             workflow_ir=workflow,

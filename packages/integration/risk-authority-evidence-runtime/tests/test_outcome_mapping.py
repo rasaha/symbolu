@@ -37,6 +37,20 @@ def test_malformed_coverage_never_passes(bad):
     assert map_assertion_outcome(AssertionCoverage.SUPPORTED, bad) is ControlStatus.UNKNOWN
 
 
-def test_coverage_above_one_is_clamped_and_passes():
-    # A provider over-reporting coverage still only means "full" — never a weight.
-    assert map_assertion_outcome(AssertionCoverage.SUPPORTED, 1.5) is ControlStatus.PASS
+@pytest.mark.parametrize("bad", [1.5, 2.0, -0.1, -1.0])
+def test_out_of_range_coverage_is_malformed_not_pass(bad):
+    # RA-5 audit L-2: a coverage outside [0, 1] is malformed, NOT "almost full
+    # support" to be clamped up to PASS. It fails closed to UNKNOWN.
+    assert map_assertion_outcome(AssertionCoverage.SUPPORTED, bad) is ControlStatus.UNKNOWN
+
+
+@pytest.mark.parametrize(
+    "coverage,expected",
+    [
+        (0.0, ControlStatus.UNKNOWN),
+        (1.0, ControlStatus.PASS),
+        (1.0 - 1e-9, ControlStatus.UNKNOWN),
+    ],
+)
+def test_coverage_boundary(coverage, expected):
+    assert map_assertion_outcome(AssertionCoverage.SUPPORTED, coverage) is expected

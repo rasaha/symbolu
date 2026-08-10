@@ -59,28 +59,19 @@ def test_full_trusted_chain_mints_and_verifies_envelope():
 
 def test_forged_pass_case_cannot_reach_envelope_issuance():
     runtime = C.build_runtime()
-    # No evidence ⇒ DENY. The case transitions to DENIED, never APPROVED /
-    # CONDITIONAL, so envelope issuance is an illegal transition — fail closed.
+    # No evidence ⇒ DENY. With the L-1 transition gating, a case whose required
+    # evidence was never admitted is NEVER represented as evidence-complete, so it
+    # cannot reach AUTHORITY_REVIEW — issue_decision itself fails closed (a strictly
+    # stronger guarantee than before: no non-authority decision is even minted).
     evaluation = _run_to_evaluation(runtime, (), None)
     assert evaluation.recommendation is RiskRecommendation.DENY
 
-    decision = runtime.issue_decision(
-        C.TENANT,
-        "rdc_prod_1",
-        evaluation,
-        DecisionRequest(principal_id=C.PRINCIPAL, requested_scope=C.FINANCE_SCOPE),
-    )
-    assert not decision.grants_authority
     with pytest.raises(RiskAuthorityError):
-        runtime.issue_envelope(
+        runtime.issue_decision(
             C.TENANT,
             "rdc_prod_1",
-            IssueEnvelopeRequest(
-                decision_id=decision.decision_id,
-                audience="finance-agent-runtime",
-                session_id="sess_1",
-                nonce="nonce_1",
-            ),
+            evaluation,
+            DecisionRequest(principal_id=C.PRINCIPAL, requested_scope=C.FINANCE_SCOPE),
         )
 
 

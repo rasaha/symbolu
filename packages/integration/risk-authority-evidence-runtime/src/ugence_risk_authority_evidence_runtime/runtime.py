@@ -42,6 +42,7 @@ from risk_authority.domain.envelope import RiskAuthorizationEnvelope
 from risk_authority.domain.evidence import ControlEvidenceRecord
 from risk_authority.domain.risk_case import RiskDecisionCase
 from risk_authority.integrations.control_assurance import ControlAssurancePort
+from risk_authority.integrations.ingress import TrustedEvidenceIngressPort
 from risk_authority.integrations.pwc import WorkflowIRSource
 from risk_authority.integrations.tap import EvidenceAdmissionPort
 from risk_authority.services.risk_engine import RiskEvaluation
@@ -60,12 +61,13 @@ class RiskAuthorityEvidenceRuntime:
         clock: Callable[[], datetime],
         evidence_admission: EvidenceAdmissionPort,
         control_assurance: ControlAssurancePort,
+        evidence_ingress: TrustedEvidenceIngressPort,
         issuer: str = "ugence-risk-authority",
         application: Optional[RiskAuthorityApplication] = None,
     ) -> None:
         if application is not None:
             # An explicitly supplied application MUST already be in production
-            # mode with both ports wired — never silently reconfigured.
+            # mode with all ports wired — never silently reconfigured.
             if not getattr(application, "_production_mode", False):
                 raise ValueError(
                     "supplied RiskAuthorityApplication is not in production mode "
@@ -73,8 +75,9 @@ class RiskAuthorityEvidenceRuntime:
                 )
             self.application = application
         else:
-            # production_mode=True + both ports ⇒ the application constructor
-            # enforces the fail-closed completeness check (RA-5 §12).
+            # production_mode=True + admission + assurance + trusted-ingress ⇒ the
+            # application constructor enforces the fail-closed completeness check
+            # and the H-1/H-2 production guardrails (RA-5 §12, §13).
             self.application = RiskAuthorityApplication(
                 workflow_source=workflow_source,
                 key_record=key_record,
@@ -82,10 +85,12 @@ class RiskAuthorityEvidenceRuntime:
                 issuer=issuer,
                 evidence_admission=evidence_admission,
                 control_assurance=control_assurance,
+                evidence_ingress=evidence_ingress,
                 production_mode=True,
             )
         self._evidence_admission = evidence_admission
         self._control_assurance = control_assurance
+        self._evidence_ingress = evidence_ingress
 
     # ------------------------------------------------------------------
     # Case lifecycle (delegated to the existing application — no reimpl).

@@ -22,11 +22,26 @@ The record is:
   required identifiers) — a malformed record cannot be constructed at all, so it
   can never silently back a passing control.
 
-Integrity: :func:`evidence_integrity_digest` is the deterministic content digest
-over the record's bound fields (never over the ``digest``/``admission`` fields
-themselves). A producer stamps ``digest`` with it; the RA-5 production admitter
-recomputes and compares, so tampering with any bound field — or the digest —
-fails admission (RA-5 spec §6 "integrity_digest: a mismatch fails admission").
+Integrity — TWO distinct digests, distinct lifecycles, **neither a signature**
+(RA-5 spec §6, §13; content integrity / tamper-detection only, NOT producer
+authenticity):
+
+* :func:`evidence_integrity_digest` — the deterministic **content** digest over
+  the record's source-content fields observed *before* admission (identity,
+  provenance, subject, freshness window, workflow/policy context). It never
+  covers the ``digest``/``admission`` decision fields, nor the admission-time
+  attribution fields. A producer stamps ``digest`` with it; the admitter
+  recomputes and compares, so tampering with any bound content field — or the
+  digest — fails admission.
+* :func:`evidence_admission_digest` — the **admission-record** binding digest
+  over the admission-decision fields produced *at admission time*
+  (``producer`` / ``producer_version`` / ``admitted_at`` / admission status),
+  chained to the content ``integrity_digest``. It exists because those three
+  attribution fields are decided *by the admitter* and cannot be folded into the
+  pre-admission content digest without a lifecycle circularity (a producer
+  stamping raw evidence does not yet know who will admit it or when). Binding
+  them separately makes post-hoc mutation of the admission attribution
+  detectable (RA-5 audit L-3) — an accountability binding, still not a signature.
 """
 
 from __future__ import annotations
@@ -44,6 +59,7 @@ __all__ = [
     "EVIDENCE_SCHEMA_VERSION",
     "SUPPORTED_EVIDENCE_SCHEMA_VERSIONS",
     "evidence_integrity_digest",
+    "evidence_admission_digest",
 ]
 
 #: Current canonical AdmittedEvidence schema version (RA-5 spec §6).
@@ -96,6 +112,12 @@ class ControlEvidenceRecord:
     #: Evidence may legitimately back multiple cases in one context; when the
     #: producer scopes it to a case, carry the id (OPTIONAL, §6).
     risk_case_id: Optional[str] = None
+    #: Admission-record binding digest over the admission-time attribution
+    #: (producer/producer_version/admitted_at/status) chained to the content
+    #: ``digest``. Empty for reference/synthetic records; production admission
+    #: requires it and re-verifies it (RA-5 audit L-3). Excluded from the content
+    #: integrity digest (it is the decision, not the content).
+    admission_digest: str = ""
 
     def __post_init__(self) -> None:
         # Fail-closed structural validation. These invariants must hold for ANY
@@ -188,6 +210,33 @@ class ControlEvidenceRecord:
 
         return bool(self.digest) and self.digest == self.expected_integrity_digest()
 
+    def expected_admission_digest(self) -> str:
+        """The admission-record binding digest this record's attribution should carry.
+
+        Chains the admission-time attribution (producer / producer_version /
+        admitted_at / admission status) to the content ``digest`` so post-hoc
+        mutation of any of them is detectable (RA-5 audit L-3).
+        """
+
+        return evidence_admission_digest(
+            integrity_digest=self.digest,
+            producer=self.producer,
+            producer_version=self.producer_version,
+            admitted_at=self.admitted_at,
+            admission_status=self.admission.status,
+        )
+
+    def admission_integrity_ok(self) -> bool:
+        """True iff the carried ``admission_digest`` binds this record's attribution.
+
+        Requires a non-empty ``admission_digest`` (reference/synthetic records
+        carry none and are never used in production admission).
+        """
+
+        return bool(self.admission_digest) and (
+            self.admission_digest == self.expected_admission_digest()
+        )
+
 
 def _reject_impossible_timestamp(name: str, value: Optional[datetime]) -> None:
     if value is None:
@@ -240,5 +289,36 @@ def evidence_integrity_digest(
             "policy_digest": policy_digest,
             "risk_case_id": risk_case_id,
             "provenance": dict(provenance or {}),
+        }
+    )
+
+
+def evidence_admission_digest(
+    *,
+    integrity_digest: str,
+    producer: str,
+    producer_version: str,
+    admitted_at: Optional[datetime],
+    admission_status: EvidenceState,
+) -> str:
+    """Deterministic ``sha256:`` binding digest over an admission decision's attribution.
+
+    Distinct from the *content* digest: this binds the admission-time attribution
+    fields — decided *by the admitter*, not present in the raw evidence a producer
+    stamps — chained to the content ``integrity_digest``. Including ``admitted_at``
+    or ``producer`` in the content digest would be lifecycle-invalid (the producer
+    cannot know them before admission); binding them here instead makes their
+    post-hoc mutation detectable (RA-5 audit L-3). Accountability binding, not a
+    signature (§13).
+    """
+
+    return _content_digest(
+        {
+            "kind": "ra5-admission-record-1",
+            "integrity_digest": integrity_digest,
+            "producer": producer,
+            "producer_version": producer_version,
+            "admitted_at": admitted_at,
+            "admission_status": admission_status.value,
         }
     )

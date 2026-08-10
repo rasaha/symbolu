@@ -20,7 +20,6 @@ caller (RA facade wraps the call).
 
 from __future__ import annotations
 
-import dataclasses
 from datetime import datetime
 from typing import Mapping, Optional
 
@@ -29,6 +28,7 @@ from risk_authority.domain.evidence import (
     SUPPORTED_EVIDENCE_SCHEMA_VERSIONS,
     ControlEvidenceRecord,
     EvidenceAdmission,
+    evidence_admission_digest,
     evidence_integrity_digest,
 )
 
@@ -45,11 +45,20 @@ class ProductionEvidenceAdmission:
       never usable);
     * the record is current at ``now`` (stale evidence can never back a PASS);
     * the carried ``digest`` matches the recomputed content digest — tamper
-      detection over the bound fields (§6);
+      detection over the bound content fields (§6);
+    * the carried ``admission_digest`` binds the admission-time attribution
+      (producer / producer_version / admitted_at / status) to the content digest —
+      so post-hoc mutation of the attribution is detected (RA-5 audit L-3);
     * every required identifier is present (evidence_id, tenant_id, source_type,
       source_identity, subject, workflow_ir_digest, policy_digest);
     * producer attribution is present (``producer`` + ``producer_version``) —
       accountability for the admission decision (§6, §13).
+
+    NOTE (RA-5 §13): both digests are content/attribution **integrity** bindings
+    for tamper detection — they are NOT producer authenticity or a signature. A
+    self-computable digest cannot prove origin; production evidence must reach
+    this admitter over an authenticated producer channel enforced upstream by the
+    trusted-ingress seam (see ``RiskAuthorityApplication`` production wiring).
     """
 
     engine_id = "ra5-production-admission"
@@ -67,8 +76,11 @@ class ProductionEvidenceAdmission:
         # Freshness.
         if not evidence.is_current(now):
             return False
-        # Integrity (tamper detection).
+        # Integrity (content tamper detection).
         if not evidence.integrity_ok():
+            return False
+        # Admission-record attribution binding (producer/version/admitted_at bound).
+        if not evidence.admission_integrity_ok():
             return False
         # Required identifiers / provenance context.
         for value in (
@@ -128,6 +140,13 @@ def stamp_admitted_evidence(
         risk_case_id=risk_case_id,
         provenance=provenance,
     )
+    admission_digest = evidence_admission_digest(
+        integrity_digest=digest,
+        producer=producer,
+        producer_version=producer_version,
+        admitted_at=admitted_at,
+        admission_status=EvidenceState.ADMITTED,
+    )
     return ControlEvidenceRecord(
         evidence_id=evidence_id,
         tenant_id=tenant_id,
@@ -145,18 +164,5 @@ def stamp_admitted_evidence(
         producer=producer,
         producer_version=producer_version,
         risk_case_id=risk_case_id,
+        admission_digest=admission_digest,
     )
-
-
-def tamper(
-    record: ControlEvidenceRecord, **changes: object
-) -> ControlEvidenceRecord:
-    """Return a copy of ``record`` with fields changed but the digest left intact.
-
-    A convenience for adversarial tests: the returned record's ``digest`` no
-    longer matches its (now-mutated) content, so ``integrity_ok()`` is false and
-    the admitter rejects it. Kept here (not in tests) so the tampering path is
-    exercised through the package's own surface.
-    """
-
-    return dataclasses.replace(record, **changes)  # type: ignore[arg-type]

@@ -87,6 +87,32 @@ def test_stale_backing_evidence_fails_closed():
     assert binding_violations(_bound(), CTX, stale_admitted, NOW)
 
 
+# --- M-2: authoritative freshness monotonicity (§7.1) ---------------------
+def test_result_outliving_evidence_fails_closed():
+    # Evidence expires at LATER (NOW+1h); a result claiming NOW+99h outlives it —
+    # RA rejects it authoritatively, without trusting the evaluator's own clamp.
+    far = _bound(valid_until=NOW + timedelta(hours=99))
+    violations = binding_violations(far, CTX, ADMITTED, NOW)
+    assert any("monotonic" in v for v in violations)
+
+
+def test_result_valid_until_equal_to_evidence_floor_is_ok():
+    # Exact-expiry boundary is monotonic (<=), so it is usable.
+    at = _bound(valid_until=LATER)
+    assert binding_violations(at, CTX, ADMITTED, NOW) == ()
+
+
+def test_non_expiring_result_over_expiring_evidence_fails_closed():
+    never = _bound(valid_until=None)  # never expires, but ev1 expires at LATER
+    violations = binding_violations(never, CTX, ADMITTED, NOW)
+    assert any("monotonic" in v for v in violations)
+
+
+def test_non_expiring_result_over_non_expiring_evidence_is_ok():
+    forever = AdmittedContext(valid_until_by_id={"ev1": None})
+    assert binding_violations(_bound(valid_until=None), CTX, forever, NOW) == ()
+
+
 def test_result_without_production_bindings_fails_closed():
     # A reference/synthetic result (no bindings) is never usable in production.
     ref = ControlResult(control_id="C1", status=ControlStatus.PASS, evidence_ids=("ev1",))

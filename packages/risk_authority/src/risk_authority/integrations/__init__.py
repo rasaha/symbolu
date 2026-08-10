@@ -15,6 +15,7 @@ from .control_assurance import (
     ReferenceControlAssurance,
     bind_control_result,
 )
+from .ingress import TrustedEvidenceIngressPort
 from .pwc import InMemoryWorkflowIRSource, WorkflowIRSource
 from .tap import EvidenceAdmissionPort, ReferenceEvidenceAdmission
 
@@ -24,6 +25,7 @@ __all__ = [
     "RuntimeIdentity",
     "EvidenceAdmissionPort",
     "ReferenceEvidenceAdmission",
+    "TrustedEvidenceIngressPort",
     "ControlAssurancePort",
     "ControlAssuranceRequest",
     "ControlAssuranceResult",

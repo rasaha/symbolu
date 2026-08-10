@@ -73,13 +73,54 @@ def test_only_known_first_party_roots_imported():
     assert not bad, "\n".join(bad)
 
 
-def test_declared_dependencies_are_ra_and_tap():
+#: Map an imported first-party import-root to the distribution that must be
+#: declared for it (RA-5 audit M-1: depend on what you import directly).
+_ROOT_TO_DISTRIBUTION = {
+    "risk_authority": "ugence-risk-authority",
+    "ugence_tap_provider": "ugence-tap-provider",
+    "ugence_governance_contracts": "ugence-governance-contracts",
+    "ugence_governance_provider_framework": "ugence-governance-provider-framework",
+}
+
+
+def _declared_deps() -> set[str]:
     with open(ROOT / "pyproject.toml", "rb") as fh:
         meta = tomllib.load(fh)
-    deps = {d.split(">")[0].split("=")[0].strip() for d in meta["project"]["dependencies"]}
+    return {
+        d.split(">")[0].split("=")[0].split("[")[0].strip()
+        for d in meta["project"]["dependencies"]
+    }
+
+
+def test_declared_dependencies_are_ra_and_tap():
+    deps = _declared_deps()
     assert {"ugence-risk-authority", "ugence-tap-provider"} <= deps
     # RA-5 must NOT depend on the RA-4.5 runtime (it is upstream of the envelope).
     assert "ugence-risk-authority-runtime" not in deps
+
+
+def test_every_direct_first_party_import_is_declared():
+    """No undeclared direct dependency (M-1).
+
+    Any first-party root the package imports at module scope must have its
+    distribution declared in ``[project].dependencies`` — never relied upon only
+    transitively (e.g. governance-contracts/framework via the TAP provider).
+    """
+
+    deps = _declared_deps()
+    imported_roots = {
+        m.split(".")[0]
+        for _p, _ln, m in _imports()
+        if (m.split(".")[0].startswith("ugence_") or m.split(".")[0] == "risk_authority")
+        and m.split(".")[0] != "ugence_risk_authority_evidence_runtime"
+    }
+    missing = []
+    for root in sorted(imported_roots):
+        dist = _ROOT_TO_DISTRIBUTION.get(root)
+        assert dist is not None, f"unmapped first-party import root: {root}"
+        if dist not in deps:
+            missing.append(f"{root} -> {dist} (imported but not declared)")
+    assert not missing, "\n".join(missing)
 
 
 def test_risk_authority_imported_via_public_ports_only():
