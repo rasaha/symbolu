@@ -51,8 +51,18 @@ class ControlResult:
         return self.status
 
 
-def _index(results: Iterable[ControlResult]) -> dict[str, ControlResult]:
-    return {r.control_id: r for r in results}
+def _group(results: Iterable[ControlResult]) -> dict[str, list[ControlResult]]:
+    """Group *all* results per control id (never collapse duplicates).
+
+    Collapsing to one result per id (e.g. last-wins) would let a later ``PASS``
+    silently mask an earlier ``FAIL`` for the same required control. Every
+    submitted result for a control must be accounted for, fail-closed.
+    """
+
+    grouped: dict[str, list[ControlResult]] = {}
+    for r in results:
+        grouped.setdefault(r.control_id, []).append(r)
+    return grouped
 
 
 def required_controls_satisfied(
@@ -74,16 +84,26 @@ def unsatisfied_controls(
     results: Iterable[ControlResult],
     now: datetime,
 ) -> tuple[tuple[str, ControlStatus], ...]:
-    """Return ``(control_id, effective_status)`` for each unsatisfied control."""
+    """Return ``(control_id, effective_status)`` for each unsatisfied control.
 
-    by_id = _index(results)
+    Fail-closed on duplicates: a required control is satisfied only when it is
+    present and *every* submitted result for it has a satisfying effective
+    status. A single non-satisfying duplicate (e.g. a ``FAIL`` alongside a
+    ``PASS``) governs, and its status is reported — a later ``PASS`` can never
+    mask an earlier failure for the same control.
+    """
+
+    grouped = _group(results)
     failures: list[tuple[str, ControlStatus]] = []
     for control_id in required:
-        result = by_id.get(control_id)
-        if result is None:
+        matches = grouped.get(control_id)
+        if not matches:
             failures.append((control_id, ControlStatus.MISSING))
             continue
-        status = result.effective_status(now)
-        if status not in SATISFYING_STATUSES:
-            failures.append((control_id, status))
+        offending = [
+            m for m in matches if m.effective_status(now) not in SATISFYING_STATUSES
+        ]
+        if offending:
+            # Deterministic: report the first non-satisfying duplicate's status.
+            failures.append((control_id, offending[0].effective_status(now)))
     return tuple(failures)

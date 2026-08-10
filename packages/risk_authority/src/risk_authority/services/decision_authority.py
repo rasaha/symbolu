@@ -6,12 +6,23 @@ issuing principal holds authority covering the requested decision
 otherwise (user brief §6–7). The Risk Engine's recommendation is advisory: a
 DENY/ESCALATE recommendation is honored as the binding outcome; an ALLOW
 recommendation still requires a principal with sufficient authority.
+
+Boundary note (spec §D1/§D2). :class:`DecisionAuthorityPort` is the contract;
+:class:`ReferenceDecisionAuthority` is the in-package **reference** ruler that
+keeps ``risk_authority`` a stdlib-only leaf and lets the RA-1..RA-4 spine be
+proven in isolation. The **canonical production binding-decision authority is
+the separately shipped ``ugence-decision-authority`` kernel** (package
+``packages/capabilities/decision-authority``); a production deployment adapts
+that kernel onto :class:`DecisionAuthorityPort` — through the contract, without
+``risk_authority`` importing it, exactly as ``ActionGatePort`` /
+``ReferenceActionGate`` relate to ``ugence-actiongate-provider``. The reference
+ruler here must not be mistaken for that canonical kernel.
 """
 
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Protocol, runtime_checkable
 
 from ..domain.authority import AuthorityGrant, authority_violations
 from ..domain.decision import RiskDecision
@@ -21,7 +32,11 @@ from ..domain.risk_case import RiskDecisionCase
 from ..domain.scope import Scope
 from .risk_engine import RiskEvaluation
 
-__all__ = ["DecisionAuthority", "DEFAULT_DECISION_TTL"]
+__all__ = [
+    "DecisionAuthorityPort",
+    "ReferenceDecisionAuthority",
+    "DEFAULT_DECISION_TTL",
+]
 
 DEFAULT_DECISION_TTL = timedelta(hours=1)
 
@@ -33,8 +48,40 @@ _RECOMMENDATION_TO_OUTCOME = {
 }
 
 
-class DecisionAuthority:
-    """Issue binding risk decisions within Authority Registry scope."""
+@runtime_checkable
+class DecisionAuthorityPort(Protocol):
+    """The contract for the binding-decision authority (spec §11).
+
+    A production deployment satisfies this port with an adapter over the shipped
+    ``ugence-decision-authority`` kernel; the RA-1..RA-4 slice satisfies it with
+    :class:`ReferenceDecisionAuthority`. Callers depend on this port, never on a
+    concrete ruler.
+    """
+
+    def issue_decision(
+        self,
+        *,
+        decision_id: str,
+        case: RiskDecisionCase,
+        evaluation: RiskEvaluation,
+        grant: AuthorityGrant,
+        requested_scope: Scope,
+        evidence_snapshot_digest: str,
+        model_digest: str,
+        now: datetime,
+        ttl: timedelta = DEFAULT_DECISION_TTL,
+    ) -> RiskDecision: ...
+
+
+class ReferenceDecisionAuthority:
+    """In-package reference ruler that issues binding decisions within Authority
+    Registry scope.
+
+    Reference implementation only — see this module's boundary note. The
+    canonical production binding-decision authority is the shipped
+    ``ugence-decision-authority`` kernel, adapted onto
+    :class:`DecisionAuthorityPort`.
+    """
 
     def issue_decision(
         self,

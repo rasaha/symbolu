@@ -14,7 +14,7 @@ from risk_authority.domain import (
     Scope,
     authority_violations,
 )
-from risk_authority.services import DecisionAuthority, RiskEngine
+from risk_authority.services import ReferenceDecisionAuthority, RiskEngine
 from risk_authority.services.risk_engine import RiskEvaluation
 from risk_authority.domain import RiskRecommendation
 
@@ -124,7 +124,7 @@ def test_decision_authority_raises_on_over_delegation():
     # Requesting a scope broader than the grant must raise, not silently issue.
     app = build_application()
     grant = build_grant()
-    authority = DecisionAuthority()
+    authority = ReferenceDecisionAuthority()
     case = _minimal_case()
     evaluation = RiskEvaluation(
         recommendation=RiskRecommendation.ALLOW,

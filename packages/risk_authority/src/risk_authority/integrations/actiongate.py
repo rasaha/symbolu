@@ -109,6 +109,13 @@ class ReferenceActionGate:
         if action.model_id != identity.model_id:
             reasons.append("model does not match runtime identity")
 
+        # NOTE (documented follow-up, F-D): the scope also carries `jurisdictions`,
+        # `max_autonomy_level` and per-resource constraints, but the canonical
+        # action has no field to match them against, so they bound *issuance*
+        # (monotonicity) without being enforced here. Closing this requires
+        # extending CanonicalAction and is tracked separately — not done in the
+        # authority-spine slice.
+
         # 3. Purpose.
         if action.purpose not in scope.purposes:
             reasons.append(f"purpose {action.purpose!r} outside envelope scope")

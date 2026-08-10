@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 from .control_resolver import applicable_rules, resolve_required_controls
-from .decision_authority import DEFAULT_DECISION_TTL, DecisionAuthority
+from .decision_authority import (
+    DEFAULT_DECISION_TTL,
+    DecisionAuthorityPort,
+    ReferenceDecisionAuthority,
+)
 from .envelope_issuer import (
     DEFAULT_ENVELOPE_TTL,
     EnvelopeIssuer,
@@ -18,7 +22,8 @@ __all__ = [
     "resolve_required_controls",
     "RiskEngine",
     "RiskEvaluation",
-    "DecisionAuthority",
+    "DecisionAuthorityPort",
+    "ReferenceDecisionAuthority",
     "DEFAULT_DECISION_TTL",
     "EnvelopeIssuer",
     "DEFAULT_ENVELOPE_TTL",

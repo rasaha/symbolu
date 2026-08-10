@@ -45,7 +45,7 @@ from ..persistence.in_memory import (
     InMemoryGovernanceEventStore,
     InMemoryRiskCaseRepository,
 )
-from ..services.decision_authority import DecisionAuthority
+from ..services.decision_authority import ReferenceDecisionAuthority
 from ..services.envelope_issuer import EnvelopeIssuer
 from ..services.envelope_verifier import EnvelopeVerification, EnvelopeVerifier
 from ..services.revocation import RevocationState
@@ -110,7 +110,9 @@ class RiskAuthorityApplication:
         self._ids = ids or _Ids()
 
         self._engine = RiskEngine()
-        self._authority_service = DecisionAuthority()
+        # Reference ruler behind DecisionAuthorityPort; production adapts the
+        # shipped ugence-decision-authority kernel onto the same port.
+        self._authority_service = ReferenceDecisionAuthority()
         self._issuer_service = EnvelopeIssuer(issuer=issuer)
         self._verifier = EnvelopeVerifier()
         self._gate = ReferenceActionGate(self._verifier)

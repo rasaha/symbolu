@@ -35,6 +35,18 @@ package integrates existing governance components (ActionGate, TAP, PWC) through
 the ports in `risk_authority.integrations` and never imports their
 application-specific policy logic.
 
+**Reference implementations vs. canonical kernels.** To stay a stdlib-only leaf
+this slice ships *reference* implementations behind ports rather than importing
+the shipped Ugence packages: `ReferenceActionGate` behind `ActionGatePort`, and
+`ReferenceDecisionAuthority` behind `DecisionAuthorityPort`. The **canonical
+production binding-decision authority is the separately shipped
+`ugence-decision-authority` kernel** (`packages/capabilities/decision-authority`),
+and exact-action enforcement is owned by `ugence-actiongate-provider`. A
+production deployment adapts those kernels onto the ports here — through the
+contract, without `risk_authority` importing them. The in-package
+`ReferenceDecisionAuthority` is a proving stand-in and must not be mistaken for
+the canonical kernel.
+
 ## Design invariants (enforced + tested)
 
 | Invariant | Where | Test |
@@ -55,7 +67,7 @@ application-specific policy logic.
 ```
 src/risk_authority/
   domain/         immutable typed artifacts + the RiskDecisionCase state machine
-  services/       risk engine, decision authority, envelope issuer/verifier, revocation
+  services/       risk engine, reference decision authority (+ port), envelope issuer/verifier, revocation
   crypto/         canonical serialization, sha-256 hashing, pure-Python Ed25519, key ring
   integrations/   ActionGate / TAP / PWC ports (+ reference ActionGate matching engine)
   persistence/    repository contracts, in-memory reference, Postgres skeleton + DDL
@@ -99,3 +111,12 @@ RA-1 → RA-4 deliberately **excludes** trajectory control, ACP, reconciliation,
 Context Minimization, full PWC ingestion and GRC dashboards. Their contracts are
 present; their runtimes are layered after the authority spine is proven
 (spec §35 roadmap, user brief §25).
+
+**Known follow-up (documented, not yet closed).** The `Scope` carries authority
+dimensions the reference ActionGate does not yet enforce at runtime because the
+canonical action model has no corresponding field: `jurisdictions`,
+`max_autonomy_level`, and per-resource (`target_id`) constraints. These bound
+issuance (they participate in delegation/envelope monotonicity) but are not
+matched against a presented action. Closing this requires extending
+`CanonicalAction` (a deliberate, separately-reviewed change) and is tracked as a
+follow-up rather than done in the authority-spine slice.
