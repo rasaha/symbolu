@@ -8,9 +8,12 @@ A **domain-neutral execution-coordination kernel** for agent and workflow execut
 > planning/reasoning/memory. See
 > [`docs/AGENT_RUNTIME_POST_MERGE_FIDELITY_AUDIT.md`](docs/AGENT_RUNTIME_POST_MERGE_FIDELITY_AUDIT.md).
 >
-> **Maturity:** `IMPLEMENTED_AND_CI_VERIFIED` (the scoped Agent Runtime GitHub Actions
-> workflow has been observed passing). Not live-verified, pilot-validated,
-> enforcement-ready, or production-ready.
+> **Maturity:** `IMPLEMENTED_AND_CI_VERIFIED` — both `0.2.0` (canonical execution state)
+> and the additive `0.3.0` **H22-A bounded workflow advancement** seam have been observed
+> passing the scoped Agent Runtime GitHub Actions workflow (package suite, isolated
+> wheel-install verification, platform-freeze, terminology, API-stability registry, and
+> safety-case checks all green). Not live-verified, pilot-validated, enforcement-ready, or
+> production-ready.
 
 The kernel drives task and workflow lifecycle, invokes providers/tools, and applies
 retry, timeout, cancellation, checkpointing, and durable recovery. Before any
@@ -47,7 +50,7 @@ neutral contracts and utilities
 
 ```bash
 python -m build packages/runtime/agent-runtime
-pip install dist/ugence_agent_runtime-0.2.0-py3-none-any.whl
+pip install dist/ugence_agent_runtime-0.3.0-py3-none-any.whl
 ```
 
 The core has **no third-party dependencies** — it is stdlib-only. Importing it is
@@ -112,6 +115,38 @@ selects agents, or duplicates the proposal's action payload. Read it with
 > canonical authoritative execution state — owned by the runtime, not the agent brain and
 > not the authority engine.
 
+## Bounded workflow advancement (H22-A)
+
+`start_workflow` drives a workflow to its next stable stopping condition in one call. To
+let a **future** external orchestrator interleave several independent workflows fairly,
+`0.3.0` adds an additive, deterministic seam that separates *creating* a workflow from
+*draining* it:
+
+```python
+a = rt.prepare_workflow(wf_a)          # created + RUNNING, no task advanced yet
+b = rt.prepare_workflow(wf_b)
+
+rt.advance_workflow(a.instance_id)     # A: exactly one bounded quantum
+rt.advance_workflow(b.instance_id)     # B: exactly one bounded quantum
+rt.advance_workflow(a.instance_id)     # A: the next quantum … A/B/A/B, deterministically
+```
+
+A **quantum** is *at most one runtime task transition through one stable, checkpointed
+boundary*. `advance_workflow` returns a frozen `WorkflowAdvanceOutcome` describing what
+happened (`task_id`, `task_status`, `stop_reason`, `execution_state_digest`,
+`checkpoint_digest`, `terminal`/`waiting`/`paused`). The
+governance→exact-action→provider→transition→checkpoint chain runs **entirely within a
+single quantum** — an orchestrator can never observe or preempt a workflow between a
+governance `CLEAR` and the provider invocation it cleared. `advance_workflow` never
+self-resolves a governance `HOLD`/`ESCALATE`: a `WAITING`/`PAUSED` workflow reports
+`REQUIRES_RESUME` until an explicit `resume_workflow`. `start_workflow` is unchanged — it
+is now simply `prepare_workflow` followed by repeated bounded advancement.
+
+**H22-A is not full H22.** It provides *only* the bounded-advancement foundation. The
+portfolio scheduler, cross-workflow dependencies, priority/fairness/aging, shared budget,
+and any concurrency are later phases. See
+[`docs/AGENT_RUNTIME_H22_READINESS.md`](docs/AGENT_RUNTIME_H22_READINESS.md).
+
 ## Documentation
 
 See [`docs/`](docs/) — overview, package boundary, public API, state model, canonical
@@ -121,14 +156,18 @@ in [`artifacts/`](artifacts/).
 
 ## Status
 
-`0.2.0` — adds canonical execution state (deterministic, versioned, integrity-protected,
-runtime-owned execution-trajectory identity; additive public API + a `checkpoint_version`
-boundary for execution-state lineage) on top of the first independent distribution, the
-post-merge governance-safety correction (0.1.1), and exact-action contract hardening
-(0.1.2). No change to exact-action fingerprint semantics, governance ownership, or the
-digest semantics of existing checkpoints. Single-workflow coordination only. Maturity:
-`IMPLEMENTED_AND_CI_VERIFIED` — the scoped Agent Runtime GitHub Actions workflow has been
-observed passing on the merged change (package suite 110 passed, 2 skipped; isolated
-wheel-install verification PASS). This does not imply production, pilot, live-environment,
-or enforcement validation. **Multi-workflow orchestration (H22) is a later feature phase,
-not implemented here.**
+`0.3.0` — adds the **H22-A bounded workflow advancement** seam (`prepare_workflow` +
+`advance_workflow` returning `WorkflowAdvanceOutcome`/`WorkflowAdvanceStop`) so an
+external orchestrator can advance independent workflows one deterministic quantum at a
+time. Additive only: `start_workflow` keeps its run-to-stable-state behavior (now built on
+the same primitive), and there is **no** change to exact-action fingerprint semantics,
+governance ownership, canonical execution state, checkpoint digest semantics, or recovery
+behavior. Builds on canonical execution state (0.2.0), the post-merge governance-safety
+correction (0.1.1), and exact-action contract hardening (0.1.2). Single-workflow
+coordination only. Maturity: `IMPLEMENTED_AND_CI_VERIFIED` — the scoped Agent Runtime
+GitHub Actions workflow has been observed passing on the change (package suite 132 passed,
+2 skipped; isolated wheel-install verification PASS; freeze, terminology, API-stability
+registry, and safety-case checks all green). This does not imply production, pilot,
+live-environment, or enforcement validation. **Full multi-workflow orchestration (H22 — portfolio scheduler,
+cross-workflow dependencies, priority/fairness, concurrency) is a later feature phase, not
+implemented here.**

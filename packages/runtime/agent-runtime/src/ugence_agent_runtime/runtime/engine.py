@@ -23,7 +23,13 @@ from ..governance.interfaces import GovernanceEvaluation
 from ..models import events as ev
 from ..models.execution_state import CanonicalExecutionState, ExecutionLineage
 from ..models.proposal import TransitionProposal, compute_fingerprint
-from ..models.results import FailureCategory, RuntimeFailure, RuntimeResult
+from ..models.results import (
+    FailureCategory,
+    RuntimeFailure,
+    RuntimeResult,
+    WorkflowAdvanceOutcome,
+    WorkflowAdvanceStop,
+)
 from ..models.task import TaskInstance, TaskStatus
 from ..models.transitions import check_task_transition, check_workflow_transition
 from ..models.workflow import (
@@ -63,6 +69,10 @@ class AgentRuntime:
         # The full trajectory journal per instance, keyed by state_digest, so a historical
         # snapshot referenced by an event stays resolvable (not only the latest per task).
         self._exec_journal: Dict[str, Dict[str, CanonicalExecutionState]] = {}
+        # The digest of the most recent checkpoint emitted per instance. Used only to
+        # populate the bounded-advancement result with a reference to the checkpoint a
+        # quantum committed; it never becomes a competing store of execution truth.
+        self._last_checkpoint: Dict[str, str] = {}
         # Runtime-level trace (records RUNTIME_CREATED); no I/O performed here.
         self._runtime_trace = RunTrace(
             instance_id=self._config.runtime_id,
@@ -101,13 +111,27 @@ class AgentRuntime:
         return list(self._traces[instance_id].events)
 
     # -- public lifecycle ---------------------------------------------------
-    def start_workflow(
+    def prepare_workflow(
         self,
         definition: WorkflowDefinition,
         correlation_id: Optional[str] = None,
         lineage: Optional[ExecutionLineage] = None,
         task_lineage: Optional[Dict[str, ExecutionLineage]] = None,
     ) -> WorkflowInstance:
+        """Create and register a workflow instance WITHOUT draining it to completion.
+
+        This is the bounded-advancement entry point (H22-A). It performs exactly the
+        same setup as :meth:`start_workflow` — instance creation, the WORKFLOW_CREATED /
+        WORKFLOW_STARTED transitions, and the initial (RUNNING) checkpoint — but it does
+        NOT drive any task. The workflow is left RUNNING with no task advanced, ready for
+        an external orchestrator to advance it one quantum at a time via
+        :meth:`advance_workflow`.
+
+        No provider or governance call happens here: setup crosses no governance boundary
+        and invokes no provider, exactly as the first phase of ``start_workflow`` never
+        did. A prepared-but-not-advanced instance persists as an ordinary RUNNING
+        checkpoint, so its recovery semantics are the existing ones (recovered as PAUSED,
+        requiring explicit continuation — never auto-run)."""
         instance_id = self._config.id_generator()
         correlation_id = correlation_id or instance_id
         instance = WorkflowInstance.create(
@@ -125,8 +149,52 @@ class AgentRuntime:
         self._set_wf(instance, WorkflowStatus.READY, trace, None)
         self._set_wf(instance, WorkflowStatus.RUNNING, trace, ev.WORKFLOW_STARTED)
         self._checkpoint(instance, trace)
-        self._drive(instance, trace)
         return instance
+
+    def start_workflow(
+        self,
+        definition: WorkflowDefinition,
+        correlation_id: Optional[str] = None,
+        lineage: Optional[ExecutionLineage] = None,
+        task_lineage: Optional[Dict[str, ExecutionLineage]] = None,
+    ) -> WorkflowInstance:
+        """Create a workflow and drive it to its next stable stopping condition.
+
+        Backward-compatible behavior is preserved exactly: the workflow is created and
+        then advanced, one quantum at a time, until it reaches a terminal state or a
+        governance HOLD/ESCALATE boundary — identical to the previous run-to-stable-state
+        semantics. It is now implemented on top of the bounded-advancement primitive
+        (``prepare_workflow`` + repeated ``_advance_once``)."""
+        instance = self.prepare_workflow(definition, correlation_id, lineage, task_lineage)
+        self._drive(instance, self._traces[instance.instance_id])
+        return instance
+
+    def advance_workflow(self, instance_id: str) -> WorkflowAdvanceOutcome:
+        """Advance a prepared/running workflow by ONE bounded execution quantum.
+
+        A quantum is the smallest indivisible unit of runtime progress that ends at a
+        stable, checkpointed boundary. It is AT MOST one runtime task transition through
+        one stable boundary — concretely one of:
+
+          * one task run through the full governance→exact-action→provider→transition→
+            checkpoint chain (leaving the workflow RUNNING if more work remains, or
+            WAITING/PAUSED/FAILED/COMPLETED), OR
+          * one finalization (no task is runnable → COMPLETED, or all remaining work is
+            blocked → WAITING), OR
+          * one cancellation (a cancellation token was observed).
+
+        The governance→exact-action→provider chain runs entirely WITHIN a single quantum
+        and this call returns only after it has reached a stable boundary and been
+        checkpointed: an external orchestrator can never observe or preempt a workflow
+        between a governance CLEAR and the provider invocation it cleared.
+
+        On a workflow that is not RUNNING this is a deterministic no-op that reports why:
+        a terminal workflow yields ``ALREADY_TERMINAL``; a WAITING/PAUSED workflow yields
+        ``REQUIRES_RESUME`` (bounded advancement never self-resolves a governance HOLD or
+        ESCALATE — that remains the explicit job of :meth:`resume_workflow`)."""
+        instance = self._instances[instance_id]
+        trace = self._traces[instance_id]
+        return self._advance_once(instance, trace)
 
     def resume_workflow(self, instance_id: str) -> WorkflowInstance:
         """Explicitly continue a workflow that is WAITING or PAUSED.
@@ -253,16 +321,126 @@ class AgentRuntime:
 
     # -- drive loop ---------------------------------------------------------
     def _drive(self, instance: WorkflowInstance, trace: RunTrace) -> None:
-        token = self._tokens[instance.instance_id]
+        """Run bounded quanta until the workflow leaves RUNNING (or a quantum makes no
+        progress). ``start_workflow`` uses this to reproduce the existing run-to-stable-
+        state behavior; it is exactly a loop over the same primitive an external
+        orchestrator drives one quantum at a time."""
         while instance.status is WorkflowStatus.RUNNING:
-            if token.cancelled:
-                self.cancel_workflow(instance.instance_id)
+            outcome = self._advance_once(instance, trace)
+            if not outcome.progressed:
+                # No forward progress while RUNNING (e.g. no runnable task and no
+                # finalization applied): stop rather than spin. Preserves the previous
+                # single-return-per-drive behavior without risking a busy loop.
                 return
-            task = instance.ready_task()
-            if task is None:
-                self._finalize(instance, trace)
-                return
-            self._run_task(instance, task, trace)
+
+    def _advance_once(
+        self, instance: WorkflowInstance, trace: RunTrace
+    ) -> WorkflowAdvanceOutcome:
+        """Execute one bounded quantum and return what happened at the stable boundary."""
+        instance_id = instance.instance_id
+        token = self._tokens[instance_id]
+        status_before = instance.status
+
+        # Not runnable: a deterministic, side-effect-free no-op that reports why. A
+        # terminal workflow is done; a WAITING/PAUSED workflow needs an explicit resume
+        # (bounded advancement never self-resolves a restrictive governance disposition).
+        if instance.status is not WorkflowStatus.RUNNING:
+            reason = (
+                WorkflowAdvanceStop.ALREADY_TERMINAL
+                if instance.is_terminal
+                else WorkflowAdvanceStop.REQUIRES_RESUME
+            )
+            return self._advance_result(instance, status_before, None,
+                                        progressed=False, stop_reason=reason)
+
+        ckpt_before = self._last_checkpoint.get(instance_id)
+
+        if token.cancelled:
+            self.cancel_workflow(instance_id)
+            return self._advance_result(
+                instance, status_before, None, progressed=True,
+                stop_reason=WorkflowAdvanceStop.WORKFLOW_CANCELLED,
+                checkpoint_before=ckpt_before)
+
+        task = instance.ready_task()
+        if task is None:
+            before = self._status_snapshot(instance)
+            self._finalize(instance, trace)
+            progressed = self._status_snapshot(instance) != before
+            return self._advance_result(
+                instance, status_before, None, progressed=progressed,
+                stop_reason=self._boundary_reason(instance.status),
+                checkpoint_before=ckpt_before)
+
+        task_id = task.task_id
+        self._run_task(instance, task, trace)
+        ti = instance.tasks[task_id]
+        return self._advance_result(
+            instance, status_before, ti, progressed=True,
+            stop_reason=self._boundary_reason(instance.status),
+            checkpoint_before=ckpt_before)
+
+    def _status_snapshot(self, instance: WorkflowInstance):
+        """A deterministic (registration-ordered) snapshot of workflow+task statuses,
+        used to detect whether a quantum changed any runtime state."""
+        return (
+            instance.status,
+            tuple(
+                (d.task_id, instance.tasks[d.task_id].status)
+                for d in instance.definition.tasks
+            ),
+        )
+
+    def _boundary_reason(self, status: WorkflowStatus) -> WorkflowAdvanceStop:
+        """Map the workflow status at a stable boundary to a stop reason."""
+        if status is WorkflowStatus.RUNNING:
+            return WorkflowAdvanceStop.TASK_ADVANCED
+        if status is WorkflowStatus.COMPLETED:
+            return WorkflowAdvanceStop.WORKFLOW_COMPLETED
+        if status is WorkflowStatus.FAILED:
+            return WorkflowAdvanceStop.WORKFLOW_FAILED
+        if status is WorkflowStatus.WAITING:
+            return WorkflowAdvanceStop.WORKFLOW_WAITING
+        if status is WorkflowStatus.PAUSED:
+            return WorkflowAdvanceStop.WORKFLOW_PAUSED
+        if status is WorkflowStatus.CANCELLED:
+            return WorkflowAdvanceStop.WORKFLOW_CANCELLED
+        # CREATED/READY are internal to setup and never observed at a quantum boundary.
+        return WorkflowAdvanceStop.TASK_ADVANCED
+
+    def _advance_result(
+        self, instance: WorkflowInstance, status_before: WorkflowStatus,
+        ti: Optional[TaskInstance], *, progressed: bool,
+        stop_reason: WorkflowAdvanceStop, checkpoint_before: Optional[str] = None,
+    ) -> WorkflowAdvanceOutcome:
+        instance_id = instance.instance_id
+        exec_digest = None
+        task_id = None
+        task_status = None
+        if ti is not None:
+            task_id = ti.task_id
+            task_status = ti.status.value
+            snap = self._exec_states.get(instance_id, {}).get(ti.task_id)
+            exec_digest = snap.state_digest if snap is not None else None
+        # Reference the checkpoint this quantum committed (if any) — a checkpoint digest
+        # that changed since the quantum began. Never a competing store of state.
+        ckpt_now = self._last_checkpoint.get(instance_id)
+        checkpoint_digest = ckpt_now if ckpt_now != checkpoint_before else None
+        return WorkflowAdvanceOutcome(
+            instance_id=instance_id,
+            workflow_id=instance.workflow_id,
+            status_before=status_before.value,
+            status_after=instance.status.value,
+            stop_reason=stop_reason.value,
+            progressed=progressed,
+            task_id=task_id,
+            task_status=task_status,
+            execution_state_digest=exec_digest,
+            checkpoint_digest=checkpoint_digest,
+            terminal=instance.is_terminal,
+            waiting=instance.status is WorkflowStatus.WAITING,
+            paused=instance.status is WorkflowStatus.PAUSED,
+        )
 
     def _finalize(self, instance: WorkflowInstance, trace: RunTrace) -> None:
         remaining = instance.remaining_tasks()
@@ -522,5 +700,9 @@ class AgentRuntime:
             self._config.checkpoint_store.put(checkpoint)
         if self._config.state_store is not None:
             self._config.state_store.save(checkpoint)
+        # Record the committed checkpoint's digest so a bounded-advancement quantum can
+        # reference the checkpoint it produced. This is a reference only; the runtime's
+        # persisted checkpoint remains the sole source of recoverable truth.
+        self._last_checkpoint[instance.instance_id] = checkpoint.digest
         trace.emit(ev.CHECKPOINT_COMMITTED, instance_id=instance.instance_id,
                    status=instance.status.value, digest=checkpoint.digest[:12])

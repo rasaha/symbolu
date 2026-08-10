@@ -9,7 +9,13 @@ from .execution_state import (
     ExecutionLineage,
 )
 from .proposal import ProposalError, TransitionProposal, compute_fingerprint
-from .results import FailureCategory, RuntimeFailure, RuntimeResult
+from .results import (
+    FailureCategory,
+    RuntimeFailure,
+    RuntimeResult,
+    WorkflowAdvanceOutcome,
+    WorkflowAdvanceStop,
+)
 from .task import (
     TERMINAL_TASK_STATUSES,
     TaskDefinition,
@@ -43,6 +49,8 @@ __all__ = [
     "FailureCategory",
     "RuntimeFailure",
     "RuntimeResult",
+    "WorkflowAdvanceOutcome",
+    "WorkflowAdvanceStop",
     "TaskDefinition",
     "TaskInstance",
     "TaskStatus",

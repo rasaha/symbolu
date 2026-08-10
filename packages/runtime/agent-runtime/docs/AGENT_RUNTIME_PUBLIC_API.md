@@ -22,6 +22,8 @@ Machine-readable form: [`../artifacts/agent_runtime_public_api.json`](../artifac
 | `RuntimeTransition` | dataclass | A recorded state change. |
 | `RuntimeEvent` | dataclass | A deterministic coordination event. |
 | `RuntimeResult` | dataclass | Outcome of a run (status, completed tasks, failures). |
+| `WorkflowAdvanceOutcome` | dataclass | Frozen result of one bounded advancement quantum (H22-A): before/after status, `stop_reason`, advanced task, `execution_state_digest`, `checkpoint_digest`, terminal/waiting/paused. References state by digest; never a second copy of it. |
+| `WorkflowAdvanceStop` | enum | Stable stop-reason for a quantum (`TASK_ADVANCED`, `WORKFLOW_COMPLETED/FAILED/WAITING/PAUSED/CANCELLED`, `ALREADY_TERMINAL`, `REQUIRES_RESUME`). |
 | `RuntimeFailure` | dataclass | Classified failure (`FailureCategory`). |
 | `FailureCategory` | enum | Neutral failure taxonomy. |
 | `Provider` | Protocol | Neutral provider contract. |
@@ -49,7 +51,9 @@ Machine-readable form: [`../artifacts/agent_runtime_public_api.json`](../artifac
 | Function | Purpose |
 | --- | --- |
 | `create_runtime(config=None)` / `open_runtime(config=None)` | Build a runtime. No I/O. |
-| `start_workflow(runtime, definition, correlation_id=None, lineage=None, task_lineage=None)` | Start and drive a workflow (optional workflow-common and per-task `ExecutionLineage`). |
+| `start_workflow(runtime, definition, correlation_id=None, lineage=None, task_lineage=None)` | Start and drive a workflow to its next stable stopping condition (optional workflow-common and per-task `ExecutionLineage`). |
+| `prepare_workflow(runtime, definition, correlation_id=None, lineage=None, task_lineage=None)` | Create/register a workflow **without draining it** (H22-A); advance it with `advance_workflow`. |
+| `advance_workflow(runtime, instance_id)` | Advance a prepared/running workflow by **one bounded quantum**; returns `WorkflowAdvanceOutcome` (H22-A). |
 | `execution_state(runtime, instance_id, task_id=None)` | Read the latest canonical execution-state snapshot (read-only). |
 | `execution_state_by_digest(runtime, instance_id, state_digest)` | Resolve a historical snapshot by its digest (read-only). |
 | `resume_workflow(runtime, instance_id)` | Explicitly continue a `WAITING`/`PAUSED` workflow. |
