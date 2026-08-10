@@ -129,6 +129,21 @@ class RiskAuthorityApplication:
                     "authenticity (RA-5 §13; audit H-2). Inject an authenticated "
                     "producer-channel verifier."
                 )
+            # F-1 (symmetric with the H-1 ControlAssurancePort guardrail below): a
+            # reference/conformance ingress stand-in must never be wired as the real
+            # producer-channel verifier in production. The shipped StaticTrustedIngress
+            # is a deterministic conformance seam (is_reference_ingress=True); accepting
+            # it here would silently reopen the H-2 evidence-authenticity gap it was
+            # meant to make explicit. Fail closed so the misconfiguration is
+            # tamper-evident at construction, not at decision time.
+            if getattr(evidence_ingress, "is_reference_ingress", False) is True:
+                raise RiskAuthorityError(
+                    "production TrustedEvidenceIngressPort must not be a "
+                    "reference/conformance stand-in (is_reference_ingress=True): a "
+                    "conformance seam records a fixed posture, it does not authenticate "
+                    "the producer channel (RA-5 §13; audit F-1). Inject the "
+                    "deployment's real authenticated-channel verifier."
+                )
             # H-1: a permissive/reference/default evaluator must not silently
             # satisfy control assurance in production. A production-authoritative
             # port must explicitly opt in; anything else fails closed.

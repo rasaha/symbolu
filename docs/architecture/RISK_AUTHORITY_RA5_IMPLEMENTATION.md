@@ -83,7 +83,7 @@ changes to Decision Authority or ActionGate semantics; no F-D (#1397) / F2 (#140
 |---|---|
 | RA-1→RA-4 baseline (`packages/risk_authority/tests`) | 97 passed (unchanged) |
 | RA-4.5 runtime (`packages/integration/risk-authority-runtime/tests`) | 77 passed (unchanged) |
-| RA-5 trusted-evidence suite (`.../risk-authority-evidence-runtime/tests`) | 86 passed (63 pre-audit + hardening/boundary coverage) |
+| RA-5 trusted-evidence suite (`.../risk-authority-evidence-runtime/tests`) | 87 passed (63 pre-audit + hardening/boundary coverage) |
 | TAP provider | 82 passed |
 | Decision Authority / ActionGate / governance framework / contracts | 79 / 62 / 84 / 48 passed |
 | Offline isolated-install + boundary proof | PASS |
@@ -125,6 +125,16 @@ architecture; the baselines above remain green and unchanged.
   **not** producer authenticity. No canonical authenticated-ingress facility exists
   in-repo to compose with, so this ships the neutral seam plus a conformance
   `StaticTrustedIngress` stand-in for the deployment's real channel decision.
+- **F-1 — symmetric ingress guardrail (final re-audit).** The conformance
+  `StaticTrustedIngress` stand-in is flagged `is_reference_ingress = True`, and
+  production mode now **refuses any ingress carrying that marker** at construction,
+  exactly mirroring the H-1 `is_production_authoritative` control-port guardrail.
+  This closes the last asymmetry the re-audit flagged: a deployment can no longer
+  accidentally wire the conformance stand-in as the real producer-channel verifier
+  and silently reopen the H-2 evidence-authenticity gap — the misconfiguration is
+  now tamper-evident (fail-closed) at construction, not at decision time. A real
+  deployment injects its own authenticated-channel verifier (mTLS / workload
+  identity / signed producer-channel token), which carries no reference marker.
 - **M-1** — the two directly-imported governance distributions
   (`ugence-governance-contracts`, `ugence-governance-provider-framework`) are now
   declared dependencies (no longer only transitive via the TAP provider); a
@@ -145,6 +155,37 @@ architecture; the baselines above remain green and unchanged.
   them into the content digest would be lifecycle-invalid. Neither digest is a
   signature.
 
-Post-hardening the RA-5 suite is **86 passed**; the reproduced exploit now fails
+Post-hardening the RA-5 suite is **87 passed**; the reproduced exploit now fails
 closed (`DENY`, no envelope) via three independent layers (admission-record
 binding, presumptive-support downgrade, and trusted-ingress gating).
+
+### Trust maturity — what these seams are, and are not (F-2)
+
+The RA-5 trust boundary is **explicit and structurally required, but delegated —
+not cryptographic producer authentication.** Two nodes on the trusted-evidence
+path are deliberate *trusted injection points* owned by the deployment, not
+tamper-proof structural checks:
+
+* the **`TrustedEvidenceIngressPort`** decides "did this evidence arrive over an
+  authenticated producer channel?" — a judgement the deployment makes out of band
+  (mTLS / workload identity / signed token). RA ships the neutral seam and fails
+  closed without it (H-2) and against the conformance stand-in (F-1); it does
+  **not** itself authenticate a producer. Producer attestation / signatures remain
+  FUTURE (§13). The integrity and admission-record digests are content /
+  attribution *tamper-detection*, **not** signatures or producer identity.
+* the **`ControlAssurancePort`** produces the trusted `ControlResult`. Production
+  refuses a non-authoritative or presumptive evaluator (H-1), and RA
+  authoritatively re-checks each result's **context and freshness** (§8) — but that
+  re-check proves *consistency*, not the *provenance* of the determination. An
+  evaluator a deployment injects is inside the trusted computing base by design.
+
+The delivered invariant is therefore precisely:
+
+> **Production authority ⇒ evidence passed a REQUIRED, fail-closed trusted-ingress
+> decision AND a production-authoritative Control-Assurance determination, both
+> injected by the deployment, AND RA's context/freshness binding re-check.**
+
+It is **not** "⇒ cryptographically authenticated producer." That is architecturally
+acceptable and intended; it is called out here so reviewers weigh the seams as
+*delegated trust*, and so a future RA-6+ effort can add real producer attestation
+where the seams already exist.

@@ -12,9 +12,17 @@ integrity digest.
   single trust posture for the channel. A real deployment injects a verifier
   backed by its authenticated ingress (mTLS / workload identity / signed
   producer-channel token) instead. It is intentionally NOT an authenticator — it
-  exists so the production *flow* can be exercised deterministically and so the
-  fail-closed requirement (no ingress ⇒ production refuses to construct) is
+  exists so the trusted-evidence *flow* can be exercised deterministically and so
+  the fail-closed requirement (no ingress ⇒ production refuses to construct) is
   testable.
+
+  Because it is a stand-in and not a real authenticator, **production mode
+  refuses it**: it is flagged ``is_reference_ingress = True`` and the production
+  ``RiskAuthorityApplication`` fails closed on any ingress carrying that marker
+  (RA-5 audit F-1), symmetric with the ``is_production_authoritative`` guardrail
+  on the Control-Assurance port. Wiring this stand-in into production would
+  silently reopen the H-2 evidence-authenticity gap, so it is rejected at
+  construction. Use it only in reference/conformance and adversarial tests.
 
 This module is stdlib-only apart from the RA contract types it implements.
 """

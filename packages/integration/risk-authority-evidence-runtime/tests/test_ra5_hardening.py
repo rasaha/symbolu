@@ -128,11 +128,38 @@ def test_production_requires_trusted_ingress():
         )
 
 
+def test_production_rejects_reference_ingress():
+    # F-1: the conformance stand-in (is_reference_ingress=True) is not a real
+    # authenticated-channel verifier; production must refuse it at construction,
+    # symmetric with test_production_rejects_reference_control_assurance. Wiring it
+    # in would silently reopen the H-2 evidence-authenticity gap.
+    assert StaticTrustedIngress(trusted=True).is_reference_ingress is True
+    with pytest.raises(RiskAuthorityError):
+        _bare_app(
+            evidence_admission=ProductionEvidenceAdmission(),
+            control_assurance=TapControlAssurance(C.make_tap_provider()),
+            evidence_ingress=StaticTrustedIngress(trusted=True),
+            production_mode=True,
+        )
+    # Rejection is on the reference marker, not the posture: trusted=False too.
+    with pytest.raises(RiskAuthorityError):
+        _bare_app(
+            evidence_admission=ProductionEvidenceAdmission(),
+            control_assurance=TapControlAssurance(C.make_tap_provider()),
+            evidence_ingress=StaticTrustedIngress(trusted=False),
+            production_mode=True,
+        )
+
+
 def test_untrusted_channel_evidence_is_dropped_and_denies():
     # Explicit full-support determination, but evidence arrives over an UNTRUSTED
     # channel ⇒ never admitted ⇒ every required control MISSING ⇒ DENY. A valid
-    # self-computed digest is irrelevant.
-    runtime = C.build_runtime(evidence_ingress=StaticTrustedIngress(trusted=False))
+    # self-computed digest is irrelevant. Uses a real (non-reference) deployment
+    # channel verifier set to distrust — the conformance stand-in is refused in
+    # production (F-1), so it can no longer stand in for this check.
+    runtime = C.build_runtime(
+        evidence_ingress=C.DeploymentChannelIngress(trusted=False)
+    )
     records, mapping = C.full_evidence_and_map()
     ev = _evaluate(runtime, records, mapping)
     assert ev.recommendation is RiskRecommendation.DENY
@@ -147,7 +174,7 @@ def test_fabricated_evidence_over_trusted_channel_still_needs_real_determination
     # presumptive support ⇒ DENY. Digest + presence are not authority.
     runtime = C.build_runtime(
         tap_provider=C.make_tap_provider(explicit_support=False),
-        evidence_ingress=StaticTrustedIngress(trusted=True),
+        evidence_ingress=C.DeploymentChannelIngress(trusted=True),
     )
     records, mapping = C.full_evidence_and_map()
     ev = _evaluate(runtime, records, mapping)

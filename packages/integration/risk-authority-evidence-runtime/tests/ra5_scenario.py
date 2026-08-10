@@ -144,6 +144,25 @@ def make_failing_provider(fail: str):
     return build_tap_provider(engine)
 
 
+class DeploymentChannelIngress:
+    """Test stand-in for a deployment's REAL authenticated-channel verifier.
+
+    Unlike the shipped conformance ``StaticTrustedIngress`` — which production mode
+    now rejects (RA-5 audit F-1) because it is only a fixed-posture stand-in — this
+    carries **no** ``is_reference_ingress`` marker: it models the mTLS /
+    workload-identity / signed-token verifier a deployment injects. It lives in
+    test code on purpose; the production package must not ship a permissive
+    always-trusting ingress, or F-1's guardrail would just be re-openable under a
+    new name. ``trusted=False`` models an unauthenticated caller channel.
+    """
+
+    def __init__(self, *, trusted: bool) -> None:
+        self._trusted = bool(trusted)
+
+    def is_trusted(self, evidence, *, now):
+        return self._trusted
+
+
 def build_runtime(
     *,
     tap_provider=None,
@@ -164,10 +183,12 @@ def build_runtime(
         clock=clock,
         evidence_admission=evidence_admission or ProductionEvidenceAdmission(),
         control_assurance=control_assurance,
-        # The finance scenario's evidence arrives over an authenticated producer
-        # channel (RA-5 §13; audit H-2). Adversarial tests override this with an
-        # untrusted-channel ingress to prove fabricated caller evidence is dropped.
-        evidence_ingress=evidence_ingress or StaticTrustedIngress(trusted=True),
+        # The finance scenario's evidence arrives over a deployment's real
+        # authenticated producer channel (RA-5 §13; audit H-2, F-1) — NOT the
+        # conformance stand-in, which production now refuses. Adversarial tests
+        # override this with an untrusted-channel verifier to prove fabricated
+        # caller evidence is dropped.
+        evidence_ingress=evidence_ingress or DeploymentChannelIngress(trusted=True),
     )
     runtime.application.authority.add_grant(build_grant())
     return runtime

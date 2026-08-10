@@ -107,10 +107,17 @@ def evidence(eid="ev1"):
         policy_digest=wf.digest, observed_at=NOW, valid_until=NOW + timedelta(hours=1),
         admitted_at=NOW, producer="prod", producer_version="1")
 
+# A deployment's REAL authenticated-channel verifier — no is_reference_ingress
+# marker, so production accepts it (unlike the conformance StaticTrustedIngress,
+# which F-1 refuses). Models mTLS / workload-identity ingress.
+class ChannelIngress:
+    def __init__(self, *, trusted): self._t = bool(trusted)
+    def is_trusted(self, evidence, *, now): return self._t
+
 # An EXPLICIT full-support determination (rule) + authenticated producer channel.
 supported = {"C1": TapRule(outcome=TapOutcome.SUPPORTED, evidence_coverage=1.0)}
 prod_assurance = TapControlAssurance(build_tap_provider(TapEngine(rules=supported)))
-trusted_ingress = StaticTrustedIngress(trusted=True)
+trusted_ingress = ChannelIngress(trusted=True)
 
 # 2. GRANT path — explicit full support + trusted channel.
 runtime = build_runtime(prod_assurance, trusted_ingress)
@@ -126,7 +133,7 @@ assert d.recommendation is RiskRecommendation.DENY, d.recommendation
 # 3b. H-1 DENY — a rule-less (presumptive) evaluator cannot mint PASS from mere
 # evidence presence, even over a trusted channel with full evidence.
 presumptive_runtime = build_runtime(
-    TapControlAssurance(build_tap_provider(TapEngine())), StaticTrustedIngress(trusted=True))
+    TapControlAssurance(build_tap_provider(TapEngine())), ChannelIngress(trusted=True))
 new_case(presumptive_runtime, "presumptive")
 p = presumptive_runtime.submit_evidence_and_evaluate(
     TENANT, "presumptive", (evidence(),), control_evidence={"C1": ("ev1",)})
@@ -136,15 +143,24 @@ assert p.recommendation is RiskRecommendation.DENY, p.recommendation
 # with an explicit full-support determination and a valid self-computed digest.
 untrusted_runtime = build_runtime(
     TapControlAssurance(build_tap_provider(TapEngine(rules=supported))),
-    StaticTrustedIngress(trusted=False))
+    ChannelIngress(trusted=False))
 new_case(untrusted_runtime, "untrusted")
 u = untrusted_runtime.submit_evidence_and_evaluate(
     TENANT, "untrusted", (evidence(),), control_evidence={"C1": ("ev1",)})
 assert u.recommendation is RiskRecommendation.DENY, u.recommendation
 
-# 3d. H-1/H-2 fail-closed construction — production refuses a permissive evaluator
-# and refuses a missing trusted-ingress seam.
+# 3d. F-1 fail-closed — production REFUSES the conformance StaticTrustedIngress
+# stand-in (is_reference_ingress=True); it is not a real authenticated-channel
+# verifier and must never be wired into production.
 from risk_authority.domain.errors import RiskAuthorityError
+try:
+    build_runtime(prod_assurance, StaticTrustedIngress(trusted=True))
+    raise AssertionError("production accepted a reference/conformance ingress (F-1)")
+except RiskAuthorityError:
+    pass
+
+# 3e. H-1/H-2 fail-closed construction — production refuses a permissive evaluator
+# and refuses a missing trusted-ingress seam.
 for bad in ("permissive", "no_ingress"):
     try:
         if bad == "permissive":
