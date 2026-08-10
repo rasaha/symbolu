@@ -74,7 +74,17 @@ adapter beyond a minimal neutral lineage seam.
   inconsistent canonical state fails closed with a precise reason — never silently accepted
   or discarded. Recovery restores the lineage source and journal
   (`RuntimeRecoveryResult.execution_states` / `.execution_state_journal`) and never
-  fabricates missing references.
+  fabricates missing references. **`runtime_id`/`runtime_version` on a snapshot are *origin*
+  provenance** (the runtime that created that historical state) and are intentionally NOT
+  required to equal the checkpoint writer, so recovery across a runtime upgrade — which is
+  permitted with `config_mismatch=True` — yields a mixed-version journal that still recovers
+  cleanly. Those fields stay integrity-protected by the snapshot's `state_digest` and the
+  `extension_digest`.
+- **Self-recoverability invariant** — the engine validates every checkpoint (base digest +
+  extension digest + canonical-state binding) *before* persisting it, so the runtime never
+  writes a checkpoint its own recovery validator would reject (fails closed with
+  `CheckpointError` on an internal inconsistency instead of emitting an unrecoverable
+  checkpoint).
 - **Hardening** — unsupported `state_version` fails closed (`SUPPORTED_STATE_VERSIONS`);
   `valid_until` must be finite (NaN/Infinity rejected); digest serialization uses
   `allow_nan=False`.

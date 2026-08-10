@@ -217,12 +217,20 @@ resolvable via `runtime.execution_state_by_digest(instance_id, state_digest)`. T
     checkpoint carries no extension and no `extension_digest`.
 - **Cross-binding & consistency.** `validate_execution_states()` enforces — beyond each
   snapshot's own digest — that the map key equals the snapshot's own key field; that
-  instance / workflow / runtime / correlation identity match the checkpoint; that the
-  referenced task exists; that the schema version is supported; that **every latest
-  snapshot is resolvable in the journal by its own digest and is the same snapshot** (the
-  public "every digest resolvable" guarantee); and that the **lineage source is structural**
-  (keys reference known tasks, values deserialize). An inconsistent canonical state fails
-  closed with a precise reason — never silently accepted *or* silently discarded.
+  instance / workflow / correlation identity match the checkpoint; that the referenced task
+  exists; that the schema version is supported; that **every latest snapshot is resolvable
+  in the journal by its own digest and is the same snapshot** (the public "every digest
+  resolvable" guarantee); and that the **lineage source is structural** (keys reference
+  known tasks, values deserialize). `runtime_id`/`runtime_version` are deliberately **not**
+  bound to the writer — they are *origin* provenance (the runtime that created that
+  historical snapshot), so a checkpoint written after a recovery across a runtime upgrade
+  legitimately carries a **mixed-version journal** and still recovers. An inconsistent
+  canonical state fails closed with a precise reason — never silently accepted *or*
+  silently discarded.
+- **Self-recoverability.** The engine validates every checkpoint (base digest + extension
+  digest + binding) *before* persisting it, so the runtime never emits a checkpoint its own
+  recovery validator would reject — every checkpoint it writes is self-recoverable under its
+  declared schema (subject to later corruption).
 - **Recovery — versioned gate.** Recovery first rejects an **unknown `checkpoint_version`**
   (fail closed rather than interpret a future schema under today's rules). For `"1"` it
   requires the base digest valid, the **extension digest valid**, and cross-binding valid;
@@ -270,6 +278,10 @@ resolvable via `runtime.execution_state_by_digest(instance_id, state_digest)`. T
   `checkpoint_version` fails closed; omitting a journal entry a latest snapshot points to is
   caught even when the extension digest is re-sealed; a lineage entry for an unknown task
   fails closed (tests: checkpoint integrity boundary).
+- A snapshot's `runtime_id`/`runtime_version` are origin provenance, not bound to the
+  checkpoint writer, so a mixed-version journal produced by recovery across a runtime upgrade
+  still recovers; every checkpoint the engine emits validates before it is persisted
+  (tests: runtime-upgrade recovery, self-recoverability).
 - Unsupported `state_version` and non-finite `valid_until` fail closed (tests: hardening).
 
 ## Current limitations / remaining gaps

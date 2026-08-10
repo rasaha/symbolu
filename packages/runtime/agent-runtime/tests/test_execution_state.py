@@ -400,6 +400,92 @@ def test_journal_omission_caught_even_when_extension_resealed():
         recover_instance(resealed, wf, cp.runtime_id, cp.runtime_version)
 
 
+def test_runtime_upgrade_mixed_version_journal_recovers():
+    # Origin provenance across an upgrade must not make a checkpoint unrecoverable:
+    #   vA writes states → recover under vB (config_mismatch) → resume under vB → the new
+    #   checkpoint carries a mixed-version journal (vA + vB) → it must still recover under vB.
+    ss = InMemoryRuntimeStateStore()
+    wf = WorkflowDefinition(
+        workflow_id="wf",
+        tasks=(
+            TaskDefinition(task_id="a", operation="op", provider_id="p"),
+            TaskDefinition(task_id="b", operation="op", provider_id="p", depends_on=("a",)),
+        ),
+    )
+    # vA: task 'a' clears and completes; task 'b' is HOLD, so the workflow is WAITING.
+    class Gate(GovernanceHook):
+        def __init__(self):
+            self.hold = {"b"}
+        def evaluate(self, proposal, evaluation_time):
+            if proposal.task_id in self.hold:
+                return GovernanceEvaluation(disposition=GovernanceDisposition.HOLD)
+            return GovernanceEvaluation(
+                disposition=GovernanceDisposition.CLEAR,
+                proposal_fingerprint=proposal.fingerprint,
+                evaluation_reference="ref",
+                correlation_reference=proposal.correlation_id,
+            )
+
+    gate_a = Gate()
+    rt_a = create_runtime(AgentRuntimeConfig(state_store=ss, runtime_version="0.2.0", governance_hook=gate_a))
+    register_provider(rt_a, RecordingProvider("p"))
+    inst = rt_a.start_workflow(wf)
+    assert inst.status is WorkflowStatus.WAITING
+    state_a = execution_state(rt_a, inst.instance_id, "a")
+    assert state_a.runtime_version == "0.2.0"
+
+    # vB: recover (runtime version differs -> config_mismatch), release the HOLD, resume.
+    gate_b = Gate()
+    gate_b.hold = set()
+    rt_b = create_runtime(AgentRuntimeConfig(state_store=ss, runtime_version="0.2.1", governance_hook=gate_b))
+    register_provider(rt_b, RecordingProvider("p"))
+    result = recover_runtime(rt_b, inst.instance_id, wf)
+    assert result.config_mismatch is True
+    resume_workflow(rt_b, inst.instance_id)
+    assert rt_b.instance(inst.instance_id).status is WorkflowStatus.COMPLETED
+
+    # The freshly written checkpoint carries a mixed-version journal.
+    cp = ss.load(inst.instance_id)
+    assert cp.runtime_version == "0.2.1"
+    journal_versions = {
+        CanonicalExecutionState.from_dict(s).runtime_version
+        for s in cp.execution_state_journal.values()
+    }
+    assert journal_versions == {"0.2.0", "0.2.1"}, journal_versions
+    # It must validate and recover cleanly under vB despite the older-origin states.
+    assert cp.verify() and cp.verify_extension()
+    assert cp.validate_execution_states()[0]
+    rt_c = create_runtime(AgentRuntimeConfig(state_store=ss, runtime_version="0.2.1"))
+    result2 = recover_runtime(rt_c, inst.instance_id, wf)
+    assert result2.instance.status is WorkflowStatus.COMPLETED
+
+
+def test_every_emitted_checkpoint_is_self_recoverable():
+    # Every checkpoint the runtime writes must pass its own recovery validator.
+    saved = []
+
+    class CapturingStore(InMemoryRuntimeStateStore):
+        def save(self, checkpoint):
+            saved.append(checkpoint)
+            super().save(checkpoint)
+
+    ss = CapturingStore()
+    rt = create_runtime(AgentRuntimeConfig(state_store=ss, governance_hook=_clear_hook()))
+    register_provider(rt, RecordingProvider("p"))
+    wf = WorkflowDefinition(
+        workflow_id="wf",
+        tasks=(
+            TaskDefinition(task_id="a", operation="op", provider_id="p"),
+            TaskDefinition(task_id="b", operation="op", provider_id="p", depends_on=("a",)),
+        ),
+    )
+    rt.start_workflow(wf)
+    assert saved  # several checkpoints were written across the run
+    for cp in saved:
+        assert cp.verify() and cp.verify_extension()
+        assert cp.validate_execution_states()[0]
+
+
 def test_unknown_checkpoint_version_fails_recovery():
     ss = InMemoryRuntimeStateStore()
     rt = create_runtime(AgentRuntimeConfig(state_store=ss, governance_hook=_clear_hook()))

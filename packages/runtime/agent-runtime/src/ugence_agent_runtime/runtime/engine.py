@@ -36,7 +36,7 @@ from ..persistence.checkpoints import Checkpoint
 from ..persistence.recovery import RuntimeRecoveryResult, recover_instance
 from ..providers.interfaces import ToolInvocation
 from .cancellation import CancellationToken
-from .errors import AgentRuntimeError
+from .errors import AgentRuntimeError, CheckpointError
 from .execution import execute_with_policy
 from .execution_state import build_execution_state
 
@@ -508,6 +508,16 @@ class AgentRuntime:
             execution_states=self._exec_states.get(instance.instance_id),
             execution_state_journal=self._exec_journal.get(instance.instance_id),
         )
+        # Self-recoverability invariant: the runtime must never persist a checkpoint its own
+        # recovery validator would reject. Verify the two integrity boundaries and the
+        # canonical-state binding BEFORE writing to any store (fail closed on an internal
+        # inconsistency rather than emit an unrecoverable checkpoint).
+        states_ok, states_reason = checkpoint.validate_execution_states()
+        if not (checkpoint.verify() and checkpoint.verify_extension() and states_ok):
+            raise CheckpointError(
+                f"refusing to persist a non-self-recoverable checkpoint for instance "
+                f"{instance.instance_id!r}: {states_reason or 'digest verification failed'}"
+            )
         if self._config.checkpoint_store is not None:
             self._config.checkpoint_store.put(checkpoint)
         if self._config.state_store is not None:

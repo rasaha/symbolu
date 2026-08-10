@@ -230,15 +230,18 @@ class Checkpoint:
         else:
             if key != state.task_id:
                 errs.append(f"execution_states key {key!r} != task_id {state.task_id!r}")
-        # Bind identity to THIS checkpoint.
+        # Bind identity to THIS checkpoint. NOTE: runtime_id / runtime_version are
+        # deliberately NOT required to equal the checkpoint writer's. They are *origin*
+        # provenance — the runtime that CREATED this historical snapshot — and after a
+        # recovery across a runtime upgrade a single checkpoint legitimately carries a
+        # mixed-version journal (older states from the previous runtime, newer states from
+        # the current one). That mix is desirable provenance, not corruption; those fields
+        # remain integrity-protected by the snapshot's own state_digest and by the
+        # checkpoint's extension_digest, they simply need not match the writer's identity.
         if state.instance_id != self.instance_id:
             errs.append(f"{where}[{key!r}] instance_id {state.instance_id!r} != {self.instance_id!r}")
         if state.workflow_id != self.workflow_id:
             errs.append(f"{where}[{key!r}] workflow_id {state.workflow_id!r} != {self.workflow_id!r}")
-        if state.runtime_id != self.runtime_id:
-            errs.append(f"{where}[{key!r}] runtime_id {state.runtime_id!r} != {self.runtime_id!r}")
-        if state.runtime_version != self.runtime_version:
-            errs.append(f"{where}[{key!r}] runtime_version {state.runtime_version!r} != {self.runtime_version!r}")
         if state.correlation_id != self.correlation_id:
             errs.append(f"{where}[{key!r}] correlation_id {state.correlation_id!r} != {self.correlation_id!r}")
         if state.task_id is None or state.task_id not in self.tasks:
@@ -249,8 +252,11 @@ class Checkpoint:
         """Strictly validate the canonical execution-state lineage against THIS checkpoint.
 
         Beyond each snapshot's own digest, this enforces cross-object binding: the map key
-        equals the snapshot's own key field; instance/workflow/runtime/correlation identity
-        match the checkpoint; the referenced task exists; the schema version is supported.
+        equals the snapshot's own key field; instance/workflow/correlation identity match
+        the checkpoint; the referenced task exists; the schema version is supported; every
+        latest snapshot is resolvable in the journal; and the lineage source is structural.
+        ``runtime_id``/``runtime_version`` are origin provenance and are intentionally NOT
+        required to equal the writer (so a post-upgrade mixed-version journal recovers).
         Returns ``(ok, reason)`` — a precise reason on the first failure. An inconsistent
         canonical state is never silently accepted or discarded.
         """
