@@ -1,0 +1,106 @@
+{
+  "schema": "bounded_typed_relational_reasoning/protocol_amendment/v1",
+  "amendment_id": "BTRR_PROTOCOL_AMENDMENT_002",
+  "supersedes_capacity_limits_of": "BTRR_PROTOCOL_AMENDMENT_001",
+  "status": "BTRR_PROTOCOL_AMENDMENT_002_READY_FOR_INDEPENDENT_AUDIT",
+  "kind": "corrective_zero_truncation_proof_and_doc_reconciliation",
+  "execution_authorized": false,
+  "preserved_invariants": [
+    "ORIGINAL_BINDINGSLOTS_NEURAL_ROUTING_UNRESOLVED",
+    "E1_TEMPORAL_TRANSFER_PARTIAL",
+    "KDA_VALIDATION_BLOCKED"
+  ],
+  "audit_verdict_accepted": "BTRR_AMENDMENT_001_REQUIRES_CORRECTION",
+  "cites": {
+    "original_preregistration_commit": "626a897a513eb7e415cde6fbaff10e9e922b8abb",
+    "implementation_blocker_commit": "f8dd65c5e734bc1f31eaf100e4069c050d014e8c",
+    "amendment_001_commit": "9e6168f93c850acbf2bc134d5226aad1572c1add"
+  },
+  "amendment_001_validated_by_audit": [
+    "tokenizer design", "parameter accounting method", "scientific-task preservation",
+    "gate preservation", "causal interpretation", "append-only provenance", "execution lock"
+  ],
+  "material_defect_repaired": "original preregistration did not numerically bound all serialization-size-driving dimensions, so A001 could not PROVE input_token_limit/max_seq_len accommodate every legal episode",
+  "frozen_size_caps": {
+    "max_entities": 12,
+    "max_events_per_entity": 4,
+    "max_events_total": 48,
+    "max_relations": 20,
+    "max_hops": 3,
+    "max_policies": 4,
+    "max_conditions_per_policy": 4,
+    "max_evidence": 16,
+    "max_attributes_per_entity": 3,
+    "max_id_len_chars": 6,
+    "max_value_len_tokens": 9,
+    "max_numeric_digits": 9,
+    "max_sequence_digits": 2,
+    "max_reasoning_path_nodes": 8,
+    "max_evidence_ids_in_output": 16,
+    "notes": {
+      "entity_density_6_12": "UNCHANGED (already frozen)",
+      "event_density_2_4_per_entity": "UNCHANGED (already frozen)",
+      "value_cap_uniform": "max_value_len applies uniformly to attribute values, event values, and condition literals (numeric or opaque categorical); conservative over-approximation for a safe zero-truncation guarantee",
+      "ids_char_level_opaque": "IDs are ASCII char-level, non-lexeme, non-answer-encoding, unique within an episode",
+      "R12_distractors": "realized within max_entities/max_relations/max_events; not a separate unbounded dimension"
+    }
+  },
+  "cap_rationale_summary": {
+    "max_relations_20": "12 entities with 3-hop discovery plus confusable near-duplicate paths (~1.7 relations/entity); bounds distractor branching without removing multi-hop discovery",
+    "max_hops_3": "matches preregistered R3/R4 '2-3 hops'; not a narrowing",
+    "max_policies_4": "one applicable + up to 3 near-miss distractor policies; preserves policy selection difficulty",
+    "max_conditions_per_policy_4": "composite typed conditions (temporal + attribute + relational) preserved",
+    "max_evidence_16": "required-support set + distractor evidence; preserves evidence precision/recall",
+    "max_attributes_per_entity_3": "preserves intended fact density for policy-condition reference",
+    "max_id_len_6": "unique + copyable within episode; opaque, does not encode the answer",
+    "max_numeric_digits_9": "enterprise amounts up to 999,999,999; supports amount-threshold policies",
+    "max_sequence_digits_2": ">= 48 events fit in 2 digits; preserves temporal ordering"
+  },
+  "maximal_legal_fixture_tokens_tokenizer_only": {
+    "method": "frozen A001 tokenizer + compact serializer; boundary fixture saturating ALL compatible caps simultaneously; handcrafted; no model/seeds",
+    "max_legal_input_R9_R12_overapprox": 2901,
+    "max_P0_input": 643,
+    "max_reasoning_output": 194,
+    "max_input_plus_output": 3095,
+    "joint_saturation_note": "PATH_GIVEN vs PATH_DISCOVERY query-line difference is <= 3 tokens; the fixture uses the longest (PATH_GIVEN 3-chain) query line as a strict upper bound over all splits"
+  },
+  "context_sizing": {
+    "rule": "worst legal input + 20% margin, round up to 64; output floor 384; no truncation",
+    "input_token_limit": {"a001": 1664, "a002": 3520, "worst_input": 2901, "margin_pct": 21},
+    "output_token_limit": {"a001": 384, "a002": 384, "worst_output": 194},
+    "max_seq_len": {"a001": 2048, "a002": 3904, "min_required": 3904}
+  },
+  "parameter_count": {
+    "d_model": 64,
+    "weight_tied_head": true,
+    "single_hop_orig": {"vocab": 200, "max_seq": 1024, "total": 209728, "pos_emb": 65536, "reasoning_blocks": 131392},
+    "amendment_001": {"vocab": 211, "max_seq": 2048, "total": 275968, "pos_emb": 131072, "reasoning_blocks": 131392},
+    "amendment_002": {"vocab": 211, "max_seq": 3904, "total": 394752, "tok_emb": 13504, "pos_emb": 249856, "reasoning_blocks": 131392},
+    "delta_vs_single_hop": 185024,
+    "delta_pct_vs_single_hop": 88.2,
+    "delta_vs_amendment_001": 118784,
+    "reasoning_block_delta": 0,
+    "classification": "representation_and_sequence_capacity_increase_not_reasoning_depth_increase"
+  },
+  "gate_recheck": {
+    "all_numeric_scientific_gates": "UNCHANGED_AND_VALID",
+    "structured_output_validity_gate": "MECHANICALLY_AFFECTED_BUT_STILL_VALID (same contract/threshold; larger context)",
+    "shortcut_gates": "UNCHANGED_AND_VALID",
+    "verdict_precedence": "UNCHANGED_AND_VALID",
+    "final_seed_rule_4_of_5": "UNCHANGED_AND_VALID",
+    "invalidated_gates": [],
+    "outcome": "no scientific gate changed"
+  },
+  "doc_reconciliations": {
+    "A_capacity_increase_override": {
+      "original": "preregistration.json model.forbidden_components includes 'capacity_increase'",
+      "override": "Amendments 001/002 supersede that item ONLY for lexical representation capacity (tokenizer vocabulary; token-embedding rows) and sequence capacity (positional-embedding rows)",
+      "still_forbidden": ["reasoning_depth", "hidden_width", "attention_heads", "FFN_width", "attention_architecture", "specialized_reasoning_modules"]
+    },
+    "B_p0_tokenizer_naming": {
+      "original": "base-capability doc references 'LexicalTokenizer' (single-hop class)",
+      "clarification": "P0 and R1-R12 use the SAME BTRR-specific frozen tokenizer introduced by Amendment 001",
+      "invariant": "same tokenizer + same checkpoint for P0 and R1-R12 (not reuse of the single-hop tokenizer implementation)"
+    }
+  }
+}
