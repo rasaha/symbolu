@@ -215,6 +215,31 @@ class AgentRuntime:
         self._drive(instance, trace)
         return instance
 
+    def continue_workflow(self, instance_id: str) -> WorkflowInstance:
+        """Explicitly re-arm a WAITING/PAUSED workflow for BOUNDED advancement — WITHOUT
+        draining it.
+
+        This is the bounded analogue of :meth:`resume_workflow`: it re-arms any WAITING task
+        and transitions the workflow back to RUNNING, but it does **not** drive to a stable
+        state. The workflow is left RUNNING so an external orchestrator can advance it one
+        quantum at a time via :meth:`advance_workflow` — exactly what a portfolio scheduler
+        needs to continue a *recovered* workflow after an explicit, operator-chosen
+        continuation. Like ``resume_workflow`` it is explicit (the runtime never self-resolves
+        a restrictive governance disposition); it invokes no provider and no governance here —
+        the next ``advance_workflow`` crosses fresh governance as usual."""
+        instance = self._instances[instance_id]
+        trace = self._traces[instance_id]
+        if instance.status not in (WorkflowStatus.WAITING, WorkflowStatus.PAUSED):
+            raise AgentRuntimeError(
+                f"workflow {instance_id} is {instance.status.value}; not continuable"
+            )
+        for ti in instance.tasks.values():
+            if ti.status is TaskStatus.WAITING:
+                self._set_task(instance, ti, TaskStatus.READY, trace, None)
+        self._set_wf(instance, WorkflowStatus.RUNNING, trace, ev.WORKFLOW_RESUMED)
+        self._checkpoint(instance, trace)
+        return instance
+
     def pause_workflow(self, instance_id: str) -> WorkflowInstance:
         instance = self._instances[instance_id]
         trace = self._traces[instance_id]

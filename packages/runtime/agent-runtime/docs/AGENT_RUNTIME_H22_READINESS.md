@@ -2,11 +2,12 @@
 
 This document describes the stable, domain-neutral base on which H22 (Multi-Workflow
 Orchestration) is built **without importing application internals**, and records the H22
-phases delivered so far — **H22-A bounded workflow advancement** (0.3.0) and **H22-B
-deterministic multi-workflow coordination** (0.4.0). **Full H22 is not implemented here:**
-H22-C (portfolio durability / trace / failure propagation / cancellation) and H22-D (true
-concurrency / resources / budget / compensation) remain future phases. The dedicated H22-B
-document is [`AGENT_RUNTIME_H22B_COORDINATION.md`](AGENT_RUNTIME_H22B_COORDINATION.md).
+phases delivered so far — **H22-A bounded workflow advancement** (0.3.0), **H22-B
+deterministic multi-workflow coordination** (0.4.0), and **H22-C durable multi-workflow
+orchestration** (0.5.0). **Full H22 is not implemented here:** H22-D (true concurrency /
+resources / budget / compensation) remains a future phase. The dedicated phase documents are
+[`AGENT_RUNTIME_H22B_COORDINATION.md`](AGENT_RUNTIME_H22B_COORDINATION.md) and
+[`AGENT_RUNTIME_H22C_DURABILITY.md`](AGENT_RUNTIME_H22C_DURABILITY.md).
 
 > **Gate (satisfied).** The post-merge corrections that had to precede any H22 work —
 > fail-closed default governance (0.1.1), exact-action proposal binding (0.1.2), honest
@@ -28,7 +29,7 @@ H22-A Bounded Workflow Advancement  ← delivered (0.3.0) — foundation only
         ↓
 H22-B Deterministic Coordination    ← delivered (0.4.0) — portfolio/deps/priority/fairness/aging
         ↓
-H22-C Portfolio durability / trace / failure propagation / cancellation   ← future
+H22-C Durable Orchestration         ← delivered (0.5.0) — checkpoint/recovery/trace/failure/cancellation
         ↓
 H22-D True concurrency / resources / budget / compensation                ← future
         ↓
@@ -111,15 +112,30 @@ GitHub Actions workflow (package suite, isolated wheel-install verification, pla
 terminology, API-stability registry, and safety-case checks) has been observed passing on the
 correction head. Not live-verified, distributed-safe, or exactly-once.
 
-## What later H22 phases build on this base (not now)
+## H22-C — Durable Multi-Workflow Orchestration (delivered, 0.5.0)
 
-- **H22-C:** portfolio checkpoint/recovery, portfolio trace, failure propagation policy,
-  cancellation scopes, richer dependency types (output/milestone/review) once the runtime
-  exposes a durable public representation for them;
+H22-C makes the H22-B coordinator durable, reconstructable, auditable, and safely controllable
+across crash/restart, failure, and cancellation — **without changing single-workflow execution
+truth**. It adds a versioned `PortfolioCheckpoint` that **references** the underlying runtime
+checkpoints by digest (and never duplicates them or Canonical Execution State), a neutral
+`PortfolioCheckpointStore` (+ in-memory reference), **side-effect-free** `recover_portfolio`
+(zero provider/governance/advancement calls, requiring explicit continuation), a bounded
+`continue_workflow` continuation seam, an append-only `PortfolioTrace` ordered by a logical
+sequence, bounded failure propagation (`ISOLATE_WORKFLOW` default / `FAIL_DEPENDENTS` /
+`FAIL_PORTFOLIO`), and cooperative, idempotent cancellation scopes (`WORKFLOW_ONLY` /
+`DEPENDENT_SUBGRAPH` / `PORTFOLIO_ALL`). SWRR `fair_credit`, aging, registration order, `round`,
+dependencies, and failure/cancellation state all survive recovery, so the next scheduler
+decision is exactly the uninterrupted one. Governance stays entirely below H22-C; recovery
+performs no execution and reuses no historical CLEAR. See
+[`AGENT_RUNTIME_H22C_DURABILITY.md`](AGENT_RUNTIME_H22C_DURABILITY.md).
+
+## What the later H22 phase builds on this base (not now)
+
 - **H22-D:** true bounded concurrency, resource coordination/ledger, shared budget
-  coordination, and compensation coordination.
+  coordination, and compensation coordination; and richer dependency types
+  (output/milestone/review) once the runtime exposes a durable public representation for them.
 
-**None of the above is implemented in this phase.**
+**None of the above is implemented in these phases.**
 
 ## Why the base is ready
 

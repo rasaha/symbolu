@@ -3,6 +3,83 @@
 All notable changes to the independent Agent Runtime distribution are recorded here.
 This project follows semantic versioning for the distribution.
 
+## 0.5.0 — H22-C durable multi-workflow orchestration
+
+Makes the H22-B portfolio/team coordinator **durable, reconstructable, auditable, and safely
+controllable** across process crash/restart, workflow failure, and operator cancellation —
+**without changing single-workflow execution truth**. Additive only: no change to exact-action
+fingerprint semantics, governance ownership, Canonical Execution State, checkpoint digest
+semantics, or single-workflow recovery. Governance stays entirely below this layer, and
+**recovery performs no workflow execution**. **This is H22-C, not full H22:** no true
+concurrency, no shared budget/resource ledger, no compensation, no runtime assurance, no
+peer-to-peer agent messaging, and no agent/model selection (those are H22-D).
+
+### Added
+- **Versioned `PortfolioCheckpoint`** (`checkpoint_version = "1"`) — a durable snapshot of
+  *orchestration* state only. It **references** each workflow's runtime checkpoint by digest via
+  `WorkflowCheckpointRef` and **never copies** it, and it never duplicates Canonical Execution
+  State. Persists exactly what deterministic reconstruction needs — `round`, and per
+  registration `registration_sequence` / `priority` / `weight` / `age` / SWRR `fair_credit`
+  (`age` and `fair_credit` drive the *next* scheduler choice, so they are mandatory), the
+  dependency edges, the failure/cancellation state, and the trace sequence anchor — and
+  deliberately recomputes derived state (dependency depth, eligibility, scheduler ordering,
+  trace history) rather than persisting it. A single SHA-256 `portfolio_digest` over a
+  deterministic canonical serialization (stable key ordering, enums by value, `allow_nan=False`
+  so NaN/±Inf fail closed) protects it; malformed / tampered / unsupported-version checkpoints
+  are rejected. The **portfolio self-recoverability invariant** validates every checkpoint with
+  the recovery validator *before* any write, so a non-recoverable checkpoint is never persisted.
+- **`PortfolioCheckpointStore`** (neutral interface) + **`InMemoryPortfolioCheckpointStore`**
+  reference implementation with a monotonic per-portfolio `generation` and optional
+  compare-and-save (`expected_generation` → `PortfolioCheckpointConflict`) for in-process
+  optimistic concurrency (not distributed consensus). No SQL/Redis/DynamoDB/filesystem/cloud
+  backend is included.
+- **`recover_portfolio(...)` + `PortfolioRecoveryResult`** — side-effect-free portfolio
+  recovery: **provider calls = 0, governance calls = 0, workflow advancement = 0, automatic
+  resume = 0**. It cross-binds each referenced runtime checkpoint (`instance_id` / `workflow_id`
+  / `correlation_id` / `checkpoint_digest`; **not** `runtime_id`/`runtime_version`, which are
+  origin provenance, so a runtime upgrade recovers), reconstructs each workflow through the
+  existing `recover_runtime` contract, rebuilds the portfolio with its `round` / `age` /
+  `fair_credit` / dependencies / failure & cancellation state, and returns
+  `requires_continuation = True`. Committed tasks never rerun; the next consequential quantum
+  obtains **fresh** governance (a historical CLEAR is never reused).
+- **`AgentRuntime.continue_workflow` / `continue_workflow(...)`** — a bounded, explicit
+  continuation seam (the bounded analogue of `resume_workflow`): re-arms a WAITING/PAUSED
+  workflow to RUNNING for one-quantum-at-a-time advancement **without draining it**, so a
+  recovered portfolio resumes deterministic interleaving under explicit operator control.
+- **`PortfolioTrace` / `PortfolioTraceEntry` / `PortfolioEventType`** — a separate append-only
+  orchestration audit trace ordered by a **logical sequence** (never wall-clock). Events carry
+  ids/digests only and never duplicate workflow execution payload or Canonical Execution State;
+  the checkpoint stores only the sequence anchor, and recovery re-seats the position so
+  post-recovery events stay strictly increasing.
+- **`PortfolioFailurePolicy`** — bounded failure propagation: `ISOLATE_WORKFLOW` (**default** —
+  most consistent with live H22-B dependency-graph isolation), `FAIL_DEPENDENTS` (cancel the
+  transitive dependent subgraph), `FAIL_PORTFOLIO` (cancel all non-terminal, terminal `FAILED`,
+  grant no further quantum). H22-C observes a failure and applies a consequence; it never
+  reinterprets *why* a workflow failed (no `BLOCK → CLEAR`, no `FAILED → COMPLETED`).
+- **`CancellationScope`** — cooperative, idempotent cancellation: `WORKFLOW_ONLY`,
+  `DEPENDENT_SUBGRAPH` (target + transitive dependents), `PORTFOLIO_ALL` (terminal `CANCELLED`).
+  Cancellation calls the runtime's own `cancel_workflow` (no threads, no process termination, no
+  direct task-status mutation), applies in deterministic registration order, and is a no-op on
+  repeat. Cancelling a WAITING/HOLD workflow is operator control, **not** a governance override.
+- **`PortfolioController`** (+ `create_portfolio_controller(...)`) — ties the H22-B scheduler to
+  the trace, failure policy, cancellation, and durable checkpointing. New terminal
+  `PortfolioStatus` values `FAILED` / `CANCELLED` (a *quiescent* portfolio stays `ACTIVE`, never
+  silently terminal).
+
+### Tests
+`tests/test_portfolio_durability.py` — 42 tests across the H22-C matrix: checkpoint roundtrip /
+digest determinism / field sensitivity / tamper + resealed-inconsistency rejection; recovery
+zero-side-effects / explicit-continuation / no-repeat / fresh-governance / canonical-state
+resolvability; SWRR (2:1 and 3:1) + aging + registration-order scheduler continuity;
+dependency / failure / cancellation continuity across recovery; trace determinism & monotonic
+sequence; the failure-policy matrix; the cancellation scopes + idempotency; the self-
+recoverability invariant; multiple sequential recoveries; and runtime-upgrade compatibility.
+
+### Verification (scoped, local)
+- `python -m pytest packages/runtime/agent-runtime/tests -q` → **220 passed, 2 skipped**.
+- `scripts/verify_isolated_install.py` → **ISOLATED INSTALL VERIFICATION: PASS** at `0.5.0`.
+- Import-boundary / governance-binding / compatibility suites green; platform-freeze **PASS**.
+
 ## 0.4.0 — H22-B deterministic multi-workflow coordination
 
 Adds the coordination layer that consumes the H22-A bounded-advancement seam and decides
