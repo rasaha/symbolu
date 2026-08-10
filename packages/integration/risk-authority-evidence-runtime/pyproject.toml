@@ -1,0 +1,49 @@
+# Ugence Risk Authority Evidence Runtime — RA-5 trusted-evidence integration.
+#
+# This is NOT a leaf: it is the integration layer that supplies the production
+# implementations behind Risk Authority's EvidenceAdmissionPort and (new)
+# ControlAssurancePort, and composes them with the machine-authority owner
+# (ugence-risk-authority). The dependency direction is one-way — this package
+# imports risk-authority (for its ports/domain) and the TAP provider (as the
+# Control-Assurance evaluator candidate); none of them imports this package, and
+# ugence-risk-authority remains a stdlib-only leaf.
+#
+# Build:   python -m build packages/integration/risk-authority-evidence-runtime
+# Verify:  python packages/integration/risk-authority-evidence-runtime/scripts/verify_isolated_install.py
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-risk-authority-evidence-runtime"
+dynamic = ["version"]
+description = "Ugence Risk Authority Evidence Runtime — RA-5 trusted evidence admission + control assurance producing trusted ControlResults for Risk Authority."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["governance", "risk", "authority", "evidence", "control-assurance", "tap", "ugence"]
+# Composes the machine-authority owner with a trusted Control-Assurance evaluator
+# (the TAP provider). No third-party runtime dependency of its own beyond what
+# those first-party wheels already declare.
+dependencies = [
+    "ugence-risk-authority>=0.1.0",
+    "ugence-tap-provider>=0.1.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_risk_authority_evidence_runtime.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_risk_authority_evidence_runtime*"]
+
+[tool.setuptools.package-data]
+ugence_risk_authority_evidence_runtime = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

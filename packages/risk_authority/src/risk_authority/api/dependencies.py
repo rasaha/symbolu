@@ -17,10 +17,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from itertools import count
-from typing import Callable, Optional
+from typing import Callable, Mapping, Optional
 
 from ..crypto.keys import KeyRing, SigningKeyRecord
 from ..domain.actions import ActionAuthorization, CanonicalAction
+from ..domain.binding import AdmittedContext, CaseBindingContext, usable_control_results
 from ..domain.controls import ControlResult
 from ..domain.decision import RiskDecision
 from ..domain.enums import (
@@ -32,9 +33,16 @@ from ..domain.enums import (
 from ..domain.envelope import EnvelopeConditions, RiskAuthorizationEnvelope
 from ..domain.errors import RiskAuthorityError
 from ..domain.events import GovernanceEvent
+from ..domain.evidence import ControlEvidenceRecord
 from ..domain.risk_case import RequestedCapabilities, RiskDecisionCase
 from ..integrations.actiongate import ReferenceActionGate, RuntimeIdentity
+from ..integrations.control_assurance import (
+    ControlAssurancePort,
+    ControlAssuranceRequest,
+    bind_control_result,
+)
 from ..integrations.pwc import WorkflowIRSource
+from ..integrations.tap import EvidenceAdmissionPort
 from ..observability.events import EventBus
 from ..observability.metrics import Metrics
 from ..persistence.in_memory import (
@@ -93,7 +101,24 @@ class RiskAuthorityApplication:
         event_bus: Optional[EventBus] = None,
         metrics: Optional[Metrics] = None,
         ids: Optional[_Ids] = None,
+        evidence_admission: Optional[EvidenceAdmissionPort] = None,
+        control_assurance: Optional[ControlAssurancePort] = None,
+        production_mode: bool = False,
     ) -> None:
+        # RA-5 mode selection (RISK_AUTHORITY_RA5_SPEC.md §12). Mode is EXPLICIT:
+        # production mode is only entered when the caller both sets
+        # ``production_mode=True`` and injects the two trusted-evidence ports.
+        # It never silently falls back to the reference (caller-asserted) path;
+        # an incomplete production configuration fails closed at construction.
+        if production_mode and (evidence_admission is None or control_assurance is None):
+            raise RiskAuthorityError(
+                "production_mode requires both an EvidenceAdmissionPort and a "
+                "ControlAssurancePort (RA-5 §12: fail closed on incomplete "
+                "production configuration)"
+            )
+        self._production_mode = bool(production_mode)
+        self._evidence_admission = evidence_admission
+        self._control_assurance = control_assurance
         self._workflow_source = workflow_source
         self._key_record = key_record
         self._key_ring = KeyRing.from_records([key_record])
@@ -206,6 +231,18 @@ class RiskAuthorityApplication:
     def evaluate(
         self, tenant_id: str, case_id: str, req: EvaluateRequest
     ) -> RiskEvaluation:
+        # RA-5 §12: in production mode a caller-supplied control status is inert.
+        # This reference path constructs a ControlResult straight from
+        # ``req.control_results`` (the RA-1→RA-4 conformance behavior); it is the
+        # exact trust gap RA-5 closes, so it fails closed rather than silently
+        # trusting caller input when production mode is active. Production callers
+        # must use ``evaluate_with_evidence`` (admit → assure → bind).
+        if self._production_mode:
+            raise RiskAuthorityError(
+                "reference evaluate() is disabled in production mode: a "
+                "caller-supplied control status cannot mint authority (RA-5 §12). "
+                "Use evaluate_with_evidence() with raw evidence."
+            )
         now = self._clock()
         case = self._require_case(tenant_id, case_id)
         workflow = self._workflow_for(case)
@@ -271,6 +308,211 @@ class RiskAuthorityApplication:
         self._emit_case_events(case)
         self.cases.save(case)
         return evaluation
+
+    # ------------------------------------------------------------------
+    # RA-5 production trusted-evidence path (RISK_AUTHORITY_RA5_SPEC.md §5, §10,
+    # §12). Raw evidence → admitted evidence → assured controls → bound, RA-re-
+    # checked trusted ControlResults → the *existing* non-compensatory gate. A
+    # caller-supplied control status is never consulted here.
+    # ------------------------------------------------------------------
+    def evaluate_with_evidence(
+        self,
+        tenant_id: str,
+        case_id: str,
+        raw_evidence: tuple[ControlEvidenceRecord, ...],
+        *,
+        control_evidence: Optional[Mapping[str, tuple[str, ...]]] = None,
+        conditions: tuple[str, ...] = (),
+    ) -> RiskEvaluation:
+        """Evaluate a case from admitted evidence and trusted control assurance.
+
+        Fail-closed at every step (RA-5 §11): admission unavailable / evidence
+        rejected / stale / wrong-context ⇒ the backed control is ``MISSING``;
+        assurance unavailable / evaluator error ⇒ ``UNKNOWN``; neither can mint a
+        ``PASS``. The RA state machine only advances on the *real* artifacts
+        produced here — never on an actor label (§10).
+        """
+
+        if not (
+            self._production_mode
+            and self._evidence_admission is not None
+            and self._control_assurance is not None
+        ):
+            raise RiskAuthorityError(
+                "evaluate_with_evidence() requires production mode with an "
+                "EvidenceAdmissionPort and a ControlAssurancePort (RA-5 §12)"
+            )
+
+        now = self._clock()
+        case = self._require_case(tenant_id, case_id)
+        workflow = self._workflow_for(case)
+        required = case.required_controls
+        # Today policy_digest == WorkflowIR digest (RA-5 §6); kept distinct for
+        # future divergence but bound to the same value now.
+        policy_digest = case.workflow_ir_digest
+
+        # --- 1. Admission (provenance/integrity/freshness/schema; §4, §6). ----
+        # Only evidence that is admissible AND bound to THIS case's tenant /
+        # workflow / policy context enters the admitted-in-context set. A
+        # cross-tenant/-workflow/-policy record is filtered out here even if
+        # storage returned it (§16), so no control can rest on it.
+        admitted_by_id: dict[str, ControlEvidenceRecord] = {}
+        for record in raw_evidence:
+            if record.tenant_id != tenant_id:
+                continue
+            if record.workflow_ir_digest != case.workflow_ir_digest:
+                continue
+            if record.policy_digest != policy_digest:
+                continue
+            try:
+                admissible = self._evidence_admission.is_admissible(record, now=now)
+            except Exception:  # noqa: BLE001 - admission failure ⇒ inadmissible
+                admissible = False
+            if admissible and record.is_admitted() and record.is_current(now):
+                admitted_by_id[record.evidence_id] = record
+
+        admitted_ctx = AdmittedContext(
+            valid_until_by_id={
+                eid: rec.valid_until for eid, rec in admitted_by_id.items()
+            }
+        )
+        binding_ctx = CaseBindingContext(
+            tenant_id=tenant_id,
+            case_id=case_id,
+            workflow_ir_digest=case.workflow_ir_digest,
+            policy_digest=policy_digest,
+            required_controls=frozenset(required),
+        )
+
+        # --- 2. Control assurance per required control (§4, §5). --------------
+        trusted: list[ControlResult] = []
+        for control_id in required:
+            backing = self._evidence_for_control(
+                control_id, control_evidence, admitted_by_id
+            )
+            request = ControlAssuranceRequest(
+                tenant_id=tenant_id,
+                risk_case_id=case_id,
+                workflow_ir_digest=case.workflow_ir_digest,
+                policy_digest=policy_digest,
+                control_id=control_id,
+                subject_id=case.subject_id,
+                admitted_evidence=backing,
+                now=now,
+            )
+            try:
+                assurance = self._control_assurance.evaluate(request)
+                result = assurance.control_result
+                if not assurance.available:
+                    # Evaluator ran but reported itself unavailable ⇒ UNKNOWN.
+                    result = bind_control_result(
+                        request,
+                        status=ControlStatus.UNKNOWN,
+                        engine_id=assurance.engine_id,
+                        engine_version=assurance.engine_version,
+                        reason="control assurance unavailable",
+                    )
+            except Exception as exc:  # noqa: BLE001 - evaluator error ⇒ UNKNOWN
+                result = bind_control_result(
+                    request,
+                    status=ControlStatus.UNKNOWN,
+                    engine_id="control-assurance",
+                    engine_version="",
+                    reason=f"control assurance error: {type(exc).__name__}",
+                )
+            trusted.append(result)
+
+        # --- 3. RA authoritative binding re-check (§8). ----------------------
+        # A trusted result must belong to the exact current decision context and
+        # rest only on admitted-in-context, current evidence. Results that fail
+        # any clause are dropped, so the non-compensatory gate then sees the
+        # control as MISSING (fail closed). A retained in-context FAIL still
+        # governs (F-E preserved).
+        trusted_tuple = tuple(trusted)
+        results = usable_control_results(
+            trusted_tuple, binding_ctx, admitted_ctx, now
+        )
+        self.controls.put(tenant_id, case_id, results)
+
+        # --- 4. State machine, bound to the real artifacts above (§10). ------
+        case.transition(
+            target=RiskCaseState.EVIDENCE_PENDING,
+            actor="risk-authority",
+            reason="evidence intake",
+            now=now,
+        )
+        # EVIDENCE_PENDING → EVIDENCE_COMPLETE: admission actually ran (the
+        # admitted-in-context set is a real artifact, not a label).
+        case.transition(
+            target=RiskCaseState.EVIDENCE_COMPLETE,
+            actor="evidence-admission",
+            reason=f"admitted {len(admitted_by_id)} evidence record(s)",
+            now=now,
+        )
+        # EVIDENCE_COMPLETE → CONTROL_EVALUATED: real Control-Assurance results
+        # were produced and RA-re-checked (not an actor label).
+        case.transition(
+            target=RiskCaseState.CONTROL_EVALUATED,
+            actor="control-assurance",
+            reason=f"assured {len(required)} control(s); {len(results)} trusted",
+            now=now,
+            event_type=GovernanceEventType.CONTROL_EVALUATED,
+        )
+        case.transition(
+            target=RiskCaseState.AUTHORITY_REVIEW,
+            actor="risk-authority",
+            reason="ready for authority review",
+            now=now,
+        )
+
+        evaluation = self._engine.evaluate(
+            workflow_ir=workflow,
+            case=case,
+            controls=results,
+            now=now,
+            conditions=conditions,
+        )
+        self._publish(
+            GovernanceEvent(
+                event_id=f"evt_{case_id}_eval_{self._ids.next('e')}",
+                tenant_id=tenant_id,
+                event_type=GovernanceEventType.RISK_EVALUATED,
+                aggregate_id=case_id,
+                actor="risk-engine",
+                timestamp=now,
+                correlation_id=case.correlation_id,
+                payload_digest="",
+                attributes={
+                    "recommendation": evaluation.recommendation.value,
+                    "mode": "production",
+                },
+            )
+        )
+        self._emit_case_events(case)
+        self.cases.save(case)
+        return evaluation
+
+    @staticmethod
+    def _evidence_for_control(
+        control_id: str,
+        control_evidence: Optional[Mapping[str, tuple[str, ...]]],
+        admitted_by_id: Mapping[str, ControlEvidenceRecord],
+    ) -> tuple[ControlEvidenceRecord, ...]:
+        """The admitted-in-context evidence assigned to one control.
+
+        When an explicit ``control_evidence`` map is supplied, only the listed
+        ids that are actually admitted-in-context back the control (an id not in
+        the admitted set is silently ignored ⇒ the control loses that backing and
+        fails closed). Absent a map, every admitted-in-context record is a
+        candidate (still bounded by admission + context filtering).
+        """
+
+        if control_evidence is not None:
+            wanted = control_evidence.get(control_id, ())
+            return tuple(
+                admitted_by_id[eid] for eid in wanted if eid in admitted_by_id
+            )
+        return tuple(admitted_by_id.values())
 
     # ------------------------------------------------------------------
     # POST /risk-cases/{id}/decision

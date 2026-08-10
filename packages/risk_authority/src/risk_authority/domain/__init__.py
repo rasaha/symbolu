@@ -4,6 +4,12 @@ from __future__ import annotations
 
 from .actions import ActionAuthorization, CanonicalAction, action_digest
 from .authority import AuthorityGrant, AuthorityPrincipal, authority_violations
+from .binding import (
+    AdmittedContext,
+    CaseBindingContext,
+    binding_violations,
+    usable_control_results,
+)
 from .controls import (
     ControlResult,
     required_controls_satisfied,
@@ -36,7 +42,13 @@ from .errors import (
     RiskAuthorityError,
 )
 from .events import GovernanceEvent, make_event
-from .evidence import ControlEvidenceRecord, EvidenceAdmission
+from .evidence import (
+    EVIDENCE_SCHEMA_VERSION,
+    SUPPORTED_EVIDENCE_SCHEMA_VERSIONS,
+    ControlEvidenceRecord,
+    EvidenceAdmission,
+    evidence_integrity_digest,
+)
 from .risk_case import (
     ALLOWED_TRANSITIONS,
     RequestedCapabilities,
@@ -75,6 +87,14 @@ __all__ = [
     "unsatisfied_controls",
     "ControlEvidenceRecord",
     "EvidenceAdmission",
+    "EVIDENCE_SCHEMA_VERSION",
+    "SUPPORTED_EVIDENCE_SCHEMA_VERSIONS",
+    "evidence_integrity_digest",
+    # trust binding (RA-5 §8)
+    "CaseBindingContext",
+    "AdmittedContext",
+    "binding_violations",
+    "usable_control_results",
     # decision / envelope / actions
     "RiskDecision",
     "RiskAuthorizationEnvelope",

@@ -7,6 +7,14 @@ never imports their application-specific policy logic directly (user brief §1).
 from __future__ import annotations
 
 from .actiongate import ActionGatePort, ReferenceActionGate, RuntimeIdentity
+from .control_assurance import (
+    ControlAssuranceError,
+    ControlAssurancePort,
+    ControlAssuranceRequest,
+    ControlAssuranceResult,
+    ReferenceControlAssurance,
+    bind_control_result,
+)
 from .pwc import InMemoryWorkflowIRSource, WorkflowIRSource
 from .tap import EvidenceAdmissionPort, ReferenceEvidenceAdmission
 
@@ -16,6 +24,12 @@ __all__ = [
     "RuntimeIdentity",
     "EvidenceAdmissionPort",
     "ReferenceEvidenceAdmission",
+    "ControlAssurancePort",
+    "ControlAssuranceRequest",
+    "ControlAssuranceResult",
+    "ControlAssuranceError",
+    "ReferenceControlAssurance",
+    "bind_control_result",
     "WorkflowIRSource",
     "InMemoryWorkflowIRSource",
 ]

@@ -1,0 +1,108 @@
+name: risk-authority-evidence-runtime-ci
+
+# Scoped CI for the RA-5 trusted-evidence integration package
+# (ugence-risk-authority-evidence-runtime). It supplies the production
+# implementations behind Risk Authority's EvidenceAdmissionPort and the new
+# ControlAssurancePort and composes them upstream of envelope issuance.
+#
+# This workflow is additive and path-scoped: it does NOT touch or weaken the
+# existing risk-authority-ci or risk-authority-runtime-ci. It runs the deny-heavy
+# RA-5 production matrix, RA-1→RA-4 and RA-4.5 baseline regressions (to prove they
+# remain green and unchanged), the package's wheel build + fully offline
+# isolated-install verifier, and the package-boundary tests.
+
+on:
+  pull_request:
+    paths:
+      - "packages/integration/risk-authority-evidence-runtime/**"
+      - "packages/risk_authority/**"
+      - "packages/providers/tap/**"
+      - "packages/governance-provider-framework/**"
+      - "packages/governance-contracts/**"
+      - ".github/workflows/risk-authority-evidence-runtime-ci.yml"
+  push:
+    branches:
+      - "claude/risk-authority-ra5-**"
+      - "claude/setup-symbolu-monorepo-**"
+    paths:
+      - "packages/integration/risk-authority-evidence-runtime/**"
+      - ".github/workflows/risk-authority-evidence-runtime-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  ra5-suite:
+    name: RA-5 trusted-evidence suite + deny matrix (source)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install tooling + first-party packages (editable)
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest build
+          pip install -e packages/governance-contracts
+          pip install -e packages/governance-provider-framework
+          pip install -e packages/providers/tap
+          pip install -e packages/risk_authority
+          pip install -e packages/integration/risk-authority-evidence-runtime
+      - name: RA-5 suite (matrix, binding/F-E, outcome mapping, e2e envelope, reference)
+        run: python -m pytest packages/integration/risk-authority-evidence-runtime/tests -q
+      - name: Deny-heavy production matrix (explicit acceptance gate)
+        run: |
+          python -m pytest \
+            packages/integration/risk-authority-evidence-runtime/tests/test_ra5_production_matrix.py \
+            packages/integration/risk-authority-evidence-runtime/tests/test_binding_and_fe.py \
+            packages/integration/risk-authority-evidence-runtime/tests/test_end_to_end_envelope.py -q
+
+  baseline-regression:
+    name: RA-1→RA-4 (97) + RA-4.5 (77) baselines remain green & unchanged
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pydantic
+          pip install -e packages/governance-contracts
+          pip install -e packages/governance-provider-framework
+          pip install -e packages/providers/actiongate
+          pip install -e packages/capabilities/decision-authority
+          pip install -e packages/risk_authority
+          pip install -e packages/integration/risk-authority-runtime
+      - name: Risk Authority conformance suite (must remain green + unchanged)
+        run: python -m pytest packages/risk_authority/tests -q
+      - name: RA-4.5 composition suite (must remain green + unchanged)
+        run: python -m pytest packages/integration/risk-authority-runtime/tests -q
+
+  isolated-install:
+    name: Wheel build + offline isolated-install verification + boundaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install build wheel pytest
+      - name: Build first-party wheels, install offline, run GRANT+DENY proof
+        run: python packages/integration/risk-authority-evidence-runtime/scripts/verify_isolated_install.py
+      - name: Package boundary tests (declared deps, no reverse cycle, RA stays a leaf)
+        run: |
+          pip install -e packages/governance-contracts \
+                      -e packages/governance-provider-framework \
+                      -e packages/providers/tap \
+                      -e packages/risk_authority \
+                      -e packages/integration/risk-authority-evidence-runtime
+          python -m pytest packages/integration/risk-authority-evidence-runtime/tests/packaging -q
