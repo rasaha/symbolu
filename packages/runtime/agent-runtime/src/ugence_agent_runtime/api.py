@@ -39,12 +39,28 @@ from .models.task import TaskDefinition, TaskInstance, TaskStatus
 from .models.transitions import RuntimeTransition
 from .models.workflow import WorkflowDefinition, WorkflowInstance, WorkflowStatus
 from .orchestration import (
+    AdmissionDecision,
+    BatchPlan,
+    BudgetCoordinator,
+    BudgetRequirement,
+    BudgetShortfall,
     CancellationScope,
+    CompensationRegistration,
+    CompensationRegistry,
+    CompensationSpec,
+    CompensationTrigger,
+    ConcurrencyPolicy,
+    ConcurrentPortfolioExecutor,
+    ConcurrentPortfolioStepResult,
+    ConcurrentStepReason,
     DependencyGraph,
     DependencyState,
     DependencyType,
+    ExecutionBackend,
+    ExecutorInfrastructureError,
     InMemoryPortfolioCheckpointStore,
     InMemoryPortfolioEventStore,
+    PortfolioBudget,
     PortfolioCancellationResult,
     PortfolioCheckpoint,
     PortfolioCheckpointConflict,
@@ -63,8 +79,15 @@ from .orchestration import (
     PortfolioTraceEntry,
     PortfolioTraceSequenceError,
     PortfolioWorkflowEntry,
+    QuantumOutcome,
+    ResourceClaim,
+    ResourceConflict,
+    ResourceCoordinator,
+    ResourceMode,
     SchedulingPolicy,
     SelectionReason,
+    SynchronousExecutionBackend,
+    ThreadPoolExecutionBackend,
     WorkflowCheckpointRef,
     WorkflowDependency,
     WorkflowEligibility,
@@ -259,6 +282,48 @@ def create_portfolio_controller(
     )
 
 
+# --- H22-D bounded concurrent execution constructor --------------------------
+def create_concurrent_executor(
+    runtime: AgentRuntime,
+    portfolio: WorkflowPortfolio,
+    *,
+    policy: Optional[ConcurrencyPolicy] = None,
+    scheduling_policy: Optional[SchedulingPolicy] = None,
+    failure_policy: PortfolioFailurePolicy = PortfolioFailurePolicy.ISOLATE_WORKFLOW,
+    trace: Optional[PortfolioTrace] = None,
+    event_store: Optional[PortfolioEventStore] = None,
+    checkpoint_store: Optional[PortfolioCheckpointStore] = None,
+    budget: Optional[PortfolioBudget] = None,
+    backend: Optional[ExecutionBackend] = None,
+    claims_resolver=None,
+    budget_resolver=None,
+) -> ConcurrentPortfolioExecutor:
+    """Create an H22-D bounded concurrent portfolio executor (the top of the H22 stack).
+
+    Given several eligible workflows, it admits a deterministic, mutually-compatible batch (up to
+    ``policy.max_concurrent_quanta``) that respects logical resource claims and a shared portfolio
+    budget, runs each admitted workflow's indivisible H22-A quantum concurrently (on the
+    synchronous or thread-pool ``backend``), then reconciles resources/budget, failure policy, and
+    compensation at a stable batch boundary — checkpointing only there. It decides *which safe
+    quanta may run at once*; it never authorizes the consequential action inside a quantum, which
+    still crosses fresh governance below H22-A. ``policy=ConcurrencyPolicy(max_concurrent_quanta=1)``
+    is semantically bounded H22-B execution."""
+    return ConcurrentPortfolioExecutor(
+        runtime,
+        portfolio,
+        policy=policy,
+        scheduling_policy=scheduling_policy,
+        failure_policy=failure_policy,
+        trace=trace,
+        event_store=event_store,
+        checkpoint_store=checkpoint_store,
+        budget=budget,
+        backend=backend,
+        claims_resolver=claims_resolver,
+        budget_resolver=budget_resolver,
+    )
+
+
 __all__ = [
     # runtime
     "AgentRuntime",
@@ -313,6 +378,31 @@ __all__ = [
     "PortfolioFailurePolicy",
     "CancellationScope",
     "PortfolioCancellationResult",
+    # H22-D bounded concurrent multi-workflow execution
+    "ConcurrencyPolicy",
+    "ConcurrentPortfolioExecutor",
+    "ConcurrentPortfolioStepResult",
+    "ConcurrentStepReason",
+    "QuantumOutcome",
+    "ExecutionBackend",
+    "SynchronousExecutionBackend",
+    "ThreadPoolExecutionBackend",
+    "ExecutorInfrastructureError",
+    "AdmissionDecision",
+    "BatchPlan",
+    "ResourceMode",
+    "ResourceClaim",
+    "ResourceConflict",
+    "ResourceCoordinator",
+    "PortfolioBudget",
+    "BudgetRequirement",
+    "BudgetShortfall",
+    "BudgetCoordinator",
+    "CompensationTrigger",
+    "CompensationSpec",
+    "CompensationRegistration",
+    "CompensationRegistry",
+    "create_concurrent_executor",
     # providers
     "Provider",
     "ProviderRegistry",

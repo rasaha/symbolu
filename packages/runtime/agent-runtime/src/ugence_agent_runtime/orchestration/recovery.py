@@ -102,6 +102,7 @@ def build_portfolio_checkpoint(
     *,
     failure_policy: str,
     trace_sequence: int,
+    concurrency_state: Optional[Dict[str, Any]] = None,
 ) -> PortfolioCheckpoint:
     """Snapshot ``portfolio`` into an unpersisted :class:`PortfolioCheckpoint`.
 
@@ -168,6 +169,7 @@ def build_portfolio_checkpoint(
         cancellation_state=portfolio.cancellation_state(),
         failure_policy=failure_policy,
         trace_sequence=trace_sequence,
+        concurrency_state=concurrency_state,
     )
 
 
@@ -291,7 +293,77 @@ def validate_portfolio_checkpoint(cp: PortfolioCheckpoint) -> Tuple[bool, Option
             return False, f"cancellation_state references unknown workflow {iid!r}"
         if label not in cancellation_labels:
             return False, f"cancellation_state[{iid!r}] has invalid scope label {label!r}"
+
+    # H22-D (checkpoint_version "2") durable coordination slice, if present. A v1 checkpoint
+    # carries no such block and is unaffected.
+    ok, reason = _validate_concurrency_state(cp, id_set)
+    if not ok:
+        return False, reason
     return True, None
+
+
+def _validate_concurrency_state(
+    cp: PortfolioCheckpoint, id_set: set
+) -> Tuple[bool, Optional[str]]:
+    """Validate the H22-D ``concurrency_state`` block fail-closed (Sections 47/52).
+
+    Budget: finite non-negative ``limits``/``consumed`` and ``0 <= consumed <= limit`` for every
+    constrained dimension (a stable checkpoint stores no reservations, so ``reserved`` is 0 by
+    construction). Compensations: well-formed registrations whose origin is a registered workflow
+    and whose trigger is a known value. Malformed values are rejected, never normalized."""
+    state = cp.concurrency_state or {}
+    if not state:
+        return True, None
+    if cp.checkpoint_version != "2":
+        return False, "concurrency_state present on a non-v2 checkpoint"
+    budget = state.get("budget") or {}
+    if budget:
+        limits = budget.get("limits", {})
+        consumed = budget.get("consumed", {})
+        if not isinstance(limits, dict) or not isinstance(consumed, dict):
+            return False, "budget limits/consumed must be objects"
+        for label, mapping in (("limits", limits), ("consumed", consumed)):
+            for dim, val in mapping.items():
+                if not dim or not isinstance(dim, str):
+                    return False, f"budget {label} has an invalid dimension name {dim!r}"
+                if not _finite(val) or val < 0:
+                    return False, f"budget {label}[{dim!r}] must be finite and non-negative"
+        for dim, used in consumed.items():
+            lim = limits.get(dim)
+            if lim is not None and used > lim:
+                return False, (
+                    f"budget consumed {used!r} exceeds limit {lim!r} for dimension {dim!r}"
+                )
+    comps = state.get("compensations") or []
+    if not isinstance(comps, list):
+        return False, "compensations must be a list"
+    triggers = _compensation_trigger_values()
+    seen_keys = set()
+    for c in comps:
+        if not isinstance(c, dict):
+            return False, "each compensation registration must be an object"
+        key = c.get("compensation_key")
+        origin = c.get("origin_instance_id")
+        comp_wf = c.get("compensation_workflow_id")
+        trig = c.get("trigger")
+        if not key or not isinstance(key, str):
+            return False, "compensation registration missing compensation_key"
+        if key in seen_keys:
+            return False, f"duplicate compensation_key {key!r}"
+        seen_keys.add(key)
+        if origin not in id_set:
+            return False, f"compensation references unknown origin workflow {origin!r}"
+        if not comp_wf or not isinstance(comp_wf, str):
+            return False, "compensation registration missing compensation_workflow_id"
+        if trig not in triggers:
+            return False, f"compensation registration has invalid trigger {trig!r}"
+    return True, None
+
+
+def _compensation_trigger_values() -> frozenset:
+    from .compensation import CompensationTrigger
+
+    return frozenset(t.value for t in CompensationTrigger)
 
 
 # --------------------------------------------------------------------------- #
@@ -319,6 +391,11 @@ class PortfolioRecoveryResult:
     checkpoint_version: str
     failure_policy: Any  # PortfolioFailurePolicy (typed; annotated Any to avoid an import cycle)
     recovery_metadata: Dict[str, Any] = field(default_factory=dict)
+    # H22-D durable coordination slice recovered from a v2 checkpoint (empty for v1). ``budget``
+    # is ``{limits, consumed}`` (reservations are never persisted, so recovery starts them at 0);
+    # ``compensations`` is the list of registration dicts. A reconstructed
+    # ``ConcurrentPortfolioExecutor`` restores its budget/compensation coordinators from these.
+    concurrency_state: Dict[str, Any] = field(default_factory=dict)
 
 
 def recover_portfolio(
@@ -446,6 +523,7 @@ def recover_portfolio(
             "failure_policy": cp.failure_policy,
             "workflows": wf_meta,
         },
+        concurrency_state=dict(cp.concurrency_state or {}),
     )
 
 

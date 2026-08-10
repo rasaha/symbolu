@@ -9,19 +9,24 @@ A **domain-neutral execution-coordination kernel** for agent and workflow execut
 > [`docs/AGENT_RUNTIME_POST_MERGE_FIDELITY_AUDIT.md`](docs/AGENT_RUNTIME_POST_MERGE_FIDELITY_AUDIT.md).
 >
 > **Maturity:** `0.2.0` (canonical execution state), `0.3.0` (**H22-A bounded workflow
-> advancement**), and `0.4.0` (**H22-B deterministic multi-workflow coordination**, incl. the
-> smooth-weighted-round-robin fairness correction and portfolio-lifecycle freezing) are
-> `IMPLEMENTED_AND_CI_VERIFIED` (observed passing the scoped Agent Runtime GitHub Actions
+> advancement**), `0.4.0` (**H22-B deterministic multi-workflow coordination**, incl. the
+> smooth-weighted-round-robin fairness correction and portfolio-lifecycle freezing), and `0.5.0`
+> (**H22-C durable multi-workflow orchestration** — durable portfolio checkpoint/recovery,
+> append-only audit event store, bounded failure propagation, cooperative cancellation scopes)
+> are `IMPLEMENTED_AND_CI_VERIFIED` (observed passing the scoped Agent Runtime GitHub Actions
 > workflow: package suite, isolated wheel-install verification, platform-freeze, terminology,
-> API-stability registry, and safety-case checks all green). The additive `0.5.0` **H22-C durable
-> multi-workflow orchestration** layer (durable portfolio checkpoint/recovery, append-only audit
-> event store, bounded failure propagation, cooperative cancellation scopes) is
-> `IMPLEMENTED_AND_CI_VERIFIED` after its final correctness corrections (real runtime-bound
-> pre-persist self-recoverability, immutable canonical-JSON event records, explicit torn
-> cross-store state detection) — all scoped `agent-runtime-ci` checks (package suite, isolated
-> wheel-install verification, platform-freeze) plus terminology, API-stability registry, and
-> safety-case were observed green on the corrected head. Not live-verified, pilot-validated,
-> distributed-safe, enforcement-ready, or production-ready.
+> API-stability registry, and safety-case checks all green). The additive `0.6.0` **H22-D bounded
+> concurrent multi-workflow execution** layer (bounded in-process concurrency over independent
+> H22-A quanta, a fairness-preserving batch-selection seam, logical resource claims with an atomic
+> all-or-none coordinator, a shared reserve-before-execute budget, and bounded compensation
+> coordination) is `IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED` — the full package suite (incl. the
+> dedicated `tests/test_portfolio_concurrency.py`) passes offline, with deterministic
+> (barrier/event, no-sleep) concurrency tests. **H22-D decides which safe quanta may run
+> concurrently; it never authorizes the consequential action inside a quantum** (that stays below
+> H22-A, with fresh governance per quantum), never preempts the indivisible
+> governance→exact-action→provider chain, never runs two quanta for one workflow at once, and
+> preserves the H22-C torn-state fail-closed contract. Not live-verified, pilot-validated,
+> distributed-safe, cluster-safe, exactly-once, enforcement-ready, or production-ready.
 
 The kernel drives task and workflow lifecycle, invokes providers/tools, and applies
 retry, timeout, cancellation, checkpointing, and durable recovery. Before any

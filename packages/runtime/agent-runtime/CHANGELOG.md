@@ -3,6 +3,74 @@
 All notable changes to the independent Agent Runtime distribution are recorded here.
 This project follows semantic versioning for the distribution.
 
+## 0.6.0 — H22-D bounded concurrent multi-workflow execution
+
+Lets several **mutually-safe** workflows make progress **at the same time** — bounded, in-process
+concurrency over independent H22-A quanta — while preventing resource conflicts, budget overruns,
+governance bypass, duplicate consequential actions, and unsafe compensation. Additive only: no
+change to exact-action fingerprint semantics, governance ownership, Canonical Execution State,
+single-workflow recovery, or the H22-C torn-state contract. **H22-D decides which safe quanta may
+run concurrently; it never authorizes the consequential action inside a quantum** (that stays
+below H22-A, with fresh governance per quantum). See
+[`docs/AGENT_RUNTIME_H22D_CONCURRENCY.md`](docs/AGENT_RUNTIME_H22D_CONCURRENCY.md).
+
+### Added
+- **`plan_batch` on `PortfolioScheduler`** — the additive batch-selection seam over the **same**
+  smooth-weighted-round-robin (SWRR) fairness core `step()` uses. It scans eligible workflows in
+  SWRR order and asks a caller-supplied admission predicate whether each fairness winner may take
+  a slot; admitted workflows are counted as served (accrue/charge/age-reset), while a
+  resource/budget-**deferred** workflow is never charged and never age-reset, preserving its
+  starvation protection. **At `max_concurrency=1` with no constraints the committed fairness/aging
+  state is identical to a single `step()`.** New immutable `BatchPlan` / `AdmissionDecision` types.
+  `step()` is unchanged.
+- **`ConcurrentPortfolioExecutor` + `create_concurrent_executor(...)`** — the admission
+  coordinator. Each round runs **plan → execute → join → reconcile → checkpoint**: a deterministic
+  admission batch (bounded by `ConcurrencyPolicy.max_concurrent_quanta`), each admitted workflow's
+  indivisible H22-A quantum run concurrently on a pluggable **`ExecutionBackend`**
+  (`SynchronousExecutionBackend` / `ThreadPoolExecutionBackend`, proven equivalent), then
+  resource/budget/failure/compensation reconciliation at a stable batch boundary. Admission is
+  deterministic; completion order is not, and never redefines admission or the reconciliation
+  trace. Immutable `ConcurrentPortfolioStepResult` / `QuantumOutcome` / `ConcurrentStepReason`; no
+  thread/future handle is ever exposed. A single coordinator thread owns all portfolio/scheduler/
+  coordinator/trace/checkpoint mutation; workers only call `advance_workflow` for distinct
+  instances and return immutable outcomes.
+- **Logical resource claims** — `ResourceMode` (`READ`/`WRITE`/`EXCLUSIVE`/`UNKNOWN`),
+  `ResourceClaim`, `normalize_claims`, `modes_conflict`, `ResourceConflict`, and a
+  `ResourceCoordinator` with an **atomic all-or-none** reservation and fail-safe release. The only
+  compatible pair is `READ + READ`; `UNKNOWN` is fail-closed. Claims are declared before the
+  quantum (a static map or an injected resolver) and are portfolio-coordination requirements, not
+  application authority. Planned-then-reserved admission means no runtime lock chains and no
+  deadlock by design.
+- **Shared portfolio budget** — a generic named-dimension `PortfolioBudget`, per-workflow
+  `BudgetRequirement`, structured `BudgetShortfall`, and a **reserve-before-execute**
+  `BudgetCoordinator` (`limit`/`reserved`/`consumed`/`available` accounting; atomic across
+  dimensions; conservative settlement charging the reservation when a provider ran, releasing
+  otherwise; fail-closed on NaN/±Inf/negative). Two individually-affordable quanta can never
+  together oversubscribe the shared budget.
+- **Bounded compensation coordination** — `CompensationTrigger`, `CompensationSpec`,
+  `CompensationRegistration`, and an idempotent `CompensationRegistry`. A compensation is a
+  **separately-defined, separately-governed** workflow scheduled through the ordinary chain
+  (fresh governance, resources/budget) — never a direct provider call from H22-D and never an
+  exactly-once-reversal claim. Registration is exactly-once per intent, with origin lineage, and
+  survives recovery without duplication.
+- **Portfolio checkpoint schema `"2"`** — additionally carries the durable H22-D slice (budget
+  `limits` + `consumed`, compensation registrations) under a `concurrency_state` block; transient
+  resource/budget reservations are **never** persisted (a stable checkpoint boundary has
+  `reserved == 0`, validated fail-closed). A **v1** checkpoint recovers unchanged; `recover_portfolio`
+  returns the recovered `concurrency_state`. The H22-C `PORTFOLIO_RUNTIME_CHECKPOINT_DIVERGENCE`
+  fail-closed torn-state contract is preserved.
+- **H22-D orchestration events** — `CONCURRENT_BATCH_PLANNED`, `QUANTUM_ADMITTED`,
+  `QUANTUM_DEFERRED_RESOURCE` / `_BUDGET` / `_CAPACITY`, `RESOURCE_RESERVED` / `RESOURCE_RELEASED`,
+  `BUDGET_RESERVED` / `BUDGET_SETTLED`, `CONCURRENT_QUANTUM_COMPLETED`,
+  `CONCURRENT_BATCH_RECONCILED`, `COMPENSATION_REGISTERED` — enough to answer "why did A and C run
+  concurrently while B did not?" with structured evidence, emitted in deterministic admission order.
+
+### Explicitly out of scope (unchanged non-claims)
+No distributed cluster scheduling, distributed locking, Kubernetes/Redis/DB coordination, global
+transactions, exactly-once external effects, Runtime Assurance, model/agent selection, peer-to-peer
+agent messaging, or autonomous workflow generation. Concurrency is bounded and in-process. Not
+live-verified, pilot-validated, distributed-safe, cluster-safe, or production-ready.
+
 ## 0.5.0 — H22-C durable multi-workflow orchestration
 
 Makes the H22-B portfolio/team coordinator **durable, reconstructable, auditable, and safely

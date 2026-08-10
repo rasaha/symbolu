@@ -7,22 +7,32 @@ independent distribution starts at 0.1.0. See docs/AGENT_RUNTIME_OVERVIEW.md.
 """
 from __future__ import annotations
 
-# 0.5.0 — H22-C durable multi-workflow orchestration: an additive layer above H22-B that makes
-# the portfolio/team coordinator durable, reconstructable, auditable, and safely controllable
-# across failure/restart. Adds a versioned PortfolioCheckpoint (referencing — never copying —
-# the underlying runtime checkpoints, and never duplicating canonical execution state), a
-# neutral portfolio checkpoint store + in-memory reference, side-effect-free portfolio recovery
-# with explicit post-recovery continuation, an append-only orchestration audit trace ordered by
-# a logical sequence, bounded failure propagation (ISOLATE_WORKFLOW default / FAIL_DEPENDENTS /
-# FAIL_PORTFOLIO), and cooperative, idempotent cancellation scopes (WORKFLOW_ONLY /
-# DEPENDENT_SUBGRAPH / PORTFOLIO_ALL). It changes no single-workflow execution truth: no change
-# to exact-action fingerprint semantics, governance ownership, canonical execution state,
-# checkpoint digest semantics, or single-workflow recovery. Recovery performs zero provider,
-# governance, and advancement calls. No true concurrency, resource ledger, shared budget, or
-# compensation (those remain H22-D).
-# (0.4.0 added the H22-B deterministic coordination layer; 0.3.0 added the H22-A bounded-
-# advancement seam; 0.2.0 added canonical execution state; 0.1.2 hardened the exact-action
-# contract; 0.1.1 added fail-closed default governance.)
-__version__ = "0.5.0"
+# 0.6.0 — H22-D bounded concurrent multi-workflow execution: an additive layer above H22-C that
+# lets several mutually-safe workflows make progress at once. Adds a fairness-preserving batch
+# selection seam on the H22-B scheduler (plan_batch: the SAME smooth-weighted-round-robin core,
+# generalized to admit a batch — at max_concurrency=1 it is identical to a single step), logical
+# resource claims with a fixed conflict matrix and an atomic all-or-none ResourceCoordinator, a
+# shared reserve-before-execute BudgetCoordinator (limit/reserved/consumed accounting, fail-closed
+# on NaN/Inf/negative, conservative settlement), bounded compensation coordination (idempotent
+# registration of a separately-defined, separately-governed compensation workflow with origin
+# lineage — never a direct provider call and never an exactly-once claim), and a
+# ConcurrentPortfolioExecutor that plans a deterministic admission batch, runs each admitted
+# indivisible H22-A quantum concurrently (synchronous or bounded thread-pool backend, proven
+# equivalent), and reconciles resources/budget/failure/compensation at a stable batch boundary.
+# The portfolio checkpoint gains a v2 schema carrying only the durable H22-D slice (budget limits
+# + consumed, compensation registrations; reservations are transient and never persisted) — v1
+# checkpoints recover unchanged. It changes no single-workflow execution truth and no governance
+# ownership: H22-D decides which safe quanta may run concurrently; it never authorizes the
+# consequential action inside a quantum (that stays below H22-A, with fresh governance per
+# quantum), never preempts the indivisible governance→exact-action→provider chain, never runs two
+# quanta for one workflow at once, and preserves the H22-C torn-state
+# PORTFOLIO_RUNTIME_CHECKPOINT_DIVERGENCE fail-closed contract. In-process only: no distributed
+# cluster scheduling, no distributed locking, no exactly-once external effects, no runtime
+# assurance, no peer messaging, no agent/model selection.
+# (0.5.0 added the H22-C durable orchestration layer; 0.4.0 added the H22-B deterministic
+# coordination layer; 0.3.0 added the H22-A bounded-advancement seam; 0.2.0 added canonical
+# execution state; 0.1.2 hardened the exact-action contract; 0.1.1 added fail-closed default
+# governance.)
+__version__ = "0.6.0"
 
 VERSION = __version__

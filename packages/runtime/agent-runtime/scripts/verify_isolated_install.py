@@ -65,7 +65,7 @@ def main() -> int:
         check = (
             "import ugence_agent_runtime as ar;"
             "import ugence_agent_runtime.api as api;"
-            "assert ar.__version__ == '0.5.0', ar.__version__;"
+            "assert ar.__version__ == '0.6.0', ar.__version__;"
             # confirm the import resolves inside site-packages, not the monorepo src
             "assert 'site-packages' in ar.__file__, ar.__file__;"
             "print('import OK', ar.__version__, ar.__file__)"
@@ -77,7 +77,7 @@ def main() -> int:
             "import importlib.metadata as m;"
             "d = m.metadata('ugence-agent-runtime');"
             "assert d['Name'] == 'ugence-agent-runtime', d['Name'];"
-            "assert d['Version'] == '0.5.0', d['Version'];"
+            "assert d['Version'] == '0.6.0', d['Version'];"
             "reqs = m.requires('ugence-agent-runtime') or [];"
             # no mandatory runtime dependency (only optional [test] extras allowed)
             "hard = [r for r in reqs if 'extra' not in r];"

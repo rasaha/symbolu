@@ -65,12 +65,46 @@ from .recovery import (
     validate_portfolio_checkpoint_bound,
 )
 from .scheduling import (
+    AdmissionDecision,
+    BatchPlan,
     PortfolioScheduler,
     PortfolioStepReason,
     PortfolioStepResult,
     SchedulingPolicy,
     SelectionReason,
     WorkflowEligibility,
+)
+from .resources import (
+    ResourceClaim,
+    ResourceConflict,
+    ResourceCoordinator,
+    ResourceMode,
+    modes_conflict,
+    normalize_claims,
+)
+from .budgets import (
+    BudgetCoordinator,
+    BudgetRequirement,
+    BudgetSettlement,
+    BudgetShortfall,
+    PortfolioBudget,
+)
+from .compensation import (
+    CompensationRegistration,
+    CompensationRegistry,
+    CompensationSpec,
+    CompensationTrigger,
+)
+from .concurrency import (
+    ConcurrencyPolicy,
+    ConcurrentPortfolioExecutor,
+    ConcurrentPortfolioStepResult,
+    ConcurrentStepReason,
+    ExecutionBackend,
+    ExecutorInfrastructureError,
+    QuantumOutcome,
+    SynchronousExecutionBackend,
+    ThreadPoolExecutionBackend,
 )
 from .tracing import (
     PORTFOLIO_EVENT_TYPES,
@@ -130,4 +164,35 @@ __all__ = [
     "PortfolioFailurePolicy",
     "CancellationScope",
     "PortfolioCancellationResult",
+    # H22-D batch selection seam (fairness-preserving)
+    "AdmissionDecision",
+    "BatchPlan",
+    # H22-D resource coordination
+    "ResourceMode",
+    "ResourceClaim",
+    "ResourceConflict",
+    "ResourceCoordinator",
+    "modes_conflict",
+    "normalize_claims",
+    # H22-D shared budget coordination
+    "PortfolioBudget",
+    "BudgetRequirement",
+    "BudgetShortfall",
+    "BudgetSettlement",
+    "BudgetCoordinator",
+    # H22-D compensation coordination
+    "CompensationTrigger",
+    "CompensationSpec",
+    "CompensationRegistration",
+    "CompensationRegistry",
+    # H22-D bounded concurrent execution
+    "ConcurrencyPolicy",
+    "ConcurrentPortfolioExecutor",
+    "ConcurrentPortfolioStepResult",
+    "ConcurrentStepReason",
+    "QuantumOutcome",
+    "ExecutionBackend",
+    "SynchronousExecutionBackend",
+    "ThreadPoolExecutionBackend",
+    "ExecutorInfrastructureError",
 ]
