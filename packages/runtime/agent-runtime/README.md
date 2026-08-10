@@ -8,11 +8,11 @@ A **domain-neutral execution-coordination kernel** for agent and workflow execut
 > planning/reasoning/memory. See
 > [`docs/AGENT_RUNTIME_POST_MERGE_FIDELITY_AUDIT.md`](docs/AGENT_RUNTIME_POST_MERGE_FIDELITY_AUDIT.md).
 >
-> **Maturity:** `0.2.0` (canonical execution state) and `0.3.0` (**H22-A bounded workflow
-> advancement**) are `IMPLEMENTED_AND_CI_VERIFIED`. The additive `0.4.0` **H22-B
-> deterministic multi-workflow coordination** layer is
-> `IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED` pending observation of the scoped Agent Runtime
-> GitHub Actions workflow on this change (see [Status](#status)). Not live-verified,
+> **Maturity:** `IMPLEMENTED_AND_CI_VERIFIED` — `0.2.0` (canonical execution state), `0.3.0`
+> (**H22-A bounded workflow advancement**), and the additive `0.4.0` **H22-B deterministic
+> multi-workflow coordination** layer have all been observed passing the scoped Agent Runtime
+> GitHub Actions workflow (package suite, isolated wheel-install verification, platform-freeze,
+> terminology, API-stability registry, and safety-case checks all green). Not live-verified,
 > pilot-validated, distributed-safe, enforcement-ready, or production-ready.
 
 The kernel drives task and workflow lifecycle, invokes providers/tools, and applies
@@ -204,13 +204,13 @@ ledger, no portfolio checkpoint/recovery, no compensation (H22-C/H22-D). Builds 
 H22-A bounded-advancement seam (0.3.0), canonical execution state (0.2.0), and the
 governance-safety/exact-action corrections (0.1.1/0.1.2).
 
-Maturity: `IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED` — locally the full package suite is
-**170 passed, 2 skipped** and isolated wheel-install verification is **PASS** at `0.4.0`;
-promotion to `IMPLEMENTED_AND_CI_VERIFIED` awaits observing the scoped Agent Runtime GitHub
-Actions workflow green on this PR head. This does not imply production, pilot,
-live-environment, distributed, or enforcement validation. **True bounded concurrency,
-resource/budget coordination, portfolio durability, and compensation remain later phases
-(H22-C / H22-D), not implemented here.**
+Maturity: `IMPLEMENTED_AND_CI_VERIFIED` — the scoped Agent Runtime GitHub Actions workflow
+has been observed green on this change (package suite **170 passed, 2 skipped**; isolated
+wheel-install verification **PASS** at `0.4.0`; platform-freeze, terminology, API-stability
+registry, and safety-case checks all green). This does not imply production, pilot,
+live-environment, distributed, exactly-once, or enforcement validation. **True bounded
+concurrency, resource/budget coordination, portfolio durability, and compensation remain
+later phases (H22-C / H22-D), not implemented here.**
 
 `0.3.0` — added the **H22-A bounded workflow advancement** seam (`prepare_workflow` +
 `advance_workflow` returning `WorkflowAdvanceOutcome`/`WorkflowAdvanceStop`).
