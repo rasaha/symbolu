@@ -19,13 +19,16 @@ A **domain-neutral execution-coordination kernel** for agent and workflow execut
 > concurrent multi-workflow execution** layer (bounded in-process concurrency over independent
 > H22-A quanta, a fairness-preserving batch-selection seam, logical resource claims with an atomic
 > all-or-none coordinator, a shared reserve-before-execute budget, and bounded compensation
-> coordination, plus the independent-audit hardening — runtime concurrency-ceiling enforcement,
-> fail-closed undeclared-requirement handling, exception-safe admission planning,
-> provider-execution-evidence settlement, and a side-effect-free recovery-reconstruction seam) is
-> `IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED` — the full package suite (incl. the dedicated
-> `tests/test_portfolio_concurrency.py`) passes offline with deterministic (barrier/event,
-> no-sleep) concurrency tests; scoped CI must be re-confirmed green on the corrected head before
-> this is upgraded to `IMPLEMENTED_AND_CI_VERIFIED`. **H22-D decides which safe quanta may run
+> coordination, plus the independent-audit corrections C1–C5 and F1–F4 — runtime
+> concurrency-ceiling enforcement, fail-closed undeclared-requirement handling, exception-safe
+> admission planning with one-resolution-per-round and audit-emission fail-safe,
+> provider-execution-evidence settlement, exact compensation-trigger semantics, a side-effect-free
+> recovery-reconstruction seam that preserves scheduling policy, and budget-dimension hardening) is
+> `IMPLEMENTED_AND_CI_VERIFIED` — all scoped `agent-runtime-ci` checks (package suite incl. the
+> dedicated `tests/test_portfolio_concurrency.py`, isolated wheel-install verification,
+> platform-freeze) plus terminology, API-stability registry, and safety-case + SBOM were observed
+> green on the independently-verified corrected head `d615e0e5`, with deterministic (barrier/event,
+> no-sleep) concurrency tests. **H22-D decides which safe quanta may run
 > concurrently; it never authorizes the consequential action inside a quantum** (that stays below
 > H22-A, with fresh governance per quantum), never preempts the indivisible
 > governance→exact-action→provider chain, never runs two quanta for one workflow at once, and
