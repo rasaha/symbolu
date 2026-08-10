@@ -67,7 +67,7 @@ adapter beyond a minimal neutral lineage seam.
   for `"1"` it requires base digest + extension digest + cross-binding valid; for `"0"` it
   requires the base digest and no extension data. `validate_execution_states()` enforces,
   beyond each snapshot's own digest, that the map key equals the snapshot's own key field
-  (task id / state digest), that instance/workflow/runtime/correlation identity match the
+  (task id / state digest), that instance/workflow/correlation identity match the
   checkpoint, that the referenced task exists, that the schema version is supported, that
   every latest snapshot is resolvable in the journal (latest↔journal consistency), and that
   the lineage source is structural (keys reference known tasks, values deserialize). An
