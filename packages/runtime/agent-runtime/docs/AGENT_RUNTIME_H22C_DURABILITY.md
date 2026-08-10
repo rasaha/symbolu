@@ -297,11 +297,11 @@ consequential action is permitted.
 
 ## Maturity
 
-`IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED` after the final audit corrections (durable trace event
-store; crash-window sequencing; full base+extension checkpoint binding; semantic lifecycle /
-failure / cancellation cross-binding; contiguous-registration validation; typed failure-policy
-continuity). Package suite **234 passed, 2 skipped**; isolated wheel-install **PASS** at `0.5.0`;
-platform-freeze **PASS**. Promotes to `IMPLEMENTED_AND_CI_VERIFIED` only once all scoped
-`agent-runtime-ci` checks are observed green on the exact new final head. No claim of production /
-pilot / live-environment / distributed / exactly-once / runtime-assurance / cluster-safe
-validation.
+`IMPLEMENTED_AND_CI_VERIFIED` after the final audit corrections (durable trace event store;
+crash-window sequencing; full base+extension checkpoint binding; semantic lifecycle / failure /
+cancellation cross-binding; contiguous-registration validation; typed failure-policy continuity).
+Package suite **234 passed, 2 skipped**; isolated wheel-install **PASS** at `0.5.0`; all scoped
+`agent-runtime-ci` checks (package suite, isolated wheel-install, platform-freeze) plus
+terminology, API-stability registry, and safety-case observed green on the corrected head. No
+claim of production / pilot / live-environment / distributed / exactly-once / runtime-assurance /
+cluster-safe validation.
