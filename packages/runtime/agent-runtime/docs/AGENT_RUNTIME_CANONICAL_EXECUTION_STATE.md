@@ -1,9 +1,11 @@
 # Agent Runtime — Canonical Execution State
 
-> **Maturity:** `IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED` — consistent with the rest of
-> the package. Additive, offline-verified by the package test suite. Not live-verified,
-> pilot-validated, enforcement-ready, or production-validated. No claim here is backed by
-> production telemetry.
+> **Maturity:** `IMPLEMENTED_AND_CI_VERIFIED` — verified by the scoped Agent Runtime
+> GitHub Actions workflow on the merged change (PR #1390): package suite 110 passed,
+> 2 skipped; wheel build + isolated-install verification PASS; platform-freeze and
+> terminology checks PASS. This does **not** imply production, pilot, live-environment,
+> enforcement, or Runtime-Assurance validation, and no claim here is backed by production
+> telemetry.
 
 ## Purpose
 

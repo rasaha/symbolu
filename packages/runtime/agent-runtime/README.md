@@ -8,8 +8,9 @@ A **domain-neutral execution-coordination kernel** for agent and workflow execut
 > planning/reasoning/memory. See
 > [`docs/AGENT_RUNTIME_POST_MERGE_FIDELITY_AUDIT.md`](docs/AGENT_RUNTIME_POST_MERGE_FIDELITY_AUDIT.md).
 >
-> **Maturity:** `IMPLEMENTED_AND_OFFLINE_VERIFIED` (plus a scoped CI job). Not
-> live-verified, pilot-validated, enforcement-ready, or production-ready.
+> **Maturity:** `IMPLEMENTED_AND_CI_VERIFIED` (the scoped Agent Runtime GitHub Actions
+> workflow has been observed passing). Not live-verified, pilot-validated,
+> enforcement-ready, or production-ready.
 
 The kernel drives task and workflow lifecycle, invokes providers/tools, and applies
 retry, timeout, cancellation, checkpointing, and durable recovery. Before any
@@ -126,6 +127,8 @@ boundary for execution-state lineage) on top of the first independent distributi
 post-merge governance-safety correction (0.1.1), and exact-action contract hardening
 (0.1.2). No change to exact-action fingerprint semantics, governance ownership, or the
 digest semantics of existing checkpoints. Single-workflow coordination only. Maturity:
-`IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED` (promoted to `IMPLEMENTED_AND_CI_VERIFIED` once
-the scoped GitHub Actions run is observed passing). **Multi-workflow orchestration (H22)
-is a later feature phase, not implemented here.**
+`IMPLEMENTED_AND_CI_VERIFIED` — the scoped Agent Runtime GitHub Actions workflow has been
+observed passing on the merged change (package suite 110 passed, 2 skipped; isolated
+wheel-install verification PASS). This does not imply production, pilot, live-environment,
+or enforcement validation. **Multi-workflow orchestration (H22) is a later feature phase,
+not implemented here.**
