@@ -1,6 +1,6 @@
 # TAP-E1.1 — Latency & Cost Report
 
-Quality gains (see the [comparison](./E1_1_COMPARISON.md)) must be weighed against
+Quality gains (see the [comparison](E1_1_COMPARISON.md)) must be weighed against
 computational cost. This report separates the **model** cost from the **deterministic**
 overhead.
 

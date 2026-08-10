@@ -2,7 +2,7 @@
 """§15.13 Phase 4 — Continuation-inertia probe (multi-turn state dynamics).
 
 Pure §0.8-binding implementation per the sealed §15.13 design
-spec at `docs/design/15_13_R_INERTIA_DESIGN_SPEC.md`. Tests
+spec at `Project_documentation/repository/docs/design/15_13_R_INERTIA_DESIGN_SPEC.md`. Tests
 whether the LM's residual alignment toward a prior answer
 trajectory R_A — relative to a new question Q_B — predicts
 whether the model will fail to pivot to Q_B.

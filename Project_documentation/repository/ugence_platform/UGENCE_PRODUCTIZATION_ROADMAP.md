@@ -2,7 +2,7 @@
 ### Internal / data-room document — not for first investor contact
 
 > **Terminology update — Ugence Decision Governance (2026-08-01).** Per
-> [`docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md):
+> [`docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](../docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md):
 > the canonical **umbrella** is **Ugence Decision Governance**; the **AI Control Plane** named in this
 > title is the **optional, bypassable** administration & coordination layer, not the umbrella and not a
 > universal authority. The "Decision Governance kernel" listed below is the **Decision Authority**

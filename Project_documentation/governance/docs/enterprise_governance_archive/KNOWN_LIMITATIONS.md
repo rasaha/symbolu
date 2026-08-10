@@ -2,7 +2,7 @@
 
 **Status:** Archival record. Every limitation is stated explicitly and without
 hedging. Cross-references the frozen architecture
-([`../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md))
+([`../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../actiongate/ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md))
 and the honesty boundary
 ([`../enterprise_pilot/RESEARCH_BOUNDARY.md`](../enterprise_pilot/RESEARCH_BOUNDARY.md)).
 
@@ -68,5 +68,5 @@ overclaiming.
 Taken together: the track has a **validated-on-synthetic-data architecture and
 method** and a set of **negative results about the ontology**, but **no established
 real-world value, accuracy, or effectiveness**. Every remaining question of worth is
-a real-data question. See [`FUTURE_WORK.md`](./FUTURE_WORK.md) and
-[`RESUME_GUIDE.md`](./RESUME_GUIDE.md).
+a real-data question. See [`FUTURE_WORK.md`](FUTURE_WORK.md) and
+[`RESUME_GUIDE.md`](RESUME_GUIDE.md).

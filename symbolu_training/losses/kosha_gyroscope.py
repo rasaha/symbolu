@@ -44,7 +44,7 @@ R-T Quadrant Geometry:
 - Vital: Energy/Momentum (not mapped to quadrant)
 
 References:
-- docs/design/KOSHA_GYROSCOPE_DESIGN.md v2.2.4
+- Project_documentation/repository/docs/design/KOSHA_GYROSCOPE_DESIGN.md v2.2.4
 - Taittiriya Upanishad (Pancha Kosha model)
 - Yoga Sutras of Patanjali (Dharana concept)
 """
@@ -1412,7 +1412,7 @@ class VrittiResonanceLoss(nn.Module):
     - Phase 1 (PPL > 30): DISABLED (read-only logging)
     - Phase 2 (PPL < 30): ACTIVE with resonance_lambda weight
 
-    Reference: docs/design/KOSHA_GYROSCOPE_DESIGN.md Section 12
+    Reference: Project_documentation/repository/docs/design/KOSHA_GYROSCOPE_DESIGN.md Section 12
     """
 
     # Kosha indices (from 32D sovereign state [12:17])
@@ -1795,7 +1795,7 @@ class KoshaPhaseCorrectorConfig:
     Each Kosha has its own overactive threshold reflecting its unique function.
     Koshas are independent [0,1] activations (not softmax zero-sum).
 
-    Reference: docs/design/KOSHA_GYROSCOPE_DESIGN.md Section 13
+    Reference: Project_documentation/repository/docs/design/KOSHA_GYROSCOPE_DESIGN.md Section 13
     """
 
     # === FIBONACCI PENTAD THRESHOLDS (v2.2.5) ===
@@ -1855,7 +1855,7 @@ class KoshaPhaseCorrector(nn.Module):
     This is the "guardrail on the cliff" - it doesn't teach driving,
     but prevents falling off during deployment.
 
-    Reference: docs/design/KOSHA_GYROSCOPE_DESIGN.md Section 13
+    Reference: Project_documentation/repository/docs/design/KOSHA_GYROSCOPE_DESIGN.md Section 13
     """
 
     # Kosha indices (from 32D sovereign state [12:17])

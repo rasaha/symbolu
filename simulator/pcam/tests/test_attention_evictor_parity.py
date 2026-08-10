@@ -6,7 +6,7 @@ policy produces identical victim sets to the canonical implementation at
 
     CTM_plus/KVPolicy/kv_policy/attention_evictor.py
 
-per ADR-0001 (docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md).
+per ADR-0001 (Project_documentation/repository/docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md).
 
 Scope
 -----

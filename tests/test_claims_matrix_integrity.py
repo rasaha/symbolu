@@ -17,7 +17,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 MATRIX_PATH = REPO_ROOT / "docs" / "reviews" / "CLAIMS_TO_TESTS_MATRIX.md"
 
 # Test paths referenced in the matrix (relative to repo root).
-# Keep in sync with docs/reviews/CLAIMS_TO_TESTS_MATRIX.md Section 1.
+# Keep in sync with Project_documentation/repository/docs/reviews/CLAIMS_TO_TESTS_MATRIX.md Section 1.
 REFERENCED_TEST_FILES = [
     # A. Complexity & Scaling
     "symbolu/ontological/test_phase_attention.py",

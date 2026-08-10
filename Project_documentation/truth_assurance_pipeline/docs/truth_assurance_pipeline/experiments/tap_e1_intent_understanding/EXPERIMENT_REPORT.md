@@ -203,7 +203,7 @@ All five gates pass.
 
 ## 17. Failure analysis
 
-See [`FAILURE_ANALYSIS.md`](./FAILURE_ANALYSIS.md). Headline severe-failure counts
+See [`FAILURE_ANALYSIS.md`](FAILURE_ANALYSIS.md). Headline severe-failure counts
 by split (V0 → V4):
 
 | split | V0 | V1 | V2 | V3 | V4 | V5 |

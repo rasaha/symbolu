@@ -5,7 +5,7 @@ Tests for Appendix F Stage 7A — SemanticCoherenceController Integration
 Verifies that SemanticCoherenceIntegration correctly aggregates per-layer
 S1 scores into S1/S2/S3 signals and feeds them into UnifiedCoherenceController.
 
-Reference: docs/design/CONSCIOUS_GENERATION_DESIGN.md, §F.10.6.1
+Reference: Project_documentation/repository/docs/design/CONSCIOUS_GENERATION_DESIGN.md, §F.10.6.1
 """
 
 import pytest

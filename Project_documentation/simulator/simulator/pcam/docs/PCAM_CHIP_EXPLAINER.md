@@ -252,7 +252,7 @@ in v2.**
 
 The Ugence Labs stack also ships a **software KV-cache quantization**
 backend through vLLM called `int4_protected` (see
-[`CTM_plus/KVPolicy/INT4_PROTECTED_README.md`](../../../CTM_plus/KVPolicy/INT4_PROTECTED_README.md)).
+[`CTM_plus/KVPolicy/INT4_PROTECTED_README.md`](../../../../../CTM_plus/KVPolicy/INT4_PROTECTED_README.md)).
 int4_protected and PCAM operate at **different layers** and compound.
 
 | Layer | Decides | Status |
@@ -304,7 +304,7 @@ per-element bits inside the blocks.
 
 **Scoring behavior (ADR-0001).** Per-block importance is computed by
 the four-signal phase-aware model locked in
-[`docs/design/ADR-0001`](../../../docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md):
+[`docs/design/ADR-0001`](../../../../repository/docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md):
 recency, frequency, attention EMA, and position importance, with
 PREFILL/DECODE weight splits and a +0.5 entity bonus for high-attention
 non-sink blocks. Frequency is estimated by a 4-row, 4-bit Count-Min

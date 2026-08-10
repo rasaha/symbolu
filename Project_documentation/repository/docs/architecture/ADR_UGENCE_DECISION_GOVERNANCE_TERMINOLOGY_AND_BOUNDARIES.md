@@ -4,9 +4,9 @@
 **Date:** 2026-08-01
 **Owners:** Ugence platform architecture
 **Related:**
-- [`ADR_MODEL_SELECTION_POLICY_PLACEMENT.md`](../../ADR_MODEL_SELECTION_POLICY_PLACEMENT.md) — Model Selection placement (complementary; not superseded)
-- [`UGENCE_TERMINOLOGY_PRODUCT_CAPABILITY_BOUNDARY_AUDIT.md`](../../UGENCE_TERMINOLOGY_PRODUCT_CAPABILITY_BOUNDARY_AUDIT.md) — the evidence audit behind this decision
-- [`UGENCE_REPOSITORY_RESTRUCTURING_PLAN.md`](../../UGENCE_REPOSITORY_RESTRUCTURING_PLAN.md), [`UGENCE_MODULARITY_AND_PACKAGING_AUDIT.md`](../../UGENCE_MODULARITY_AND_PACKAGING_AUDIT.md), [`UGENCE_INTERMODULE_IO_AND_AUTHORITY_AUDIT.md`](../../UGENCE_INTERMODULE_IO_AND_AUTHORITY_AUDIT.md)
+- [`ADR_MODEL_SELECTION_POLICY_PLACEMENT.md`](../../../model_selection/adr/ADR_MODEL_SELECTION_POLICY_PLACEMENT.md) — Model Selection placement (complementary; not superseded)
+- [`UGENCE_TERMINOLOGY_PRODUCT_CAPABILITY_BOUNDARY_AUDIT.md`](../../architecture/UGENCE_TERMINOLOGY_PRODUCT_CAPABILITY_BOUNDARY_AUDIT.md) — the evidence audit behind this decision
+- [`UGENCE_REPOSITORY_RESTRUCTURING_PLAN.md`](../../restructuring/UGENCE_REPOSITORY_RESTRUCTURING_PLAN.md), [`UGENCE_MODULARITY_AND_PACKAGING_AUDIT.md`](../../architecture/UGENCE_MODULARITY_AND_PACKAGING_AUDIT.md), [`UGENCE_INTERMODULE_IO_AND_AUTHORITY_AUDIT.md`](../../architecture/UGENCE_INTERMODULE_IO_AND_AUTHORITY_AUDIT.md)
 
 > *This ADR changes **no** production code, package, wheel, API, schema, frozen identifier,
 > serialization, digest, authority boundary, or historical record. It fixes vocabulary and
@@ -126,7 +126,7 @@ over the capabilities' findings; authority remains federated by function.
 Model Selection is the **tenth capability**, distinct from Hybrid LLM. Its platform placement
 is a **cross-cutting policy service at research/pilot maturity**
 (`CROSS_CUTTING_POLICY_SERVICE — RESEARCH/PILOT MATURITY`), consistent with
-[`ADR_MODEL_SELECTION_POLICY_PLACEMENT.md`](../../ADR_MODEL_SELECTION_POLICY_PLACEMENT.md).
+[`ADR_MODEL_SELECTION_POLICY_PLACEMENT.md`](../../../model_selection/adr/ADR_MODEL_SELECTION_POLICY_PLACEMENT.md).
 It may govern approved-model/provider eligibility, privacy/data-egress restrictions, required
 capabilities, cost/latency constraints, availability policy, and fallback order. It must
 **not** determine assertion admissibility, binding business decisions, exact-action

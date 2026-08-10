@@ -78,8 +78,8 @@ PCAM systems:
 
 The Ugence Labs project ships a software KV-cache quantization
 backend through vLLM called **int4_protected** (see
-[`CTM_plus/KVPolicy/INT4_PROTECTED_README.md`](../../../CTM_plus/KVPolicy/INT4_PROTECTED_README.md)
-and [`INT4_PROTECTED_VC_BRIEF.md`](../../../INT4_PROTECTED_VC_BRIEF.md)).
+[`CTM_plus/KVPolicy/INT4_PROTECTED_README.md`](../../../../../CTM_plus/KVPolicy/INT4_PROTECTED_README.md)
+and [`INT4_PROTECTED_VC_BRIEF.md`](../../../../../INT4_PROTECTED_VC_BRIEF.md)).
 PCAM and int4_protected operate at **different layers** of the
 serving stack and are designed to compound, not compete.
 

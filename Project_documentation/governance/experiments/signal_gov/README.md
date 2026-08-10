@@ -13,7 +13,7 @@ unsafe tool calls* and reports standard, deck-ready metrics.
 > the ablation math. **No scientific claim follows from a `mock` run.** Real conclusions
 > require the `real_cg` feature mode, the full balanced benchmark, and a held-out split.
 > The pre-registered design (hypothesis + success/failure criteria) lives in
-> [`../../AGENTIC_FRAMEWORK_SIGNAL_GOVERNANCE_EXPERIMENT.md`](../../AGENTIC_FRAMEWORK_SIGNAL_GOVERNANCE_EXPERIMENT.md).
+> [`../../AGENTIC_FRAMEWORK_SIGNAL_GOVERNANCE_EXPERIMENT.md`](../../../agentic_framework/root_brief/AGENTIC_FRAMEWORK_SIGNAL_GOVERNANCE_EXPERIMENT.md).
 
 ---
 
@@ -242,7 +242,7 @@ experiments/signal_gov/
 
 ## Fix-or-falsify (research-only; `diagnostics/`)
 
-Per [`AGENTIC_FRAMEWORK_CG_RESEARCH_PLAN.md`](../../AGENTIC_FRAMEWORK_CG_RESEARCH_PLAN.md),
+Per [`AGENTIC_FRAMEWORK_CG_RESEARCH_PLAN.md`](../../../agentic_framework/root_brief/AGENTIC_FRAMEWORK_CG_RESEARCH_PLAN.md),
 CG is demoted to research-only (`enable_cg_state_signals=False`) and off the product path.
 [`diagnostics/`](diagnostics/) holds the **read-only** probe studies that localize where
 the predictive-uncertainty signal dies. **D1 — the signal-survival ladder** is implemented

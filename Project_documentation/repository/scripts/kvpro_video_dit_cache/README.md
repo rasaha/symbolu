@@ -1,7 +1,7 @@
 # Video-DiT reused-feature-cache compression — feasibility harness
 
 Pre-registered, two-stage feasibility study for
-[`docs/VIDEO_DIT_FEATURE_CACHE_COMPRESSION_FEASIBILITY_PLAN.md`](../../docs/VIDEO_DIT_FEATURE_CACHE_COMPRESSION_FEASIBILITY_PLAN.md).
+[`docs/VIDEO_DIT_FEATURE_CACHE_COMPRESSION_FEASIBILITY_PLAN.md`](../../../../docs/VIDEO_DIT_FEATURE_CACHE_COMPRESSION_FEASIBILITY_PLAN.md).
 Bounded research decision — **not** a product, **no** novelty/patent/commercial claims before measurement.
 
 > This study evaluates whether **protected compression** improves a **persistent video-DiT cache** under

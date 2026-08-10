@@ -7,7 +7,7 @@ any cascade quantity. It only produces the curation-time artifact.
 
 Output: docs/experiments/sticky_framing_15_14_stimuli.json
 
-Per §15.14 spec at docs/design/15_14_STICKY_FRAMING_DESIGN_SPEC.md:
+Per §15.14 spec at Project_documentation/repository/docs/design/15_14_STICKY_FRAMING_DESIGN_SPEC.md:
 
 - 25 framing-pool items (this chunk: C-1)
 - 100 main_chains  (chunk C-4)

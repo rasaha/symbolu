@@ -1,7 +1,7 @@
 # PCAM Update PR — Scope Against ADR-0001
 
 **Status:** Ready to implement
-**Depends on:** [ADR-0001](../../../docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md) (CTM+ source-of-truth; lives in `docs/design/`, not under PCAM)
+**Depends on:** [ADR-0001](../../../../repository/docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md) (CTM+ source-of-truth; lives in `docs/design/`, not under PCAM)
 **Reference:** `CTM_plus/KVPolicy/kv_policy/attention_evictor.py`
 
 ---

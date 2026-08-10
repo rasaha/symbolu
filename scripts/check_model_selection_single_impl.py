@@ -11,7 +11,7 @@ canonical modules; its remaining files are the local *research* harness only).
 This does NOT police the intentionally-separate research engines under
 ``model_selection_experiment/`` / ``model_selection_pilot/`` / ``model_selection_reconciliation/``
 — those are classified research algorithms with a distinct I/O contract, not copies of
-the canonical core (see docs/migrations/model_selection/RESEARCH_SEPARATION.md).
+the canonical core (see Project_documentation/repository/docs/migrations/model_selection/RESEARCH_SEPARATION.md).
 
 Run: python scripts/check_model_selection_single_impl.py
 """

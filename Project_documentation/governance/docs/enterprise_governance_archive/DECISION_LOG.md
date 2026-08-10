@@ -2,7 +2,7 @@
 
 **Status:** Archival record of the major decisions and the evidence behind them.
 Cross-references the frozen architecture
-([`../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md)).
+([`../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../actiongate/ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md)).
 
 Each entry: **Decision · Reason · Evidence · Current status.** "Evidence" is what
 actually justified the call — synthetic unless stated.
@@ -41,7 +41,7 @@ actually justified the call — synthetic unless stated.
 - **Evidence:** Adversarial tests show zero unauthorized execution and zero
   sensitive-data leakage (synthetic EMR / simulated broker).
 - **Current status:** Kept as evidence; **real-system enforcement remains
-  UNKNOWN** ([`KNOWN_LIMITATIONS.md`](./KNOWN_LIMITATIONS.md)).
+  UNKNOWN** ([`KNOWN_LIMITATIONS.md`](KNOWN_LIMITATIONS.md)).
 
 ### D4 — Artifacts are HMAC-authenticated, not called digital signatures
 
@@ -121,7 +121,7 @@ actually justified the call — synthetic unless stated.
 - **Reason:** Additional synthetic work adds no new evidence; the open questions are
   all real-data questions.
 - **Evidence:** All remaining unknowns require operational data
-  ([`FINAL_CONCLUSIONS.md`](./FINAL_CONCLUSIONS.md) "Unknown").
+  ([`FINAL_CONCLUSIONS.md`](FINAL_CONCLUSIONS.md) "Unknown").
 - **Current status:** **In force** — track frozen.
 
 ### D12 — No fabricated data, no efficacy claims
@@ -137,6 +137,6 @@ actually justified the call — synthetic unless stated.
 
 ## Cross-references
 
-- Freeze scope: [`ARCHITECTURE_FREEZE.md`](./ARCHITECTURE_FREEZE.md)
-- Conclusions: [`FINAL_CONCLUSIONS.md`](./FINAL_CONCLUSIONS.md)
-- Timeline: [`RESEARCH_TIMELINE.md`](./RESEARCH_TIMELINE.md)
+- Freeze scope: [`ARCHITECTURE_FREEZE.md`](ARCHITECTURE_FREEZE.md)
+- Conclusions: [`FINAL_CONCLUSIONS.md`](FINAL_CONCLUSIONS.md)
+- Timeline: [`RESEARCH_TIMELINE.md`](RESEARCH_TIMELINE.md)

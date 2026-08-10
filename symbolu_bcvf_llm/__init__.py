@@ -1,7 +1,7 @@
 """BCVF LLM — LLM-domain port of the autonomy BCVF kernel.
 
 Phase 1 kernel (pure NumPy) per
-``docs/design/BCVF_LLM_TRUST_ROUTING_DESIGN.md`` §2.8.
+``Project_documentation/repository/docs/design/BCVF_LLM_TRUST_ROUTING_DESIGN.md`` §2.8.
 
 Parallel implementation of ``symbolu_robotics/bcvf_autonomous``; no
 cross-import. The public API surfaces the kernel only — source

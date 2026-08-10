@@ -3,7 +3,7 @@ Sovereign Loss Functions and Training Utilities
 ================================================
 
 Version: 9.8.0
-Reference: docs/architecture/SOVEREIGN_REASONING_KERNEL_DESIGN.md Section 28
+Reference: Project_documentation/repository/docs/architecture/SOVEREIGN_REASONING_KERNEL_DESIGN.md Section 28
 
 Implements the multi-objective loss functions for SRK training:
 - B1: Consistency Lagrangian (forward-backward divergence)

@@ -6,9 +6,9 @@ recommended enhancements for a new customer-facing product that governs software
 changes. **Documentation only** — no code, package, API, schema, or frozen artifact
 is changed by this document.
 **Canonical vocabulary:** this document follows
-[`docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md)
+[`docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](../../repository/docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md)
 and the
-[`UGENCE_TERMINOLOGY_PRODUCT_CAPABILITY_BOUNDARY_AUDIT.md`](UGENCE_TERMINOLOGY_PRODUCT_CAPABILITY_BOUNDARY_AUDIT.md).
+[`UGENCE_TERMINOLOGY_PRODUCT_CAPABILITY_BOUNDARY_AUDIT.md`](../../repository/architecture/UGENCE_TERMINOLOGY_PRODUCT_CAPABILITY_BOUNDARY_AUDIT.md).
 **Competitive landscape & market positioning** (how Ugence differs from CodeRabbit,
 Copilot, Snyk, GitHub Rulesets, Harness, etc., and which tools are evidence
 producers rather than competitors) are intentionally **out of scope here** and live
@@ -110,16 +110,16 @@ This requires **no new `ProviderKind`** and **avoids duplicating TAP and ActionG
 
 | Building block | Canonical package (dist · version) | Public import | Reused for |
 |---|---|---|---|
-| Governance Provider Framework | `packages/governance-provider-framework/` (`ugence-governance-provider-framework` · 0.1.0, contract 1.0.0) — see [`docs/DGM_PROVIDER_FRAMEWORK.md`](docs/DGM_PROVIDER_FRAMEWORK.md) | `ugence_governance_provider_framework.api` (legacy `governance_providers`) | registering + resolving the GitHub execution provider |
+| Governance Provider Framework | `packages/governance-provider-framework/` (`ugence-governance-provider-framework` · 0.1.0, contract 1.0.0) — see [`docs/DGM_PROVIDER_FRAMEWORK.md`](../../../docs/DGM_PROVIDER_FRAMEWORK.md) | `ugence_governance_provider_framework.api` (legacy `governance_providers`) | registering + resolving the GitHub execution provider |
 | Neutral provider contracts | `packages/governance-contracts/` (`ugence-governance-contracts`) | `ugence_governance_contracts` — `ProviderKind`, `AssertionGovernanceProvider`, `ActionGovernanceProvider`, `ExternalExecutionProvider` | the families TAP/ActionGate/GitHub-execution implement |
 | Decision Authority (frozen kernel) | `packages/capabilities/decision-authority/` (`ugence-decision-authority` · 1.0.0, frozen API) | `ugence_decision_authority.api` (legacy `decision_governance.api`) | `DecisionRecord` + CER (`ContextEnvelopeRecord`) |
 | TAP | `tap_provider/` (adapter) · `truth_assurance_pipeline/` (research, prototype) | `tap_provider` | claim → evidence admissibility (`ASSERTION_GOVERNANCE`) |
 | ActionGate | `actiongate_provider/` (adapter) · `cyber_security/action_gate_reference/` | `actiongate_provider` | exact-action authorization (`ACTION_GOVERNANCE`) |
 | ACP | `symbolu_robotics/autonomous_control_plane/` (shadow-only) · design in `acp/` | — | execution-time operational clearance |
 | StoryGraph | `packages/capabilities/storygraph/` (`ugence-storygraph` · 2.0.0) | `ugence_storygraph` (incl. its own `policypack/` compiler) | control-erosion sequence risk |
-| Policy compiler | [`POLICY_PACK_GOVERNED_WORKFLOW_COMPILER_SPEC.md`](POLICY_PACK_GOVERNED_WORKFLOW_COMPILER_SPEC.md) | — | compiling repo policy packs into the pipeline |
+| Policy compiler | [`POLICY_PACK_GOVERNED_WORKFLOW_COMPILER_SPEC.md`](../policy_pack/POLICY_PACK_GOVERNED_WORKFLOW_COMPILER_SPEC.md) | — | compiling repo policy packs into the pipeline |
 
-**Maturity, stated honestly** (per [`UGENCE_PRODUCTIZATION_ROADMAP.md`](UGENCE_PRODUCTIZATION_ROADMAP.md) §1):
+**Maturity, stated honestly** (per [`UGENCE_PRODUCTIZATION_ROADMAP.md`](../../repository/ugence_platform/UGENCE_PRODUCTIZATION_ROADMAP.md) §1):
 Decision Authority, ActionGate, and StoryGraph are reusable, frozen cores;
 ActionGate/ACP are shadow-validated against fixtures; TAP is a partial prototype on
 synthetic data. Code Governance must not overstate the readiness of what it composes.
@@ -255,7 +255,7 @@ but never substitutes its own judgment for any capability's.
 ## 4. Component responsibilities & authority boundaries
 
 Authority boundaries are inherited unchanged from
-[`UGENCE_TERMINOLOGY_PRODUCT_CAPABILITY_BOUNDARY_AUDIT.md`](UGENCE_TERMINOLOGY_PRODUCT_CAPABILITY_BOUNDARY_AUDIT.md) §5.
+[`UGENCE_TERMINOLOGY_PRODUCT_CAPABILITY_BOUNDARY_AUDIT.md`](../../repository/architecture/UGENCE_TERMINOLOGY_PRODUCT_CAPABILITY_BOUNDARY_AUDIT.md) §5.
 
 ### 4A. Code Governance Workflow Service (new product component — no authority)
 
@@ -407,7 +407,7 @@ to perform now?*
 > representation rather than defining a new contract here.
 
 > **Cross-reference.** The neutral capability that performs this live operational
-> clearance is specified in [`ACTION_CLEARANCE_V0_1_DESIGN_SPEC.md`](ACTION_CLEARANCE_V0_1_DESIGN_SPEC.md)
+> clearance is specified in [`ACTION_CLEARANCE_V0_1_DESIGN_SPEC.md`](../action_clearance/ACTION_CLEARANCE_V0_1_DESIGN_SPEC.md)
 > (namespace `ugence_action_clearance`; clear-only; consumes the GitHub exact-merge
 > profile). Its full design lives under `docs/design/action_clearance/`; it is not
 > duplicated here.
@@ -568,7 +568,7 @@ are reused, not duplicated.
 > **Persistence (corrected — no overstatement).** Records **will be persisted through
 > the planned shared durable audit service**; a production-ready, tamper-evident,
 > hash-chained store is a roadmap item (see
-> [`UGENCE_PRODUCTIZATION_ROADMAP.md`](UGENCE_PRODUCTIZATION_ROADMAP.md) §3), **not**
+> [`UGENCE_PRODUCTIZATION_ROADMAP.md`](../../repository/ugence_platform/UGENCE_PRODUCTIZATION_ROADMAP.md) §3), **not**
 > something this document claims is available today. The implementation-readiness
 > audit must verify the actual available persistence surface. Note that the CER
 > already carries a `content_hash` field usable for chain reconstruction.
@@ -700,7 +700,7 @@ governs it.
 
 Repository policy packs are authored, versioned, and published through the existing
 policy service and compiled by the
-[`POLICY_PACK_GOVERNED_WORKFLOW_COMPILER_SPEC.md`](POLICY_PACK_GOVERNED_WORKFLOW_COMPILER_SPEC.md)
+[`POLICY_PACK_GOVERNED_WORKFLOW_COMPILER_SPEC.md`](../policy_pack/POLICY_PACK_GOVERNED_WORKFLOW_COMPILER_SPEC.md)
 so that a policy deterministically configures which pipeline stages run, which
 evidence is mandatory, and who may approve. Example:
 
@@ -852,7 +852,7 @@ merge path is measured and stable.**
 **MVP 3 — Deployment Governance.** Signed build provenance; artifact-digest binding;
 environment authorization; production freeze + incident checks; Kubernetes/cloud
 deploy connectors (reuse the ACP + ActionGate Kubernetes surface — see
-[`UGENCE_PRODUCTIZATION_ROADMAP.md`](UGENCE_PRODUCTIZATION_ROADMAP.md)); rollback
+[`UGENCE_PRODUCTIZATION_ROADMAP.md`](../../repository/ugence_platform/UGENCE_PRODUCTIZATION_ROADMAP.md)); rollback
 governance; post-deployment evidence.
 
 Later-MVP features **do not silently become MVP-1 dependencies**: competitive
@@ -1007,7 +1007,7 @@ and the adjudicator can prefer the more deterministic candidate.
 Approvers need one place to see: the candidate diff(s), the side-by-side
 `requirement_comparison`, admitted vs. contradicted claims, residual risks, and the
 exact artifact they are authorizing. Integrate with the planned unified console
-([`ACP/UGENCE_UNIFIED_CONSOLE_PLAN.md`](ACP/UGENCE_UNIFIED_CONSOLE_PLAN.md)); render
+([`ACP/UGENCE_UNIFIED_CONSOLE_PLAN.md`](../../control_plane/ACP/UGENCE_UNIFIED_CONSOLE_PLAN.md)); render
 the decision inline on the GitHub PR (check-run + summary) so reviewers stay in their
 workflow. Segregation-of-duties (author ≠ final approver) is enforced in the UI, not
 just the record.
@@ -1089,8 +1089,8 @@ from satisfying `required_roles`.
 | GitHub evidence ingestion | **new product connector** (no authority) |
 | Code Governance Workflow Service | **new product component** (no authority) |
 | Competitive adjudication | `packages/capabilities/competitive-adjudication/` (**new, optional**) |
-| Policy pack compilation | [`POLICY_PACK_GOVERNED_WORKFLOW_COMPILER_SPEC.md`](POLICY_PACK_GOVERNED_WORKFLOW_COMPILER_SPEC.md) |
-| Console / review UX | [`ACP/UGENCE_UNIFIED_CONSOLE_PLAN.md`](ACP/UGENCE_UNIFIED_CONSOLE_PLAN.md) |
+| Policy pack compilation | [`POLICY_PACK_GOVERNED_WORKFLOW_COMPILER_SPEC.md`](../policy_pack/POLICY_PACK_GOVERNED_WORKFLOW_COMPILER_SPEC.md) |
+| Console / review UX | [`ACP/UGENCE_UNIFIED_CONSOLE_PLAN.md`](../../control_plane/ACP/UGENCE_UNIFIED_CONSOLE_PLAN.md) |
 
 ---
 
@@ -1128,8 +1128,8 @@ from satisfying `required_roles`.
 
 ---
 
-*Companion to [`UGENCE_PLATFORM_OVERVIEW.md`](UGENCE_PLATFORM_OVERVIEW.md) and the
-[`UGENCE_TERMINOLOGY_PRODUCT_CAPABILITY_BOUNDARY_AUDIT.md`](UGENCE_TERMINOLOGY_PRODUCT_CAPABILITY_BOUNDARY_AUDIT.md).
+*Companion to [`UGENCE_PLATFORM_OVERVIEW.md`](../../repository/ugence_platform/UGENCE_PLATFORM_OVERVIEW.md) and the
+[`UGENCE_TERMINOLOGY_PRODUCT_CAPABILITY_BOUNDARY_AUDIT.md`](../../repository/architecture/UGENCE_TERMINOLOGY_PRODUCT_CAPABILITY_BOUNDARY_AUDIT.md).
 Draft for review — no code, package, API, schema, or frozen artifact is changed by
 this document. Next phase: Code Governance implementation-readiness audit (map every
 conceptual object onto existing Decision Authority, CER, ActionGate, and execution

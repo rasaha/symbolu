@@ -2,7 +2,7 @@
 
 Machine-readable: [`CONFIRMATORY_PROTOCOL.json`](./CONFIRMATORY_PROTOCOL.json) (canonical copy of
 `experiments/bindingslots_confirmatory/preregistration.json`). Full narrative:
-[`experiments/bindingslots_confirmatory/preregistration.md`](../../../experiments/bindingslots_confirmatory/preregistration.md).
+[`experiments/bindingslots_confirmatory/preregistration.md`](../../../../../experiments/bindingslots_confirmatory/preregistration.md).
 
 ## Execution order (frozen)
 
@@ -25,7 +25,7 @@ frozen Stage B matrix; A+ is the reference for the frozen formation/margin/causa
 `REPLICATED_SLOT_FORMATION_STABILIZATION` iff C1..C11 all pass (≥4/5 form, >B0, ≥4/5 wins, mean
 ≥0.080, median ≥0.050, quality, distance, slots-off collapse every forming seed, randomized-address
 collapse every forming seed, integrity, no deviation). See
-[`CLASSIFIER_SPEC.md`](./CLASSIFIER_SPEC.md) and [`CAUSAL_GATE_SPEC.md`](./CAUSAL_GATE_SPEC.md).
+[`CLASSIFIER_SPEC.md`](CLASSIFIER_SPEC.md) and [`CAUSAL_GATE_SPEC.md`](CAUSAL_GATE_SPEC.md).
 
 ## Discipline
 

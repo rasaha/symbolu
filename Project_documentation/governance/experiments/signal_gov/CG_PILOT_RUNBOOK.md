@@ -15,7 +15,7 @@ using the **actual CG checkpoint path** (`--mode real_cg` with `MistralCGAdapter
 A `results.json` + `experiment_report.md` comparing the four nested-ablation governance
 configs (C1 approval → C2 +risk → C3 +text-confidence → **C4 +CG internal signals**) as
 detectors of unsafe tool calls, on a balanced 30-scenario pilot. The pre-registered
-hypothesis/criteria live in [`../../AGENTIC_FRAMEWORK_SIGNAL_GOVERNANCE_EXPERIMENT.md`](../../AGENTIC_FRAMEWORK_SIGNAL_GOVERNANCE_EXPERIMENT.md).
+hypothesis/criteria live in [`../../AGENTIC_FRAMEWORK_SIGNAL_GOVERNANCE_EXPERIMENT.md`](../../../agentic_framework/root_brief/AGENTIC_FRAMEWORK_SIGNAL_GOVERNANCE_EXPERIMENT.md).
 
 ---
 

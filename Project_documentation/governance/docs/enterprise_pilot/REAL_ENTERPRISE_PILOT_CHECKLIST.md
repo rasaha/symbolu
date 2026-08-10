@@ -1,7 +1,7 @@
 # Real Enterprise Pilot Checklist
 
 **Status:** Phase-3 readiness documentation against the **frozen** architecture
-([`ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md)).
+([`ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../actiongate/ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md)).
 An operational checklist for running the **first real** enterprise validation. It
 adds no architecture and asserts no results. Every box is unchecked; this is a
 plan, not a record.
@@ -13,7 +13,7 @@ plan, not a record.
 - [ ] Enterprise names **one** cross-vertical workflow to evaluate first
       (recommended: discount → contract activation).
 - [ ] Workflow owner, data owner, and enterprise reviewer identified (roles per
-      [`ENTERPRISE_PILOT_ONBOARDING_GUIDE.md`](./ENTERPRISE_PILOT_ONBOARDING_GUIDE.md) §4).
+      [`ENTERPRISE_PILOT_ONBOARDING_GUIDE.md`](ENTERPRISE_PILOT_ONBOARDING_GUIDE.md) §4).
 - [ ] Scope confirmed **read-only, historical, shadow** — no write/execute path,
       no live traffic.
 - [ ] Data-handling / anonymization agreement signed (what may be exported, how
@@ -26,7 +26,7 @@ plan, not a record.
 - [ ] Workflow mapped using a blank template ([`templates/`](./templates/)); no
       example data introduced.
 - [ ] Each participating source system inventoried (record shape → capability
-      group) per [`SOURCE_ADAPTER_SPECIFICATION.md`](./SOURCE_ADAPTER_SPECIFICATION.md).
+      group) per [`SOURCE_ADAPTER_SPECIFICATION.md`](SOURCE_ADAPTER_SPECIFICATION.md).
 - [ ] Confirmed the workflow is expressible with the **frozen** 10 capability
       groups and 11 invariants. Any gap recorded as an
       **architecture-coverage gap**, not patched with a new invariant.
@@ -48,14 +48,14 @@ plan, not a record.
 - [ ] Each control mapped to frozen failure codes → `enterprise_baseline_codes`.
 - [ ] Baseline reconciled with the modeled floor (`BASELINE_DETECTABLE`); baseline
       only grown, never shrunk without documented enterprise sign-off
-      ([`BASELINE_COMPARISON_FRAMEWORK.md`](./BASELINE_COMPARISON_FRAMEWORK.md) §3).
+      ([`BASELINE_COMPARISON_FRAMEWORK.md`](BASELINE_COMPARISON_FRAMEWORK.md) §3).
 - [ ] `enterprise_baseline_codes` **hash-locked** before any finding is revealed.
 
 ## Phase E — Ground truth
 
 - [ ] Historical sample selected (known-good, known-bad, boundary); selection bias
       recorded.
-- [ ] Instances labeled per [`GROUND_TRUTH_PROTOCOL.md`](./GROUND_TRUTH_PROTOCOL.md)
+- [ ] Instances labeled per [`GROUND_TRUTH_PROTOCOL.md`](GROUND_TRUTH_PROTOCOL.md)
       (`clean` / `problematic` / `unknown`, existing-control coverage, confidence).
 - [ ] Problem classes mapped to frozen failure codes **before** findings revealed
       (blind adjudication order).
@@ -65,13 +65,13 @@ plan, not a record.
 
 - [ ] Concrete pass/fail thresholds for the frozen success criteria agreed **with**
       the enterprise and recorded here (thresholds are not pre-set in
-      [`ENTERPRISE_METRICS.md`](./ENTERPRISE_METRICS.md)).
+      [`ENTERPRISE_METRICS.md`](ENTERPRISE_METRICS.md)).
 - [ ] Denominators, sample size, and reporting date fields agreed.
 
 ## Phase G — Shadow run
 
 - [ ] Inputs (ground truth + baseline + export snapshot) hash-recorded before the
-      run ([`SHADOW_MODE_OPERATION.md`](./SHADOW_MODE_OPERATION.md) §4).
+      run ([`SHADOW_MODE_OPERATION.md`](SHADOW_MODE_OPERATION.md) §4).
 - [ ] `ShadowEvaluator` run over real historical `WorkflowEvidence`.
 - [ ] All findings treated audit-only; **no promotion, no enforcement**.
 - [ ] Per-run log captured (findings, net-new, duplicates, missing-data rate,
@@ -104,11 +104,11 @@ plan, not a record.
 
 ## Cross-references
 
-- Onboarding: [`ENTERPRISE_PILOT_ONBOARDING_GUIDE.md`](./ENTERPRISE_PILOT_ONBOARDING_GUIDE.md)
-- Adapters: [`SOURCE_ADAPTER_SPECIFICATION.md`](./SOURCE_ADAPTER_SPECIFICATION.md)
-- Ground truth: [`GROUND_TRUTH_PROTOCOL.md`](./GROUND_TRUTH_PROTOCOL.md)
-- Baseline: [`BASELINE_COMPARISON_FRAMEWORK.md`](./BASELINE_COMPARISON_FRAMEWORK.md)
-- Metrics: [`ENTERPRISE_METRICS.md`](./ENTERPRISE_METRICS.md)
-- Shadow operation: [`SHADOW_MODE_OPERATION.md`](./SHADOW_MODE_OPERATION.md)
-- Boundary: [`RESEARCH_BOUNDARY.md`](./RESEARCH_BOUNDARY.md)
-- Frozen position: [`ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md)
+- Onboarding: [`ENTERPRISE_PILOT_ONBOARDING_GUIDE.md`](ENTERPRISE_PILOT_ONBOARDING_GUIDE.md)
+- Adapters: [`SOURCE_ADAPTER_SPECIFICATION.md`](SOURCE_ADAPTER_SPECIFICATION.md)
+- Ground truth: [`GROUND_TRUTH_PROTOCOL.md`](GROUND_TRUTH_PROTOCOL.md)
+- Baseline: [`BASELINE_COMPARISON_FRAMEWORK.md`](BASELINE_COMPARISON_FRAMEWORK.md)
+- Metrics: [`ENTERPRISE_METRICS.md`](ENTERPRISE_METRICS.md)
+- Shadow operation: [`SHADOW_MODE_OPERATION.md`](SHADOW_MODE_OPERATION.md)
+- Boundary: [`RESEARCH_BOUNDARY.md`](RESEARCH_BOUNDARY.md)
+- Frozen position: [`ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../actiongate/ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md)

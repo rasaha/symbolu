@@ -3,7 +3,7 @@
 **Status:** Archival index of the important files for this track, grouped by role.
 Every file appears **once** (no duplicates). Paths are repo-relative. Cross-references
 the frozen architecture
-([`../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md)).
+([`../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../actiongate/ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md)).
 
 > This index covers only the Enterprise Governance / ActionGate governance track.
 > The monorepo contains many unrelated tracks (Symbolu/Varna, agent-runtime,
@@ -118,6 +118,6 @@ the frozen architecture
 
 ## Cross-references
 
-- Timeline: [`RESEARCH_TIMELINE.md`](./RESEARCH_TIMELINE.md)
-- Freeze: [`ARCHITECTURE_FREEZE.md`](./ARCHITECTURE_FREEZE.md)
-- Resume: [`RESUME_GUIDE.md`](./RESUME_GUIDE.md)
+- Timeline: [`RESEARCH_TIMELINE.md`](RESEARCH_TIMELINE.md)
+- Freeze: [`ARCHITECTURE_FREEZE.md`](ARCHITECTURE_FREEZE.md)
+- Resume: [`RESUME_GUIDE.md`](RESUME_GUIDE.md)

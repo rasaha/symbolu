@@ -5,7 +5,7 @@ Tests for Appendix F Stage 7D — Polarity Encoding (Varna Polarity Gates)
 Verifies that PolarityGate correctly implements the polarity encoding
 formula: c = (1-φ)/2 · v_neg + (1+φ)/2 · v_pos
 
-Reference: docs/design/CONSCIOUS_GENERATION_DESIGN.md, §F.10.6.4
+Reference: Project_documentation/repository/docs/design/CONSCIOUS_GENERATION_DESIGN.md, §F.10.6.4
 """
 
 import pytest

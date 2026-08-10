@@ -1,7 +1,7 @@
 # Vendored CTM+ Reference — Update Ritual
 
 **Scope:** `simulator/pcam/reference/attention_evictor_vendored.py`
-**Contract:** [`ADR-0001`](../../../docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md)
+**Contract:** [`ADR-0001`](../../../../repository/docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md)
 **Phase:** 0 — Conformance foundation
 
 ---

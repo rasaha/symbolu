@@ -21,7 +21,7 @@ Capturing these moments allows post-hoc analysis of:
 - Fluidity dynamics (how smoothly did the model transition?) [v2.2.3.1]
 
 References:
-- docs/design/KOSHA_GYROSCOPE_DESIGN.md v2.2.3.1
+- Project_documentation/repository/docs/design/KOSHA_GYROSCOPE_DESIGN.md v2.2.3.1
 """
 
 import json

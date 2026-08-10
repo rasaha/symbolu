@@ -10,7 +10,7 @@ approved ``acp/`` architecture documents.
 Standard library only — no numpy, no ROS, no hardware dependency in the core.
 
 This is Phase 0 (interface freeze). It does NOT replace any BCVF call site and is
-not wired into the runtime; see ``acp/ACP_PHASE1_READINESS.md`` for what comes
+not wired into the runtime; see ``Project_documentation/control_plane/acp/ACP_PHASE1_READINESS.md`` for what comes
 next.
 """
 from __future__ import annotations

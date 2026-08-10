@@ -46,7 +46,7 @@ Modules:
     - safety: Safety contract to voice response processing
     - app: Complete voice agent application with WebSocket support
 
-See docs/design/HYBRID_VOICE_SDK_DESIGN.md for detailed documentation.
+See Project_documentation/repository/docs/design/HYBRID_VOICE_SDK_DESIGN.md for detailed documentation.
 """
 
 __version__ = "1.0.0"

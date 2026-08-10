@@ -30,7 +30,7 @@ Invariants:
 
 Pattern precedent: mistral_wrapper.py:318-324 (phase adapter via gated residual).
 
-Reference: docs/design/CONSCIOUS_GENERATION_DESIGN.md §F.12.5
+Reference: Project_documentation/repository/docs/design/CONSCIOUS_GENERATION_DESIGN.md §F.12.5
 """
 
 from dataclasses import dataclass, field

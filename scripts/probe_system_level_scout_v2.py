@@ -19,7 +19,7 @@ Reference:
   the §14a-pinned configuration. §14a.2 fixes ONLY the selector
   spec; everything else inherits §14a verbatim.
 
-  symbolu_robotics/bcvf_autonomous/DESIGN.md §6.1 / §6.7 —
+  Project_documentation/autonomous_robotics/symbolu_robotics/bcvf_autonomous/DESIGN.md §6.1 / §6.7 —
   autonomy-domain validation that passed (sign-test p=0.0072 on
   N=21 with S3_map_error_accel) was a SYSTEM-LEVEL result: multi-
   source robotic system using BCVF-shaped routing produces sign-

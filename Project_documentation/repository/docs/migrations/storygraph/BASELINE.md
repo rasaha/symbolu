@@ -122,7 +122,7 @@ any drift signals an accidental semantic change and must halt the phase (gate S3
 
 `composite_threat_detector.__all__` exposes **75** public symbols (full list in the
 manifest). The curated *stable* subset that will become `ugence_storygraph.api` is
-defined in [`API_INVENTORY.md`](./API_INVENTORY.md). Key public entrypoints:
+defined in [`API_INVENTORY.md`](API_INVENTORY.md). Key public entrypoints:
 `SequenceRiskAnalyzer`, `CompositeThreatMonitor`, `StoryGraph`, `story_match`,
 `story_evaluate`, `evaluate_proposed_action`, `completion_witness`,
 `to_advisory_evidence`, `DIGITAL_ONTOLOGY`, `FINANCIAL_ONTOLOGY`, `PolicyBinding`,

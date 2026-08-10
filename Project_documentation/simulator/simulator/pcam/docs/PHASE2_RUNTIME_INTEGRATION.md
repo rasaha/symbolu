@@ -2,7 +2,7 @@
 
 **Status:** Phase 2 complete
 **Scope:** vLLM adapter + offline trace replay
-**Contract:** [`docs/design/ADR-0001`](../../../docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md)
+**Contract:** [`docs/design/ADR-0001`](../../../../repository/docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md)
 **Phase 1 reference:** [`PHASE1_PUBLIC_API.md`](PHASE1_PUBLIC_API.md)
 
 ---

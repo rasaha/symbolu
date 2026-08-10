@@ -31,7 +31,7 @@
       "implementation_stage": "package core (evaluate) / shadow (adapters) / enforcement (L2+)",
       "blocking_classification": "SHADOW_INTEGRATION_BLOCKER (adapters); ENFORCEMENT_BLOCKER (L2/L3)",
       "closure": "CLOSED_BY_NEW_PRODUCT_INTERFACE",
-      "source_refs": ["TRUSTED_SIGNAL_PROVENANCE.md", "trusted_signal_provenance.schema.json", "docs/design/action_clearance/TRUSTED_SIGNAL_MODEL.md", "OPEN_QUESTIONS.md Q3"]
+      "source_refs": ["TRUSTED_SIGNAL_PROVENANCE.md", "trusted_signal_provenance.schema.json", "Project_documentation/repository/docs/design/action_clearance/TRUSTED_SIGNAL_MODEL.md", "OPEN_QUESTIONS.md Q3"]
     },
     {
       "id": "PA-2",
@@ -55,7 +55,7 @@
       "implementation_stage": "package core",
       "blocking_classification": "PACKAGE_CORE (satisfied)",
       "closure": "CLOSED_BY_NEW_PRODUCT_INTERFACE",
-      "source_refs": ["SIGNAL_NORMALIZATION_AND_DIGESTS.md", "SIGNAL_FRESHNESS_AND_CONFLICTS.md", "docs/design/action_clearance/DETERMINISM_AND_FINGERPRINTS.md"]
+      "source_refs": ["SIGNAL_NORMALIZATION_AND_DIGESTS.md", "SIGNAL_FRESHNESS_AND_CONFLICTS.md", "Project_documentation/repository/docs/design/action_clearance/DETERMINISM_AND_FINGERPRINTS.md"]
     },
     {
       "id": "PB-1",
@@ -91,7 +91,7 @@
       "implementation_stage": "shadow / enforcement",
       "blocking_classification": "SHADOW_INTEGRATION_BLOCKER (wiring)",
       "closure": "CLOSED_BY_NEW_PRODUCT_INTERFACE",
-      "source_refs": ["RECEIPT_LIFECYCLE.md", "UPSTREAM_INVALIDATION_EVENTS.md", "RECEIPT_SUPERSESSION.md", "receipt_lifecycle_events.schema.json", "docs/design/action_clearance/STATE_MACHINE.md"]
+      "source_refs": ["RECEIPT_LIFECYCLE.md", "UPSTREAM_INVALIDATION_EVENTS.md", "RECEIPT_SUPERSESSION.md", "receipt_lifecycle_events.schema.json", "Project_documentation/repository/docs/design/action_clearance/STATE_MACHINE.md"]
     },
     {
       "id": "PC-2",
@@ -115,7 +115,7 @@
       "implementation_stage": "enforcement",
       "blocking_classification": "ENFORCEMENT_BLOCKER",
       "closure": "CLOSED_BY_NEW_PRODUCT_INTERFACE",
-      "source_refs": ["EXECUTION_KEY.md", "execution_key.schema.json", "docs/design/action_clearance/ONE_TIME_USE_AND_REPLAY.md"]
+      "source_refs": ["EXECUTION_KEY.md", "execution_key.schema.json", "Project_documentation/repository/docs/design/action_clearance/ONE_TIME_USE_AND_REPLAY.md"]
     },
     {
       "id": "PD-2",

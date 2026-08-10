@@ -18,7 +18,7 @@ contracts, so delegation knows **who is allowed to do what**.
 > **planning-strategy agnostic** — the coordinator advances a mission's goals
 > and sits below any planner. H15 (hierarchical planning) was subsequently
 > added and plugs into this coordinator **without any change to it**; see
-> [Hierarchical Planning (H15)](./HIERARCHICAL_PLANNING.md).
+> [Hierarchical Planning (H15)](HIERARCHICAL_PLANNING.md).
 
 This layer adds coordination only. It does not modify RunBudget, WorkingMemory,
 replanning, plan validity, governance, authorization, ActionGate, TAP, routing,

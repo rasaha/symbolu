@@ -9,7 +9,7 @@ components don't dominate.
 These tests use mock projector weights to verify the test logic itself,
 and can be run with a real SovereignStateProjector when available.
 
-Reference: docs/design/CONSCIOUS_GENERATION_DESIGN.md, §F.10.6.5
+Reference: Project_documentation/repository/docs/design/CONSCIOUS_GENERATION_DESIGN.md, §F.10.6.5
 """
 
 import pytest

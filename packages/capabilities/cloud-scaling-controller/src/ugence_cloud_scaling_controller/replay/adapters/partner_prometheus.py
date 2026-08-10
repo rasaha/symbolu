@@ -1,7 +1,7 @@
 """Partner Prometheus/HPA export adapter (Track B — design-partner ingestion).
 
 Ingests a design partner's exported telemetry (the §5 data ask:
-`docs/cloud_scaling_real_validation/track_c_design_partner/03_DATA_REQUEST_NDA_CHECKLIST.md`)
+`Project_documentation/governance/docs/cloud_scaling_real_validation/track_c_design_partner/03_DATA_REQUEST_NDA_CHECKLIST.md`)
 into a `TraceSeries` the Tier-A detector consumes. Unlike the Azure arrival traces —
 where metrics are *modeled* from a demand series — a partner export carries **real
 measured metrics AND a real replica history**, so the verdict runs on real signals and

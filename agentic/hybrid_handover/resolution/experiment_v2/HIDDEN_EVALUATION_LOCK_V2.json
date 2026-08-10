@@ -5,9 +5,9 @@
     "agentic/hybrid_handover/resolution/experiment_v2/hybrid_resolver_v2.py": "620e82c76d7f35932fc9c40af2241d4749d6dac1400b35faf2708529cbaa5a8e",
     "agentic/hybrid_handover/resolution/experiment_v2/run_validation_experiment.py": "52551201b602a0cb6cde530d153cacc453822ac18f532a05ecdd1f94898aa19d",
     "agentic/hybrid_handover/resolution/experiment_v2/lock_v2.py": "269317042206f1f1bdd264901c582e850654751718edd3a7207bdc9515355eca",
-    "agentic/hybrid_handover/resolution/experiment_v2/PROPOSAL_VALIDATION_PREREGISTRATION.md": "67d0156185cbe33df822746e1a43b66b16fbb4a33b76dbb045c13c659e8b0297",
-    "agentic/hybrid_handover/resolution/experiment_v2/VALIDATION_RULEBOOK.md": "d00e5a2af27fc526db3f0ef7347a011f86ee3f3be47680efdb788f78064e989d",
-    "agentic/hybrid_handover/resolution/experiment_v2/CONFIDENCE_VECTOR_SPEC.md": "5b313ad00a8cff6338b04a5465e5ade0e3e2110b7aa26cd0e017905e90acf733"
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v2/PROPOSAL_VALIDATION_PREREGISTRATION.md": "67d0156185cbe33df822746e1a43b66b16fbb4a33b76dbb045c13c659e8b0297",
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v2/VALIDATION_RULEBOOK.md": "d00e5a2af27fc526db3f0ef7347a011f86ee3f3be47680efdb788f78064e989d",
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v2/CONFIDENCE_VECTOR_SPEC.md": "5b313ad00a8cff6338b04a5465e5ade0e3e2110b7aa26cd0e017905e90acf733"
   },
   "frozen_hashes": {
     "agentic/hybrid_handover/resolution/experiment/hybrid_resolver.py": "a2bb9803f0d180dd80a0f3c7806247dde284b9830240a44095fdd4632b887add",

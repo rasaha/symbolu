@@ -1,7 +1,7 @@
 # Ground-Truth Protocol
 
 **Status:** Phase-3 readiness documentation against the **frozen** architecture
-([`ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md)).
+([`ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../actiongate/ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md)).
 This defines how a real enterprise supplies labels so that pilot findings can be
 judged. It contains **no** labels, **no** enterprise data, and makes **no** claim
 about how the system will score.
@@ -14,7 +14,7 @@ A shadow finding is only meaningful against a known answer. Without enterprise-
 supplied ground truth we cannot distinguish a true detection from a coincidence,
 nor a false positive from an unlabeled true positive. **We do not generate ground
 truth ourselves** — doing so would be fabricating enterprise data, which is
-explicitly out of bounds ([`RESEARCH_BOUNDARY.md`](./RESEARCH_BOUNDARY.md)). Ground
+explicitly out of bounds ([`RESEARCH_BOUNDARY.md`](RESEARCH_BOUNDARY.md)). Ground
 truth is authored by the enterprise workflow owner.
 
 ## 2. Unit of labeling: the historical workflow instance
@@ -73,7 +73,7 @@ Rules:
 
 ## 5. How ground truth is used in measurement
 
-Feeds the definitions in [`ENTERPRISE_METRICS.md`](./ENTERPRISE_METRICS.md):
+Feeds the definitions in [`ENTERPRISE_METRICS.md`](ENTERPRISE_METRICS.md):
 
 - **True positive** — a finding on an instance labeled `problematic` whose mapped
   failure code matches the adjudicated problem class.
@@ -83,7 +83,7 @@ Feeds the definitions in [`ENTERPRISE_METRICS.md`](./ENTERPRISE_METRICS.md):
 - **Net-new true positive** — a true positive whose failure code is **not** in the
   baseline-detectable set for that workflow, **and** whose instance was labeled
   `caught_by_existing_controls != yes`
-  (see [`BASELINE_COMPARISON_FRAMEWORK.md`](./BASELINE_COMPARISON_FRAMEWORK.md)).
+  (see [`BASELINE_COMPARISON_FRAMEWORK.md`](BASELINE_COMPARISON_FRAMEWORK.md)).
 - `unknown`-labeled instances are **excluded** from precision/recall and reported
   separately as coverage-of-unknowns.
 
@@ -106,7 +106,7 @@ Feeds the definitions in [`ENTERPRISE_METRICS.md`](./ENTERPRISE_METRICS.md):
 
 ## 8. Cross-references
 
-- Metrics that consume these labels: [`ENTERPRISE_METRICS.md`](./ENTERPRISE_METRICS.md).
-- Baseline comparison for net-new: [`BASELINE_COMPARISON_FRAMEWORK.md`](./BASELINE_COMPARISON_FRAMEWORK.md).
+- Metrics that consume these labels: [`ENTERPRISE_METRICS.md`](ENTERPRISE_METRICS.md).
+- Baseline comparison for net-new: [`BASELINE_COMPARISON_FRAMEWORK.md`](BASELINE_COMPARISON_FRAMEWORK.md).
 - Failure-code vocabulary: `agentic/enterprise_governance/invariants.py`.
-- Frozen position: [`ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md).
+- Frozen position: [`ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../actiongate/ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md).

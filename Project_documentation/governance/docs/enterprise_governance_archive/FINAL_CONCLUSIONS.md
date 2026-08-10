@@ -3,11 +3,11 @@
 **Status:** Archival record. No marketing language, no speculation. Every claim is
 tagged by evidential status and points at where it was established. Cross-references
 the frozen architecture
-([`../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md)).
+([`../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../actiongate/ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md)).
 
 Scope of "validated": unless a line says otherwise, validation means **on
 synthetic, schema-shaped fixtures and/or structurally by tests** — not on real
-enterprise data. See [`KNOWN_LIMITATIONS.md`](./KNOWN_LIMITATIONS.md).
+enterprise data. See [`KNOWN_LIMITATIONS.md`](KNOWN_LIMITATIONS.md).
 
 ---
 

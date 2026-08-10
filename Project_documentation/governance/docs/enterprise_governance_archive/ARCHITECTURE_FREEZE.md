@@ -1,12 +1,12 @@
 # Architecture Freeze — Enterprise Governance Track
 
 **Status:** Binding freeze declaration for this track. Extends and restates
-[`../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md);
+[`../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../actiongate/ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md);
 if the two ever appear to differ, the ACTIONGATE position document governs and this
 file is to be corrected to match.
 
 This declaration is distinct from the unrelated
-[`../../ONTOLOGY_FREEZE_CONTRACT.md`](../../ONTOLOGY_FREEZE_CONTRACT.md), which
+[`../../ONTOLOGY_FREEZE_CONTRACT.md`](../../../../ONTOLOGY_FREEZE_CONTRACT.md), which
 belongs to the Symbolu/Varna track and is not part of Enterprise Governance.
 
 ---
@@ -63,11 +63,11 @@ Concretely, to change a frozen element:
 1. Present **real operational evidence** (from a real pilot) that the current model
    is insufficient or wrong — not a synthetic scenario and not a preference.
 2. Record the evidence and the proposed change in
-   [`DECISION_LOG.md`](./DECISION_LOG.md) with its justification.
+   [`DECISION_LOG.md`](DECISION_LOG.md) with its justification.
 3. Show the change does not silently reopen a rejected decision (e.g. re-introducing
    the twelve-layer taxonomy) without directly refuting the ablation results that
    rejected it.
-4. Update [`../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md)
+4. Update [`../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../actiongate/ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md)
    first; this file follows.
 
 ## 4. What a freeze does not mean
@@ -81,7 +81,7 @@ Concretely, to change a frozen element:
 
 ## 5. Cross-references
 
-- Canonical position: [`../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md)
+- Canonical position: [`../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../actiongate/ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md)
 - Model code: [`../../agentic/enterprise_governance/`](../../agentic/enterprise_governance/)
-- Decisions and evidence: [`DECISION_LOG.md`](./DECISION_LOG.md)
-- Future work within the freeze: [`FUTURE_WORK.md`](./FUTURE_WORK.md)
+- Decisions and evidence: [`DECISION_LOG.md`](DECISION_LOG.md)
+- Future work within the freeze: [`FUTURE_WORK.md`](FUTURE_WORK.md)

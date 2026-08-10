@@ -23,7 +23,7 @@ Integration pattern::
 Bounded introduction: S-score weights in UnifiedCoherenceConfig
 initialized to 0.0, ramped during training with max bound 0.15.
 
-Reference: docs/design/CONSCIOUS_GENERATION_DESIGN.md, Appendix F §F.10.6.1
+Reference: Project_documentation/repository/docs/design/CONSCIOUS_GENERATION_DESIGN.md, Appendix F §F.10.6.1
 
 Author: Sovereign-1 Training Initiative
 Date: March 2026

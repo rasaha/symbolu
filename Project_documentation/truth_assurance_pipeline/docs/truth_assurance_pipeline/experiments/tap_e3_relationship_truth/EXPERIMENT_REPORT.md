@@ -11,7 +11,7 @@
 Code: [`truth_assurance_pipeline/tap_e3_relationship_truth/`](../../../../truth_assurance_pipeline/tap_e3_relationship_truth/)
 · Results: [`experiments/results_v3.json`](../../../../truth_assurance_pipeline/tap_e3_relationship_truth/experiments/results_v3.json)
 · Prereg: [`experiments/preregistration.json`](../../../../truth_assurance_pipeline/tap_e3_relationship_truth/experiments/preregistration.json)
-· Companions: [ARCHITECTURE](./ARCHITECTURE.md) · [ONTOLOGY](./ONTOLOGY.md) · [SCHEMA](./SCHEMA.md) · [CORPUS](./CORPUS.md) · [METRICS](./METRICS.md) · [FAILURE_ANALYSIS](./FAILURE_ANALYSIS.md) · [LEAKAGE_AUDIT](./LEAKAGE_AUDIT.md)
+· Companions: [ARCHITECTURE](ARCHITECTURE.md) · [ONTOLOGY](ONTOLOGY.md) · [SCHEMA](SCHEMA.md) · [CORPUS](CORPUS.md) · [METRICS](METRICS.md) · [FAILURE_ANALYSIS](FAILURE_ANALYSIS.md) · [LEAKAGE_AUDIT](LEAKAGE_AUDIT.md)
 
 > **Evaluation protocol (read first).** For the recorded run the eval split was
 > **content-hash locked** and the **ontology, normalization rules, metric definitions, and
@@ -86,7 +86,7 @@ Display labels below make the metric denominators explicit. The stored result ke
 `results_v3.json` are unchanged for reproducibility (`exact_triple_accuracy`,
 `full_structure_accuracy`, `predicate_accuracy`, …); this table uses clearer *display*
 names for the conditional (matched-only) metrics — see the denominator note under the
-table and [METRICS](./METRICS.md).
+table and [METRICS](METRICS.md).
 
 | metric (display label) | A | B | C | D | E | **F** |
 |---|---|---|---|---|---|---|

@@ -5,7 +5,7 @@ adapter together with a SafeMCPGateway.
 Motivation
 ----------
 The Phase 1 + Phase 2 enrichment wiring (see
-``agentic/AGENTIC_ARCHITECTURE.md`` § "Inference CG Metadata ↔ MCP
+``Project_documentation/agentic_framework/agentic/AGENTIC_ARCHITECTURE.md`` § "Inference CG Metadata ↔ MCP
 Gateway") lets a tool call carry sovereign signals from a CG-capable
 adapter (``MistralCGAdapter.last_cg_metadata``) into governance. But
 that seam has no obvious owner in production code: the adapter lives

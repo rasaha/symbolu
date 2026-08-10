@@ -19,7 +19,7 @@
     "ai_hiring.__version__"
   ],
   "product_version_source_of_truth": "ai_hiring/product/version.py (PRODUCT_VERSION='0.6.0')",
-  "release_manifest_source_of_truth": "docs/ai-hiring/release/RELEASE_MANIFEST.md",
+  "release_manifest_source_of_truth": "Project_documentation/ai_hiring/docs/ai-hiring/release/RELEASE_MANIFEST.md",
   "cli_surfaces": [
     "python -m ai_hiring.product (version|demo|report|verify)"
   ],

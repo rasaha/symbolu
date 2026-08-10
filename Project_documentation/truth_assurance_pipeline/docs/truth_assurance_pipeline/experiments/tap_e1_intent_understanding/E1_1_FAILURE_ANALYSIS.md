@@ -8,7 +8,7 @@ provenance errors, clarification errors.
 > All LLM counts below reflect the **author==interpreter confound**: the same
 > in-session model authored the corpus and produced the interpretations, and the locked
 > eval was seen by the interpreter (not double-blind). These are integration findings,
-> not independent model-capability measurements. See the [experiment report](./E1_1_EXPERIMENT_REPORT.md) §2/§5.
+> not independent model-capability measurements. See the [experiment report](E1_1_EXPERIMENT_REPORT.md) §2/§5.
 
 ## Severe-failure counts (v1.1 corpus)
 

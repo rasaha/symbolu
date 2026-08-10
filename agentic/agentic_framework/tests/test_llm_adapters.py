@@ -591,7 +591,7 @@ class TestCreateAdapterMistralCG:
 
 # =============================================================================
 # Vritti Sampling Gate Validation Tests (V-1 through V-7)
-# Reference: docs/specs/VRITTI_SAMPLING_GATE_SPEC.md
+# Reference: Project_documentation/repository/docs/specs/VRITTI_SAMPLING_GATE_SPEC.md
 # =============================================================================
 
 
@@ -685,7 +685,7 @@ def _make_vritti_adapter(vritti_values, temperature=0.7, enable_gate=True):
 class TestVrittiSamplingGate:
     """
     Validation tests for the Vritti sampling gate (V-1 through V-7).
-    Reference: docs/specs/VRITTI_SAMPLING_GATE_SPEC.md
+    Reference: Project_documentation/repository/docs/specs/VRITTI_SAMPLING_GATE_SPEC.md
     """
 
     # V-1: Bounded temperature effect

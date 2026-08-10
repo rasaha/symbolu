@@ -422,7 +422,7 @@ _DISCLAIMER = (
     "baselines. These are NOT the published LRU/LFU/ARC/H2O/Streaming LLM "
     "implementations. Metrics reflect policy decisions on a synthetic "
     "trace, not model throughput or serving quality. See "
-    "simulator/pcam/docs/PHASE3_BENCHMARKS.md for the full caveat list."
+    "Project_documentation/simulator/simulator/pcam/docs/PHASE3_BENCHMARKS.md for the full caveat list."
 )
 
 

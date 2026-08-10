@@ -13,7 +13,7 @@ Five verification tests:
   4. Long-Sequence Stability (F.8.5)
   5. Auxiliary Module Kill Switch (F.8.6)
 
-Reference: docs/design/CONSCIOUS_GENERATION_DESIGN.md, Appendix F §F.8
+Reference: Project_documentation/repository/docs/design/CONSCIOUS_GENERATION_DESIGN.md, Appendix F §F.8
 
 Author: Sovereign-1 Training Initiative
 Date: March 2026

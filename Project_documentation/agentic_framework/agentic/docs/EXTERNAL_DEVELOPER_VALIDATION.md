@@ -42,7 +42,7 @@ stop at any point — partial feedback is still valuable.
 
 1. Clone the repo and create a fresh virtual environment
 2. Run `pip install -e .` from the repo root
-3. Read the root [README.md](../../README.md) — follow its pointers
+3. Read the root [README.md](../../../repository/root_readme/README.md) — follow its pointers
 4. Read the [Quickstart](QUICKSTART.md) through the "Mental model" section
 5. Record: did anything fail? Was anything confusing?
 

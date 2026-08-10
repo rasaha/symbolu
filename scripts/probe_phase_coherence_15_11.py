@@ -8,7 +8,7 @@ non-linear, multi-scale phase relationship across Qwen-7B's
 that §13.10 entropy and §15.10 supervised linear extraction
 cannot capture by construction.
 
-Reference: docs/design/BCVF_LLM_TRUST_ROUTING_DESIGN.md §15.11
+Reference: Project_documentation/repository/docs/design/BCVF_LLM_TRUST_ROUTING_DESIGN.md §15.11
 (commits 7c20d3b, ec6f667, f0a96a0, dab98cf, 7ba55ee, d59d4e7).
 
 What this script DOES:

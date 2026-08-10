@@ -2,7 +2,7 @@
 """Ugence Decision Governance terminology validation.
 
 Documentation-only guard. Enforces the canonical vocabulary decided in
-`docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`
+`Project_documentation/repository/docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`
 over the *current, canonical* architecture documents only. Historical evidence,
 frozen reports, and investor documents are intentionally NOT enforced.
 
@@ -38,8 +38,8 @@ ADR_REF = "ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES"
 # Canonical / new architecture documents whose *content* is enforced.
 GOVERNED_DOCS = [
     "UGENCE_TERMINOLOGY_PRODUCT_CAPABILITY_BOUNDARY_AUDIT.md",
-    "docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md",
-    "docs/architecture/UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_UPDATE_REPORT.md",
+    "Project_documentation/repository/docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md",
+    "Project_documentation/repository/docs/architecture/UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_UPDATE_REPORT.md",
 ]
 
 # Current-architecture documents amended with a terminology note; each must

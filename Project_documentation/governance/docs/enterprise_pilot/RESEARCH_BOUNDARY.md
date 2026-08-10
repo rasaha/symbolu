@@ -1,7 +1,7 @@
 # Research Boundary
 
 **Status:** Phase-3 readiness documentation against the **frozen** architecture
-([`ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md)).
+([`ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../actiongate/ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md)).
 This is the honesty contract for the whole enterprise-pilot package. Read it before
 any other document here and before quoting any number to anyone.
 
@@ -85,7 +85,7 @@ This package sits **downstream** of all three and changes none of them.
 
 ## 7. Cross-references
 
-- Frozen position: [`ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md).
-- Synthetic pilot & non-claims: [`ACTIONGATE_ENTERPRISE_GOVERNANCE_PHASE3_PILOT.md`](../../ACTIONGATE_ENTERPRISE_GOVERNANCE_PHASE3_PILOT.md) §10.
-- Metrics (all `TBD`): [`ENTERPRISE_METRICS.md`](./ENTERPRISE_METRICS.md).
-- Readiness self-assessment: [`ENTERPRISE_READINESS_REPORT.md`](./ENTERPRISE_READINESS_REPORT.md).
+- Frozen position: [`ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../actiongate/ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md).
+- Synthetic pilot & non-claims: [`ACTIONGATE_ENTERPRISE_GOVERNANCE_PHASE3_PILOT.md`](../../actiongate/ACTIONGATE_ENTERPRISE_GOVERNANCE_PHASE3_PILOT.md) §10.
+- Metrics (all `TBD`): [`ENTERPRISE_METRICS.md`](ENTERPRISE_METRICS.md).
+- Readiness self-assessment: [`ENTERPRISE_READINESS_REPORT.md`](ENTERPRISE_READINESS_REPORT.md).

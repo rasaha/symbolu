@@ -6,7 +6,7 @@
 (how the product works). This document explains **what category it belongs to, how
 it differs, and how to sell it.**
 **Canonical vocabulary:** per
-[`docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md).
+[`docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](../../repository/docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md).
 
 > **Central message.** *Code-review tools identify problems. Ugence determines
 > whether an exact software change is sufficiently evidenced, properly approved,
@@ -485,7 +485,7 @@ Governance composes them.
 ---
 
 *Companion to [`UGENCE_CODE_GOVERNANCE_DESIGN_SPEC.md`](UGENCE_CODE_GOVERNANCE_DESIGN_SPEC.md),
-[`UGENCE_PLATFORM_OVERVIEW.md`](UGENCE_PLATFORM_OVERVIEW.md), and the
-[`UGENCE_TERMINOLOGY_PRODUCT_CAPABILITY_BOUNDARY_AUDIT.md`](UGENCE_TERMINOLOGY_PRODUCT_CAPABILITY_BOUNDARY_AUDIT.md).
+[`UGENCE_PLATFORM_OVERVIEW.md`](../../repository/ugence_platform/UGENCE_PLATFORM_OVERVIEW.md), and the
+[`UGENCE_TERMINOLOGY_PRODUCT_CAPABILITY_BOUNDARY_AUDIT.md`](../../repository/architecture/UGENCE_TERMINOLOGY_PRODUCT_CAPABILITY_BOUNDARY_AUDIT.md).
 Positioning source for internal planning and GTM; competitor facts must be re-verified
 against current vendor documentation before external use.*

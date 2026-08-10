@@ -159,7 +159,7 @@ port this ADR contracts for.
 
 When the upstream reference changes, maintainers follow the ritual
 at
-[`simulator/pcam/docs/VENDORED_REFERENCE_UPDATE_RITUAL.md`](../../simulator/pcam/docs/VENDORED_REFERENCE_UPDATE_RITUAL.md):
+[`simulator/pcam/docs/VENDORED_REFERENCE_UPDATE_RITUAL.md`](../../../simulator/simulator/pcam/docs/VENDORED_REFERENCE_UPDATE_RITUAL.md):
 re-copy the file, re-apply the vendoring header, run the parity
 harness, update the runtime port only if behavior diverged, and
 commit the bump with the new pinned commit hash in the header.

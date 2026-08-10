@@ -1,7 +1,7 @@
 """§15.14 framing-stickiness probe — implementation §0.X.
 
 Implements scripts/probe_framing_15_14.py per the §15.14 spec at
-docs/design/15_14_STICKY_FRAMING_DESIGN_SPEC.md (sealed §0.8-binding,
+Project_documentation/repository/docs/design/15_14_STICKY_FRAMING_DESIGN_SPEC.md (sealed §0.8-binding,
 amendment §15.14-A1 EFFECTIVE) and the implementation §0.X
 authorization at docs/design/15_14_IMPLEMENTATION_AUTHORIZATION.md.
 

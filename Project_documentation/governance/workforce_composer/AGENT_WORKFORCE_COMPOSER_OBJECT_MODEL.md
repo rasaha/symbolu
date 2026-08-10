@@ -3,7 +3,7 @@
 > ## Implementation-Status Correction & Reconciliation Note (2026-08-03)
 >
 > *Added by AWC Phase 0 (H16 reconciliation). Changes documentation only; no production code.*
-> See the ADR: [`docs/architecture/ADR_AGENT_WORKFORCE_COMPOSER_H16_CANONICALIZATION.md`](docs/architecture/ADR_AGENT_WORKFORCE_COMPOSER_H16_CANONICALIZATION.md)
+> See the ADR: [`docs/architecture/ADR_AGENT_WORKFORCE_COMPOSER_H16_CANONICALIZATION.md`](../../../docs/architecture/ADR_AGENT_WORKFORCE_COMPOSER_H16_CANONICALIZATION.md)
 > and the audit set [`docs/audits/agent_workforce_composer_phase0/`](docs/audits/agent_workforce_composer_phase0/).
 >
 > - **Original assumption:** the Policy Workflow Compiler was *spec-only / not yet implemented*, with no typed

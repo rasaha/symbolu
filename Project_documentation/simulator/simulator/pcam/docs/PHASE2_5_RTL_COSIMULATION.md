@@ -2,7 +2,7 @@
 
 **Status:** Phase 2.5 complete (harness landed; external simulator required to execute)
 **Scope:** bit-parity verification of `simulator/pcam/rtl/core/freq_sketch.sv`
-**Contract:** [`docs/design/ADR-0001`](../../../docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md)
+**Contract:** [`docs/design/ADR-0001`](../../../../repository/docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md)
 **Depends on:** Phase 0 (vendored reference), Phase 1 (Python runtime policy)
 
 ---

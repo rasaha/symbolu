@@ -6,14 +6,14 @@
     "agentic/hybrid_handover/resolution/experiment_v5/synthetic_fixtures.py": "509014ea9cc2c241d92b78d13d327446d10ead269848a6b774cbbd9bcfc0af28",
     "agentic/hybrid_handover/resolution/experiment_v5/run_competing_operative_experiment.py": "f118a37d305afee440a86109a12a6c13ee9a0b38f78678adebfb9ac76fff5916",
     "agentic/hybrid_handover/resolution/experiment_v5/lock_v5.py": "e75c860fffbe8bd885262058e0deaa5b09fa9aa70d2c80039b86f6ab6b60728e",
-    "agentic/hybrid_handover/resolution/experiment_v5/COMPETING_OPERATIVE_PREREGISTRATION.md": "e61480955d6d7ce4a88ac7027e6d2fe0bf31b5c87cbf9f70028cd573801d0fa8",
-    "agentic/hybrid_handover/resolution/experiment_v5/COMPETING_OPERATIVE_ARCHITECTURE.md": "70898bdf10d8757446acc970825615389211bc52f171b489d0fc867a7061bda0",
-    "agentic/hybrid_handover/resolution/experiment_v5/OPERATIVE_CANDIDATE_SCHEMA.md": "a045b4012ed151408ce95c5496e549391d99272209ec560b3723b31bfc1ebcd0",
-    "agentic/hybrid_handover/resolution/experiment_v5/OPERATIVE_SCOPE_SPEC.md": "ddfd8d17ee9c3007c9cfb52d6b4618085d49e1250f2a150085e2e65f5c3a108e",
-    "agentic/hybrid_handover/resolution/experiment_v5/CONFLICT_PREDICATE_SPEC.md": "26ad6f344b5979c71aef098198b808c7a7bb089191f2f930c7f39b2d6445dff6",
-    "agentic/hybrid_handover/resolution/experiment_v5/CONFLICT_CLASSIFICATION_RULEBOOK.md": "b76f22675a16ae4a2e7a3b220d2ffac8d5443a3a41d5b8d010650a6099c31483",
-    "agentic/hybrid_handover/resolution/experiment_v5/PRECISE_ABSTENTION_SPEC.md": "881e00e56bb8d33175c40c4f07b661b523f817b9a6517d269c7f5e0b009d9ef3",
-    "agentic/hybrid_handover/resolution/experiment_v5/PACKET_CARDINALITY_BOUNDARY.md": "bdc71e34ec66c50860535577d6efa99e64843191c74da1289ed2a11c4ae3bb6e"
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v5/COMPETING_OPERATIVE_PREREGISTRATION.md": "e61480955d6d7ce4a88ac7027e6d2fe0bf31b5c87cbf9f70028cd573801d0fa8",
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v5/COMPETING_OPERATIVE_ARCHITECTURE.md": "70898bdf10d8757446acc970825615389211bc52f171b489d0fc867a7061bda0",
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v5/OPERATIVE_CANDIDATE_SCHEMA.md": "a045b4012ed151408ce95c5496e549391d99272209ec560b3723b31bfc1ebcd0",
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v5/OPERATIVE_SCOPE_SPEC.md": "ddfd8d17ee9c3007c9cfb52d6b4618085d49e1250f2a150085e2e65f5c3a108e",
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v5/CONFLICT_PREDICATE_SPEC.md": "26ad6f344b5979c71aef098198b808c7a7bb089191f2f930c7f39b2d6445dff6",
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v5/CONFLICT_CLASSIFICATION_RULEBOOK.md": "b76f22675a16ae4a2e7a3b220d2ffac8d5443a3a41d5b8d010650a6099c31483",
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v5/PRECISE_ABSTENTION_SPEC.md": "881e00e56bb8d33175c40c4f07b661b523f817b9a6517d269c7f5e0b009d9ef3",
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v5/PACKET_CARDINALITY_BOUNDARY.md": "bdc71e34ec66c50860535577d6efa99e64843191c74da1289ed2a11c4ae3bb6e"
   },
   "frozen_hashes": {
     "agentic/hybrid_handover/resolution/experiment_v4/governance_semantics.py": "228a90a02327f816615548fcbcd3755593057a2cf963c7ef053298154568d2a7",

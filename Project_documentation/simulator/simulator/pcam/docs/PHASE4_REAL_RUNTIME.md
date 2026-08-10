@@ -2,7 +2,7 @@
 
 **Status:** Phase 4 complete for the executable pieces (in-repo baseline adapter, derived-trace reconstruction, pure-Python attention-to-block conversion). Real vLLM and HuggingFace executions are landed ready-to-run but require external dependencies not available in the current dev environment.
 **Scope:** real-vLLM shadow mode, HuggingFace trace extractor, in-repo baseline adapter, acquisition-facing benchmark report.
-**Contract:** [`docs/design/ADR-0001`](../../../docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md)
+**Contract:** [`docs/design/ADR-0001`](../../../../repository/docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md)
 **Depends on:** Phase 0–3 (vendored reference, public API, integration surface, replay infrastructure).
 
 ---

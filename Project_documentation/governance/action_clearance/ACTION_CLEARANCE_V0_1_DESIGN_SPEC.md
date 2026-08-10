@@ -79,7 +79,7 @@ Full detail for every section below lives in the companion set under
 
 Both prerequisites are satisfied: PR #1275 (ACP product-core audit) is integrated, and the Code
 Governance readiness audit (PR #1274) is integrated. The design proceeds. Baseline reproduction and
-freeze verification are in §36 and [`docs/design/action_clearance/EXECUTIVE_SUMMARY.md`](docs/design/action_clearance/EXECUTIVE_SUMMARY.md).
+freeze verification are in §36 and [`docs/design/action_clearance/EXECUTIVE_SUMMARY.md`](../../repository/docs/design/action_clearance/EXECUTIVE_SUMMARY.md).
 
 ---
 
@@ -112,7 +112,7 @@ reason-code prefixes, persistent record names, and new technical documentation h
 robotics code retains "Autonomous Control Plane" and its compatibility surface unchanged. The new
 capability must **not** alias, re-export, or claim object identity with
 `symbolu_robotics.autonomous_control_plane`. Full acronym-collision policy:
-[`TERMINOLOGY_AND_NAMING.md`](docs/design/action_clearance/TERMINOLOGY_AND_NAMING.md).
+[`TERMINOLOGY_AND_NAMING.md`](../../repository/docs/design/action_clearance/TERMINOLOGY_AND_NAMING.md).
 
 ---
 
@@ -146,7 +146,7 @@ Execution provider + execution/idempotency ledger
   reservation, execution, observation, reconciliation, and authoritative consumption state.
 
 Prohibited responsibility transfers and the resolution of the robotics "authorize vs clear" ambiguity
-(resolved to **clear-only**): [`AUTHORITY_BOUNDARY.md`](docs/design/action_clearance/AUTHORITY_BOUNDARY.md).
+(resolved to **clear-only**): [`AUTHORITY_BOUNDARY.md`](../../repository/docs/design/action_clearance/AUTHORITY_BOUNDARY.md).
 
 ---
 
@@ -164,7 +164,7 @@ Deterministic constraint intersection:
 - Direct conflict: `CONSTRAINT_CONFLICT` → **block or escalate** (default `ESCALATE`).
 - Missing interpretation rule: **fail closed** (never silently union).
 
-Detail and worked examples: [`MONOTONICITY_AND_CONSTRAINTS.md`](docs/design/action_clearance/MONOTONICITY_AND_CONSTRAINTS.md).
+Detail and worked examples: [`MONOTONICITY_AND_CONSTRAINTS.md`](../../repository/docs/design/action_clearance/MONOTONICITY_AND_CONSTRAINTS.md).
 
 ---
 
@@ -176,8 +176,8 @@ serve GitHub merges, deployments, database operations, agent-tool execution, fin
 robotics operations.
 
 **First supported profile: the GitHub exact-merge clearance profile** (§23). Deployment and other
-domains are later profiles. Served-world detail: [`PACKAGE_BOUNDARY.md`](docs/design/action_clearance/PACKAGE_BOUNDARY.md)
-and [`PROFILE_EXTENSIBILITY.md`](docs/design/action_clearance/PROFILE_EXTENSIBILITY.md).
+domains are later profiles. Served-world detail: [`PACKAGE_BOUNDARY.md`](../../repository/docs/design/action_clearance/PACKAGE_BOUNDARY.md)
+and [`PROFILE_EXTENSIBILITY.md`](../../repository/docs/design/action_clearance/PROFILE_EXTENSIBILITY.md).
 
 ---
 
@@ -196,9 +196,9 @@ source-identified, integrity-verifiable, freshness-evaluable, deterministic afte
 serializable, and immutable after creation. Missing mandatory signals **fail closed**. Action Clearance
 **receives** signals; it never fetches external state directly. Field-level model, required-vs-adapter
 split, and every missing/stale/expired/contradictory/untrusted/mismatch case:
-[`TRUSTED_SIGNAL_MODEL.md`](docs/design/action_clearance/TRUSTED_SIGNAL_MODEL.md). Per-signal
+[`TRUSTED_SIGNAL_MODEL.md`](../../repository/docs/design/action_clearance/TRUSTED_SIGNAL_MODEL.md). Per-signal
 authoritative owner and receive/validate/evaluate/reference relationship:
-[`SIGNAL_OWNERSHIP_MATRIX.md`](docs/design/action_clearance/SIGNAL_OWNERSHIP_MATRIX.md).
+[`SIGNAL_OWNERSHIP_MATRIX.md`](../../repository/docs/design/action_clearance/SIGNAL_OWNERSHIP_MATRIX.md).
 
 ---
 
@@ -208,13 +208,13 @@ authoritative owner and receive/validate/evaluate/reference relationship:
   bundle, and the clearance-policy context. It carries **no credentials and no executable provider
   commands**. Identity is grouped to avoid duplication:
   `AuthorizationContext` · `ActionIdentity` · `SignalBundle` · `ClearancePolicyContext`.
-  Full field table and grouping rationale: [`REQUEST_CONTRACT.md`](docs/design/action_clearance/REQUEST_CONTRACT.md).
+  Full field table and grouping rationale: [`REQUEST_CONTRACT.md`](../../repository/docs/design/action_clearance/REQUEST_CONTRACT.md).
 - **`ClearanceResult`** is the deterministic evaluator output. **`ClearanceReceipt`** is the durable
   product record persisted by the caller/workflow layer around a `ClearanceResult`. The evaluator
   generates **no** nondeterministic UUID and reads **no** system clock.
   Identity strategy: **caller-supplied `request_id` + content-addressed `result_fingerprint`**;
   `result_id = "acr_" + result_fingerprint`. Full field tables:
-  [`RESULT_AND_RECEIPT_CONTRACT.md`](docs/design/action_clearance/RESULT_AND_RECEIPT_CONTRACT.md).
+  [`RESULT_AND_RECEIPT_CONTRACT.md`](../../repository/docs/design/action_clearance/RESULT_AND_RECEIPT_CONTRACT.md).
 
 Machine-readable schemas: [`action_clearance_request.schema.json`](docs/design/action_clearance/action_clearance_request.schema.json),
 [`action_clearance_result.schema.json`](docs/design/action_clearance/action_clearance_result.schema.json),
@@ -233,13 +233,13 @@ conditions; the underlying authorization is neither broadened nor replaced.*
 Status combination is least-permissive-wins with precedence `BLOCK > ESCALATE > HOLD > CLEAR`. Per
 status: whether execution is permitted, retry allowed, a fresh request required, human review required,
 upstream reauthorization required, and whether the authorization remains valid — all tabulated in
-[`STATUS_AND_REASON_SEMANTICS.md`](docs/design/action_clearance/STATUS_AND_REASON_SEMANTICS.md).
+[`STATUS_AND_REASON_SEMANTICS.md`](../../repository/docs/design/action_clearance/STATUS_AND_REASON_SEMANTICS.md).
 
 Reason codes are a curated closed catalog (UPPER_SNAKE, no `ACP`/`AC_` prefix, aligned with Decision
 Authority's governed-catalog discipline). Each code is classified `CORE_NEUTRAL` / `PROFILE_SPECIFIC` /
 `ADAPTER_SPECIFIC` / `WORKFLOW_ONLY` / `UNNECESSARY`. Existing ActionGate/Decision-Authority codes are
 **referenced, not duplicated**. Full catalog and classification:
-[`STATUS_AND_REASON_SEMANTICS.md`](docs/design/action_clearance/STATUS_AND_REASON_SEMANTICS.md).
+[`STATUS_AND_REASON_SEMANTICS.md`](../../repository/docs/design/action_clearance/STATUS_AND_REASON_SEMANTICS.md).
 
 ---
 
@@ -249,7 +249,7 @@ Evaluation time is **caller-supplied**; the core contains no `datetime.now()`. W
 `clearance.valid_until ≤ authorization.expires_at` and
 `clearance.valid_until ≤ min(required-signal valid_until)`. Clearance may shorten but never extend
 authorization validity. A required signal with no trustworthy validity bound → **fail closed**. Clock
-skew, boundary-at-exact-expiry, and stale-signal policy: [`TIME_AND_FRESHNESS.md`](docs/design/action_clearance/TIME_AND_FRESHNESS.md).
+skew, boundary-at-exact-expiry, and stale-signal policy: [`TIME_AND_FRESHNESS.md`](../../repository/docs/design/action_clearance/TIME_AND_FRESHNESS.md).
 
 The evaluator is deterministic. Canonical serialization (sorted keys, compact separators, UTF-8,
 `allow_nan=false`, normalized `-0.0`, ordered reason codes) feeds four SHA-256, domain-separated
@@ -258,7 +258,7 @@ fingerprints — `action_fingerprint`, `request_fingerprint`, `signal_bundle_fin
 under a new `action_clearance` domain tag (never `acp`). No random values, implicit clock reads,
 network calls, env reads, mutable global policy, unordered reason output, or unstable map serialization.
 Inclusion/exclusion sets and the semantic-equivalence harness design:
-[`DETERMINISM_AND_FINGERPRINTS.md`](docs/design/action_clearance/DETERMINISM_AND_FINGERPRINTS.md).
+[`DETERMINISM_AND_FINGERPRINTS.md`](../../repository/docs/design/action_clearance/DETERMINISM_AND_FINGERPRINTS.md).
 
 ---
 
@@ -267,14 +267,14 @@ Inclusion/exclusion sets and the semantic-equivalence harness design:
 The core persists **nothing**. The **Workflow Service** persists the `ClearanceReceipt`. The
 **execution/idempotency ledger** (today the Decision-Authority execution repositories) persists
 reservation, consumption, dispatch, and observation. Content-addressed fingerprints link the layers.
-Detail: [`PERSISTENCE_BOUNDARY.md`](docs/design/action_clearance/PERSISTENCE_BOUNDARY.md).
+Detail: [`PERSISTENCE_BOUNDARY.md`](../../repository/docs/design/action_clearance/PERSISTENCE_BOUNDARY.md).
 
 One-time-use is **downstream**. The authoritative replay key binds at least
 `tenant · authorization_ref · action_fingerprint · target · operation`. Action Clearance receives
 prior-consumption as a trusted signal (`ALREADY_CONSUMED`) but never atomically owns consumption. Two
 concurrent dispatches sharing one valid clearance → the ledger's atomic reservation lets **exactly one**
 proceed; the other observes `DUPLICATE`. Handoff and race semantics:
-[`ONE_TIME_USE_AND_REPLAY.md`](docs/design/action_clearance/ONE_TIME_USE_AND_REPLAY.md).
+[`ONE_TIME_USE_AND_REPLAY.md`](../../repository/docs/design/action_clearance/ONE_TIME_USE_AND_REPLAY.md).
 
 ---
 
@@ -286,14 +286,14 @@ Action Clearance consumes a **minimal authorization projection** derived from th
 logic, or the provider-framework adapter. Only `AUTHORIZED` / `AUTHORIZED_WITH_CONSTRAINTS` are eligible
 inputs; `DENIED` / `INDETERMINATE` / `EXPIRED` are **never** reinterpreted as clearable. Mismatch of
 parameters/target/artifact/operation/actor/policy-ref/expiration → fail-closed `BLOCK`.
-[`ACTIONGATE_INTEGRATION.md`](docs/design/action_clearance/ACTIONGATE_INTEGRATION.md).
+[`ACTIONGATE_INTEGRATION.md`](../../repository/docs/design/action_clearance/ACTIONGATE_INTEGRATION.md).
 
 For reconstructability the request carries references — `DecisionRecord` id, `cer_id`, CER
 `content_hash`, `policy_refs`, authorized-actor basis, override/supersession refs. `DecisionRecord` and
 CER live in `ugence_decision_authority`, so Action Clearance references them by **id/hash only** and
 never imports Decision Authority. It does **not** revalidate segregation of duties (unless a
 current-state actor signal requires it) and creates **no** duplicate decision record.
-[`DECISION_AND_CER_INTEGRATION.md`](docs/design/action_clearance/DECISION_AND_CER_INTEGRATION.md).
+[`DECISION_AND_CER_INTEGRATION.md`](../../repository/docs/design/action_clearance/DECISION_AND_CER_INTEGRATION.md).
 
 ---
 
@@ -303,7 +303,7 @@ current-state actor signal requires it) and creates **no** duplicate decision re
 adapters. **No new `ProviderKind` is added** (the three peers — `ASSERTION_GOVERNANCE`,
 `ACTION_GOVERNANCE`, `EXTERNAL_EXECUTION` — are unchanged). Adapters are registered and resolved by the
 product/workflow layer, not by GPF, and GPF is given no authority over clearance.
-[`GPF_RELATIONSHIP.md`](docs/design/action_clearance/GPF_RELATIONSHIP.md).
+[`GPF_RELATIONSHIP.md`](../../repository/docs/design/action_clearance/GPF_RELATIONSHIP.md).
 
 ---
 
@@ -316,11 +316,11 @@ authorization-consumption state — matching the Code Governance v0.2 artifact-b
 `UGENCE_CODE_GOVERNANCE_DESIGN_SPEC.md`). **MVP supports direct-merge and squash**; **rebase is
 deferred** (no deterministic pre-merge exact-tree binding in MVP); **merge queue** authorizes the queue
 entry, then clears the *exact merge-group artifact* — the original PR clearance never auto-authorizes a
-changed merge-group. [`GITHUB_MERGE_PROFILE.md`](docs/design/action_clearance/GITHUB_MERGE_PROFILE.md),
+changed merge-group. [`GITHUB_MERGE_PROFILE.md`](../../repository/docs/design/action_clearance/GITHUB_MERGE_PROFILE.md),
 schema [`github_merge_profile.schema.json`](docs/design/action_clearance/github_merge_profile.schema.json).
 Profiles add required signal types, profile reason codes, target identity, and profile policy — and may
 only **narrow**, never broaden or subclass authority semantics:
-[`PROFILE_EXTENSIBILITY.md`](docs/design/action_clearance/PROFILE_EXTENSIBILITY.md).
+[`PROFILE_EXTENSIBILITY.md`](../../repository/docs/design/action_clearance/PROFILE_EXTENSIBILITY.md).
 
 ---
 
@@ -333,14 +333,14 @@ and `tests/`. Public API is curated and each symbol classified
 downward only: recommended single optional dependency on `ugence-governance-contracts>=0.1.0` (to speak
 the neutral `ActionGovernance*`/`EXPIRED` seam) with a stdlib-only-leaf fallback; **never** upward on
 Code Governance, robotics, console API, execution providers, incident clients, identity clients,
-workflow engines, Model Selection, or Hybrid LLM. [`PACKAGE_BOUNDARY.md`](docs/design/action_clearance/PACKAGE_BOUNDARY.md).
+workflow engines, Model Selection, or Hybrid LLM. [`PACKAGE_BOUNDARY.md`](../../repository/docs/design/action_clearance/PACKAGE_BOUNDARY.md).
 
 Disposition of existing implementations — robotics Autonomous Control Plane:
 `SEPARATE_CAPABILITY` · `NOT_A_SOURCE_MOVE` · `NO_COMPATIBILITY_ALIAS` · `LOCAL_FREEZE_UNCHANGED`
 (reusable only as engineering-pattern evidence; grant-minting authority **not** reused); console
 clearance: `BEHAVIORAL_REFERENCE` · `POTENTIAL_FUTURE_CONSUMER` · `NOT_AUTOMATIC_CANONICAL_SOURCE`
 (preserve *Authorize → Clear → Record*); database `acp_db` adapter: future **profile/adapter**, no
-runtime migration now. [`EXISTING_IMPLEMENTATION_DISPOSITION.md`](docs/design/action_clearance/EXISTING_IMPLEMENTATION_DISPOSITION.md).
+runtime migration now. [`EXISTING_IMPLEMENTATION_DISPOSITION.md`](../../repository/docs/design/action_clearance/EXISTING_IMPLEMENTATION_DISPOSITION.md).
 
 ---
 
@@ -354,8 +354,8 @@ one-time use; stale/superseded clearance must not execute; new action fingerprin
 authorization requires new clearance; profile constraints may only narrow). Threat model covers replay,
 TOCTOU, stale/forged signals, tenant confusion, source impersonation, action/target substitution,
 policy downgrade, clock manipulation, duplicate dispatch, clearance reuse, missing receipt, incomplete
-chain, and fail-open exception handling. [`SECURITY_INVARIANTS.md`](docs/design/action_clearance/SECURITY_INVARIANTS.md),
-[`THREAT_MODEL.md`](docs/design/action_clearance/THREAT_MODEL.md).
+chain, and fail-open exception handling. [`SECURITY_INVARIANTS.md`](../../repository/docs/design/action_clearance/SECURITY_INVARIANTS.md),
+[`THREAT_MODEL.md`](../../repository/docs/design/action_clearance/THREAT_MODEL.md).
 
 ---
 
@@ -364,12 +364,12 @@ chain, and fail-open exception handling. [`SECURITY_INVARIANTS.md`](docs/design/
 Evaluation flow: `REQUESTED → VALIDATING_AUTHORIZATION → VALIDATING_ACTION_IDENTITY →
 VALIDATING_SIGNALS → EVALUATING_POLICY → (CLEAR | HOLD | BLOCK | ESCALATE)`. Durable receipt states:
 `ISSUED → (EXPIRED | SUPERSEDED | REVOKED_BY_UPSTREAM_CHANGE)`. Authoritative execution-consumption
-state is **not** inside the receipt. [`STATE_MACHINE.md`](docs/design/action_clearance/STATE_MACHINE.md).
+state is **not** inside the receipt. [`STATE_MACHINE.md`](../../repository/docs/design/action_clearance/STATE_MACHINE.md).
 
 Failures are classified `RESULT` / `RETRYABLE_ERROR` / `NON_RETRYABLE_ERROR` / `ESCALATION` /
 `UPSTREAM_REAUTHORIZATION_REQUIRED`. Expected operational problems produce fail-closed *results*;
 programming errors and malformed contracts raise typed *exceptions*.
-[`STATUS_AND_REASON_SEMANTICS.md`](docs/design/action_clearance/STATUS_AND_REASON_SEMANTICS.md) §Failure-handling.
+[`STATUS_AND_REASON_SEMANTICS.md`](../../repository/docs/design/action_clearance/STATUS_AND_REASON_SEMANTICS.md) §Failure-handling.
 
 ---
 
@@ -380,7 +380,7 @@ expiry/mismatch/freeze/incident/actor/signal/policy/consumption cases; validity 
 expiry; identical-request→identical fingerprint; reason-order-independent fingerprint; no widening; new
 head SHA / regenerated merge group → new clearance; expired-before-dispatch → no dispatch; concurrent
 dispatch → one reservation; superseded authorization → old clearance unusable). Narrative:
-[`ACCEPTANCE_SCENARIOS.md`](docs/design/action_clearance/ACCEPTANCE_SCENARIOS.md); machine-readable:
+[`ACCEPTANCE_SCENARIOS.md`](../../repository/docs/design/action_clearance/ACCEPTANCE_SCENARIOS.md); machine-readable:
 [`acceptance_scenarios.json`](docs/design/action_clearance/acceptance_scenarios.json).
 
 ---
@@ -392,7 +392,7 @@ reference adapters; (D) ActionGate integration, shadow only; (E) durable receipt
 shadow; (G) execution-ledger integration (one-time reservation, replay protection); (H) Code Governance
 enforced direct+squash merge; (I) merge queue + rebase. Each phase lists prerequisites, package
 ownership, contracts, tests, acceptance criteria, rollback, and evidence tier. **Not executed here.**
-[`IMPLEMENTATION_SEQUENCE.md`](docs/design/action_clearance/IMPLEMENTATION_SEQUENCE.md).
+[`IMPLEMENTATION_SEQUENCE.md`](../../repository/docs/design/action_clearance/IMPLEMENTATION_SEQUENCE.md).
 
 ---
 
@@ -401,7 +401,7 @@ ownership, contracts, tests, acceptance criteria, rollback, and evidence tier. *
 Proposed distribution version `0.1.0`; contract/policy version `action_clearance.v1` — design proposals,
 not implementation facts. Compatibility policy for request/result schema, reason codes, signal types,
 profile versions, and fingerprint algorithms; **no** compatibility promise to any existing robotics
-import. [`VERSIONING.md`](docs/design/action_clearance/VERSIONING.md).
+import. [`VERSIONING.md`](../../repository/docs/design/action_clearance/VERSIONING.md).
 
 ---
 
@@ -411,16 +411,16 @@ Ranked P0/P1/P2 and classed `DESIGN_BLOCKER` / `IMPLEMENTATION_PREREQUISITE` / `
 `PRODUCTION_RISK` / `FUTURE_ENHANCEMENT`. The audit's three MIGRATION_BLOCKERs are **resolved by this
 spec** (authority = clear-only; one contract family; neutral core + GitHub profile). Remaining P0/P1
 implementation-prerequisites concern signal provenance, receipt persistence ownership, one-time-use
-race handling, and the execution-ledger dependency. [`RISK_REGISTER.md`](docs/design/action_clearance/RISK_REGISTER.md),
-[`OPEN_QUESTIONS.md`](docs/design/action_clearance/OPEN_QUESTIONS.md),
-[`ROLLBACK.md`](docs/design/action_clearance/ROLLBACK.md), machine-readable
+race handling, and the execution-ledger dependency. [`RISK_REGISTER.md`](../../repository/docs/design/action_clearance/RISK_REGISTER.md),
+[`OPEN_QUESTIONS.md`](../../repository/docs/design/action_clearance/OPEN_QUESTIONS.md),
+[`ROLLBACK.md`](../../repository/docs/design/action_clearance/ROLLBACK.md), machine-readable
 [`design_decisions.json`](docs/design/action_clearance/design_decisions.json).
 
 **Prerequisite closure (follow-on phase).** The four implementation-prerequisites above (signal
 provenance, receipt persistence, receipt lifecycle, atomic one-time reservation) are closed at the
 interface/contract level in the companion set under
 [`docs/design/action_clearance_prerequisites/`](docs/design/action_clearance_prerequisites/) — see its
-[`PREREQUISITE_CLOSURE_REPORT.md`](docs/design/action_clearance_prerequisites/PREREQUISITE_CLOSURE_REPORT.md)
+[`PREREQUISITE_CLOSURE_REPORT.md`](../../repository/docs/design/action_clearance_prerequisites/PREREQUISITE_CLOSURE_REPORT.md)
 and machine-readable
 [`implementation_gate.json`](docs/design/action_clearance_prerequisites/implementation_gate.json). That
 phase concludes the package core may begin while durable atomic execution infrastructure remains an
@@ -435,7 +435,7 @@ The full companion set and six machine-readable artifacts live under
 `status: PROPOSED`, `version: action_clearance.design.v0.1`; the schemas are **design artifacts, not
 committed runtime contracts**. Validation results (terminology, doc-links, dependency-direction,
 platform freeze, robotics local freeze, baseline tests, JSON validation, git status) are recorded in
-[`EXECUTIVE_SUMMARY.md`](docs/design/action_clearance/EXECUTIVE_SUMMARY.md) §Validation. The diff for
+[`EXECUTIVE_SUMMARY.md`](../../repository/docs/design/action_clearance/EXECUTIVE_SUMMARY.md) §Validation. The diff for
 this phase contains only `ACTION_CLEARANCE_V0_1_DESIGN_SPEC.md`, `docs/design/action_clearance/**`, and
 a single cross-reference line in `UGENCE_CODE_GOVERNANCE_DESIGN_SPEC.md` — no runtime file, no package,
 no neutral-contract change, no `ProviderKind`, no compatibility shim, no robotics import change.
@@ -444,5 +444,5 @@ no neutral-contract change, no `ProviderKind`, no compatibility shim, no robotic
 
 ## Verdict
 
-See [`EXECUTIVE_SUMMARY.md`](docs/design/action_clearance/EXECUTIVE_SUMMARY.md) for the single verdict
+See [`EXECUTIVE_SUMMARY.md`](../../repository/docs/design/action_clearance/EXECUTIVE_SUMMARY.md) for the single verdict
 line and the completion report.

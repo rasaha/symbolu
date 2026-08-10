@@ -1,7 +1,7 @@
 # Source Adapter Specification
 
 **Status:** Phase-3 readiness documentation against the **frozen** architecture
-([`ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md)).
+([`ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../actiongate/ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md)).
 This specifies how a real enterprise source system is mapped into the neutral
 evidence model **without changing that model**. No enterprise data appears here.
 
@@ -140,6 +140,6 @@ Where the enterprise requires it (default assumption), anonymization happens
 
 - Frozen model: `agentic/enterprise_governance/model.py`, `adapters.py`,
   `invariants.py`.
-- Frozen position: [`ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md).
+- Frozen position: [`ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../actiongate/ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md).
 - Mapping templates: [`templates/`](./templates/).
-- Ground truth for validating emitted evidence: [`GROUND_TRUTH_PROTOCOL.md`](./GROUND_TRUTH_PROTOCOL.md).
+- Ground truth for validating emitted evidence: [`GROUND_TRUTH_PROTOCOL.md`](GROUND_TRUTH_PROTOCOL.md).

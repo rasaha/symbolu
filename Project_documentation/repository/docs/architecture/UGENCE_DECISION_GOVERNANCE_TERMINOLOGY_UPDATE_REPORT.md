@@ -3,7 +3,7 @@
 **Date:** 2026-08-01
 **Phase:** documentation-only terminology & boundary canonicalization
 **Decision record:** [`ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md)
-**Evidence audit:** [`../../UGENCE_TERMINOLOGY_PRODUCT_CAPABILITY_BOUNDARY_AUDIT.md`](../../UGENCE_TERMINOLOGY_PRODUCT_CAPABILITY_BOUNDARY_AUDIT.md)
+**Evidence audit:** [`../../UGENCE_TERMINOLOGY_PRODUCT_CAPABILITY_BOUNDARY_AUDIT.md`](../../architecture/UGENCE_TERMINOLOGY_PRODUCT_CAPABILITY_BOUNDARY_AUDIT.md)
 
 > *No runtime package, API, import path, serialization, digest, authority boundary, frozen
 > artifact, or historical record was renamed or changed in this phase.*
@@ -110,7 +110,7 @@ Governance Contracts remain **shared foundation**, not a capability.
 restrictions, required capabilities, cost/latency constraints, availability policy, and
 fallback order. It must **not** determine assertion admissibility, binding business decisions,
 exact-action authorization, operational safety, or execution permission. Consistent with
-[`../../ADR_MODEL_SELECTION_POLICY_PLACEMENT.md`](../../ADR_MODEL_SELECTION_POLICY_PLACEMENT.md)
+[`../../ADR_MODEL_SELECTION_POLICY_PLACEMENT.md`](../../../model_selection/adr/ADR_MODEL_SELECTION_POLICY_PLACEMENT.md)
 (complementary axis: capability-engine inventory vs. platform placement).
 
 ## 9. Documents amended

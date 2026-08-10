@@ -1,7 +1,7 @@
 """S3 — frozen digest stability across the migration.
 
 Pins the exact digest/version anchors recorded in the pre-migration baseline
-(docs/migrations/storygraph/BASELINE.md §4–§5). Any drift in graph, policy,
+(Project_documentation/repository/docs/migrations/storygraph/BASELINE.md §4–§5). Any drift in graph, policy,
 replay, pre-registration, or schema digests fails here — the guard that the
 physical move introduced no semantic change.
 """

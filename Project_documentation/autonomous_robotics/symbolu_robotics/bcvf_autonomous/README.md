@@ -3,7 +3,7 @@
 **A safety-cased predictor-arbitration kernel for autonomous systems.**
 
 Status: pre-1.0 (current `0.4.0`). API stability commitment is documented
-in [`API_STABILITY.md`](./API_STABILITY.md). The math kernel, the
+in [`API_STABILITY.md`](API_STABILITY.md). The math kernel, the
 per-tick arbitration surface, and the safety-case mapping are stable;
 deployment-partner surfaces (ROS 2 node, replay framework, calibration
 bundle, sensor attestation) are provisional and are graduated as
@@ -39,7 +39,7 @@ path. The integrator-facing question isn't "does the math work" — it's
 "can the safety case be closed against this code." The repository is
 laid out so that question can be answered without reading the kernel:
 
-- [`safety_case/SOTIF_TRACEABILITY.md`](./safety_case/SOTIF_TRACEABILITY.md)
+- [`safety_case/SOTIF_TRACEABILITY.md`](safety_case/SOTIF_TRACEABILITY.md)
   — clause-by-clause map from ISO 21448 + ISO 26262 Part 6 to the
   importable BCVF surfaces that ground each clause. 69 indexed
   artifacts across 13 clauses (41 SOTIF + 28 ISO 26262 Part 6).
@@ -93,14 +93,14 @@ print(f"Mean trust: {result.diagnostics.mean_trust_per_predictor}")
 ```
 
 For the safety-cased path (state machine + attestation + replay),
-see [`DESIGN.md`](./DESIGN.md) §6 and the per-feature design docs:
+see [`DESIGN.md`](DESIGN.md) §6 and the per-feature design docs:
 
-- [`SAFETY_STATE_MACHINE_DESIGN.md`](./SAFETY_STATE_MACHINE_DESIGN.md)
-- [`ROS2_DDS_SBOM_DESIGN.md`](./ROS2_DDS_SBOM_DESIGN.md)
-- [`REPLAY_FRAMEWORK_DESIGN.md`](./REPLAY_FRAMEWORK_DESIGN.md)
-- [`REAL_TIME_BUDGET_DESIGN.md`](./REAL_TIME_BUDGET_DESIGN.md)
-- [`CALIBRATION_DESIGN.md`](./CALIBRATION_DESIGN.md)
-- [`SENSOR_ATTESTATION_DESIGN.md`](./SENSOR_ATTESTATION_DESIGN.md)
+- [`SAFETY_STATE_MACHINE_DESIGN.md`](SAFETY_STATE_MACHINE_DESIGN.md)
+- [`ROS2_DDS_SBOM_DESIGN.md`](ROS2_DDS_SBOM_DESIGN.md)
+- [`REPLAY_FRAMEWORK_DESIGN.md`](REPLAY_FRAMEWORK_DESIGN.md)
+- [`REAL_TIME_BUDGET_DESIGN.md`](REAL_TIME_BUDGET_DESIGN.md)
+- [`CALIBRATION_DESIGN.md`](CALIBRATION_DESIGN.md)
+- [`SENSOR_ATTESTATION_DESIGN.md`](SENSOR_ATTESTATION_DESIGN.md)
 
 ## What this is *not*
 
@@ -118,7 +118,7 @@ see [`DESIGN.md`](./DESIGN.md) §6 and the per-feature design docs:
   Lemma 1 invariance is a mathematical property of the kernel — if
   every upstream predictor agrees on a wrong answer, BCVF will not
   catch it. This is the explicit scope boundary documented in
-  [`DESIGN.md`](./DESIGN.md) §1 and in [`NOTICE`](./NOTICE).
+  [`DESIGN.md`](DESIGN.md) §1 and in [`NOTICE`](./NOTICE).
 
 ## Testing
 
@@ -145,7 +145,7 @@ workflow at [`.github/workflows/bcvf-autonomous-ci.yml`](../../.github/workflows
 
 ## Contributing
 
-See [`CONTRIBUTING.md`](./CONTRIBUTING.md). Pull requests are
+See [`CONTRIBUTING.md`](CONTRIBUTING.md). Pull requests are
 welcome; the repo's discipline is documented there:
 
 1. Design doc first.
@@ -175,5 +175,5 @@ https://github.com/rasaha/symbolu
 - `STABLE_API`: 38 symbols. Removal requires a deprecation cycle.
 - `PROVISIONAL_API`: 77 symbols. May change in a minor version with
   a release-note line.
-- See [`API_STABILITY.md`](./API_STABILITY.md) §3 for the full
+- See [`API_STABILITY.md`](API_STABILITY.md) §3 for the full
   semver mapping.

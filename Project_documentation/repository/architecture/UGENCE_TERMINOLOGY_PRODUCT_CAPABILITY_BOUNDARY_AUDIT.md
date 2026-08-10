@@ -4,7 +4,7 @@
 **Scope:** documentation and naming only — no code, package, API, schema, freeze
 artifact, or historical record is renamed or changed.
 **Companion decision record:**
-[`docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md)
+[`docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](../docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md)
 
 > **Provenance note (read this first).** An earlier hand-off referenced this audit as
 > pre-existing commit `4cb3f1e`. Direct verification against the repository (local refs,
@@ -91,7 +91,7 @@ compositions over capability *public contracts* — never new copies of the engi
 ### Capability inventory correction: nine → ten
 
 The current audits enumerate **nine** reusable capabilities
-([`UGENCE_REPOSITORY_RESTRUCTURING_PLAN.md`](UGENCE_REPOSITORY_RESTRUCTURING_PLAN.md) §4;
+([`UGENCE_REPOSITORY_RESTRUCTURING_PLAN.md`](../restructuring/UGENCE_REPOSITORY_RESTRUCTURING_PLAN.md) §4;
 [`UGENCE_MODULARITY_AND_PACKAGING_AUDIT.md`](UGENCE_MODULARITY_AND_PACKAGING_AUDIT.md)),
 with model selection folded under Hybrid LLM. The canonical inventory is **ten**:
 
@@ -110,7 +110,7 @@ with model selection folded under Hybrid LLM. The canonical inventory is **ten**
 
 Model Selection (#8) is a **distinct capability**, separate from Hybrid LLM (#9). It is
 simultaneously classified as a *cross-cutting policy service* at research/pilot maturity
-(see [`ADR_MODEL_SELECTION_POLICY_PLACEMENT.md`](ADR_MODEL_SELECTION_POLICY_PLACEMENT.md));
+(see [`ADR_MODEL_SELECTION_POLICY_PLACEMENT.md`](../../model_selection/adr/ADR_MODEL_SELECTION_POLICY_PLACEMENT.md));
 the two framings are complementary — capability-engine inventory vs. platform placement.
 
 Governance Contracts are **shared foundation**, not a capability. The AI Control Plane and

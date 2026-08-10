@@ -1,7 +1,7 @@
 # Enterprise Metrics
 
 **Status:** Phase-3 readiness documentation against the **frozen** architecture
-([`ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md)).
+([`ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../actiongate/ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md)).
 This defines *how success would be measured on real data*. It reports **no**
 numbers — every value below is a **definition and a placeholder**. Filling these in
 requires real records, real controls, and enterprise-supplied ground truth. We do
@@ -12,9 +12,9 @@ requires real records, real controls, and enterprise-supplied ground truth. We d
 ## 1. Principle
 
 Metrics are only computed on **real** historical records with **enterprise ground
-truth** ([`GROUND_TRUTH_PROTOCOL.md`](./GROUND_TRUTH_PROTOCOL.md)) and against the
+truth** ([`GROUND_TRUTH_PROTOCOL.md`](GROUND_TRUTH_PROTOCOL.md)) and against the
 **enterprise's real baseline**
-([`BASELINE_COMPARISON_FRAMEWORK.md`](./BASELINE_COMPARISON_FRAMEWORK.md)). Until
+([`BASELINE_COMPARISON_FRAMEWORK.md`](BASELINE_COMPARISON_FRAMEWORK.md)). Until
 then every cell is `TBD — requires real pilot data`. The synthetic shadow numbers
 describe fixtures only and are never reported as enterprise metrics.
 
@@ -30,7 +30,7 @@ describe fixtures only and are never reported as enterprise metrics.
 | Coverage of unknowns | findings on `unknown`-labeled instances | reported separately, not scored | `TBD` |
 | Architecture-coverage gap | `problematic` classes that map to **no** frozen failure code | ground-truth adjudication | `TBD` |
 
-TP/FP/FN are defined in [`GROUND_TRUTH_PROTOCOL.md`](./GROUND_TRUTH_PROTOCOL.md) §5.
+TP/FP/FN are defined in [`GROUND_TRUTH_PROTOCOL.md`](GROUND_TRUTH_PROTOCOL.md) §5.
 
 ### 2.2 Net-new value (needs real baseline)
 
@@ -67,7 +67,7 @@ not an efficacy claim.
 
 `missing_data_rate > 0` is *good*: gaps are surfaced, not filled. `invented-value
 rate` is structurally zero because adapters emit MISSING instead of guessing
-([`SOURCE_ADAPTER_SPECIFICATION.md`](./SOURCE_ADAPTER_SPECIFICATION.md) §1).
+([`SOURCE_ADAPTER_SPECIFICATION.md`](SOURCE_ADAPTER_SPECIFICATION.md) §1).
 
 ### 2.5 Disposition / promotion profile (operational)
 
@@ -84,14 +84,14 @@ a real bad outcome) and is exactly what the pilot success criteria call for. It 
 ## 3. Success thresholds are set WITH the enterprise, not here
 
 This document does **not** hard-code pass/fail thresholds. Per the pilot success
-criteria ([`ACTIONGATE_ENTERPRISE_GOVERNANCE_PHASE3_PILOT.md`](../../ACTIONGATE_ENTERPRISE_GOVERNANCE_PHASE3_PILOT.md) §8),
+criteria ([`ACTIONGATE_ENTERPRISE_GOVERNANCE_PHASE3_PILOT.md`](../../actiongate/ACTIONGATE_ENTERPRISE_GOVERNANCE_PHASE3_PILOT.md) §8),
 proceeding toward productization requires that real-data validation show: findings
 not trivially available already; low, explainable false positives; shared
 invariants reused across multiple real workflows; clear authority provenance;
 actionable cross-vertical dependencies; measurable reconciliation/audit
 improvement; and at least one preventive finding before an invalid execution. The
 enterprise and the pilot team agree the concrete thresholds **before** the run,
-recorded in the checklist ([`REAL_ENTERPRISE_PILOT_CHECKLIST.md`](./REAL_ENTERPRISE_PILOT_CHECKLIST.md)).
+recorded in the checklist ([`REAL_ENTERPRISE_PILOT_CHECKLIST.md`](REAL_ENTERPRISE_PILOT_CHECKLIST.md)).
 
 ## 4. Reporting rules
 
@@ -106,8 +106,8 @@ recorded in the checklist ([`REAL_ENTERPRISE_PILOT_CHECKLIST.md`](./REAL_ENTERPR
 
 ## 5. Cross-references
 
-- Ground truth: [`GROUND_TRUTH_PROTOCOL.md`](./GROUND_TRUTH_PROTOCOL.md).
-- Baseline / net-new: [`BASELINE_COMPARISON_FRAMEWORK.md`](./BASELINE_COMPARISON_FRAMEWORK.md).
+- Ground truth: [`GROUND_TRUTH_PROTOCOL.md`](GROUND_TRUTH_PROTOCOL.md).
+- Baseline / net-new: [`BASELINE_COMPARISON_FRAMEWORK.md`](BASELINE_COMPARISON_FRAMEWORK.md).
 - Evaluator emitting these fields: `agentic/enterprise_governance/shadow.py`.
-- Frozen success criteria: [`ACTIONGATE_ENTERPRISE_GOVERNANCE_PHASE3_PILOT.md`](../../ACTIONGATE_ENTERPRISE_GOVERNANCE_PHASE3_PILOT.md) §8.
-- Frozen position: [`ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md).
+- Frozen success criteria: [`ACTIONGATE_ENTERPRISE_GOVERNANCE_PHASE3_PILOT.md`](../../actiongate/ACTIONGATE_ENTERPRISE_GOVERNANCE_PHASE3_PILOT.md) §8.
+- Frozen position: [`ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../actiongate/ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md).

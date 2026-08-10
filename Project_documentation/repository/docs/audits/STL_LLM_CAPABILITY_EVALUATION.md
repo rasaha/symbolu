@@ -295,7 +295,7 @@ While not an LLM, STL provides some capabilities that superficially resemble LLM
 ## Related Documents
 
 - [PHONEME_TRANSFORMER_HYBRID_ARCHITECTURE.md](../architecture/PHONEME_TRANSFORMER_HYBRID_ARCHITECTURE.md) - Full STL specification
-- [INTEGRATION_FLOW_E2E.md](./INTEGRATION_FLOW_E2E.md) - End-to-end system flow
+- [INTEGRATION_FLOW_E2E.md](INTEGRATION_FLOW_E2E.md) - End-to-end system flow
 - [tests/integration/stl_rag/test_stl_rag_integration.py](../../tests/integration/stl_rag/test_stl_rag_integration.py) - Integration tests
 
 ---

@@ -2,7 +2,7 @@
 
 **Status:** Phase 1 complete
 **Scope:** consumable software surface only — no runtime integration, no benchmarks
-**Contract:** [`docs/design/ADR-0001`](../../../docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md)
+**Contract:** [`docs/design/ADR-0001`](../../../../repository/docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md)
 **Update ritual (vendored reference):** [`VENDORED_REFERENCE_UPDATE_RITUAL.md`](VENDORED_REFERENCE_UPDATE_RITUAL.md)
 
 ---

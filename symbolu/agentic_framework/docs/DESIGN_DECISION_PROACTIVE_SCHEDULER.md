@@ -296,5 +296,5 @@ print(f"Total executions: {stats['total_executions']}")
 
 ## References
 
-- [MCP Gateway Design Decision](./DESIGN_DECISION_MCP_GATEWAY.md)
+- [MCP Gateway Design Decision](DESIGN_DECISION_MCP_GATEWAY.md)
 - [Sentinel Guide - Proactive Scheduler Section](../AGENTIC_FRAMEWORK_GUIDE.md)

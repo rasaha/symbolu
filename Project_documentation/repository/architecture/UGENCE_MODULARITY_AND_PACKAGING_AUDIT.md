@@ -1,7 +1,7 @@
 # Ugence Modularity & Product-Packaging Audit
 
 > **Terminology update — Ugence Decision Governance (2026-08-01).** Canonical vocabulary per
-> [`docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md).
+> [`docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](../docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md).
 > **Ugence Decision Governance** is the umbrella. The capability referred to below as "Decision
 > Governance" is the **Decision Authority** capability, still implemented under the
 > **`decision_governance`** package (name unchanged this phase). The capability inventory is

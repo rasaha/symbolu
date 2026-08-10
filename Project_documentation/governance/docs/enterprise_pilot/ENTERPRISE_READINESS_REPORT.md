@@ -1,10 +1,10 @@
 # Enterprise Readiness Report
 
 **Status:** Phase-3 readiness self-assessment against the **frozen** architecture
-([`ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md)).
+([`ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../actiongate/ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md)).
 It reports **preparation readiness** — whether the project is ready to *begin* a
 real enterprise validation — not validation results. There are none, and this
-report claims none ([`RESEARCH_BOUNDARY.md`](./RESEARCH_BOUNDARY.md)).
+report claims none ([`RESEARCH_BOUNDARY.md`](RESEARCH_BOUNDARY.md)).
 
 ---
 
@@ -18,13 +18,13 @@ Each part now has a documented answer:
 
 | Question | Answered by |
 |---|---|
-| What must the company provide? | [`ENTERPRISE_PILOT_ONBOARDING_GUIDE.md`](./ENTERPRISE_PILOT_ONBOARDING_GUIDE.md) §3, [`GROUND_TRUTH_PROTOCOL.md`](./GROUND_TRUTH_PROTOCOL.md) |
-| How do we ingest it? | [`SOURCE_ADAPTER_SPECIFICATION.md`](./SOURCE_ADAPTER_SPECIFICATION.md), blank [`templates/`](./templates/) |
-| How do we compare against their controls? | [`BASELINE_COMPARISON_FRAMEWORK.md`](./BASELINE_COMPARISON_FRAMEWORK.md) |
-| How do we measure success? | [`ENTERPRISE_METRICS.md`](./ENTERPRISE_METRICS.md) (definitions; values `TBD`) |
-| How is it operated safely? | [`SHADOW_MODE_OPERATION.md`](./SHADOW_MODE_OPERATION.md) |
-| In what order? | [`REAL_ENTERPRISE_PILOT_CHECKLIST.md`](./REAL_ENTERPRISE_PILOT_CHECKLIST.md) |
-| What must we never claim? | [`RESEARCH_BOUNDARY.md`](./RESEARCH_BOUNDARY.md) |
+| What must the company provide? | [`ENTERPRISE_PILOT_ONBOARDING_GUIDE.md`](ENTERPRISE_PILOT_ONBOARDING_GUIDE.md) §3, [`GROUND_TRUTH_PROTOCOL.md`](GROUND_TRUTH_PROTOCOL.md) |
+| How do we ingest it? | [`SOURCE_ADAPTER_SPECIFICATION.md`](SOURCE_ADAPTER_SPECIFICATION.md), blank [`templates/`](./templates/) |
+| How do we compare against their controls? | [`BASELINE_COMPARISON_FRAMEWORK.md`](BASELINE_COMPARISON_FRAMEWORK.md) |
+| How do we measure success? | [`ENTERPRISE_METRICS.md`](ENTERPRISE_METRICS.md) (definitions; values `TBD`) |
+| How is it operated safely? | [`SHADOW_MODE_OPERATION.md`](SHADOW_MODE_OPERATION.md) |
+| In what order? | [`REAL_ENTERPRISE_PILOT_CHECKLIST.md`](REAL_ENTERPRISE_PILOT_CHECKLIST.md) |
+| What must we never claim? | [`RESEARCH_BOUNDARY.md`](RESEARCH_BOUNDARY.md) |
 
 ## 2. Readiness status by dimension
 
@@ -53,9 +53,9 @@ None of the following exist yet and none can be manufactured:
 5. A real shadow run and metrics computed from it.
 6. Enterprise review of findings against ground truth.
 
-Until all six exist, every metric in [`ENTERPRISE_METRICS.md`](./ENTERPRISE_METRICS.md)
+Until all six exist, every metric in [`ENTERPRISE_METRICS.md`](ENTERPRISE_METRICS.md)
 stays `TBD`, and the frozen success criteria
-([`ACTIONGATE_ENTERPRISE_GOVERNANCE_PHASE3_PILOT.md`](../../ACTIONGATE_ENTERPRISE_GOVERNANCE_PHASE3_PILOT.md) §8)
+([`ACTIONGATE_ENTERPRISE_GOVERNANCE_PHASE3_PILOT.md`](../../actiongate/ACTIONGATE_ENTERPRISE_GOVERNANCE_PHASE3_PILOT.md) §8)
 remain **unmet**.
 
 ## 4. Known risks & open questions (recorded, not resolved)
@@ -63,7 +63,7 @@ remain **unmet**.
 - **Coverage risk:** a real workflow may carry facts or problem classes the frozen
   10 groups / 11 codes cannot express. Handling: record an **architecture-coverage
   gap**; do not silently extend the model
-  ([`REAL_ENTERPRISE_PILOT_CHECKLIST.md`](./REAL_ENTERPRISE_PILOT_CHECKLIST.md) Phase B).
+  ([`REAL_ENTERPRISE_PILOT_CHECKLIST.md`](REAL_ENTERPRISE_PILOT_CHECKLIST.md) Phase B).
 - **Baseline honesty risk:** the enterprise's real controls may already catch most
   net-new. Handling: baseline may only grow; a small net-new result is a valid
   outcome, reported plainly.
@@ -78,7 +78,7 @@ remain **unmet**.
 
 - No production code modified (verified before commit — see §6).
 - Previous research conclusions untouched (stage-1, stage-2, freeze restated
-  verbatim in [`RESEARCH_BOUNDARY.md`](./RESEARCH_BOUNDARY.md) §5).
+  verbatim in [`RESEARCH_BOUNDARY.md`](RESEARCH_BOUNDARY.md) §5).
 - No new capability groups; no new ontology concepts; no new invariants added.
 - No fabricated enterprise data; templates blank; metrics `TBD`.
 - No efficacy/readiness-for-production claim.
@@ -99,12 +99,12 @@ At authoring time the following were checked and recorded in the commit:
 The project is **ready to begin** a real, read-only, shadow-mode enterprise pilot
 using this package as the contract. It is **not** validated and makes **no**
 efficacy claim. The immediate next step is external: secure a partner and one real
-workflow, then execute [`REAL_ENTERPRISE_PILOT_CHECKLIST.md`](./REAL_ENTERPRISE_PILOT_CHECKLIST.md)
+workflow, then execute [`REAL_ENTERPRISE_PILOT_CHECKLIST.md`](REAL_ENTERPRISE_PILOT_CHECKLIST.md)
 from Phase A.
 
 ## 8. Cross-references
 
 - All package documents (see §1 table).
-- Frozen position: [`ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md).
-- Synthetic pilot & non-claims: [`ACTIONGATE_ENTERPRISE_GOVERNANCE_PHASE3_PILOT.md`](../../ACTIONGATE_ENTERPRISE_GOVERNANCE_PHASE3_PILOT.md).
+- Frozen position: [`ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../actiongate/ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md).
+- Synthetic pilot & non-claims: [`ACTIONGATE_ENTERPRISE_GOVERNANCE_PHASE3_PILOT.md`](../../actiongate/ACTIONGATE_ENTERPRISE_GOVERNANCE_PHASE3_PILOT.md).
 - Neutral model code: `agentic/enterprise_governance/`.

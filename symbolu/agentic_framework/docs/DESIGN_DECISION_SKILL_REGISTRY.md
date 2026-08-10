@@ -242,5 +242,5 @@ registry.unregister("backup-tools")
 ## References
 
 - [SafetyContract Design](./safety_contract.py)
-- [MCP Gateway Design Decision](./DESIGN_DECISION_MCP_GATEWAY.md)
+- [MCP Gateway Design Decision](DESIGN_DECISION_MCP_GATEWAY.md)
 - [ChatGPT Feature Assessment](./FEATURE_ASSESSMENT_CHATGPT.md)

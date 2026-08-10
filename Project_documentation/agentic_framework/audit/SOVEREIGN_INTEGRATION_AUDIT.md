@@ -3,7 +3,7 @@
 > **Status:** This pre-integration audit has been **superseded** by the
 > completed S1–S4 integration. The recommendations in this document were
 > used to guide the implementation. For the current architecture, see
-> [`agentic/AGENTIC_ARCHITECTURE.md`](agentic/AGENTIC_ARCHITECTURE.md).
+> [`agentic/AGENTIC_ARCHITECTURE.md`](../agentic/AGENTIC_ARCHITECTURE.md).
 
 **Date:** 2026-04-04
 **Scope:** Every `.py` file in `agentic/sovereign/` (29 files)

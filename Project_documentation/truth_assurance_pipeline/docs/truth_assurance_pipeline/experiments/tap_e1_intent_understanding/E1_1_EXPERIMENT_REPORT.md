@@ -14,7 +14,7 @@
 Code: [`truth_assurance_pipeline/tap_e1_1_realmodel/`](../../../../truth_assurance_pipeline/tap_e1_1_realmodel/)
 · Results: [`experiments/results_v11.json`](../../../../truth_assurance_pipeline/tap_e1_1_realmodel/experiments/results_v11.json)
 · Prereg: [`experiments/preregistration_v11.json`](../../../../truth_assurance_pipeline/tap_e1_1_realmodel/experiments/preregistration_v11.json)
-· Companions: [comparison](./E1_1_COMPARISON.md) · [latency](./E1_1_LATENCY_REPORT.md) · [failure analysis](./E1_1_FAILURE_ANALYSIS.md) · [leakage audit](./E1_1_LEAKAGE_AUDIT.md) · [metric audit](./E1_1_METRIC_AUDIT.md)
+· Companions: [comparison](E1_1_COMPARISON.md) · [latency](E1_1_LATENCY_REPORT.md) · [failure analysis](E1_1_FAILURE_ANALYSIS.md) · [leakage audit](E1_1_LEAKAGE_AUDIT.md) · [metric audit](E1_1_METRIC_AUDIT.md)
 
 ---
 
@@ -88,7 +88,7 @@ distinct notions must not be conflated:
 - **Locked / hidden from the scoring infrastructure and development decisions.** ✅ Gold
   labels are withheld by the loader; the eval inputs are content-hash locked; config
   selection used the dev split only; no interpreter/corpus change was made in response
-  to eval scores. This is genuinely enforced (see the [leakage audit](./E1_1_LEAKAGE_AUDIT.md)).
+  to eval scores. This is genuinely enforced (see the [leakage audit](E1_1_LEAKAGE_AUDIT.md)).
 - **Hidden from the interpreter.** ❌ The in-session model generated interpretations for
   the eval cases, so the eval was **seen by the interpreter**. This was **not** a
   double-blind or interpreter-blind evaluation.
@@ -114,7 +114,7 @@ surfaced that TAP-E1's `invented_action` metric false-positives on benign paraph
 flaw **also visible on the dev split** (4 dev cases). It was corrected
 (paraphrase-invariant) together with a material-ambiguity crediting fix, both applied
 **uniformly** to every baseline and to the deterministic interpreter, localized in
-`metrics_e11.py` (TAP-E1's `metrics.py` untouched). See the [metric audit](./E1_1_METRIC_AUDIT.md).
+`metrics_e11.py` (TAP-E1's `metrics.py` untouched). See the [metric audit](E1_1_METRIC_AUDIT.md).
 
 ## 8. Configuration selection (dev only)
 

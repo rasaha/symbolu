@@ -127,7 +127,7 @@ Transforms autonomous execution from a liability into a differentiated feature.
 ## References
 
 - [Sentinel Guide](../AGENTIC_FRAMEWORK_GUIDE.md)
-- [Test Results](./TEST_RESULTS.md)
-- [MCP Gateway Design](./DESIGN_DECISION_MCP_GATEWAY.md)
-- [Proactive Scheduler Design](./DESIGN_DECISION_PROACTIVE_SCHEDULER.md)
-- [Skill Registry Plan](./DESIGN_DECISION_SKILL_REGISTRY.md)
+- [Test Results](TEST_RESULTS.md)
+- [MCP Gateway Design](DESIGN_DECISION_MCP_GATEWAY.md)
+- [Proactive Scheduler Design](DESIGN_DECISION_PROACTIVE_SCHEDULER.md)
+- [Skill Registry Plan](DESIGN_DECISION_SKILL_REGISTRY.md)

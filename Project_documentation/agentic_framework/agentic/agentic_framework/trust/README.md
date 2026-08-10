@@ -2,7 +2,7 @@
 
 The explicit, typed formalization of the Agentic Framework's **proven** governance
 signals. It is the product realization of
-[`AGENTIC_FRAMEWORK_TRUST_OBSERVABLE_ARCHITECTURE.md`](../../../AGENTIC_FRAMEWORK_TRUST_OBSERVABLE_ARCHITECTURE.md),
+[`AGENTIC_FRAMEWORK_TRUST_OBSERVABLE_ARCHITECTURE.md`](../../../root_brief/AGENTIC_FRAMEWORK_TRUST_OBSERVABLE_ARCHITECTURE.md),
 Phase 1. It adds **no new ML** and **no CG research features** — it wraps and structures
 logic the gateway already runs, and makes the trust decision auditable.
 

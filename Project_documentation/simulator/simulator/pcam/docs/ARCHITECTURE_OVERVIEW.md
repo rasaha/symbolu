@@ -111,7 +111,7 @@ That sentence is the claim every other PCAM document is allowed to make. Any str
 
 | Artifact | What it is | Location |
 |---|---|---|
-| ADR-0001 | The contract that declares CTM+ the spec and forbids a bridge | [`docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md`](../../../docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md) |
+| ADR-0001 | The contract that declares CTM+ the spec and forbids a bridge | [`docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md`](../../../../repository/docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md) |
 | Upstream reference | The CTM+ source file (the spec itself) | `CTM_plus/KVPolicy/kv_policy/attention_evictor.py` |
 | Vendored reference | Pinned in-tree copy of the spec, with commit-hash header | [`../reference/attention_evictor_vendored.py`](../reference/attention_evictor_vendored.py) |
 | Update ritual | Six-step procedure for bumping the vendored reference | [`VENDORED_REFERENCE_UPDATE_RITUAL.md`](VENDORED_REFERENCE_UPDATE_RITUAL.md) |
@@ -122,8 +122,8 @@ That sentence is the claim every other PCAM document is allowed to make. Any str
 | Phase 3 benchmarks | Replay scripts, baseline comparison | [`PHASE3_BENCHMARKS.md`](PHASE3_BENCHMARKS.md) |
 | Phase 4 real-runtime (shadow) | vLLM bridge, HuggingFace trace extractor | [`PHASE4_REAL_RUNTIME.md`](PHASE4_REAL_RUNTIME.md) |
 | Phase 5 active mode | Monkey-patch installer, perf harness | [`PHASE5_ACTIVE_MODE.md`](PHASE5_ACTIVE_MODE.md) |
-| Phase 5 benchmark report | Acquisition-facing summary with the active-mode status | [`../../../benchmarks/PCAM_PHASE5_REPORT.md`](../../../benchmarks/PCAM_PHASE5_REPORT.md) |
-| Closure run log | Live-run runbooks + dated attempts for Phase 2.5 / 4 / 5 closures | [`../../../benchmarks/PHASE4_CLOSURE_RUN_LOG.md`](../../../benchmarks/PHASE4_CLOSURE_RUN_LOG.md) |
+| Phase 5 benchmark report | Acquisition-facing summary with the active-mode status | [`../../../benchmarks/PCAM_PHASE5_REPORT.md`](../../../../repository/benchmarks/PCAM_PHASE5_REPORT.md) |
+| Closure run log | Live-run runbooks + dated attempts for Phase 2.5 / 4 / 5 closures | [`../../../benchmarks/PHASE4_CLOSURE_RUN_LOG.md`](../../../../repository/benchmarks/PHASE4_CLOSURE_RUN_LOG.md) |
 | FSCS signal tests (Stage 1-3) | 36 tests covering boundary, band class, instability signals | [`../tests/test_boundary_signal.py`](../tests/test_boundary_signal.py), [`../tests/test_band_class_signal.py`](../tests/test_band_class_signal.py), [`../tests/test_instability_signal.py`](../tests/test_instability_signal.py) |
 | Annotated trace capture | Captures FSCS-derived signals from Mistral-7B into a replayable trace | [`../../../benchmarks/pcam_fscs_trace_capture.py`](../../../benchmarks/pcam_fscs_trace_capture.py) |
 | Baseline vs enhanced replay | Compares eviction decisions with signals on vs off | [`../../../benchmarks/pcam_fscs_replay_compare.py`](../../../benchmarks/pcam_fscs_replay_compare.py) |

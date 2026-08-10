@@ -2,7 +2,7 @@
 
 **Status:** design + reference implementation for an **advisory** evidence
 producer that plugs into the deterministic Action Gate
-([`ACTION_GATE_SPECIFICATION.md`](../../../../../cyber_security/ACTION_GATE_SPECIFICATION.md)).
+([`ACTION_GATE_SPECIFICATION.md`](../../../../../Project_documentation/action_gate_cyber/cyber_security/ACTION_GATE_SPECIFICATION.md)).
 
 > **Product statement.** ActionGate controls individual actions; the sequence-risk
 > analyzer detects when individually acceptable actions collectively assemble a
@@ -35,7 +35,7 @@ obtain a credential, reach protected data, open an outbound path — can assembl
 data-exfiltration capability that no single action reveals.
 
 The Action Gate reserves `correlation_id` / `sequence_id` "for structuring
-detection" ([spec §2](../../../../../cyber_security/ACTION_GATE_SPECIFICATION.md), fields 23–24). This analyzer
+detection" ([spec §2](../../../../../Project_documentation/action_gate_cyber/cyber_security/ACTION_GATE_SPECIFICATION.md), fields 23–24). This analyzer
 is that layer — but it does **not** use `correlation_id` as the sole grouping key
 (§4).
 
@@ -46,7 +46,7 @@ is that layer — but it does **not** use `correlation_id` as the sole grouping 
 The analyzer's output alphabet is exactly **`OBSERVE`**, **`ESCALATE`**, and
 **`UNAVAILABLE`**. It **MUST NOT** emit `ALLOW`, `AUTHORIZE`, `DENY`, `BLOCK`, or
 `EXECUTE`. It is behavioral evidence in the sense of
-[Action Gate §3](../../../../../cyber_security/ACTION_GATE_SPECIFICATION.md) — *ADVISORY, OPTIONAL* — governed
+[Action Gate §3](../../../../../Project_documentation/action_gate_cyber/cyber_security/ACTION_GATE_SPECIFICATION.md) — *ADVISORY, OPTIONAL* — governed
 by the **non-compensatory** invariant: it may only move a decision toward *more*
 assurance.
 
@@ -105,7 +105,7 @@ are always tenant-scoped, cross-tenant linkage is impossible by construction.
 Shipped specs: `by_actor`, `by_case`, `by_target`, `by_actor_target`, and
 `by_correlation` (legacy/synthetic only — §4 forbids correlation as the sole
 *default* boundary). Schema: `ctd.linkage/1.0.0` (see
-[`LINKAGE_SCHEMA.md`](./LINKAGE_SCHEMA.md)).
+[`LINKAGE_SCHEMA.md`](LINKAGE_SCHEMA.md)).
 
 ---
 
@@ -132,7 +132,7 @@ temporal `max_assembly_gap` / pair gaps; actor scope (ANY / SAME / MULTI);
 resource scope; completion / escalation / observe thresholds; required
 corroboration and minimum-optional counts; benign-use exclusions; severity;
 recommended (advisory) consequence; and a concise explanation template. Schema:
-[`RECIPE_SCHEMA.md`](./RECIPE_SCHEMA.md).
+[`RECIPE_SCHEMA.md`](RECIPE_SCHEMA.md).
 
 ---
 

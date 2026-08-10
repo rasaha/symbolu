@@ -8,7 +8,7 @@ framework but are not part of the curated contract API.
 
 Every symbol below is ``PUBLIC_STABLE`` and matches, field-for-field and
 enum-for-enum, the frozen ``governance_providers`` contract surface it was
-extracted from (see docs/migrations/governance_contracts/PUBLIC_API_INVENTORY.md).
+extracted from (see Project_documentation/repository/docs/migrations/governance_contracts/PUBLIC_API_INVENTORY.md).
 """
 
 from __future__ import annotations

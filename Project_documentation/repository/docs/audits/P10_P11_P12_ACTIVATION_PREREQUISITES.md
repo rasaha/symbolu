@@ -253,8 +253,8 @@ the Chitta-Vṛtti → Presentation Layer pipeline, enabling P12 to perform usef
 
 ## Related Documents
 
-- [PHASE_ARCHITECTURE_AUDIT_REPORT.md](./PHASE_ARCHITECTURE_AUDIT_REPORT.md) - Overall phase architecture
-- [P34_P37_SPECIFICATION.md](./P34_P37_SPECIFICATION.md) - P34/P37 implementation spec
+- [PHASE_ARCHITECTURE_AUDIT_REPORT.md](PHASE_ARCHITECTURE_AUDIT_REPORT.md) - Overall phase architecture
+- [P34_P37_SPECIFICATION.md](P34_P37_SPECIFICATION.md) - P34/P37 implementation spec
 - [PHASE_STATUS.yaml](../../symbolu/mechanical/pipeline/PHASE_STATUS.yaml) - Current phase activation status
 
 ---

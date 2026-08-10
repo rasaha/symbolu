@@ -35,10 +35,10 @@ docs in the module root for examples.
    The feature's public symbols are added to `_api.PROVISIONAL_API`
    (or `_api.STABLE_API` if graduating); the count is updated in
    `tests/test_api_stability.py::EXPECTED_PROVISIONAL_COUNT`; the
-   relevant row in [`INDUSTRY_FEATURES_ROADMAP.md`](./INDUSTRY_FEATURES_ROADMAP.md)
+   relevant row in [`INDUSTRY_FEATURES_ROADMAP.md`](INDUSTRY_FEATURES_ROADMAP.md)
    is struck through with a pointer to the design doc; the
    evidence row is appended to
-   [`AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md`](../../AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md).
+   [`AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md`](../../root_brief/AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md).
 
 After step 6 the change is **independently audited** (the audit pass
 runs by a different reviewer than the author, against the design
@@ -46,7 +46,7 @@ doc, looking for regressions and security issues) before merge.
 
 ## §2 API stability
 
-See [`API_STABILITY.md`](./API_STABILITY.md). The short version:
+See [`API_STABILITY.md`](API_STABILITY.md). The short version:
 
 - **Stable** (`_api.STABLE_API`): a symbol's signature does not
   change in a backwards-incompatible way without a deprecation

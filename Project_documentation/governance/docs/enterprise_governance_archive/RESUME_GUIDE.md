@@ -4,21 +4,21 @@
 is **frozen** and research-complete pending real enterprise validation; resuming
 means starting the **real pilot**, not more synthetic work. Cross-references the
 frozen architecture
-([`../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md)).
+([`../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../actiongate/ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md)).
 
 ---
 
 ## 0. Read these first (in order)
 
-1. [`../../FINAL_PROJECT_STATUS.md`](../../FINAL_PROJECT_STATUS.md) — where the track
+1. [`../../FINAL_PROJECT_STATUS.md`](../../../repository/status/FINAL_PROJECT_STATUS.md) — where the track
    stands.
 2. [`../enterprise_pilot/RESEARCH_BOUNDARY.md`](../enterprise_pilot/RESEARCH_BOUNDARY.md)
    — what may and may not be claimed. **Non-negotiable.**
-3. [`../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md)
-   and [`ARCHITECTURE_FREEZE.md`](./ARCHITECTURE_FREEZE.md) — what is frozen and the
+3. [`../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../actiongate/ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md)
+   and [`ARCHITECTURE_FREEZE.md`](ARCHITECTURE_FREEZE.md) — what is frozen and the
    bar to change it.
-4. [`FINAL_CONCLUSIONS.md`](./FINAL_CONCLUSIONS.md) and
-   [`KNOWN_LIMITATIONS.md`](./KNOWN_LIMITATIONS.md) — what is / isn't established.
+4. [`FINAL_CONCLUSIONS.md`](FINAL_CONCLUSIONS.md) and
+   [`KNOWN_LIMITATIONS.md`](KNOWN_LIMITATIONS.md) — what is / isn't established.
 5. [`../enterprise_pilot/REAL_ENTERPRISE_PILOT_CHECKLIST.md`](../enterprise_pilot/REAL_ENTERPRISE_PILOT_CHECKLIST.md)
    — the operational runbook.
 
@@ -73,7 +73,7 @@ already; low, explainable false positives; shared invariants reused across multi
 real workflows; clear authority provenance; actionable cross-vertical dependencies;
 measurable reconciliation/audit improvement; and at least one preventive finding
 before an invalid execution
-([`../../ACTIONGATE_ENTERPRISE_GOVERNANCE_PHASE3_PILOT.md`](../../ACTIONGATE_ENTERPRISE_GOVERNANCE_PHASE3_PILOT.md) §8).
+([`../../ACTIONGATE_ENTERPRISE_GOVERNANCE_PHASE3_PILOT.md`](../../actiongate/ACTIONGATE_ENTERPRISE_GOVERNANCE_PHASE3_PILOT.md) §8).
 
 ## 6. Stop conditions
 
@@ -111,10 +111,10 @@ inventory, labeling) dominate the timeline.
 - Do not wire ActionGate to an enterprise write path before validated data.
 - Do not make any efficacy/ROI/readiness claim from a single pilot.
 - Do not reopen a frozen decision without new real-data evidence
-  ([`ARCHITECTURE_FREEZE.md`](./ARCHITECTURE_FREEZE.md) §3).
+  ([`ARCHITECTURE_FREEZE.md`](ARCHITECTURE_FREEZE.md) §3).
 
 ## 9. Cross-references
 
 - Readiness package: [`../enterprise_pilot/`](../enterprise_pilot/)
-- Future work: [`FUTURE_WORK.md`](./FUTURE_WORK.md)
-- Repository index: [`REPOSITORY_INDEX.md`](./REPOSITORY_INDEX.md)
+- Future work: [`FUTURE_WORK.md`](FUTURE_WORK.md)
+- Repository index: [`REPOSITORY_INDEX.md`](REPOSITORY_INDEX.md)

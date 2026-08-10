@@ -6,7 +6,7 @@
 > `MISSING` when the source does not carry the fact — never invent a value.
 >
 > Maps onto the **frozen** architecture
-> ([`ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md));
+> ([`ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../../actiongate/ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md));
 > field meanings in [`SOURCE_ADAPTER_SPECIFICATION.md`](../SOURCE_ADAPTER_SPECIFICATION.md).
 
 ## 0. Header

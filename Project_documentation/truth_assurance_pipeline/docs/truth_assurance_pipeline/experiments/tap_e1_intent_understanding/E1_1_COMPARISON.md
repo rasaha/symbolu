@@ -8,7 +8,7 @@ with the frozen TAP-E1 layers; "DET" = the frozen TAP-E1 deterministic interpret
 > authored the corpus and produced the LLM interpretations (author==interpreter
 > confound), and the locked eval was **seen by the interpreter** (not double-blind).
 > This is architectural-integration evidence, not independent model validation. See the
-> [experiment report](./E1_1_EXPERIMENT_REPORT.md) §2 and §5.
+> [experiment report](E1_1_EXPERIMENT_REPORT.md) §2 and §5.
 
 ## Locked eval (24) — scoring-frozen, seen by the interpreter
 

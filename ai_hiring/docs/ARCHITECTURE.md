@@ -2,7 +2,7 @@
 
 This document describes the *implemented* foundation. It is deliberately narrow:
 the broader framework (scoring, fairness, governance surfaces) is specified in
-[`../../docs/design/AI_ASSISTED_HIRING_FRAMEWORK_DESIGN.md`](../../docs/design/AI_ASSISTED_HIRING_FRAMEWORK_DESIGN.md)
+[`../../docs/design/AI_ASSISTED_HIRING_FRAMEWORK_DESIGN.md`](../../Project_documentation/repository/docs/design/AI_ASSISTED_HIRING_FRAMEWORK_DESIGN.md)
 but not built in this phase.
 
 ## Layering

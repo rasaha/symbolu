@@ -19,7 +19,7 @@ Diagnostic signals and their adaptive responses::
     │ Component norm ratio │ > 3.0         │ Apply per-component norm     │
     └──────────────────────┴───────────────┴──────────────────────────────┘
 
-Reference: docs/design/CONSCIOUS_GENERATION_DESIGN.md, Appendix F §F.10.6.2
+Reference: Project_documentation/repository/docs/design/CONSCIOUS_GENERATION_DESIGN.md, Appendix F §F.10.6.2
 
 Author: Sovereign-1 Training Initiative
 Date: March 2026

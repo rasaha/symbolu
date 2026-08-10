@@ -1,7 +1,7 @@
 # Baseline Comparison Framework
 
 **Status:** Phase-3 readiness documentation against the **frozen** architecture
-([`ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md)).
+([`ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../actiongate/ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md)).
 This defines how a pilot finding is judged **net-new versus the enterprise's own
 existing controls**, so we never claim credit for something they already catch. No
 enterprise data or results appear here.
@@ -18,8 +18,8 @@ the enterprise actually runs*.
 
 We make **no** claim here that net-new findings are correct or valuable — that is
 established (or not) later against ground truth
-([`GROUND_TRUTH_PROTOCOL.md`](./GROUND_TRUTH_PROTOCOL.md)) and metrics
-([`ENTERPRISE_METRICS.md`](./ENTERPRISE_METRICS.md)). Net-new only means *not
+([`GROUND_TRUTH_PROTOCOL.md`](GROUND_TRUTH_PROTOCOL.md)) and metrics
+([`ENTERPRISE_METRICS.md`](ENTERPRISE_METRICS.md)). Net-new only means *not
 already covered*.
 
 ## 2. The frozen mechanism
@@ -112,13 +112,13 @@ against the **modeled** baseline (discount 9 net-new, IAM 5 net-new). Those numb
 describe the fixtures, not any enterprise, and are **not** transferable. A real
 pilot recomputes net-new from scratch against the enterprise's real baseline set.
 See the non-claims in
-[`ACTIONGATE_ENTERPRISE_GOVERNANCE_PHASE3_PILOT.md`](../../ACTIONGATE_ENTERPRISE_GOVERNANCE_PHASE3_PILOT.md) §10.
+[`ACTIONGATE_ENTERPRISE_GOVERNANCE_PHASE3_PILOT.md`](../../actiongate/ACTIONGATE_ENTERPRISE_GOVERNANCE_PHASE3_PILOT.md) §10.
 
 ## 7. Cross-references
 
 - Net-new computation: `agentic/enterprise_governance/shadow.py`,
   `agentic/enterprise_governance/baseline.py`.
 - Failure-code vocabulary: `agentic/enterprise_governance/invariants.py`.
-- Labels feeding the grades: [`GROUND_TRUTH_PROTOCOL.md`](./GROUND_TRUTH_PROTOCOL.md).
-- Metric definitions: [`ENTERPRISE_METRICS.md`](./ENTERPRISE_METRICS.md).
-- Frozen position: [`ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md).
+- Labels feeding the grades: [`GROUND_TRUTH_PROTOCOL.md`](GROUND_TRUTH_PROTOCOL.md).
+- Metric definitions: [`ENTERPRISE_METRICS.md`](ENTERPRISE_METRICS.md).
+- Frozen position: [`ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../actiongate/ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md).

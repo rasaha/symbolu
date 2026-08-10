@@ -21,9 +21,9 @@ SOURCES = [
     ("execution_gate/policy.py", "model_policy"),
     ("execution_gate/harness.py", "metric_definitions_and_simulator"),
     ("execution_gate/results/evaluation.json", "evaluation_output"),
-    ("docs/execution_eligibility/EXECUTION_ELIGIBILITY_EVALUATION_PROTOCOL.md", "evaluation_protocol"),
-    ("docs/execution_eligibility/EVALUATION_REPORT.md", "evaluation_report"),
-    ("docs/execution_eligibility/LIMITATIONS_AND_FALSIFICATION.md", "limitations_and_falsification"),
+    ("Project_documentation/governance/docs/execution_eligibility/EXECUTION_ELIGIBILITY_EVALUATION_PROTOCOL.md", "evaluation_protocol"),
+    ("Project_documentation/governance/docs/execution_eligibility/EVALUATION_REPORT.md", "evaluation_report"),
+    ("Project_documentation/governance/docs/execution_eligibility/LIMITATIONS_AND_FALSIFICATION.md", "limitations_and_falsification"),
 ]
 
 

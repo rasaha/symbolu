@@ -83,7 +83,7 @@ class HuggingFaceSource:
             raise RuntimeError(
                 "HuggingFaceSource requires `torch` and `transformers`. "
                 "Install them or use MockSource for testing. "
-                "See docs/design/BCVF_LLM_TRUST_ROUTING_DESIGN.md §4.4."
+                "See Project_documentation/repository/docs/design/BCVF_LLM_TRUST_ROUTING_DESIGN.md §4.4."
             ) from exc
 
         if L < 3:

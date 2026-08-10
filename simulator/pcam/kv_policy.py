@@ -14,7 +14,7 @@ this parity on every commit.
 
 Contract
 --------
-- **ADR:** ``docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md``
+- **ADR:** ``Project_documentation/repository/docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md``
   locks the four-signal phase-aware scoring model and the Count-Min
   frequency sketch as canonical. Any behavioral change must land in the
   ADR first.
@@ -85,7 +85,7 @@ from typing import Any, Dict, List, Optional, Set
 # ``PositionClass`` are re-exported from the vendored copy, which
 # is a bit-parity snapshot of the upstream reference per ADR-0001.
 #
-# Update ritual: simulator/pcam/docs/VENDORED_REFERENCE_UPDATE_RITUAL.md
+# Update ritual: Project_documentation/simulator/simulator/pcam/docs/VENDORED_REFERENCE_UPDATE_RITUAL.md
 # ---------------------------------------------------------------------------
 from .reference.attention_evictor_vendored import (
     InferencePhase,
@@ -136,7 +136,7 @@ __all__ = [
 # FrequencySketch — ported from the canonical CTM+ reference.
 #
 # Source: CTM_plus/KVPolicy/kv_policy/attention_evictor.py:69-112
-# Contract: docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md
+# Contract: Project_documentation/repository/docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md
 #
 # Any intentional divergence from the reference is a contract change and
 # must be reflected in the ADR first. The conformance harness at
@@ -323,7 +323,7 @@ def classify_block_importance(
 # KVCachePolicy — ported from the canonical CTM+ reference.
 #
 # Source: CTM_plus/KVPolicy/kv_policy/attention_evictor.py:180-505
-# Contract: docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md
+# Contract: Project_documentation/repository/docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md
 # Harness:  simulator/pcam/tests/test_attention_evictor_parity.py
 #
 # The reference is the oracle. Any intentional behavioral divergence from

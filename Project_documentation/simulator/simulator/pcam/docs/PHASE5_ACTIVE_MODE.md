@@ -2,7 +2,7 @@
 
 **Status:** Active-mode bridge landed, tested end-to-end against a mocked `FreeKVCacheBlockQueue`, and ready to run against real vLLM. Real serving metrics require a GPU machine with vLLM installed and are not yet executed.
 **Scope:** active-mode vLLM integration, version-compatibility feature detection, real throughput/latency harness.
-**Contract:** [`docs/design/ADR-0001`](../../../docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md)
+**Contract:** [`docs/design/ADR-0001`](../../../../repository/docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md)
 **Depends on:** Phase 0–4 (vendored reference, public API, integration surface, replay infrastructure, shadow-mode bridge).
 
 ---

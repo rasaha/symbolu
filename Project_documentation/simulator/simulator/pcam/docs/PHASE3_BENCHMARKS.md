@@ -2,7 +2,7 @@
 
 **Status:** Phase 3 complete for replay-only measurement. Real-runtime execution remains pending.
 **Scope:** trace replay benchmark, baseline comparison, vLLM-facing demo, shared reporting helper.
-**Contract:** [`docs/design/ADR-0001`](../../../docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md)
+**Contract:** [`docs/design/ADR-0001`](../../../../repository/docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md)
 **Depends on:** Phase 0 (vendored reference), Phase 1 (public API), Phase 2 (vLLM adapter + trace replay primitive)
 
 ---

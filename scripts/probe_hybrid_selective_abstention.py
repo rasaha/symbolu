@@ -8,7 +8,7 @@ winning-source's semantic-entropy scalar, runs a §15-style
 abstention sweep + bootstrap, and emits a §15.3 verdict per
 the 1D Delta_kappa cascade pinned in §15.3 Chunk 3g.
 
-Reference design: docs/design/BCVF_LLM_TRUST_ROUTING_DESIGN.md
+Reference design: Project_documentation/repository/docs/design/BCVF_LLM_TRUST_ROUTING_DESIGN.md
 §15.3 Chunks 3a-3i.
 
 Discipline: all pinned constants, the cascade, the demotion

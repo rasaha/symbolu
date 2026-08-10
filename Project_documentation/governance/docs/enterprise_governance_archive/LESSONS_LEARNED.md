@@ -1,7 +1,7 @@
 # Lessons Learned — Enterprise Governance Track
 
 **Status:** Archival record. Cross-references the frozen architecture
-([`../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md)).
+([`../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../actiongate/ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md)).
 Descriptive, not prescriptive-for-production; no efficacy claims.
 
 ---
@@ -80,6 +80,6 @@ Descriptive, not prescriptive-for-production; no efficacy claims.
 
 ## Cross-references
 
-- Conclusions: [`FINAL_CONCLUSIONS.md`](./FINAL_CONCLUSIONS.md)
-- Decisions and their evidence: [`DECISION_LOG.md`](./DECISION_LOG.md)
-- Limitations: [`KNOWN_LIMITATIONS.md`](./KNOWN_LIMITATIONS.md)
+- Conclusions: [`FINAL_CONCLUSIONS.md`](FINAL_CONCLUSIONS.md)
+- Decisions and their evidence: [`DECISION_LOG.md`](DECISION_LOG.md)
+- Limitations: [`KNOWN_LIMITATIONS.md`](KNOWN_LIMITATIONS.md)

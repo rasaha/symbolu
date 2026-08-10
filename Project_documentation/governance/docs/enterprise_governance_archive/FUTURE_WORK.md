@@ -1,8 +1,8 @@
 # Future Work — Enterprise Governance Track
 
 **Status:** Archival record. Cross-references the frozen architecture
-([`../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md))
-and [`ARCHITECTURE_FREEZE.md`](./ARCHITECTURE_FREEZE.md). Nothing here reopens a
+([`../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../actiongate/ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md))
+and [`ARCHITECTURE_FREEZE.md`](ARCHITECTURE_FREEZE.md). Nothing here reopens a
 frozen decision.
 
 ---
@@ -20,7 +20,7 @@ current work does not already provide.
 
 Every open question below needs **real operational data** and cannot be answered
 synthetically. These are the questions a real pilot exists to resolve (see
-[`RESUME_GUIDE.md`](./RESUME_GUIDE.md) and
+[`RESUME_GUIDE.md`](RESUME_GUIDE.md) and
 [`../enterprise_pilot/REAL_ENTERPRISE_PILOT_CHECKLIST.md`](../enterprise_pilot/REAL_ENTERPRISE_PILOT_CHECKLIST.md)):
 
 1. **Precision on real workflows** — of the findings emitted, how many correspond
@@ -75,6 +75,6 @@ pilot first establishes baseline value; otherwise they are premature.
 
 ## Cross-references
 
-- Freeze scope and change bar: [`ARCHITECTURE_FREEZE.md`](./ARCHITECTURE_FREEZE.md)
-- How to resume: [`RESUME_GUIDE.md`](./RESUME_GUIDE.md)
+- Freeze scope and change bar: [`ARCHITECTURE_FREEZE.md`](ARCHITECTURE_FREEZE.md)
+- How to resume: [`RESUME_GUIDE.md`](RESUME_GUIDE.md)
 - Metric definitions (all `TBD`): [`../enterprise_pilot/ENTERPRISE_METRICS.md`](../enterprise_pilot/ENTERPRISE_METRICS.md)

@@ -4,18 +4,18 @@ Canonical index for all StoryGraph-owned documentation. StoryGraph is an
 **advisory** sequence-risk analyzer (package `ugence_storygraph`, distribution
 `ugence-storygraph`). Every StoryGraph-owned document is reachable from here; the
 per-document ownership + wheel-shipping table is in
-[`DOCUMENT_OWNERSHIP.md`](./DOCUMENT_OWNERSHIP.md).
+[`DOCUMENT_OWNERSHIP.md`](DOCUMENT_OWNERSHIP.md).
 
 ## Canonical reading order
 
-1. **Overview** — [`architecture/CAPABILITY_OVERVIEW.md`](./architecture/CAPABILITY_OVERVIEW.md) and the package [`../README.md`](../README.md)
+1. **Overview** — [`architecture/CAPABILITY_OVERVIEW.md`](architecture/CAPABILITY_OVERVIEW.md) and the package [`../README.md`](../README.md)
 2. **Current specification** — [`architecture/`](./architecture/)
-3. **Public API** — [`api/README.md`](./api/README.md)
+3. **Public API** — [`api/README.md`](api/README.md)
 4. **Policy Packs** — [`policy-packs/`](./policy-packs/)
 5. **Replay** — [`replay/`](./replay/)
 6. **Validation** — [`validation/`](./validation/)
 7. **Evaluation & historical evidence** — [`evaluation/`](./evaluation/)
-8. **Limitations** — [`limitations/KNOWN_LIMITATIONS.md`](./limitations/KNOWN_LIMITATIONS.md)
+8. **Limitations** — [`limitations/KNOWN_LIMITATIONS.md`](limitations/KNOWN_LIMITATIONS.md)
 
 ## Categories
 
@@ -53,7 +53,7 @@ with `LINKAGE_SCHEMA.md` and `RECIPE_SCHEMA.md` for the data model.
 
 - **Ships (runtime):** the package README, JSON schemas, Policy Pack fixtures,
   replay-intake schema/templates, and the `examples/`. See
-  [`DOCUMENT_OWNERSHIP.md`](./DOCUMENT_OWNERSHIP.md) for the exact list, proven by
+  [`DOCUMENT_OWNERSHIP.md`](DOCUMENT_OWNERSHIP.md) for the exact list, proven by
   `../verify_storygraph_distribution.py`.
 - **Repository-only (not shipped):** everything under `docs/` (architecture,
   evaluation, validation, historical evidence, limitations), and the repo-level

@@ -6,7 +6,7 @@ Reference:
   Retain the Power of Hallucination Detection." ICLR 2024.
   (EigenScore as the per-position scalar.)
 
-  symbolu_robotics/bcvf_autonomous/DESIGN.md §6.1 / §6.7 — the
+  Project_documentation/autonomous_robotics/symbolu_robotics/bcvf_autonomous/DESIGN.md §6.1 / §6.7 — the
   autonomy-domain BCVF observable `S3_map_error_accel` peak that
   passed validation, motivating the 2nd-difference operator applied
   here.

@@ -12,7 +12,7 @@ documents.
 
 The full archival package lives in
 [`docs/enterprise_governance_archive/`](docs/enterprise_governance_archive/). This
-page is the entry point; read [`RESUME_GUIDE.md`](docs/enterprise_governance_archive/RESUME_GUIDE.md)
+page is the entry point; read [`RESUME_GUIDE.md`](../../governance/docs/enterprise_governance_archive/RESUME_GUIDE.md)
 first if you are resuming the work later.
 
 ---
@@ -87,8 +87,8 @@ schema.
 | Operational effectiveness | **UNKNOWN** |
 
 Detail behind each classification is in
-[`FINAL_CONCLUSIONS.md`](docs/enterprise_governance_archive/FINAL_CONCLUSIONS.md)
-and [`KNOWN_LIMITATIONS.md`](docs/enterprise_governance_archive/KNOWN_LIMITATIONS.md).
+[`FINAL_CONCLUSIONS.md`](../../governance/docs/enterprise_governance_archive/FINAL_CONCLUSIONS.md)
+and [`KNOWN_LIMITATIONS.md`](../../governance/docs/enterprise_governance_archive/KNOWN_LIMITATIONS.md).
 
 ## 3. Final recommendation
 
@@ -96,25 +96,25 @@ and [`KNOWN_LIMITATIONS.md`](docs/enterprise_governance_archive/KNOWN_LIMITATION
 available.** No further research, architecture, ontology, or synthetic-experiment
 work should be performed on this track. The next step is external: secure a real
 enterprise partner and one real cross-vertical workflow, then execute the pilot
-per [`RESUME_GUIDE.md`](docs/enterprise_governance_archive/RESUME_GUIDE.md) and
-[`docs/enterprise_pilot/REAL_ENTERPRISE_PILOT_CHECKLIST.md`](docs/enterprise_pilot/REAL_ENTERPRISE_PILOT_CHECKLIST.md).
+per [`RESUME_GUIDE.md`](../../governance/docs/enterprise_governance_archive/RESUME_GUIDE.md) and
+[`docs/enterprise_pilot/REAL_ENTERPRISE_PILOT_CHECKLIST.md`](../../governance/docs/enterprise_pilot/REAL_ENTERPRISE_PILOT_CHECKLIST.md).
 
 ## 4. Archival package index
 
 | Document | Purpose |
 |---|---|
-| [`RESEARCH_TIMELINE.md`](docs/enterprise_governance_archive/RESEARCH_TIMELINE.md) | Every major phase: purpose, question, method, result, decision, next step |
-| [`FINAL_CONCLUSIONS.md`](docs/enterprise_governance_archive/FINAL_CONCLUSIONS.md) | Validated / partially supported / rejected / unknown |
-| [`LESSONS_LEARNED.md`](docs/enterprise_governance_archive/LESSONS_LEARNED.md) | Wrong assumptions, surprises, what mattered, what to repeat |
-| [`FUTURE_WORK.md`](docs/enterprise_governance_archive/FUTURE_WORK.md) | Immediate / requires-real-enterprise / genuinely-new |
-| [`ARCHITECTURE_FREEZE.md`](docs/enterprise_governance_archive/ARCHITECTURE_FREEZE.md) | What is frozen and the bar for change |
-| [`DECISION_LOG.md`](docs/enterprise_governance_archive/DECISION_LOG.md) | Major decisions: reason, evidence, current status |
-| [`REPOSITORY_INDEX.md`](docs/enterprise_governance_archive/REPOSITORY_INDEX.md) | Index of important files by group |
-| [`KNOWN_LIMITATIONS.md`](docs/enterprise_governance_archive/KNOWN_LIMITATIONS.md) | Every known limitation, explicit |
-| [`RESUME_GUIDE.md`](docs/enterprise_governance_archive/RESUME_GUIDE.md) | How to resume months/years later |
+| [`RESEARCH_TIMELINE.md`](../../governance/docs/enterprise_governance_archive/RESEARCH_TIMELINE.md) | Every major phase: purpose, question, method, result, decision, next step |
+| [`FINAL_CONCLUSIONS.md`](../../governance/docs/enterprise_governance_archive/FINAL_CONCLUSIONS.md) | Validated / partially supported / rejected / unknown |
+| [`LESSONS_LEARNED.md`](../../governance/docs/enterprise_governance_archive/LESSONS_LEARNED.md) | Wrong assumptions, surprises, what mattered, what to repeat |
+| [`FUTURE_WORK.md`](../../governance/docs/enterprise_governance_archive/FUTURE_WORK.md) | Immediate / requires-real-enterprise / genuinely-new |
+| [`ARCHITECTURE_FREEZE.md`](../../governance/docs/enterprise_governance_archive/ARCHITECTURE_FREEZE.md) | What is frozen and the bar for change |
+| [`DECISION_LOG.md`](../../governance/docs/enterprise_governance_archive/DECISION_LOG.md) | Major decisions: reason, evidence, current status |
+| [`REPOSITORY_INDEX.md`](../../governance/docs/enterprise_governance_archive/REPOSITORY_INDEX.md) | Index of important files by group |
+| [`KNOWN_LIMITATIONS.md`](../../governance/docs/enterprise_governance_archive/KNOWN_LIMITATIONS.md) | Every known limitation, explicit |
+| [`RESUME_GUIDE.md`](../../governance/docs/enterprise_governance_archive/RESUME_GUIDE.md) | How to resume months/years later |
 
 Frozen-architecture references:
-[`ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md),
+[`ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../governance/actiongate/ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md),
 the neutral model in [`agentic/enterprise_governance/`](agentic/enterprise_governance/),
 and the readiness package in [`docs/enterprise_pilot/`](docs/enterprise_pilot/).
 

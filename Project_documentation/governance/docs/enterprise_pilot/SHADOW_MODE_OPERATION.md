@@ -1,7 +1,7 @@
 # Shadow-Mode Operation
 
 **Status:** Phase-3 readiness documentation against the **frozen** architecture
-([`ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md)).
+([`ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../actiongate/ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md)).
 This describes how the pilot is **operated** in shadow mode on real historical
 records. It changes no code and asserts no results.
 
@@ -21,7 +21,7 @@ is not connected to any enterprise system in the pilot; the loop terminates at
 
 1. **Read-only.** Adapters observe historical exports/replicas/scoped reads.
    Nothing writes to a source. (Adapter contract:
-   [`SOURCE_ADAPTER_SPECIFICATION.md`](./SOURCE_ADAPTER_SPECIFICATION.md) §1.)
+   [`SOURCE_ADAPTER_SPECIFICATION.md`](SOURCE_ADAPTER_SPECIFICATION.md) §1.)
 2. **No automated enforcement.** Every finding is advisory input to an enterprise
    reviewer. Promotion levels on findings are *defaults for a future decision*, not
    live actions.
@@ -41,7 +41,7 @@ default records where a finding *could* eventually sit, not where it acts now.
 
 Promotion of an individual invariant from audit toward enforcement is **out of
 scope for this pilot** and, per the freeze, is a later data-driven decision
-([`ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md) §5).
+([`ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../actiongate/ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md) §5).
 The frozen guidance names **integration closure** and **prohibited-capability
 exposure** as the first enforcement *candidates*, with advisory/derivation findings
 staying audit-oriented longer — but no promotion happens during the readiness
@@ -50,9 +50,9 @@ pilot.
 ## 4. Run procedure
 
 1. **Freeze inputs.** Hash-record the labeled ground-truth set
-   ([`GROUND_TRUTH_PROTOCOL.md`](./GROUND_TRUTH_PROTOCOL.md)) and the
+   ([`GROUND_TRUTH_PROTOCOL.md`](GROUND_TRUTH_PROTOCOL.md)) and the
    `enterprise_baseline_codes` set
-   ([`BASELINE_COMPARISON_FRAMEWORK.md`](./BASELINE_COMPARISON_FRAMEWORK.md))
+   ([`BASELINE_COMPARISON_FRAMEWORK.md`](BASELINE_COMPARISON_FRAMEWORK.md))
    **before** running, so nothing is back-fitted.
 2. **Assemble evidence.** Run the read-only adapters over the historical export to
    build one `WorkflowEvidence` per instance.
@@ -60,7 +60,7 @@ pilot.
    `evaluate([...], clean=[...])` for the aggregate report.
 4. **Do not reveal to adjudicators early.** Findings are computed but the
    code-mapping adjudication (ground truth) must already be locked.
-5. **Compute metrics** ([`ENTERPRISE_METRICS.md`](./ENTERPRISE_METRICS.md)) with
+5. **Compute metrics** ([`ENTERPRISE_METRICS.md`](ENTERPRISE_METRICS.md)) with
    denominators and dates.
 6. **Human review.** Enterprise reviewers judge findings; the pilot records
    agreement/disagreement. No action is taken on the enterprise's systems.
@@ -101,5 +101,5 @@ Stop and report (do not tune to rescue a number) if:
 - Evaluator: `agentic/enterprise_governance/shadow.py`.
 - Promotion ladder / dispositions: `agentic/enterprise_governance/model.py`,
   `invariants.py`.
-- Frozen shadow description: [`ACTIONGATE_ENTERPRISE_GOVERNANCE_PHASE3_PILOT.md`](../../ACTIONGATE_ENTERPRISE_GOVERNANCE_PHASE3_PILOT.md) §5.
-- Frozen position: [`ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md).
+- Frozen shadow description: [`ACTIONGATE_ENTERPRISE_GOVERNANCE_PHASE3_PILOT.md`](../../actiongate/ACTIONGATE_ENTERPRISE_GOVERNANCE_PHASE3_PILOT.md) §5.
+- Frozen position: [`ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../actiongate/ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md).

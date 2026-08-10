@@ -16,7 +16,7 @@
     "GitHubExecutionProvider": {"maturity": "MISSING", "evidence": "no EXTERNAL_EXECUTION GitHub provider; only framework DeterministicExecutionProvider test-double exists", "path": "n/a (proposed providers/github-execution)"},
     "RepositoryPolicyEngine": {"maturity": "DOCUMENTED_ONLY", "evidence": "POLICY_PACK_GOVERNED_WORKFLOW_COMPILER_SPEC.md exists; StoryGraph policypack compiler is real but domain-specific; no code-governance repo-policy engine", "path": "POLICY_PACK_GOVERNED_WORKFLOW_COMPILER_SPEC.md, storygraph/policypack"},
     "IdentityIntegration": {"maturity": "PARTIAL_PROTOTYPE", "evidence": "DA ActorIdentity/ActorType + authenticate(); no enterprise OIDC/SSO; no GitHub identity mapping; SoD off by default", "path": "decision-authority/identity"},
-    "CodeGovernanceUI": {"maturity": "DOCUMENTED_ONLY", "evidence": "ACP/UGENCE_UNIFIED_CONSOLE_PLAN.md; no code-governance PR check-run UI", "path": "ACP/UGENCE_UNIFIED_CONSOLE_PLAN.md"},
+    "CodeGovernanceUI": {"maturity": "DOCUMENTED_ONLY", "evidence": "Project_documentation/control_plane/ACP/UGENCE_UNIFIED_CONSOLE_PLAN.md; no code-governance PR check-run UI", "path": "Project_documentation/control_plane/ACP/UGENCE_UNIFIED_CONSOLE_PLAN.md"},
     "CompetitiveCodeAdjudication": {"maturity": "MISSING", "evidence": "no patch-pair adjudication capability; reusable analogues only (model-selection Selection contract, comparative_governance_benchmark harness, StoryVerdict, reviewer_ready_pilot AdjudicationResult)", "path": "n/a (proposed packages/capabilities/competitive-adjudication)"},
     "DeploymentGovernance": {"maturity": "DOCUMENTED_ONLY", "evidence": "MVP3; reuses ACP+ActionGate K8s surface (shadow); no build provenance/digest binding implemented", "path": "roadmap"}
   }

@@ -2,7 +2,7 @@
 
 **Status:** Archival record. Documentation only; no research, architecture, or
 experiments added. Cross-references the frozen architecture
-([`../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md)).
+([`../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../actiongate/ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md)).
 
 This is the chronological record of every major phase. The five phases the archival
 brief names explicitly — ontology exploration, cross-vertical governance,
@@ -31,7 +31,7 @@ complete.
   preserved when no per-rule/per-action config exists.
 - **Decision:** Keep; this becomes the human-authority substrate.
 - **Next step:** Specialize into a concrete high-stakes domain.
-- **Docs:** [`../../ACTIONGATE_HUMAN_POLICY_GOVERNANCE.md`](../../ACTIONGATE_HUMAN_POLICY_GOVERNANCE.md).
+- **Docs:** [`../../ACTIONGATE_HUMAN_POLICY_GOVERNANCE.md`](../../actiongate/ACTIONGATE_HUMAN_POLICY_GOVERNANCE.md).
 
 ## Phase 1 — Healthcare specialization + enforcement
 
@@ -48,8 +48,8 @@ complete.
   tests show zero unauthorized execution and zero PHI leakage.
 - **Decision:** Keep as evidence the pattern generalizes to regulated domains.
 - **Next step:** Repeat in a structurally different domain to test generality.
-- **Docs:** [`../../ACTIONGATE_HEALTHCARE_DATA_ACCESS_GOVERNANCE.md`](../../ACTIONGATE_HEALTHCARE_DATA_ACCESS_GOVERNANCE.md),
-  [`../../ACTIONGATE_HEALTHCARE_ENFORCEMENT_VALIDATION.md`](../../ACTIONGATE_HEALTHCARE_ENFORCEMENT_VALIDATION.md).
+- **Docs:** [`../../ACTIONGATE_HEALTHCARE_DATA_ACCESS_GOVERNANCE.md`](../../actiongate/ACTIONGATE_HEALTHCARE_DATA_ACCESS_GOVERNANCE.md),
+  [`../../ACTIONGATE_HEALTHCARE_ENFORCEMENT_VALIDATION.md`](../../actiongate/ACTIONGATE_HEALTHCARE_ENFORCEMENT_VALIDATION.md).
 
 ## Phase 2 — Trading specialization + enforcement
 
@@ -67,8 +67,8 @@ complete.
 - **Decision:** Two independent domains are enough to motivate asking whether a
   single cross-vertical model exists.
 - **Next step:** Evaluate a cross-vertical semantic architecture.
-- **Docs:** [`../../ACTIONGATE_TRADING_PRETRADE_GOVERNANCE.md`](../../ACTIONGATE_TRADING_PRETRADE_GOVERNANCE.md),
-  [`../../ACTIONGATE_TRADING_ENFORCEMENT_VALIDATION.md`](../../ACTIONGATE_TRADING_ENFORCEMENT_VALIDATION.md).
+- **Docs:** [`../../ACTIONGATE_TRADING_PRETRADE_GOVERNANCE.md`](../../actiongate/ACTIONGATE_TRADING_PRETRADE_GOVERNANCE.md),
+  [`../../ACTIONGATE_TRADING_ENFORCEMENT_VALIDATION.md`](../../actiongate/ACTIONGATE_TRADING_ENFORCEMENT_VALIDATION.md).
 
 ## Phase 3 — Ontology exploration (cross-vertical, stage 1)
 
@@ -86,7 +86,7 @@ complete.
 - **Decision:** The cross-vertical value is real, but the layer taxonomy is
   suspect; investigate the four unused concepts before adopting the taxonomy.
 - **Next step:** Ablate the four unused concepts by label vs content.
-- **Docs:** [`../../ACTIONGATE_ENTERPRISE_ONTOLOGY_EVALUATION.md`](../../ACTIONGATE_ENTERPRISE_ONTOLOGY_EVALUATION.md).
+- **Docs:** [`../../ACTIONGATE_ENTERPRISE_ONTOLOGY_EVALUATION.md`](../../actiongate/ACTIONGATE_ENTERPRISE_ONTOLOGY_EVALUATION.md).
 
 ## Phase 4 — Semantic-content ablation (stage 2)
 
@@ -105,7 +105,7 @@ complete.
 - **Decision:** Retain the concepts as typed evidence + invariants; **reject** the
   twelve-label taxonomy as a runtime schema.
 - **Next step:** Freeze the ontology as a scaffold and extract the neutral model.
-- **Docs:** [`../../ACTIONGATE_ENTERPRISE_ONTOLOGY_STAGE2_EVALUATION.md`](../../ACTIONGATE_ENTERPRISE_ONTOLOGY_STAGE2_EVALUATION.md).
+- **Docs:** [`../../ACTIONGATE_ENTERPRISE_ONTOLOGY_STAGE2_EVALUATION.md`](../../actiongate/ACTIONGATE_ENTERPRISE_ONTOLOGY_STAGE2_EVALUATION.md).
 
 ## Phase 5 — Neutral architecture extraction + freeze
 
@@ -121,8 +121,8 @@ complete.
   authority is never inferred from a capability group; missing data is explicit.
 - **Decision:** **FREEZE.** No more twelve-layer redesign without new evidence.
 - **Next step:** Prepare for real-data validation (readiness, not more design).
-- **Docs:** [`../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md),
-  [`../../ACTIONGATE_ENTERPRISE_GOVERNANCE_PHASE3_PILOT.md`](../../ACTIONGATE_ENTERPRISE_GOVERNANCE_PHASE3_PILOT.md).
+- **Docs:** [`../../ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md`](../../actiongate/ACTIONGATE_GOVERNANCE_ARCHITECTURE_POSITION.md),
+  [`../../ACTIONGATE_ENTERPRISE_GOVERNANCE_PHASE3_PILOT.md`](../../actiongate/ACTIONGATE_ENTERPRISE_GOVERNANCE_PHASE3_PILOT.md).
 
 ## Phase 6 — Enterprise readiness (documentation)
 
@@ -146,6 +146,6 @@ complete.
 
 - **Purpose:** Freeze the track into a stable, reproducible research artifact.
 - **Method:** This archival package (`docs/enterprise_governance_archive/`) plus the
-  top-level [`../../FINAL_PROJECT_STATUS.md`](../../FINAL_PROJECT_STATUS.md).
+  top-level [`../../FINAL_PROJECT_STATUS.md`](../../../repository/status/FINAL_PROJECT_STATUS.md).
 - **Result:** Track frozen, research-complete pending real enterprise validation.
 - **Next step:** None on this track until real operational data exists.

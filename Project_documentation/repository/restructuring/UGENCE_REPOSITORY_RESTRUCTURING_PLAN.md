@@ -24,7 +24,7 @@ deleted, or changed.** All findings were verified against the live repository at
 > ## Terminology update — Ugence Decision Governance (2026-08-01)
 >
 > *Canonical vocabulary per
-> [`docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md).
+> [`docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md`](../docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md).
 > Documentation-only; no package, API, or freeze artifact is renamed here.*
 >
 > - **Ugence Decision Governance** is the umbrella (platform + product family). The capability
