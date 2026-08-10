@@ -282,15 +282,39 @@ class RiskAuthorityApplication:
     ) -> RiskDecision:
         now = self._clock()
         case = self._require_case(tenant_id, case_id)
+        # A binding decision may only be issued once the case has actually reached
+        # authority review. This gate runs *before* anything is persisted, so a
+        # caller cannot skip evaluation (or replay the call out of order) and have
+        # a decision survive a later illegal-transition error (spec AC-02).
+        if case.state is not RiskCaseState.AUTHORITY_REVIEW:
+            raise RiskAuthorityError(
+                f"case {case_id!r} is in state {case.state.value}; a binding "
+                "decision may only be issued from AUTHORITY_REVIEW (evaluate first)"
+            )
         grant = self.authority.get_grant(tenant_id, req.principal_id)
         if grant is None:
             raise RiskAuthorityError(
                 f"no authority grant for principal {req.principal_id!r}"
             )
+        # The recommendation that gates authority is re-derived here from the
+        # case's *persisted* control state, never taken from the caller-supplied
+        # evaluation. The passed evaluation is advisory: a caller cannot substitute
+        # an ALLOW for a case whose required controls failed. Only its
+        # caller-requested conditions (which can merely tighten authority) are
+        # carried forward.
+        workflow = self._workflow_for(case)
+        controls = self.controls.get(tenant_id, case_id)
+        authoritative = self._engine.evaluate(
+            workflow_ir=workflow,
+            case=case,
+            controls=controls,
+            now=now,
+            conditions=evaluation.conditions,
+        )
         decision = self._authority_service.issue_decision(
             decision_id=self._ids.next("risk_dec"),
             case=case,
-            evaluation=evaluation,
+            evaluation=authoritative,
             grant=grant,
             requested_scope=req.requested_scope,
             evidence_snapshot_digest=req.evidence_snapshot_digest,

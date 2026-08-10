@@ -75,6 +75,16 @@ class EnvelopeIssuer:
                 "does not grant authority; no envelope may be issued"
             )
 
+        # Time binding (spec §29): an envelope may never be minted from a decision
+        # whose own validity window has elapsed. Without this an expired decision
+        # would be re-minted into fresh runtime authority with a new TTL.
+        if decision.expires_at is not None and now > decision.expires_at:
+            raise RiskAuthorityError(
+                f"decision {decision.decision_id} expired at "
+                f"{decision.expires_at.isoformat()}; no envelope may be issued from "
+                "an expired decision"
+            )
+
         # Default to the exact decision scope; a caller may narrow it.
         scope = (envelope_scope or decision.scope).normalized()
         validate_envelope_subset(scope, decision.scope.normalized())
