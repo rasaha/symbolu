@@ -37,6 +37,7 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import json
+import math
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional, Sequence, Tuple
 
@@ -45,6 +46,9 @@ from ..runtime.errors import ExecutionStateError
 # Version of the canonical execution-state schema. Bump on any change to the set or
 # meaning of identity-bearing fields so digests are never silently reinterpreted.
 STATE_VERSION = "1"
+# The versions this build can construct/verify. An unsupported version fails closed
+# rather than being silently reinterpreted under the current schema's field meanings.
+SUPPORTED_STATE_VERSIONS = frozenset({STATE_VERSION})
 
 
 def _ref(value: Any, name: str) -> Optional[str]:
@@ -79,9 +83,17 @@ def _freeze_refs(values: Any, name: str) -> Tuple[str, ...]:
 
 
 def _opt_float(value: Any, name: str) -> Optional[float]:
-    if value is None or isinstance(value, (int, float)) and not isinstance(value, bool):
+    if value is None:
         return value
-    raise ExecutionStateError(f"{name} must be a number or None, got {type(value).__name__}")
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ExecutionStateError(
+            f"{name} must be a number or None, got {type(value).__name__}"
+        )
+    if not math.isfinite(value):
+        # NaN / Infinity are not deterministically canonicalizable (and JSON has no
+        # standard representation) — fail closed rather than admit a non-finite horizon.
+        raise ExecutionStateError(f"{name} must be finite, got {value!r}")
+    return value
 
 
 @dataclass(frozen=True)
@@ -124,6 +136,36 @@ class ExecutionLineage:
         object.__setattr__(self, "output_artifact_refs", _freeze_refs(self.output_artifact_refs, "output_artifact_refs"))
         object.__setattr__(self, "evidence_refs", _freeze_refs(self.evidence_refs, "evidence_refs"))
 
+    def overlay(self, other: Optional["ExecutionLineage"]) -> "ExecutionLineage":
+        """Return a lineage where ``other``'s *set* fields take precedence over this one.
+
+        Used to combine workflow-common lineage (this) with task-specific lineage
+        (``other``): a scalar field on ``other`` wins when it is not ``None``; a sequence
+        field wins when it is non-empty. This lets sibling tasks carry different agents,
+        artifacts, and causation while still inheriting workflow-common references (e.g. a
+        shared team plan or parent workflow). ``None`` leaves this lineage unchanged."""
+        if other is None:
+            return self
+
+        def s(a, b):  # scalar override
+            return b if b is not None else a
+
+        def q(a, b):  # sequence override
+            return b if b else a
+
+        return ExecutionLineage(
+            causation_id=s(self.causation_id, other.causation_id),
+            parent_workflow_ref=s(self.parent_workflow_ref, other.parent_workflow_ref),
+            parent_task_ref=s(self.parent_task_ref, other.parent_task_ref),
+            assigned_agent_ref=s(self.assigned_agent_ref, other.assigned_agent_ref),
+            agent_team_plan_ref=s(self.agent_team_plan_ref, other.agent_team_plan_ref),
+            assignment_digest=s(self.assignment_digest, other.assignment_digest),
+            authority_scope_ref=s(self.authority_scope_ref, other.authority_scope_ref),
+            input_artifact_refs=q(self.input_artifact_refs, other.input_artifact_refs),
+            output_artifact_refs=q(self.output_artifact_refs, other.output_artifact_refs),
+            evidence_refs=q(self.evidence_refs, other.evidence_refs),
+        )
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "causation_id": self.causation_id,
@@ -137,6 +179,21 @@ class ExecutionLineage:
             "output_artifact_refs": list(self.output_artifact_refs),
             "evidence_refs": list(self.evidence_refs),
         }
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "ExecutionLineage":
+        return cls(
+            causation_id=d.get("causation_id"),
+            parent_workflow_ref=d.get("parent_workflow_ref"),
+            parent_task_ref=d.get("parent_task_ref"),
+            assigned_agent_ref=d.get("assigned_agent_ref"),
+            agent_team_plan_ref=d.get("agent_team_plan_ref"),
+            assignment_digest=d.get("assignment_digest"),
+            authority_scope_ref=d.get("authority_scope_ref"),
+            input_artifact_refs=tuple(d.get("input_artifact_refs", ())),
+            output_artifact_refs=tuple(d.get("output_artifact_refs", ())),
+            evidence_refs=tuple(d.get("evidence_refs", ())),
+        )
 
 
 @dataclass(frozen=True)
@@ -217,6 +274,13 @@ class CanonicalExecutionState:
             "result_digest", "state_digest",
         ):
             object.__setattr__(self, name, _ref(getattr(self, name), name))
+        # A version this build does not understand must fail closed rather than be
+        # digested under the current schema's field meanings.
+        if self.state_version not in SUPPORTED_STATE_VERSIONS:
+            raise ExecutionStateError(
+                f"unsupported state_version {self.state_version!r} "
+                f"(supported: {sorted(SUPPORTED_STATE_VERSIONS)})"
+            )
         if not isinstance(self.attempt, int) or isinstance(self.attempt, bool):
             raise ExecutionStateError(
                 f"attempt must be an int, got {type(self.attempt).__name__}"
@@ -268,8 +332,10 @@ class CanonicalExecutionState:
         }
 
     def compute_digest(self) -> str:
+        # allow_nan=False rejects any non-finite float defensively; construction already
+        # guarantees finite values, so this can only trip on a corrupted in-memory object.
         encoded = json.dumps(
-            self.canonical_payload(), sort_keys=True, separators=(",", ":")
+            self.canonical_payload(), sort_keys=True, separators=(",", ":"), allow_nan=False
         ).encode("utf-8")
         return hashlib.sha256(encoded).hexdigest()
 

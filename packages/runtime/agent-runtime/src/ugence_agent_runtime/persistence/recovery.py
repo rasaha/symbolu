@@ -40,9 +40,12 @@ class RuntimeRecoveryResult:
     requires_continuation: bool
     config_mismatch: bool = False
     notes: tuple = field(default_factory=tuple)
-    # Per-task canonical execution states restored from the checkpoint (empty for a
-    # legacy / lineage-free checkpoint — unavailable, never fabricated).
+    # Per-task canonical execution states (latest) restored from the checkpoint (empty for
+    # a legacy / lineage-free checkpoint — unavailable, never fabricated).
     execution_states: Dict[str, CanonicalExecutionState] = field(default_factory=dict)
+    # The digest-keyed trajectory journal restored from the checkpoint, so events that
+    # reference historical snapshot digests stay resolvable after recovery.
+    execution_state_journal: Dict[str, CanonicalExecutionState] = field(default_factory=dict)
 
 
 def recover_instance(
@@ -60,12 +63,13 @@ def recover_instance(
         raise RecoveryError(
             f"checkpoint for instance {checkpoint.instance_id!r} failed integrity check"
         )
-    if not checkpoint.verify_execution_states():
-        # Tampered canonical execution-state lineage: fail closed rather than restore a
-        # snapshot whose identity-bearing fields no longer match its digest.
+    states_ok, states_reason = checkpoint.validate_execution_states()
+    if not states_ok:
+        # Tampered / inconsistent canonical execution-state lineage: fail closed rather
+        # than restore a snapshot whose digest or cross-object binding does not hold.
         raise RecoveryError(
             f"checkpoint for instance {checkpoint.instance_id!r} carries canonical "
-            "execution state that failed integrity check"
+            f"execution state that failed integrity check: {states_reason}"
         )
     if checkpoint.workflow_id != definition.workflow_id:
         raise RecoveryError(
@@ -87,6 +91,14 @@ def recover_instance(
         definition=definition,
         correlation_id=checkpoint.correlation_id,
     )
+
+    # Restore the typed lineage *source* so snapshots derived after recovery (including for
+    # tasks that had not yet run) keep the same agent/artifact/causation references. A
+    # legacy checkpoint carries no lineage, which stays unavailable — never fabricated.
+    instance.lineage = checkpoint.workflow_execution_lineage()
+    for tid, task_lin in checkpoint.task_execution_lineage().items():
+        if tid in instance.tasks:
+            instance.tasks[tid].lineage = task_lin
 
     requires_continuation = False
     for task_id, snap in checkpoint.tasks.items():
@@ -129,13 +141,18 @@ def recover_instance(
         if wf_status in (WorkflowStatus.PAUSED, WorkflowStatus.WAITING):
             requires_continuation = True
 
-    # Restore previously-established canonical execution-state lineage verbatim. Only
-    # states for tasks the definition still knows are kept; nothing is fabricated.
-    execution_states = {
-        tid: state
-        for tid, state in checkpoint.canonical_execution_states().items()
-        if tid in instance.tasks
-    }
+    # Restore previously-established canonical execution-state lineage verbatim. Strict
+    # validation above already bound every snapshot's task to this checkpoint, so an
+    # inconsistent state would have failed closed rather than being silently discarded.
+    execution_states = {}
+    for tid, state in checkpoint.canonical_execution_states().items():
+        if tid not in instance.tasks:
+            raise RecoveryError(
+                f"execution state references task {tid!r} not in workflow "
+                f"{definition.workflow_id!r}"
+            )
+        execution_states[tid] = state
+    execution_state_journal = dict(checkpoint.canonical_execution_journal())
 
     return RuntimeRecoveryResult(
         instance=instance,
@@ -144,4 +161,5 @@ def recover_instance(
         config_mismatch=config_mismatch,
         notes=tuple(notes),
         execution_states=execution_states,
+        execution_state_journal=execution_state_journal,
     )

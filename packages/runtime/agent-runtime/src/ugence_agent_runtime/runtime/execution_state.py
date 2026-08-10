@@ -38,8 +38,15 @@ def build_execution_state(
     re-canonicalized copy of the arguments. ``evaluation`` supplies authority-lineage
     references exactly as governance produced them; when it is ``None`` those references
     remain unavailable and are never fabricated.
+
+    Lineage is the workflow-common lineage on the instance overlaid by the task-specific
+    lineage on the task (task fields win when set), so sibling tasks driven by different
+    agents are attributed to their own agent/artifacts/causation while still inheriting
+    workflow-common references.
     """
-    lineage = instance.lineage or ExecutionLineage()
+    lineage = (instance.lineage or ExecutionLineage()).overlay(
+        task.lineage if task is not None else None
+    )
     return CanonicalExecutionState(
         runtime_id=config.runtime_id,
         runtime_version=config.runtime_version,

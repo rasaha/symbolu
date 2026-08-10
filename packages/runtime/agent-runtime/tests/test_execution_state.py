@@ -19,8 +19,10 @@ from ugence_agent_runtime.api import (
     WorkflowDefinition,
     create_runtime,
     execution_state,
+    execution_state_by_digest,
     recover_runtime,
     register_provider,
+    resume_workflow,
 )
 from ugence_agent_runtime.governance.interfaces import (
     GovernanceDisposition,
@@ -146,7 +148,6 @@ def test_sensitivity_every_identity_field_changes_digest():
         "workflow_id": "wf2",
         "instance_id": "inst-2",
         "task_id": "t2",
-        "state_version": "2",
         "correlation_id": "corr-2",
         "causation_id": "cause-2",
         "parent_workflow_ref": "pw2",
@@ -501,3 +502,203 @@ def test_unsupported_identity_types_fail_closed():
 
 def test_state_version_default():
     assert CanonicalExecutionState().state_version == STATE_VERSION
+
+
+def test_unsupported_state_version_fails_closed():
+    with pytest.raises(ExecutionStateError):
+        CanonicalExecutionState(state_version="2")
+
+
+def test_non_finite_valid_until_fails_closed():
+    with pytest.raises(ExecutionStateError):
+        CanonicalExecutionState(valid_until=float("nan"))
+    with pytest.raises(ExecutionStateError):
+        CanonicalExecutionState(valid_until=float("inf"))
+
+
+# ---------------------------------------------------------------------------
+# Task-specific lineage (multi-agent) — correction 1
+# ---------------------------------------------------------------------------
+def test_task_specific_lineage_overrides_workflow_common():
+    rt = create_runtime(AgentRuntimeConfig(governance_hook=_clear_hook()))
+    register_provider(rt, RecordingProvider("p"))
+    wf = WorkflowDefinition(
+        workflow_id="wf",
+        tasks=(
+            TaskDefinition(task_id="t1", operation="op", provider_id="p"),
+            TaskDefinition(task_id="t2", operation="op", provider_id="p"),
+        ),
+    )
+    wf_lineage = ExecutionLineage(agent_team_plan_ref="PLAN-1", parent_workflow_ref="root")
+    task_lineage = {
+        "t1": ExecutionLineage(assigned_agent_ref="research", input_artifact_refs=["doc-r"]),
+        "t2": ExecutionLineage(assigned_agent_ref="risk", input_artifact_refs=["doc-k"]),
+    }
+    inst = rt.start_workflow(wf, lineage=wf_lineage, task_lineage=task_lineage)
+    assert inst.status is WorkflowStatus.COMPLETED
+    s1 = execution_state(rt, inst.instance_id, "t1")
+    s2 = execution_state(rt, inst.instance_id, "t2")
+    # Task-specific fields are attributed per task — not smeared across siblings.
+    assert s1.assigned_agent_ref == "research"
+    assert s2.assigned_agent_ref == "risk"
+    assert s1.input_artifact_refs == ("doc-r",)
+    assert s2.input_artifact_refs == ("doc-k",)
+    # Workflow-common fields are inherited by both.
+    assert s1.agent_team_plan_ref == s2.agent_team_plan_ref == "PLAN-1"
+    assert s1.parent_workflow_ref == s2.parent_workflow_ref == "root"
+    assert s1.state_digest != s2.state_digest
+
+
+def test_unknown_task_lineage_key_rejected():
+    rt = create_runtime(AgentRuntimeConfig(governance_hook=_clear_hook()))
+    register_provider(rt, RecordingProvider("p"))
+    wf = WorkflowDefinition(
+        workflow_id="wf",
+        tasks=(TaskDefinition(task_id="t", operation="op", provider_id="p"),),
+    )
+    with pytest.raises(ValueError):
+        rt.start_workflow(wf, task_lineage={"nope": ExecutionLineage(assigned_agent_ref="x")})
+
+
+# ---------------------------------------------------------------------------
+# Lineage continuity across recovery — correction 2
+# ---------------------------------------------------------------------------
+def test_recovery_preserves_lineage_for_future_snapshots():
+    ss = InMemoryRuntimeStateStore()
+    hold = DispositionHook(GovernanceDisposition.HOLD)
+    rt = create_runtime(AgentRuntimeConfig(state_store=ss, governance_hook=hold))
+    register_provider(rt, RecordingProvider("p"))
+    wf = WorkflowDefinition(
+        workflow_id="wf",
+        tasks=(TaskDefinition(task_id="t", operation="op", provider_id="p"),),
+    )
+    task_lineage = {
+        "t": ExecutionLineage(
+            assigned_agent_ref="risk-agent-7",
+            agent_team_plan_ref="PLAN-88",
+            evidence_refs=["EV-44"],
+        )
+    }
+    inst = rt.start_workflow(wf, task_lineage=task_lineage)
+    assert inst.status is WorkflowStatus.WAITING
+    before = execution_state(rt, inst.instance_id, "t")
+    assert before.assigned_agent_ref == "risk-agent-7"
+
+    # Recover in a fresh runtime, then resume with CLEAR. The NEW snapshot built after
+    # recovery must keep the same lineage refs — continuity is not lost across the crash.
+    clear = DispositionHook(GovernanceDisposition.CLEAR)
+    rt2 = create_runtime(AgentRuntimeConfig(state_store=ss, governance_hook=clear))
+    register_provider(rt2, RecordingProvider("p"))
+    result = recover_runtime(rt2, inst.instance_id, wf)
+    assert result.requires_continuation
+    resume_workflow(rt2, inst.instance_id)
+    after = execution_state(rt2, inst.instance_id, "t")
+    assert after.task_status == "COMPLETED"
+    assert after.assigned_agent_ref == "risk-agent-7"
+    assert after.agent_team_plan_ref == "PLAN-88"
+    assert after.evidence_refs == ("EV-44",)
+
+
+# ---------------------------------------------------------------------------
+# Checkpoint <-> execution-state cross-binding — correction 3
+# ---------------------------------------------------------------------------
+def test_cross_binding_rejects_relabelled_state():
+    ss = InMemoryRuntimeStateStore()
+    rt = create_runtime(AgentRuntimeConfig(state_store=ss, governance_hook=_clear_hook()))
+    register_provider(rt, RecordingProvider("p"))
+    wf = WorkflowDefinition(
+        workflow_id="wf",
+        tasks=(TaskDefinition(task_id="t", operation="op", provider_id="p"),),
+    )
+    inst = rt.start_workflow(wf)
+    cp = ss.load(inst.instance_id)
+
+    # The state's own digest is intact, but it is filed under the wrong task key.
+    states = dict(cp.execution_states)
+    states["WRONG"] = states.pop("t")
+    tampered = dataclasses.replace(cp, execution_states=states)
+    ok, reason = tampered.validate_execution_states()
+    assert not ok and reason is not None
+    with pytest.raises(RecoveryError):
+        recover_instance(tampered, wf, cp.runtime_id, cp.runtime_version)
+
+
+def test_cross_binding_rejects_foreign_instance_state():
+    ss = InMemoryRuntimeStateStore()
+    rt = create_runtime(AgentRuntimeConfig(state_store=ss, governance_hook=_clear_hook()))
+    register_provider(rt, RecordingProvider("p"))
+    wf = WorkflowDefinition(
+        workflow_id="wf",
+        tasks=(TaskDefinition(task_id="t", operation="op", provider_id="p"),),
+    )
+    inst = rt.start_workflow(wf)
+    cp = ss.load(inst.instance_id)
+
+    # A snapshot whose OWN digest is valid but which belongs to a different instance must
+    # be rejected — something digest-only verification would miss.
+    foreign = _sample_state(
+        instance_id="OTHER-INSTANCE", task_id="t", workflow_id="wf",
+        runtime_id=cp.runtime_id, runtime_version=cp.runtime_version,
+        correlation_id=cp.correlation_id,
+    )
+    assert foreign.is_intact()  # internally consistent
+    tampered = dataclasses.replace(cp, execution_states={"t": foreign.to_dict()})
+    ok, _ = tampered.validate_execution_states()
+    assert not ok
+
+
+def test_cross_binding_rejects_unsupported_version_with_precise_reason():
+    ss = InMemoryRuntimeStateStore()
+    rt = create_runtime(AgentRuntimeConfig(state_store=ss, governance_hook=_clear_hook()))
+    register_provider(rt, RecordingProvider("p"))
+    wf = WorkflowDefinition(
+        workflow_id="wf",
+        tasks=(TaskDefinition(task_id="t", operation="op", provider_id="p"),),
+    )
+    inst = rt.start_workflow(wf)
+    cp = ss.load(inst.instance_id)
+    snap = dict(cp.execution_states["t"])
+    snap["state_version"] = "99"
+    tampered = dataclasses.replace(cp, execution_states={"t": snap})
+    ok, reason = tampered.validate_execution_states()
+    assert not ok
+    assert "state_version" in reason
+
+
+# ---------------------------------------------------------------------------
+# Historical state digests resolvable — correction 4
+# ---------------------------------------------------------------------------
+def test_historical_state_digests_resolvable():
+    rt, inst, _, _ = _run_clear()
+    events = rt.events(inst.instance_id)
+    anchored = [
+        e.detail["execution_state_digest"]
+        for e in events
+        if e.detail.get("execution_state_digest") is not None
+    ]
+    assert len(set(anchored)) >= 3  # several distinct trajectory points, not just the last
+    for dig in anchored:
+        s = execution_state_by_digest(rt, inst.instance_id, dig)
+        assert s is not None and s.state_digest == dig
+    # The latest-only accessor still returns just the final snapshot.
+    assert execution_state(rt, inst.instance_id, "t").state_digest == anchored[-1]
+
+
+def test_journal_restored_after_recovery():
+    ss = InMemoryRuntimeStateStore()
+    rt = create_runtime(AgentRuntimeConfig(state_store=ss, governance_hook=_clear_hook()))
+    register_provider(rt, RecordingProvider("p"))
+    wf = WorkflowDefinition(
+        workflow_id="wf",
+        tasks=(TaskDefinition(task_id="t", operation="op", provider_id="p"),),
+    )
+    inst = rt.start_workflow(wf)
+    anchored = [
+        e.detail["execution_state_digest"]
+        for e in rt.events(inst.instance_id)
+        if e.detail.get("execution_state_digest") is not None
+    ]
+    rt2 = create_runtime(AgentRuntimeConfig(state_store=ss))
+    recover_runtime(rt2, inst.instance_id, wf)
+    for dig in set(anchored):
+        assert execution_state_by_digest(rt2, inst.instance_id, dig) is not None

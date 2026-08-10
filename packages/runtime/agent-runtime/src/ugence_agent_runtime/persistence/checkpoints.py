@@ -25,9 +25,13 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
-from ..models.execution_state import CanonicalExecutionState
+from ..models.execution_state import (
+    SUPPORTED_STATE_VERSIONS,
+    CanonicalExecutionState,
+    ExecutionLineage,
+)
 from ..models.task import TaskStatus
 from ..models.workflow import WorkflowInstance, WorkflowStatus
 
@@ -58,6 +62,16 @@ class Checkpoint:
     # is checked separately via each state's own state_digest.
     checkpoint_version: str = CHECKPOINT_VERSION
     execution_states: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    # Additive (v1): the full trajectory journal, keyed by state_digest, so an event that
+    # references a historical snapshot digest stays resolvable after restart (not only the
+    # latest per task). Each entry is a self-verifying CanonicalExecutionState.to_dict().
+    execution_state_journal: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    # Additive (v1): the typed lineage *source* (workflow-common + per-task), preserved
+    # separately from historical snapshots so future snapshots after recovery keep the same
+    # agent/artifact/causation references — including for tasks that had not yet run when
+    # the checkpoint was written. Neutral references only; never authority.
+    workflow_lineage: Optional[Dict[str, Any]] = None
+    task_lineage: Dict[str, Dict[str, Any]] = field(default_factory=dict)
 
     @classmethod
     def of(
@@ -66,6 +80,7 @@ class Checkpoint:
         runtime_id: str,
         runtime_version: str,
         execution_states: Optional[Dict[str, CanonicalExecutionState]] = None,
+        execution_state_journal: Optional[Dict[str, CanonicalExecutionState]] = None,
     ) -> "Checkpoint":
         tasks = {
             tid: {"status": ti.status.value, "attempts": ti.attempts}
@@ -84,10 +99,23 @@ class Checkpoint:
             tid: state.to_dict()
             for tid, state in (execution_states or {}).items()
         }
+        serialized_journal = {
+            digest: state.to_dict()
+            for digest, state in (execution_state_journal or {}).items()
+        }
         return cls(
             digest=_digest(payload),
             checkpoint_version=CHECKPOINT_VERSION,
             execution_states=serialized_states,
+            execution_state_journal=serialized_journal,
+            workflow_lineage=(
+                instance.lineage.to_dict() if instance.lineage is not None else None
+            ),
+            task_lineage={
+                tid: ti.lineage.to_dict()
+                for tid, ti in instance.tasks.items()
+                if ti.lineage is not None
+            },
             **payload,
         )
 
@@ -107,22 +135,97 @@ class Checkpoint:
         return self.digest == _digest(self.payload())
 
     def verify_execution_states(self) -> bool:
-        """True when every persisted canonical execution state is intact.
+        """True when every persisted canonical execution state is digest-intact.
 
         Empty (legacy or no-lineage) checkpoints are vacuously intact. A tampered state
         — fields changed without recomputing its ``state_digest``, or vice versa — fails
-        closed."""
-        for snap in self.execution_states.values():
-            if not CanonicalExecutionState.from_dict(snap).is_intact():
-                return False
-        return True
+        closed. This is the digest-only self-check; :meth:`validate_execution_states` also
+        enforces cross-object binding to this checkpoint."""
+        ok, _ = self.validate_execution_states()
+        return ok
+
+    def _bind_errors(self, key: str, snap: Dict[str, Any], *, journal: bool) -> List[str]:
+        """Cross-object binding + integrity checks for one persisted snapshot. Returns a
+        list of human-readable reasons (empty when the snapshot is fully consistent)."""
+        where = "journal" if journal else "execution_states"
+        errs: List[str] = []
+        # Version first, so an unknown schema version yields a precise reason rather than a
+        # generic construction failure.
+        version = snap.get("state_version")
+        if version not in SUPPORTED_STATE_VERSIONS:
+            return [f"{where}[{key!r}] unsupported state_version {version!r}"]
+        try:
+            state = CanonicalExecutionState.from_dict(snap)
+        except Exception as exc:  # malformed persisted snapshot
+            return [f"{where}[{key!r}] is not a valid canonical execution state: {exc}"]
+        if not state.is_intact():
+            errs.append(f"{where}[{key!r}] failed digest integrity")
+        # The dictionary key must match the field it is keyed by (task_id for the latest
+        # map, state_digest for the journal) — a mismatch is a swapped/relabeled snapshot.
+        if journal:
+            if key != state.state_digest:
+                errs.append(f"journal key {key!r} != state_digest {state.state_digest!r}")
+        else:
+            if key != state.task_id:
+                errs.append(f"execution_states key {key!r} != task_id {state.task_id!r}")
+        # Bind identity to THIS checkpoint.
+        if state.instance_id != self.instance_id:
+            errs.append(f"{where}[{key!r}] instance_id {state.instance_id!r} != {self.instance_id!r}")
+        if state.workflow_id != self.workflow_id:
+            errs.append(f"{where}[{key!r}] workflow_id {state.workflow_id!r} != {self.workflow_id!r}")
+        if state.runtime_id != self.runtime_id:
+            errs.append(f"{where}[{key!r}] runtime_id {state.runtime_id!r} != {self.runtime_id!r}")
+        if state.runtime_version != self.runtime_version:
+            errs.append(f"{where}[{key!r}] runtime_version {state.runtime_version!r} != {self.runtime_version!r}")
+        if state.correlation_id != self.correlation_id:
+            errs.append(f"{where}[{key!r}] correlation_id {state.correlation_id!r} != {self.correlation_id!r}")
+        if state.task_id is None or state.task_id not in self.tasks:
+            errs.append(f"{where}[{key!r}] task_id {state.task_id!r} not present in checkpoint tasks")
+        return errs
+
+    def validate_execution_states(self) -> Tuple[bool, Optional[str]]:
+        """Strictly validate the canonical execution-state lineage against THIS checkpoint.
+
+        Beyond each snapshot's own digest, this enforces cross-object binding: the map key
+        equals the snapshot's own key field; instance/workflow/runtime/correlation identity
+        match the checkpoint; the referenced task exists; the schema version is supported.
+        Returns ``(ok, reason)`` — a precise reason on the first failure. An inconsistent
+        canonical state is never silently accepted or discarded.
+        """
+        reasons: List[str] = []
+        for key, snap in self.execution_states.items():
+            reasons += self._bind_errors(key, snap, journal=False)
+        for key, snap in self.execution_state_journal.items():
+            reasons += self._bind_errors(key, snap, journal=True)
+        if reasons:
+            return False, reasons[0]
+        return True, None
 
     def canonical_execution_states(self) -> Dict[str, CanonicalExecutionState]:
-        """Reconstruct the per-task canonical execution states (unverified — callers
-        should have already run :meth:`verify_execution_states`)."""
+        """Reconstruct the per-task (latest) canonical execution states (unverified —
+        callers should have already run :meth:`validate_execution_states`)."""
         return {
             tid: CanonicalExecutionState.from_dict(snap)
             for tid, snap in self.execution_states.items()
+        }
+
+    def canonical_execution_journal(self) -> Dict[str, CanonicalExecutionState]:
+        """Reconstruct the digest-keyed trajectory journal (unverified)."""
+        return {
+            digest: CanonicalExecutionState.from_dict(snap)
+            for digest, snap in self.execution_state_journal.items()
+        }
+
+    def workflow_execution_lineage(self) -> Optional[ExecutionLineage]:
+        """Reconstruct the workflow-common lineage source, if any was persisted."""
+        if self.workflow_lineage is None:
+            return None
+        return ExecutionLineage.from_dict(self.workflow_lineage)
+
+    def task_execution_lineage(self) -> Dict[str, ExecutionLineage]:
+        """Reconstruct the per-task lineage source, keyed by task id."""
+        return {
+            tid: ExecutionLineage.from_dict(d) for tid, d in self.task_lineage.items()
         }
 
     def to_dict(self) -> Dict[str, Any]:
@@ -130,6 +233,9 @@ class Checkpoint:
         d["digest"] = self.digest
         d["checkpoint_version"] = self.checkpoint_version
         d["execution_states"] = self.execution_states
+        d["execution_state_journal"] = self.execution_state_journal
+        d["workflow_lineage"] = self.workflow_lineage
+        d["task_lineage"] = self.task_lineage
         return d
 
     @classmethod
@@ -146,4 +252,7 @@ class Checkpoint:
             # Absent version tag => legacy checkpoint with no execution-state lineage.
             checkpoint_version=d.get("checkpoint_version", LEGACY_CHECKPOINT_VERSION),
             execution_states=dict(d.get("execution_states", {})),
+            execution_state_journal=dict(d.get("execution_state_journal", {})),
+            workflow_lineage=d.get("workflow_lineage"),
+            task_lineage=dict(d.get("task_lineage", {})),
         )

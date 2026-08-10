@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Tuple
 
 from .task import TaskDefinition, TaskInstance, TaskStatus
 
@@ -92,9 +92,17 @@ class WorkflowInstance:
         instance_id: str,
         definition: WorkflowDefinition,
         correlation_id: Optional[str] = None,
-        lineage: Optional[ExecutionLineage] = None,
+        lineage: Optional["ExecutionLineage"] = None,
+        task_lineage: Optional[Mapping[str, "ExecutionLineage"]] = None,
     ) -> "WorkflowInstance":
         tasks = {t.task_id: TaskInstance(definition=t) for t in definition.tasks}
+        for task_id, task_lin in (task_lineage or {}).items():
+            if task_id not in tasks:
+                raise ValueError(
+                    f"task_lineage references unknown task {task_id!r} for workflow "
+                    f"{definition.workflow_id!r}"
+                )
+            tasks[task_id].lineage = task_lin
         return cls(
             instance_id=instance_id,
             definition=definition,

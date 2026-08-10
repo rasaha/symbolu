@@ -11,7 +11,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
+
+if TYPE_CHECKING:  # pragma: no cover - annotation only; avoids an import cycle
+    from .execution_state import ExecutionLineage
 
 
 class TaskStatus(str, Enum):
@@ -77,6 +80,11 @@ class TaskInstance:
     result: Optional[Any] = None
     failure: Optional[Any] = None
     governance_reference: Optional[str] = None
+    # Optional, typed, task-specific lineage seam (assigned agent, causation, artifacts,
+    # evidence). Overlays the workflow-common lineage when the canonical execution state
+    # is derived, so sibling tasks driven by different agents are attributed correctly.
+    # Defaults to unavailable — never fabricated.
+    lineage: Optional["ExecutionLineage"] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -93,5 +101,6 @@ class TaskInstance:
             "status": self.status.value,
             "attempts": self.attempts,
             "governance_reference": self.governance_reference,
+            "lineage": self.lineage.to_dict() if self.lineage is not None else None,
             "metadata": dict(self.metadata),
         }

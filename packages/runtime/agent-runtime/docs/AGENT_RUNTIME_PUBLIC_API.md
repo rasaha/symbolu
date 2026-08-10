@@ -49,8 +49,9 @@ Machine-readable form: [`../artifacts/agent_runtime_public_api.json`](../artifac
 | Function | Purpose |
 | --- | --- |
 | `create_runtime(config=None)` / `open_runtime(config=None)` | Build a runtime. No I/O. |
-| `start_workflow(runtime, definition, correlation_id=None, lineage=None)` | Start and drive a workflow (optional `ExecutionLineage`). |
+| `start_workflow(runtime, definition, correlation_id=None, lineage=None, task_lineage=None)` | Start and drive a workflow (optional workflow-common and per-task `ExecutionLineage`). |
 | `execution_state(runtime, instance_id, task_id=None)` | Read the latest canonical execution-state snapshot (read-only). |
+| `execution_state_by_digest(runtime, instance_id, state_digest)` | Resolve a historical snapshot by its digest (read-only). |
 | `resume_workflow(runtime, instance_id)` | Explicitly continue a `WAITING`/`PAUSED` workflow. |
 | `pause_workflow(runtime, instance_id)` | Explicitly pause a `RUNNING` workflow. |
 | `cancel_workflow(runtime, instance_id)` | Cancel a workflow and its non-terminal tasks. |

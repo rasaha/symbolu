@@ -62,6 +62,7 @@ def test_public_api_surface_is_curated():
         "create_runtime",
         "start_workflow",
         "execution_state",
+        "execution_state_by_digest",
         "resume_workflow",
         "pause_workflow",
         "cancel_workflow",

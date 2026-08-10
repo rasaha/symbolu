@@ -123,14 +123,14 @@ source in the reference engine yet — optional, defaults to unavailable, never 
 | | `workflow_id`, `instance_id` | derived | `WorkflowInstance` |
 | | `task_id` | derived | `TaskInstance` |
 | Correlation / causation | `correlation_id` | derived | `WorkflowInstance.correlation_id` |
-| | `causation_id`, `parent_workflow_ref`, `parent_task_ref` | referenced | `ExecutionLineage` seam (optional) |
-| Agent / plan lineage | `assigned_agent_ref`, `agent_team_plan_ref`, `assignment_digest`, `authority_scope_ref` | referenced | `ExecutionLineage` seam (optional; AWC/H16 constraints only) |
+| | `causation_id`, `parent_workflow_ref`, `parent_task_ref` | referenced | `ExecutionLineage` seam (workflow and/or task level) |
+| Agent / plan lineage | `assigned_agent_ref`, `agent_team_plan_ref`, `assignment_digest`, `authority_scope_ref` | referenced | `ExecutionLineage` seam (workflow and/or task level; AWC/H16 constraints only) |
 | Runtime state | `workflow_status`, `task_status`, `attempt` | derived | instance / task |
 | Action identity | `provider_id`, `operation`, `idempotency_key`, `proposal_version` | derived | `TransitionProposal` (descriptive echo) |
 | | `proposal_fingerprint` | referenced | `TransitionProposal.fingerprint` (the single action identity) |
 | Authority lineage | `governance_disposition` | referenced | `GovernanceEvaluation.disposition` |
 | | `evaluation_reference`, `authorization_reference`, `clearance_reference`, `valid_until` | referenced | `GovernanceEvaluation` (verbatim; `None` when governance produced none) |
-| Data / artifact lineage | `input_artifact_refs`, `output_artifact_refs`, `evidence_refs` | referenced | `ExecutionLineage` seam (optional) |
+| Data / artifact lineage | `input_artifact_refs`, `output_artifact_refs`, `evidence_refs` | referenced | `ExecutionLineage` seam (workflow and/or task level) |
 | Execution lineage | `execution_reference`, `result_digest` | deferred | future Runtime Assurance / receipt consumer — currently always `None` |
 | Integrity | `state_digest` | derived | SHA-256 over all fields **except** itself |
 
@@ -142,6 +142,30 @@ source in the reference engine yet — optional, defaults to unavailable, never 
 - `attempted_action_digest` — would duplicate `proposal_fingerprint`. The proposal
   fingerprint *is* the attempted action digest; a second field would invite a second,
   divergent action identity.
+
+## Lineage is two-level (workflow-common + per-task)
+
+The motivating case is multiple agents in one workflow:
+
+```
+Workflow
+ ├─ Task 1 → Research Agent
+ ├─ Task 2 → Risk Agent
+ └─ Task 3 → Execution Agent
+```
+
+So lineage is supplied at two levels and combined per task via `ExecutionLineage.overlay`
+(task fields win when set; a sequence field wins when non-empty):
+
+- **Workflow-common** — `start_workflow(definition, lineage=…)`, stored on
+  `WorkflowInstance.lineage`. Natural home for `agent_team_plan_ref`, `parent_workflow_ref`.
+- **Per-task** — `start_workflow(definition, task_lineage={task_id: …})`, stored on
+  `TaskInstance.lineage`. Natural home for `assigned_agent_ref`, `causation_id`, input/
+  output artifacts, evidence.
+
+Each task's canonical state is therefore attributed to *its own* agent, artifacts, and
+causation, while still inheriting workflow-common references. A per-task lineage that sets
+only `assigned_agent_ref` still inherits the workflow's team plan.
 
 ## Lifecycle: immutable snapshots, not a mutable blob
 
@@ -162,8 +186,10 @@ S4  task completed / failed                     (terminal task status)
 
 Each snapshot has a deterministic `state_digest`. `runtime.execution_state(instance_id,
 task_id)` returns the latest snapshot for a task; `task_id=None` derives a workflow-level
-snapshot on demand. There is **no** API to overwrite a snapshot — execution truth is
-runtime-owned and read-only to callers.
+snapshot on demand. Every snapshot — not only the latest per task — is also retained in a
+per-instance **journal** keyed by digest, so a digest anchored on any earlier event stays
+resolvable via `runtime.execution_state_by_digest(instance_id, state_digest)`. There is
+**no** API to overwrite a snapshot — execution truth is runtime-owned and read-only.
 
 ## Integrity, events, checkpoints, recovery
 
@@ -174,15 +200,25 @@ runtime-owned and read-only to callers.
   `GOVERNANCE_EVALUATION_REQUESTED`, `GOVERNANCE_DISPOSITION_RECEIVED`, `TASK_STARTED`,
   `PROVIDER_INVOKED`, `PROVIDER_COMPLETED`, `TASK_COMPLETED`, `TASK_FAILED`. Digest
   references only — the full state never bloats the event stream; sequencing is unchanged.
-- **Checkpoints.** `Checkpoint` gains `checkpoint_version` (`"1"`) and a self-verifying
-  `execution_states` section. The base coordination `digest` is computed over exactly the
-  original payload, so **pre-existing checkpoints verify byte-identically** and their
-  digest semantics are unchanged. A checkpoint deserialized without a version tag is
-  treated as legacy `"0"` with execution-state lineage unavailable.
-- **Recovery.** Restores established lineage verbatim, fails closed on tampering
-  (`verify_execution_states`), and **never fabricates** a missing decision reference,
-  authorization, clearance, proposal fingerprint, execution reference, or agent
-  provenance. Recovery still performs no provider or governance call.
+- **Checkpoints.** `Checkpoint` gains `checkpoint_version` (`"1"`), a self-verifying
+  per-task `execution_states` section, the digest-keyed `execution_state_journal`, and the
+  typed **lineage source** (`workflow_lineage` + `task_lineage`) — the latter preserved
+  *separately* from historical snapshots so future snapshots after recovery keep the same
+  references, including for tasks that had not yet run. The base coordination `digest` is
+  computed over exactly the original payload, so **pre-existing checkpoints verify
+  byte-identically** and their digest semantics are unchanged. A checkpoint deserialized
+  without a version tag is treated as legacy `"0"` with execution-state lineage unavailable.
+- **Cross-binding.** `validate_execution_states()` enforces — beyond each snapshot's own
+  digest — that the map key equals the snapshot's own key field, that instance / workflow /
+  runtime / correlation identity match the checkpoint, that the referenced task exists, and
+  that the schema version is supported. An inconsistent canonical state fails closed with a
+  precise reason; it is never silently accepted *or* silently discarded.
+- **Recovery.** Restores the lineage source, the per-task latest snapshots, and the
+  journal; fails closed on tampering or inconsistent cross-binding; and **never fabricates**
+  a missing decision reference, authorization, clearance, proposal fingerprint, execution
+  reference, or agent provenance. Recovery still performs no provider or governance call,
+  and recovered non-terminal work still requires explicit continuation (a fresh governance
+  evaluation), so a stored `valid_until` is never consumed as a live grant.
 
 ## What is enforced mechanically
 
@@ -198,8 +234,15 @@ runtime-owned and read-only to callers.
   neutrality).
 - Constructing a state creates no authority and cannot turn HOLD/BLOCK/ESCALATE into
   CLEAR; there is no mutation API (tests: authority boundary).
+- Per-task lineage overlays workflow-common lineage, so sibling tasks are attributed to
+  their own agent/artifacts (test: task-specific lineage).
+- Lineage continuity survives recovery — a snapshot built after recovery keeps the same
+  references (test: recovery lineage continuity).
 - Checkpoint round trip preserves intact lineage; legacy checkpoints remain supported;
-  tampering fails closed; recovery has no side effects (tests: checkpoint/recovery).
+  historical digests stay resolvable after recovery; cross-binding rejects a relabelled or
+  foreign-instance snapshot and an unsupported version with a precise reason; tampering
+  fails closed; recovery has no side effects (tests: checkpoint/recovery/cross-binding).
+- Unsupported `state_version` and non-finite `valid_until` fail closed (tests: hardening).
 
 ## Current limitations / remaining gaps
 

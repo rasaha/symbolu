@@ -60,6 +60,9 @@ class AgentRuntime:
         # runtime is the canonical owner of execution-trajectory identity; these are the
         # anchors persisted into checkpoints and referenced (by digest) from events.
         self._exec_states: Dict[str, Dict[str, CanonicalExecutionState]] = {}
+        # The full trajectory journal per instance, keyed by state_digest, so a historical
+        # snapshot referenced by an event stays resolvable (not only the latest per task).
+        self._exec_journal: Dict[str, Dict[str, CanonicalExecutionState]] = {}
         # Runtime-level trace (records RUNTIME_CREATED); no I/O performed here.
         self._runtime_trace = RunTrace(
             instance_id=self._config.runtime_id,
@@ -103,16 +106,20 @@ class AgentRuntime:
         definition: WorkflowDefinition,
         correlation_id: Optional[str] = None,
         lineage: Optional[ExecutionLineage] = None,
+        task_lineage: Optional[Dict[str, ExecutionLineage]] = None,
     ) -> WorkflowInstance:
         instance_id = self._config.id_generator()
         correlation_id = correlation_id or instance_id
-        instance = WorkflowInstance.create(instance_id, definition, correlation_id, lineage)
+        instance = WorkflowInstance.create(
+            instance_id, definition, correlation_id, lineage, task_lineage
+        )
         trace = RunTrace(instance_id=instance_id, sink=self._make_sink(instance_id))
         self._instances[instance_id] = instance
         self._traces[instance_id] = trace
         self._tokens[instance_id] = CancellationToken()
         self._failures[instance_id] = []
         self._exec_states[instance_id] = {}
+        self._exec_journal[instance_id] = {}
         trace.emit(ev.WORKFLOW_CREATED, workflow_id=definition.workflow_id, instance_id=instance_id)
 
         self._set_wf(instance, WorkflowStatus.READY, trace, None)
@@ -192,6 +199,7 @@ class AgentRuntime:
         # Restore previously-established canonical execution-state lineage (empty for a
         # legacy checkpoint — unavailable, never fabricated).
         self._exec_states[instance_id] = dict(result.execution_states)
+        self._exec_journal[instance_id] = dict(result.execution_state_journal)
         trace.emit(
             ev.RECOVERY_PERFORMED,
             instance_id=instance_id,
@@ -218,6 +226,17 @@ class AgentRuntime:
         if instance is None:
             return None
         return build_execution_state(self._config, instance)
+
+    def execution_state_by_digest(
+        self, instance_id: str, state_digest: str
+    ) -> Optional[CanonicalExecutionState]:
+        """Resolve a historical canonical execution-state snapshot by its digest.
+
+        Every snapshot the runtime records — not only the latest per task — is retained in
+        a per-instance journal, so a digest anchored on any earlier event
+        (``execution_state_digest``) remains resolvable. Returns ``None`` if the digest is
+        unknown for this instance."""
+        return self._exec_journal.get(instance_id, {}).get(state_digest)
 
     def result(self, instance_id: str) -> RuntimeResult:
         instance = self._instances[instance_id]
@@ -460,6 +479,9 @@ class AgentRuntime:
         events."""
         state = build_execution_state(self._config, instance, ti, proposal, evaluation)
         self._exec_states.setdefault(instance.instance_id, {})[ti.task_id] = state
+        # Retain every snapshot by digest so an event anchored on a historical digest stays
+        # resolvable, not only the latest per task.
+        self._exec_journal.setdefault(instance.instance_id, {})[state.state_digest] = state
         return state
 
     def _emit_task(self, trace, ti, event_type, state, **detail):
@@ -484,6 +506,7 @@ class AgentRuntime:
         checkpoint = Checkpoint.of(
             instance, self._config.runtime_id, self._config.runtime_version,
             execution_states=self._exec_states.get(instance.instance_id),
+            execution_state_journal=self._exec_journal.get(instance.instance_id),
         )
         if self._config.checkpoint_store is not None:
             self._config.checkpoint_store.put(checkpoint)
