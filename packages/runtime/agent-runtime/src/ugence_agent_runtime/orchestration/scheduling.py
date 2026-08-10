@@ -113,7 +113,8 @@ class SelectionReason:
 
     Enough to answer "why B instead of A?" without free-form prose: the effective rank the
     selection turned on, the base priority, the accumulated age, the dependency depth, the
-    fairness deficit, and the tie-breaking registration sequence.
+    smooth-weighted-round-robin ``fairness_credit`` that won the within-tier tie, and the
+    tie-breaking registration sequence.
     """
 
     instance_id: str
@@ -121,7 +122,7 @@ class SelectionReason:
     base_priority: str
     age: int
     dependency_depth: int
-    fairness_deficit: float
+    fairness_credit: float
     registration_sequence: int
 
     def to_dict(self) -> Dict[str, object]:
@@ -131,7 +132,7 @@ class SelectionReason:
             "base_priority": self.base_priority,
             "age": self.age,
             "dependency_depth": self.dependency_depth,
-            "fairness_deficit": self.fairness_deficit,
+            "fairness_credit": self.fairness_credit,
             "registration_sequence": self.registration_sequence,
         }
 
@@ -257,13 +258,30 @@ class PortfolioScheduler:
         """Run exactly one scheduling round and grant at most one bounded quantum.
 
         Sequence: begin a logical round → classify every workflow → if none eligible return
-        a deterministic stop reason → otherwise accrue fairness, order by the stable key,
-        select the best, age the unselected, reset the selected, and grant one quantum via
-        ``advance_workflow``. Returns a frozen :class:`PortfolioStepResult`.
+        a deterministic stop reason → otherwise compute effective ranks, form the top
+        *contention tier* (the eligible workflows sharing the best
+        ``(effective_rank, dependency_depth)``), run **smooth weighted round-robin (SWRR)**
+        within that tier to pick the workflow most owed service, age the eligible workflows
+        held back *below* the tier (cross-priority starvation prevention), and grant one
+        quantum via ``advance_workflow``. Returns a frozen :class:`PortfolioStepResult`.
+
+        Two orthogonal mechanisms, so weighted fairness and aging never fight each other:
+
+        * **Fairness (within a tier):** SWRR. Each round every contender's ``fair_credit``
+          gains its ``weight``; the max-credit contender is selected and pays back the tier's
+          total weight. This is the classic smooth weighted round-robin — service is exactly
+          proportional to weight, deterministic, and starvation-free for every positive
+          weight (a weight-1 workflow is never starved by a weight-3 one).
+        * **Aging (across tiers):** only an eligible workflow *below* the top tier — held
+          back by a higher-priority or more-upstream peer — ages, bounded by ``aging_cap``,
+          lowering its effective rank until it eventually joins the tier. Contenders are not
+          starved (SWRR serves them), so they never age; the selected workflow resets its
+          age. Non-eligible workflows (dependency-blocked / WAITING / PAUSED / terminal) never
+          age.
         """
         graph = portfolio.dependency_graph()
         entries = portfolio.entries()
-        rnd = portfolio._begin_round()
+        rnd = portfolio._begin_round(activate=bool(entries))
 
         if not entries:
             return PortfolioStepResult(
@@ -294,49 +312,61 @@ class PortfolioScheduler:
                 classifications=classifications,
             )
 
-        # Fairness: every eligible workflow accrues its weight this round (deficit RR).
-        for e in eligible:
-            e.deficit += e.weight
+        # Contention key per eligible workflow (lower = more preferred). Priority (via the
+        # aging-adjusted effective rank) dominates, then dependency depth (upstream first).
+        # Everything below is deterministic — no wall-clock, identity, dict order, or randomness.
+        rank = {e.instance_id: self._policy.effective_rank(e) for e in eligible}
+        depth = {e.instance_id: graph.depth(e.instance_id) for e in eligible}
 
-        # Deterministic ordering key (select the minimum). Lower effective_rank preferred;
-        # then more-upstream (lower dependency_depth); then higher fairness deficit
-        # (negated); then earliest registration; then instance_id — a total order with no
-        # dependence on wall-clock, identity, dict order, or randomness.
-        def key(e: PortfolioWorkflowEntry):
-            return (
-                self._policy.effective_rank(e),
-                graph.depth(e.instance_id),
-                -e.deficit,
+        def contention_key(e: PortfolioWorkflowEntry):
+            return (rank[e.instance_id], depth[e.instance_id])
+
+        tier_key = min(contention_key(e) for e in eligible)
+        tier = [e for e in eligible if contention_key(e) == tier_key]
+        tier_ids = {e.instance_id for e in tier}
+
+        # SWRR fairness WITHIN the tier: accrue weight, select the workflow most owed
+        # service, then charge it the tier's total weight. Proportional and starvation-free.
+        for e in tier:
+            e.fair_credit += e.weight
+        tier_weight = sum(e.weight for e in tier)
+        selected = min(
+            tier,
+            key=lambda e: (-e.fair_credit, e.registration_sequence, e.instance_id),
+        )
+
+        # Full deterministic ordering of the eligible set for the result (best first).
+        ordered = sorted(
+            eligible,
+            key=lambda e: (
+                rank[e.instance_id],
+                depth[e.instance_id],
+                -e.fair_credit,
                 e.registration_sequence,
                 e.instance_id,
-            )
-
-        ordered = sorted(eligible, key=key)
-        selected = ordered[0]
-
-        # Aging: every eligible-but-NOT-selected workflow ages (bounded); the selected one
-        # resets. Only runnable-but-unselected workflows age — non-eligible workflows
-        # (dependency-blocked / WAITING / PAUSED / terminal) are not in `eligible` and are
-        # never aged here.
-        for e in eligible:
-            if e.instance_id == selected.instance_id:
-                continue
-            e.age = min(e.age + 1, self._policy.aging_cap)
+            ),
+        )
 
         reason_obj = SelectionReason(
             instance_id=selected.instance_id,
-            effective_rank=self._policy.effective_rank(selected),
+            effective_rank=rank[selected.instance_id],
             base_priority=selected.priority.value,
             age=selected.age,
-            dependency_depth=graph.depth(selected.instance_id),
-            fairness_deficit=selected.deficit,
+            dependency_depth=depth[selected.instance_id],
+            fairness_credit=selected.fair_credit,
             registration_sequence=selected.registration_sequence,
         )
 
-        # Fairness cost + age reset happen AFTER the reason snapshot so the reason reflects
-        # the state the selection turned on.
-        selected.deficit -= 1.0
-        selected.age = 0
+        # SWRR cost (charge the selected the tier total) + aging update happen AFTER the
+        # reason snapshot so the reason reflects the state the selection turned on.
+        selected.fair_credit -= tier_weight
+        for e in eligible:
+            if e.instance_id == selected.instance_id:
+                e.age = 0                     # served this round — not starved
+            elif e.instance_id not in tier_ids:
+                # Eligible but held BELOW the top tier -> age it toward contention (bounded).
+                e.age = min(e.age + 1, self._policy.aging_cap)
+            # else: a non-selected tier member — SWRR will serve it in turn, so it never ages.
 
         # Grant exactly one bounded quantum through the unchanged H22-A seam. This is the
         # ONLY place the scheduler touches execution — governance/exact-action/provider all

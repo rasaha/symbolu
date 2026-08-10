@@ -751,6 +751,146 @@ def test_agent_teams_delivery_graph_release_chain():
     assert p.status.value == "COMPLETED"
 
 
+# --------------------------------------------------------------------------- #
+# Weighted fairness (SWRR) — unequal weights                                  #
+# --------------------------------------------------------------------------- #
+def _weighted_run(weight_a, weight_b, rounds, tasks=80):
+    """Two equal-priority workflows of unequal weight, both long enough to stay eligible
+    for the whole window. Returns (count_a, count_b, order_string)."""
+    rt = _runtime()
+    a = prepare_workflow(rt, _wf("A", *[f"a{i}" for i in range(tasks)], chain=True))
+    b = prepare_workflow(rt, _wf("B", *[f"b{i}" for i in range(tasks)], chain=True))
+    p = create_portfolio("p1")
+    p.register(a.instance_id, runtime=rt, weight=weight_a)
+    p.register(b.instance_id, runtime=rt, weight=weight_b)
+    sched = create_portfolio_scheduler(rt)
+    order = []
+    for _ in range(rounds):
+        r = sched.step(p)
+        if r.granted:
+            order.append(rt.instance(r.selected_instance_id).workflow_id)
+    return order.count("A"), order.count("B"), "".join(order)
+
+
+def test_weighted_fairness_2to1_proportional_service():
+    ca, cb, order = _weighted_run(2, 1, rounds=12)
+    # SWRR gives exactly proportional service over a whole number of periods.
+    assert (ca, cb) == (8, 4)
+    assert ca == 2 * cb
+    # ...and it is SMOOTH, not bursty: the heavier workflow never monopolizes — the lighter
+    # one is served at least every few rounds (no starvation of the positive weight).
+    assert "BBB" not in order and order.count("B") > 0
+    assert max(_max_run(order)) <= 2  # no run of the same workflow longer than 2
+
+
+def test_weighted_fairness_3to1_proportional_service():
+    ca, cb, order = _weighted_run(3, 1, rounds=12)
+    assert (ca, cb) == (9, 3)
+    assert ca == 3 * cb
+    assert order.count("B") > 0  # weight-1 workflow is not starved by the weight-3 one
+
+
+def test_weighted_fairness_no_permanent_starvation_over_long_horizon():
+    # The exact defect the audit flagged: A(weight=2), B(weight=1). B must NOT starve.
+    ca, cb, order = _weighted_run(2, 1, rounds=60)
+    assert cb > 0
+    assert ca == 2 * cb                 # still exactly 2:1 over the long horizon
+    # B is served regularly throughout — not just once. Check the second half too.
+    assert order[30:].count("B") > 0
+
+
+def test_weighted_fairness_is_deterministic():
+    assert _weighted_run(3, 1, rounds=15) == _weighted_run(3, 1, rounds=15)
+    assert _weighted_run(5, 2, rounds=21) == _weighted_run(5, 2, rounds=21)
+
+
+def _max_run(s):
+    """Lengths of maximal same-character runs in a string (helper for smoothness checks)."""
+    runs, cur, prev = [], 0, None
+    for ch in s:
+        if ch == prev:
+            cur += 1
+        else:
+            if prev is not None:
+                runs.append(cur)
+            cur, prev = 1, ch
+    if prev is not None:
+        runs.append(cur)
+    return runs or [0]
+
+
+def test_non_finite_and_non_positive_weights_rejected():
+    rt = _runtime()
+    a = prepare_workflow(rt, _wf("A", "A1"))
+    p = create_portfolio("p1")
+    for i, bad in enumerate((float("nan"), float("inf"), float("-inf"), 0, -1.0)):
+        with pytest.raises(ValueError):
+            # A distinct, unregistered id each time; weight is validated fail-closed.
+            p.register(f"unregistered-{i}", runtime=None, weight=bad)
+    # A real registration with a good weight still works.
+    e = p.register(a.instance_id, runtime=rt, weight=2.0)
+    assert e.weight == 2.0
+
+
+# --------------------------------------------------------------------------- #
+# Portfolio lifecycle — topology frozen once scheduling begins                #
+# --------------------------------------------------------------------------- #
+def test_topology_frozen_after_first_scheduling_round():
+    rt = _runtime()
+    a = prepare_workflow(rt, _wf("A", "A1", "A2", chain=True))
+    b = prepare_workflow(rt, _wf("B", "B1"))
+    c = prepare_workflow(rt, _wf("C", "C1"))
+    p = create_portfolio("p1")
+    p.register(a.instance_id, runtime=rt)
+    p.register(b.instance_id, runtime=rt)
+    sched = create_portfolio_scheduler(rt)
+    assert p.status.value == "CREATED"
+    sched.step(p)                                  # scheduling begins -> ACTIVE + frozen
+    assert p.status.value == "ACTIVE"
+    # A NEW registration is now rejected (topology frozen).
+    with pytest.raises(ValueError):
+        p.register(c.instance_id, runtime=rt)
+    # A new dependency is rejected too.
+    with pytest.raises(ValueError):
+        p.add_dependency(b.instance_id, a.instance_id, DependencyType.REQUIRES_SUCCESS)
+    # Re-registering an EXISTING id is still an idempotent no-op (not a topology change).
+    assert p.register(a.instance_id) is p.entry(a.instance_id)
+    # The un-registerable C never entered the schedule.
+    assert not p.is_registered(c.instance_id)
+
+
+def test_topology_frozen_after_completion_no_zombie_registration():
+    rt = _runtime()
+    a = prepare_workflow(rt, _wf("A", "A1"))
+    b = prepare_workflow(rt, _wf("B", "B1"))
+    p = create_portfolio("p1")
+    p.register(a.instance_id, runtime=rt)
+    sched = create_portfolio_scheduler(rt)
+    sched.run(p, max_rounds=10)
+    assert p.status.value == "COMPLETED"
+    # The audit's zombie case: a COMPLETED portfolio must not accept a new workflow it would
+    # then run while still reporting COMPLETED.
+    with pytest.raises(ValueError):
+        p.register(b.instance_id, runtime=rt)
+    assert p.status.value == "COMPLETED"
+    assert not p.is_registered(b.instance_id)
+
+
+def test_empty_portfolio_step_leaves_it_created_and_mutable():
+    rt = _runtime()
+    p = create_portfolio("p1")
+    r = create_portfolio_scheduler(rt).step(p)
+    assert r.reason == PortfolioStepReason.EMPTY_PORTFOLIO.value
+    # Stepping an empty portfolio must NOT flip it to a misleading ACTIVE — it stays CREATED
+    # and therefore still mutable.
+    assert p.status.value == "CREATED"
+    a = prepare_workflow(rt, _wf("A", "A1"))
+    p.register(a.instance_id, runtime=rt)          # still permitted
+    r2 = create_portfolio_scheduler(rt).step(p)
+    assert r2.reason == PortfolioStepReason.QUANTUM_GRANTED.value
+    assert p.status.value == "ACTIVE"
+
+
 def test_agent_teams_independent_plus_dependent_interleaves_then_releases():
     """A and B independent; C depends on A. A/B interleave; A's success releases C."""
     rt = _runtime()

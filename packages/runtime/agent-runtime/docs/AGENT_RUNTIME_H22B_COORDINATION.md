@@ -54,10 +54,17 @@ state only** — it references each workflow by its `instance_id` and never dupl
 runtime-owned workflow/task state, canonical execution state, or checkpoints. The Agent
 Runtime stays the sole authority for execution truth.
 
-`PortfolioStatus` is minimal: `CREATED` (before any round) → `ACTIVE` (stepping, some
+`PortfolioStatus` is minimal: `CREATED` (before scheduling begins — the **only** state in
+which topology may be mutated) → `ACTIVE` (a round has run over a non-empty portfolio; some
 workflow can still progress) → `COMPLETED` (every registered workflow terminal). A
 *quiescent* portfolio — all workflows WAITING / PAUSED / dependency-blocked — is `ACTIVE`,
 **not** `COMPLETED`; governance `WAITING` is never silently treated as completion.
+
+**Topology is frozen once scheduling begins.** In `ACTIVE` and `COMPLETED`, a new
+registration or a new dependency is rejected — so the scheduler can never run a workflow the
+portfolio does not report (this closes the "register into a COMPLETED portfolio, then run it
+while the portfolio still reports COMPLETED" gap). Stepping an **empty** portfolio is a no-op
+that leaves it `CREATED` (still mutable), never misleadingly `ACTIVE`.
 
 ### Registration
 
@@ -66,13 +73,17 @@ workflow can still progress) → `COMPLETED` (every registered workflow terminal
 - **deterministic & order-stable** — each entry gets a monotonic `registration_sequence`;
 - **explicit** — only prepared instances are registered;
 - **idempotent** — re-registering an `instance_id` returns the existing entry **unchanged**
-  (priority/weight/sequence are immutable registered identity);
-- **validated** — with a `runtime` given, an unknown `instance_id` is rejected;
+  (priority/weight/sequence are immutable registered identity), and stays permitted even
+  after freeze because it is a no-op, not a topology change;
+- **validated** — with a `runtime` given, an unknown `instance_id` is rejected; `weight` must
+  be a **positive, finite** number (NaN / ±Inf / non-positive are rejected fail-closed);
+- **topology-scoped** — a *new* registration (or dependency) is permitted only while
+  `CREATED`;
 - **inert** — registration runs no workflow and mutates no runtime state.
 
 `PortfolioWorkflowEntry` stores only orchestration metadata: `instance_id`,
-`registration_sequence`, `priority`, `weight`, and the mutable per-round `age` / `deficit`
-scheduler bookkeeping. There is **no** agent/model selection here.
+`registration_sequence`, `priority`, `weight`, and the mutable per-round `age` /
+`fair_credit` scheduler bookkeeping. There is **no** agent/model selection here.
 
 ## Dependency graph
 
@@ -126,20 +137,26 @@ H22-B.
 ## Deterministic scheduler
 
 One `scheduler.step(portfolio)` runs one logical round: classify → (if none eligible, return
-a deterministic stop reason) → accrue fairness → order eligible workflows by the stable key
-→ age the unselected, reset the selected → grant **exactly one** quantum via
+a deterministic stop reason) → compute effective ranks → form the top **contention tier** →
+run **SWRR** within the tier to pick the workflow most owed service → age the eligible
+workflows held *below* the tier, reset the selected → grant **exactly one** quantum via
 `advance_workflow` → return a frozen `PortfolioStepResult`.
 
-**Stable ordering key** (the selected workflow is the minimum):
+**Selection order** — priority chooses the tier, fairness arbitrates within it. The full
+deterministic ordering (selected = minimum) is:
 
 ```
-( effective_rank, dependency_depth, -fairness_deficit, registration_sequence, instance_id )
+( effective_rank, dependency_depth, -fairness_credit, registration_sequence, instance_id )
 ```
 
-Reproducible from explicit portfolio state alone — no wall-clock, object identity,
-dictionary iteration order, thread scheduling, randomness, or global mutable state. Two
-identical portfolios with identical runtime/governance/provider outcomes produce identical
-selection sequences.
+`effective_rank` and `dependency_depth` define a *contention tier*; the workflows sharing the
+best tier compete on `fairness_credit` (the SWRR counter — see below). Reproducible from
+explicit portfolio state alone — no wall-clock, object identity, dictionary iteration order,
+thread scheduling, randomness, or global mutable state. Two identical portfolios with
+identical runtime/governance/provider outcomes produce identical selection sequences.
+
+Fairness and aging are **orthogonal** so they never fight: fairness (SWRR) governs
+proportional sharing *within* the top tier; aging only rescues workflows *below* the tier.
 
 ### Priority
 
@@ -148,11 +165,34 @@ lower rank preferred. Priority is **orchestration priority only**: it never crea
 governance authority and never bypasses a dependency, a WAITING/PAUSED runtime state, or
 exact-action validation. A CRITICAL workflow that is dependency-blocked does not run.
 
-### Aging (bounded starvation prevention)
+### Fairness — smooth weighted round-robin (SWRR)
 
-Driven by **logical scheduler rounds**, not wall-clock. Only a workflow that is
-`ELIGIBLE`-but-not-selected ages; the selected workflow resets to 0; dependency-blocked /
-WAITING / PAUSED / terminal workflows never age.
+Within the top contention tier (the eligible workflows sharing the best
+`(effective_rank, dependency_depth)`), selection uses the classic **smooth weighted
+round-robin** algorithm on each entry's `fair_credit` counter and its `weight`:
+
+```
+each round, for every tier member:   fair_credit += weight
+select the tier member with the maximum fair_credit
+                    (ties broken by registration_sequence, then instance_id)
+charge the selected:                 fair_credit -= sum(weight over the tier)
+```
+
+This is provably **proportional** (a workflow of weight *w* receives a *w*-share of the
+tier's quanta), **smooth** (service is interleaved, not bursty), **deterministic**, and
+**starvation-free for every positive weight** — the defect of a plain `deficit += weight,
+deficit -= 1` accrual (where a weight-2 workflow permanently outruns a weight-1 one) is
+gone. Worked ratios: weight `2:1` → `A B A A B A …` (2 : 1 exactly); `3:1` → `A A B A …`
+(3 : 1). Weights must be positive and finite (NaN / ±Inf / non-positive rejected at
+registration).
+
+### Aging (bounded starvation prevention across tiers)
+
+Driven by **logical scheduler rounds**, not wall-clock. Only an `ELIGIBLE` workflow held
+**below** the top tier — kept from selection by a higher-priority or more-upstream peer —
+ages; the selected workflow resets to 0. A non-selected *tier* member does **not** age (SWRR
+already guarantees it fair service, so it is not starved), and dependency-blocked / WAITING /
+PAUSED / terminal workflows never age.
 
 ```
 effective_rank = max(1, base_rank − min(age, aging_cap))     # non-critical
@@ -161,15 +201,12 @@ effective_rank = base_rank                                    # CRITICAL (never 
 
 The floor at 1 guarantees no non-critical workflow can ever reach the CRITICAL rank (0) —
 aging prevents starvation without letting a lower class become an emergency class.
-`aging_cap` (default 500) bounds the effect.
+`aging_cap` (default 500) bounds the effect. Because aging only lifts *below-tier* workflows
+and never perturbs within-tier SWRR, weighted proportional service is exact and stable.
 
-### Fairness
-
-Deterministic deficit round-robin: every eligible workflow accrues its `weight` each round,
-selection costs one deficit unit, and ties within a comparable effective priority are broken
-by highest deficit (the `-fairness_deficit` term). **Priority chooses the class; fairness
-arbitrates within comparable effective priority.** Fairness/aging state lives on the
-portfolio entries as plain serializable numbers, ready for later H22-C persistence.
+Fairness/aging state lives on the portfolio entries as plain serializable numbers
+(`fair_credit`, `age`), ready for later H22-C persistence. **Priority chooses the tier;
+SWRR fairness arbitrates within comparable effective priority.**
 
 ### Step result & explainability
 
@@ -182,7 +219,7 @@ prose:
 
 ```
 selected = B
-reason: effective_rank=100 (HIGH), dependency_depth=0, fairness_deficit=3.0,
+reason: effective_rank=100 (HIGH), dependency_depth=0, fairness_credit=3.0,
         age=0, registration_sequence=2
 ```
 

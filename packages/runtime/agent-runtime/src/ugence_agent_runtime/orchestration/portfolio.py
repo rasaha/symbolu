@@ -19,6 +19,7 @@ governance → exact-action → provider boundary *below* H22, inside ``advance_
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
@@ -61,11 +62,17 @@ def priority_rank(priority: WorkflowPriority) -> int:
 class PortfolioStatus(str, Enum):
     """Minimal portfolio lifecycle.
 
-    ``CREATED`` before any scheduling round has run; ``ACTIVE`` once stepping has begun and
-    some workflow can still make progress (this includes a *quiescent* portfolio whose
-    workflows are all WAITING/PAUSED/dependency-blocked — quiescent is NOT complete);
-    ``COMPLETED`` only when every registered workflow is terminal. Richer portfolio
-    lifecycle (FAILED / PAUSED / cancellation scopes) is deliberately deferred to H22-C.
+    ``CREATED`` before scheduling has begun over any registered workflow — the ONLY state in
+    which the portfolio topology (registrations and dependencies) may be mutated. ``ACTIVE``
+    once a scheduling round has run over a non-empty portfolio and some workflow can still
+    make progress (this includes a *quiescent* portfolio whose workflows are all
+    WAITING/PAUSED/dependency-blocked — quiescent is NOT complete). ``COMPLETED`` only when
+    every registered workflow is terminal. **Topology is frozen once scheduling begins:** in
+    ``ACTIVE`` and ``COMPLETED`` a new registration or dependency is rejected, so the
+    scheduler can never run a workflow the portfolio does not report. Stepping an *empty*
+    portfolio is a no-op that leaves it ``CREATED`` (still mutable), never misleadingly
+    ``ACTIVE``. Richer portfolio lifecycle (FAILED / PAUSED / cancellation scopes) is
+    deliberately deferred to H22-C.
     """
 
     CREATED = "CREATED"
@@ -79,9 +86,11 @@ class PortfolioWorkflowEntry:
 
     Immutable identity: ``instance_id`` (a reference to an existing Agent Runtime workflow
     instance) and ``registration_sequence`` (assigned once, stable). ``priority`` and
-    ``weight`` are the declared scheduling inputs. ``age`` and ``deficit`` are the mutable
-    per-round fairness/aging state the scheduler evolves deterministically. No agent/model
-    selection, no execution payload, no runtime-owned state is stored here.
+    ``weight`` are the declared scheduling inputs. ``age`` and ``fair_credit`` are the
+    mutable per-round aging / fairness state the scheduler evolves deterministically:
+    ``fair_credit`` is the smooth-weighted-round-robin current-weight counter (higher =
+    more owed service). No agent/model selection, no execution payload, no runtime-owned
+    state is stored here.
     """
 
     instance_id: str
@@ -90,7 +99,7 @@ class PortfolioWorkflowEntry:
     weight: float = 1.0
     # --- mutable deterministic scheduler bookkeeping (evolved by rounds only) ---
     age: int = 0
-    deficit: float = 0.0
+    fair_credit: float = 0.0
 
     def to_dict(self) -> Dict[str, object]:
         return {
@@ -99,7 +108,7 @@ class PortfolioWorkflowEntry:
             "priority": self.priority.value,
             "weight": self.weight,
             "age": self.age,
-            "deficit": self.deficit,
+            "fair_credit": self.fair_credit,
         }
 
 
@@ -153,15 +162,24 @@ class WorkflowPortfolio:
 
         If ``runtime`` is supplied, the instance must already exist in it (an unknown
         ``instance_id`` is rejected) — the runtime is used only to validate the reference
-        and is never stored. ``weight`` must be positive. Re-registering an existing
-        ``instance_id`` returns the existing entry unchanged.
+        and is never stored. ``weight`` must be a positive, finite number (NaN / ±Inf and
+        non-positive weights are rejected fail-closed). Re-registering an existing
+        ``instance_id`` returns the existing entry unchanged and is permitted at any time
+        (it is a no-op, not a topology change). Registering a **new** workflow is permitted
+        only while the portfolio is ``CREATED``; once scheduling has begun (``ACTIVE`` /
+        ``COMPLETED``) the topology is frozen and a new registration is rejected.
         """
         if not instance_id or not isinstance(instance_id, str):
             raise ValueError("register requires a non-empty instance_id")
         if instance_id in self._entries:
             return self._entries[instance_id]
-        if weight <= 0:
-            raise ValueError("register weight must be positive")
+        if self._status is not PortfolioStatus.CREATED:
+            raise ValueError(
+                "cannot register a new workflow: portfolio topology is frozen once "
+                f"scheduling has begun (status={self._status.value})"
+            )
+        if not isinstance(weight, (int, float)) or not math.isfinite(weight) or weight <= 0:
+            raise ValueError("register weight must be a positive, finite number")
         if runtime is not None and not _instance_known(runtime, instance_id):
             raise ValueError(
                 f"unknown workflow instance {instance_id!r}: register a prepared instance"
@@ -175,11 +193,9 @@ class WorkflowPortfolio:
         self._entries[instance_id] = entry
         self._order.append(instance_id)
         self._graph = None  # node set changed
-        if self._status is PortfolioStatus.CREATED:
-            # Registration alone does not activate scheduling; ACTIVE is entered on the
-            # first step. Kept CREATED here so "no execution occurs from registration"
-            # is observable.
-            pass
+        # Registration does not activate scheduling; the portfolio stays CREATED (and
+        # mutable) until the first scheduling round runs over it — so "no execution occurs
+        # from registration" holds and the topology can still be completed before stepping.
         return entry
 
     def entry(self, instance_id: str) -> PortfolioWorkflowEntry:
@@ -208,8 +224,14 @@ class WorkflowPortfolio:
         Both workflows must be registered. A self-dependency is rejected, and any edge that
         would introduce a cycle (direct or indirect) is rejected fail-closed — the edge is
         not added. An exact duplicate edge is idempotent; a duplicate pair with a different
-        ``dep_type`` is rejected as ambiguous.
+        ``dep_type`` is rejected as ambiguous. Declaring a dependency is permitted only while
+        the portfolio is ``CREATED``; once scheduling has begun the topology is frozen.
         """
+        if self._status is not PortfolioStatus.CREATED:
+            raise ValueError(
+                "cannot add a dependency: portfolio topology is frozen once scheduling has "
+                f"begun (status={self._status.value})"
+            )
         if dependent_id not in self._entries:
             raise ValueError(f"unknown dependent workflow {dependent_id!r}")
         if requires_id not in self._entries:
@@ -237,9 +259,12 @@ class WorkflowPortfolio:
         return self._graph
 
     # -- internal scheduler hooks (used by PortfolioScheduler only) ---------
-    def _begin_round(self) -> int:
+    def _begin_round(self, activate: bool) -> int:
+        """Advance the logical round counter. ``activate`` transitions CREATED → ACTIVE
+        (freezing topology) only when there is a non-empty portfolio to schedule; stepping
+        an empty portfolio leaves it CREATED and still mutable."""
         self._round += 1
-        if self._status is PortfolioStatus.CREATED:
+        if activate and self._status is PortfolioStatus.CREATED:
             self._status = PortfolioStatus.ACTIVE
         return self._round
 

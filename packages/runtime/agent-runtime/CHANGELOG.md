@@ -26,11 +26,15 @@ agent messaging, and no agent/model selection (those are H22-C / H22-D).
   workflow/task state, canonical execution state, or checkpoints. Registration is explicit,
   append-only, order-stable, and idempotent (re-registering an `instance_id` returns the
   existing entry unchanged — registered identity is immutable); an unknown instance is
-  rejected; registration runs nothing. `PortfolioWorkflowEntry` carries only orchestration
-  metadata (priority, fairness weight, registration sequence, and the mutable age/deficit
-  scheduler bookkeeping). `PortfolioStatus` = `CREATED` / `ACTIVE` / `COMPLETED` (a
-  quiescent portfolio whose workflows are all WAITING/PAUSED/dependency-blocked is ACTIVE,
-  **not** complete).
+  rejected; a `weight` must be positive and finite (NaN / ±Inf / non-positive rejected
+  fail-closed); registration runs nothing. `PortfolioWorkflowEntry` carries only
+  orchestration metadata (priority, fairness weight, registration sequence, and the mutable
+  age / `fair_credit` scheduler bookkeeping). `PortfolioStatus` = `CREATED` / `ACTIVE` /
+  `COMPLETED` (a quiescent portfolio whose workflows are all WAITING/PAUSED/dependency-blocked
+  is ACTIVE, **not** complete). **Topology is frozen once scheduling begins:** a new
+  registration or dependency is rejected in `ACTIVE`/`COMPLETED` (so the scheduler can never
+  run a workflow the portfolio does not report), and stepping an *empty* portfolio is a no-op
+  that leaves it `CREATED` and still mutable — never misleadingly `ACTIVE`.
 - **Cross-workflow dependency graph** — `DependencyGraph`, `WorkflowDependency`,
   `DependencyType` (`REQUIRES_COMPLETION` — any terminal predecessor releases the dependent;
   `REQUIRES_SUCCESS` — fail-closed, a non-`COMPLETED` terminal predecessor turns the
@@ -45,21 +49,28 @@ agent messaging, and no agent/model selection (those are H22-C / H22-D).
   `BLOCKED_DEPENDENCY`, `WAITING_RUNTIME`, `PAUSED`, `TERMINAL`) is mapped one-to-one from
   runtime status + dependency verdict and invokes **zero** provider and **zero** governance
   calls. Selection uses the single stable ordering key `(effective_rank, dependency_depth,
-  -fairness_deficit, registration_sequence, instance_id)` — no wall-clock, object identity,
+  -fairness_credit, registration_sequence, instance_id)` — no wall-clock, object identity,
   dict order, thread order, or randomness. `SchedulingPolicy` carries the `aging_cap` and
   the CRITICAL-never-ages rule. `PortfolioStepResult` is a frozen value object with a
-  structured `SelectionReason` (rank/priority/age/depth/deficit/sequence) that answers "why
-  B instead of A?". `PortfolioStepReason` = `QUANTUM_GRANTED` / `NO_ELIGIBLE_WORKFLOW` /
-  `ALL_TERMINAL` / `EMPTY_PORTFOLIO`. A bounded `run(portfolio, max_rounds)` convenience
-  loops the single-quantum `step` until the portfolio is quiescent or complete and never
-  spins.
-- **Priority / aging / fairness** — `WorkflowPriority` (`CRITICAL` … `BACKGROUND`, lower
-  rank preferred) + `priority_rank`; bounded starvation-prevention aging on logical rounds
-  (`effective_rank = max(1, base − min(age, aging_cap))`; only a runnable-but-unselected
-  workflow ages; dependency-blocked / WAITING / PAUSED / terminal workflows never age;
-  CRITICAL is absolute and never reaches by aging); deterministic deficit round-robin
-  fairness within comparable effective priority. Priority is orchestration priority only —
-  it never bypasses dependencies, a WAITING/PAUSED runtime state, or exact-action validation.
+  structured `SelectionReason` (rank/priority/age/depth/`fairness_credit`/sequence) that
+  answers "why B instead of A?". `PortfolioStepReason` = `QUANTUM_GRANTED` /
+  `NO_ELIGIBLE_WORKFLOW` / `ALL_TERMINAL` / `EMPTY_PORTFOLIO`. A bounded
+  `run(portfolio, max_rounds)` convenience loops the single-quantum `step` until the
+  portfolio is quiescent or complete and never spins.
+- **Priority / fairness / aging (orthogonal, so they never fight)** — `WorkflowPriority`
+  (`CRITICAL` … `BACKGROUND`, lower rank preferred) + `priority_rank`. **Fairness is smooth
+  weighted round-robin (SWRR)** within the top contention tier (eligible workflows sharing
+  the best `(effective_rank, dependency_depth)`): each round every tier member's
+  `fair_credit` gains its `weight`, the maximum-credit member is selected, and it is charged
+  the tier's total weight — provably proportional to weight, smooth, deterministic, and
+  starvation-free for every positive weight (fixing the earlier `deficit += weight`/`-= 1`
+  accrual, under which a weight-2 workflow permanently outran a weight-1 one). **Aging** is
+  bounded and cross-tier only (`effective_rank = max(1, base − min(age, aging_cap))`): only
+  an eligible workflow held *below* the top tier ages; a non-selected tier member never ages
+  (SWRR already serves it), the selected workflow resets, and dependency-blocked / WAITING /
+  PAUSED / terminal workflows never age; CRITICAL is absolute and no aged class ever reaches
+  it. Priority is orchestration priority only — it never bypasses dependencies, a
+  WAITING/PAUSED runtime state, or exact-action validation.
 
 ### Unchanged (explicitly)
 - The H22-A seam, exact-action proposal binding, canonical execution state, checkpoint

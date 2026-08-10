@@ -94,8 +94,9 @@ state only — it references workflows by `instance_id` and duplicates no runtim
 state), a cross-workflow dependency graph (`REQUIRES_COMPLETION` / `REQUIRES_SUCCESS`, with
 cycles/self-edges/unknown references rejected), deterministic eligibility classification,
 and a `PortfolioScheduler` that grants one quantum per round by the stable key
-`(effective_rank, dependency_depth, -fairness_deficit, registration_sequence, instance_id)`
-with explicit priority, bounded aging, and deterministic fairness. It imports only the
+`(effective_rank, dependency_depth, -fairness_credit, registration_sequence, instance_id)`
+with explicit priority, smooth weighted round-robin (SWRR) fairness within a priority tier,
+and bounded cross-tier aging; topology is frozen once scheduling begins. It imports only the
 runtime's public contracts (orchestration → runtime; the engine never imports
 orchestration). See [`AGENT_RUNTIME_H22B_COORDINATION.md`](AGENT_RUNTIME_H22B_COORDINATION.md).
 
@@ -104,9 +105,11 @@ authorizes its task, resumes a `HOLD`/`ESCALATE`, or calls a provider. Every con
 quantum still crosses fresh governance and exact-action validation inside `advance_workflow`.
 H22-B is deterministic interleaving, **not** simultaneous execution.
 
-H22-B is `IMPLEMENTED_AND_CI_VERIFIED` — the scoped `agent-runtime-ci` GitHub Actions
+H22-B is `IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED` after the audit corrections (weighted
+fairness → smooth weighted round-robin; portfolio-lifecycle topology freeze). Promotion to
+`IMPLEMENTED_AND_CI_VERIFIED` awaits re-observing the scoped `agent-runtime-ci` GitHub Actions
 workflow (package suite, isolated wheel-install verification, platform-freeze, terminology,
-API-stability registry, and safety-case checks) has been observed passing on the change. Not
+API-stability registry, and safety-case checks) green on the correction head. Not
 live-verified, distributed-safe, or exactly-once.
 
 ## What later H22 phases build on this base (not now)
