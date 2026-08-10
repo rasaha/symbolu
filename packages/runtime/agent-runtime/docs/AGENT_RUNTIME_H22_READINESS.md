@@ -1,9 +1,12 @@
 # Agent Runtime — H22 Readiness
 
 This document describes the stable, domain-neutral base on which H22 (Multi-Workflow
-Orchestration) is built **without importing application internals**, and records the one
-H22 phase delivered so far — **H22-A bounded workflow advancement** (0.3.0). **Full H22 is
-not implemented here.**
+Orchestration) is built **without importing application internals**, and records the H22
+phases delivered so far — **H22-A bounded workflow advancement** (0.3.0) and **H22-B
+deterministic multi-workflow coordination** (0.4.0). **Full H22 is not implemented here:**
+H22-C (portfolio durability / trace / failure propagation / cancellation) and H22-D (true
+concurrency / resources / budget / compensation) remain future phases. The dedicated H22-B
+document is [`AGENT_RUNTIME_H22B_COORDINATION.md`](AGENT_RUNTIME_H22B_COORDINATION.md).
 
 > **Gate (satisfied).** The post-merge corrections that had to precede any H22 work —
 > fail-closed default governance (0.1.1), exact-action proposal binding (0.1.2), honest
@@ -23,7 +26,11 @@ Canonical Execution State           ← delivered (0.2.0)
         ↓
 H22-A Bounded Workflow Advancement  ← delivered (0.3.0) — foundation only
         ↓
-H22-B … full Multi-Workflow Orchestration    ← future feature phase(s)
+H22-B Deterministic Coordination    ← delivered (0.4.0) — portfolio/deps/priority/fairness/aging
+        ↓
+H22-C Portfolio durability / trace / failure propagation / cancellation   ← future
+        ↓
+H22-D True concurrency / resources / budget / compensation                ← future
         ↓
 Runtime-to-Governance integration validation
         ↓
@@ -77,22 +84,42 @@ existing Agent Runtime governance / exact-action / execution / checkpoint bounda
 governance decides WHETHER each consequential transition is permitted
 ```
 
-`H22-A != full H22.` H22 is **not** implemented or complete; only its bounded-advancement
-foundation is.
+`H22-A != full H22.` H22-A is only the bounded-advancement foundation.
 
-## What H22 may build on this base (not now)
+## H22-B — Deterministic Multi-Workflow Coordination (delivered, 0.4.0)
 
-- multi-workflow graph definitions;
-- dependency resolution across workflows;
-- bounded parallelism across workflows;
-- cross-workflow state aggregation;
-- failure propagation across workflows;
-- compensation coordination;
-- parent/child workflow relationships;
-- multi-workflow recovery;
-- orchestration-level audit events.
+H22-B is the coordination layer that consumes the H22-A seam and answers *which* prepared
+workflow receives the next quantum, and *why*. It adds a `WorkflowPortfolio` (orchestration
+state only — it references workflows by `instance_id` and duplicates no runtime-owned
+state), a cross-workflow dependency graph (`REQUIRES_COMPLETION` / `REQUIRES_SUCCESS`, with
+cycles/self-edges/unknown references rejected), deterministic eligibility classification,
+and a `PortfolioScheduler` that grants one quantum per round by the stable key
+`(effective_rank, dependency_depth, -fairness_credit, registration_sequence, instance_id)`
+with explicit priority, smooth weighted round-robin (SWRR) fairness within a priority tier,
+and bounded cross-tier aging; topology is frozen once scheduling begins. It imports only the
+runtime's public contracts (orchestration → runtime; the engine never imports
+orchestration). See [`AGENT_RUNTIME_H22B_COORDINATION.md`](AGENT_RUNTIME_H22B_COORDINATION.md).
 
-**None of the above is implemented in this packaging phase.**
+**Governance stays entirely below H22-B.** The scheduler selects a workflow; it never
+authorizes its task, resumes a `HOLD`/`ESCALATE`, or calls a provider. Every consequential
+quantum still crosses fresh governance and exact-action validation inside `advance_workflow`.
+H22-B is deterministic interleaving, **not** simultaneous execution.
+
+H22-B is `IMPLEMENTED_AND_CI_VERIFIED` after the audit corrections (weighted fairness → smooth
+weighted round-robin; portfolio-lifecycle topology freeze) — the scoped `agent-runtime-ci`
+GitHub Actions workflow (package suite, isolated wheel-install verification, platform-freeze,
+terminology, API-stability registry, and safety-case checks) has been observed passing on the
+correction head. Not live-verified, distributed-safe, or exactly-once.
+
+## What later H22 phases build on this base (not now)
+
+- **H22-C:** portfolio checkpoint/recovery, portfolio trace, failure propagation policy,
+  cancellation scopes, richer dependency types (output/milestone/review) once the runtime
+  exposes a durable public representation for them;
+- **H22-D:** true bounded concurrency, resource coordination/ledger, shared budget
+  coordination, and compensation coordination.
+
+**None of the above is implemented in this phase.**
 
 ## Why the base is ready
 

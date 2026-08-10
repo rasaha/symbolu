@@ -38,6 +38,23 @@ from .models.results import (
 from .models.task import TaskDefinition, TaskInstance, TaskStatus
 from .models.transitions import RuntimeTransition
 from .models.workflow import WorkflowDefinition, WorkflowInstance, WorkflowStatus
+from .orchestration import (
+    DependencyGraph,
+    DependencyState,
+    DependencyType,
+    PortfolioScheduler,
+    PortfolioStatus,
+    PortfolioStepReason,
+    PortfolioStepResult,
+    PortfolioWorkflowEntry,
+    SchedulingPolicy,
+    SelectionReason,
+    WorkflowDependency,
+    WorkflowEligibility,
+    WorkflowPortfolio,
+    WorkflowPriority,
+    priority_rank,
+)
 from .persistence.checkpoints import Checkpoint
 from .persistence.interfaces import CheckpointStore, RuntimeEventStore, RuntimeStateStore
 from .persistence.recovery import RuntimeRecoveryResult
@@ -159,6 +176,29 @@ def register_governance_hook(config: AgentRuntimeConfig, hook: GovernanceHook) -
     return dataclasses.replace(config, governance_hook=hook)
 
 
+# --- H22-B multi-workflow coordination constructors --------------------------
+def create_portfolio(portfolio_id: str) -> WorkflowPortfolio:
+    """Create an empty workflow portfolio (H22-B). No I/O; registers nothing.
+
+    Register already-prepared workflow instances with ``portfolio.register(instance_id,
+    runtime=…)`` and declare cross-workflow prerequisites with
+    ``portfolio.add_dependency(...)``. The portfolio holds orchestration state only and
+    never duplicates runtime-owned workflow state."""
+    return WorkflowPortfolio(portfolio_id)
+
+
+def create_portfolio_scheduler(
+    runtime: AgentRuntime, policy: Optional[SchedulingPolicy] = None
+) -> PortfolioScheduler:
+    """Create a deterministic portfolio scheduler bound to ``runtime`` (H22-B).
+
+    ``scheduler.step(portfolio)`` grants at most one bounded H22-A quantum per round to the
+    eligible workflow chosen by priority/fairness/aging; ``scheduler.run(portfolio)`` loops
+    that bounded step until the portfolio is quiescent or complete. The scheduler selects a
+    workflow; it never authorizes its task — governance stays entirely below H22-B."""
+    return PortfolioScheduler(runtime, policy)
+
+
 __all__ = [
     # runtime
     "AgentRuntime",
@@ -178,6 +218,22 @@ __all__ = [
     "FailureCategory",
     "WorkflowAdvanceOutcome",
     "WorkflowAdvanceStop",
+    # H22-B multi-workflow coordination
+    "WorkflowPortfolio",
+    "PortfolioWorkflowEntry",
+    "PortfolioStatus",
+    "WorkflowPriority",
+    "priority_rank",
+    "DependencyGraph",
+    "DependencyType",
+    "DependencyState",
+    "WorkflowDependency",
+    "PortfolioScheduler",
+    "SchedulingPolicy",
+    "PortfolioStepResult",
+    "PortfolioStepReason",
+    "SelectionReason",
+    "WorkflowEligibility",
     # providers
     "Provider",
     "ProviderRegistry",
@@ -231,4 +287,6 @@ __all__ = [
     "recover_runtime",
     "register_provider",
     "register_governance_hook",
+    "create_portfolio",
+    "create_portfolio_scheduler",
 ]

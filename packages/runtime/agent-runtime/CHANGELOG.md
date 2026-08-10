@@ -3,6 +3,92 @@
 All notable changes to the independent Agent Runtime distribution are recorded here.
 This project follows semantic versioning for the distribution.
 
+## 0.4.0 — H22-B deterministic multi-workflow coordination
+
+Adds the coordination layer that consumes the H22-A bounded-advancement seam and decides
+**which** prepared workflow receives the next execution quantum, and **why** — the
+deterministic equivalent of a team lead over a shared workflow graph, with **no**
+concurrency. Additive only: it consumes the unchanged `advance_workflow` seam and makes no
+change to exact-action fingerprint semantics, governance ownership, canonical execution
+state, checkpoint digest semantics, or recovery behavior. Governance stays entirely below
+this layer — the scheduler selects a workflow, it never authorizes that workflow's task.
+**This is H22-B, not full H22:** no concurrency, no shared budget/resource ledger, no
+portfolio checkpoint/recovery, no failure-propagation/compensation engine, no peer-to-peer
+agent messaging, and no agent/model selection (those are H22-C / H22-D).
+
+### Added
+- **`ugence_agent_runtime.orchestration`** subpackage (re-exported from the curated
+  `ugence_agent_runtime.api`), whose dependency direction is orchestration → runtime — the
+  single-workflow runtime engine never imports it.
+- **`WorkflowPortfolio`** (+ `create_portfolio(portfolio_id)`) — a deterministic aggregate
+  of already-prepared workflow registrations. It is **orchestration state only**: it
+  references each workflow by `instance_id` and never duplicates runtime-owned
+  workflow/task state, canonical execution state, or checkpoints. Registration is explicit,
+  append-only, order-stable, and idempotent (re-registering an `instance_id` returns the
+  existing entry unchanged — registered identity is immutable); an unknown instance is
+  rejected; a `weight` must be positive and finite (NaN / ±Inf / non-positive rejected
+  fail-closed); registration runs nothing. `PortfolioWorkflowEntry` carries only
+  orchestration metadata (priority, fairness weight, registration sequence, and the mutable
+  age / `fair_credit` scheduler bookkeeping). `PortfolioStatus` = `CREATED` / `ACTIVE` /
+  `COMPLETED` (a quiescent portfolio whose workflows are all WAITING/PAUSED/dependency-blocked
+  is ACTIVE, **not** complete). **Topology is frozen once scheduling begins:** a new
+  registration or dependency is rejected in `ACTIVE`/`COMPLETED` (so the scheduler can never
+  run a workflow the portfolio does not report), and stepping an *empty* portfolio is a no-op
+  that leaves it `CREATED` and still mutable — never misleadingly `ACTIVE`.
+- **Cross-workflow dependency graph** — `DependencyGraph`, `WorkflowDependency`,
+  `DependencyType` (`REQUIRES_COMPLETION` — any terminal predecessor releases the dependent;
+  `REQUIRES_SUCCESS` — fail-closed, a non-`COMPLETED` terminal predecessor turns the
+  dependent into `BLOCKED_DEPENDENCY`), and `DependencyState`. The graph is validated
+  fail-closed: self-dependency, unknown references, and direct/indirect cycles are rejected;
+  duplicate edges are idempotent; `depth()` is the deterministic longest-path-to-root.
+  Richer types (output/milestone/review) are deliberately **not** invented — the packaged
+  runtime exposes no durable public representation for them yet (documented as H22-C+).
+- **`PortfolioScheduler`** (+ `create_portfolio_scheduler(runtime, policy=None)`) — grants
+  at most one bounded quantum per `step`, through the unchanged `advance_workflow` seam.
+  `WorkflowEligibility` classification (`ELIGIBLE`, `WAITING_DEPENDENCY`,
+  `BLOCKED_DEPENDENCY`, `WAITING_RUNTIME`, `PAUSED`, `TERMINAL`) is mapped one-to-one from
+  runtime status + dependency verdict and invokes **zero** provider and **zero** governance
+  calls. Selection uses the single stable ordering key `(effective_rank, dependency_depth,
+  -fairness_credit, registration_sequence, instance_id)` — no wall-clock, object identity,
+  dict order, thread order, or randomness. `SchedulingPolicy` carries the `aging_cap` and
+  the CRITICAL-never-ages rule. `PortfolioStepResult` is a frozen value object with a
+  structured `SelectionReason` (rank/priority/age/depth/`fairness_credit`/sequence) that
+  answers "why B instead of A?". `PortfolioStepReason` = `QUANTUM_GRANTED` /
+  `NO_ELIGIBLE_WORKFLOW` / `ALL_TERMINAL` / `EMPTY_PORTFOLIO`. A bounded
+  `run(portfolio, max_rounds)` convenience loops the single-quantum `step` until the
+  portfolio is quiescent or complete and never spins.
+- **Priority / fairness / aging (orthogonal, so they never fight)** — `WorkflowPriority`
+  (`CRITICAL` … `BACKGROUND`, lower rank preferred) + `priority_rank`. **Fairness is smooth
+  weighted round-robin (SWRR)** within the top contention tier (eligible workflows sharing
+  the best `(effective_rank, dependency_depth)`): each round every tier member's
+  `fair_credit` gains its `weight`, the maximum-credit member is selected, and it is charged
+  the tier's total weight — provably proportional to weight, smooth, deterministic, and
+  starvation-free for every positive weight (fixing the earlier `deficit += weight`/`-= 1`
+  accrual, under which a weight-2 workflow permanently outran a weight-1 one). **Aging** is
+  bounded and cross-tier only (`effective_rank = max(1, base − min(age, aging_cap))`): only
+  an eligible workflow held *below* the top tier ages; a non-selected tier member never ages
+  (SWRR already serves it), the selected workflow resets, and dependency-blocked / WAITING /
+  PAUSED / terminal workflows never age; CRITICAL is absolute and no aged class ever reaches
+  it. Priority is orchestration priority only — it never bypasses dependencies, a
+  WAITING/PAUSED runtime state, or exact-action validation.
+
+### Unchanged (explicitly)
+- The H22-A seam, exact-action proposal binding, canonical execution state, checkpoint
+  digest semantics, and side-effect-free recovery are untouched. The scheduler never caches
+  or manufactures a `CLEAR`, reinterprets a `HOLD`, downgrades a `BLOCK`, auto-resumes an
+  `ESCALATE`, mutates a proposal, or calls a provider directly — every consequential quantum
+  still crosses fresh governance inside `advance_workflow`. No concurrency (no
+  threads/asyncio/pools), no shared budget/resource ledger, no portfolio durability, no
+  compensation, no peer-to-peer messaging, no agent/model selection.
+
+### Public API
+- Added the H22-B orchestration symbols (`WorkflowPortfolio`, `PortfolioWorkflowEntry`,
+  `PortfolioStatus`, `WorkflowPriority`, `priority_rank`, `DependencyGraph`,
+  `DependencyType`, `DependencyState`, `WorkflowDependency`, `PortfolioScheduler`,
+  `SchedulingPolicy`, `PortfolioStepResult`, `PortfolioStepReason`, `SelectionReason`,
+  `WorkflowEligibility`) and the `create_portfolio` / `create_portfolio_scheduler`
+  constructors to the curated surface. Version `0.3.0` → `0.4.0` (additive).
+
 ## 0.3.0 — H22-A bounded workflow advancement
 
 Adds a small, additive, deterministic seam that lets an external orchestrator create a
