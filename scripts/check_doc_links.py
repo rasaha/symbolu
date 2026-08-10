@@ -21,8 +21,8 @@ DOCS = [
     "UGENCE_PLATFORM_OVERVIEW.md",
     "UGENCE_PRODUCTIZATION_ROADMAP.md",
     "ADR_MODEL_SELECTION_POLICY_PLACEMENT.md",
-    "docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md",
-    "docs/architecture/UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_UPDATE_REPORT.md",
+    "Project_documentation/repository/docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md",
+    "Project_documentation/repository/docs/architecture/UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_UPDATE_REPORT.md",
 ]
 
 LINK = re.compile(r"\[[^\]]*\]\((?!https?://)([^)#]+)(?:#[^)]*)?\)")

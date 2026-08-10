@@ -12,7 +12,7 @@ NORMATIVE REQUIREMENTS (from spec Section 0):
 - MUST NOT select, rank, or prioritize candidates
 - MUST expose rejection reasons only via audit metadata
 
-Reference: docs/architecture/STITCHING_FUSION_SPECIFICATION.md
+Reference: Project_documentation/repository/docs/architecture/STITCHING_FUSION_SPECIFICATION.md
 """
 
 from dataclasses import dataclass, field

@@ -2,7 +2,7 @@
 
 This module contains two layered pieces of work:
 
-1. **[int4_protected backend](./INT4_PROTECTED_README.md)** *(current
+1. **[int4_protected backend](INT4_PROTECTED_README.md)** *(current
    ship — Phase 5-7)* — a 4-bit KV-cache quantization backend for
    vLLM with quality-preserving "protected channels." Four
    model families validated at 100% needle-retrieval matching stock

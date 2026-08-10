@@ -2,7 +2,7 @@
 
 An **isolated** module implementing the *foundation* of the AI-Assisted Hiring
 Framework described in
-[`docs/design/AI_ASSISTED_HIRING_FRAMEWORK_DESIGN.md`](../docs/design/AI_ASSISTED_HIRING_FRAMEWORK_DESIGN.md).
+[`docs/design/AI_ASSISTED_HIRING_FRAMEWORK_DESIGN.md`](../Project_documentation/repository/docs/design/AI_ASSISTED_HIRING_FRAMEWORK_DESIGN.md).
 
 This phase delivers the canonical data contracts, an audited workflow state
 machine, and the hard, enforced separation between **AI recommendations

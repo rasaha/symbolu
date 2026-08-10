@@ -8,7 +8,7 @@ accuracy, error capture rate, AURC, false abstention rate)
 across an exhaustive threshold sweep, runs paired bootstrap
 CIs, and emits a verdict per the §15.1-pinned ordered cascade.
 
-Reference design: docs/design/BCVF_LLM_TRUST_ROUTING_DESIGN.md
+Reference design: Project_documentation/repository/docs/design/BCVF_LLM_TRUST_ROUTING_DESIGN.md
 §15.1 Chunks 1–7 plus §15.1 Amendment 1.
 
 Discipline: all numerical bands, metric definitions, baselines,

@@ -5,9 +5,9 @@
     "agentic/hybrid_handover/resolution/experiment_v3/hybrid_resolver_v3.py": "45a2656cc945bbfba1819cb96fba798a63f893546be1f39498190548a4cacb41",
     "agentic/hybrid_handover/resolution/experiment_v3/run_prioritization_experiment.py": "acac2384be55612e1dcb921ef17f93b6b7cba847d327b3188b149691e389d451",
     "agentic/hybrid_handover/resolution/experiment_v3/lock_v3.py": "91e7a0832b950e68dfb061116f6f0e74eef17282a8f5cb94bfd713418d312c74",
-    "agentic/hybrid_handover/resolution/experiment_v3/EDGE_PRIORITIZATION_PREREGISTRATION.md": "010bd9f7253e68b84c2901f60656157e84c206959a5ed1bb82eada98ba531ff8",
-    "agentic/hybrid_handover/resolution/experiment_v3/PRIORITY_VECTOR_SPEC.md": "643332620bbfc30a463b62223d746770853e605943a3f60fa7e37652ac07b6ba",
-    "agentic/hybrid_handover/resolution/experiment_v3/EDGE_PRIORITY_RULEBOOK.md": "7ea6ba0fa4119cd849565c0612647711111258ab201d7f1e8e8bc976a637d9d9"
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v3/EDGE_PRIORITIZATION_PREREGISTRATION.md": "010bd9f7253e68b84c2901f60656157e84c206959a5ed1bb82eada98ba531ff8",
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v3/PRIORITY_VECTOR_SPEC.md": "643332620bbfc30a463b62223d746770853e605943a3f60fa7e37652ac07b6ba",
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v3/EDGE_PRIORITY_RULEBOOK.md": "7ea6ba0fa4119cd849565c0612647711111258ab201d7f1e8e8bc976a637d9d9"
   },
   "frozen_hashes": {
     "agentic/hybrid_handover/resolution/experiment_v2/hybrid_resolver_v2.py": "620e82c76d7f35932fc9c40af2241d4749d6dac1400b35faf2708529cbaa5a8e",

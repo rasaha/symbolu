@@ -13,7 +13,7 @@ NORMATIVE REQUIREMENTS (from spec Section 0.3):
 CRITICAL: Fusion code MUST import from this module, NOT from contracts.py.
 This enforces that Fusion cannot access StitchingDecision internals.
 
-Reference: docs/architecture/STITCHING_FUSION_SPECIFICATION.md
+Reference: Project_documentation/repository/docs/architecture/STITCHING_FUSION_SPECIFICATION.md
 """
 
 from dataclasses import dataclass, field

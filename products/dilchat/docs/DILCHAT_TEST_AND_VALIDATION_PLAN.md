@@ -5,7 +5,7 @@
 **Product:** DilChat (consumer) · **Company:** Ugence Labs · **Site:** dilchat.com
 **Document type:** Test & Validation Plan (design phase — DESIGN ONLY, no test code)
 **Status:** Draft for review · **Owner:** Principal QA / Validation Engineer
-**Canonical reference:** [`DILCHAT_DECISION_LOG.md`](./DILCHAT_DECISION_LOG.md) — all names, versions, module boundaries, and technology choices are fixed there; this plan cites the log and never re-decides. Product behavior traces to [`DILCHAT_BACKEND_PRODUCT_REQUIREMENTS.md`](./DILCHAT_BACKEND_PRODUCT_REQUIREMENTS.md).
+**Canonical reference:** [`DILCHAT_DECISION_LOG.md`](DILCHAT_DECISION_LOG.md) — all names, versions, module boundaries, and technology choices are fixed there; this plan cites the log and never re-decides. Product behavior traces to [`DILCHAT_BACKEND_PRODUCT_REQUIREMENTS.md`](DILCHAT_BACKEND_PRODUCT_REQUIREMENTS.md).
 
 > **This document describes tests; it does not contain test code.** Cases, fixtures, matrices, and acceptance criteria are specified so an implementer can write the suite. Small illustrative pseudocode is used only where an assertion's shape is load-bearing.
 

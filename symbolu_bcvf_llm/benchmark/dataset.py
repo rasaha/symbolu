@@ -327,7 +327,7 @@ class TruthfulQABenchmark:
             raise RuntimeError(
                 "TruthfulQABenchmark requires `torch`, `transformers`, "
                 "and `datasets`. For offline testing use MockBenchmark. "
-                "See docs/design/BCVF_LLM_TRUST_ROUTING_DESIGN.md §6.2."
+                "See Project_documentation/repository/docs/design/BCVF_LLM_TRUST_ROUTING_DESIGN.md §6.2."
             ) from exc
 
         from transformers import AutoModelForCausalLM, AutoTokenizer

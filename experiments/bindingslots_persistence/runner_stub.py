@@ -11,7 +11,7 @@ import sys
 
 MSG = ("TRAINING NOT AUTHORIZED: the BindingSlots persistence matrix is preregistered only. "
        "Training requires separate explicit authorization (see "
-       "docs/audits/bindingslots_persistence_preregistration/TRAINING_AUTHORIZATION_GATE.md). "
+       "Project_documentation/repository/docs/audits/bindingslots_persistence_preregistration/TRAINING_AUTHORIZATION_GATE.md). "
        "This phase produces the preregistration, integrity report, and non-interference proof only.")
 
 

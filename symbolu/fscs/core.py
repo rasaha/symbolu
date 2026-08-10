@@ -222,7 +222,7 @@ class FSCSCoherenceModule(nn.Module):
     This module operates on POST-LAYER residual streams, which means it reads
     the *output* of the previous layer to decide how to route the *current*
     layer. That is the causal, FlashAttention-compatible design from the GCT
-    paper (docs/design/GCT_GATED_COHERENCE_TRANSFORMER_DESIGN.md §2.3).
+    paper (Project_documentation/repository/docs/design/GCT_GATED_COHERENCE_TRANSFORMER_DESIGN.md §2.3).
 
     Shape convention (first-pass, token-level gating):
         attn_output : [B, N, D]   — per-layer attention output (already

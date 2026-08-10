@@ -5,7 +5,7 @@ Legacy Integration Cleanup Script
 
 Creates a new clean training file by removing legacy control-plane integrations
 from train_unified_llm.py. This prepares the codebase for the new unified
-ControlPlaneGovernor (see docs/design/LATENT_SEMANTIC_TOKEN_BRIDGE_DESIGN.md,
+ControlPlaneGovernor (see Project_documentation/repository/docs/design/LATENT_SEMANTIC_TOKEN_BRIDGE_DESIGN.md,
 Appendices E and F).
 
 Legacy integrations removed:
@@ -666,7 +666,7 @@ def process_file(input_path: str, output_path: str):
     # Find and remove the Kosha Gyroscope initialization block (lines ~14886-15020)
     for i, line in enumerate(lines):
         stripped = line.strip()
-        if '# Reference: docs/design/KOSHA_GYROSCOPE_DESIGN.md' in stripped:
+        if '# Reference: Project_documentation/repository/docs/design/KOSHA_GYROSCOPE_DESIGN.md' in stripped:
             # Find the block that follows
             block_start = i
             block_end = i

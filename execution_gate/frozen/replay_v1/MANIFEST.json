@@ -8,19 +8,19 @@
       "frozen_name": "EVALUATION_REPORT.md",
       "role": "evaluation_report",
       "sha256": "a9ad7931c815447eaab50a72c542fb363ed7066e2df6cffcfb2a124a90d067f1",
-      "source_path": "docs/execution_eligibility/EVALUATION_REPORT.md"
+      "source_path": "Project_documentation/governance/docs/execution_eligibility/EVALUATION_REPORT.md"
     },
     {
       "frozen_name": "EXECUTION_ELIGIBILITY_EVALUATION_PROTOCOL.md",
       "role": "evaluation_protocol",
       "sha256": "8bebf0a61e94099f812d70b9922a094c070aa80e78b856db4a2713f98ada55a0",
-      "source_path": "docs/execution_eligibility/EXECUTION_ELIGIBILITY_EVALUATION_PROTOCOL.md"
+      "source_path": "Project_documentation/governance/docs/execution_eligibility/EXECUTION_ELIGIBILITY_EVALUATION_PROTOCOL.md"
     },
     {
       "frozen_name": "LIMITATIONS_AND_FALSIFICATION.md",
       "role": "limitations_and_falsification",
       "sha256": "78b8b57c8db5a6d8364e99345a766a1130e1bd5184a3062c9bc99e76c5f91ae7",
-      "source_path": "docs/execution_eligibility/LIMITATIONS_AND_FALSIFICATION.md"
+      "source_path": "Project_documentation/governance/docs/execution_eligibility/LIMITATIONS_AND_FALSIFICATION.md"
     },
     {
       "frozen_name": "baselines.py",

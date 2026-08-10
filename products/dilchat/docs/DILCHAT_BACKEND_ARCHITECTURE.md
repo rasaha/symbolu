@@ -2,9 +2,9 @@
 
 **Product:** DilChat (consumer couples compatibility & communication) · **Company:** Ugence Labs · **Site:** dilchat.com
 **Status:** Design phase. No production code has been written. This document is a **design specification**, not an implementation.
-**Authority:** This document is subordinate to [`DILCHAT_DECISION_LOG.md`](./DILCHAT_DECISION_LOG.md). Where a name, version, boundary, or technology choice appears here, it restates a decision made there; it does not re-decide. Conflicts are resolved in favor of the decision log.
+**Authority:** This document is subordinate to [`DILCHAT_DECISION_LOG.md`](DILCHAT_DECISION_LOG.md). Where a name, version, boundary, or technology choice appears here, it restates a decision made there; it does not re-decide. Conflicts are resolved in favor of the decision log.
 
-> **Scope of this document.** Container/component structure, module boundaries, source layout, data flows, trust boundaries, sync/async split, client interaction patterns, caching, background jobs, observability, deployment, and the future module-extraction path. Endpoint shapes live in [`DILCHAT_API_SPEC.md`](./DILCHAT_API_SPEC.md); the consent state machine lives in [`DILCHAT_PRIVACY_CONSENT_AND_SECURITY.md`](./DILCHAT_PRIVACY_CONSENT_AND_SECURITY.md); the ephemeris math lives in [`DILCHAT_ASTROLOGY_ENGINE_SPEC.md`](./DILCHAT_ASTROLOGY_ENGINE_SPEC.md).
+> **Scope of this document.** Container/component structure, module boundaries, source layout, data flows, trust boundaries, sync/async split, client interaction patterns, caching, background jobs, observability, deployment, and the future module-extraction path. Endpoint shapes live in [`DILCHAT_API_SPEC.md`](DILCHAT_API_SPEC.md); the consent state machine lives in [`DILCHAT_PRIVACY_CONSENT_AND_SECURITY.md`](DILCHAT_PRIVACY_CONSENT_AND_SECURITY.md); the ephemeris math lives in [`DILCHAT_ASTROLOGY_ENGINE_SPEC.md`](DILCHAT_ASTROLOGY_ENGINE_SPEC.md).
 
 ---
 
@@ -740,11 +740,11 @@ Extraction order recommendation: `astrology` → `moon_transits` → `ai_guidanc
 
 | Document | What it authoritatively defines |
 |----------|--------------------------------|
-| [`DILCHAT_DECISION_LOG.md`](./DILCHAT_DECISION_LOG.md) | **Canonical.** All decisions (DEC-001…DEC-021), canonical identifiers/provenance tuple, open questions. This architecture restates, never overrides. |
-| [`DILCHAT_API_SPEC.md`](./DILCHAT_API_SPEC.md) / [`openapi/dilchat.openapi.yaml`](./openapi/dilchat.openapi.yaml) | Endpoint shapes, DTOs, error codes, idempotency headers referenced in §5 and §8. |
-| [`DILCHAT_ASTROLOGY_ENGINE_SPEC.md`](./DILCHAT_ASTROLOGY_ENGINE_SPEC.md) | Ephemeris math, ayanamsa handling, nakshatra/pada boundaries, ambiguous-time handling behind §5a and the `astrology/engine`. |
-| [`DILCHAT_PRIVACY_CONSENT_AND_SECURITY.md`](./DILCHAT_PRIVACY_CONSENT_AND_SECURITY.md) | Full `ConsentEvent → SharedArtifact` state machine, scope guard details, retention/encryption behind §5f and §6. |
-| [`DILCHAT_TEST_AND_VALIDATION_PLAN.md`](./DILCHAT_TEST_AND_VALIDATION_PLAN.md) | Golden-chart oracle validation (DEC-020) referenced by the blue/green health check in §11. |
+| [`DILCHAT_DECISION_LOG.md`](DILCHAT_DECISION_LOG.md) | **Canonical.** All decisions (DEC-001…DEC-021), canonical identifiers/provenance tuple, open questions. This architecture restates, never overrides. |
+| [`DILCHAT_API_SPEC.md`](DILCHAT_API_SPEC.md) / [`openapi/dilchat.openapi.yaml`](./openapi/dilchat.openapi.yaml) | Endpoint shapes, DTOs, error codes, idempotency headers referenced in §5 and §8. |
+| [`DILCHAT_ASTROLOGY_ENGINE_SPEC.md`](DILCHAT_ASTROLOGY_ENGINE_SPEC.md) | Ephemeris math, ayanamsa handling, nakshatra/pada boundaries, ambiguous-time handling behind §5a and the `astrology/engine`. |
+| [`DILCHAT_PRIVACY_CONSENT_AND_SECURITY.md`](DILCHAT_PRIVACY_CONSENT_AND_SECURITY.md) | Full `ConsentEvent → SharedArtifact` state machine, scope guard details, retention/encryption behind §5f and §6. |
+| [`DILCHAT_TEST_AND_VALIDATION_PLAN.md`](DILCHAT_TEST_AND_VALIDATION_PLAN.md) | Golden-chart oracle validation (DEC-020) referenced by the blue/green health check in §11. |
 
 ---
 

@@ -39,7 +39,7 @@
     "approx_lines": 4890,
     "core_dependency_floor": "Python standard library only (dataclasses, enum, typing, hashlib, json, math, types, collections)",
     "frozen": true,
-    "freeze_contract_doc": "acp/ACP_V1_FREEZE.md",
+    "freeze_contract_doc": "Project_documentation/control_plane/acp/ACP_V1_FREEZE.md",
     "freeze_combined_digest_10_modules": "8f8660e293308cf94c983a26a2ae69c9",
     "freeze_verified_against_live_code": true,
     "frozen_core_modules_sha256_16": {

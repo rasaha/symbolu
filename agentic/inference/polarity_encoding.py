@@ -19,7 +19,7 @@ Backward compatibility: when φ = 0, the formula reduces to
 The polarity-aware CSR signal replaces the standard CSR context projection
 in the InterpretiveStateBuilder.
 
-Reference: docs/design/CONSCIOUS_GENERATION_DESIGN.md, Appendix F §F.10.6.4
+Reference: Project_documentation/repository/docs/design/CONSCIOUS_GENERATION_DESIGN.md, Appendix F §F.10.6.4
 
 Author: Sovereign-1 Training Initiative
 Date: March 2026

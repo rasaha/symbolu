@@ -10,7 +10,7 @@ These tests ensure:
 3. Score separation: Stitching diagnostics not used in Fusion
 4. Deterministic tie-breaking: Lexicographic by candidate ID
 
-Reference: docs/architecture/STITCHING_FUSION_SPECIFICATION.md Section 0.5
+Reference: Project_documentation/repository/docs/architecture/STITCHING_FUSION_SPECIFICATION.md Section 0.5
 """
 
 import pytest

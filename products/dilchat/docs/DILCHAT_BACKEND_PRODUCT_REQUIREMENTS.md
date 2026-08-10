@@ -3,7 +3,7 @@
 **Product:** DilChat (consumer) · **Company:** Ugence Labs · **Site:** dilchat.com
 **Document type:** Product Requirements (design phase — DESIGN ONLY, no production code)
 **Status:** Draft for review · **Owner:** Principal Technical PM
-**Canonical reference:** [`DILCHAT_DECISION_LOG.md`](./DILCHAT_DECISION_LOG.md) — all names, versions, module boundaries, and technology choices are fixed there; this PRD cites the log and never re-decides.
+**Canonical reference:** [`DILCHAT_DECISION_LOG.md`](DILCHAT_DECISION_LOG.md) — all names, versions, module boundaries, and technology choices are fixed there; this PRD cites the log and never re-decides.
 
 > **Claim labels used throughout this document**
 > Every substantive claim is tagged with exactly one of:

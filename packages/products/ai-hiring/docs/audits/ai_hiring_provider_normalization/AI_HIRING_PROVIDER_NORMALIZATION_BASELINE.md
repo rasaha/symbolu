@@ -4,7 +4,7 @@ Machine-readable companion:
 [`ai_hiring_provider_normalization_baseline.json`](./ai_hiring_provider_normalization_baseline.json).
 Behavioral captures:
 [`artifacts/`](./artifacts/). Reference inventory:
-[`LEGACY_PROVIDER_REFERENCE_INVENTORY.md`](./LEGACY_PROVIDER_REFERENCE_INVENTORY.md).
+[`LEGACY_PROVIDER_REFERENCE_INVENTORY.md`](LEGACY_PROVIDER_REFERENCE_INVENTORY.md).
 
 ## Live-state audit (recorded before any code change)
 

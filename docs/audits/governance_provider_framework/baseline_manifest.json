@@ -26,7 +26,7 @@
   },
   "integrated_completed_work": {
     "storygraph_canonical_package": {"integrated": true, "package": "packages/capabilities/storygraph", "namespace": "ugence_storygraph"},
-    "storygraph_documentation_canonicalization": {"integrated": true, "evidence": "docs/migrations/storygraph/STORYGRAPH_CANONICAL_PACKAGE_MIGRATION_REPORT.md"},
+    "storygraph_documentation_canonicalization": {"integrated": true, "evidence": "Project_documentation/repository/docs/migrations/storygraph/STORYGRAPH_CANONICAL_PACKAGE_MIGRATION_REPORT.md"},
     "governance_contracts_canonical_package": {"integrated": true, "package": "packages/governance-contracts", "namespace": "ugence_governance_contracts"},
     "terminology_foundation": {"integrated": true, "validator": "scripts/validate_terminology.py", "result": "PASS"},
     "decision_authority_canonical_package": {"integrated": true, "package": "packages/capabilities/decision-authority", "namespace": "ugence_decision_authority", "legacy_namespace": "decision_governance (identity-preserving shim, removal target 2.0.0)"}

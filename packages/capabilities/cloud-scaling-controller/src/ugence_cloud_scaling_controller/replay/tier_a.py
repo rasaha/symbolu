@@ -1,7 +1,7 @@
 """Tier-A episode detector + APCY model (Track B).
 
 Implements the **pre-registered** spec in
-`docs/cloud_scaling_real_validation/TIER_A_DETECTOR_SPEC.md`. The constants here ARE
+`Project_documentation/governance/docs/cloud_scaling_real_validation/TIER_A_DETECTOR_SPEC.md`. The constants here ARE
 the pre-registration's machine form (`DEFAULT_TIER_A_SPEC`) — they are frozen and must
 not be tuned post-hoc (spec §6).
 

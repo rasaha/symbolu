@@ -14,7 +14,7 @@ Output: 8-dim softmax domain distribution
 When disabled (flag off), the existing hardcoded domain_bridge.py path
 remains active. When enabled, this classifier's output replaces it.
 
-Reference: docs/design/DOMAIN_CONDITIONING_ARCHITECTURE.md (MVP subset)
+Reference: Project_documentation/repository/docs/design/DOMAIN_CONDITIONING_ARCHITECTURE.md (MVP subset)
 """
 
 import torch

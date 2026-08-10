@@ -5,12 +5,12 @@
     "agentic/hybrid_handover/resolution/experiment_v4/hybrid_resolver_v4.py": "b68dd97c05561786b0098bcf7bdda15984a1fd93c407f13b31ae35efccc4adeb",
     "agentic/hybrid_handover/resolution/experiment_v4/run_governance_experiment.py": "207b7b042021a62263661b585f60de63b1c95738ee0ca34e653dbab910fee2d3",
     "agentic/hybrid_handover/resolution/experiment_v4/lock_v4.py": "aef4572ffda9d0721ce66ae3bf9e19de3b6ebc02b5a64b6e08e0bd2092160ce4",
-    "agentic/hybrid_handover/resolution/experiment_v4/GOVERNANCE_SEMANTICS_PREREGISTRATION.md": "e5869756cb527dd454e5e63d245ddb725086a0d5818a67f8c1325533f1cd0a0d",
-    "agentic/hybrid_handover/resolution/experiment_v4/GOVERNANCE_SEMANTICS_ARCHITECTURE.md": "ea33f99d6ab496bbe74fec02552e8f2594061260a970057b9a60e78e87ca1b94",
-    "agentic/hybrid_handover/resolution/experiment_v4/GOVERNANCE_STATUS_MODEL.md": "10432f50620f87039d4c43eb1944c35eccef2e8d6df2fa16013b42d76cbbb3cd",
-    "agentic/hybrid_handover/resolution/experiment_v4/GOVERNANCE_RULEBOOK.md": "dd3eff4f3d7eb9a58c5d5dfc2eaf6fd8e29e7a234f2f427718eb5ebec064fddb",
-    "agentic/hybrid_handover/resolution/experiment_v4/OPERATIVE_SOURCE_SPEC.md": "f38b34e16d996099b9c4791fc5b3dc54e630fc1e59dd19c00bed0afb8e0b9666",
-    "agentic/hybrid_handover/resolution/experiment_v4/GOVERNANCE_ABSTENTION_SPEC.md": "1012b50e29e16f068f78abfa084e9d8f42257cee0b413a10320d4d734ba2688f"
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v4/GOVERNANCE_SEMANTICS_PREREGISTRATION.md": "e5869756cb527dd454e5e63d245ddb725086a0d5818a67f8c1325533f1cd0a0d",
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v4/GOVERNANCE_SEMANTICS_ARCHITECTURE.md": "ea33f99d6ab496bbe74fec02552e8f2594061260a970057b9a60e78e87ca1b94",
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v4/GOVERNANCE_STATUS_MODEL.md": "10432f50620f87039d4c43eb1944c35eccef2e8d6df2fa16013b42d76cbbb3cd",
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v4/GOVERNANCE_RULEBOOK.md": "dd3eff4f3d7eb9a58c5d5dfc2eaf6fd8e29e7a234f2f427718eb5ebec064fddb",
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v4/OPERATIVE_SOURCE_SPEC.md": "f38b34e16d996099b9c4791fc5b3dc54e630fc1e59dd19c00bed0afb8e0b9666",
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v4/GOVERNANCE_ABSTENTION_SPEC.md": "1012b50e29e16f068f78abfa084e9d8f42257cee0b413a10320d4d734ba2688f"
   },
   "frozen_hashes": {
     "agentic/hybrid_handover/resolution/experiment_v3/prioritizer.py": "9a18377bbf18e657a25f347c897114bec6126002f6a9ff5be0a2c2fa9c836310",

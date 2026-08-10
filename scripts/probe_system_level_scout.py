@@ -2,7 +2,7 @@
 """§14a experiment — System-level BCVF integration scout.
 
 Reference:
-  symbolu_robotics/bcvf_autonomous/DESIGN.md §6.1 / §6.7 — autonomy-
+  Project_documentation/autonomous_robotics/symbolu_robotics/bcvf_autonomous/DESIGN.md §6.1 / §6.7 — autonomy-
   domain validation that passed (sign-test p=0.0072 on N=21 with
   S3_map_error_accel) was a SYSTEM-LEVEL result: multi-source robotic
   system using BCVF-shaped routing produces sign-test-significant

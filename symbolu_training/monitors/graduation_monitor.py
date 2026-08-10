@@ -12,7 +12,7 @@ Graduation Criteria (v2.2.0):
 The dual criteria prevents false graduations from "easy" batches.
 
 References:
-- docs/design/KOSHA_GYROSCOPE_DESIGN.md v2.2.0, Appendix E.3
+- Project_documentation/repository/docs/design/KOSHA_GYROSCOPE_DESIGN.md v2.2.0, Appendix E.3
 """
 
 import re

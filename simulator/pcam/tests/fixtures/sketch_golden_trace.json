@@ -9,8 +9,8 @@
     "This file is intentionally human-readable so reviewers can see exactly",
     "what behaviors the conformance suite exercises without running Python.",
     "",
-    "Source of truth for scoring model: docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md",
-    "PR scope: simulator/pcam/docs/PCAM_UPDATE_PR_SCOPE.md"
+    "Source of truth for scoring model: Project_documentation/repository/docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md",
+    "PR scope: Project_documentation/simulator/simulator/pcam/docs/PCAM_UPDATE_PR_SCOPE.md"
   ],
 
   "sketch_traces": {

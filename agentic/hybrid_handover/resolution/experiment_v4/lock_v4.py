@@ -23,12 +23,12 @@ _V4_FILES = [
     "agentic/hybrid_handover/resolution/experiment_v4/hybrid_resolver_v4.py",
     "agentic/hybrid_handover/resolution/experiment_v4/run_governance_experiment.py",
     "agentic/hybrid_handover/resolution/experiment_v4/lock_v4.py",
-    "agentic/hybrid_handover/resolution/experiment_v4/GOVERNANCE_SEMANTICS_PREREGISTRATION.md",
-    "agentic/hybrid_handover/resolution/experiment_v4/GOVERNANCE_SEMANTICS_ARCHITECTURE.md",
-    "agentic/hybrid_handover/resolution/experiment_v4/GOVERNANCE_STATUS_MODEL.md",
-    "agentic/hybrid_handover/resolution/experiment_v4/GOVERNANCE_RULEBOOK.md",
-    "agentic/hybrid_handover/resolution/experiment_v4/OPERATIVE_SOURCE_SPEC.md",
-    "agentic/hybrid_handover/resolution/experiment_v4/GOVERNANCE_ABSTENTION_SPEC.md",
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v4/GOVERNANCE_SEMANTICS_PREREGISTRATION.md",
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v4/GOVERNANCE_SEMANTICS_ARCHITECTURE.md",
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v4/GOVERNANCE_STATUS_MODEL.md",
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v4/GOVERNANCE_RULEBOOK.md",
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v4/OPERATIVE_SOURCE_SPEC.md",
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment_v4/GOVERNANCE_ABSTENTION_SPEC.md",
 ]
 
 _FROZEN_FILES = [

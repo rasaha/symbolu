@@ -3,7 +3,7 @@
 **Product:** DilChat (consumer) · **Company:** Ugence Labs · **Site:** dilchat.com
 **Document:** 10 of the DilChat design-document suite (the roadmap/operations doc).
 **Status:** Design phase. **No production implementation begins until specs (documents 1–9) are approved.**
-**Subordinate to:** [`DILCHAT_DECISION_LOG.md`](./DILCHAT_DECISION_LOG.md) — canonical. This roadmap sequences and gates the work; it never re-decides architecture, rule packs, or provenance. On any conflict, the Decision Log wins.
+**Subordinate to:** [`DILCHAT_DECISION_LOG.md`](DILCHAT_DECISION_LOG.md) — canonical. This roadmap sequences and gates the work; it never re-decides architecture, rule packs, or provenance. On any conflict, the Decision Log wins.
 
 > **Flagship first milestone (verbatim, the north star of the MVP):**
 > *"Two users independently create birth profiles, securely pair, and receive a reproducible shared Guna Milan scorecard plus individual daily Moon-interest profiles, with private and shared authorization boundaries enforced."*
@@ -62,9 +62,9 @@
 > mobile track adds **Phase 2 (device/native hardening)** and **Phase 3 (secure
 > shared chat)** ahead of AI Assist (Phases 4A–4D). This refines — and is
 > sequenced by — the dedicated
-> [`DILCHAT_AI_ASSIST_DEVELOPMENT_ROADMAP.md`](./DILCHAT_AI_ASSIST_DEVELOPMENT_ROADMAP.md);
-> see also [`DILCHAT_AI_ASSIST_PRODUCT_REQUIREMENTS.md`](./DILCHAT_AI_ASSIST_PRODUCT_REQUIREMENTS.md)
-> and [`DILCHAT_RELATIONSHIP_SIGNAL_FUSION_REQUIREMENTS.md`](./DILCHAT_RELATIONSHIP_SIGNAL_FUSION_REQUIREMENTS.md).
+> [`DILCHAT_AI_ASSIST_DEVELOPMENT_ROADMAP.md`](DILCHAT_AI_ASSIST_DEVELOPMENT_ROADMAP.md);
+> see also [`DILCHAT_AI_ASSIST_PRODUCT_REQUIREMENTS.md`](DILCHAT_AI_ASSIST_PRODUCT_REQUIREMENTS.md)
+> and [`DILCHAT_RELATIONSHIP_SIGNAL_FUSION_REQUIREMENTS.md`](DILCHAT_RELATIONSHIP_SIGNAL_FUSION_REQUIREMENTS.md).
 > No AI Assist implementation is authorized by this note; **AI Assist must not be
 > built before secure shared chat and privacy boundaries exist.**
 
@@ -673,10 +673,10 @@ Ordered by recommended sequence after MVP launch:
 
 | Document | Authoritative for | Roadmap dependency |
 |----------|-------------------|--------------------|
-| [`DILCHAT_DECISION_LOG.md`](./DILCHAT_DECISION_LOG.md) | All decisions, provenance tuple, open questions — **canonical** | Every phase & gate |
-| [`DILCHAT_BACKEND_PRODUCT_REQUIREMENTS.md`](./DILCHAT_BACKEND_PRODUCT_REQUIREMENTS.md) | FR/NFR, personas, journeys, MVP boundaries | Every phase |
-| [`DILCHAT_BACKEND_ARCHITECTURE.md`](./DILCHAT_BACKEND_ARCHITECTURE.md) | Modular monolith, data flows, deployment | A–F |
-| [`DILCHAT_API_SPEC.md`](./DILCHAT_API_SPEC.md) / [`openapi/dilchat.openapi.yaml`](./openapi/dilchat.openapi.yaml) | HTTP contract | B–F |
+| [`DILCHAT_DECISION_LOG.md`](DILCHAT_DECISION_LOG.md) | All decisions, provenance tuple, open questions — **canonical** | Every phase & gate |
+| [`DILCHAT_BACKEND_PRODUCT_REQUIREMENTS.md`](DILCHAT_BACKEND_PRODUCT_REQUIREMENTS.md) | FR/NFR, personas, journeys, MVP boundaries | Every phase |
+| [`DILCHAT_BACKEND_ARCHITECTURE.md`](DILCHAT_BACKEND_ARCHITECTURE.md) | Modular monolith, data flows, deployment | A–F |
+| [`DILCHAT_API_SPEC.md`](DILCHAT_API_SPEC.md) / [`openapi/dilchat.openapi.yaml`](./openapi/dilchat.openapi.yaml) | HTTP contract | B–F |
 | `DILCHAT_DATA_MODEL.md` | Tables, scope columns, RLS | B, C, D, G |
 | `DILCHAT_ASTROLOGY_ENGINE_SPEC.md` | Ephemeris math, ayanamsa, tz, transits | A, B, C, E |
 | `DILCHAT_PRIVACY_CONSENT_AND_SECURITY.md` | Consent state machine, scope guard | D, E, F, G |

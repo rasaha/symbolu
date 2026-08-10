@@ -16,7 +16,7 @@ NORMATIVE REQUIREMENTS (from spec Section 0.2):
 CRITICAL: This module MUST NOT import from symbolu.core.stitching.contracts.
 It may only import from symbolu.core.stitching.handoff (the boundary interface).
 
-Reference: docs/architecture/STITCHING_FUSION_SPECIFICATION.md
+Reference: Project_documentation/repository/docs/architecture/STITCHING_FUSION_SPECIFICATION.md
 """
 
 from dataclasses import dataclass, field

@@ -6,7 +6,7 @@ Verifies that PhaseCoherenceExtractor, PhaseCoherenceAggregator, and
 PhaseCoherenceProjection correctly extract, aggregate, and project
 phase coherence for the interpretive state.
 
-Reference: docs/design/CONSCIOUS_GENERATION_DESIGN.md, §F.10.6.6
+Reference: Project_documentation/repository/docs/design/CONSCIOUS_GENERATION_DESIGN.md, §F.10.6.6
 """
 
 import pytest

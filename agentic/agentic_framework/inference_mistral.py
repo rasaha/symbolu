@@ -39,8 +39,8 @@ Environment:
                              (see tests/test_inference_mistral_cg_smoke.py).
 
 See also:
-    agentic/docs/CG_RUNTIME_RUNBOOK.md  — runbook for --cg
-    agentic/docs/RUNTIME_MCP_PATH.md    — runtime wiring
+    Project_documentation/agentic_framework/agentic/docs/CG_RUNTIME_RUNBOOK.md  — runbook for --cg
+    Project_documentation/agentic_framework/agentic/docs/RUNTIME_MCP_PATH.md    — runtime wiring
 """
 
 from __future__ import annotations

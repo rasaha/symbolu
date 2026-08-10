@@ -27,7 +27,7 @@ LOCK_VERSION = "v0.1"
 # experiment sources (mutable within the study, hashed at lock)
 _EXPERIMENT_FILES = [
     "agentic/hybrid_handover/resolution/experiment/hybrid_resolver.py",
-    "agentic/hybrid_handover/resolution/experiment/EXPERIMENT_PREREGISTRATION.md",
+    "Project_documentation/agentic_framework/agentic/hybrid_handover/resolution/experiment/EXPERIMENT_PREREGISTRATION.md",
     "agentic/hybrid_handover/resolution/experiment/stats.py",
     "agentic/hybrid_handover/resolution/experiment/hidden_metrics.py",
     "agentic/hybrid_handover/resolution/experiment/hidden_data.py",

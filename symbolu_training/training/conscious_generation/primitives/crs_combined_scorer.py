@@ -16,7 +16,7 @@ Combination formula (semantic-dominant):
 
 Non-negotiable rule: high resonance must never rescue low semantic correctness.
 
-Reference: docs/audits/CRS_DOCTRINE_FREEZE.md
+Reference: Project_documentation/repository/docs/audits/CRS_DOCTRINE_FREEZE.md
 """
 
 import torch

@@ -13,7 +13,7 @@ Implements:
 - MistralCGGenerationTracer: Composed tracer for mistral_cg model type (F.2.9)
 - BaselineStatisticsAnalyzer: Full F.2.5 + F.2.6a baseline statistics (F.2.5)
 
-Reference: docs/design/CONSCIOUS_GENERATION_DESIGN.md, Appendix F §F.2.3–F.2.9
+Reference: Project_documentation/repository/docs/design/CONSCIOUS_GENERATION_DESIGN.md, Appendix F §F.2.3–F.2.9
 
 Author: Sovereign-1 Training Initiative
 Date: March 2026

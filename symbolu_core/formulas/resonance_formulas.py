@@ -40,7 +40,7 @@ ARCHITECTURAL NOTE:
     Authoritative phases (PO1-PO5, P6-P9) govern meaning and authority.
     Core/Substrate formulas may only be observed by allowed sinks.
 
-    See: docs/architecture/core_vs_pipeline.md
+    See: Project_documentation/repository/docs/architecture/core_vs_pipeline.md
 
 HISTORICAL NOTE: Legacy docstrings may reference "Phase 1". This is a
 historical development label, NOT an authoritative pipeline phase.

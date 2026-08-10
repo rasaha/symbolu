@@ -10,7 +10,7 @@ the 19 synthetic scenarios for the side-by-side baseline.
     python scripts/run_trace_replay.py --fixtures # force the small committed slices
 
 Writes:
-    artifacts/cloud_controller_real_validation/track_b_trace_replay.md
+    Project_documentation/repository/artifacts/cloud_controller_real_validation/track_b_trace_replay.md
     artifacts/cloud_controller_real_validation/track_b_trace_replay.json
 """
 

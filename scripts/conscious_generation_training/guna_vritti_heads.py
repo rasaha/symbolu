@@ -4,7 +4,7 @@ validate Conscious Generation training, change runtime, or claim cognitive-state
 
 FORMULA PROVENANCE (sourced, NOT invented):
   - 32-D sovereign-state layout + per-slice activations:
-    docs/design/CONSCIOUS_GENERATION_DESIGN.md, Appendix D Phase 1; canonical code in
+    Project_documentation/repository/docs/design/CONSCIOUS_GENERATION_DESIGN.md, Appendix D Phase 1; canonical code in
     symbolu_training/training/conscious_generation/token_ontology.py:
         Bhava[0:12] softmax · Kosha[12:17] softmax · Vritti[17:22] softmax · Guna[22:28] sigmoid ·
         Reserved[28:32] tanh
@@ -33,7 +33,7 @@ SLICES = {"bhava": (0, 12), "kosha": (12, 17), "vritti": (17, 22), "guna": (22, 
 GUNA_NAMES = ["SATTVA", "RAJAS", "TAMAS", "VELOCITY", "ACCEL", "STABLE"]
 VRITTI_NAMES = ["PRAMANA", "VIPARYAYA", "VIKALPA", "NIDRA", "SMRITI"]
 FORMULA_PROVENANCE = {
-    "source_design": "docs/design/CONSCIOUS_GENERATION_DESIGN.md (Appendix D Phase 1)",
+    "source_design": "Project_documentation/repository/docs/design/CONSCIOUS_GENERATION_DESIGN.md (Appendix D Phase 1)",
     "source_code": ["symbolu_training/training/conscious_generation/token_ontology.py",
                     "symbolu_training/training/conscious_generation/primitives/guna_scorer.py",
                     "symbolu_training/training/conscious_generation/primitives/vritti_scorer.py",

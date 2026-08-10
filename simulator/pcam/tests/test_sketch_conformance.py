@@ -6,7 +6,7 @@ FrequencySketch port and the canonical implementation at
 
     CTM_plus/KVPolicy/kv_policy/attention_evictor.py:69-112
 
-per ADR-0001 (docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md).
+per ADR-0001 (Project_documentation/repository/docs/design/ADR-0001-CTM-KV-SCORING-SOURCE-OF-TRUTH.md).
 
 Scope
 -----
@@ -28,7 +28,7 @@ Reference side
 Imported from the vendored copy at
 ``simulator/pcam/reference/attention_evictor_vendored.py``, not via a
 sys.path hack against the upstream CTM+ package. See ADR-0001 and
-``simulator/pcam/docs/VENDORED_REFERENCE_UPDATE_RITUAL.md`` for how the
+``Project_documentation/simulator/simulator/pcam/docs/VENDORED_REFERENCE_UPDATE_RITUAL.md`` for how the
 vendored file is kept in sync with upstream. The reference is the
 oracle — we never assert against hand-computed hash outputs. We assert
 PCAM equals reference on a fixed trace, and we assert structural
@@ -60,7 +60,7 @@ import pytest
 # release-safe oracle that does not depend on the ambient location of
 # the CTM_plus package.
 #
-# Update ritual: simulator/pcam/docs/VENDORED_REFERENCE_UPDATE_RITUAL.md
+# Update ritual: Project_documentation/simulator/simulator/pcam/docs/VENDORED_REFERENCE_UPDATE_RITUAL.md
 # ---------------------------------------------------------------------------
 from simulator.pcam.reference.attention_evictor_vendored import (
     FrequencySketch as RefFrequencySketch,

@@ -14,7 +14,7 @@ float64 arrays of shape (M, T, L, V) where:
     L = forward-lookahead horizon (V1: L = 5, see §2.3.4)
     V = vocabulary size (shared across sources for V1, see §2.7.5)
 
-Design anchor: ``docs/design/BCVF_LLM_TRUST_ROUTING_DESIGN.md``
+Design anchor: ``Project_documentation/repository/docs/design/BCVF_LLM_TRUST_ROUTING_DESIGN.md``
 §2.4-§2.7. Mathematical specification: V3.1 Lemma 1 (autonomy)
 restated in §2.6 with the vector-path proof in §2.6.4.
 

@@ -5,7 +5,7 @@ Pipeline (all offline, read-only): partner export → `PartnerPrometheusAdapter`
 `detect_tier_a` (per-cluster Tier-A candidates + Tier-B events) → `compute_apcy`
 (fleet roll-up with the pre-registered honesty trip-wire) → SRE-adjudication
 worksheets. The detector + cost model are frozen in
-`docs/cloud_scaling_real_validation/TIER_A_DETECTOR_SPEC.md`.
+`Project_documentation/governance/docs/cloud_scaling_real_validation/TIER_A_DETECTOR_SPEC.md`.
 
 Modes
 -----
@@ -83,7 +83,7 @@ def build_markdown(results, apcy, is_fixture):
     L.append(f"# {title}")
     L.append("")
     L.append(f"> **Label: `{apcy.label}`.** Detector + cost model are frozen in "
-             "`docs/cloud_scaling_real_validation/TIER_A_DETECTOR_SPEC.md`. The replay "
+             "`Project_documentation/governance/docs/cloud_scaling_real_validation/TIER_A_DETECTOR_SPEC.md`. The replay "
              "surfaces Tier-A **candidates**; an SRE confirms true/false + cost before "
              "anything counts. **Tier-B is never market evidence.**")
     if is_fixture:
@@ -154,7 +154,7 @@ def main(argv=None):
         json.dump({
             "label": apcy.label,
             "is_tooling_self_test": is_fixture,
-            "spec_doc": "docs/cloud_scaling_real_validation/TIER_A_DETECTOR_SPEC.md",
+            "spec_doc": "Project_documentation/governance/docs/cloud_scaling_real_validation/TIER_A_DETECTOR_SPEC.md",
             "clusters": [r.to_dict() for r in results],
             "apcy": apcy.to_dict(),
         }, f, indent=2)

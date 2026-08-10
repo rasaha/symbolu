@@ -3,7 +3,7 @@
 These event types cover the **candidate-facing hiring product entities** —
 requisitions, job definitions, candidates, applications, and evidence intake —
 whose lifecycles are owned by AI Hiring (see
-``docs/ai-hiring/PLATFORM_BOUNDARY.md``). They are *deliberately* a hiring-owned
+``Project_documentation/ai_hiring/docs/ai-hiring/PLATFORM_BOUNDARY.md``). They are *deliberately* a hiring-owned
 enum, not members of the frozen kernel ``decision_governance`` ``AuditEventType``:
 Platform v1.0 is frozen and does not (and must not) enumerate hiring product
 events. This taxonomy is additive, application-local, and never crosses the

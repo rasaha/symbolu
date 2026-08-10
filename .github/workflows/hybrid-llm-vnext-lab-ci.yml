@@ -9,13 +9,13 @@ on:
   push:
     paths:
       - 'hybrid_llm_vnext_lab/**'
-      - 'docs/audits/hybrid_llm/BINDING_SLOT_EVIDENCE_RECONCILIATION.md'
+      - 'Project_documentation/repository/docs/audits/hybrid_llm/BINDING_SLOT_EVIDENCE_RECONCILIATION.md'
       - 'docs/audits/hybrid_llm/artifacts/binding_slot_evidence_reconciliation.json'
       - '.github/workflows/hybrid-llm-vnext-lab-ci.yml'
   pull_request:
     paths:
       - 'hybrid_llm_vnext_lab/**'
-      - 'docs/audits/hybrid_llm/BINDING_SLOT_EVIDENCE_RECONCILIATION.md'
+      - 'Project_documentation/repository/docs/audits/hybrid_llm/BINDING_SLOT_EVIDENCE_RECONCILIATION.md'
       - 'docs/audits/hybrid_llm/artifacts/binding_slot_evidence_reconciliation.json'
       - '.github/workflows/hybrid-llm-vnext-lab-ci.yml'
 

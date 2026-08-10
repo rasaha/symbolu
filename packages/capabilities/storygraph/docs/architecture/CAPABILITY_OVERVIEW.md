@@ -4,7 +4,7 @@
 > individually acceptable actions collectively assemble a prohibited or high-risk
 > capability.**
 
-It complements the per-action [Action Gate](../../../../../cyber_security/ACTION_GATE_SPECIFICATION.md),
+It complements the per-action [Action Gate](../../../../../Project_documentation/action_gate_cyber/cyber_security/ACTION_GATE_SPECIFICATION.md),
 which decides one action at a time. This layer adds the **sequence axis**: it
 links individually-admissible actions into an *assembly*, accumulates the
 capability *fragments* each contributes, and — when a linked set satisfies a
@@ -19,7 +19,7 @@ a system that infers arbitrary criminal intent. It does not "understand crime."
 The physical firearm example (steel rod + piston + trigger → firearm) is retained
 **only as a synthetic illustration** that the engine is domain-agnostic. The
 product target is enterprise AI-agent and infrastructure workflows. See
-[`COMPOSITE_THREAT_DETECTION_SPEC.md`](./COMPOSITE_THREAT_DETECTION_SPEC.md).
+[`COMPOSITE_THREAT_DETECTION_SPEC.md`](COMPOSITE_THREAT_DETECTION_SPEC.md).
 
 ## Authority boundary
 

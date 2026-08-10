@@ -384,7 +384,7 @@ def render_real_report(result: Dict[str, Any]) -> str:
         "observed workload. vLLM's own eviction was NOT replaced — "
         "this is shadow mode, not active control. See "
         "benchmarks/vllm_bridge.py and "
-        "simulator/pcam/docs/PHASE4_REAL_RUNTIME.md for the caveats."
+        "Project_documentation/simulator/simulator/pcam/docs/PHASE4_REAL_RUNTIME.md for the caveats."
     )
 
     vllm_run = result["vllm_run"]

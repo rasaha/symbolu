@@ -32,7 +32,7 @@ Invariants:
 
 Pattern precedent: mistral_wrapper.py:318-324 (phase adapter via gated residual).
 
-Reference: docs/design/CONSCIOUS_GENERATION_DESIGN.md, Appendix F §F.4
+Reference: Project_documentation/repository/docs/design/CONSCIOUS_GENERATION_DESIGN.md, Appendix F §F.4
 
 Author: Sovereign-1 Training Initiative
 Date: March 2026

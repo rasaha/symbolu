@@ -28,7 +28,7 @@ Bounded introduction: Phase coherence is computed and logged before
 activation. The InterpretiveConditioner gate starts at 0, so phase
 coherence has no effect until the gate trains up.
 
-Reference: docs/design/CONSCIOUS_GENERATION_DESIGN.md, Appendix F §F.10.6.6
+Reference: Project_documentation/repository/docs/design/CONSCIOUS_GENERATION_DESIGN.md, Appendix F §F.10.6.6
 
 Author: Sovereign-1 Training Initiative
 Date: March 2026
