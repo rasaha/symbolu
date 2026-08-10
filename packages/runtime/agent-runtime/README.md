@@ -8,12 +8,12 @@ A **domain-neutral execution-coordination kernel** for agent and workflow execut
 > planning/reasoning/memory. See
 > [`docs/AGENT_RUNTIME_POST_MERGE_FIDELITY_AUDIT.md`](docs/AGENT_RUNTIME_POST_MERGE_FIDELITY_AUDIT.md).
 >
-> **Maturity:** `IMPLEMENTED_AND_CI_VERIFIED` — both `0.2.0` (canonical execution state)
-> and the additive `0.3.0` **H22-A bounded workflow advancement** seam have been observed
-> passing the scoped Agent Runtime GitHub Actions workflow (package suite, isolated
-> wheel-install verification, platform-freeze, terminology, API-stability registry, and
-> safety-case checks all green). Not live-verified, pilot-validated, enforcement-ready, or
-> production-ready.
+> **Maturity:** `0.2.0` (canonical execution state) and `0.3.0` (**H22-A bounded workflow
+> advancement**) are `IMPLEMENTED_AND_CI_VERIFIED`. The additive `0.4.0` **H22-B
+> deterministic multi-workflow coordination** layer is
+> `IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED` pending observation of the scoped Agent Runtime
+> GitHub Actions workflow on this change (see [Status](#status)). Not live-verified,
+> pilot-validated, distributed-safe, enforcement-ready, or production-ready.
 
 The kernel drives task and workflow lifecycle, invokes providers/tools, and applies
 retry, timeout, cancellation, checkpointing, and durable recovery. Before any
@@ -50,7 +50,7 @@ neutral contracts and utilities
 
 ```bash
 python -m build packages/runtime/agent-runtime
-pip install dist/ugence_agent_runtime-0.3.0-py3-none-any.whl
+pip install dist/ugence_agent_runtime-0.4.0-py3-none-any.whl
 ```
 
 The core has **no third-party dependencies** — it is stdlib-only. Importing it is
@@ -142,10 +142,44 @@ self-resolves a governance `HOLD`/`ESCALATE`: a `WAITING`/`PAUSED` workflow repo
 `REQUIRES_RESUME` until an explicit `resume_workflow`. `start_workflow` is unchanged — it
 is now simply `prepare_workflow` followed by repeated bounded advancement.
 
-**H22-A is not full H22.** It provides *only* the bounded-advancement foundation. The
-portfolio scheduler, cross-workflow dependencies, priority/fairness/aging, shared budget,
-and any concurrency are later phases. See
+**H22-A is not full H22.** It provides *only* the bounded-advancement foundation. See
 [`docs/AGENT_RUNTIME_H22_READINESS.md`](docs/AGENT_RUNTIME_H22_READINESS.md).
+
+## Deterministic multi-workflow coordination (H22-B)
+
+`0.4.0` adds the coordination layer that decides **which** prepared workflow receives the
+next H22-A quantum, and **why** — a deterministic "team lead" over a shared workflow graph,
+without any concurrency. It lives in `ugence_agent_runtime.orchestration` and is re-exported
+from the curated API.
+
+```python
+p = create_portfolio("delivery")
+p.register(a.instance_id, runtime=rt, priority=WorkflowPriority.NORMAL)
+p.register(b.instance_id, runtime=rt)
+p.register(c.instance_id, runtime=rt)
+p.add_dependency(c.instance_id, a.instance_id, DependencyType.REQUIRES_SUCCESS)  # C waits on A
+
+sched = create_portfolio_scheduler(rt)
+result = sched.step(p)          # one round: classify → order → grant ONE quantum
+result.selected_instance_id     # who was chosen
+result.selection_reason         # structured "why B not A" (rank/age/depth/deficit/seq)
+```
+
+A `WorkflowPortfolio` is **orchestration state only** — it references workflows by
+`instance_id` and never duplicates runtime-owned workflow/task/execution state. Each
+`step` classifies every workflow (`ELIGIBLE`, `WAITING_DEPENDENCY`, `BLOCKED_DEPENDENCY`,
+`WAITING_RUNTIME`, `PAUSED`, `TERMINAL`), orders the eligible ones by a single stable key —
+`(effective_rank, dependency_depth, -fairness_deficit, registration_sequence, instance_id)`
+— applies explicit **priority**, bounded starvation-prevention **aging**, and deterministic
+**fairness**, then grants exactly one quantum through the unchanged `advance_workflow` seam.
+
+**Governance stays entirely below H22-B.** The scheduler *selects* a workflow; it never
+authorizes its task, never resumes a `HOLD`/`ESCALATE`, and never calls a provider. Every
+consequential quantum still crosses fresh governance and exact-action validation inside
+`advance_workflow`. H22-B is deterministic *interleaving*, **not** simultaneous execution —
+no threads, no shared budget/resource ledger, no portfolio checkpoint/recovery, no
+compensation (those are H22-C/H22-D). See
+[`docs/AGENT_RUNTIME_H22B_COORDINATION.md`](docs/AGENT_RUNTIME_H22B_COORDINATION.md).
 
 ## Documentation
 
@@ -156,18 +190,28 @@ in [`artifacts/`](artifacts/).
 
 ## Status
 
-`0.3.0` — adds the **H22-A bounded workflow advancement** seam (`prepare_workflow` +
-`advance_workflow` returning `WorkflowAdvanceOutcome`/`WorkflowAdvanceStop`) so an
-external orchestrator can advance independent workflows one deterministic quantum at a
-time. Additive only: `start_workflow` keeps its run-to-stable-state behavior (now built on
-the same primitive), and there is **no** change to exact-action fingerprint semantics,
-governance ownership, canonical execution state, checkpoint digest semantics, or recovery
-behavior. Builds on canonical execution state (0.2.0), the post-merge governance-safety
-correction (0.1.1), and exact-action contract hardening (0.1.2). Single-workflow
-coordination only. Maturity: `IMPLEMENTED_AND_CI_VERIFIED` — the scoped Agent Runtime
-GitHub Actions workflow has been observed passing on the change (package suite 132 passed,
-2 skipped; isolated wheel-install verification PASS; freeze, terminology, API-stability
-registry, and safety-case checks all green). This does not imply production, pilot,
-live-environment, or enforcement validation. **Full multi-workflow orchestration (H22 — portfolio scheduler,
-cross-workflow dependencies, priority/fairness, concurrency) is a later feature phase, not
-implemented here.**
+`0.4.0` — adds **H22-B deterministic multi-workflow coordination**: a `WorkflowPortfolio`,
+a cross-workflow dependency graph, deterministic eligibility classification, and a
+`PortfolioScheduler` that grants one H22-A quantum per round using explicit
+priority, bounded aging, and deterministic fairness (`create_portfolio` /
+`create_portfolio_scheduler` and the `ugence_agent_runtime.orchestration` types). Additive
+only: it consumes the unchanged `advance_workflow` seam and makes **no** change to
+exact-action fingerprint semantics, governance ownership, canonical execution state,
+checkpoint digest semantics, or recovery behavior. Governance stays entirely below it — the
+scheduler selects a workflow, it never authorizes its task. H22-B is deterministic
+interleaving, **not** simultaneous execution: no concurrency, no shared budget/resource
+ledger, no portfolio checkpoint/recovery, no compensation (H22-C/H22-D). Builds on the
+H22-A bounded-advancement seam (0.3.0), canonical execution state (0.2.0), and the
+governance-safety/exact-action corrections (0.1.1/0.1.2).
+
+Maturity: `IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED` — locally the full package suite is
+**170 passed, 2 skipped** and isolated wheel-install verification is **PASS** at `0.4.0`;
+promotion to `IMPLEMENTED_AND_CI_VERIFIED` awaits observing the scoped Agent Runtime GitHub
+Actions workflow green on this PR head. This does not imply production, pilot,
+live-environment, distributed, or enforcement validation. **True bounded concurrency,
+resource/budget coordination, portfolio durability, and compensation remain later phases
+(H22-C / H22-D), not implemented here.**
+
+`0.3.0` — added the **H22-A bounded workflow advancement** seam (`prepare_workflow` +
+`advance_workflow` returning `WorkflowAdvanceOutcome`/`WorkflowAdvanceStop`).
+`IMPLEMENTED_AND_CI_VERIFIED`.
