@@ -19,7 +19,7 @@ deterministic interleaving, NOT simultaneous multi-workflow execution.**
 | --- | --- | --- |
 | **H22-A** | bounded workflow advancement (`prepare_workflow` / `advance_workflow`) | delivered (0.3.0) |
 | **H22-B** | deterministic coordination: portfolio, dependency graph, eligibility, priority, fairness, aging, scheduler | **delivered (0.4.0) — this document** |
-| **H22-C** | portfolio durability / trace / failure propagation / cancellation scopes | future |
+| **H22-C** | portfolio durability / trace / failure propagation / cancellation scopes | delivered (0.5.0) — see [`AGENT_RUNTIME_H22C_DURABILITY.md`](AGENT_RUNTIME_H22C_DURABILITY.md) |
 | **H22-D** | true bounded concurrency / resource coordination / budget coordination / compensation | future |
 
 ## Where it sits

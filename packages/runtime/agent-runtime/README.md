@@ -8,14 +8,20 @@ A **domain-neutral execution-coordination kernel** for agent and workflow execut
 > planning/reasoning/memory. See
 > [`docs/AGENT_RUNTIME_POST_MERGE_FIDELITY_AUDIT.md`](docs/AGENT_RUNTIME_POST_MERGE_FIDELITY_AUDIT.md).
 >
-> **Maturity:** `IMPLEMENTED_AND_CI_VERIFIED` — `0.2.0` (canonical execution state), `0.3.0`
-> (**H22-A bounded workflow advancement**), and the additive `0.4.0` **H22-B deterministic
-> multi-workflow coordination** layer (including the audit corrections to weighted fairness —
-> now smooth weighted round-robin — and portfolio-lifecycle freezing) have all been observed
-> passing the scoped Agent Runtime GitHub Actions workflow (package suite, isolated
-> wheel-install verification, platform-freeze, terminology, API-stability registry, and
-> safety-case checks all green). Not live-verified, pilot-validated, distributed-safe,
-> enforcement-ready, or production-ready.
+> **Maturity:** `0.2.0` (canonical execution state), `0.3.0` (**H22-A bounded workflow
+> advancement**), and `0.4.0` (**H22-B deterministic multi-workflow coordination**, incl. the
+> smooth-weighted-round-robin fairness correction and portfolio-lifecycle freezing) are
+> `IMPLEMENTED_AND_CI_VERIFIED` (observed passing the scoped Agent Runtime GitHub Actions
+> workflow: package suite, isolated wheel-install verification, platform-freeze, terminology,
+> API-stability registry, and safety-case checks all green). The additive `0.5.0` **H22-C durable
+> multi-workflow orchestration** layer (durable portfolio checkpoint/recovery, append-only audit
+> event store, bounded failure propagation, cooperative cancellation scopes) is
+> `IMPLEMENTED_AND_CI_VERIFIED` after its final correctness corrections (real runtime-bound
+> pre-persist self-recoverability, immutable canonical-JSON event records, explicit torn
+> cross-store state detection) — all scoped `agent-runtime-ci` checks (package suite, isolated
+> wheel-install verification, platform-freeze) plus terminology, API-stability registry, and
+> safety-case were observed green on the corrected head. Not live-verified, pilot-validated,
+> distributed-safe, enforcement-ready, or production-ready.
 
 The kernel drives task and workflow lifecycle, invokes providers/tools, and applies
 retry, timeout, cancellation, checkpointing, and durable recovery. Before any
@@ -52,7 +58,7 @@ neutral contracts and utilities
 
 ```bash
 python -m build packages/runtime/agent-runtime
-pip install dist/ugence_agent_runtime-0.4.0-py3-none-any.whl
+pip install dist/ugence_agent_runtime-0.5.0-py3-none-any.whl
 ```
 
 The core has **no third-party dependencies** — it is stdlib-only. Importing it is
@@ -181,9 +187,42 @@ dependencies are frozen once scheduling begins.
 authorizes its task, never resumes a `HOLD`/`ESCALATE`, and never calls a provider. Every
 consequential quantum still crosses fresh governance and exact-action validation inside
 `advance_workflow`. H22-B is deterministic *interleaving*, **not** simultaneous execution —
-no threads, no shared budget/resource ledger, no portfolio checkpoint/recovery, no
-compensation (those are H22-C/H22-D). See
+no threads, no shared budget/resource ledger, no compensation (those are H22-D). See
 [`docs/AGENT_RUNTIME_H22B_COORDINATION.md`](docs/AGENT_RUNTIME_H22B_COORDINATION.md).
+
+## Durable multi-workflow orchestration (H22-C)
+
+`0.5.0` makes the H22-B coordinator **durable, reconstructable, auditable, and safely
+controllable** across crash/restart, failure, and cancellation — **without changing
+single-workflow execution truth**.
+
+```python
+ctrl = create_portfolio_controller(rt, p, checkpoint_store=InMemoryPortfolioCheckpointStore())
+ctrl.step()                       # scheduler round + audit trace + failure observation
+ctrl.checkpoint()                 # durable PortfolioCheckpoint (self-recoverable before write)
+
+# … process crash / restart, a NEW runtime sharing the same durable stores …
+result = recover_portfolio(store=store, portfolio_id="delivery",
+                           runtime=rt2, definitions=defs)   # NO execution occurs
+result.requires_continuation      # True — recovery reconstructs, it does not continue
+rt2.continue_workflow(iid)        # explicit, bounded continuation (no drain)
+```
+
+A `PortfolioCheckpoint` **references** each workflow's runtime checkpoint by digest and
+**never copies** it, and never duplicates Canonical Execution State. It persists exactly what
+deterministic reconstruction needs — `round`, per-registration `age` / SWRR `fair_credit` /
+priority / weight / sequence, dependencies, failure/cancellation state, and the trace anchor —
+under a fail-closed SHA-256 digest, and is validated by the recovery validator **before** any
+write (the portfolio self-recoverability invariant). `recover_portfolio` is **side-effect free**
+(provider = 0, governance = 0, advancement = 0, auto-resume = 0), cross-binds each referenced
+runtime checkpoint (without requiring writer runtime-version equality, so upgrades recover),
+and requires **explicit continuation**; committed work never reruns and the next consequential
+quantum still crosses **fresh** governance. A separate append-only `PortfolioTrace` (logical
+sequence, ids/digests only) records *why* the coordinator acted. Failure propagation is bounded
+(`ISOLATE_WORKFLOW` default / `FAIL_DEPENDENTS` / `FAIL_PORTFOLIO`) and never reinterprets *why*
+a workflow failed; cancellation is cooperative and idempotent (`WORKFLOW_ONLY` /
+`DEPENDENT_SUBGRAPH` / `PORTFOLIO_ALL`) via the runtime's own `cancel_workflow`. See
+[`docs/AGENT_RUNTIME_H22C_DURABILITY.md`](docs/AGENT_RUNTIME_H22C_DURABILITY.md).
 
 ## Documentation
 
@@ -193,6 +232,33 @@ compatibility, security, limitations, and H22 readiness. Machine-readable contra
 in [`artifacts/`](artifacts/).
 
 ## Status
+
+`0.5.0` — adds **H22-C durable multi-workflow orchestration**: a versioned
+`PortfolioCheckpoint` (referencing, never copying, the underlying runtime checkpoints, and never
+duplicating canonical execution state), a neutral `PortfolioCheckpointStore` + in-memory
+reference, **side-effect-free** `recover_portfolio` with explicit continuation and a bounded
+`continue_workflow` seam, an append-only `PortfolioTrace`, bounded failure propagation
+(`PortfolioFailurePolicy`), and cooperative idempotent cancellation scopes (`CancellationScope`),
+tied together by `PortfolioController` (`create_portfolio_controller`). Additive only: no change
+to exact-action semantics, governance ownership, canonical execution state, checkpoint digest
+semantics, or single-workflow recovery; recovery performs no execution. SWRR `fair_credit`,
+aging, registration order, and dependencies survive recovery, so the next scheduler decision is
+exactly the uninterrupted one. Final audit corrections make the audit trace durable via an
+append-only `PortfolioEventStore` (crash-safe checkpoint/commit-event sequencing), bind the
+**full** runtime checkpoint across both the base and canonical-execution-state extension
+integrity domains, add semantic failure/cancellation/lifecycle cross-binding after recovery, and
+make the recovered failure policy a typed, first-class continuity contract. Final correctness
+corrections make the pre-persist self-recoverability check **runtime-bound** (the same validator
+recovery uses, so a checkpoint recovery would reject can never be persisted), make durable event
+records genuinely immutable (canonical-JSON snapshots), and define an explicit **torn cross-store
+state** contract (`PORTFOLIO_RUNTIME_CHECKPOINT_DIVERGENCE` fails closed when runtime state is
+ahead of the portfolio snapshot — no rollback, no re-run, no fabrication; recovery succeeds once
+resynchronized). Maturity `IMPLEMENTED_AND_CI_VERIFIED` — scoped Agent Runtime CI (package suite
+**246 passed, 2 skipped**; isolated wheel-install **PASS** at `0.5.0`; platform-freeze,
+terminology, API-stability registry, and safety-case) observed green on the corrected head. Not
+production / pilot / distributed / exactly-once / runtime-assurance validated. **True
+concurrency, resource/budget coordination, and compensation remain H22-D, not implemented
+here.**
 
 `0.4.0` — adds **H22-B deterministic multi-workflow coordination**: a `WorkflowPortfolio`,
 a cross-workflow dependency graph, deterministic eligibility classification, and a

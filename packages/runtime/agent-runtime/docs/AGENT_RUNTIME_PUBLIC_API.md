@@ -46,6 +46,36 @@ Machine-readable form: [`../artifacts/agent_runtime_public_api.json`](../artifac
 | `RetryPolicy` | dataclass | Deterministic attempt-counting policy. |
 | `AgentRuntimeError` + subclasses | exception | Curated error taxonomy. |
 
+### Multi-workflow coordination (H22-B)
+
+| Symbol | Kind | Purpose |
+| --- | --- | --- |
+| `WorkflowPortfolio` | class | Orchestration-state aggregate; references workflows by `instance_id`, duplicates no runtime state. |
+| `PortfolioWorkflowEntry` | dataclass | One registration's orchestration metadata (priority/weight/sequence/age/`fair_credit`). |
+| `PortfolioStatus` | enum | `CREATED/ACTIVE/COMPLETED/FAILED/CANCELLED`. |
+| `WorkflowPriority` / `priority_rank` | enum / fn | Orchestration priority (never governance authority). |
+| `DependencyGraph` / `WorkflowDependency` / `DependencyType` / `DependencyState` | class / dataclass / enum | Deterministic cross-workflow DAG (`REQUIRES_COMPLETION` / `REQUIRES_SUCCESS`). |
+| `PortfolioScheduler` | class | Grants one bounded H22-A quantum per round (priority / SWRR fairness / bounded aging). |
+| `SchedulingPolicy` / `SelectionReason` / `PortfolioStepResult` / `PortfolioStepReason` / `WorkflowEligibility` | dataclass / enum | Scheduler policy, structured "why", and step outcome. |
+
+### Durable orchestration (H22-C)
+
+| Symbol | Kind | Purpose |
+| --- | --- | --- |
+| `PortfolioCheckpoint` | dataclass | Versioned, self-verifying portfolio orchestration snapshot; **references** runtime checkpoints by digest, never copies them or Canonical Execution State. |
+| `WorkflowCheckpointRef` | dataclass | Reference binding a registration to its runtime checkpoint across **both** integrity domains: identity + base `checkpoint_digest` + `checkpoint_version` + canonical-execution-state `extension_digest`. |
+| `PortfolioCheckpointStore` | Protocol | Neutral portfolio checkpoint store interface. |
+| `InMemoryPortfolioCheckpointStore` | class | Reference store (monotonic `generation`, optional compare-and-save). |
+| `PortfolioCheckpointConflict` | exception | Stale compare-and-save write. |
+| `PortfolioRecoveryResult` | dataclass | Side-effect-free recovery outcome (`requires_continuation`, recovered ids, trace, typed `failure_policy`, metadata). |
+| `PortfolioTrace` / `PortfolioTraceEntry` / `PortfolioEventType` | class / dataclass / enum | Append-only orchestration audit trace (logical sequence; ids/digests only). |
+| `PortfolioEventStore` / `InMemoryPortfolioEventStore` | Protocol / class | Neutral durable append-only, portfolio-scoped trace event store (contiguous sequence; immutable canonical-JSON records; reference impl). Makes pre-crash audit history survive recovery. |
+| `PortfolioTraceSequenceError` | exception | Duplicate / out-of-order trace event rejected by the event store. |
+| `PortfolioTraceEncodingError` | exception | Non-serializable (opaque) or NaN/±Inf trace-event detail rejected fail-closed. |
+| `PortfolioController` | class | Ties scheduler + trace + failure policy + cancellation + durable checkpoint. |
+| `PortfolioFailurePolicy` | enum | Bounded failure propagation (`ISOLATE_WORKFLOW` default / `FAIL_DEPENDENTS` / `FAIL_PORTFOLIO`). |
+| `CancellationScope` / `PortfolioCancellationResult` | enum / dataclass | Cooperative, idempotent cancellation (`WORKFLOW_ONLY` / `DEPENDENT_SUBGRAPH` / `PORTFOLIO_ALL`). |
+
 ## Functions
 
 | Function | Purpose |
@@ -56,12 +86,17 @@ Machine-readable form: [`../artifacts/agent_runtime_public_api.json`](../artifac
 | `advance_workflow(runtime, instance_id)` | Advance a prepared/running workflow by **one bounded quantum**; returns `WorkflowAdvanceOutcome` (H22-A). |
 | `execution_state(runtime, instance_id, task_id=None)` | Read the latest canonical execution-state snapshot (read-only). |
 | `execution_state_by_digest(runtime, instance_id, state_digest)` | Resolve a historical snapshot by its digest (read-only). |
-| `resume_workflow(runtime, instance_id)` | Explicitly continue a `WAITING`/`PAUSED` workflow. |
+| `resume_workflow(runtime, instance_id)` | Explicitly continue a `WAITING`/`PAUSED` workflow (drains to a stable state). |
+| `continue_workflow(runtime, instance_id)` | Bounded continuation seam (H22-C): re-arm a `WAITING`/`PAUSED` workflow to `RUNNING` for one-quantum-at-a-time advancement **without draining it**. |
 | `pause_workflow(runtime, instance_id)` | Explicitly pause a `RUNNING` workflow. |
 | `cancel_workflow(runtime, instance_id)` | Cancel a workflow and its non-terminal tasks. |
-| `recover_runtime(runtime, instance_id, definition)` | Reconstruct state from persistence (no external call). |
+| `recover_runtime(runtime, instance_id, definition)` | Reconstruct one instance from persistence (no external call). |
 | `register_provider(runtime, provider)` | Register a provider explicitly. |
 | `register_governance_hook(config, hook)` | Return a new config bound to `hook`. |
+| `create_portfolio(portfolio_id)` | Create an empty `WorkflowPortfolio` (H22-B). |
+| `create_portfolio_scheduler(runtime, policy=None)` | Create a deterministic `PortfolioScheduler` (H22-B). |
+| `create_portfolio_controller(runtime, portfolio, *, policy=…, checkpoint_store=None, …)` | Create an H22-C `PortfolioController` (scheduler + trace + failure policy + cancellation + durable checkpoint). |
+| `recover_portfolio(*, store, portfolio_id, runtime, definitions, trace=None)` | **Side-effect-free** portfolio recovery (H22-C); reconstructs the portfolio and returns `PortfolioRecoveryResult` requiring explicit continuation. |
 
 ## Stability
 

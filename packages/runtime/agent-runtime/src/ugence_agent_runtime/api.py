@@ -39,21 +39,39 @@ from .models.task import TaskDefinition, TaskInstance, TaskStatus
 from .models.transitions import RuntimeTransition
 from .models.workflow import WorkflowDefinition, WorkflowInstance, WorkflowStatus
 from .orchestration import (
+    CancellationScope,
     DependencyGraph,
     DependencyState,
     DependencyType,
+    InMemoryPortfolioCheckpointStore,
+    InMemoryPortfolioEventStore,
+    PortfolioCancellationResult,
+    PortfolioCheckpoint,
+    PortfolioCheckpointConflict,
+    PortfolioCheckpointStore,
+    PortfolioController,
+    PortfolioEventStore,
+    PortfolioEventType,
+    PortfolioFailurePolicy,
+    PortfolioRecoveryResult,
     PortfolioScheduler,
     PortfolioStatus,
     PortfolioStepReason,
     PortfolioStepResult,
+    PortfolioTrace,
+    PortfolioTraceEncodingError,
+    PortfolioTraceEntry,
+    PortfolioTraceSequenceError,
     PortfolioWorkflowEntry,
     SchedulingPolicy,
     SelectionReason,
+    WorkflowCheckpointRef,
     WorkflowDependency,
     WorkflowEligibility,
     WorkflowPortfolio,
     WorkflowPriority,
     priority_rank,
+    recover_portfolio,
 )
 from .persistence.checkpoints import Checkpoint
 from .persistence.interfaces import CheckpointStore, RuntimeEventStore, RuntimeStateStore
@@ -146,6 +164,16 @@ def resume_workflow(runtime: AgentRuntime, instance_id: str) -> WorkflowInstance
     return runtime.resume_workflow(instance_id)
 
 
+def continue_workflow(runtime: AgentRuntime, instance_id: str) -> WorkflowInstance:
+    """Re-arm a WAITING/PAUSED workflow for bounded advancement WITHOUT draining it.
+
+    The bounded analogue of :func:`resume_workflow`: it returns the workflow RUNNING so an
+    orchestrator can advance it one quantum at a time — the explicit continuation seam a
+    portfolio scheduler uses to continue a recovered workflow. See
+    ``AgentRuntime.continue_workflow``."""
+    return runtime.continue_workflow(instance_id)
+
+
 def pause_workflow(runtime: AgentRuntime, instance_id: str) -> WorkflowInstance:
     return runtime.pause_workflow(instance_id)
 
@@ -199,6 +227,38 @@ def create_portfolio_scheduler(
     return PortfolioScheduler(runtime, policy)
 
 
+# --- H22-C durable portfolio recovery / control constructors -----------------
+def create_portfolio_controller(
+    runtime: AgentRuntime,
+    portfolio: WorkflowPortfolio,
+    *,
+    policy: PortfolioFailurePolicy = PortfolioFailurePolicy.ISOLATE_WORKFLOW,
+    scheduling_policy: Optional[SchedulingPolicy] = None,
+    trace: Optional[PortfolioTrace] = None,
+    event_store: Optional[PortfolioEventStore] = None,
+    checkpoint_store: Optional[PortfolioCheckpointStore] = None,
+    emit_created: bool = False,
+) -> PortfolioController:
+    """Create an H22-C portfolio controller over ``runtime`` and ``portfolio``.
+
+    The controller drives the H22-B scheduler, records an append-only orchestration audit
+    trace (durable when an ``event_store`` is supplied), applies the bounded failure ``policy``
+    when it observes a terminal workflow failure, performs cooperative cancellation by scope, and
+    commits durable portfolio checkpoints that satisfy the self-recoverability invariant. It
+    reaches execution only through the unchanged ``advance_workflow`` seam and never authorizes a
+    task."""
+    return PortfolioController(
+        runtime,
+        portfolio,
+        policy=policy,
+        scheduling_policy=scheduling_policy,
+        trace=trace,
+        event_store=event_store,
+        checkpoint_store=checkpoint_store,
+        emit_created=emit_created,
+    )
+
+
 __all__ = [
     # runtime
     "AgentRuntime",
@@ -234,6 +294,25 @@ __all__ = [
     "PortfolioStepReason",
     "SelectionReason",
     "WorkflowEligibility",
+    # H22-C durable portfolio orchestration (checkpoint / recovery / trace / control)
+    "PortfolioCheckpoint",
+    "WorkflowCheckpointRef",
+    "PortfolioCheckpointStore",
+    "InMemoryPortfolioCheckpointStore",
+    "PortfolioCheckpointConflict",
+    "PortfolioRecoveryResult",
+    "recover_portfolio",
+    "PortfolioTrace",
+    "PortfolioTraceEntry",
+    "PortfolioEventType",
+    "PortfolioEventStore",
+    "InMemoryPortfolioEventStore",
+    "PortfolioTraceSequenceError",
+    "PortfolioTraceEncodingError",
+    "PortfolioController",
+    "PortfolioFailurePolicy",
+    "CancellationScope",
+    "PortfolioCancellationResult",
     # providers
     "Provider",
     "ProviderRegistry",
@@ -282,6 +361,7 @@ __all__ = [
     "execution_state",
     "execution_state_by_digest",
     "resume_workflow",
+    "continue_workflow",
     "pause_workflow",
     "cancel_workflow",
     "recover_runtime",
@@ -289,4 +369,5 @@ __all__ = [
     "register_governance_hook",
     "create_portfolio",
     "create_portfolio_scheduler",
+    "create_portfolio_controller",
 ]

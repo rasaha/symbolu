@@ -60,7 +60,7 @@ def priority_rank(priority: WorkflowPriority) -> int:
 
 
 class PortfolioStatus(str, Enum):
-    """Minimal portfolio lifecycle.
+    """Portfolio lifecycle.
 
     ``CREATED`` before scheduling has begun over any registered workflow — the ONLY state in
     which the portfolio topology (registrations and dependencies) may be mutated. ``ACTIVE``
@@ -68,16 +68,31 @@ class PortfolioStatus(str, Enum):
     make progress (this includes a *quiescent* portfolio whose workflows are all
     WAITING/PAUSED/dependency-blocked — quiescent is NOT complete). ``COMPLETED`` only when
     every registered workflow is terminal. **Topology is frozen once scheduling begins:** in
-    ``ACTIVE`` and ``COMPLETED`` a new registration or dependency is rejected, so the
+    every non-``CREATED`` state a new registration or dependency is rejected, so the
     scheduler can never run a workflow the portfolio does not report. Stepping an *empty*
     portfolio is a no-op that leaves it ``CREATED`` (still mutable), never misleadingly
-    ``ACTIVE``. Richer portfolio lifecycle (FAILED / PAUSED / cancellation scopes) is
-    deliberately deferred to H22-C.
+    ``ACTIVE``.
+
+    H22-C adds two explicit terminal orchestration states for the failure/cancellation
+    capabilities: ``FAILED`` (the ``FAIL_PORTFOLIO`` failure policy has been applied — no
+    further quantum is granted) and ``CANCELLED`` (a ``PORTFOLIO_ALL`` cancellation has been
+    applied). A *quiescent* portfolio (all workflows WAITING/PAUSED/dependency-blocked) is
+    deliberately NOT a portfolio state — it stays ``ACTIVE`` and is surfaced only as the
+    scheduler stop reason ``NO_ELIGIBLE_WORKFLOW``; governance WAITING is never silently
+    turned into completion or failure.
     """
 
     CREATED = "CREATED"
     ACTIVE = "ACTIVE"
     COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
+
+
+#: Terminal portfolio states — no further scheduling round grants a quantum in these.
+TERMINAL_PORTFOLIO_STATUSES = frozenset(
+    {PortfolioStatus.COMPLETED, PortfolioStatus.FAILED, PortfolioStatus.CANCELLED}
+)
 
 
 @dataclass
@@ -134,6 +149,16 @@ class WorkflowPortfolio:
         self._round = 0
         # Cached dependency graph, invalidated on any registration/edge change.
         self._graph: Optional[DependencyGraph] = None
+        # --- H22-C orchestration failure / cancellation state (durable) --------
+        # instance_id -> a neutral orchestration label recording that the portfolio has
+        # OBSERVED this workflow's terminal failure (the runtime owns why it failed; H22-C
+        # only records the orchestration consequence). Never reinterprets a governance/runtime
+        # failure reason.
+        self._failed: Dict[str, str] = {}
+        # instance_id -> the cancellation scope under which the portfolio cancelled it. The
+        # runtime owns the CANCELLED task/workflow transition (cooperative); this records the
+        # orchestration decision so it survives restart and stays idempotent.
+        self._cancelled: Dict[str, str] = {}
 
     # -- identity / lifecycle ----------------------------------------------
     @property
@@ -269,7 +294,109 @@ class WorkflowPortfolio:
         return self._round
 
     def _mark_completed(self) -> None:
-        self._status = PortfolioStatus.COMPLETED
+        # Never override an explicit terminal state (FAILED / CANCELLED) with COMPLETED: a
+        # portfolio failed or cancelled by H22-C whose workflows are consequently all terminal
+        # must not be relabeled "completed" by the scheduler's all-terminal branch.
+        if self._status not in TERMINAL_PORTFOLIO_STATUSES:
+            self._status = PortfolioStatus.COMPLETED
+
+    def _mark_failed(self) -> None:
+        """Mark the portfolio itself FAILED (the FAIL_PORTFOLIO policy). Terminal, idempotent —
+        a portfolio already terminal keeps its existing terminal state."""
+        if self._status not in TERMINAL_PORTFOLIO_STATUSES:
+            self._status = PortfolioStatus.FAILED
+
+    def _mark_cancelled(self) -> None:
+        """Mark the portfolio itself CANCELLED (a PORTFOLIO_ALL cancellation). Terminal,
+        idempotent — a portfolio already terminal keeps its existing terminal state."""
+        if self._status not in TERMINAL_PORTFOLIO_STATUSES:
+            self._status = PortfolioStatus.CANCELLED
+
+    # -- H22-C orchestration failure / cancellation state -------------------
+    def record_failure(self, instance_id: str, label: str = "WORKFLOW_FAILED") -> bool:
+        """Record that the portfolio has observed ``instance_id``'s terminal failure.
+
+        Idempotent: recording the same workflow again is a no-op that returns ``False``.
+        Returns ``True`` only the first time. This records an orchestration observation; it
+        never reinterprets *why* the workflow failed (the runtime owns that)."""
+        if instance_id not in self._entries:
+            raise ValueError(f"unknown workflow {instance_id!r}")
+        if instance_id in self._failed:
+            return False
+        self._failed[instance_id] = label
+        return True
+
+    def record_cancellation(self, instance_id: str, scope: str) -> bool:
+        """Record that the portfolio cancelled ``instance_id`` under ``scope``.
+
+        Idempotent: recording an already-cancelled workflow is a no-op returning ``False``
+        (the first recorded scope is kept, so cancellation is never resurrected or relabeled).
+        Returns ``True`` only the first time."""
+        if instance_id not in self._entries:
+            raise ValueError(f"unknown workflow {instance_id!r}")
+        if instance_id in self._cancelled:
+            return False
+        self._cancelled[instance_id] = scope
+        return True
+
+    def is_failed(self, instance_id: str) -> bool:
+        return instance_id in self._failed
+
+    def is_cancelled(self, instance_id: str) -> bool:
+        return instance_id in self._cancelled
+
+    def failed_ids(self) -> Tuple[str, ...]:
+        """Portfolio-observed failed workflows, in registration order."""
+        return tuple(i for i in self._order if i in self._failed)
+
+    def cancelled_ids(self) -> Tuple[str, ...]:
+        """Portfolio-cancelled workflows, in registration order."""
+        return tuple(i for i in self._order if i in self._cancelled)
+
+    def failure_state(self) -> Dict[str, str]:
+        """A copy of the observed-failure map (instance_id → orchestration label)."""
+        return {i: self._failed[i] for i in self.failed_ids()}
+
+    def cancellation_state(self) -> Dict[str, str]:
+        """A copy of the cancellation map (instance_id → cancellation scope)."""
+        return {i: self._cancelled[i] for i in self.cancelled_ids()}
+
+    @property
+    def dependencies(self) -> Tuple[WorkflowDependency, ...]:
+        """The declared dependency edges, in declaration order."""
+        return tuple(self._dependencies)
+
+    # -- H22-C recovery restore seam ----------------------------------------
+    @classmethod
+    def _restore(
+        cls,
+        *,
+        portfolio_id: str,
+        status: PortfolioStatus,
+        round: int,
+        entries: List[PortfolioWorkflowEntry],
+        dependencies: List[WorkflowDependency],
+        failed: Dict[str, str],
+        cancelled: Dict[str, str],
+    ) -> "WorkflowPortfolio":
+        """Rebuild a portfolio from validated durable orchestration state (H22-C recovery).
+
+        This deliberately bypasses :meth:`register` / :meth:`add_dependency` — those assign a
+        fresh sequence and reset ``age``/``fair_credit`` to 0, which would destroy scheduler
+        continuity. The caller (portfolio recovery) MUST have validated the snapshot first;
+        this performs no execution and no validation of its own. ``entries`` are given in
+        registration-sequence order and carry their restored ``age``/``fair_credit``."""
+        p = cls(portfolio_id)
+        for entry in entries:
+            p._entries[entry.instance_id] = entry
+            p._order.append(entry.instance_id)
+        p._dependencies = list(dependencies)
+        p._graph = None
+        p._status = status
+        p._round = int(round)
+        p._failed = dict(failed)
+        p._cancelled = dict(cancelled)
+        return p
 
     def to_dict(self) -> Dict[str, object]:
         """A deterministic, serializable snapshot of orchestration state (no runtime state).
@@ -289,6 +416,8 @@ class WorkflowPortfolio:
                 }
                 for e in self._dependencies
             ],
+            "failed": {i: self._failed[i] for i in self.failed_ids()},
+            "cancelled": {i: self._cancelled[i] for i in self.cancelled_ids()},
         }
 
 

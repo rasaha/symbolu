@@ -15,7 +15,7 @@ from ugence_agent_runtime import api
 
 def test_version_accessible():  # check 7
     assert isinstance(ugence_agent_runtime.__version__, str)
-    assert ugence_agent_runtime.__version__ == "0.4.0"
+    assert ugence_agent_runtime.__version__ == "0.5.0"
 
 
 def test_py_typed_shipped():  # check 5
@@ -64,6 +64,25 @@ def test_public_api_surface_is_curated():
         "WorkflowEligibility",
         "create_portfolio",
         "create_portfolio_scheduler",
+        "create_portfolio_controller",
+        "PortfolioCheckpoint",
+        "WorkflowCheckpointRef",
+        "PortfolioCheckpointStore",
+        "InMemoryPortfolioCheckpointStore",
+        "PortfolioCheckpointConflict",
+        "PortfolioRecoveryResult",
+        "recover_portfolio",
+        "PortfolioTrace",
+        "PortfolioTraceEntry",
+        "PortfolioEventType",
+        "PortfolioEventStore",
+        "InMemoryPortfolioEventStore",
+        "PortfolioTraceSequenceError",
+        "PortfolioTraceEncodingError",
+        "PortfolioController",
+        "PortfolioFailurePolicy",
+        "CancellationScope",
+        "PortfolioCancellationResult",
         "Provider",
         "ProviderRegistry",
         "ToolInvocation",
@@ -85,6 +104,7 @@ def test_public_api_surface_is_curated():
         "execution_state",
         "execution_state_by_digest",
         "resume_workflow",
+        "continue_workflow",
         "pause_workflow",
         "cancel_workflow",
         "recover_runtime",
