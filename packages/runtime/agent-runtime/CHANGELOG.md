@@ -3,6 +3,54 @@
 All notable changes to the independent Agent Runtime distribution are recorded here.
 This project follows semantic versioning for the distribution.
 
+## 0.2.0 — canonical execution state
+
+Establishes the Agent Runtime as the canonical owner of **execution-trajectory
+identity**: a deterministic, versioned, integrity-protected, runtime-owned snapshot of
+what execution trajectory is being coordinated, what caused it, what immutable action
+identity is involved, and which external authority/artifact references are associated.
+Additive only — no change to exact-action fingerprint semantics, governance ownership,
+task scheduling, retries, timeout, cancellation, recovery behavior, or the digest
+semantics of existing serialized checkpoints. Not H22, not Runtime Assurance, not an AWC
+adapter beyond a minimal neutral lineage seam.
+
+### Added
+- **`CanonicalExecutionState`** (`models/execution_state.py`) — a frozen, stdlib-only
+  dataclass with deterministic canonical serialization and a SHA-256 `state_digest`
+  (excludes itself; identity-bearing changes change the digest; semantically equal
+  construction yields an identical digest). Flat, typed identity fields only — it
+  references the active proposal by `proposal_fingerprint` and never re-canonicalizes the
+  proposal's argument payload. `to_dict()`/`from_dict()`/`compute_digest()`/`sealed()`/
+  `is_intact()`.
+- **`ExecutionLineage`** — a typed, optional, neutral seam for causation / parent /
+  agent-plan / artifact *references* supplied at workflow boundaries (never untyped
+  metadata; never fabricated; defaults to unavailable). Agent references are lineage
+  constraints only — carrying one never causes the runtime to select or re-rank an agent.
+- **Runtime derivation** (`runtime/execution_state.py`, `build_execution_state`) — the
+  sole in-runtime author of snapshots, deriving them from config / instance / task /
+  proposal / (optional) governance evaluation. Authority-lineage fields are copied
+  verbatim from what governance returned and are `None` when governance produced nothing.
+- **Read-only access** — `AgentRuntime.execution_state(instance_id, task_id=None)` and the
+  `execution_state(runtime, …)` convenience function. No mutation API.
+- **Event anchoring** — `execution_state_digest=<digest>` added to `TASK_READY`,
+  `GOVERNANCE_EVALUATION_REQUESTED`, `GOVERNANCE_DISPOSITION_RECEIVED`, `TASK_STARTED`,
+  `PROVIDER_INVOKED`, `PROVIDER_COMPLETED`, `TASK_COMPLETED`, and `TASK_FAILED`. Digest
+  references only — the full state is never stuffed into the event stream. No new event
+  types; sequencing is unchanged.
+- **Checkpoint lineage** — `Checkpoint` gains `checkpoint_version` (`"1"`) and a
+  self-verifying `execution_states` section (`verify_execution_states`,
+  `canonical_execution_states`). The base coordination `digest` is computed over exactly
+  the original payload, so pre-existing checkpoints verify byte-identically; a checkpoint
+  deserialized without a version tag is treated as legacy `"0"` with lineage unavailable.
+  Recovery restores established lineage, fails closed on tampering, and never fabricates
+  missing references (`RuntimeRecoveryResult.execution_states`).
+- `ExecutionStateError`; canonical-execution-state test suite; docs
+  `AGENT_RUNTIME_CANONICAL_EXECUTION_STATE.md`.
+
+### Public API
+- Added `CanonicalExecutionState`, `ExecutionLineage`, and `execution_state` to the
+  curated surface; `start_workflow` gains an optional `lineage=` argument (additive).
+
 ## 0.1.2 — exact-action contract hardening
 
 Corrects three remaining gaps in the exact-action governance contract. Bounded

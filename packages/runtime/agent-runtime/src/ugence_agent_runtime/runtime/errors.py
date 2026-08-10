@@ -27,6 +27,12 @@ class ProposalError(AgentRuntimeError):
     relying on unstable ``repr()`` output for identity."""
 
 
+class ExecutionStateError(AgentRuntimeError):
+    """A canonical execution state carries an identity-bearing value that is not a
+    supported, deterministically canonicalizable type. Fails closed rather than
+    relying on unstable ``repr()`` output for identity."""
+
+
 class ProviderNotFoundError(AgentRuntimeError):
     """A task references a provider id that is not registered."""
 

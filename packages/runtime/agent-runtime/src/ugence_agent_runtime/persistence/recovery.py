@@ -8,13 +8,21 @@ Invariants (preserved deliberately):
   * COMPLETED work does not rerun; CANCELLED work does not restart;
   * a runtime-identity / configuration mismatch is reported, not silently accepted;
   * checkpoint corruption fails closed;
-  * recovery never fabricates provider success.
+  * recovery never fabricates provider success;
+  * recovery never fabricates missing canonical execution-state lineage — a legacy or
+    lineage-free checkpoint recovers with execution state explicitly unavailable, and
+    tampered lineage fails closed.
+
+Recovery restores previously-established canonical execution-state lineage but never
+manufactures a decision reference, authorization, clearance, proposal fingerprint,
+execution reference, or agent assignment provenance that the checkpoint did not carry.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import Dict, List, Optional
 
+from ..models.execution_state import CanonicalExecutionState
 from ..models.task import TaskInstance, TaskStatus
 from ..models.workflow import (
     WorkflowDefinition,
@@ -32,6 +40,9 @@ class RuntimeRecoveryResult:
     requires_continuation: bool
     config_mismatch: bool = False
     notes: tuple = field(default_factory=tuple)
+    # Per-task canonical execution states restored from the checkpoint (empty for a
+    # legacy / lineage-free checkpoint — unavailable, never fabricated).
+    execution_states: Dict[str, CanonicalExecutionState] = field(default_factory=dict)
 
 
 def recover_instance(
@@ -48,6 +59,13 @@ def recover_instance(
         # Corrupted / tampered checkpoint: fail closed.
         raise RecoveryError(
             f"checkpoint for instance {checkpoint.instance_id!r} failed integrity check"
+        )
+    if not checkpoint.verify_execution_states():
+        # Tampered canonical execution-state lineage: fail closed rather than restore a
+        # snapshot whose identity-bearing fields no longer match its digest.
+        raise RecoveryError(
+            f"checkpoint for instance {checkpoint.instance_id!r} carries canonical "
+            "execution state that failed integrity check"
         )
     if checkpoint.workflow_id != definition.workflow_id:
         raise RecoveryError(
@@ -111,10 +129,19 @@ def recover_instance(
         if wf_status in (WorkflowStatus.PAUSED, WorkflowStatus.WAITING):
             requires_continuation = True
 
+    # Restore previously-established canonical execution-state lineage verbatim. Only
+    # states for tasks the definition still knows are kept; nothing is fabricated.
+    execution_states = {
+        tid: state
+        for tid, state in checkpoint.canonical_execution_states().items()
+        if tid in instance.tasks
+    }
+
     return RuntimeRecoveryResult(
         instance=instance,
         resumed_from_status=checkpoint.status,
         requires_continuation=requires_continuation,
         config_mismatch=config_mismatch,
         notes=tuple(notes),
+        execution_states=execution_states,
     )

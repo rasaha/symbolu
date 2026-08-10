@@ -11,9 +11,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from .task import TaskDefinition, TaskInstance, TaskStatus
+
+if TYPE_CHECKING:  # pragma: no cover - annotation only; avoids an import cycle
+    from .execution_state import ExecutionLineage
 
 
 class WorkflowStatus(str, Enum):
@@ -76,6 +79,11 @@ class WorkflowInstance:
     status: WorkflowStatus = WorkflowStatus.CREATED
     tasks: Dict[str, TaskInstance] = field(default_factory=dict)
     correlation_id: Optional[str] = None
+    # Optional, typed neutral lineage seam (causation/parent/agent/artifact references).
+    # Defaults to unavailable — the runtime never fabricates provenance. Used only to
+    # derive CanonicalExecutionState; carrying an agent reference here never causes the
+    # runtime to select or re-rank an agent.
+    lineage: Optional[ExecutionLineage] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
@@ -84,6 +92,7 @@ class WorkflowInstance:
         instance_id: str,
         definition: WorkflowDefinition,
         correlation_id: Optional[str] = None,
+        lineage: Optional[ExecutionLineage] = None,
     ) -> "WorkflowInstance":
         tasks = {t.task_id: TaskInstance(definition=t) for t in definition.tasks}
         return cls(
@@ -92,6 +101,7 @@ class WorkflowInstance:
             status=WorkflowStatus.CREATED,
             tasks=tasks,
             correlation_id=correlation_id,
+            lineage=lineage,
         )
 
     @property
@@ -128,6 +138,7 @@ class WorkflowInstance:
             "workflow_id": self.workflow_id,
             "status": self.status.value,
             "correlation_id": self.correlation_id,
+            "lineage": self.lineage.to_dict() if self.lineage is not None else None,
             "tasks": {tid: ti.to_dict() for tid, ti in self.tasks.items()},
             "metadata": dict(self.metadata),
         }
