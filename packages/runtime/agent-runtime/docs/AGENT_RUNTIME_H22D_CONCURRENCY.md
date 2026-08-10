@@ -159,12 +159,18 @@ available = limit − consumed − reserved
 
 Reservation is atomic all-or-none across dimensions; an unconstrained dimension always fits.
 H22-D never invents an estimate — a workflow declares a `BudgetRequirement` (or an injected
-`budget_resolver` supplies one). With no runtime usage telemetry in this release, settlement uses
-the documented **conservative rule**: on a quantum that ran a provider, charge the full
-reservation as `consumed` (never under-charge) and mark the actual usage unavailable
-(`actual_known = False`); on a quantum that consumed nothing (HOLD/ESCALATE/BLOCK/no-op/cancel/
-infra fault), release the reservation without charging. This keeps `0 ≤ consumed ≤ limit` always.
-NaN/±Inf/negative values fail **closed**. Budget exhaustion makes a workflow *not concurrently
+`budget_resolver` supplies one). Settlement is driven by **authoritative provider-execution
+evidence** (`WorkflowAdvanceOutcome.provider_invoked`), never inferred from a terminal task
+status: on a quantum whose governance→exact-action→provider chain actually reached the provider
+(a CLEAR that ran, whether it succeeded or the provider failed), the full reservation is charged
+as `consumed` (the conservative rule — never under-charge; `actual_known = False` records that no
+usage telemetry exists); on a quantum that ran **no** provider — a governance HOLD/ESCALATE/BLOCK,
+an exact-action clearance/integrity rejection (both fail closed *before* the provider), a no-op,
+a cancellation, or an infrastructure fault — the reservation is **released** without charging.
+This keeps `0 ≤ consumed ≤ limit` always. If a caller ever settles with a *measured* actual usage
+greater than the reservation, settlement fails **closed** (`BudgetEstimateExceeded`) rather than
+silently clamping, so the ledger can never claim `consumed ≤ limit` by discarding real usage.
+NaN/±Inf/negative values fail closed. Budget exhaustion makes a workflow *not concurrently
 admissible* (`DEFERRED_BUDGET`) — it never creates a governance decision and never marks the
 workflow FAILED.
 
@@ -247,6 +253,39 @@ executor.set_budget_requirement(a, BudgetRequirement({"model_cost": 70}))
 result = executor.step_concurrent()   # plan → execute → join → reconcile
 executor.checkpoint()                 # stable batch boundary only
 ```
+
+## Independent-audit hardening (0.6.0)
+
+Five corrections tighten the safety envelope without changing the architecture:
+
+- **Runtime concurrency ceiling respected.** H22-D never exceeds the runtime's own configured
+  in-flight-task bound: the effective concurrency is
+  `min(ConcurrencyPolicy.max_concurrent_quanta, AgentRuntimeConfig.max_concurrent_tasks)`
+  (`ConcurrentPortfolioExecutor.effective_max_concurrent_quanta`). A runtime configured for one
+  in-flight task makes H22-D serial regardless of policy.
+- **Undeclared ≠ empty (fail-closed default).** An *explicitly empty* resource claim set (or
+  budget requirement) is the application asserting "no shared footprint" and permits concurrency.
+  A workflow that has **not** declared is treated as *unknown* and handled fail-closed: an
+  undeclared resource footprint conservatively **serializes** (it runs alone;
+  `RESOURCE_REQUIREMENT_UNAVAILABLE`), and an undeclared budget requirement is refused whenever the
+  portfolio budget has configured limits (`BUDGET_REQUIREMENT_UNAVAILABLE`). Undeclared is never
+  silently assumed conflict-free / zero-cost.
+- **Exception-safe admission planning.** Requirements are resolved up front, *before* any
+  reservation or fairness/service state is committed. A resolver/coordinator fault fails **closed**
+  with all reservations released and **no** H22-B fairness state mutated — planning is all-or-none,
+  and no batch executes on a partially-reserved plan.
+- **Authoritative settlement evidence.** Budget settlement uses `WorkflowAdvanceOutcome.provider_invoked`
+  (additive, immutable) instead of inferring provider execution from a terminal task status — so a
+  governance BLOCK or an exact-action rejection (no provider) correctly *releases* rather than
+  charges, and a measured overrun fails closed instead of silently clamping.
+- **Recovery reconstruction seam.** `ConcurrentPortfolioExecutor.from_recovery(...)` /
+  `create_concurrent_executor_from_recovery(...)` rebuild the executor from a
+  `PortfolioRecoveryResult`, adopting the recovered portfolio, append-only trace, H22-C failure
+  policy, durable **consumed budget**, and **compensation registrations** — so a recovered
+  portfolio continues instead of silently resetting shared budget, compensation state, failure
+  policy, or trace continuity. Reconstruction launches zero workers, makes zero
+  provider/governance/advance calls, and preserves `requires_continuation`; a v1 checkpoint yields
+  empty-but-valid H22-D state.
 
 ## Explicit non-claims (limitations)
 

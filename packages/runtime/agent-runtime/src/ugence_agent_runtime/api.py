@@ -42,6 +42,7 @@ from .orchestration import (
     AdmissionDecision,
     BatchPlan,
     BudgetCoordinator,
+    BudgetEstimateExceeded,
     BudgetRequirement,
     BudgetShortfall,
     CancellationScope,
@@ -324,6 +325,35 @@ def create_concurrent_executor(
     )
 
 
+def create_concurrent_executor_from_recovery(
+    runtime: AgentRuntime,
+    recovery_result: PortfolioRecoveryResult,
+    *,
+    policy: Optional[ConcurrencyPolicy] = None,
+    checkpoint_store: Optional[PortfolioCheckpointStore] = None,
+    backend: Optional[ExecutionBackend] = None,
+    claims_resolver=None,
+    budget_resolver=None,
+) -> ConcurrentPortfolioExecutor:
+    """Reconstruct an H22-D executor from a :class:`PortfolioRecoveryResult` (no side effects).
+
+    Adopts the recovered portfolio, append-only trace, H22-C failure policy, durable **consumed
+    budget**, and **compensation registrations** — so a recovered portfolio continues instead of
+    silently resetting shared budget, compensation state, failure policy, or trace continuity. It
+    launches no workers and makes no provider/governance/advance call; the recovered portfolio
+    still ``requires_continuation``. Concurrency policy is supplied here (configuration, not
+    persisted). See ``ConcurrentPortfolioExecutor.from_recovery``."""
+    return ConcurrentPortfolioExecutor.from_recovery(
+        runtime,
+        recovery_result,
+        policy=policy,
+        checkpoint_store=checkpoint_store,
+        backend=backend,
+        claims_resolver=claims_resolver,
+        budget_resolver=budget_resolver,
+    )
+
+
 __all__ = [
     # runtime
     "AgentRuntime",
@@ -398,11 +428,13 @@ __all__ = [
     "BudgetRequirement",
     "BudgetShortfall",
     "BudgetCoordinator",
+    "BudgetEstimateExceeded",
     "CompensationTrigger",
     "CompensationSpec",
     "CompensationRegistration",
     "CompensationRegistry",
     "create_concurrent_executor",
+    "create_concurrent_executor_from_recovery",
     # providers
     "Provider",
     "ProviderRegistry",

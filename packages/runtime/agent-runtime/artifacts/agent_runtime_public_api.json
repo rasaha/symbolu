@@ -12,6 +12,7 @@
     "AllowAllGovernanceHook",
     "BatchPlan",
     "BudgetCoordinator",
+    "BudgetEstimateExceeded",
     "BudgetRequirement",
     "BudgetShortfall",
     "CancellationError",
@@ -110,6 +111,7 @@
     "cancel_workflow",
     "continue_workflow",
     "create_concurrent_executor",
+    "create_concurrent_executor_from_recovery",
     "create_portfolio",
     "create_portfolio_controller",
     "create_portfolio_scheduler",
@@ -147,6 +149,7 @@
     "create_portfolio_scheduler",
     "create_portfolio_controller",
     "create_concurrent_executor",
+    "create_concurrent_executor_from_recovery",
     "recover_portfolio",
     "priority_rank"
   ]

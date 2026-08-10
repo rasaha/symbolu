@@ -100,6 +100,15 @@ class WorkflowAdvanceOutcome:
     terminal: bool = False
     waiting: bool = False
     paused: bool = False
+    #: Authoritative, additive evidence that a provider was actually invoked during THIS
+    #: quantum (at least one attempt). It is ``False`` whenever no provider ran — a governance
+    #: HOLD/ESCALATE/BLOCK (governance denied before any provider call), an exact-action
+    #: clearance rejection / invocation-integrity mismatch (fails closed *before* the provider),
+    #: a no-op/finalization quantum, or a cancellation. It is ``True`` only after the
+    #: governance→exact-action→provider chain reached the provider. This lets an orchestrator
+    #: settle side-effecting cost precisely instead of inferring it from a terminal task status
+    #: (a FAILED task may or may not have run a provider).
+    provider_invoked: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -116,6 +125,7 @@ class WorkflowAdvanceOutcome:
             "terminal": self.terminal,
             "waiting": self.waiting,
             "paused": self.paused,
+            "provider_invoked": self.provider_invoked,
         }
 
 

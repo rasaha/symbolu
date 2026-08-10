@@ -52,7 +52,7 @@ from .budgets import BudgetCoordinator, BudgetRequirement, PortfolioBudget
 from .compensation import CompensationRegistry
 from .control import PortfolioController, PortfolioFailurePolicy
 from .portfolio import WorkflowPortfolio
-from .resources import ResourceClaim, ResourceCoordinator
+from .resources import ResourceClaim, ResourceCoordinator, ResourceMode
 from .scheduling import (
     AdmissionDecision,
     BatchPlan,
@@ -60,8 +60,17 @@ from .scheduling import (
     PortfolioStepReason,
     SchedulingPolicy,
     SelectionReason,
+    WorkflowEligibility,
 )
 from .tracing import PortfolioEventType, PortfolioTrace
+
+#: Synthetic logical resource key used to model an *undeclared* resource footprint fail-closed
+#: (Section 4). A workflow that has NOT declared its claims implicitly holds this key EXCLUSIVE
+#: (so it can only run alone); a workflow that HAS declared (even an explicitly empty set) holds
+#: it READ (so declared workflows stay mutually concurrent, but an undeclared quantum conflicts
+#: with every other quantum). This makes "undeclared" conservatively serialize rather than be
+#: silently assumed conflict-free. It is transient like any reservation and never persisted.
+_UNKNOWN_RESOURCE_KEY = "__h22d_unknown_resource__"
 
 
 # --------------------------------------------------------------------------- #
@@ -307,6 +316,57 @@ class ConcurrentPortfolioExecutor:
         # Compensation configuration: origin instance_id -> (compensation_workflow_id, trigger).
         self._compensation_specs: Dict[str, Tuple[str, str]] = {}
 
+    # -- recovery reconstruction (side-effect-free) -------------------------
+    @classmethod
+    def from_recovery(
+        cls,
+        runtime: object,
+        recovery_result: object,
+        *,
+        policy: Optional[ConcurrencyPolicy] = None,
+        checkpoint_store: Optional[object] = None,
+        resource_coordinator: Optional[ResourceCoordinator] = None,
+        backend: Optional[ExecutionBackend] = None,
+        claims_resolver: Optional[ClaimsResolver] = None,
+        budget_resolver: Optional[BudgetResolver] = None,
+    ) -> "ConcurrentPortfolioExecutor":
+        """Reconstruct an executor from a :class:`~.recovery.PortfolioRecoveryResult`, WITHOUT any
+        side effect.
+
+        It adopts, by default: the recovered ``portfolio``; the recovered append-only ``trace``
+        (through the H22-C controller's recovery-continuity contract, so the sequence continues
+        rather than resetting); the recovered H22-C ``failure_policy`` (never silently reset to the
+        constructor default); the durable **consumed budget** (via ``BudgetCoordinator.restore``);
+        and the durable **compensation registrations** (via ``CompensationRegistry.restore``). For
+        a v1 checkpoint that carried no H22-D slice, empty-but-valid budget/compensation state is
+        constructed. Concurrency/resource policy is operator-supplied configuration on recovery
+        (like ``SchedulingPolicy``), so it is passed here rather than persisted.
+
+        Construction launches **zero** workers, calls **zero** providers, **zero** governance,
+        advances **zero** workflows, and preserves ``recovery_result.requires_continuation`` — the
+        operator must still explicitly step the executor before any new execution occurs."""
+        controller = PortfolioController.from_recovery(
+            runtime, recovery_result, checkpoint_store=checkpoint_store
+        )
+        cs = dict(getattr(recovery_result, "concurrency_state", {}) or {})
+        budget_slice = cs.get("budget") or {}
+        budget_coordinator = (
+            BudgetCoordinator.restore(budget_slice) if budget_slice else BudgetCoordinator()
+        )
+        compensation_registry = CompensationRegistry.restore(cs.get("compensations") or [])
+        return cls(
+            runtime,
+            getattr(recovery_result, "portfolio"),
+            policy=policy,
+            controller=controller,
+            resource_coordinator=resource_coordinator,
+            budget_coordinator=budget_coordinator,
+            compensation_registry=compensation_registry,
+            backend=backend,
+            claims_resolver=claims_resolver,
+            budget_resolver=budget_resolver,
+        )
+
     # -- accessors ----------------------------------------------------------
     @property
     def portfolio(self) -> WorkflowPortfolio:
@@ -368,15 +428,44 @@ class ConcurrentPortfolioExecutor:
             self._static_budget: Dict[str, BudgetRequirement] = {}
         return self._static_budget
 
-    def _claims_for(self, instance_id: str) -> Tuple[ResourceClaim, ...]:
-        if self._claims_resolver is not None:
-            return tuple(self._claims_resolver(instance_id))
-        return self._static_claims_setdefault().get(instance_id, ())
+    def _resolve_claims(self, instance_id: str) -> Tuple[Tuple[ResourceClaim, ...], bool]:
+        """Resolve a workflow's resource claims AND whether they were *declared* (Section 4).
 
-    def _budget_for(self, instance_id: str) -> BudgetRequirement:
+        A configured ``claims_resolver`` is itself the declaration mechanism (always declared); a
+        static entry — including an explicitly empty ``[]`` — is a declaration; otherwise the
+        requirement is **undeclared** (unknown), which is handled fail-closed at admission. May
+        raise if a resolver raises; callers pre-resolve so that happens before any reservation."""
+        if self._claims_resolver is not None:
+            return tuple(self._claims_resolver(instance_id)), True
+        static = self._static_claims_setdefault()
+        if instance_id in static:
+            return static[instance_id], True
+        return (), False
+
+    def _resolve_budget(self, instance_id: str) -> Tuple[BudgetRequirement, bool]:
+        """Resolve a workflow's budget requirement AND whether it was *declared* (Section 4).
+
+        A configured ``budget_resolver`` or a static entry — including an explicit
+        ``BudgetRequirement({})`` — is a declaration; otherwise the requirement is undeclared,
+        which fails closed only when the portfolio budget actually has configured limits."""
         if self._budget_resolver is not None:
-            return self._budget_resolver(instance_id)
-        return self._static_budget_setdefault().get(instance_id, BudgetRequirement())
+            return self._budget_resolver(instance_id), True
+        static = self._static_budget_setdefault()
+        if instance_id in static:
+            return static[instance_id], True
+        return BudgetRequirement(), False
+
+    # -- effective concurrency ceiling (Section 2) --------------------------
+    @property
+    def effective_max_concurrent_quanta(self) -> int:
+        """The concurrency actually enforced: the minimum of the H22-D policy limit and the
+        runtime's own ``AgentRuntimeConfig.max_concurrent_tasks`` ceiling. H22-D never exceeds the
+        runtime's configured in-flight-task bound; a runtime configured for one in-flight task
+        makes H22-D serial regardless of the policy."""
+        runtime_cap = getattr(getattr(self._runtime, "config", None), "max_concurrent_tasks", None)
+        if not isinstance(runtime_cap, int) or runtime_cap < 1:
+            return self._policy.max_concurrent_quanta
+        return min(self._policy.max_concurrent_quanta, runtime_cap)
 
     # -- cancellation (cooperative; delegated to the H22-C controller) ------
     def cancel(self, instance_id: str, scope=None):
@@ -406,12 +495,29 @@ class ConcurrentPortfolioExecutor:
                 reason=ConcurrentStepReason.PORTFOLIO_TERMINAL.value,
             )
 
-        # 1) PLAN — deterministic batch selection with atomic resource+budget admission.
-        plan = self._controller.scheduler.plan_batch(
-            self._portfolio,
-            max_concurrency=self._policy.max_concurrent_quanta,
-            admit=self._admit,
-        )
+        # 1a) PRE-RESOLVE all eligible candidates' declared requirements BEFORE any reservation or
+        # fairness mutation (Section 3). A resolver fault here fails closed with nothing reserved
+        # and NO H22-B fairness/service state committed — planning is all-or-none.
+        try:
+            resolved = self._preresolve()
+        except Exception as exc:
+            raise ExecutorInfrastructureError(
+                f"admission requirement resolution failed (fail closed, no reservation taken): {exc}"
+            ) from exc
+
+        # 1b) PLAN — deterministic batch selection with atomic resource+budget admission, using the
+        # pre-resolved (non-throwing) admission predicate and the effective concurrency ceiling.
+        try:
+            plan = self._controller.scheduler.plan_batch(
+                self._portfolio,
+                max_concurrency=self.effective_max_concurrent_quanta,
+                admit=self._make_admit(resolved),
+            )
+        except Exception as exc:  # defensive: release anything reserved, fail closed.
+            self._release_all_reservations()
+            raise ExecutorInfrastructureError(
+                f"admission planning failed (fail closed, reservations released): {exc}"
+            ) from exc
         batch_id = self._batch_id(plan.round)
         deferred_resource, deferred_budget = self._split_deferrals(plan)
 
@@ -514,36 +620,84 @@ class ConcurrentPortfolioExecutor:
         """Deterministic batch identity assigned before launch (never from completion timing)."""
         return f"{self._portfolio.portfolio_id}#batch-{rnd}"
 
-    def _admit(self, entry) -> AdmissionDecision:
-        """The admission predicate the scheduler calls in SWRR order. Atomically reserves the
-        candidate's resources then its budget; rolls the resource reservation back if the budget
-        is short, so admission is truly all-or-none across both coordinators."""
-        iid = entry.instance_id
-        claims = self._claims_for(iid)
-        req = self._budget_for(iid)
-        r_ok, conflict = self._resources.reserve(iid, claims)
-        if not r_ok:
-            return AdmissionDecision(False, "RESOURCE_CONFLICT", conflict.to_dict())
-        b_ok, shortfall = self._budget.reserve(iid, req)
-        if not b_ok:
-            self._resources.release(iid)  # roll back — nothing half-reserved survives
-            return AdmissionDecision(False, "BUDGET_UNAVAILABLE", shortfall.to_dict())
-        return AdmissionDecision(
-            True,
-            detail={
-                "claims": [c.to_dict() for c in self._resources.active_claims(iid)],
-                "budget": req.to_dict(),
-            },
-        )
+    def _preresolve(self) -> Dict[str, Tuple[Tuple[ResourceClaim, ...], bool, BudgetRequirement, bool]]:
+        """Resolve every currently-eligible workflow's declared resource claims and budget
+        requirement up front (read-only; no reservation, no fairness mutation).
 
-    @staticmethod
-    def _split_deferrals(plan: BatchPlan):
+        Any resolver exception propagates from here — *before* the scheduler is invoked — so a
+        fault can never leave a partial reservation or a partially-committed fairness state. Only
+        ELIGIBLE workflows are resolved (the only ones the batch can admit)."""
+        cache: Dict[str, Tuple[Tuple[ResourceClaim, ...], bool, BudgetRequirement, bool]] = {}
+        for entry, cls in self._controller.scheduler.classify(self._portfolio):
+            if cls is not WorkflowEligibility.ELIGIBLE:
+                continue
+            iid = entry.instance_id
+            claims, r_declared = self._resolve_claims(iid)
+            req, b_declared = self._resolve_budget(iid)
+            cache[iid] = (claims, r_declared, req, b_declared)
+        return cache
+
+    def _release_all_reservations(self) -> None:
+        """Fail-safe cleanup: release every active resource and budget reservation (used when
+        admission planning fails, so no reservation is ever left behind without a batch)."""
+        for iid in list(self._resources.active_instance_ids()):
+            self._resources.release(iid)
+        for iid in list(self._budget.active_instance_ids()):
+            self._budget.release(iid)
+
+    def _make_admit(self, resolved):
+        """Build the (non-throwing) admission predicate the scheduler calls in SWRR order.
+
+        It reserves the candidate's resources then its budget atomically (rolling back the
+        resource reservation if the budget is short), all from pre-resolved values so it cannot
+        raise. Fail-closed handling of *undeclared* requirements (Section 4): an undeclared
+        resource footprint holds the synthetic UNKNOWN key EXCLUSIVE (runs alone), and an
+        undeclared budget requirement is refused whenever the portfolio budget has limits."""
+
+        def admit(entry) -> AdmissionDecision:
+            iid = entry.instance_id
+            claims, r_declared, req, b_declared = resolved[iid]
+            # Resource: declared workflows implicitly hold the UNKNOWN key READ (mutually
+            # compatible); an undeclared one holds it EXCLUSIVE (conflicts with every quantum).
+            if r_declared:
+                effective = list(claims) + [ResourceClaim(_UNKNOWN_RESOURCE_KEY, ResourceMode.READ)]
+            else:
+                effective = [ResourceClaim(_UNKNOWN_RESOURCE_KEY, ResourceMode.EXCLUSIVE)]
+            r_ok, conflict = self._resources.reserve(iid, effective)
+            if not r_ok:
+                if conflict.resource_key == _UNKNOWN_RESOURCE_KEY:
+                    return AdmissionDecision(False, "RESOURCE_REQUIREMENT_UNAVAILABLE", {
+                        "reason": "RESOURCE_REQUIREMENT_UNAVAILABLE", "instance_id": iid,
+                        "declared": r_declared, "conflicts_with": conflict.holder,
+                    })
+                return AdmissionDecision(False, "RESOURCE_CONFLICT", conflict.to_dict())
+            # Budget: an undeclared requirement must not bypass an active shared budget.
+            if self._budget.has_limits and not b_declared:
+                self._resources.release(iid)  # roll back the resource reservation
+                return AdmissionDecision(False, "BUDGET_REQUIREMENT_UNAVAILABLE", {
+                    "reason": "BUDGET_REQUIREMENT_UNAVAILABLE", "instance_id": iid,
+                })
+            b_ok, shortfall = self._budget.reserve(iid, req)
+            if not b_ok:
+                self._resources.release(iid)  # roll back — nothing half-reserved survives
+                return AdmissionDecision(False, "BUDGET_UNAVAILABLE", shortfall.to_dict())
+            return AdmissionDecision(True, detail={
+                "claims": [c.to_dict() for c in claims], "budget": req.to_dict(),
+            })
+
+        return admit
+
+    #: Deferral reasons that are budget-related (everything else is resource-related).
+    _BUDGET_DEFERRAL_REASONS = frozenset({"BUDGET_UNAVAILABLE", "BUDGET_REQUIREMENT_UNAVAILABLE"})
+
+    @classmethod
+    def _split_deferrals(cls, plan: BatchPlan):
         deferred_resource: List[Dict[str, object]] = []
         deferred_budget: List[Dict[str, object]] = []
         for iid, reason, detail in plan.deferred:
             record = dict(detail)
             record.setdefault("instance_id", iid)
-            if reason == "BUDGET_UNAVAILABLE":
+            if reason in cls._BUDGET_DEFERRAL_REASONS:
                 deferred_budget.append(record)
             else:
                 deferred_resource.append(record)
@@ -593,13 +747,18 @@ class ConcurrentPortfolioExecutor:
                 instance_id=iid, batch_id=batch_id, admission_sequence=seq, round=plan.round,
                 selection_reason=detail.to_dict() if detail else None,
             )
-            claims = [c.to_dict() for c in self._resources.active_claims(iid)]
+            # Report only the application's declared claims — the synthetic UNKNOWN-footprint key
+            # is an internal coordination artifact and is elided from the audit trail.
+            claims = [
+                c.to_dict() for c in self._resources.active_claims(iid)
+                if c.resource_key != _UNKNOWN_RESOURCE_KEY
+            ]
             if claims:
                 self._controller.trace.emit(
                     PortfolioEventType.RESOURCE_RESERVED,
                     instance_id=iid, batch_id=batch_id, claims=claims,
                 )
-            req = self._budget_for(iid)
+            req, _ = self._resolve_budget(iid)
             if not req.is_empty:
                 self._controller.trace.emit(
                     PortfolioEventType.BUDGET_RESERVED,
@@ -683,18 +842,20 @@ class ConcurrentPortfolioExecutor:
         return tuple(reconciled)
 
     def _settle_budget(self, instance_id: str, outcome: Optional[QuantumOutcome]):
-        """Settle (charge, conservatively) when a provider ran, else release (no charge)."""
+        """Settle (charge, conservatively) iff a provider was actually invoked, else release.
+
+        Provider execution is taken from the **authoritative** ``provider_invoked`` evidence on the
+        H22-A outcome — never inferred from a terminal task status. A governance HOLD/ESCALATE/BLOCK
+        and an exact-action clearance/integrity rejection all reach a terminal-or-waiting task
+        *without* running a provider (``provider_invoked == False``), so they RELEASE the
+        reservation and charge nothing; a CLEAR that reached the provider (success OR provider
+        failure) charges (conservatively, the full reservation). An infrastructure fault
+        (``outcome.error``) also releases."""
         provider_ran = bool(
             outcome
-            and outcome.advance_outcome is not None
             and outcome.error is None
-            and outcome.advance_outcome.task_id is not None
-            and outcome.advance_outcome.task_status
-            in (
-                # A task that reached COMPLETED or FAILED ran (or attempted) its provider.
-                "COMPLETED",
-                "FAILED",
-            )
+            and outcome.advance_outcome is not None
+            and outcome.advance_outcome.provider_invoked
         )
         if provider_ran:
             settlement = self._budget.settle(instance_id)  # conservative: charge reservation

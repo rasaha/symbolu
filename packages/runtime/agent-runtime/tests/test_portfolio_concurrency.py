@@ -28,6 +28,7 @@ from ugence_agent_runtime.api import (
     ConcurrentStepReason,
     ExecutorInfrastructureError,
     PortfolioBudget,
+    PortfolioFailurePolicy,
     PortfolioScheduler,
     ResourceClaim,
     ResourceCoordinator,
@@ -190,9 +191,14 @@ class FaultyAdvanceRuntime:
         return self._rt.advance_workflow(instance_id)
 
 
-def _runtime(hook=None, providers=None, *, store=None):
+def _runtime(hook=None, providers=None, *, store=None, max_concurrent_tasks=8):
+    # A permissive runtime ceiling by default so the H22-D ConcurrencyPolicy governs; the C2
+    # tests set a low ceiling explicitly to prove min(policy, runtime.max_concurrent_tasks).
     ss = store if store is not None else InMemoryRuntimeStateStore()
-    cfg = AgentRuntimeConfig(governance_hook=hook or AllowAllGovernanceHook(), state_store=ss)
+    cfg = AgentRuntimeConfig(
+        governance_hook=hook or AllowAllGovernanceHook(), state_store=ss,
+        max_concurrent_tasks=max_concurrent_tasks,
+    )
     rt = create_runtime(cfg)
     for prov in providers or [Probe("p")]:
         register_provider(rt, prov)
@@ -203,6 +209,13 @@ def _prepare_register(rt, portfolio, definition, **reg):
     inst = prepare_workflow(rt, definition)
     portfolio.register(inst.instance_id, runtime=rt, **reg)
     return inst.instance_id
+
+
+def _declare_no_claims(ex, *instance_ids):
+    """Explicitly declare an empty resource claim set — the application asserting this quantum has
+    no shared resource footprint — which (unlike leaving it undeclared) permits concurrency."""
+    for iid in instance_ids:
+        ex.set_resource_claims(iid, [])
 
 
 # --------------------------------------------------------------------------- #
@@ -219,6 +232,7 @@ def test_A_at_most_max_concurrent_quanta_in_flight():
         rt, p, policy=ConcurrencyPolicy(max_concurrent_quanta=2),
         backend=ThreadPoolExecutionBackend(),
     )
+    _declare_no_claims(ex, *p.instance_ids)  # explicit empty claims -> concurrency permitted
     results = ex.run_concurrent()
     executed = [r for r in results if r.granted]
     assert all(len(r.admitted) <= 2 for r in executed)
@@ -237,6 +251,7 @@ def test_C_two_independent_workflows_run_concurrently():
         rt, p, policy=ConcurrencyPolicy(max_concurrent_quanta=2),
         backend=ThreadPoolExecutionBackend(),
     )
+    _declare_no_claims(ex, *p.instance_ids)  # explicit empty claims -> concurrency permitted
     result = ex.step_concurrent()
     # The barrier only releases if BOTH quanta were in flight simultaneously.
     assert result.granted and len(result.admitted) == 2
@@ -460,6 +475,7 @@ def test_P_Q_sufficient_admits_insufficient_defers():
         rt, p, policy=ConcurrencyPolicy(max_concurrent_quanta=2),
         budget=PortfolioBudget({"cost": 100}),
     )
+    _declare_no_claims(ex, a, b)  # isolate the BUDGET deferral from resource coordination
     ex.set_budget_requirement(a, BudgetRequirement({"cost": 70}))
     ex.set_budget_requirement(b, BudgetRequirement({"cost": 70}))
     r = ex.step_concurrent()
@@ -604,6 +620,7 @@ def test_AC_AD_AE_governance_dispositions_are_independent_across_the_batch():
     }
     ex = create_concurrent_executor(rt, p, policy=ConcurrencyPolicy(max_concurrent_quanta=4),
                                     backend=ThreadPoolExecutionBackend())
+    _declare_no_claims(ex, *p.instance_ids)
     ex.run_concurrent()
     assert rt.instance(ids["clear"]).status is WorkflowStatus.COMPLETED
     assert rt.instance(ids["hold"]).status is WorkflowStatus.WAITING     # HOLD
@@ -848,6 +865,7 @@ def test_BF_one_worker_failure_does_not_fabricate_another_result():
     faulty = FaultyAdvanceRuntime(rt, {boom})  # only BM's worker faults
     ex = create_concurrent_executor(faulty, p, policy=ConcurrencyPolicy(max_concurrent_quanta=2),
                                     backend=ThreadPoolExecutionBackend())
+    _declare_no_claims(ex, ok, boom)
     result = ex.step_concurrent()
     by_id = {o.instance_id: o for o in result.outcomes}
     assert by_id[ok].advance_outcome is not None and not by_id[ok].infrastructure_failure
@@ -889,6 +907,7 @@ def test_BJ_reconciliation_trace_is_admission_ordered_despite_completion_race():
     b = _prepare_register(rt, p, _wf("B", "B1"))
     ex = create_concurrent_executor(rt, p, policy=ConcurrencyPolicy(max_concurrent_quanta=2),
                                     backend=ThreadPoolExecutionBackend(), event_store=est)
+    _declare_no_claims(ex, a, b)
     r = ex.step_concurrent()
     completed = [e for e in ex.trace.history() if e.event_type == "CONCURRENT_QUANTUM_COMPLETED"]
     order = [e.detail["instance_id"] for e in completed]
@@ -913,3 +932,266 @@ def test_BK_audit_history_survives_recovery():
     assert "CONCURRENT_BATCH_PLANNED" in post  # pre-crash H22-D events preserved
     assert "PORTFOLIO_RECOVERED" in post
     assert len(post) > len(pre)
+
+
+# =========================================================================== #
+# Independent-audit corrections C1–C5                                          #
+# =========================================================================== #
+from ugence_agent_runtime.orchestration.budgets import BudgetEstimateExceeded
+from ugence_agent_runtime.api import create_concurrent_executor_from_recovery
+from ugence_agent_runtime.runtime.errors import ProviderExecutionError
+
+
+class FailProvider(Provider):
+    """Provider that always raises a retriable provider error (a provider that RAN and failed)."""
+
+    def __init__(self, provider_id="fail"):
+        self.provider_id = provider_id
+        self.version = "1.0.0"
+        self.calls = 0
+
+    def execute(self, invocation):
+        self.calls += 1
+        raise ProviderExecutionError("provider failed", retriable=False)
+
+
+def _hook(disp, *, bind=True):
+    class _H(GovernanceHook):
+        def __init__(self): self.calls = 0
+        def evaluate(self, p, t):
+            self.calls += 1
+            clear = disp is CLEAR
+            return GovernanceEvaluation(
+                disposition=disp,
+                proposal_fingerprint=(p.fingerprint if (clear and bind) else None),
+                reason_codes=("X",),
+                evaluation_reference=("r" if (clear and bind) else None),
+                valid_until=None, correlation_reference=p.correlation_id)
+    return _H()
+
+
+# --- C5: settlement is driven by authoritative provider-execution evidence --- #
+@pytest.mark.parametrize(
+    "disp,bind,provider,expected_consumed",
+    [
+        (CLEAR, True, "probe", 40.0),   # CLEAR + provider success -> charge
+        (CLEAR, True, "fail", 40.0),    # CLEAR + provider ran then failed -> charge
+        (HOLD, True, "probe", 0.0),     # HOLD (no provider) -> release
+        (ESCALATE, True, "probe", 0.0), # ESCALATE (no provider) -> release
+        (BLOCK, True, "probe", 0.0),    # BLOCK (no provider) -> release
+        (CLEAR, False, "probe", 0.0),   # CLEAR but unbound -> exact-action reject before provider -> release
+    ],
+)
+def test_C5_settlement_follows_provider_execution_evidence(disp, bind, provider, expected_consumed):
+    hook = _hook(disp, bind=bind)
+    prov = Probe("probe") if provider == "probe" else FailProvider("fail")
+    rt = _runtime(hook, [prov])
+    p = create_portfolio("c5")
+    a = _prepare_register(rt, p, _wf("A", "A1", provider=provider))
+    ex = create_concurrent_executor(rt, p, policy=ConcurrencyPolicy(max_concurrent_quanta=1),
+                                    budget=PortfolioBudget({"cost": 100}))
+    ex.set_budget_requirement(a, BudgetRequirement({"cost": 40}))
+    ex.step_concurrent()
+    assert ex.budget.consumed("cost") == expected_consumed
+    assert not ex.budget.has_active_reservations
+
+
+def test_C5_infrastructure_fault_releases_budget():
+    rt = _runtime(providers=[Probe("p")])
+    p = create_portfolio("c5inf")
+    a = _prepare_register(rt, p, _wf("A", "A1"))
+    faulty = FaultyAdvanceRuntime(rt, {a})
+    ex = create_concurrent_executor(faulty, p, policy=ConcurrencyPolicy(max_concurrent_quanta=1),
+                                    budget=PortfolioBudget({"cost": 100}))
+    ex.set_budget_requirement(a, BudgetRequirement({"cost": 40}))
+    ex.step_concurrent()
+    assert ex.budget.consumed("cost") == 0.0 and not ex.budget.has_active_reservations
+
+
+def test_C5_settle_overrun_fails_closed_without_clamping():
+    bc = BudgetCoordinator(PortfolioBudget({"cost": 100}))
+    bc.reserve("A", BudgetRequirement({"cost": 40}))
+    with pytest.raises(BudgetEstimateExceeded):
+        bc.settle("A", actual={"cost": 50})          # measured > reserved -> fail closed
+    # Ledger untouched: reservation intact, nothing consumed (no silent clamp to 40).
+    assert bc.reserved("cost") == 40.0 and bc.consumed("cost") == 0.0
+    s = bc.settle("A", actual={"cost": 30})           # honest actual <= reserved
+    assert s.charged["cost"] == 30.0 and s.released["cost"] == 10.0
+    assert bc.consumed("cost") == 30.0 and bc.reserved("cost") == 0.0
+
+
+# --- C4: undeclared vs explicitly-empty requirements ------------------------ #
+def test_C4_undeclared_resource_serializes_but_explicit_empty_permits_concurrency():
+    # Undeclared: conservatively serialized (only one admitted, the other fail-closed).
+    rt = _runtime(providers=[Probe("p")])
+    p = create_portfolio("c4r")
+    a = _prepare_register(rt, p, _wf("A", "A1"))
+    b = _prepare_register(rt, p, _wf("B", "B1"))
+    ex = create_concurrent_executor(rt, p, policy=ConcurrencyPolicy(max_concurrent_quanta=2))
+    r = ex.step_concurrent()
+    assert len(r.admitted) == 1
+    assert r.deferred_resource and r.deferred_resource[0]["reason"] == "RESOURCE_REQUIREMENT_UNAVAILABLE"
+
+    # Explicit empty declaration: application asserts no shared footprint -> concurrency allowed.
+    rt2 = _runtime(providers=[Probe("p")])
+    p2 = create_portfolio("c4r2")
+    a2 = _prepare_register(rt2, p2, _wf("A", "A1"))
+    b2 = _prepare_register(rt2, p2, _wf("B", "B1"))
+    ex2 = create_concurrent_executor(rt2, p2, policy=ConcurrencyPolicy(max_concurrent_quanta=2))
+    _declare_no_claims(ex2, a2, b2)
+    r2 = ex2.step_concurrent()
+    assert set(r2.admitted) == {a2, b2}
+
+
+def test_C4_undeclared_budget_fails_closed_when_limits_configured():
+    rt = _runtime(providers=[Probe("p")])
+    p = create_portfolio("c4b")
+    a = _prepare_register(rt, p, _wf("A", "A1"))
+    ex = create_concurrent_executor(rt, p, policy=ConcurrencyPolicy(max_concurrent_quanta=1),
+                                    budget=PortfolioBudget({"cost": 100}))
+    _declare_no_claims(ex, a)  # isolate: resources fine, budget requirement UNDECLARED
+    r = ex.step_concurrent()
+    assert not r.granted
+    assert r.deferred_budget and r.deferred_budget[0]["reason"] == "BUDGET_REQUIREMENT_UNAVAILABLE"
+
+    # Explicit empty budget requirement = declared zero -> admitted.
+    ex.set_budget_requirement(a, BudgetRequirement({}))
+    assert ex.step_concurrent().granted
+
+
+def test_C4_undeclared_budget_harmless_without_limits():
+    rt = _runtime(providers=[Probe("p")])
+    p = create_portfolio("c4b2")
+    a = _prepare_register(rt, p, _wf("A", "A1"))
+    ex = create_concurrent_executor(rt, p, policy=ConcurrencyPolicy(max_concurrent_quanta=1))
+    _declare_no_claims(ex, a)  # no budget configured at all -> undeclared requirement is fine
+    assert ex.step_concurrent().granted
+
+
+# --- C3: admission planning is exception-safe (all-or-none, fail closed) ----- #
+def test_C3_claims_resolver_exception_fails_closed_no_leak_no_fairness_mutation():
+    prov = Probe("p")
+    rt = _runtime(providers=[prov])
+    p = create_portfolio("c3")
+    a = _prepare_register(rt, p, _wf("A", "A1"))
+    b = _prepare_register(rt, p, _wf("B", "B1"))
+
+    def resolver(iid):
+        if iid == b:
+            raise RuntimeError("resolver blew up on candidate B")
+        return []
+
+    ex = create_concurrent_executor(rt, p, policy=ConcurrencyPolicy(max_concurrent_quanta=2),
+                                    claims_resolver=resolver, budget=PortfolioBudget({"cost": 100}))
+    with pytest.raises(ExecutorInfrastructureError):
+        ex.step_concurrent()
+    # Fail closed: no reservation left behind, no worker launched...
+    assert ex.resources.is_empty and not ex.budget.has_active_reservations
+    assert prov.calls == 0
+    # ...and no H22-B fairness/service state was committed (all entries pristine).
+    for e in p.entries():
+        assert e.fair_credit == 0.0 and e.age == 0
+
+
+def test_C3_budget_resolver_exception_fails_closed():
+    prov = Probe("p")
+    rt = _runtime(providers=[prov])
+    p = create_portfolio("c3b")
+    a = _prepare_register(rt, p, _wf("A", "A1"))
+
+    def bresolver(iid):
+        raise RuntimeError("budget resolver blew up")
+
+    ex = create_concurrent_executor(rt, p, policy=ConcurrencyPolicy(max_concurrent_quanta=1),
+                                    budget_resolver=bresolver, budget=PortfolioBudget({"cost": 100}))
+    with pytest.raises(ExecutorInfrastructureError):
+        ex.step_concurrent()
+    assert ex.resources.is_empty and not ex.budget.has_active_reservations and prov.calls == 0
+
+
+# --- C2: H22-D respects AgentRuntimeConfig.max_concurrent_tasks -------------- #
+@pytest.mark.parametrize("runtime_max,policy_max,expected", [(1, 4, 1), (2, 4, 2), (8, 2, 2)])
+def test_C2_effective_concurrency_is_min_of_policy_and_runtime(runtime_max, policy_max, expected):
+    n = expected * 2  # a multiple of expected so provider-running batches are exactly `expected`
+    barrier = threading.Barrier(expected)
+    prov = Probe("p", barrier=barrier)
+    rt = _runtime(providers=[prov], max_concurrent_tasks=runtime_max)
+    p = create_portfolio("c2")
+    ids = [_prepare_register(rt, p, _wf(f"W{i}", f"W{i}t")) for i in range(n)]
+    ex = create_concurrent_executor(rt, p, policy=ConcurrencyPolicy(max_concurrent_quanta=policy_max),
+                                    backend=ThreadPoolExecutionBackend())
+    _declare_no_claims(ex, *ids)
+    assert ex.effective_max_concurrent_quanta == expected
+    ex.run_concurrent()
+    assert prov.peak == expected  # never exceeds the runtime ceiling
+    assert all(len(r.admitted) <= expected for r in ex.run_concurrent() or [])
+
+
+# --- C1: recovery reconstruction seam --------------------------------------- #
+def test_C1_from_recovery_restores_budget_compensation_and_failure_policy():
+    ss = InMemoryRuntimeStateStore()
+    hook = ThreadSafeHook()
+    hook.set("PAY", BLOCK)  # PAY fails -> compensation intent registered
+    rt = _runtime(hook, [Probe("p")], store=ss)
+    p = create_portfolio("c1")
+    a = _prepare_register(rt, p, _wf("A", "A1"))       # CLEAR success -> consumes budget
+    pay = _prepare_register(rt, p, _wf("PAY", "charge"))
+    cps = InMemoryPortfolioCheckpointStore()
+    est = InMemoryPortfolioEventStore()
+    ex = create_concurrent_executor(
+        rt, p, policy=ConcurrencyPolicy(max_concurrent_quanta=2),
+        failure_policy=PortfolioFailurePolicy.FAIL_DEPENDENTS,
+        budget=PortfolioBudget({"cost": 100}), checkpoint_store=cps, event_store=est,
+    )
+    _declare_no_claims(ex, a, pay)
+    ex.set_budget_requirement(a, BudgetRequirement({"cost": 70}))
+    ex.set_budget_requirement(pay, BudgetRequirement({"cost": 10}))
+    ex.configure_compensation(pay, "RefundPaymentWorkflow", CompensationTrigger.ON_WORKFLOW_FAILURE)
+    ex.step_concurrent()
+    assert ex.budget.consumed("cost") == 70.0          # A charged, PAY (BLOCK) released
+    assert len(ex.compensations.registrations()) == 1
+    ex.checkpoint()
+
+    # Recover on a fresh runtime, then reconstruct the executor — NO side effects.
+    prov2 = Probe("p2")
+    rt2 = _runtime(providers=[prov2], store=ss)
+    rec = recover_portfolio(
+        store=cps, portfolio_id="c1", runtime=rt2, event_store=est,
+        definitions={a: _wf("A", "A1"), pay: _wf("PAY", "charge")},
+    )
+    calls_before = prov2.calls
+    ex2 = create_concurrent_executor_from_recovery(
+        rt2, rec, policy=ConcurrencyPolicy(max_concurrent_quanta=2), checkpoint_store=cps)
+    # Zero side effects during reconstruction.
+    assert prov2.calls == calls_before and rec.requires_continuation is True
+    # Durable state adopted, not reset.
+    assert ex2.budget.consumed("cost") == 70.0
+    assert ex2.controller.failure_policy is PortfolioFailurePolicy.FAIL_DEPENDENTS
+    regs = ex2.compensations.registrations()
+    assert len(regs) == 1 and regs[0].compensation_workflow_id == "RefundPaymentWorkflow"
+    # Compensation remains idempotent after reconstruction (no duplicate on replay).
+    _, created = ex2.compensations.register(
+        CompensationSpec(origin_instance_id=pay, compensation_workflow_id="RefundPaymentWorkflow",
+                         trigger=CompensationTrigger.ON_WORKFLOW_FAILURE))
+    assert created is False
+
+
+def test_C1_from_recovery_v1_style_empty_h22d_state_is_safe():
+    # A portfolio checkpointed via the plain H22-C controller carries an empty H22-D slice;
+    # reconstruction must produce empty-but-valid budget/compensation coordinators.
+    from ugence_agent_runtime.api import create_portfolio_controller
+    ss = InMemoryRuntimeStateStore()
+    rt = _runtime(providers=[Probe("p")], store=ss)
+    p = create_portfolio("c1v1")
+    a = _prepare_register(rt, p, _wf("A", "A1"))
+    cps = InMemoryPortfolioCheckpointStore()
+    ctl = create_portfolio_controller(rt, p, checkpoint_store=cps)
+    ctl.step()
+    ctl.checkpoint()
+    rt2 = _runtime(providers=[Probe("p2")], store=ss)
+    rec = recover_portfolio(store=cps, portfolio_id="c1v1", runtime=rt2,
+                            definitions={a: _wf("A", "A1")})
+    ex2 = create_concurrent_executor_from_recovery(rt2, rec)
+    assert ex2.budget.consumed("cost") == 0.0
+    assert ex2.compensations.registrations() == ()
+    assert not ex2.budget.has_active_reservations and ex2.resources.is_empty

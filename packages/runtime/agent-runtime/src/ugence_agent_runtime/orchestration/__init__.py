@@ -13,15 +13,18 @@ It provides a :class:`WorkflowPortfolio` (orchestration-state aggregate), a cros
 **aging**, and deterministic **fairness** to grant one quantum per round through the
 unchanged ``advance_workflow`` seam.
 
-**Scope (H22-B + H22-C).** Deterministic *interleaving*, NOT simultaneous execution — no
-concurrency, no shared budget/resource ledger, no compensation engine, no peer-to-peer agent
-messaging, no agent/model selection (those remain H22-D). H22-B decides *which* prepared
-workflow receives the next quantum and *why*; **H22-C** (this release, 0.5.0) makes that
-coordination durable: a versioned portfolio checkpoint that references (never copies) the
-underlying runtime checkpoints, side-effect-free portfolio recovery, an append-only
-orchestration audit trace, bounded failure propagation, and cooperative cancellation scopes.
-Governance stays entirely below this layer: the scheduler selects a workflow, it never
-authorizes that workflow's task, and recovery performs no execution.
+**Scope (H22-B + H22-C + H22-D).** H22-B decides *which* prepared workflow receives the next
+quantum and *why*; **H22-C** makes that coordination durable (a versioned portfolio checkpoint
+that references — never copies — the underlying runtime checkpoints, side-effect-free portfolio
+recovery, an append-only orchestration audit trace, bounded failure propagation, and cooperative
+cancellation scopes); **H22-D** (this release, 0.6.0) adds **bounded, in-process concurrency**
+over independent H22-A quanta — a fairness-preserving batch-selection seam, logical resource
+claims with an atomic coordinator, a shared reserve-before-execute budget, and bounded
+compensation coordination. It remains **in-process only**: no distributed cluster scheduling, no
+distributed locking, no exactly-once external effects, no Runtime Assurance, and no
+peer-to-peer/agent-selection. Governance stays entirely below this layer: the scheduler selects a
+workflow and H22-D admits which safe quanta run concurrently, but neither ever authorizes that
+workflow's task, and recovery performs no execution.
 
 Dependency direction is orchestration → runtime: this package imports the runtime's public
 contracts; the runtime engine never imports orchestration, so the single-workflow runtime
@@ -84,6 +87,7 @@ from .resources import (
 )
 from .budgets import (
     BudgetCoordinator,
+    BudgetEstimateExceeded,
     BudgetRequirement,
     BudgetSettlement,
     BudgetShortfall,
@@ -180,6 +184,7 @@ __all__ = [
     "BudgetShortfall",
     "BudgetSettlement",
     "BudgetCoordinator",
+    "BudgetEstimateExceeded",
     # H22-D compensation coordination
     "CompensationTrigger",
     "CompensationSpec",

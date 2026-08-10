@@ -65,6 +65,27 @@ below H22-A, with fresh governance per quantum). See
   `CONCURRENT_BATCH_RECONCILED`, `COMPENSATION_REGISTERED` — enough to answer "why did A and C run
   concurrently while B did not?" with structured evidence, emitted in deterministic admission order.
 
+### Independent-audit hardening (same phase)
+- **Runtime concurrency ceiling.** The executor bounds concurrency by
+  `min(ConcurrencyPolicy.max_concurrent_quanta, AgentRuntimeConfig.max_concurrent_tasks)`
+  (`effective_max_concurrent_quanta`) — it never exceeds the runtime's configured in-flight-task
+  limit.
+- **Undeclared ≠ empty (fail closed).** An *explicitly empty* resource claim set / budget
+  requirement permits concurrency; an *undeclared* one is unknown and handled fail-closed —
+  undeclared resources serialize conservatively (`RESOURCE_REQUIREMENT_UNAVAILABLE`) and an
+  undeclared budget requirement is refused when the portfolio budget has limits
+  (`BUDGET_REQUIREMENT_UNAVAILABLE`). Undeclared is never assumed conflict-free / zero-cost.
+- **Exception-safe admission.** Requirements are pre-resolved before any reservation or fairness
+  commit; a resolver/coordinator fault fails closed with all reservations released and **no**
+  H22-B fairness state mutated (all-or-none planning).
+- **Authoritative settlement evidence.** New additive immutable
+  `WorkflowAdvanceOutcome.provider_invoked` drives budget settlement — a governance BLOCK or
+  exact-action rejection (no provider) now *releases* rather than charges; a measured overrun
+  fails closed (`BudgetEstimateExceeded`) instead of silently clamping.
+- **Recovery reconstruction seam.** `ConcurrentPortfolioExecutor.from_recovery(...)` /
+  `create_concurrent_executor_from_recovery(...)` adopt the recovered portfolio, trace, failure
+  policy, durable consumed budget, and compensation registrations — no side effects, v1-safe.
+
 ### Explicitly out of scope (unchanged non-claims)
 No distributed cluster scheduling, distributed locking, Kubernetes/Redis/DB coordination, global
 transactions, exactly-once external effects, Runtime Assurance, model/agent selection, peer-to-peer

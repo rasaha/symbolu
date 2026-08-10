@@ -81,6 +81,26 @@ class BudgetRequirement:
         return dict(sorted(self.amounts.items()))
 
 
+class BudgetEstimateExceeded(Exception):
+    """Raised when settlement is asked to charge *measured* usage greater than the amount that
+    was reserved for a quantum.
+
+    The reservation is the workflow's declared maximum requirement; measured usage above it means
+    the declared estimate was wrong. Rather than silently clamp (which would let the ledger claim
+    ``consumed <= limit`` by discarding real usage), settlement fails **closed** and surfaces the
+    overrun explicitly, so a mis-declared estimate can never be hidden."""
+
+    def __init__(self, instance_id: str, dimension: str, actual: float, reserved: float) -> None:
+        self.instance_id = instance_id
+        self.dimension = dimension
+        self.actual = actual
+        self.reserved = reserved
+        super().__init__(
+            f"settled actual usage {actual!r} exceeds the reservation {reserved!r} for "
+            f"dimension {dimension!r} of {instance_id!r} (declared budget estimate exceeded)"
+        )
+
+
 @dataclass(frozen=True)
 class BudgetShortfall:
     """A structured, audit-friendly explanation of why a reservation was refused (Section 55).
@@ -144,6 +164,13 @@ class BudgetCoordinator:
         self._holds: Dict[str, Dict[str, float]] = {}
 
     # -- accounting reads ---------------------------------------------------
+    @property
+    def has_limits(self) -> bool:
+        """True when at least one budget dimension is configured with a limit. When ``False`` the
+        coordinator gates nothing, so an *undeclared* budget requirement is harmless; when
+        ``True`` an undeclared requirement must fail closed (it could draw on a shared limit)."""
+        return bool(self._budget.limits)
+
     def limit(self, dimension: str) -> Optional[float]:
         """The configured limit for ``dimension`` (``None`` if unconstrained)."""
         return self._budget.limits.get(dimension)
@@ -211,11 +238,14 @@ class BudgetCoordinator:
     ) -> BudgetSettlement:
         """Settle a quantum's reservation into ``consumed`` and release the hold.
 
-        The reservation is the **ceiling**: a dimension is charged ``min(actual, reserved)`` when
-        an actual is supplied, or the full reservation when it is not (the conservative rule —
-        never under-charge, and ``actual_known=False`` records that no measurement occurred). This
-        guarantees ``consumed`` can never exceed the reservation, so ``0 <= consumed <= limit``
-        always holds. Settling a workflow with no active hold is a fail-safe no-op."""
+        When no actual is supplied, the full reservation is charged (the conservative rule —
+        never under-charge; ``actual_known=False`` records that no measurement occurred). When an
+        actual IS supplied it is charged as-is, but a measured value **greater than** the
+        reservation fails **closed** with :class:`BudgetEstimateExceeded` rather than being
+        silently clamped — so the ledger never claims ``consumed <= limit`` by discarding real
+        usage, and a mis-declared estimate is surfaced, not hidden. With a well-declared estimate
+        (actual <= reserved) this charges the actual and releases the unused remainder, keeping
+        ``0 <= consumed <= limit``. Settling a workflow with no active hold is a fail-safe no-op."""
         actual_amounts = None
         if actual is not None:
             actual_amounts = _validate_amounts(actual, what="settle actual")
@@ -223,19 +253,24 @@ class BudgetCoordinator:
             hold = self._holds.pop(instance_id, None)
             if hold is None:
                 return BudgetSettlement(instance_id, {}, {}, actual_known=actual is not None)
+            # Fail closed on any overrun BEFORE mutating the ledger, so a rejected settlement
+            # leaves the reservation intact (the caller can release it explicitly).
+            if actual_amounts is not None:
+                for dim, reserved_amt in hold.items():
+                    a = actual_amounts.get(dim, 0.0)
+                    if a > reserved_amt:
+                        self._holds[instance_id] = hold  # restore — nothing was changed
+                        raise BudgetEstimateExceeded(instance_id, dim, a, reserved_amt)
             charged: Dict[str, float] = {}
             released: Dict[str, float] = {}
             for dim, reserved_amt in hold.items():
-                if actual_amounts is None:
-                    charge = reserved_amt
-                else:
-                    charge = min(max(actual_amounts.get(dim, 0.0), 0.0), reserved_amt)
+                charge = reserved_amt if actual_amounts is None else actual_amounts.get(dim, 0.0)
                 charged[dim] = charge
                 released[dim] = reserved_amt - charge
                 if dim in self._reserved:
                     self._reserved[dim] -= reserved_amt  # release the whole hold
                     if dim in self._consumed:
-                        self._consumed[dim] += charge      # charge the (bounded) actual
+                        self._consumed[dim] += charge      # charge (actual <= reserved, or full)
             return BudgetSettlement(instance_id, charged, released, actual_known=actual is not None)
 
     def release(self, instance_id: str) -> bool:
