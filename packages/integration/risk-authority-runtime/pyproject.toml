@@ -1,0 +1,48 @@
+# Ugence Risk Authority Runtime — RA-4.5 governance-composition integration.
+#
+# This is NOT a leaf: it is the integration/composition layer that wires the
+# machine-authority owner (ugence-risk-authority) together with two additive
+# governance inputs (ugence-decision-authority, ugence-actiongate-provider).
+# The dependency direction is one-way — this package imports all three; none of
+# them imports this package, and ugence-risk-authority remains a stdlib-only leaf.
+#
+# Build:   python -m build packages/integration/risk-authority-runtime
+# Verify:  python packages/integration/risk-authority-runtime/scripts/verify_isolated_install.py
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-risk-authority-runtime"
+dynamic = ["version"]
+description = "Ugence Risk Authority Runtime — RA-4.5 fail-closed governance composition (Risk Authority × Decision Authority × ActionGate)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["governance", "risk", "authority", "composition", "actiongate", "decision-authority", "ugence"]
+# The integration package composes the machine-authority owner with the two
+# additive governance kernels. It adds no third-party runtime dependency of its
+# own beyond what those kernels already declare (pydantic via decision-authority).
+dependencies = [
+    "ugence-risk-authority>=0.1.0",
+    "ugence-decision-authority>=0.1.0",
+    "ugence-actiongate-provider>=0.1.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_risk_authority_runtime.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_risk_authority_runtime*"]
+
+[tool.setuptools.package-data]
+ugence_risk_authority_runtime = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
