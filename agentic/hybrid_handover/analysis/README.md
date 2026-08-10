@@ -1,20 +1,11 @@
-# Capability Isolation — SEEB v1.0.0
+# analysis — documentation moved
 
-Analysis-only phase (reads SEEB; modifies nothing). Determines whether SEEB's
-remaining failures are retrieval or reasoning problems, via an oracle-retrieval
-counterfactual.
+Project and historical documentation for this component has been
+centralized under the repository documentation root.
 
-## Run
-```bash
-python -m agentic.hybrid_handover.analysis.capability_isolation   # writes CAPABILITY_ISOLATION.json
-python -m pytest tests/test_hybrid_handover_analysis.py -q
-```
+It now lives at:
 
-## Result
-A **maximal retrieval oracle** (returns every sentence — the retrieval upper
-bound) solves **0** of the 7 unresolved cases. Retrieval is **saturated** by the
-conventional baselines; the residual (L3–L5: precedence, cross-document
-governance, logical reasoning) is **RETRIEVAL INSUFFICIENT**.
+- [`Project_documentation/agentic_framework/agentic/hybrid_handover/analysis/README.md`](../../../Project_documentation/agentic_framework/agentic/hybrid_handover/analysis/README.md)
 
-Deliverables: `CAPABILITY_ISOLATION.md`, `RELATIONSHIP_GRAPHS.md`, `TAXONOMY.md`,
-`CAPABILITY_ISOLATION.json`.
+The implementation remains in this directory. Active replacement
+components, where applicable, are maintained under `packages/`.
