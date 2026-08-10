@@ -1,0 +1,42 @@
+# Ugence Risk Authority — independently packaged executable-governance kernel.
+#
+# A stdlib-only leaf: no third-party runtime dependency (Ed25519 is a pure-Python
+# reference implementation) so the conformance suite runs in an isolated
+# clean-venv install exactly like the other governance leaves. FastAPI is an
+# optional extra used only by the HTTP route adapter.
+#
+# Build:   python -m build packages/risk_authority
+# Verify:  python packages/risk_authority/verify_risk_authority_distribution.py
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-risk-authority"
+dynamic = ["version"]
+description = "Ugence Risk Authority — executable governance authority kernel (RA-1..RA-4)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["governance", "risk", "authority", "actiongate", "ugence"]
+# A leaf: no third-party runtime dependency and no other Ugence package.
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+api = ["fastapi>=0.100.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "risk_authority.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["risk_authority*"]
+
+[tool.setuptools.package-data]
+risk_authority = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
