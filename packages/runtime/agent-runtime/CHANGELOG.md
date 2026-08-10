@@ -86,6 +86,27 @@ below H22-A, with fresh governance per quantum). See
   `create_concurrent_executor_from_recovery(...)` adopt the recovered portfolio, trace, failure
   policy, durable consumed budget, and compensation registrations — no side effects, v1-safe.
 
+### Final edge-case corrections (same phase)
+- **One resolution per round.** The pre-resolved requirement cache is used throughout a round;
+  an injected `budget_resolver`/`claims_resolver` is never invoked a second time after admission.
+- **Audit-emission fail-safe.** If the deterministic admission audit fails *after* admission but
+  *before* any worker launches, the round fails closed: all reservations are released, no worker
+  is launched, and the H22-B fairness/service state is restored — an unexecuted batch is never
+  counted as serviced.
+- **Exact `CompensationTrigger` semantics.** `ON_WORKFLOW_FAILURE` auto-registers only when the
+  origin workflow is terminal FAILED; `ON_PORTFOLIO_FAILURE` only when the portfolio itself is
+  terminal FAILED (an isolated workflow failure is not a portfolio failure);
+  `EXPLICIT_OPERATOR_REQUEST` never auto-registers — a new idempotent
+  `ConcurrentPortfolioExecutor.request_compensation(...)` seam is the only path (no
+  provider/governance execution).
+- **Scheduling-policy recovery continuity.** `from_recovery(...)` /
+  `create_concurrent_executor_from_recovery(...)` accept `scheduling_policy` and pass it to the
+  H22-C controller, so a recovered scheduler makes the same deterministic choice it would have made
+  uninterrupted (policy is operator-supplied configuration, still never persisted).
+- **Budget dimension hardening.** `BudgetCoordinator.settle(actual=…)` fails closed
+  (`BudgetEstimateExceeded`) on measured positive usage in a dimension that had **no** reservation
+  (effective reservation zero), leaving the ledger unchanged — such usage is never silently ignored.
+
 ### Explicitly out of scope (unchanged non-claims)
 No distributed cluster scheduling, distributed locking, Kubernetes/Redis/DB coordination, global
 transactions, exactly-once external effects, Runtime Assurance, model/agent selection, peer-to-peer

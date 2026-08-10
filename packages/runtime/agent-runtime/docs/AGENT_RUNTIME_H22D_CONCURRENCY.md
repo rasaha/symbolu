@@ -190,9 +190,14 @@ separately-defined, explicitly-governed workflow** that mitigates an earlier eff
 once**, with provenance back to the origin workflow.
 
 * The application declares a `CompensationSpec` (which compensation workflow definition
-  compensates which origin workflow, on which bounded trigger — `ON_WORKFLOW_FAILURE`,
-  `ON_PORTFOLIO_FAILURE`, `EXPLICIT_OPERATOR_REQUEST`). H22-D synthesizes no prompt, model, tool,
-  refund amount, or rollback payload.
+  compensates which origin workflow, on which bounded trigger). H22-D synthesizes no prompt, model,
+  tool, refund amount, or rollback payload. Each trigger has **exact** semantics:
+  `ON_WORKFLOW_FAILURE` auto-registers only when the configured origin workflow is terminal FAILED;
+  `ON_PORTFOLIO_FAILURE` auto-registers only when the **portfolio itself** reaches the H22-C
+  terminal FAILED state (an isolated workflow failure is *not* a portfolio failure);
+  `EXPLICIT_OPERATOR_REQUEST` never auto-registers — it fires only through the explicit
+  `ConcurrentPortfolioExecutor.request_compensation(...)` operator seam (idempotent, and performing
+  no provider/governance execution).
 * Registration is **idempotent** (keyed by a deterministic identity), so a repeated failure
   observation — or a recovery replay — never duplicates it, and the origin lineage is recorded.
 * The compensation workflow, when the application schedules it, is an **ordinary** workflow: it

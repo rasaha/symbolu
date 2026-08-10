@@ -324,6 +324,7 @@ class ConcurrentPortfolioExecutor:
         recovery_result: object,
         *,
         policy: Optional[ConcurrencyPolicy] = None,
+        scheduling_policy: Optional[SchedulingPolicy] = None,
         checkpoint_store: Optional[object] = None,
         resource_coordinator: Optional[ResourceCoordinator] = None,
         backend: Optional[ExecutionBackend] = None,
@@ -346,7 +347,8 @@ class ConcurrentPortfolioExecutor:
         advances **zero** workflows, and preserves ``recovery_result.requires_continuation`` — the
         operator must still explicitly step the executor before any new execution occurs."""
         controller = PortfolioController.from_recovery(
-            runtime, recovery_result, checkpoint_store=checkpoint_store
+            runtime, recovery_result, scheduling_policy=scheduling_policy,
+            checkpoint_store=checkpoint_store,
         )
         cs = dict(getattr(recovery_result, "concurrency_state", {}) or {})
         budget_slice = cs.get("budget") or {}
@@ -506,14 +508,18 @@ class ConcurrentPortfolioExecutor:
             ) from exc
 
         # 1b) PLAN — deterministic batch selection with atomic resource+budget admission, using the
-        # pre-resolved (non-throwing) admission predicate and the effective concurrency ceiling.
+        # pre-resolved (non-throwing) admission predicate and the effective concurrency ceiling. The
+        # H22-B fairness/service state is snapshotted first so an infrastructure fault between
+        # admission and worker launch can un-count the batch (it never executed).
+        fairness_snapshot = self._snapshot_fairness()
         try:
             plan = self._controller.scheduler.plan_batch(
                 self._portfolio,
                 max_concurrency=self.effective_max_concurrent_quanta,
                 admit=self._make_admit(resolved),
             )
-        except Exception as exc:  # defensive: release anything reserved, fail closed.
+        except Exception as exc:  # defensive: restore fairness + release anything reserved.
+            self._restore_fairness(fairness_snapshot)
             self._release_all_reservations()
             raise ExecutorInfrastructureError(
                 f"admission planning failed (fail closed, reservations released): {exc}"
@@ -524,8 +530,20 @@ class ConcurrentPortfolioExecutor:
         if not plan.admitted:
             return self._quiescent_result(plan, batch_id, deferred_resource, deferred_budget)
 
-        # Deterministic admission audit (emitted in admission order, before any execution).
-        self._emit_plan(plan, batch_id, deferred_resource, deferred_budget)
+        # Deterministic admission audit (emitted in admission order, before any execution) using the
+        # SAME pre-resolved requirements — no resolver is ever called twice in one round. If audit
+        # emission itself fails (e.g. a durable event store fault) AFTER admission but BEFORE any
+        # worker launches, fail closed: restore H22-B fairness (do not count the unexecuted batch as
+        # serviced), release every reservation, and launch nothing.
+        try:
+            self._emit_plan(plan, batch_id, deferred_resource, deferred_budget, resolved)
+        except Exception as exc:
+            self._restore_fairness(fairness_snapshot)
+            self._release_all_reservations()
+            raise ExecutorInfrastructureError(
+                f"admission audit emission failed for batch {batch_id!r} (fail closed, batch "
+                f"un-serviced, reservations released, no worker launched): {exc}"
+            ) from exc
 
         # 2) EXECUTE — one indivisible H22-A quantum per admitted workflow, on the backend.
         thunks: List[Callable[[], QuantumOutcome]] = [
@@ -536,9 +554,8 @@ class ConcurrentPortfolioExecutor:
             results = self._backend.run(thunks)
         except Exception as exc:  # backend/executor infrastructure failure — fail closed.
             # Do not fabricate any workflow outcome; release every reservation taken for this batch.
-            for iid in plan.admitted:
-                self._budget.release(iid)
-                self._resources.release(iid)
+            # (Workers may have started, so fairness is NOT rolled back here.)
+            self._release_all_reservations()
             raise ExecutorInfrastructureError(
                 f"concurrent execution backend failed for batch {batch_id!r}: {exc}"
             ) from exc
@@ -645,6 +662,20 @@ class ConcurrentPortfolioExecutor:
         for iid in list(self._budget.active_instance_ids()):
             self._budget.release(iid)
 
+    def _snapshot_fairness(self) -> Dict[str, Tuple[float, int]]:
+        """Capture per-workflow SWRR ``fair_credit`` / ``age`` before admission, so a batch that is
+        admitted but never executes (an infrastructure fault before workers launch) can be
+        un-counted as serviced without touching the H22-B algorithm itself."""
+        return {e.instance_id: (e.fair_credit, e.age) for e in self._portfolio.entries()}
+
+    def _restore_fairness(self, snapshot: Dict[str, Tuple[float, int]]) -> None:
+        """Restore the fairness snapshot (only the service state; the monotonic round counter and
+        the CREATED→ACTIVE transition are left as-is)."""
+        for e in self._portfolio.entries():
+            saved = snapshot.get(e.instance_id)
+            if saved is not None:
+                e.fair_credit, e.age = saved
+
     def _make_admit(self, resolved):
         """Build the (non-throwing) admission predicate the scheduler calls in SWRR order.
 
@@ -732,7 +763,7 @@ class ConcurrentPortfolioExecutor:
             classifications=plan.classifications,
         )
 
-    def _emit_plan(self, plan, batch_id, deferred_resource, deferred_budget):
+    def _emit_plan(self, plan, batch_id, deferred_resource, deferred_budget, resolved):
         self._controller.trace.emit(
             PortfolioEventType.CONCURRENT_BATCH_PLANNED,
             batch_id=batch_id, round=plan.round,
@@ -758,7 +789,8 @@ class ConcurrentPortfolioExecutor:
                     PortfolioEventType.RESOURCE_RESERVED,
                     instance_id=iid, batch_id=batch_id, claims=claims,
                 )
-            req, _ = self._resolve_budget(iid)
+            # Use the pre-resolved requirement — never call the budget resolver a second time.
+            req = resolved[iid][2] if iid in resolved else BudgetRequirement()
             if not req.is_empty:
                 self._controller.trace.emit(
                     PortfolioEventType.BUDGET_RESERVED,
@@ -873,23 +905,77 @@ class ConcurrentPortfolioExecutor:
         return None
 
     def _coordinate_compensation(self) -> None:
-        """Register (idempotently) a compensation intent for any configured origin workflow that
-        has been observed to fail. Never executes the compensation; only records the intent with
-        origin lineage and emits one event the first time."""
-        from .compensation import CompensationSpec, CompensationTrigger
+        """Auto-register compensation intents strictly per each configured trigger's semantics.
 
+        * ``ON_WORKFLOW_FAILURE`` — only when the configured origin workflow is terminal FAILED.
+        * ``ON_PORTFOLIO_FAILURE`` — only when the portfolio itself has reached the H22-C terminal
+          FAILED state (an isolated workflow failure is NOT a portfolio failure).
+        * ``EXPLICIT_OPERATOR_REQUEST`` — never auto-registered; only via :meth:`request_compensation`.
+
+        Registration is idempotent and performs no provider/governance execution."""
+        from .compensation import CompensationTrigger
+        from .portfolio import PortfolioStatus
+
+        portfolio_failed = self._portfolio.status is PortfolioStatus.FAILED
         for iid, (comp_wf_id, trigger_value) in sorted(self._compensation_specs.items()):
-            if not self._portfolio.is_failed(iid):
+            trigger = CompensationTrigger(trigger_value)
+            if trigger is CompensationTrigger.ON_WORKFLOW_FAILURE:
+                if not self._portfolio.is_failed(iid):
+                    continue
+                reason = "observed_workflow_failure"
+            elif trigger is CompensationTrigger.ON_PORTFOLIO_FAILURE:
+                if not portfolio_failed:
+                    continue
+                reason = "observed_portfolio_failure"
+            else:  # EXPLICIT_OPERATOR_REQUEST — never fires from a mere failure observation.
                 continue
-            spec = CompensationSpec(
-                origin_instance_id=iid,
-                compensation_workflow_id=comp_wf_id,
-                trigger=CompensationTrigger(trigger_value),
-                reason="observed_workflow_failure",
-            )
-            reg, created = self._compensations.register(spec)
-            if created:
-                self._controller.trace.emit(
-                    PortfolioEventType.COMPENSATION_REGISTERED,
-                    **{k: v for k, v in reg.to_dict().items() if v is not None},
+            self._register_compensation(iid, comp_wf_id, trigger, reason)
+
+    def request_compensation(
+        self, origin_instance_id: str, compensation_workflow_id: Optional[str] = None,
+        *, reason: Optional[str] = None,
+    ):
+        """Explicit operator/application seam to register a compensation intent (idempotent).
+
+        This is the ONLY way an ``EXPLICIT_OPERATOR_REQUEST`` compensation is registered — it is
+        never triggered by a failure observation. It records the intent (the supplied
+        ``compensation_workflow_id`` or, if omitted, the one configured via
+        :meth:`configure_compensation`) with origin lineage and performs **no** provider or
+        governance execution; the compensation workflow remains an ordinary, separately-scheduled
+        workflow that crosses fresh governance when the application runs it. Returns
+        ``(registration, created)`` — ``created`` is ``False`` on a repeat (idempotent)."""
+        from .compensation import CompensationTrigger
+
+        if not self._portfolio.is_registered(origin_instance_id):
+            raise ValueError(f"unknown workflow {origin_instance_id!r}")
+        comp_wf = compensation_workflow_id
+        if comp_wf is None:
+            configured = self._compensation_specs.get(origin_instance_id)
+            if configured is None:
+                raise ValueError(
+                    f"no compensation workflow configured for {origin_instance_id!r}; supply "
+                    "compensation_workflow_id"
                 )
+            comp_wf = configured[0]
+        return self._register_compensation(
+            origin_instance_id, comp_wf, CompensationTrigger.EXPLICIT_OPERATOR_REQUEST,
+            reason or "explicit_operator_request",
+        )
+
+    def _register_compensation(self, origin_instance_id, comp_wf_id, trigger, reason):
+        """Idempotently register one compensation intent and emit its event the first time."""
+        from .compensation import CompensationSpec
+
+        spec = CompensationSpec(
+            origin_instance_id=origin_instance_id,
+            compensation_workflow_id=comp_wf_id,
+            trigger=trigger,
+            reason=reason,
+        )
+        reg, created = self._compensations.register(spec)
+        if created:
+            self._controller.trace.emit(
+                PortfolioEventType.COMPENSATION_REGISTERED,
+                **{k: v for k, v in reg.to_dict().items() if v is not None},
+            )
+        return reg, created

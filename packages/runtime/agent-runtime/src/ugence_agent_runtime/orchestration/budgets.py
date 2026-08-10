@@ -254,10 +254,13 @@ class BudgetCoordinator:
             if hold is None:
                 return BudgetSettlement(instance_id, {}, {}, actual_known=actual is not None)
             # Fail closed on any overrun BEFORE mutating the ledger, so a rejected settlement
-            # leaves the reservation intact (the caller can release it explicitly).
+            # leaves the reservation intact (the caller can release it explicitly). An overrun is
+            # measured usage above the reservation for a reserved dimension, OR any positive usage
+            # in a dimension that had NO reservation (an effective reservation of zero) — the
+            # latter must not be silently ignored.
             if actual_amounts is not None:
-                for dim, reserved_amt in hold.items():
-                    a = actual_amounts.get(dim, 0.0)
+                for dim, a in actual_amounts.items():
+                    reserved_amt = hold.get(dim, 0.0)
                     if a > reserved_amt:
                         self._holds[instance_id] = hold  # restore — nothing was changed
                         raise BudgetEstimateExceeded(instance_id, dim, a, reserved_amt)

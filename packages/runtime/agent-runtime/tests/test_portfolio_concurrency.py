@@ -34,6 +34,7 @@ from ugence_agent_runtime.api import (
     ResourceCoordinator,
     ResourceMode,
     TaskDefinition,
+    TaskStatus,
     WorkflowDefinition,
     WorkflowPriority,
     WorkflowStatus,
@@ -1195,3 +1196,187 @@ def test_C1_from_recovery_v1_style_empty_h22d_state_is_safe():
     assert ex2.budget.consumed("cost") == 0.0
     assert ex2.compensations.registrations() == ()
     assert not ex2.budget.has_active_reservations and ex2.resources.is_empty
+
+
+# =========================================================================== #
+# Final edge-case corrections F1–F4                                            #
+# =========================================================================== #
+import collections
+from ugence_agent_runtime.api import SchedulingPolicy, continue_workflow
+from ugence_agent_runtime.orchestration import InMemoryPortfolioEventStore as _EvtStore
+from ugence_agent_runtime.orchestration.budgets import BudgetEstimateExceeded
+
+
+# --- F1: one resolution per round; audit-emission fails safe ---------------- #
+def test_F1_budget_resolver_called_once_per_workflow_per_round():
+    calls = collections.Counter()
+
+    def bresolver(iid):
+        calls[iid] += 1
+        if calls[iid] > 1:
+            raise AssertionError("budget resolver invoked twice in one round")
+        return BudgetRequirement({"cost": 10})
+
+    rt = _runtime(providers=[Probe("p")])
+    p = create_portfolio("f1")
+    a = _prepare_register(rt, p, _wf("A", "A1"))
+    b = _prepare_register(rt, p, _wf("B", "B1"))
+    ex = create_concurrent_executor(rt, p, policy=ConcurrencyPolicy(max_concurrent_quanta=2),
+                                    budget=PortfolioBudget({"cost": 100}), budget_resolver=bresolver)
+    _declare_no_claims(ex, a, b)
+    r = ex.step_concurrent()
+    assert r.granted and set(r.admitted) == {a, b}
+    assert calls[a] == 1 and calls[b] == 1  # exactly one resolution each, none after planning
+
+
+class _RaisingEventStore(_EvtStore):
+    """A durable event store that raises on the first admission-audit event, to exercise the
+    audit-emission-failure path deterministically."""
+
+    def append(self, entry):
+        if entry.event_type == "CONCURRENT_BATCH_PLANNED":
+            raise OSError("event store append failed")
+        return super().append(entry)
+
+
+def test_F1_audit_emission_failure_fails_closed_uncounts_batch_no_worker():
+    prov = Probe("p")
+    rt = _runtime(providers=[prov])
+    p = create_portfolio("f1e")
+    a = _prepare_register(rt, p, _wf("A", "A1"))
+    b = _prepare_register(rt, p, _wf("B", "B1"))
+    ex = create_concurrent_executor(rt, p, policy=ConcurrencyPolicy(max_concurrent_quanta=2),
+                                    event_store=_RaisingEventStore(), budget=PortfolioBudget({"cost": 100}))
+    _declare_no_claims(ex, a, b)
+    ex.set_budget_requirement(a, BudgetRequirement({"cost": 10}))
+    ex.set_budget_requirement(b, BudgetRequirement({"cost": 10}))
+    with pytest.raises(ExecutorInfrastructureError):
+        ex.step_concurrent()
+    # No worker launched, nothing consumed, no reservation leaked.
+    assert prov.calls == 0
+    assert ex.resources.is_empty and not ex.budget.has_active_reservations
+    assert ex.budget.consumed("cost") == 0.0
+    assert rt.instance(a).task("A1").status is TaskStatus.PENDING
+    # H22-B fairness un-counted: the admitted batch never executed, so no service was recorded.
+    for e in p.entries():
+        assert e.fair_credit == 0.0 and e.age == 0
+
+
+# --- F2: exact CompensationTrigger semantics -------------------------------- #
+def test_F2_on_workflow_failure_fires_only_for_the_failed_workflow():
+    hook = ThreadSafeHook()
+    hook.set("PAY", BLOCK)
+    rt = _runtime(hook, [Probe("p")])
+    p = create_portfolio("f2wf")
+    pay = _prepare_register(rt, p, _wf("PAY", "charge"))
+    ok = _prepare_register(rt, p, _wf("OK", "o1"))
+    ex = create_concurrent_executor(rt, p, policy=ConcurrencyPolicy(max_concurrent_quanta=2))
+    _declare_no_claims(ex, pay, ok)
+    ex.configure_compensation(pay, "RefundPay", CompensationTrigger.ON_WORKFLOW_FAILURE)
+    ex.configure_compensation(ok, "RefundOk", CompensationTrigger.ON_WORKFLOW_FAILURE)
+    ex.run_concurrent()
+    regs = ex.compensations.registrations()
+    assert [r.origin_instance_id for r in regs] == [pay]     # only the FAILED workflow
+    ex.step_concurrent()                                     # repeat observation -> idempotent
+    assert len(ex.compensations.registrations()) == 1
+
+
+def test_F2_on_portfolio_failure_only_when_portfolio_terminal():
+    # ISOLATE policy: an isolated workflow failure is NOT a portfolio failure -> no registration.
+    hook = ThreadSafeHook(); hook.set("X", BLOCK)
+    rt = _runtime(hook, [Probe("p")])
+    p = create_portfolio("f2pi")
+    x = _prepare_register(rt, p, _wf("X", "x1"))
+    ex = create_concurrent_executor(rt, p, policy=ConcurrencyPolicy(max_concurrent_quanta=1),
+                                    failure_policy=PortfolioFailurePolicy.ISOLATE_WORKFLOW)
+    _declare_no_claims(ex, x)
+    ex.configure_compensation(x, "RefundX", CompensationTrigger.ON_PORTFOLIO_FAILURE)
+    ex.run_concurrent()
+    assert ex.compensations.registrations() == ()
+
+    # FAIL_PORTFOLIO policy: the portfolio reaches terminal FAILED -> registration fires.
+    hook2 = ThreadSafeHook(); hook2.set("X", BLOCK)
+    rt2 = _runtime(hook2, [Probe("p")])
+    p2 = create_portfolio("f2pf")
+    x2 = _prepare_register(rt2, p2, _wf("X", "x1"))
+    ex2 = create_concurrent_executor(rt2, p2, policy=ConcurrencyPolicy(max_concurrent_quanta=1),
+                                     failure_policy=PortfolioFailurePolicy.FAIL_PORTFOLIO)
+    _declare_no_claims(ex2, x2)
+    ex2.configure_compensation(x2, "RefundX", CompensationTrigger.ON_PORTFOLIO_FAILURE)
+    ex2.run_concurrent()
+    regs = ex2.compensations.registrations()
+    assert len(regs) == 1 and regs[0].trigger == CompensationTrigger.ON_PORTFOLIO_FAILURE.value
+
+
+def test_F2_explicit_request_never_auto_and_is_idempotent():
+    hook = ThreadSafeHook(); hook.set("X", BLOCK)
+    rt = _runtime(hook, [Probe("p")])
+    p = create_portfolio("f2ex")
+    x = _prepare_register(rt, p, _wf("X", "x1"))
+    ex = create_concurrent_executor(rt, p, policy=ConcurrencyPolicy(max_concurrent_quanta=1))
+    _declare_no_claims(ex, x)
+    ex.configure_compensation(x, "RefundX", CompensationTrigger.EXPLICIT_OPERATOR_REQUEST)
+    ex.run_concurrent()
+    assert ex.compensations.registrations() == ()          # a mere failure never auto-registers
+    reg, created = ex.request_compensation(x)              # explicit operator seam
+    assert created is True and reg.trigger == CompensationTrigger.EXPLICIT_OPERATOR_REQUEST.value
+    _, created2 = ex.request_compensation(x)              # idempotent
+    assert created2 is False and len(ex.compensations.registrations()) == 1
+    with pytest.raises(ValueError):
+        ex.request_compensation("no-such-workflow")
+
+
+# --- F3: SchedulingPolicy preserved through recovery reconstruction --------- #
+def test_F3_recovered_scheduling_policy_continuity():
+    custom = SchedulingPolicy(aging_cap=7, critical_never_ages=False)
+
+    def build(store, cps=None):
+        rt = _runtime(providers=[Probe("p")], store=store)
+        p = create_portfolio("f3")
+        a = _prepare_register(rt, p, _wf("A", "A1", "A2", "A3", "A4"), priority=WorkflowPriority.HIGH)
+        b = _prepare_register(rt, p, _wf("B", "B1", "B2", "B3", "B4"))
+        ex = create_concurrent_executor(rt, p, policy=ConcurrencyPolicy(max_concurrent_quanta=1),
+                                        scheduling_policy=custom, checkpoint_store=cps)
+        return rt, p, ex, a, b
+
+    # Uninterrupted: run 3 rounds, record the 4th deterministic choice.
+    rt_u, p_u, ex_u, a_u, b_u = build(InMemoryRuntimeStateStore())
+    for _ in range(3):
+        ex_u.step_concurrent()
+    admitted_u = ex_u.step_concurrent().admitted
+
+    # Recovered with the SAME scheduling policy: run 3, checkpoint, recover, reconstruct, continue.
+    ss = InMemoryRuntimeStateStore(); cps = InMemoryPortfolioCheckpointStore()
+    rt_r, p_r, ex_r, a_r, b_r = build(ss, cps)
+    for _ in range(3):
+        ex_r.step_concurrent()
+    ex_r.checkpoint()
+    rt2 = _runtime(providers=[Probe("p2")], store=ss)
+    rec = recover_portfolio(store=cps, portfolio_id="f3", runtime=rt2,
+                            definitions={a_r: _wf("A", "A1", "A2", "A3", "A4"),
+                                         b_r: _wf("B", "B1", "B2", "B3", "B4")})
+    ex2 = create_concurrent_executor_from_recovery(
+        rt2, rec, policy=ConcurrencyPolicy(max_concurrent_quanta=1), scheduling_policy=custom)
+    assert ex2.controller.scheduler.policy.aging_cap == 7  # policy carried, not reset
+    for iid in p_r.instance_ids:
+        continue_workflow(rt2, iid)                        # re-arm recovered (PAUSED) workflows
+    admitted_r = ex2.step_concurrent().admitted
+    assert admitted_r == admitted_u                        # same deterministic next choice
+
+    # Reconstructing WITHOUT the policy falls back to the default — proving the param actually flows.
+    ex_default = create_concurrent_executor_from_recovery(rt2, rec)
+    assert ex_default.controller.scheduler.policy.aging_cap == 500
+
+
+# --- F4: settle rejects usage in an unreserved dimension -------------------- #
+def test_F4_settle_rejects_usage_in_unreserved_dimension():
+    bc = BudgetCoordinator(PortfolioBudget({"cost": 100, "token_units": 1000}))
+    bc.reserve("A", BudgetRequirement({"cost": 40}))       # token_units NOT reserved (effective 0)
+    with pytest.raises(BudgetEstimateExceeded):
+        bc.settle("A", actual={"cost": 30, "token_units": 5})
+    # Ledger unchanged after rejection.
+    assert bc.reserved("cost") == 40.0 and bc.consumed("cost") == 0.0
+    assert bc.consumed("token_units") == 0.0
+    # An honest settlement within the reservation still works.
+    s = bc.settle("A", actual={"cost": 30})
+    assert s.charged["cost"] == 30.0 and bc.consumed("cost") == 30.0
