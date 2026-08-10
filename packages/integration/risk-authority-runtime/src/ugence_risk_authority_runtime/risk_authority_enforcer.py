@@ -80,6 +80,7 @@ class RiskAuthorityEnforcer:
                 disposition=RiskAuthorityDisposition.DENY,
                 reason_codes=(ReasonCode.RA_ENVELOPE_INVALID.value,),
                 action_digest=action.digest,
+                action=action,
                 source_version=_RA_VERSION,
                 raw_reason_codes=("unknown envelope",),
             )
@@ -104,6 +105,7 @@ class RiskAuthorityEnforcer:
                 reason_codes=(ReasonCode.RA_UNAVAILABLE.value,),
                 envelope_id=envelope.envelope_id,
                 action_digest=action.digest,
+                action=action,
                 scope=envelope.scope,
                 expires_at=envelope.expires_at,
                 source_version=_RA_VERSION,
@@ -116,6 +118,7 @@ class RiskAuthorityEnforcer:
                 reason_codes=(ReasonCode.RA_ALLOW.value,),
                 envelope_id=envelope.envelope_id,
                 action_digest=action.digest,
+                action=action,
                 scope=envelope.scope,
                 expires_at=envelope.expires_at,
                 source_version=_RA_VERSION,

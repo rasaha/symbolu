@@ -55,6 +55,10 @@ from .decision_authority_adapter import (
 )
 from .composition import RiskAuthorityCompositionEngine
 from .restrictions import apply_restrictions
+from .effective_scope import (
+    effective_scope_authorizes,
+    effective_scope_violations,
+)
 from .risk_authority_enforcer import RiskAuthorityEnforcer
 
 __all__ = [
@@ -77,4 +81,6 @@ __all__ = [
     "RiskAuthorityEnforcer",
     "RiskAuthorityCompositionEngine",
     "apply_restrictions",
+    "effective_scope_violations",
+    "effective_scope_authorizes",
 ]

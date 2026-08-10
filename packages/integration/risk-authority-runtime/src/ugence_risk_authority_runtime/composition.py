@@ -13,6 +13,8 @@ Corrected decision rule — GRANT **iff** every check holds (all fail-closed):
     4. ActionGate does not veto            (ALLOW/…; not DENY/UNKNOWN)
     5. no authority-critical input errored (else ERROR_NON_EXECUTABLE)
     6. effective restrictions leave a non-empty scope
+    7. the current action is still inside the effective scope
+       (F1: CurrentAction ∈ EffectiveScope; else DENY)
 
 Precedence (highest wins, all fail-closed; plan §3):
 
@@ -23,6 +25,7 @@ Precedence (highest wins, all fail-closed; plan §3):
       > DA HOLD / DEFER
       > ERROR / UNAVAILABLE (fail-closed)
       > empty effective scope
+      > action outside effective scope (F1)
       > GRANT
 
 Formal guarantee, by construction:
@@ -48,6 +51,7 @@ from .contracts import (
     RiskAuthorityMachineResult,
     VetoDisposition,
 )
+from .effective_scope import effective_scope_violations
 from .restrictions import apply_restrictions
 
 __all__ = ["RiskAuthorityCompositionEngine"]
@@ -62,13 +66,22 @@ class RiskAuthorityCompositionEngine:
         risk_authority: RiskAuthorityMachineResult,
         decision_authority: GovernanceVetoResult,
         actiongate: GovernanceVetoResult,
+        action: object = None,
         correlation_id: str = "",
     ) -> GovernedExecutionDecision:
-        """Return the governed execution decision for one request."""
+        """Return the governed execution decision for one request.
+
+        ``action`` is the exact canonical action being authorized. When provided
+        (or carried on ``risk_authority.action`` by the enforcer), the engine
+        re-checks it against the governance-narrowed effective scope before GRANT
+        (F1: ``CurrentAction ∈ EffectiveScope``). When neither is available the
+        engine composes at the algebra level and performs no action re-check.
+        """
 
         ra = risk_authority
         da = decision_authority
         ag = actiongate
+        current_action = action if action is not None else getattr(ra, "action", None)
 
         source_versions = {
             "risk_authority": ra.source_version,
@@ -81,7 +94,7 @@ class RiskAuthorityCompositionEngine:
         effective = apply_restrictions(ra, _restrictions(da, ag))
 
         disposition, reason_codes, non_executable_reason = self._decide(
-            ra, da, ag, effective
+            ra, da, ag, effective, current_action
         )
 
         return GovernedExecutionDecision(
@@ -103,6 +116,7 @@ class RiskAuthorityCompositionEngine:
         da: GovernanceVetoResult,
         ag: GovernanceVetoResult,
         effective: EffectiveConstraints,
+        action: object = None,
     ) -> tuple[FinalDisposition, tuple[str, ...], str]:
         """Apply the fail-closed precedence order and return the disposition."""
 
@@ -177,7 +191,29 @@ class RiskAuthorityCompositionEngine:
                 "governance restrictions left an empty effective scope",
             )
 
-        # 8. All clear — execution eligible (still bounded by effective scope).
+        # 8. Current action must still be authorized by the governance-narrowed
+        #    effective scope (F1: CurrentAction ∈ EffectiveScope). A non-empty
+        #    effective scope is NOT sufficient — governance may have narrowed a
+        #    set or ceiling so the specific action RA authorized now falls
+        #    outside it. Skipped only when no concrete action is available
+        #    (pure algebra-level composition); the enforcer always supplies one.
+        if action is not None:
+            try:
+                action_violations = effective_scope_violations(effective, action)
+            except Exception as exc:  # noqa: BLE001 - fail closed on matcher error
+                return (
+                    FinalDisposition.ERROR_NON_EXECUTABLE,
+                    (ReasonCode.EFFECTIVE_SCOPE_RECHECK_ERROR.value,),
+                    f"effective-scope action re-check failed: {type(exc).__name__}",
+                )
+            if action_violations:
+                return (
+                    FinalDisposition.DENY,
+                    (ReasonCode.EFFECTIVE_SCOPE_ACTION_MISMATCH.value,),
+                    "current action outside governance-narrowed effective scope",
+                )
+
+        # 9. All clear — execution eligible (still bounded by effective scope).
         return (
             FinalDisposition.GRANT,
             (ReasonCode.GRANTED.value,),

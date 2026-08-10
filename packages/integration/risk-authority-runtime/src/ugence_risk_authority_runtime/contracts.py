@@ -126,6 +126,12 @@ class ReasonCode(str, Enum):
     # Restriction algebra.
     EFFECTIVE_SCOPE_EMPTY = "EFFECTIVE_SCOPE_EMPTY"
     RESTRICTIONS_APPLIED = "RESTRICTIONS_APPLIED"
+    #: The current action is no longer authorized by the governance-narrowed
+    #: effective scope (F1: CurrentAction ∉ EffectiveScope) — fail closed.
+    EFFECTIVE_SCOPE_ACTION_MISMATCH = "EFFECTIVE_SCOPE_ACTION_MISMATCH"
+    #: The effective-scope/action re-check could not be completed (malformed
+    #: effective scope or matcher error) — fail closed, never GRANT.
+    EFFECTIVE_SCOPE_RECHECK_ERROR = "EFFECTIVE_SCOPE_RECHECK_ERROR"
 
     # All-clear.
     GRANTED = "GRANTED"
@@ -238,6 +244,12 @@ class RiskAuthorityMachineResult:
     expires_at: Optional[datetime] = None
     source_version: str = ""
     raw_reason_codes: tuple[str, ...] = ()
+    # The exact canonical action RA verified against the signed scope. Kept as an
+    # opaque object (like ``scope``) to avoid importing RA domain types here; the
+    # composition engine re-checks it against the governance-narrowed effective
+    # scope before GRANT (F1). ``None`` when the caller composes at the algebra
+    # level without a concrete action (then no action re-check is possible).
+    action: object = None
 
     @property
     def authorized(self) -> bool:
