@@ -105,12 +105,11 @@ authorizes its task, resumes a `HOLD`/`ESCALATE`, or calls a provider. Every con
 quantum still crosses fresh governance and exact-action validation inside `advance_workflow`.
 H22-B is deterministic interleaving, **not** simultaneous execution.
 
-H22-B is `IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED` after the audit corrections (weighted
-fairness → smooth weighted round-robin; portfolio-lifecycle topology freeze). Promotion to
-`IMPLEMENTED_AND_CI_VERIFIED` awaits re-observing the scoped `agent-runtime-ci` GitHub Actions
-workflow (package suite, isolated wheel-install verification, platform-freeze, terminology,
-API-stability registry, and safety-case checks) green on the correction head. Not
-live-verified, distributed-safe, or exactly-once.
+H22-B is `IMPLEMENTED_AND_CI_VERIFIED` after the audit corrections (weighted fairness → smooth
+weighted round-robin; portfolio-lifecycle topology freeze) — the scoped `agent-runtime-ci`
+GitHub Actions workflow (package suite, isolated wheel-install verification, platform-freeze,
+terminology, API-stability registry, and safety-case checks) has been observed passing on the
+correction head. Not live-verified, distributed-safe, or exactly-once.
 
 ## What later H22 phases build on this base (not now)
 
