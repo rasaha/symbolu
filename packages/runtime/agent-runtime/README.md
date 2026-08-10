@@ -8,12 +8,12 @@ A **domain-neutral execution-coordination kernel** for agent and workflow execut
 > planning/reasoning/memory. See
 > [`docs/AGENT_RUNTIME_POST_MERGE_FIDELITY_AUDIT.md`](docs/AGENT_RUNTIME_POST_MERGE_FIDELITY_AUDIT.md).
 >
-> **Maturity:** `0.2.0` (canonical execution state) is `IMPLEMENTED_AND_CI_VERIFIED`.
-> The additive `0.3.0` **H22-A bounded workflow advancement** seam is
-> `IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED` — it is promoted to
-> `IMPLEMENTED_AND_CI_VERIFIED` only once the scoped Agent Runtime GitHub Actions workflow
-> is observed passing on the change. Not live-verified, pilot-validated,
-> enforcement-ready, or production-ready.
+> **Maturity:** `IMPLEMENTED_AND_CI_VERIFIED` — both `0.2.0` (canonical execution state)
+> and the additive `0.3.0` **H22-A bounded workflow advancement** seam have been observed
+> passing the scoped Agent Runtime GitHub Actions workflow (package suite, isolated
+> wheel-install verification, platform-freeze, terminology, API-stability registry, and
+> safety-case checks all green). Not live-verified, pilot-validated, enforcement-ready, or
+> production-ready.
 
 The kernel drives task and workflow lifecycle, invokes providers/tools, and applies
 retry, timeout, cancellation, checkpointing, and durable recovery. Before any
@@ -164,10 +164,10 @@ the same primitive), and there is **no** change to exact-action fingerprint sema
 governance ownership, canonical execution state, checkpoint digest semantics, or recovery
 behavior. Builds on canonical execution state (0.2.0), the post-merge governance-safety
 correction (0.1.1), and exact-action contract hardening (0.1.2). Single-workflow
-coordination only. Maturity: `IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED` for the 0.3.0
-seam (package suite 132 passed, 2 skipped locally) — promoted to
-`IMPLEMENTED_AND_CI_VERIFIED` only once the scoped Agent Runtime GitHub Actions workflow is
-observed passing. This does not imply production, pilot, live-environment, or enforcement
-validation. **Full multi-workflow orchestration (H22 — portfolio scheduler,
+coordination only. Maturity: `IMPLEMENTED_AND_CI_VERIFIED` — the scoped Agent Runtime
+GitHub Actions workflow has been observed passing on the change (package suite 132 passed,
+2 skipped; isolated wheel-install verification PASS; freeze, terminology, API-stability
+registry, and safety-case checks all green). This does not imply production, pilot,
+live-environment, or enforcement validation. **Full multi-workflow orchestration (H22 — portfolio scheduler,
 cross-workflow dependencies, priority/fairness, concurrency) is a later feature phase, not
 implemented here.**

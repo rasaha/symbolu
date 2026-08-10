@@ -10,8 +10,9 @@ not implemented here.**
 > compatibility, and the scoped CI job — are validated and `IMPLEMENTED_AND_CI_VERIFIED`
 > as of the canonical-execution-state release (0.2.0). See
 > `AGENT_RUNTIME_POST_MERGE_FIDELITY_AUDIT.md`. On that base, **H22-A** (0.3.0) adds only
-> the bounded-advancement seam below; it is `IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED`
-> until the scoped CI run is observed passing on the change. Not live-verified.
+> the bounded-advancement seam below; it is `IMPLEMENTED_AND_CI_VERIFIED` — the scoped
+> Agent Runtime GitHub Actions workflow has been observed passing on the change. Not
+> live-verified.
 
 ## Ordering
 
