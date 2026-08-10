@@ -3,6 +3,60 @@
 All notable changes to the independent Agent Runtime distribution are recorded here.
 This project follows semantic versioning for the distribution.
 
+## 0.3.0 — H22-A bounded workflow advancement
+
+Adds a small, additive, deterministic seam that lets an external orchestrator create a
+workflow **without draining it to completion** and then advance it **one bounded quantum
+at a time** to a stable, checkpointed boundary. This is the compositional foundation the
+future H22 portfolio scheduler needs in order to interleave independent workflows fairly
+(`advance(A)`, `advance(B)`, `advance(A)`, …). Additive only — no change to exact-action
+fingerprint semantics, governance ownership, canonical execution state, checkpoint digest
+semantics, or recovery behavior. **This is H22-A, not full H22:** no portfolio, no
+cross-workflow dependencies, no priority/fairness/aging, no shared budget, no concurrency.
+
+### Added
+- **`AgentRuntime.prepare_workflow(...)`** (and the `prepare_workflow(runtime, …)`
+  convenience function) — create and register a workflow instance with the exact same
+  setup `start_workflow` performs (instance creation, `WORKFLOW_CREATED` /
+  `WORKFLOW_STARTED`, and the initial `RUNNING` checkpoint) but **without driving any
+  task**. No provider or governance call happens at preparation. A prepared instance
+  persists as an ordinary `RUNNING` checkpoint, so its recovery semantics are the existing
+  ones (recovered as `PAUSED`, requiring explicit continuation — never auto-run).
+- **`AgentRuntime.advance_workflow(instance_id)`** (and `advance_workflow(runtime, …)`) —
+  advance a prepared/running workflow by **one bounded quantum**: *at most one runtime task
+  transition through one stable, checkpointed boundary*. Concretely a quantum is one of:
+  one task run through the full governance→exact-action→provider→transition→checkpoint
+  chain; one finalization (`→ COMPLETED`, or all remaining work blocked `→ WAITING`); or
+  one cancellation. The chain runs **entirely within** the quantum, so the scheduler can
+  never observe or preempt a workflow between a governance `CLEAR` and the provider
+  invocation it cleared. On a non-`RUNNING` workflow it is a deterministic no-op that
+  reports why (`ALREADY_TERMINAL`, or `REQUIRES_RESUME` for a `WAITING`/`PAUSED` workflow
+  — bounded advancement never self-resolves a governance `HOLD`/`ESCALATE`).
+- **`WorkflowAdvanceOutcome`** — a frozen, read-only value object returned by
+  `advance_workflow`: `instance_id`, `workflow_id`, `status_before`/`status_after`,
+  `stop_reason`, `progressed`, `task_id`, `task_status`, `execution_state_digest`,
+  `checkpoint_digest`, and `terminal`/`waiting`/`paused` flags. It references
+  runtime-owned canonical execution state and the emitted checkpoint **by digest** rather
+  than duplicating either — the runtime remains the sole owner of execution-trajectory
+  truth. `to_dict()` provided.
+- **`WorkflowAdvanceStop`** — a stable `str` enum of the boundaries a quantum may stop at
+  (`TASK_ADVANCED`, `WORKFLOW_COMPLETED`, `WORKFLOW_FAILED`, `WORKFLOW_WAITING`,
+  `WORKFLOW_PAUSED`, `WORKFLOW_CANCELLED`, `ALREADY_TERMINAL`, `REQUIRES_RESUME`).
+
+### Changed
+- **`start_workflow` is now implemented on top of the new primitive** (`prepare_workflow`
+  followed by repeated bounded advancement until the existing stopping condition). Its
+  externally observable behavior — event stream, checkpoints, and terminal/HOLD/ESCALATE
+  results — is unchanged; a regression test asserts the event sequence is byte-identical
+  to `prepare_workflow` + drive.
+
+### Unchanged (explicitly)
+- No new event types; the existing deterministic event stream is preserved. Exact-action
+  proposal binding, canonical execution state, checkpoint digest semantics, and
+  side-effect-free recovery are all untouched. No concurrency, threads, asyncio, portfolio
+  scheduler, cross-workflow dependencies, priority/fairness, shared budget, agent
+  selection, shared reasoning memory, or Runtime Assurance were introduced.
+
 ## 0.2.0 — canonical execution state
 
 Establishes the Agent Runtime as the canonical owner of **execution-trajectory

@@ -28,7 +28,13 @@ from .models.agent import AgentDescriptor
 from .models.events import RuntimeEvent
 from .models.execution_state import CanonicalExecutionState, ExecutionLineage
 from .models.proposal import TransitionProposal
-from .models.results import FailureCategory, RuntimeFailure, RuntimeResult
+from .models.results import (
+    FailureCategory,
+    RuntimeFailure,
+    RuntimeResult,
+    WorkflowAdvanceOutcome,
+    WorkflowAdvanceStop,
+)
 from .models.task import TaskDefinition, TaskInstance, TaskStatus
 from .models.transitions import RuntimeTransition
 from .models.workflow import WorkflowDefinition, WorkflowInstance, WorkflowStatus
@@ -73,6 +79,29 @@ def start_workflow(
     task_lineage: Optional[dict] = None,
 ) -> WorkflowInstance:
     return runtime.start_workflow(definition, correlation_id, lineage, task_lineage)
+
+
+def prepare_workflow(
+    runtime: AgentRuntime,
+    definition: WorkflowDefinition,
+    correlation_id: Optional[str] = None,
+    lineage: Optional[ExecutionLineage] = None,
+    task_lineage: Optional[dict] = None,
+) -> WorkflowInstance:
+    """Create and register a workflow WITHOUT draining it to completion (H22-A).
+
+    The returned instance is RUNNING with no task advanced; advance it one bounded
+    quantum at a time with :func:`advance_workflow`. See
+    ``AgentRuntime.prepare_workflow``."""
+    return runtime.prepare_workflow(definition, correlation_id, lineage, task_lineage)
+
+
+def advance_workflow(runtime: AgentRuntime, instance_id: str) -> WorkflowAdvanceOutcome:
+    """Advance a prepared/running workflow by one bounded execution quantum (H22-A).
+
+    Returns a :class:`WorkflowAdvanceOutcome` describing exactly what happened and the
+    stable boundary the quantum stopped at. See ``AgentRuntime.advance_workflow``."""
+    return runtime.advance_workflow(instance_id)
 
 
 def execution_state(
@@ -147,6 +176,8 @@ __all__ = [
     "RuntimeResult",
     "RuntimeFailure",
     "FailureCategory",
+    "WorkflowAdvanceOutcome",
+    "WorkflowAdvanceStop",
     # providers
     "Provider",
     "ProviderRegistry",
@@ -190,6 +221,8 @@ __all__ = [
     "create_runtime",
     "open_runtime",
     "start_workflow",
+    "prepare_workflow",
+    "advance_workflow",
     "execution_state",
     "execution_state_by_digest",
     "resume_workflow",
