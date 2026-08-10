@@ -19,9 +19,11 @@ A **domain-neutral execution-coordination kernel** for agent and workflow execut
 > concurrent multi-workflow execution** layer (bounded in-process concurrency over independent
 > H22-A quanta, a fairness-preserving batch-selection seam, logical resource claims with an atomic
 > all-or-none coordinator, a shared reserve-before-execute budget, and bounded compensation
-> coordination) is `IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED` — the full package suite (incl. the
-> dedicated `tests/test_portfolio_concurrency.py`) passes offline, with deterministic
-> (barrier/event, no-sleep) concurrency tests. **H22-D decides which safe quanta may run
+> coordination) is `IMPLEMENTED_AND_CI_VERIFIED` — all scoped `agent-runtime-ci` checks (package
+> suite incl. the dedicated `tests/test_portfolio_concurrency.py`, isolated wheel-install
+> verification, platform-freeze) plus terminology, API-stability registry, and safety-case + SBOM
+> were observed green on the PR head, with deterministic (barrier/event, no-sleep) concurrency
+> tests. **H22-D decides which safe quanta may run
 > concurrently; it never authorizes the consequential action inside a quantum** (that stays below
 > H22-A, with fresh governance per quantum), never preempts the indivisible
 > governance→exact-action→provider chain, never runs two quanta for one workflow at once, and
