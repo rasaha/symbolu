@@ -107,15 +107,21 @@ evaluator yielded `PASS → ALLOW → signed envelope`. The following narrow
 hardening closes it without redesigning RA-1→RA-4, RA-4.5, or the ratified RA-5
 architecture; the baselines above remain green and unchanged.
 
-- **H-1 — no fail-open control assurance.** The reference TAP engine now marks
-  support *presumed from mere evidence presence* (no per-assertion rule / explicit
-  stance) with a `presumptive_support` reason code; its native outcome is
-  unchanged, so existing TAP consumers are unaffected. The production
-  `TapControlAssurance` (default `require_explicit_determination=True`) downgrades
-  presumptive support to `UNKNOWN` — a `PASS` now requires an *explicit affirmative
-  determination*. Production composition additionally **rejects a non-authoritative
-  Control-Assurance port** (`is_production_authoritative` must be `True`), so a
-  permissive/reference evaluator cannot silently satisfy control assurance.
+- **H-1 — no fail-open control assurance.** Detection of *presumptive* support —
+  support the TAP engine derives from mere evidence presence via its default
+  fallback path (no per-assertion rule matched, no explicit per-evidence stance) —
+  lives **entirely in the RA-5 integration adapter**, not in the TAP engine. TAP
+  core emits its canonical, un-annotated output (its frozen behavioral-equivalence
+  baseline is untouched: the derive path's `reason:evidence_supports` /
+  `supported:<id>` refs are unchanged). The production `TapControlAssurance`
+  (default `require_explicit_determination=True`) recognizes that default-fallback
+  `SUPPORTED` from TAP's canonical `reason:evidence_supports` marker and downgrades
+  it to `UNKNOWN` — a `PASS` now requires an *explicit affirmative determination*
+  (a matched rule, or an explicit per-evidence stance). A rule-matched `SUPPORTED`
+  carries the rule's own reason code and is never downgraded. Production composition
+  additionally **rejects a non-authoritative Control-Assurance port**
+  (`is_production_authoritative` must be `True`), so a permissive/reference
+  evaluator cannot silently satisfy control assurance.
 - **H-2 — authenticated producer-channel seam.** A new stdlib-only
   `TrustedEvidenceIngressPort` (RA leaf) makes the previously-implicit §13
   transport/producer-trust assumption **explicit and fail-closed**: production mode

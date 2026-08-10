@@ -10,7 +10,6 @@ from ..health import TapHealthReport, check as check_health
 from ..conformance import TapConformanceReport, run_tap_conformance
 from ..errors import translate_error
 from ..core import (
-    PRESUMPTIVE_SUPPORT_REASON,
     TapConstraint, TapEngine, TapEvaluationRequest, TapEvaluationResult,
     TapEvidenceClass, TapEvidenceItem, TapObligation, TapOutcome, TapRule)
 from ..mapping import (
@@ -24,7 +23,6 @@ __all__ = [
     "TapInvocationLog", "TapInvocationRecord",
     "TapHealthReport", "check_health",
     "TapConformanceReport", "run_tap_conformance", "translate_error",
-    "PRESUMPTIVE_SUPPORT_REASON",
     "TapEngine", "TapEvaluationRequest", "TapEvaluationResult", "TapOutcome",
     "TapEvidenceItem", "TapEvidenceClass", "TapConstraint", "TapObligation", "TapRule",
     "MAPPING_VERSION", "KNOWN_CONSTRAINT_TYPES", "KNOWN_OBLIGATION_TYPES",

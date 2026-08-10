@@ -36,7 +36,6 @@ from ugence_governance_contracts.contracts.assertion import (
     AssertionGovernanceResult,
 )
 from ugence_governance_provider_framework.contracts import AssertionGovernanceProvider
-from ugence_tap_provider.core import PRESUMPTIVE_SUPPORT_REASON
 
 from risk_authority.domain.enums import ControlStatus
 from risk_authority.integrations.control_assurance import (
@@ -54,10 +53,19 @@ __all__ = ["TapControlAssurance"]
 #: ``indeterminate_result``). Its presence means "evaluator did not really run".
 _PROVIDER_ERROR_MARK = "reason:provider_error"
 
-#: Marker for a *presumptive* support outcome — support presumed from mere
-#: evidence presence, with no explicit rule/stance determination (RA-5 audit H-1).
-#: In production this is never a PASS.
-_PRESUMPTIVE_MARK = f"reason:{PRESUMPTIVE_SUPPORT_REASON}"
+#: Reason code the reference TAP engine stamps into ``explanation_refs`` when a
+#: ``SUPPORTED`` outcome is *derived from evidence presence* via its default
+#: fallback path — i.e. NO per-assertion rule matched. This is TAP's canonical,
+#: un-annotated output (part of its frozen behavioral-equivalence baseline). The
+#: *presumptive* judgement is made HERE, in this adapter, not inside the engine,
+#: so TAP core stays observably unchanged (RA-5 audit H-1 detection relocated to
+#: the integration layer to preserve TAP behavioral equivalence).
+_DEFAULT_FALLBACK_MARK = "reason:evidence_supports"
+
+#: Prefix of an ``explanation_refs`` entry naming a covered (supporting) evidence
+#: id (e.g. ``supported:e1``); used to locate the evidence a SUPPORTED outcome
+#: rested on so an explicit per-evidence stance can be recognized.
+_SUPPORTED_PREFIX = "supported:"
 
 
 class TapControlAssurance:
@@ -142,7 +150,7 @@ class TapControlAssurance:
             # provider — never a control determination; force UNKNOWN and flag it.
             status = ControlStatus.UNKNOWN
 
-        presumptive = _looks_presumptive(provider_result)
+        presumptive = _looks_presumptive(agr, provider_result)
         reason = (
             f"tap outcome={provider_result.coverage.value} "
             f"coverage={provider_result.evidence_coverage}"
@@ -210,13 +218,40 @@ def _looks_like_infrastructure_failure(result: AssertionGovernanceResult) -> boo
     return any(ref.startswith(_PROVIDER_ERROR_MARK) for ref in result.explanation_refs)
 
 
-def _looks_presumptive(result: AssertionGovernanceResult) -> bool:
-    """True iff the outcome is support presumed from presence, not determined.
+def _looks_presumptive(
+    agr: AssertionGovernanceRequest, result: AssertionGovernanceResult
+) -> bool:
+    """True iff a ``SUPPORTED`` outcome is *default-fallback* (presumptive) support.
 
-    The reference engine stamps ``reason:presumptive_support`` into
-    ``explanation_refs`` when it derives ``SUPPORTED`` from the default stance
-    (no per-assertion rule, no explicit ``stance:<id>``). A production-grade
-    evaluator that makes an explicit determination never sets this marker.
+    Presumptive support is support the engine **derived from mere evidence
+    presence** through its default fallback path — no per-assertion rule matched,
+    and no explicit per-evidence ``stance:<id>`` determination was supplied by the
+    caller. It is NOT an explicit affirmative determination, so in production it can
+    never satisfy a mandatory control (RA-5 audit H-1).
+
+    Detection is done entirely from TAP's **canonical, un-annotated** output, so the
+    engine's observable behavior stays frozen (TAP behavioral-equivalence
+    preserved — the engine no longer stamps any RA-specific marker):
+
+    * the derive/default-fallback path emits ``reason:evidence_supports``; a
+      rule-matched ``SUPPORTED`` instead carries the rule's own reason code (or
+      ``reason:supported``) and so is treated as an explicit determination and is
+      never flagged here;
+    * an explicit per-evidence ``stance:<covered_id>`` in the request context is
+      itself an explicit determination and lifts the flag — mirroring the reference
+      engine's own stance handling. (RA's production pipeline supplies no stance, so
+      production default-fallback support is always presumptive.)
     """
 
-    return _PRESUMPTIVE_MARK in result.explanation_refs
+    if _DEFAULT_FALLBACK_MARK not in result.explanation_refs:
+        return False
+    covered_ids = [
+        ref[len(_SUPPORTED_PREFIX):]
+        for ref in result.explanation_refs
+        if ref.startswith(_SUPPORTED_PREFIX)
+    ]
+    # If any covered (supporting) evidence carried an explicit stance, the support
+    # rested on an explicit determination, not mere presence ⇒ not presumptive.
+    if any(f"stance:{cid}" in agr.context for cid in covered_ids):
+        return False
+    return True
