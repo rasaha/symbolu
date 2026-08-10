@@ -48,6 +48,7 @@ from ugence_agent_runtime.governance.interfaces import (
     GovernanceHook,
 )
 from ugence_agent_runtime.models.task import TaskStatus
+from ugence_agent_runtime.orchestration.control import PortfolioController
 from ugence_agent_runtime.orchestration.persistence import (
     InMemoryPortfolioCheckpointStore,
     PortfolioCheckpoint,
@@ -55,12 +56,18 @@ from ugence_agent_runtime.orchestration.persistence import (
     WorkflowCheckpointRef,
     _portfolio_digest,
 )
+from ugence_agent_runtime.orchestration.portfolio import PortfolioStatus
 from ugence_agent_runtime.orchestration.recovery import (
     build_portfolio_checkpoint,
     validate_portfolio_checkpoint,
 )
 from ugence_agent_runtime.orchestration.scheduling import PortfolioScheduler
-from ugence_agent_runtime.orchestration.tracing import PortfolioTrace
+from ugence_agent_runtime.orchestration.tracing import (
+    InMemoryPortfolioEventStore,
+    PortfolioTrace,
+    PortfolioTraceSequenceError,
+)
+from ugence_agent_runtime.persistence.checkpoints import Checkpoint
 from ugence_agent_runtime.persistence.in_memory import InMemoryRuntimeStateStore
 from ugence_agent_runtime.runtime.errors import CheckpointError, RecoveryError
 
@@ -122,11 +129,12 @@ class ExplodingHook(GovernanceHook):
 
 
 def build(specs, deps=(), *, hook=None, policy=PortfolioFailurePolicy.ISOLATE_WORKFLOW,
-          runtime_version=None, provider=None, pid="P"):
+          runtime_version=None, provider=None, pid="P", event_store=None):
     """Build a runtime (with a durable state_store), prepared workflows, a portfolio, a
     portfolio-checkpoint store, and a controller. ``specs`` is a list of dicts with keys
     ``name``, ``n`` (task count), ``priority``, ``weight``. ``deps`` are
-    ``(dependent_name, requires_name, dep_type)`` tuples."""
+    ``(dependent_name, requires_name, dep_type)`` tuples. Pass ``event_store`` for a durable
+    orchestration trace."""
     ss = InMemoryRuntimeStateStore()
     cfg_kw = dict(state_store=ss, governance_hook=hook or AllowAllGovernanceHook())
     if runtime_version is not None:
@@ -150,10 +158,10 @@ def build(specs, deps=(), *, hook=None, policy=PortfolioFailurePolicy.ISOLATE_WO
         portfolio.add_dependency(ids[dep], ids[req], t)
     pcp = InMemoryPortfolioCheckpointStore()
     controller = create_portfolio_controller(
-        rt, portfolio, policy=policy, checkpoint_store=pcp
+        rt, portfolio, policy=policy, checkpoint_store=pcp, event_store=event_store
     )
     return dict(ss=ss, rt=rt, prov=prov, portfolio=portfolio, defs=defs, ids=ids,
-                pid=pid, pcp=pcp, controller=controller)
+                pid=pid, pcp=pcp, controller=controller, event_store=event_store)
 
 
 def checkpoint_now(env, failure_policy="ISOLATE_WORKFLOW", trace_sequence=0):
@@ -165,7 +173,7 @@ def checkpoint_now(env, failure_policy="ISOLATE_WORKFLOW", trace_sequence=0):
     return cp
 
 
-def recover(env, *, hook=None, provider=None, runtime_version=None):
+def recover(env, *, hook=None, provider=None, runtime_version=None, event_store=None):
     cfg_kw = dict(state_store=env["ss"], governance_hook=hook or AllowAllGovernanceHook())
     if runtime_version is not None:
         cfg_kw["runtime_version"] = runtime_version
@@ -173,9 +181,19 @@ def recover(env, *, hook=None, provider=None, runtime_version=None):
     prov2 = provider or RecordingProvider("p")
     register_provider(rt2, prov2)
     result = recover_portfolio(
-        store=env["pcp"], portfolio_id=env["pid"], runtime=rt2, definitions=env["defs"]
+        store=env["pcp"], portfolio_id=env["pid"], runtime=rt2, definitions=env["defs"],
+        event_store=event_store,
     )
     return rt2, prov2, result
+
+
+def _reseal_portfolio(cp, mutate):
+    """Return a PortfolioCheckpoint with ``mutate(dict)`` applied and the outer digest
+    recomputed over the canonical payload (a genuine reseal — verify() passes)."""
+    d = cp.to_dict()
+    mutate(d)
+    d["portfolio_digest"] = PortfolioCheckpoint.from_dict(d).compute_digest()
+    return PortfolioCheckpoint.from_dict(d)
 
 
 def run_scheduler(rt, portfolio, rounds, policy=None):
@@ -864,3 +882,237 @@ def test_unsupported_version_rejected():
     d["portfolio_digest"] = _portfolio_digest({k: v for k, v in d.items() if k != "portfolio_digest"})
     ok, reason = validate_portfolio_checkpoint(PortfolioCheckpoint.from_dict(d))
     assert not ok and "version" in reason
+
+
+# =========================================================================== #
+# FINAL AUDIT CORRECTIONS — durable trace, crash windows, full checkpoint      #
+# binding, semantic cross-bind, failure-policy continuity                      #
+# =========================================================================== #
+
+# --- 1/2: durable trace history + globally-monotonic sequence across recovery #
+def test_audit_durable_trace_history_survives_recovery():
+    es = InMemoryPortfolioEventStore()
+    env = build([{"name": "A", "n": 4}, {"name": "B", "n": 4}], event_store=es)
+    ctrl = env["controller"]
+    ctrl.step(); ctrl.step(); ctrl.step()
+    ctrl.checkpoint()
+    pre = [(e.sequence, e.event_type) for e in es.events(env["pid"])]
+    assert len(pre) >= 4  # QUANTUM_GRANTED x3 + CHECKPOINT_COMMITTED at least
+
+    # New process: recover WITH the same durable event store.
+    rt2, prov2, result = recover(env, event_store=es)
+    # Pre-crash history is preserved (not just the last sequence number).
+    hist = result.trace.history()
+    assert [(e.sequence, e.event_type) for e in hist][: len(pre)] == pre
+    # Globally monotonic: the recovery event's sequence is strictly greater than every prior.
+    rec = [e for e in hist if e.event_type == PortfolioEventType.PORTFOLIO_RECOVERED.value]
+    assert len(rec) == 1
+    assert rec[0].sequence == max(s for s, _ in pre) + 1
+    seqs = [e.sequence for e in hist]
+    assert seqs == list(range(1, len(seqs) + 1))  # contiguous, gap-free, no duplicates
+
+
+# --- 3/5: no duplicate sequence after a persisted CHECKPOINT_COMMITTED (Window B)
+def test_audit_window_B_crash_after_commit_event_persisted():
+    es = InMemoryPortfolioEventStore()
+    env = build([{"name": "A", "n": 4}], event_store=es)
+    ctrl = env["controller"]
+    ctrl.step()
+    cp = ctrl.checkpoint()  # appends CHECKPOINT_COMMITTED durably; anchor precedes it
+    committed = [e for e in es.events(env["pid"])
+                 if e.event_type == PortfolioEventType.PORTFOLIO_CHECKPOINT_COMMITTED.value]
+    assert len(committed) == 1
+    commit_seq = committed[0].sequence
+    assert cp.trace_sequence < commit_seq  # checkpoint captured the anchor BEFORE the commit
+
+    # Crash after both persisted; recover continues strictly AFTER the commit event.
+    rt2, prov2, result = recover(env, event_store=es)
+    rec = [e for e in es.events(env["pid"])
+           if e.event_type == PortfolioEventType.PORTFOLIO_RECOVERED.value]
+    assert len(rec) == 1
+    assert rec[0].sequence == commit_seq + 1        # no reuse of the commit sequence
+    seqs = [e.sequence for e in es.events(env["pid"])]
+    assert len(seqs) == len(set(seqs))              # no duplicates
+
+
+# --- 4: crash after checkpoint save but BEFORE commit-event append (Window A)  #
+def test_audit_window_A_crash_before_commit_event():
+    es = InMemoryPortfolioEventStore()
+    env = build([{"name": "A", "n": 4}], event_store=es)
+    ctrl = env["controller"]
+    ctrl.step()  # emits QUANTUM_GRANTED (seq 1) into the durable store
+    anchor = es.last_sequence(env["pid"])           # = 1
+    # Simulate: portfolio checkpoint saved, but crash BEFORE the CHECKPOINT_COMMITTED append.
+    cp = build_portfolio_checkpoint(env["portfolio"], env["rt"],
+                                    failure_policy="ISOLATE_WORKFLOW", trace_sequence=anchor)
+    env["pcp"].save(cp)
+    # No CHECKPOINT_COMMITTED in the store.
+    assert all(e.event_type != PortfolioEventType.PORTFOLIO_CHECKPOINT_COMMITTED.value
+               for e in es.events(env["pid"]))
+    rt2, prov2, result = recover(env, event_store=es)
+    rec = [e for e in es.events(env["pid"])
+           if e.event_type == PortfolioEventType.PORTFOLIO_RECOVERED.value]
+    assert rec[0].sequence == anchor + 1            # continues without gap/collision
+    seqs = [e.sequence for e in es.events(env["pid"])]
+    assert seqs == list(range(1, len(seqs) + 1))
+
+
+def test_audit_event_store_rejects_out_of_order_sequence():
+    es = InMemoryPortfolioEventStore()
+    t = PortfolioTrace("P", event_store=es)
+    t.emit(PortfolioEventType.PORTFOLIO_CREATED)   # seq 1
+    from ugence_agent_runtime.orchestration.tracing import PortfolioTraceEntry
+    with pytest.raises(PortfolioTraceSequenceError):
+        es.append(PortfolioTraceEntry("P", 1, "PORTFOLIO_CREATED"))   # duplicate
+    with pytest.raises(PortfolioTraceSequenceError):
+        es.append(PortfolioTraceEntry("P", 5, "PORTFOLIO_CREATED"))   # gap
+
+
+# --- 6: full runtime-checkpoint binding includes the CES extension domain      #
+def test_audit_ref_binds_both_base_and_extension_integrity_domains():
+    env = build([{"name": "A", "n": 3}])
+    run_scheduler(env["rt"], env["portfolio"], 2)
+    cp = build_portfolio_checkpoint(env["portfolio"], env["rt"],
+                                    failure_policy="ISOLATE_WORKFLOW", trace_sequence=0)
+    ref = cp.workflow_checkpoint_refs[0]
+    wf_cp = env["ss"].load(env["ids"]["A"])
+    assert ref.checkpoint_digest == wf_cp.digest
+    assert ref.checkpoint_version == wf_cp.checkpoint_version == "1"
+    assert ref.extension_digest == wf_cp.extension_digest
+    assert ref.extension_digest and ref.extension_digest != ref.checkpoint_digest
+
+
+# --- 7: resealed CES/lineage extension with UNCHANGED base digest is rejected  #
+def test_audit_resealed_extension_unchanged_base_is_rejected():
+    env = build([{"name": "A", "n": 3}])
+    run_scheduler(env["rt"], env["portfolio"], 3)  # multiple journal snapshots recorded
+    a = env["ids"]["A"]
+    checkpoint_now(env)  # portfolio ref binds the ORIGINAL full checkpoint (base + extension)
+
+    # Tamper the runtime checkpoint's CES extension while keeping the base payload/digest
+    # unchanged, and VALIDLY reseal the extension (remove a stale journal snapshot).
+    d = env["ss"].load(a).to_dict()
+    base_digest_before = d["digest"]
+    latest_digests = {s["state_digest"] for s in d["execution_states"].values()}
+    stale = [k for k in d["execution_state_journal"] if k not in latest_digests]
+    assert stale, "need a non-latest journal snapshot to prune"
+    del d["execution_state_journal"][stale[0]]
+    resealed = Checkpoint.from_dict(d)
+    d["extension_digest"] = resealed.compute_extension_digest()
+    tampered = Checkpoint.from_dict(d)
+    assert tampered.digest == base_digest_before      # base UNCHANGED
+    assert tampered.verify() and tampered.verify_extension()  # internally valid (resealed)
+    assert tampered.extension_digest != env["ss"].load(a).extension_digest  # but changed
+    env["ss"].save(tampered)
+
+    # The portfolio reference still binds the ORIGINAL extension digest -> recovery rejects.
+    with pytest.raises(RecoveryError):
+        recover(env)
+
+
+# --- 8: cancellation-state / runtime-status inconsistency rejected             #
+def test_audit_cancellation_state_inconsistent_with_runtime_rejected():
+    env = build([{"name": "A", "n": 3}, {"name": "B", "n": 3}])
+    run_scheduler(env["rt"], env["portfolio"], 2)  # B is RUNNING, never cancelled
+    checkpoint_now(env)
+    b = env["ids"]["B"]
+    cp = env["pcp"].load(env["pid"])
+    resealed = _reseal_portfolio(cp, lambda d: d.__setitem__("cancellation_state", {b: "WORKFLOW_ONLY"}))
+    assert resealed.verify()
+    env["pcp"].save(resealed)
+    with pytest.raises(RecoveryError):
+        recover(env)  # B recovers RUNNING/PAUSED, not CANCELLED -> fail closed
+
+
+# --- 9: failure-state / runtime-status inconsistency rejected                  #
+def test_audit_failure_state_inconsistent_with_runtime_rejected():
+    env = build([{"name": "A", "n": 3}, {"name": "B", "n": 3}])
+    run_scheduler(env["rt"], env["portfolio"], 2)
+    checkpoint_now(env)
+    b = env["ids"]["B"]
+    cp = env["pcp"].load(env["pid"])
+    resealed = _reseal_portfolio(cp, lambda d: d.__setitem__("failure_state", {b: "WORKFLOW_FAILED"}))
+    assert resealed.verify()
+    env["pcp"].save(resealed)
+    with pytest.raises(RecoveryError):
+        recover(env)  # B is not FAILED -> fail closed
+
+
+# --- 10: resealed COMPLETED portfolio with a non-terminal workflow rejected    #
+def test_audit_resealed_completed_with_nonterminal_workflow_rejected():
+    env = build([{"name": "A", "n": 3}, {"name": "B", "n": 3}])
+    run_scheduler(env["rt"], env["portfolio"], 2)  # both still RUNNING
+    checkpoint_now(env)
+    cp = env["pcp"].load(env["pid"])
+    resealed = _reseal_portfolio(cp, lambda d: d.__setitem__("portfolio_status", "COMPLETED"))
+    assert resealed.verify()
+    env["pcp"].save(resealed)
+    with pytest.raises(RecoveryError):
+        recover(env)  # workflows recover non-terminal -> COMPLETED invariant violated
+
+
+# --- 11: non-contiguous registration sequences rejected                        #
+def test_audit_non_contiguous_registration_sequence_rejected():
+    env = build([{"name": "A", "n": 2}, {"name": "B", "n": 2}])
+    cp = build_portfolio_checkpoint(env["portfolio"], env["rt"],
+                                    failure_policy="ISOLATE_WORKFLOW", trace_sequence=0)
+
+    def bump(d):
+        # sequences become [0, 2] — a gap the canonical H22-B invariant forbids.
+        for r in d["registrations"]:
+            if r["registration_sequence"] == 1:
+                r["registration_sequence"] = 2
+    resealed = _reseal_portfolio(cp, bump)
+    assert resealed.verify()
+    ok, reason = validate_portfolio_checkpoint(resealed)
+    assert not ok and "contiguous" in reason
+
+
+def test_audit_invalid_failure_label_rejected():
+    env = build([{"name": "A", "n": 2}])
+    run_scheduler(env["rt"], env["portfolio"], 1)
+    cp = build_portfolio_checkpoint(env["portfolio"], env["rt"],
+                                    failure_policy="ISOLATE_WORKFLOW", trace_sequence=0)
+    a = env["ids"]["A"]
+    resealed = _reseal_portfolio(cp, lambda d: d.__setitem__("failure_state", {a: "BOGUS"}))
+    ok, reason = validate_portfolio_checkpoint(resealed)
+    assert not ok and "label" in reason
+
+
+# --- 12: persisted failure policy survives recovery + controller reconstruction #
+def test_audit_failure_policy_survives_recovery_and_controller():
+    env = build([{"name": "A", "n": 3}, {"name": "B", "n": 3}],
+                policy=PortfolioFailurePolicy.FAIL_DEPENDENTS)
+    ctrl = env["controller"]
+    ctrl.step(); ctrl.step()
+    ctrl.checkpoint()
+    rt2, prov2, result = recover(env)
+    # Typed, first-class field — not buried in generic metadata.
+    assert result.failure_policy is PortfolioFailurePolicy.FAIL_DEPENDENTS
+    # A controller reconstructed from the recovery uses the recovered policy by DEFAULT,
+    # not the constructor default ISOLATE_WORKFLOW.
+    ctrl2 = PortfolioController.from_recovery(rt2, result, checkpoint_store=env["pcp"])
+    assert ctrl2.failure_policy is PortfolioFailurePolicy.FAIL_DEPENDENTS
+
+
+# --- 13/14: recovery still zero provider + governance calls (with event store) #
+def test_audit_recovery_zero_side_effects_with_event_store():
+    es = InMemoryPortfolioEventStore()
+    env = build([{"name": "A", "n": 4}, {"name": "B", "n": 4}], event_store=es)
+    ctrl = env["controller"]
+    ctrl.step(); ctrl.step()
+    ctrl.checkpoint()
+    rt2 = create_runtime(AgentRuntimeConfig(state_store=env["ss"], governance_hook=ExplodingHook()))
+    register_provider(rt2, ExplodingProvider("p"))
+    result = recover_portfolio(store=env["pcp"], portfolio_id=env["pid"], runtime=rt2,
+                               definitions=env["defs"], event_store=es)  # must not raise
+    assert result.requires_continuation is True
+
+
+# --- 16: SWRR/aging continuity unchanged by the corrections (durable trace)     #
+def test_audit_swrr_continuity_unchanged_with_durable_trace():
+    n = 30
+    unint, split = _continuity(
+        [{"name": "A", "n": n, "weight": 2}, {"name": "B", "n": n, "weight": 1}], 20, 10
+    )
+    assert unint == split

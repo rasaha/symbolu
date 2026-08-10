@@ -8,14 +8,16 @@ A **domain-neutral execution-coordination kernel** for agent and workflow execut
 > planning/reasoning/memory. See
 > [`docs/AGENT_RUNTIME_POST_MERGE_FIDELITY_AUDIT.md`](docs/AGENT_RUNTIME_POST_MERGE_FIDELITY_AUDIT.md).
 >
-> **Maturity:** `IMPLEMENTED_AND_CI_VERIFIED` — `0.2.0` (canonical execution state), `0.3.0`
-> (**H22-A bounded workflow advancement**), `0.4.0` (**H22-B deterministic multi-workflow
-> coordination**, incl. the smooth-weighted-round-robin fairness correction and
-> portfolio-lifecycle freezing), and the additive `0.5.0` **H22-C durable multi-workflow
-> orchestration** layer (portfolio checkpoint/recovery, audit trace, bounded failure
-> propagation, cooperative cancellation scopes) have all been observed passing the scoped Agent
-> Runtime GitHub Actions workflow (package suite, isolated wheel-install verification,
-> platform-freeze, terminology, API-stability registry, and safety-case checks all green). Not
+> **Maturity:** `0.2.0` (canonical execution state), `0.3.0` (**H22-A bounded workflow
+> advancement**), and `0.4.0` (**H22-B deterministic multi-workflow coordination**, incl. the
+> smooth-weighted-round-robin fairness correction and portfolio-lifecycle freezing) are
+> `IMPLEMENTED_AND_CI_VERIFIED` (observed passing the scoped Agent Runtime GitHub Actions
+> workflow: package suite, isolated wheel-install verification, platform-freeze, terminology,
+> API-stability registry, and safety-case checks all green). The additive `0.5.0` **H22-C durable
+> multi-workflow orchestration** layer (durable portfolio checkpoint/recovery, append-only audit
+> event store, bounded failure propagation, cooperative cancellation scopes) is
+> `IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED` after its final audit corrections and promotes to
+> `IMPLEMENTED_AND_CI_VERIFIED` once scoped CI is observed green on its exact final head. Not
 > live-verified, pilot-validated, distributed-safe, enforcement-ready, or production-ready.
 
 The kernel drives task and workflow lifecycle, invokes providers/tools, and applies
@@ -238,11 +240,17 @@ tied together by `PortfolioController` (`create_portfolio_controller`). Additive
 to exact-action semantics, governance ownership, canonical execution state, checkpoint digest
 semantics, or single-workflow recovery; recovery performs no execution. SWRR `fair_credit`,
 aging, registration order, and dependencies survive recovery, so the next scheduler decision is
-exactly the uninterrupted one. Maturity `IMPLEMENTED_AND_CI_VERIFIED` (scoped Agent Runtime CI
-observed green on the PR head; package suite **220 passed, 2 skipped**; isolated wheel-install
-verification **PASS** at `0.5.0`; platform-freeze green). Not production / pilot / distributed /
-exactly-once / runtime-assurance validated. **True concurrency, resource/budget coordination,
-and compensation remain H22-D, not implemented here.**
+exactly the uninterrupted one. Final audit corrections make the audit trace durable via an
+append-only `PortfolioEventStore` (crash-safe checkpoint/commit-event sequencing), bind the
+**full** runtime checkpoint across both the base and canonical-execution-state extension
+integrity domains, add semantic failure/cancellation/lifecycle cross-binding after recovery, and
+make the recovered failure policy a typed, first-class continuity contract. Maturity
+`IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED` (package suite **234 passed, 2 skipped**; isolated
+wheel-install verification **PASS** at `0.5.0`; platform-freeze green) — promotes to
+`IMPLEMENTED_AND_CI_VERIFIED` once scoped Agent Runtime CI is observed green on the exact new
+head. Not production / pilot / distributed / exactly-once / runtime-assurance validated. **True
+concurrency, resource/budget coordination, and compensation remain H22-D, not implemented
+here.**
 
 `0.4.0` — adds **H22-B deterministic multi-workflow coordination**: a `WorkflowPortfolio`,
 a cross-workflow dependency graph, deterministic eligibility classification, and a

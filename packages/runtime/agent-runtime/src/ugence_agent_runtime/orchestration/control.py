@@ -96,6 +96,7 @@ class PortfolioController:
         policy: PortfolioFailurePolicy = PortfolioFailurePolicy.ISOLATE_WORKFLOW,
         scheduling_policy: Optional[SchedulingPolicy] = None,
         trace: Optional[PortfolioTrace] = None,
+        event_store: Optional[object] = None,
         checkpoint_store: Optional[object] = None,
         emit_created: bool = False,
     ) -> None:
@@ -103,12 +104,37 @@ class PortfolioController:
         self._portfolio = portfolio
         self._scheduler = scheduler or PortfolioScheduler(runtime, scheduling_policy)
         self._policy = policy
-        self._trace = trace or PortfolioTrace(portfolio.portfolio_id)
+        # A supplied trace wins; otherwise build one (durable if an event store is given).
+        self._trace = trace or PortfolioTrace(portfolio.portfolio_id, event_store=event_store)
         self._store = checkpoint_store
         if emit_created and not self._trace.entries:
             self._trace.emit(
                 PortfolioEventType.PORTFOLIO_CREATED, portfolio_id=portfolio.portfolio_id
             )
+
+    @classmethod
+    def from_recovery(
+        cls,
+        runtime: object,
+        recovery_result: object,
+        *,
+        scheduling_policy: Optional[SchedulingPolicy] = None,
+        checkpoint_store: Optional[object] = None,
+    ) -> "PortfolioController":
+        """Reconstruct a controller from a :class:`~.recovery.PortfolioRecoveryResult`.
+
+        The controller adopts the recovered portfolio, the recovered (already sequence-re-seated)
+        trace, and — crucially — the **recovered** ``failure_policy`` by default, so failure
+        propagation continuity is preserved across restart rather than silently reset to the
+        constructor default. No execution occurs; explicit continuation is still required."""
+        return cls(
+            runtime,
+            recovery_result.portfolio,
+            policy=recovery_result.failure_policy,
+            scheduling_policy=scheduling_policy,
+            trace=recovery_result.trace,
+            checkpoint_store=checkpoint_store,
+        )
 
     # -- accessors ----------------------------------------------------------
     @property

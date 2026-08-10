@@ -27,7 +27,11 @@ import math
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Mapping, Optional, Tuple
 
-from ..models.workflow import WorkflowDefinition
+from ..models.workflow import (
+    TERMINAL_WORKFLOW_STATUSES,
+    WorkflowDefinition,
+    WorkflowStatus,
+)
 from ..runtime.errors import CheckpointError, RecoveryError
 from .dependencies import DependencyGraph, DependencyType, WorkflowDependency
 from .persistence import (
@@ -36,16 +40,20 @@ from .persistence import (
     WorkflowCheckpointRef,
 )
 from .portfolio import (
+    TERMINAL_PORTFOLIO_STATUSES,
     PortfolioStatus,
     PortfolioWorkflowEntry,
     WorkflowPortfolio,
     WorkflowPriority,
 )
-from .tracing import PortfolioEventType, PortfolioTrace
+from .tracing import PortfolioEventStore, PortfolioEventType, PortfolioTrace
 
 _PRIORITY_VALUES = frozenset(p.value for p in WorkflowPriority)
 _DEP_TYPE_VALUES = frozenset(t.value for t in DependencyType)
 _STATUS_VALUES = frozenset(s.value for s in PortfolioStatus)
+
+# The only orchestration failure label the H22-C controller records for an observed failure.
+_FAILURE_LABELS = frozenset({"WORKFLOW_FAILED"})
 
 
 def _failure_policy_values() -> frozenset:
@@ -53,6 +61,20 @@ def _failure_policy_values() -> frozenset:
     from .control import PortfolioFailurePolicy
 
     return frozenset(p.value for p in PortfolioFailurePolicy)
+
+
+def _cancellation_labels() -> frozenset:
+    """Permitted cancellation-state labels: the explicit cancellation scopes plus the two
+    failure policies that cancel cooperatively (FAIL_DEPENDENTS / FAIL_PORTFOLIO)."""
+    from .control import CancellationScope, PortfolioFailurePolicy
+
+    return frozenset(
+        {
+            *(s.value for s in CancellationScope),
+            PortfolioFailurePolicy.FAIL_DEPENDENTS.value,
+            PortfolioFailurePolicy.FAIL_PORTFOLIO.value,
+        }
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -113,12 +135,18 @@ def build_portfolio_checkpoint(
                 f"no runtime checkpoint found for workflow {entry.instance_id!r}: the "
                 "workflow must be checkpointed before the portfolio references it"
             )
+        # Bind BOTH runtime integrity domains: the base coordination digest AND the separate
+        # canonical-execution-state extension digest (+ schema version). The base digest
+        # deliberately excludes the extension, so base alone would not uniquely bind a v1
+        # checkpoint. A legacy (v0) checkpoint carries an empty extension_digest.
         refs.append(
             WorkflowCheckpointRef(
                 instance_id=wf_cp.instance_id,
                 workflow_id=wf_cp.workflow_id,
                 correlation_id=wf_cp.correlation_id,
                 checkpoint_digest=wf_cp.digest,
+                checkpoint_version=wf_cp.checkpoint_version,
+                extension_digest=wf_cp.extension_digest,
             )
         )
     dependencies = [
@@ -204,8 +232,14 @@ def validate_portfolio_checkpoint(cp: PortfolioCheckpoint) -> Tuple[bool, Option
     id_set = set(ids)
     if len(id_set) != len(ids):
         return False, "duplicate registration instance_id"
-    if len(set(seqs)) != len(seqs):
-        return False, "duplicate registration_sequence"
+    # Registration sequences must be the canonical CONTIGUOUS range 0 .. len-1 — the exact
+    # invariant H22-B assigns (registration_sequence = len(order) at registration time). A
+    # gap/offset is a tampered or corrupt snapshot.
+    if sorted(seqs) != list(range(len(seqs))):
+        return False, (
+            "registration_sequence must be the contiguous range 0.."
+            f"{len(seqs) - 1} (got {sorted(seqs)})"
+        )
 
     # Dependencies (validate references + type, then acyclicity via the graph).
     edges: List[WorkflowDependency] = []
@@ -244,13 +278,19 @@ def validate_portfolio_checkpoint(cp: PortfolioCheckpoint) -> Tuple[bool, Option
         if not r.checkpoint_digest or not isinstance(r.checkpoint_digest, str):
             return False, f"workflow_checkpoint_ref {r.instance_id!r} missing checkpoint_digest"
 
-    # Failure / cancellation targets must be registered workflows.
-    for iid in cp.failure_state:
+    # Failure / cancellation targets must be registered workflows, with labels drawn from the
+    # actual permitted vocabulary (a corrupt or fabricated label is rejected).
+    for iid, label in cp.failure_state.items():
         if iid not in id_set:
             return False, f"failure_state references unknown workflow {iid!r}"
-    for iid in cp.cancellation_state:
+        if label not in _FAILURE_LABELS:
+            return False, f"failure_state[{iid!r}] has invalid label {label!r}"
+    cancellation_labels = _cancellation_labels()
+    for iid, label in cp.cancellation_state.items():
         if iid not in id_set:
             return False, f"cancellation_state references unknown workflow {iid!r}"
+        if label not in cancellation_labels:
+            return False, f"cancellation_state[{iid!r}] has invalid scope label {label!r}"
     return True, None
 
 
@@ -262,18 +302,22 @@ class PortfolioRecoveryResult:
     """The immutable outcome of a side-effect-free portfolio recovery.
 
     ``portfolio`` is the reconstructed (frozen-topology) :class:`WorkflowPortfolio`; ``trace``
-    is a fresh :class:`PortfolioTrace` re-seated at the checkpoint's sequence anchor and
+    is a :class:`PortfolioTrace` re-seated past the checkpoint anchor and any durable events,
     carrying exactly one ``PORTFOLIO_RECOVERED`` event; ``recovered_workflow_ids`` are the
     workflows reconstructed through the runtime recovery contract; ``requires_continuation`` is
     always ``True`` (a recovered portfolio must be explicitly continued before any execution);
-    ``recovery_metadata`` holds per-workflow recovery notes (e.g. ``config_mismatch``) — never
-    fabricated. No provider, governance, or advancement call is made to produce this."""
+    ``failure_policy`` is the persisted :class:`~.control.PortfolioFailurePolicy` — exposed as a
+    typed, first-class field so a reconstructed controller uses the recovered policy by default
+    (never silently the constructor default); ``recovery_metadata`` holds per-workflow recovery
+    notes (e.g. ``config_mismatch``) — never fabricated. No provider, governance, or advancement
+    call is made to produce this."""
 
     portfolio: WorkflowPortfolio
     trace: PortfolioTrace
     recovered_workflow_ids: Tuple[str, ...]
     requires_continuation: bool
     checkpoint_version: str
+    failure_policy: Any  # PortfolioFailurePolicy (typed; annotated Any to avoid an import cycle)
     recovery_metadata: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -284,20 +328,26 @@ def recover_portfolio(
     runtime: object,
     definitions: Mapping[str, WorkflowDefinition],
     trace: Optional[PortfolioTrace] = None,
+    event_store: Optional[PortfolioEventStore] = None,
 ) -> PortfolioRecoveryResult:
     """Reconstruct a portfolio from its durable checkpoint. **No execution occurs.**
 
-    Loads and validates the portfolio checkpoint; for each referenced workflow, binds the
-    reference to the runtime checkpoint the runtime store actually holds (identity + digest,
-    fail-closed) and reconstructs the workflow through ``runtime.recover_runtime`` (which itself
-    makes no provider/governance call and never auto-runs); then rebuilds the portfolio with
-    its round, per-workflow ``age``/``fair_credit``, dependencies, and failure/cancellation
-    state exactly as checkpointed, and re-seats the trace position. Emits exactly one
-    ``PORTFOLIO_RECOVERED`` event. The result ``requires_continuation``.
+    Loads and validates the portfolio checkpoint; for each referenced workflow it (1) binds the
+    reference to the runtime checkpoint the runtime store actually holds across BOTH integrity
+    domains — identity, base ``checkpoint_digest``, ``checkpoint_version``, and the separate
+    canonical-execution-state ``extension_digest`` — (2) verifies that runtime checkpoint's own
+    integrity (``verify`` / ``verify_extension`` / ``validate_execution_states``), and (3)
+    reconstructs the workflow through ``runtime.recover_runtime`` (which makes no
+    provider/governance call and never auto-runs). It then rebuilds the portfolio with its
+    round, per-workflow ``age``/``fair_credit``, dependencies, and failure/cancellation state,
+    performs a **semantic** cross-bind against the recovered runtime statuses, and re-seats the
+    trace position (continuing past both the checkpoint anchor and any durable events). Emits
+    exactly one ``PORTFOLIO_RECOVERED`` event. The result ``requires_continuation``.
 
     ``definitions`` maps each registered ``instance_id`` to its original
-    :class:`WorkflowDefinition` (the runtime recovery contract needs it; the runtime does not
-    persist definitions)."""
+    :class:`WorkflowDefinition`. Pass ``event_store`` to recover the durable audit history and
+    keep the trace sequence globally monotonic across restart; ``runtime_id`` /
+    ``runtime_version`` are origin provenance and are NOT required to match (upgrades recover)."""
     cp = store.load(portfolio_id) if hasattr(store, "load") else None
     if cp is None:
         raise RecoveryError(f"no portfolio checkpoint found for {portfolio_id!r}")
@@ -316,15 +366,16 @@ def recover_portfolio(
     refs_by_id = {r.instance_id: r for r in cp.workflow_checkpoint_refs}
     recovered_ids: List[str] = []
     wf_meta: Dict[str, Any] = {}
+    recovered_status: Dict[str, WorkflowStatus] = {}
 
     for iid in cp.instance_ids:
         ref = refs_by_id[iid]
         definition = definitions.get(iid)
         if definition is None:
             raise RecoveryError(f"no WorkflowDefinition supplied for workflow {iid!r}")
-        # Cross-binding: prove the referenced runtime checkpoint belongs to this registration.
-        # NOTE: runtime_id / runtime_version are origin provenance and are deliberately NOT
-        # required to match the current runtime — a legitimate runtime upgrade must recover.
+        # Cross-binding: prove the referenced runtime checkpoint belongs to this registration,
+        # across BOTH integrity domains. NOTE: runtime_id / runtime_version are origin
+        # provenance and are deliberately NOT required to match — an upgrade must recover.
         wf_cp = _load_runtime_checkpoint(rt_store, iid)
         if wf_cp is None:
             raise RecoveryError(f"no runtime checkpoint found for referenced workflow {iid!r}")
@@ -339,8 +390,34 @@ def recover_portfolio(
             raise RecoveryError(f"workflow checkpoint correlation_id mismatch for {iid!r}")
         if wf_cp.digest != ref.checkpoint_digest:
             raise RecoveryError(
-                f"workflow checkpoint digest for {iid!r} does not match the portfolio "
+                f"workflow checkpoint base digest for {iid!r} does not match the portfolio "
                 "reference (the reference does not bind the runtime checkpoint on record)"
+            )
+        if wf_cp.checkpoint_version != ref.checkpoint_version:
+            raise RecoveryError(
+                f"workflow checkpoint_version {wf_cp.checkpoint_version!r} != referenced "
+                f"{ref.checkpoint_version!r} for {iid!r}"
+            )
+        # The base digest EXCLUDES the canonical-execution-state extension, so bind the
+        # extension digest too — a resealed extension (base unchanged) is caught here.
+        if wf_cp.extension_digest != ref.extension_digest:
+            raise RecoveryError(
+                f"workflow checkpoint extension digest for {iid!r} does not match the "
+                "portfolio reference (canonical-execution-state extension altered/resealed)"
+            )
+        # Verify the runtime checkpoint's OWN integrity across both domains before accepting.
+        if not wf_cp.verify():
+            raise RecoveryError(f"referenced runtime checkpoint for {iid!r} failed base integrity")
+        if wf_cp.checkpoint_version != "0":
+            states_ok, states_reason = wf_cp.validate_execution_states()
+            if not (wf_cp.verify_extension() and states_ok):
+                raise RecoveryError(
+                    f"referenced runtime checkpoint for {iid!r} failed canonical-execution-"
+                    f"state integrity: {states_reason or 'extension_digest mismatch'}"
+                )
+        elif wf_cp.has_extension_data():
+            raise RecoveryError(
+                f"legacy (v0) runtime checkpoint for {iid!r} unexpectedly carries extension data"
             )
         if definition.workflow_id != ref.workflow_id:
             raise RecoveryError(
@@ -350,11 +427,17 @@ def recover_portfolio(
         # Reconstruct the workflow through the EXISTING runtime recovery contract (no exec).
         rec = runtime.recover_runtime(iid, definition)
         recovered_ids.append(iid)
+        recovered_status[iid] = runtime.instance(iid).status
         wf_meta[iid] = {
             "resumed_from_status": rec.resumed_from_status,
             "requires_continuation": rec.requires_continuation,
             "config_mismatch": rec.config_mismatch,
         }
+
+    # Semantic cross-binding: the orchestration state H22-C claims must match underlying
+    # runtime truth AFTER recovery. A resealed checkpoint whose outer digest was recomputed
+    # but whose claimed state contradicts the recovered workflows must still fail closed.
+    _semantic_cross_bind(cp, recovered_status)
 
     # Rebuild the portfolio orchestration aggregate from the validated snapshot.
     entries: List[PortfolioWorkflowEntry] = []
@@ -387,10 +470,14 @@ def recover_portfolio(
         cancelled=dict(cp.cancellation_state),
     )
 
-    # Re-seat the trace position and record exactly one recovery event.
-    restored_trace = trace if trace is not None else PortfolioTrace.restore(
-        cp.portfolio_id, cp.trace_sequence
-    )
+    # Re-seat the trace position (crash-safe past the checkpoint anchor AND any durable event)
+    # and record exactly one recovery event. A durable event store preserves pre-crash history.
+    if trace is not None:
+        restored_trace = trace
+    else:
+        restored_trace = PortfolioTrace.restore(
+            cp.portfolio_id, cp.trace_sequence, event_store=event_store
+        )
     restored_trace.emit(
         PortfolioEventType.PORTFOLIO_RECOVERED,
         portfolio_id=cp.portfolio_id,
@@ -400,15 +487,60 @@ def recover_portfolio(
         recovered_workflow_ids=list(recovered_ids),
     )
 
+    from .control import PortfolioFailurePolicy  # lazy (module-load cycle)
+
     return PortfolioRecoveryResult(
         portfolio=portfolio,
         trace=restored_trace,
         recovered_workflow_ids=tuple(recovered_ids),
         requires_continuation=True,
         checkpoint_version=cp.checkpoint_version,
+        failure_policy=PortfolioFailurePolicy(cp.failure_policy),
         recovery_metadata={
             "portfolio_digest": cp.portfolio_digest,
             "failure_policy": cp.failure_policy,
             "workflows": wf_meta,
         },
     )
+
+
+def _semantic_cross_bind(
+    cp: PortfolioCheckpoint, recovered_status: Mapping[str, WorkflowStatus]
+) -> None:
+    """Prove the portfolio's claimed orchestration state matches recovered runtime truth.
+
+    Fails closed (``RecoveryError``) if the claim contradicts the workflows actually
+    reconstructed from their runtime checkpoints — even when the outer portfolio digest was
+    validly resealed. Intermediate ``CREATED``/``ACTIVE`` portfolios are not over-constrained."""
+    # failure_state[iid] ⇒ that workflow really is FAILED; cancellation_state[iid] ⇒ CANCELLED.
+    for iid in cp.failure_state:
+        if recovered_status.get(iid) is not WorkflowStatus.FAILED:
+            raise RecoveryError(
+                f"failure_state claims {iid!r} failed, but its recovered runtime status is "
+                f"{recovered_status.get(iid)!r}"
+            )
+    for iid in cp.cancellation_state:
+        if recovered_status.get(iid) is not WorkflowStatus.CANCELLED:
+            raise RecoveryError(
+                f"cancellation_state claims {iid!r} cancelled, but its recovered runtime status "
+                f"is {recovered_status.get(iid)!r}"
+            )
+    # Terminal portfolio lifecycle invariants created by the H22-C controller: COMPLETED,
+    # FAILED, and CANCELLED all imply every registered workflow is terminal (FAIL_PORTFOLIO and
+    # PORTFOLIO_ALL cancel every non-terminal workflow; COMPLETED means all workflows finished).
+    status = PortfolioStatus(cp.portfolio_status)
+    if status in TERMINAL_PORTFOLIO_STATUSES:
+        non_terminal = [
+            iid for iid, st in recovered_status.items()
+            if st not in TERMINAL_WORKFLOW_STATUSES
+        ]
+        if non_terminal:
+            raise RecoveryError(
+                f"portfolio_status {status.value} but recovered workflows are non-terminal: "
+                f"{sorted(non_terminal)}"
+            )
+        # FAILED additionally implies at least one observed workflow failure was recorded.
+        if status is PortfolioStatus.FAILED and not cp.failure_state:
+            raise RecoveryError(
+                "portfolio_status FAILED but no workflow failure was recorded"
+            )

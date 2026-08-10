@@ -72,9 +72,12 @@ from .scheduling import (
 )
 from .tracing import (
     PORTFOLIO_EVENT_TYPES,
+    InMemoryPortfolioEventStore,
+    PortfolioEventStore,
     PortfolioEventType,
     PortfolioTrace,
     PortfolioTraceEntry,
+    PortfolioTraceSequenceError,
 )
 
 __all__ = [
@@ -108,11 +111,14 @@ __all__ = [
     "recover_portfolio",
     "build_portfolio_checkpoint",
     "validate_portfolio_checkpoint",
-    # H22-C audit trace
+    # H22-C audit trace + durable event store
     "PortfolioTrace",
     "PortfolioTraceEntry",
     "PortfolioEventType",
     "PORTFOLIO_EVENT_TYPES",
+    "PortfolioEventStore",
+    "InMemoryPortfolioEventStore",
+    "PortfolioTraceSequenceError",
     # H22-C failure propagation + cancellation control
     "PortfolioController",
     "PortfolioFailurePolicy",

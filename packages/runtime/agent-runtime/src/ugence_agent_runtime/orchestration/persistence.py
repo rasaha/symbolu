@@ -72,15 +72,30 @@ class WorkflowCheckpointRef:
     """A reference (never a copy) to one workflow's authoritative runtime checkpoint.
 
     Binds the portfolio registration to the underlying runtime checkpoint by identity
-    (``instance_id`` / ``workflow_id`` / ``correlation_id``) and by ``checkpoint_digest`` (the
-    runtime checkpoint's base digest). Recovery re-verifies this reference against the runtime
-    checkpoint the runtime store actually holds — proving the referenced checkpoint belongs to
-    the registration it claims to represent, without ever duplicating its contents."""
+    (``instance_id`` / ``workflow_id`` / ``correlation_id``) and by the checkpoint's **complete**
+    integrity, across BOTH runtime checkpoint integrity domains:
+
+    * ``checkpoint_digest`` — the base coordination digest (``Checkpoint.digest``);
+    * ``checkpoint_version`` — the runtime checkpoint schema version (``"1"``, or ``"0"`` for a
+      legacy pre-canonical-state checkpoint);
+    * ``extension_digest`` — the SEPARATE digest over the canonical-execution-state extension
+      (``checkpoint_version`` + execution states + journal + workflow/task lineage). The base
+      digest deliberately EXCLUDES this extension for backward compatibility, so binding
+      ``checkpoint_digest`` alone would not uniquely bind a v1 checkpoint's full snapshot. A
+      legacy (v0) checkpoint carries no extension and stores ``extension_digest = ""``.
+
+    Recovery re-verifies this reference against the runtime checkpoint the runtime store
+    actually holds — and verifies that checkpoint's own integrity — proving the referenced
+    checkpoint belongs to the registration it claims to represent, without ever duplicating its
+    contents or Canonical Execution State. ``runtime_id`` / ``runtime_version`` are origin
+    provenance and are intentionally NOT bound (so a legitimate runtime upgrade recovers)."""
 
     instance_id: str
     workflow_id: str
     correlation_id: Optional[str]
     checkpoint_digest: str
+    checkpoint_version: str = ""
+    extension_digest: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -88,6 +103,8 @@ class WorkflowCheckpointRef:
             "workflow_id": self.workflow_id,
             "correlation_id": self.correlation_id,
             "checkpoint_digest": self.checkpoint_digest,
+            "checkpoint_version": self.checkpoint_version,
+            "extension_digest": self.extension_digest,
         }
 
     @classmethod
@@ -97,6 +114,8 @@ class WorkflowCheckpointRef:
             workflow_id=d["workflow_id"],
             correlation_id=d.get("correlation_id"),
             checkpoint_digest=d["checkpoint_digest"],
+            checkpoint_version=d.get("checkpoint_version", ""),
+            extension_digest=d.get("extension_digest", ""),
         )
 
 

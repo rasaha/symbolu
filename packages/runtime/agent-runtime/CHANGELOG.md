@@ -66,17 +66,47 @@ peer-to-peer agent messaging, and no agent/model selection (those are H22-D).
   `PortfolioStatus` values `FAILED` / `CANCELLED` (a *quiescent* portfolio stays `ACTIVE`, never
   silently terminal).
 
+### Final audit corrections (applied on the H22-C PR)
+1. **Durable audit trace (was a merge blocker).** `PortfolioTrace` became a thin writer/view over
+   a new neutral append-only **`PortfolioEventStore`** (+ `InMemoryPortfolioEventStore`,
+   portfolio-scoped, immutable records, contiguous logical sequence, duplicate/out-of-order
+   rejected via `PortfolioTraceSequenceError`). Recovery now preserves pre-crash audit **history**,
+   not just the last sequence number.
+2. **Crash-safe checkpoint/commit-event sequencing.** The checkpoint captures the trace anchor
+   that existed *before* the `PORTFOLIO_CHECKPOINT_COMMITTED` event; recovery continues at
+   `max(checkpoint anchor, event-store last sequence) + 1`, handling both the "checkpoint saved,
+   crash before commit-event" window and the "commit-event persisted, then crash" window with no
+   gap, collision, or reuse. The two stores are documented as independent (no atomic distributed
+   transaction claimed).
+3. **Full runtime-checkpoint binding.** `WorkflowCheckpointRef` now binds **both** runtime
+   integrity domains — the base `checkpoint_digest`, the `checkpoint_version`, and the separate
+   canonical-execution-state `extension_digest` (empty for legacy v0). Recovery matches all three
+   and verifies the runtime checkpoint's own integrity, so an altered-and-resealed CES extension
+   with an unchanged base digest is rejected.
+4. **Semantic cross-binding after recovery.** `failure_state[iid]` ⇒ recovered workflow `FAILED`;
+   `cancellation_state[iid]` ⇒ `CANCELLED`; labels drawn from the permitted vocabulary; a terminal
+   `portfolio_status` ⇒ all registered workflows terminal (`FAILED` ⇒ ≥1 recorded failure);
+   registration sequences must be the contiguous range `0..len-1`. A resealed checkpoint whose
+   claim contradicts recovered runtime truth fails closed.
+5. **Failure-policy continuity.** `PortfolioRecoveryResult` exposes a typed
+   `failure_policy: PortfolioFailurePolicy`, and `PortfolioController.from_recovery(...)` adopts the
+   recovered policy by default (a `FAIL_DEPENDENTS` portfolio resumes as `FAIL_DEPENDENTS`, not the
+   constructor default `ISOLATE_WORKFLOW`).
+
 ### Tests
-`tests/test_portfolio_durability.py` — 42 tests across the H22-C matrix: checkpoint roundtrip /
+`tests/test_portfolio_durability.py` — **56 tests** across the H22-C matrix: checkpoint roundtrip /
 digest determinism / field sensitivity / tamper + resealed-inconsistency rejection; recovery
 zero-side-effects / explicit-continuation / no-repeat / fresh-governance / canonical-state
 resolvability; SWRR (2:1 and 3:1) + aging + registration-order scheduler continuity;
-dependency / failure / cancellation continuity across recovery; trace determinism & monotonic
-sequence; the failure-policy matrix; the cancellation scopes + idempotency; the self-
-recoverability invariant; multiple sequential recoveries; and runtime-upgrade compatibility.
+dependency / failure / cancellation continuity across recovery; **durable trace history +
+globally-monotonic sequence across recovery; both checkpoint/commit crash windows; full
+base+extension checkpoint binding + resealed-extension rejection; semantic failure/cancellation/
+lifecycle cross-bind rejection; non-contiguous-sequence rejection; failure-policy continuity**;
+the self-recoverability invariant; multiple sequential recoveries; and runtime-upgrade
+compatibility.
 
 ### Verification (scoped, local)
-- `python -m pytest packages/runtime/agent-runtime/tests -q` → **220 passed, 2 skipped**.
+- `python -m pytest packages/runtime/agent-runtime/tests -q` → **234 passed, 2 skipped**.
 - `scripts/verify_isolated_install.py` → **ISOLATED INSTALL VERIFICATION: PASS** at `0.5.0`.
 - Import-boundary / governance-binding / compatibility suites green; platform-freeze **PASS**.
 

@@ -44,11 +44,13 @@ from .orchestration import (
     DependencyState,
     DependencyType,
     InMemoryPortfolioCheckpointStore,
+    InMemoryPortfolioEventStore,
     PortfolioCancellationResult,
     PortfolioCheckpoint,
     PortfolioCheckpointConflict,
     PortfolioCheckpointStore,
     PortfolioController,
+    PortfolioEventStore,
     PortfolioEventType,
     PortfolioFailurePolicy,
     PortfolioRecoveryResult,
@@ -58,6 +60,7 @@ from .orchestration import (
     PortfolioStepResult,
     PortfolioTrace,
     PortfolioTraceEntry,
+    PortfolioTraceSequenceError,
     PortfolioWorkflowEntry,
     SchedulingPolicy,
     SelectionReason,
@@ -231,22 +234,25 @@ def create_portfolio_controller(
     policy: PortfolioFailurePolicy = PortfolioFailurePolicy.ISOLATE_WORKFLOW,
     scheduling_policy: Optional[SchedulingPolicy] = None,
     trace: Optional[PortfolioTrace] = None,
+    event_store: Optional[PortfolioEventStore] = None,
     checkpoint_store: Optional[PortfolioCheckpointStore] = None,
     emit_created: bool = False,
 ) -> PortfolioController:
     """Create an H22-C portfolio controller over ``runtime`` and ``portfolio``.
 
     The controller drives the H22-B scheduler, records an append-only orchestration audit
-    trace, applies the bounded failure ``policy`` when it observes a terminal workflow failure,
-    performs cooperative cancellation by scope, and commits durable portfolio checkpoints that
-    satisfy the self-recoverability invariant. It reaches execution only through the unchanged
-    ``advance_workflow`` seam and never authorizes a task."""
+    trace (durable when an ``event_store`` is supplied), applies the bounded failure ``policy``
+    when it observes a terminal workflow failure, performs cooperative cancellation by scope, and
+    commits durable portfolio checkpoints that satisfy the self-recoverability invariant. It
+    reaches execution only through the unchanged ``advance_workflow`` seam and never authorizes a
+    task."""
     return PortfolioController(
         runtime,
         portfolio,
         policy=policy,
         scheduling_policy=scheduling_policy,
         trace=trace,
+        event_store=event_store,
         checkpoint_store=checkpoint_store,
         emit_created=emit_created,
     )
@@ -298,6 +304,9 @@ __all__ = [
     "PortfolioTrace",
     "PortfolioTraceEntry",
     "PortfolioEventType",
+    "PortfolioEventStore",
+    "InMemoryPortfolioEventStore",
+    "PortfolioTraceSequenceError",
     "PortfolioController",
     "PortfolioFailurePolicy",
     "CancellationScope",

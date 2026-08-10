@@ -117,16 +117,21 @@ correction head. Not live-verified, distributed-safe, or exactly-once.
 H22-C makes the H22-B coordinator durable, reconstructable, auditable, and safely controllable
 across crash/restart, failure, and cancellation — **without changing single-workflow execution
 truth**. It adds a versioned `PortfolioCheckpoint` that **references** the underlying runtime
-checkpoints by digest (and never duplicates them or Canonical Execution State), a neutral
-`PortfolioCheckpointStore` (+ in-memory reference), **side-effect-free** `recover_portfolio`
-(zero provider/governance/advancement calls, requiring explicit continuation), a bounded
-`continue_workflow` continuation seam, an append-only `PortfolioTrace` ordered by a logical
-sequence, bounded failure propagation (`ISOLATE_WORKFLOW` default / `FAIL_DEPENDENTS` /
-`FAIL_PORTFOLIO`), and cooperative, idempotent cancellation scopes (`WORKFLOW_ONLY` /
+checkpoints — binding **both** the base and canonical-execution-state extension integrity
+domains — and never duplicates them or Canonical Execution State; a neutral
+`PortfolioCheckpointStore` (+ in-memory reference); **side-effect-free** `recover_portfolio`
+(zero provider/governance/advancement calls, requiring explicit continuation) with base+extension
+and **semantic** failure/cancellation/lifecycle cross-binding; a bounded `continue_workflow`
+continuation seam; a **durable** append-only orchestration trace (`PortfolioTrace` over a
+`PortfolioEventStore`, crash-safe checkpoint/commit-event sequencing); bounded failure propagation
+(`ISOLATE_WORKFLOW` default / `FAIL_DEPENDENTS` / `FAIL_PORTFOLIO`) with a typed recovered-policy
+continuity contract; and cooperative, idempotent cancellation scopes (`WORKFLOW_ONLY` /
 `DEPENDENT_SUBGRAPH` / `PORTFOLIO_ALL`). SWRR `fair_credit`, aging, registration order, `round`,
 dependencies, and failure/cancellation state all survive recovery, so the next scheduler
 decision is exactly the uninterrupted one. Governance stays entirely below H22-C; recovery
-performs no execution and reuses no historical CLEAR. See
+performs no execution and reuses no historical CLEAR. Maturity
+`IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED` after the final audit corrections (promotes to
+`IMPLEMENTED_AND_CI_VERIFIED` on scoped CI green at the exact final head). See
 [`AGENT_RUNTIME_H22C_DURABILITY.md`](AGENT_RUNTIME_H22C_DURABILITY.md).
 
 ## What the later H22 phase builds on this base (not now)

@@ -63,12 +63,14 @@ Machine-readable form: [`../artifacts/agent_runtime_public_api.json`](../artifac
 | Symbol | Kind | Purpose |
 | --- | --- | --- |
 | `PortfolioCheckpoint` | dataclass | Versioned, self-verifying portfolio orchestration snapshot; **references** runtime checkpoints by digest, never copies them or Canonical Execution State. |
-| `WorkflowCheckpointRef` | dataclass | Reference (identity + runtime checkpoint digest) binding a registration to its runtime checkpoint. |
+| `WorkflowCheckpointRef` | dataclass | Reference binding a registration to its runtime checkpoint across **both** integrity domains: identity + base `checkpoint_digest` + `checkpoint_version` + canonical-execution-state `extension_digest`. |
 | `PortfolioCheckpointStore` | Protocol | Neutral portfolio checkpoint store interface. |
 | `InMemoryPortfolioCheckpointStore` | class | Reference store (monotonic `generation`, optional compare-and-save). |
 | `PortfolioCheckpointConflict` | exception | Stale compare-and-save write. |
-| `PortfolioRecoveryResult` | dataclass | Side-effect-free recovery outcome (`requires_continuation`, recovered ids, trace, metadata). |
+| `PortfolioRecoveryResult` | dataclass | Side-effect-free recovery outcome (`requires_continuation`, recovered ids, trace, typed `failure_policy`, metadata). |
 | `PortfolioTrace` / `PortfolioTraceEntry` / `PortfolioEventType` | class / dataclass / enum | Append-only orchestration audit trace (logical sequence; ids/digests only). |
+| `PortfolioEventStore` / `InMemoryPortfolioEventStore` | Protocol / class | Neutral durable append-only, portfolio-scoped trace event store (contiguous sequence; reference impl). Makes pre-crash audit history survive recovery. |
+| `PortfolioTraceSequenceError` | exception | Duplicate / out-of-order trace event rejected by the event store. |
 | `PortfolioController` | class | Ties scheduler + trace + failure policy + cancellation + durable checkpoint. |
 | `PortfolioFailurePolicy` | enum | Bounded failure propagation (`ISOLATE_WORKFLOW` default / `FAIL_DEPENDENTS` / `FAIL_PORTFOLIO`). |
 | `CancellationScope` / `PortfolioCancellationResult` | enum / dataclass | Cooperative, idempotent cancellation (`WORKFLOW_ONLY` / `DEPENDENT_SUBGRAPH` / `PORTFOLIO_ALL`). |

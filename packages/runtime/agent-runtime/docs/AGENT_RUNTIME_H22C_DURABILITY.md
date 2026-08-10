@@ -93,14 +93,48 @@ references → orchestration consistency. A checkpoint that would not recover is
 would reject. This is the portfolio-level analogue of the single-workflow checkpoint
 self-recoverability invariant.
 
-### Cross-binding to workflow checkpoints
+### Cross-binding to workflow checkpoints (both integrity domains)
 
 Recovery proves each referenced runtime checkpoint belongs to the registration it claims to
-represent: it binds `instance_id`, `workflow_id`, `correlation_id`, and the `checkpoint_digest`
-against the runtime checkpoint the runtime store actually holds. It **does not** require
-`runtime_id` / `runtime_version` equality — those are *origin provenance* (the Canonical
-Execution State precedent), so a portfolio written under one runtime version recovers cleanly
-under a later, compatible one (the mismatch is reported, never fatal).
+represent, binding the **complete** runtime checkpoint across **both** of its integrity domains.
+The runtime `Checkpoint` deliberately splits integrity in two: the base `digest` covers only the
+coordination payload and **excludes** the canonical-execution-state extension (for backward
+compatibility), while a separate `extension_digest` covers `checkpoint_version` + the execution
+states + the journal + workflow/task lineage. Binding the base digest alone would therefore
+*not* uniquely bind a v1 checkpoint's full snapshot. So `WorkflowCheckpointRef` binds:
+
+```
+instance_id · workflow_id · correlation_id
+checkpoint_digest      (base coordination integrity)
+checkpoint_version     ("1", or "0" for a legacy pre-CES checkpoint)
+extension_digest       (canonical-execution-state extension integrity; "" for v0)
+```
+
+Recovery matches all of these against the runtime checkpoint the store actually holds, **and**
+verifies that checkpoint's own integrity (`verify()`, and for v1 `verify_extension()` +
+`validate_execution_states()`; a v0 checkpoint must carry no extension data). A CES/lineage
+extension that was altered and validly resealed — base digest unchanged — is caught because the
+portfolio reference still binds the *original* `extension_digest`. `runtime_id` /
+`runtime_version` are **not** bound — origin provenance (the Canonical Execution State
+precedent), so a portfolio written under one runtime version recovers cleanly under a later,
+compatible one (the mismatch is reported, never fatal).
+
+### Semantic cross-binding (after workflow recovery)
+
+Beyond structural checks, recovery proves the orchestration state H22-C *claims* matches the
+underlying runtime truth actually reconstructed:
+
+- `failure_state[iid]` ⇒ the recovered workflow is `FAILED`; `cancellation_state[iid]` ⇒ it is
+  `CANCELLED`; failure/cancellation labels must be drawn from the permitted vocabulary;
+- a terminal `portfolio_status` (`COMPLETED` / `FAILED` / `CANCELLED`) ⇒ **every** registered
+  workflow is terminal (and `FAILED` ⇒ at least one recorded workflow failure); intermediate
+  `CREATED` / `ACTIVE` portfolios are not over-constrained;
+- registration sequences must be the canonical **contiguous** range `0 .. len-1` (the exact
+  H22-B registration invariant).
+
+So a resealed checkpoint claiming `portfolio_status = COMPLETED` while a workflow is non-terminal,
+or `cancellation_state[B] = WORKFLOW_ONLY` while B recovers `RUNNING`/`PAUSED`, **fails closed**
+even though its outer portfolio digest was recomputed.
 
 ## Recovery is side-effect free (`recover_portfolio`)
 
@@ -129,21 +163,51 @@ portfolio resumes deterministic interleaving. Committed work never repeats: reco
 COMPLETED tasks as COMPLETED, so an already-consumed quantum is never re-run, and the next
 consequential quantum still crosses **fresh** governance (a historical CLEAR is never reused).
 
-## Portfolio audit trace
+## Portfolio audit trace (durable)
 
 A separate, append-only orchestration trace ordered by a **logical sequence number**
 (1, 2, 3, …), never wall-clock. It answers *"why did the coordinator make this decision?"* —
 distinct from the runtime trace's *"what happened inside execution?"*. Events carry ids/digests
 only (`instance_id`, `execution_state_digest`, `workflow_checkpoint_digest`); they **never**
 embed workflow execution payload or Canonical Execution State, so the portfolio trace never
-duplicates the runtime trace. History is never mutated. The checkpoint stores only the latest
-sequence anchor; recovery re-seats the position so post-recovery events stay strictly
-increasing.
+duplicates the runtime trace. History is never mutated.
+
+`PortfolioTrace` is a thin stateful writer/view. Bound to a **`PortfolioEventStore`** (neutral,
+append-only, portfolio-scoped; reference implementation `InMemoryPortfolioEventStore`), every
+event is also appended to that durable store — so **pre-crash audit history survives recovery**,
+not just the last sequence number (`trace.history()` returns the full durable log). The store
+enforces a contiguous monotonic sequence and **rejects duplicate/out-of-order events**
+(`PortfolioTraceSequenceError`). Without a store the trace degrades to an in-process log (only
+the checkpoint anchor is then durable). No SQL/Redis/filesystem/cloud backend is included.
 
 Event vocabulary (`PortfolioEventType`): `PORTFOLIO_CREATED`, `WORKFLOW_REGISTERED`,
 `DEPENDENCY_ADDED`, `QUANTUM_GRANTED`, `NO_ELIGIBLE_WORKFLOW`, `WORKFLOW_FAILURE_OBSERVED`,
 `CANCELLATION_REQUESTED`, `WORKFLOW_CANCELLED_BY_PORTFOLIO`, `PORTFOLIO_CHECKPOINT_COMMITTED`,
 `PORTFOLIO_RECOVERED`, `PORTFOLIO_CANCELLED`, `PORTFOLIO_FAILED`, `PORTFOLIO_COMPLETED`.
+
+### Checkpoint / commit-event sequencing (crash-safe, honestly in-process)
+
+The checkpoint captures the trace anchor that existed **before** the commit event; the store is
+saved; then a `PORTFOLIO_CHECKPOINT_COMMITTED` event is appended:
+
+```
+anchor N = trace.last_sequence
+save checkpoint(trace_sequence = N)
+append PORTFOLIO_CHECKPOINT_COMMITTED   (sequence N+1, durable)
+```
+
+Recovery continues at `max(checkpoint.trace_sequence, event_store.last_sequence) + 1`, which is
+crash-safe across both windows:
+
+- **Window A** — checkpoint saved, crash *before* the commit event: anchor and store agree at
+  `N`, so `PORTFOLIO_RECOVERED` takes `N+1`; no gap, no collision.
+- **Window B** — commit event durably appended (`N+1`), then crash: the store's last sequence is
+  `N+1`, so recovery continues at `N+2` and never reuses the commit sequence.
+
+The portfolio checkpoint store and the event store are **two independent stores** — H22-C does
+**not** pretend they form one atomic distributed transaction. The reconciliation above is the
+honest in-process/reference guarantee; a production deployment supplies durable backends and the
+same `max(anchor, last-event) + 1` invariant holds.
 
 ## Bounded failure propagation
 
@@ -159,6 +223,12 @@ Event vocabulary (`PortfolioEventType`): `PORTFOLIO_CREATED`, `WORKFLOW_REGISTER
 semantics — H22-B already isolates a failure through the dependency graph (a failed
 `REQUIRES_SUCCESS` predecessor turns its dependents into `BLOCKED_DEPENDENCY` while independent
 workflows keep running). Degraded continuation and compensation are **not** implemented (H22-D).
+
+**Failure-policy continuity across recovery.** The configured policy is persisted in the
+checkpoint and surfaced as a **typed, first-class** `failure_policy: PortfolioFailurePolicy` on
+`PortfolioRecoveryResult` (not buried in generic metadata). `PortfolioController.from_recovery(...)`
+adopts the recovered policy by default, so a portfolio checkpointed under `FAIL_DEPENDENTS`
+resumes under `FAIL_DEPENDENTS` — never silently reset to the constructor default.
 
 **Failure authority boundary.** H22-C decides orchestration *consequences* ("do not schedule
 workflows dependent on failed A"). It never reinterprets *why* A failed. If governance `BLOCK`ed
@@ -227,7 +297,11 @@ consequential action is permitted.
 
 ## Maturity
 
-`IMPLEMENTED_AND_CI_VERIFIED` (scoped `agent-runtime-ci`: package suite, isolated wheel-install
-verification, import boundaries, platform-freeze, and API-stability registry observed on the PR
-head). No claim of production / pilot / live-environment / distributed / exactly-once /
-runtime-assurance / cluster-safe validation.
+`IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED` after the final audit corrections (durable trace event
+store; crash-window sequencing; full base+extension checkpoint binding; semantic lifecycle /
+failure / cancellation cross-binding; contiguous-registration validation; typed failure-policy
+continuity). Package suite **234 passed, 2 skipped**; isolated wheel-install **PASS** at `0.5.0`;
+platform-freeze **PASS**. Promotes to `IMPLEMENTED_AND_CI_VERIFIED` only once all scoped
+`agent-runtime-ci` checks are observed green on the exact new final head. No claim of production /
+pilot / live-environment / distributed / exactly-once / runtime-assurance / cluster-safe
+validation.
