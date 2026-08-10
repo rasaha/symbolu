@@ -17,9 +17,21 @@ future capabilities rather than built to justify the package.
 - **LLM routing / provider specifics.** No LLM client, no model routing, no vendor
   provider. Providers are neutral and supplied externally.
 - **New provider kinds.** No new `ProviderKind` is introduced.
-- **Distributed / parallel execution.** The reference engine executes tasks
-  sequentially and deterministically. `max_concurrent_tasks` bounds concurrency but the
-  reference engine never exceeds one in-flight task; a concurrent executor is future work.
+- **Distributed / cluster execution.** Still out of scope: no distributed cluster
+  scheduling, no distributed locking, no cross-process/cross-machine execution, and no
+  exactly-once external effects. Resource coordination is portfolio-local.
+- **In-process concurrency (H22-D, 0.6.0).** The single-workflow reference engine still
+  executes one task at a time per workflow. **H22-D** adds bounded, in-process concurrency
+  *across* workflows: the `ConcurrentPortfolioExecutor` runs several independent H22-A quanta
+  at once on a thread-pool backend, capped by
+  `min(ConcurrencyPolicy.max_concurrent_quanta, AgentRuntimeConfig.max_concurrent_tasks)` — it
+  never exceeds the runtime's configured in-flight-task ceiling. **Injected dependency
+  thread-safety is a deployment contract, not a guarantee:** when the thread-pool backend is
+  selected, the injected providers, governance hooks, persistence/event stores, and event sinks
+  are invoked concurrently, so they must satisfy the concurrency/reentrancy contract appropriate
+  to the deployment. The package does **not** claim that arbitrary third-party providers, hooks,
+  or stores are automatically thread-safe; the synchronous backend (the default) runs quanta one
+  at a time and imposes no such contract.
 - **Durable persistence backend.** Only in-memory reference stores ship; durable
   backends are supplied externally behind the persistence interfaces.
 - **Concrete governance adapters.** The core ships only the neutral boundary and a

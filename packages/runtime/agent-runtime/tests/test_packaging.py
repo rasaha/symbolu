@@ -15,7 +15,7 @@ from ugence_agent_runtime import api
 
 def test_version_accessible():  # check 7
     assert isinstance(ugence_agent_runtime.__version__, str)
-    assert ugence_agent_runtime.__version__ == "0.5.0"
+    assert ugence_agent_runtime.__version__ == "0.6.0"
 
 
 def test_py_typed_shipped():  # check 5
@@ -83,6 +83,32 @@ def test_public_api_surface_is_curated():
         "PortfolioFailurePolicy",
         "CancellationScope",
         "PortfolioCancellationResult",
+        "ConcurrencyPolicy",
+        "ConcurrentPortfolioExecutor",
+        "ConcurrentPortfolioStepResult",
+        "ConcurrentStepReason",
+        "QuantumOutcome",
+        "ExecutionBackend",
+        "SynchronousExecutionBackend",
+        "ThreadPoolExecutionBackend",
+        "ExecutorInfrastructureError",
+        "AdmissionDecision",
+        "BatchPlan",
+        "ResourceMode",
+        "ResourceClaim",
+        "ResourceConflict",
+        "ResourceCoordinator",
+        "PortfolioBudget",
+        "BudgetRequirement",
+        "BudgetShortfall",
+        "BudgetCoordinator",
+        "BudgetEstimateExceeded",
+        "CompensationTrigger",
+        "CompensationSpec",
+        "CompensationRegistration",
+        "CompensationRegistry",
+        "create_concurrent_executor",
+        "create_concurrent_executor_from_recovery",
         "Provider",
         "ProviderRegistry",
         "ToolInvocation",

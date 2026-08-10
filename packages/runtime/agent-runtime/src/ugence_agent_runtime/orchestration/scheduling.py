@@ -29,7 +29,7 @@ non-eligible; the scheduler never resumes it — that remains the explicit job o
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
 
@@ -37,7 +37,6 @@ from ..models.results import WorkflowAdvanceOutcome
 from ..models.workflow import TERMINAL_WORKFLOW_STATUSES, WorkflowStatus
 from .dependencies import DependencyState
 from .portfolio import (
-    PortfolioStatus,
     PortfolioWorkflowEntry,
     WorkflowPortfolio,
     WorkflowPriority,
@@ -186,6 +185,73 @@ class PortfolioStepResult:
                 self.advance_outcome.to_dict() if self.advance_outcome else None
             ),
         }
+
+
+@dataclass(frozen=True)
+class AdmissionDecision:
+    """The verdict of an admission predicate for one candidate quantum (H22-B-neutral).
+
+    ``admitted`` grants the candidate a slot in the concurrent batch. ``reason`` / ``detail``
+    are **opaque to the scheduler** — the H22-D admission coordinator fills them with a
+    structured resource/budget deferral explanation that flows straight through into the batch
+    result. The scheduler never interprets them; it only decides fairness/ordering and calls the
+    predicate in smooth-weighted-round-robin order. This is the seam that keeps *scheduling
+    eligibility* (H22-B) and *concurrent admission* (H22-D) separate: H22-B asks "may this
+    fairness-preferred candidate take a slot?"; it never asks whether the candidate's task is
+    authorized (that stays below H22, inside ``advance_workflow``)."""
+
+    admitted: bool
+    reason: Optional[str] = None
+    detail: Optional[Dict[str, object]] = None
+
+
+def _always_admit(_entry: PortfolioWorkflowEntry) -> AdmissionDecision:
+    """The trivial predicate: admit every candidate (used for the max_concurrency=1,
+    no-resource/no-budget case, which is then semantically bounded H22-B execution)."""
+    return AdmissionDecision(True)
+
+
+@dataclass(frozen=True)
+class BatchPlan:
+    """The deterministic outcome of one batch-selection round (immutable, read-only).
+
+    Produced by :meth:`PortfolioScheduler.plan_batch`. It records which fairness-preferred
+    eligible workflows were admitted a concurrent quantum this round and, for every workflow
+    held back, *why* — with enough structure to answer "why did A and C run while B did not?"
+    without free-form prose:
+
+    * ``admitted`` — instance ids granted a slot, in deterministic admission (SWRR) order;
+    * ``admitted_reasons`` — the :class:`SelectionReason` each grant turned on (the effective
+      rank, base priority, age, dependency depth, and SWRR fairness credit at selection);
+    * ``deferred`` — ``(instance_id, reason, detail)`` for each candidate the admission
+      predicate rejected (a resource conflict or budget shortfall — the ``detail`` carries the
+      structured evidence);
+    * ``capacity_deferred`` — eligible workflows never evaluated because the concurrency limit
+      was already filled (they keep their fairness credit; they are not charged and not aged as
+      served);
+    * ``ordered`` — the full ranked eligible list (best first);
+    * ``classifications`` — every registered workflow's eligibility this round;
+    * ``round`` — the logical scheduler round;
+    * ``stop_reason`` — set (to a :class:`PortfolioStepReason` value) only when nothing was
+      admitted (empty / all-terminal / no eligible / nothing concurrently admissible).
+
+    The fairness accounting (SWRR credit + bounded aging) for the admitted set is **already
+    committed** on the portfolio when this is returned — admission *is* service. Execution of
+    the admitted quanta is the caller's job and happens after (and outside) this call."""
+
+    portfolio_id: str
+    round: int
+    admitted: Tuple[str, ...]
+    admitted_reasons: Dict[str, SelectionReason]
+    deferred: Tuple[Tuple[str, str, Dict[str, object]], ...]
+    capacity_deferred: Tuple[str, ...]
+    ordered: Tuple[str, ...]
+    classifications: Tuple[Tuple[str, str], ...]
+    stop_reason: Optional[str] = None
+
+    @property
+    def granted(self) -> bool:
+        return bool(self.admitted)
 
 
 class PortfolioScheduler:
@@ -382,6 +448,174 @@ class PortfolioScheduler:
             eligible=tuple(e.instance_id for e in ordered),
             classifications=classifications,
             advance_outcome=outcome,
+        )
+
+    # -- batch selection seam (H22-D concurrent admission) ------------------
+    def plan_batch(
+        self,
+        portfolio: WorkflowPortfolio,
+        *,
+        max_concurrency: int = 1,
+        admit=None,
+    ) -> BatchPlan:
+        """Select a mutually-compatible *batch* of eligible workflows for concurrent quanta.
+
+        This is the additive H22-D seam over the *same* deterministic H22-B fairness core the
+        single-quantum :meth:`step` uses. It advances one logical round, classifies every
+        workflow, and then repeatedly runs a single smooth-weighted-round-robin (SWRR) tier pick
+        — the identical mechanism as :meth:`step` — asking the caller-supplied ``admit``
+        predicate whether the fairness winner may take a concurrent slot. A candidate the
+        predicate rejects is **deferred** (removed from this round's contention, but **never
+        charged SWRR credit and never aged as served**, so its starvation protection is fully
+        preserved — a resource-conflicted workflow stays exactly as owed as before); the scan
+        then continues to the next fairness-preferred candidate. Selection stops when
+        ``max_concurrency`` slots are filled or no eligible candidate remains.
+
+        Fairness is committed for exactly the admitted set: each admission performs one real SWRR
+        pick (accrue each live tier member's weight, charge the winner the tier's total weight,
+        reset the winner's age), and — after the batch — every eligible workflow held strictly
+        *below* the lowest served tier ages (bounded by ``aging_cap``), exactly as in a
+        single-quantum round. **At ``max_concurrency == 1`` with an always-admit predicate the
+        committed fairness/aging state is identical to :meth:`step`** (proven by test), so
+        concurrency=1 is semantically bounded H22-B execution.
+
+        The scheduler NEVER touches execution here — no ``advance_workflow``, no provider, no
+        governance. It returns an immutable :class:`BatchPlan`; the caller executes the admitted
+        workflows' quanta (each an unchanged, indivisible H22-A quantum) however it likes. The
+        ``admit`` predicate is opaque coordination glue: the scheduler passes its ``reason`` /
+        ``detail`` straight into the plan and interprets neither.
+        """
+        if not isinstance(max_concurrency, int) or isinstance(max_concurrency, bool) or max_concurrency < 1:
+            raise ValueError("max_concurrency must be a positive integer")
+        admit = admit or _always_admit
+        graph = portfolio.dependency_graph()
+        entries = portfolio.entries()
+        rnd = portfolio._begin_round(activate=bool(entries))
+
+        if not entries:
+            return BatchPlan(
+                portfolio_id=portfolio.portfolio_id, round=rnd, admitted=(),
+                admitted_reasons={}, deferred=(), capacity_deferred=(), ordered=(),
+                classifications=(), stop_reason=PortfolioStepReason.EMPTY_PORTFOLIO.value,
+            )
+
+        classification = self.classify(portfolio)
+        classifications = tuple((e.instance_id, c.value) for e, c in classification)
+        eligible = [e for e, c in classification if c is WorkflowEligibility.ELIGIBLE]
+
+        if not eligible:
+            all_terminal = all(c is WorkflowEligibility.TERMINAL for _, c in classification)
+            if all_terminal:
+                portfolio._mark_completed()
+                stop = PortfolioStepReason.ALL_TERMINAL
+            else:
+                stop = PortfolioStepReason.NO_ELIGIBLE_WORKFLOW
+            return BatchPlan(
+                portfolio_id=portfolio.portfolio_id, round=rnd, admitted=(),
+                admitted_reasons={}, deferred=(), capacity_deferred=(), ordered=(),
+                classifications=classifications, stop_reason=stop.value,
+            )
+
+        # Per-round contention keys, snapshotted on the round's starting state (lower = more
+        # preferred). Priority (via aging-adjusted effective rank) dominates, then dependency
+        # depth. Deterministic — no wall-clock, identity, dict order, or randomness.
+        rank = {e.instance_id: self._policy.effective_rank(e) for e in eligible}
+        depth = {e.instance_id: graph.depth(e.instance_id) for e in eligible}
+
+        def contention_key(e: PortfolioWorkflowEntry) -> Tuple[int, int]:
+            return (rank[e.instance_id], depth[e.instance_id])
+
+        ordered = tuple(
+            e.instance_id
+            for e in sorted(
+                eligible,
+                key=lambda e: (
+                    rank[e.instance_id], depth[e.instance_id], -e.fair_credit,
+                    e.registration_sequence, e.instance_id,
+                ),
+            )
+        )
+
+        pool: List[PortfolioWorkflowEntry] = list(eligible)
+        admitted: List[str] = []
+        admitted_reasons: Dict[str, SelectionReason] = {}
+        deferred: List[Tuple[str, str, Dict[str, object]]] = []
+        served_keys: List[Tuple[int, int]] = []
+
+        while pool and len(admitted) < max_concurrency:
+            tkey = min(contention_key(e) for e in pool)
+            tier = [e for e in pool if contention_key(e) == tkey]
+            # SWRR order within the tier by the SAME key step() selects on (max post-accrual
+            # credit, then registration sequence, then id). post-accrual = current + weight.
+            swrr_order = sorted(
+                tier,
+                key=lambda e: (-(e.fair_credit + e.weight), e.registration_sequence, e.instance_id),
+            )
+            winner: Optional[PortfolioWorkflowEntry] = None
+            for cand in swrr_order:
+                decision = admit(cand)
+                if decision.admitted:
+                    winner = cand
+                    break
+                # Deferred: not served. Leaves this round's contention but is neither charged
+                # SWRR credit nor age-reset — its owed-ness is preserved for the next round.
+                deferred.append(
+                    (cand.instance_id, decision.reason or "DEFERRED", dict(decision.detail or {}))
+                )
+                pool.remove(cand)
+            if winner is None:
+                # The whole top tier was inadmissible this round; the pool shrank, so the next
+                # loop iteration moves on to the next tier. No accrual, no charge occurred.
+                continue
+            # Commit exactly ONE real SWRR pick over the LIVE tier (post-deferral removals).
+            live_tier = [e for e in pool if contention_key(e) == tkey]
+            for e in live_tier:
+                e.fair_credit += e.weight
+            tier_weight = sum(e.weight for e in live_tier)
+            # SelectionReason snapshot: post-accrual, pre-charge, pre-age-reset — the exact
+            # instant step() snapshots its reason.
+            admitted_reasons[winner.instance_id] = SelectionReason(
+                instance_id=winner.instance_id,
+                effective_rank=rank[winner.instance_id],
+                base_priority=winner.priority.value,
+                age=winner.age,
+                dependency_depth=depth[winner.instance_id],
+                fairness_credit=winner.fair_credit,
+                registration_sequence=winner.registration_sequence,
+            )
+            winner.fair_credit -= tier_weight
+            admitted.append(winner.instance_id)
+            served_keys.append(tkey)
+            pool.remove(winner)
+
+        # Whatever remains in the pool was never evaluated because the concurrency limit filled
+        # first — capacity-deferred. It keeps its fairness credit (owed) and is not charged.
+        capacity_deferred = tuple(e.instance_id for e in pool)
+
+        # Aging (cross-tier starvation prevention): the admitted reset to 0; every eligible
+        # workflow held strictly BELOW the lowest served tier ages (bounded). Tier-peers of a
+        # served tier never age (SWRR owes them). Identical to step() when one workflow is served.
+        admitted_set = set(admitted)
+        if served_keys:
+            worst_served = max(served_keys)
+            for e in eligible:
+                if e.instance_id in admitted_set:
+                    e.age = 0
+                elif contention_key(e) > worst_served:
+                    e.age = min(e.age + 1, self._policy.aging_cap)
+                # else: a tier-peer at/above the served frontier — unchanged.
+
+        stop_reason = None
+        if not admitted:
+            # Eligible work exists but nothing was concurrently admissible (all deferred by the
+            # predicate). Deterministically quiescent — the caller must not busy-loop.
+            stop_reason = PortfolioStepReason.NO_ELIGIBLE_WORKFLOW.value
+
+        return BatchPlan(
+            portfolio_id=portfolio.portfolio_id, round=rnd, admitted=tuple(admitted),
+            admitted_reasons=admitted_reasons, deferred=tuple(deferred),
+            capacity_deferred=capacity_deferred, ordered=ordered,
+            classifications=classifications, stop_reason=stop_reason,
         )
 
     def run(

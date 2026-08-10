@@ -3,11 +3,15 @@
 This document describes the stable, domain-neutral base on which H22 (Multi-Workflow
 Orchestration) is built **without importing application internals**, and records the H22
 phases delivered so far — **H22-A bounded workflow advancement** (0.3.0), **H22-B
-deterministic multi-workflow coordination** (0.4.0), and **H22-C durable multi-workflow
-orchestration** (0.5.0). **Full H22 is not implemented here:** H22-D (true concurrency /
-resources / budget / compensation) remains a future phase. The dedicated phase documents are
-[`AGENT_RUNTIME_H22B_COORDINATION.md`](AGENT_RUNTIME_H22B_COORDINATION.md) and
-[`AGENT_RUNTIME_H22C_DURABILITY.md`](AGENT_RUNTIME_H22C_DURABILITY.md).
+deterministic multi-workflow coordination** (0.4.0), **H22-C durable multi-workflow
+orchestration** (0.5.0), and **H22-D bounded concurrent multi-workflow execution** (0.6.0 —
+bounded in-process concurrency over independent H22-A quanta, resource claims, shared budget, and
+compensation coordination). The dedicated phase documents are
+[`AGENT_RUNTIME_H22B_COORDINATION.md`](AGENT_RUNTIME_H22B_COORDINATION.md),
+[`AGENT_RUNTIME_H22C_DURABILITY.md`](AGENT_RUNTIME_H22C_DURABILITY.md), and
+[`AGENT_RUNTIME_H22D_CONCURRENCY.md`](AGENT_RUNTIME_H22D_CONCURRENCY.md). H22-D remains the
+smallest justified form of concurrency: in-process only, **not** distributed cluster scheduling,
+distributed locking, exactly-once external effects, or Runtime Assurance.
 
 > **Gate (satisfied).** The post-merge corrections that had to precede any H22 work —
 > fail-closed default governance (0.1.1), exact-action proposal binding (0.1.2), honest
@@ -31,7 +35,7 @@ H22-B Deterministic Coordination    ← delivered (0.4.0) — portfolio/deps/pri
         ↓
 H22-C Durable Orchestration         ← delivered (0.5.0) — checkpoint/recovery/trace/failure/cancellation
         ↓
-H22-D True concurrency / resources / budget / compensation                ← future
+H22-D Bounded Concurrent Execution  ← delivered (0.6.0) — in-process concurrency/resources/budget/compensation
         ↓
 Runtime-to-Governance integration validation
         ↓

@@ -1,6 +1,6 @@
 {
   "trace": "portfolio_orchestration",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "ordering": "logical_sequence",
   "event_types": [
     "PORTFOLIO_CREATED",
@@ -15,9 +15,21 @@
     "PORTFOLIO_RECOVERED",
     "PORTFOLIO_CANCELLED",
     "PORTFOLIO_FAILED",
-    "PORTFOLIO_COMPLETED"
+    "PORTFOLIO_COMPLETED",
+    "CONCURRENT_BATCH_PLANNED",
+    "QUANTUM_ADMITTED",
+    "QUANTUM_DEFERRED_RESOURCE",
+    "QUANTUM_DEFERRED_BUDGET",
+    "QUANTUM_DEFERRED_CAPACITY",
+    "RESOURCE_RESERVED",
+    "RESOURCE_RELEASED",
+    "BUDGET_RESERVED",
+    "BUDGET_SETTLED",
+    "CONCURRENT_QUANTUM_COMPLETED",
+    "CONCURRENT_BATCH_RECONCILED",
+    "COMPENSATION_REGISTERED"
   ],
-  "notes": "H22-C portfolio (orchestration-level) audit trace. Separate from the per-workflow runtime event trace and ordered by a portfolio-level monotonic logical sequence number (NOT wall-clock). Append-only; history is never mutated. Events reference workflows and execution artifacts by id/digest only (instance_id, execution_state_digest, workflow_checkpoint_digest) and never embed workflow execution payload or Canonical Execution State — the portfolio trace never duplicates the runtime trace. The portfolio checkpoint persists only the latest sequence anchor; recovery re-seats the position so post-recovery sequence numbers stay strictly increasing.",
+  "notes": "H22-C portfolio (orchestration-level) audit trace. Separate from the per-workflow runtime event trace and ordered by a portfolio-level monotonic logical sequence number (NOT wall-clock). Append-only; history is never mutated. Events reference workflows and execution artifacts by id/digest only (instance_id, execution_state_digest, workflow_checkpoint_digest) and never embed workflow execution payload or Canonical Execution State \u2014 the portfolio trace never duplicates the runtime trace. The portfolio checkpoint persists only the latest sequence anchor; recovery re-seats the position so post-recovery sequence numbers stay strictly increasing.",
   "execution_reference_carrying_events": [
     "QUANTUM_GRANTED"
   ]

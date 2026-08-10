@@ -352,7 +352,12 @@ class PortfolioController:
         return tuple(i for i in self._portfolio.instance_ids if i in reached)
 
     # -- durable checkpoint -------------------------------------------------
-    def checkpoint(self, *, expected_generation: Optional[int] = None) -> PortfolioCheckpoint:
+    def checkpoint(
+        self,
+        *,
+        expected_generation: Optional[int] = None,
+        concurrency_state: Optional[Dict[str, object]] = None,
+    ) -> PortfolioCheckpoint:
         """Build, self-validate, and persist a durable portfolio checkpoint.
 
         Enforces the **portfolio self-recoverability invariant**: the checkpoint is validated by
@@ -371,6 +376,7 @@ class PortfolioController:
             self._runtime,
             failure_policy=self._policy.value,
             trace_sequence=self._trace.last_sequence,
+            concurrency_state=concurrency_state,
         )
         ok, reason = validate_portfolio_checkpoint_bound(cp, self._runtime)
         if not ok:

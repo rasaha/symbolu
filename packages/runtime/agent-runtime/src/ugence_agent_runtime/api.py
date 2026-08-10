@@ -39,12 +39,29 @@ from .models.task import TaskDefinition, TaskInstance, TaskStatus
 from .models.transitions import RuntimeTransition
 from .models.workflow import WorkflowDefinition, WorkflowInstance, WorkflowStatus
 from .orchestration import (
+    AdmissionDecision,
+    BatchPlan,
+    BudgetCoordinator,
+    BudgetEstimateExceeded,
+    BudgetRequirement,
+    BudgetShortfall,
     CancellationScope,
+    CompensationRegistration,
+    CompensationRegistry,
+    CompensationSpec,
+    CompensationTrigger,
+    ConcurrencyPolicy,
+    ConcurrentPortfolioExecutor,
+    ConcurrentPortfolioStepResult,
+    ConcurrentStepReason,
     DependencyGraph,
     DependencyState,
     DependencyType,
+    ExecutionBackend,
+    ExecutorInfrastructureError,
     InMemoryPortfolioCheckpointStore,
     InMemoryPortfolioEventStore,
+    PortfolioBudget,
     PortfolioCancellationResult,
     PortfolioCheckpoint,
     PortfolioCheckpointConflict,
@@ -63,8 +80,15 @@ from .orchestration import (
     PortfolioTraceEntry,
     PortfolioTraceSequenceError,
     PortfolioWorkflowEntry,
+    QuantumOutcome,
+    ResourceClaim,
+    ResourceConflict,
+    ResourceCoordinator,
+    ResourceMode,
     SchedulingPolicy,
     SelectionReason,
+    SynchronousExecutionBackend,
+    ThreadPoolExecutionBackend,
     WorkflowCheckpointRef,
     WorkflowDependency,
     WorkflowEligibility,
@@ -259,6 +283,79 @@ def create_portfolio_controller(
     )
 
 
+# --- H22-D bounded concurrent execution constructor --------------------------
+def create_concurrent_executor(
+    runtime: AgentRuntime,
+    portfolio: WorkflowPortfolio,
+    *,
+    policy: Optional[ConcurrencyPolicy] = None,
+    scheduling_policy: Optional[SchedulingPolicy] = None,
+    failure_policy: PortfolioFailurePolicy = PortfolioFailurePolicy.ISOLATE_WORKFLOW,
+    trace: Optional[PortfolioTrace] = None,
+    event_store: Optional[PortfolioEventStore] = None,
+    checkpoint_store: Optional[PortfolioCheckpointStore] = None,
+    budget: Optional[PortfolioBudget] = None,
+    backend: Optional[ExecutionBackend] = None,
+    claims_resolver=None,
+    budget_resolver=None,
+) -> ConcurrentPortfolioExecutor:
+    """Create an H22-D bounded concurrent portfolio executor (the top of the H22 stack).
+
+    Given several eligible workflows, it admits a deterministic, mutually-compatible batch (up to
+    ``policy.max_concurrent_quanta``) that respects logical resource claims and a shared portfolio
+    budget, runs each admitted workflow's indivisible H22-A quantum concurrently (on the
+    synchronous or thread-pool ``backend``), then reconciles resources/budget, failure policy, and
+    compensation at a stable batch boundary — checkpointing only there. It decides *which safe
+    quanta may run at once*; it never authorizes the consequential action inside a quantum, which
+    still crosses fresh governance below H22-A. ``policy=ConcurrencyPolicy(max_concurrent_quanta=1)``
+    is semantically bounded H22-B execution."""
+    return ConcurrentPortfolioExecutor(
+        runtime,
+        portfolio,
+        policy=policy,
+        scheduling_policy=scheduling_policy,
+        failure_policy=failure_policy,
+        trace=trace,
+        event_store=event_store,
+        checkpoint_store=checkpoint_store,
+        budget=budget,
+        backend=backend,
+        claims_resolver=claims_resolver,
+        budget_resolver=budget_resolver,
+    )
+
+
+def create_concurrent_executor_from_recovery(
+    runtime: AgentRuntime,
+    recovery_result: PortfolioRecoveryResult,
+    *,
+    policy: Optional[ConcurrencyPolicy] = None,
+    scheduling_policy: Optional[SchedulingPolicy] = None,
+    checkpoint_store: Optional[PortfolioCheckpointStore] = None,
+    backend: Optional[ExecutionBackend] = None,
+    claims_resolver=None,
+    budget_resolver=None,
+) -> ConcurrentPortfolioExecutor:
+    """Reconstruct an H22-D executor from a :class:`PortfolioRecoveryResult` (no side effects).
+
+    Adopts the recovered portfolio, append-only trace, H22-C failure policy, durable **consumed
+    budget**, and **compensation registrations** — so a recovered portfolio continues instead of
+    silently resetting shared budget, compensation state, failure policy, or trace continuity. It
+    launches no workers and makes no provider/governance/advance call; the recovered portfolio
+    still ``requires_continuation``. Concurrency policy is supplied here (configuration, not
+    persisted). See ``ConcurrentPortfolioExecutor.from_recovery``."""
+    return ConcurrentPortfolioExecutor.from_recovery(
+        runtime,
+        recovery_result,
+        policy=policy,
+        scheduling_policy=scheduling_policy,
+        checkpoint_store=checkpoint_store,
+        backend=backend,
+        claims_resolver=claims_resolver,
+        budget_resolver=budget_resolver,
+    )
+
+
 __all__ = [
     # runtime
     "AgentRuntime",
@@ -313,6 +410,33 @@ __all__ = [
     "PortfolioFailurePolicy",
     "CancellationScope",
     "PortfolioCancellationResult",
+    # H22-D bounded concurrent multi-workflow execution
+    "ConcurrencyPolicy",
+    "ConcurrentPortfolioExecutor",
+    "ConcurrentPortfolioStepResult",
+    "ConcurrentStepReason",
+    "QuantumOutcome",
+    "ExecutionBackend",
+    "SynchronousExecutionBackend",
+    "ThreadPoolExecutionBackend",
+    "ExecutorInfrastructureError",
+    "AdmissionDecision",
+    "BatchPlan",
+    "ResourceMode",
+    "ResourceClaim",
+    "ResourceConflict",
+    "ResourceCoordinator",
+    "PortfolioBudget",
+    "BudgetRequirement",
+    "BudgetShortfall",
+    "BudgetCoordinator",
+    "BudgetEstimateExceeded",
+    "CompensationTrigger",
+    "CompensationSpec",
+    "CompensationRegistration",
+    "CompensationRegistry",
+    "create_concurrent_executor",
+    "create_concurrent_executor_from_recovery",
     # providers
     "Provider",
     "ProviderRegistry",

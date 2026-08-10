@@ -46,14 +46,20 @@ from __future__ import annotations
 
 import hashlib
 import json
-import math
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Protocol, Tuple, runtime_checkable
 
 # Current portfolio-checkpoint schema version. An unknown future version must fail closed on
 # recovery rather than be interpreted under today's semantics.
-PORTFOLIO_CHECKPOINT_VERSION = "1"
-SUPPORTED_PORTFOLIO_CHECKPOINT_VERSIONS = frozenset({PORTFOLIO_CHECKPOINT_VERSION})
+#
+# "1" — H22-C: orchestration state only (registrations, dependencies, failure/cancellation,
+#       workflow checkpoint refs, trace anchor).
+# "2" — H22-D: additionally carries the durable H22-D coordination slice — the shared budget
+#       (limits + consumed; reservations are transient and never persisted) and the compensation
+#       registrations — under a ``concurrency_state`` block. A v1 checkpoint recovers unchanged
+#       (its payload/digest exclude the H22-D block entirely).
+PORTFOLIO_CHECKPOINT_VERSION = "2"
+SUPPORTED_PORTFOLIO_CHECKPOINT_VERSIONS = frozenset({"1", "2"})
 
 
 def _portfolio_digest(payload: Dict[str, Any]) -> str:
@@ -65,6 +71,30 @@ def _portfolio_digest(payload: Dict[str, Any]) -> str:
         payload, sort_keys=True, separators=(",", ":"), allow_nan=False
     ).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _canonical_concurrency_state(state: Dict[str, Any]) -> Dict[str, Any]:
+    """Normalize the H22-D durable slice into a deterministic, digest-stable shape.
+
+    ``budget`` keeps ``limits`` / ``consumed`` maps (json ``sort_keys`` orders their keys);
+    ``compensations`` is sorted by ``compensation_key`` so registration insertion order never
+    changes the digest. Only these two keys are carried — transient reservations are excluded by
+    construction."""
+    if not state:
+        return {}
+    out: Dict[str, Any] = {}
+    budget = state.get("budget")
+    if budget:
+        out["budget"] = {
+            "limits": dict(budget.get("limits", {})),
+            "consumed": dict(budget.get("consumed", {})),
+        }
+    comps = state.get("compensations")
+    if comps:
+        out["compensations"] = sorted(
+            (dict(c) for c in comps), key=lambda c: c.get("compensation_key", "")
+        )
+    return out
 
 
 @dataclass(frozen=True)
@@ -142,6 +172,10 @@ class PortfolioCheckpoint:
     cancellation_state: Dict[str, str]
     failure_policy: str
     trace_sequence: int
+    # H22-D (checkpoint_version "2") durable coordination slice: {"budget": {"limits":…,
+    # "consumed":…}, "compensations": [ {registration}, … ]}. Empty for a v1 checkpoint and
+    # excluded from a v1 payload/digest entirely. Transient reservations are NEVER stored here.
+    concurrency_state: Dict[str, Any] = field(default_factory=dict)
     portfolio_digest: str = ""
 
     # -- construction -------------------------------------------------------
@@ -159,6 +193,7 @@ class PortfolioCheckpoint:
         cancellation_state: Dict[str, str],
         failure_policy: str,
         trace_sequence: int,
+        concurrency_state: Optional[Dict[str, Any]] = None,
     ) -> "PortfolioCheckpoint":
         regs = tuple(sorted(registrations, key=lambda r: r["registration_sequence"]))
         deps = tuple(
@@ -177,6 +212,7 @@ class PortfolioCheckpoint:
             cancellation_state=dict(cancellation_state),
             failure_policy=failure_policy,
             trace_sequence=int(trace_sequence),
+            concurrency_state=dict(concurrency_state or {}),
         )
         return cls(**{**obj.__dict__, "portfolio_digest": _portfolio_digest(obj.payload())})
 
@@ -185,7 +221,7 @@ class PortfolioCheckpoint:
         """The canonical, digest-covered payload (every integrity-critical field; the
         digest itself excluded). Deterministic: registrations ordered by sequence, edges and
         refs and maps ordered by id."""
-        return {
+        base = {
             "checkpoint_version": self.checkpoint_version,
             "portfolio_id": self.portfolio_id,
             "portfolio_status": self.portfolio_status,
@@ -207,6 +243,11 @@ class PortfolioCheckpoint:
             "failure_policy": self.failure_policy,
             "trace_sequence": self.trace_sequence,
         }
+        # H22-D block is part of the digest ONLY for v2 — a v1 checkpoint's payload/digest are
+        # byte-for-byte unchanged, so v1 recovery and any v1 test remain exact.
+        if self.checkpoint_version == "2":
+            base["concurrency_state"] = _canonical_concurrency_state(self.concurrency_state)
+        return base
 
     def compute_digest(self) -> str:
         return _portfolio_digest(self.payload())
@@ -224,6 +265,10 @@ class PortfolioCheckpoint:
     def to_dict(self) -> Dict[str, Any]:
         d = self.payload()
         d["portfolio_digest"] = self.portfolio_digest
+        # Always round-trip the raw H22-D slice for v2 (payload already carries the canonical
+        # form; keep the source too so an unchanged reload reproduces the exact object).
+        if self.checkpoint_version == "2":
+            d["concurrency_state"] = _canonical_concurrency_state(self.concurrency_state)
         return d
 
     @classmethod
@@ -243,6 +288,7 @@ class PortfolioCheckpoint:
             cancellation_state=dict(d.get("cancellation_state", {})),
             failure_policy=d.get("failure_policy", ""),
             trace_sequence=int(d.get("trace_sequence", 0)),
+            concurrency_state=dict(d.get("concurrency_state", {})),
             portfolio_digest=d.get("portfolio_digest", ""),
         )
 

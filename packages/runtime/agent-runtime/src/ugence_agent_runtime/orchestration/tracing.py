@@ -60,6 +60,32 @@ class PortfolioEventType(str, Enum):
     PORTFOLIO_CANCELLED = "PORTFOLIO_CANCELLED"
     PORTFOLIO_FAILED = "PORTFOLIO_FAILED"
     PORTFOLIO_COMPLETED = "PORTFOLIO_COMPLETED"
+    # -- H22-D bounded concurrent execution ---------------------------------
+    #: A concurrent admission plan was finalized for one round (records the admitted batch,
+    #: the deferral reasons, and the concurrency limit) — deterministic, before any execution.
+    CONCURRENT_BATCH_PLANNED = "CONCURRENT_BATCH_PLANNED"
+    #: One workflow was admitted a concurrent quantum this round (with its resource/budget grant).
+    QUANTUM_ADMITTED = "QUANTUM_ADMITTED"
+    #: A candidate was deferred by a resource conflict (carries the structured conflict evidence).
+    QUANTUM_DEFERRED_RESOURCE = "QUANTUM_DEFERRED_RESOURCE"
+    #: A candidate was deferred by a shared-budget shortfall (carries dimension/requested/available).
+    QUANTUM_DEFERRED_BUDGET = "QUANTUM_DEFERRED_BUDGET"
+    #: An eligible candidate was not evaluated because the concurrency limit was already filled.
+    QUANTUM_DEFERRED_CAPACITY = "QUANTUM_DEFERRED_CAPACITY"
+    #: A resource reservation was taken for an admitted quantum.
+    RESOURCE_RESERVED = "RESOURCE_RESERVED"
+    #: A resource reservation was released at a quantum's stable boundary.
+    RESOURCE_RELEASED = "RESOURCE_RELEASED"
+    #: A shared-budget reservation was taken for an admitted quantum.
+    BUDGET_RESERVED = "BUDGET_RESERVED"
+    #: A budget reservation was settled into consumed (or released) at a quantum's stable boundary.
+    BUDGET_SETTLED = "BUDGET_SETTLED"
+    #: One admitted concurrent quantum reached its stable boundary and was reconciled.
+    CONCURRENT_QUANTUM_COMPLETED = "CONCURRENT_QUANTUM_COMPLETED"
+    #: A concurrent batch finished reconciliation at its stable boundary (round summary).
+    CONCURRENT_BATCH_RECONCILED = "CONCURRENT_BATCH_RECONCILED"
+    #: A compensation intent was registered (exactly once) with origin lineage.
+    COMPENSATION_REGISTERED = "COMPENSATION_REGISTERED"
 
 
 PORTFOLIO_EVENT_TYPES: Tuple[str, ...] = tuple(e.value for e in PortfolioEventType)

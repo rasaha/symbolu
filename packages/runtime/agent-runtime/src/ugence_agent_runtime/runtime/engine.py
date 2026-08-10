@@ -442,9 +442,15 @@ class AgentRuntime:
         exec_digest = None
         task_id = None
         task_status = None
+        provider_invoked = False
         if ti is not None:
             task_id = ti.task_id
             task_status = ti.status.value
+            # Authoritative provider-invocation evidence: ``attempts`` is set (to >= 1) only
+            # after ``execute_with_policy`` actually invoked the provider. It stays 0 for a
+            # governance HOLD/ESCALATE/BLOCK and for an exact-action clearance/integrity
+            # rejection (both fail closed BEFORE the provider), so this never over-reports.
+            provider_invoked = ti.attempts > 0
             snap = self._exec_states.get(instance_id, {}).get(ti.task_id)
             exec_digest = snap.state_digest if snap is not None else None
         # Reference the checkpoint this quantum committed (if any) — a checkpoint digest
@@ -465,6 +471,7 @@ class AgentRuntime:
             terminal=instance.is_terminal,
             waiting=instance.status is WorkflowStatus.WAITING,
             paused=instance.status is WorkflowStatus.PAUSED,
+            provider_invoked=provider_invoked,
         )
 
     def _finalize(self, instance: WorkflowInstance, trace: RunTrace) -> None:
