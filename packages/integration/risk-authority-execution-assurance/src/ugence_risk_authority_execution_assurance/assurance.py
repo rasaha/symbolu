@@ -85,11 +85,28 @@ class EffectAssuranceService:
     ) -> None:
         if ingress is None or reconciler is None:
             raise ValueError("EffectAssuranceService requires an ingress and a reconciler")
-        if production_mode and getattr(reconciler, "is_reference_reconciler", False):
-            raise ReferenceReconcilerRejectedError(
-                "reference DA reconciler refused in production mode (F-1): inject a "
-                "DA reconciler backed by durable persistence + authenticated ingestion"
-            )
+        if production_mode:
+            if getattr(reconciler, "is_reference_reconciler", False):
+                raise ReferenceReconcilerRejectedError(
+                    "reference DA reconciler refused in production mode (F-1): inject a "
+                    "DA reconciler backed by durable persistence + authenticated ingestion"
+                )
+            # The outer composition boundary must not rely on the caller having
+            # remembered to construct a production-posture ingress. A production
+            # service requires a production-safe ingress — and because a
+            # ``TrustedEffectIngress`` built with ``production_mode=True`` already
+            # refuses a reference effect authenticator at construction (D-A/F-1),
+            # this single exact-bool check transitively guarantees no reference
+            # authenticator can reach a production reconciliation. Fail closed on any
+            # non-``True`` posture (malformed/None/1/"yes" never satisfy it).
+            if getattr(ingress, "production_mode", False) is not True:
+                raise CompositionRejectedError(
+                    "production EffectAssuranceService requires a production-posture "
+                    "TrustedEffectIngress (constructed with production_mode=True); a "
+                    "reference/default ingress is refused so a reference effect "
+                    "authenticator can never become production reconciliation evidence "
+                    "(spec §4/D-A, §19, RA-5/6/7 F-1)"
+                )
         self._ingress = ingress
         self._reconciler = reconciler
         self._emitter = emitter
