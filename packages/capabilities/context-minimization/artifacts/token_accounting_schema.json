@@ -1,0 +1,374 @@
+{
+  "apis": [
+    "prepare_api_call_measurement",
+    "reconcile_api_call_measurement",
+    "aggregate_logical_request_usage",
+    "canonical_tenant_namespace"
+  ],
+  "boundary": {
+    "is": [
+      "neutral accounting of already-measured facts",
+      "deterministic fingerprints"
+    ],
+    "is_not": [
+      "provider tokenizer",
+      "model SDK",
+      "network/database/filesystem persistence",
+      "pricing authority",
+      "invoice reconciliation",
+      "wall-clock or random id generation"
+    ]
+  },
+  "contract_version": "1.1.0",
+  "enums": {
+    "AttemptStatus": [
+      "SUCCEEDED",
+      "FAILED",
+      "TIMEOUT",
+      "EXCEPTION"
+    ],
+    "TokenCountBasis": [
+      "CALLER_SUPPLIED",
+      "INJECTED_COUNTER",
+      "DEFAULT_APPROXIMATE",
+      "MIXED",
+      "PROVIDER_REPORTED",
+      "UNKNOWN"
+    ],
+    "UsageAvailability": [
+      "AVAILABLE",
+      "UNAVAILABLE_NOT_REPORTED",
+      "UNAVAILABLE_PROVIDER_ERROR",
+      "UNAVAILABLE_UNKNOWN"
+    ]
+  },
+  "fail_closed_conditions": [
+    "negative / bool / float / NaN / inf / str token count -> InvalidUnitError/InvalidRequestError",
+    "usage AVAILABLE without any known field -> InvalidRequestError",
+    "usage AVAILABLE while provider not invoked -> InvalidRequestError",
+    "provider_usage supplied while availability is UNAVAILABLE -> InvalidRequestError",
+    "context_tokens_eliminated != before-after, or after>before -> InvalidRequestError",
+    "attempt_number < 1 -> InvalidRequestError",
+    "duplicate attempt_id with conflicting content -> InvalidRequestError (idempotent replay must be byte-identical)",
+    "aggregation over divergent minimization run fingerprints -> InvalidRequestError"
+  ],
+  "models": {
+    "ApiCallTokenRecord": {
+      "computed_properties": [
+        "is_retry",
+        "reduction_pct",
+        "record_fingerprint"
+      ],
+      "excludes": [
+        "prompt_text",
+        "credentials",
+        "secrets",
+        "provider_response_payload"
+      ],
+      "fields": [
+        {
+          "name": "logical_request_id",
+          "type": "str"
+        },
+        {
+          "name": "attempt_id",
+          "type": "str"
+        },
+        {
+          "name": "attempt_number",
+          "type": "int"
+        },
+        {
+          "name": "context_id",
+          "type": "str"
+        },
+        {
+          "name": "minimization_run_fingerprint",
+          "type": "str"
+        },
+        {
+          "name": "provider_id",
+          "type": "str"
+        },
+        {
+          "name": "status",
+          "type": "AttemptStatus"
+        },
+        {
+          "name": "provider_invoked",
+          "type": "bool"
+        },
+        {
+          "name": "context_tokens_before",
+          "type": "int"
+        },
+        {
+          "name": "context_tokens_after",
+          "type": "int"
+        },
+        {
+          "name": "context_tokens_eliminated",
+          "type": "int"
+        },
+        {
+          "name": "request_estimate",
+          "type": "RequestTokenEstimate"
+        },
+        {
+          "name": "usage_availability",
+          "type": "UsageAvailability"
+        },
+        {
+          "name": "provider_usage",
+          "type": "Optional[ProviderTokenUsage]"
+        },
+        {
+          "name": "usage_unavailable_reason",
+          "type": "Optional[str]"
+        },
+        {
+          "name": "retry_of_attempt_id",
+          "type": "Optional[str]"
+        },
+        {
+          "name": "correlation_id",
+          "type": "Optional[str]"
+        },
+        {
+          "name": "model_id",
+          "type": "Optional[str]"
+        },
+        {
+          "name": "attribution",
+          "type": "RequestAttribution"
+        }
+      ],
+      "fingerprint_domain": "ugence-context-minimization/api-call/1"
+    },
+    "LogicalRequestTokenSummary": {
+      "computed_properties": [
+        "summary_fingerprint"
+      ],
+      "fields": [
+        {
+          "name": "logical_request_id",
+          "type": "str"
+        },
+        {
+          "name": "attempt_count",
+          "type": "int"
+        },
+        {
+          "name": "succeeded_count",
+          "type": "int"
+        },
+        {
+          "name": "failed_count",
+          "type": "int"
+        },
+        {
+          "name": "retry_count",
+          "type": "int"
+        },
+        {
+          "name": "attempts_usage_unknown",
+          "type": "int"
+        },
+        {
+          "name": "attempts_reporting_total",
+          "type": "int"
+        },
+        {
+          "name": "provider_input_tokens",
+          "type": "int"
+        },
+        {
+          "name": "provider_output_tokens",
+          "type": "int"
+        },
+        {
+          "name": "provider_reported_total_tokens",
+          "type": "int"
+        },
+        {
+          "name": "derived_total_tokens",
+          "type": "int"
+        },
+        {
+          "name": "settlement_token_units",
+          "type": "int"
+        },
+        {
+          "name": "retry_input_tokens",
+          "type": "int"
+        },
+        {
+          "name": "retry_output_tokens",
+          "type": "int"
+        },
+        {
+          "name": "failed_attempt_input_tokens",
+          "type": "int"
+        },
+        {
+          "name": "failed_attempt_output_tokens",
+          "type": "int"
+        },
+        {
+          "name": "context_tokens_before",
+          "type": "int"
+        },
+        {
+          "name": "context_tokens_after",
+          "type": "int"
+        },
+        {
+          "name": "context_tokens_eliminated",
+          "type": "int"
+        },
+        {
+          "name": "complete",
+          "type": "bool"
+        },
+        {
+          "name": "record_fingerprints",
+          "type": "tuple[str, ...]"
+        }
+      ],
+      "fingerprint_domain": "ugence-context-minimization/logical-request/1",
+      "note": "context savings counted once per logical request; unknown usage keeps complete=False",
+      "total_provenance": {
+        "attempts_reporting_total": "count of known attempts that carried an explicit provider total",
+        "derived_total_tokens": "sum of derived input+output; cached/cache_write/reasoning excluded (never re-added)",
+        "provider_reported_total_tokens": "sum of ONLY explicit provider-reported totals; never a derived value",
+        "rule": "a field named 'provider ... total' contains ONLY provider-reported values; provider-reported and derived totals are never blended into one field",
+        "settlement_token_units": "documented settlement selection per attempt (reported total if present, else derived); meaningful only when complete"
+      }
+    },
+    "ProviderTokenUsage": {
+      "derived_total": "input+output ONLY (cached/cache_write/reasoning excluded to avoid double-count); reported total_tokens preserved separately",
+      "fields": [
+        {
+          "name": "input_tokens",
+          "type": "Optional[int]"
+        },
+        {
+          "name": "cached_input_tokens",
+          "type": "Optional[int]"
+        },
+        {
+          "name": "cache_write_input_tokens",
+          "type": "Optional[int]"
+        },
+        {
+          "name": "output_tokens",
+          "type": "Optional[int]"
+        },
+        {
+          "name": "reasoning_tokens",
+          "type": "Optional[int]"
+        },
+        {
+          "name": "total_tokens",
+          "type": "Optional[int]"
+        },
+        {
+          "name": "provider_request_id",
+          "type": "Optional[str]"
+        },
+        {
+          "name": "usage_schema",
+          "type": "Optional[str]"
+        },
+        {
+          "name": "adapter_id",
+          "type": "Optional[str]"
+        },
+        {
+          "name": "adapter_version",
+          "type": "Optional[str]"
+        }
+      ],
+      "measurement": "C",
+      "optional_int_fields_unknown_is_null": [
+        "input_tokens",
+        "cached_input_tokens",
+        "cache_write_input_tokens",
+        "output_tokens",
+        "reasoning_tokens",
+        "total_tokens"
+      ]
+    },
+    "RequestTokenEstimate": {
+      "fields": [
+        {
+          "name": "estimated_input_tokens",
+          "type": "int"
+        },
+        {
+          "name": "counter_id",
+          "type": "str"
+        },
+        {
+          "name": "counter_version",
+          "type": "str"
+        },
+        {
+          "name": "basis",
+          "type": "TokenCountBasis"
+        },
+        {
+          "name": "model_id",
+          "type": "Optional[str]"
+        },
+        {
+          "name": "provider_id",
+          "type": "Optional[str]"
+        },
+        {
+          "name": "covers_tools",
+          "type": "bool"
+        },
+        {
+          "name": "covers_schemas",
+          "type": "bool"
+        },
+        {
+          "name": "covers_images",
+          "type": "bool"
+        },
+        {
+          "name": "covers_non_text",
+          "type": "bool"
+        },
+        {
+          "name": "incomplete_reason",
+          "type": "Optional[str]"
+        }
+      ],
+      "measurement": "B",
+      "note": "estimated_input_tokens is distinct from MinimizationResult.resulting_tokens"
+    }
+  },
+  "module": "ugence_context_minimization.token_accounting",
+  "principle": "Context Minimization measures how much context was safely removed (A). The request estimate measures the complete serialized request (B) via an INJECTED counter \u2014 the core implements no provider tokenizer. Provider usage measures what the API reported consuming (C); it is authoritative for the response being reconciled, never overwrites the estimate, and is NOT an invoice. Unknown usage is None, never zero.",
+  "protocols": [
+    "RequestTokenCounter",
+    "TokenAccountingSink"
+  ],
+  "tenant_isolation": {
+    "attempt_id_binding": "the tenant namespace is a prefix-free segment of the derived attempt id, so identical tenant-local ids in different tenants derive different attempt ids",
+    "explicit_retry_reference": {
+      "enforcement": "reconcile_api_call_measurement fails closed with InvalidRequestError if retry_of.tenant_namespace != canonical_tenant_namespace(prepared.attribution.tenant_id), BEFORE any record is built or written to a sink; the current tenant is never silently substituted",
+      "rule": "explicit retry linkage is a tenant-scoped reference, never a raw opaque string (N3)",
+      "scope": "tenant-scope validation only; it does NOT assert the referenced parent record exists (durable referential-integrity is deferred)",
+      "serialization": "the parent's tenant namespace equals the record's own (enforced), so retry lineage inherits an unambiguous namespace; retry_of_attempt_id + attribution.tenant_id are both bound in record_fingerprint",
+      "type": "ExplicitAttemptReference(attempt_id, tenant_id)"
+    },
+    "fingerprint": "tenant_id is bound into ApiCallTokenRecord.record_fingerprint via attribution",
+    "named_tenant_namespace": "tenant_id present -> 't:' + tenant (must be non-empty, non-whitespace)",
+    "namespace_helper": "canonical_tenant_namespace(tenant_id)",
+    "single_tenant_namespace": "tenant_id is None -> 's' (domain-separated; NEVER an empty string)",
+    "sink_idempotency_key": "(tenant_namespace, attempt_id) \u2014 two tenants may store the same explicit attempt_id; same-tenant replay is idempotent; same-tenant conflict is rejected; tenant isolation does not rely on record fingerprints"
+  }
+}

@@ -1,7 +1,10 @@
 {
   "interface": "ugence_agent_runtime.providers.interfaces.Provider",
   "description": "A provider executes a runtime-requested operation AFTER all required runtime and external governance checks have completed. Neutral: no vendor coupling.",
-  "provider_attributes": ["provider_id", "version"],
+  "provider_attributes": [
+    "provider_id",
+    "version"
+  ],
   "method": {
     "name": "execute",
     "input": "ToolInvocation",
@@ -32,5 +35,39 @@
     "unknown_exception": "wrapped by the runtime; never surfaced raw"
   },
   "neutrality": "No OpenAI/Anthropic/GitHub/cloud/database specifics. Concrete providers live outside this package.",
-  "new_provider_kind_introduced": false
+  "new_provider_kind_introduced": false,
+  "attempt_telemetry": {
+    "seam": "ugence_agent_runtime.observability.attempts.AttemptObserver",
+    "config_field": "AgentRuntimeConfig.attempt_observer (Optional; None = no behavior change)",
+    "record": "ProviderAttempt",
+    "emitted_once_per": "actual provider.execute invocation (success, expected failure, timeout, provider error, raw exception)",
+    "attempt_number": "runtime-authoritative; incremented per retry; retried attempts are NEVER collapsed",
+    "no_attempt_when": [
+      "governance HOLD/BLOCK/ESCALATE (provider never invoked)",
+      "exact-action clearance/integrity rejection (fails closed before invocation)",
+      "provider-not-found"
+    ],
+    "neutral_usage_metadata_key": "token_usage",
+    "neutral_usage_rule": "A provider MAY attach an opaque mapping at ToolResult.metadata['token_usage']; the runtime forwards it verbatim as ProviderAttempt.neutral_usage and NEVER interprets provider-specific token fields. Absent/non-mapping => None (unknown, never fabricated).",
+    "robustness": "A raising observer is swallowed; telemetry can never change the provider action or break execution.",
+    "observation_failure_reporting": {
+      "config_field": "AgentRuntimeConfig.attempt_observer_error_reporter (Optional; None = prior silent fail-open)",
+      "seam": "ugence_agent_runtime.observability.attempts.AttemptObservationErrorReporter",
+      "record": "AttemptObservationFailure (field error_kind: closed ObservationFailureKind enum)",
+      "fail_open": "a raising observer never re-executes the provider, erases its result, or changes retry behavior",
+      "surfacing": "exactly one structured failure per observer failure when a reporter is configured; a raising reporter is contained and never masks the provider result",
+      "safe_payload": "carries safe identity + error_kind (a FIXED code from the closed ObservationFailureKind allowlist) ONLY; NEVER the exception class name/module/message/args/repr or any provider payload (N2)",
+      "no_signal_when": "no provider was invoked (governance/exact-action rejection, provider-not-found)",
+      "classification": {
+        "enum": "ObservationFailureKind",
+        "values": [
+          "OBSERVER_VALUE_ERROR",
+          "OBSERVER_TYPE_ERROR",
+          "OBSERVER_LOOKUP_ERROR",
+          "OBSERVER_EXCEPTION"
+        ],
+        "mapping": "isinstance against a closed allowlist (never type(exc).__name__); unmatched -> OBSERVER_EXCEPTION"
+      }
+    }
+  }
 }

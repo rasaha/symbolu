@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 #: Distribution version (SemVer). Bump on any public-surface change.
-__version__ = "0.1.2"
+__version__ = "0.2.0"
 
 #: The minimization contract version. Governs the shape/meaning of
 #: :class:`MinimizationResult`, the reason-code vocabulary, and the neutral oracle
@@ -23,4 +23,16 @@ __version__ = "0.1.2"
 #: restricted to JSON scalars; token-counter run-fingerprint identity is now
 #: module-qualified (run-fingerprint domain bumped run/1 -> run/2). The
 #: outcome_fingerprint digest remains byte-unchanged.
-CONTRACT_VERSION = "1.0.2"
+#:
+#: 1.1.0 (v0.2.0): additive token-accounting contracts (CM-TA1). New neutral,
+#: stdlib-only module :mod:`token_accounting` distinguishing THREE measurements —
+#: context reduction (A, unchanged), the complete-request estimate (B, via an injected
+#: RequestTokenCounter; the core implements no provider tokenizer), and provider-reported
+#: usage (C, optional non-negative ints; unknown is None, never zero). Adds
+#: TokenCountBasis / AttemptStatus / UsageAvailability, RequestTokenEstimate,
+#: ProviderTokenUsage, ApiCallTokenRecord (fingerprint domain ``api-call/1``),
+#: LogicalRequestTokenSummary (domain ``logical-request/1``), the RequestTokenCounter /
+#: TokenAccountingSink protocols, and prepare/reconcile/aggregate APIs. Purely additive:
+#: the minimization algorithm, protected-span behavior, oracle equivalence, and BOTH the
+#: outcome_fingerprint and run_fingerprint digests are byte-unchanged.
+CONTRACT_VERSION = "1.1.0"

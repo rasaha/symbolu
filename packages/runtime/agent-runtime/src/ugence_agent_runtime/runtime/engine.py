@@ -37,6 +37,7 @@ from ..models.workflow import (
     WorkflowInstance,
     WorkflowStatus,
 )
+from ..observability.attempts import AttemptContext
 from ..observability.tracing import RunTrace
 from ..persistence.checkpoints import Checkpoint
 from ..persistence.recovery import RuntimeRecoveryResult, recover_instance
@@ -634,6 +635,15 @@ class AgentRuntime:
         s_inv = self._record_state(instance, ti, proposal=proposal, evaluation=evaluation)
         trace.emit(ev.PROVIDER_INVOKED, task_id=ti.task_id, provider_id=invocation.provider_id,
                    execution_state_digest=s_inv.state_digest)
+        # Neutral attempt telemetry: identity only (no arguments/prompts/credentials).
+        # Fires once per actual provider invocation; a governance/exact-action rejection
+        # never reaches here, so it never produces an attempt.
+        attempt_context = AttemptContext(
+            workflow_id=proposal.workflow_id,
+            instance_id=proposal.instance_id,
+            task_id=ti.task_id,
+            correlation_id=proposal.correlation_id,
+        )
         outcome = execute_with_policy(
             self._config.provider_registry,
             invocation,
@@ -641,6 +651,9 @@ class AgentRuntime:
             self._config.clock,
             invocation.timeout,
             ti.task_id,
+            attempt_observer=self._config.attempt_observer,
+            attempt_context=attempt_context,
+            attempt_error_reporter=self._config.attempt_observer_error_reporter,
         )
         ti.attempts = outcome.attempts
         # S(provider-completed) — attempt count now reflects the outcome.

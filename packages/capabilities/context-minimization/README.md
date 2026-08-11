@@ -25,6 +25,16 @@ closed** whenever equivalence cannot be established.
 Structural deduplication alone is **not** authorization-preserving Context
 Minimization — see `docs/STRUCTURAL_MINIMIZATION.md`.
 
+## Token accounting (CM-TA1)
+
+The neutral `token_accounting` module measures token consumption for every model API
+attempt while keeping **three distinct quantities** separate: **context reduction**
+(what the minimizer removed), the **complete-request estimate** (via an *injected*
+counter — the core implements no tokenizer), and **provider-reported usage** (unknown
+is `None`, never zero; authoritative for the response reconciled, **not** an invoice).
+See `docs/TOKEN_ACCOUNTING.md`. Cross-package wiring to the Agent Runtime lives in the
+separate `context-minimization-token-accounting-runtime` integration distribution.
+
 ## Quick start
 
 ```python

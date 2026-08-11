@@ -105,3 +105,20 @@ Machine-readable form: [`../artifacts/agent_runtime_public_api.json`](../artifac
   part of the contract.
 - Deprecated legacy aliases live in `ugence_agent_runtime.compat` and emit
   `DeprecationWarning`.
+
+## Attempt telemetry (CM-TA1, 0.7.0)
+
+Additive, opt-in: `ProviderAttempt`, `ProviderAttemptStatus`, `AttemptContext`,
+`AttemptObserver`, `RecordingAttemptObserver`, and `PROVIDER_USAGE_METADATA_KEY`, plus
+the optional `AgentRuntimeConfig.attempt_observer` field (`None` = no behavior change).
+The observer is notified once per actual `provider.execute` invocation with the
+runtime-authoritative attempt number; a governance/exact-action rejection or a
+provider-not-found produces no attempt. See
+[`AGENT_RUNTIME_ATTEMPT_TELEMETRY.md`](AGENT_RUNTIME_ATTEMPT_TELEMETRY.md).
+
+## Attempt-observation failure surfacing (CM-TA1 F2, 0.7.0)
+
+Additive: `AttemptObservationFailure`, `AttemptObservationErrorReporter`,
+`RecordingObservationErrorReporter`, and the optional
+`AgentRuntimeConfig.attempt_observer_error_reporter` field (`None` = prior silent
+fail-open). See [`AGENT_RUNTIME_ATTEMPT_TELEMETRY.md`](AGENT_RUNTIME_ATTEMPT_TELEMETRY.md).

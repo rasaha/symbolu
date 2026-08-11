@@ -26,6 +26,19 @@ from .governance.interfaces import (
 )
 from .models.agent import AgentDescriptor
 from .models.events import RuntimeEvent
+from .observability.attempts import (
+    PROVIDER_USAGE_METADATA_KEY,
+    AttemptContext,
+    AttemptObservationErrorReporter,
+    AttemptObservationFailure,
+    AttemptObserver,
+    ObservationFailureKind,
+    ProviderAttempt,
+    ProviderAttemptStatus,
+    RecordingAttemptObserver,
+    RecordingObservationErrorReporter,
+    classify_observation_failure,
+)
 from .models.execution_state import CanonicalExecutionState, ExecutionLineage
 from .models.proposal import TransitionProposal
 from .models.results import (
@@ -375,6 +388,19 @@ __all__ = [
     "FailureCategory",
     "WorkflowAdvanceOutcome",
     "WorkflowAdvanceStop",
+    # neutral provider-attempt telemetry (CM-TA1)
+    "ProviderAttempt",
+    "ProviderAttemptStatus",
+    "AttemptContext",
+    "AttemptObserver",
+    "RecordingAttemptObserver",
+    "PROVIDER_USAGE_METADATA_KEY",
+    # attempt-observation failure surfacing (CM-TA1 F2 / N2)
+    "AttemptObservationFailure",
+    "AttemptObservationErrorReporter",
+    "RecordingObservationErrorReporter",
+    "ObservationFailureKind",
+    "classify_observation_failure",
     # H22-B multi-workflow coordination
     "WorkflowPortfolio",
     "PortfolioWorkflowEntry",

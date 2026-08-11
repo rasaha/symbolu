@@ -3,6 +3,64 @@
 All notable changes to the independent Agent Runtime distribution are recorded here.
 This project follows semantic versioning for the distribution.
 
+## 0.7.0 — CM-TA1 neutral provider-attempt telemetry
+
+An **additive, opt-in** observation seam that lets a neutral observer see **every actual
+`provider.execute` invocation** — success, expected failure, timeout, provider error, or raw
+exception — with the runtime-authoritative attempt number. Before this, the retry loop kept only
+a final attempt *count* and discarded the earlier failed attempts; now retried and failed attempts
+are recorded **distinctly and never collapsed** into the final attempt. **Purely additive**: no
+change to execution truth, governance ownership, the exact-action fingerprint / proposal-binding
+contract, Canonical Execution State, checkpoint schema, or recovery semantics. See
+[`docs/AGENT_RUNTIME_ATTEMPT_TELEMETRY.md`](docs/AGENT_RUNTIME_ATTEMPT_TELEMETRY.md).
+
+### Added
+- **`ProviderAttempt`** — a neutral, immutable per-invocation record (provider/operation identity,
+  workflow/instance/task/correlation identity, runtime-authoritative `attempt_number`, neutral
+  status, `ok`, `provider_invoked`, an opaque `neutral_usage` mapping, and a neutral
+  `failure_category`). It carries **no** arguments, prompts, credentials, or provider payloads.
+- **`ProviderAttemptStatus`** (`SUCCEEDED` / `FAILED` / `TIMEOUT` / `EXCEPTION`), **`AttemptContext`**,
+  the **`AttemptObserver`** protocol, and the in-memory **`RecordingAttemptObserver`** reference.
+- **`PROVIDER_USAGE_METADATA_KEY = "token_usage"`** — the neutral key under which a provider MAY
+  attach an opaque usage mapping to its `ToolResult.metadata`. The runtime **forwards it verbatim**
+  as `ProviderAttempt.neutral_usage` and **never interprets** provider-specific token fields; an
+  absent or non-mapping value is `None` (unknown, never fabricated).
+- **`AgentRuntimeConfig.attempt_observer`** — optional; `None` (default) is a strict no-op.
+
+### Guarantees preserved
+- A governance **HOLD/BLOCK/ESCALATE**, an **exact-action** clearance/integrity rejection, and a
+  **provider-not-found** produce **no** attempt — the provider was never invoked.
+- The runtime imports **no** provider SDK and interprets **no** provider token field. Observing an
+  attempt can never change the provider action; a raising observer is swallowed and never breaks
+  execution.
+
+### Audit remediation — F2: attempt-observation failure is surfaced, not silent
+A raising `attempt_observer` was previously swallowed silently. The runtime remains
+**fail-open** with respect to provider execution (a raising observer never re-executes the
+provider, never erases a successful result, and never changes retry behavior), but the loss
+is no longer invisible: the new optional `AgentRuntimeConfig.attempt_observer_error_reporter`
+receives exactly **one** structured `AttemptObservationFailure` per observer failure. The
+signal carries safe identity plus a bounded classification code (see N2 below) — never the
+exception message/args or any provider payload. A reporter that itself raises is contained and
+never masks the provider result. `None` (default) preserves the prior silent fail-open for
+callers that do not configure accounting. Added exports: `AttemptObservationFailure`,
+`AttemptObservationErrorReporter`, `RecordingObservationErrorReporter`.
+
+### Audit remediation — N2: bounded observation-failure classification
+`AttemptObservationFailure.error_type` (which carried `type(exc).__name__` and could expose an
+observer-constructed dynamically-named exception's name) is **replaced** by `error_kind`, a
+FIXED code from the closed `ObservationFailureKind` enum
+(`OBSERVER_VALUE_ERROR` / `OBSERVER_TYPE_ERROR` / `OBSERVER_LOOKUP_ERROR` / `OBSERVER_EXCEPTION`).
+Classification uses `isinstance` against a closed allowlist (`classify_observation_failure`) —
+never the exception class name/module/message/args/`repr` — so no attacker- or
+provider-controlled string can enter the telemetry. Fail-open behavior, the exactly-one-signal
+guarantee, reporter containment, and provider execution/retry semantics are unchanged. Added
+exports: `ObservationFailureKind`, `classify_observation_failure`. Corrected in place (0.7.0 is
+unreleased).
+
+**Package maturity: `IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED`** (upgrade to
+`IMPLEMENTED_AND_CI_VERIFIED` only after the scoped Actions run is observed green).
+
 ## 0.6.0 — H22-D bounded concurrent multi-workflow execution
 
 Lets several **mutually-safe** workflows make progress **at the same time** — bounded, in-process
