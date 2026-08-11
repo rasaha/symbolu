@@ -13,11 +13,25 @@ from .envelope_issuer import (
     EnvelopeIssuer,
     validate_envelope_subset,
 )
+from .authority_status import (
+    AUTHORITY_STATUS_SCHEMA_VERSION,
+    AuthorityStatus,
+    AuthorityStatusSnapshot,
+    StalenessPolicy,
+    check_authority_status,
+    evaluate_status_freshness,
+)
 from .envelope_verifier import EnvelopeVerification, EnvelopeVerifier
 from .revocation import RevocationState
 from .risk_engine import RiskEngine, RiskEvaluation
 
 __all__ = [
+    "AuthorityStatus",
+    "AuthorityStatusSnapshot",
+    "StalenessPolicy",
+    "AUTHORITY_STATUS_SCHEMA_VERSION",
+    "check_authority_status",
+    "evaluate_status_freshness",
     "applicable_rules",
     "resolve_required_controls",
     "RiskEngine",

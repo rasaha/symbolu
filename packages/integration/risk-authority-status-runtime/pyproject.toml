@@ -1,0 +1,54 @@
+# Ugence Risk Authority Status Runtime — RA-6 authority-lifecycle operationalization.
+#
+# This is NOT a leaf: it is the integration/control-plane package that supplies
+# the production persistence-backed reader/cache, the authenticated lifecycle
+# writer, the reassessment-signal intake, the driven case-state transitions, and
+# the status-aware enforcement composition behind Risk Authority's three RA-6
+# ports. The dependency direction is one-way — this package imports
+# risk-authority (for its ports/domain/pure predicate); risk-authority does NOT
+# import this package and remains a stdlib-only leaf.
+#
+# It deliberately does NOT depend on the RA-4.5 runtime, the Agent Runtime, any
+# database driver, framework, or event bus: the reference persistence + in-process
+# propagation are stdlib-only, and production infrastructure is delegated behind
+# the ports (see src/.../postgres.py). The Agent Runtime last-mile seam is
+# satisfied structurally (a neutral callable), so no runtime dependency is added.
+#
+# Build:   python -m build packages/integration/risk-authority-status-runtime
+# Verify:  python packages/integration/risk-authority-status-runtime/scripts/verify_isolated_install.py
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-risk-authority-status-runtime"
+dynamic = ["version"]
+description = "Ugence Risk Authority Status Runtime — RA-6 post-issuance authority lifecycle (revocation/epoch propagation) around the sole Risk Authority machine-authority artifact."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["governance", "risk", "authority", "revocation", "epoch", "lifecycle", "ugence"]
+# One-way dependency on the machine-authority owner only. No third-party runtime
+# dependency of its own (reference persistence + in-process propagation are
+# stdlib-only); production infrastructure is delegated behind the ports.
+dependencies = [
+    "ugence-risk-authority>=0.1.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_risk_authority_status_runtime.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_risk_authority_status_runtime*"]
+
+[tool.setuptools.package-data]
+ugence_risk_authority_status_runtime = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
