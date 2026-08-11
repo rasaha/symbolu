@@ -58,6 +58,36 @@ from .canonical import (
     CapacityObservationSource,
 )
 
+# Phase 2: Predictive Capacity Intelligence — deterministic, provider-neutral, SHADOW-only
+# forecasting and replay evaluation built AROUND the canonical Phase-1 layer. Additive and
+# pure-stdlib; forecasts never feed the live controller and never actuate infrastructure.
+from . import forecasting
+from .forecasting import (
+    CanonicalCapacitySeries,
+    SeriesConstructionPolicy,
+    ForecastTarget,
+    ForecastHorizon,
+    ForecastInputWindow,
+    FeatureConfig,
+    build_input_window,
+    BaselineForecaster,
+    PersistenceForecaster,
+    LinearTrendForecaster,
+    UncertaintyConfig,
+    UncertaintyMethod,
+    AbstentionReason,
+    CapacityForecast,
+    AdmissionPolicy,
+    CapacityForecastEvidence,
+    generate_forecast,
+    forecast_with_evidence,
+    ForecastEvaluationRecord,
+    AggregateEvaluation,
+    evaluate_forecast,
+    aggregate_evaluations,
+    run_replay_evaluation,
+)
+
 __all__ = [
     "CloudScalingController",
     "Controller",
@@ -86,4 +116,29 @@ __all__ = [
     "CapacityDecisionEvidence",
     "recommend_with_evidence",
     "CapacityObservationSource",
+    # Phase 2 predictive capacity intelligence (additive, shadow-only)
+    "forecasting",
+    "CanonicalCapacitySeries",
+    "SeriesConstructionPolicy",
+    "ForecastTarget",
+    "ForecastHorizon",
+    "ForecastInputWindow",
+    "FeatureConfig",
+    "build_input_window",
+    "BaselineForecaster",
+    "PersistenceForecaster",
+    "LinearTrendForecaster",
+    "UncertaintyConfig",
+    "UncertaintyMethod",
+    "AbstentionReason",
+    "CapacityForecast",
+    "AdmissionPolicy",
+    "CapacityForecastEvidence",
+    "generate_forecast",
+    "forecast_with_evidence",
+    "ForecastEvaluationRecord",
+    "AggregateEvaluation",
+    "evaluate_forecast",
+    "aggregate_evaluations",
+    "run_replay_evaluation",
 ]
