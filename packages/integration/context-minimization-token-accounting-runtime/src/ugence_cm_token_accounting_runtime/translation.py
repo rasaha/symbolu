@@ -27,6 +27,7 @@ from ugence_agent_runtime.observability.attempts import (
 from ugence_context_minimization.api import (
     ApiCallTokenRecord,
     AttemptStatus,
+    ExplicitAttemptReference,
     PreparedApiCall,
     ProviderTokenUsage,
     UsageAvailability,
@@ -180,7 +181,7 @@ def translate_attempt(
     *,
     normalizer: Optional[UsageNormalizer] = None,
     attempt_id: Optional[str] = None,
-    retry_of_attempt_id: Optional[str] = None,
+    retry_of: Optional[ExplicitAttemptReference] = None,
     sink=None,
 ) -> ApiCallTokenRecord:
     """Translate one Agent Runtime :class:`ProviderAttempt` into an :class:`ApiCallTokenRecord`.
@@ -188,17 +189,19 @@ def translate_attempt(
     * Uses the injected ``normalizer`` to type the attempt's opaque ``neutral_usage``; a
       ``None`` result (or no usage, or no normalizer) records the attempt as usage-unavailable
       with a status-derived reason — never fabricated zero usage.
-    * Attempt identity (F3 + N1): when ``attempt_id`` is omitted, both the attempt id and —
-      for a retry (``attempt_number > 1``) — its ``retry_of_attempt_id`` are derived from the
-      SAME tenant-bound scheme (the canonical tenant namespace from
-      ``prepared.attribution.tenant_id`` + ``prepared.logical_request_id`` + instance/task),
-      rejecting missing or ambiguous identity, so a derived retry never crosses tenants. When
-      ``attempt_id`` is supplied explicitly, ``retry_of_attempt_id`` is NEVER reconstructed
-      from the derivation scheme: a retry then REQUIRES an explicit ``retry_of_attempt_id``,
-      and a non-retry must not carry one. Supplying ``retry_of_attempt_id`` while deriving
-      ``attempt_id`` is rejected. The sink additionally partitions idempotency by
-      ``(tenant_namespace, attempt_id)``, so even explicit attempt ids cannot collide across
-      tenants.
+    * Attempt identity (F3 + N1 + N3): when ``attempt_id`` is omitted, both the attempt id and
+      — for a retry (``attempt_number > 1``) — its parent reference are derived from the SAME
+      tenant-bound scheme (the canonical tenant namespace from ``prepared.attribution.tenant_id``
+      + ``prepared.logical_request_id`` + instance/task), so a derived retry can never cross
+      tenants. When ``attempt_id`` is supplied explicitly, the parent linkage is a caller-supplied
+      **tenant-scoped** :class:`ExplicitAttemptReference` (``retry_of``): a retry REQUIRES one,
+      a non-retry must not carry one, and supplying ``retry_of`` while deriving ``attempt_id`` is
+      rejected. The raw opaque ``retry_of_attempt_id`` string form is **removed** — explicit
+      retry linkage must carry a verifiable tenant namespace (N3). Both modes converge on one
+      internal tenant-scoped reference; :func:`reconcile_api_call_measurement` fails closed if
+      the reference's tenant namespace does not match this attempt's, BEFORE any evidence is
+      stored (and never invokes a provider). The sink additionally partitions idempotency by
+      ``(tenant_namespace, attempt_id)``.
     * Delegates to :func:`reconcile_api_call_measurement`, so all strict token-count and
       attempt-identity validation (and the byte-identical idempotent-replay contract on the
       ``sink``) applies unchanged.
@@ -219,41 +222,44 @@ def translate_attempt(
             unavailable_reason = f"attempt {attempt.status.value.lower()}; no usage evidence"
 
     # The tenant namespace is taken from the prepared measurement's attribution (N1): the
-    # attempt id and its retry linkage are BOTH bound to this tenant, so a derived retry can
-    # never reference another tenant's attempt.
+    # attempt id and its retry linkage are BOTH bound to this tenant. Both identity modes
+    # converge on one tenant-scoped ExplicitAttemptReference for the parent (N3).
     tenant_id = prepared.attribution.tenant_id
     is_retry = attempt.attempt_number > 1
     if attempt_id is None:
-        # Derived scheme: id + retry_of both come from the same tenant-bound derivation.
-        if retry_of_attempt_id is not None:
+        # Derived scheme: id + parent reference come from the same tenant-bound derivation.
+        if retry_of is not None:
             raise ValueError(
-                "retry_of_attempt_id may only be supplied with an explicit attempt_id; "
-                "when deriving, retry linkage is derived from the same scheme"
+                "retry_of may only be supplied with an explicit attempt_id; when deriving, "
+                "the parent reference is derived from the same tenant-bound scheme"
             )
         aid = derive_attempt_id(
             attempt, logical_request_id=prepared.logical_request_id, tenant_id=tenant_id
         )
-        retry_of = (
-            _attempt_id_for(
-                prepared.logical_request_id, attempt.instance_id, attempt.task_id,
-                attempt.attempt_number - 1, tenant_id=tenant_id,
+        parent_ref = (
+            ExplicitAttemptReference(
+                attempt_id=_attempt_id_for(
+                    prepared.logical_request_id, attempt.instance_id, attempt.task_id,
+                    attempt.attempt_number - 1, tenant_id=tenant_id,
+                ),
+                tenant_id=tenant_id,
             )
             if is_retry
             else None
         )
     else:
-        # Explicit id: never cross identity schemes to reconstruct retry linkage.
+        # Explicit id: the parent linkage must be a tenant-scoped reference (no opaque string).
         aid = _require_identity(attempt_id, "attempt_id")
-        if is_retry and retry_of_attempt_id is None:
+        if retry_of is not None and not isinstance(retry_of, ExplicitAttemptReference):
+            raise ValueError("retry_of must be an ExplicitAttemptReference")
+        if is_retry and retry_of is None:
             raise ValueError(
                 "an explicit attempt_id for a retry (attempt_number > 1) requires an explicit "
-                "retry_of_attempt_id — the derivation scheme must not be used to reconstruct it"
+                "tenant-scoped retry_of (ExplicitAttemptReference)"
             )
-        if not is_retry and retry_of_attempt_id is not None:
-            raise ValueError(
-                "attempt_number 1 is not a retry; retry_of_attempt_id must be None"
-            )
-        retry_of = retry_of_attempt_id
+        if not is_retry and retry_of is not None:
+            raise ValueError("attempt_number 1 is not a retry; retry_of must be None")
+        parent_ref = retry_of  # tenant validated in reconcile (fail closed on mismatch)
 
     return reconcile_api_call_measurement(
         prepared,
@@ -263,6 +269,6 @@ def translate_attempt(
         provider_invoked=attempt.provider_invoked,
         provider_usage=usage,
         usage_unavailable_reason=unavailable_reason,
-        retry_of_attempt_id=retry_of,
+        retry_of=parent_ref,
         sink=sink,
     )

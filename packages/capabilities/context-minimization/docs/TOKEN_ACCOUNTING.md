@@ -137,6 +137,20 @@ Callers that share accounting infrastructure across tenants **must** provide ten
 (via `RequestAttribution.tenant_id`); otherwise all traffic occupies the single-tenant
 namespace.
 
+### Tenant-scoped explicit retry linkage (N3)
+
+Explicit retry linkage is **not** an opaque string. `reconcile_api_call_measurement` takes
+`retry_of: ExplicitAttemptReference` — a value binding the parent attempt's `attempt_id` **and**
+its `tenant_id`. Reconciliation **fails closed** (`InvalidRequestError`) when the reference's
+tenant namespace does not equal the current attempt's, *before* any record is built or written
+to a sink; the current tenant is never silently substituted. So a tenant-A child can never
+reference a tenant-B parent, in either the explicit or the derived identity mode (derived mode
+builds the reference with the current tenant automatically). This is **tenant-scope** validation
+only — it does **not** assert the referenced parent record exists (durable referential-integrity
+is a separate, deferred concern). Because the parent's tenant is enforced to equal the record's
+own, serialized retry lineage inherits an unambiguous namespace, and `retry_of_attempt_id` +
+`attribution.tenant_id` are both bound in `record_fingerprint`.
+
 ## What this is not
 
 - Not a provider tokenizer, model SDK, or network/database/filesystem persistence.

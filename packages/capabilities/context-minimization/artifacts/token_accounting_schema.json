@@ -358,6 +358,13 @@
   ],
   "tenant_isolation": {
     "attempt_id_binding": "the tenant namespace is a prefix-free segment of the derived attempt id, so identical tenant-local ids in different tenants derive different attempt ids",
+    "explicit_retry_reference": {
+      "enforcement": "reconcile_api_call_measurement fails closed with InvalidRequestError if retry_of.tenant_namespace != canonical_tenant_namespace(prepared.attribution.tenant_id), BEFORE any record is built or written to a sink; the current tenant is never silently substituted",
+      "rule": "explicit retry linkage is a tenant-scoped reference, never a raw opaque string (N3)",
+      "scope": "tenant-scope validation only; it does NOT assert the referenced parent record exists (durable referential-integrity is deferred)",
+      "serialization": "the parent's tenant namespace equals the record's own (enforced), so retry lineage inherits an unambiguous namespace; retry_of_attempt_id + attribution.tenant_id are both bound in record_fingerprint",
+      "type": "ExplicitAttemptReference(attempt_id, tenant_id)"
+    },
     "fingerprint": "tenant_id is bound into ApiCallTokenRecord.record_fingerprint via attribution",
     "named_tenant_namespace": "tenant_id present -> 't:' + tenant (must be non-empty, non-whitespace)",
     "namespace_helper": "canonical_tenant_namespace(tenant_id)",

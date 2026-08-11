@@ -12,6 +12,7 @@ import dataclasses
 import pytest
 
 from ugence_context_minimization.api import (
+    ExplicitAttemptReference,
     AttemptStatus,
     InMemoryTokenAccountingSink,
     ProviderTokenUsage,
@@ -45,7 +46,7 @@ def test_three_attempts_remain_three_records():
     for i in range(1, 4):
         reconcile_api_call_measurement(
             prep, attempt_id=f"a{i}", attempt_number=i, status=AttemptStatus.FAILED if i < 3 else AttemptStatus.SUCCEEDED,
-            retry_of_attempt_id=(f"a{i-1}" if i > 1 else None),
+            retry_of=(ExplicitAttemptReference(attempt_id=f"a{i-1}") if i > 1 else None),
             provider_usage=ProviderTokenUsage(input_tokens=100 * i, output_tokens=i),
             sink=sink,
         )
@@ -62,10 +63,10 @@ def test_retry_and_failed_token_aggregation():
     reconcile_api_call_measurement(prep, attempt_id="a1", attempt_number=1, status=AttemptStatus.FAILED,
                                    provider_usage=ProviderTokenUsage(input_tokens=100, output_tokens=1), sink=sink)
     reconcile_api_call_measurement(prep, attempt_id="a2", attempt_number=2, status=AttemptStatus.FAILED,
-                                   retry_of_attempt_id="a1",
+                                   retry_of=ExplicitAttemptReference(attempt_id="a1"),
                                    provider_usage=ProviderTokenUsage(input_tokens=200, output_tokens=2), sink=sink)
     reconcile_api_call_measurement(prep, attempt_id="a3", attempt_number=3, status=AttemptStatus.SUCCEEDED,
-                                   retry_of_attempt_id="a2",
+                                   retry_of=ExplicitAttemptReference(attempt_id="a2"),
                                    provider_usage=ProviderTokenUsage(input_tokens=300, output_tokens=3), sink=sink)
     summ = aggregate_logical_request_usage(sink.records)
     assert summ.provider_input_tokens == 600

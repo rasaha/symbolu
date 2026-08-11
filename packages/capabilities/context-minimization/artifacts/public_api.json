@@ -11,6 +11,7 @@
     "DEFAULT_POLICY",
     "DefaultApproximateRequestCounter",
     "EquivalenceStatus",
+    "ExplicitAttemptReference",
     "InMemoryTokenAccountingSink",
     "InvalidRequestError",
     "InvalidUnitError",

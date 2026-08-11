@@ -18,7 +18,9 @@ from ugence_context_minimization.api import (
     prepare_api_call_measurement,
 )
 
-from ugence_cm_token_accounting_runtime import derive_attempt_id, translate_attempt
+from ugence_cm_token_accounting_runtime import (
+    derive_attempt_id, translate_attempt, ExplicitAttemptReference,
+)
 
 from support_itg import sample_minimization_result
 
@@ -99,7 +101,7 @@ def test_stable_replay_same_request():
 def test_explicit_id_with_explicit_retry_linkage_accepted():
     prep = _prep()
     att = _att(attempt_number=2)
-    rec = translate_attempt(prep, att, attempt_id="custom-att-2", retry_of_attempt_id="custom-att-1")
+    rec = translate_attempt(prep, att, attempt_id="custom-att-2", retry_of=ExplicitAttemptReference(attempt_id="custom-att-1"))
     assert rec.attempt_id == "custom-att-2"
     assert rec.retry_of_attempt_id == "custom-att-1"
 
@@ -115,14 +117,14 @@ def test_explicit_id_non_retry_with_retry_linkage_rejected():
     prep = _prep()
     att = _att(attempt_number=1)  # not a retry
     with pytest.raises(ValueError):
-        translate_attempt(prep, att, attempt_id="custom-att-1", retry_of_attempt_id="x")
+        translate_attempt(prep, att, attempt_id="custom-att-1", retry_of=ExplicitAttemptReference(attempt_id="x"))
 
 
 def test_derived_id_with_explicit_retry_of_rejected():
     prep = _prep()
     att = _att(attempt_number=2)
     with pytest.raises(ValueError):
-        translate_attempt(prep, att, retry_of_attempt_id="x")  # deriving id but supplying retry_of
+        translate_attempt(prep, att, retry_of=ExplicitAttemptReference(attempt_id="x"))  # deriving id but supplying retry_of
 
 
 def test_derived_retry_uses_same_scheme():

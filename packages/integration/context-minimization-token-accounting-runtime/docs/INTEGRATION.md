@@ -87,16 +87,23 @@ coordinator settles exactly once (the second call finds no active hold and is a 
 same reservation is never charged twice. Thread-safe in-memory storage is **not** durable
 storage; production persistence remains follow-on work.
 
-## Tenant isolation (N1)
+## Tenant isolation (N1 + N3)
 
 Attempt-id derivation is tenant-scoped. `translate_attempt` takes the tenant from
 `prepared.attribution.tenant_id` and binds the canonical tenant namespace
 (`canonical_tenant_namespace`) as a prefix-free segment of the derived `attempt_id`, so two
 tenants using **identical** tenant-local ids (`logical_request_id` + instance + task +
-attempt_number) derive **different** attempt ids. A derived retry's `retry_of_attempt_id`
-uses the **same** tenant namespace, so retry chains never cross tenants. `derive_attempt_id`
-accepts an explicit `tenant_id` (absent → the single-tenant namespace `"s"`; present → must be
-non-empty/non-whitespace).
+attempt_number) derive **different** attempt ids. `derive_attempt_id` accepts an explicit
+`tenant_id` (absent → the single-tenant namespace `"s"`; present → must be non-empty/non-whitespace).
+
+**Retry linkage is tenant-scoped and enforced (N3), not merely conventional.** Explicit retry
+linkage is a caller-supplied **tenant-scoped** `ExplicitAttemptReference(attempt_id, tenant_id)`
+— the raw opaque `retry_of_attempt_id` string is removed. Both identity modes converge on this
+reference (derived mode builds it with the current tenant automatically), and
+`reconcile_api_call_measurement` **fails closed** if the reference's tenant namespace does not
+equal the current attempt's — before any evidence is stored, and without invoking a provider.
+So retry chains cannot cross tenants in either mode. This is tenant-scope validation only; it
+does not assert the referenced parent record exists (durable referential-integrity is deferred).
 
 Defense in depth: the reference `InMemoryTokenAccountingSink` additionally partitions
 idempotency/conflict detection by `(tenant_namespace, attempt_id)`, so even **explicit**

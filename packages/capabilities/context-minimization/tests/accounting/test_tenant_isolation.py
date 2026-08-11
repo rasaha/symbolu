@@ -150,3 +150,60 @@ def test_concurrent_conflicting_duplicates_isolated_within_tenant():
     b_recs = [r for r in sink.records if r.attribution.tenant_id == "B"]
     assert len(a_recs) == 1 and len(b_recs) == 1
     assert any(isinstance(e, InvalidRequestError) for e in errs)
+
+
+# --------------------------------------------------------------------------- #
+# N3 — reconcile enforces tenant-scoped explicit retry references (the choke point).
+# --------------------------------------------------------------------------- #
+def test_reconcile_rejects_cross_tenant_retry_reference():
+    from ugence_context_minimization.api import ExplicitAttemptReference
+    sink = InMemoryTokenAccountingSink()
+    prep = _prep(tenant="tenantA")
+    with pytest.raises(InvalidRequestError):
+        reconcile_api_call_measurement(
+            prep, attempt_id="child", attempt_number=2, status=AttemptStatus.SUCCEEDED,
+            provider_usage=ProviderTokenUsage(input_tokens=1, output_tokens=1),
+            retry_of=ExplicitAttemptReference(attempt_id="P", tenant_id="tenantB"), sink=sink,
+        )
+    assert sink.records == ()  # fail closed before any evidence stored
+
+
+def test_reconcile_accepts_same_tenant_retry_reference():
+    from ugence_context_minimization.api import ExplicitAttemptReference
+    prep = _prep(tenant="tenantA")
+    rec = reconcile_api_call_measurement(
+        prep, attempt_id="child", attempt_number=2, status=AttemptStatus.SUCCEEDED,
+        provider_usage=ProviderTokenUsage(input_tokens=1, output_tokens=1),
+        retry_of=ExplicitAttemptReference(attempt_id="P", tenant_id="tenantA"),
+    )
+    assert rec.retry_of_attempt_id == "P"
+
+
+def test_reconcile_missing_vs_named_tenant_reference_mismatch_rejected():
+    from ugence_context_minimization.api import ExplicitAttemptReference
+    # single-tenant current, named-tenant reference → reject
+    with pytest.raises(InvalidRequestError):
+        reconcile_api_call_measurement(
+            _prep(tenant=None), attempt_id="c", attempt_number=2, status=AttemptStatus.SUCCEEDED,
+            retry_of=ExplicitAttemptReference(attempt_id="P", tenant_id="tenantA"),
+        )
+
+
+def test_reconcile_rejects_raw_string_retry_reference():
+    # retry_of must be an ExplicitAttemptReference, not an opaque string.
+    with pytest.raises(InvalidRequestError):
+        reconcile_api_call_measurement(
+            _prep(tenant="A"), attempt_id="c", attempt_number=2, status=AttemptStatus.SUCCEEDED,
+            retry_of="P",
+        )
+
+
+def test_explicit_attempt_reference_validates_tenant():
+    from ugence_context_minimization.api import ExplicitAttemptReference
+    assert ExplicitAttemptReference(attempt_id="P").tenant_namespace == "s"
+    assert ExplicitAttemptReference(attempt_id="P", tenant_id="X").tenant_namespace == "t:X"
+    for bad in ("", "  ", "\t"):
+        with pytest.raises(InvalidRequestError):
+            ExplicitAttemptReference(attempt_id="P", tenant_id=bad)
+    with pytest.raises(InvalidRequestError):
+        ExplicitAttemptReference(attempt_id="")  # empty parent id

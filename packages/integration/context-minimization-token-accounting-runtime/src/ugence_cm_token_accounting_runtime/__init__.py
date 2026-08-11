@@ -30,6 +30,7 @@ from .bridge import (
     settle_budget_from_usage,
     token_units_from_usage,
 )
+from ugence_context_minimization.api import ExplicitAttemptReference
 from .translation import (
     MappingUsageNormalizer,
     UsageNormalizer,
@@ -46,6 +47,8 @@ __all__ = [
     "MappingUsageNormalizer",
     "translate_attempt",
     "derive_attempt_id",
+    # tenant-scoped explicit retry reference (N3; re-exported from the CM core)
+    "ExplicitAttemptReference",
     # runtime bridge + budget settlement
     "RuntimeTokenAccountingBridge",
     "settle_budget_from_usage",

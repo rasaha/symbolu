@@ -392,6 +392,40 @@ class RequestAttribution:
         }
 
 
+@dataclass(frozen=True)
+class ExplicitAttemptReference:
+    """A tenant-scoped reference to a parent attempt (N3).
+
+    Explicit retry linkage must not be an opaque string: it binds BOTH the parent's tenant
+    namespace and its ``attempt_id`` so a retry reference can be validated to not cross
+    tenants. ``tenant_id`` follows the optional-tenant contract (``None`` = the single-tenant
+    namespace ``"s"``, distinct from any named tenant; a present tenant must be
+    non-empty/non-whitespace). The tenant scope is therefore explicit and verifiable — it is
+    never inferred by parsing the opaque ``attempt_id``.
+
+    This is a **tenant-scope** reference only. It does NOT assert that the referenced parent
+    record actually exists (durable referential-integrity is a separate, deferred concern).
+    """
+
+    attempt_id: str
+    tenant_id: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "attempt_id", _req_str(self.attempt_id, "attempt_id"))
+        object.__setattr__(self, "tenant_id", _opt_tenant(self.tenant_id))
+
+    @property
+    def tenant_namespace(self) -> str:
+        return canonical_tenant_namespace(self.tenant_id)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "attempt_id": self.attempt_id,
+            "tenant_id": self.tenant_id,
+            "tenant_namespace": self.tenant_namespace,
+        }
+
+
 # --------------------------------------------------------------------------- #
 # The per-attempt record.
 # --------------------------------------------------------------------------- #
@@ -897,7 +931,7 @@ def reconcile_api_call_measurement(
     provider_usage: Optional[ProviderTokenUsage] = None,
     usage_unavailable_reason: Optional[str] = None,
     usage_availability: Optional[UsageAvailability] = None,
-    retry_of_attempt_id: Optional[str] = None,
+    retry_of: Optional["ExplicitAttemptReference"] = None,
     sink: Optional[TokenAccountingSink] = None,
 ) -> ApiCallTokenRecord:
     """Record ONE and only one provider attempt against a prepared measurement.
@@ -906,7 +940,13 @@ def reconcile_api_call_measurement(
       it NEVER fabricates zero usage and never replaces the pre-call estimate with actual
       usage (both are carried, distinctly, on the record).
     * Failed / retried attempts are preserved as their own records (a retry is a new
-      ``attempt_id``; supply ``retry_of_attempt_id`` to link it to the prior attempt).
+      ``attempt_id``; supply ``retry_of`` — a tenant-scoped :class:`ExplicitAttemptReference`
+      — to link it to the prior attempt). **Tenant enforcement (N3):** the reference's tenant
+      namespace MUST equal this attempt's tenant namespace (from
+      ``prepared.attribution.tenant_id``); a mismatched, absent-vs-named, or unverifiable
+      reference **fails closed** with :class:`InvalidRequestError` BEFORE any record is built
+      or written to a sink. Cross-tenant retry linkage is impossible by construction, and the
+      current tenant is never silently substituted for a supplied one.
     * Rejects malformed token counts (negative / bool / float / NaN / inf / str) via the
       strict field validators, and — when a ``sink`` is given — rejects a duplicate
       ``attempt_id`` whose content differs (idempotent replay must be byte-identical).
@@ -919,6 +959,22 @@ def reconcile_api_call_measurement(
         raise InvalidRequestError("prepared must be a PreparedApiCall")
     if not isinstance(status, AttemptStatus):
         raise InvalidRequestError("status must be an AttemptStatus")
+
+    # N3 — validate explicit retry linkage is tenant-scoped BEFORE building any evidence.
+    resolved_retry_of_attempt_id: Optional[str] = None
+    if retry_of is not None:
+        if not isinstance(retry_of, ExplicitAttemptReference):
+            raise InvalidRequestError(
+                "retry_of must be an ExplicitAttemptReference (a tenant-scoped parent "
+                "reference), not a raw attempt-id string"
+            )
+        current_ns = canonical_tenant_namespace(prepared.attribution.tenant_id)
+        if retry_of.tenant_namespace != current_ns:
+            raise InvalidRequestError(
+                f"cross-tenant retry linkage rejected: retry_of references tenant namespace "
+                f"{retry_of.tenant_namespace!r} but the current attempt is in {current_ns!r}"
+            )
+        resolved_retry_of_attempt_id = retry_of.attempt_id
 
     has_usage = isinstance(provider_usage, ProviderTokenUsage) and provider_usage.has_any
     if usage_availability is None:
@@ -951,7 +1007,7 @@ def reconcile_api_call_measurement(
         usage_availability=usage_availability,
         provider_usage=effective_usage,
         usage_unavailable_reason=usage_unavailable_reason,
-        retry_of_attempt_id=retry_of_attempt_id,
+        retry_of_attempt_id=resolved_retry_of_attempt_id,
         correlation_id=prepared.correlation_id,
         model_id=prepared.model_id,
         attribution=prepared.attribution,
@@ -1091,6 +1147,7 @@ __all__ = [
     "ProviderTokenUsage",
     "RequestAttribution",
     "canonical_tenant_namespace",
+    "ExplicitAttemptReference",
     "ApiCallTokenRecord",
     "LogicalRequestTokenSummary",
     "RequestTokenCounter",

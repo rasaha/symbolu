@@ -50,7 +50,7 @@ assert "site-packages" in loc.parts, f"not installed from site-packages: {loc}"
 
 from ugence_cm_token_accounting_runtime import (
     MappingUsageNormalizer, translate_attempt, derive_attempt_id, RuntimeTokenAccountingBridge,
-    settle_budget_from_usage, BudgetEstimateExceeded,
+    settle_budget_from_usage, BudgetEstimateExceeded, ExplicitAttemptReference,
 )
 from ugence_agent_runtime.observability.attempts import ProviderAttempt, ProviderAttemptStatus
 from ugence_agent_runtime.orchestration import BudgetCoordinator, BudgetRequirement, PortfolioBudget
@@ -132,6 +132,23 @@ try:
     raise AssertionError("expected whitespace tenant rejection")
 except Exception:
     pass
+# N3: explicit cross-tenant retry reference is rejected fail-closed (no evidence stored)
+_tretry = ProviderAttempt(provider_id="vendor", operation="op", attempt_number=2,
+                          status=ProviderAttemptStatus.SUCCEEDED, ok=True, provider_invoked=True,
+                          instance_id="wf-1", task_id="t1", correlation_id="corr")
+_n3sink = InMemoryTokenAccountingSink()
+try:
+    translate_attempt(_pA, _tretry, attempt_id="A-child",
+                      retry_of=ExplicitAttemptReference(attempt_id="P", tenant_id="tenantB"),
+                      sink=_n3sink)  # tenant-A child, tenant-B parent
+    raise AssertionError("expected cross-tenant retry rejection")
+except Exception:
+    pass
+assert len(_n3sink.records) == 0, "cross-tenant retry must fail closed before storing evidence"
+# same-tenant explicit retry accepted
+_ok = translate_attempt(_pA, _tretry, attempt_id="A-child2",
+                        retry_of=ExplicitAttemptReference(attempt_id="P", tenant_id="tenantA"))
+assert _ok.retry_of_attempt_id == "P"
 
 # ---- F1: total provenance is never blended --------------------------------
 r1b = translate_attempt(prep, _att(1, ProviderAttemptStatus.SUCCEEDED,

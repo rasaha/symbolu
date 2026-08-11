@@ -238,6 +238,13 @@ def token_accounting_schema() -> dict:
             "attempt_id_binding": "the tenant namespace is a prefix-free segment of the derived attempt id, so identical tenant-local ids in different tenants derive different attempt ids",
             "sink_idempotency_key": "(tenant_namespace, attempt_id) — two tenants may store the same explicit attempt_id; same-tenant replay is idempotent; same-tenant conflict is rejected; tenant isolation does not rely on record fingerprints",
             "fingerprint": "tenant_id is bound into ApiCallTokenRecord.record_fingerprint via attribution",
+            "explicit_retry_reference": {
+                "type": "ExplicitAttemptReference(attempt_id, tenant_id)",
+                "rule": "explicit retry linkage is a tenant-scoped reference, never a raw opaque string (N3)",
+                "enforcement": "reconcile_api_call_measurement fails closed with InvalidRequestError if retry_of.tenant_namespace != canonical_tenant_namespace(prepared.attribution.tenant_id), BEFORE any record is built or written to a sink; the current tenant is never silently substituted",
+                "scope": "tenant-scope validation only; it does NOT assert the referenced parent record exists (durable referential-integrity is deferred)",
+                "serialization": "the parent's tenant namespace equals the record's own (enforced), so retry lineage inherits an unambiguous namespace; retry_of_attempt_id + attribution.tenant_id are both bound in record_fingerprint",
+            },
         },
         "fail_closed_conditions": [
             "negative / bool / float / NaN / inf / str token count -> InvalidUnitError/InvalidRequestError",

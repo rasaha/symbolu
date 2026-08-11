@@ -86,6 +86,18 @@ New contracts: `TokenCountBasis`, `AttemptStatus`, `UsageAvailability`,
   same-tenant conflict is still rejected, and tenant isolation does **not** rely on record
   fingerprints. `tenant_id` was already bound into `record_fingerprint` via attribution. (The
   matching tenant-bound attempt-id derivation lives in the integration package.)
+- **N3 — explicit retry linkage is tenant-scoped and fails closed.** New
+  `ExplicitAttemptReference(attempt_id, tenant_id)` binds a parent attempt's tenant namespace
+  explicitly (never inferred from the opaque id). `reconcile_api_call_measurement` replaces the
+  raw `retry_of_attempt_id: str` parameter with `retry_of: ExplicitAttemptReference` and **fails
+  closed** with `InvalidRequestError` when the reference's tenant namespace does not equal this
+  attempt's (`prepared.attribution.tenant_id`) — BEFORE any record is built or written to a sink,
+  and it never substitutes the current tenant for a supplied one. This makes cross-tenant retry
+  linkage impossible in both the explicit and derived identity modes (both converge on one
+  tenant-scoped reference). The raw opaque string form is removed (unreleased, so no alias
+  retained). This is tenant-scope validation only; it does **not** assert the referenced parent
+  record exists (durable referential-integrity remains deferred). New export:
+  `ExplicitAttemptReference`.
 
 ## 0.1.2 — timestamp validation & fingerprint documentation correction
 

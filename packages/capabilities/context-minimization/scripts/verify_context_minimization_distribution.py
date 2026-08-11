@@ -185,6 +185,7 @@ from ugence_context_minimization.api import (
     prepare_api_call_measurement, reconcile_api_call_measurement,
     aggregate_logical_request_usage, ProviderTokenUsage, AttemptStatus,
     UsageAvailability, RequestComponents, TokenCountBasis, InMemoryTokenAccountingSink,
+    ExplicitAttemptReference,
 )
 # A: context reduction is copied from a real MinimizationResult (o, from step 2 above).
 _prep = prepare_api_call_measurement(
@@ -206,7 +207,7 @@ _sink = InMemoryTokenAccountingSink()
 reconcile_api_call_measurement(_prep, attempt_id="d1", attempt_number=1,
                                status=AttemptStatus.FAILED, sink=_sink)
 reconcile_api_call_measurement(_prep, attempt_id="d2", attempt_number=2,
-                               status=AttemptStatus.SUCCEEDED, retry_of_attempt_id="d1",
+                               status=AttemptStatus.SUCCEEDED, retry_of=ExplicitAttemptReference(attempt_id="d1"),
                                provider_usage=ProviderTokenUsage(input_tokens=2337,
                                                                  cached_input_tokens=1500,
                                                                  output_tokens=428),
