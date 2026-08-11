@@ -4,6 +4,14 @@ from __future__ import annotations
 
 from .actions import ActionAuthorization, CanonicalAction, action_digest
 from .authority import AuthorityGrant, AuthorityPrincipal, authority_violations
+from .authority_signal import (
+    AUTHORITY_SIGNAL_SCHEMA_VERSION,
+    SUPPORTED_SIGNAL_SCHEMA_VERSIONS,
+    AuthorityReassessmentSignal,
+    SignalChangeType,
+    SignalTarget,
+    SignalTargetType,
+)
 from .binding import (
     AdmittedContext,
     CaseBindingContext,
@@ -81,6 +89,13 @@ __all__ = [
     "AuthorityGrant",
     "AuthorityPrincipal",
     "authority_violations",
+    # RA-6 reassessment signal (neutral; carries no authority)
+    "AuthorityReassessmentSignal",
+    "SignalChangeType",
+    "SignalTarget",
+    "SignalTargetType",
+    "AUTHORITY_SIGNAL_SCHEMA_VERSION",
+    "SUPPORTED_SIGNAL_SCHEMA_VERSIONS",
     # controls / evidence
     "ControlResult",
     "required_controls_satisfied",
