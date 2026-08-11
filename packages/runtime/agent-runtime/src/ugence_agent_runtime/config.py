@@ -61,6 +61,12 @@ class AgentRuntimeConfig:
     event_store: Optional[RuntimeEventStore] = None
     event_sink: Optional[Callable] = None
     clock: Callable[[], float] = _default_clock
+    # Optional last-mile authority re-verification hook (RA-6 §8). When set, the
+    # runtime runs it inside ``validate_clearance`` immediately before a
+    # consequential provider invocation, re-confirming the authority the CLEAR
+    # rested on is still valid at the commit point. Neutral by contract: the
+    # runtime never inspects it, and ``None`` (default) means no behavior change.
+    authority_recheck: Optional[Callable] = None
     id_generator: Callable[[], str] = field(
         default_factory=lambda: _SequentialIdGenerator("wf")
     )

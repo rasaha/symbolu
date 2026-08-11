@@ -543,7 +543,9 @@ class AgentRuntime:
         # CONTINUE (CLEAR): for consequential tasks, the CLEAR must be bound to the
         # EXACT proposal before any provider is invoked. Fail closed otherwise.
         if ti.definition.consequential:
-            permitted, reasons = validate_clearance(evaluation, proposal, self._config.clock())
+            permitted, reasons = validate_clearance(
+                evaluation, proposal, self._config.clock(), self._config.authority_recheck
+            )
             if not permitted:
                 self._fail_task_governance(
                     instance, ti, trace, reasons,

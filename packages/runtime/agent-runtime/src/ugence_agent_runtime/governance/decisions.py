@@ -14,10 +14,23 @@ or malformed evaluation as CLEAR (fail closed).
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional, Tuple
+from typing import Callable, Optional, Tuple
 
 from ..models.proposal import TransitionProposal
 from .interfaces import GovernanceDisposition, GovernanceEvaluation
+
+# A neutral pre-effect authority-recheck callable (RA-6 §8 "last-mile TOCTOU").
+# The runtime stays concrete-free: it knows nothing about Risk Authority, epochs,
+# or revocation. An external governance integration may supply a callable that,
+# immediately before the irreversible effect, re-verifies that the authority the
+# CLEAR was bound to is *still* valid (not expired, not revoked, not stale-epoch,
+# and status fresh enough). It returns ``(ok, reason_codes)`` and MUST NOT mint
+# authority or mutate state — it can only confirm or fail closed. When no callable
+# is configured, behavior is exactly as before (fully backward compatible).
+AuthorityRecheck = Callable[
+    [Optional[GovernanceEvaluation], TransitionProposal, float],
+    Tuple[bool, Tuple[str, ...]],
+]
 
 
 class RuntimeDirective(str, Enum):
@@ -71,18 +84,31 @@ CLEAR_REJECTED_NO_REFERENCE = "GOVERNANCE_CLEAR_MISSING_REFERENCE"
 CLEAR_REJECTED_EXPIRED = "GOVERNANCE_CLEAR_EXPIRED"
 CLEAR_REJECTED_MISSING_CORRELATION = "GOVERNANCE_CLEAR_MISSING_CORRELATION"
 CLEAR_REJECTED_CORRELATION = "GOVERNANCE_CLEAR_CORRELATION_MISMATCH"
+# Emitted when a configured last-mile authority recheck fails immediately before
+# the effect (RA-6 §8): the CLEAR was validly bound, but the authority it rested
+# on is no longer valid at the commit point (expired / revoked / stale epoch /
+# status too stale). Fail closed.
+CLEAR_REJECTED_AUTHORITY_STALE = "GOVERNANCE_CLEAR_AUTHORITY_STALE"
 
 
 def validate_clearance(
     evaluation: Optional[GovernanceEvaluation],
     proposal: TransitionProposal,
     now: float,
+    authority_recheck: "Optional[AuthorityRecheck]" = None,
 ) -> Tuple[bool, Tuple[str, ...]]:
     """Decide whether a CLEAR result may be acted on for this exact proposal.
 
     Returns ``(permitted, reason_codes)``. Fails closed: any missing, mismatched,
     unreferenced, or expired binding yields ``(False, reasons)``. This is the sole
     gate between a governance result and a provider invocation.
+
+    ``authority_recheck`` (optional, RA-6 §8) is a neutral last-mile hook run
+    ONLY after every existing binding check has passed — i.e. immediately before
+    the irreversible effect. If supplied and it returns ``(False, reasons)`` the
+    clearance is rejected fail-closed with :data:`CLEAR_REJECTED_AUTHORITY_STALE`
+    plus the hook's reasons. When it is ``None`` (the default) behavior is
+    identical to before — the runtime adds no authority concept of its own.
     """
     if evaluation is None:
         return False, (CLEAR_REJECTED_MISSING,)
@@ -120,4 +146,14 @@ def validate_clearance(
 
     if reasons:
         return False, tuple(reasons)
+
+    # Last-mile authority re-verification (RA-6 §8): the CLEAR is validly bound to
+    # this exact proposal; re-confirm the underlying authority is STILL valid at
+    # the commit point. This runs last, closest to the effect, and can only fail
+    # closed — it never broadens a decision.
+    if authority_recheck is not None:
+        ok, recheck_reasons = authority_recheck(evaluation, proposal, now)
+        if not ok:
+            return False, (CLEAR_REJECTED_AUTHORITY_STALE,) + tuple(recheck_reasons)
+
     return True, ()
