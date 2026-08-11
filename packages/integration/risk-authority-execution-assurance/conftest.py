@@ -24,6 +24,15 @@ for _src in (
     ),
     os.path.join(_REPO, "packages", "capabilities", "decision-authority", "src"),
     os.path.join(_REPO, "packages", "governance-contracts", "src"),
+    # RA-7 runtime-assurance is a baseline compatibility dependency for the RA-8
+    # regression `test_35_ra7_unchanged` (it asserts RA-7's surface is undisturbed
+    # and that RA-7 does NOT carry the RA-8 EXECUTION_EFFECT_MISMATCH reason). Adding
+    # its ``src`` here keeps the in-place source suite at parity with the scoped CI
+    # job (which pip-installs the same package), so the invariant is actually
+    # exercised rather than silently skipped.
+    os.path.join(
+        _REPO, "packages", "integration", "risk-authority-runtime-assurance", "src"
+    ),
 ):
     if os.path.isdir(_src) and _src not in sys.path:
         sys.path.insert(0, _src)

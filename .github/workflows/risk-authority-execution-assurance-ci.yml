@@ -56,6 +56,10 @@ jobs:
           pip install -e packages/risk_authority
           pip install -e packages/integration/risk-authority-status-runtime
           pip install -e packages/capabilities/decision-authority
+          # RA-7 is a baseline compatibility dependency for test_35_ra7_unchanged,
+          # which asserts RA-7's surface is undisturbed by RA-8. Install it so the
+          # regression is actually exercised (not ImportError-skipped).
+          pip install -e packages/integration/risk-authority-runtime-assurance
           pip install -e packages/integration/risk-authority-execution-assurance
       - name: RA-8 suite (contracts, correlation, ingress, aggregation, assurance, handoff, e2e)
         run: python -m pytest packages/integration/risk-authority-execution-assurance/tests -q
