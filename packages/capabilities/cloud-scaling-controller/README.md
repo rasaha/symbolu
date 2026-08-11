@@ -179,10 +179,19 @@ print(fc.advisory_only, fc.shadow_only, fc.actuation_performed) # True True Fals
 print(evidence.digest())                                        # sha256: content identity
 ```
 
-**Baseline models:** persistence (last value) and deterministic linear-trend (OLS). A
-third baseline is deferred until replay evaluation justifies it. **Uncertainty:** an
-empirical rolling-origin residual interval (non-Gaussian; explicitly *unavailable* when
-residuals are insufficient). **Abstention** is a first-class, evidence-producing output
+**Value space (precisely disclosed):** forecasts are either *projected without conversion*
+(default — raw canonical target domain; `running_replicas → current_replicas`, never
+ready/desired/healthy) or *explicitly normalized* (`forecast_space=NORMALIZED` applies the
+Phase-1 `normalize_signal` authority to a ratio in `[0, 1]`); the applied space and
+normalization-policy digest are bound into the input-window and evidence digests, and no
+unit is silently converted. **Domain enforcement:** a `SignalDomain` sourced from the
+Phase-1 `unit_domain` authority is enforced on inputs and outputs (including integer
+semantics — a fractional replica forecast abstains rather than being presented as valid);
+nothing is clamped or rounded. **Baseline models:** persistence (last value) and
+deterministic linear-trend (OLS). A third baseline is deferred until replay evaluation
+justifies it. **Uncertainty:** an empirical rolling-origin residual interval (non-Gaussian;
+explicitly *unavailable* when residuals are insufficient). **Abstention** is a first-class,
+evidence-producing output
 (insufficient/stale history, excessive missingness, irregular cadence, subject/tenant
 mismatch, unsupported target/horizon, missing normalization policy, out-of-domain
 forecast, insufficient calibration, …). See the

@@ -30,7 +30,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
-from ..canonical.measurement import Measurement, Unit
+from ..canonical.measurement import Measurement, Unit, UnitDomain, unit_domain
 from ..canonical.state import CanonicalCapacityState
 
 
@@ -50,16 +50,33 @@ class ForecastTarget(str, Enum):
 
 
 # Synthetic unit label for the raw integer replica count (which is NOT a Measurement).
+# Its admissible domain is the same as a COUNT: a non-negative integer.
 REPLICAS_UNIT = "replicas"
+
+# Map every controller-relevant target to the Phase-1 normalization signal name it
+# corresponds to under the canonical projection. RUNNING_REPLICAS has no normalization
+# method — the projection maps it to ScalingObservation.current_replicas WITHOUT
+# conversion (never desired/ready/healthy), so it carries no signal name here.
+TARGET_SIGNAL_NAME = {
+    ForecastTarget.CPU_UTILIZATION: "cpu",
+    ForecastTarget.MEMORY_UTILIZATION: "memory",
+    ForecastTarget.P99_LATENCY: "latency_p99",
+    ForecastTarget.ERROR_RATE: "error_rate",
+    ForecastTarget.QUEUE_DEPTH: "queue_depth",
+    ForecastTarget.RUNNING_REPLICAS: None,
+}
 
 
 @dataclass(frozen=True)
 class SignalDomain:
     """Admissible value domain for a target measured in a specific unit.
 
-    ``lower``/``upper`` are inclusive finite bounds or ``None`` (unbounded). ``integer``
-    marks integer-valued domains (counts, replica counts). Used to detect out-of-domain
-    forecasts; the forecasting layer never silently clamps into the domain.
+    ``lower``/``upper`` are inclusive finite bounds or ``None`` (unbounded); ``integer``
+    marks integer-valued domains (counts, replica counts). Bounds are sourced from the
+    authoritative Phase-1 :func:`~..canonical.measurement.unit_domain` — this layer keeps
+    no divergent duplicate of the per-unit bounds. Used to detect out-of-domain
+    observations AND forecasts; the forecasting layer never silently clamps, rounds, or
+    coerces into the domain.
     """
 
     label: str
@@ -68,9 +85,18 @@ class SignalDomain:
     integer: bool
 
     def contains(self, value: float, *, tol: float = 1e-9) -> bool:
+        """True iff ``value`` is finite, within bounds, AND (when the domain is integer)
+        integer-valued. A fractional value in an integer domain is OUT of domain."""
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return False
+        import math as _math
+        if _math.isnan(value) or _math.isinf(value):
+            return False
         if self.lower is not None and value < self.lower - tol:
             return False
         if self.upper is not None and value > self.upper + tol:
+            return False
+        if self.integer and abs(value - round(value)) > tol:
             return False
         return True
 
@@ -90,20 +116,21 @@ class TargetSample:
 
 
 def _domain_for_unit(unit: str) -> SignalDomain:
-    """Derive the admissible domain from a raw unit string (no conversion implied)."""
-    if unit in (Unit.RATIO.value, Unit.RATE.value):
-        return SignalDomain(unit, 0.0, 1.0, integer=False)
-    if unit == Unit.PERCENT.value:
-        return SignalDomain(unit, 0.0, 100.0, integer=False)
-    if unit in (Unit.MILLISECONDS.value, Unit.SECONDS.value, Unit.PER_SECOND.value,
-                Unit.BYTES.value, Unit.CORES.value):
-        return SignalDomain(unit, 0.0, None, integer=False)
-    if unit == Unit.COUNT.value:
-        return SignalDomain(unit, 0.0, None, integer=True)
+    """Derive the admissible domain from a raw unit string via the Phase-1 authority.
+
+    Replica counts share the COUNT domain (non-negative integer). Bounds are NOT
+    duplicated here — they come from :func:`~..canonical.measurement.unit_domain`.
+    """
     if unit == REPLICAS_UNIT:
-        return SignalDomain(unit, 0.0, None, integer=True)
-    # Unknown/opaque unit: unbounded, non-integer. The forecaster still records it.
-    return SignalDomain(unit, None, None, integer=False)
+        d = unit_domain(Unit.COUNT)
+        return SignalDomain(REPLICAS_UNIT, d.lower, d.upper, d.integer)
+    try:
+        u = Unit(unit)
+    except ValueError:
+        # Unknown/opaque unit: unbounded, non-integer. The forecaster still records it.
+        return SignalDomain(unit, None, None, integer=False)
+    d = unit_domain(u)
+    return SignalDomain(unit, d.lower, d.upper, d.integer)
 
 
 def domain_for(unit: str) -> SignalDomain:
@@ -123,6 +150,23 @@ def _measurement_for(state: CanonicalCapacityState, target: ForecastTarget) -> O
     if target is ForecastTarget.QUEUE_DEPTH:
         return None if state.workload is None else state.workload.queue_depth
     raise TargetError(f"{target.value} is not a Measurement-backed target")
+
+
+def extract_measurement(
+    state: CanonicalCapacityState, target: ForecastTarget
+) -> Optional[Measurement]:
+    """Return the underlying :class:`Measurement` for a measurement-backed ``target``.
+
+    Returns ``None`` for RUNNING_REPLICAS (a raw integer count, not a Measurement — it is
+    projected to the controller WITHOUT conversion) and for an absent target. Used by the
+    normalization path, which needs the unit-bearing Measurement to apply the Phase-1
+    normalization authority.
+    """
+    if not isinstance(state, CanonicalCapacityState):
+        raise TargetError("state must be a CanonicalCapacityState")
+    if target is ForecastTarget.RUNNING_REPLICAS:
+        return None
+    return _measurement_for(state, target)
 
 
 def extract_sample(
@@ -162,8 +206,10 @@ __all__ = [
     "TargetError",
     "ForecastTarget",
     "REPLICAS_UNIT",
+    "TARGET_SIGNAL_NAME",
     "SignalDomain",
     "TargetSample",
     "domain_for",
     "extract_sample",
+    "extract_measurement",
 ]

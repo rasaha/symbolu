@@ -62,6 +62,10 @@ class CapacityForecast:
     point_estimate: Optional[float] = None
     abstention_reason: Optional[AbstentionReason] = None
     warnings: Tuple[str, ...] = field(default_factory=tuple)
+    # Normalization/projection disclosure — precisely states the value space the point
+    # estimate and unit live in (raw projected-without-conversion vs explicitly normalized).
+    value_space: str = "projected_without_conversion"
+    normalization_applied: bool = False
 
     # Fixed shadow-only, advisory-only classification.
     authority_class: str = AUTHORITY_CLASS_ADVISORY
@@ -115,6 +119,8 @@ class CapacityForecast:
             "model_version": self.model_version,
             "status": self.status,
             "unit": self.unit,
+            "value_space": self.value_space,
+            "normalization_applied": self.normalization_applied,
             "point_estimate": self.point_estimate,
             "abstention_reason": self.abstention_reason.value if self.abstention_reason else None,
             "uncertainty": self.uncertainty.to_canonical_dict(),

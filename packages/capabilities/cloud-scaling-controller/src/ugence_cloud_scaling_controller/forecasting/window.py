@@ -24,18 +24,58 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
+from ..canonical.normalization import (
+    NormalizationError,
+    NormalizationPolicy,
+    normalize_signal,
+)
 from ..canonical.serialization import content_digest
 from .series import CanonicalCapacitySeries, _as_utc
-from .targets import ForecastTarget, TargetSample, extract_sample
+from .targets import (
+    TARGET_SIGNAL_NAME,
+    ForecastTarget,
+    TargetSample,
+    extract_measurement,
+    extract_sample,
+)
 
 INPUT_WINDOW_SCHEMA_VERSION = "capacity-forecast-window-1"
 FEATURE_CONFIG_SCHEMA_VERSION = "capacity-forecast-feature-1"
 
+# Normalized signals are ratios in [0, 1].
+NORMALIZED_UNIT = "ratio"
+
 
 class WindowError(ValueError):
     """Raised when a forecast input window would be unsafe or malformed (fail closed)."""
+
+
+class NormalizationApplicabilityError(WindowError):
+    """Raised when a requested normalization cannot be applied to the observations.
+
+    Carries a ``reason`` label the forecast service maps to a typed abstention rather than
+    propagating as a hard error (missing method vs. incompatible unit)."""
+
+    def __init__(self, message: str, *, reason: str):
+        super().__init__(message)
+        self.reason = reason
+
+
+class ForecastValueSpace(str, Enum):
+    """The space a forecast's values live in — precisely disclosed, never implied.
+
+    * ``PROJECTED_WITHOUT_CONVERSION`` — raw canonical target values, mapped to the
+      controller-relevant signal WITHOUT unit conversion (the default; e.g. CPU percent
+      stays percent, running_replicas stays an integer count → current_replicas).
+    * ``NORMALIZED`` — values explicitly normalized to a ratio in ``[0, 1]`` by applying
+      the supplied Phase-1 :class:`NormalizationPolicy` (the canonical authority).
+    """
+
+    PROJECTED_WITHOUT_CONVERSION = "projected_without_conversion"
+    NORMALIZED = "normalized"
 
 
 @dataclass(frozen=True)
@@ -168,6 +208,12 @@ class ForecastInputWindow:
     cadence: CadenceInfo
     feature_config: FeatureConfig
     source_series_digest: str
+    # Normalization / projection disclosure (bound into the window digest).
+    value_space: str = ForecastValueSpace.PROJECTED_WITHOUT_CONVERSION.value
+    normalization_applied: bool = False
+    normalization_policy_digest: Optional[str] = None
+    applied_signal: Optional[str] = None
+    applied_method: Optional[str] = None
 
     def __post_init__(self) -> None:
         # Hard leakage invariant: no included sample may be after the cutoff.
@@ -209,6 +255,11 @@ class ForecastInputWindow:
             "cadence": self.cadence.to_canonical_dict(),
             "feature_config": self.feature_config.to_canonical_dict(),
             "source_series_digest": self.source_series_digest,
+            "value_space": self.value_space,
+            "normalization_applied": self.normalization_applied,
+            "normalization_policy_digest": self.normalization_policy_digest,
+            "applied_signal": self.applied_signal,
+            "applied_method": self.applied_method,
         }
 
     def digest(self) -> str:
@@ -221,12 +272,27 @@ def build_input_window(
     cutoff: datetime,
     horizon: ForecastHorizon,
     feature_config: Optional[FeatureConfig] = None,
+    *,
+    normalization_policy: Optional[NormalizationPolicy] = None,
+    forecast_space: ForecastValueSpace = ForecastValueSpace.PROJECTED_WITHOUT_CONVERSION,
 ) -> ForecastInputWindow:
     """Build a leakage-safe input window from ``series`` for ``target`` at ``cutoff``.
 
     Only observations with ``cutoff - lookback <= event_time <= cutoff`` are considered.
-    Present samples carry the raw value + unit; missing observations are counted, never
-    filled. Cadence gaps are measured between consecutive PRESENT samples.
+    Missing observations are counted, never filled. Cadence gaps are measured between
+    consecutive PRESENT samples.
+
+    Value space (disclosed and digest-bound):
+
+    * ``PROJECTED_WITHOUT_CONVERSION`` (default): present samples carry the RAW canonical
+      value + unit — no unit conversion. The ``normalization_policy``, if supplied, is
+      recorded as the canonical reference but is NOT applied to the values.
+    * ``NORMALIZED``: for a measurement-backed target, each sample is normalized to a ratio
+      in ``[0, 1]`` by applying the Phase-1 :func:`normalize_signal` authority under the
+      supplied ``normalization_policy``. Requires a policy with a method for the target's
+      signal; a missing method or an incompatible unit raises
+      :class:`NormalizationApplicabilityError` (mapped to a typed abstention by the service).
+      RUNNING_REPLICAS has no normalization method and cannot be normalized.
     """
     if not isinstance(series, CanonicalCapacitySeries):
         raise WindowError("series must be a CanonicalCapacitySeries")
@@ -236,7 +302,29 @@ def build_input_window(
         raise WindowError("horizon must be a ForecastHorizon")
     if not isinstance(cutoff, datetime):
         raise WindowError("cutoff must be a datetime")
+    if not isinstance(forecast_space, ForecastValueSpace):
+        raise WindowError("forecast_space must be a ForecastValueSpace")
     feature_config = feature_config or FeatureConfig()
+
+    signal = TARGET_SIGNAL_NAME.get(target)
+    do_normalize = forecast_space is ForecastValueSpace.NORMALIZED
+    if do_normalize:
+        if signal is None:
+            raise NormalizationApplicabilityError(
+                f"target {target.value} has no normalization method (projected without "
+                "conversion); it cannot be normalized",
+                reason="unsupported_target",
+            )
+        if normalization_policy is None:
+            raise NormalizationApplicabilityError(
+                "NORMALIZED forecast_space requires an explicit normalization_policy",
+                reason="missing_normalization_policy",
+            )
+        if normalization_policy.method_by_signal.get(signal) is None:
+            raise NormalizationApplicabilityError(
+                f"normalization_policy has no method for signal {signal!r}",
+                reason="missing_normalization_policy",
+            )
 
     c = _as_utc(cutoff)
     lower = c - timedelta(seconds=feature_config.lookback_seconds)
@@ -248,10 +336,28 @@ def build_input_window(
 
     samples: List[TargetSample] = []
     missing_count = 0
+    applied_method: Optional[str] = None
     for state in considered:
         sample = extract_sample(state, target)
         if sample is None:
             missing_count += 1
+            continue
+        if do_normalize:
+            measurement = extract_measurement(state, target)
+            if measurement is None:  # defensive; guarded above
+                missing_count += 1
+                continue
+            try:
+                ns = normalize_signal(signal, measurement, normalization_policy,
+                                      state.provenance_for(signal))
+            except NormalizationError as exc:
+                raise NormalizationApplicabilityError(
+                    f"normalization of signal {signal!r} failed: {exc}",
+                    reason="inconsistent_unit",
+                ) from exc
+            applied_method = ns.method
+            samples.append(TargetSample(
+                event_time=sample.event_time, value=ns.normalized_value, unit=NORMALIZED_UNIT))
         else:
             samples.append(sample)
 
@@ -296,13 +402,22 @@ def build_input_window(
         cadence=cadence,
         feature_config=feature_config,
         source_series_digest=series.digest(),
+        value_space=forecast_space.value,
+        normalization_applied=do_normalize,
+        normalization_policy_digest=(
+            normalization_policy.digest() if normalization_policy is not None else None),
+        applied_signal=(signal if do_normalize else None),
+        applied_method=applied_method,
     )
 
 
 __all__ = [
     "INPUT_WINDOW_SCHEMA_VERSION",
     "FEATURE_CONFIG_SCHEMA_VERSION",
+    "NORMALIZED_UNIT",
     "WindowError",
+    "NormalizationApplicabilityError",
+    "ForecastValueSpace",
     "ForecastHorizon",
     "HORIZON_5M",
     "HORIZON_15M",

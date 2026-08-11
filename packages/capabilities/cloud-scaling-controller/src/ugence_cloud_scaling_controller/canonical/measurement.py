@@ -16,7 +16,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 
 class MeasurementError(ValueError):
@@ -43,6 +43,58 @@ _NON_NEGATIVE_UNITS = frozenset({
     Unit.PERCENT, Unit.MILLISECONDS, Unit.SECONDS, Unit.COUNT,
     Unit.PER_SECOND, Unit.RATE, Unit.BYTES, Unit.CORES,
 })
+
+
+@dataclass(frozen=True)
+class UnitDomain:
+    """The admissible value domain for a :class:`Unit`: inclusive finite bounds (or
+    ``None`` for unbounded) and whether the domain is integer-valued.
+
+    This is the single authoritative source of per-unit bounds. :class:`Measurement`
+    validation and any downstream domain check (e.g. the forecasting layer's
+    ``SignalDomain``) must agree with it — a consistency test pins that agreement so the
+    bounds can never silently diverge into a duplicate, drifting copy.
+    """
+
+    lower: Optional[float]
+    upper: Optional[float]
+    integer: bool
+
+    def contains(self, value: Any, *, tol: float = 1e-9) -> bool:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return False
+        fv = float(value)
+        if math.isnan(fv) or math.isinf(fv):
+            return False
+        if self.lower is not None and fv < self.lower - tol:
+            return False
+        if self.upper is not None and fv > self.upper + tol:
+            return False
+        if self.integer and abs(fv - round(fv)) > tol:
+            return False
+        return True
+
+
+# Authoritative per-unit domains (bounds mirror Measurement.__post_init__ exactly).
+_UNIT_DOMAINS: Dict[Unit, UnitDomain] = {
+    Unit.RATIO: UnitDomain(0.0, 1.0, False),
+    Unit.RATE: UnitDomain(0.0, 1.0, False),
+    Unit.PERCENT: UnitDomain(0.0, 100.0, False),
+    Unit.MILLISECONDS: UnitDomain(0.0, None, False),
+    Unit.SECONDS: UnitDomain(0.0, None, False),
+    Unit.PER_SECOND: UnitDomain(0.0, None, False),
+    Unit.BYTES: UnitDomain(0.0, None, False),
+    Unit.CORES: UnitDomain(0.0, None, False),
+    Unit.COUNT: UnitDomain(0.0, None, True),
+    Unit.CURRENCY_MINOR: UnitDomain(None, None, True),
+}
+
+
+def unit_domain(unit: Unit) -> UnitDomain:
+    """Return the authoritative :class:`UnitDomain` for ``unit`` (fail closed on non-Unit)."""
+    if not isinstance(unit, Unit):
+        raise MeasurementError(f"unit must be a Unit, got {unit!r}")
+    return _UNIT_DOMAINS[unit]
 
 
 @dataclass(frozen=True)
@@ -117,4 +169,6 @@ __all__ = [
     "Unit",
     "Measurement",
     "measure",
+    "UnitDomain",
+    "unit_domain",
 ]

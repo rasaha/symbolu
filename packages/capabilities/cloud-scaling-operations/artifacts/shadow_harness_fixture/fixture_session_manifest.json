@@ -1,5 +1,5 @@
 {
-  "advisory_package_version": "0.1.1",
+  "advisory_package_version": "0.3.0",
   "cluster_identifier": "fake-cluster",
   "context_name": "fake-read-only-context",
   "decision_count": 3,

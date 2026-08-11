@@ -161,9 +161,19 @@ def main() -> int:
     c.check("scenarios_reproducible_and_ok", rep["reproducible"] and rep["all_ok"],
             f"{rep['count']} scenarios")
 
-    # 7. Package versions + boundaries.
-    c.check("package_versions", OPS_V == "0.1.0" and ADV_V == "0.1.1",
-            f"ops={OPS_V}, advisory={ADV_V}")
+    # 7. Package versions + boundaries. Read the expected controller version from the
+    # controller's single-source version.py (never hardcode it) and assert the operations
+    # package depends on that line — this tests the SUPPORTED compatibility relationship
+    # (operations -> current controller) rather than pinning a stale controller version.
+    import re as _re
+    _adv_ver_txt = (ADV / "src" / "ugence_cloud_scaling_controller" / "version.py").read_text()
+    _adv_expected = _re.search(r'__version__\s*=\s*"([^"]+)"', _adv_ver_txt).group(1)
+    _ops_ver_txt = (PKG / "src" / "ugence_cloud_scaling_operations" / "version.py").read_text()
+    _ops_expected = _re.search(r'__version__\s*=\s*"([^"]+)"', _ops_ver_txt).group(1)
+    _adv_major_minor = tuple(int(x) for x in _adv_expected.split(".")[:2])
+    c.check("package_versions",
+            OPS_V == _ops_expected and ADV_V == _adv_expected and _adv_major_minor == (0, 3),
+            f"ops={OPS_V} (expect {_ops_expected}), advisory={ADV_V} (expect {_adv_expected}, 0.3.x)")
     adv_manifest = json.loads((ADV / "module_manifest.json").read_text())
     c.check("advisory_remains_advisory_only",
             adv_manifest.get("execution_capability") == "NONE"

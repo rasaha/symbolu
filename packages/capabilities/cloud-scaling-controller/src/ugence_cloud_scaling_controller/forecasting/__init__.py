@@ -43,11 +43,13 @@ from .abstention import (
 from .targets import (
     ForecastTarget,
     REPLICAS_UNIT,
+    TARGET_SIGNAL_NAME,
     SignalDomain,
     TargetError,
     TargetSample,
     domain_for,
     extract_sample,
+    extract_measurement,
 )
 from .series import (
     CANONICAL_SERIES_SCHEMA_VERSION,
@@ -56,18 +58,22 @@ from .series import (
     OrderingPolicy,
     SeriesConstructionPolicy,
     SeriesError,
+    SeriesErrorReason,
 )
 from .window import (
     FEATURE_CONFIG_SCHEMA_VERSION,
     INPUT_WINDOW_SCHEMA_VERSION,
+    NORMALIZED_UNIT,
     CadenceInfo,
     FeatureConfig,
     ForecastHorizon,
     ForecastInputWindow,
+    ForecastValueSpace,
     HORIZON_5M,
     HORIZON_15M,
     HORIZON_60M,
     MissingnessInfo,
+    NormalizationApplicabilityError,
     WindowError,
     build_input_window,
 )
@@ -97,6 +103,7 @@ from .evidence import (
     AdmissionPolicy,
     CapacityForecastEvidence,
     ForecastServiceError,
+    forecast_from_observations,
     forecast_with_evidence,
     generate_forecast,
 )
@@ -109,6 +116,7 @@ from .evaluation import (
     ForecastEvaluationRecord,
     aggregate_evaluations,
     evaluate_forecast,
+    unscored_record,
 )
 from .replay import (
     ReplayError,
@@ -121,15 +129,17 @@ __all__ = [
     # abstention
     "FORECAST_STATUS_ABSTAINED", "FORECAST_STATUS_FORECAST", "AbstentionReason",
     # targets
-    "ForecastTarget", "REPLICAS_UNIT", "SignalDomain", "TargetError", "TargetSample",
-    "domain_for", "extract_sample",
+    "ForecastTarget", "REPLICAS_UNIT", "TARGET_SIGNAL_NAME", "SignalDomain", "TargetError",
+    "TargetSample", "domain_for", "extract_sample", "extract_measurement",
     # series
     "CANONICAL_SERIES_SCHEMA_VERSION", "CanonicalCapacitySeries",
     "DuplicateTimestampPolicy", "OrderingPolicy", "SeriesConstructionPolicy", "SeriesError",
+    "SeriesErrorReason",
     # window
-    "FEATURE_CONFIG_SCHEMA_VERSION", "INPUT_WINDOW_SCHEMA_VERSION", "CadenceInfo",
-    "FeatureConfig", "ForecastHorizon", "ForecastInputWindow", "HORIZON_5M", "HORIZON_15M",
-    "HORIZON_60M", "MissingnessInfo", "WindowError", "build_input_window",
+    "FEATURE_CONFIG_SCHEMA_VERSION", "INPUT_WINDOW_SCHEMA_VERSION", "NORMALIZED_UNIT",
+    "CadenceInfo", "FeatureConfig", "ForecastHorizon", "ForecastInputWindow",
+    "ForecastValueSpace", "HORIZON_5M", "HORIZON_15M", "HORIZON_60M", "MissingnessInfo",
+    "NormalizationApplicabilityError", "WindowError", "build_input_window",
     # forecasters
     "BaselineForecaster", "ForecasterError", "LinearTrendForecaster", "PersistenceForecaster",
     # uncertainty
@@ -140,11 +150,11 @@ __all__ = [
     # evidence + service
     "ADMISSION_POLICY_SCHEMA_VERSION", "FORECAST_EVIDENCE_SCHEMA_VERSION", "AdmissionPolicy",
     "CapacityForecastEvidence", "ForecastServiceError", "forecast_with_evidence",
-    "generate_forecast",
+    "forecast_from_observations", "generate_forecast",
     # evaluation
     "AGGREGATE_EVALUATION_SCHEMA_VERSION", "EVALUATION_RECORD_SCHEMA_VERSION",
     "AggregateEvaluation", "EvaluationError", "EvaluationStatus", "ForecastEvaluationRecord",
-    "aggregate_evaluations", "evaluate_forecast",
+    "aggregate_evaluations", "evaluate_forecast", "unscored_record",
     # replay
     "ReplayError", "ReplayEvaluationResult", "default_cutoffs", "run_replay_evaluation",
 ]

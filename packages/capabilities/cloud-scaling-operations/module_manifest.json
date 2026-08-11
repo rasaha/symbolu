@@ -16,9 +16,9 @@
   "production_certified": false,
   "live_cluster_validated": false,
   "core_dependencies": [
-    "ugence-cloud-scaling-controller>=0.1.1,<0.2"
+    "ugence-cloud-scaling-controller>=0.3.0,<0.4"
   ],
-  "advisory_dependency_range": ">=0.1.1,<0.2",
+  "advisory_dependency_range": ">=0.3.0,<0.4",
   "optional_dependencies": {
     "kubernetes": ["kubernetes>=26.1.0"],
     "metrics": ["prometheus-client>=0.16.0"],

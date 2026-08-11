@@ -46,5 +46,8 @@ def test_public_api_exports():
 
 
 def test_advisory_dependency_range_declared():
+    # The operations distribution depends on the CURRENT controller line (0.3.x) and must
+    # be installable against it. The previous <0.2 pin was unsatisfiable once the controller
+    # advanced to 0.2.0/0.3.0; the range is the narrowest justified, installed-wheel-verified.
     text = (PKG_ROOT / "pyproject.toml").read_text()
-    assert "ugence-cloud-scaling-controller>=0.1.1,<0.2" in text
+    assert "ugence-cloud-scaling-controller>=0.3.0,<0.4" in text

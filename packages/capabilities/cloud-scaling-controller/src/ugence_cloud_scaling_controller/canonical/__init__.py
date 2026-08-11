@@ -37,7 +37,9 @@ from .serialization import (
     canonical_bytes,
     content_digest,
 )
-from .measurement import MeasurementError, Unit, Measurement, measure
+from .measurement import (
+    MeasurementError, Unit, Measurement, measure, UnitDomain, unit_domain,
+)
 from .identity import SubjectError, CapacitySubject
 from .provenance import (
     ProvenanceError,
@@ -97,7 +99,7 @@ __all__ = [
     "NAMESPACE", "DIGEST_PREFIX", "CanonicalizationError",
     "canonical_json", "canonical_bytes", "content_digest",
     # measurement
-    "MeasurementError", "Unit", "Measurement", "measure",
+    "MeasurementError", "Unit", "Measurement", "measure", "UnitDomain", "unit_domain",
     # identity
     "SubjectError", "CapacitySubject",
     # provenance

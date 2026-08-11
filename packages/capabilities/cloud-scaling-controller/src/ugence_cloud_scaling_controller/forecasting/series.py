@@ -34,8 +34,31 @@ from ..canonical.state import CanonicalCapacityState
 CANONICAL_SERIES_SCHEMA_VERSION = "capacity-series-1"
 
 
+class SeriesErrorReason(str, Enum):
+    """Typed classification of a series-construction failure.
+
+    Lets a controlled admission/service boundary map a *data-quality* construction failure
+    to a typed forecasting abstention, while programming/type errors stay hard failures."""
+
+    EMPTY = "empty"
+    TYPE = "type"
+    CROSS_SUBJECT = "cross_subject"
+    CROSS_TENANT = "cross_tenant"
+    NAIVE_TIMESTAMP = "naive_timestamp"
+    INVALID_TIME_ORDER = "invalid_time_order"
+    CONFLICTING_DUPLICATE = "conflicting_duplicate"
+    DUPLICATE_TIMESTAMP = "duplicate_timestamp"
+
+
 class SeriesError(ValueError):
-    """Raised when a series cannot be constructed safely (fail closed)."""
+    """Raised when a series cannot be constructed safely (fail closed).
+
+    Carries an optional typed :class:`SeriesErrorReason` so a service boundary can map
+    expected data-quality failures to typed abstentions (and re-raise everything else)."""
+
+    def __init__(self, message: str, *, reason: Optional["SeriesErrorReason"] = None):
+        super().__init__(message)
+        self.reason = reason
 
 
 class OrderingPolicy(str, Enum):
@@ -125,14 +148,17 @@ class CanonicalCapacitySeries:
         """Construct a validated series from ``states`` under ``policy`` (fail-closed)."""
         policy = policy or SeriesConstructionPolicy()
         if not isinstance(policy, SeriesConstructionPolicy):
-            raise SeriesError("policy must be a SeriesConstructionPolicy")
+            raise SeriesError("policy must be a SeriesConstructionPolicy",
+                              reason=SeriesErrorReason.TYPE)
 
         materialized: List[CanonicalCapacityState] = list(states)
         if not materialized:
-            raise SeriesError("a series requires at least one observation")
+            raise SeriesError("a series requires at least one observation",
+                              reason=SeriesErrorReason.EMPTY)
         for s in materialized:
             if not isinstance(s, CanonicalCapacityState):
-                raise SeriesError("every series item must be a CanonicalCapacityState")
+                raise SeriesError("every series item must be a CanonicalCapacityState",
+                                  reason=SeriesErrorReason.TYPE)
 
         subject = materialized[0].subject
         for s in materialized:
@@ -141,11 +167,13 @@ class CanonicalCapacitySeries:
                     raise SeriesError(
                         "cross-subject contamination: all observations must share one "
                         f"subject; got workload_id {s.subject.workload_id!r} != "
-                        f"{subject.workload_id!r}"
+                        f"{subject.workload_id!r}",
+                        reason=SeriesErrorReason.CROSS_SUBJECT,
                     )
                 raise SeriesError(
                     "cross-tenant/scope contamination: subject/tenant/scope identity "
-                    "differs across observations"
+                    "differs across observations",
+                    reason=SeriesErrorReason.CROSS_TENANT,
                 )
 
         if policy.require_timezone_aware:
@@ -153,7 +181,8 @@ class CanonicalCapacitySeries:
                 if s.observed_at.tzinfo is None:
                     raise SeriesError(
                         "timezone-aware observed_at required by policy; got a naive "
-                        "datetime (enable require_timezone_aware=False to allow naive)"
+                        "datetime (enable require_timezone_aware=False to allow naive)",
+                        reason=SeriesErrorReason.NAIVE_TIMESTAMP,
                     )
 
         # Ordering.
@@ -168,7 +197,8 @@ class CanonicalCapacitySeries:
                     raise SeriesError(
                         "invalid event-time order: observations are not ascending and "
                         "ordering policy is REQUIRE_SORTED (enable ordering=SORT to permit "
-                        "an explicit, disclosed sort)"
+                        "an explicit, disclosed sort)",
+                        reason=SeriesErrorReason.INVALID_TIME_ORDER,
                     )
 
         # Duplicate timestamps (now that equal timestamps are adjacent).
@@ -189,7 +219,8 @@ class CanonicalCapacitySeries:
                     raise SeriesError(
                         "conflicting duplicate: multiple observations share event time "
                         f"{group[0].observed_at.isoformat()} but differ in content "
-                        "(always rejected, fail closed)"
+                        "(always rejected, fail closed)",
+                        reason=SeriesErrorReason.CONFLICTING_DUPLICATE,
                     )
                 # Identical duplicates.
                 if policy.duplicate_timestamp is DuplicateTimestampPolicy.COLLAPSE_IDENTICAL:
@@ -199,7 +230,8 @@ class CanonicalCapacitySeries:
                     raise SeriesError(
                         "duplicate timestamp: multiple identical observations share event "
                         f"time {group[0].observed_at.isoformat()} and duplicate policy is "
-                        "REJECT (enable COLLAPSE_IDENTICAL to collapse identical duplicates)"
+                        "REJECT (enable COLLAPSE_IDENTICAL to collapse identical duplicates)",
+                        reason=SeriesErrorReason.DUPLICATE_TIMESTAMP,
                     )
             i = j
 
@@ -263,6 +295,7 @@ class CanonicalCapacitySeries:
 __all__ = [
     "CANONICAL_SERIES_SCHEMA_VERSION",
     "SeriesError",
+    "SeriesErrorReason",
     "OrderingPolicy",
     "DuplicateTimestampPolicy",
     "SeriesConstructionPolicy",

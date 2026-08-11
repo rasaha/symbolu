@@ -29,7 +29,12 @@ from typing import Any, Dict, Optional, Tuple
 
 from ..canonical.evidence import AUTHORITY_CLASS_ADVISORY, EXECUTION_CAPABILITY_NONE
 from ..canonical.identity import CapacitySubject
-from ..canonical.normalization import NormalizationPolicy
+from ..canonical.measurement import Measurement, Unit
+from ..canonical.normalization import (
+    NormalizationError,
+    NormalizationPolicy,
+    normalize_signal,
+)
 from ..canonical.serialization import content_digest
 from ..version import __version__ as CONTROLLER_PACKAGE_VERSION
 from .abstention import (
@@ -39,8 +44,13 @@ from .abstention import (
 )
 from .forecast import CAPACITY_FORECAST_SCHEMA_VERSION, CapacityForecast
 from .forecasters import BaselineForecaster
-from .series import CanonicalCapacitySeries, _as_utc
-from .targets import ForecastTarget, domain_for
+from .series import CanonicalCapacitySeries, SeriesError, SeriesErrorReason, _as_utc
+from .targets import (
+    TARGET_SIGNAL_NAME,
+    ForecastTarget,
+    domain_for,
+    extract_measurement,
+)
 from .uncertainty import (
     UncertaintyConfig,
     UncertaintyInterval,
@@ -51,6 +61,8 @@ from .window import (
     FeatureConfig,
     ForecastHorizon,
     ForecastInputWindow,
+    ForecastValueSpace,
+    NormalizationApplicabilityError,
     build_input_window,
 )
 
@@ -133,6 +145,13 @@ def _unit_label(window: ForecastInputWindow) -> str:
     return "inconsistent"
 
 
+_APPLICABILITY_REASON = {
+    "missing_normalization_policy": AbstentionReason.MISSING_NORMALIZATION_POLICY,
+    "inconsistent_unit": AbstentionReason.INCONSISTENT_UNIT,
+    "unsupported_target": AbstentionReason.UNSUPPORTED_TARGET,
+}
+
+
 def _forecast_and_window(
     series: CanonicalCapacitySeries,
     target: ForecastTarget,
@@ -146,18 +165,23 @@ def _forecast_and_window(
     admission_policy: AdmissionPolicy,
     correlation_id: Optional[str],
     expected_subject: Optional[CapacitySubject],
+    forecast_space: ForecastValueSpace,
 ) -> Tuple[CapacityForecast, ForecastInputWindow]:
     """Core deterministic decision: build the window, then forecast or abstain."""
     if not isinstance(series, CanonicalCapacitySeries):
         raise ForecastServiceError("series must be a CanonicalCapacitySeries")
     if not isinstance(forecaster, BaselineForecaster):
         raise ForecastServiceError("forecaster must be a BaselineForecaster")
+    if not isinstance(forecast_space, ForecastValueSpace):
+        raise ForecastServiceError("forecast_space must be a ForecastValueSpace")
 
-    # The window is always built (leakage-safe) so even an abstention binds a real window.
-    window = build_input_window(series, target, cutoff, horizon, feature_config)
+    # A RAW probe window is always built (leakage-safe) so even an abstention binds a real
+    # window and every space-independent gate reads raw facts (units/cadence/missingness).
+    probe = build_input_window(series, target, cutoff, horizon, feature_config)
     model_config_digest = forecaster.config_digest()
 
     def _make(
+        window: ForecastInputWindow,
         status: str,
         *,
         point: Optional[float],
@@ -183,73 +207,105 @@ def _forecast_and_window(
             point_estimate=point,
             abstention_reason=reason,
             warnings=warnings,
+            value_space=window.value_space,
+            normalization_applied=window.normalization_applied,
         )
 
-    def _abstain(reason: AbstentionReason) -> CapacityForecast:
+    def _abstain(reason: AbstentionReason, window: ForecastInputWindow) -> Tuple[CapacityForecast, ForecastInputWindow]:
         return _make(
-            FORECAST_STATUS_ABSTAINED,
-            point=None,
-            reason=reason,
+            window, FORECAST_STATUS_ABSTAINED,
+            point=None, reason=reason,
             uncertainty=_unavailable_uncertainty(uncertainty_config, "abstained"),
-        )
+        ), window
 
     # --- structural gates ----------------------------------------------------------
     if expected_subject is not None:
         if series.subject.workload_id != expected_subject.workload_id:
-            return _abstain(AbstentionReason.SUBJECT_MISMATCH), window
+            return _abstain(AbstentionReason.SUBJECT_MISMATCH, probe)
         if series.subject != expected_subject:
-            return _abstain(AbstentionReason.TENANT_SCOPE_MISMATCH), window
+            return _abstain(AbstentionReason.TENANT_SCOPE_MISMATCH, probe)
 
     if not forecaster.supports_target(target):
-        return _abstain(AbstentionReason.UNSUPPORTED_TARGET), window
+        return _abstain(AbstentionReason.UNSUPPORTED_TARGET, probe)
     if not forecaster.supports_horizon(horizon):
-        return _abstain(AbstentionReason.UNSUPPORTED_HORIZON), window
+        return _abstain(AbstentionReason.UNSUPPORTED_HORIZON, probe)
     if normalization_policy is None:
-        return _abstain(AbstentionReason.MISSING_NORMALIZATION_POLICY), window
+        return _abstain(AbstentionReason.MISSING_NORMALIZATION_POLICY, probe)
     if not isinstance(normalization_policy, NormalizationPolicy):
         raise ForecastServiceError("normalization_policy must be a NormalizationPolicy or None")
 
-    # --- data-quality gates --------------------------------------------------------
-    if len(window.units_present) > 1:
-        return _abstain(AbstentionReason.INCONSISTENT_UNIT), window
-    if any(not math.isfinite(v) for v in window.values):  # defensive; measurements are finite
-        return _abstain(AbstentionReason.INVALID_MEASUREMENT), window
+    # --- data-quality gates (raw facts) --------------------------------------------
+    if len(probe.units_present) > 1:
+        return _abstain(AbstentionReason.INCONSISTENT_UNIT, probe)
+    if any(not math.isfinite(v) for v in probe.values):  # defensive; measurements are finite
+        return _abstain(AbstentionReason.INVALID_MEASUREMENT, probe)
+
+    # Input-domain enforcement: every raw observation must lie within its SignalDomain
+    # (bounds + integer semantics from the Phase-1 authority). Never clamp/round/coerce.
+    for s in probe.samples:
+        if not domain_for(s.unit).contains(s.value):
+            return _abstain(AbstentionReason.INVALID_MEASUREMENT, probe)
 
     effective_min = max(admission_policy.min_history, forecaster.min_history)
-    if window.sample_count < effective_min:
-        return _abstain(AbstentionReason.INSUFFICIENT_HISTORY), window
+    if probe.sample_count < effective_min:
+        return _abstain(AbstentionReason.INSUFFICIENT_HISTORY, probe)
 
-    if admission_policy.max_staleness_seconds is not None and window.last_event_time is not None:
-        staleness = (_as_utc(cutoff) - _as_utc(window.last_event_time)).total_seconds()
+    if admission_policy.max_staleness_seconds is not None and probe.last_event_time is not None:
+        staleness = (_as_utc(cutoff) - _as_utc(probe.last_event_time)).total_seconds()
         if staleness > admission_policy.max_staleness_seconds:
-            return _abstain(AbstentionReason.STALE_HISTORY), window
+            return _abstain(AbstentionReason.STALE_HISTORY, probe)
 
-    if window.missingness.missing_fraction > admission_policy.max_missing_fraction:
-        return _abstain(AbstentionReason.EXCESSIVE_MISSINGNESS), window
+    if probe.missingness.missing_fraction > admission_policy.max_missing_fraction:
+        return _abstain(AbstentionReason.EXCESSIVE_MISSINGNESS, probe)
 
     if admission_policy.require_regular_cadence and (
-        window.cadence.irregular_gap_count > admission_policy.max_irregular_gaps
+        probe.cadence.irregular_gap_count > admission_policy.max_irregular_gaps
     ):
-        return _abstain(AbstentionReason.IRREGULAR_CADENCE), window
+        return _abstain(AbstentionReason.IRREGULAR_CADENCE, probe)
+
+    # --- normalization applicability (Phase-1 authority) ---------------------------
+    signal = TARGET_SIGNAL_NAME.get(target)
+    if signal is not None:
+        if normalization_policy.method_by_signal.get(signal) is None:
+            return _abstain(AbstentionReason.MISSING_NORMALIZATION_POLICY, probe)
+        # Validate the supplied policy actually applies to these observations' unit.
+        s0 = probe.samples[0]
+        try:
+            normalize_signal(signal, Measurement(s0.value, Unit(s0.unit)), normalization_policy)
+        except (NormalizationError, ValueError):
+            return _abstain(AbstentionReason.INCONSISTENT_UNIT, probe)
+    elif forecast_space is ForecastValueSpace.NORMALIZED:
+        # e.g. RUNNING_REPLICAS: projected without conversion, cannot be normalized.
+        return _abstain(AbstentionReason.UNSUPPORTED_TARGET, probe)
+
+    # --- working window (raw reference digest, or explicitly normalized) -----------
+    try:
+        window = build_input_window(
+            series, target, cutoff, horizon, feature_config,
+            normalization_policy=normalization_policy, forecast_space=forecast_space,
+        )
+    except NormalizationApplicabilityError as exc:
+        return _abstain(_APPLICABILITY_REASON.get(exc.reason, AbstentionReason.MISSING_NORMALIZATION_POLICY), probe)
 
     # --- point estimate ------------------------------------------------------------
     point = forecaster.point_estimate(window)
     if point is None:
-        return _abstain(AbstentionReason.INSUFFICIENT_HISTORY), window
+        return _abstain(AbstentionReason.INSUFFICIENT_HISTORY, window)
     if not math.isfinite(point):
-        return _abstain(AbstentionReason.INVALID_MEASUREMENT), window
+        return _abstain(AbstentionReason.INVALID_MEASUREMENT, window)
 
     warnings: Tuple[str, ...] = ()
 
-    # --- domain gate ---------------------------------------------------------------
+    # --- output-domain gate (bounds AND integer semantics; never clamp) ------------
     unit_label = _unit_label(window)
     domain = domain_for(unit_label) if unit_label else None
     if domain is not None and not domain.contains(point):
         if not admission_policy.allow_out_of_domain:
-            return _abstain(AbstentionReason.FORECAST_OUTSIDE_DOMAIN), window
+            return _abstain(AbstentionReason.FORECAST_OUTSIDE_DOMAIN, window)
         warnings = warnings + (
             f"forecast {point!r} is outside the admissible {unit_label} domain "
-            f"[{domain.lower}, {domain.upper}]; retained by explicit allow_out_of_domain policy",
+            f"[{domain.lower}, {domain.upper}]{' (integer-valued)' if domain.integer else ''}; "
+            "retained by explicit allow_out_of_domain policy",
         )
 
     # --- uncertainty ---------------------------------------------------------------
@@ -260,7 +316,7 @@ def _forecast_and_window(
         and uncertainty.insufficient_calibration
         and not uncertainty_config.allow_point_only_when_uncalibrated
     ):
-        return _abstain(AbstentionReason.INSUFFICIENT_CALIBRATION_HISTORY), window
+        return _abstain(AbstentionReason.INSUFFICIENT_CALIBRATION_HISTORY, window)
     if not uncertainty.available and uncertainty.insufficient_calibration:
         warnings = warnings + (
             "uncertainty interval unavailable (insufficient calibration residuals); "
@@ -268,11 +324,8 @@ def _forecast_and_window(
         )
 
     return _make(
-        FORECAST_STATUS_FORECAST,
-        point=point,
-        reason=None,
-        uncertainty=uncertainty,
-        warnings=warnings,
+        window, FORECAST_STATUS_FORECAST,
+        point=point, reason=None, uncertainty=uncertainty, warnings=warnings,
     ), window
 
 
@@ -289,6 +342,7 @@ def generate_forecast(
     admission_policy: Optional[AdmissionPolicy] = None,
     correlation_id: Optional[str] = None,
     expected_subject: Optional[CapacitySubject] = None,
+    forecast_space: ForecastValueSpace = ForecastValueSpace.PROJECTED_WITHOUT_CONVERSION,
 ) -> CapacityForecast:
     """Produce a :class:`CapacityForecast` (point or typed abstention) — no evidence."""
     forecast, _window = _forecast_and_window(
@@ -299,6 +353,7 @@ def generate_forecast(
         admission_policy=admission_policy or AdmissionPolicy(),
         correlation_id=correlation_id,
         expected_subject=expected_subject,
+        forecast_space=forecast_space,
     )
     return forecast
 
@@ -398,6 +453,7 @@ def forecast_with_evidence(
     admission_policy: Optional[AdmissionPolicy] = None,
     correlation_id: Optional[str] = None,
     expected_subject: Optional[CapacitySubject] = None,
+    forecast_space: ForecastValueSpace = ForecastValueSpace.PROJECTED_WITHOUT_CONVERSION,
     evidence_produced_at: Optional[datetime] = None,
     diagnostic_annotation: str = "",
 ) -> CapacityForecastEvidence:
@@ -419,6 +475,7 @@ def forecast_with_evidence(
         admission_policy=admission_policy,
         correlation_id=correlation_id,
         expected_subject=expected_subject,
+        forecast_space=forecast_space,
     )
     produced_at = evidence_produced_at if evidence_produced_at is not None else cutoff
     if not isinstance(produced_at, datetime):
@@ -444,6 +501,131 @@ def forecast_with_evidence(
     )
 
 
+# Series-construction failures that a controlled admission boundary converts into typed,
+# evidence-producing abstentions (everything else re-raises — never silently swallowed).
+_SERIES_ERROR_ABSTENTION = {
+    SeriesErrorReason.INVALID_TIME_ORDER: AbstentionReason.INVALID_TIME_ORDER,
+    SeriesErrorReason.CONFLICTING_DUPLICATE: AbstentionReason.CONFLICTING_DUPLICATE,
+    SeriesErrorReason.DUPLICATE_TIMESTAMP: AbstentionReason.CONFLICTING_DUPLICATE,
+    SeriesErrorReason.CROSS_SUBJECT: AbstentionReason.SUBJECT_MISMATCH,
+    SeriesErrorReason.CROSS_TENANT: AbstentionReason.TENANT_SCOPE_MISMATCH,
+}
+
+
+def _construction_abstention_forecast(
+    observations, target, cutoff, horizon, forecaster, correlation_id, reason,
+) -> CapacityForecast:
+    """Build a typed abstention forecast when a series could not be constructed.
+
+    Binds a deterministic input-window digest over the (sorted) rejected observation
+    digests + the failure reason, so the evidence records *which* inputs were rejected and
+    *why* without implying a usable window ever existed."""
+    obs = list(observations)
+    subject = obs[0].subject
+    forecast_for = cutoff + horizon.delta
+    rejected = {
+        "reason": reason.value,
+        "rejected_state_digests": sorted(o.digest() for o in obs),
+        "subject": subject.to_canonical_dict(),
+        "target": target.value,
+        "cutoff": cutoff,
+        "forecast_for": forecast_for,
+    }
+    window_digest = content_digest("forecast_input_window_rejected", "capacity-forecast-window-1", rejected)
+    return CapacityForecast(
+        schema_version=CAPACITY_FORECAST_SCHEMA_VERSION,
+        subject=subject,
+        correlation_id=correlation_id,
+        target=target,
+        forecast_cutoff=cutoff,
+        horizon=horizon,
+        forecast_for=forecast_for,
+        model_id=forecaster.model_id,
+        model_version=forecaster.model_version,
+        status=FORECAST_STATUS_ABSTAINED,
+        unit="",
+        input_window_digest=window_digest,
+        model_config_digest=forecaster.config_digest(),
+        uncertainty=UncertaintyInterval(
+            method="none", requested_coverage=0.5, calibration_sample_count=0,
+            available=False, unavailable_reason="series_construction_failed"),
+        point_estimate=None,
+        abstention_reason=reason,
+    )
+
+
+def forecast_from_observations(
+    observations,
+    target: ForecastTarget,
+    cutoff: datetime,
+    horizon: ForecastHorizon,
+    forecaster: BaselineForecaster,
+    *,
+    normalization_policy: Optional[NormalizationPolicy],
+    series_policy=None,
+    feature_config: Optional[FeatureConfig] = None,
+    uncertainty_config: Optional[UncertaintyConfig] = None,
+    admission_policy: Optional[AdmissionPolicy] = None,
+    correlation_id: Optional[str] = None,
+    expected_subject: Optional[CapacitySubject] = None,
+    forecast_space: ForecastValueSpace = ForecastValueSpace.PROJECTED_WITHOUT_CONVERSION,
+    evidence_produced_at: Optional[datetime] = None,
+    diagnostic_annotation: str = "",
+) -> CapacityForecastEvidence:
+    """Controlled admission boundary: build the series from raw observations, mapping the
+    expected *data-quality* construction failures (invalid event-time order, conflicting/
+    duplicate timestamps, cross-subject/tenant contamination) to typed, evidence-producing
+    abstentions. Any other error (a programming/type error) is NOT swallowed — it re-raises.
+
+    This is what makes ``INVALID_TIME_ORDER`` and ``CONFLICTING_DUPLICATE`` reachable as
+    typed Phase-2 abstentions while the strict :meth:`CanonicalCapacitySeries.build` API and
+    its fail-closed exceptions are preserved for callers that want them.
+    """
+    obs = list(observations)
+    if not obs:
+        raise ForecastServiceError("forecast_from_observations requires >= 1 observation")
+    try:
+        series = CanonicalCapacitySeries.build(obs, series_policy)
+    except SeriesError as exc:
+        mapped = _SERIES_ERROR_ABSTENTION.get(exc.reason)
+        if mapped is None:
+            raise  # empty/type/naive-timestamp etc. remain hard failures (not swallowed)
+        forecast = _construction_abstention_forecast(
+            obs, target, cutoff, horizon, forecaster, correlation_id, mapped)
+        produced_at = evidence_produced_at if evidence_produced_at is not None else cutoff
+        return CapacityForecastEvidence(
+            evidence_schema_version=FORECAST_EVIDENCE_SCHEMA_VERSION,
+            series_schema_version="capacity-series-1",
+            input_window_schema_version="capacity-forecast-window-1",
+            forecast_schema_version=forecast.schema_version,
+            controller_package_version=CONTROLLER_PACKAGE_VERSION,
+            source_series_digest="sha256:series-not-constructed",
+            input_window_digest=forecast.input_window_digest,
+            feature_config_digest=(feature_config or FeatureConfig()).digest(),
+            admission_policy_digest=(admission_policy or AdmissionPolicy()).digest(),
+            uncertainty_config_digest=(uncertainty_config or UncertaintyConfig()).digest(),
+            model_config_digest=forecaster.config_digest(),
+            normalization_policy_id=(normalization_policy.policy_id if normalization_policy else None),
+            normalization_policy_digest=(normalization_policy.digest() if normalization_policy else None),
+            forecast=forecast,
+            evidence_produced_at=produced_at,
+            diagnostic_annotation=diagnostic_annotation,
+        )
+
+    return forecast_with_evidence(
+        series, target, cutoff, horizon, forecaster,
+        normalization_policy=normalization_policy,
+        feature_config=feature_config,
+        uncertainty_config=uncertainty_config,
+        admission_policy=admission_policy,
+        correlation_id=correlation_id,
+        expected_subject=expected_subject,
+        forecast_space=forecast_space,
+        evidence_produced_at=evidence_produced_at,
+        diagnostic_annotation=diagnostic_annotation,
+    )
+
+
 __all__ = [
     "FORECAST_EVIDENCE_SCHEMA_VERSION",
     "ADMISSION_POLICY_SCHEMA_VERSION",
@@ -453,4 +635,5 @@ __all__ = [
     "CapacityForecastEvidence",
     "generate_forecast",
     "forecast_with_evidence",
+    "forecast_from_observations",
 ]

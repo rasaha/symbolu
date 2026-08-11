@@ -186,6 +186,63 @@ independent schema versions are new (`capacity-series-1`, `capacity-forecast-win
 plus feature/uncertainty/admission config schemas); `ScalingObservation`,
 `ScalingRecommendation`, and all Phase-1 canonical schemas are untouched.
 
+## Independent-audit corrections (v0.3.0)
+
+Accepted independent-audit findings were corrected in place on the Phase-2 branch:
+
+- **Controlled evaluation construction.** `ForecastEvaluationRecord` is produced by the
+  controlled `evaluate_forecast` service, which derives the actual value and unit from the
+  bound `CanonicalCapacityState` + target and recomputes every error/coverage figure. The
+  public constructor also re-validates all internally-derivable invariants and rejects
+  contradictory or non-finite records, so a caller cannot hand-assemble an apparently valid
+  evaluation with mismatched errors, actual value, unit, or interval. The record binds the
+  actual-state digest, target, derived value, unit, and matching policy into its identity
+  digest — a content identity, not a signature or authenticity proof.
+
+- **Deterministic, fail-closed matching.** Replay actual-matching filters candidates by
+  subject/tenant/scope, target, strictly-future event time, horizon, and tolerance, then
+  selects the unique closest candidate under a documented total order. Equally-eligible
+  (equidistant) candidates yield a typed `AMBIGUOUS`, unscored outcome — never a silent
+  first-by-input-order pick. The result is independent of caller input order.
+
+- **Value space / normalization.** Forecast values are precisely disclosed as one of:
+  *projected without conversion* (the default — raw canonical target domain, e.g. CPU
+  percent stays percent, `running_replicas` stays an integer count mapped to
+  `current_replicas` without substitution) or *explicitly normalized* (the Phase-1
+  `normalize_signal` authority applied to a ratio in `[0, 1]`). The applied space, the
+  `normalization_applied` flag, and the normalization-policy digest are bound into the
+  input-window and evidence digests. A supplied policy must actually apply to the
+  observations (method present for the signal + compatible unit) or the layer abstains
+  (`MISSING_NORMALIZATION_POLICY` / `INCONSISTENT_UNIT`); no unit is ever silently converted.
+
+- **Input + output domain enforcement.** A `SignalDomain` sourced from the single Phase-1
+  `unit_domain` authority (no divergent duplicate bounds) is enforced on both input
+  observations and output forecasts, including integer semantics: a fractional
+  running-replica observation fails closed at the Phase-1 contract, and a fractional
+  running-replica *forecast* is out-of-domain and abstains (`FORECAST_OUTSIDE_DOMAIN`) rather
+  than being presented as valid. Nothing is silently clamped, rounded, or coerced; domain
+  failures are evidence-producing.
+
+- **Reachable typed abstentions.** `forecast_from_observations` is a controlled admission
+  boundary that maps expected series-construction data-quality failures — invalid event-time
+  order, conflicting/duplicate timestamps, cross-subject/tenant contamination — to typed,
+  evidence-producing abstentions (`INVALID_TIME_ORDER`, `CONFLICTING_DUPLICATE`,
+  `SUBJECT_MISMATCH`, `TENANT_SCOPE_MISMATCH`), while the strict
+  `CanonicalCapacitySeries.build` API and its fail-closed exceptions are preserved and any
+  unrelated/programming error is re-raised (never swallowed). Every `AbstentionReason` is now
+  reachable through a supported service path (including `INVALID_MEASUREMENT`, exercised via a
+  forecaster that yields a non-finite point) — proven by the reachability test suite.
+
+- **Operations compatibility.** The `cloud-scaling-operations` distribution declared
+  `ugence-cloud-scaling-controller >=0.1.1,<0.2`, unsatisfiable once the controller advanced
+  to 0.2.0/0.3.0. After confirming operations imports only stable controller APIs
+  (unchanged by Phase 2), the constraint was corrected to the narrowest installed-wheel-
+  verified range `>=0.3.0,<0.4`; the shadow-harness version check now reads the controller's
+  single-source version instead of hardcoding it; and the committed shadow evidence was
+  regenerated through the canonical harness (advisory version `0.1.1 → 0.3.0`). The one-way
+  `operations → controller` dependency is preserved; no `controller → operations` dependency
+  is introduced.
+
 ## Consequences
 
 - The capability now offers deterministic shadow forecasting + replay evaluation as a

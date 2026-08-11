@@ -29,9 +29,12 @@ from ..canonical.normalization import NormalizationPolicy
 from ..canonical.state import CanonicalCapacityState
 from .evaluation import (
     AggregateEvaluation,
+    EvaluationStatus,
     ForecastEvaluationRecord,
+    REASON_AMBIGUOUS_MATCH,
     aggregate_evaluations,
     evaluate_forecast,
+    unscored_record,
 )
 from .evidence import (
     AdmissionPolicy,
@@ -79,6 +82,14 @@ def _history_at_or_before(
     return [o for o in observations if _as_utc(o.observed_at) <= c]
 
 
+# Matcher outcome kinds.
+MATCH_UNIQUE = "unique"        # exactly one closest eligible candidate
+MATCH_NONE = "none"           # no eligible candidate within tolerance
+MATCH_AMBIGUOUS = "ambiguous"  # >1 candidate equally closest under the full policy
+
+_MATCH_TOL = 1e-9
+
+
 def _match_actual(
     observations: Sequence[CanonicalCapacityState],
     cutoff: datetime,
@@ -86,30 +97,40 @@ def _match_actual(
     tolerance_seconds: float,
     subject,
     target: ForecastTarget,
-) -> Optional[CanonicalCapacityState]:
-    """Closest strictly-future actual for the same subject that carries the target.
+) -> Tuple[str, Optional[CanonicalCapacityState]]:
+    """Deterministic, order-independent matcher (fail closed on ambiguity).
 
-    Candidates MUST have event time strictly greater than the cutoff (so the scored value
-    was never available to the forecast) and within ``tolerance_seconds`` of the
-    forecast-for time.
+    Eligibility (documented matching policy): an actual is eligible iff it has the SAME
+    subject/tenant/scope, carries the target, has event time STRICTLY greater than the
+    cutoff (so the scored value was never available to the forecast), and lies within
+    ``tolerance_seconds`` of the forecast-for time. Among eligible candidates the one with
+    the smallest gap to the forecast-for time is chosen. If two or more candidates share
+    the minimum gap, the result is AMBIGUOUS (never silently break the tie by input order).
+    Returns ``(kind, state_or_None)``.
     """
     c = _as_utc(cutoff)
     tgt = _as_utc(forecast_for)
-    best = None
-    best_gap = None
+    eligible = []
     for o in observations:
         ot = _as_utc(o.observed_at)
         if ot <= c:  # never a past/at-cutoff observation — that would be leakage
             continue
-        if o.subject != subject:
+        if o.subject != subject:  # full subject equality covers tenant/scope
             continue
         if extract_sample(o, target) is None:
             continue
         gap = abs((ot - tgt).total_seconds())
-        if gap <= tolerance_seconds and (best_gap is None or gap < best_gap):
-            best_gap = gap
-            best = o
-    return best
+        if gap <= tolerance_seconds:
+            eligible.append((gap, ot, o.digest(), o))
+    if not eligible:
+        return MATCH_NONE, None
+    # Deterministic total order independent of input position.
+    eligible.sort(key=lambda e: (e[0], e[1], e[2]))
+    min_gap = eligible[0][0]
+    at_min = [e for e in eligible if abs(e[0] - min_gap) <= _MATCH_TOL]
+    if len(at_min) > 1:
+        return MATCH_AMBIGUOUS, None
+    return MATCH_UNIQUE, at_min[0][3]
 
 
 def run_replay_evaluation(
@@ -162,16 +183,22 @@ def run_replay_evaluation(
             correlation_id=None,
         )
 
-        actual = None
         if evidence.forecast.is_forecast:
-            actual = _match_actual(
+            kind, actual = _match_actual(
                 observations, cutoff, evidence.forecast.forecast_for,
                 match_tolerance_seconds, series.subject, target,
             )
             if actual is not None and _as_utc(actual.observed_at) <= _as_utc(cutoff):
                 raise ReplayError("leakage detected: matched actual is not strictly future")
-
-        record = evaluate_forecast(evidence, actual, match_tolerance_seconds=match_tolerance_seconds)
+            if kind == MATCH_AMBIGUOUS:
+                record = unscored_record(
+                    evidence, status=EvaluationStatus.AMBIGUOUS, reason=REASON_AMBIGUOUS_MATCH,
+                    match_tolerance_seconds=match_tolerance_seconds,
+                )
+            else:  # MATCH_UNIQUE (actual set) or MATCH_NONE (actual is None -> UNMATCHED)
+                record = evaluate_forecast(evidence, actual, match_tolerance_seconds=match_tolerance_seconds)
+        else:
+            record = evaluate_forecast(evidence, None, match_tolerance_seconds=match_tolerance_seconds)
         evidences.append(evidence)
         records.append(record)
 
