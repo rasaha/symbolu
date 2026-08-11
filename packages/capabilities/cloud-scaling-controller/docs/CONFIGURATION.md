@@ -69,3 +69,22 @@ across repeated fresh instances. `identity_deviation` is **diagnostically
 nondeterministic before bootstrap** (unseeded IdentityEMA baseline) and affects no
 decision; each recommendation discloses this in its `determinism` block. See
 [EVIDENCE_AND_LIMITATIONS.md](EVIDENCE_AND_LIMITATIONS.md).
+
+## NormalizationPolicy (Phase 1 canonical layer)
+
+The canonical capacity layer introduces a **separate, independently-versioned**
+`NormalizationPolicy` (schema `capacity-normalization-policy-1`) — distinct from
+`InfraControllerConfig`, which is unchanged. The policy governs only how raw
+`Measurement`s are normalized into the controller's `[0, 1]` signals; it does **not**
+tune the decision algorithm.
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `policy_id` | `str` | Stable identity, recorded in evidence. |
+| `method_by_signal` | `Mapping[str, NormalizationMethod]` | Signal → method (e.g. `cpu → PERCENT_TO_RATIO`, `latency_p99 → LATENCY_MS_TO_THRESHOLD`, `queue_depth → QUEUE_TO_CAPACITY`). |
+| `thresholds` | `Mapping[str, float]` | Explicit SLO/baseline for threshold methods. Must be finite and `> 0`. **Never invented** — a threshold method with no threshold fails closed. |
+| `clamp` / `clamp_low` / `clamp_high` | `bool` / `float` / `float` | Explicit clamping to `[clamp_low, clamp_high]`; recorded per-signal in evidence. With clamping disabled, an out-of-range result fails closed. |
+| `allow_latency_p95_substitution` | `bool` (default `False`) | Explicit, disclosed opt-in to use `latency_p95` for a missing `latency_p99`. Off by default (prefer failing closed). |
+
+The policy is immutable and carries a `digest()` (`sha256:` content identity) recorded in
+`CapacityDecisionEvidence.normalization_policy_digest`. Policies are **not** auto-tuned.

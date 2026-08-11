@@ -90,3 +90,47 @@ strictly `cloud_scaling_operations → ugence_cloud_scaling_controller`. The
 distribution verifier opens every packaged `.py` and fails on any actuator, approver,
 orchestrator, mutation call, or concrete executor. No infrastructure-write path is
 shipped or was added.
+
+## Canonical Capacity Intelligence layer (Phase 1) — boundary
+
+The `canonical` subpackage (v0.2.0) is an **additive, advisory-only** observation and
+evidence layer. It preserves every invariant above:
+
+- It is pure-stdlib — it adds **no** runtime dependency (no cloud SDK, no network).
+- It performs **no** actuation, opens **no** socket, spawns **no** subprocess, and reads
+  **no** credentials (asserted by `tests/canonical/test_sources_and_side_effects.py`).
+- Provider semantics terminate at the observation/normalization boundary. Provider labels
+  live only in provenance; the projection is provider-neutral and contains **no**
+  `provider == "..."` decision branch. Two states differing only by provider project
+  identically.
+- The decision kernel is **unchanged**: the projection maps only the five established
+  signals plus `deploy_active`, `recent_pod_restarts`, `current_replicas`, `phase`,
+  `correlation_id`, and `timestamp`. Every other canonical field is reported as ignored.
+- `CapacityDecisionEvidence` always carries `advisory_only=True`,
+  `actuation_performed=False`, `authority_class="ADVISORY"`, `execution_capability="NONE"`.
+
+### Risk Authority boundary (strict, one-directional)
+
+The canonical layer produces **upstream recommendation evidence only**. It must not, and
+does not:
+
+- import any Risk Authority / Decision Authority / action-gate / Agent Runtime / Runtime
+  Assurance / operations implementation (AST-asserted by
+  `tests/canonical/test_ra_boundary.py`);
+- construct a risk evaluation, verdict, authorization, or authority-lifecycle record;
+- evaluate controls or claim controls were satisfied;
+- perform expiry, revocation, or action-gate matching.
+
+The evidence `digest()` is a **content identity** (`sha256:` over a documented canonical
+form) — never a signature, authorization, or risk verdict. A future, separately governed
+integration package may reference this digest/identity to bind capacity evidence into the
+canonical RA-1→RA-8 lifecycle; that adapter is **not** part of this phase, and neither
+leaf package depends on the other.
+
+### Read-only observation sources
+
+`CapacityObservationSource` is a read-only `Protocol` (`observe() -> CanonicalCapacityState`).
+No write-capable client is reachable through it. Phase 1 ships only fixture / replay
+sources; network-backed adapters (Prometheus, CloudWatch, Azure Monitor, GCP Monitoring,
+Kubernetes read APIs) are future work and, like the existing `prometheus`/`shadow` extras,
+must remain opt-in, read-only, lazily imported, and off the default import path.

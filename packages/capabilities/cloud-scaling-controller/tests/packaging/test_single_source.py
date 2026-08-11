@@ -37,7 +37,7 @@ def test_single_source_no_duplicates():
 
 
 def test_version_matches_metadata():
-    assert __version__ == "0.1.1"
+    assert __version__ == "0.2.0"
 
 
 def test_py_typed_shipped():
