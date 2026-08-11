@@ -50,6 +50,7 @@
     "IntegrityError",
     "InvalidTransitionError",
     "NoopGovernanceHook",
+    "ObservationFailureKind",
     "PROVIDER_USAGE_METADATA_KEY",
     "PortfolioBudget",
     "PortfolioCancellationResult",
@@ -116,6 +117,7 @@
     "WorkflowPortfolio",
     "WorkflowPriority",
     "WorkflowStatus",
+    "classify_observation_failure",
     "validate_clearance"
   ],
   "functions": [

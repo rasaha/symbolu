@@ -51,6 +51,7 @@ from .token_accounting import (
     TokenUsageSink,
     UsageAvailability,
     aggregate_logical_request_usage,
+    canonical_tenant_namespace,
     prepare_api_call_measurement,
     reconcile_api_call_measurement,
 )
@@ -95,6 +96,7 @@ __all__ = [
     "RequestTokenEstimate",
     "ProviderTokenUsage",
     "RequestAttribution",
+    "canonical_tenant_namespace",
     "ApiCallTokenRecord",
     "LogicalRequestTokenSummary",
     "RequestTokenCounter",

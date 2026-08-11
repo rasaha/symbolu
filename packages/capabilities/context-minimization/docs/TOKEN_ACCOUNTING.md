@@ -117,6 +117,26 @@ assert summary.attempt_count == 2 and summary.attempts_usage_unknown == 1
 assert summary.complete is False                  # a measurement gap, not zero
 ```
 
+## Tenant isolation (N1)
+
+Attempt identity and sink idempotency are **tenant-scoped**. The canonical tenant
+namespace (`canonical_tenant_namespace`) maps an absent tenant to a domain-separated
+single-tenant namespace `"s"` (never an empty string) and a present tenant to
+`"t:" + tenant` (which must be non-empty and non-whitespace — `RequestAttribution.tenant_id`
+enforces this). The tenant namespace is a prefix-free segment of the derived attempt id, so
+**identical tenant-local ids in different tenants derive different attempt ids**.
+
+The reference `InMemoryTokenAccountingSink` keys idempotency and conflict detection by the
+pair **`(tenant_namespace, attempt_id)`**, not `attempt_id` alone. So two different tenants
+may safely store the same explicit `attempt_id` (both retained); within one tenant an
+identical replay stays idempotent and a conflicting reuse is rejected; and the single-tenant
+namespace is distinct from any named tenant. Tenant isolation therefore does **not** rely on
+record fingerprints. `tenant_id` is also bound into `record_fingerprint`.
+
+Callers that share accounting infrastructure across tenants **must** provide tenant identity
+(via `RequestAttribution.tenant_id`); otherwise all traffic occupies the single-tenant
+namespace.
+
 ## What this is not
 
 - Not a provider tokenizer, model SDK, or network/database/filesystem persistence.

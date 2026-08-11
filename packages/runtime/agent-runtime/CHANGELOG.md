@@ -40,11 +40,23 @@ A raising `attempt_observer` was previously swallowed silently. The runtime rema
 provider, never erases a successful result, and never changes retry behavior), but the loss
 is no longer invisible: the new optional `AgentRuntimeConfig.attempt_observer_error_reporter`
 receives exactly **one** structured `AttemptObservationFailure` per observer failure. The
-signal carries safe identity plus `error_type` (the exception **type name** only) — never the
+signal carries safe identity plus a bounded classification code (see N2 below) — never the
 exception message/args or any provider payload. A reporter that itself raises is contained and
 never masks the provider result. `None` (default) preserves the prior silent fail-open for
 callers that do not configure accounting. Added exports: `AttemptObservationFailure`,
 `AttemptObservationErrorReporter`, `RecordingObservationErrorReporter`.
+
+### Audit remediation — N2: bounded observation-failure classification
+`AttemptObservationFailure.error_type` (which carried `type(exc).__name__` and could expose an
+observer-constructed dynamically-named exception's name) is **replaced** by `error_kind`, a
+FIXED code from the closed `ObservationFailureKind` enum
+(`OBSERVER_VALUE_ERROR` / `OBSERVER_TYPE_ERROR` / `OBSERVER_LOOKUP_ERROR` / `OBSERVER_EXCEPTION`).
+Classification uses `isinstance` against a closed allowlist (`classify_observation_failure`) —
+never the exception class name/module/message/args/`repr` — so no attacker- or
+provider-controlled string can enter the telemetry. Fail-open behavior, the exactly-one-signal
+guarantee, reporter containment, and provider execution/retry semantics are unchanged. Added
+exports: `ObservationFailureKind`, `classify_observation_failure`. Corrected in place (0.7.0 is
+unreleased).
 
 **Package maturity: `IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED`** (upgrade to
 `IMPLEMENTED_AND_CI_VERIFIED` only after the scoped Actions run is observed green).

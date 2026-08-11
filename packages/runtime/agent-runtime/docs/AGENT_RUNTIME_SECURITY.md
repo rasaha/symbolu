@@ -69,7 +69,7 @@ swallowed so it can never break execution or alter a governed transition.
 ## Attempt-observation failure surfacing (CM-TA1 F2)
 
 When an attempt observer raises, the optional error reporter receives a structured
-`AttemptObservationFailure` carrying safe identity and the exception **type name** only —
+`AttemptObservationFailure` carrying safe identity and a FIXED `ObservationFailureKind` classification code (N2) —
 never the exception message/args or any provider payload — because arbitrary exception
 payloads may embed provider data. The reporter cannot influence provider execution, and a
 raising reporter is contained so it can never mask the provider result. Default (no reporter)

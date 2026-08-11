@@ -100,6 +100,35 @@ def _req_str(value: Any, name: str) -> str:
     return value
 
 
+def _opt_tenant(value: Any, name: str = "tenant_id") -> Optional[str]:
+    """Validate an OPTIONAL tenant id (N1): ``None`` OR a non-empty, non-whitespace str.
+
+    Unlike other optional identity fields, tenant identity partitions the accounting
+    namespace, so a whitespace-only tenant is rejected (it must never be confused with the
+    single-tenant namespace, which is the distinct value ``None``).
+    """
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value.strip():
+        raise InvalidRequestError(
+            f"{name} must be None (single-tenant namespace) or a non-empty, "
+            f"non-whitespace str, got {value!r}"
+        )
+    return value
+
+
+def canonical_tenant_namespace(tenant_id: Optional[str]) -> str:
+    """The canonical, domain-separated tenant namespace token (N1).
+
+    Absence of a tenant is an EXPLICIT single-tenant namespace (``"s"``), never an empty
+    string; a present tenant is ``"t:" + tenant``. The two forms can never collide (a tenant
+    literally named ``"s"`` encodes as ``"t:s"``). Used identically by attempt-id derivation
+    and by the sink partition key so both agree on tenant boundaries.
+    """
+    tenant_id = _opt_tenant(tenant_id)
+    return "s" if tenant_id is None else "t:" + tenant_id
+
+
 # --------------------------------------------------------------------------- #
 # Enumerations.
 # --------------------------------------------------------------------------- #
@@ -344,8 +373,15 @@ class RequestAttribution:
     task_id: Optional[str] = None
 
     def __post_init__(self) -> None:
-        for name in ("tenant_id", "workflow_id", "agent_id", "task_id"):
+        # tenant_id partitions the accounting namespace (N1) → stricter (no whitespace).
+        object.__setattr__(self, "tenant_id", _opt_tenant(self.tenant_id))
+        for name in ("workflow_id", "agent_id", "task_id"):
             object.__setattr__(self, name, _opt_str(getattr(self, name), name))
+
+    @property
+    def tenant_namespace(self) -> str:
+        """The canonical, domain-separated tenant namespace token (``"s"`` when single-tenant)."""
+        return canonical_tenant_namespace(self.tenant_id)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -677,36 +713,53 @@ class DefaultApproximateRequestCounter:
 
 
 class InMemoryTokenAccountingSink:
-    """A deterministic, **thread-safe** in-memory :class:`TokenAccountingSink`
-    (test/reference only — NOT durable storage; production persistence is follow-on work).
+    """A deterministic, **thread-safe**, **tenant-partitioned** in-memory
+    :class:`TokenAccountingSink` (test/reference only — NOT durable storage; production
+    persistence is follow-on work).
 
-    Enforces attempt-identity discipline: a duplicate ``attempt_id`` is REJECTED unless
-    the replayed record is byte-identical (an explicitly idempotent replay). Duplicate
-    detection and insertion are **atomic** under a lock (F4), so concurrent writers can
-    never lose a record, double-store an identical replay, or observe a partially-updated
-    snapshot. It performs no I/O and holds no external resource.
+    Idempotency and conflict detection are keyed by the canonical pair
+    ``(tenant_namespace, attempt_id)`` (N1), never by ``attempt_id`` alone. Consequences:
+
+    * two DIFFERENT tenants may safely store the same explicit ``attempt_id`` — both records
+      are retained (they occupy distinct namespaces, so a cross-tenant collision is never
+      silently deduplicated and never spuriously rejected);
+    * within ONE tenant, an identical replay stays idempotent and a conflicting reuse of the
+      same ``attempt_id`` is still rejected;
+    * the single-tenant namespace (``tenant_id is None``) is a DISTINCT namespace from any
+      named tenant — tenant isolation does not rely on record fingerprints.
+
+    Duplicate detection and insertion are **atomic** under a lock (F4). It performs no I/O and
+    holds no external resource.
     """
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._records: list[ApiCallTokenRecord] = []
-        self._by_attempt: dict[str, ApiCallTokenRecord] = {}
+        # Internal canonical key: (tenant_namespace, attempt_id). Never exposed as a mutable
+        # object; callers read whole records via the snapshot properties.
+        self._by_key: dict[tuple[str, str], ApiCallTokenRecord] = {}
+
+    @staticmethod
+    def _key(record: ApiCallTokenRecord) -> tuple[str, str]:
+        return (record.attribution.tenant_namespace, record.attempt_id)
 
     def record(self, record: ApiCallTokenRecord) -> None:
         if not isinstance(record, ApiCallTokenRecord):
             raise InvalidRequestError("record must be an ApiCallTokenRecord")
+        key = self._key(record)
         # Atomic check-and-insert: the fingerprint comparison and the append happen under
-        # one lock so two threads racing the same attempt_id cannot both insert.
+        # one lock so two threads racing the same (tenant, attempt_id) cannot both insert.
         with self._lock:
-            existing = self._by_attempt.get(record.attempt_id)
+            existing = self._by_key.get(key)
             if existing is not None:
                 if existing.record_fingerprint != record.record_fingerprint:
                     raise InvalidRequestError(
-                        f"duplicate attempt_id {record.attempt_id!r} with conflicting content "
-                        "(idempotent replay requires a byte-identical record)"
+                        f"duplicate attempt_id {record.attempt_id!r} in tenant namespace "
+                        f"{key[0]!r} with conflicting content (idempotent replay requires a "
+                        "byte-identical record)"
                     )
-                return  # identical replay — accepted, not double-stored
-            self._by_attempt[record.attempt_id] = record
+                return  # identical replay within the same tenant — accepted, not double-stored
+            self._by_key[key] = record
             self._records.append(record)
 
     @property
@@ -1037,6 +1090,7 @@ __all__ = [
     "RequestTokenEstimate",
     "ProviderTokenUsage",
     "RequestAttribution",
+    "canonical_tenant_namespace",
     "ApiCallTokenRecord",
     "LogicalRequestTokenSummary",
     "RequestTokenCounter",

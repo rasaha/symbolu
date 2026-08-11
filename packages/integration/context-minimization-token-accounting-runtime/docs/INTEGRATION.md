@@ -86,3 +86,19 @@ lost increments. The per-attempt (`settle_budget_from_usage`) and summary
 coordinator settles exactly once (the second call finds no active hold and is a no-op) — so the
 same reservation is never charged twice. Thread-safe in-memory storage is **not** durable
 storage; production persistence remains follow-on work.
+
+## Tenant isolation (N1)
+
+Attempt-id derivation is tenant-scoped. `translate_attempt` takes the tenant from
+`prepared.attribution.tenant_id` and binds the canonical tenant namespace
+(`canonical_tenant_namespace`) as a prefix-free segment of the derived `attempt_id`, so two
+tenants using **identical** tenant-local ids (`logical_request_id` + instance + task +
+attempt_number) derive **different** attempt ids. A derived retry's `retry_of_attempt_id`
+uses the **same** tenant namespace, so retry chains never cross tenants. `derive_attempt_id`
+accepts an explicit `tenant_id` (absent → the single-tenant namespace `"s"`; present → must be
+non-empty/non-whitespace).
+
+Defense in depth: the reference `InMemoryTokenAccountingSink` additionally partitions
+idempotency/conflict detection by `(tenant_namespace, attempt_id)`, so even **explicit**
+`attempt_id` overrides cannot collide across tenants. Callers sharing accounting infrastructure
+across tenants MUST populate `RequestAttribution.tenant_id`.

@@ -108,26 +108,69 @@ class AttemptObserver(Protocol):
     def on_attempt(self, attempt: ProviderAttempt) -> None: ...
 
 
+class ObservationFailureKind(str, Enum):
+    """A CLOSED, module-owned classification for an attempt-observation failure (N2).
+
+    Every value is a fixed constant defined here — NEVER derived from the exception's class
+    name, module, message, args, or ``repr``. An observer that constructs a dynamically-named
+    exception (or raises one whose message embeds provider data) can therefore never inject
+    arbitrary content into the telemetry: it maps only to one of these fixed codes.
+    """
+
+    #: A built-in ``ValueError`` (or subclass) — the common "bad value" category.
+    OBSERVER_VALUE_ERROR = "OBSERVER_VALUE_ERROR"
+    #: A built-in ``TypeError`` (or subclass).
+    OBSERVER_TYPE_ERROR = "OBSERVER_TYPE_ERROR"
+    #: A built-in ``KeyError`` / ``IndexError`` / ``AttributeError`` (lookup category).
+    OBSERVER_LOOKUP_ERROR = "OBSERVER_LOOKUP_ERROR"
+    #: Anything else — the catch-all. A dynamically-named/custom exception lands here.
+    OBSERVER_EXCEPTION = "OBSERVER_EXCEPTION"
+
+
+#: The closed allowlist mapping exception TYPES (by ``isinstance``, not by name) to fixed
+#: codes. Order matters: first match wins. A type not covered here → ``OBSERVER_EXCEPTION``.
+_OBSERVATION_FAILURE_ALLOWLIST = (
+    (ValueError, ObservationFailureKind.OBSERVER_VALUE_ERROR),
+    (TypeError, ObservationFailureKind.OBSERVER_TYPE_ERROR),
+    ((KeyError, IndexError, AttributeError), ObservationFailureKind.OBSERVER_LOOKUP_ERROR),
+)
+
+
+def classify_observation_failure(exc: BaseException) -> ObservationFailureKind:
+    """Map an observer exception to a FIXED classification code (N2).
+
+    Uses ``isinstance`` against a closed allowlist — never ``type(exc).__name__`` — so the
+    returned value is always one of the finite :class:`ObservationFailureKind` members and can
+    never carry attacker-/provider-controlled content. A dynamically-named exception subclass
+    of, e.g., ``RuntimeError`` maps to the generic ``OBSERVER_EXCEPTION``.
+    """
+    for types, kind in _OBSERVATION_FAILURE_ALLOWLIST:
+        if isinstance(exc, types):
+            return kind
+    return ObservationFailureKind.OBSERVER_EXCEPTION
+
+
 @dataclass(frozen=True)
 class AttemptObservationFailure:
-    """A structured, neutral signal that an :class:`AttemptObserver` raised (F2).
+    """A structured, neutral signal that an :class:`AttemptObserver` raised (F2 + N2).
 
     The runtime is **fail-open** with respect to provider execution: an observer raising
     never re-executes the provider, never erases a successful provider result, and never
     changes retry behavior. But the loss must not be silent — this record is emitted to an
     injected error reporter so the gap is visible.
 
-    It carries only SAFE identity plus ``error_type`` (the exception *type name* only). It
-    deliberately excludes the exception message/args and any provider payload, because an
-    arbitrary exception's payload may contain provider data (prompts, responses, tool
-    arguments, credentials).
+    It carries only SAFE identity plus ``error_kind`` — a FIXED classification code from the
+    closed :class:`ObservationFailureKind` enum (N2). It NEVER carries the exception's class
+    name, module, message, args, or ``repr``, and never any provider payload, because those
+    could embed provider data (prompts, responses, tool arguments, credentials) or, for a
+    dynamically-named exception, arbitrary attacker-controlled strings.
     """
 
     provider_id: str
     operation: str
     attempt_number: int
     status: ProviderAttemptStatus
-    error_type: str
+    error_kind: ObservationFailureKind
     workflow_id: Optional[str] = None
     instance_id: Optional[str] = None
     task_id: Optional[str] = None
@@ -139,7 +182,7 @@ class AttemptObservationFailure:
             "operation": self.operation,
             "attempt_number": self.attempt_number,
             "status": self.status.value,
-            "error_type": self.error_type,
+            "error_kind": self.error_kind.value,
             "workflow_id": self.workflow_id,
             "instance_id": self.instance_id,
             "task_id": self.task_id,

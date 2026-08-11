@@ -32,10 +32,12 @@ from .observability.attempts import (
     AttemptObservationErrorReporter,
     AttemptObservationFailure,
     AttemptObserver,
+    ObservationFailureKind,
     ProviderAttempt,
     ProviderAttemptStatus,
     RecordingAttemptObserver,
     RecordingObservationErrorReporter,
+    classify_observation_failure,
 )
 from .models.execution_state import CanonicalExecutionState, ExecutionLineage
 from .models.proposal import TransitionProposal
@@ -393,10 +395,12 @@ __all__ = [
     "AttemptObserver",
     "RecordingAttemptObserver",
     "PROVIDER_USAGE_METADATA_KEY",
-    # attempt-observation failure surfacing (CM-TA1 F2)
+    # attempt-observation failure surfacing (CM-TA1 F2 / N2)
     "AttemptObservationFailure",
     "AttemptObservationErrorReporter",
     "RecordingObservationErrorReporter",
+    "ObservationFailureKind",
+    "classify_observation_failure",
     # H22-B multi-workflow coordination
     "WorkflowPortfolio",
     "PortfolioWorkflowEntry",

@@ -58,6 +58,7 @@ from ugence_context_minimization.api import (
     Context, ContextUnit, OracleEvaluation, minimize_context,
     prepare_api_call_measurement, aggregate_logical_request_usage,
     AttemptStatus, UsageAvailability, ProviderTokenUsage,
+    RequestAttribution, InMemoryTokenAccountingSink,
 )
 
 # ---- a real minimization result (measurement A) ---------------------------
@@ -108,6 +109,28 @@ try:
     translate_attempt(prep, _bad, normalizer=norm)
     raise AssertionError("expected rejection for missing instance identity")
 except ValueError:
+    pass
+
+# ---- N1: two tenants, identical tenant-local ids, one shared sink -> both retained ----
+_tsink = InMemoryTokenAccountingSink()
+_tatt = ProviderAttempt(provider_id="vendor", operation="op", attempt_number=1,
+                        status=ProviderAttemptStatus.SUCCEEDED, ok=True, provider_invoked=True,
+                        instance_id="wf-1", task_id="t1", correlation_id="corr")
+_pA = prepare_api_call_measurement(minimization_result=res, logical_request_id="req-1",
+                                   provider_id="vendor", attribution=RequestAttribution(tenant_id="tenantA"))
+_pB = prepare_api_call_measurement(minimization_result=res, logical_request_id="req-1",
+                                   provider_id="vendor", attribution=RequestAttribution(tenant_id="tenantB"))
+_rA = translate_attempt(_pA, _tatt, sink=_tsink)
+_rB = translate_attempt(_pB, _tatt, sink=_tsink)
+assert _rA.attempt_id != _rB.attempt_id, "tenant-bound derivation must differ"
+assert len(_tsink.records) == 2, "both tenants must be retained in a shared sink"
+assert derive_attempt_id(_tatt, logical_request_id="req-1", tenant_id="tenantA") != \
+       derive_attempt_id(_tatt, logical_request_id="req-1", tenant_id="tenantB")
+# whitespace tenant rejected
+try:
+    RequestAttribution(tenant_id="   ")
+    raise AssertionError("expected whitespace tenant rejection")
+except Exception:
     pass
 
 # ---- F1: total provenance is never blended --------------------------------

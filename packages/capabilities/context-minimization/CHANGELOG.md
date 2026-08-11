@@ -77,6 +77,15 @@ New contracts: `TokenCountBasis`, `AttemptStatus`, `UsageAvailability`,
 - **F4 — `InMemoryTokenAccountingSink` is thread-safe.** Duplicate detection and insertion are
   atomic under a lock; snapshots never observe partial state. Still a reference/in-memory sink,
   **not** durable storage (production persistence remains follow-on work).
+- **N1 — tenant-safe attempt identity + sink partition.** `RequestAttribution.tenant_id` now
+  rejects whitespace-only values and exposes `tenant_namespace`; new `canonical_tenant_namespace`
+  helper maps absence to a domain-separated single-tenant namespace (`"s"`, never an empty
+  string) and a present tenant to `"t:" + tenant`. `InMemoryTokenAccountingSink` partitions
+  idempotency/conflict detection by the pair **`(tenant_namespace, attempt_id)`** — two tenants
+  may store the same explicit `attempt_id` (both retained), same-tenant replay stays idempotent,
+  same-tenant conflict is still rejected, and tenant isolation does **not** rely on record
+  fingerprints. `tenant_id` was already bound into `record_fingerprint` via attribution. (The
+  matching tenant-bound attempt-id derivation lives in the integration package.)
 
 ## 0.1.2 — timestamp validation & fingerprint documentation correction
 

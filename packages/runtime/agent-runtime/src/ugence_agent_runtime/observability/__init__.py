@@ -8,10 +8,12 @@ from .attempts import (
     AttemptObservationErrorReporter,
     AttemptObservationFailure,
     AttemptObserver,
+    ObservationFailureKind,
     ProviderAttempt,
     ProviderAttemptStatus,
     RecordingAttemptObserver,
     RecordingObservationErrorReporter,
+    classify_observation_failure,
 )
 from .metrics import event_counts
 from .tracing import EventSink, RunTrace, format_trace
@@ -30,8 +32,10 @@ __all__ = [
     "AttemptObserver",
     "RecordingAttemptObserver",
     "PROVIDER_USAGE_METADATA_KEY",
-    # attempt-observation failure surfacing (CM-TA1 F2)
+    # attempt-observation failure surfacing (CM-TA1 F2 / N2)
     "AttemptObservationFailure",
     "AttemptObservationErrorReporter",
     "RecordingObservationErrorReporter",
+    "ObservationFailureKind",
+    "classify_observation_failure",
 ]

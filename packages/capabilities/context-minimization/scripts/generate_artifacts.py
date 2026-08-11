@@ -229,7 +229,16 @@ def token_accounting_schema() -> dict:
             "prepare_api_call_measurement",
             "reconcile_api_call_measurement",
             "aggregate_logical_request_usage",
+            "canonical_tenant_namespace",
         ],
+        "tenant_isolation": {
+            "namespace_helper": "canonical_tenant_namespace(tenant_id)",
+            "single_tenant_namespace": "tenant_id is None -> 's' (domain-separated; NEVER an empty string)",
+            "named_tenant_namespace": "tenant_id present -> 't:' + tenant (must be non-empty, non-whitespace)",
+            "attempt_id_binding": "the tenant namespace is a prefix-free segment of the derived attempt id, so identical tenant-local ids in different tenants derive different attempt ids",
+            "sink_idempotency_key": "(tenant_namespace, attempt_id) — two tenants may store the same explicit attempt_id; same-tenant replay is idempotent; same-tenant conflict is rejected; tenant isolation does not rely on record fingerprints",
+            "fingerprint": "tenant_id is bound into ApiCallTokenRecord.record_fingerprint via attribution",
+        },
         "fail_closed_conditions": [
             "negative / bool / float / NaN / inf / str token count -> InvalidUnitError/InvalidRequestError",
             "usage AVAILABLE without any known field -> InvalidRequestError",

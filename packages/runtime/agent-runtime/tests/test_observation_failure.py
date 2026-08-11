@@ -68,12 +68,14 @@ def test_observation_failure_carries_no_sensitive_payload():
     rt = _runtime(RecordingProvider("p"), RaisingObserver(), rep)
     rt.start_workflow(_wf(TaskDefinition(task_id="t", operation="op", provider_id="p")))
     f = rep.failures[0]
-    # Only the exception TYPE NAME is exposed — never the message/args/payload.
-    assert f.error_type == "RuntimeError"
+    # N2: a FIXED classification code — never the exception class name/message/args.
+    from ugence_agent_runtime.api import ObservationFailureKind
+    assert f.error_kind is ObservationFailureKind.OBSERVER_EXCEPTION  # RuntimeError → catch-all
     d = f.to_dict()
     blob = repr(d)
-    assert "DEADBEEF" not in blob and "secret" not in blob
-    # No message/args/exception field exists on the structured record.
+    assert "DEADBEEF" not in blob and "secret" not in blob and "RuntimeError" not in blob
+    # No exception class name / message / args field exists on the structured record.
+    assert not hasattr(f, "error_type")
     assert not hasattr(f, "message")
     assert not hasattr(f, "exception")
     # Safe identity is present.
@@ -119,3 +121,70 @@ def test_default_no_reporter_preserves_silent_fail_open():
     inst = rt.start_workflow(_wf(TaskDefinition(task_id="t", operation="op", provider_id="p")))
     assert inst.status is WorkflowStatus.COMPLETED
     assert len(prov.calls) == 1
+
+
+# --------------------------------------------------------------------------- #
+# N2 — bounded classification: attacker-controlled strings never enter telemetry.
+# --------------------------------------------------------------------------- #
+def _one_failure(observer):
+    prov = RecordingProvider("p")
+    rep = RecordingObservationErrorReporter()
+    rt = _runtime(prov, observer, rep)
+    inst = rt.start_workflow(_wf(TaskDefinition(task_id="t", operation="op", provider_id="p")))
+    from ugence_agent_runtime.models.workflow import WorkflowStatus as _WS
+    assert inst.status is _WS.COMPLETED and len(prov.calls) == 1  # fail-open preserved
+    assert len(rep.failures) == 1
+    return rep.failures[0]
+
+
+def test_dynamically_named_exception_cannot_inject_content():
+    class Evil:
+        def on_attempt(self, a):
+            # class NAME embeds a fake secret; message embeds another.
+            Exc = type("sk_live_DEADBEEF_classname", (RuntimeError,), {})
+            raise Exc("BEGIN PRIVATE KEY prompt-body api_key=sk_live_9999")
+    from ugence_agent_runtime.api import ObservationFailureKind
+    f = _one_failure(Evil())
+    assert f.error_kind is ObservationFailureKind.OBSERVER_EXCEPTION  # not in allowlist → catch-all
+    blob = repr(f.to_dict()) + repr(f)
+    for secret in ("sk_live_DEADBEEF_classname", "PRIVATE KEY", "prompt-body", "sk_live_9999"):
+        assert secret not in blob, secret
+    # error_kind is a fixed enum value, not derived from the class name.
+    assert f.error_kind.value in {k.value for k in ObservationFailureKind}
+
+
+def test_message_and_args_with_secrets_are_absent():
+    class Evil:
+        def on_attempt(self, a):
+            raise ValueError("secret=SUPERSECRET", {"authorization": "Bearer LEAK"})
+    from ugence_agent_runtime.api import ObservationFailureKind
+    f = _one_failure(Evil())
+    assert f.error_kind is ObservationFailureKind.OBSERVER_VALUE_ERROR  # allowlisted category
+    blob = repr(f.to_dict()) + repr(f)
+    for secret in ("SUPERSECRET", "Bearer LEAK", "authorization"):
+        assert secret not in blob, secret
+
+
+def test_allowlist_categories_are_fixed_codes():
+    from ugence_agent_runtime.api import ObservationFailureKind, classify_observation_failure
+    assert classify_observation_failure(ValueError("x")) is ObservationFailureKind.OBSERVER_VALUE_ERROR
+    assert classify_observation_failure(TypeError("x")) is ObservationFailureKind.OBSERVER_TYPE_ERROR
+    assert classify_observation_failure(KeyError("x")) is ObservationFailureKind.OBSERVER_LOOKUP_ERROR
+    assert classify_observation_failure(RuntimeError("x")) is ObservationFailureKind.OBSERVER_EXCEPTION
+    # a dynamically-named subclass of an allowlisted type still maps to the FIXED code
+    Sub = type("LEAK_secret", (ValueError,), {})
+    assert classify_observation_failure(Sub()) is ObservationFailureKind.OBSERVER_VALUE_ERROR
+
+
+def test_raising_reporter_with_dynamic_exception_still_contained():
+    class Evil:
+        def on_attempt(self, a):
+            raise type("LEAK", (RuntimeError,), {})("x")
+    class BadReporter:
+        def on_observation_failure(self, f):
+            raise type("REPORTER_LEAK", (RuntimeError,), {})("y")
+    prov = RecordingProvider("p")
+    rt = _runtime(prov, Evil(), BadReporter())
+    from ugence_agent_runtime.models.workflow import WorkflowStatus as _WS
+    inst = rt.start_workflow(_wf(TaskDefinition(task_id="t", operation="op", provider_id="p")))
+    assert inst.status is _WS.COMPLETED and len(prov.calls) == 1  # both contained

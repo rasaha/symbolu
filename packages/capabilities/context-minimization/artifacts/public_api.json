@@ -38,6 +38,7 @@
     "UsageAvailability",
     "__version__",
     "aggregate_logical_request_usage",
+    "canonical_tenant_namespace",
     "deduplicate_context",
     "default_token_count",
     "minimize",

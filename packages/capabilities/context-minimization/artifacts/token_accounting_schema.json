@@ -2,7 +2,8 @@
   "apis": [
     "prepare_api_call_measurement",
     "reconcile_api_call_measurement",
-    "aggregate_logical_request_usage"
+    "aggregate_logical_request_usage",
+    "canonical_tenant_namespace"
   ],
   "boundary": {
     "is": [
@@ -354,5 +355,13 @@
   "protocols": [
     "RequestTokenCounter",
     "TokenAccountingSink"
-  ]
+  ],
+  "tenant_isolation": {
+    "attempt_id_binding": "the tenant namespace is a prefix-free segment of the derived attempt id, so identical tenant-local ids in different tenants derive different attempt ids",
+    "fingerprint": "tenant_id is bound into ApiCallTokenRecord.record_fingerprint via attribution",
+    "named_tenant_namespace": "tenant_id present -> 't:' + tenant (must be non-empty, non-whitespace)",
+    "namespace_helper": "canonical_tenant_namespace(tenant_id)",
+    "single_tenant_namespace": "tenant_id is None -> 's' (domain-separated; NEVER an empty string)",
+    "sink_idempotency_key": "(tenant_namespace, attempt_id) \u2014 two tenants may store the same explicit attempt_id; same-tenant replay is idempotent; same-tenant conflict is rejected; tenant isolation does not rely on record fingerprints"
+  }
 }

@@ -25,6 +25,7 @@ from ..observability.attempts import (
     AttemptObserver,
     ProviderAttempt,
     ProviderAttemptStatus,
+    classify_observation_failure,
 )
 from ..providers.interfaces import Provider, ToolInvocation, ToolResult
 from ..providers.registry import ProviderRegistry
@@ -99,14 +100,16 @@ def _observe(
     except Exception as exc:  # noqa: BLE001 - telemetry must never break execution
         if error_reporter is None:
             return  # default: preserve prior fail-open-silent behavior
-        # Surface the loss with SAFE identity + the exception TYPE NAME only (never the
-        # message/args, which may embed provider data). Contain a raising reporter.
+        # Surface the loss with SAFE identity + a FIXED classification code from a closed
+        # allowlist (N2) — NEVER the exception class name/module/message/args, which could
+        # embed provider data or (for a dynamically-named exception) arbitrary content.
+        # Contain a raising reporter.
         failure = AttemptObservationFailure(
             provider_id=attempt.provider_id,
             operation=attempt.operation,
             attempt_number=attempt.attempt_number,
             status=attempt.status,
-            error_type=type(exc).__name__,
+            error_kind=classify_observation_failure(exc),
             workflow_id=attempt.workflow_id,
             instance_id=attempt.instance_id,
             task_id=attempt.task_id,

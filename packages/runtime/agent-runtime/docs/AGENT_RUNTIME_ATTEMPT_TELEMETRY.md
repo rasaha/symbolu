@@ -88,10 +88,16 @@ is not silent when `AgentRuntimeConfig.attempt_observer_error_reporter` (an
 | `provider_id`, `operation` | which provider/operation |
 | `workflow_id`, `instance_id`, `task_id`, `correlation_id` | safe identity |
 | `attempt_number`, `status` | which attempt, and its neutral status |
-| `error_type` | the exception **type name** only — never the message/args or any provider payload |
+| `error_kind` | a FIXED code from the closed `ObservationFailureKind` enum — **never** the exception class name/module/message/args (N2) |
 
 Guarantees: exactly one signal per observer failure; a reporter that itself raises is
 contained (it can never mask the provider result); no signal on paths where no provider was
-invoked; and with no reporter configured, behavior is unchanged (silent fail-open). The
-structured record deliberately omits the exception message/args because an arbitrary
-exception's payload may contain provider data (prompts, responses, tool arguments, credentials).
+invoked; and with no reporter configured, behavior is unchanged (silent fail-open).
+
+**N2 — bounded classification.** `error_kind` is produced by `classify_observation_failure`,
+which maps the exception via `isinstance` against a *closed allowlist*
+(`OBSERVER_VALUE_ERROR` / `OBSERVER_TYPE_ERROR` / `OBSERVER_LOOKUP_ERROR`, else the catch-all
+`OBSERVER_EXCEPTION`) — it never reads `type(exc).__name__`. So even an observer that raises a
+dynamically-named exception whose class name or message embeds provider data (or a fake secret)
+cannot inject that content into the telemetry: it maps only to one of the finite enum codes.
+The record carries no exception message, args, or `repr`.

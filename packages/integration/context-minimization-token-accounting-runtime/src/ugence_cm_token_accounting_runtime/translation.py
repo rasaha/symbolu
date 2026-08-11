@@ -30,6 +30,7 @@ from ugence_context_minimization.api import (
     PreparedApiCall,
     ProviderTokenUsage,
     UsageAvailability,
+    canonical_tenant_namespace,
     reconcile_api_call_measurement,
 )
 
@@ -127,16 +128,23 @@ def _require_identity(value: object, name: str) -> str:
 
 
 def _attempt_id_for(
-    logical_request_id: object, instance_id: object, task_id: object, attempt_number: object
+    logical_request_id: object, instance_id: object, task_id: object, attempt_number: object,
+    *, tenant_id: object = None,
 ) -> str:
-    """Deterministic, collision-resistant attempt id from the FULL logical-request identity.
+    """Deterministic, collision-resistant attempt id from the FULL tenant + logical identity.
 
-    Binds ``logical_request_id`` (not just instance/task) so two distinct logical requests
-    can never produce the same id even if instance/task identity coincides. Components are
-    length-prefixed (a prefix-free encoding), so no two distinct identity tuples can map to
-    the same string regardless of which characters the ids contain. No wall-clock, no
-    randomness, no provider-controlled request id is used as internal attempt authority.
+    Binds, as prefix-free length-prefixed segments, the canonical **tenant namespace** (N1),
+    ``logical_request_id``, ``instance_id``, ``task_id`` and ``attempt_number``, so:
+
+    * two distinct logical requests never collide even if instance/task coincide;
+    * two DIFFERENT tenants never collide even if EVERY tenant-local id coincides;
+    * absence of a tenant is a distinct single-tenant namespace, never an empty string.
+
+    No wall-clock, no randomness, no provider-controlled request id is used as attempt
+    authority. A present tenant must be non-empty/non-whitespace (validated by
+    :func:`canonical_tenant_namespace`).
     """
+    tenant_ns = canonical_tenant_namespace(tenant_id)  # validates + domain-separates
     lr = _require_identity(logical_request_id, "logical_request_id")
     inst = _require_identity(instance_id, "instance_id")
     task = _require_identity(task_id, "task_id")
@@ -146,18 +154,23 @@ def _attempt_id_for(
     def _seg(s: str) -> str:
         return f"{len(s)}|{s}"
 
-    return "cmta1/" + "".join(_seg(x) for x in (lr, inst, task, str(attempt_number)))
+    return "cmta1/" + "".join(_seg(x) for x in (tenant_ns, lr, inst, task, str(attempt_number)))
 
 
-def derive_attempt_id(attempt: ProviderAttempt, *, logical_request_id: str) -> str:
-    """A deterministic, collision-resistant attempt id from runtime + logical-request identity.
+def derive_attempt_id(
+    attempt: ProviderAttempt, *, logical_request_id: str, tenant_id: Optional[str] = None
+) -> str:
+    """A deterministic, collision-resistant attempt id from tenant + runtime + logical identity.
 
-    ``logical_request_id`` is REQUIRED (the minimum stable business identity); ``attempt``
-    must carry non-empty ``instance_id`` and ``task_id``. Missing/empty/whitespace identity
-    is rejected — never replaced with a placeholder. No clock, no randomness.
+    ``logical_request_id`` is REQUIRED; ``attempt`` must carry non-empty ``instance_id`` and
+    ``task_id``. ``tenant_id`` is the tenant namespace: ``None`` is an explicit single-tenant
+    namespace (NOT an empty string); a present tenant must be non-empty/non-whitespace.
+    Callers sharing infrastructure across tenants MUST pass tenant identity so identical
+    tenant-local ids in different tenants derive different attempt ids. No clock, no randomness.
     """
     return _attempt_id_for(
-        logical_request_id, attempt.instance_id, attempt.task_id, attempt.attempt_number
+        logical_request_id, attempt.instance_id, attempt.task_id, attempt.attempt_number,
+        tenant_id=tenant_id,
     )
 
 
@@ -175,13 +188,17 @@ def translate_attempt(
     * Uses the injected ``normalizer`` to type the attempt's opaque ``neutral_usage``; a
       ``None`` result (or no usage, or no normalizer) records the attempt as usage-unavailable
       with a status-derived reason — never fabricated zero usage.
-    * Attempt identity (F3): when ``attempt_id`` is omitted, both the attempt id and — for a
-      retry (``attempt_number > 1``) — its ``retry_of_attempt_id`` are derived from the SAME
-      scheme (bound to ``prepared.logical_request_id`` + instance/task), rejecting missing or
-      ambiguous identity. When ``attempt_id`` is supplied explicitly, ``retry_of_attempt_id``
-      is NEVER reconstructed from the derivation scheme (it would cross identity schemes): a
-      retry then REQUIRES an explicit ``retry_of_attempt_id``, and a non-retry must not carry
-      one. Supplying ``retry_of_attempt_id`` while deriving ``attempt_id`` is rejected.
+    * Attempt identity (F3 + N1): when ``attempt_id`` is omitted, both the attempt id and —
+      for a retry (``attempt_number > 1``) — its ``retry_of_attempt_id`` are derived from the
+      SAME tenant-bound scheme (the canonical tenant namespace from
+      ``prepared.attribution.tenant_id`` + ``prepared.logical_request_id`` + instance/task),
+      rejecting missing or ambiguous identity, so a derived retry never crosses tenants. When
+      ``attempt_id`` is supplied explicitly, ``retry_of_attempt_id`` is NEVER reconstructed
+      from the derivation scheme: a retry then REQUIRES an explicit ``retry_of_attempt_id``,
+      and a non-retry must not carry one. Supplying ``retry_of_attempt_id`` while deriving
+      ``attempt_id`` is rejected. The sink additionally partitions idempotency by
+      ``(tenant_namespace, attempt_id)``, so even explicit attempt ids cannot collide across
+      tenants.
     * Delegates to :func:`reconcile_api_call_measurement`, so all strict token-count and
       attempt-identity validation (and the byte-identical idempotent-replay contract on the
       ``sink``) applies unchanged.
@@ -201,19 +218,25 @@ def translate_attempt(
         else:
             unavailable_reason = f"attempt {attempt.status.value.lower()}; no usage evidence"
 
+    # The tenant namespace is taken from the prepared measurement's attribution (N1): the
+    # attempt id and its retry linkage are BOTH bound to this tenant, so a derived retry can
+    # never reference another tenant's attempt.
+    tenant_id = prepared.attribution.tenant_id
     is_retry = attempt.attempt_number > 1
     if attempt_id is None:
-        # Derived scheme: id + retry_of both come from the same derivation.
+        # Derived scheme: id + retry_of both come from the same tenant-bound derivation.
         if retry_of_attempt_id is not None:
             raise ValueError(
                 "retry_of_attempt_id may only be supplied with an explicit attempt_id; "
                 "when deriving, retry linkage is derived from the same scheme"
             )
-        aid = derive_attempt_id(attempt, logical_request_id=prepared.logical_request_id)
+        aid = derive_attempt_id(
+            attempt, logical_request_id=prepared.logical_request_id, tenant_id=tenant_id
+        )
         retry_of = (
             _attempt_id_for(
                 prepared.logical_request_id, attempt.instance_id, attempt.task_id,
-                attempt.attempt_number - 1,
+                attempt.attempt_number - 1, tenant_id=tenant_id,
             )
             if is_retry
             else None
