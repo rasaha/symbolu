@@ -20,6 +20,8 @@ from ..models.results import FailureCategory, RuntimeFailure
 from ..observability.attempts import (
     PROVIDER_USAGE_METADATA_KEY,
     AttemptContext,
+    AttemptObservationErrorReporter,
+    AttemptObservationFailure,
     AttemptObserver,
     ProviderAttempt,
     ProviderAttemptStatus,
@@ -64,8 +66,17 @@ def _observe(
     ok: bool,
     result: Optional[ToolResult] = None,
     failure_category: Optional[str] = None,
+    error_reporter: Optional[AttemptObservationErrorReporter] = None,
 ) -> None:
-    """Emit one neutral attempt record. A raising observer never breaks execution."""
+    """Emit one neutral attempt record.
+
+    Fail-open (F2): a raising observer never re-executes the provider, never erases the
+    provider result, and never changes retry behavior — but the loss is NOT silent when an
+    ``error_reporter`` is configured. Exactly one structured, payload-free
+    :class:`AttemptObservationFailure` is delivered per observer failure; a reporter that
+    itself raises is contained here so it can never mask the provider result. With no
+    reporter configured, behavior is unchanged from before (silent swallow).
+    """
     if observer is None:
         return
     ctx = context or AttemptContext()
@@ -85,8 +96,26 @@ def _observe(
     )
     try:
         observer.on_attempt(attempt)
-    except Exception:  # noqa: BLE001 - telemetry must never break execution
-        pass
+    except Exception as exc:  # noqa: BLE001 - telemetry must never break execution
+        if error_reporter is None:
+            return  # default: preserve prior fail-open-silent behavior
+        # Surface the loss with SAFE identity + the exception TYPE NAME only (never the
+        # message/args, which may embed provider data). Contain a raising reporter.
+        failure = AttemptObservationFailure(
+            provider_id=attempt.provider_id,
+            operation=attempt.operation,
+            attempt_number=attempt.attempt_number,
+            status=attempt.status,
+            error_type=type(exc).__name__,
+            workflow_id=attempt.workflow_id,
+            instance_id=attempt.instance_id,
+            task_id=attempt.task_id,
+            correlation_id=attempt.correlation_id,
+        )
+        try:
+            error_reporter.on_observation_failure(failure)
+        except Exception:  # noqa: BLE001 - a failing reporter must never mask the result
+            pass
 
 
 def execute_with_policy(
@@ -99,6 +128,7 @@ def execute_with_policy(
     *,
     attempt_observer: Optional[AttemptObserver] = None,
     attempt_context: Optional[AttemptContext] = None,
+    attempt_error_reporter: Optional[AttemptObservationErrorReporter] = None,
 ) -> ExecutionOutcome:
     """Invoke the selected provider, applying retry and timeout deterministically.
 
@@ -138,7 +168,8 @@ def execute_with_policy(
             )
             _observe(attempt_observer, attempt_context, invocation, attempts,
                      ProviderAttemptStatus.EXCEPTION, ok=False,
-                     failure_category=FailureCategory.PROVIDER_ERROR.value)
+                     failure_category=FailureCategory.PROVIDER_ERROR.value,
+                     error_reporter=attempt_error_reporter)
             if exc.retriable and retry_policy.should_retry(attempts):
                 continue
             return ExecutionOutcome(ok=False, attempts=attempts, failure=last_failure)
@@ -150,7 +181,8 @@ def execute_with_policy(
             )
             _observe(attempt_observer, attempt_context, invocation, attempts,
                      ProviderAttemptStatus.EXCEPTION, ok=False,
-                     failure_category=FailureCategory.PROVIDER_ERROR.value)
+                     failure_category=FailureCategory.PROVIDER_ERROR.value,
+                     error_reporter=attempt_error_reporter)
             if retry_policy.should_retry(attempts):
                 continue
             return ExecutionOutcome(ok=False, attempts=attempts, failure=last_failure)
@@ -159,7 +191,8 @@ def execute_with_policy(
         if timeout is not None and _timeout_exceeded(started_at, clock(), timeout):
             _observe(attempt_observer, attempt_context, invocation, attempts,
                      ProviderAttemptStatus.TIMEOUT, ok=False, result=result,
-                     failure_category=FailureCategory.TIMEOUT.value)
+                     failure_category=FailureCategory.TIMEOUT.value,
+                     error_reporter=attempt_error_reporter)
             return ExecutionOutcome(
                 ok=False,
                 attempts=attempts,
@@ -173,7 +206,8 @@ def execute_with_policy(
 
         if result.ok:
             _observe(attempt_observer, attempt_context, invocation, attempts,
-                     ProviderAttemptStatus.SUCCEEDED, ok=True, result=result)
+                     ProviderAttemptStatus.SUCCEEDED, ok=True, result=result,
+                     error_reporter=attempt_error_reporter)
             return ExecutionOutcome(ok=True, attempts=attempts, result=result)
 
         # Expected provider failure reported by value.
@@ -185,7 +219,8 @@ def execute_with_policy(
         )
         _observe(attempt_observer, attempt_context, invocation, attempts,
                  ProviderAttemptStatus.FAILED, ok=False, result=result,
-                 failure_category=FailureCategory.PROVIDER_ERROR.value)
+                 failure_category=FailureCategory.PROVIDER_ERROR.value,
+                 error_reporter=attempt_error_reporter)
         if retry_policy.should_retry(attempts):
             continue
         return ExecutionOutcome(ok=False, attempts=attempts, result=result, failure=last_failure)

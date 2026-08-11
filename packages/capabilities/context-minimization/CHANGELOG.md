@@ -65,6 +65,19 @@ New contracts: `TokenCountBasis`, `AttemptStatus`, `UsageAvailability`,
   `tests/accounting/` (deny/failure/unknown paths outnumber happy paths); the isolated
   single-wheel verifier now proves the accounting surface on the installed wheel.
 
+### Audit remediation (pre-merge; part of the same unreleased 0.2.0 contract)
+- **F1 — total provenance is never blended.** `LogicalRequestTokenSummary.provider_total_tokens`
+  (which had folded derived input+output totals into a "provider" field) is **replaced** by three
+  distinctly-named quantities: `provider_reported_total_tokens` (ONLY explicit provider
+  `total_tokens`), `derived_total_tokens` (input+output, cached/cache-write/reasoning excluded),
+  and `settlement_token_units` (the documented per-attempt selection: reported total if present,
+  else derived), plus `attempts_reporting_total`. A field named "provider … total" now contains
+  only provider-reported values. Corrected in place (0.2.0 is unreleased, so no consumer depends
+  on the ambiguous shape); the summary schema and fingerprint reflect the new fields.
+- **F4 — `InMemoryTokenAccountingSink` is thread-safe.** Duplicate detection and insertion are
+  atomic under a lock; snapshots never observe partial state. Still a reference/in-memory sink,
+  **not** durable storage (production persistence remains follow-on work).
+
 ## 0.1.2 — timestamp validation & fingerprint documentation correction
 
 **Package maturity: `IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED`** (upgrade to

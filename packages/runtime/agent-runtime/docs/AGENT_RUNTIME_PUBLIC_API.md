@@ -115,3 +115,10 @@ The observer is notified once per actual `provider.execute` invocation with the
 runtime-authoritative attempt number; a governance/exact-action rejection or a
 provider-not-found produces no attempt. See
 [`AGENT_RUNTIME_ATTEMPT_TELEMETRY.md`](AGENT_RUNTIME_ATTEMPT_TELEMETRY.md).
+
+## Attempt-observation failure surfacing (CM-TA1 F2, 0.7.0)
+
+Additive: `AttemptObservationFailure`, `AttemptObservationErrorReporter`,
+`RecordingObservationErrorReporter`, and the optional
+`AgentRuntimeConfig.attempt_observer_error_reporter` field (`None` = prior silent
+fail-open). See [`AGENT_RUNTIME_ATTEMPT_TELEMETRY.md`](AGENT_RUNTIME_ATTEMPT_TELEMETRY.md).

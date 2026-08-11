@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import threading
 from dataclasses import dataclass, field
 from enum import Enum
 from types import MappingProxyType
@@ -514,6 +515,22 @@ class LogicalRequestTokenSummary:
     counts the rest, and ``complete`` is False whenever any gap exists — so a reader
     never mistakes a measurement gap for zero consumption. Context savings are reported
     once for the request (from the linked minimization run), never multiplied per attempt.
+
+    **Total provenance is never blended** (F1). Three total quantities are kept
+    separate and distinctly named so a field called "provider ... total" only ever
+    contains provider-reported values:
+
+    * ``provider_reported_total_tokens`` — the sum of ONLY the totals a provider
+      explicitly reported (``ProviderTokenUsage.total_tokens``). It never contains a
+      derived value. ``attempts_reporting_total`` counts how many known attempts
+      contributed an explicit total.
+    * ``derived_total_tokens`` — the sum of the *derived* per-attempt ``input + output``
+      totals over known attempts. Explicitly derived; cached/cache-write/reasoning
+      tokens are excluded (they are subsets/details, never re-added).
+    * ``settlement_token_units`` — the sum of the documented settlement selection per
+      attempt: the provider-reported total when present, else the derived total. This is
+      the magnitude a budget settlement would charge; it is only meaningful when
+      ``complete`` is True (no measurement gaps).
     """
 
     logical_request_id: str
@@ -522,9 +539,12 @@ class LogicalRequestTokenSummary:
     failed_count: int
     retry_count: int
     attempts_usage_unknown: int
+    attempts_reporting_total: int
     provider_input_tokens: int
     provider_output_tokens: int
-    provider_total_tokens: int
+    provider_reported_total_tokens: int
+    derived_total_tokens: int
+    settlement_token_units: int
     retry_input_tokens: int
     retry_output_tokens: int
     failed_attempt_input_tokens: int
@@ -543,9 +563,12 @@ class LogicalRequestTokenSummary:
             "failed_count": self.failed_count,
             "retry_count": self.retry_count,
             "attempts_usage_unknown": self.attempts_usage_unknown,
+            "attempts_reporting_total": self.attempts_reporting_total,
             "provider_input_tokens": self.provider_input_tokens,
             "provider_output_tokens": self.provider_output_tokens,
-            "provider_total_tokens": self.provider_total_tokens,
+            "provider_reported_total_tokens": self.provider_reported_total_tokens,
+            "derived_total_tokens": self.derived_total_tokens,
+            "settlement_token_units": self.settlement_token_units,
             "retry_input_tokens": self.retry_input_tokens,
             "retry_output_tokens": self.retry_output_tokens,
             "failed_attempt_input_tokens": self.failed_attempt_input_tokens,
@@ -654,37 +677,49 @@ class DefaultApproximateRequestCounter:
 
 
 class InMemoryTokenAccountingSink:
-    """A deterministic, in-memory :class:`TokenAccountingSink` (test/reference only).
+    """A deterministic, **thread-safe** in-memory :class:`TokenAccountingSink`
+    (test/reference only — NOT durable storage; production persistence is follow-on work).
 
     Enforces attempt-identity discipline: a duplicate ``attempt_id`` is REJECTED unless
-    the replayed record is byte-identical (an explicitly idempotent replay). It performs
-    no I/O and holds no external resource.
+    the replayed record is byte-identical (an explicitly idempotent replay). Duplicate
+    detection and insertion are **atomic** under a lock (F4), so concurrent writers can
+    never lose a record, double-store an identical replay, or observe a partially-updated
+    snapshot. It performs no I/O and holds no external resource.
     """
 
     def __init__(self) -> None:
+        self._lock = threading.Lock()
         self._records: list[ApiCallTokenRecord] = []
         self._by_attempt: dict[str, ApiCallTokenRecord] = {}
 
     def record(self, record: ApiCallTokenRecord) -> None:
         if not isinstance(record, ApiCallTokenRecord):
             raise InvalidRequestError("record must be an ApiCallTokenRecord")
-        existing = self._by_attempt.get(record.attempt_id)
-        if existing is not None:
-            if existing.record_fingerprint != record.record_fingerprint:
-                raise InvalidRequestError(
-                    f"duplicate attempt_id {record.attempt_id!r} with conflicting content "
-                    "(idempotent replay requires a byte-identical record)"
-                )
-            return  # identical replay — accepted, not double-stored
-        self._by_attempt[record.attempt_id] = record
-        self._records.append(record)
+        # Atomic check-and-insert: the fingerprint comparison and the append happen under
+        # one lock so two threads racing the same attempt_id cannot both insert.
+        with self._lock:
+            existing = self._by_attempt.get(record.attempt_id)
+            if existing is not None:
+                if existing.record_fingerprint != record.record_fingerprint:
+                    raise InvalidRequestError(
+                        f"duplicate attempt_id {record.attempt_id!r} with conflicting content "
+                        "(idempotent replay requires a byte-identical record)"
+                    )
+                return  # identical replay — accepted, not double-stored
+            self._by_attempt[record.attempt_id] = record
+            self._records.append(record)
 
     @property
     def records(self) -> tuple[ApiCallTokenRecord, ...]:
-        return tuple(self._records)
+        # A consistent snapshot: the tuple copy happens under the lock so a reader never
+        # sees a list mid-append.
+        with self._lock:
+            return tuple(self._records)
 
     def for_logical_request(self, logical_request_id: str) -> tuple[ApiCallTokenRecord, ...]:
-        return tuple(r for r in self._records if r.logical_request_id == logical_request_id)
+        with self._lock:
+            snapshot = tuple(self._records)
+        return tuple(r for r in snapshot if r.logical_request_id == logical_request_id)
 
 
 # --------------------------------------------------------------------------- #
@@ -933,18 +968,34 @@ def aggregate_logical_request_usage(
     def _out(r: ApiCallTokenRecord) -> int:
         return r.provider_usage.output_tokens or 0 if r.provider_usage else 0
 
-    def _tot(r: ApiCallTokenRecord) -> int:
+    def _reported_total(r: ApiCallTokenRecord) -> Optional[int]:
+        """ONLY an explicit provider-reported total; never a derived value."""
+        if not r.provider_usage:
+            return None
+        return r.provider_usage.total_tokens
+
+    def _derived_total(r: ApiCallTokenRecord) -> int:
+        """input+output derived total (0 when neither known). Never adds cached/reasoning."""
         if not r.provider_usage:
             return 0
-        if r.provider_usage.total_tokens is not None:
-            return r.provider_usage.total_tokens
-        derived = r.provider_usage.derived_total()
-        return derived or 0
+        d = r.provider_usage.derived_total()
+        return d or 0
+
+    def _settlement_units(r: ApiCallTokenRecord) -> int:
+        """Documented settlement selection: reported total if present, else derived."""
+        rt = _reported_total(r)
+        if rt is not None:
+            return rt
+        return _derived_total(r)
 
     known = [r for r in unique if r.usage_availability is UsageAvailability.AVAILABLE]
     provider_input = sum(_in(r) for r in known)
     provider_output = sum(_out(r) for r in known)
-    provider_total = sum(_tot(r) for r in known)
+    # provider_reported_total_tokens contains ONLY explicit provider totals (F1).
+    provider_reported_total = sum(t for t in (_reported_total(r) for r in known) if t is not None)
+    attempts_reporting_total = sum(1 for r in known if _reported_total(r) is not None)
+    derived_total = sum(_derived_total(r) for r in known)
+    settlement_units = sum(_settlement_units(r) for r in known)
     retry_input = sum(_in(r) for r in known if r.is_retry)
     retry_output = sum(_out(r) for r in known if r.is_retry)
     failed_input = sum(_in(r) for r in known if r.status is not AttemptStatus.SUCCEEDED)
@@ -960,9 +1011,12 @@ def aggregate_logical_request_usage(
         failed_count=failed,
         retry_count=retries,
         attempts_usage_unknown=unknown,
+        attempts_reporting_total=attempts_reporting_total,
         provider_input_tokens=provider_input,
         provider_output_tokens=provider_output,
-        provider_total_tokens=provider_total,
+        provider_reported_total_tokens=provider_reported_total,
+        derived_total_tokens=derived_total,
+        settlement_token_units=settlement_units,
         retry_input_tokens=retry_input,
         retry_output_tokens=retry_output,
         failed_attempt_input_tokens=failed_input,

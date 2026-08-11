@@ -105,16 +105,29 @@ def test_context_savings_counted_once_across_attempts():
     assert summ.context_tokens_before == prep.context_tokens_before
 
 
-def test_total_prefers_reported_else_derived():
+def test_total_provenance_is_not_blended(F1=True):
+    """F1: a field named provider ... total contains ONLY provider-reported totals.
+
+    a1 reports an explicit total (999); a2 reports none (derived 30). The reported-total
+    field must be 999 alone; the derived field must be the sum of per-attempt input+output;
+    and the settlement selection (reported-else-derived per attempt) must be 999 + 30.
+    """
     prep = _prep()
     sink = InMemoryTokenAccountingSink()
-    # a1: reported total 999. a2: no reported total → derived 30.
     reconcile_api_call_measurement(prep, attempt_id="a1", attempt_number=1, status=AttemptStatus.SUCCEEDED,
                                    provider_usage=ProviderTokenUsage(input_tokens=10, output_tokens=5, total_tokens=999), sink=sink)
     reconcile_api_call_measurement(prep, attempt_id="a2", attempt_number=2, status=AttemptStatus.SUCCEEDED,
                                    provider_usage=ProviderTokenUsage(input_tokens=20, output_tokens=10), sink=sink)
     summ = aggregate_logical_request_usage(sink.records)
-    assert summ.provider_total_tokens == 999 + 30
+    # ONLY the explicit provider total contributes here (a2 reported none).
+    assert summ.provider_reported_total_tokens == 999
+    assert summ.attempts_reporting_total == 1
+    # Derived = per-attempt input+output over both known attempts (15 + 30).
+    assert summ.derived_total_tokens == 15 + 30
+    # Settlement selection: reported-else-derived per attempt (999 for a1, 30 for a2).
+    assert summ.settlement_token_units == 999 + 30
+    # No field named "provider ... total" carries the blended derived value.
+    assert not hasattr(summ, "provider_total_tokens")
 
 
 def test_divergent_run_fingerprint_across_attempts_fails_closed():

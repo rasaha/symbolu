@@ -29,10 +29,13 @@ from .models.events import RuntimeEvent
 from .observability.attempts import (
     PROVIDER_USAGE_METADATA_KEY,
     AttemptContext,
+    AttemptObservationErrorReporter,
+    AttemptObservationFailure,
     AttemptObserver,
     ProviderAttempt,
     ProviderAttemptStatus,
     RecordingAttemptObserver,
+    RecordingObservationErrorReporter,
 )
 from .models.execution_state import CanonicalExecutionState, ExecutionLineage
 from .models.proposal import TransitionProposal
@@ -390,6 +393,10 @@ __all__ = [
     "AttemptObserver",
     "RecordingAttemptObserver",
     "PROVIDER_USAGE_METADATA_KEY",
+    # attempt-observation failure surfacing (CM-TA1 F2)
+    "AttemptObservationFailure",
+    "AttemptObservationErrorReporter",
+    "RecordingObservationErrorReporter",
     # H22-B multi-workflow coordination
     "WorkflowPortfolio",
     "PortfolioWorkflowEntry",

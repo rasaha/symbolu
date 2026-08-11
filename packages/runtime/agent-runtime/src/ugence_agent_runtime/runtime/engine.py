@@ -653,6 +653,7 @@ class AgentRuntime:
             ti.task_id,
             attempt_observer=self._config.attempt_observer,
             attempt_context=attempt_context,
+            attempt_error_reporter=self._config.attempt_observer_error_reporter,
         )
         ti.attempts = outcome.attempts
         # S(provider-completed) — attempt count now reflects the outcome.

@@ -22,7 +22,7 @@ from .runtime.errors import RuntimeConfigurationError
 from .runtime.retry import RetryPolicy
 
 if TYPE_CHECKING:  # pragma: no cover - annotations only, avoids an import cycle
-    from .observability.attempts import AttemptObserver
+    from .observability.attempts import AttemptObservationErrorReporter, AttemptObserver
     from .persistence.interfaces import (
         CheckpointStore,
         RuntimeEventStore,
@@ -75,6 +75,13 @@ class AgentRuntimeConfig:
     # means no behavior change. A governance HOLD/BLOCK/ESCALATE or an exact-action
     # rejection never invokes the provider, so it produces no attempt.
     attempt_observer: Optional["AttemptObserver"] = None
+    # Optional neutral reporter for attempt-observation FAILURES (CM-TA1 F2). When set, a
+    # raising ``attempt_observer`` is surfaced as a structured, payload-free
+    # ``AttemptObservationFailure`` instead of being swallowed silently — the runtime stays
+    # fail-open (the provider is never re-invoked and its result is never erased), but the
+    # telemetry gap is no longer invisible. ``None`` (default) preserves the prior
+    # swallow-silently behavior for callers that do not configure accounting.
+    attempt_observer_error_reporter: Optional["AttemptObservationErrorReporter"] = None
     id_generator: Callable[[], str] = field(
         default_factory=lambda: _SequentialIdGenerator("wf")
     )

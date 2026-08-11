@@ -15,6 +15,7 @@ otherwise; a measured overrun raises `BudgetEstimateExceeded` (never clamped/hid
 
 from __future__ import annotations
 
+import threading
 from typing import Callable, Dict, Optional, Tuple
 
 from ugence_agent_runtime.observability.attempts import ProviderAttempt
@@ -56,24 +57,39 @@ class RuntimeTokenAccountingBridge:
         self._sink = sink
         self._normalizer = normalizer
         self._prepared: Dict[Tuple[str, str], PreparedApiCall] = {}
-        self.skipped_attempts: int = 0
+        # F4: guard mutable diagnostics and the registry so concurrent attempts cannot lose
+        # a skip increment or race the registry lookup.
+        self._lock = threading.Lock()
+        self._skipped_attempts: int = 0
+
+    @property
+    def skipped_attempts(self) -> int:
+        """Count of observed attempts with no registered pre-call measurement (thread-safe)."""
+        with self._lock:
+            return self._skipped_attempts
 
     def register(self, prepared: PreparedApiCall, *, instance_id: str, task_id: str) -> None:
         """Link a pre-call measurement to the runtime identity its attempts will carry."""
         if not isinstance(prepared, PreparedApiCall):
             raise TypeError("prepared must be a PreparedApiCall")
-        self._prepared[(instance_id, task_id)] = prepared
+        with self._lock:
+            self._prepared[(instance_id, task_id)] = prepared
 
     def prepared_for(self, instance_id: str, task_id: str) -> Optional[PreparedApiCall]:
-        return self._prepared.get((instance_id, task_id))
+        with self._lock:
+            return self._prepared.get((instance_id, task_id))
 
     # -- AttemptObserver ----------------------------------------------------
     def on_attempt(self, attempt: ProviderAttempt) -> Optional[ApiCallTokenRecord]:
         key = (attempt.instance_id or "", attempt.task_id or "")
-        prepared = self._prepared.get(key)
-        if prepared is None:
-            self.skipped_attempts += 1
-            return None
+        with self._lock:
+            prepared = self._prepared.get(key)
+            if prepared is None:
+                self._skipped_attempts += 1  # atomic increment (no lost updates under F4)
+                return None
+        # Translation + sink write happen OUTSIDE the bridge lock: the sink has its own
+        # lock (F4), and holding the bridge lock across a sink write would needlessly widen
+        # the critical section. The prepared snapshot above is immutable.
         return translate_attempt(
             prepared, attempt, normalizer=self._normalizer, sink=self._sink
         )
@@ -132,12 +148,19 @@ def settle_budget_from_summary(
 ) -> BudgetSettlement:
     """Settle from an aggregated logical-request summary.
 
-    Uses the summed provider total ONLY when the summary is complete (no measurement
-    gaps); an incomplete summary falls back to conservative full-reservation settlement,
-    so a gap is never charged as if it were the whole truth.
+    Charges the documented settlement selection (``summary.settlement_token_units`` —
+    provider-reported total per attempt where present, else derived input+output) ONLY when
+    the summary is **complete** (no unknown-usage attempts). An incomplete summary — any
+    attempt whose usage is unavailable — falls back to conservative full-reservation
+    settlement (F1 §6): a partial known sum is never settled as if it were the whole truth.
+
+    Note ``settlement_token_units`` is deliberately used here rather than
+    ``provider_reported_total_tokens`` (which, by contract, holds ONLY provider-reported
+    values and would understate consumption whenever an attempt reported input/output but
+    no explicit total).
     """
-    if summary.complete and summary.provider_total_tokens > 0:
-        return coordinator.settle(instance_id, {dimension: float(summary.provider_total_tokens)})
+    if summary.complete and summary.settlement_token_units > 0:
+        return coordinator.settle(instance_id, {dimension: float(summary.settlement_token_units)})
     return coordinator.settle(instance_id)
 
 

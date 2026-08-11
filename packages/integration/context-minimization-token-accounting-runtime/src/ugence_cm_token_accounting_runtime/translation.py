@@ -110,11 +110,55 @@ class MappingUsageNormalizer:
         )
 
 
-def derive_attempt_id(attempt: ProviderAttempt) -> str:
-    """A deterministic, globally-unique attempt id from runtime identity (no clock/random)."""
-    inst = attempt.instance_id or "?"
-    task = attempt.task_id or "?"
-    return f"{inst}:{task}:{attempt.attempt_number}"
+def _require_identity(value: object, name: str) -> str:
+    """Require a stable, non-ambiguous identity component (F3).
+
+    Rejects ``None``, non-str, empty, and whitespace-only values rather than falling
+    back to a placeholder that would collide across distinct requests. Deterministic —
+    reads no clock and generates no random id.
+    """
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(
+            f"{name} must be a non-empty, non-whitespace str for deterministic "
+            f"attempt-id derivation (got {value!r}); an accounting attempt id must never "
+            "be derived from missing or ambiguous runtime identity"
+        )
+    return value
+
+
+def _attempt_id_for(
+    logical_request_id: object, instance_id: object, task_id: object, attempt_number: object
+) -> str:
+    """Deterministic, collision-resistant attempt id from the FULL logical-request identity.
+
+    Binds ``logical_request_id`` (not just instance/task) so two distinct logical requests
+    can never produce the same id even if instance/task identity coincides. Components are
+    length-prefixed (a prefix-free encoding), so no two distinct identity tuples can map to
+    the same string regardless of which characters the ids contain. No wall-clock, no
+    randomness, no provider-controlled request id is used as internal attempt authority.
+    """
+    lr = _require_identity(logical_request_id, "logical_request_id")
+    inst = _require_identity(instance_id, "instance_id")
+    task = _require_identity(task_id, "task_id")
+    if isinstance(attempt_number, bool) or not isinstance(attempt_number, int) or attempt_number < 1:
+        raise ValueError(f"attempt_number must be an int >= 1 (got {attempt_number!r})")
+
+    def _seg(s: str) -> str:
+        return f"{len(s)}|{s}"
+
+    return "cmta1/" + "".join(_seg(x) for x in (lr, inst, task, str(attempt_number)))
+
+
+def derive_attempt_id(attempt: ProviderAttempt, *, logical_request_id: str) -> str:
+    """A deterministic, collision-resistant attempt id from runtime + logical-request identity.
+
+    ``logical_request_id`` is REQUIRED (the minimum stable business identity); ``attempt``
+    must carry non-empty ``instance_id`` and ``task_id``. Missing/empty/whitespace identity
+    is rejected — never replaced with a placeholder. No clock, no randomness.
+    """
+    return _attempt_id_for(
+        logical_request_id, attempt.instance_id, attempt.task_id, attempt.attempt_number
+    )
 
 
 def translate_attempt(
@@ -123,6 +167,7 @@ def translate_attempt(
     *,
     normalizer: Optional[UsageNormalizer] = None,
     attempt_id: Optional[str] = None,
+    retry_of_attempt_id: Optional[str] = None,
     sink=None,
 ) -> ApiCallTokenRecord:
     """Translate one Agent Runtime :class:`ProviderAttempt` into an :class:`ApiCallTokenRecord`.
@@ -130,8 +175,13 @@ def translate_attempt(
     * Uses the injected ``normalizer`` to type the attempt's opaque ``neutral_usage``; a
       ``None`` result (or no usage, or no normalizer) records the attempt as usage-unavailable
       with a status-derived reason — never fabricated zero usage.
-    * Preserves the runtime-authoritative ``attempt_number`` and links a retry to its
-      predecessor (``retry_of_attempt_id``) deterministically.
+    * Attempt identity (F3): when ``attempt_id`` is omitted, both the attempt id and — for a
+      retry (``attempt_number > 1``) — its ``retry_of_attempt_id`` are derived from the SAME
+      scheme (bound to ``prepared.logical_request_id`` + instance/task), rejecting missing or
+      ambiguous identity. When ``attempt_id`` is supplied explicitly, ``retry_of_attempt_id``
+      is NEVER reconstructed from the derivation scheme (it would cross identity schemes): a
+      retry then REQUIRES an explicit ``retry_of_attempt_id``, and a non-retry must not carry
+      one. Supplying ``retry_of_attempt_id`` while deriving ``attempt_id`` is rejected.
     * Delegates to :func:`reconcile_api_call_measurement`, so all strict token-count and
       attempt-identity validation (and the byte-identical idempotent-replay contract on the
       ``sink``) applies unchanged.
@@ -151,10 +201,36 @@ def translate_attempt(
         else:
             unavailable_reason = f"attempt {attempt.status.value.lower()}; no usage evidence"
 
-    aid = attempt_id or derive_attempt_id(attempt)
-    retry_of = None
-    if attempt.attempt_number > 1:
-        retry_of = f"{attempt.instance_id or '?'}:{attempt.task_id or '?'}:{attempt.attempt_number - 1}"
+    is_retry = attempt.attempt_number > 1
+    if attempt_id is None:
+        # Derived scheme: id + retry_of both come from the same derivation.
+        if retry_of_attempt_id is not None:
+            raise ValueError(
+                "retry_of_attempt_id may only be supplied with an explicit attempt_id; "
+                "when deriving, retry linkage is derived from the same scheme"
+            )
+        aid = derive_attempt_id(attempt, logical_request_id=prepared.logical_request_id)
+        retry_of = (
+            _attempt_id_for(
+                prepared.logical_request_id, attempt.instance_id, attempt.task_id,
+                attempt.attempt_number - 1,
+            )
+            if is_retry
+            else None
+        )
+    else:
+        # Explicit id: never cross identity schemes to reconstruct retry linkage.
+        aid = _require_identity(attempt_id, "attempt_id")
+        if is_retry and retry_of_attempt_id is None:
+            raise ValueError(
+                "an explicit attempt_id for a retry (attempt_number > 1) requires an explicit "
+                "retry_of_attempt_id — the derivation scheme must not be used to reconstruct it"
+            )
+        if not is_retry and retry_of_attempt_id is not None:
+            raise ValueError(
+                "attempt_number 1 is not a retry; retry_of_attempt_id must be None"
+            )
+        retry_of = retry_of_attempt_id
 
     return reconcile_api_call_measurement(
         prepared,

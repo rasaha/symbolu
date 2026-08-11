@@ -46,6 +46,24 @@ stay **visible** but are **not** folded into input/output totals. `derived_total
 returns `input + output` only, and is explicitly *derived* — distinct from the
 provider-reported `total_tokens`, which is preserved separately.
 
+## Total provenance is never blended (F1)
+
+`LogicalRequestTokenSummary` keeps three total quantities **distinct and distinctly
+named**, so a field called "provider … total" only ever holds provider-reported values:
+
+| field | contains |
+| ----- | -------- |
+| `provider_reported_total_tokens` | the sum of **only** the totals a provider explicitly reported (`total_tokens`). Never a derived value. |
+| `attempts_reporting_total` | how many known attempts contributed an explicit provider total. |
+| `derived_total_tokens` | the sum of the **derived** per-attempt `input + output`. Cached / cache-write / reasoning tokens are excluded (subsets/details, never re-added). |
+| `settlement_token_units` | the documented per-attempt settlement selection: the provider-reported total when present, else the derived total. Meaningful only when `complete` is True. |
+
+A provider total that disagrees with `input + output` is preserved **verbatim** in
+`provider_reported_total_tokens`; the honest `derived_total_tokens` is reported alongside
+it, never forced to match. Settlement from an **incomplete** summary (any unknown-usage
+attempt) falls back to conservative full-reservation settlement — a partial known sum is
+never charged as if it were the whole truth.
+
 ## Attempt vs logical request
 
 - `logical_request_id` identifies the **business** request.

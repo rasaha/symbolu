@@ -74,3 +74,24 @@ usage record.
   observer is swallowed so it can never break execution.
 - Deterministic: the seam adds no wall-clock read and no random id — attempt numbering
   comes from the existing deterministic retry loop.
+
+## Surfacing observation failures (F2)
+
+An `AttemptObserver` that raises is **fail-open** for provider execution: the provider is
+never re-invoked, its result is never erased, and retry behavior is unchanged. But the loss
+is not silent when `AgentRuntimeConfig.attempt_observer_error_reporter` (an
+`AttemptObservationErrorReporter`) is configured — the runtime emits exactly one structured
+`AttemptObservationFailure` per observer failure:
+
+| field | contents |
+| ----- | -------- |
+| `provider_id`, `operation` | which provider/operation |
+| `workflow_id`, `instance_id`, `task_id`, `correlation_id` | safe identity |
+| `attempt_number`, `status` | which attempt, and its neutral status |
+| `error_type` | the exception **type name** only — never the message/args or any provider payload |
+
+Guarantees: exactly one signal per observer failure; a reporter that itself raises is
+contained (it can never mask the provider result); no signal on paths where no provider was
+invoked; and with no reporter configured, behavior is unchanged (silent fail-open). The
+structured record deliberately omits the exception message/args because an arbitrary
+exception's payload may contain provider data (prompts, responses, tool arguments, credentials).

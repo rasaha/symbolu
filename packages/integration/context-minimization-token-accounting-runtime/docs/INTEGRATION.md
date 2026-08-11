@@ -52,3 +52,37 @@ adapter implements the `UsageNormalizer` protocol (`normalize(neutral_usage) ->
 ProviderTokenUsage | None`) and lives **outside** this package so no vendor SDK enters the
 base install. It must never invent counts the provider did not report — returning `None`
 records the attempt as usage-unavailable, not zero.
+
+## Attempt identity (F3)
+
+`translate_attempt` derives a deterministic, collision-resistant `attempt_id` bound to the
+FULL logical-request identity (`prepared.logical_request_id` + `instance_id` + `task_id` +
+`attempt_number`), using a length-prefixed encoding so no two distinct identity tuples can
+collide regardless of id contents. Missing, empty, or whitespace-only identity is **rejected**
+(no placeholder fallback), so two distinct logical requests can never share an attempt id
+merely because instance/task identity is absent. No wall-clock, no randomness, and no
+provider-controlled request id is used as internal attempt authority.
+
+Retry linkage never crosses identity schemes: when `attempt_id` is **derived**, its
+`retry_of_attempt_id` is derived from the **same** scheme (the attempt-(n-1) id). When an
+`attempt_id` is supplied **explicitly**, the derivation scheme is never used to reconstruct
+retry linkage — a retry then **requires** an explicit `retry_of_attempt_id`, a non-retry must
+not carry one, and supplying `retry_of_attempt_id` while deriving the id is rejected.
+
+## Settlement field (F1)
+
+`settle_budget_from_summary` charges `summary.settlement_token_units` (the documented
+per-attempt reported-else-derived selection) — **not** `provider_reported_total_tokens`, which
+by contract holds only provider-reported values and would understate consumption when an
+attempt reported input/output but no explicit total. It settles only when the summary is
+`complete`; an incomplete summary falls back to conservative full-reservation settlement.
+
+## Concurrency (F4)
+
+The reference `InMemoryTokenAccountingSink` is thread-safe (atomic duplicate-detect-and-insert;
+consistent snapshots), and the bridge's `skipped_attempts` diagnostic is lock-protected against
+lost increments. The per-attempt (`settle_budget_from_usage`) and summary
+(`settle_budget_from_summary`) settlement paths target the same H22-D reservation, which the
+coordinator settles exactly once (the second call finds no active hold and is a no-op) — so the
+same reservation is never charged twice. Thread-safe in-memory storage is **not** durable
+storage; production persistence remains follow-on work.

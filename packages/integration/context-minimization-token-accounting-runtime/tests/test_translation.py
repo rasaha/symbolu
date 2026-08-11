@@ -58,7 +58,8 @@ def test_success_with_usage_translates_to_available_record():
     assert rec.provider_usage.cached_input_tokens == 1500
     assert rec.provider_usage.output_tokens == 428
     assert rec.provider_usage.usage_schema == "vendor.v1"
-    assert rec.attempt_id == "wf-1:t:1"
+    # F3: attempt id is the deterministic, logical-request-bound derivation.
+    assert rec.attempt_id == derive_attempt_id(att, logical_request_id=prep.logical_request_id)
 
 
 def test_exception_attempt_has_unknown_usage():
@@ -99,18 +100,21 @@ def test_failed_attempt_with_usage_keeps_usage():
 
 def test_retry_links_to_predecessor_deterministically():
     prep = _prep()
-    att = _attempt(attempt_number=3, neutral_usage={"prompt_tokens": 5, "completion_tokens": 1})
-    rec = translate_attempt(prep, att, normalizer=_norm())
+    att3 = _attempt(attempt_number=3, neutral_usage={"prompt_tokens": 5, "completion_tokens": 1})
+    att2 = _attempt(attempt_number=2)
+    rec = translate_attempt(prep, att3, normalizer=_norm())
     assert rec.attempt_number == 3
-    assert rec.attempt_id == "wf-1:t:3"
-    assert rec.retry_of_attempt_id == "wf-1:t:2"
+    assert rec.attempt_id == derive_attempt_id(att3, logical_request_id=prep.logical_request_id)
+    # retry_of is derived from the SAME scheme (the attempt-2 id), never a different one.
+    assert rec.retry_of_attempt_id == derive_attempt_id(att2, logical_request_id=prep.logical_request_id)
     assert rec.is_retry is True
 
 
 def test_derive_attempt_id_is_deterministic():
     att = _attempt(attempt_number=2)
-    assert derive_attempt_id(att) == "wf-1:t:2"
-    assert derive_attempt_id(att) == derive_attempt_id(att)
+    aid = derive_attempt_id(att, logical_request_id="lr")
+    assert aid == derive_attempt_id(att, logical_request_id="lr")  # stable replay
+    assert aid.startswith("cmta1/")
 
 
 @pytest.mark.parametrize("bad", [-1, True, 1.5, math.nan, math.inf, "5"])

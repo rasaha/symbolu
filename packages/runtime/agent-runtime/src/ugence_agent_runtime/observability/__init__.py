@@ -5,10 +5,13 @@ from ..models.events import EVENT_TYPES, RuntimeEvent
 from .attempts import (
     PROVIDER_USAGE_METADATA_KEY,
     AttemptContext,
+    AttemptObservationErrorReporter,
+    AttemptObservationFailure,
     AttemptObserver,
     ProviderAttempt,
     ProviderAttemptStatus,
     RecordingAttemptObserver,
+    RecordingObservationErrorReporter,
 )
 from .metrics import event_counts
 from .tracing import EventSink, RunTrace, format_trace
@@ -27,4 +30,8 @@ __all__ = [
     "AttemptObserver",
     "RecordingAttemptObserver",
     "PROVIDER_USAGE_METADATA_KEY",
+    # attempt-observation failure surfacing (CM-TA1 F2)
+    "AttemptObservationFailure",
+    "AttemptObservationErrorReporter",
+    "RecordingObservationErrorReporter",
 ]

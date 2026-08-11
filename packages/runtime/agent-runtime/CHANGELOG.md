@@ -34,6 +34,18 @@ contract, Canonical Execution State, checkpoint schema, or recovery semantics. S
   attempt can never change the provider action; a raising observer is swallowed and never breaks
   execution.
 
+### Audit remediation — F2: attempt-observation failure is surfaced, not silent
+A raising `attempt_observer` was previously swallowed silently. The runtime remains
+**fail-open** with respect to provider execution (a raising observer never re-executes the
+provider, never erases a successful result, and never changes retry behavior), but the loss
+is no longer invisible: the new optional `AgentRuntimeConfig.attempt_observer_error_reporter`
+receives exactly **one** structured `AttemptObservationFailure` per observer failure. The
+signal carries safe identity plus `error_type` (the exception **type name** only) — never the
+exception message/args or any provider payload. A reporter that itself raises is contained and
+never masks the provider result. `None` (default) preserves the prior silent fail-open for
+callers that do not configure accounting. Added exports: `AttemptObservationFailure`,
+`AttemptObservationErrorReporter`, `RecordingObservationErrorReporter`.
+
 **Package maturity: `IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED`** (upgrade to
 `IMPLEMENTED_AND_CI_VERIFIED` only after the scoped Actions run is observed green).
 

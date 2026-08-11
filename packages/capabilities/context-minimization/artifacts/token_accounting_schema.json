@@ -174,6 +174,10 @@
           "type": "int"
         },
         {
+          "name": "attempts_reporting_total",
+          "type": "int"
+        },
+        {
           "name": "provider_input_tokens",
           "type": "int"
         },
@@ -182,7 +186,15 @@
           "type": "int"
         },
         {
-          "name": "provider_total_tokens",
+          "name": "provider_reported_total_tokens",
+          "type": "int"
+        },
+        {
+          "name": "derived_total_tokens",
+          "type": "int"
+        },
+        {
+          "name": "settlement_token_units",
           "type": "int"
         },
         {
@@ -223,7 +235,14 @@
         }
       ],
       "fingerprint_domain": "ugence-context-minimization/logical-request/1",
-      "note": "context savings counted once per logical request; unknown usage keeps complete=False"
+      "note": "context savings counted once per logical request; unknown usage keeps complete=False",
+      "total_provenance": {
+        "attempts_reporting_total": "count of known attempts that carried an explicit provider total",
+        "derived_total_tokens": "sum of derived input+output; cached/cache_write/reasoning excluded (never re-added)",
+        "provider_reported_total_tokens": "sum of ONLY explicit provider-reported totals; never a derived value",
+        "rule": "a field named 'provider ... total' contains ONLY provider-reported values; provider-reported and derived totals are never blended into one field",
+        "settlement_token_units": "documented settlement selection per attempt (reported total if present, else derived); meaningful only when complete"
+      }
     },
     "ProviderTokenUsage": {
       "derived_total": "input+output ONLY (cached/cache_write/reasoning excluded to avoid double-count); reported total_tokens preserved separately",

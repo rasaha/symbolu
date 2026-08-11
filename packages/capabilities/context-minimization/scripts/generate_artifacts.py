@@ -215,6 +215,13 @@ def token_accounting_schema() -> dict:
                 "computed_properties": ["summary_fingerprint"],
                 "fingerprint_domain": "ugence-context-minimization/logical-request/1",
                 "note": "context savings counted once per logical request; unknown usage keeps complete=False",
+                "total_provenance": {
+                    "provider_reported_total_tokens": "sum of ONLY explicit provider-reported totals; never a derived value",
+                    "attempts_reporting_total": "count of known attempts that carried an explicit provider total",
+                    "derived_total_tokens": "sum of derived input+output; cached/cache_write/reasoning excluded (never re-added)",
+                    "settlement_token_units": "documented settlement selection per attempt (reported total if present, else derived); meaningful only when complete",
+                    "rule": "a field named 'provider ... total' contains ONLY provider-reported values; provider-reported and derived totals are never blended into one field",
+                },
             },
         },
         "protocols": ["RequestTokenCounter", "TokenAccountingSink"],

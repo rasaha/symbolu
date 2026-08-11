@@ -49,6 +49,15 @@
     ],
     "neutral_usage_metadata_key": "token_usage",
     "neutral_usage_rule": "A provider MAY attach an opaque mapping at ToolResult.metadata['token_usage']; the runtime forwards it verbatim as ProviderAttempt.neutral_usage and NEVER interprets provider-specific token fields. Absent/non-mapping => None (unknown, never fabricated).",
-    "robustness": "A raising observer is swallowed; telemetry can never change the provider action or break execution."
+    "robustness": "A raising observer is swallowed; telemetry can never change the provider action or break execution.",
+    "observation_failure_reporting": {
+      "config_field": "AgentRuntimeConfig.attempt_observer_error_reporter (Optional; None = prior silent fail-open)",
+      "seam": "ugence_agent_runtime.observability.attempts.AttemptObservationErrorReporter",
+      "record": "AttemptObservationFailure",
+      "fail_open": "a raising observer never re-executes the provider, erases its result, or changes retry behavior",
+      "surfacing": "exactly one structured failure per observer failure when a reporter is configured; a raising reporter is contained and never masks the provider result",
+      "safe_payload": "carries safe identity + error_type (exception type name) ONLY; never the exception message/args or any provider payload",
+      "no_signal_when": "no provider was invoked (governance/exact-action rejection, provider-not-found)"
+    }
   }
 }

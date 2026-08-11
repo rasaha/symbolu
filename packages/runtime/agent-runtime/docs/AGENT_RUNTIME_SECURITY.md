@@ -65,3 +65,12 @@ The neutral attempt observer receives identities, a neutral status, and a provid
 response payloads. The runtime interprets no provider-specific token field. Telemetry is
 observation only: it can never change the provider action, and a raising observer is
 swallowed so it can never break execution or alter a governed transition.
+
+## Attempt-observation failure surfacing (CM-TA1 F2)
+
+When an attempt observer raises, the optional error reporter receives a structured
+`AttemptObservationFailure` carrying safe identity and the exception **type name** only —
+never the exception message/args or any provider payload — because arbitrary exception
+payloads may embed provider data. The reporter cannot influence provider execution, and a
+raising reporter is contained so it can never mask the provider result. Default (no reporter)
+preserves the prior silent fail-open.

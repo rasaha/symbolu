@@ -49,14 +49,15 @@ loc = pathlib.Path(itg.__file__).resolve()
 assert "site-packages" in loc.parts, f"not installed from site-packages: {loc}"
 
 from ugence_cm_token_accounting_runtime import (
-    MappingUsageNormalizer, translate_attempt, RuntimeTokenAccountingBridge,
+    MappingUsageNormalizer, translate_attempt, derive_attempt_id, RuntimeTokenAccountingBridge,
     settle_budget_from_usage, BudgetEstimateExceeded,
 )
 from ugence_agent_runtime.observability.attempts import ProviderAttempt, ProviderAttemptStatus
 from ugence_agent_runtime.orchestration import BudgetCoordinator, BudgetRequirement, PortfolioBudget
 from ugence_context_minimization.api import (
     Context, ContextUnit, OracleEvaluation, minimize_context,
-    prepare_api_call_measurement, AttemptStatus, UsageAvailability, ProviderTokenUsage,
+    prepare_api_call_measurement, aggregate_logical_request_usage,
+    AttemptStatus, UsageAvailability, ProviderTokenUsage,
 )
 
 # ---- a real minimization result (measurement A) ---------------------------
@@ -91,10 +92,33 @@ r1 = translate_attempt(prep, _att(1, ProviderAttemptStatus.SUCCEEDED,
 assert r1.usage_availability is UsageAvailability.AVAILABLE, r1.usage_availability
 assert r1.provider_usage.input_tokens == 2337 and r1.provider_usage.output_tokens == 428
 
-# exception with no usage -> unknown (not zero)
-r2 = translate_attempt(prep, _att(2, ProviderAttemptStatus.EXCEPTION, None), normalizer=norm)
+# exception with no usage -> unknown (not zero); retry_of derived in the SAME scheme (F3)
+att2 = _att(2, ProviderAttemptStatus.EXCEPTION, None)
+r2 = translate_attempt(prep, att2, normalizer=norm)
 assert r2.provider_usage is None and r2.usage_availability is not UsageAvailability.AVAILABLE
-assert r2.retry_of_attempt_id == "wf:t:1"
+assert r2.retry_of_attempt_id == derive_attempt_id(_att(1, ProviderAttemptStatus.EXCEPTION, None),
+                                                   logical_request_id="lr")
+assert r2.attempt_id.startswith("cmta1/")
+# F3: missing/blank identity is rejected (no placeholder fallback)
+_bad = _att(1, ProviderAttemptStatus.SUCCEEDED, None)
+_bad = ProviderAttempt(provider_id="vendor", operation="op", attempt_number=1,
+                       status=ProviderAttemptStatus.SUCCEEDED, ok=True, provider_invoked=True,
+                       instance_id=None, task_id="t", correlation_id="corr")
+try:
+    translate_attempt(prep, _bad, normalizer=norm)
+    raise AssertionError("expected rejection for missing instance identity")
+except ValueError:
+    pass
+
+# ---- F1: total provenance is never blended --------------------------------
+r1b = translate_attempt(prep, _att(1, ProviderAttemptStatus.SUCCEEDED,
+                                   {"prompt_tokens": 100, "completion_tokens": 40}),  # no total reported
+                        normalizer=norm)
+summ = aggregate_logical_request_usage([r1b])
+assert summ.provider_reported_total_tokens == 0        # none reported -> zero reported (not derived)
+assert summ.derived_total_tokens == 140                # 100 + 40, derived
+assert summ.settlement_token_units == 140              # falls back to derived
+assert not hasattr(summ, "provider_total_tokens")      # ambiguous blended field is gone
 
 # ---- H22-D budget settlement ----------------------------------------------
 coord = BudgetCoordinator(PortfolioBudget({"token_units": 10000.0}))
