@@ -1,0 +1,105 @@
+name: risk-authority-runtime-assurance-ci
+
+# Scoped CI for the RA-7 runtime / trajectory assurance integration package
+# (ugence-risk-authority-runtime-assurance). RA-7 observes the Agent Runtime
+# through the existing neutral event seam, risk-types the per-workflow-instance
+# trajectory, and — on a material deviation — emits a neutral
+# AuthorityReassessmentSignal into the already-built RA-6 intake. RA-7 OBSERVES
+# AND ASSESSES; RA-6 OWNS AUTHORITY CONSEQUENCES.
+#
+# This workflow is additive and path-scoped: it does NOT touch or weaken the
+# existing risk-authority-* workflows. It runs the deny-heavy RA-7 matrix, proves
+# the RA leaf / RA-6 / Agent Runtime baselines remain green and unchanged, and
+# runs the package's wheel build + fully offline isolated-install verifier and the
+# package-boundary tests (no reverse dependency, no second authority artifact, no
+# Agent Runtime import).
+
+on:
+  pull_request:
+    paths:
+      - "packages/integration/risk-authority-runtime-assurance/**"
+      - "packages/integration/risk-authority-status-runtime/**"
+      - "packages/risk_authority/**"
+      - ".github/workflows/risk-authority-runtime-assurance-ci.yml"
+  push:
+    branches:
+      - "claude/ra7-**"
+      - "claude/setup-symbolu-monorepo-**"
+    paths:
+      - "packages/integration/risk-authority-runtime-assurance/**"
+      - ".github/workflows/risk-authority-runtime-assurance-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  ra7-suite:
+    name: RA-7 runtime-assurance suite + deny-heavy matrix (source)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install tooling + first-party packages (editable)
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest build
+          pip install -e packages/risk_authority
+          pip install -e packages/integration/risk-authority-status-runtime
+          pip install -e packages/integration/risk-authority-runtime-assurance
+      - name: RA-7 suite (contracts, ingress, observer, evaluator, handoff, e2e, D4)
+        run: python -m pytest packages/integration/risk-authority-runtime-assurance/tests -q
+      - name: Deny-heavy adversarial subset (trust boundary, malformed returns, boundaries)
+        run: |
+          python -m pytest \
+            packages/integration/risk-authority-runtime-assurance/tests/test_ingress.py \
+            packages/integration/risk-authority-runtime-assurance/tests/test_evaluator.py \
+            packages/integration/risk-authority-runtime-assurance/tests/test_boundaries.py \
+            packages/integration/risk-authority-runtime-assurance/tests/test_end_to_end.py -q
+
+  baseline-regression:
+    name: RA leaf (113) + RA-6 (72) + Agent Runtime baselines remain green & unchanged
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+          pip install -e packages/risk_authority
+          pip install -e packages/runtime/agent-runtime
+          pip install -e packages/integration/risk-authority-status-runtime
+      - name: Risk Authority leaf conformance (must remain green + unchanged)
+        run: python -m pytest packages/risk_authority/tests -q
+      - name: RA-6 status-runtime suite (must remain green + unchanged)
+        run: python -m pytest packages/integration/risk-authority-status-runtime/tests -q
+      - name: Agent Runtime suite (must remain green + unchanged; no RA import)
+        run: python -m pytest packages/runtime/agent-runtime/tests -q
+
+  isolated-install:
+    name: Wheel build + offline isolated-install verification + boundaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install build wheel pytest
+      - name: Build first-party wheels, install offline, run observe->signal->RA-6 revoke proof
+        run: python packages/integration/risk-authority-runtime-assurance/scripts/verify_isolated_install.py
+      - name: Package boundary tests (declared deps, no reverse cycle, no second authority, no agent-runtime import)
+        run: |
+          pip install -e packages/risk_authority \
+                      -e packages/integration/risk-authority-status-runtime \
+                      -e packages/integration/risk-authority-runtime-assurance
+          python -m pytest packages/integration/risk-authority-runtime-assurance/tests/packaging -q
