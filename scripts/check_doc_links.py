@@ -13,14 +13,16 @@ import argparse
 import re
 from pathlib import Path
 
+# Paths are repo-root-relative; the docs live under Project_documentation/ after
+# the repository restructuring.
 DOCS = [
-    "UGENCE_TERMINOLOGY_PRODUCT_CAPABILITY_BOUNDARY_AUDIT.md",
-    "UGENCE_REPOSITORY_RESTRUCTURING_PLAN.md",
-    "UGENCE_MODULARITY_AND_PACKAGING_AUDIT.md",
-    "UGENCE_INTERMODULE_IO_AND_AUTHORITY_AUDIT.md",
-    "UGENCE_PLATFORM_OVERVIEW.md",
-    "UGENCE_PRODUCTIZATION_ROADMAP.md",
-    "ADR_MODEL_SELECTION_POLICY_PLACEMENT.md",
+    "Project_documentation/repository/architecture/UGENCE_TERMINOLOGY_PRODUCT_CAPABILITY_BOUNDARY_AUDIT.md",
+    "Project_documentation/repository/restructuring/UGENCE_REPOSITORY_RESTRUCTURING_PLAN.md",
+    "Project_documentation/repository/architecture/UGENCE_MODULARITY_AND_PACKAGING_AUDIT.md",
+    "Project_documentation/repository/architecture/UGENCE_INTERMODULE_IO_AND_AUTHORITY_AUDIT.md",
+    "Project_documentation/repository/ugence_platform/UGENCE_PLATFORM_OVERVIEW.md",
+    "Project_documentation/repository/ugence_platform/UGENCE_PRODUCTIZATION_ROADMAP.md",
+    "Project_documentation/model_selection/adr/ADR_MODEL_SELECTION_POLICY_PLACEMENT.md",
     "Project_documentation/repository/docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md",
     "Project_documentation/repository/docs/architecture/UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_UPDATE_REPORT.md",
 ]
