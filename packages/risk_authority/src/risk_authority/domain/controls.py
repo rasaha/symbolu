@@ -27,7 +27,18 @@ SATISFYING_STATUSES = frozenset({ControlStatus.PASS, ControlStatus.NOT_APPLICABL
 
 @dataclass(frozen=True)
 class ControlResult:
-    """A deterministic, evidence-backed result for one required control."""
+    """A deterministic, evidence-backed result for one required control.
+
+    RA-5 (``RISK_AUTHORITY_RA5_SPEC.md`` §7) extends the result with the
+    trust-binding tuple (``tenant_id`` / ``risk_case_id`` / ``workflow_ir_digest``
+    / ``policy_digest``) and evaluator attribution (``assurance_engine`` /
+    ``assurance_version``). The result is *extended, never forked*: every RA-5
+    field defaults to empty so RA-1→RA-4 reference construction
+    (``ControlResult("A", ControlStatus.PASS)``) still compiles and the 97-test
+    suite is unaffected. Production mode requires the bindings to be populated and
+    re-checked (``domain.binding``); a caller-asserted status carries none of
+    them and therefore satisfies no required control in production (§12).
+    """
 
     control_id: str
     status: ControlStatus
@@ -35,9 +46,48 @@ class ControlResult:
     evaluated_at: Optional[datetime] = None
     valid_until: Optional[datetime] = None
     reason: str = ""
+    # --- RA-5 trust-binding additions (default empty for reference mode) ----
+    tenant_id: str = ""
+    risk_case_id: str = ""
+    workflow_ir_digest: str = ""
+    policy_digest: str = ""
+    assurance_engine: str = ""
+    assurance_version: str = ""
+
+    def __post_init__(self) -> None:
+        # A validity window that closes before evaluation is impossible — fail
+        # closed. Only checked when both instants are present (reference results
+        # may omit them).
+        if (
+            self.valid_until is not None
+            and self.evaluated_at is not None
+            and self.valid_until < self.evaluated_at
+        ):
+            raise ValueError(
+                "control result valid_until precedes evaluated_at "
+                "(negative freshness window)"
+            )
 
     def is_current(self, now: datetime) -> bool:
         return self.valid_until is None or now <= self.valid_until
+
+    def has_production_bindings(self) -> bool:
+        """True iff every RA-5 trust-binding field is populated.
+
+        A result with any empty binding field is a reference/synthetic result;
+        it can never be treated as a trusted production result (§12).
+        """
+
+        return all(
+            (
+                self.tenant_id,
+                self.risk_case_id,
+                self.workflow_ir_digest,
+                self.policy_digest,
+                self.assurance_engine,
+                self.assurance_version,
+            )
+        )
 
     def effective_status(self, now: datetime) -> ControlStatus:
         """Return the status accounting for freshness.
