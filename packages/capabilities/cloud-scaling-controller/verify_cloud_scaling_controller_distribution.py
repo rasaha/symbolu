@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Advisory-boundary distribution verifier for ugence-cloud-scaling-controller (0.1.1).
+"""Advisory-boundary distribution verifier for ugence-cloud-scaling-controller (0.2.0).
 
 Builds wheel + sdist, inspects the PACKAGED Python source inside the wheel for any
 execution capability, installs ONLY the wheel into an isolated venv created OUTSIDE
@@ -35,7 +35,7 @@ PKG = Path(__file__).resolve().parent
 ARTIFACTS = PKG / "artifacts"
 DIST_NAME = "ugence-cloud-scaling-controller"
 IMPORT_NAME = "ugence_cloud_scaling_controller"
-EXPECTED_VERSION = "0.1.1"
+EXPECTED_VERSION = "0.2.0"
 BASELINE_COMMIT = "0d5d4dde5b68ef61e6dec994cc4b9e55fa57e363"
 
 FORBIDDEN_UGENCE = [

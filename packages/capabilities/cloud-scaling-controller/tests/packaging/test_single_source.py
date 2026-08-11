@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
+import json
 import pathlib
+import re
 import sys
 
 import pytest
@@ -12,7 +14,8 @@ import pytest
 import ugence_cloud_scaling_controller
 from ugence_cloud_scaling_controller.version import __version__
 
-_SCRIPTS = pathlib.Path(__file__).resolve().parents[2] / "scripts"
+_PKG_ROOT = pathlib.Path(__file__).resolve().parents[2]
+_SCRIPTS = _PKG_ROOT / "scripts"
 
 
 def _load_audit_module():
@@ -37,7 +40,39 @@ def test_single_source_no_duplicates():
 
 
 def test_version_matches_metadata():
-    assert __version__ == "0.1.1"
+    assert __version__ == "0.2.0"
+
+
+def test_version_single_source_consistency():
+    """Every hardcoded version string in the package must agree with version.py.
+
+    Regression guard: a version bump previously drifted across several hardcoded
+    spots (manifest, authority inventory, the distribution verifier's
+    EXPECTED_VERSION, and — outside this test's reach — a CI workflow smoke check).
+    Keep the in-package spots pinned to the single source of truth so drift fails a
+    fast unit test instead of only CI. Files are skipped individually if absent
+    (e.g. a wheel-only environment ships neither the manifest nor the verifier).
+    """
+    checked = 0
+
+    manifest = _PKG_ROOT / "module_manifest.json"
+    if manifest.exists():
+        assert json.loads(manifest.read_text())["version"] == __version__, "module_manifest.json"
+        checked += 1
+
+    inventory = _PKG_ROOT / "artifacts" / "wheel_authority_inventory.json"
+    if inventory.exists():
+        assert json.loads(inventory.read_text())["version"] == __version__, "wheel_authority_inventory.json"
+        checked += 1
+
+    verifier = _PKG_ROOT / "verify_cloud_scaling_controller_distribution.py"
+    if verifier.exists():
+        m = re.search(r'EXPECTED_VERSION\s*=\s*"([^"]+)"', verifier.read_text())
+        assert m and m.group(1) == __version__, "verifier EXPECTED_VERSION"
+        checked += 1
+
+    if checked == 0:
+        pytest.skip("no version-bearing metadata files present (wheel-only environment)")
 
 
 def test_py_typed_shipped():

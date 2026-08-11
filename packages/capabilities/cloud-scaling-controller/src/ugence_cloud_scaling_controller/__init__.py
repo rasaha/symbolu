@@ -38,6 +38,26 @@ from .contracts import (
 )
 from .api import CloudScalingController, evaluate
 
+# Phase 1: Canonical Capacity Intelligence — provider-neutral observation representation,
+# explicit normalization/projection, and immutable recommendation evidence built AROUND
+# the unchanged controller. Additive and pure-stdlib; the decision kernel is untouched.
+from . import canonical
+from .canonical import (
+    CanonicalCapacityState,
+    CapacitySubject,
+    Measurement,
+    Unit,
+    ObservationProvenance,
+    ObservationSourceType,
+    NormalizationPolicy,
+    NormalizationMethod,
+    ControllerProjection,
+    project_to_scaling_observation,
+    CapacityDecisionEvidence,
+    recommend_with_evidence,
+    CapacityObservationSource,
+)
+
 __all__ = [
     "CloudScalingController",
     "Controller",
@@ -51,4 +71,19 @@ __all__ = [
     "evaluate",
     "SCHEMA_VERSION",
     "__version__",
+    # Phase 1 canonical capacity intelligence (additive)
+    "canonical",
+    "CanonicalCapacityState",
+    "CapacitySubject",
+    "Measurement",
+    "Unit",
+    "ObservationProvenance",
+    "ObservationSourceType",
+    "NormalizationPolicy",
+    "NormalizationMethod",
+    "ControllerProjection",
+    "project_to_scaling_observation",
+    "CapacityDecisionEvidence",
+    "recommend_with_evidence",
+    "CapacityObservationSource",
 ]

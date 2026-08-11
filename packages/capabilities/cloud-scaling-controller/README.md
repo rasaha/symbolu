@@ -9,7 +9,7 @@ Ugence control plane.
 
 - **Distribution:** `ugence-cloud-scaling-controller`
 - **Import namespace:** `ugence_cloud_scaling_controller`
-- **Version:** `0.1.1`
+- **Version:** `0.2.0`
 - **Authority class:** ADVISORY · **Execution capability:** NONE (no code in the wheel can apply the advice)
 - **Core dependency:** NumPy only · **Network required (core):** no · **Cloud credentials required:** no
 - **Determinism:** decision-deterministic; identity diagnostics vary before bootstrap.
@@ -48,6 +48,82 @@ $ ugence-cloud-scaling version
   human-readable explanation.
 - Offline evaluation, trace replay, and read-only shadow comparison.
 - An advisory CLI. No direct actuation.
+
+## Canonical Capacity Intelligence (Phase 1)
+
+Version 0.2.0 adds a provider-neutral **observation → normalization/projection →
+recommendation-evidence** layer *around* the unchanged controller. The rich canonical
+state does **not** change the controller's five-signal decision model — an explicit,
+deterministic projection maps only the controller's established inputs and reports
+everything else as ignored context.
+
+```text
+Provider / Monitoring Source
+        ↓
+CanonicalCapacityState          (rich, immutable, versioned, provider-neutral)
+        ↓
+Normalization / Projection      (explicit, deterministic, policy-driven)
+        ↓
+existing ScalingObservation
+        ↓
+existing CloudScalingController (unchanged decision kernel)
+        ↓
+ScalingRecommendation  +  CapacityDecisionEvidence  (immutable, sha256 content-identity)
+```
+
+```python
+from datetime import datetime, timezone
+from ugence_cloud_scaling_controller.canonical import (
+    CanonicalCapacityState, CapacitySubject, InfrastructureState, PerformanceState,
+    ReliabilityState, WorkloadState, CapacityState, Measurement, Unit,
+    NormalizationPolicy, NormalizationMethod, recommend_with_evidence,
+)
+
+state = CanonicalCapacityState(
+    subject=CapacitySubject(workload_id="checkout-api", tenant_id="acme"),
+    observed_at=datetime(2026, 8, 11, 12, 0, tzinfo=timezone.utc),
+    correlation_id="req-123", time_phase="peak",
+    infrastructure=InfrastructureState(cpu_utilization=Measurement(92.0, Unit.PERCENT),
+                                       memory_utilization=Measurement(88.0, Unit.PERCENT)),
+    performance=PerformanceState(latency_p99=Measurement(810.0, Unit.MILLISECONDS)),
+    reliability=ReliabilityState(error_rate=Measurement(0.2, Unit.RATE)),
+    workload=WorkloadState(queue_depth=Measurement(70, Unit.COUNT)),
+    capacity=CapacityState(running_replicas=4),
+)
+policy = NormalizationPolicy(
+    policy_id="default-slo-v1",
+    method_by_signal={
+        "cpu": NormalizationMethod.PERCENT_TO_RATIO,
+        "memory": NormalizationMethod.PERCENT_TO_RATIO,
+        "latency_p99": NormalizationMethod.LATENCY_MS_TO_THRESHOLD,
+        "error_rate": NormalizationMethod.RATIO_PASSTHROUGH,
+        "queue_depth": NormalizationMethod.QUEUE_TO_CAPACITY,
+    },
+    thresholds={"latency_p99": 1000.0, "queue_depth": 100.0},
+)
+rec, evidence = recommend_with_evidence(state, policy)
+print(rec.recommendation, rec.replica_delta)          # advisory recommendation (unchanged kernel)
+print(evidence.digest())                              # sha256: content identity
+print(evidence.ignored_canonical_fields)              # honest: what did NOT drive the decision
+```
+
+**Newly implemented in Phase 1:** canonical capacity-state representation; typed
+measurements + explicit units; policy-driven normalization; deterministic controller
+projection; first-class observation provenance; immutable recommendation evidence with a
+deterministic content-identity digest; a read-only observation-source boundary. See the
+[Phase-1 ADR](../../../docs/architecture/ADR_CLOUD_SCALING_CANONICAL_CAPACITY_INTELLIGENCE_PHASE1.md).
+
+**Implemented elsewhere, NOT integrated here:** the canonical Risk Authority RA-1→RA-8
+authority lifecycle (risk artifacts, scope, expiry/revocation, integrity, downstream
+enforcement) lives in separate packages. Phase 1 produces *upstream recommendation
+evidence only*; the evidence digest is a stable identity a **future, separately governed**
+integration package could reference. This package performs no risk evaluation, authority,
+or authorization.
+
+**Future / not implemented in this phase:** native AWS/Azure/GCP collectors; predictive
+forecasting; dependency-aware scaling; economic optimization; cross-cloud placement; a
+CapacityDecisionEvidence→RA integration adapter; authority-bound scaling; provider
+execution; execution receipts; effect verification; closed-loop learning.
 
 ## What it does **not** provide
 
@@ -90,6 +166,13 @@ required for the advisory core.
 
 `Controller` is the low-level compatibility API; `CloudScalingController` is the stable
 independent-package facade.
+
+Phase 1 also exports the canonical capacity-intelligence layer (subpackage
+`ugence_cloud_scaling_controller.canonical`): `CanonicalCapacityState`, `CapacitySubject`,
+`Measurement`, `Unit`, `ObservationProvenance`, `ObservationSourceType`,
+`NormalizationPolicy`, `NormalizationMethod`, `ControllerProjection`,
+`project_to_scaling_observation`, `CapacityDecisionEvidence`, `recommend_with_evidence`,
+`CapacityObservationSource`.
 
 ## Legacy imports
 
