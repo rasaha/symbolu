@@ -9,7 +9,9 @@
 their own. Part II onward and the appendices carry the package-level evidence (distribution
 names, public APIs, dependency graph, maturity) for technical diligence. Appendix D is the
 v2.5 → v3.0 change summary; Appendix E is the package-to-document traceability table with exact
-repository paths and the default-branch commit these claims were verified against.
+repository paths and the default-branch commit these claims were verified against; **Appendix F is
+the independently source-verified ServiceNow product-ecosystem mapping matrix** (exact ServiceNow
+product names, relationship types, roles, integration status and citations).
 
 **Evidence basis.** Every package claim in this v3.0 edition was re-verified against the live
 default branch `claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF` at commit
@@ -63,7 +65,14 @@ v0.2 token-accounting contracts and the new token-accounting integration runtime
 Compiler and AWC are updated to `workflow_ir.v2`; and the categorical "every package ships a
 legacy-compatibility facade" claim is **removed and replaced with a per-package statement** (it is
 true of some packages and explicitly false of the net-new ones). New Appendices D (change summary)
-and E (traceability, with the verification SHA) were added.
+and E (traceability, with the verification SHA) were added. **A subsequent v3.0 correction added
+the ServiceNow side of the ledger:** the ServiceNow product ecosystem was independently verified
+against ServiceNow-owned sources (2026-08-11) and captured as **Appendix F** (a canonical mapping
+matrix with exact product names, relationship types, roles, integration status and citations);
+Appendix B was retitled (it had claimed "ServiceNow Adjacency" without a ServiceNow column); the
+Part 0 opening now reflects current ServiceNow offerings (Action Fabric, AI Agent Fabric, AI Agent
+Orchestrator, expanded AI Control Tower); and the prior "ServiceNow claims not independently
+re-verified" caveat was replaced with a dated, sourced verification statement (Appendix D).
 
 ---
 
@@ -71,16 +80,28 @@ and E (traceability, with the verification SHA) were added.
 
 ## Why Ugence + ServiceNow
 
-ServiceNow has become strong at governing **both** the AI estate *and* ServiceNow-native AI
-runtime interactions: AI Control Tower manages AI asset lifecycle, governance, compliance and
-agent approvals; AI Risk & Compliance provides risk, regulatory and ethical governance; and Now
-Assist Guardian can terminate an agentic plan when harmful content is detected. This is a
-coordinated lifecycle-governance system, and it is getting stronger.
+ServiceNow has become strong at governing **both** the AI estate *and* an increasingly agentic AI
+runtime, and its footprint here expanded materially through 2025–2026 (verified 2026-08-11;
+sources in Appendix F): **AI Control Tower** discovers, inventories and governs AI assets across
+**first *and* third parties and any cloud/vendor** (mapped to CMDB), with an **AI Risk and
+Compliance** module executing frameworks like the EU AI Act and NIST AI RMF; **Now Assist
+Guardian** applies real-time content guardrails (sensitive-topic, offensiveness and prompt-injection
+detection); **AI Agent Orchestrator** coordinates teams of ServiceNow AI agents; and **AI Agent
+Fabric** and **Action Fabric** open ServiceNow's system of action to external agents (Claude,
+Copilot, Gemini, custom) over **MCP and A2A**, with every action routed through AI Control Tower to
+be identity-verified, permission-scoped and auditable. This is a coordinated, strengthening
+governance system — *not* an absence of AI governance.
 
-Ugence does not compete with that. Ugence differentiates through **vendor-neutral,
+Ugence does not replace any of that. Ugence differentiates through **vendor-neutral,
 decision-level and exact-action authority that can span ServiceNow *and* non-ServiceNow
 runtimes** — the layer that decides, per request, whether *this* AI action may execute *right
-now*, and proves afterward that it stayed within bounds.
+now*, and proves afterward that it stayed within bounds. The sharpest gap it fills: ServiceNow's
+runtime governance is **identity-verified, permission-scoped and policy-gated**, but the packages
+verified for this document surface **no** ServiceNow capability that issues a *cryptographically
+signed, per-action authorization artifact bound to a payload digest and re-checked at commit time*
+(Appendix F). That exact-action, signed-authority boundary — and the genuine overlap zones with
+Action Fabric, AI Agent Fabric, AI Agent Orchestrator and Now Assist Guardian — are mapped
+honestly in Appendix F.
 
 ```
 SYSTEM OF RECORD / WORKFLOW        →   SYSTEM OF RUNTIME AUTHORITY   →   SYSTEMS OF ACTION
@@ -1838,7 +1859,14 @@ while preserving the governance core.
 
 ---
 
-# Appendix B — Master Map: Package ↔ Module ↔ ServiceNow Adjacency
+# Appendix B — Master Map: Package ↔ Module ↔ Decision Vocabulary ↔ Maturity
+
+> **Scope of this appendix.** This table maps each shipped package to its module, decision
+> vocabulary and maturity. The **ServiceNow product-ecosystem mapping** — exact ServiceNow
+> product/capability names, relationship type, system-of-record vs runtime-enforcement roles, and
+> integration status — is a separate, independently source-verified matrix in **Appendix F**. (In
+> earlier editions this appendix's title claimed "ServiceNow Adjacency" but carried no ServiceNow
+> column; that mapping now lives, with citations, in Appendix F.)
 
 **Status key:** ✅ SHIPPED PACKAGE (independently installable under `symbolu/packages/` on the
 default branch) · 🚧 PROPOSED (design/architecture, not a package). All versions and the maturity
@@ -1991,8 +2019,24 @@ All corrections were verified against the default branch at SHA
   Decision Authority owns execution/reconciliation records.
 - StoryGraph Sequence Risk is kept distinct from RA‑7 Runtime Assurance and from the proposed
   Governance Story Graph.
-- ServiceNow capability statements were preserved as written (this pass is an Ugence package-state
-  update; ServiceNow claims were not independently re-verified).
+
+### ServiceNow-side verification (updated)
+The earlier note that "ServiceNow claims were preserved and not independently re-verified" no longer
+holds. The ServiceNow product ecosystem relevant to this architecture was **independently verified
+on 2026-08-11** against ServiceNow-owned sources (product pages under `servicenow.com`, docs under
+`servicenow.com/docs`, the ServiceNow Store, and ServiceNow newsroom press releases); the resulting
+exact-name mapping, relationship types and citations are in **Appendix F**. Corrections that came
+out of that verification include: **"AI Guardian" is not an official product name** — the shipping
+product is **Now Assist Guardian**; **Action Fabric** (GA at Knowledge 2026) and **AI Agent Fabric**
+(MCP/A2A) are current offerings that were previously unmapped; **AI Control Tower** now governs
+first- *and* third-party AI; and ServiceNow ships **no** signed per-action / payload-digest
+authorization artifact. **Unresolved ambiguity (carried into Appendix F):** direct page fetches to
+`servicenow.com` were egress-blocked in this environment, so descriptions were assembled from
+web-search results surfacing ServiceNow-owned pages — product names, protocol support and GA framing
+are corroborated across multiple ServiceNow URLs, but exact marketing quotes and precise
+release/patch numbers should be spot-checked against the live pages; AI Case Management's release
+train is unconfirmed (Store listing only); the GRC→IRM and PSM↔SPO namings remain dual-branded; and
+a possible "Otto" rebrand of Now Assist is unconfirmed.
 
 ---
 
@@ -2042,6 +2086,126 @@ Versions are resolved from each package's `version.py` / `__init__.py` at the SH
 >   taken from each README's own "Maturity (no overclaim)" section.
 > - RA‑5 has no single "Status:" banner; its maturity is expressed as a reference-vs-production table
 >   plus a scope-negative statement.
+
+---
+
+# Appendix F — ServiceNow Product-Ecosystem Mapping Matrix
+
+**Verification:** ServiceNow products/capabilities below were **independently verified on
+2026-08-11** against ServiceNow-owned sources (product pages on `servicenow.com`, documentation on
+`servicenow.com/docs`, the ServiceNow Store, and ServiceNow newsroom press releases). Release
+context observed: **Zurich** (H2 2025) is where AI Control Tower matured into a full governance
+layer; **Action Fabric** GA'd at **Knowledge 2026** (May 2026). See the source legend (§F.4).
+
+**Method caveat (unresolved ambiguity).** Direct page fetches to `servicenow.com` were
+egress-blocked in this environment, so descriptions were assembled from web-search results
+surfacing ServiceNow-owned pages. Product names, protocol support (MCP/A2A) and GA framing are
+corroborated across multiple ServiceNow URLs; **exact marketing quotes and precise release/patch
+numbers should be spot-checked on the live pages**. Specific unresolved points: **AI Case
+Management**'s release train is confirmed only via its Store listing; **GRC ↔ IRM** and
+**Sourcing and Procurement Operations (SPO) ↔ Procurement Service Management (PSM)** are
+dual-branded; a possible **"Otto"** rebrand of Now Assist is unconfirmed; and **"AI Guardian" is
+not an official product name** — the shipping product is **Now Assist Guardian** (a separate
+"Guardian AI Agent" Store item should not be conflated with it).
+
+**Boundaries this matrix preserves.** ServiceNow is *not* described as lacking AI governance; Ugence
+is *not* described as replacing AI Control Tower, AI Agent Orchestrator, Action Fabric, AI Agent
+Fabric, IRM, CMDB, ITSM, ITOM, HRSD or procurement; product-name overlap is *not* treated as
+functional equivalence; and **no ServiceNow connector is claimed to ship — none exists in the
+packages, so every integration below is PROPOSED**. Current ServiceNow functionality (source-cited)
+is kept distinct from proposed Ugence integration.
+
+## F.1 Canonical matrix
+
+Relationship legend: **C** = COMPLEMENTS · **PO** = PARTIAL OVERLAP · **X** = EXTENDS · **I** =
+INTEGRATES WITH. Integration status is the *ServiceNow-integration adapter* status (the Ugence
+package's own maturity is in Appendix B). This table is intentionally wide (diligence reference) and
+scrolls horizontally; a genuine-overlap analysis follows in §F.2.
+
+| Ugence module (pkgs) | Ugence capability | Exact ServiceNow product/capability | What ServiceNow already does | Ugence-differentiated capability | Rel. | SN system-of-record role | Ugence runtime-enforcement role | Proposed artifact exchanged | Integration status | Source |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `governance-contracts` | Neutral governance request/result/outcome vocabulary | Flow Designer; IntegrationHub | No-code workflows; certified spokes to external systems | One versioned, machine-checkable governance-verdict contract spanning ServiceNow + non-ServiceNow | C | Owns workflow + integration definitions | Neutral contract others target; grants no authority | Governance request/verdict schema | PROPOSED | [Flow][IHub] |
+| `governance-provider-framework` | Register / resolve / invoke governance providers | IntegrationHub; Action Fabric (MCP/A2A) | Spoke registration; exposes system of action to any agent via MCP/A2A, governed by ACT | Deterministic provider resolution where coordination transfers no authority | C · I | Orchestrates which integration runs | Resolves providers; proves no authority leak | Provider registration/invocation fingerprint | PROPOSED | [IHub][ActionFabric] |
+| `policy-workflow-compiler` (PWC) | Compile approved policy → deterministic `workflow_ir.v1/.v2` | Policy and Compliance Management (IRM); Flow Designer | Policy library, authoring/lifecycle, continuous control monitoring | Digest-addressed compilation so an LLM never re-interprets policy per decision | X | Owns the policy record | Compiles approved meaning into runtime constraints | Export approved policy/control defs → compiled `workflow_ir` | PROPOSED | [PCM][Flow] |
+| `tap` + `risk-authority-evidence-runtime` (RA‑5) | Assertion support; trusted evidence admission upstream of authority | AI Risk and Compliance (AI Control Tower); IRM | AI risk classification/intake, Quality & Safety scoring, EU AI Act / NIST AI RMF workflows | Per-decision runtime evidence admissibility; a caller-asserted `PASS` is inert unless re-checked | C | Owns risk register / assessment records | Gates whether *this* decision's evidence is supported/admissible | Evidence refs / admission verdicts | PROPOSED | [ACT][IRM] |
+| `decision-authority` | Binding delegated decision; AI barred as principal; owns exec/recon records | AI Control Tower (AI Governance); AI Case Management; approval workflows | Agent approvals, governance workflows, AI case handling | Structural bar on AI self-authorization; immutable decision record | X · C | System of record for approvals/cases | Produces the machine-consumable binding-decision artifact | Decision-record ingestion | PROPOSED | [ACT][AICase] |
+| `risk-authority` RA‑1→RA‑8 (6 pkgs) | `RiskDecisionCase` → signed `RiskAuthorizationEnvelope` → enforcement + lifecycle + assurance | AI Control Tower; AI Risk and Compliance; IRM | Governs approved AI state across first + third-party AI; risk frameworks; enforcement workflows | Converts approved governance into a **signed, scoped, revocable per-action** authority artifact — **no ServiceNow equivalent found** | X · PO | Owns risk/approval records & frameworks | Issues + enforces signed machine authority; owns authority lifecycle/assurance | `RiskAuthorizationEnvelope` events / decision & enforcement receipts | PROPOSED | [ACT][IRM] |
+| `actiongate` | Exact-action / payload-digest authorization, commit-time recheck | Action Fabric; AI Control Tower; tool/MCP governance | Governed action execution — identity-verified, permission-scoped, auditable | Per-**payload-digest** authorization re-checked at commit — **no ServiceNow equivalent found** | PO · X | Governs which agents/tools belong | Authorizes *this exact payload* right now | Action authorization result / payload digest | PROPOSED | [ActionFabric][ACT] |
+| `action-clearance` (ACP) | Independent live operational clearance veto | ITSM/ITOM Change Management (freeze/blackout/maintenance windows, conflict detection); Event Management | Change freeze windows, conflict detection, event/incident state | A separate, non-compensatory AI-action clearance gate independent of authorization | C · PO | Owns operational / change / incident state | Turns live state into a fail-closed pre-dispatch veto | Trusted change/freeze/incident state signals | PROPOSED | [Change][ITOM][Event] |
+| `model-selection` (Model Authority) | Per-request `ModelAuthorizationDecision` (ALLOW/DENY/HOLD/ESCALATE + fallback/expiry) | AI Control Tower model/provider governance | Approved model/provider inventory & policies | Per-**request** binding model authorization with governed fallback + expiry | X | Owns model inventory/policy config | Issues per-request binding model authorization | Model policy / eligibility inputs | PROPOSED | [ACT] |
+| `llm-steering-controller` | Decision-policy-anchored advisory routing/steering | Now Assist Guardian; Now Assist controls | Real-time content guardrails (sensitive-topic, offensiveness, prompt-injection) | Steering anchored to the exact DecisionCase/evidence — not general content moderation | PO · C | Owns content-safety configuration | Advisory routing recommendation (executes nothing) | Steering recommendation context | PROPOSED | [Guardian] |
+| `agent-workforce-composer` (AWC) | Governed workforce composition/planning; zero new authority | AI Agent Orchestrator; Autonomous Workforce | Orchestrates and coordinates teams of AI agents (and executes) | Composition that grants **nothing** — a plan is a proposal; each action still needs its own authorization | PO | Orchestrates/executes agent teams | Plans least-privilege team without granting authority | `AgentTeamPlan` / permission-bound proposals | PROPOSED | [Orchestrator][AIAgents] |
+| `agent-runtime` | Vendor-neutral governed execution coordination (CER; H22‑A→D); fails closed | ServiceNow AI Agents; AI Agent Orchestrator; AI Agent Fabric; Action Fabric (MCP/A2A) | Governed execution env for own + third-party agents via MCP/A2A, routed through AI Control Tower | One vendor-neutral CER + governance seam that fails closed when ungoverned; in-process | PO · I | Hosts/executes its own agent runtime | Coordinates governable execution across runtimes; creates no authority | CER + governance dispositions | PROPOSED | [AIAgents][AgentFabric][ActionFabric] |
+| `context-minimization` (+ token-accounting-runtime) | Extractive minimum-necessary context + token accounting | AI Control Tower (AI Security and Privacy); Now Assist Data Privacy | AI security/privacy governance controls | Per-decision extractive minimization + measured token accounting (reduction vs estimate vs usage) | C · X | Owns data-access/privacy policy | Governs exactly what data crosses the model boundary; accounts tokens | Minimized context + usage/settlement records | PROPOSED | [ACT] |
+| `storygraph` (Sequence Risk) | Advisory multi-step sequence-risk signal | AI Case Management; workflow history/audit | Case/task/workflow history (largely per-record) | Trajectory-aware advisory when benign steps assemble a harmful capability | C | Owns cases / workflow history | Emits advisory sequence-risk evidence | `OBSERVE`/`ESCALATE` advisory signal | PROPOSED | [AICase] |
+| Governance Story Graph (**proposed module**) | Causal governance lineage graph | CMDB; AI Case Management; workflow audit | Linked records, CMDB relationships, case lineage | Causal story of why an AI decision was allowed → what happened → future authority | C | Owns linked records / CMDB | (Proposed) causal-lineage graph over runtime governance | Causal lineage nodes/edges | PROPOSED (module also proposed) | [CMDB][AICase] |
+| `cloud-scaling-controller` + `-operations` | Governed scaling recommendation + gated controlled execution | ITOM; Event Management; remediation workflows | Event management, AIOps, runbook remediation | Advice and actuation in separate packages; actuation gated on an external `ExecutionAuthorization`, `dry_run` default | C | Owns ITOM/event/runbook state | Separates recommendation from gated execution | Scaling recommendation / execution authorization | PROPOSED | [ITOM][Event] |
+| `ai-hiring` | Hiring decision governance (human-binding; graduated is target) | HRSD; Hiring Experiences; Recruitment Workspace | Recruiting/ATS workflow; agentic hiring assistants | Governs the *level* of AI authority within hiring; a human binds today | C · X | Owns hiring workflow/records | Governs delegated decision authority in hiring | Hiring decision case / action request | PROPOSED | [HRSD][Hiring] |
+| `procurement` | Procurement approval/execution governance (human approval; graduated is target) | Sourcing and Procurement Operations / Procurement Service Management | Source-to-pay approval chains, guided buying, supplier collaboration | Exactly-bound governed action + graduated decision rights (target) | C · X | Owns procurement workflow/records | Governs binding procurement decision + exactly-bound action | Purchase decision/approval + governed action request | PROPOSED | [SPO/PSM] |
+
+> RA‑1→RA‑8 spans six packages and cloud-scaling spans two; see Appendices B and E for the
+> package-level breakdown. Every "Integration status = PROPOSED" reflects that **no ServiceNow
+> connector ships in any package today** — the adapters are design intent over the vendor-neutral
+> contracts, not shipped code.
+
+## F.2 Genuine competitive-overlap zones (stated honestly)
+
+Most rows are complementary, but four zones are genuine overlap with current ServiceNow capability
+and should be discussed as such rather than as pure white space:
+
+- **ActionGate ↔ Action Fabric / AI Control Tower.** Action Fabric already routes agent actions
+  through governed, identity-verified, permission-scoped, auditable execution. The Ugence
+  differentiation is narrow and specific: **per-payload-digest** authorization re-checked at commit
+  time, which the verified sources do not show as a ServiceNow capability. Pitch the granularity,
+  not a governance gap.
+- **Agent Runtime ↔ AI Agent Fabric / Action Fabric / AI Agent Orchestrator.** ServiceNow already
+  provides a governed, MCP/A2A-based execution and orchestration environment for its own *and*
+  third-party agents. Ugence's differentiation is a **vendor-neutral CER + fail-closed governance
+  seam** usable off the ServiceNow platform — not a claim that ServiceNow cannot govern agent
+  execution.
+- **AWC ↔ AI Agent Orchestrator / Autonomous Workforce.** ServiceNow orchestrates and executes
+  agent teams. AWC is **planning/composition only, granting zero authority**. The distinction is
+  authority, not capability breadth.
+- **LLM Steering ↔ Now Assist Guardian.** Both touch model safety. Guardian does real-time content
+  guardrails; Ugence steering is **decision-policy-anchored routing**, not general moderation. These
+  are complementary but overlap on the "safe model output" objective.
+- **Risk Authority / Model Authority ↔ AI Control Tower.** AI Control Tower governs AI assets and
+  risk (now across first- and third-party AI). Ugence adds **signed, per-action runtime authority
+  and per-request model authorization** — an enforcement artifact, not an inventory/governance
+  dashboard. Position as extension of an approved governance state into runtime enforcement.
+
+## F.3 System-of-record vs runtime-enforcement split
+
+Across every row the division is consistent and is the core of the partnership story: **ServiceNow
+is the system of record and workflow/orchestration platform** (policy records, risk registers,
+approvals, cases, CMDB, agent orchestration, and — via Action Fabric — a governed action surface);
+**Ugence is the runtime-enforcement layer** that converts an approved governance state into a
+per-request, per-action, signed and revocable authority decision, and reconciles the observed
+effect. Neither replaces the other; the proposed adapters carry records one way and
+decision/enforcement/assessment receipts the other.
+
+## F.4 Source legend (authoritative ServiceNow-owned URLs, verified 2026-08-11)
+
+- **[Platform]** ServiceNow AI Platform — https://www.servicenow.com/platform.html
+- **[ACT]** AI Control Tower — https://www.servicenow.com/products/ai-control-tower.html
+- **[IRM]** Integrated Risk Management (GRC) — https://www.servicenow.com/products/integrated-risk-management.html
+- **[PCM]** Policy and Compliance Management — https://www.servicenow.com/docs/r/governance-risk-compliance/policy-and-compliance-management/r_PolicyComplianceMgmt.html
+- **[Guardian]** Now Assist Guardian — https://www.servicenow.com/docs/bundle/zurich-intelligent-experiences/page/administer/now-assist-platform/concept/now-assist-guardian.html
+- **[AICase]** AI Case Management (Store) — https://store.servicenow.com/store/app/34a35e701b952a50396216db234bcb3e
+- **[AIAgents]** ServiceNow AI Agents — https://www.servicenow.com/products/ai-agents.html
+- **[Orchestrator]** AI Agent Orchestrator / Autonomous Workforce — https://www.servicenow.com/platform/autonomous-workforce.html
+- **[AgentFabric]** AI Agent Fabric — https://www.servicenow.com/now-platform/ai-agent-fabric.html
+- **[ActionFabric]** Action Fabric — https://www.servicenow.com/platform/action-fabric.html
+- **[Flow]** Flow Designer — https://www.servicenow.com/products/platform-flow-designer.html
+- **[IHub]** IntegrationHub — https://www.servicenow.com/products/integration-hub.html
+- **[ITSM]** IT Service Management — https://www.servicenow.com/products/itsm.html
+- **[ITOM]** IT Operations Management — https://www.servicenow.com/products/it-operations-management.html
+- **[Change]** Change Management — https://www.servicenow.com/products/change-management.html
+- **[Event]** Event Management — https://www.servicenow.com/products/event-management.html
+- **[CMDB]** Configuration Management Database — https://www.servicenow.com/products/servicenow-platform/configuration-management-database.html
+- **[HRSD]** HR Service Delivery — https://www.servicenow.com/products/hr-service-delivery.html
+- **[Hiring]** Hiring Experiences / Recruitment Workspace — https://www.servicenow.com/community/hrsd-articles/agentic-ai-for-hiring-experiences-overview/ta-p/3514999
+- **[SPO/PSM]** Sourcing and Procurement Operations / Procurement Service Management — https://www.servicenow.com/products/procurement-service-management.html
 
 ---
 
