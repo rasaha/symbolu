@@ -48,3 +48,18 @@ recall/precision to 100% *via the fail-closed hybrid*; 1.3–2.6% decision flips
 protection-unaware control) are the **experiment's** frozen numbers, verified against
 its artifacts. Do **not** present them as this package's production evidence, and do not
 describe any of it as live-enterprise validation.
+
+## Token accounting (CM-TA1) limitations
+
+- **No provider tokenizer.** The bundled `DefaultApproximateRequestCounter` is a
+  word/punctuation approximation (`DEFAULT_APPROXIMATE`), never exact provider
+  tokenization. Exact counts require an injected `RequestTokenCounter` from outside.
+- **No cost / no invoice.** No price is computed and no billing figure is claimed; that
+  needs an explicit, versioned external pricing source. Provider-reported usage is
+  authoritative only for the API response reconciled — it is **not** invoice reconciliation.
+- **No persistence.** The core defines the `TokenAccountingSink` protocol and an
+  in-memory reference only; durable storage is an external concern.
+- **Ghost tokens are surfaced, not eliminated.** Failed/exception attempts with unknown
+  usage are recorded as `UNAVAILABLE_*` (never zero); the summary reports the gap
+  (`complete = False`). The package does not *guarantee* complete elimination of unmeasured
+  ("ghost") token consumption — it makes gaps auditable.

@@ -4,6 +4,67 @@ All notable changes to this package are documented here. This package follows
 SemVer for the distribution version and carries a separate `CONTRACT_VERSION` for
 the minimization contract (result shape, reason-code vocabulary, oracle protocol).
 
+## 0.2.0 — measurable token accounting (CM-TA1)
+
+**Package maturity: `IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED`** (upgrade to
+`IMPLEMENTED_AND_CI_VERIFIED` only after the scoped Actions run is observed green).
+Contract version `1.0.2` → `1.1.0`. **Purely additive**: the minimization algorithm,
+protected-span behavior, oracle equivalence semantics, and BOTH fingerprint digests
+(`outcome_fingerprint`, `run_fingerprint`) are byte-unchanged. No provider SDK, no
+tokenizer, no network/database/filesystem persistence, and no pricing authority
+enters the leaf.
+
+### Added — a new neutral, stdlib-only `token_accounting` module
+Three measurements are kept **distinct** and never collapsed into one field:
+
+- **A — context reduction** (unchanged): `MinimizationResult.original_tokens /
+  resulting_tokens / achieved_reduction`. The accounting module *copies* these; it
+  never re-runs or mutates a minimization result.
+- **B — complete-request estimate**: `RequestTokenEstimate` — the estimated input-token
+  size of the *complete serialized request* (system + messages + minimized context +
+  tool definitions + schemas + provider wrappers), produced by an **injected**
+  `RequestTokenCounter`. The core ships only the transparent `DefaultApproximateRequestCounter`
+  (word/punctuation, labelled `DEFAULT_APPROXIMATE`) — it implements **no** provider tokenizer.
+- **C — provider-reported usage**: `ProviderTokenUsage` — optional non-negative ints for
+  `input_tokens`, `cached_input_tokens`, `cache_write_input_tokens`, `output_tokens`,
+  `reasoning_tokens`, `total_tokens`, plus `provider_request_id` / `usage_schema` /
+  `adapter_id` / `adapter_version`. **Unknown is `None`, never fabricated as zero.**
+  Cached/cache-write/reasoning are provider-specific subsets/details and are **not** added
+  into input/output; `derived_total()` = input+output only and is explicitly *derived*,
+  distinct from the provider-reported `total_tokens`.
+
+New contracts: `TokenCountBasis`, `AttemptStatus`, `UsageAvailability`,
+`RequestComponents`, `RequestTokenEstimate`, `ProviderTokenUsage`, `RequestAttribution`,
+`ApiCallTokenRecord` (domain-separated `record_fingerprint`, `api-call/1`),
+`LogicalRequestTokenSummary` (`logical-request/1`), the `RequestTokenCounter` and
+`TokenAccountingSink` protocols, the `DefaultApproximateRequestCounter` and
+`InMemoryTokenAccountingSink` reference implementations, and the
+`prepare_api_call_measurement` / `reconcile_api_call_measurement` /
+`aggregate_logical_request_usage` APIs.
+
+### Accounting semantics (enforced, fail-closed)
+- A retry is a **new** `attempt_id`; three attempts under one logical request stay three
+  records. Retried/failed attempts are preserved separately, never collapsed into the
+  final success.
+- A failed attempt with known usage still contributes to consumption; a failed/exception
+  attempt with no usage is `UNAVAILABLE_*` and keeps the logical-request summary
+  `complete=False` — a gap is never reported as zero.
+- Context-token savings and billed-token savings are **different quantities**; savings are
+  attributed **once** per logical request (never multiplied per attempt).
+- Negative / bool / float / NaN / inf / str token counts are rejected; a duplicate
+  `attempt_id` with conflicting content is rejected (idempotent replay must be
+  byte-identical). Deterministic replay reads no wall clock and generates no random ids —
+  every id is caller-supplied.
+- Provider-reported usage is authoritative for the API response being reconciled; it never
+  overwrites the pre-call estimate, and it is **not** an invoice.
+
+### Artifacts / docs
+- New `artifacts/token_accounting_schema.json`; extended `acceptance_scenarios.json`;
+  regenerated `public_api.json`. New `docs/TOKEN_ACCOUNTING.md`. Boundary, limitations, and
+  security/failure-mode docs updated. Adversarial + compatibility tests added under
+  `tests/accounting/` (deny/failure/unknown paths outnumber happy paths); the isolated
+  single-wheel verifier now proves the accounting surface on the installed wheel.
+
 ## 0.1.2 — timestamp validation & fingerprint documentation correction
 
 **Package maturity: `IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED`** (upgrade to

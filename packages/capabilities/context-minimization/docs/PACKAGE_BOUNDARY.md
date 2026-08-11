@@ -31,3 +31,15 @@ Model weights, benchmark corpora/results, RunPod scripts, plots, detector-traini
 code, and large corpora are **never** shipped in the core wheel. The isolated-install
 verifier asserts the wheel contains only `ugence_context_minimization/` (+ `py.typed`)
 and its dist-info, with no foreign top-level package.
+
+## Token accounting (CM-TA1)
+
+`token_accounting` is inside the leaf but stays inside the boundary: it *copies*
+already-measured facts (context reduction A), wraps an **injected** request counter
+(estimate B — the core implements no tokenizer), and stores optional provider-reported
+usage (C). It adds **no** dependency — no OpenAI/Anthropic/Google SDK, no tokenizer, no
+model client, no database, no network, no filesystem, and no pricing table. Provider
+usage *normalizers* and *persistence* live **outside** this package (in the
+`context-minimization-token-accounting-runtime` integration distribution and its
+optional provider adapters). The wheel still contains only
+`ugence_context_minimization/` + `py.typed`.

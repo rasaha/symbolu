@@ -57,3 +57,11 @@ into the event stream. Governance reason codes are recorded; governance evidence
 
 The runtime does not enforce policy and mints no execution authority. It coordinates;
 permission is always determined by the external governance boundary.
+
+## Attempt telemetry (CM-TA1)
+
+The neutral attempt observer receives identities, a neutral status, and a provider's
+**opaque** usage mapping only — never arguments, prompts, credentials, or provider
+response payloads. The runtime interprets no provider-specific token field. Telemetry is
+observation only: it can never change the provider action, and a raising observer is
+swallowed so it can never break execution or alter a governed transition.

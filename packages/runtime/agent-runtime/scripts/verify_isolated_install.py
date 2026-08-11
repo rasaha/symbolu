@@ -65,9 +65,12 @@ def main() -> int:
         check = (
             "import ugence_agent_runtime as ar;"
             "import ugence_agent_runtime.api as api;"
-            "assert ar.__version__ == '0.6.0', ar.__version__;"
+            "assert ar.__version__ == '0.7.0', ar.__version__;"
             # confirm the import resolves inside site-packages, not the monorepo src
             "assert 'site-packages' in ar.__file__, ar.__file__;"
+            # CM-TA1: the neutral attempt-telemetry surface is present on the wheel
+            "assert hasattr(api, 'ProviderAttempt') and hasattr(api, 'AttemptObserver');"
+            "assert api.PROVIDER_USAGE_METADATA_KEY == 'token_usage';"
             "print('import OK', ar.__version__, ar.__file__)"
         )
         run([str(py), "-c", check], cwd=str(tmp))
@@ -77,7 +80,7 @@ def main() -> int:
             "import importlib.metadata as m;"
             "d = m.metadata('ugence-agent-runtime');"
             "assert d['Name'] == 'ugence-agent-runtime', d['Name'];"
-            "assert d['Version'] == '0.6.0', d['Version'];"
+            "assert d['Version'] == '0.7.0', d['Version'];"
             "reqs = m.requires('ugence-agent-runtime') or [];"
             # no mandatory runtime dependency (only optional [test] extras allowed)
             "hard = [r for r in reqs if 'extra' not in r];"

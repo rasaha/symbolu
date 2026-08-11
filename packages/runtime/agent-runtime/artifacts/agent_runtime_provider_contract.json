@@ -1,7 +1,10 @@
 {
   "interface": "ugence_agent_runtime.providers.interfaces.Provider",
   "description": "A provider executes a runtime-requested operation AFTER all required runtime and external governance checks have completed. Neutral: no vendor coupling.",
-  "provider_attributes": ["provider_id", "version"],
+  "provider_attributes": [
+    "provider_id",
+    "version"
+  ],
   "method": {
     "name": "execute",
     "input": "ToolInvocation",
@@ -32,5 +35,20 @@
     "unknown_exception": "wrapped by the runtime; never surfaced raw"
   },
   "neutrality": "No OpenAI/Anthropic/GitHub/cloud/database specifics. Concrete providers live outside this package.",
-  "new_provider_kind_introduced": false
+  "new_provider_kind_introduced": false,
+  "attempt_telemetry": {
+    "seam": "ugence_agent_runtime.observability.attempts.AttemptObserver",
+    "config_field": "AgentRuntimeConfig.attempt_observer (Optional; None = no behavior change)",
+    "record": "ProviderAttempt",
+    "emitted_once_per": "actual provider.execute invocation (success, expected failure, timeout, provider error, raw exception)",
+    "attempt_number": "runtime-authoritative; incremented per retry; retried attempts are NEVER collapsed",
+    "no_attempt_when": [
+      "governance HOLD/BLOCK/ESCALATE (provider never invoked)",
+      "exact-action clearance/integrity rejection (fails closed before invocation)",
+      "provider-not-found"
+    ],
+    "neutral_usage_metadata_key": "token_usage",
+    "neutral_usage_rule": "A provider MAY attach an opaque mapping at ToolResult.metadata['token_usage']; the runtime forwards it verbatim as ProviderAttempt.neutral_usage and NEVER interprets provider-specific token fields. Absent/non-mapping => None (unknown, never fabricated).",
+    "robustness": "A raising observer is swallowed; telemetry can never change the provider action or break execution."
+  }
 }

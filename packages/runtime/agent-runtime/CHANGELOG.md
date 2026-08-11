@@ -3,6 +3,40 @@
 All notable changes to the independent Agent Runtime distribution are recorded here.
 This project follows semantic versioning for the distribution.
 
+## 0.7.0 — CM-TA1 neutral provider-attempt telemetry
+
+An **additive, opt-in** observation seam that lets a neutral observer see **every actual
+`provider.execute` invocation** — success, expected failure, timeout, provider error, or raw
+exception — with the runtime-authoritative attempt number. Before this, the retry loop kept only
+a final attempt *count* and discarded the earlier failed attempts; now retried and failed attempts
+are recorded **distinctly and never collapsed** into the final attempt. **Purely additive**: no
+change to execution truth, governance ownership, the exact-action fingerprint / proposal-binding
+contract, Canonical Execution State, checkpoint schema, or recovery semantics. See
+[`docs/AGENT_RUNTIME_ATTEMPT_TELEMETRY.md`](docs/AGENT_RUNTIME_ATTEMPT_TELEMETRY.md).
+
+### Added
+- **`ProviderAttempt`** — a neutral, immutable per-invocation record (provider/operation identity,
+  workflow/instance/task/correlation identity, runtime-authoritative `attempt_number`, neutral
+  status, `ok`, `provider_invoked`, an opaque `neutral_usage` mapping, and a neutral
+  `failure_category`). It carries **no** arguments, prompts, credentials, or provider payloads.
+- **`ProviderAttemptStatus`** (`SUCCEEDED` / `FAILED` / `TIMEOUT` / `EXCEPTION`), **`AttemptContext`**,
+  the **`AttemptObserver`** protocol, and the in-memory **`RecordingAttemptObserver`** reference.
+- **`PROVIDER_USAGE_METADATA_KEY = "token_usage"`** — the neutral key under which a provider MAY
+  attach an opaque usage mapping to its `ToolResult.metadata`. The runtime **forwards it verbatim**
+  as `ProviderAttempt.neutral_usage` and **never interprets** provider-specific token fields; an
+  absent or non-mapping value is `None` (unknown, never fabricated).
+- **`AgentRuntimeConfig.attempt_observer`** — optional; `None` (default) is a strict no-op.
+
+### Guarantees preserved
+- A governance **HOLD/BLOCK/ESCALATE**, an **exact-action** clearance/integrity rejection, and a
+  **provider-not-found** produce **no** attempt — the provider was never invoked.
+- The runtime imports **no** provider SDK and interprets **no** provider token field. Observing an
+  attempt can never change the provider action; a raising observer is swallowed and never breaks
+  execution.
+
+**Package maturity: `IMPLEMENTED_AND_LOCALLY_OFFLINE_VERIFIED`** (upgrade to
+`IMPLEMENTED_AND_CI_VERIFIED` only after the scoped Actions run is observed green).
+
 ## 0.6.0 — H22-D bounded concurrent multi-workflow execution
 
 Lets several **mutually-safe** workflows make progress **at the same time** — bounded, in-process

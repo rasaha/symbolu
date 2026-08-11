@@ -34,6 +34,26 @@ from .oracle import minimize, minimize_context
 from .policy import DEFAULT_POLICY, MinimizationPolicy
 from .protocols import InvarianceOracle, ProtectionProvider, TokenCounter
 from .structural import deduplicate_context, structural_minimize
+from .token_accounting import (
+    ApiCallTokenRecord,
+    AttemptStatus,
+    DefaultApproximateRequestCounter,
+    InMemoryTokenAccountingSink,
+    LogicalRequestTokenSummary,
+    PreparedApiCall,
+    ProviderTokenUsage,
+    RequestAttribution,
+    RequestComponents,
+    RequestTokenCounter,
+    RequestTokenEstimate,
+    TokenAccountingSink,
+    TokenCountBasis,
+    TokenUsageSink,
+    UsageAvailability,
+    aggregate_logical_request_usage,
+    prepare_api_call_measurement,
+    reconcile_api_call_measurement,
+)
 from .version import CONTRACT_VERSION, __version__
 
 #: The curated public reason-code vocabulary.
@@ -67,6 +87,25 @@ __all__ = [
     # helpers + vocab
     "default_token_count",
     "REASON_CODES",
+    # token accounting (CM-TA1) — three distinct measurements
+    "TokenCountBasis",
+    "AttemptStatus",
+    "UsageAvailability",
+    "RequestComponents",
+    "RequestTokenEstimate",
+    "ProviderTokenUsage",
+    "RequestAttribution",
+    "ApiCallTokenRecord",
+    "LogicalRequestTokenSummary",
+    "RequestTokenCounter",
+    "TokenAccountingSink",
+    "TokenUsageSink",
+    "DefaultApproximateRequestCounter",
+    "InMemoryTokenAccountingSink",
+    "PreparedApiCall",
+    "prepare_api_call_measurement",
+    "reconcile_api_call_measurement",
+    "aggregate_logical_request_usage",
     # errors
     "ContextMinimizationError",
     "InvalidRequestError",

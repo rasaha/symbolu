@@ -7,6 +7,19 @@ independent distribution starts at 0.1.0. See docs/AGENT_RUNTIME_OVERVIEW.md.
 """
 from __future__ import annotations
 
+# 0.7.0 — CM-TA1 additive attempt telemetry: a neutral, opt-in seam that observes EVERY actual
+# provider.execute invocation (success, expected failure, timeout, provider error, raw exception)
+# with the runtime-authoritative attempt number, so retried and failed attempts are never
+# collapsed into the final attempt count. Adds ProviderAttempt / ProviderAttemptStatus /
+# AttemptContext / AttemptObserver / RecordingAttemptObserver and the PROVIDER_USAGE_METADATA_KEY
+# under which a provider MAY attach an opaque usage mapping the runtime forwards verbatim. New
+# optional config field `attempt_observer` (None = no behavior change). The runtime stays
+# provider-neutral: it never imports a provider SDK and never interprets provider-specific token
+# fields; a governance HOLD/BLOCK/ESCALATE or an exact-action clearance/integrity rejection never
+# invokes the provider and so produces no attempt. Purely additive — no execution truth, governance
+# ownership, exact-action fingerprint, proposal binding, checkpoint schema, or recovery semantics
+# changes.
+#
 # 0.6.0 — H22-D bounded concurrent multi-workflow execution: an additive layer above H22-C that
 # lets several mutually-safe workflows make progress at once. Adds a fairness-preserving batch
 # selection seam on the H22-B scheduler (plan_batch: the SAME smooth-weighted-round-robin core,
@@ -33,6 +46,6 @@ from __future__ import annotations
 # coordination layer; 0.3.0 added the H22-A bounded-advancement seam; 0.2.0 added canonical
 # execution state; 0.1.2 hardened the exact-action contract; 0.1.1 added fail-closed default
 # governance.)
-__version__ = "0.6.0"
+__version__ = "0.7.0"
 
 VERSION = __version__
