@@ -1,0 +1,72 @@
+# Ugence Risk Authority Execution Assurance — RA-8 execution / effect reconciliation.
+#
+# This is NOT a leaf: it is the integration/composition package that CORRELATES a
+# governed machine-authority context, the Agent Runtime execution attempt, and a
+# trusted external effect observation; COMPOSES the mature Decision Authority
+# reconciliation kernel under a safe, non-compensatory aggregation; and — on a
+# *material* post-effect mismatch — emits a neutral ``AuthorityReassessmentSignal``
+# (``EXECUTION_EFFECT_MISMATCH``) into the already-built RA-6 intake.
+#
+#   RA-8 OBSERVES, CORRELATES, AGGREGATES, AND ASSESSES POST-EFFECT.
+#   RA-6 OWNS AUTHORITY CONSEQUENCES.
+#
+# The dependency direction is one-way (spec §8):
+#
+#     risk_authority (stdlib-only leaf)            <- neutral signal + intake port
+#         ▲
+#     ugence-risk-authority-status-runtime (RA-6)  <- reassessor + sole writer
+#         ▲
+#     ugence-risk-authority-execution-assurance (RA-8, this package)
+#         ├─► ugence-decision-authority            <- reconciliation kernel (reused)
+#         └─► ugence-governance-contracts          <- neutral effect-observation seam
+#         ··· observes agent-runtime via a neutral, duck-typed event contract (no AR dep)
+#
+# RA-8 introduces NO second machine-authority artifact and NO third canonical
+# execution ledger. The Ed25519-signed ``RiskAuthorizationEnvelope`` remains the
+# sole machine-execution authority; Decision Authority remains the sole owner of
+# execution/reconciliation records.
+#
+# Build:   python -m build packages/integration/risk-authority-execution-assurance
+# Verify:  python packages/integration/risk-authority-execution-assurance/scripts/verify_isolated_install.py
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-risk-authority-execution-assurance"
+dynamic = ["version"]
+description = "Ugence Risk Authority Execution Assurance — RA-8 post-effect execution/effect reconciliation that can cause previously-valid machine authority to be reassessed via the RA-6 intake. Correlates, composes DA reconciliation, aggregates non-compensatorily, and assesses; never mints, widens, or mutates authority."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["governance", "risk", "authority", "execution", "effect", "reconciliation", "assurance", "ugence"]
+# One-way dependencies on: the machine-authority owner (neutral signal types), the
+# RA-6 status-runtime intake (reassessor + sole writer), the Decision Authority
+# reconciliation kernel (reused, never re-implemented), and the neutral governance
+# effect-observation contract. NO agent-runtime dependency — the Agent Runtime is
+# observed through a neutral duck-typed event contract. pydantic is a transitive
+# dependency of Decision Authority only (RA-8 defines no pydantic models of its own).
+dependencies = [
+    "ugence-risk-authority>=0.1.0",
+    "ugence-risk-authority-status-runtime>=0.1.0",
+    "ugence-decision-authority>=1.0.0",
+    "ugence-governance-contracts>=0.1.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_risk_authority_execution_assurance.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_risk_authority_execution_assurance*"]
+
+[tool.setuptools.package-data]
+ugence_risk_authority_execution_assurance = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
