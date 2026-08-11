@@ -114,15 +114,13 @@ outbox UPDATE-denial assertion) are resolved above and in §4b.
 
 ### (B) Repository-level checks that do NOT support the secure-chat verdict
 
-The following are green repository-level checks but exercise the unrelated
-`symbolu_robotics/bcvf_autonomous` module (workflow `bcvf-autonomous-ci.yml`).
-They are **explicitly not** counted as secure-chat evidence, and one
-(`Safety case + SBOM + traceability`) filters with `-k "safety_case"`:
-
-| Workflow · job | Why excluded |
-|----------------|--------------|
-| API stability registry | tests `symbolu_robotics` API stability; unrelated to DilChat chat |
-| Safety case + SBOM + traceability | `symbolu_robotics` safety-case + SBOM; `-k` filter; unrelated to DilChat chat |
+Earlier revisions of this report credited two green repository-level checks
+(`API stability registry` and `Safety case + SBOM + traceability`) that
+actually exercised the unrelated `symbolu_robotics/bcvf_autonomous` module via
+the `bcvf-autonomous-ci.yml` workflow. Those checks said nothing about the chat
+backend and were **explicitly not** counted as secure-chat evidence. The
+`bcvf-autonomous-ci.yml` workflow has since been removed, so these jobs no
+longer run at all.
 
 > **CI-trigger constraint (repository).** `dilchat-ci` and `dilchat-mobile-ci` are
 > bound to the current authoritative default branch

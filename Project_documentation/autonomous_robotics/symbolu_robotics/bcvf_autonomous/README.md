@@ -132,8 +132,7 @@ pytest bcvf_autonomous/tests -q
 ```
 
 A small number of timing-sensitive tests are host-speed dependent and
-are excluded from the default sweep — they're listed in the CI
-workflow at [`.github/workflows/bcvf-autonomous-ci.yml`](../../.github/workflows/bcvf-autonomous-ci.yml).
+are excluded from the default sweep.
 
 ## Compatibility
 

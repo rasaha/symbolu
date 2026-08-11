@@ -52,12 +52,10 @@ check runs): **11 checks, all `success`.** Named checks include:
 - `Wheel + sdist build + isolated installation + demo` — success
 - `Migrated Console structural parity` — success
 - `Platform-freeze verification` — success
-- `Safety case + SBOM + traceability` — success
-- `API stability registry` — success
 - `terminology` — success
 
-CI workflows present in `.github/workflows/` (14 total): `agent-runtime-ci.yml`,
-`backbone-ci.yml`, `bcvf-autonomous-ci.yml`, `context-minimization-ci.yml`,
+CI workflows present in `.github/workflows/` (13 total): `agent-runtime-ci.yml`,
+`backbone-ci.yml`, `context-minimization-ci.yml`,
 `core-rag-ci.yml`, `formula-drift-ci.yml`, `governance-contracts-ci.yml`,
 `ontology-freeze-ci.yml`, `pipeline-ci.yml`, `renderer-ci.yml`,
 `telemetry-audit-ci.yml`, `temporal-ci.yml`, `terminology-ci.yml`.

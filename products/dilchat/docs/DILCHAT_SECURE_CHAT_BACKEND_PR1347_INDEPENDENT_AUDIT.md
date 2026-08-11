@@ -71,6 +71,8 @@ No pending, no failures. (`get_status` reports `pending`/`total_count:0` only be
    nothing about the chat backend. The chat-specific evidence rests on dilchat-ci jobs 2 (PG migrations +
    full suite), 3 (OpenAPI + secure-chat contract gate), and 5 (mobile ↔ live FastAPI + PG). The report
    should stop crediting the robotics jobs.
+   **Resolved:** the `bcvf-autonomous-ci.yml` workflow has since been removed, so those robotics jobs no
+   longer run; the implementation report no longer credits them.
 2. **CI trigger is base-branch-coupled.** `dilchat-ci` / `dilchat-mobile-ci` only fire when the PR base is
    exactly `claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF` (the current base — so they fired and
    are green). Retargeting the PR to `main` or any other base would run **zero** backend CI. Fix the merge
