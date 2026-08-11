@@ -41,6 +41,12 @@ class SignalChangeType(str, Enum):
     fail-closed. ``TENANT_EMERGENCY_STOP`` is privileged (RA-6 §12): it is the
     one category that may map to an immediate tenant-epoch advance, and only
     when presented over the stronger emergency-authorized write path.
+
+    ``EXECUTION_EFFECT_MISMATCH`` is the neutral post-execution effect-mismatch
+    category emitted by RA-8 (execution/effect reconciliation, spec §7/D-D): a
+    *material* discrepancy between the authorized action and the observed external
+    effect. It is additive, non-authority, and — like every ordinary observer
+    category — can only *trigger* reassessment; RA-6 alone owns the consequence.
     """
 
     EVIDENCE_INVALIDATED = "EVIDENCE_INVALIDATED"
@@ -49,6 +55,7 @@ class SignalChangeType(str, Enum):
     WORKFLOW_SUPERSEDED = "WORKFLOW_SUPERSEDED"
     MODEL_INVALIDATED = "MODEL_INVALIDATED"
     RUNTIME_RISK_ESCALATED = "RUNTIME_RISK_ESCALATED"
+    EXECUTION_EFFECT_MISMATCH = "EXECUTION_EFFECT_MISMATCH"
     TENANT_EMERGENCY_STOP = "TENANT_EMERGENCY_STOP"
 
 

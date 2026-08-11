@@ -81,7 +81,10 @@ def test_importing_ra7_does_not_mutate_leaf_signal_enum():
     import ugence_risk_authority_runtime_assurance  # noqa: F401
     from risk_authority.domain.authority_signal import SignalChangeType
 
-    # The leaf enum has exactly its ratified members — RA-7 added none.
+    # Importing RA-7 adds NO leaf enum member. The leaf carries its ratified
+    # categories; ``EXECUTION_EFFECT_MISMATCH`` is the additive RA-8 (execution/
+    # effect reconciliation) category ratified in the RA-8 spec §7/D-D — it is a
+    # property of the leaf, not of RA-7, and RA-7 neither emits nor references it.
     assert {m.value for m in SignalChangeType} == {
         "EVIDENCE_INVALIDATED",
         "CONTROL_CHANGED",
@@ -89,6 +92,7 @@ def test_importing_ra7_does_not_mutate_leaf_signal_enum():
         "WORKFLOW_SUPERSEDED",
         "MODEL_INVALIDATED",
         "RUNTIME_RISK_ESCALATED",
+        "EXECUTION_EFFECT_MISMATCH",
         "TENANT_EMERGENCY_STOP",
     }
 
