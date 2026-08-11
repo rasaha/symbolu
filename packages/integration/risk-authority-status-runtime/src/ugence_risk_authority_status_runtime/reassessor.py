@@ -108,6 +108,12 @@ class ReferenceReassessmentDecider:
             SignalChangeType.EVIDENCE_INVALIDATED,
             SignalChangeType.CONTROL_CHANGED,
             SignalChangeType.RUNTIME_RISK_ESCALATED,
+            # RA-8 post-effect mismatch is a restrictive reassessment cause, mapped
+            # exactly like the RA-7 runtime-risk category: the smallest fail-closed
+            # consequence (targeted envelope revocation on an ENVELOPE target). The
+            # reference map's worst outcome is *restriction*, never a widening — a
+            # false RA-8 mismatch can cost availability but can never mint authority.
+            SignalChangeType.EXECUTION_EFFECT_MISMATCH,
         ):
             if tgt.target_type is SignalTargetType.ENVELOPE:
                 return ReassessmentAction(
