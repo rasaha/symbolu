@@ -32,7 +32,7 @@ ADVISORY_PKG = PKG.parent / "cloud-scaling-controller"
 ARTIFACTS = PKG / "artifacts"
 DIST = "ugence-cloud-scaling-operations"
 IMPORT_NAME = "ugence_cloud_scaling_operations"
-EXPECTED_VERSION = "0.1.1"
+EXPECTED_VERSION = "0.1.2"
 BASELINE = "379a6366894fd2eead9460c29f4865fb1c3990de"
 
 FORBIDDEN_CORE = ["kubernetes", "boto3", "botocore", "azure", "google.cloud",

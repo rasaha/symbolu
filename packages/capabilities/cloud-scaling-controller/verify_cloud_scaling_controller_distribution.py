@@ -35,7 +35,7 @@ PKG = Path(__file__).resolve().parent
 ARTIFACTS = PKG / "artifacts"
 DIST_NAME = "ugence-cloud-scaling-controller"
 IMPORT_NAME = "ugence_cloud_scaling_controller"
-EXPECTED_VERSION = "0.3.0"
+EXPECTED_VERSION = "0.4.0"
 BASELINE_COMMIT = "0d5d4dde5b68ef61e6dec994cc4b9e55fa57e363"
 
 FORBIDDEN_UGENCE = [

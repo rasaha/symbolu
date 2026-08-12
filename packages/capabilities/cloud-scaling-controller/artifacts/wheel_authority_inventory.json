@@ -1100,9 +1100,199 @@
       "network_listener": false,
       "path": "version.py",
       "subprocess": false
+    },
+    {
+      "classification": "CORE_ADVISORY",
+      "credential_access_tokens": false,
+      "imported_by_default": true,
+      "imported_dependencies": [
+        "__future__",
+        "dataclasses",
+        "datetime",
+        "enum",
+        "math",
+        "typing",
+        "ugence_cloud_scaling_controller"
+      ],
+      "infra_mutation_capability": false,
+      "network_egress": false,
+      "network_listener": false,
+      "path": "planning/__init__.py",
+      "subprocess": false
+    },
+    {
+      "classification": "CORE_ADVISORY",
+      "credential_access_tokens": false,
+      "imported_by_default": true,
+      "imported_dependencies": [
+        "__future__",
+        "dataclasses",
+        "datetime",
+        "enum",
+        "math",
+        "typing",
+        "ugence_cloud_scaling_controller"
+      ],
+      "infra_mutation_capability": false,
+      "network_egress": false,
+      "network_listener": false,
+      "path": "planning/abstention.py",
+      "subprocess": false
+    },
+    {
+      "classification": "CORE_ADVISORY",
+      "credential_access_tokens": false,
+      "imported_by_default": true,
+      "imported_dependencies": [
+        "__future__",
+        "dataclasses",
+        "datetime",
+        "enum",
+        "math",
+        "typing",
+        "ugence_cloud_scaling_controller"
+      ],
+      "infra_mutation_capability": false,
+      "network_egress": false,
+      "network_listener": false,
+      "path": "planning/candidates.py",
+      "subprocess": false
+    },
+    {
+      "classification": "CORE_ADVISORY",
+      "credential_access_tokens": false,
+      "imported_by_default": true,
+      "imported_dependencies": [
+        "__future__",
+        "dataclasses",
+        "datetime",
+        "enum",
+        "math",
+        "typing",
+        "ugence_cloud_scaling_controller"
+      ],
+      "infra_mutation_capability": false,
+      "network_egress": false,
+      "network_listener": false,
+      "path": "planning/constraints.py",
+      "subprocess": false
+    },
+    {
+      "classification": "CORE_ADVISORY",
+      "credential_access_tokens": false,
+      "imported_by_default": true,
+      "imported_dependencies": [
+        "__future__",
+        "dataclasses",
+        "datetime",
+        "enum",
+        "math",
+        "typing",
+        "ugence_cloud_scaling_controller"
+      ],
+      "infra_mutation_capability": false,
+      "network_egress": false,
+      "network_listener": false,
+      "path": "planning/cost.py",
+      "subprocess": false
+    },
+    {
+      "classification": "CORE_ADVISORY",
+      "credential_access_tokens": false,
+      "imported_by_default": true,
+      "imported_dependencies": [
+        "__future__",
+        "dataclasses",
+        "datetime",
+        "enum",
+        "math",
+        "typing",
+        "ugence_cloud_scaling_controller"
+      ],
+      "infra_mutation_capability": false,
+      "network_egress": false,
+      "network_listener": false,
+      "path": "planning/pipeline.py",
+      "subprocess": false
+    },
+    {
+      "classification": "CORE_ADVISORY",
+      "credential_access_tokens": false,
+      "imported_by_default": true,
+      "imported_dependencies": [
+        "__future__",
+        "dataclasses",
+        "datetime",
+        "enum",
+        "math",
+        "typing",
+        "ugence_cloud_scaling_controller"
+      ],
+      "infra_mutation_capability": false,
+      "network_egress": false,
+      "network_listener": false,
+      "path": "planning/policy.py",
+      "subprocess": false
+    },
+    {
+      "classification": "CORE_ADVISORY",
+      "credential_access_tokens": false,
+      "imported_by_default": true,
+      "imported_dependencies": [
+        "__future__",
+        "dataclasses",
+        "datetime",
+        "enum",
+        "math",
+        "typing",
+        "ugence_cloud_scaling_controller"
+      ],
+      "infra_mutation_capability": false,
+      "network_egress": false,
+      "network_listener": false,
+      "path": "planning/recommendation.py",
+      "subprocess": false
+    },
+    {
+      "classification": "CORE_ADVISORY",
+      "credential_access_tokens": false,
+      "imported_by_default": true,
+      "imported_dependencies": [
+        "__future__",
+        "dataclasses",
+        "datetime",
+        "enum",
+        "math",
+        "typing",
+        "ugence_cloud_scaling_controller"
+      ],
+      "infra_mutation_capability": false,
+      "network_egress": false,
+      "network_listener": false,
+      "path": "planning/scoring.py",
+      "subprocess": false
+    },
+    {
+      "classification": "CORE_ADVISORY",
+      "credential_access_tokens": false,
+      "imported_by_default": true,
+      "imported_dependencies": [
+        "__future__",
+        "dataclasses",
+        "datetime",
+        "enum",
+        "math",
+        "typing",
+        "ugence_cloud_scaling_controller"
+      ],
+      "infra_mutation_capability": false,
+      "network_egress": false,
+      "network_listener": false,
+      "path": "planning/topology.py",
+      "subprocess": false
     }
   ],
   "policy": "Every packaged module must be an allowed advisory classification; none may be EXECUTOR/ACTUATOR/AUTHORIZER/APPROVER/MUTATION_CLIENT/ROLLBACK_EXECUTOR/PRODUCTION_ORCHESTRATOR.",
   "unclassified_or_mutating": [],
-  "version": "0.3.0"
+  "version": "0.4.0"
 }
