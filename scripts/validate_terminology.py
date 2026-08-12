@@ -36,20 +36,23 @@ from pathlib import Path
 ADR_REF = "ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES"
 
 # Canonical / new architecture documents whose *content* is enforced.
+# Paths are repo-root-relative; the docs were relocated under Project_documentation/
+# by the repository restructuring (100%-similarity renames, no content change).
 GOVERNED_DOCS = [
-    "UGENCE_TERMINOLOGY_PRODUCT_CAPABILITY_BOUNDARY_AUDIT.md",
+    "Project_documentation/repository/architecture/UGENCE_TERMINOLOGY_PRODUCT_CAPABILITY_BOUNDARY_AUDIT.md",
     "Project_documentation/repository/docs/architecture/ADR_UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_AND_BOUNDARIES.md",
     "Project_documentation/repository/docs/architecture/UGENCE_DECISION_GOVERNANCE_TERMINOLOGY_UPDATE_REPORT.md",
 ]
 
 # Current-architecture documents amended with a terminology note; each must
-# reference the ADR so the note is present and discoverable.
+# reference the ADR so the note is present and discoverable. Relocated under
+# Project_documentation/ by the repository restructuring (renames, no content change).
 AMENDED_DOCS = [
-    "UGENCE_REPOSITORY_RESTRUCTURING_PLAN.md",
-    "UGENCE_MODULARITY_AND_PACKAGING_AUDIT.md",
-    "UGENCE_INTERMODULE_IO_AND_AUTHORITY_AUDIT.md",
-    "UGENCE_PLATFORM_OVERVIEW.md",
-    "UGENCE_PRODUCTIZATION_ROADMAP.md",
+    "Project_documentation/repository/restructuring/UGENCE_REPOSITORY_RESTRUCTURING_PLAN.md",
+    "Project_documentation/repository/architecture/UGENCE_MODULARITY_AND_PACKAGING_AUDIT.md",
+    "Project_documentation/repository/architecture/UGENCE_INTERMODULE_IO_AND_AUTHORITY_AUDIT.md",
+    "Project_documentation/repository/ugence_platform/UGENCE_PLATFORM_OVERVIEW.md",
+    "Project_documentation/repository/ugence_platform/UGENCE_PRODUCTIZATION_ROADMAP.md",
 ]
 
 NEGATIONS = ("not", "never", "neither", "nor", "no ")
@@ -108,7 +111,7 @@ def check_amended(path: Path, text: str) -> list[str]:
 
 # Documents where "AI Control Plane" must denote ONLY the optional component and the
 # governance layer must be named the Governance Services Layer.
-SINGLE_MEANING_DOCS = ["UGENCE_PLATFORM_OVERVIEW.md"]
+SINGLE_MEANING_DOCS = ["Project_documentation/repository/ugence_platform/UGENCE_PLATFORM_OVERVIEW.md"]
 
 
 def check_single_meaning(path: Path, text: str) -> list[str]:
