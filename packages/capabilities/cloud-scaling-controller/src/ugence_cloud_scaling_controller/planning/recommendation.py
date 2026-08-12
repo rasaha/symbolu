@@ -34,7 +34,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 from ..canonical.evidence import AUTHORITY_CLASS_ADVISORY, EXECUTION_CAPABILITY_NONE
@@ -240,15 +240,17 @@ class CapacityActionRecommendation:
         if cutoff > rec_time:
             raise RecommendationError("forecast cutoff must not be after the recommendation time")
         # Canonical forecast relationship: forecast_for MUST equal forecast_cutoff + the
-        # declared horizon duration. A contradictory endpoint (before the cutoff) or an
-        # inflated endpoint (beyond cutoff + horizon, which would let a longer validity window
-        # look in-bounds) fails closed here at construction AND reconstruction.
-        horizon_seconds = float(fc.horizon.seconds)
-        if not (horizon_seconds > 0):
+        # declared horizon duration, compared as EXACT normalized datetimes — no Unix
+        # timestamps, no floating-point subtraction, no absolute-difference tolerance, no
+        # epsilon acceptance. A contradictory endpoint (before the cutoff) or an inflated one
+        # (after cutoff + horizon), including a one-microsecond difference, fails closed here
+        # at BOTH direct construction and reconstruction. Aware-datetime equality compares the
+        # underlying instant, so equivalent UTC offsets for the same instant remain valid.
+        if not (float(fc.horizon.seconds) > 0):
             raise RecommendationError("forecast horizon duration must be > 0")
+        canonical_forecast_for = cutoff + timedelta(seconds=fc.horizon.seconds)
         forecast_for_dt = _as_utc(fc.forecast_for)
-        expected_for_ts = cutoff.timestamp() + horizon_seconds
-        if abs(forecast_for_dt.timestamp() - expected_for_ts) > 1e-6:
+        if forecast_for_dt != canonical_forecast_for:
             raise RecommendationError(
                 "forecast_for must equal forecast_cutoff + horizon "
                 "(contradictory or inflated forecast endpoint)")
@@ -271,14 +273,14 @@ class CapacityActionRecommendation:
             age = (rec_time - cutoff).total_seconds()
             if age > self.constraints.forecast_validity_seconds:
                 raise RecommendationError("forecast age exceeds the constraint forecast_validity_seconds")
-        # Recommendation validity window must not extend beyond EITHER the forecast endpoint
-        # OR the declared horizon duration measured from the cutoff (defence-in-depth: the two
-        # coincide while forecast_for is pinned above, but both are asserted explicitly).
-        validity_end = rec_time.timestamp() + float(self.validity_seconds)
-        if validity_end > forecast_for_dt.timestamp() + 1e-6:
-            raise RecommendationError("recommendation validity must not extend beyond the forecast endpoint")
-        if validity_end > cutoff.timestamp() + horizon_seconds + 1e-6:
-            raise RecommendationError("recommendation validity must not extend beyond the declared horizon duration")
+        # Recommendation validity window must not extend beyond the canonical forecast
+        # endpoint, compared as EXACT normalized datetimes. A validity end exactly equal to the
+        # endpoint is admissible; exceeding it by even one microsecond fails closed. Because
+        # forecast_for is pinned to (cutoff + horizon) above, this single exact boundary is the
+        # authoritative horizon-duration guard — no parallel epsilon check remains.
+        validity_end_dt = rec_time + timedelta(seconds=float(self.validity_seconds))
+        if validity_end_dt > canonical_forecast_for:
+            raise RecommendationError("recommendation validity must not extend beyond the forecast horizon")
 
         # --- rebuild the deterministic context and recompute every candidate -------
         try:

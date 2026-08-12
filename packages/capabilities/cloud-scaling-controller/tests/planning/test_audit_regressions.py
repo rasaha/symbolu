@@ -291,3 +291,160 @@ def test_abstention_from_dict_rejects_surplus_field():
     d["totally_unexpected"] = 1
     with pytest.raises(RecommendationError):
         RecommendationAbstention.from_dict(d)
+
+
+# =============================== Canonical-time correction: exact microsecond boundaries
+
+from datetime import timedelta, timezone
+from ugence_cloud_scaling_controller.forecasting.series import _as_utc
+
+
+def _construct(rec, **overrides):
+    """Direct CapacityActionRecommendation construction from a valid rec's components."""
+    fields = dict(
+        recommendation_id=rec.recommendation_id, forecast_evidence=rec.forecast_evidence,
+        current_state=rec.current_state, cost_book=rec.cost_book, constraints=rec.constraints,
+        policy=rec.policy, evaluated_candidates=rec.evaluated_candidates,
+        selected_plan_id=rec.selected_plan_id, recommendation_time=rec.recommendation_time,
+        validity_seconds=rec.validity_seconds, topology=rec.topology)
+    fields.update(overrides)
+    return CapacityActionRecommendation(**fields)
+
+
+def _evidence_with_forecast_for(rec, new_forecast_for):
+    fc = rec.forecast_evidence.forecast
+    return dataclasses.replace(rec.forecast_evidence,
+                               forecast=dataclasses.replace(fc, forecast_for=new_forecast_for))
+
+
+# (1) canonical endpoint accepted
+def test_canonical_forecast_for_accepted():
+    rec = _valid_rec()
+    fc = rec.forecast_evidence.forecast
+    assert _as_utc(fc.forecast_for) == _as_utc(fc.forecast_cutoff) + timedelta(seconds=fc.horizon.seconds)
+    # round-trips cleanly
+    assert CapacityActionRecommendation.from_dict(rec.to_canonical_dict()).digest() == rec.digest()
+
+
+# (2) endpoint + 1 microsecond rejected (from_dict AND direct)
+def test_forecast_for_plus_one_microsecond_rejected_from_dict():
+    rec = _valid_rec()
+    d = rec.to_canonical_dict()
+    d["forecast_evidence"]["forecast"]["forecast_for"] += timedelta(microseconds=1)
+    with pytest.raises(RecommendationError):
+        _rebuild(d)
+
+
+def test_forecast_for_plus_one_microsecond_rejected_direct():
+    rec = _valid_rec()
+    bad = _evidence_with_forecast_for(rec, rec.forecast_evidence.forecast.forecast_for + timedelta(microseconds=1))
+    with pytest.raises(RecommendationError):
+        _construct(rec, forecast_evidence=bad)
+
+
+# (3) endpoint - 1 microsecond rejected (from_dict AND direct)
+def test_forecast_for_minus_one_microsecond_rejected_from_dict():
+    rec = _valid_rec()
+    d = rec.to_canonical_dict()
+    d["forecast_evidence"]["forecast"]["forecast_for"] -= timedelta(microseconds=1)
+    with pytest.raises(RecommendationError):
+        _rebuild(d)
+
+
+def test_forecast_for_minus_one_microsecond_rejected_direct():
+    rec = _valid_rec()
+    bad = _evidence_with_forecast_for(rec, rec.forecast_evidence.forecast.forecast_for - timedelta(microseconds=1))
+    with pytest.raises(RecommendationError):
+        _construct(rec, forecast_evidence=bad)
+
+
+# (4) validity_end == canonical endpoint accepted
+def _rec_with_validity(validity_seconds):
+    app, db = H.subject("app"), H.subject("db")
+    return recommend_capacity_action(
+        H.build_forecast_evidence(8, subj=app), H.replicas_state(H.at(180), 6, subj=app),
+        H.cost_book(subj=app, dependency=db), H.constraints(max_capacity=50), H.policy(),
+        recommendation_time=H.at(190), validity_seconds=validity_seconds,
+        topology=H.topology(subj=app, dependency=db))
+
+
+def test_validity_end_equal_to_canonical_endpoint_accepted():
+    # cutoff=180, horizon=900 -> forecast_for=1080; rec_time=190 -> validity 890 hits it exactly.
+    out = _rec_with_validity(890.0)
+    assert isinstance(out, CapacityActionRecommendation)
+    fc = out.forecast_evidence.forecast
+    assert _as_utc(out.recommendation_time) + timedelta(seconds=out.validity_seconds) == _as_utc(fc.forecast_for)
+    assert CapacityActionRecommendation.from_dict(out.to_canonical_dict()).digest() == out.digest()
+
+
+# (5) validity_end + 1 microsecond rejected (from_dict AND direct)
+def test_validity_end_plus_one_microsecond_rejected_from_dict():
+    out = _rec_with_validity(890.0)
+    d = out.to_canonical_dict()
+    d["validity_seconds"] = 890.0 + 1e-6  # rec_time + 890.000001s == forecast_for + 1us
+    with pytest.raises(RecommendationError):
+        _rebuild(d)
+
+
+def test_validity_end_plus_one_microsecond_rejected_direct():
+    out = _rec_with_validity(890.0)
+    with pytest.raises(RecommendationError):
+        _construct(out, validity_seconds=890.0 + 1e-6)
+
+
+# (6) equivalent UTC offsets for the same instant accepted
+def test_equivalent_utc_offset_accepted():
+    rec = _valid_rec()
+    fc = rec.forecast_evidence.forecast
+    tz = timezone(timedelta(hours=5))
+    bad = dataclasses.replace(rec.forecast_evidence, forecast=dataclasses.replace(
+        fc, forecast_cutoff=fc.forecast_cutoff.astimezone(tz),
+        forecast_for=fc.forecast_for.astimezone(tz)))
+    out = _construct(rec, forecast_evidence=bad)
+    assert isinstance(out, CapacityActionRecommendation)
+
+
+# (7) consistent naive datetimes follow the UTC-normalization policy
+def test_consistent_naive_forecast_datetimes_accepted():
+    rec = _valid_rec()
+    fc = rec.forecast_evidence.forecast
+    bad = dataclasses.replace(rec.forecast_evidence, forecast=dataclasses.replace(
+        fc, forecast_cutoff=fc.forecast_cutoff.replace(tzinfo=None),
+        forecast_for=fc.forecast_for.replace(tzinfo=None)))
+    out = _construct(rec, forecast_evidence=bad)
+    assert isinstance(out, CapacityActionRecommendation)
+
+
+# (8) fractional horizon constructs and round-trips
+def test_fractional_horizon_round_trip():
+    app, db = H.subject("app"), H.subject("db")
+    fe = H.build_forecast_evidence(8, subj=app, horizon_seconds=900.5)
+    out = recommend_capacity_action(
+        fe, H.replicas_state(H.at(180), 6, subj=app), H.cost_book(subj=app, dependency=db),
+        H.constraints(max_capacity=50), H.policy(), recommendation_time=H.at(190),
+        validity_seconds=600.0, topology=H.topology(subj=app, dependency=db))
+    assert isinstance(out, CapacityActionRecommendation)
+    fc = out.forecast_evidence.forecast
+    assert _as_utc(fc.forecast_for) == _as_utc(fc.forecast_cutoff) + timedelta(seconds=900.5)
+    assert CapacityActionRecommendation.from_dict(out.to_canonical_dict()).digest() == out.digest()
+
+
+# (9) direct construction and from_dict reject the SAME noncanonical value
+def test_direct_and_from_dict_reject_same_noncanonical_forecast_for():
+    rec = _valid_rec()
+    off = rec.forecast_evidence.forecast.forecast_for + timedelta(microseconds=1)
+    d = rec.to_canonical_dict()
+    d["forecast_evidence"]["forecast"]["forecast_for"] = off
+    with pytest.raises(RecommendationError):
+        _rebuild(d)
+    with pytest.raises(RecommendationError):
+        _construct(rec, forecast_evidence=_evidence_with_forecast_for(rec, off))
+
+
+# (10) canonical recommendation + abstention round-trip with stable digests
+def test_canonical_records_roundtrip_stable():
+    rec = _valid_rec()
+    assert CapacityActionRecommendation.from_dict(rec.to_canonical_dict()).digest() == rec.digest()
+    d = _abstention_dict()
+    ab = RecommendationAbstention.from_dict(d)
+    assert RecommendationAbstention.from_dict(ab.to_canonical_dict()).digest() == ab.digest()

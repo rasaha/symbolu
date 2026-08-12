@@ -28,7 +28,7 @@ Pipeline order (matches the Phase-3 contract):
 from __future__ import annotations
 
 import math
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional, Union
 
 from ..canonical.state import CanonicalCapacityState
@@ -180,7 +180,10 @@ def recommend_capacity_action(
     if isinstance(validity_seconds, bool) or not isinstance(validity_seconds, (int, float)) \
             or not math.isfinite(validity_seconds) or validity_seconds <= 0:
         raise PipelineError("validity_seconds must be a finite number > 0")
-    if rec_t.timestamp() + float(validity_seconds) > forecast_for.timestamp() + _TOL:
+    # Exact normalized-datetime boundary, matching CapacityActionRecommendation's canonical
+    # validity check, so the pipeline ABSTAINS here rather than building a record the record's
+    # own exact validation would reject (no raise on the microsecond boundary).
+    if rec_t + timedelta(seconds=float(validity_seconds)) > forecast_for:
         return abc(R.CONTRADICTORY_EVIDENCE, "recommendation validity window exceeds forecast horizon")
 
     # Forecast confidence gate (explicit policy threshold).
