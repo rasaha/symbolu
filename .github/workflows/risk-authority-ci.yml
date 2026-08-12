@@ -44,7 +44,8 @@ jobs:
         run: |
           python -m pytest \
             packages/risk_authority/tests/adversarial \
-            packages/risk_authority/tests/contract -q
+            packages/risk_authority/tests/contract \
+            packages/risk_authority/tests/seam -q
 
   isolated-install:
     name: Wheel build + isolated single-wheel installation verification

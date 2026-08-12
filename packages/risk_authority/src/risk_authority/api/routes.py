@@ -39,6 +39,7 @@ def build_app(application: "RiskAuthorityApplication"):
     from fastapi import FastAPI, HTTPException  # pragma: no cover
 
     from ..domain.errors import RiskAuthorityError  # pragma: no cover
+    from ..version import __version__  # pragma: no cover
     from .schemas import (  # pragma: no cover
         AuthorizeActionRequest,
         CreateCaseRequest,
@@ -47,7 +48,7 @@ def build_app(application: "RiskAuthorityApplication"):
         IssueEnvelopeRequest,
     )
 
-    app = FastAPI(title="Ugence Risk Authority", version="0.1.0")  # pragma: no cover
+    app = FastAPI(title="Ugence Risk Authority", version=__version__)  # pragma: no cover
 
     @app.post("/risk-cases")  # pragma: no cover
     def create_case(req: CreateCaseRequest):

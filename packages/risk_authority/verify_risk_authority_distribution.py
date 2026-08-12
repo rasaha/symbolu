@@ -34,7 +34,7 @@ import importlib.util, sys
 from datetime import datetime, timezone
 
 import risk_authority as ra
-assert ra.__version__ == "0.1.0", ra.__version__
+assert ra.__version__ == "0.2.0", ra.__version__
 assert "site-packages" in ra.__file__, ra.__file__
 assert not any("/symbolu" in p for p in sys.path), sys.path
 
@@ -95,6 +95,53 @@ def go(**kw):
 
 assert go(action_type="crm.read") is ActionGateDecision.AUTHORIZED
 assert go(action_type="refund.execute") is ActionGateDecision.DENIED
+
+# --- PR-1: stop-at-decision evaluation seam, from the installed wheel ----------------
+from risk_authority.api import RiskEvaluationSeam, SeamConfigurationError
+from risk_authority.integrations import (SubjectRiskEvaluationRequest, SubjectRiskDecision,
+    SubjectRiskDisposition, SubjectRiskNonDecisionReason, ReferencePolicyResolver,
+    ReferenceControlEvidenceResolver)
+from risk_authority.services.decision_authority import ReferenceDecisionAuthority
+
+sscope = Scope(purposes=("SCALE",), max_autonomy_level=1)
+swf = WorkflowIR(workflow_ir_id="scaling-pol", version="1.0.0", status=WorkflowStatus.ACTIVE,
+    rules=(), source_refs=(), effective_at=now).with_digest()
+ssrc = InMemoryWorkflowIRSource(); ssrc.register(swf)
+seam = RiskEvaluationSeam.reference(workflow_source=ssrc, key_record=key, clock=lambda: now,
+    policy_resolver=ReferencePolicyResolver(by_purpose_domain={("SCALE", "SCALING"): swf}))
+sreq = SubjectRiskEvaluationRequest(subject_type="cloud_scaling_recommendation", subject_id="rec-1",
+    subject_digest="sha256:abc", tenant_id="t", requested_purpose="SCALE", requested_domain="SCALING",
+    requested_scope=sscope, requested_risk_class=RiskClass.HIGH, requested_autonomy_level=1,
+    evaluation_time=now)
+sres = seam.evaluate(sreq)
+# successful evaluation returns a NON-EXECUTABLE decision
+assert sres.disposition is SubjectRiskDisposition.RISK_PASSED, sres.disposition
+assert (sres.executable, sres.authorization_performed, sres.envelope_issued,
+        sres.actiongate_invoked, sres.actuation_performed, sres.effect_verified) == (False,)*6
+# serialization + digest round-trip is stable
+assert SubjectRiskDecision.from_dict(sres.to_canonical_dict()).digest() == sres.digest()
+# no envelope / ActionGate path was reachable (sentinels)
+seam._app.issue_envelope = lambda *a, **k: (_ for _ in ()).throw(AssertionError("envelope reached"))
+seam._app.authorize_action = lambda *a, **k: (_ for _ in ()).throw(AssertionError("actiongate reached"))
+assert seam.evaluate(sreq).disposition is SubjectRiskDisposition.RISK_PASSED
+# missing trusted policy fails closed to a typed non-decision
+sres_np = seam.evaluate(SubjectRiskEvaluationRequest(subject_type="x", subject_id="s",
+    subject_digest="d", tenant_id="t", requested_purpose="SCALE", requested_domain="OTHER",
+    requested_scope=sscope, evaluation_time=now))
+assert sres_np.disposition is SubjectRiskDisposition.NOT_EVALUATED
+assert sres_np.non_decision_reason is SubjectRiskNonDecisionReason.NO_AUTHORITATIVE_POLICY
+# production construction rejects reference dependencies (the caller cannot supply authority)
+try:
+    RiskEvaluationSeam.production(workflow_source=ssrc,
+        policy_resolver=ReferencePolicyResolver(by_purpose_domain={}),
+        evidence_resolver=ReferenceControlEvidenceResolver(), evidence_admission=None,
+        control_assurance=None, evidence_ingress=None,
+        decision_authority=ReferenceDecisionAuthority(), evaluator_grant=None,
+        key_record=key, clock=lambda: now)
+    raise AssertionError("production accepted reference config")
+except SeamConfigurationError:
+    pass
+print("ISOLATED SINGLE-WHEEL RISK-AUTHORITY SEAM (PR-1) VERIFICATION OK")
 
 print("ISOLATED SINGLE-WHEEL RISK-AUTHORITY VERIFICATION OK")
 '''

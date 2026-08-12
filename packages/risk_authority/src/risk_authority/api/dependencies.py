@@ -54,7 +54,7 @@ from ..persistence.in_memory import (
     InMemoryGovernanceEventStore,
     InMemoryRiskCaseRepository,
 )
-from ..services.decision_authority import ReferenceDecisionAuthority
+from ..services.decision_authority import DecisionAuthorityPort, ReferenceDecisionAuthority
 from ..services.envelope_issuer import EnvelopeIssuer
 from ..services.envelope_verifier import EnvelopeVerification, EnvelopeVerifier
 from ..services.revocation import RevocationState
@@ -105,6 +105,7 @@ class RiskAuthorityApplication:
         evidence_admission: Optional[EvidenceAdmissionPort] = None,
         control_assurance: Optional[ControlAssurancePort] = None,
         evidence_ingress: Optional[TrustedEvidenceIngressPort] = None,
+        decision_authority: Optional[DecisionAuthorityPort] = None,
         production_mode: bool = False,
     ) -> None:
         # RA-5 mode selection (RISK_AUTHORITY_RA5_SPEC.md §12; audit H-1/H-2).
@@ -154,6 +155,28 @@ class RiskAuthorityApplication:
                     "evaluator whose support is presumptive cannot mint PASS in "
                     "production (RA-5 audit H-1)."
                 )
+            # Defect (h): the binding-decision ruler must be production-substitutable.
+            # When a caller injects a ``decision_authority`` in production it MUST be an
+            # explicitly production-authoritative adapter over the shipped
+            # ``ugence-decision-authority`` kernel — never the in-package reference
+            # ruler. An omitted ``decision_authority`` retains the reference ruler for
+            # backward compatibility with existing RA-5 evidence-only production
+            # callers (which never issue an ALLOW-family binding decision through this
+            # facade); the supported production *decision* path is the injectable
+            # ``RiskEvaluationSeam``, which mandates a production ruler. A reference
+            # ruler supplied here fails closed at construction.
+            if decision_authority is not None:
+                if isinstance(decision_authority, ReferenceDecisionAuthority) or (
+                    getattr(decision_authority, "is_production_authoritative", False)
+                    is not True
+                ):
+                    raise RiskAuthorityError(
+                        "production DecisionAuthorityPort must be a production-"
+                        "authoritative adapter over ugence-decision-authority "
+                        "(is_production_authoritative=True); the in-package reference "
+                        "ruler cannot mint binding authority in production (audit "
+                        "defect (h))."
+                    )
         self._production_mode = bool(production_mode)
         self._evidence_admission = evidence_admission
         self._control_assurance = control_assurance
@@ -174,9 +197,16 @@ class RiskAuthorityApplication:
         self._ids = ids or _Ids()
 
         self._engine = RiskEngine()
-        # Reference ruler behind DecisionAuthorityPort; production adapts the
-        # shipped ugence-decision-authority kernel onto the same port.
-        self._authority_service = ReferenceDecisionAuthority()
+        # Reference ruler behind DecisionAuthorityPort by default; production adapts
+        # the shipped ugence-decision-authority kernel onto the same port and injects
+        # it here (validated above in production mode). Making the ruler injectable
+        # closes audit defect (h): the facade no longer hardcodes the reference ruler
+        # with no production substitution point.
+        self._authority_service: DecisionAuthorityPort = (
+            decision_authority
+            if decision_authority is not None
+            else ReferenceDecisionAuthority()
+        )
         self._issuer_service = EnvelopeIssuer(issuer=issuer)
         self._verifier = EnvelopeVerifier()
         self._gate = ReferenceActionGate(self._verifier)

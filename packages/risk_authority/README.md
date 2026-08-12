@@ -99,6 +99,20 @@ reference (validated against the RFC test vectors); production issuance/verifica
 should be backed by a vetted library and an HSM/KMS. The `SigningKey` / `VerifyKey`
 surface is shaped so that backend can be swapped without touching callers.
 
+## Non-executing evaluation seam (v0.2.0)
+
+`RiskEvaluationSeam` (`risk_authority.api`) lets an external domain integration obtain a
+canonical risk outcome for a neutral `SubjectRiskEvaluationRequest` and **stop at the risk
+decision** — it never issues an envelope or invokes ActionGate. The request carries only
+subject facts + correlation context; policy, controls, keys, evaluator identity, clock and
+revocation come from the trusted composition root. `RiskEvaluationSeam.production(...)` fails
+closed on any reference-grade or missing dependency; `RiskEvaluationSeam.reference(...)` is a
+labelled conformance seam. A `RISK_PASSED` result is *not* authorization
+(`executable = authorization_performed = envelope_issued = False`). See
+[`docs/architecture/RISK_AUTHORITY_EVALUATION_SEAM.md`](../../../docs/architecture/RISK_AUTHORITY_EVALUATION_SEAM.md).
+`RiskAuthorityApplication` also now accepts an optional production-authoritative
+`decision_authority` (closing audit defect (h)); omitting it preserves the reference ruler.
+
 ## Verify the distribution
 
 ```
