@@ -93,6 +93,34 @@ from .forecasting import (
     run_replay_evaluation,
 )
 
+# Phase 3: Dependency- and Cost-aware Capacity Planning — deterministic, provider-neutral,
+# SHADOW/advisory-only capacity-action recommendations built AROUND the Phase-2 forecast and
+# supplied dependency/cost/constraint evidence. Additive and pure-stdlib; a recommendation
+# never executes, authorizes, or verifies an effect, and never feeds the live controller.
+from . import planning
+from .planning import (
+    recommend_capacity_action,
+    RecommendationOutcome,
+    CapacityActionRecommendation,
+    RecommendationAbstention,
+    RecommendationAbstentionReason,
+    EvaluatedCandidate,
+    DependencyTopology,
+    DependencyEdge,
+    DependencyKind,
+    CostBook,
+    CostEvidence,
+    Money,
+    CostBasis,
+    OperatingConstraints,
+    ConstraintViolationKind,
+    RecommendationPolicy,
+    ScoreBreakdown,
+    CandidateActionPlan,
+    ActionKind,
+    ResourceChange,
+)
+
 __all__ = [
     "CloudScalingController",
     "Controller",
@@ -151,4 +179,26 @@ __all__ = [
     "evaluate_forecast",
     "aggregate_evaluations",
     "run_replay_evaluation",
+    # Phase 3 dependency- and cost-aware capacity planning (additive, shadow/advisory-only)
+    "planning",
+    "recommend_capacity_action",
+    "RecommendationOutcome",
+    "CapacityActionRecommendation",
+    "RecommendationAbstention",
+    "RecommendationAbstentionReason",
+    "EvaluatedCandidate",
+    "DependencyTopology",
+    "DependencyEdge",
+    "DependencyKind",
+    "CostBook",
+    "CostEvidence",
+    "Money",
+    "CostBasis",
+    "OperatingConstraints",
+    "ConstraintViolationKind",
+    "RecommendationPolicy",
+    "ScoreBreakdown",
+    "CandidateActionPlan",
+    "ActionKind",
+    "ResourceChange",
 ]

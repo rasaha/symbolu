@@ -2,7 +2,7 @@
   "module_name": "cloud-scaling-controller",
   "distribution_name": "ugence-cloud-scaling-controller",
   "import_namespace": "ugence_cloud_scaling_controller",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "maturity": "beta",
   "authority_class": "ADVISORY",
   "execution_capability": "NONE",
@@ -15,9 +15,17 @@
     "numpy>=1.24.0"
   ],
   "optional_dependencies": {
-    "prometheus": ["requests>=2.28.0"],
-    "shadow": ["requests>=2.28.0"],
-    "dev": ["pytest>=7.0", "build>=1.0", "pip-audit>=2.6"]
+    "prometheus": [
+      "requests>=2.28.0"
+    ],
+    "shadow": [
+      "requests>=2.28.0"
+    ],
+    "dev": [
+      "pytest>=7.0",
+      "build>=1.0",
+      "pip-audit>=2.6"
+    ]
   },
   "optional_adapter_network_requirements": {
     "prometheus": "Read-only outbound HTTP GET to a Prometheus server (opt-in).",
@@ -78,7 +86,28 @@
     "EvaluationStatus",
     "evaluate_forecast",
     "aggregate_evaluations",
-    "run_replay_evaluation"
+    "run_replay_evaluation",
+    "planning",
+    "recommend_capacity_action",
+    "RecommendationOutcome",
+    "CapacityActionRecommendation",
+    "RecommendationAbstention",
+    "RecommendationAbstentionReason",
+    "EvaluatedCandidate",
+    "DependencyTopology",
+    "DependencyEdge",
+    "DependencyKind",
+    "CostBook",
+    "CostEvidence",
+    "Money",
+    "CostBasis",
+    "OperatingConstraints",
+    "ConstraintViolationKind",
+    "RecommendationPolicy",
+    "ScoreBreakdown",
+    "CandidateActionPlan",
+    "ActionKind",
+    "ResourceChange"
   ],
   "public_api_notes": {
     "ScalingExecutor": "Inert Protocol (interface only). No concrete executor is shipped or invoked; the facade/CLI cannot supply or call one.",
@@ -87,7 +116,9 @@
     "recommend_with_evidence": "Controlled service path: project a CanonicalCapacityState -> run the unchanged CloudScalingController -> (ScalingRecommendation, CapacityDecisionEvidence). Evidence is bound to the real recommendation and cannot be forged by a caller-supplied recommendation.",
     "forecasting": "Phase 2 Predictive Capacity Intelligence subpackage (additive, pure-stdlib): deterministic, provider-neutral, SHADOW-only forecasting and replay evaluation built AROUND the Phase-1 canonical layer. CanonicalCapacityState history -> CanonicalCapacitySeries -> leakage-safe ForecastInputWindow -> deterministic baseline forecaster (persistence/linear-trend) -> CapacityForecast (point + empirical uncertainty OR typed abstention) -> CapacityForecastEvidence (sha256 identity) -> ForecastEvaluationRecord. Adds no dependency, no actuation, no authority integration; forecasts NEVER feed the controller decision kernel.",
     "forecast_with_evidence": "Controlled service path: build a leakage-safe input window at a cutoff -> run a deterministic baseline forecaster -> point forecast + empirical rolling-origin uncertainty OR a typed abstention -> immutable CapacityForecastEvidence. A forecast is descriptive capacity intelligence only (advisory_only=True, shadow_only=True, actuation_performed=False), never a recommendation, risk evaluation, authority, or execution instruction.",
-    "run_replay_evaluation": "Deterministic shadow replay: for each cutoff, forecast from history <= cutoff and match against a STRICTLY-later actual observation; produces immutable ForecastEvaluationRecords and a deterministic aggregate (count, abstention rate, MAE, RMSE, bias, interval coverage/width, unmatched). Shadow only; never promotes a model or changes controller configuration."
+    "run_replay_evaluation": "Deterministic shadow replay: for each cutoff, forecast from history <= cutoff and match against a STRICTLY-later actual observation; produces immutable ForecastEvaluationRecords and a deterministic aggregate (count, abstention rate, MAE, RMSE, bias, interval coverage/width, unmatched). Shadow only; never promotes a model or changes controller configuration.",
+    "planning": "Phase 3 Dependency- and Cost-aware Capacity Planning subpackage (additive, pure-stdlib): deterministic, provider-neutral, SHADOW/advisory-only capacity-ACTION recommendations built AROUND the Phase-2 forecast plus supplied DependencyTopology, CostBook (exact integer-minor-unit money), and OperatingConstraints (hard, non-compensatory limits), scored by an explicit, versioned RecommendationPolicy. Produces a self-revalidating CapacityActionRecommendation (selected plan + alternatives + typed rejections + sha256 content-identity digest) OR a typed RecommendationAbstention. Adds no dependency, no actuation, no authority integration; never executes, authorizes, or verifies an effect, and never feeds the live controller.",
+    "recommend_capacity_action": "Controlled shadow/advisory entry point: validate + scope-bind forecast/state/topology/cost/constraints/policy -> reject future/expired inputs -> bounded candidate generation (incl. NO_CHANGE) -> hard-constraint filtering BEFORE scoring -> dependency + cost evaluation -> explicit policy scoring -> a CapacityActionRecommendation or a typed RecommendationAbstention. Deterministic and clock-free (recommendation_time injected); advisory_only=shadow_only=True, actuation_performed=authorization_performed=effect_verified=False."
   },
   "input_schema_version": "1.0",
   "output_schema_version": "1.1",
@@ -119,8 +150,18 @@
     "feature_config_schema_version": "capacity-forecast-feature-1",
     "uncertainty_config_schema_version": "capacity-forecast-uncertainty-1",
     "admission_policy_schema_version": "capacity-forecast-admission-1",
-    "baseline_models": ["persistence", "linear_trend"],
-    "supported_targets": ["cpu_utilization", "memory_utilization", "p99_latency", "error_rate", "queue_depth", "running_replicas"],
+    "baseline_models": [
+      "persistence",
+      "linear_trend"
+    ],
+    "supported_targets": [
+      "cpu_utilization",
+      "memory_utilization",
+      "p99_latency",
+      "error_rate",
+      "queue_depth",
+      "running_replicas"
+    ],
     "supported_horizons": "explicitly configured (e.g. 5m / 15m / 60m); no horizon-specific scaling behavior is hardcoded",
     "uncertainty_method": "empirical_rolling_origin_residual (non-Gaussian; calibration-gated; explicit 'unavailable' when insufficient residuals)",
     "value_space": "Forecast values are disclosed as projected_without_conversion (raw canonical target domain; default) or normalized (Phase-1 normalize_signal applied to a ratio in [0,1]); the applied space + normalization_policy_digest are bound into the input-window and evidence digests. No silent unit conversion; running_replicas -> current_replicas without substitution.",
@@ -138,11 +179,16 @@
   },
   "decision_deterministic": true,
   "diagnostic_deterministic_before_bootstrap": false,
-  "nondeterministic_fields": ["identity_deviation"],
+  "nondeterministic_fields": [
+    "identity_deviation"
+  ],
   "operations_code_distribution": "NOT_INCLUDED",
   "operations_code_location": "cloud_scaling_operations/ (monorepo-only; not packaged; may become a separate ugence-cloud-scaling-operations distribution in a future, separately-governed phase)",
   "legacy_imports": {
-    "advisory_monorepo": ["cloud_controller", "symbolu.cloud_controller"],
+    "advisory_monorepo": [
+      "cloud_controller",
+      "symbolu.cloud_controller"
+    ],
     "operations_monorepo_only": [
       "cloud_controller.action.*",
       "cloud_controller.orchestrator",
@@ -190,9 +236,42 @@
     "Decision-deterministic; identity_deviation is a diagnostic that varies before deterministic bootstrap (see output determinism block). It affects no scaling decision.",
     "No cost-savings, customer-validation, or real-cluster-superiority claims are made.",
     "Execution/approval/orchestration code is NOT included in this distribution; it lives in the monorepo-only cloud_scaling_operations namespace.",
-    "Phase-2 forecasting is SHADOW-only and never feeds the controller; forecasts are baselines (persistence/linear-trend) whose PREDICTIVE quality is NOT established on representative external workloads (PREDICTIVE_QUALITY_NOT_ESTABLISHED). Passing tests/CI prove implementation correctness, not forecast accuracy."
+    "Phase-2 forecasting is SHADOW-only and never feeds the controller; forecasts are baselines (persistence/linear-trend) whose PREDICTIVE quality is NOT established on representative external workloads (PREDICTIVE_QUALITY_NOT_ESTABLISHED). Passing tests/CI prove implementation correctness, not forecast accuracy.",
+    "Phase-3 capacity-action recommendation is SHADOW/advisory-only and never feeds the controller or executes/authorizes/verifies anything. The recommendation policy is a deterministic BASELINE; economic optimality, predictive quality, and production effectiveness are NOT established (ECONOMIC_OPTIMALITY_NOT_ESTABLISHED, PREDICTIVE_QUALITY_NOT_ESTABLISHED, PRODUCTION_EFFECTIVENESS_NOT_ESTABLISHED). Passing tests/CI prove implementation correctness, not recommendation quality. Risk Authority (Phase 4), ActionGate/provider execution (Phase 5), and effect verification/learning (Phase 6) are out of scope."
   ],
   "provenance_policy": "The static manifest carries stable metadata only. The actual build revision is generated at build/verification time from GITHUB_SHA or `git rev-parse HEAD` into artifacts/build_provenance.json (evidence_class CI_GENERATED_BUILD_EVIDENCE). No self-referential commit SHA is stored here.",
   "build_revision_source": "GITHUB_SHA | git rev-parse HEAD",
-  "source_baseline_commit": "0d5d4dde5b68ef61e6dec994cc4b9e55fa57e363"
+  "source_baseline_commit": "0d5d4dde5b68ef61e6dec994cc4b9e55fa57e363",
+  "dependency_cost_aware_recommendation": {
+    "phase": "3",
+    "additive_only": true,
+    "controller_decision_kernel_changed": false,
+    "shadow_only": true,
+    "recommendations_feed_controller": false,
+    "recommendation_schema_version": "capacity-action-recommendation-1",
+    "recommendation_abstention_schema_version": "capacity-recommendation-abstention-1",
+    "evaluated_candidate_schema_version": "capacity-evaluated-candidate-1",
+    "dependency_topology_schema_version": "capacity-dependency-topology-1",
+    "cost_evidence_schema_version": "capacity-cost-evidence-1",
+    "cost_book_schema_version": "capacity-cost-book-1",
+    "operating_constraints_schema_version": "capacity-operating-constraints-1",
+    "candidate_plan_schema_version": "capacity-candidate-plan-1",
+    "recommendation_policy_schema_version": "capacity-recommendation-policy-1",
+    "score_breakdown_schema_version": "capacity-score-breakdown-1",
+    "planning_target": "running_replicas (the forecast target that directly predicts required primary replicas; other targets abstain UNSUPPORTED_FORECAST_TARGET in this baseline)",
+    "money_representation": "exact integer minor units + ISO currency (Money); no float money; cross-currency without exchange-rate evidence abstains CURRENCY_MISMATCH (exchange rates out of scope for this baseline)",
+    "hard_constraints": "min/max capacity, allowed step, regional quota, cooldown/min-change-interval, SLO + error-budget protection (forbid scale-down), dependency capacity ceiling, prohibited actions, max cost increase \u2014 non-compensatory, applied BEFORE scoring",
+    "scoring_preferences": "explicit versioned weights over coverage, bottleneck/dependency risk, reliability risk, cost delta, change magnitude, uncertainty, hold-bias; selection is coverage-first then policy score; ties within tie_epsilon abstain AMBIGUOUS_BEST_PLAN",
+    "no_change_semantics": "NO_CHANGE is a mandatory baseline candidate and wins whenever current capacity covers the forecast (hold-bias + no cost/magnitude penalty)",
+    "construction_safety": "CapacityActionRecommendation EMBEDS forecast evidence, current state, topology, cost book, constraints, and policy; derives every bound digest and RECOMPUTES each candidate's feasibility/cost/score at construction AND at from_dict; a forged score/cost/feasibility/digest, a fabricated or unevaluated candidate, a non-winning selection, or a subject/tenant/scope/temporal mismatch is rejected. The recommendation digest is a content IDENTITY only, not a signature/authorization/effect proof.",
+    "temporal_safety": "forecast cutoff precedes recommendation time; recommendation validity window lies within the forecast horizon; expired forecast (per forecast_validity_seconds), stale cost/topology, and future-dated inputs are typed abstentions",
+    "authority_class": "ADVISORY",
+    "execution_capability": "NONE",
+    "risk_authority_integration": "NONE (Phase 4)",
+    "actiongate_integration": "NONE (Phase 5)",
+    "effect_verification": "NONE (Phase 6)",
+    "economic_optimality": "ECONOMIC_OPTIMALITY_NOT_ESTABLISHED (baseline policy verified for implementation correctness only; not proven cost-optimal on representative workloads)",
+    "production_effectiveness": "PRODUCTION_EFFECTIVENESS_NOT_ESTABLISHED",
+    "new_core_dependencies": []
+  }
 }
