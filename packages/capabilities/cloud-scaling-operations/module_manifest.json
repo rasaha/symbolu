@@ -20,66 +20,30 @@
   ],
   "advisory_dependency_range": ">=0.4.0,<0.5",
   "optional_dependencies": {
-    "kubernetes": [
-      "kubernetes>=26.1.0"
-    ],
-    "metrics": [
-      "prometheus-client>=0.16.0"
-    ],
-    "otel": [
-      "opentelemetry-api>=1.20.0",
-      "opentelemetry-sdk>=1.20.0",
-      "opentelemetry-exporter-otlp>=1.20.0"
-    ],
-    "config": [
-      "PyYAML>=6.0"
-    ],
-    "dev": [
-      "pytest>=7.0",
-      "build>=1.0",
-      "pip-audit>=2.6"
-    ]
+    "kubernetes": ["kubernetes>=26.1.0"],
+    "metrics": ["prometheus-client>=0.16.0"],
+    "otel": ["opentelemetry-api>=1.20.0", "opentelemetry-sdk>=1.20.0", "opentelemetry-exporter-otlp>=1.20.0"],
+    "config": ["PyYAML>=6.0"],
+    "dev": ["pytest>=7.0", "build>=1.0", "pip-audit>=2.6"]
   },
-  "execution_modes": [
-    "dry_run",
-    "simulation",
-    "shadow",
-    "live"
-  ],
+  "execution_modes": ["dry_run", "simulation", "shadow", "live"],
   "mutation_entrypoints": [
     "ugence_cloud_scaling_operations.executors.ControlledScalingExecutor.execute (LIVE)",
     "ugence_cloud_scaling_operations.gate_executor.GateExecutor.sync (LIVE)"
   ],
   "public_api": [
-    "ExecutionAuthorization",
-    "ExecutionRequest",
-    "ExecutionResult",
-    "ExecutionReceipt",
-    "ExecutionDenied",
-    "ExecutionIntegrityError",
-    "ExecutionMode",
-    "ControlledScalingExecutor",
-    "KubernetesScalingExecutor",
-    "GateExecutor",
-    "RollbackCoordinator",
-    "ReadinessEvaluator",
-    "OutcomeRecorder",
-    "OperationsConfig",
-    "TargetPolicy",
-    "AuthorityVerifier",
-    "IdempotencyStore",
-    "AuditSink",
-    "__version__"
+    "ExecutionAuthorization", "ExecutionRequest", "ExecutionResult", "ExecutionReceipt",
+    "ExecutionDenied", "ExecutionIntegrityError", "ExecutionMode",
+    "ControlledScalingExecutor", "KubernetesScalingExecutor", "GateExecutor",
+    "RollbackCoordinator", "ReadinessEvaluator", "OutcomeRecorder",
+    "OperationsConfig", "TargetPolicy", "AuthorityVerifier", "IdempotencyStore",
+    "AuditSink", "__version__"
   ],
   "authority_model": {
     "state_transitions": [
-      "ADVISORY_RECOMMENDATION",
-      "POLICY_AND_SAFETY_EVALUATION",
-      "HUMAN_OR_EXTERNAL_GOVERNANCE_APPROVAL",
-      "EXECUTION_AUTHORIZATION",
-      "READINESS_CHECK",
-      "CONTROLLED_EXECUTION",
-      "OUTCOME_AND_AUDIT"
+      "ADVISORY_RECOMMENDATION", "POLICY_AND_SAFETY_EVALUATION",
+      "HUMAN_OR_EXTERNAL_GOVERNANCE_APPROVAL", "EXECUTION_AUTHORIZATION",
+      "READINESS_CHECK", "CONTROLLED_EXECUTION", "OUTCOME_AND_AUDIT"
     ],
     "prohibited_paths": [
       "recommendation -> direct actuator call",
@@ -93,27 +57,16 @@
   "legacy_imports": {
     "monorepo_only": [
       "cloud_scaling_operations.*",
-      "cloud_controller.action.*",
-      "cloud_controller.orchestrator",
-      "cloud_controller.main",
-      "cloud_controller.recommend.engine",
-      "cloud_controller.recommend.approval",
+      "cloud_controller.action.*", "cloud_controller.orchestrator", "cloud_controller.main",
+      "cloud_controller.recommend.engine", "cloud_controller.recommend.approval",
       "cloud_controller.recommend.webhook",
-      "symbolu.cloud_controller.action.*",
-      "symbolu.cloud_controller.orchestrator"
+      "symbolu.cloud_controller.action.*", "symbolu.cloud_controller.orchestrator"
     ],
     "note": "Legacy operational namespaces are monorepo-only compatibility surfaces (object identity preserved); not part of the distributed wheel and not a stable API."
   },
   "forbidden_core_dependencies": [
-    "kubernetes",
-    "boto3",
-    "botocore",
-    "azure",
-    "google-cloud",
-    "prometheus-client",
-    "opentelemetry-sdk",
-    "fastapi",
-    "uvicorn"
+    "kubernetes", "boto3", "botocore", "azure", "google-cloud",
+    "prometheus-client", "opentelemetry-sdk", "fastapi", "uvicorn"
   ],
   "reference_store_limitations": "InMemoryIdempotencyStore and InMemoryAuditSink are process-local reference implementations; they are NOT durable and NOT sufficient for multi-process production deployment.",
   "known_limitations": [
