@@ -1,5 +1,5 @@
 {
-  "advisory_package_version": "0.3.0",
+  "advisory_package_version": "0.4.0",
   "cluster_identifier": "fake-cluster",
   "context_name": "fake-read-only-context",
   "decision_count": 3,
@@ -8,7 +8,7 @@
   "evidence_class": "FAKE_LOCAL_FIXTURE",
   "observations_hash": "93d0b4fa2f4663d800e8f7dde8d5779e6b8fc699441924b5ca5ff2999d361de1",
   "observed_target_count": 3,
-  "operations_package_version": "0.1.1",
+  "operations_package_version": "0.1.2",
   "real_cluster_accessed": false,
   "real_environment_observed": false,
   "session_id": "shadow-session-fixture-1",

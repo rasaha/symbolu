@@ -172,8 +172,8 @@ def main() -> int:
     _ops_expected = _re.search(r'__version__\s*=\s*"([^"]+)"', _ops_ver_txt).group(1)
     _adv_major_minor = tuple(int(x) for x in _adv_expected.split(".")[:2])
     c.check("package_versions",
-            OPS_V == _ops_expected and ADV_V == _adv_expected and _adv_major_minor == (0, 3),
-            f"ops={OPS_V} (expect {_ops_expected}), advisory={ADV_V} (expect {_adv_expected}, 0.3.x)")
+            OPS_V == _ops_expected and ADV_V == _adv_expected and _adv_major_minor == (0, 4),
+            f"ops={OPS_V} (expect {_ops_expected}), advisory={ADV_V} (expect {_adv_expected}, 0.4.x)")
     adv_manifest = json.loads((ADV / "module_manifest.json").read_text())
     c.check("advisory_remains_advisory_only",
             adv_manifest.get("execution_capability") == "NONE"
