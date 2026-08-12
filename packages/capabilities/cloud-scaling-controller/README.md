@@ -204,6 +204,77 @@ forecast, insufficient calibration, …). See the
 > FORECAST is descriptive capacity intelligence: it is not a recommendation, a risk
 > evaluation, an authority, or an execution instruction.
 
+## Dependency- and Cost-aware Capacity Planning (Phase 3 — shadow recommendations)
+
+Version 0.4.0 adds a deterministic, provider-neutral, **shadow/advisory-only** capacity-action
+recommendation layer *around* the Phase-2 forecast. It answers: *given the forecast, service
+dependencies, operating constraints and cost evidence, what is the best capacity action — and
+why?* **Recommendations never feed the live controller and never execute, authorize, or verify
+an effect.**
+
+```text
+Phase-2 CapacityForecastEvidence
+   +  DependencyTopology  +  CostBook  +  OperatingConstraints  +  RecommendationPolicy
+        ↓  recommend_capacity_action  (deterministic, clock-free, fail-closed)
+   bounded candidate generation (always includes NO_CHANGE)
+        ↓  hard-constraint filtering (BEFORE scoring; non-compensatory)
+        ↓  dependency + cost evaluation, explicit policy scoring (coverage-first)
+   CapacityActionRecommendation  (selected plan + alternatives + typed rejections,
+                                  self-revalidating, sha256 content identity)
+      OR  RecommendationAbstention  (typed, first-class)
+```
+
+```python
+from ugence_cloud_scaling_controller import (
+    recommend_capacity_action, CapacityActionRecommendation,
+    DependencyTopology, DependencyEdge, DependencyKind,
+    CostBook, CostEvidence, Money, CostBasis,
+    OperatingConstraints, RecommendationPolicy,
+)
+# forecast_evidence: a Phase-2 RUNNING_REPLICAS point forecast (app may need 8 replicas)
+# current_state:     a CanonicalCapacityState with capacity.running_replicas == 6
+out = recommend_capacity_action(
+    forecast_evidence, current_state,
+    cost_book=CostBook(subject=app, entries=(
+        CostEvidence(app, Money(1000, "USD"), CostBasis.PER_REPLICA_HOUR, t_from, t_until),
+        CostEvidence(db,  Money(50,   "USD"), CostBasis.PER_CONNECTION_HOUR, t_from, t_until))),
+    constraints=OperatingConstraints(min_capacity=1, max_capacity=50),
+    policy=RecommendationPolicy(),
+    recommendation_time=now, validity_seconds=600.0,
+    topology=DependencyTopology(subject=app, as_of=now, edges=(
+        DependencyEdge(app, db, DependencyKind.CAPACITY_BOUND,
+                       downstream_current_capacity=100, required_per_upstream_unit=20.0),)),
+)
+if isinstance(out, CapacityActionRecommendation):
+    print(out.selected_plan.action_kind.value, out.reason_codes)   # e.g. coordinated (...)
+    print(out.estimated_cost_change_minor, out.currency)           # disclosed cost delta
+    print(out.digest())                                            # sha256 content identity
+```
+
+**Hard constraints vs. preferences:** hard operating limits (min/max, step, quota, cooldown, SLO
+and error-budget protection, dependency ceiling, prohibited actions, max cost increase) are
+*non-compensatory* and filter candidates **before** scoring — a cheaper plan never overcomes a
+safety/quota/validity violation. Optimization preferences (coverage, bottleneck risk, reliability
+risk, cost, change magnitude, uncertainty, hold-bias) are explicit, versioned, digest-bound
+weights; selection is coverage-first, then policy score. **NO_CHANGE** is a mandatory baseline and
+wins whenever current capacity already covers the forecast. **Cost** is exact integer minor units
+plus currency and is an optimization input, never an authorizer. **Abstention** is a first-class,
+typed output (missing/expired/abstained forecast, subject/scope mismatch, missing/stale
+topology, dependency cycle, missing dependency capacity, missing/incompatible/stale cost,
+currency mismatch, quota conflict, no feasible action, ambiguous best plan, future-data leakage,
+…). The `CapacityActionRecommendation` **embeds** its authoritative inputs and recomputes every
+feasibility/cost/score at construction and at `from_dict`, so a forged score/cost/digest or an
+unevaluated/non-winning selection is rejected. See the
+[Phase-3 ADR](../../../docs/architecture/ADR_CLOUD_SCALING_DEPENDENCY_COST_AWARE_RECOMMENDATION_PHASE3.md).
+
+> **Maturity:** `IMPLEMENTED_AND_CI_VERIFIED` · `BASELINE_RECOMMENDATION_POLICY_IMPLEMENTED` ·
+> `PREDICTIVE_QUALITY_NOT_ESTABLISHED` · `ECONOMIC_OPTIMALITY_NOT_ESTABLISHED` ·
+> `PRODUCTION_EFFECTIVENESS_NOT_ESTABLISHED` · `NOT_AUTHORIZED_FOR_EXECUTION`. Passing tests/CI
+> prove implementation correctness, **not** recommendation quality. A RECOMMENDATION is
+> descriptive capacity intelligence: it is not an authorization, a risk evaluation, an ActionGate
+> decision, or an execution instruction. Risk Authority (Phase 4), ActionGate/provider execution
+> (Phase 5), and effect verification/learning (Phase 6) are out of scope.
+
 ## What it does **not** provide
 
 - Does not scale Kubernetes / mutate the HPA.
