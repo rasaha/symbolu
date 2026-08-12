@@ -60,6 +60,26 @@ randomness was not seeded. The change set is: moving execution/operations code O
 the wheel, adding the determinism disclosure + build provenance, and correcting
 metadata/docs — verified by exact decision-baseline parity.
 
+## Predictive Capacity Intelligence (Phase 2) — evidence & maturity
+
+**Implementation maturity: IMPLEMENTED_AND_LOCALLY_VERIFIED.** New in v0.3.0.
+**Model quality: BASELINE_FORECASTING_IMPLEMENTED · PREDICTIVE_QUALITY_NOT_ESTABLISHED.**
+
+The `forecasting` subpackage is a deterministic, provider-neutral, **shadow-only**
+forecasting and replay-evaluation layer (`CanonicalCapacitySeries` → `ForecastInputWindow`
+→ baseline forecaster → `CapacityForecast` → `CapacityForecastEvidence` →
+`ForecastEvaluationRecord`). It is pure-stdlib, adds no dependency, performs no
+actuation/network/subprocess/credential/LLM activity, and **never** feeds the controller.
+
+| Concern | Status | Evidence |
+|---------|--------|----------|
+| Implemented | ✅ | `src/ugence_cloud_scaling_controller/forecasting/` — series, window, targets, baselines, uncertainty, forecast/evidence, evaluation, replay. |
+| Unit-tested | ✅ | `tests/forecasting/` (90 tests): series policy, leakage-safe windows, baselines, empirical uncertainty, forecast/evidence + digest boundary, evaluation/aggregate, adversarial replay/leakage, demand scenarios, boundary. |
+| Leakage-prevented | ✅ | Windows contain only `event_time <= cutoff` (invariant-checked); replay matches strictly-later actuals; harness fails closed on residual leakage (adversarial tests). |
+| Shadow-only / advisory-only | ✅ | Every forecast + evidence: `advisory_only=True`, `shadow_only=True`, `actuation_performed=False`, `authority_class="ADVISORY"`, `execution_capability="NONE"`. |
+| Evidence identity | ✅ | `sha256:` digest over all authoritative fields; excludes production time + non-authoritative annotation. |
+| **Forecast accuracy** | ❌ **NOT established** | Baselines (persistence/linear-trend) are **not** evaluated on representative external workloads against preregistered acceptance thresholds. Passing tests prove implementation correctness, **not** production accuracy → **PREDICTIVE_QUALITY_NOT_ESTABLISHED**. |
+
 ## Canonical Capacity Intelligence (Phase 1) — evidence & determinism
 
 **Status: IMPLEMENTED_AND_LOCALLY_VERIFIED.** New in v0.2.0.

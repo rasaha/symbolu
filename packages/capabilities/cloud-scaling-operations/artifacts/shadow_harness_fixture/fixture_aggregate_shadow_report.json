@@ -1,5 +1,5 @@
 {
-  "advisory_package_version": "0.1.1",
+  "advisory_package_version": "0.3.0",
   "artifacts": {
     "fixture_authorization_validation.json": "d82bf9ca2dafd85802a27ae081f5652e089aacab5e35f7a497a57bf12449bb86",
     "fixture_environment_manifest.json": "0867a5087e56e00290fe131edee9379507b38f7e8197d75185d7169253e4ef02",
@@ -9,14 +9,14 @@
     "fixture_observation_records.jsonl": "204cc9309a57ba8372c2534645c3674fd8441752cf1b837dbb7ec690139bfc3c",
     "fixture_request_method_ledger.jsonl": "98ebb76267ba6a0830141c172fe32d2edaf199f73645e2e2268ae08fd49034a4",
     "fixture_secret_redaction_report.json": "7e026fe80a9d4848439504d81e2be9e10a5180244115ea1c8e3c05feeb4dbde8",
-    "fixture_session_manifest.json": "ed9080ec4c43c6b16b105bce11d6747501fcb341e4910369fe235042b9868b56",
+    "fixture_session_manifest.json": "9f730d42563d3f71124134281b3223e9674f9623c7eb5cc511d46a29c5c2dbb3",
     "fixture_shadow_decisions.jsonl": "1ab13905fe651e7b85ba3358acd86f77cb02db764d01e52ae52d2172eca861c1",
     "fixture_shadow_harness_integrity_report.json": "73e02c69c2aa6aaead6790d319c898b476b14ba24aa48b4e74b65fdaf71ac362",
     "fixture_stale_state_results.json": "1436da8934d14d94b452a90cb6f66825706ebfe6acbbb68fa5a5742e382718f6",
     "fixture_target_allowlist.json": "64c9604504681638354d4e41af7ff310897d6a5dc17386c0ef0975b383c37f1f"
   },
   "evidence_class": "FAKE_LOCAL_FIXTURE",
-  "operations_package_version": "0.1.0",
+  "operations_package_version": "0.1.1",
   "real_cluster_accessed": false,
   "real_environment_observed": false,
   "source_revision": "FIXTURE_LOCAL",

@@ -36,7 +36,7 @@ classifiers = [
 # Core dependency: the advisory recommendation package (one-directional). It transitively
 # provides numpy. No cloud SDK is a core dependency — dry-run/simulation/import need none.
 dependencies = [
-    "ugence-cloud-scaling-controller>=0.1.1,<0.2",
+    "ugence-cloud-scaling-controller>=0.3.0,<0.4",
 ]
 
 [project.optional-dependencies]

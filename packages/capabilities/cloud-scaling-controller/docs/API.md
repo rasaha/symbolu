@@ -17,7 +17,7 @@ Import namespace: `ugence_cloud_scaling_controller`.
 | `ContractError` | exception | Raised on invalid input (fail-closed). |
 | `evaluate` | function | One-shot convenience: `evaluate(obs, config=None) -> ScalingRecommendation`. |
 | `SCHEMA_VERSION` | str | `"1.1"` (output schema). |
-| `__version__` | str | `"0.2.0"`. |
+| `__version__` | str | `"0.3.0"`. |
 
 ## `CloudScalingController`
 
