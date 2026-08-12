@@ -91,6 +91,26 @@ distribution verifier opens every packaged `.py` and fails on any actuator, appr
 orchestrator, mutation call, or concrete executor. No infrastructure-write path is
 shipped or was added.
 
+## Predictive Capacity Intelligence layer (Phase 2) — boundary
+
+The `forecasting` subpackage (v0.3.0) is an **additive, shadow-only** forecasting and
+replay-evaluation layer. It preserves every invariant above and adds two of its own:
+
+- It is pure-stdlib — **no** runtime dependency, **no** cloud SDK, **no** network,
+  subprocess, credentials, or LLM (asserted by `tests/forecasting/test_boundary.py`).
+- Forecasts **never** feed the controller: there is no path from a `CapacityForecast` into
+  `CloudScalingController`. The live `ScalingObservation → ScalingRecommendation` path is
+  byte-for-byte unchanged.
+- **Leakage safety:** a `ForecastInputWindow` contains only observations with
+  `event_time <= cutoff` (construction-time invariant), and replay matches only
+  **strictly-later** actuals; the harness fails closed on any residual leakage.
+- Every `CapacityForecast` and `CapacityForecastEvidence` carries `advisory_only=True`,
+  `shadow_only=True`, `actuation_performed=False`, `authority_class="ADVISORY"`,
+  `execution_capability="NONE"`. `FORECAST != RECOMMENDATION != RISK EVALUATION !=
+  AUTHORITY != EXECUTION`.
+- Forecasted pressure is descriptive capacity intelligence, **not** "Risk Authority risk".
+  No Risk Authority / ActionGate / execution-assurance package is imported.
+
 ## Canonical Capacity Intelligence layer (Phase 1) — boundary
 
 The `canonical` subpackage (v0.2.0) is an **additive, advisory-only** observation and

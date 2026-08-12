@@ -9,7 +9,7 @@ Ugence control plane.
 
 - **Distribution:** `ugence-cloud-scaling-controller`
 - **Import namespace:** `ugence_cloud_scaling_controller`
-- **Version:** `0.2.0`
+- **Version:** `0.3.0`
 - **Authority class:** ADVISORY · **Execution capability:** NONE (no code in the wheel can apply the advice)
 - **Core dependency:** NumPy only · **Network required (core):** no · **Cloud credentials required:** no
 - **Determinism:** decision-deterministic; identity diagnostics vary before bootstrap.
@@ -125,6 +125,85 @@ forecasting; dependency-aware scaling; economic optimization; cross-cloud placem
 CapacityDecisionEvidence→RA integration adapter; authority-bound scaling; provider
 execution; execution receipts; effect verification; closed-loop learning.
 
+## Predictive Capacity Intelligence (Phase 2 — shadow forecasting)
+
+Version 0.3.0 adds a deterministic, provider-neutral, **shadow-only** forecasting and
+replay-evaluation layer *around* the Phase-1 canonical layer. It answers: *given the
+capacity history available at event time, what capacity pressure is likely at a future
+horizon, how uncertain is that prediction, and how well has the method performed in
+replay?* **Forecasts never feed the live controller and never actuate anything.**
+
+```text
+CanonicalCapacityState history
+        ↓  series validation + strict event-time ordering
+CanonicalCapacitySeries
+        ↓  leakage-safe input window (event_time <= cutoff, invariant-checked)
+ForecastInputWindow
+        ↓  deterministic baseline forecaster (persistence / linear trend)
+CapacityForecast          (point + empirical uncertainty  OR  typed abstention)
+        ↓  controlled service path binds window + config + output
+CapacityForecastEvidence  (immutable, sha256 content-identity digest)
+        ↓  shadow replay against strictly-later actual observations
+ForecastEvaluationRecord  + deterministic aggregate (MAE / RMSE / bias / coverage)
+```
+
+```python
+from datetime import datetime, timedelta, timezone
+from ugence_cloud_scaling_controller.canonical import (
+    CanonicalCapacityState, CapacitySubject, InfrastructureState, CapacityState,
+    Measurement, Unit, NormalizationPolicy, NormalizationMethod,
+)
+from ugence_cloud_scaling_controller.forecasting import (
+    CanonicalCapacitySeries, ForecastTarget, ForecastHorizon,
+    PersistenceForecaster, UncertaintyConfig, forecast_with_evidence,
+)
+
+subj = CapacitySubject(workload_id="checkout-api", tenant_id="acme")
+t0 = datetime(2026, 8, 11, 12, 0, tzinfo=timezone.utc)
+history = [CanonicalCapacityState(
+    subject=subj, observed_at=t0 + timedelta(seconds=60 * i),
+    infrastructure=InfrastructureState(cpu_utilization=Measurement(70.0 + i, Unit.PERCENT)),
+    capacity=CapacityState(running_replicas=4)) for i in range(8)]
+
+series = CanonicalCapacitySeries.build(history)
+policy = NormalizationPolicy(policy_id="slo-v1",
+                             method_by_signal={"cpu": NormalizationMethod.PERCENT_TO_RATIO})
+evidence = forecast_with_evidence(
+    series, ForecastTarget.CPU_UTILIZATION, series.end_event_time, ForecastHorizon.minutes(5),
+    PersistenceForecaster(), normalization_policy=policy,
+    uncertainty_config=UncertaintyConfig(min_calibration_samples=3, match_tolerance_seconds=5.0),
+)
+fc = evidence.forecast
+print(fc.status, fc.point_estimate, fc.uncertainty.available)  # forecast / point / interval?
+print(fc.advisory_only, fc.shadow_only, fc.actuation_performed) # True True False
+print(evidence.digest())                                        # sha256: content identity
+```
+
+**Value space (precisely disclosed):** forecasts are either *projected without conversion*
+(default — raw canonical target domain; `running_replicas → current_replicas`, never
+ready/desired/healthy) or *explicitly normalized* (`forecast_space=NORMALIZED` applies the
+Phase-1 `normalize_signal` authority to a ratio in `[0, 1]`); the applied space and
+normalization-policy digest are bound into the input-window and evidence digests, and no
+unit is silently converted. **Domain enforcement:** a `SignalDomain` sourced from the
+Phase-1 `unit_domain` authority is enforced on inputs and outputs (including integer
+semantics — a fractional replica forecast abstains rather than being presented as valid);
+nothing is clamped or rounded. **Baseline models:** persistence (last value) and
+deterministic linear-trend (OLS). A third baseline is deferred until replay evaluation
+justifies it. **Uncertainty:** an empirical rolling-origin residual interval (non-Gaussian;
+explicitly *unavailable* when residuals are insufficient). **Abstention** is a first-class,
+evidence-producing output
+(insufficient/stale history, excessive missingness, irregular cadence, subject/tenant
+mismatch, unsupported target/horizon, missing normalization policy, out-of-domain
+forecast, insufficient calibration, …). See the
+[Phase-2 ADR](../../../docs/architecture/ADR_CLOUD_SCALING_PREDICTIVE_CAPACITY_INTELLIGENCE_PHASE2.md).
+
+> **Maturity:** `IMPLEMENTED_AND_LOCALLY_VERIFIED` · `BASELINE_FORECASTING_IMPLEMENTED` ·
+> `PREDICTIVE_QUALITY_NOT_ESTABLISHED`. Passing tests/CI prove implementation
+> correctness, **not** forecast accuracy — the baselines have not been evaluated on
+> representative external workloads against preregistered acceptance thresholds. A
+> FORECAST is descriptive capacity intelligence: it is not a recommendation, a risk
+> evaluation, an authority, or an execution instruction.
+
 ## What it does **not** provide
 
 - Does not scale Kubernetes / mutate the HPA.
@@ -173,6 +252,15 @@ Phase 1 also exports the canonical capacity-intelligence layer (subpackage
 `NormalizationPolicy`, `NormalizationMethod`, `ControllerProjection`,
 `project_to_scaling_observation`, `CapacityDecisionEvidence`, `recommend_with_evidence`,
 `CapacityObservationSource`.
+
+Phase 2 exports the shadow forecasting layer (subpackage
+`ugence_cloud_scaling_controller.forecasting`): `CanonicalCapacitySeries`,
+`SeriesConstructionPolicy`, `ForecastTarget`, `ForecastHorizon`, `ForecastInputWindow`,
+`FeatureConfig`, `build_input_window`, `BaselineForecaster`, `PersistenceForecaster`,
+`LinearTrendForecaster`, `UncertaintyConfig`, `UncertaintyMethod`, `AbstentionReason`,
+`CapacityForecast`, `AdmissionPolicy`, `CapacityForecastEvidence`, `generate_forecast`,
+`forecast_with_evidence`, `ForecastEvaluationRecord`, `AggregateEvaluation`,
+`evaluate_forecast`, `aggregate_evaluations`, `run_replay_evaluation`.
 
 ## Legacy imports
 
