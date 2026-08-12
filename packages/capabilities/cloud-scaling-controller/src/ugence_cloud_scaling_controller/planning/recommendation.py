@@ -44,7 +44,7 @@ from ..canonical.state import CanonicalCapacityState
 from ..forecasting.evidence import CapacityForecastEvidence
 from ..forecasting.series import _as_utc
 from ..version import __version__ as CONTROLLER_PACKAGE_VERSION
-from .candidates import ActionKind, CandidateActionPlan
+from .candidates import ActionKind, CandidateActionPlan, generate_candidates
 from .constraints import OperatingConstraints
 from .cost import CostBook
 from .policy import RecommendationPolicy, ScoreBreakdown
@@ -232,14 +232,36 @@ class CapacityActionRecommendation:
         if self.topology is not None and self.topology.subject != subject:
             raise RecommendationError("topology subject must equal the recommendation subject")
 
-        # --- temporal safety -------------------------------------------------------
+        # --- temporal safety (every embedded evidence timestamp + validity window) --
+        # Fail closed on future, stale, contradictory, or horizon-incompatible evidence at
+        # BOTH direct construction and from_dict, mirroring the pipeline's typed abstentions.
         cutoff = _as_utc(fc.forecast_cutoff)
         rec_time = _as_utc(self.recommendation_time)
         if cutoff > rec_time:
             raise RecommendationError("forecast cutoff must not be after the recommendation time")
+        # Forecast horizon must still be ahead of the recommendation time.
+        forecast_for_dt = _as_utc(fc.forecast_for)
+        if forecast_for_dt <= rec_time:
+            raise RecommendationError("forecast horizon must be after the recommendation time")
+        # Current canonical state must not be observed in the future.
+        if _as_utc(self.current_state.observed_at) > rec_time:
+            raise RecommendationError("current_state.observed_at must not be after the recommendation time")
+        # Topology as_of must not be in the future.
+        if self.topology is not None and _as_utc(self.topology.as_of) > rec_time:
+            raise RecommendationError("topology as_of must not be after the recommendation time")
+        # Every cost-evidence entry must be effective at the recommendation time (no
+        # future-dated or stale/expired pricing masquerading as current).
+        for entry in self.cost_book.entries:
+            if not entry.is_effective_at(self.recommendation_time):
+                raise RecommendationError("cost evidence is not effective at the recommendation time")
+        # Operator-set forecast validity window: the forecast must not be expired.
+        if self.constraints.forecast_validity_seconds is not None:
+            age = (rec_time - cutoff).total_seconds()
+            if age > self.constraints.forecast_validity_seconds:
+                raise RecommendationError("forecast age exceeds the constraint forecast_validity_seconds")
+        # Recommendation validity window must lie within the forecast horizon.
         validity_end = rec_time.timestamp() + float(self.validity_seconds)
-        forecast_for = _as_utc(fc.forecast_for).timestamp()
-        if validity_end > forecast_for + 1e-6:
+        if validity_end > forecast_for_dt.timestamp() + 1e-6:
             raise RecommendationError("recommendation validity must lie within the forecast horizon")
 
         # --- rebuild the deterministic context and recompute every candidate -------
@@ -250,6 +272,38 @@ class CapacityActionRecommendation:
             )
         except Exception as exc:  # ScoringError / value errors -> record is inconsistent
             raise RecommendationError(f"recommendation inputs are inconsistent: {exc}") from exc
+
+        # --- canonical candidate-set binding ---------------------------------------
+        # Re-run the SAME bounded candidate generation the pipeline used and require exact
+        # semantic set equality with evaluated_candidates. This rejects an omitted candidate
+        # (a reduced set that lets a worse plan "win"), a fabricated/surplus candidate, a
+        # duplicated candidate, or a content-tampered candidate — none of which the
+        # per-candidate recompute above could catch on its own.
+        canonical_plans = generate_candidates(
+            ctx.primary_subject, ctx.current_capacity, ctx.required_capacity,
+            allowed_step=self.constraints.allowed_step,
+            min_capacity=self.constraints.min_capacity,
+            max_capacity=self.constraints.effective_ceiling(),
+            dependency=ctx.dependency_subject,
+            dependency_current=ctx.dependency_current,
+            dependency_required=ctx.dependency_required,
+        )
+        canonical_by_id = {p.plan_id: p.digest() for p in canonical_plans}
+        if len(canonical_by_id) != len(canonical_plans):  # defensive; generation is unique
+            raise RecommendationError("canonical candidate generation produced a non-unique set")
+        evaluated_by_id: Dict[str, str] = {}
+        for ec in self.evaluated_candidates:
+            if ec.plan.plan_id in evaluated_by_id:
+                raise RecommendationError(f"duplicate evaluated candidate: {ec.plan.plan_id!r}")
+            evaluated_by_id[ec.plan.plan_id] = ec.plan.digest()
+        if evaluated_by_id != canonical_by_id:
+            missing = sorted(set(canonical_by_id) - set(evaluated_by_id))
+            surplus = sorted(set(evaluated_by_id) - set(canonical_by_id))
+            tampered = sorted(k for k in canonical_by_id.keys() & evaluated_by_id.keys()
+                              if canonical_by_id[k] != evaluated_by_id[k])
+            raise RecommendationError(
+                "evaluated_candidates must be exactly the canonical generated candidate set "
+                f"(missing={missing}, surplus={surplus}, tampered={tampered})")
 
         seen_plan_ids = set()
         seen_plan_digests = set()
@@ -597,6 +651,10 @@ class RecommendationAbstention:
             raise RecommendationError("abstention must be advisory-only and shadow-only")
         if self.actuation_performed is not False:
             raise RecommendationError("actuation_performed must be False")
+        if self.authority_class != AUTHORITY_CLASS_ADVISORY:
+            raise RecommendationError("authority_class must be ADVISORY")
+        if self.execution_capability != EXECUTION_CAPABILITY_NONE:
+            raise RecommendationError("execution_capability must be NONE")
 
     @property
     def is_abstained(self) -> bool:
@@ -658,6 +716,13 @@ class RecommendationAbstention:
             policy_digest=data.get("policy_digest"),
             controller_package_version=data.get("controller_package_version", CONTROLLER_PACKAGE_VERSION),
             schema_version=data.get("schema_version", RECOMMENDATION_ABSTENTION_SCHEMA_VERSION),
+            # Pass the advisory/authority fields through so a tampered value fails closed in
+            # __post_init__ rather than being silently normalized on reconstruction.
+            authority_class=data.get("authority_class", AUTHORITY_CLASS_ADVISORY),
+            execution_capability=data.get("execution_capability", EXECUTION_CAPABILITY_NONE),
+            advisory_only=data.get("advisory_only", True),
+            shadow_only=data.get("shadow_only", True),
+            actuation_performed=data.get("actuation_performed", False),
         )
 
 
