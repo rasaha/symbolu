@@ -12,6 +12,7 @@ both direct construction and `from_dict`:
 from __future__ import annotations
 
 import copy
+import dataclasses
 
 import pytest
 
@@ -204,5 +205,89 @@ def test_abstention_from_dict_cannot_smuggle_execution_capability():
         H.policy(), recommendation_time=H.at(190), validity_seconds=600.0)
     d = out.to_canonical_dict()
     d["execution_capability"] = "INFRASTRUCTURE_MUTATION"
+    with pytest.raises(RecommendationError):
+        RecommendationAbstention.from_dict(d)
+
+
+# ============================================ Hardening item 1: forecast relationship
+
+def _abstention_dict(reason=RecommendationAbstentionReason.MISSING_FORECAST):
+    app = H.subject()
+    out = recommend_capacity_action(
+        None, H.replicas_state(H.at(180), 6, subj=app), H.cost_book(subj=app), H.constraints(),
+        H.policy(), recommendation_time=H.at(190), validity_seconds=600.0)
+    return out.to_canonical_dict()
+
+
+def test_inflated_forecast_for_rejected():
+    """An embedded forecast_for pushed beyond forecast_cutoff + horizon fails closed —
+    otherwise a longer validity window would look in-bounds against the inflated endpoint."""
+    rec = _valid_rec()
+    d = rec.to_canonical_dict()
+    orig = d["forecast_evidence"]["forecast"]["forecast_for"]
+    d["forecast_evidence"]["forecast"]["forecast_for"] = orig + __import__("datetime").timedelta(seconds=100000)
+    with pytest.raises(RecommendationError):
+        _rebuild(d)
+
+
+def test_inflated_forecast_for_with_long_validity_rejected():
+    rec = _valid_rec()
+    d = rec.to_canonical_dict()
+    orig = d["forecast_evidence"]["forecast"]["forecast_for"]
+    d["forecast_evidence"]["forecast"]["forecast_for"] = orig + __import__("datetime").timedelta(seconds=100000)
+    d["validity_seconds"] = 90000.0  # would fit the inflated endpoint but exceeds the real horizon
+    with pytest.raises(RecommendationError):
+        _rebuild(d)
+
+
+def test_contradictory_forecast_for_before_cutoff_rejected():
+    rec = _valid_rec()
+    d = rec.to_canonical_dict()
+    cutoff = d["forecast_evidence"]["forecast"]["forecast_cutoff"]
+    d["forecast_evidence"]["forecast"]["forecast_for"] = cutoff  # equals cutoff, != cutoff + horizon
+    with pytest.raises(RecommendationError):
+        _rebuild(d)
+
+
+def test_inflated_forecast_for_rejected_on_direct_construction():
+    """Item 1 also holds for DIRECT construction, not only from_dict."""
+    rec = _valid_rec()
+    fc = rec.forecast_evidence.forecast
+    bad_fc = dataclasses.replace(
+        fc, forecast_for=fc.forecast_for + __import__("datetime").timedelta(seconds=100000))
+    bad_evidence = dataclasses.replace(rec.forecast_evidence, forecast=bad_fc)
+    with pytest.raises(RecommendationError):
+        CapacityActionRecommendation(
+            recommendation_id="x", forecast_evidence=bad_evidence, current_state=rec.current_state,
+            cost_book=rec.cost_book, constraints=rec.constraints, policy=rec.policy,
+            evaluated_candidates=rec.evaluated_candidates, selected_plan_id=rec.selected_plan_id,
+            recommendation_time=rec.recommendation_time, validity_seconds=rec.validity_seconds,
+            topology=rec.topology)
+
+
+# ==================================== Hardening item 2: recommendation advisory fields
+
+@pytest.mark.parametrize("field,value", [
+    ("advisory_only", False),
+    ("shadow_only", False),
+    ("actuation_performed", True),
+    ("authorization_performed", True),
+    ("effect_verified", True),
+    ("authority_class", "AUTHORITATIVE"),
+    ("execution_capability", "INFRASTRUCTURE_MUTATION"),
+])
+def test_recommendation_from_dict_rejects_tampered_advisory_field(field, value):
+    rec = _valid_rec()
+    d = rec.to_canonical_dict()
+    d[field] = value
+    with pytest.raises(RecommendationError):
+        _rebuild(d)
+
+
+# ==================================== Hardening item 3: surplus abstention fields
+
+def test_abstention_from_dict_rejects_surplus_field():
+    d = _abstention_dict()
+    d["totally_unexpected"] = 1
     with pytest.raises(RecommendationError):
         RecommendationAbstention.from_dict(d)

@@ -239,8 +239,20 @@ class CapacityActionRecommendation:
         rec_time = _as_utc(self.recommendation_time)
         if cutoff > rec_time:
             raise RecommendationError("forecast cutoff must not be after the recommendation time")
-        # Forecast horizon must still be ahead of the recommendation time.
+        # Canonical forecast relationship: forecast_for MUST equal forecast_cutoff + the
+        # declared horizon duration. A contradictory endpoint (before the cutoff) or an
+        # inflated endpoint (beyond cutoff + horizon, which would let a longer validity window
+        # look in-bounds) fails closed here at construction AND reconstruction.
+        horizon_seconds = float(fc.horizon.seconds)
+        if not (horizon_seconds > 0):
+            raise RecommendationError("forecast horizon duration must be > 0")
         forecast_for_dt = _as_utc(fc.forecast_for)
+        expected_for_ts = cutoff.timestamp() + horizon_seconds
+        if abs(forecast_for_dt.timestamp() - expected_for_ts) > 1e-6:
+            raise RecommendationError(
+                "forecast_for must equal forecast_cutoff + horizon "
+                "(contradictory or inflated forecast endpoint)")
+        # Forecast horizon must still be ahead of the recommendation time.
         if forecast_for_dt <= rec_time:
             raise RecommendationError("forecast horizon must be after the recommendation time")
         # Current canonical state must not be observed in the future.
@@ -259,10 +271,14 @@ class CapacityActionRecommendation:
             age = (rec_time - cutoff).total_seconds()
             if age > self.constraints.forecast_validity_seconds:
                 raise RecommendationError("forecast age exceeds the constraint forecast_validity_seconds")
-        # Recommendation validity window must lie within the forecast horizon.
+        # Recommendation validity window must not extend beyond EITHER the forecast endpoint
+        # OR the declared horizon duration measured from the cutoff (defence-in-depth: the two
+        # coincide while forecast_for is pinned above, but both are asserted explicitly).
         validity_end = rec_time.timestamp() + float(self.validity_seconds)
         if validity_end > forecast_for_dt.timestamp() + 1e-6:
-            raise RecommendationError("recommendation validity must lie within the forecast horizon")
+            raise RecommendationError("recommendation validity must not extend beyond the forecast endpoint")
+        if validity_end > cutoff.timestamp() + horizon_seconds + 1e-6:
+            raise RecommendationError("recommendation validity must not extend beyond the declared horizon duration")
 
         # --- rebuild the deterministic context and recompute every candidate -------
         try:
@@ -530,6 +546,16 @@ class CapacityActionRecommendation:
             diagnostic_annotation=data.get("diagnostic_annotation", ""),
             controller_package_version=data.get("controller_package_version", CONTROLLER_PACKAGE_VERSION),
             schema_version=data.get("schema_version", RECOMMENDATION_SCHEMA_VERSION),
+            # Pass every supplied fixed advisory field through so a tampered/contradictory
+            # value fails closed in __post_init__ rather than being silently normalized to a
+            # safe default on reconstruction.
+            authority_class=data.get("authority_class", AUTHORITY_CLASS_ADVISORY),
+            execution_capability=data.get("execution_capability", EXECUTION_CAPABILITY_NONE),
+            advisory_only=data.get("advisory_only", True),
+            shadow_only=data.get("shadow_only", True),
+            actuation_performed=data.get("actuation_performed", False),
+            authorization_performed=data.get("authorization_performed", False),
+            effect_verified=data.get("effect_verified", False),
         )
 
 
@@ -696,6 +722,18 @@ class RecommendationAbstention:
         for req in ("subject", "reason", "recommendation_time"):
             if req not in data:
                 raise RecommendationError(f"abstention requires '{req}'")
+        # Reject surplus fields (matching the recommendation serializer) so a stray field is
+        # never a silent bypass channel.
+        allowed = {
+            "schema_version", "controller_package_version", "subject", "reason",
+            "recommendation_time", "detail", "forecast_evidence_digest", "canonical_state_digest",
+            "topology_digest", "cost_evidence_digest", "constraint_digest", "policy_digest",
+            "evidence_digest", "authority_class", "execution_capability", "advisory_only",
+            "shadow_only", "actuation_performed",
+        }
+        surplus = set(data) - allowed
+        if surplus:
+            raise RecommendationError(f"unknown abstention field(s): {sorted(surplus)}")
         rec_time = data["recommendation_time"]
         if not isinstance(rec_time, datetime):
             raise RecommendationError("recommendation_time must be a datetime")
