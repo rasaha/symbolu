@@ -104,10 +104,11 @@ def test_non_finite_fields_rejected():
                             absolute_error=float("nan"), squared_error=float("nan"))
 
 
-def test_altered_state_digest_changes_record_identity():
+def test_forged_state_digest_rejected():
     rec = _valid_evaluated()
-    tampered = dataclasses.replace(rec, actual_state_digest="sha256:forged")
-    assert tampered.digest() != rec.digest()  # the actual-state digest is bound into identity
+    # The digest is checked against the EMBEDDED actual state — a forged digest is rejected.
+    with pytest.raises(EvaluationError, match="forged digest|embedded actual_state"):
+        dataclasses.replace(rec, actual_state_digest="sha256:forged")
 
 
 def test_abstained_record_cannot_carry_scored_fields():

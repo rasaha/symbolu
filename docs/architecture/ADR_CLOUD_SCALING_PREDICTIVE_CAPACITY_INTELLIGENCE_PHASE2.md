@@ -190,14 +190,19 @@ plus feature/uncertainty/admission config schemas); `ScalingObservation`,
 
 Accepted independent-audit findings were corrected in place on the Phase-2 branch:
 
-- **Controlled evaluation construction.** `ForecastEvaluationRecord` is produced by the
-  controlled `evaluate_forecast` service, which derives the actual value and unit from the
-  bound `CanonicalCapacityState` + target and recomputes every error/coverage figure. The
-  public constructor also re-validates all internally-derivable invariants and rejects
-  contradictory or non-finite records, so a caller cannot hand-assemble an apparently valid
-  evaluation with mismatched errors, actual value, unit, or interval. The record binds the
-  actual-state digest, target, derived value, unit, and matching policy into its identity
-  digest — a content identity, not a signature or authenticity proof.
+- **Controlled evaluation construction (structurally bound to the actual state).** An
+  `EVALUATED` `ForecastEvaluationRecord` **embeds the canonical actual `CanonicalCapacityState`**
+  and derives — and re-validates at construction *and* at `from_dict` reconstruction — every
+  outcome field from it: `actual_state_digest` (= `actual_state.digest()`), `actual_value`/
+  `unit` (from `extract_sample(actual_state, target)`), the subject/tenant/scope binding
+  (`actual_state.subject == subject`), and the recomputed signed/absolute/squared errors and
+  interval coverage/width. Because the state is embedded, a caller cannot present a forged
+  `actual_value` with an unrelated `actual_state_digest` and self-consistent arithmetic — the
+  digest is checked against the embedded state and the value/unit are re-extracted from it, so
+  a forged value, forged digest, or subject/target/unit mismatch is rejected. This closes the
+  gap that a digest string alone cannot prove which value a referenced state contained. The
+  evaluation digest remains a canonical content identity/integrity value — **not** a signature
+  or a proof of authenticity.
 
 - **Deterministic, fail-closed matching.** Replay actual-matching filters candidates by
   subject/tenant/scope, target, strictly-future event time, horizon, and tolerance, then

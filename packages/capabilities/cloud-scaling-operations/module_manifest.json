@@ -2,7 +2,7 @@
   "module_name": "cloud-scaling-operations",
   "distribution_name": "ugence-cloud-scaling-operations",
   "import_namespace": "ugence_cloud_scaling_operations",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "maturity": "alpha",
   "authority_class": "CONTROLLED_EXECUTION",
   "execution_capability": "INFRASTRUCTURE_MUTATION",
