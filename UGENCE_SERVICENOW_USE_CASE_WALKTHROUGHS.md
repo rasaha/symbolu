@@ -3,8 +3,9 @@
 ## A plain-language guide to what happens to enterprise data as it moves through governed agentic execution
 
 **Version:** 1.0
-**Companion to:** `UGENCE_SERVICENOW_PRODUCT_ANCHORED_USE_CASES.md` v1.1 (the factual & technical
-source of record). This document does **not** replace or weaken v1.1; it makes the same use cases
+**Version:** 1.1 (source-of-record reference updated to catalog v1.2)
+**Companion to:** `UGENCE_SERVICENOW_PRODUCT_ANCHORED_USE_CASES.md` **v1.2** (the factual & technical
+source of record). This document does **not** replace or weaken v1.2; it makes the same use cases
 understandable to four readers — a **ServiceNow representative**, an **enterprise executive**, an
 **operational owner**, and a **solution architect** — without revealing any Ugence source code,
 proprietary algorithm, or security-sensitive detail.
@@ -106,7 +107,7 @@ output artifact, and explicit non-responsibility). No internal mechanics are dis
   transitions are blocked (reason: governance-not-configured). It **never** creates authority,
   authors policy, authorizes actions, or mints clearance. *(Note: Agent Runtime is the
   execution-coordination kernel; it is **not** the "context-envelope record / CER" — those records
-  belong to Decision Authority. See §8, Ambiguity A2.)*
+  belong to Decision Authority. See §8, decision A2.)*
 
 **RA-8 — Execution / effect assurance** *(shipped; reference-grade)*
 - *Layman:* Checks whether **reality matched what was authorized**, after the fact.
@@ -241,7 +242,7 @@ customer deployment.*
 **Ordering note (contract-verified).** Agent Runtime and Cloud Scaling Operations are **peers at the
 execution layer**: the runtime is the coordination kernel that **invokes** the scaling executor
 within one governed quantum. The runtime does **not** run "after" Cloud Scaling Operations. (This is
-the verified repository contract; see §8, Ambiguity A1.)
+the verified repository contract; see §8, decision A1.)
 
 ### F. The data journey (with example information added at each stage)
 
@@ -294,11 +295,11 @@ flowchart TD
   AG -.->|DENIED / INDETERMINATE → stop| HOLD
   AC -->|CLEAR| RT
   AC -.->|HOLD / BLOCK / ESCALATE| HOLD
-  RT -->|invokes domain executor<br/>product-wired, gated by execution authorization| CS
+  RT -->|invokes domain executor<br/>gated by execution authorization| CS
   CS -->|scaling request to target| K8S
   K8S -->|execution outcome + audit| CS
-  CS -->|execution receipt| RA8
-  RT -->|trajectory / attempt evidence| RA8
+  CS -->|execution result returns| RT
+  RT -->|execution receipt| RA8
   RA8 -->|effect matched| SN2
   RA8 -.->|mismatch / uncertain → escalate| SN2
   HOLD -->|reason + evidence| SN2
@@ -317,14 +318,15 @@ flowchart TD
 4. If ActionGate returns **DENIED/INDETERMINATE**, the flow **stops** (no execution).
 5. On **CLEAR**, Action Clearance passes control to Agent Runtime.
 6. On **HOLD/BLOCK/ESCALATE**, the flow diverts to the stop branch — no execution.
-7. Agent Runtime **invokes** Cloud Scaling Operations as the domain executor (product-wired; gated by
-   an externally minted execution authorization). *This is an invocation, not a hand-off "after"
-   scaling.*
+7. Agent Runtime **invokes** Cloud Scaling Operations as the domain executor (gated by an externally
+   minted execution authorization). *This is an invocation, not a hand-off "after" scaling — Cloud
+   Scaling Operations is not a preceding gate.*
 8. Cloud Scaling Operations issues the **bounded scaling request** to the cluster.
 9. The cluster returns an **execution outcome + audit** to Cloud Scaling Operations.
-10. Cloud Scaling Operations emits an **execution receipt** to RA-8.
-11. Agent Runtime contributes **trajectory/attempt evidence** to RA-8.
-12. RA-8 returns **effect-matched** (success path) to the ServiceNow change record.
+10. Cloud Scaling Operations **returns its execution result to Agent Runtime**.
+11. Agent Runtime carries the **execution receipt** to RA-8.
+12. RA-8 compares authorized action + execution receipt + observed effect and returns
+    **effect-matched** (success path) to the ServiceNow change record.
 13. RA-8 returns a **mismatch/uncertain → escalate** result on the failure/uncertainty path.
 14. The stop branch returns its **reason + evidence** to the ServiceNow change record.
 
@@ -1205,24 +1207,25 @@ detail. Permitted, guarantee-level language used here includes: *tamper-evident 
 authorization · bound to the exact target and requested action · time-limited · independently checked
 · fail-closed · execution receipt · observed-effect reconciliation.*
 
-## §8 — Architectural ambiguities flagged for confirmation before deck generation
+## §8 — Architectural decisions (resolved in catalog v1.2)
 
-- **A1 — Agent Runtime ↔ Cloud Scaling Operations ordering (UC-5).** The repository contracts show
-  these as **peers at the execution layer with no direct reference** between them; the coordination
-  kernel **invokes** a domain executor within one governed quantum, so drawing "Cloud Scaling
-  Operations → Agent Runtime" (as the v1.1 pipeline shorthand does) is not contract-accurate. This
-  document draws **Agent Runtime invokes Cloud Scaling Operations** and labels the edge
-  "product-wired." *Confirm this is the intended representation before the deck.*
-- **A2 — "Agent Runtime (CER)" label in v1.1.** The contracts show Agent Runtime owns **Canonical
-  Execution State**, while **CER (context-envelope records) belongs to Decision Authority.** v1.1
-  labels the runtime "Agent Runtime (CER)"; this companion avoids that equation. *Consider a small
-  v1.1 erratum to decouple the CER label from Agent Runtime.*
-- **A3 — Agent Runtime version prose.** Authoritative version is **0.7.0**; some v1.1 references and
-  the package README prose are internally inconsistent (0.5.0 vs 0.7.0). *Confirm 0.7.0 as the
-  citation.*
-- **A4 — UC-4 execution ownership.** This document attributes execution/kernel enforcement to
-  ServiceNow Action Fabric + OpenShell and confines Ugence to authority/evidence artifacts. *Confirm
-  this composition framing is acceptable for representative-facing use.*
+All four items below were **confirmed** and applied in catalog **v1.2**; this companion reflects the
+same resolutions.
+
+- **A1 — Agent Runtime ↔ Cloud Scaling Operations ordering (UC-5): RESOLVED.** Per the repository
+  contracts, **Agent Runtime is the execution-coordination kernel that *invokes* the Cloud Scaling
+  Operations domain executor** within the governed flow; the executor **returns its result to Agent
+  Runtime**, whose execution receipt then feeds RA-8. Cloud Scaling Operations is **not** a preceding
+  authorization gate and does **not** feed Agent Runtime. Diagrams draw the invocation accordingly.
+- **A2 — "Agent Runtime (CER)": RESOLVED (removed).** Agent Runtime owns **governed execution
+  coordination / canonical execution state**; **CER (context-envelope records) belongs to Decision
+  Authority.** The "Agent Runtime (CER)" equation is removed from catalog v1.2 and is not used here.
+- **A3 — Agent Runtime version: RESOLVED.** Authoritative package metadata is **0.7.0**; version
+  numbers are kept out of representative-facing narrative (technical reference only).
+- **A4 — UC-4 execution ownership: RESOLVED (composition).** Execution/kernel enforcement is
+  **ServiceNow Action Fabric + NVIDIA OpenShell**; Ugence contributes independently verifiable
+  authority, exact-action binding, evidence lineage, clearance where applicable, sequence-risk and
+  assurance artifacts — **composition and partnership, not replacement or hierarchy.**
 
 ## Sources (primary: ServiceNow Docs; then release notes, Newsroom, Community)
 
@@ -1244,7 +1247,7 @@ contracts (READMEs/CHANGELOGs) at interface level only.
 - Action Fabric / AI Agent Fabric / OpenShell (UC-4) — Newsroom: "opens its full system of action";
   Community: Action Fabric MCP/A2A; Community + NVIDIA: OpenShell trust layer (enforcement via
   seccomp + Landlock LSM + network namespaces — not eBPF).
-- Full URL list: see v1.1 §9 source legend.
+- Full URL list: see catalog **v1.2** §9 source legend.
 
 ---
 
@@ -1261,4 +1264,4 @@ contracts (READMEs/CHANGELOGs) at interface level only.
 7. Enterprise Governed Value is **developing and cross-cutting**, not a gate. ✅
 8. Every scenario is labeled **illustrative**, not a customer deployment. ✅
 9. Current ServiceNow capability is acknowledged honestly; no "lacks/cannot/above/replacement." ✅
-10. Consistent with v1.1, with divergences from v1.1 *shorthand* explicitly flagged (§8 A1–A3). ✅
+10. Consistent with catalog **v1.2**; architecture corrections A1–A4 applied and reflected (§8). ✅

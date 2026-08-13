@@ -2,9 +2,20 @@
 
 ## A ServiceNow-product-first, pipeline-driven use-case catalog
 
-**Version:** 1.1 (factual & positioning correction of v1.0)
-**Supersedes:** v1.0 (2026-08-13)
+**Version:** 1.2 (architecture-correction of v1.1 — execution ordering & CER ownership)
+**Supersedes:** v1.1 (which superseded v1.0, 2026-08-13)
 **Companion to:** the v3.0 *Runtime AI Decision & Execution Authority* differentiation package
+
+> **v1.2 change note (scope-limited to architecture corrections).** Two corrections, verified
+> against the repository contracts: **(A1)** UC‑5's execution shorthand is corrected — **Agent
+> Runtime is the execution-coordination kernel that *invokes* the Cloud Scaling Operations domain
+> executor** (result returns to Agent Runtime, whose execution receipt feeds RA‑8); Cloud Scaling
+> Operations is **not** a preceding authorization gate and does **not** feed Agent Runtime. **(A2)**
+> the label **"Agent Runtime (CER)" is removed everywhere** — Agent Runtime owns *governed
+> execution coordination / canonical execution state*, whereas **CER (context-envelope records)
+> belongs to Decision Authority**. Agent Runtime version is **0.7.0** (package metadata). All
+> approved maturity, availability, source-hierarchy and positioning corrections from v1.1 are
+> preserved unchanged.
 **Audience:** ServiceNow architecture, product, security, risk & compliance, and partnership teams
 **Purpose of this document.** The v3.0 differentiation package is organized *Ugence-package-first*
 ("here is our module, here is the adjacent ServiceNow capability"). This companion **inverts the
@@ -110,8 +121,8 @@ one. Read the full chain once here; each use case then names which stages fire.
       ▼                 ▼                   ▼                   ▼                   ▼
  SEQUENCE          CLEARANCE           EXECUTION           RUNTIME ASSURANCE   LIFECYCLE
  StoryGraph        Action Clearance    Agent Runtime       RA‑7 trajectory +   RA‑6 revoke /
- (OBSERVE/         (ACP: CLEAR/HOLD/   (CER; fails closed   RA‑8 effect         supersede / epoch
- ESCALATE)         BLOCK/ESCALATE)     if ungoverned)       reconciliation      propagation
+ (OBSERVE/         (ACP: CLEAR/HOLD/   (coordinates; fails  RA‑8 effect         supersede / epoch
+ ESCALATE)         BLOCK/ESCALATE)     closed if ungovnd)   reconciliation      propagation
 
  Binding it together: Risk Authority — RiskDecision → signed RiskAuthorizationEnvelope (Ed25519)
  Non-compensatory:    P ∧ E ∧ R ∧ A ∧ O ∧ L → execute;  any ¬ → no execution (fail-closed)
@@ -191,8 +202,8 @@ developed in full depth in §6.
 | **UC‑1 ★** *(FUTURE — Dec 2026)* | Autonomous security-incident containment | Security Incident Response / Autonomous Security (**Tier 2 SOC AI Specialist — ANNOUNCED, expected Dec 2026**) | Decision Authority → Model Authority → **ActionGate (host/account/IP digest)** → ACP → Agent Runtime → RA‑8 → RA‑6 |
 | **UC‑2 ★** | Runtime model authorization for regulated data | AI Control Tower (model/provider governance; Skill Kit) | PWC → Context Minimization → **Model Authority (per-request ALLOW/DENY/HOLD/ESCALATE + fallback)** → ActionGate |
 | **UC‑3 ★** | EU AI Act high-risk action enforcement | AI Control Tower — AI Risk & Compliance / IRM | PWC → **RA‑5 trusted evidence** → Decision Authority → **Risk Authority (signed envelope)** → ActionGate → RA‑8 |
-| **UC‑4 ★** | Governing external agents on the system of action | Action Fabric + AI Agent Fabric (MCP/A2A; Claude/Copilot/Gemini) | **Agent Runtime (vendor-neutral CER)** → Model Authority → ActionGate → **StoryGraph** → ACP → RA‑7 |
-| **UC‑5 ★** | Autonomous change execution | Change Management + ITOM auto-remediation | **Decision Authority (no AI self-auth)** → ActionGate (CI + change digest) → **ACP (blackout/conflict)** → Cloud Scaling Operations → RA‑8 |
+| **UC‑4 ★** | Governing external agents on the system of action | Action Fabric + AI Agent Fabric (MCP/A2A; Claude/Copilot/Gemini) | **Agent Runtime (governed execution coordination)** → Model Authority → ActionGate → **StoryGraph** → ACP → RA‑7 |
+| **UC‑5 ★** | Autonomous change execution | Change Management + ITOM auto-remediation | **Decision Authority (no AI self-auth)** → ActionGate (CI + change digest) → **ACP (blackout/conflict)** → **Agent Runtime → invokes Cloud Scaling Operations** (result returns) → RA‑8 |
 | UC‑6 | Autonomous access provisioning with SoD | ITSM Request / Virtual Agent / Employee Center (+ Veza) | Decision Authority → ActionGate (entitlement digest) → **ACP (SoD/risk posture)** → RA‑8 |
 | UC‑7 | Autonomous customer refunds / credits | Customer Service Management (Now Assist for CSM) | Decision Authority (delegated $ threshold) → **ActionGate (amount+account digest)** → ACP → RA‑8 |
 | UC‑8 | Autonomous procurement / PO issuance | Sourcing & Procurement Operations / PSM | **PWC (">$100K → CFO")** → TAP (supplier-cert evidence) → Decision Authority → ActionGate → RA‑8 |
@@ -248,7 +259,7 @@ ActionGate                AUTHORIZED bound to the EXACT target digest: isolate h
 Action Clearance (ACP)    CLEAR/BLOCK on live state: is the target a business-critical CI? in a
                           maintenance freeze? would isolation break a dependent revenue service?
       ▼
-Agent Runtime (CER)       executes the containment; fails closed if the governance seam is unwired
+Agent Runtime            coordinates execution of the containment; fails closed if the governance seam is unwired
       ▼
 RA‑8 execution assurance  reconciles that ONLY srv‑prod‑0412 was isolated (EXECUTION_EFFECT_MISMATCH
                           if the blast radius exceeded the authorization)
@@ -417,7 +428,7 @@ capability?*
 
 **4. Ugence pipeline.**
 ```
-Agent Runtime (CER)        a Canonical Execution Request as an independent governance-decision seam
+Agent Runtime              governed execution coordination as an independent governance-decision seam
                            (a layer that composes with an OpenShell-style execution sandbox — it
                            issues/verifies authority; it does not replace kernel-level enforcement)
       ▼
@@ -499,12 +510,17 @@ ActionGate                  AUTHORIZED bound to the EXACT CI + change payload di
 Action Clearance (ACP)      CLEAR/HOLD/BLOCK on live change state: blackout window? conflicting
                             change? dependent-service freeze? — a non-compensatory pre-dispatch veto
       ▼
-Cloud Scaling Operations    gated CONTROLLED_EXECUTION requiring an explicit ExecutionAuthorization;
-                            dry_run by default
+Agent Runtime               governed execution coordination; INVOKES the domain executor and drives
+      │                     lifecycle (retry/timeout/recovery). NOT preceded by Cloud Scaling Ops.
+      │  invokes ▼
+      │   Cloud Scaling Operations   gated CONTROLLED_EXECUTION requiring an explicit
+      │                              ExecutionAuthorization; dry_run by default
+      │  result ▲                    (execution result returns to Agent Runtime)
       ▼
-Agent Runtime (CER)         executes the change
+Agent Runtime               carries the execution receipt forward
       ▼
-RA‑8 execution assurance    reconciles that the executed change matched the authorized CI + payload
+RA‑8 execution assurance    reconciles the authorized action + execution receipt + observed effect
+                            (only the authorized CI + payload changed)
 ```
 
 **5. ServiceNow role → Ugence role.** ServiceNow owns the change record, CMDB impact, windows,
