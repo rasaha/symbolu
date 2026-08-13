@@ -1,9 +1,19 @@
-"""Closed enumerations for the governed-value spine.
+"""Closed enumerations for the governed-value kernel.
 
-The spine is deliberately small: value decomposes into exactly three sources,
-and the *intended outcome* selects exactly one measurement method. Domain and
-geography act as **modifiers** on the spine's terms, not as parallel
-frameworks — see :mod:`governed_value.domain.modifiers`.
+Classification is **three orthogonal dimensions**, never one enum:
+
+- :class:`AssessmentStage` — *where in the ROI lifecycle* a figure sits
+  (readiness / forecast / post-deployment). This kernel only ever produces
+  ``POST_DEPLOYMENT_VALUE``.
+- :class:`EvidenceStatus` — *how well substantiated* the inputs are. This kernel
+  only ever produces ``REPORTED`` (caller-supplied, un-evidenced). ``OBSERVED``,
+  ``ATTRIBUTED`` and ``VERIFIED`` require the evidence/attribution/authority
+  layers (GV-2/GV-4), which do not exist yet.
+- :class:`AuthorityStatus` — *whether an authority attested* the figure. This
+  kernel only ever produces ``UNVERIFIED``.
+
+:class:`Scorability` is a fourth, independent axis: whether a defensible number
+can be produced at all. Do not conflate evidence status with lifecycle stage.
 """
 
 from __future__ import annotations
@@ -15,6 +25,11 @@ __all__ = [
     "DomainKind",
     "OutcomeClass",
     "MeasurementMethod",
+    "OUTCOME_MEASUREMENT",
+    "AssessmentStage",
+    "EvidenceStatus",
+    "AuthorityStatus",
+    "ConfidenceClass",
     "Scorability",
 ]
 
@@ -37,7 +52,7 @@ class DomainKind(str, Enum):
     SUPPORT = "support"
     SOFTWARE = "software"
     FINANCE_OPS = "finance_ops"
-    REGULATED = "regulated"  # health, legal, credit — loss-avoided dominates
+    REGULATED = "regulated"  # health, legal, credit — loss dominates
     SALES_MARKETING = "sales_marketing"
     GENERIC = "generic"
 
@@ -69,13 +84,53 @@ OUTCOME_MEASUREMENT: dict[OutcomeClass, MeasurementMethod] = {
 }
 
 
-class Scorability(str, Enum):
-    """The governance verdict on whether a hard ROI figure is defensible.
+class AssessmentStage(str, Enum):
+    """Where in the ROI lifecycle a figure sits. Orthogonal to evidence."""
 
-    ``NOT_SCORABLE`` suppresses the headline ``ngva``/``roi`` (fail closed):
-    a number without a defensible basis is worse than no number.
+    PRE_ROI_READINESS = "pre_roi_readiness"
+    FORECAST = "forecast"
+    POST_DEPLOYMENT_VALUE = "post_deployment_value"
+
+
+class EvidenceStatus(str, Enum):
+    """How well substantiated an input/result is. Orthogonal to lifecycle stage.
+
+    Ordered from weakest to strongest. This kernel never rises above
+    ``REPORTED`` — naming an input "realized" does not make it ``OBSERVED``.
+    """
+
+    REPORTED = "reported"
+    MODELED = "modeled"
+    OBSERVED = "observed"
+    ATTRIBUTED = "attributed"
+    VERIFIED = "verified"
+
+
+class AuthorityStatus(str, Enum):
+    """Whether a governance/finance authority attested the figure."""
+
+    UNVERIFIED = "unverified"
+    ATTESTED = "attested"
+    VERIFIED = "verified"
+
+
+class ConfidenceClass(str, Enum):
+    """A qualitative confidence label — carried alongside, never in the math."""
+
+    UNCLASSIFIED = "unclassified"
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class Scorability(str, Enum):
+    """Whether a defensible figure can be produced at all.
+
+    ``NOT_SCORABLE`` suppresses the headline ROI / payback (fail closed): a
+    number without a defensible basis is worse than no number. Independent of
+    stage, evidence status and authority status.
     """
 
     SCORABLE = "scorable"
-    DEGRADED = "degraded"  # a figure is returned, but with material caveats
+    DEGRADED = "degraded"  # a figure is returned, with material caveats
     NOT_SCORABLE = "not_scorable"  # headline suppressed

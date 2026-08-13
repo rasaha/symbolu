@@ -1,9 +1,8 @@
-"""Reusable scenario builders for the governed-value suite.
+"""Reusable scenario builders for the realized (POST_DEPLOYMENT_VALUE) suite.
 
-``scorable_support_case`` is the canonical happy path: a support-deflection
-agent with a captured baseline, a priced wrong-action term, a complete TCO, and
-authorized actions to normalize over. Tests mutate one facet at a time to prove
-each guard fires (or does not) independently.
+``scorable_support_case`` is the canonical happy path: a captured baseline, a
+complete cost-to-serve and investment, explicit zero actual losses, and one
+residual expected-loss item. Tests mutate one facet at a time.
 """
 
 from __future__ import annotations
@@ -12,16 +11,17 @@ from decimal import Decimal
 
 from governed_value.api import (
     AgentValueCase,
-    AttributionContext,
-    AuthorizedActionRef,
+    AttributionEvidence,
     CostToServe,
     DomainKind,
     DomainProfile,
-    ErrorProfile,
+    ExpectedLoss,
+    ExpectedLossItem,
     GeographyProfile,
     Money,
     OutcomeClass,
     RealizedValue,
+    TotalInvestment,
     ValueSource,
 )
 
@@ -33,8 +33,6 @@ def money(units: int, currency: str = USD) -> Money:
 
 
 def full_cost(currency: str = USD) -> CostToServe:
-    """A TCO that speaks to all seven components (some deliberately zero)."""
-
     return CostToServe(
         currency=currency,
         inference=money(200_00, currency),
@@ -47,8 +45,33 @@ def full_cost(currency: str = USD) -> CostToServe:
     )
 
 
+def full_investment(currency: str = USD) -> TotalInvestment:
+    return TotalInvestment(
+        currency=currency,
+        capital_expenditure=money(100_00, currency),
+        one_time_build=money(300_00, currency),
+        integration=money(100_00, currency),
+        amortized_cost_to_serve=money(0, currency),
+    )
+
+
+def one_expected_loss(currency: str = USD) -> ExpectedLoss:
+    # 1% chance of a $200 wrongful action -> expected value $2.00 (200 minor units).
+    return ExpectedLoss(
+        currency=currency,
+        items=(
+            ExpectedLossItem(
+                label="wrongful_action",
+                probability=Decimal("0.01"),
+                loss_magnitude=money(200_00, currency),
+            ),
+        ),
+    )
+
+
 def scorable_support_case(**overrides) -> AgentValueCase:
     base = dict(
+        tenant_id="tenant-a",
         agent_id="support-manila-1",
         domain=DomainProfile(
             kind=DomainKind.SUPPORT,
@@ -57,27 +80,16 @@ def scorable_support_case(**overrides) -> AgentValueCase:
         ),
         geography=GeographyProfile(label="PH", currency=USD),
         outcome=OutcomeClass.DETERMINISTIC_AUTOMATION,
-        realized=RealizedValue(
+        benefit=RealizedValue(
             labor_displaced=money(1_000_00),
             throughput_gained=money(0),
             loss_avoided=money(0),
         ),
-        error_profile=ErrorProfile(p_error=Decimal("0.05"), severity=Decimal("0.20")),
+        actual_losses=money(0),
+        residual_expected_loss=one_expected_loss(),
         cost=full_cost(),
-        attribution=AttributionContext(
-            baseline_captured=True,
-            realization_rate=Decimal("0.90"),
-            headcount_or_scope_changed=True,
-            attribution_fraction=Decimal("1.0"),
-            concurrent_changes=0,
-            holdout_or_staged=False,
-        ),
-        action=AuthorizedActionRef(
-            tenant_id="tenant-a",
-            envelope_id="env-1",
-            action_digest="digest-1",
-            authorized_count=500,
-        ),
+        investment=full_investment(),
+        attribution=AttributionEvidence(baseline_captured=True),
     )
     base.update(overrides)
     return AgentValueCase(**base)

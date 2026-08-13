@@ -1,21 +1,23 @@
-"""Ugence Governed Value — governed-value accounting kernel.
+"""Ugence Governed Value — experimental realized-value calculation kernel.
 
-An independently packaged, stdlib-only leaf that turns an agent's realized
-value, wrong-action risk, and cost of ownership into **net governed value per
-authorized action (NGVA)** — the single figure that makes agents across domains
-and geographies commensurable, measured at the control-plane chokepoint where
-authorization already happens.
+An independently packaged, stdlib-only leaf that computes a **realized
+(post-deployment) governed-value** figure from **caller-reported, unverified**
+inputs. It is the downstream financial-calculation stage only — one of three
+engines in the larger Ugence Value Intelligence capability (Agent Value
+Readiness, Value Forecasting, Governed Value Verification); the readiness and
+forecast engines, evidence/attribution/authority binding, FX and portfolio
+comparison are separate, later, reviewed phases and are **not** in this package.
 
-    ROI = (realized value - TCO) / TCO
-    realized value = labor displaced + throughput/revenue gained + loss avoided
-    net governed value = value x (1 - p_error x severity) - cost to serve
-    NGVA = net governed value / authorized actions
+    total benefit   = attributable realized benefit + attributed avoided loss
+    RealizedNGV     = total benefit − actual losses − cost to serve
+    RiskAdjustedNGV = RealizedNGV − residual expected loss   (Σ probability × magnitude)
+    RealizedROI     = RealizedNGV / Total Investment
 
-Domain, geography and intended outcome act as *modifiers* on the spine's terms,
-not as separate frameworks. The scorer fails closed: without a defensible basis
-(baseline, priced error term, holdout where required, actions to normalize over)
-it reports ``NOT_SCORABLE`` and suppresses the headline rather than emit a
-flattering number.
+Expected loss is additive absolute money and may exceed total benefit; realized
+benefit is never realization-discounted; Total Investment is distinct from
+cost-to-serve. Every result is classified on four orthogonal axes and this kernel
+never rises above ``POST_DEPLOYMENT_VALUE / REPORTED / UNVERIFIED``: naming an
+input "realized" does not make it observed, attributed or verified.
 
 See :mod:`governed_value.api` for the public surface.
 """

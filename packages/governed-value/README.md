@@ -1,73 +1,83 @@
 # Ugence Governed Value (`ugence-governed-value`)
 
-Governed-value accounting kernel. This independently packaged module turns an
-agent's **realized value**, **wrong-action risk**, and **cost of ownership** into
-one auditable figure — **net governed value per authorized action (NGVA)** —
-measured at the control-plane chokepoint where authorization already happens.
+> **Scope (read first).** This package is an **experimental, downstream
+> realized-value _calculation kernel_**. It computes a post-deployment
+> governed-value figure from **caller-reported, unverified inputs**. It is **not**
+> an ROI governance system: it has no evidence, attribution, or authority binding
+> yet, so it can never claim a figure is observed, attributed, or verified —
+> naming an input "realized" does not make it so. It is one stage (the
+> _Governed Value Verification_ engine's downstream calculator) of the larger
+> **Ugence Value Intelligence** capability; the readiness and forecast engines,
+> evidence/attribution/authority binding, FX, and portfolio comparison are
+> separate, later, reviewed phases and are **not** in this package.
 
-> Your ROI deck tells you an agent is positive. Ugence tells you whether that
-> number survives its own error term, its baseline, and its attribution.
-
-## The spine
+## What it computes (GV-1)
 
 ```
-ROI            = (realized value − TCO) / TCO
-realized value = labor displaced + throughput/revenue gained + loss avoided
-net gov. value = realized value × (1 − p_error × severity) − cost to serve
-NGVA           = net governed value / authorized actions
+total benefit    = attributable realized benefit + attributed avoided loss
+                   (= labor displaced + throughput/revenue gained + loss avoided)
+RealizedNGV      = total benefit − actual losses − cost to serve
+RiskAdjustedNGV  = RealizedNGV − residual expected loss     (Σ probability × loss magnitude)
+RealizedROI      = RealizedNGV / Total Investment
+RiskAdjustedROI  = RiskAdjustedNGV / Total Investment
 ```
 
-Realized value decomposes into **only three sources**. Everything else
-(satisfaction, "productivity", adoption) is a leading indicator, not value, and
-is intentionally not representable in the numerator. Critically, net value is
-reduced by the cost of the agent's *wrong* actions — the term that most models
-omit, and the reason agents that look strongly positive usually aren't.
+Three properties are the point of this version:
 
-**Domain, geography and intended outcome are modifiers on the spine's terms, not
-three separate frameworks.**
+1. **Expected loss is additive, absolute money and unbounded relative to
+   benefit.** It is `Σ probability × loss_magnitude`, not a `(1 − p×severity)`
+   haircut. A low-probability, high-magnitude item can exceed total benefit and
+   drive risk-adjusted net governed value deeply negative — the case a
+   high-consequence agent must surface.
+2. **Realized benefit is never realization-discounted.** Post-deployment benefit
+   is already realized and already attributable; applying a realization/decay/
+   locale factor here would double-discount it. Those factors are forecast
+   concerns and are deferred.
+3. **Total Investment is the ROI denominator, distinct from cost-to-serve.**
 
-| Lens | What it moves |
-|---|---|
-| **Domain** | the natural value unit + the error asymmetry (`min_severity` floor in high-consequence domains) |
-| **Geography** | the *denominator* mostly — regulatory load and residency inference cost add to TCO; locale performance scales the realization rate |
-| **Intended outcome** | the *measurement method* — deterministic → before/after; judgment → holdout; discovery → option value; risk containment → actuarial baseline |
+**Historical vs forward loss are separate:** `actual_losses` (incurred, subtracted
+in `RealizedNGV`) is never mixed into the forward `residual_expected_loss`, which
+appears only in the explicit risk-adjusted view.
+
+## Classification — four orthogonal axes (GV-0)
+
+Every result carries all four; they are independent, not one enum:
+
+| Axis | Values | This kernel emits |
+|---|---|---|
+| `AssessmentStage` | `PRE_ROI_READINESS` · `FORECAST` · `POST_DEPLOYMENT_VALUE` | **`POST_DEPLOYMENT_VALUE`** |
+| `EvidenceStatus` | `REPORTED` · `MODELED` · `OBSERVED` · `ATTRIBUTED` · `VERIFIED` | **`REPORTED`** only |
+| `AuthorityStatus` | `UNVERIFIED` · `ATTESTED` · `VERIFIED` | **`UNVERIFIED`** only |
+| `Scorability` | `SCORABLE` · `DEGRADED` · `NOT_SCORABLE` | computed |
+
+Rising above `REPORTED`/`UNVERIFIED` requires the evidence (GV-2) and authority
+(GV-4) layers, which do not exist. The classification is invariant across
+`SCORABLE`/`DEGRADED`/`NOT_SCORABLE`.
 
 ## Design invariants (enforced + tested)
 
 | Invariant | Where | Test |
 |---|---|---|
-| **Fail closed** — no defensible basis ⇒ headline `ngva`/`roi` suppressed | `services.scorer` | `adversarial/test_fatal_guards_suppress_headline.py` |
-| **Error term is mandatory** — an unpriced `p_error`/`severity` is NOT_SCORABLE | `services.scorer`, `domain.error_profile` | `adversarial/test_fatal_guards_suppress_headline.py` |
-| **Baseline required** — no pre-deployment baseline ⇒ NOT_SCORABLE | `services.scorer`, `domain.attribution` | `adversarial/…` |
-| **Holdout where attribution is unrecoverable** — judgment/risk-containment need it | `services.scorer` | `adversarial/…` |
-| **One action, one denominator** — normalize per authorized action or nothing | `domain.action`, `services.scorer` | `adversarial/…` |
-| **Error asymmetry floor** — regulated domains reject an under-priced severity | `domain.modifiers`, `services.scorer` | `adversarial/…` |
-| **Exact money** — integer minor units, one half-even rounding, no binary drift | `domain.money` | `unit/test_money.py` |
-| **Determinism** — same inputs ⇒ bit-identical result; NGVA is `Decimal` | `services.scorer` | `contract/test_determinism.py` |
-| **Currency isolation** — no silent cross-currency add; portfolio needs one base | `domain.money`, `services.portfolio` | `unit/test_money.py`, `adversarial/test_portfolio_commensurability.py` |
-| **Decay is per-period** — value is recomputed as drift accrues, not once | `domain.attribution`, `services.decay` | `unit/test_decay.py` |
-
-### The five ROI-model failures, as executable guards
-
-| Failure | Guard | Verdict |
-|---|---|---|
-| 1. No baseline before go-live | `attribution.baseline_captured` | **NOT_SCORABLE** |
-| 2. Realization assumed at 100% | `realization_rate == 1 & not headcount_or_scope_changed` | DEGRADED |
-| 3. TCO omits retries/evals/monitoring/HITL/remediation/migration | `cost.missing_components()` | DEGRADED |
-| 4. No decay term | `decay_per_period == 0 & periods_elapsed > 0` | DEGRADED |
-| 5. Full credit amid several concurrent changes | `concurrent_changes > 0 & not holdout_or_staged` | DEGRADED |
-| (spine) Unpriced wrong-action term | `error_profile.is_priced()` | **NOT_SCORABLE** |
-
-`NOT_SCORABLE` suppresses the headline; `DEGRADED` keeps it with an attached,
-auditable advisory. A number without a defensible basis is worse than no number.
+| **Additive expected loss, unbounded vs benefit** | `domain/expected_loss.py`, `services/scorer.py` | `adversarial/test_expected_loss.py` |
+| **Catastrophic loss ⇒ deeply negative NGV** | `services/scorer.py` | `adversarial/test_expected_loss.py` |
+| **Realized benefit not re-discounted** | `domain/value.py`, `services/scorer.py` | `unit/test_no_double_discount.py` |
+| **Investment ≠ cost-to-serve** | `domain/investment.py` | `unit/test_scorer_happy_path.py` |
+| **Actual (historical) loss ≠ forward expected loss** | `domain/case.py`, `services/scorer.py` | `adversarial/test_expected_loss.py` |
+| **Honest classification; never over-claims** | `services/scorer.py` | `contract/test_classification.py` |
+| **Fail closed** — no basis ⇒ ROI + payback suppressed | `services/scorer.py` | `adversarial/test_fatal_guards_suppress_headline.py` |
+| **Geography/domain touch no money** | `domain/modifiers.py` | `unit/test_modifiers.py` |
+| **Exact money** — integer minor units, half-even, no float | `domain/money.py` | `unit/test_money.py` |
+| **`None` ≠ explicit zero** (cost & investment) | `domain/cost.py`, `domain/investment.py` | `adversarial/test_degrade_guards_keep_headline.py` |
+| **Determinism** — same inputs ⇒ identical; ROI is `Decimal` | `services/scorer.py` | `contract/test_determinism.py` |
+| **Payback only on a defensible run-rate** | `services/scorer.py` | `unit/test_scorer_happy_path.py` |
+| **Confidence never enters the arithmetic** | `services/scorer.py` | (carried, not multiplied) |
 
 ## Package layout
 
 ```
 src/governed_value/
-  domain/         money · value sources · error profile · cost · modifiers · attribution · case
-  services/       scorer (NGVA + guards) · decay projection · portfolio normalization
-  integrations/   AuthorizedActionPort chokepoint seam (+ reference ledger)
+  domain/         money · value · expected_loss · cost · investment · modifiers · attribution · case · enums
+  services/       scorer (realized NGV + risk-adjusted view + guards + classification)
   observability/  governance-event bus
   api/            application facade + public surface
 tests/            unit · contract · adversarial (+ reusable scenario builder)
@@ -77,50 +87,37 @@ tests/            unit · contract · adversarial (+ reusable scenario builder)
 
 ```python
 from decimal import Decimal
-from governed_value.api import (GovernedValueApplication, AgentValueCase, AttributionContext,
-    AuthorizedActionRef, CostToServe, DomainKind, DomainProfile, ErrorProfile,
-    GeographyProfile, Money, OutcomeClass, RealizedValue, ValueSource)
+from governed_value.api import (GovernedValueApplication, AgentValueCase, AttributionEvidence,
+    CostToServe, DomainKind, DomainProfile, ExpectedLoss, ExpectedLossItem, GeographyProfile,
+    Money, OutcomeClass, RealizedValue, TotalInvestment, ValueSource)
 
+M = lambda u: Money(u, "USD")
 case = AgentValueCase(
-    agent_id="support-manila-1",
+    tenant_id="tenant-a", agent_id="support-manila-1",
     domain=DomainProfile(DomainKind.SUPPORT, "contact_deflected", ValueSource.LABOR_DISPLACED),
     geography=GeographyProfile(label="PH", currency="USD"),
     outcome=OutcomeClass.DETERMINISTIC_AUTOMATION,
-    realized=RealizedValue(Money(1_000_00, "USD"), Money(0, "USD"), Money(0, "USD")),
-    error_profile=ErrorProfile(p_error=Decimal("0.05"), severity=Decimal("0.20")),
-    cost=CostToServe(currency="USD", inference=Money(200_00, "USD"), retries=Money(20_00, "USD"),
-        evals=Money(15_00, "USD"), monitoring=Money(10_00, "USD"),
-        human_in_loop_review=Money(50_00, "USD"), incident_remediation=Money(5_00, "USD"),
-        model_migration=Money(0, "USD")),
-    attribution=AttributionContext(baseline_captured=True, realization_rate=Decimal("0.90"),
-        headcount_or_scope_changed=True),
-    action=AuthorizedActionRef("tenant-a", "env-1", "digest-1", authorized_count=500),
+    benefit=RealizedValue(M(1_000_00), M(0), M(0)),
+    actual_losses=M(0),
+    residual_expected_loss=ExpectedLoss("USD", (ExpectedLossItem("wrong", Decimal("0.01"), M(200_00)),)),
+    cost=CostToServe(currency="USD", inference=M(200_00), retries=M(20_00), evals=M(15_00),
+        monitoring=M(10_00), human_in_loop_review=M(50_00), incident_remediation=M(5_00),
+        model_migration=M(0)),
+    investment=TotalInvestment(currency="USD", capital_expenditure=M(100_00),
+        one_time_build=M(300_00), integration=M(100_00), amortized_cost_to_serve=M(0)),
+    attribution=AttributionEvidence(baseline_captured=True),
 )
 
-app = GovernedValueApplication()
-result = app.score(case)
-print(result.scorability, result.ngva_per_action)   # Scorability.SCORABLE 118.2
+r = GovernedValueApplication().score(case)
+print(r.stage.value, r.evidence_status.value, r.scorability.value)  # post_deployment_value reported scorable
+print(r.realized_roi, r.risk_adjusted_roi)                          # 1.4  1.396
 ```
-
-`app.compare([...], base_currency="USD")` ranks a heterogeneous portfolio by
-NGVA; `app.project(case, horizon=4)` recomputes it per period under decay.
-
-## The chokepoint seam
-
-`governed_value` never imports the authority kernel. It measures *per authorized
-action*, so the count of authorized actions is resolved through
-`integrations.authorization.AuthorizedActionPort`. A production deployment adapts
-a signed `RiskAuthorizationEnvelope` (`ugence-risk-authority`) onto that port —
-through the contract — exactly as `risk_authority` consumes ActionGate/TAP/PWC
-through *its* ports. This keeps the package a **stdlib-only leaf**: the
-conformance suite installs the single wheel into a clean `--no-index` venv with
-zero third-party packages, like the other governance leaves.
 
 ## Why exact `Decimal` money?
 
-Because a CFO audits this figure. Money is integer minor units; ratios are
-`Decimal`; scaling rounds once, half-to-even. Floats are rejected at the door
-(`Decimal(0.1) != 0.1`), so no binary drift reaches a reported number.
+A CFO audits these figures. Money is integer minor units; probabilities are
+`Decimal`; scaling rounds once, half-to-even; floats are rejected at the door.
+No binary drift reaches a reported number.
 
 ## Verify the distribution
 
@@ -128,10 +125,16 @@ Because a CFO audits this figure. Money is integer minor units; ratios are
 python packages/governed-value/verify_governed_value_distribution.py
 ```
 
-## Scope note
+Builds the single wheel, installs it into a clean `--no-index` venv (zero
+third-party packages), and proves the realized calculation, the honest
+classification, the fail-closed suppression, and the additive-catastrophic-loss
+behaviour.
 
-This slice ships the scoring spine, the modifier lenses, the five-failure
-guards, decay projection and portfolio normalization. It deliberately **excludes**
-FX conversion (bring a base currency), a persistence backend, and an HTTP route
-adapter — their seams are present (transport-neutral facade, per-currency
-portfolio) and layer on without touching the kernel.
+## Not in this package (separate, reviewed phases)
+
+Pre-ROI readiness scoring (Intelligence / Capabilities / Adoption), forecast
+modelling, geography/domain/outcome as **versioned policy context**, evidence &
+attribution binding, authority adapters, FX / valuation basis / discounting,
+per-unit normalization (`NormalizationBasis`), and portfolio comparison. This
+kernel deliberately stops at a deterministic realized calculation over reported
+inputs.

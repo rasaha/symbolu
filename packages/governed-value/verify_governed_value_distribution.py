@@ -8,9 +8,12 @@ no system site packages and no monorepo path (``--no-index`` — the package
 declares zero third-party runtime dependencies), then proves inside that env:
 
   * ``governed_value`` imports from site-packages and ships ``py.typed``;
-  * the spine scores a case end-to-end and the headline NGVA is exact Decimal;
-  * a fail-closed guard (no baseline) suppresses the headline;
-  * a portfolio normalizes two agents to net-governed-value-per-authorized-action;
+  * the realized kernel scores a case end-to-end, the headline ROI is exact
+    Decimal, and the result is honestly classified POST_DEPLOYMENT_VALUE /
+    REPORTED / UNVERIFIED;
+  * a fail-closed guard (no baseline) suppresses the headline (ROI + payback);
+  * GV-1: an additive catastrophic expected-loss item exceeds total benefit and
+    drives risk-adjusted net governed value deeply negative;
   * NO capability / framework / product / authority package is importable.
 
 Run:  python packages/governed-value/verify_governed_value_distribution.py
@@ -33,7 +36,7 @@ import importlib.util, sys
 from decimal import Decimal
 
 import governed_value as gv
-assert gv.__version__ == "0.1.0", gv.__version__
+assert gv.__version__ == "0.2.0", gv.__version__
 assert "site-packages" in gv.__file__, gv.__file__
 assert not any("/symbolu" in p for p in sys.path), sys.path
 
@@ -45,50 +48,65 @@ for mod in ("pydantic", "fastapi", "numpy", "governance_providers",
             "risk_authority", "ugence_actiongate_provider", "platform_freeze"):
     assert importlib.util.find_spec(mod) is None, ("unexpected package present: " + mod)
 
-from governed_value.api import (GovernedValueApplication, AgentValueCase, AttributionContext,
-    AuthorizedActionRef, CostToServe, DomainKind, DomainProfile, ErrorProfile,
-    GeographyProfile, Money, OutcomeClass, RealizedValue, Scorability, ValueSource)
+from governed_value.api import (GovernedValueApplication, AgentValueCase, AttributionEvidence,
+    AssessmentStage, AuthorityStatus, CostToServe, DomainKind, DomainProfile, EvidenceStatus,
+    ExpectedLoss, ExpectedLossItem, GeographyProfile, Money, OutcomeClass, RealizedValue,
+    Scorability, TotalInvestment, ValueSource)
+
+M = lambda u: Money(u, "USD")
 
 
-def _case(agent_id, authorized, baseline=True):
+def _cost():
+    return CostToServe(currency="USD", inference=M(200_00), retries=M(20_00), evals=M(15_00),
+        monitoring=M(10_00), human_in_loop_review=M(50_00), incident_remediation=M(5_00),
+        model_migration=M(0))
+
+
+def _inv():
+    return TotalInvestment(currency="USD", capital_expenditure=M(100_00), one_time_build=M(300_00),
+        integration=M(100_00), amortized_cost_to_serve=M(0))
+
+
+def _case(agent_id, baseline=True, expected_loss=None):
     return AgentValueCase(
-        agent_id=agent_id,
+        tenant_id="t", agent_id=agent_id,
         domain=DomainProfile(kind=DomainKind.SUPPORT, natural_unit="contact_deflected",
                              dominant_source=ValueSource.LABOR_DISPLACED),
         geography=GeographyProfile(label="PH", currency="USD"),
         outcome=OutcomeClass.DETERMINISTIC_AUTOMATION,
-        realized=RealizedValue(labor_displaced=Money(1_000_00, "USD"),
-                               throughput_gained=Money(0, "USD"), loss_avoided=Money(0, "USD")),
-        error_profile=ErrorProfile(p_error=Decimal("0.05"), severity=Decimal("0.20")),
-        cost=CostToServe(currency="USD", inference=Money(200_00, "USD"), retries=Money(20_00, "USD"),
-                         evals=Money(15_00, "USD"), monitoring=Money(10_00, "USD"),
-                         human_in_loop_review=Money(50_00, "USD"),
-                         incident_remediation=Money(5_00, "USD"), model_migration=Money(0, "USD")),
-        attribution=AttributionContext(baseline_captured=baseline, realization_rate=Decimal("0.90"),
-                                       headcount_or_scope_changed=True),
-        action=AuthorizedActionRef(tenant_id="t", envelope_id="e", action_digest="d",
-                                   authorized_count=authorized),
+        benefit=RealizedValue(labor_displaced=M(1_000_00), throughput_gained=M(0), loss_avoided=M(0)),
+        actual_losses=M(0),
+        residual_expected_loss=expected_loss if expected_loss is not None else ExpectedLoss(
+            currency="USD", items=(ExpectedLossItem("wrong", Decimal("0.01"), M(200_00)),)),
+        cost=_cost(), investment=_inv(),
+        attribution=AttributionEvidence(baseline_captured=baseline),
     )
 
 
 app = GovernedValueApplication()
 
-# 1) Spine scores end to end; headline is exact Decimal.
-r = app.score(_case("a", 500))
+# 1) Realized kernel scores end to end; headline is exact Decimal; honest class.
+r = app.score(_case("a"))
 assert r.scorability is Scorability.SCORABLE, r.reasons
-assert r.net_governed_value.minor_units == 59_100, r.net_governed_value
-assert r.ngva_per_action == Decimal("118.2"), r.ngva_per_action
-assert isinstance(r.ngva_per_action, Decimal)
+assert r.realized_net_governed_value.minor_units == 70_000, r.realized_net_governed_value
+assert r.risk_adjusted_net_governed_value.minor_units == 69_800
+assert r.realized_roi == Decimal("70000") / Decimal("50000")
+assert isinstance(r.realized_roi, Decimal)
+assert r.stage is AssessmentStage.POST_DEPLOYMENT_VALUE
+assert r.evidence_status is EvidenceStatus.REPORTED
+assert r.authority_status is AuthorityStatus.UNVERIFIED
 
-# 2) Fail-closed guard suppresses the headline.
-bad = app.score(_case("b", 500, baseline=False))
+# 2) Fail-closed guard suppresses the headline (ROI + payback).
+bad = app.score(_case("b", baseline=False))
 assert bad.scorability is Scorability.NOT_SCORABLE
-assert bad.ngva_per_action is None and bad.roi_ratio is None
+assert bad.realized_roi is None and bad.risk_adjusted_roi is None and bad.payback_periods is None
 
-# 3) Portfolio normalizes to net-governed-value-per-authorized-action.
-summary = app.compare([_case("high", 500), _case("low", 5000)], base_currency="USD")
-assert [e.agent_id for e in summary.ranked] == ["high", "low"], summary.ranked
-assert summary.portfolio_ngva is not None
+# 3) GV-1 core: additive expected loss may exceed benefit and invert NGV.
+catastrophe = ExpectedLoss(currency="USD",
+    items=(ExpectedLossItem("catastrophe", Decimal("0.10"), M(50_000_00)),))
+c = app.score(_case("c", expected_loss=catastrophe))
+assert c.residual_expected_loss.minor_units == 500_000 > c.total_benefit.minor_units
+assert c.risk_adjusted_net_governed_value.minor_units == -430_000
 
 print("governed_value distribution OK:", gv.__version__)
 '''

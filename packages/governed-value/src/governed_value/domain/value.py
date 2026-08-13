@@ -1,11 +1,17 @@
-"""Realized value — the numerator, decomposed into exactly three sources.
+"""Realized value — already realized and already attributable.
 
-    realized value = labor displaced + throughput/revenue gained + loss avoided
+    total benefit = attributable realized benefit + attributed avoided loss
+    attributable realized benefit = labor displaced + throughput/revenue gained
+    attributed avoided loss        = loss avoided
 
-Anything a caller is tempted to add here that is *not* one of these three
-(satisfaction, "productivity", adoption, story points) is a leading indicator,
-not value, and belongs in a separate leading-indicator channel — never in the
-ROI numerator.
+In a POST_DEPLOYMENT_VALUE calculation these are outcomes that have already
+occurred and are already credited to the agent. **No realization, attribution,
+decay or locale factor is applied to them** — discounting an already-realized,
+already-attributed benefit is the double-discount error GV-1 exists to prevent.
+
+Anything that is not one of these sources (satisfaction, "productivity",
+adoption, story points) is a leading indicator, not value, and belongs in the
+readiness stage (GV-3r), never in this numerator.
 """
 
 from __future__ import annotations
@@ -24,17 +30,24 @@ class RealizedValue:
     loss_avoided: Money
 
     def __post_init__(self) -> None:
-        # One currency across the numerator; combining is exact and total-able.
-        c = self.labor_displaced.currency
-        # ``+`` fails closed on any currency mismatch.
+        # One currency across the numerator; ``+`` fails closed on mismatch.
         _ = self.labor_displaced + self.throughput_gained + self.loss_avoided
-        object.__setattr__(self, "_currency", c)
 
     @property
     def currency(self) -> str:
         return self.labor_displaced.currency
 
+    def attributable_benefit(self) -> Money:
+        """Realized benefit from labor + throughput (excludes avoided loss)."""
+
+        return self.labor_displaced + self.throughput_gained
+
+    def attributed_avoided_loss(self) -> Money:
+        """Verified avoided loss credited as a benefit."""
+
+        return self.loss_avoided
+
     def gross(self) -> Money:
-        """Total realized value before realization / attribution / risk terms."""
+        """Total benefit = attributable realized benefit + attributed avoided loss."""
 
         return self.labor_displaced + self.throughput_gained + self.loss_avoided

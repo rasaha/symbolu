@@ -1,47 +1,54 @@
-"""Public application surface for ugence-governed-value.
+"""Public application surface for ugence-governed-value (experimental kernel).
 
-Re-exports the aggregate input, the scorer result, the portfolio types, and the
-facade so callers can ``from governed_value.api import ...`` a stable set.
+Re-exports the aggregate input, the scorer result and the facade. This surface
+covers the realized (POST_DEPLOYMENT_VALUE) calculation only; it operates on
+caller-reported, unverified inputs.
 """
 
 from __future__ import annotations
 
-from ..domain.action import AuthorizedActionRef
-from ..domain.attribution import AttributionContext
+from ..domain.attribution import AttributionEvidence
 from ..domain.case import AgentValueCase
 from ..domain.cost import CostToServe
 from ..domain.enums import (
+    AssessmentStage,
+    AuthorityStatus,
+    ConfidenceClass,
     DomainKind,
+    EvidenceStatus,
     MeasurementMethod,
     OutcomeClass,
     Scorability,
     ValueSource,
 )
-from ..domain.error_profile import ErrorProfile
+from ..domain.expected_loss import ExpectedLoss, ExpectedLossItem
+from ..domain.investment import TotalInvestment
 from ..domain.modifiers import DomainProfile, GeographyProfile
 from ..domain.money import Money
 from ..domain.value import RealizedValue
-from ..services.portfolio import PortfolioEntry, PortfolioSummary
 from ..services.scorer import GovernedValueResult
 from .facade import GovernedValueApplication
 
 __all__ = [
-    "AuthorizedActionRef",
-    "AttributionContext",
+    "AttributionEvidence",
     "AgentValueCase",
     "CostToServe",
+    "AssessmentStage",
+    "AuthorityStatus",
+    "ConfidenceClass",
     "DomainKind",
+    "EvidenceStatus",
     "MeasurementMethod",
     "OutcomeClass",
     "Scorability",
     "ValueSource",
-    "ErrorProfile",
+    "ExpectedLoss",
+    "ExpectedLossItem",
+    "TotalInvestment",
     "DomainProfile",
     "GeographyProfile",
     "Money",
     "RealizedValue",
-    "PortfolioEntry",
-    "PortfolioSummary",
     "GovernedValueResult",
     "GovernedValueApplication",
 ]
