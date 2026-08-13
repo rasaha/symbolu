@@ -2,8 +2,13 @@
 const P = require('pptxgenjs');
 const pptx = new P();
 pptx.layout = 'LAYOUT_WIDE';           // 13.33 x 7.5
-pptx.author = 'Ugence';
-pptx.title = 'Ugence + ServiceNow: Independent Action-Level Authority for Governed Agentic Workflows';
+pptx.title = 'Ugence + ServiceNow — Detailed Architecture and Use-Case Briefing';
+pptx.subject = 'Proposed independent action-level authority for governed ServiceNow agentic workflows';
+pptx.author = 'Rakesh Mohan, Founder, Ugence Labs';
+pptx.company = 'Ugence Labs';
+pptx.revision = '2';
+const DOC_TITLE = 'Ugence + ServiceNow — Detailed Architecture and Use-Case Briefing';
+const OUT = 'UGENCE_SERVICENOW_ARCHITECTURE_AND_USE_CASE_BRIEFING';
 
 const W = 13.33, H = 7.5;
 const TITLE='Cambria', BODY='Calibri';
@@ -47,7 +52,7 @@ function header(s,kicker,title,titleColor){
   T(s,title,{x:0.58,y:0.6,w:12.15,h:0.72,fontFace:TITLE,fontSize:26,bold:true,color:titleColor||INK,align:'left'});
 }
 function footnote(s,txt){
-  T(s,txt,{x:0.6,y:7.06,w:12.1,h:0.3,fontFace:BODY,fontSize:8,italic:true,color:MUTED,align:'left'});
+  T(s,txt,{x:0.6,y:7.06,w:11.55,h:0.3,fontFace:BODY,fontSize:8.5,italic:true,color:MUTED,align:'left'});
 }
 function badge(s,x,y,label,w){
   const c=BADGE[label]||GREY;
@@ -123,9 +128,12 @@ function notes(s,t){ s.addNotes(t); }
   T(s,'Extending ServiceNow-governed workflows with independently verifiable authorization, operational clearance, execution reconciliation, and governed-value evidence.',
     {x:0.9,y:3.85,w:11.0,h:0.9,fontFace:BODY,fontSize:15,color:'C9CFEA',lineSpacingMultiple:1.15});
   // category legend chips
-  legendDark(s,0.9,5.15);
+  legendDark(s,0.9,5.05);
+  // presenter / company
+  T(s,[{text:'Rakesh Mohan',options:{bold:true,color:'FFFFFF'}},{text:'    ·    Founder, Ugence Labs    ·    ugence.ai    ·    August 2026',options:{color:'C9CFEA'}}],
+    {x:0.9,y:6.12,w:11.5,h:0.34,fontFace:BODY,fontSize:13,align:'left',valign:'middle',margin:0});
   T(s,'All ServiceNow integrations are PROPOSED — no connector ships today. All scenarios are illustrative, not customer deployments.',
-    {x:0.9,y:6.75,w:11.5,h:0.5,fontFace:BODY,fontSize:11,italic:true,color:'AEB6E0'});
+    {x:0.9,y:6.68,w:11.5,h:0.4,fontFace:BODY,fontSize:11,italic:true,color:'AEB6E0'});
   notes(s,'Open by naming the single question the deck answers: when an AI agent takes a consequential action, how can the enterprise PROVE that this exact action was authorized, stayed safe at execution time, and produced only the intended effect. Emphasize the framing is complementary to ServiceNow, not competitive. State plainly up front: every integration shown is PROPOSED (no connector ships), and every scenario is illustrative, not a Ugence customer deployment. This is a technical-fit conversation aiming at one bounded pilot, not a partnership demand.');
 })();
 function legendDark(s,x,y){
@@ -141,12 +149,30 @@ function legendDark(s,x,y){
 /* 2. HOW TO READ */
 (()=>{ const s=slide();
   header(s,'How to read this deck','Two levels for two audiences — on every major scenario');
-  card(s,0.6,1.5,6.0,4.7,{title:'Level 1 — Layman view',tcolor:VIOLET_DK,fill:VIOLET_LT,line:VIOLET,
-    body:'For business, operations and partnership stakeholders. Each scenario first answers, in plain language:\n\n•  The enterprise problem and why it matters\n•  What could go wrong when an AI agent acts\n•  What the AI agent wants to do\n•  Where control is required\n•  What ServiceNow already provides\n•  What Ugence proposes to contribute\n•  What the enterprise receives at the end',bfs:11.5});
-  card(s,6.75,1.5,6.0,4.7,{title:'Level 2 — Technical architecture view',tcolor:TEAL_DK,fill:TEAL_LT,line:TEAL,
-    body:'For solution architects. Each scenario then shows:\n\n•  What business data enters, and where it originates\n•  What each module receives or references\n•  What it checks or decides\n•  The separate governance artifact it emits\n•  What information passes over every arrow\n•  What executes the action\n•  What operational evidence returns\n•  How the observed effect is reconciled\n•  What is recorded or referenced in ServiceNow',bfs:11.5});
-  footnote(s,'Source of record: catalog v1.2 and the use-case walkthrough companion. We explain what guarantee each module provides — never the proprietary mechanism that produces it.');
-  notes(s,'Set expectations: every major scenario is explained twice — a plain-language pass, then a technical architecture pass. Tell the audience they can stay at Level 1 and still follow the whole story. Architects get the data-journey detail in Level 2. Emphasize we describe guarantees, not internal mechanics — no code, schemas, algorithms, or cryptographic detail are disclosed.');
+  card(s,0.6,1.42,6.0,4.05,{title:'Level 1 — Layman view',tcolor:VIOLET_DK,fill:VIOLET_LT,line:VIOLET,
+    body:'For business, operations and partnership stakeholders. Each scenario first answers, in plain language:\n\n•  The enterprise problem and why it matters\n•  What could go wrong when an AI agent acts\n•  What the AI agent wants to do\n•  Where control is required\n•  What ServiceNow already provides\n•  What Ugence proposes to contribute\n•  What the enterprise receives at the end',bfs:11});
+  card(s,6.75,1.42,6.0,4.05,{title:'Level 2 — Technical architecture view',tcolor:TEAL_DK,fill:TEAL_LT,line:TEAL,
+    body:'For solution architects. Each scenario then shows:\n\n•  What business data enters, and where it originates\n•  What each module receives or references\n•  What it checks or decides\n•  The separate governance artifact it emits\n•  What information passes over every arrow\n•  What executes the action\n•  What operational evidence returns\n•  How the observed effect is reconciled\n•  What is recorded or referenced in ServiceNow',bfs:11});
+  // How to use this briefing
+  SH(s,pptx.ShapeType.roundRect,{x:0.6,y:5.62,w:12.15,h:1.28,rectRadius:0.06,fill:{color:'F1F4FA'},line:{color:VIOLET,width:1}});
+  T(s,'How to use this briefing',{x:0.8,y:5.72,w:11.7,h:0.3,fontFace:BODY,fontSize:12.5,bold:true,color:VIOLET_DK,margin:0});
+  T(s,'This is a detailed landscape presentation designed for screen-based discussion and technical reference. The meeting walkthrough can focus on the executive framing, UC-5 autonomous change execution, the pilot proposal, and the discovery questions; the remaining sections provide supporting architecture and use-case detail.',
+    {x:0.8,y:6.04,w:11.75,h:0.8,fontFace:BODY,fontSize:11,color:INK,margin:0,lineSpacingMultiple:1.08});
+  notes(s,'Set expectations: every major scenario is explained twice — a plain-language pass, then a technical architecture pass. Tell the audience they can stay at Level 1 and still follow the whole story. Architects get the data-journey detail in Level 2. Emphasize we describe guarantees, not internal mechanics — no code, schemas, algorithms, or cryptographic detail are disclosed. Read the “How to use this briefing” box aloud so the representative knows they are not expected to review every slide during the meeting.');
+})();
+
+/* AGENDA / NAVIGATION */
+(()=>{ const s=slide();
+  header(s,'Agenda','How this briefing is organized — navigate by slide number');
+  const secs=[['I','Executive framing'],['II','Data journey'],['III','Module responsibilities'],['IV','Lead UC-5 walkthrough'],['V','Additional scenarios'],['VI','Full use-case portfolio'],['VII','Honest overlap & differentiation'],['VIII','Enterprise Governed Value'],['IX','Pilot proposal'],['X','Discovery & next step']];
+  secs.forEach((r,i)=>{ const col=i<5?0:1, row=i%5; const x=0.7+col*6.2, y=1.7+row*1.02;
+    SH(s,pptx.ShapeType.roundRect,{x,y,w:5.85,h:0.84,rectRadius:0.06,fill:{color: i<5?VIOLET_LT:TEAL_LT},line:{color:i<5?VIOLET:TEAL,width:1},shadow:sh()});
+    SH(s,pptx.ShapeType.ellipse,{x:x+0.18,y:y+0.17,w:0.5,h:0.5,fill:{color:i<5?VIOLET:TEAL},line:{width:0}});
+    T(s,r[0],{x:x+0.18,y:y+0.17,w:0.5,h:0.5,fontFace:TITLE,fontSize:15,bold:true,color:'FFFFFF',align:'center',valign:'middle',margin:0});
+    T(s,r[1],{x:x+0.84,y:y,w:4.85,h:0.84,fontFace:BODY,fontSize:13.5,bold:true,color:INK,valign:'middle',margin:0});
+  });
+  footnote(s,'Meeting spine: sections I, IV, IX and X. Sections II, III and V–VIII are supporting architecture and use-case reference. Every content slide is numbered for direct navigation.');
+  notes(s,'Optional navigation slide. Set the meeting path: executive framing (I), the UC-5 lead walkthrough (IV), the pilot proposal (IX), and discovery / next step (X) are the spine; II, III and V–VIII are supporting reference the representative can read after the meeting. Note that every content slide is numbered so anyone can say “let us go to slide N”.');
 })();
 
 /* SECTION I */
@@ -336,9 +362,9 @@ function glossary(subtitle, rows){
   header(s,'Module responsibilities',subtitle);
   const head=['Module','Layman responsibility','Receives / references','Checks / decides','Emits','Does not do'];
   const colW=[1.5,2.35,2.15,2.35,1.9,1.85];
-  const table=[head.map(h=>({text:h,options:{fill:{color:INK},color:'FFFFFF',bold:true,fontSize:9.5,align:'left',valign:'middle'}}))];
-  rows.forEach((r,ri)=>{ table.push(r.map((c,ci)=>({text:c,options:{fill:{color: ri%2?'F4F6FA':'FFFFFF'},color: ci===0?VIOLET_DK:INK,bold:ci===0,fontSize:8.6,align:'left',valign:'top'}}))); });
-  TB(s,table,{x:0.5,y:1.45,w:12.35,colW,border:{type:'solid',color:HAIR,pt:0.75},rowH:0.2,fontFace:BODY,valign:'top',autoPage:false});
+  const table=[head.map(h=>({text:h,options:{fill:{color:INK},color:'FFFFFF',bold:true,fontSize:10.5,align:'left',valign:'middle'}}))];
+  rows.forEach((r,ri)=>{ table.push(r.map((c,ci)=>({text:c,options:{fill:{color: ri%2?'F4F6FA':'FFFFFF'},color: ci===0?VIOLET_DK:INK,bold:ci===0,fontSize:9.6,align:'left',valign:'top'}}))); });
+  TB(s,table,{x:0.5,y:1.5,w:12.35,colW,border:{type:'solid',color:HAIR,pt:0.75},rowH:0.32,fontFace:BODY,valign:'top',autoPage:false});
   footnote(s,'We describe the guarantee each module provides, not the internal mechanism. All ServiceNow integration is PROPOSED.');
   return s;
 }
@@ -496,9 +522,9 @@ function moduleWalk(title, rows){
   header(s,'UC-5 · Autonomous change execution',title);
   const head=['Module','Receives','Question it answers','Adds','Sends next','If information is missing'];
   const colW=[1.55,2.15,2.5,1.9,1.75,2.5];
-  const table=[head.map(h=>({text:h,options:{fill:{color:INK},color:'FFFFFF',bold:true,fontSize:9.5,valign:'middle'}}))];
-  rows.forEach((r,ri)=>table.push(r.map((c,ci)=>({text:c,options:{fill:{color:ri%2?'F4F6FA':'FFFFFF'},color:ci===0?VIOLET_DK:INK,bold:ci===0,fontSize:8.6,valign:'top'}}))));
-  TB(s,table,{x:0.5,y:1.5,w:12.35,colW,border:{type:'solid',color:HAIR,pt:0.75},fontFace:BODY,valign:'top',autoPage:false});
+  const table=[head.map(h=>({text:h,options:{fill:{color:INK},color:'FFFFFF',bold:true,fontSize:10.5,valign:'middle'}}))];
+  rows.forEach((r,ri)=>table.push(r.map((c,ci)=>({text:c,options:{fill:{color:ri%2?'F4F6FA':'FFFFFF'},color:ci===0?VIOLET_DK:INK,bold:ci===0,fontSize:9.6,valign:'top'}}))));
+  TB(s,table,{x:0.5,y:1.55,w:12.35,colW,border:{type:'solid',color:HAIR,pt:0.75},rowH:0.4,fontFace:BODY,valign:'top',autoPage:false});
   footnote(s,'Each module reads or references business context and emits a SEPARATE governance artifact — it does not rewrite CHG0048217.');
   return s;
 }
@@ -965,8 +991,9 @@ divider('X','Discovery & next step','Constructive questions, and a request for o
     T(s,a[0],{x:x+0.25,y:4.2,w:5.2,h:0.4,fontFace:BODY,fontSize:13,bold:true,color:i?'8FE3C2':'F4B8B0'});
     T(s,a[1],{x:x+0.25,y:4.65,w:5.2,h:1.2,fontFace:BODY,fontSize:13,color:'E7EAF7',lineSpacingMultiple:1.12});
   });
-  T(s,'All ServiceNow integrations PROPOSED · all scenarios illustrative · composition, not replacement.',{x:0.95,y:6.5,w:11.4,h:0.4,fontFace:BODY,fontSize:11,italic:true,color:'AEB6E0'});
-  notes(s,'Close on a modest, concrete ask: one joint technical discovery session to scope a bounded pilot — not a partnership demand. Restate the guardrails one last time: everything is proposed, everything illustrative, and Ugence composes with ServiceNow. Invite the discovery-question answers as the starting agenda.');
+  T(s,'All ServiceNow integrations PROPOSED · all scenarios illustrative · composition, not replacement.',{x:0.95,y:6.42,w:11.4,h:0.35,fontFace:BODY,fontSize:11,italic:true,color:'AEB6E0'});
+  T(s,'Rakesh Mohan  ·  Founder, Ugence Labs  ·  ugence.ai',{x:0.95,y:6.88,w:11.4,h:0.35,fontFace:BODY,fontSize:12.5,bold:true,color:'8FE3C2',align:'left',valign:'middle',margin:0});
+  notes(s,'Close on a modest, concrete ask: one joint technical discovery session to scope a bounded pilot — not a partnership demand. Restate the guardrails one last time: everything is proposed, everything illustrative, and Ugence composes with ServiceNow. Invite the discovery-question answers as the starting agenda. Presenter: Rakesh Mohan, Founder, Ugence Labs.');
 })();
 
 /* APPENDIX */
@@ -1080,12 +1107,20 @@ function slideHTML(s){
   s._ops.forEach(op=>{ if(op.k==='shape') body+=shapeDIV(op); else if(op.k==='text') body+=textDIV(op); else if(op.k==='table') body+=tableHTML(op); });
   return '<div class="page" style="position:relative;width:'+(W*PX)+'px;height:'+(H*PX)+'px;background:'+bg+';overflow:hidden">'+svg+body+'</div>';
 }
+function addPageNumbers(){
+  DECK.forEach((s,i)=>{
+    if(i===0) return;              // title slide: not numbered
+    if(s._divider || s._dark) return; // dividers / dark slides: not numbered
+    T(s,String(i+1),{x:12.35,y:7.06,w:0.5,h:0.3,fontFace:BODY,fontSize:9.5,color:MUTED,align:'right',valign:'middle',margin:0});
+  });
+}
 function buildMirror(){
-  let html='<!doctype html><html><head><meta charset="utf-8"><style>@page{size:'+W+'in '+H+'in;margin:0}html,body{margin:0;padding:0}.page{page-break-after:always}</style></head><body>';
+  let html='<!doctype html><html><head><meta charset="utf-8"><title>'+DOC_TITLE+'</title><style>@page{size:'+W+'in '+H+'in;margin:0}html,body{margin:0;padding:0}.page{page-break-after:always}</style></head><body>';
   DECK.forEach(s=>{ html+=slideHTML(s); });
   html+='</body></html>';
-  fs.writeFileSync('mirror.html',html);
+  fs.writeFileSync(OUT+'.render.html',html);
   console.log('MIRROR', DECK.length,'slides');
 }
 
-pptx.writeFile({fileName:'UGENCE_SERVICENOW_PRESENTATION.pptx'}).then(f=>{console.log('WROTE',f); buildMirror();}).catch(e=>{console.error('ERR',e);process.exit(1);});
+addPageNumbers();
+pptx.writeFile({fileName:OUT+'.pptx'}).then(f=>{console.log('WROTE',f); buildMirror();}).catch(e=>{console.error('ERR',e);process.exit(1);});
