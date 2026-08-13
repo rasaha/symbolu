@@ -47,11 +47,20 @@ internally; one inflated claim discounts the whole document.
   an increasingly capable agentic runtime. The differentiation is **narrower and specific**, and
   the genuine overlap zones (§3, and per-use-case "Overlap, stated honestly" notes) are named as
   overlaps — not as white space.
-- **Method caveat.** Direct fetches to `www.servicenow.com` were egress-blocked in this
-  environment (as they were for the v3.0 package). Product descriptions were assembled from
-  ServiceNow-owned pages surfaced via web search (product pages, `docs.servicenow.com`,
-  ServiceNow Community, ServiceNow Newsroom). **Exact marketing quotes, release/patch numbers, and
-  capability names should be spot-checked on the live pages before customer use.**
+- **Research method & source hierarchy.** The product workflows and use cases here were researched
+  **primarily through official ServiceNow product documentation at `docs.servicenow.com`**, not from
+  marketing pages. The authority order used was:
+  1. **ServiceNow Docs (`docs.servicenow.com`)** — existing product behavior and workflow mechanics;
+  2. **ServiceNow release notes** — version and availability (what ships when);
+  3. **ServiceNow Newsroom** — announcements, partnerships, strategy, and *future* availability;
+  4. **ServiceNow Community** — supporting and release-explanation material.
+  Reputable third-party press ([3P]) is used only to corroborate announcement facts (e.g. the
+  Dec-2026 SOC availability), never as a primary source of product behavior.
+- **Egress caveat (honest).** In *this* build environment, direct fetches to `www.servicenow.com`,
+  `docs.servicenow.com` and `docs.nvidia.com` were egress-blocked, so the above sources were reached
+  via web search returning those same ServiceNow-owned (and NVIDIA-owned) pages. **Exact quotes,
+  release/patch numbers, and capability names should be spot-checked on the live documentation
+  before customer use.**
 
 ---
 
@@ -70,7 +79,7 @@ change note corrects Appendix F accordingly. Positioning that ignores them reads
 | **AI Control Tower — enforcement** [3P: Knowledge 2026] | AVAILABLE NOW | Can **shut down a rogue agent in real time**; approval enforcement at the **Skill Kit** level so only approved providers/models reach skill & agent builders. | ServiceNow *enforces*, not just inventories. Ugence differentiation moves off "ServiceNow can't enforce" onto **mechanism**: a signed, per-action, per-payload authority artifact vs a platform kill-switch/allowlist. |
 | **AI Control Tower — Agent Deviation Detection** [3P: Knowledge 2026] | AVAILABLE NOW | Runtime metric that **flags when an agent strays** from its authorized role — prompt-injection attempts, role-boundary breaches, override attempts. | Genuine overlap with **RA‑7 trajectory assurance**. Position as complementary + independent-verification, *not* as a capability ServiceNow lacks. |
 | **Action Fabric** — MCP Server/Client + A2A; Anthropic first design partner (Claude Cowork → ServiceNow's governed execution layer) [SN Newsroom; SN Community] | AVAILABLE NOW (GA Knowledge 2026) | Opens ServiceNow's **system of action** to any external agent; **every action runs through AI Control Tower** (identity-verified, permission-scoped, auditable) with consumption metering, OAuth, audit trails, session management, role-based tool packages. | Strong overlap zone. Ugence differentiation is **per-payload/target-digest** authorization, **commit-time recheck**, and **independent post-effect verification** — not "ServiceNow can't govern external agents." |
-| **ServiceNow–NVIDIA OpenShell** — trust layer for autonomous AI: **policy authored centrally in AI Control Tower, enforced at runtime by OpenShell** [SN Community; NVIDIA blog; NVIDIA docs/GitHub] | AVAILABLE NOW / open-source | **Every file read, command executed, and network call passes through OpenShell first**; agents start at **zero permissions**; enforcement is **below the application layer** via Linux kernel primitives (seccomp, eBPF, Landlock), running across **PCs, data centers and clouds** (Ubuntu, Windows, OpenShift). | **Directly refutes any "runtime enforcement across heterogeneous/off-platform runtimes is unique to Ugence" claim.** ServiceNow already couples central policy to kernel-level runtime enforcement across form factors. Ugence must differentiate on the **artifact and its properties** (see thesis), not on "where enforcement can run." Added as overlap zone #5 (§3). |
+| **ServiceNow–NVIDIA OpenShell** — trust layer for autonomous AI. **ServiceNow's public description:** policy is **authored centrally in AI Control Tower and enforced at runtime by OpenShell** on **every file read, command, and network call** the agent takes [SN Community]. **NVIDIA's technical description:** an open-source secure runtime that **starts agents at zero permissions**; enforcement is **below the container/application layer** via **seccomp** (syscall filtering), **Landlock LSM** (filesystem access), and **network namespaces** — **not eBPF** [NVIDIA docs: Security Best Practices]. Runs across major enterprise OSes/form factors (e.g. Ubuntu, Windows, OpenShift) [NVIDIA blog]. | AVAILABLE NOW / open-source | Couples central AICT policy to kernel-level runtime enforcement of file, command, and network access across form factors. | **Directly refutes any "runtime enforcement across heterogeneous/off-platform runtimes is unique to Ugence" claim.** Ugence must differentiate on the **authority artifact and its properties** (see thesis), not on "where enforcement can run." Added as overlap zone #5 (§3). |
 | **Autonomous Security portfolio** — six unified security solutions; **Armis** (asset intelligence) + **Veza** (AI-native identity, least-privilege for AI agents) [SN Newsroom; 3P] | MIXED — some AVAILABLE NOW (e.g. Autonomous Remediation Agents, AI Agent Access Security, Non-Human Identity Remediation); **Tier 2 SOC AI Specialist ANNOUNCED / expected December 2026** | Autonomous, prevention-first cyber defense; the **Tier 2 SOC AI Specialist** is designed to investigate and execute multi-stage response (enrichment, correlation, **containment and blocking**), escalating high-risk to humans. | Makes the autonomous-containment (UC‑1) and access-provisioning (UC‑6) use cases timely — **but UC‑1's anchor is an ANNOUNCED Dec-2026 capability, not shipped** (see UC‑1). Sharp edge remains exact-target-digest authorization + independent operational clearance + effect reconciliation. |
 
 **The one-sentence thesis (v1.1, narrowed):**
@@ -137,15 +146,17 @@ granularity / independent-verification extensions, never as governance gaps:
    proposed edge: a **per-request binding authorization** with **governed fallback and expiry**,
    rather than a config-level allowlist.
 5. **Runtime execution enforcement ↔ ServiceNow–NVIDIA OpenShell.** This is the zone most easily
-   overclaimed. ServiceNow describes **centrally authored policies (in AI Control Tower) enforced at
-   runtime by OpenShell on every file read, command, and network call — across PCs, data centers and
-   clouds**, below the application layer via kernel primitives (seccomp/eBPF/Landlock), agents
-   starting at zero permissions. **Ugence therefore must not claim that runtime enforcement across
+   overclaimed. **ServiceNow's public description:** policies are **centrally authored in AI Control
+   Tower and enforced at runtime by OpenShell on every file read, command, and network call** the
+   agent takes. **NVIDIA's technical description:** OpenShell starts agents at **zero permissions**
+   and enforces below the container/application layer via **seccomp** (syscall filtering),
+   **Landlock LSM** (filesystem access), and **network namespaces** — **not eBPF** — across major
+   enterprise OSes/form factors. **Ugence therefore must not claim that runtime enforcement across
    heterogeneous or off-platform runtimes is unique to it.** The honest differentiation is the
    *authority artifact*: a signed, per-business-action, digest-bound, evidence-fresh,
    commit-rechecked, operationally-cleared, effect-reconciled decision that is *independently
-   verifiable* — a governance-decision layer that could sit **above** an OpenShell-style execution
-   sandbox, not a competitor to kernel-level sandboxing.
+   verifiable* — a governance-decision layer that composes with (and can sit alongside/upstream of)
+   an OpenShell-style execution sandbox, not a competitor to kernel-level sandboxing.
 
 Everywhere else the relationship is **complementary** (system of record + workflow + platform
 enforcement vs an independent, signed authority-decision artifact), which is the core partnership
@@ -407,7 +418,7 @@ capability?*
 **4. Ugence pipeline.**
 ```
 Agent Runtime (CER)        a Canonical Execution Request as an independent governance-decision seam
-                           (a layer that can sit ABOVE an OpenShell-style execution sandbox — it
+                           (a layer that composes with an OpenShell-style execution sandbox — it
                            issues/verifies authority; it does not replace kernel-level enforcement)
       ▼
 Model Authority            per-request model authorization for the external agent's step
@@ -428,7 +439,7 @@ RA‑7 runtime assurance     trajectory assessment → neutral reassessment sign
 system of action; AICT verifies identity/permission/audit for every action; OpenShell enforces
 policy at the kernel level. Ugence adds an **independent, signed, digest-bound authority-decision
 record** per business action and a **sequence-risk** signal across the plan — an authority/evidence
-layer that composes *above* ServiceNow's execution enforcement, not a substitute for it.
+layer that composes *with* ServiceNow's execution enforcement, not a substitute for it.
 
 **6. Overlap, stated honestly.** This is the **strongest overlap zone**. Action Fabric + AICT govern
 external agents thoroughly, and OpenShell enforces execution across form factors — so Ugence claims
@@ -456,6 +467,15 @@ when a sequence of allowed steps assembles a disallowed capability?"*
 > Fully Autonomous IT; SN Store: Now Assist for ITOM]. The Ugence authorization/clearance layer on
 > top is a **PROPOSED INTEGRATION**. *Note: some deeper autonomous-remediation capabilities are
 > rolling out in waves through 2026 — confirm the customer's specific release before scoping.*
+>
+> **Ugence Cloud Scaling Controller / Operations maturity (four dimensions — do not conflate):**
+> **(1) Core Cloud Scaling Controller: IMPLEMENTED.** **(2) Production validation: PILOT PENDING.**
+> **(3) Additional agentic-AI capabilities: UNDER ACTIVE DEVELOPMENT.** **(4) ServiceNow
+> integration: PROPOSED — no connector currently ships.** The core is **not downgraded** because
+> broader agentic-AI features are still in development; those are additive. Representative-facing
+> wording: *"Ugence Cloud Scaling Controller is implemented and awaiting pilot validation.
+> Additional capabilities for broader agentic-AI workflows continue to be developed, while
+> ServiceNow integration remains proposed."*
 
 **1. ServiceNow product & workflow.** *Change Management* + *ITOM* autonomous remediation [SN: ITOM;
 SN Store: Now Assist for ITOM]. Agentic workflows analyze change impact on the CMDB; ITOM AI agents
@@ -515,6 +535,38 @@ the natural home for the receipts these pipelines emit (decision records, signed
 clearance verdicts, RA‑7/RA‑8 assessments). It remains **proposed / design-only** and is named as
 such.
 
+### 7.1 Enterprise Governed Value (developing — cross-cutting roadmap capability, *not* an authorization stage)
+
+> This is a **roadmap note**, not a new gate in the §2 pipeline. It does not authorize, clear, or
+> execute anything.
+
+Ugence is **developing an Enterprise Governed Value capability to verify whether agentic workflows
+deliver attributable business outcomes while preserving cost, risk, compliance, quality, and service
+constraints.**
+
+**Acknowledge ServiceNow first.** ServiceNow **AI Control Tower already measures AI adoption,
+business impact, realized value, and ROI** — this is a real, shipped strength, and the proposed
+Ugence capability does **not** claim ServiceNow lacks ROI measurement.
+
+The proposed Ugence extension is positioned **only as evidence-backed *attribution*** that connects,
+into one verifiable chain per workflow:
+
+- **approved objectives and baselines** (what outcome was authorized, measured against what
+  starting point);
+- **governed workflow and execution receipts** (the decision records, signed envelopes, clearance
+  verdicts, and RA‑7/RA‑8 assessments the pipelines already emit);
+- **model and infrastructure costs** (including the token accounting from Context Minimization and
+  scaling actuation from Cloud Scaling Operations);
+- **observed outcomes** (the reconciled real-world effect);
+- **attribution rules** (how outcomes are causally tied back to the governed actions); and
+- **preserved risk, compliance, quality, and service constraints** (evidence the value was not
+  realized by breaching a governance boundary).
+
+In short: ServiceNow measures adoption, impact and realized value; the proposed Ugence capability
+adds **evidence-backed attribution** that a *specific governed action* produced a *specific outcome*
+**without** trading away cost, risk, compliance, quality, or service constraints. Maturity:
+**developing / proposed**; ServiceNow integration **PROPOSED**.
+
 ---
 
 ## 8. Recommended sequencing for the ServiceNow conversation
@@ -535,16 +587,20 @@ such.
    Tier 2 SOC AI Specialist ships," clearly labeled ANNOUNCED/FUTURE, never as available today.
 7. **Close on partnership** (system-of-record vs runtime-enforcement split; v3.0 §F.3): ServiceNow is the system of record, system of action, and
    runtime enforcement (Action Fabric + AICT + OpenShell); Ugence is an independent, signed
-   authority-decision artifact that composes above it. Every integration is **PROPOSED**; every
+   authority-decision artifact that composes with it. Every integration is **PROPOSED**; every
    package is independently deployable if a ServiceNow partnership is not pursued.
 
 ---
 
 ## 9. Source legend (ServiceNow-owned & press sources, verified 2026-08-13)
 
-Product pages on `www.servicenow.com` were egress-blocked; the following were surfaced via web
-search and should be spot-checked live before customer use. ServiceNow-owned sources are marked
-**[SN]**; reputable third-party corroboration is marked **[3P]**.
+Per the research method (§0), the **primary source is ServiceNow product documentation at
+`docs.servicenow.com`**, with release notes for availability, Newsroom for announcements/future
+availability, and Community for supporting material; third-party press corroborates announcement
+facts only. Direct page fetches were egress-blocked in this environment, so these ServiceNow-owned
+(and NVIDIA-owned) pages were reached via web search and **should be spot-checked live before
+customer use**. ServiceNow-owned sources are marked **[SN]**; NVIDIA-owned sources **[NVIDIA]**;
+reputable third-party corroboration **[3P]**.
 
 - **[SN] AI Control Tower** — https://www.servicenow.com/products/ai-control-tower.html
 - **[SN] AI Control Tower — expansion (discover/observe/govern/secure/measure any AI)**, Newsroom — https://newsroom.servicenow.com/press-releases/details/2026/ServiceNow-expands-AI-Control-Tower-to-discover-observe-govern-secure-and-measure-AI-deployed-across-any-system-in-the-enterprise/default.aspx
@@ -591,6 +647,18 @@ search and should be spot-checked live before customer use. ServiceNow-owned sou
 - **Evidence discipline:** "the verified sources do not show X" is treated throughout as a
   **discovery hypothesis to confirm with the customer's architects**, not as proof ServiceNow lacks
   X.
+- **Cloud Scaling Controller / Operations (four-dimension status, UC‑5):** core **IMPLEMENTED**;
+  production validation **PILOT PENDING**; additional agentic-AI capabilities **UNDER ACTIVE
+  DEVELOPMENT**; ServiceNow integration **PROPOSED (no connector ships)**. Retained in the UC‑5
+  pipeline; not downgraded for in-development additions.
+- **Enterprise Governed Value (§7.1):** a **developing, cross-cutting roadmap capability** (not an
+  authorization stage) providing **evidence-backed attribution**; acknowledges AICT already measures
+  adoption, business impact, realized value and ROI.
+- **Research method:** primary source is **`docs.servicenow.com`** (docs → release notes → Newsroom
+  → Community); third-party press corroborates announcement facts only (§0).
+- **OpenShell precision:** enforcement described as **seccomp + Landlock LSM + network namespaces
+  (not eBPF)**, with ServiceNow's AICT-relationship description distinguished from NVIDIA's technical
+  description (§1, §3).
 - **Integration status:** all PROPOSED. **Package maturity:** shipped but mostly reference-grade,
   production deployment validation pending (per v3.0 Appendix B).
 - **Verification:** ServiceNow capabilities checked against ServiceNow-owned + corroborating
