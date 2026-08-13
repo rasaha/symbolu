@@ -49,7 +49,7 @@ def test_catastrophic_loss_makes_risk_adjusted_ngv_deeply_negative():
     r = score_case(scorable_support_case(residual_expected_loss=catastrophic))
 
     # Realized NGV stays positive (70_000); the risk-adjusted view inverts hard.
-    assert r.realized_net_governed_value.minor_units == 70_000
+    assert r.reported_net_governed_value.minor_units == 70_000
     assert r.risk_adjusted_net_governed_value.minor_units == 70_000 - 500_000
     assert r.risk_adjusted_net_governed_value.minor_units == -430_000
     # Risk-adjusted ROI is sharply negative on the 50_000 investment base.
@@ -65,6 +65,6 @@ def test_actual_losses_are_separate_from_forward_expected_loss():
     r = score_case(
         scorable_support_case(actual_losses=money(40_000))  # historical, incurred
     )
-    assert r.realized_net_governed_value.minor_units == 100_000 - 40_000 - 30_000  # 30_000
+    assert r.reported_net_governed_value.minor_units == 100_000 - 40_000 - 30_000  # 30_000
     # residual expected loss (200) applies only beyond realized NGV.
     assert r.risk_adjusted_net_governed_value.minor_units == 30_000 - 200

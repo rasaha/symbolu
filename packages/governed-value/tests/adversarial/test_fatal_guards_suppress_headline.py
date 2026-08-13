@@ -14,7 +14,7 @@ from ..scenario import money, scorable_support_case
 
 def _assert_suppressed(result, needle: str):
     assert result.scorability is Scorability.NOT_SCORABLE
-    assert result.realized_roi is None
+    assert result.reported_roi is None
     assert result.risk_adjusted_roi is None
     assert result.payback_periods is None
     assert any(needle in r for r in result.reasons), result.reasons
@@ -49,7 +49,7 @@ def test_headline_suppressed_even_with_supplied_run_rate():
     r = score_case(
         scorable_support_case(
             attribution=AttributionEvidence(baseline_captured=False),
-            realized_net_per_period=money(10_000),
+            reported_net_per_period=money(10_000),
         )
     )
     assert r.payback_periods is None

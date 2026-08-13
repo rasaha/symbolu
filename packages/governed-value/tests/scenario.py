@@ -20,7 +20,7 @@ from governed_value.api import (
     GeographyProfile,
     Money,
     OutcomeClass,
-    RealizedValue,
+    ReportedValue,
     TotalInvestment,
     ValueSource,
 )
@@ -80,7 +80,7 @@ def scorable_support_case(**overrides) -> AgentValueCase:
         ),
         geography=GeographyProfile(label="PH", currency=USD),
         outcome=OutcomeClass.DETERMINISTIC_AUTOMATION,
-        benefit=RealizedValue(
+        benefit=ReportedValue(
             labor_displaced=money(1_000_00),
             throughput_gained=money(0),
             loss_avoided=money(0),

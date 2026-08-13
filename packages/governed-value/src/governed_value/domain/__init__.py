@@ -1,16 +1,16 @@
 """Immutable typed artifacts for the governed-value kernel (POST_DEPLOYMENT_VALUE).
 
-The realized identity (GV-1):
+The reported identity (GV-1):
 
-    total benefit        = attributable realized benefit + attributed avoided loss
-    RealizedNGV          = total benefit − actual losses − cost to serve
-    RiskAdjustedNGV      = RealizedNGV − residual expected loss        (Σ p × magnitude)
-    RealizedROI          = RealizedNGV / Total Investment
+    total benefit        = reported benefit + reported avoided loss
+    ReportedNGV          = total benefit − actual losses − cost to serve
+    RiskAdjustedNGV      = ReportedNGV − residual expected loss        (Σ p × magnitude)
+    ReportedROI          = ReportedNGV / Total Investment
     RiskAdjustedROI      = RiskAdjustedNGV / Total Investment
 
-Expected loss is additive absolute money and may exceed total benefit; realized
-benefit is never realization-discounted; Total Investment is distinct from
-cost-to-serve. Every result carries an orthogonal classification
+Expected loss is additive absolute money and may exceed total benefit; reported
+benefit is never re-discounted; Total Investment is distinct from cost-to-serve.
+Every result carries an orthogonal classification
 (:class:`AssessmentStage` / :class:`EvidenceStatus` / :class:`AuthorityStatus` /
 :class:`Scorability`) and this kernel never rises above
 ``POST_DEPLOYMENT_VALUE / REPORTED / UNVERIFIED``.
@@ -36,7 +36,6 @@ from .enums import (
 from .errors import (
     CurrencyMismatchError,
     GovernedValueError,
-    InvalidMultiplierError,
     InvalidRatioError,
 )
 from .events import GovernedValueEvent
@@ -44,8 +43,8 @@ from .expected_loss import ExpectedLoss, ExpectedLossItem
 from .investment import INVESTMENT_COMPONENTS, TotalInvestment
 from .modifiers import DomainProfile, GeographyProfile
 from .money import Money
-from .rates import nonneg_multiplier, to_decimal, unit_ratio
-from .value import RealizedValue
+from .rates import to_decimal, unit_ratio
+from .value import ReportedValue
 
 __all__ = [
     "AttributionEvidence",
@@ -64,7 +63,6 @@ __all__ = [
     "ValueSource",
     "CurrencyMismatchError",
     "GovernedValueError",
-    "InvalidMultiplierError",
     "InvalidRatioError",
     "GovernedValueEvent",
     "ExpectedLoss",
@@ -74,8 +72,7 @@ __all__ = [
     "DomainProfile",
     "GeographyProfile",
     "Money",
-    "nonneg_multiplier",
     "to_decimal",
     "unit_ratio",
-    "RealizedValue",
+    "ReportedValue",
 ]

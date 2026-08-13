@@ -20,10 +20,10 @@ def test_happy_path_numbers_are_exact():
     assert r.residual_expected_loss.minor_units == 200  # 20_000 x 0.01
     assert r.cost_to_serve.minor_units == 30_000
     assert r.total_investment.minor_units == 50_000
-    assert r.realized_net_governed_value.minor_units == 70_000  # 100_000 - 0 - 30_000
+    assert r.reported_net_governed_value.minor_units == 70_000  # 100_000 - 0 - 30_000
     assert r.risk_adjusted_net_governed_value.minor_units == 69_800  # - 200
 
-    assert r.realized_roi == Decimal("70000") / Decimal("50000")  # 1.4
+    assert r.reported_roi == Decimal("70000") / Decimal("50000")  # 1.4
     assert r.risk_adjusted_roi == Decimal("69800") / Decimal("50000")
     assert r.payback_periods is None  # no run-rate supplied
 
@@ -48,6 +48,6 @@ def test_payback_only_with_defensible_run_rate():
     from ..scenario import money
 
     r = score_case(
-        scorable_support_case(realized_net_per_period=money(10_000), period_label="month")
+        scorable_support_case(reported_net_per_period=money(10_000), period_label="month")
     )
     assert r.payback_periods == Decimal("50000") / Decimal("10000")

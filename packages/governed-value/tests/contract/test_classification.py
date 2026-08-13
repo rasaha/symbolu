@@ -39,7 +39,7 @@ def test_not_scorable_result_keeps_same_honest_classification():
         scorable_support_case(attribution=AttributionEvidence(baseline_captured=False))
     )
     assert r.scorability is Scorability.NOT_SCORABLE
-    assert r.realized_roi is None and r.risk_adjusted_roi is None
+    assert r.reported_roi is None and r.risk_adjusted_roi is None
     assert r.stage is AssessmentStage.POST_DEPLOYMENT_VALUE
     assert r.evidence_status is EvidenceStatus.REPORTED
     assert r.authority_status is AuthorityStatus.UNVERIFIED
@@ -55,3 +55,16 @@ def test_evidence_status_is_orthogonal_to_scorability():
     degraded = score_case(scorable_support_case(cost=thin))
     assert degraded.scorability is Scorability.DEGRADED
     assert clean.evidence_status is degraded.evidence_status is EvidenceStatus.REPORTED
+
+
+def test_reported_confidence_is_caller_supplied_and_non_evidential():
+    from governed_value.domain.enums import ConfidenceClass
+
+    # Caller asserts HIGH confidence; it is echoed but does NOT change the money,
+    # the evidence status, or the scorability — it is not an evidence signal.
+    base = score_case(scorable_support_case())
+    hi = score_case(scorable_support_case(reported_confidence=ConfidenceClass.HIGH))
+    assert hi.reported_confidence is ConfidenceClass.HIGH
+    assert hi.evidence_status is EvidenceStatus.REPORTED  # unchanged by confidence
+    assert hi.reported_net_governed_value == base.reported_net_governed_value
+    assert hi.reported_roi == base.reported_roi

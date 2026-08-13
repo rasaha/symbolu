@@ -6,7 +6,6 @@ __all__ = [
     "GovernedValueError",
     "CurrencyMismatchError",
     "InvalidRatioError",
-    "InvalidMultiplierError",
 ]
 
 
@@ -20,7 +19,3 @@ class CurrencyMismatchError(GovernedValueError):
 
 class InvalidRatioError(GovernedValueError):
     """A value expected to be a unit ratio (0..1 inclusive) was out of range."""
-
-
-class InvalidMultiplierError(GovernedValueError):
-    """A value expected to be a non-negative multiplier was negative."""

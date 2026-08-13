@@ -18,9 +18,9 @@ def test_changing_geography_label_does_not_change_money():
     other = score_case(
         scorable_support_case(geography=GeographyProfile(label="DE", currency="USD"))
     )
-    assert other.realized_net_governed_value == base.realized_net_governed_value
+    assert other.reported_net_governed_value == base.reported_net_governed_value
     assert other.cost_to_serve == base.cost_to_serve
-    assert other.realized_roi == base.realized_roi
+    assert other.reported_roi == base.reported_roi
 
 
 def test_changing_domain_profile_does_not_change_money():
@@ -31,7 +31,7 @@ def test_changing_domain_profile_does_not_change_money():
         dominant_source=ValueSource.LOSS_AVOIDED,
     )
     other = score_case(scorable_support_case(domain=regulated))
-    assert other.realized_net_governed_value == base.realized_net_governed_value
+    assert other.reported_net_governed_value == base.reported_net_governed_value
     assert other.risk_adjusted_net_governed_value == base.risk_adjusted_net_governed_value
 
 

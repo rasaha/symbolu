@@ -50,7 +50,7 @@ for mod in ("pydantic", "fastapi", "numpy", "governance_providers",
 
 from governed_value.api import (GovernedValueApplication, AgentValueCase, AttributionEvidence,
     AssessmentStage, AuthorityStatus, CostToServe, DomainKind, DomainProfile, EvidenceStatus,
-    ExpectedLoss, ExpectedLossItem, GeographyProfile, Money, OutcomeClass, RealizedValue,
+    ExpectedLoss, ExpectedLossItem, GeographyProfile, Money, OutcomeClass, ReportedValue,
     Scorability, TotalInvestment, ValueSource)
 
 M = lambda u: Money(u, "USD")
@@ -74,7 +74,7 @@ def _case(agent_id, baseline=True, expected_loss=None):
                              dominant_source=ValueSource.LABOR_DISPLACED),
         geography=GeographyProfile(label="PH", currency="USD"),
         outcome=OutcomeClass.DETERMINISTIC_AUTOMATION,
-        benefit=RealizedValue(labor_displaced=M(1_000_00), throughput_gained=M(0), loss_avoided=M(0)),
+        benefit=ReportedValue(labor_displaced=M(1_000_00), throughput_gained=M(0), loss_avoided=M(0)),
         actual_losses=M(0),
         residual_expected_loss=expected_loss if expected_loss is not None else ExpectedLoss(
             currency="USD", items=(ExpectedLossItem("wrong", Decimal("0.01"), M(200_00)),)),
@@ -88,10 +88,10 @@ app = GovernedValueApplication()
 # 1) Realized kernel scores end to end; headline is exact Decimal; honest class.
 r = app.score(_case("a"))
 assert r.scorability is Scorability.SCORABLE, r.reasons
-assert r.realized_net_governed_value.minor_units == 70_000, r.realized_net_governed_value
+assert r.reported_net_governed_value.minor_units == 70_000, r.reported_net_governed_value
 assert r.risk_adjusted_net_governed_value.minor_units == 69_800
-assert r.realized_roi == Decimal("70000") / Decimal("50000")
-assert isinstance(r.realized_roi, Decimal)
+assert r.reported_roi == Decimal("70000") / Decimal("50000")
+assert isinstance(r.reported_roi, Decimal)
 assert r.stage is AssessmentStage.POST_DEPLOYMENT_VALUE
 assert r.evidence_status is EvidenceStatus.REPORTED
 assert r.authority_status is AuthorityStatus.UNVERIFIED
@@ -99,7 +99,7 @@ assert r.authority_status is AuthorityStatus.UNVERIFIED
 # 2) Fail-closed guard suppresses the headline (ROI + payback).
 bad = app.score(_case("b", baseline=False))
 assert bad.scorability is Scorability.NOT_SCORABLE
-assert bad.realized_roi is None and bad.risk_adjusted_roi is None and bad.payback_periods is None
+assert bad.reported_roi is None and bad.risk_adjusted_roi is None and bad.payback_periods is None
 
 # 3) GV-1 core: additive expected loss may exceed benefit and invert NGV.
 catastrophe = ExpectedLoss(currency="USD",

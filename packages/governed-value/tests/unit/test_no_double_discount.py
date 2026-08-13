@@ -6,7 +6,7 @@ locale multiplier. Feeding a benefit of X (with zero losses and zero cost) must
 yield exactly X in realized NGV.
 """
 
-from governed_value.domain.value import RealizedValue
+from governed_value.domain.value import ReportedValue
 from governed_value.services.scorer import score_case
 
 from ..scenario import money, scorable_support_case
@@ -37,7 +37,7 @@ def test_zero_cost_zero_loss_yields_benefit_exactly():
 
     r = score_case(
         scorable_support_case(
-            benefit=RealizedValue(money(777_00), money(0), money(0)),
+            benefit=ReportedValue(money(777_00), money(0), money(0)),
             actual_losses=money(0),
             residual_expected_loss=ExpectedLoss.none("USD"),
             cost=zero_cost,
@@ -45,4 +45,4 @@ def test_zero_cost_zero_loss_yields_benefit_exactly():
         )
     )
     assert r.total_benefit.minor_units == 77_700
-    assert r.realized_net_governed_value.minor_units == 77_700  # undiscounted
+    assert r.reported_net_governed_value.minor_units == 77_700  # undiscounted

@@ -9,9 +9,9 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Union
 
-from .errors import InvalidMultiplierError, InvalidRatioError
+from .errors import InvalidRatioError
 
-__all__ = ["to_decimal", "unit_ratio", "nonneg_multiplier", "ZERO", "ONE"]
+__all__ = ["to_decimal", "unit_ratio", "ZERO", "ONE"]
 
 Number = Union[int, str, Decimal]
 
@@ -46,13 +46,4 @@ def unit_ratio(value: Number, name: str) -> Decimal:
     d = to_decimal(value)
     if d < ZERO or d > ONE:
         raise InvalidRatioError(f"{name} must be in [0, 1], got {d}")
-    return d
-
-
-def nonneg_multiplier(value: Number, name: str) -> Decimal:
-    """A non-negative multiplier (>= 0); may exceed 1."""
-
-    d = to_decimal(value)
-    if d < ZERO:
-        raise InvalidMultiplierError(f"{name} must be >= 0, got {d}")
     return d

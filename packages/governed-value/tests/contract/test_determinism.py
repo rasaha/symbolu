@@ -10,10 +10,10 @@ def test_scoring_is_deterministic():
     a = score_case(case)
     b = score_case(case)
     assert a == b
-    assert a.realized_roi == b.realized_roi
+    assert a.reported_roi == b.reported_roi
 
 
 def test_no_binary_float_in_headline():
     r = score_case(scorable_support_case())
-    assert isinstance(r.realized_roi, Decimal)
+    assert isinstance(r.reported_roi, Decimal)
     assert isinstance(r.risk_adjusted_roi, Decimal)

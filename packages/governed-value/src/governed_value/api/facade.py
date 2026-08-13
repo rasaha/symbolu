@@ -37,13 +37,13 @@ class GovernedValueApplication:
                 authority_status=result.authority_status,
                 scorability=result.scorability,
                 measurement_method=result.measurement_method,
-                realized_net_governed_value_minor_units=(
-                    result.realized_net_governed_value.minor_units
+                reported_net_governed_value_minor_units=(
+                    result.reported_net_governed_value.minor_units
                 ),
                 risk_adjusted_net_governed_value_minor_units=(
                     result.risk_adjusted_net_governed_value.minor_units
                 ),
-                realized_roi=result.realized_roi,
+                reported_roi=result.reported_roi,
                 reasons=result.reasons,
                 advisories=result.advisories,
             )

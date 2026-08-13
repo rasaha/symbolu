@@ -25,7 +25,7 @@ from ..domain.expected_loss import ExpectedLoss, ExpectedLossItem
 from ..domain.investment import TotalInvestment
 from ..domain.modifiers import DomainProfile, GeographyProfile
 from ..domain.money import Money
-from ..domain.value import RealizedValue
+from ..domain.value import ReportedValue
 from ..services.scorer import GovernedValueResult
 from .facade import GovernedValueApplication
 
@@ -48,7 +48,7 @@ __all__ = [
     "DomainProfile",
     "GeographyProfile",
     "Money",
-    "RealizedValue",
+    "ReportedValue",
     "GovernedValueResult",
     "GovernedValueApplication",
 ]

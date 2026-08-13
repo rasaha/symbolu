@@ -33,8 +33,8 @@ class GovernedValueEvent:
     authority_status: AuthorityStatus
     scorability: Scorability
     measurement_method: MeasurementMethod
-    realized_net_governed_value_minor_units: int
+    reported_net_governed_value_minor_units: int
     risk_adjusted_net_governed_value_minor_units: int
-    realized_roi: Optional[Decimal]
+    reported_roi: Optional[Decimal]
     reasons: tuple[str, ...] = field(default_factory=tuple)
     advisories: tuple[str, ...] = field(default_factory=tuple)

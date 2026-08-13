@@ -14,7 +14,7 @@ def test_incomplete_cost_is_flagged():
     thin = CostToServe(currency="USD", inference=money(200_00))  # 1 of 7 accounted
     r = score_case(scorable_support_case(cost=thin))
     assert r.scorability is Scorability.DEGRADED
-    assert r.realized_roi is not None  # headline kept
+    assert r.reported_roi is not None  # headline kept
     assert any("cost-to-serve incomplete" in a for a in r.advisories)
 
 
@@ -32,7 +32,7 @@ def test_empty_residual_expected_loss_is_flagged():
     # With no forward loss, the risk-adjusted view equals the realized view.
     assert (
         r.risk_adjusted_net_governed_value.minor_units
-        == r.realized_net_governed_value.minor_units
+        == r.reported_net_governed_value.minor_units
     )
 
 
@@ -46,4 +46,4 @@ def test_concurrent_changes_without_holdout_is_flagged():
     )
     assert r.scorability is Scorability.DEGRADED
     assert any("concurrent change" in a for a in r.advisories)
-    assert r.realized_roi is not None
+    assert r.reported_roi is not None

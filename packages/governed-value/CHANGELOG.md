@@ -2,6 +2,25 @@
 
 ## [0.2.0] — GV-0 classification + GV-1 corrected money model
 
+### Audit polish (RF-1..RF-4 + honest naming)
+- **RF-1**: removed the vestigial `inference_multiplier` argument (and its
+  geography/data-residency doc) from `CostToServe.total()`; it now accepts no
+  caller-controlled multiplier.
+- **RF-2**: removed the unused `nonneg_multiplier` helper and
+  `InvalidMultiplierError` (zero consumers repo-wide).
+- **RF-3**: `AgentValueCase` now fails closed with a typed `GovernedValueError`
+  when `actual_losses` (or `reported_net_per_period`) is missing/wrong-typed,
+  instead of an incidental `AttributeError`.
+- **RF-4**: `confidence` → `reported_confidence`, documented as caller-reported,
+  unverified, separate from `EvidenceStatus`, and never used in the arithmetic.
+- **Honest naming**: `RealizedValue` → `ReportedValue`; result/event fields
+  `attributed_avoided_loss` → `reported_avoided_loss`,
+  `realized_net_governed_value` → `reported_net_governed_value`,
+  `realized_roi` → `reported_roi`; `realized_net_per_period` →
+  `reported_net_per_period`. No name implies the kernel observed, attributed, or
+  verified anything. **No mathematics changed.**
+
+
 **Breaking, internal-only** (the leaf has zero reverse dependencies and was
 unmerged). Corrects the mathematical model flagged in the architectural audit and
 relabels the package as an experimental downstream calculation kernel.

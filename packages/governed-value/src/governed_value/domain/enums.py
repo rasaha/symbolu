@@ -115,7 +115,17 @@ class AuthorityStatus(str, Enum):
 
 
 class ConfidenceClass(str, Enum):
-    """A qualitative confidence label — carried alongside, never in the math."""
+    """A qualitative, **caller-reported and unverified** confidence label.
+
+    It is carried on the case (``reported_confidence``) and echoed to the result,
+    but it is:
+
+    * caller-reported — the caller asserts it; the kernel does not derive it;
+    * unverified — it is *not* an evidence determination and is entirely separate
+      from :class:`EvidenceStatus` (which this kernel fixes at ``REPORTED``);
+    * never used in any monetary calculation — it does not scale, gate, or enter
+      NGV / ROI / payback in any way.
+    """
 
     UNCLASSIFIED = "unclassified"
     LOW = "low"

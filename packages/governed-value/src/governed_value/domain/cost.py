@@ -11,11 +11,9 @@ must not look identical.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from decimal import Decimal
 from typing import Optional
 
 from .money import Money
-from .rates import ONE
 
 __all__ = ["CostToServe", "COST_COMPONENTS"]
 
@@ -56,20 +54,13 @@ class CostToServe:
 
         return tuple(n for n in COST_COMPONENTS if getattr(self, n) is None)
 
-    def total(self, *, inference_multiplier: Decimal = ONE) -> Money:
-        """Sum accounted components.
-
-        ``inference_multiplier`` scales the inference line only — data-residency
-        / sovereign hosting changes inference cost per action (geography), and
-        nothing else in the TCO.
-        """
+    def total(self) -> Money:
+        """Sum accounted components. No caller-controlled multiplier is applied."""
 
         acc = Money.zero(self.currency)
         for name in COST_COMPONENTS:
             component: Optional[Money] = getattr(self, name)
             if component is None:
                 continue
-            if name == "inference" and inference_multiplier != ONE:
-                component = component.scaled(inference_multiplier)
             acc = acc + component
         return acc
