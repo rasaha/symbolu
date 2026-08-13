@@ -28,6 +28,20 @@ from .control_assurance import (
 from .ingress import TrustedEvidenceIngressPort
 from .pwc import InMemoryWorkflowIRSource, WorkflowIRSource
 from .tap import EvidenceAdmissionPort, ReferenceEvidenceAdmission
+from .evaluation_contracts import (
+    EVALUATION_REQUEST_SCHEMA_VERSION,
+    EVALUATION_RESULT_SCHEMA_VERSION,
+    SUPPORTED_REQUEST_SCHEMA_VERSIONS,
+    PolicyResolverPort,
+    ReferenceControlEvidenceResolver,
+    ReferencePolicyResolver,
+    SeamContractError,
+    SubjectRiskDecision,
+    SubjectRiskDisposition,
+    SubjectRiskEvaluationRequest,
+    SubjectRiskNonDecisionReason,
+    TrustedControlEvidenceResolverPort,
+)
 
 __all__ = [
     "ActionGatePort",
@@ -52,4 +66,16 @@ __all__ = [
     "bind_control_result",
     "WorkflowIRSource",
     "InMemoryWorkflowIRSource",
+    "EVALUATION_REQUEST_SCHEMA_VERSION",
+    "EVALUATION_RESULT_SCHEMA_VERSION",
+    "SUPPORTED_REQUEST_SCHEMA_VERSIONS",
+    "PolicyResolverPort",
+    "TrustedControlEvidenceResolverPort",
+    "ReferencePolicyResolver",
+    "ReferenceControlEvidenceResolver",
+    "SubjectRiskEvaluationRequest",
+    "SubjectRiskDecision",
+    "SubjectRiskDisposition",
+    "SubjectRiskNonDecisionReason",
+    "SeamContractError",
 ]

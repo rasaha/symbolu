@@ -66,6 +66,20 @@ from risk_authority.domain import (
 )
 from risk_authority.domain.enums import RiskRecommendation
 from risk_authority.integrations import InMemoryWorkflowIRSource
+from risk_authority.services.decision_authority import ReferenceDecisionAuthority
+
+
+class _ProdDecisionAuthority:
+    """Conformance double for a production Decision Authority adapter (defect (h)):
+    production mode now requires an explicit production-authoritative ruler."""
+    is_production_authoritative = True
+
+    def __init__(self):
+        self._inner = ReferenceDecisionAuthority()
+
+    def issue_decision(self, **kw):
+        return self._inner.issue_decision(**kw)
+
 
 NOW = datetime(2026, 8, 10, 12, 0, 0, tzinfo=timezone.utc)
 TENANT, ACTOR, MODEL, PRINCIPAL = "t1", "a1", "m1", "p1"
@@ -86,7 +100,8 @@ def build_runtime(control_assurance, ingress):
     r = RiskAuthorityEvidenceRuntime(
         workflow_source=source, key_record=key, clock=lambda: NOW,
         evidence_admission=ProductionEvidenceAdmission(),
-        control_assurance=control_assurance, evidence_ingress=ingress)
+        control_assurance=control_assurance, evidence_ingress=ingress,
+        decision_authority=_ProdDecisionAuthority())
     r.application.authority.add_grant(AuthorityGrant(
         principal_id=PRINCIPAL, tenant_id=TENANT, authority_type=AuthorityType.RISK_APPROVAL,
         domains=("FINANCE",), allowed_risk_classes=(RiskClass.HIGH,), max_autonomy=2,

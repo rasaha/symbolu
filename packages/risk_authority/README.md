@@ -99,6 +99,27 @@ reference (validated against the RFC test vectors); production issuance/verifica
 should be backed by a vetted library and an HSM/KMS. The `SigningKey` / `VerifyKey`
 surface is shaped so that backend can be swapped without touching callers.
 
+## Non-executing evaluation seam (v0.2.0)
+
+`RiskEvaluationSeam` (`risk_authority.api`) lets an external domain integration obtain a
+canonical risk outcome for a neutral `SubjectRiskEvaluationRequest` and **stop at the risk
+decision** — it never issues an envelope or invokes ActionGate. The request carries only
+subject facts + correlation context; policy, controls, keys, evaluator identity, clock and
+revocation come from the trusted composition root. `RiskEvaluationSeam.production(...)` fails
+closed on any reference-grade or missing dependency; `RiskEvaluationSeam.reference(...)` is a
+labelled conformance seam. A `RISK_PASSED` result is *not* authorization
+(`executable = authorization_performed = envelope_issued = False`). See
+[`docs/architecture/RISK_AUTHORITY_EVALUATION_SEAM.md`](../../../docs/architecture/RISK_AUTHORITY_EVALUATION_SEAM.md).
+
+**Production containment (defect (h)).** In `production_mode=True`, `RiskAuthorityApplication`
+now **requires** an explicit production-authoritative `decision_authority` — `None` and the
+in-package reference ruler both **fail closed at construction** (no reference fallback in
+production). `issue_envelope` and `authorize_action` also **fail closed in production** with a
+typed `ProductionContainmentError`: envelope issuance and production ActionGate authorization are
+**Phase 5** and are not implemented — production Risk Authority integration stops at a
+non-executable `RiskDecision`. Reference/conformance mode (`production_mode=False`) retains the
+full flow. This is a breaking production-construction change; see the ADR's migration note.
+
 ## Verify the distribution
 
 ```

@@ -31,7 +31,7 @@ from ..domain.enums import (
     RiskOutcome,
 )
 from ..domain.envelope import EnvelopeConditions, RiskAuthorizationEnvelope
-from ..domain.errors import RiskAuthorityError
+from ..domain.errors import ProductionContainmentError, RiskAuthorityError
 from ..domain.events import GovernanceEvent
 from ..domain.evidence import ControlEvidenceRecord
 from ..domain.risk_case import RequestedCapabilities, RiskDecisionCase
@@ -54,7 +54,7 @@ from ..persistence.in_memory import (
     InMemoryGovernanceEventStore,
     InMemoryRiskCaseRepository,
 )
-from ..services.decision_authority import ReferenceDecisionAuthority
+from ..services.decision_authority import DecisionAuthorityPort, ReferenceDecisionAuthority
 from ..services.envelope_issuer import EnvelopeIssuer
 from ..services.envelope_verifier import EnvelopeVerification, EnvelopeVerifier
 from ..services.revocation import RevocationState
@@ -105,6 +105,7 @@ class RiskAuthorityApplication:
         evidence_admission: Optional[EvidenceAdmissionPort] = None,
         control_assurance: Optional[ControlAssurancePort] = None,
         evidence_ingress: Optional[TrustedEvidenceIngressPort] = None,
+        decision_authority: Optional[DecisionAuthorityPort] = None,
         production_mode: bool = False,
     ) -> None:
         # RA-5 mode selection (RISK_AUTHORITY_RA5_SPEC.md §12; audit H-1/H-2).
@@ -154,6 +155,29 @@ class RiskAuthorityApplication:
                     "evaluator whose support is presumptive cannot mint PASS in "
                     "production (RA-5 audit H-1)."
                 )
+            # Defect (h), fully contained: production mode requires an EXPLICIT,
+            # production-authoritative binding-decision ruler. There is no reference
+            # fallback in production — ``decision_authority=None`` and the in-package
+            # reference ruler both fail closed at construction, so no production path
+            # can silently install a reference authority and mint an ALLOW decision.
+            # Reference behavior is available only when ``production_mode=False``.
+            if decision_authority is None:
+                raise RiskAuthorityError(
+                    "production_mode=True requires an explicit, production-authoritative "
+                    "decision_authority; there is NO reference fallback in production "
+                    "(audit defect (h)). Inject an adapter over ugence-decision-authority "
+                    "(is_production_authoritative=True), or use production_mode=False for "
+                    "reference/conformance."
+                )
+            if isinstance(decision_authority, ReferenceDecisionAuthority) or (
+                getattr(decision_authority, "is_production_authoritative", False) is not True
+            ):
+                raise RiskAuthorityError(
+                    "production DecisionAuthorityPort must be a production-authoritative "
+                    "adapter over ugence-decision-authority (is_production_authoritative="
+                    "True); the in-package reference ruler cannot mint binding authority "
+                    "in production (audit defect (h))."
+                )
         self._production_mode = bool(production_mode)
         self._evidence_admission = evidence_admission
         self._control_assurance = control_assurance
@@ -174,9 +198,16 @@ class RiskAuthorityApplication:
         self._ids = ids or _Ids()
 
         self._engine = RiskEngine()
-        # Reference ruler behind DecisionAuthorityPort; production adapts the
-        # shipped ugence-decision-authority kernel onto the same port.
-        self._authority_service = ReferenceDecisionAuthority()
+        # Reference ruler behind DecisionAuthorityPort by default; production adapts
+        # the shipped ugence-decision-authority kernel onto the same port and injects
+        # it here (validated above in production mode). Making the ruler injectable
+        # closes audit defect (h): the facade no longer hardcodes the reference ruler
+        # with no production substitution point.
+        self._authority_service: DecisionAuthorityPort = (
+            decision_authority
+            if decision_authority is not None
+            else ReferenceDecisionAuthority()
+        )
         self._issuer_service = EnvelopeIssuer(issuer=issuer)
         self._verifier = EnvelopeVerifier()
         self._gate = ReferenceActionGate(self._verifier)
@@ -684,6 +715,16 @@ class RiskAuthorityApplication:
     def issue_envelope(
         self, tenant_id: str, case_id: str, req: IssueEnvelopeRequest
     ) -> RiskAuthorizationEnvelope:
+        # Production containment (audit): envelope issuance is Phase 5 and is deferred.
+        # Fail closed rather than mint a signed execution-authority artifact through the
+        # reference issuer/ActionGate in production mode. Reference mode retains the flow.
+        if self._production_mode:
+            raise ProductionContainmentError(
+                "issue_envelope is disabled in production_mode: signed envelope issuance "
+                "is Phase 5 (production ActionGate / provider execution) and is not "
+                "implemented. Production Risk Authority integration stops at a "
+                "non-executable RiskDecision."
+            )
         now = self._clock()
         case = self._require_case(tenant_id, case_id)
         decision = self.decisions.get(tenant_id, req.decision_id)
@@ -753,6 +794,16 @@ class RiskAuthorityApplication:
     # POST /actions/authorize
     # ------------------------------------------------------------------
     def authorize_action(self, req: AuthorizeActionRequest) -> ActionAuthorization:
+        # Production containment (audit): the reference ActionGate must never act as a
+        # production enforcement component. Action authorization is Phase 5 and fails
+        # closed in production mode. Reference mode retains the conformance flow.
+        if self._production_mode:
+            raise ProductionContainmentError(
+                "authorize_action is disabled in production_mode: production ActionGate "
+                "authorization is Phase 5 and is not implemented. The in-package "
+                "ReferenceActionGate is a conformance component, never production "
+                "enforcement."
+            )
         now = self._clock()
         envelope = self.envelopes.get(req.tenant_id, req.envelope_id)
         action = CanonicalAction(

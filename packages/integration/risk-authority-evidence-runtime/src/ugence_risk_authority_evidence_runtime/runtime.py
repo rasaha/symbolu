@@ -45,6 +45,7 @@ from risk_authority.integrations.control_assurance import ControlAssurancePort
 from risk_authority.integrations.ingress import TrustedEvidenceIngressPort
 from risk_authority.integrations.pwc import WorkflowIRSource
 from risk_authority.integrations.tap import EvidenceAdmissionPort
+from risk_authority.services.decision_authority import DecisionAuthorityPort
 from risk_authority.services.risk_engine import RiskEvaluation
 
 __all__ = ["RiskAuthorityEvidenceRuntime"]
@@ -62,6 +63,7 @@ class RiskAuthorityEvidenceRuntime:
         evidence_admission: EvidenceAdmissionPort,
         control_assurance: ControlAssurancePort,
         evidence_ingress: TrustedEvidenceIngressPort,
+        decision_authority: Optional[DecisionAuthorityPort] = None,
         issuer: str = "ugence-risk-authority",
         application: Optional[RiskAuthorityApplication] = None,
     ) -> None:
@@ -75,9 +77,13 @@ class RiskAuthorityEvidenceRuntime:
                 )
             self.application = application
         else:
-            # production_mode=True + admission + assurance + trusted-ingress ⇒ the
-            # application constructor enforces the fail-closed completeness check
-            # and the H-1/H-2 production guardrails (RA-5 §12, §13).
+            # production_mode=True + admission + assurance + trusted-ingress + an
+            # explicit production-authoritative decision_authority ⇒ the application
+            # constructor enforces the fail-closed completeness check, the H-1/H-2
+            # production guardrails (RA-5 §12, §13), and defect-(h) containment (no
+            # reference decision-authority fallback in production). Envelope issuance
+            # and action authorization remain Phase-5 and fail closed in production;
+            # the evidence path stops at a non-executable RiskDecision.
             self.application = RiskAuthorityApplication(
                 workflow_source=workflow_source,
                 key_record=key_record,
@@ -86,6 +92,7 @@ class RiskAuthorityEvidenceRuntime:
                 evidence_admission=evidence_admission,
                 control_assurance=control_assurance,
                 evidence_ingress=evidence_ingress,
+                decision_authority=decision_authority,
                 production_mode=True,
             )
         self._evidence_admission = evidence_admission

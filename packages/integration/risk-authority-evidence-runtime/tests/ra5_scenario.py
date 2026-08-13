@@ -30,8 +30,29 @@ from risk_authority.domain import (
     WorkflowStatus,
 )
 from risk_authority.integrations import InMemoryWorkflowIRSource
+from risk_authority.services.decision_authority import ReferenceDecisionAuthority
 
 import dataclasses
+
+
+class ProductionDecisionAuthorityDouble:
+    """Conformance double for a production Decision Authority adapter.
+
+    Since defect-(h) containment, ``RiskAuthorityApplication(production_mode=True)``
+    refuses the reference ruler and requires an explicit production-authoritative
+    ``decision_authority``. In a real deployment this is an adapter over the shipped
+    ``ugence-decision-authority`` kernel; here it delegates to the reference ruler but
+    is explicitly marked production-authoritative purely to exercise the RA-5 evidence
+    → trusted-decision path in tests. It mints only a non-executable ``RiskDecision``;
+    envelope issuance / action authorization remain Phase-5 and fail closed."""
+
+    is_production_authoritative = True
+
+    def __init__(self) -> None:
+        self._inner = ReferenceDecisionAuthority()
+
+    def issue_decision(self, **kw):
+        return self._inner.issue_decision(**kw)
 
 from ugence_risk_authority_evidence_runtime import (
     ProductionEvidenceAdmission,
@@ -189,6 +210,7 @@ def build_runtime(
         # override this with an untrusted-channel verifier to prove fabricated
         # caller evidence is dropped.
         evidence_ingress=evidence_ingress or DeploymentChannelIngress(trusted=True),
+        decision_authority=ProductionDecisionAuthorityDouble(),
     )
     runtime.application.authority.add_grant(build_grant())
     return runtime

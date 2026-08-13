@@ -1,20 +1,27 @@
-"""End-to-end production path → the sole machine-authority envelope (Phase 12, 29).
+"""End-to-end production path → a non-executable RiskDecision (Phase 4 boundary).
 
-Proves the full trusted chain and its fail-closed complement:
+Proves the full trusted chain and its fail-closed complements:
 
-    raw evidence → admitted → assured → trusted controls → RA → signed envelope
+    raw evidence → admitted → assured → trusted controls → RA → RiskDecision  [STOP]
 
-and that a DENY (forged-PASS) case can NEVER reach envelope issuance — the RA
-state machine forbids the transition, so no authority is minted.
+Since defect-(h) containment, production Risk Authority integration STOPS at a
+non-executable ``RiskDecision``: envelope issuance and action authorization are
+Phase 5 and fail closed in production mode (the reference issuer / ActionGate are
+never production enforcement). A DENY (forged-PASS) case still can never even mint
+a decision — the RA state machine forbids the transition.
 """
 
 from __future__ import annotations
 
 import pytest
 
-from risk_authority.api.schemas import DecisionRequest, IssueEnvelopeRequest
+from risk_authority.api.schemas import (
+    AuthorizeActionRequest,
+    DecisionRequest,
+    IssueEnvelopeRequest,
+)
 from risk_authority.domain.enums import RiskRecommendation
-from risk_authority.domain.errors import RiskAuthorityError
+from risk_authority.domain.errors import ProductionContainmentError, RiskAuthorityError
 
 import ra5_scenario as C
 
@@ -26,7 +33,7 @@ def _run_to_evaluation(runtime, records, mapping, conditions=()):
     )
 
 
-def test_full_trusted_chain_mints_and_verifies_envelope():
+def test_full_trusted_chain_mints_non_executable_decision_and_contains_envelope():
     runtime = C.build_runtime()
     records, mapping = C.full_evidence_and_map()
     evaluation = _run_to_evaluation(runtime, records, mapping, conditions=("context_minimization",))
@@ -35,6 +42,7 @@ def test_full_trusted_chain_mints_and_verifies_envelope():
         RiskRecommendation.ALLOW_WITH_CONDITIONS,
     )
 
+    # The trusted chain mints a valid binding RiskDecision — and STOPS there.
     decision = runtime.issue_decision(
         C.TENANT,
         "rdc_prod_1",
@@ -43,18 +51,27 @@ def test_full_trusted_chain_mints_and_verifies_envelope():
     )
     assert decision.grants_authority
 
-    envelope = runtime.issue_envelope(
-        C.TENANT,
-        "rdc_prod_1",
-        IssueEnvelopeRequest(
-            decision_id=decision.decision_id,
-            audience="finance-agent-runtime",
-            session_id="sess_1",
-            nonce="nonce_1",
-        ),
-    )
-    verification = runtime.verify_envelope(C.TENANT, envelope.envelope_id)
-    assert verification.valid, verification.reasons
+    # Phase-5 containment: production envelope issuance fails closed (no signed
+    # execution-authority artifact is minted through the reference issuer).
+    with pytest.raises(ProductionContainmentError):
+        runtime.issue_envelope(
+            C.TENANT,
+            "rdc_prod_1",
+            IssueEnvelopeRequest(
+                decision_id=decision.decision_id,
+                audience="finance-agent-runtime",
+                session_id="sess_1",
+                nonce="nonce_1",
+            ),
+        )
+
+    # Phase-5 containment: production action authorization fails closed (the
+    # reference ActionGate is never production enforcement).
+    with pytest.raises(ProductionContainmentError):
+        runtime.authorize_action(AuthorizeActionRequest(
+            envelope_id="e", tenant_id=C.TENANT, actor_id=C.ACTOR, model_id=C.MODEL,
+            session_id="sess_1", action_type="crm.read", target_id="txn",
+            purpose="CUSTOMER_REFUND_REVIEW", destination="internal://finance"))
 
 
 def test_forged_pass_case_cannot_reach_envelope_issuance():
