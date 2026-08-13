@@ -1,10 +1,12 @@
 # ADR — Cloud Scaling: Risk Authority Integration (Phase 4)
 
-**Status:** **PROPOSED** (design-only draft; no runtime adapter, no package, no production behavior). Requires owner ratification before any Phase-4 implementation begins.
+**Status:** **PROPOSED** (design-only draft; no runtime adapter, no package, no production behavior). Owner decisions D-1…D-7 were ratified on 2026-08-13 (see §20) and are folded into this design; the *design* is ratified, its *implementation* remains gated (see the final sequencing rule).
 **Date:** 2026-08-13
-**Package (proposed, NOT created here):** `ugence-cloud-scaling-risk-integration` (new leaf integration sibling under `packages/integration/`)
-**Depends on (design intent):** `ugence-cloud-scaling-controller >= 0.4.0` (Phase 3 recommendation contracts) · `ugence-risk-authority >= 0.2.0` (the PR-1 evaluation seam)
-**Scope:** Define the canonical Phase-4 adapter design and the canonical **risk-subject projection** contract at the design/schema level only. Phase 4 stops at a non-executable risk decision. Envelope issuance / ActionGate / provider execution are **Phase 5**; effect verification / recommendation learning are **Phase 6** — both explicitly excluded.
+**Package (approved name, NOT created here — D-3):** `ugence-cloud-scaling-risk-integration` at `packages/integration/cloud-scaling-risk-integration/`
+**Depends on (design intent):** `ugence-cloud-scaling-controller >= 0.4.0` (Phase 3 recommendation contracts) · `ugence-risk-authority >= 0.2.0` (the PR-1 evaluation seam), with a future, RA-owned `ugence-risk-authority` minor bump for the v2 subject-context contract (D-2)
+**Scope:** Define the canonical Phase-4 adapter design, the canonical **risk-subject projection**, and the RA-owned strict **v2 neutral subject-context contract** at the design/schema level only. Phase 4 stops at a non-executable risk decision. Envelope issuance / ActionGate / provider execution are **Phase 5**; effect verification / recommendation learning are **Phase 6** — both explicitly excluded.
+
+> **Ratified owner decisions (2026-08-13):** **D-2 approved** — a strict, versioned, canonical, digest-bound, RA-owned *neutral subject-context* contract (§5.2), **not** an unrestricted generic attribute map; **D-1 (digest-only) rejected**. D-3 package name approved. D-4 purpose/domain constants proposed but their final identifiers are marked for ratification during review. D-5 primary input = `CapacityActionRecommendation` + its digest-bound embedded evidence; `RecommendationAbstention` propagates as a typed non-evaluation and never enters risk evaluation as a recommendation. D-6 idempotency = canonical `tenant + subject + recommendation digest + evaluation purpose + schema version` (never timestamps alone). D-7 documentation-tense cleanups are recorded separately and are out of scope for this ADR.
 
 > This ADR is a design artifact. It creates no runtime package, publishes no distribution, and changes no production behavior. Where it names types, methods, or fields as *proposed*, those are design proposals subject to the owner decisions in §20 — not committed contracts. The only committed contracts it references are those already merged on the default branch and cited by file.
 
@@ -66,12 +68,11 @@ The adapter is **non-authoritative**: it selects no policy, admits no evidence, 
 
 ## 4. Exact input contract from Cloud Scaling
 
-The adapter accepts exactly one of the controller's *validated, immutable* Phase-3 outputs:
+Per **D-5**, the **primary input is `CapacityActionRecommendation` together with its digest-bound embedded evidence** (forecast / cost / topology / state / constraint / policy digests are re-derived and rebound by the recommendation's own `__post_init__`). The adapter reconstructs/re-validates it via `from_dict` (strict, unknown-field-rejecting, digest-rebinding).
 
-- `CapacityActionRecommendation` — the proposed action to risk-evaluate; or
-- `RecommendationAbstention` — the controller declined to recommend (typed).
+`RecommendationAbstention` is also an accepted input but is **not** a recommendation: it **propagates as a typed non-evaluation** (§11) and **must never enter risk evaluation as a recommendation** — the adapter does not project it into a `SubjectRiskEvaluationRequest` and does not call the seam for it.
 
-Both are reconstructed/re-validated via their own `from_dict` (strict, unknown-field-rejecting, digest-rebinding `__post_init__`). The adapter accepts **no** other inbound fields: it never accepts a caller-supplied risk class, policy id, control result, evidence body, decision, envelope, or executable flag — there is no parameter for any of them.
+The adapter accepts **no** other inbound fields: it never accepts a caller-supplied risk class, policy id, control result, evidence body, decision, envelope, or executable flag — there is no parameter for any of them.
 
 ## 5. Canonical risk-subject projection (the core Phase-4 contract)
 
@@ -101,12 +102,52 @@ The projection is **lossless for all risk-relevant fields** (they all enter the 
 | 11 | recommendation timestamp | `.recommendation_time` | *(fact dict)*; `evaluation_time` left `None` (RA clock) | ⚠️ semantic overlap only |
 | 12 | forecast-evidence digest | `.forecast_evidence_digest()` | `evidence_references[]` (opaque) | ⚠️ typed→opaque |
 | 13 | dependency / cost evidence digest | `.cost_evidence_digest()`, `.topology_digest()` | `evidence_references[]` (opaque) | ⚠️ typed→opaque |
-| 14 | correlation / idempotency id | `forecast.correlation_id`; `.recommendation_id` | `correlation_id`; `idempotency_key` | ✅ |
+| 14 | correlation id | `forecast.correlation_id` | `correlation_id` | ✅ |
+| 14a | idempotency key (D-6) | canonical `tenant_id` + `subject_id` + `recommendation.digest()` + evaluation purpose + request `schema_version` (digest of that tuple; **never timestamps alone**) | `idempotency_key` | ✅ |
 | 15 | risk class | *(absent — advisory)* | `requested_risk_class = None` (RA classifies) | ✅ |
 | 16 | purpose / domain id | canonical constants (adapter) | `requested_purpose="cloud_scaling.capacity_action"`, `requested_domain="cloud_scaling"` | ✅ |
 | 17 | evidence references | derived digests (12,13, state) | `evidence_references` | ✅ |
 
 Emitted request (design intent): `subject_type="cloud_scaling.capacity_action"`, `requested_scope=Scope(purposes=("cloud_scaling.capacity_action",))` (**minimal — never overloaded** with topology), `evidence_references=(forecast_evidence_digest, cost_evidence_digest[, topology_digest], canonical_state_digest)`, all executable flags fixed `False` by the `SubjectRiskDecision` contract.
+
+Under the ratified decision the ❌/⚠️ rows (#4–#13) are **not** left digest-only: they are carried in the strict RA-owned **v2 neutral subject-context** (§5.2), which makes them individually visible to policy resolution while remaining domain-neutral and non-authoritative. Digest-only anchoring (D-1) is rejected because it cannot expose those facts to `PolicyResolverPort` (see §8, §20).
+
+### 5.2 Canonical v2 neutral subject-context contract (`SubjectContext`) — RA-owned
+
+**Owned by Risk Authority**, added to `risk_authority.integrations.evaluation_contracts` (schema `risk-subject-context-1`), embedded in a new request schema `risk-subject-evaluation-request-2`. The Cloud Scaling adapter may **populate** it but may **not** define the meaning of authority or select policy. It is a strict, closed, frozen, canonical, digest-bound contract — **not** a generic `Mapping[str,str]`. It carries only *neutral subject facts* that policy resolution legitimately needs; the adapter maps scaling semantics onto neutral slots (capacity→`magnitude_before/after`, cluster→`compute_group`, action→`action_type`).
+
+Proposed fields (explicit canonical types; final names ratified in review — D-4):
+
+| Field | Type | Neutral meaning | Populated from (scaling) | Missing-vs-named |
+|---|---|---|---|---|
+| `schema_version` | `str` (mandatory, `= "risk-subject-context-1"`) | contract version | constant | — |
+| `tenant_id` | `str` (required, non-empty) | tenant | `subject.tenant_id` | required |
+| `environment` | `Optional[str]` | deployment environment | `subject.environment` | `None` ≠ `""` |
+| `region` | `Optional[str]` | geographic locality | `subject.region` | `None` ≠ `""` |
+| `zone` | `Optional[str]` | finer locality | `subject.zone` | `None` ≠ `""` |
+| `compute_group` | `Optional[str]` | compute domain / cluster | `subject.cluster` | `None` ≠ `""` |
+| `resource_class` | `Optional[str]` | resource / capacity class | `subject.resource_id` / plan `role` | `None` ≠ `""` |
+| `action_type` | `str` (required, controlled neutral vocabulary) | proposed action kind | `ActionKind` (`no_change`/`scale_up`/`scale_down`/`coordinated`) | required |
+| `magnitude_before` | `Optional[int]` (int units; not bool/float) | current quantity | `ResourceChange.current_capacity` | `None` ≠ `0` |
+| `magnitude_after` | `Optional[int]` (int units; not bool/float) | target quantity | `ResourceChange.proposed_capacity` | `None` ≠ `0` |
+| `subject_asserted_at` | `datetime` (canonical RFC3339 UTC) | when the subject fact was asserted | `recommendation_time` | required |
+| `subject_valid_from` | `datetime` (canonical RFC3339 UTC) | validity-window start | `recommendation_time` | required |
+| `subject_valid_until` | `datetime` (canonical RFC3339 UTC) | validity-window end | `recommendation_time + validity_seconds` | required |
+| `evidence_references` | `tuple[str, ...]` (opaque, non-empty strings) | applicable evidence references | forecast/cost/topology/state digests | required (may be empty tuple) |
+
+`SubjectContext` requirements (design):
+- strict constructor / `from_dict` parity; **unknown fields rejected**; non-canonical values rejected (int fields reject `bool`/`float`; timestamps must parse at `%Y-%m-%dT%H:%M:%S.%fZ`; strings non-empty when present);
+- **distinguishes missing (`None`) from named** — never coerces `None`→`""`/`0`, and both states produce distinct digests;
+- deterministic `sha256:` `context_digest = digest(to_canonical_obj(context))`;
+- **binds into `subject_digest`** (the projection folds `context_digest` and the full recommendation fact dict into `subject_digest`) and thereby into `request_digest = SubjectRiskEvaluationRequest.digest()`;
+- **replay safety:** `tenant_id` + `subject_id` + the validity window bound in-context; RA's authoritative binding re-check rejects cross-tenant, cross-subject and cross-scope reuse and rejects use outside `[subject_valid_from, subject_valid_until]`;
+- **exposes no** caller-selected policy, **no** caller-authored control status, and contains **no** key, decision, envelope, authorization, or execution instruction — the field set is closed and excludes them structurally;
+- **non-executable** (request-side context only; the `SubjectRiskDecision` keeps every executable flag `False`);
+- **domain-neutral** at the RA boundary (neutral field names; RA never learns the word "capacity").
+
+### 5.3 Policy-resolver access (design)
+
+`risk-subject-evaluation-request-2` adds an **optional** `subject_context: Optional[SubjectContext]`. `PolicyResolverPort` gains a **backward-compatible** widening so the resolver may inspect `subject_context` (e.g., an added keyword `subject_context: Optional[SubjectContext] = None`, or a `resolve` successor); v1 resolvers that ignore it keep working. This is an additive, versioned RA-side change (§16) — **not implemented in this PR**.
 
 ## 6. Required subject and scope dimensions
 
@@ -121,7 +162,7 @@ Emitted request (design intent): `subject_type="cloud_scaling.capacity_action"`,
 
 The adapter **never selects policy**. It calls `seam.evaluate(request)`; the seam calls the trusted `PolicyResolverPort.resolve(tenant_id, purpose, domain, risk_class, requested_scope, now)`. If no authoritative policy exists → `NOT_EVALUATED(NO_AUTHORITATIVE_POLICY)`; if multiple claim authority → ambiguity → fail closed. The resolver is production-authoritative (`is_production_authoritative = True`) or the production seam refuses to construct.
 
-> **Contract gap (see §20 D-1/D-2).** `PolicyResolverPort.resolve(...)` receives only `(tenant, purpose, domain, risk_class, requested_scope, now)`. Fields #4–#10 (environment, cluster, region, resource/capacity class, action type, current/target capacity, validity window) are bound losslessly inside `subject_digest` **but are not individually visible to the resolver**, so scaling-risk policy cannot *route* on them unless they are placed in `requested_scope` — which this design **refuses** ("do not silently overload unrelated fields"). This is the single material contract gap; §20 records the two resolutions.
+> **Why v1 is insufficient, and how v2 resolves it.** In `risk-subject-evaluation-request-1`, `PolicyResolverPort.resolve(...)` receives only `(tenant, purpose, domain, risk_class, requested_scope, now)`. Fields #4–#13 (environment, cluster, region, resource/capacity class, action type, current/target capacity, recommendation timestamp, validity window, evidence references) can be bound losslessly inside `subject_digest` **but are not individually visible to the resolver**, so scaling-risk policy cannot *route* on them unless they are stuffed into `requested_scope` — which this design **refuses** ("do not silently overload unrelated fields"). **Digest-only anchoring (D-1) is therefore rejected.** The ratified resolution (**D-2**) is the strict RA-owned **v2 `SubjectContext`** (§5.2): a resolver reading `risk-subject-evaluation-request-2` inspects those neutral facts directly. The adapter populates the context; it never selects policy.
 
 ## 9. Evidence-reference semantics
 
@@ -136,7 +177,7 @@ The projection carries only **opaque evidence references** (digest strings) in `
 
 ## 11. Typed abstention and fail-closed behavior
 
-`RecommendationAbstention` input ⇒ the adapter **does not call the seam**; it returns a typed `PROJECTION_ABSTAINED_UPSTREAM` outcome (proposed) carrying the abstention's subject + reason + available input digests. A controller abstention **never becomes a risk approval**. Every non-nominal case (§12) is fail-closed and typed; none returns an ALLOW-family disposition.
+Per **D-5**, a `RecommendationAbstention` input ⇒ the adapter **does not project it and does not call the seam**; it returns a typed `PROJECTION_ABSTAINED_UPSTREAM` outcome (proposed) carrying the abstention's subject + reason + available input digests. An abstention **must never enter risk evaluation as a recommendation**, and a controller abstention **never becomes a risk approval**. Every non-nominal case (§12) is fail-closed and typed; none returns an ALLOW-family disposition.
 
 ## 12. Risk-decision output semantics & failure behavior
 
@@ -182,8 +223,13 @@ For the projection contract and any adapter outcome type: strict constructor / `
 ## 16. Compatibility and versioning
 
 - Projection schema `cloud-scaling-risk-subject-projection-1`; adapter distribution starts at `0.1.0`.
-- Consumes **already-merged** contracts: controller `0.4.0`, risk-authority `0.2.0`. **No change** to either frozen contract is required by §20 D-1. §20 D-2 (a `risk-subject-evaluation-request-2` extension) would be a *coordinated, RA-owned, versioned migration* — out of Phase-4 scope and gated on owner approval.
-- Frozen identifiers/schemas/digests are not changed without a versioned migration.
+- Consumes **already-merged** contracts: controller `0.4.0`, risk-authority `0.2.0`.
+- **v2 subject-context migration (D-2), RA-owned, additive, versioned, backward-compatible:**
+  - New `SubjectContext` (schema `risk-subject-context-1`) and new request schema `risk-subject-evaluation-request-2` with an **optional** `subject_context` field.
+  - **v1 preserved:** `risk-subject-evaluation-request-1` requests remain valid and continue to validate/round-trip unchanged; a v2 request with `subject_context = None` is behaviorally equivalent to v1. `SUPPORTED_REQUEST_SCHEMA_VERSIONS` becomes `{…-1, …-2}`.
+  - `PolicyResolverPort` widening is additive (optional keyword / successor method) so existing resolvers keep working — a **bounded, documented migration**, not a breaking change.
+  - Requires a **versioned `ugence-risk-authority` minor bump** (e.g. `0.2.0 → 0.3.0`) owned by Risk Authority; **not implemented in this PR**.
+- Frozen identifiers/schemas/digests are not changed without a versioned migration; the v1 contract's frozen digest behavior is untouched.
 
 ## 17. Test and acceptance matrix (for the implementation phase, when authorized)
 
@@ -197,15 +243,17 @@ Phase 4 is a **consumer** of the RA-5 boundary, not a re-implementation of it. T
 
 Phase 4 performs **no** envelope issuance, **no** ActionGate authorization, **no** provider/cloud execution or actuation (Phase 5), and **no** effect verification or recommendation learning (Phase 6). These remain fail-closed and are not implemented, imported, or wired by this design.
 
-## 20. Open implementation details requiring owner approval
+## 20. Owner decisions — ratified 2026-08-13 (design ratified; implementation gated)
 
-- **D-1 — Projection-anchoring (no contract change) [recommended default].** Ship Phase 4 against the *unchanged, frozen* `risk-subject-evaluation-request-1`: carry the scaling topology/action/validity dimensions only inside `subject_digest` + canonical purpose/domain, and constrain scaling-risk policy to route on `(tenant, purpose, domain, risk_class, scope)`. **Consequence:** policy cannot vary by environment/region/action/capacity at resolve time. Non-executing and fail-closed are fully preserved.
-- **D-2 — Versioned RA-side extension (only if policy must route on those dimensions).** A coordinated, RA-owned bump to `risk-subject-evaluation-request-2` adding an *optional, additive, strict* `subject_attributes: Mapping[str,str]` (canonical, sorted) + explicit `subject_valid_from` / `subject_valid_until`, and widening `PolicyResolverPort.resolve(...)` to receive them. This touches the seam contract merged in PR #1423 and is **out of Phase-4-design scope**; it needs explicit owner approval and its own versioned migration before implementation.
-- **D-3 — Package name.** `ugence-cloud-scaling-risk-integration` vs the existing `-runtime` suffix convention (`ugence-cloud-scaling-risk-authority-runtime`).
-- **D-4 — Canonical `requested_purpose` / `requested_domain` / `subject_type` string constants** (proposed: `"cloud_scaling.capacity_action"` / `"cloud_scaling"`).
-- **D-5 — Primary input artifact.** `CapacityActionRecommendation` (recommended) vs `CapacityDecisionEvidence`; and whether both are accepted.
-- **D-6 — Idempotency key composition** (`recommendation_id` alone vs `recommendation_id` + `subject_digest`).
-- **D-7 — Note for maintainers:** the Phase 3 ADR header still reads "PROPOSED (not merged)" while its code is merged (#1421, controller `0.4.0`); and the seam's `TrustedControlEvidenceResolverPort` docstring still says RA-5 "will implement" though RA-5 is merged. Neither blocks Phase 4; both are documentation-tense items for owner cleanup.
+- **D-1 — Digest-only projection-anchoring: REJECTED.** Carrying the scaling facts only inside `subject_digest` cannot expose environment/cluster/region/resource-class/action-type/current-target-capacity/validity to `PolicyResolverPort`, so scaling-risk policy could not route on risk-relevant facts. Rejected in favor of D-2.
+- **D-2 — Strict, versioned, RA-owned v2 neutral subject-context: APPROVED (with constraints).** Adopt the strict `SubjectContext` contract in §5.2 — **not** an unrestricted generic `subject_attributes` map. It must: remain domain-neutral at the RA boundary; use explicit canonical types and validation; reject unknown/non-canonical fields; distinguish missing from named values; bind all subject context into `subject_digest` and `request_digest`; prevent cross-tenant, cross-subject and cross-scope replay; expose no caller-selected policy and no caller-authored control status; contain no key/decision/envelope/authorization/execution instruction; remain non-executable; require a versioned Risk Authority contract change; preserve v1 backward compatibility (or document a bounded migration — see §16); and be **owned by Risk Authority, not Cloud Scaling**. The adapter may populate it but may not define authority or select policy. **Not implemented in this PR.**
+- **D-3 — Package name: APPROVED** — `packages/integration/cloud-scaling-risk-integration/` (dist `ugence-cloud-scaling-risk-integration`).
+- **D-4 — Canonical purpose/domain constants: PROPOSED, final identifiers to be ratified in review.** Proposed `requested_purpose = "cloud_scaling.capacity_action"`, `requested_domain = "cloud_scaling"`, `subject_type = "cloud_scaling.capacity_action"`, `action_type ∈ {no_change, scale_up, scale_down, coordinated}`. These strings are **marked for ratification during review** and are not frozen by this ADR.
+- **D-5 — Primary input: APPROVED** — `CapacityActionRecommendation` **plus its digest-bound embedded evidence** is the primary input (§4). `RecommendationAbstention` propagates as a **typed non-evaluation** (§11) and **must never enter risk evaluation as a recommendation**. (`CapacityDecisionEvidence` is not the primary input.)
+- **D-6 — Idempotency: APPROVED** — the idempotency key is a digest of canonical `tenant_id + subject_id + recommendation.digest() + evaluation purpose + request schema_version`. **Timestamps alone must not** define idempotency (§5.1, row 14a).
+- **D-7 — Documentation-tense cleanup: OUT OF SCOPE for this PR.** The Phase-3 ADR header still reads "PROPOSED" though merged (#1421), and the seam's `TrustedControlEvidenceResolverPort` docstring still says RA-5 "will implement" though RA-5 is merged (#1408). These are **recorded separately** and **must not expand this ADR PR**.
+
+Residual items for the implementation phase (not blockers to ratifying this design): the exact `PolicyResolverPort` widening shape (optional keyword vs successor method), and the final `ugence-risk-authority` version number for the v2 bump.
 
 ---
 
@@ -223,5 +271,5 @@ Phase 4 performs **no** envelope issuance, **no** ActionGate authorization, **no
 ## Consequences
 
 - Cloud Scaling gains a safe, auditable, non-executing risk-decision path; the controller stays an advisory leaf.
-- One material contract gap (§8/§20) is surfaced explicitly rather than papered over by overloading `Scope`.
-- No runtime adapter, package, or Phase 5/6 behavior is created by this ADR. Implementation is gated on: RA-5 merged & verified (done), this ADR ratified, the projection contract approved, and D-1…D-6 resolved.
+- The v1 limitation (§8) is resolved by a strict, RA-owned, versioned **v2 subject-context** (§5.2) rather than papered over by overloading `Scope` — the facts policy resolution needs become first-class and canonically typed, while the RA boundary stays domain-neutral and non-authoritative.
+- No runtime adapter, package, v2 RA contract, or Phase 5/6 behavior is created by this ADR. Implementation is gated on: RA-5 merged & verified (done), this ADR ratified, the v2 subject-context contract approved and versioned by Risk Authority, and D-4's final identifiers ratified in review.
