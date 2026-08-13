@@ -2,7 +2,9 @@
 
 ## A ServiceNow-product-first, pipeline-driven use-case catalog
 
-**Version:** 1.0 (companion to the v3.0 *Runtime AI Decision & Execution Authority* differentiation package)
+**Version:** 1.1 (factual & positioning correction of v1.0)
+**Supersedes:** v1.0 (2026-08-13)
+**Companion to:** the v3.0 *Runtime AI Decision & Execution Authority* differentiation package
 **Audience:** ServiceNow architecture, product, security, risk & compliance, and partnership teams
 **Purpose of this document.** The v3.0 differentiation package is organized *Ugence-package-first*
 ("here is our module, here is the adjacent ServiceNow capability"). This companion **inverts the
@@ -19,12 +21,13 @@ already owns.
    exact action → clearance → execution → assurance → lifecycle). The single canonical pipeline is
    defined in §2, and each use case names the subset of modules it activates.
 2. **Grounded in current ServiceNow products.** Products and capabilities were verified against
-   ServiceNow-owned sources on **2026-08-13** (see the source legend, §7). This edition
-   deliberately captures **ServiceNow capabilities that postdate the v3.0 package's 2026-08-11
-   verification** — AI Control Tower's new real-time *enforcement* and *Agent Deviation Detection*,
-   Action Fabric's GA with Anthropic as design partner, and the **Autonomous Security** portfolio
-   (Armis + Veza). These strengthen ServiceNow's runtime governance and therefore **sharpen, not
-   soften, the honesty guardrails** below.
+   ServiceNow-owned sources on **2026-08-13** (see the source legend, §9). This edition captures
+   **important ServiceNow capabilities that the v3.0 package's Appendix F did not reflect** — AI
+   Control Tower's real-time *enforcement* and *Agent Deviation Detection*, Action Fabric, the
+   **Autonomous Security** portfolio (Armis + Veza), and the **ServiceNow–NVIDIA OpenShell**
+   runtime-enforcement direction. **These predate v3.0's 2026-08-11 verification** — they are gaps
+   in v3.0's coverage, not new market developments — and they strengthen ServiceNow's runtime
+   governance, which **sharpens, not softens, the honesty guardrails** below.
 
 ---
 
@@ -52,25 +55,33 @@ internally; one inflated claim discounts the whole document.
 
 ---
 
-## 1. What changed on the ServiceNow side since v3.0 (read this first)
+## 1. Important ServiceNow capabilities not captured in v3.0 (read this first)
 
-Between the v3.0 verification (2026-08-11) and this edition (2026-08-13), ServiceNow's *runtime*
-governance advanced materially. The rep will know these; positioning that ignores them reads as
-stale. All four **narrow** the defensible Ugence differentiation to its sharpest form:
+The v3.0 package's Appendix F did not reflect the ServiceNow capabilities below. **They are not new
+market developments** — each predates v3.0's 2026-08-11 verification (Action Fabric GA'd at
+Knowledge 2026 in May; AI Control Tower's enforcement and June-2026 controls, the Autonomous
+Security portfolio's design partners, and the ServiceNow–NVIDIA OpenShell direction were all public
+before 2026-08-11). They are **coverage gaps in v3.0**, and the v3.0 erratum in the accompanying
+change note corrects Appendix F accordingly. Positioning that ignores them reads as stale, and each
+**narrows the defensible Ugence differentiation to its sharpest, most honest form.**
 
-| New / matured ServiceNow capability (2026) | What it does | Effect on Ugence positioning |
-|---|---|---|
-| **AI Control Tower — enforcement** ("enforcement muscle", Knowledge 2026) | Can **shut down a rogue agent in real time**; approval enforcement at the **Skill Kit** level so only approved providers/models reach skill & agent builders. | ServiceNow now *enforces*, not just inventories. Ugence differentiation moves off "ServiceNow can't enforce" and onto **mechanism**: a signed, per-action, per-payload authority artifact vs a platform kill-switch/allowlist. |
-| **AI Control Tower — Agent Deviation Detection** | Runtime metric that **flags when an agent strays** from its authorized role — prompt-injection attempts, role-boundary breaches, override attempts. | Genuine overlap with **RA‑7 trajectory assurance**. Position as complementary + vendor-neutral, *not* as a capability ServiceNow lacks. |
-| **Action Fabric (GA, Knowledge 2026)** — MCP Server/Client + A2A; Anthropic first design partner (Claude Cowork → ServiceNow's governed execution layer) | Opens ServiceNow's **system of action** to any external agent; **every action runs through AI Control Tower** (identity-verified, permission-scoped, auditable) with consumption metering, OAuth, audit trails, session management, role-based tool packages. | Strongest overlap zone. Ugence differentiation is **per-payload-digest** authorization and a **vendor-neutral CER that travels off-platform** — not "ServiceNow can't govern external agents." |
-| **Autonomous Security portfolio (Aug 2026)** — six autonomous security products; a **Tier 2 SOC AI Specialist** that autonomously executes containment/blocking, escalating only high-risk to humans; built on **Armis** (asset intelligence) and **Veza** (AI-native identity, least-privilege for AI agents). | ServiceNow now ships **autonomous action** in security, and least-privilege identity for agents (Veza). | Makes the autonomous-containment and access-provisioning use cases *more* timely, and makes **exact-target-digest authorization + independent operational clearance + effect reconciliation** the sharp edge. |
+| ServiceNow capability (source) | Availability | What it does | Effect on Ugence positioning |
+|---|---|---|---|
+| **AI Control Tower — enforcement** [3P: Knowledge 2026] | AVAILABLE NOW | Can **shut down a rogue agent in real time**; approval enforcement at the **Skill Kit** level so only approved providers/models reach skill & agent builders. | ServiceNow *enforces*, not just inventories. Ugence differentiation moves off "ServiceNow can't enforce" onto **mechanism**: a signed, per-action, per-payload authority artifact vs a platform kill-switch/allowlist. |
+| **AI Control Tower — Agent Deviation Detection** [3P: Knowledge 2026] | AVAILABLE NOW | Runtime metric that **flags when an agent strays** from its authorized role — prompt-injection attempts, role-boundary breaches, override attempts. | Genuine overlap with **RA‑7 trajectory assurance**. Position as complementary + independent-verification, *not* as a capability ServiceNow lacks. |
+| **Action Fabric** — MCP Server/Client + A2A; Anthropic first design partner (Claude Cowork → ServiceNow's governed execution layer) [SN Newsroom; SN Community] | AVAILABLE NOW (GA Knowledge 2026) | Opens ServiceNow's **system of action** to any external agent; **every action runs through AI Control Tower** (identity-verified, permission-scoped, auditable) with consumption metering, OAuth, audit trails, session management, role-based tool packages. | Strong overlap zone. Ugence differentiation is **per-payload/target-digest** authorization, **commit-time recheck**, and **independent post-effect verification** — not "ServiceNow can't govern external agents." |
+| **ServiceNow–NVIDIA OpenShell** — trust layer for autonomous AI: **policy authored centrally in AI Control Tower, enforced at runtime by OpenShell** [SN Community; NVIDIA blog; NVIDIA docs/GitHub] | AVAILABLE NOW / open-source | **Every file read, command executed, and network call passes through OpenShell first**; agents start at **zero permissions**; enforcement is **below the application layer** via Linux kernel primitives (seccomp, eBPF, Landlock), running across **PCs, data centers and clouds** (Ubuntu, Windows, OpenShift). | **Directly refutes any "runtime enforcement across heterogeneous/off-platform runtimes is unique to Ugence" claim.** ServiceNow already couples central policy to kernel-level runtime enforcement across form factors. Ugence must differentiate on the **artifact and its properties** (see thesis), not on "where enforcement can run." Added as overlap zone #5 (§3). |
+| **Autonomous Security portfolio** — six unified security solutions; **Armis** (asset intelligence) + **Veza** (AI-native identity, least-privilege for AI agents) [SN Newsroom; 3P] | MIXED — some AVAILABLE NOW (e.g. Autonomous Remediation Agents, AI Agent Access Security, Non-Human Identity Remediation); **Tier 2 SOC AI Specialist ANNOUNCED / expected December 2026** | Autonomous, prevention-first cyber defense; the **Tier 2 SOC AI Specialist** is designed to investigate and execute multi-stage response (enrichment, correlation, **containment and blocking**), escalating high-risk to humans. | Makes the autonomous-containment (UC‑1) and access-provisioning (UC‑6) use cases timely — **but UC‑1's anchor is an ANNOUNCED Dec-2026 capability, not shipped** (see UC‑1). Sharp edge remains exact-target-digest authorization + independent operational clearance + effect reconciliation. |
 
-**The one-sentence sharpened thesis:**
+**The one-sentence thesis (v1.1, narrowed):**
 
-> ServiceNow now *governs, enforces, and even autonomously acts*. Ugence's defensible, verifiable
-> edge is the **cryptographically signed, per-action, per-payload authorization artifact —
-> re-checked at commit, cleared by an independent live gate, reconciled against observed effect,
-> and enforceable even when the runtime is not ServiceNow.** Everything in this catalog is a
+> ServiceNow *governs, enforces at runtime (including at the kernel level via OpenShell), and is
+> moving to autonomously act*. Ugence's defensible, verifiable edge is **not** "enforcement that can
+> run off-platform" — OpenShell already does that. It is the **nature of the authority artifact**: a
+> **cryptographically signed, per-business-action authorization** bound to an **exact payload/target
+> digest**, gated on **trusted evidence freshness**, **re-checked at commit**, subject to an
+> **independent operational clearance**, **reconciled against observed effect** afterward, and
+> **independently verifiable across heterogeneous runtimes**. Everything in this catalog is a
 > variation on that one boundary.
 
 ---
@@ -106,26 +117,39 @@ through it.
 
 ## 3. Genuine overlap zones (name them, don't hide them)
 
-Four zones are real overlap with *current* ServiceNow capability and must be discussed as
-granularity/vendor-neutrality extensions, never as governance gaps:
+Five zones are real overlap with *current* ServiceNow capability and must be discussed as
+granularity / independent-verification extensions, never as governance gaps:
 
 1. **ActionGate ↔ Action Fabric / AI Control Tower.** Action Fabric already routes every agent
-   action through identity-verified, permission-scoped, auditable execution. Ugence's narrow edge:
-   **per-payload-digest** authorization **re-checked at commit** — not shown in the verified
-   ServiceNow sources. *Pitch granularity, not a gap.*
+   action through identity-verified, permission-scoped, auditable execution. Ugence's proposed
+   narrow edge: **per-payload/target-digest** authorization **re-checked at commit**. Whether
+   ServiceNow offers an equivalent *per-payload-digest, commit-time* binding is a **discovery
+   hypothesis to confirm with the customer's architects — not an established gap.** *Pitch
+   granularity, not a governance hole.*
 2. **RA‑7 trajectory assurance ↔ AI Control Tower Agent Deviation Detection.** Both risk-type
-   runtime behavior and flag deviation. Ugence's is **vendor-neutral** and emits a **neutral
-   reassessment signal into an authority-lifecycle owner (RA‑6)** rather than a platform metric.
-   *Complementary.*
+   runtime behavior and flag deviation. Ugence's emits a **neutral reassessment signal into an
+   authority-lifecycle owner (RA‑6)** and is independently verifiable; ServiceNow's is a native
+   platform metric. *Complementary.*
 3. **RA‑6 revocation ↔ AI Control Tower real-time shutdown.** Both can stop a misbehaving agent.
    Different mechanism: a **kill-switch** vs an **authority-lifecycle epoch/revoke** that makes the
    signed envelope inert at the next pre-effect recheck while enforcement stays read-only.
 4. **Model Authority ↔ AICT Skill-Kit provider approval.** Both restrict which models run. Ugence's
-   edge: a **per-request binding authorization** with **governed fallback and expiry**, not a
-   config-level allowlist.
+   proposed edge: a **per-request binding authorization** with **governed fallback and expiry**,
+   rather than a config-level allowlist.
+5. **Runtime execution enforcement ↔ ServiceNow–NVIDIA OpenShell.** This is the zone most easily
+   overclaimed. ServiceNow describes **centrally authored policies (in AI Control Tower) enforced at
+   runtime by OpenShell on every file read, command, and network call — across PCs, data centers and
+   clouds**, below the application layer via kernel primitives (seccomp/eBPF/Landlock), agents
+   starting at zero permissions. **Ugence therefore must not claim that runtime enforcement across
+   heterogeneous or off-platform runtimes is unique to it.** The honest differentiation is the
+   *authority artifact*: a signed, per-business-action, digest-bound, evidence-fresh,
+   commit-rechecked, operationally-cleared, effect-reconciled decision that is *independently
+   verifiable* — a governance-decision layer that could sit **above** an OpenShell-style execution
+   sandbox, not a competitor to kernel-level sandboxing.
 
-Everywhere else the relationship is **complementary** (system of record + workflow vs runtime
-enforcement artifact), which is the core partnership story (v3.0 §F.3).
+Everywhere else the relationship is **complementary** (system of record + workflow + platform
+enforcement vs an independent, signed authority-decision artifact), which is the core partnership
+story (v3.0 §F.3).
 
 ---
 
@@ -153,7 +177,7 @@ developed in full depth in §6.
 
 | # | Use case | ServiceNow product anchor | Ugence pipeline (module chain) |
 |---|---|---|---|
-| **UC‑1 ★** | Autonomous security-incident containment | Security Incident Response / Autonomous Security (Tier 2 SOC AI Specialist) | Decision Authority → Model Authority → **ActionGate (host/account/IP digest)** → ACP → Agent Runtime → RA‑8 → RA‑6 |
+| **UC‑1 ★** *(FUTURE — Dec 2026)* | Autonomous security-incident containment | Security Incident Response / Autonomous Security (**Tier 2 SOC AI Specialist — ANNOUNCED, expected Dec 2026**) | Decision Authority → Model Authority → **ActionGate (host/account/IP digest)** → ACP → Agent Runtime → RA‑8 → RA‑6 |
 | **UC‑2 ★** | Runtime model authorization for regulated data | AI Control Tower (model/provider governance; Skill Kit) | PWC → Context Minimization → **Model Authority (per-request ALLOW/DENY/HOLD/ESCALATE + fallback)** → ActionGate |
 | **UC‑3 ★** | EU AI Act high-risk action enforcement | AI Control Tower — AI Risk & Compliance / IRM | PWC → **RA‑5 trusted evidence** → Decision Authority → **Risk Authority (signed envelope)** → ActionGate → RA‑8 |
 | **UC‑4 ★** | Governing external agents on the system of action | Action Fabric + AI Agent Fabric (MCP/A2A; Claude/Copilot/Gemini) | **Agent Runtime (vendor-neutral CER)** → Model Authority → ActionGate → **StoryGraph** → ACP → RA‑7 |
@@ -176,13 +200,24 @@ developed in full depth in §6.
 Developed in full using the §4 template. These are the highest-consequence, most product-anchored,
 best-pipeline stories — lead with them.
 
-### UC‑1 ★ — Autonomous security-incident containment
+### UC‑1 ★ — Autonomous security-incident containment  ·  **ANNOUNCED / FUTURE (Dec 2026 anchor)**
+
+> **Availability label.** This is a **forward-looking** scenario. Its ServiceNow anchor — the
+> **Tier 2 SOC AI Specialist** that autonomously performs **containment and blocking** — is
+> **ANNOUNCED, expected December 2026** [SN Newsroom; 3P: cxtoday, shashi.co]. **It has not
+> shipped.** Related Autonomous Security capabilities *are* AVAILABLE NOW (e.g. Autonomous
+> Remediation Agents, AI Agent Access Security, Non-Human Identity Remediation), and the underlying
+> action/identity plumbing (Action Fabric, Veza, Armis) is available now — but the specific
+> autonomous-containment agent this use case rides on is a **December 2026 opportunity**, and the
+> Ugence integration on top of it is **PROPOSED**. Present it as "where this is going," not as a
+> capability the customer can buy today.
 
 **1. ServiceNow product & workflow.** *Security Incident Response* within the **Autonomous
-Security** portfolio. ServiceNow's **Tier 2 SOC AI Specialist** autonomously builds and executes
-multi-phase response plans — enrichment, correlation, **containment and blocking** — escalating only
-high-risk decisions to a human analyst. Actions reach endpoints/identity through Action Fabric,
-routed through AI Control Tower; asset context comes from Armis, identity from Veza.
+Security** portfolio [SN: Security Incident Response; SN Newsroom: Autonomous Security]. On its
+December-2026 roadmap, ServiceNow's **Tier 2 SOC AI Specialist** is designed to autonomously build
+and execute multi-phase response plans — enrichment, correlation, **containment and blocking** —
+escalating only high-risk decisions to a human analyst. Actions reach endpoints/identity through
+Action Fabric, routed through AI Control Tower; asset context comes from Armis, identity from Veza.
 
 **2. The autonomy moment.** The AI specialist decides to **isolate a compromised host, disable an
 account, or block an IP** and executes it without a human — the difference between "recommend
@@ -215,25 +250,33 @@ asset (Armis/CMDB) and identity (Veza) context, and the audit trail. Ugence conv
 containment into an **exact-target, signed authorization** and adds an **independent live-safety
 veto** and **effect reconciliation** the incident record refers to.
 
-**6. Overlap, stated honestly.** ServiceNow *already* performs autonomous containment and, via AI
-Control Tower, can shut a rogue agent down and flag deviation. The narrow, verifiable Ugence edge:
-**per-target-payload-digest** authorization (this host, this account — not the class of action) plus
-a **non-compensatory operational clearance** independent of the authorization, and **post-effect
-reconciliation** that a content-hash-vs-authorization mismatch surfaces. This is granularity and
-independence, not a claim that ServiceNow cannot contain.
+**6. Overlap, stated honestly.** By December 2026 ServiceNow expects to perform autonomous
+containment natively, and via AI Control Tower it can already shut a rogue agent down and flag
+deviation; OpenShell already enforces command/network policy at the kernel level. The proposed,
+narrow Ugence edge: **per-target-payload-digest** authorization (this host, this account — not the
+class of action), a **non-compensatory operational clearance** independent of the authorization, and
+**post-effect reconciliation** that surfaces a content-hash-vs-authorization mismatch. **Whether
+ServiceNow's Dec-2026 specialist binds authorization to an exact target digest with commit-time
+recheck is a discovery hypothesis to confirm — not an assumed gap.** This is granularity and
+independent verification, not a claim that ServiceNow cannot contain.
 
-**7. Discovery question.** *"When the SOC AI Specialist isolates a host autonomously, is the
-authorization bound to that exact host and payload and re-checked at commit — and is there a
-separate live-safety gate that can block it even when the authorization is perfectly valid?"*
+**7. Discovery question.** *"When the Tier 2 SOC AI Specialist ships and isolates a host
+autonomously, will the authorization be bound to that exact host and payload and re-checked at
+commit — and is there a separate live-safety gate that can block it even when the authorization is
+perfectly valid?"*
 
 ---
 
-### UC‑2 ★ — Runtime model authorization for regulated data
+### UC‑2 ★ — Runtime model authorization for regulated data  ·  **SN anchor AVAILABLE NOW · Ugence integration PROPOSED**
 
-**1. ServiceNow product & workflow.** *AI Control Tower* model/provider governance. AI Stewards
-govern customer-configured model providers alongside ServiceNow OEM providers from one page, with
-**approval enforcement at the Skill Kit level** so only approved providers/models reach skill and
-agent builders, plus data-routing controls.
+> **Availability label.** ServiceNow anchor (AI Control Tower model/provider governance, Skill-Kit
+> approval enforcement) is **AVAILABLE NOW** [SN: AI Control Tower; SN Community: AICT June 2026
+> release]. The Ugence per-request Model Authority layer on top is a **PROPOSED INTEGRATION**.
+
+**1. ServiceNow product & workflow.** *AI Control Tower* model/provider governance [SN: AI Control
+Tower]. AI Stewards govern customer-configured model providers alongside ServiceNow OEM providers
+from one page, with **approval enforcement at the Skill Kit level** so only approved providers/models
+reach skill and agent builders, plus data-routing controls.
 
 **2. The autonomy moment.** A running skill/agent is about to send a **request that touches
 regulated data** (PHI, EU-resident PII) to a model provider. Approving the provider *in general* is
@@ -271,12 +314,16 @@ request carries?"*
 
 ---
 
-### UC‑3 ★ — EU AI Act high-risk action enforcement
+### UC‑3 ★ — EU AI Act high-risk action enforcement  ·  **SN anchor AVAILABLE NOW · Ugence integration PROPOSED**
+
+> **Availability label.** ServiceNow anchor (AI Control Tower — AI Risk & Compliance, multi-framework
+> control mapping) is **AVAILABLE NOW** [SN: AI Control Tower; SN: AICT Solution Brief; 3P:
+> Knowledge 2026]. The Ugence signed-envelope enforcement layer is a **PROPOSED INTEGRATION**.
 
 **1. ServiceNow product & workflow.** *AI Control Tower — AI Risk & Compliance* over *Integrated
-Risk Management*. AICT ships pre-built content aligned to the **EU AI Act** and **NIST AI RMF**, and
-a single control can map simultaneously to the EU AI Act, Colorado AI Act, California AI Act and
-NIST AI RMF. It classifies AI use cases and runs the risk/compliance workflows.
+Risk Management* [SN: AI Control Tower]. AICT ships pre-built content aligned to the **EU AI Act**
+and **NIST AI RMF**, and a single control can map simultaneously to the EU AI Act, Colorado AI Act,
+California AI Act and NIST AI RMF. It classifies AI use cases and runs the risk/compliance workflows.
 
 **2. The autonomy moment.** An AI use case classified **high-risk** is about to take a consequential
 action. The compliance state is *approved* in the register — but is every required control
@@ -309,11 +356,13 @@ control mappings and compliance workflows. Ugence converts that approved complia
 satisfied** — "your GRC system tells you what your AI policy is; Ugence makes it executable."
 
 **6. Overlap, stated honestly.** AICT now *enforces* (approval enforcement, real-time shutdown) and
-maps controls across frameworks — this is strong. The verified sources do **not** show a
+maps controls across frameworks — this is strong. The proposed Ugence extension is a
 **cryptographically signed, scoped, revocable per-action authorization artifact bound to a payload
-digest and gated on trusted, re-checked evidence**. That signed-envelope + trusted-admission
-boundary is the extension; position it as making an approved AICT governance state enforceable at
-the action, not as a compliance gap.
+digest and gated on trusted, re-checked evidence**. **Whether AICT already issues an equivalent
+signed, evidence-fresh per-action artifact is a discovery hypothesis to test with the customer's
+architects — not something these sources establish either way.** Position the signed-envelope +
+trusted-admission boundary as making an approved AICT governance state enforceable at the exact
+action, not as a compliance gap.
 
 **7. Discovery question.** *"When a high-risk AI action fires, what stops it if a required control's
 evidence is stale or merely caller-asserted — and is the resulting authority a signed, scoped,
@@ -321,67 +370,97 @@ revocable artifact, or a workflow status?"*
 
 ---
 
-### UC‑4 ★ — Governing external agents on the system of action
+### UC‑4 ★ — Governing external agents on the system of action  ·  **SN anchor AVAILABLE NOW · Ugence integration PROPOSED**
 
-**1. ServiceNow product & workflow.** *Action Fabric* + *AI Agent Fabric* (GA at Knowledge 2026).
-ServiceNow opens its **full system of action** to any MCP-compatible external agent — Claude,
-Copilot Studio, Moveworks, AWS Bedrock, custom — with **Anthropic as first design partner** (Claude
-Cowork connected to ServiceNow's governed execution layer). **Every action runs through AI Control
-Tower** (identity-verified, permission-scoped, auditable), with an MCP Server Console for metering,
-OAuth, audit and role-based tool packages.
+> **Availability label.** ServiceNow anchor (Action Fabric MCP/A2A, GA at Knowledge 2026; AI Agent
+> Fabric; every action routed through AI Control Tower; **plus ServiceNow–NVIDIA OpenShell**
+> kernel-level runtime enforcement) is **AVAILABLE NOW** [SN Newsroom: "opens its full system of
+> action"; SN Community: Action Fabric MCP/A2A explained; SN Community + NVIDIA: OpenShell]. The
+> Ugence authority-artifact layer on top is a **PROPOSED INTEGRATION**.
+>
+> **Positioning caution — do not overclaim.** ServiceNow already governs external agents *and*
+> already enforces execution across heterogeneous runtimes (Action Fabric routes every action
+> through AICT; **OpenShell enforces central AICT policy at the kernel level on every file read,
+> command and network call, across PCs, data centers and clouds**). Ugence therefore does **not**
+> claim unique off-platform or cross-runtime enforcement. The differentiation is confined to the
+> **properties of an independent authority-decision artifact** (below).
 
-**2. The autonomy moment.** An **external** agent (outside ServiceNow's runtime) executes a
-governed ServiceNow action headlessly over MCP/A2A — *and* the enterprise wants the **same
-enforcement** to hold when that agent also acts on non-ServiceNow systems in the same task.
+**1. ServiceNow product & workflow.** *Action Fabric* + *AI Agent Fabric*. ServiceNow opens its
+**full system of action** to any MCP-compatible external agent — Claude, Copilot Studio, Moveworks,
+AWS Bedrock, custom — with **Anthropic as first design partner** (Claude Cowork connected to
+ServiceNow's governed execution layer). **Every action runs through AI Control Tower**
+(identity-verified, permission-scoped, auditable), with an MCP Server Console for metering, OAuth,
+audit and role-based tool packages; **ServiceNow–NVIDIA OpenShell** enforces the resulting policy at
+runtime.
 
-**3. Runtime-authority question.** *Can one vendor-neutral execution contract enforce the same
-authority across ServiceNow and non-ServiceNow runtimes — and catch a harmful sequence of
-individually-benign steps?*
+**2. The autonomy moment.** An **external** agent executes a governed action headlessly over
+MCP/A2A. ServiceNow governs and enforces that action. The remaining question is whether each such
+action carries an **independent, signed, digest-bound authority record** the enterprise can verify
+and reconcile *separately from the platform that executed it*.
+
+**3. Runtime-authority question.** *For each external-agent action, is there a signed
+per-business-action authorization — bound to an exact payload/target digest, evidence-fresh,
+re-checked at commit, operationally cleared, and reconciled against effect — that is independently
+verifiable, and does anything flag when a sequence of individually-allowed steps assembles a harmful
+capability?*
 
 **4. Ugence pipeline.**
 ```
-Agent Runtime (CER)        one vendor-neutral Canonical Execution Request + fail-closed governance
-                           seam; the SAME contract whether the step lands on ServiceNow or elsewhere
+Agent Runtime (CER)        a Canonical Execution Request as an independent governance-decision seam
+                           (a layer that can sit ABOVE an OpenShell-style execution sandbox — it
+                           issues/verifies authority; it does not replace kernel-level enforcement)
       ▼
 Model Authority            per-request model authorization for the external agent's step
       ▼
-ActionGate                 AUTHORIZED bound to the exact payload of the MCP-published tool call
+ActionGate                 AUTHORIZED bound to the exact payload/target digest of the MCP tool call,
+                           re-checked at commit time
       ▼
 StoryGraph (sequence)      OBSERVE/ESCALATE when benign steps assemble a harmful capability across
                            the multi-step external-agent plan
       ▼
-Action Clearance (ACP)     live operational veto before dispatch
+Action Clearance (ACP)     independent live operational veto before dispatch
       ▼
-RA‑7 runtime assurance     trajectory assessment → neutral reassessment signal (NORMAL/ESCALATED)
+RA‑7 runtime assurance     trajectory assessment → neutral reassessment signal (NORMAL/ESCALATED),
+                           independently verifiable
 ```
 
 **5. ServiceNow role → Ugence role.** Action Fabric is the governed *doorway* into ServiceNow's
-system of action; AICT verifies identity/permission/audit for every action that passes through it.
-Ugence adds a **vendor-neutral CER that travels with the agent off-platform** and a
-**sequence-risk** signal across the whole plan — enforcement that isn't scoped to the ServiceNow
-doorway alone.
+system of action; AICT verifies identity/permission/audit for every action; OpenShell enforces
+policy at the kernel level. Ugence adds an **independent, signed, digest-bound authority-decision
+record** per business action and a **sequence-risk** signal across the plan — an authority/evidence
+layer that composes *above* ServiceNow's execution enforcement, not a substitute for it.
 
-**6. Overlap, stated honestly.** This is the **strongest overlap zone**. Action Fabric + AICT
-already govern external agents thoroughly *for actions routed through ServiceNow*, including
-identity, permission scope, audit, metering and Agent Deviation Detection. Ugence does **not** claim
-ServiceNow cannot govern external agents. The two narrow edges: (a) **per-payload-digest**
-authorization re-checked at commit, and (b) a **single governance seam that also binds the agent's
-non-ServiceNow steps** in the same task, so a step that leaves the ServiceNow system of action isn't
-outside the authority envelope. Anthropic being ServiceNow's design partner makes this a
-partnership-native conversation, not a competitive one.
+**6. Overlap, stated honestly.** This is the **strongest overlap zone**. Action Fabric + AICT govern
+external agents thoroughly, and OpenShell enforces execution across form factors — so Ugence claims
+**neither** a governance gap **nor** unique cross-runtime enforcement. The confined, defensible
+edges are the **artifact properties**: (a) a **signed per-business-action** authorization bound to an
+**exact payload/target digest**; (b) **trusted evidence freshness** as a precondition; (c)
+**commit-time recheck**; (d) an **independent operational clearance**; (e) **post-effect
+reconciliation**; and (f) **independent verification across heterogeneous runtimes** (verifiable by a
+party other than the executor). **Whether ServiceNow already emits an equivalent independently
+verifiable signed per-action artifact is a discovery hypothesis to confirm with its architects.**
+Anthropic being ServiceNow's design partner makes this a partnership-native conversation, not a
+competitive one.
 
-**7. Discovery question.** *"When Claude or Copilot acts through Action Fabric on ServiceNow and
-then acts on a non-ServiceNow system in the same task, does one authority contract cover both steps
-— and does anything flag when a sequence of allowed steps assembles a disallowed capability?"*
+**7. Discovery question.** *"For each external-agent action governed by Action Fabric and enforced by
+OpenShell, is there an independently verifiable, signed per-action authorization bound to the exact
+payload — re-checked at commit and reconciled against the observed effect — and does anything flag
+when a sequence of allowed steps assembles a disallowed capability?"*
 
 ---
 
-### UC‑5 ★ — Autonomous change execution
+### UC‑5 ★ — Autonomous change execution  ·  **SN anchor AVAILABLE NOW · Ugence integration PROPOSED**
 
-**1. ServiceNow product & workflow.** *Change Management* + *ITOM* autonomous remediation. Agentic
-workflows already analyze change impact on the CMDB; ITOM AI agents autonomously handle alert
-triage, root-cause analysis, and trigger orchestrated **auto-remediation** runbooks. Change
-Management owns freeze/blackout/maintenance windows and conflict detection.
+> **Availability label.** ServiceNow anchor (Change Management windows/conflict detection; ITOM
+> agentic change-impact analysis and auto-remediation) is **AVAILABLE NOW** [SN: ITOM; SN Newsroom:
+> Fully Autonomous IT; SN Store: Now Assist for ITOM]. The Ugence authorization/clearance layer on
+> top is a **PROPOSED INTEGRATION**. *Note: some deeper autonomous-remediation capabilities are
+> rolling out in waves through 2026 — confirm the customer's specific release before scoping.*
+
+**1. ServiceNow product & workflow.** *Change Management* + *ITOM* autonomous remediation [SN: ITOM;
+SN Store: Now Assist for ITOM]. Agentic workflows analyze change impact on the CMDB; ITOM AI agents
+autonomously handle alert triage, root-cause analysis, and trigger orchestrated **auto-remediation**
+runbooks. Change Management owns freeze/blackout/maintenance windows and conflict detection.
 
 **2. The autonomy moment.** An AI agent **auto-approves and executes a standard change** —
 restart a service, push a config, scale a cluster, fail over — with no human in the loop.
@@ -440,17 +519,24 @@ such.
 
 ## 8. Recommended sequencing for the ServiceNow conversation
 
-1. **Open with UC‑1 or UC‑5** (autonomous action the customer can picture in a product they own).
-2. **Acknowledge ServiceNow's 2026 runtime strength first** (§1) — enforcement, deviation
-   detection, Action Fabric, Autonomous Security — then land the sharpened thesis (§1, one-liner).
-3. **Walk one pipeline end-to-end** (§2) so the distinct verbs and fail-closed conjunction are
-   concrete.
-4. **Name the overlap zones yourself** (§3) before the reviewer does — it is the fastest way to
-   earn the credibility the narrow differentiation needs.
-5. **Close on partnership** (§7 split): ServiceNow is the system of record and system of action;
-   Ugence is the vendor-neutral runtime-authority artifact between them. Every integration is
-   **PROPOSED**; every package is independently deployable if a ServiceNow partnership is not
-   pursued.
+1. **Open with UC‑5** (autonomous change execution) — an available-now, low-controversy product
+   the customer already runs, where the exact-CI authorization and independent clearance land
+   cleanly.
+2. **Acknowledge ServiceNow's runtime strength first** (§1) — enforcement, Agent Deviation
+   Detection, Action Fabric, and **OpenShell kernel-level enforcement** — then land the narrowed
+   v1.1 thesis (§1). Naming OpenShell yourself is what earns the room's trust.
+3. **Then UC‑3** (EU AI Act enforcement) — the highest-value, available-now governance→enforcement
+   story, where trusted evidence freshness and the signed envelope are the point.
+4. **Then UC‑4** (external agents) — the partnership-native zone with Anthropic as design partner;
+   explicitly disclaim unique cross-runtime enforcement and confine the pitch to the artifact
+   properties.
+5. **Name all five overlap zones yourself** (§3), including OpenShell, before the reviewer does.
+6. **Present UC‑1 as a December 2026 opportunity** — a forward-looking "where this goes when the
+   Tier 2 SOC AI Specialist ships," clearly labeled ANNOUNCED/FUTURE, never as available today.
+7. **Close on partnership** (system-of-record vs runtime-enforcement split; v3.0 §F.3): ServiceNow is the system of record, system of action, and
+   runtime enforcement (Action Fabric + AICT + OpenShell); Ugence is an independent, signed
+   authority-decision artifact that composes above it. Every integration is **PROPOSED**; every
+   package is independently deployable if a ServiceNow partnership is not pursued.
 
 ---
 
@@ -476,8 +562,10 @@ search and should be spot-checked live before customer use. ServiceNow-owned sou
 - **[SN] IT Operations Management (ITOM)** — https://www.servicenow.com/products/it-operations-management.html
 - **[SN] "ServiceNow Sets New Standard for Fully Autonomous IT"**, Newsroom — https://newsroom.servicenow.com/press-releases/details/2025/ServiceNow-Sets-New-Standard-for-Fully-Autonomous-IT-Envisioning-a-Zero-Downtime-Zero-Outage-Future-With-Agentic-AI/default.aspx
 - **[SN] AI Control Tower — Solution Brief (Govern any AI at Scale)** — https://www.servicenow.com/content/dam/servicenow-assets/public/en-us/doc-type/resource-center/solution-brief/sb-ai-control-tower.pdf
+- **[SN] ServiceNow builds the trust layer for Autonomous AI with NVIDIA OpenShell**, Community — https://www.servicenow.com/community/in-other-news/servicenow-builds-the-trust-layer-for-autonomous-ai-with-nvidia/ba-p/3553486
+- **[3P/NVIDIA] NVIDIA OpenShell — secure runtime for autonomous AI agents** — https://blogs.nvidia.com/blog/secure-autonomous-ai-agents-openshell/ ; https://docs.nvidia.com/openshell/about/overview ; https://github.com/NVIDIA/openshell ; https://thenewstack.io/nvidia-openshell-agent-runtime/
 - **[3P] AICT enforcement (Knowledge 2026)** — https://thelettertwo.com/2026/05/05/servicenow-expands-ai-control-tower-knowledge-2026/ ; https://erp.today/servicenow-ai-security-governance-knowledge-2026/
-- **[3P] Autonomous Security / Armis + Veza** — https://siliconangle.com/2026/08/04/servicenow-debuts-six-autonomous-security-products-built-armis-veza/ ; https://www.helpnetsecurity.com/2026/08/04/servicenow-ai-specialists/
+- **[3P] Autonomous Security / Armis + Veza; Tier 2 SOC AI Specialist expected Dec 2026 (two-wave rollout)** — https://siliconangle.com/2026/08/04/servicenow-debuts-six-autonomous-security-products-built-armis-veza/ ; https://www.helpnetsecurity.com/2026/08/04/servicenow-ai-specialists/ ; https://www.cxtoday.com/security-privacy-compliance/servicenow-moves-to-lock-down-enterprise-ai-agents-with-autonomous-security-portfolio/ ; https://www.shashi.co/2026/08/servicenow-rolls-six-security-products.html
 - **[3P] Action Fabric / Anthropic design partner** — https://www.bankinfosecurity.com/servicenows-new-platform-also-governs-everyone-elses-ai-a-31631
 
 > **Also see** the v3.0 package's Appendix F source legend for the base product URLs (IRM, Policy &
@@ -489,9 +577,22 @@ search and should be spot-checked live before customer use. ServiceNow-owned sou
 
 - **Deliverable type:** ServiceNow-product-anchored, pipeline-driven use-case catalog (companion to
   the v3.0 differentiation package).
+- **Version:** 1.1 — factual & positioning correction of v1.0 (see the change log in the
+  accompanying note).
 - **Use cases defined:** 12 (§5). **Developed in full depth:** 5 lead scenarios (§6).
 - **Every use case** chains ≥3 Ugence modules as a pipeline (requirement met).
+- **Availability discipline:** each lead scenario carries an availability label — **AVAILABLE NOW /
+  ANNOUNCED-FUTURE / PROPOSED INTEGRATION**. UC‑1's anchor (Tier 2 SOC AI Specialist) is
+  **ANNOUNCED, expected Dec 2026** — not shipped.
+- **Positioning correction:** Ugence does **not** claim unique off-platform or cross-runtime
+  enforcement — ServiceNow–NVIDIA OpenShell already enforces at the kernel level across form
+  factors (overlap zone #5). Differentiation is confined to the **independent, signed
+  authority-decision artifact** and its properties (§1 thesis).
+- **Evidence discipline:** "the verified sources do not show X" is treated throughout as a
+  **discovery hypothesis to confirm with the customer's architects**, not as proof ServiceNow lacks
+  X.
 - **Integration status:** all PROPOSED. **Package maturity:** shipped but mostly reference-grade,
   production deployment validation pending (per v3.0 Appendix B).
 - **Verification:** ServiceNow capabilities checked against ServiceNow-owned + corroborating
-  sources on 2026-08-13; live pages should be spot-checked (egress caveat, §0).
+  sources on 2026-08-13; live pages should be spot-checked (egress caveat, §0). The capabilities in
+  §1 **predate** v3.0's 2026-08-11 verification and are coverage gaps in v3.0's Appendix F.
