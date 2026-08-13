@@ -31,7 +31,7 @@ from ..domain.enums import (
     RiskOutcome,
 )
 from ..domain.envelope import EnvelopeConditions, RiskAuthorizationEnvelope
-from ..domain.errors import RiskAuthorityError
+from ..domain.errors import ProductionContainmentError, RiskAuthorityError
 from ..domain.events import GovernanceEvent
 from ..domain.evidence import ControlEvidenceRecord
 from ..domain.risk_case import RequestedCapabilities, RiskDecisionCase
@@ -155,28 +155,29 @@ class RiskAuthorityApplication:
                     "evaluator whose support is presumptive cannot mint PASS in "
                     "production (RA-5 audit H-1)."
                 )
-            # Defect (h): the binding-decision ruler must be production-substitutable.
-            # When a caller injects a ``decision_authority`` in production it MUST be an
-            # explicitly production-authoritative adapter over the shipped
-            # ``ugence-decision-authority`` kernel — never the in-package reference
-            # ruler. An omitted ``decision_authority`` retains the reference ruler for
-            # backward compatibility with existing RA-5 evidence-only production
-            # callers (which never issue an ALLOW-family binding decision through this
-            # facade); the supported production *decision* path is the injectable
-            # ``RiskEvaluationSeam``, which mandates a production ruler. A reference
-            # ruler supplied here fails closed at construction.
-            if decision_authority is not None:
-                if isinstance(decision_authority, ReferenceDecisionAuthority) or (
-                    getattr(decision_authority, "is_production_authoritative", False)
-                    is not True
-                ):
-                    raise RiskAuthorityError(
-                        "production DecisionAuthorityPort must be a production-"
-                        "authoritative adapter over ugence-decision-authority "
-                        "(is_production_authoritative=True); the in-package reference "
-                        "ruler cannot mint binding authority in production (audit "
-                        "defect (h))."
-                    )
+            # Defect (h), fully contained: production mode requires an EXPLICIT,
+            # production-authoritative binding-decision ruler. There is no reference
+            # fallback in production — ``decision_authority=None`` and the in-package
+            # reference ruler both fail closed at construction, so no production path
+            # can silently install a reference authority and mint an ALLOW decision.
+            # Reference behavior is available only when ``production_mode=False``.
+            if decision_authority is None:
+                raise RiskAuthorityError(
+                    "production_mode=True requires an explicit, production-authoritative "
+                    "decision_authority; there is NO reference fallback in production "
+                    "(audit defect (h)). Inject an adapter over ugence-decision-authority "
+                    "(is_production_authoritative=True), or use production_mode=False for "
+                    "reference/conformance."
+                )
+            if isinstance(decision_authority, ReferenceDecisionAuthority) or (
+                getattr(decision_authority, "is_production_authoritative", False) is not True
+            ):
+                raise RiskAuthorityError(
+                    "production DecisionAuthorityPort must be a production-authoritative "
+                    "adapter over ugence-decision-authority (is_production_authoritative="
+                    "True); the in-package reference ruler cannot mint binding authority "
+                    "in production (audit defect (h))."
+                )
         self._production_mode = bool(production_mode)
         self._evidence_admission = evidence_admission
         self._control_assurance = control_assurance
@@ -714,6 +715,16 @@ class RiskAuthorityApplication:
     def issue_envelope(
         self, tenant_id: str, case_id: str, req: IssueEnvelopeRequest
     ) -> RiskAuthorizationEnvelope:
+        # Production containment (audit): envelope issuance is Phase 5 and is deferred.
+        # Fail closed rather than mint a signed execution-authority artifact through the
+        # reference issuer/ActionGate in production mode. Reference mode retains the flow.
+        if self._production_mode:
+            raise ProductionContainmentError(
+                "issue_envelope is disabled in production_mode: signed envelope issuance "
+                "is Phase 5 (production ActionGate / provider execution) and is not "
+                "implemented. Production Risk Authority integration stops at a "
+                "non-executable RiskDecision."
+            )
         now = self._clock()
         case = self._require_case(tenant_id, case_id)
         decision = self.decisions.get(tenant_id, req.decision_id)
@@ -783,6 +794,16 @@ class RiskAuthorityApplication:
     # POST /actions/authorize
     # ------------------------------------------------------------------
     def authorize_action(self, req: AuthorizeActionRequest) -> ActionAuthorization:
+        # Production containment (audit): the reference ActionGate must never act as a
+        # production enforcement component. Action authorization is Phase 5 and fails
+        # closed in production mode. Reference mode retains the conformance flow.
+        if self._production_mode:
+            raise ProductionContainmentError(
+                "authorize_action is disabled in production_mode: production ActionGate "
+                "authorization is Phase 5 and is not implemented. The in-package "
+                "ReferenceActionGate is a conformance component, never production "
+                "enforcement."
+            )
         now = self._clock()
         envelope = self.envelopes.get(req.tenant_id, req.envelope_id)
         action = CanonicalAction(

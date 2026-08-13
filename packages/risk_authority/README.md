@@ -110,8 +110,15 @@ closed on any reference-grade or missing dependency; `RiskEvaluationSeam.referen
 labelled conformance seam. A `RISK_PASSED` result is *not* authorization
 (`executable = authorization_performed = envelope_issued = False`). See
 [`docs/architecture/RISK_AUTHORITY_EVALUATION_SEAM.md`](../../../docs/architecture/RISK_AUTHORITY_EVALUATION_SEAM.md).
-`RiskAuthorityApplication` also now accepts an optional production-authoritative
-`decision_authority` (closing audit defect (h)); omitting it preserves the reference ruler.
+
+**Production containment (defect (h)).** In `production_mode=True`, `RiskAuthorityApplication`
+now **requires** an explicit production-authoritative `decision_authority` — `None` and the
+in-package reference ruler both **fail closed at construction** (no reference fallback in
+production). `issue_envelope` and `authorize_action` also **fail closed in production** with a
+typed `ProductionContainmentError`: envelope issuance and production ActionGate authorization are
+**Phase 5** and are not implemented — production Risk Authority integration stops at a
+non-executable `RiskDecision`. Reference/conformance mode (`production_mode=False`) retains the
+full flow. This is a breaking production-construction change; see the ADR's migration note.
 
 ## Verify the distribution
 

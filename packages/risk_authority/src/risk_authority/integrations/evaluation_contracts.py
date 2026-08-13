@@ -217,10 +217,25 @@ class SubjectRiskEvaluationRequest:
     def digest(self) -> str:
         return _digest(self.to_canonical_dict())
 
+    _ALLOWED_KEYS = frozenset({
+        "schema_version", "subject_type", "subject_id", "subject_digest", "tenant_id",
+        "requested_purpose", "requested_domain", "requested_scope", "requested_risk_class",
+        "jurisdictions", "requested_tools", "requested_autonomy_level",
+        "requested_data_classes", "evidence_references", "correlation_id",
+        "idempotency_key", "evaluation_time",
+    })
+
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> "SubjectRiskEvaluationRequest":
         if not isinstance(data, Mapping):
             raise SeamContractError("request data must be a mapping")
+        # Strict parsing (audit): unknown fields are rejected (never silently dropped
+        # before digest computation), and schema_version is mandatory.
+        unknown = set(data) - cls._ALLOWED_KEYS
+        if unknown:
+            raise SeamContractError(f"unknown request field(s): {sorted(unknown)}")
+        if "schema_version" not in data:
+            raise SeamContractError("request requires an explicit schema_version")
         rc = data.get("requested_risk_class")
         return cls(
             schema_version=data["schema_version"],
@@ -372,14 +387,38 @@ class SubjectRiskDecision:
     def digest(self) -> str:
         return _digest(self.to_canonical_dict())
 
+    _ALLOWED_KEYS = frozenset({
+        "schema_version", "request_digest", "subject_digest", "tenant_id", "disposition",
+        "evaluator_principal_id", "evaluated_at", "risk_outcome", "evaluation_snapshot",
+        "evaluation_digest", "decision_snapshot", "decision_digest", "workflow_ir_digest",
+        "expires_at", "non_decision_reason", "reason_codes", "correlation_id",
+        "idempotency_key", "authorization_performed", "envelope_issued",
+        "actiongate_invoked", "actuation_performed", "effect_verified", "executable",
+    })
+
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> "SubjectRiskDecision":
         if not isinstance(data, Mapping):
             raise SeamContractError("result data must be a mapping")
+        # Strict parsing (audit): unknown fields rejected; schema_version mandatory.
+        unknown = set(data) - cls._ALLOWED_KEYS
+        if unknown:
+            raise SeamContractError(f"unknown result field(s): {sorted(unknown)}")
+        if "schema_version" not in data:
+            raise SeamContractError("result requires an explicit schema_version")
         outcome = data.get("risk_outcome")
         ndr = data.get("non_decision_reason")
+
+        def _flag(name: str) -> bool:
+            # The executable flags are read and passed through so a forged True is
+            # REJECTED by __post_init__ rather than silently normalized to False.
+            v = data.get(name, False)
+            if not isinstance(v, bool):
+                raise SeamContractError(f"{name} must be a bool")
+            return v
+
         return cls(
-            schema_version=data.get("schema_version", EVALUATION_RESULT_SCHEMA_VERSION),
+            schema_version=data["schema_version"],
             request_digest=data["request_digest"],
             subject_digest=data["subject_digest"],
             tenant_id=data["tenant_id"],
@@ -397,6 +436,12 @@ class SubjectRiskDecision:
             reason_codes=tuple(data.get("reason_codes", ())),
             correlation_id=data.get("correlation_id"),
             idempotency_key=data.get("idempotency_key"),
+            authorization_performed=_flag("authorization_performed"),
+            envelope_issued=_flag("envelope_issued"),
+            actiongate_invoked=_flag("actiongate_invoked"),
+            actuation_performed=_flag("actuation_performed"),
+            effect_verified=_flag("effect_verified"),
+            executable=_flag("executable"),
         )
 
 

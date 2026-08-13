@@ -7,11 +7,24 @@ __all__ = [
     "IllegalTransitionError",
     "AuthorityDeniedError",
     "MonotonicityViolationError",
+    "ProductionContainmentError",
 ]
 
 
 class RiskAuthorityError(Exception):
     """Base class for all risk-authority domain errors."""
+
+
+class ProductionContainmentError(RiskAuthorityError):
+    """A production-mode caller reached an execution-authority path that is deferred.
+
+    Production Risk Authority integration (Phase 4) stops at a non-executable
+    ``RiskDecision``. Envelope issuance and action authorization are Phase 5 (a
+    separately-governed production ActionGate / provider seam) and are **not**
+    implemented, so they fail closed in production mode rather than mint an
+    execution-authority artifact through the reference components. Reference /
+    conformance mode (``production_mode=False``) retains the full flow.
+    """
 
 
 class IllegalTransitionError(RiskAuthorityError):

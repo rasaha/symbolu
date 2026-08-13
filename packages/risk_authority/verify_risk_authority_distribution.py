@@ -141,6 +141,56 @@ try:
     raise AssertionError("production accepted reference config")
 except SeamConfigurationError:
     pass
+
+# --- Facade containment (audit corrections), from the installed wheel ----------------
+from risk_authority.domain.errors import ProductionContainmentError, RiskAuthorityError
+from risk_authority.api.schemas import IssueEnvelopeRequest, AuthorizeActionRequest
+from risk_authority.services.decision_authority import ReferenceDecisionAuthority
+
+class _PA:
+    is_production_authoritative = True
+    def is_trusted(self, evidence, *, now): return True
+    def is_admissible(self, record, *, now): return True
+    def evaluate(self, request): raise AssertionError
+class _PDA:
+    is_production_authoritative = True
+    def __init__(self): self._i = ReferenceDecisionAuthority()
+    def issue_decision(self, **k): return self._i.issue_decision(**k)
+
+psrc = InMemoryWorkflowIRSource(); psrc.register(swf)
+pkw = dict(workflow_source=psrc, key_record=key, clock=lambda: now,
+           evidence_admission=_PA(), control_assurance=_PA(), evidence_ingress=_PA(),
+           production_mode=True)
+# production_mode=True with no Decision Authority fails closed
+try:
+    RiskAuthorityApplication(decision_authority=None, **pkw)
+    raise AssertionError("production accepted a missing decision authority")
+except RiskAuthorityError:
+    pass
+# production_mode=True with the reference ruler fails closed
+try:
+    RiskAuthorityApplication(decision_authority=ReferenceDecisionAuthority(), **pkw)
+    raise AssertionError("production accepted the reference ruler")
+except RiskAuthorityError:
+    pass
+# an approved production app constructs, but cannot issue an envelope or authorize
+papp = RiskAuthorityApplication(decision_authority=_PDA(), **pkw)
+try:
+    papp.issue_envelope("t", "c", IssueEnvelopeRequest(decision_id="d", audience="a",
+        session_id="s", nonce="n"))
+    raise AssertionError("production issued an envelope")
+except ProductionContainmentError:
+    pass
+try:
+    papp.authorize_action(AuthorizeActionRequest(envelope_id="e", tenant_id="t",
+        actor_id="a", model_id="m", session_id="s", action_type="x", target_id="y", purpose="p"))
+    raise AssertionError("production authorized an action")
+except ProductionContainmentError:
+    pass
+# reference mode remains available only outside production (no injection needed)
+refapp = RiskAuthorityApplication(workflow_source=psrc, key_record=key, clock=lambda: now)
+assert isinstance(refapp._authority_service, ReferenceDecisionAuthority)
+print("ISOLATED SINGLE-WHEEL RISK-AUTHORITY FACADE CONTAINMENT VERIFICATION OK")
 print("ISOLATED SINGLE-WHEEL RISK-AUTHORITY SEAM (PR-1) VERIFICATION OK")
 
 print("ISOLATED SINGLE-WHEEL RISK-AUTHORITY VERIFICATION OK")
