@@ -1,0 +1,174 @@
+Ugence + ServiceNow — Detailed Architecture and Use-Case Briefing
+Speaker notes (57 slides)
+
+=== Slide 1 ===
+Open by naming the single question the deck answers: when an AI agent takes a consequential action, how can the enterprise PROVE that this exact action was authorized, stayed safe at execution time, and produced only the intended effect. Emphasize the framing is complementary to ServiceNow, not competitive. State plainly up front: every integration shown is PROPOSED (no connector ships), and every scenario is illustrative, not a Ugence customer deployment. This is a technical-fit conversation aiming at one bounded pilot, not a partnership demand.
+
+=== Slide 2 ===
+Set expectations: every major scenario is explained twice — a plain-language pass, then a technical architecture pass. Tell the audience they can stay at Level 1 and still follow the whole story. Architects get the data-journey detail in Level 2. Emphasize we describe guarantees, not internal mechanics — no code, schemas, algorithms, or cryptographic detail are disclosed. Read the “How to use this briefing” box aloud so the representative knows they are not expected to review every slide during the meeting.
+
+=== Slide 3 ===
+Optional navigation slide. Set the meeting path: executive framing (I), the UC-5 lead walkthrough (IV), the pilot proposal (IX), and discovery / next step (X) are the spine; II, III and V–VIII are supporting reference the representative can read after the meeting. Note that every content slide is numbered so anyone can say “let us go to slide N”.
+
+=== Slide 4 ===
+Section I — Executive framing. Transition slide: orient the audience to this section in a sentence (The problem, the discovery questions, what ServiceNow provides, and the partnership boundary), then continue. Keep the honest posture: ServiceNow strengths acknowledged, all integrations PROPOSED, scenarios illustrative.Section I establishes the problem and the honest partnership posture before any Ugence module appears.
+
+=== Slide 5 ===
+Lead with the question verbatim — it frames the entire deck. Walk the three risks in plain language before any module name appears. Use the checkout example (return to it in UC-5 and again in Governed Value) so the audience carries one concrete thread through the deck. Do not mention Ugence packages yet.
+
+=== Slide 6 ===
+Frame every one of these as a constructive discovery question. Say explicitly: "these are questions we would work through with your architects, not claims about gaps." This slide sets up the honest posture that recurs throughout — unverified differentiation is always a hypothesis to confirm.
+
+=== Slide 7 ===
+Spend real time here. Acknowledging ServiceNow’s strength accurately is what earns credibility for the narrow proposal that follows. Read the capabilities as facts. Explicitly avoid the banned phrases (lacks / cannot / above / replacement / only inventories) and do not claim Ugence uniquely enforces across runtimes — OpenShell already enforces at the kernel level. Position everything as complementary.
+
+=== Slide 8 ===
+This is the single most important slide for the representative. Say it out loud: ServiceNow remains the system of record, system of action and platform enforcement; Ugence contributes an independent, verifiable authority-and-evidence layer that composes WITH it. Avoid any hierarchy language. Mark the Ugence column PROPOSED.
+
+=== Slide 9 ===
+Section II — Understanding the data journey. Transition slide: orient the audience to this section in a sentence (Four kinds of data, and the same journey told first in plain language, then technically), then continue. Keep the honest posture: ServiceNow strengths acknowledged, all integrations PROPOSED, scenarios illustrative.
+
+=== Slide 10 ===
+This is the conceptual backbone. Stress the principle in the dark bar: modules emit NEW, separate artifacts alongside the business record — they do not quietly edit the business truth. When the record is updated, it receives a reference, status or receipt via the proposed integration. Architects should leave able to repeat the four categories.
+
+=== Slide 11 ===
+Walk left to right, top to bottom. Keep it business-plain: an event, a proposal, an approval, an exact permission, a safety check, execution, a confirmation of the real effect, and an auditable result back in ServiceNow. Point at the right-hand column to show the kind of information added at each step. Say the example is illustrative.
+
+=== Slide 12 ===
+This is the canonical spine. Emphasize: distinct verbs per layer, fail-closed at every boundary (uncertainty never becomes permission), and that we only draw the modules a given scenario actually uses. Point out the STOP column and the return path to ServiceNow — both recur in every scenario diagram.
+
+=== Slide 13 ===
+Section III — Module responsibilities. Transition slide: orient the audience to this section in a sentence (A business-readable glossary, and the repository-verified architecture facts), then continue. Keep the honest posture: ServiceNow strengths acknowledged, all integrations PROPOSED, scenarios illustrative.
+
+=== Slide 14 ===
+These are the corrected, verified facts (catalog v1.2). Two matter most for the diagrams: Agent Runtime INVOKES Cloud Scaling Operations and receives its result — Cloud Scaling Operations is not a preceding gate; and CER belongs to Decision Authority, so we never write “Agent Runtime (CER).” Also stress RA-8 never retro-authorizes, and everything fails closed.
+
+=== Slide 15 ===
+Read down the “Does not do” column — that is where the guarantees live. PWC is compile-time only and decides nothing. RA-5 makes a stale or self-asserted “pass” inert. Decision Authority owns the binding decision and the CER, and structurally bars AI as principal. Risk Authority is the sole issuer of the signed, scoped, time-limited authorization.
+
+=== Slide 16 ===
+Model Authority is a per-REQUEST binding decision with fallback and expiry, not a static allowlist. ActionGate binds to the exact action/target and never promotes uncertainty to AUTHORIZED. StoryGraph is advisory across a sequence. Action Clearance is the independent, subtractive live-safety veto — it can only preserve, narrow, hold or block, never widen.
+
+=== Slide 17 ===
+Close the glossary on the execution and assurance modules. Agent Runtime coordinates and invokes; Cloud Scaling Operations is the domain executor it invokes (dry-run by default, needs external execution authorization) and returns its result to the runtime. RA-6 keeps authority current; RA-7 watches in-flight; RA-8 reconciles after the fact and never retro-authorizes.
+
+=== Slide 18 ===
+Section IV — Lead scenario — autonomous change execution. Transition slide: orient the audience to this section in a sentence (UC-5: the full two-level walkthrough, end to end), then continue. Keep the honest posture: ServiceNow strengths acknowledged, all integrations PROPOSED, scenarios illustrative.
+
+=== Slide 19 ===
+Introduce UC-5 as the lead scenario and the pilot candidate. Read the illustrative banner verbatim — this is not a customer deployment. Keep this slide entirely in business language; the modules come next. The key tension to land: a valid approval is necessary but not sufficient, because targets and live conditions can change, and the real effect must be verified.
+
+=== Slide 20 ===
+Use this to reinforce the four-kinds-of-data distinction with concrete rows. Rows 1–2 are original business data owned by ServiceNow; row 3 is observed operational data; row 4 is approved policy. Nothing here is a Ugence artifact yet — those are produced by the modules on the next slides and kept separate from the record.
+
+=== Slide 21 ===
+Tell the checkout story as a sequence anyone can follow. The one decision point is “is it safe right now?” — if not, the change is held, escalated or blocked, and even that outcome returns an auditable result to the change record. Keep module names out of this slide entirely.
+
+=== Slide 22 ===
+The architecturally critical slide. Trace it: Decision Authority → ActionGate → Action Clearance → Agent Runtime. Agent Runtime then INVOKES Cloud Scaling Operations (the two arrows show invocation and result-return — not a linear stage), Cloud Scaling Operations actuates the cluster, its result returns to Agent Runtime, and the runtime carries the execution receipt to RA-8. RA-8 reconciles and returns to the change record. Point out the STOP column and that even mismatch/uncertain returns an auditable result. Cloud Scaling Operations is dry-run by default and needs an external execution authorization.
+
+=== Slide 23 ===
+Make the fail-closed principle vivid. Each of these is a distinct guard, and in every case the workflow stops and returns an auditable reason to the change record rather than proceeding on uncertainty. This is the heart of the safety story: the system prefers a safe stop over an unsafe action.
+
+=== Slide 24 ===
+Walk the authorization half. Decision Authority proves delegation (and bars AI as principal). ActionGate binds to the exact cluster/action and refuses to promote uncertainty. Action Clearance is the independent live-safety veto. In every row, missing information produces a safe stop, not a guess.
+
+=== Slide 25 ===
+Walk the execution half and reinforce the corrected architecture: Agent Runtime coordinates and INVOKES Cloud Scaling Operations, which returns its result to the runtime; the runtime carries the receipt to RA-8. Cloud Scaling Operations is dry-run by default and needs an external execution authorization. RA-8 reconciles intent, evidence and effect — and never retro-authorizes.
+
+=== Slide 26 ===
+Close UC-5 on value and honesty. Make the maturity distinction explicit: the CORE controller is IMPLEMENTED; production validation is PILOT PENDING; additional agentic-AI capabilities are UNDER DEVELOPMENT; the ServiceNow integration is PROPOSED. Do NOT let the four collapse into one label. Governed value is developing and cross-cutting, and AICT already measures ROI — our proposed addition is attribution, not a new gate.
+
+=== Slide 27 ===
+Section V — Additional enterprise scenarios. Transition slide: orient the audience to this section in a sentence (UC-11 · UC-6 · UC-3 · UC-4 — each at both levels), then continue. Keep the honest posture: ServiceNow strengths acknowledged, all integrations PROPOSED, scenarios illustrative.
+
+=== Slide 28 ===
+Set up UC-11 as a security scenario where blast radius and timing are everything. Emphasize the two distinctive controls the next slide shows: per-stage live clearance, and mid-rollout revocation. Acknowledge ServiceNow Vulnerability Response already creates and links remediation tasks — Ugence adds exact-CI binding, independent clearance, revocation and reconciliation.
+
+=== Slide 29 ===
+Same spine as UC-5 but note two differences: the rollout is staged (per-stage CLEAR), and RA-6 can revoke authority mid-rollout — the dashed amber arrow into Action Clearance. Revocation is bounded-latency: it stops the NEXT stage, not one already running. Agent Runtime coordinates the staged rollout and carries receipts to RA-8.
+
+=== Slide 30 ===
+Close UC-11 on control and measurement. The boundary slide is where a security leader confirms nothing consequential happens without delegated authority, and that revocation gives a hard stop mid-rollout. Pilot metrics are concrete and security-relevant. Keep governed value labelled developing.
+
+=== Slide 31 ===
+UC-6 is a fraud-prevention story. The decisive control is the SoD conflict check at clearance time. Keep the left side plain-language, the right side a simple journey. Acknowledge ServiceNow + Veza identity controls; Ugence adds exact-entitlement binding and an independent SoD veto.
+
+=== Slide 32 ===
+The teaching point: even a perfectly valid authorization is blocked when Action Clearance detects an SoD conflict — authorization and clearance are independent. On a clean request, Agent Runtime provisions in the ERP, the result returns, and RA-8 confirms ONLY the authorized entitlement was granted.
+
+=== Slide 33 ===
+Close UC-6 for a risk/compliance owner: nothing is granted that breaks SoD, the AI never self-grants, and a blocked request produces a clean “no change” with an SoD reason. Metrics are audit-relevant. Governed value stays developing.
+
+=== Slide 34 ===
+Do not leave “high-risk” abstract — anchor it to privileged production access. The point is evidence freshness: an approved policy is not enough if the control evidence is stale. ServiceNow AICT/AIRC remain the systems of record; Ugence proposes a signed, evidence-linked, action-level authority. Frame anything unverified as a discovery hypothesis.
+
+=== Slide 35 ===
+Trace the evidence-first path: compiled policy + RA-5 trusted evidence → a re-checked control result (a stale “pass” is inert) → Decision Authority → Risk Authority mints a signed, scoped, time-limited authorization → ActionGate enforces the exact action → execution → RA-8. Three stop conditions all route to NOT PERMITTED. Position Risk Authority as the sole issuer of the signed artifact.
+
+=== Slide 36 ===
+This is the slide where discipline matters most. Credit AICT/AIRC generously. State the Ugence proposal narrowly — a signed, evidence-fresh, action-level artifact — and immediately flag that whether ServiceNow already does this is a question for their architects. Metrics are audit-centric.
+
+=== Slide 37 ===
+This is the strongest overlap zone and a partnership-native one (Anthropic is ServiceNow’s design partner). Be explicit: ServiceNow already governs and enforces these actions, including at the kernel level via OpenShell. Ugence claims neither a gap nor unique cross-runtime enforcement — only the artifact properties. Read the green ownership box aloud.
+
+=== Slide 38 ===
+Trace it carefully to preserve ownership: the external agent goes through Action Fabric; Ugence’s Agent Runtime is an independent decision seam; Model Authority and ActionGate bind the exact payload; StoryGraph flags sequence risk; Action Clearance clears; then Action Fabric DISPATCHES and OpenShell ENFORCES at runtime; RA-7 observes the trajectory and returns assurance evidence to the ServiceNow audit context. The dispatch and enforcement boxes are ServiceNow / NVIDIA (green / grey); the Ugence boxes are authority, advisory and assurance only. Anthropic is ServiceNow’s Action Fabric design partner — partnership-native.
+
+=== Slide 39 ===
+Close UC-4 by reinforcing ownership and the partnership framing (Anthropic design partner). The differentiation is confined to artifact properties. Metrics center on unauthorized payloads and sequence escalations. Keep governed value developing.
+
+=== Slide 40 ===
+Section VI — The full use-case portfolio. Transition slide: orient the audience to this section in a sentence (All 12 scenarios — grounded in ServiceNow products, with proposed Ugence governance extensions), then continue. Keep the honest posture: ServiceNow strengths acknowledged, all integrations PROPOSED, scenarios illustrative.
+
+=== Slide 41 ===
+Group A are the most pilot-ready. UC-5 is the recommended first pilot. All three are available-now ServiceNow anchors with PROPOSED Ugence integration. Emphasize the catalog framing in the footnote — grounded ServiceNow products, proposed extensions, not deployments.
+
+=== Slide 42 ===
+Group B are practical but need tighter autonomy limits — money movement and hiring. In UC-10 the binding decision stays human by design (AI barred as principal), which is a compliance strength. All PROPOSED.
+
+=== Slide 43 ===
+Group C are strategic governance plays that extend AI Control Tower into per-request and per-action enforcement. Keep the honest overlap posture (next section) in mind — position as extension of an approved governance state, framed as discovery where unverified.
+
+=== Slide 44 ===
+Group D are emerging. UC-1 is explicitly ANNOUNCED/FUTURE — the Tier 2 SOC AI Specialist is expected December 2026 and has not shipped; present it as “where this goes,” never as available. UC-9 is a composition play that grants no authority.
+
+=== Slide 45 ===
+Section VII — Honest overlap & differentiation. Transition slide: orient the audience to this section in a sentence (Name the overlaps first — then the narrow, artifact-level differentiation), then continue. Keep the honest posture: ServiceNow strengths acknowledged, all integrations PROPOSED, scenarios illustrative.
+
+=== Slide 46 ===
+Name every overlap zone yourself, before the reviewer does — it is the fastest way to earn trust. The OpenShell row is the one to get exactly right: ServiceNow already enforces at runtime across form factors, so we explicitly do not claim unique cross-runtime enforcement. Where the Ugence edge is unconfirmed, say “discovery hypothesis.”
+
+=== Slide 47 ===
+This is the thesis in nine properties. Deliver it as “the differentiation is the artifact, not where enforcement runs.” If asked how each property is produced, answer at the guarantee level only — no mechanism, keys, or algorithms. Frame any property ServiceNow may already provide as a discovery question.
+
+=== Slide 48 ===
+Section VIII — Enterprise Governed Value. Transition slide: orient the audience to this section in a sentence (A developing, cross-cutting capability — evidence-backed outcome attribution), then continue. Keep the honest posture: ServiceNow strengths acknowledged, all integrations PROPOSED, scenarios illustrative.
+
+=== Slide 49 ===
+Present governed value as developing and cross-cutting. Credit AICT for already measuring adoption/impact/value/ROI. The Ugence addition is attribution: tying a specific governed action to a specific outcome without trading away constraints — using the evidence the pipelines already emit. Walk the UC-5 example left to right. Do not present it as an authorization stage.
+
+=== Slide 50 ===
+Section IX — Pilot proposal. Transition slide: orient the audience to this section in a sentence (One bounded technical pilot around UC-5 — no broad production autonomy), then continue. Keep the honest posture: ServiceNow strengths acknowledged, all integrations PROPOSED, scenarios illustrative.
+
+=== Slide 51 ===
+Walk the ten steps as a confidence-building ladder: nothing consequential runs live until offline replay, dry-run/shadow, exception-path testing and receipt verification all pass. This directly answers the “are you going to let AI loose in production?” objection — no, autonomy is earned in bounded steps with the customer.
+
+=== Slide 52 ===
+Keep the boundary tight and reversible; that is what makes a pilot approvable. Lead the measurements with safety/fidelity metrics — exact-target binding, mismatch blocks, effect-match — before efficiency metrics. Attributable governed value is labelled developing.
+
+=== Slide 53 ===
+Section X — Discovery & next step. Transition slide: orient the audience to this section in a sentence (Constructive questions, and a request for one joint technical session), then continue. Keep the honest posture: ServiceNow strengths acknowledged, all integrations PROPOSED, scenarios illustrative.
+
+=== Slide 54 ===
+These are the questions we want to leave with the representative. They establish authoritative inputs, integration points, and what stays human-binding — the raw material for scoping a pilot. Ask which they can answer now and which need an architect.
+
+=== Slide 55 ===
+Close on a modest, concrete ask: one joint technical discovery session to scope a bounded pilot — not a partnership demand. Restate the guardrails one last time: everything is proposed, everything illustrative, and Ugence composes with ServiceNow. Invite the discovery-question answers as the starting agenda. Presenter: Rakesh Mohan, Founder, Ugence Labs.
+
+=== Slide 56 ===
+Use this as the reference for every badge in the deck. The key discipline: do not apply one maturity label to a whole workflow — individual modules differ (e.g., Cloud Scaling core IMPLEMENTED, integration PROPOSED). Re-read the standing disclaimers.
+
+=== Slide 57 ===
+State the source hierarchy plainly: ServiceNow Docs first, then release notes, Newsroom, Community; NVIDIA docs for OpenShell; third-party press only to corroborate. Note the OpenShell technical correction (seccomp + Landlock + network namespaces, not eBPF). No internal repository paths are shown in this external deck.
+
