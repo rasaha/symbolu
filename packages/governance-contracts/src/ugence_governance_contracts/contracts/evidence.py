@@ -480,6 +480,16 @@ class MetricClaim:
             AttributionStatus.ATTRIBUTED,
             AttributionStatus.PARTIALLY_ATTRIBUTED,
         ):
+            # ADR §12: attribution requires OBSERVED or MIXED grounding; a
+            # REPORTED-only or SYNTHETIC claim can only be NOT_APPLICABLE or
+            # NOT_ATTRIBUTED. (MODELED transform is permitted — causal
+            # attribution is routinely model-based — provided the *source basis*
+            # is observed/mixed and a method is declared.)
+            if self.source_basis not in (SourceBasis.OBSERVED, SourceBasis.MIXED):
+                raise EvidenceContractError(
+                    "attributed claim requires SourceBasis OBSERVED or MIXED grounding; "
+                    f"{self.source_basis.value} claims cannot be attributed"
+                )
             _require_nonempty(self.attribution_ref, "attributed claim attribution_ref")
             _require_nonempty(self.counterfactual_ref, "attributed claim counterfactual_ref")
             _require_nonempty(self.causal_method_ref, "attributed claim causal_method_ref")

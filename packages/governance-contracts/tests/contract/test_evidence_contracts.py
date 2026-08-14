@@ -240,6 +240,24 @@ def test_attributed_without_causal_method_rejected():
               attribution_ref="a://1", counterfactual_ref="cf://1")
 
 
+def test_reported_claim_cannot_be_attributed():
+    # ADR §12: attribution requires OBSERVED/MIXED grounding; a REPORTED claim
+    # cannot be ATTRIBUTED even with all attribution references supplied.
+    with pytest.raises(EvidenceContractError):
+        _base(source_basis=SourceBasis.REPORTED,
+              attribution_status=AttributionStatus.ATTRIBUTED,
+              attribution_ref="a://1", counterfactual_ref="cf://1", causal_method_ref="cm://1")
+
+
+def test_mixed_grounded_attribution_valid():
+    # MIXED (>= 2 inputs) is valid grounding for attribution.
+    c = _base(source_basis=SourceBasis.MIXED, input_evidence_refs=("e1", "e2"),
+              attribution_status=AttributionStatus.PARTIALLY_ATTRIBUTED,
+              attribution_ref="a://1", counterfactual_ref="cf://1", causal_method_ref="cm://1")
+    assert c.attribution_status is AttributionStatus.PARTIALLY_ATTRIBUTED
+    assert c.source_basis is SourceBasis.MIXED
+
+
 # --------------------------------------------------------------------------- #
 # Orthogonality
 # --------------------------------------------------------------------------- #
