@@ -20,7 +20,7 @@ from typing import Optional
 
 from ugence_governance_contracts.api import BenchmarkReference
 
-from ._util import canonical_digest, require_nonempty
+from ._util import canonical_digest, coerce_tuple, require_nonempty
 from .enums import ComparisonOperator, GateCategory, RequirementClass, ReadinessTarget
 from .errors import PolicyContractError
 
@@ -96,15 +96,17 @@ class PolicyGate:
         if self.threshold is not None and not isinstance(self.threshold, GovernedThreshold):
             raise PolicyContractError("PolicyGate.threshold must be a GovernedThreshold")
 
-        if not self.applicability:
+        applicability = coerce_tuple(self.applicability, "PolicyGate.applicability")
+        if not applicability:
             raise PolicyContractError("PolicyGate.applicability must name at least one ReadinessTarget")
         seen: set[ReadinessTarget] = set()
-        for t in self.applicability:
+        for t in applicability:
             if not isinstance(t, ReadinessTarget):
                 raise PolicyContractError("PolicyGate.applicability entries must be ReadinessTarget")
             if t in seen:
                 raise PolicyContractError(f"PolicyGate.applicability contains duplicate {t.value}")
             seen.add(t)
+        object.__setattr__(self, "applicability", applicability)
 
         if not isinstance(self.conditionally_compensable, bool):
             raise PolicyContractError("PolicyGate.conditionally_compensable must be a bool")

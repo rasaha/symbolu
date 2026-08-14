@@ -24,7 +24,7 @@ from ugence_governance_contracts.api import (
     VerificationStatus,
 )
 
-from ._util import canonical_digest, normalize_tokens, require_nonempty
+from ._util import canonical_digest, coerce_tuple, normalize_tokens, require_nonempty
 from .enums import (
     HeadlineClassificationPolicy,
     MissingComponentBehavior,
@@ -50,6 +50,12 @@ __all__ = [
 # --------------------------------------------------------------------------- #
 # Shared structural helpers
 # --------------------------------------------------------------------------- #
+def _set(obj, name: str, value) -> None:
+    """Store a normalized value on a frozen dataclass during ``__post_init__``."""
+
+    object.__setattr__(obj, name, value)
+
+
 def _require_family(meta: PolicyArtifactMetadata, family: PolicyFamily, owner: str) -> None:
     if not isinstance(meta, PolicyArtifactMetadata):
         raise PolicyContractError(f"{owner}.metadata must be a PolicyArtifactMetadata")
@@ -65,26 +71,48 @@ def _require_currency(code: str, name: str) -> None:
         raise PolicyContractError(f"{name} must be a 3-letter uppercase currency code (e.g. 'USD')")
 
 
-def _unique_threshold_ids(thresholds: tuple[GovernedThreshold, ...], owner: str) -> None:
-    normalize_tokens(tuple(t.threshold_id for t in thresholds), f"{owner} threshold_id")
+# Each of these coerces the caller's sequence into an immutable tuple (rejecting
+# str/bytes/mapping/non-iterable), validates every element's type and the
+# collection-level uniqueness rule, and returns the normalized tuple for the
+# constructor to store back via ``object.__setattr__`` — so later mutation of a
+# caller-owned list can never reach the frozen contract.
+def _norm_thresholds(values, owner: str) -> tuple[GovernedThreshold, ...]:
+    coerced = coerce_tuple(values, owner)
+    ids = []
+    for t in coerced:
+        if not isinstance(t, GovernedThreshold):
+            raise PolicyContractError(f"{owner} entries must be GovernedThreshold")
+        ids.append(t.threshold_id)
+    normalize_tokens(tuple(ids), f"{owner} threshold_id")
+    return coerced
 
 
-def _unique_gate_ids(gates: tuple[PolicyGate, ...], owner: str) -> None:
-    normalize_tokens(tuple(g.gate_id for g in gates), f"{owner} gate_id")
+def _norm_gates(values, owner: str) -> tuple[PolicyGate, ...]:
+    coerced = coerce_tuple(values, owner)
+    ids = []
+    for g in coerced:
+        if not isinstance(g, PolicyGate):
+            raise PolicyContractError(f"{owner} entries must be PolicyGate")
+        ids.append(g.gate_id)
+    normalize_tokens(tuple(ids), f"{owner} gate_id")
+    return coerced
 
 
-def _unique_benchmarks(refs: tuple[BenchmarkReference, ...], owner: str) -> None:
+def _norm_benchmarks(values, owner: str) -> tuple[BenchmarkReference, ...]:
+    coerced = coerce_tuple(values, owner)
     keys = []
-    for r in refs:
+    for r in coerced:
         if not isinstance(r, BenchmarkReference):
             raise PolicyContractError(f"{owner} entries must be BenchmarkReference")
         keys.append(f"{r.benchmark_id}@{r.version}")
     normalize_tokens(tuple(keys), owner)
+    return coerced
 
 
-def _require_ref_family(refs: tuple[PolicyReference, ...], family: PolicyFamily, owner: str) -> None:
+def _norm_ref_family(values, family: PolicyFamily, owner: str) -> tuple[PolicyReference, ...]:
+    coerced = coerce_tuple(values, owner)
     keys = []
-    for r in refs:
+    for r in coerced:
         if not isinstance(r, PolicyReference):
             raise PolicyContractError(f"{owner} entries must be PolicyReference")
         if r.policy_family is not family:
@@ -93,6 +121,7 @@ def _require_ref_family(refs: tuple[PolicyReference, ...], family: PolicyFamily,
             )
         keys.append(f"{r.policy_id}@{r.version}")
     normalize_tokens(tuple(keys), owner)
+    return coerced
 
 
 # --------------------------------------------------------------------------- #
@@ -126,14 +155,12 @@ class GeographyPolicy:
         require_nonempty(self.jurisdiction, "GeographyPolicy.jurisdiction")
         _require_currency(self.reporting_currency, "GeographyPolicy.reporting_currency")
         _require_currency(self.functional_currency, "GeographyPolicy.functional_currency")
-        normalize_tokens(self.applicable_regulations, "GeographyPolicy.applicable_regulations")
-        normalize_tokens(self.language_requirements, "GeographyPolicy.language_requirements")
-        normalize_tokens(self.residency_requirements, "GeographyPolicy.residency_requirements")
-        _unique_benchmarks(self.cost_benchmark_refs, "GeographyPolicy.cost_benchmark_refs")
-        _unique_threshold_ids(self.regional_thresholds, "GeographyPolicy.regional_thresholds")
-        _require_ref_family(
-            self.valuation_policy_refs, PolicyFamily.VALUATION, "GeographyPolicy.valuation_policy_refs"
-        )
+        _set(self, "applicable_regulations", normalize_tokens(self.applicable_regulations, "GeographyPolicy.applicable_regulations"))
+        _set(self, "language_requirements", normalize_tokens(self.language_requirements, "GeographyPolicy.language_requirements"))
+        _set(self, "residency_requirements", normalize_tokens(self.residency_requirements, "GeographyPolicy.residency_requirements"))
+        _set(self, "cost_benchmark_refs", _norm_benchmarks(self.cost_benchmark_refs, "GeographyPolicy.cost_benchmark_refs"))
+        _set(self, "regional_thresholds", _norm_thresholds(self.regional_thresholds, "GeographyPolicy.regional_thresholds"))
+        _set(self, "valuation_policy_refs", _norm_ref_family(self.valuation_policy_refs, PolicyFamily.VALUATION, "GeographyPolicy.valuation_policy_refs"))
 
     @property
     def reference(self) -> PolicyReference:
@@ -163,12 +190,12 @@ class DomainPolicy:
     def __post_init__(self) -> None:
         _require_family(self.metadata, PolicyFamily.DOMAIN, "DomainPolicy")
         require_nonempty(self.governed_outcome_unit, "DomainPolicy.governed_outcome_unit")
-        normalize_tokens(self.task_taxonomy, "DomainPolicy.task_taxonomy")
-        normalize_tokens(self.benefit_taxonomy, "DomainPolicy.benefit_taxonomy")
-        normalize_tokens(self.loss_taxonomy, "DomainPolicy.loss_taxonomy")
-        normalize_tokens(self.permitted_valuation_methods, "DomainPolicy.permitted_valuation_methods")
-        _unique_benchmarks(self.domain_benchmark_refs, "DomainPolicy.domain_benchmark_refs")
-        _unique_gate_ids(self.gates, "DomainPolicy.gates")
+        _set(self, "task_taxonomy", normalize_tokens(self.task_taxonomy, "DomainPolicy.task_taxonomy"))
+        _set(self, "benefit_taxonomy", normalize_tokens(self.benefit_taxonomy, "DomainPolicy.benefit_taxonomy"))
+        _set(self, "loss_taxonomy", normalize_tokens(self.loss_taxonomy, "DomainPolicy.loss_taxonomy"))
+        _set(self, "permitted_valuation_methods", normalize_tokens(self.permitted_valuation_methods, "DomainPolicy.permitted_valuation_methods"))
+        _set(self, "domain_benchmark_refs", _norm_benchmarks(self.domain_benchmark_refs, "DomainPolicy.domain_benchmark_refs"))
+        _set(self, "gates", _norm_gates(self.gates, "DomainPolicy.gates"))
 
     @property
     def reference(self) -> PolicyReference:
@@ -206,14 +233,10 @@ class IntendedOutcomePolicy:
         _require_family(self.metadata, PolicyFamily.INTENDED_OUTCOME, "IntendedOutcomePolicy")
         require_nonempty(self.target_outcome, "IntendedOutcomePolicy.target_outcome")
         require_nonempty(self.task_definition, "IntendedOutcomePolicy.task_definition")
-        normalize_tokens(self.success_criteria, "IntendedOutcomePolicy.success_criteria")
-        normalize_tokens(self.required_effect_evidence, "IntendedOutcomePolicy.required_effect_evidence")
-        _unique_threshold_ids(self.acceptance_thresholds, "IntendedOutcomePolicy.acceptance_thresholds")
-        _require_ref_family(
-            self.valuation_policy_refs,
-            PolicyFamily.VALUATION,
-            "IntendedOutcomePolicy.valuation_policy_refs",
-        )
+        _set(self, "success_criteria", normalize_tokens(self.success_criteria, "IntendedOutcomePolicy.success_criteria"))
+        _set(self, "required_effect_evidence", normalize_tokens(self.required_effect_evidence, "IntendedOutcomePolicy.required_effect_evidence"))
+        _set(self, "acceptance_thresholds", _norm_thresholds(self.acceptance_thresholds, "IntendedOutcomePolicy.acceptance_thresholds"))
+        _set(self, "valuation_policy_refs", _norm_ref_family(self.valuation_policy_refs, PolicyFamily.VALUATION, "IntendedOutcomePolicy.valuation_policy_refs"))
 
     @property
     def reference(self) -> PolicyReference:
@@ -286,7 +309,7 @@ class ValuationPolicy:
 
     def __post_init__(self) -> None:
         _require_family(self.metadata, PolicyFamily.VALUATION, "ValuationPolicy")
-        normalize_tokens(self.permitted_valuation_methods, "ValuationPolicy.permitted_valuation_methods")
+        _set(self, "permitted_valuation_methods", normalize_tokens(self.permitted_valuation_methods, "ValuationPolicy.permitted_valuation_methods"))
         if not isinstance(self.headline_classification, HeadlineClassificationPolicy):
             raise PolicyContractError(
                 "ValuationPolicy.headline_classification must be a HeadlineClassificationPolicy"
@@ -295,8 +318,9 @@ class ValuationPolicy:
             raise PolicyContractError(
                 "ValuationPolicy.missing_component_behavior must be a MissingComponentBehavior"
             )
+        required_components = coerce_tuple(self.required_components, "ValuationPolicy.required_components")
         seen: set[ValueComponent] = set()
-        for req in self.required_components:
+        for req in required_components:
             if not isinstance(req, ComponentEvidenceRequirement):
                 raise PolicyContractError(
                     "ValuationPolicy.required_components entries must be ComponentEvidenceRequirement"
@@ -306,7 +330,8 @@ class ValuationPolicy:
                     f"ValuationPolicy.required_components duplicates component {req.component.value}"
                 )
             seen.add(req.component)
-        _unique_threshold_ids(self.acceptance_thresholds, "ValuationPolicy.acceptance_thresholds")
+        _set(self, "required_components", required_components)
+        _set(self, "acceptance_thresholds", _norm_thresholds(self.acceptance_thresholds, "ValuationPolicy.acceptance_thresholds"))
 
     @property
     def reference(self) -> PolicyReference:
@@ -339,16 +364,18 @@ class ReadinessPolicy:
 
     def __post_init__(self) -> None:
         _require_family(self.metadata, PolicyFamily.READINESS, "ReadinessPolicy")
-        _unique_gate_ids(self.gates, "ReadinessPolicy.gates")
-        if not self.readiness_targets:
+        _set(self, "gates", _norm_gates(self.gates, "ReadinessPolicy.gates"))
+        readiness_targets = coerce_tuple(self.readiness_targets, "ReadinessPolicy.readiness_targets")
+        if not readiness_targets:
             raise PolicyContractError("ReadinessPolicy.readiness_targets must name at least one target")
         seen: set[ReadinessTarget] = set()
-        for t in self.readiness_targets:
+        for t in readiness_targets:
             if not isinstance(t, ReadinessTarget):
                 raise PolicyContractError("ReadinessPolicy.readiness_targets entries must be ReadinessTarget")
             if t in seen:
                 raise PolicyContractError(f"ReadinessPolicy.readiness_targets duplicates {t.value}")
             seen.add(t)
+        _set(self, "readiness_targets", readiness_targets)
         if self.composite_is_advisory is not True:
             raise PolicyContractError(
                 "ReadinessPolicy.composite_is_advisory must be True — the composite is advisory "

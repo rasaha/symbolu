@@ -15,13 +15,24 @@ Structural invariants enforced here:
   by :class:`PolicyReference`).
 * **Cross-tenant rejection.** A ``TENANT``-scoped reference must belong to the
   context's tenant; a reference for another tenant is rejected. ``GLOBAL``
-  references are always admissible.
+  references are always admissible. (There is **no** cross-*subject* rejection:
+  policies are tenant-scoped, not subject-scoped, so there is no subject
+  dimension on a policy to compare against.)
 * **Distinct artifacts.** The same ``policy_id`` cannot occupy two slots.
+* **Immutability.** ``additional_policy_refs`` is normalized to a real tuple at
+  construction (scalar substitutes rejected), so mutating a caller-owned list
+  afterward cannot alter the bound context or its ``canonical_digest()``.
 
 Subject binding uses the existing repository convention (plain ``tenant_id`` /
-``subject_id``). ``AssessedSystemBinding`` / ``SubjectContext`` (RA-owned, PR
-#1425, unmerged) are a **deferred dependency** and intentionally not defined
-here (ADR D-14, §16).
+``subject_id``); only cross-tenant consistency is enforced. ``AssessedSystemBinding``
+/ ``SubjectContext`` (RA-owned, PR #1425, unmerged) are a **deferred dependency**
+and intentionally not defined here (ADR D-14, §16).
+
+Two time inputs are kept deliberately distinct: ``bind_policies``'s mandatory
+``as_of`` is *when policy applicability is evaluated*, while ``assessment_window``
+records *the period the assessment evidence was drawn from*. ``as_of`` is not
+derived from ``assessment_window``, and the policy effective period is not
+required to cover the evidence window (evidence freshness is a downstream rule).
 """
 
 from __future__ import annotations
@@ -32,7 +43,13 @@ from typing import Optional
 
 from ugence_governance_contracts.api import AssessmentWindow
 
-from ._util import canonical_digest, require_nonempty, require_tzaware, validate_digest
+from ._util import (
+    canonical_digest,
+    coerce_tuple,
+    require_nonempty,
+    require_tzaware,
+    validate_digest,
+)
 from .enums import AssessmentPurpose, PolicyFamily, PolicyLifecycleState, PolicyScope
 from .errors import PolicyContractError
 from .metadata import PolicyReference
@@ -84,11 +101,16 @@ class AssessmentContext:
             _require_ref(self.valuation_ref, PolicyFamily.VALUATION, "AssessmentContext.valuation_ref")
         if self.readiness_ref is not None:
             _require_ref(self.readiness_ref, PolicyFamily.READINESS, "AssessmentContext.readiness_ref")
-        for ref in self.additional_policy_refs:
+        # Normalize the caller's sequence into an immutable tuple, rejecting scalar
+        # substitutes, so a later mutation of the caller's list cannot inject an
+        # extra / duplicate / cross-family / cross-tenant reference after validation.
+        additional = coerce_tuple(self.additional_policy_refs, "AssessmentContext.additional_policy_refs")
+        for ref in additional:
             if not isinstance(ref, PolicyReference):
                 raise PolicyContractError(
                     "AssessmentContext.additional_policy_refs entries must be PolicyReference"
                 )
+        object.__setattr__(self, "additional_policy_refs", additional)
 
         # Cross-tenant rejection + distinct-artifact check over every bound ref.
         seen_ids: set[str] = set()
@@ -141,24 +163,41 @@ class AssessmentContext:
         geography: GeographyPolicy,
         domain: DomainPolicy,
         intended_outcome: IntendedOutcomePolicy,
+        as_of: datetime,
         valuation: Optional[ValuationPolicy] = None,
         readiness: Optional[ReadinessPolicy] = None,
         purpose: AssessmentPurpose = AssessmentPurpose.PRE_ROI_READINESS,
-        as_of: Optional[datetime] = None,
         assessment_window: Optional[AssessmentWindow] = None,
         created_at: Optional[datetime] = None,
     ) -> "AssessmentContext":
         """Build a context from full policy artifacts, **failing closed**.
 
-        Beyond the structural rules the plain constructor enforces, the binder
-        rejects any artifact whose asserted ``lifecycle_state`` is not
-        ``APPROVED_ACTIVE`` (a draft/expired/revoked/superseded artifact is never
-        bound into an active context), requires all bound artifacts to share the
-        context tenant, and — when ``as_of`` is supplied — requires each artifact
-        to be within its declared effective period at that moment. This is a
-        *structural* fail-closed gate, **not** a trust check: it never verifies a
-        signature, approval, or revocation (Policy-Authority work, out of scope).
+        ``as_of`` is **mandatory** and keyword-only — the explicit instant at
+        which policy applicability is evaluated. It must be a timezone-aware
+        ``datetime``; there is no default and it is **never** read from the
+        system clock, so binding is deterministic and reproducible. Every bound
+        artifact (required *and* any supplied optional Valuation/Readiness) must
+        be ``APPROVED_ACTIVE``, belong to the context tenant, and be within its
+        declared effective period at ``as_of``; any temporally-invalid or
+        inactive artifact fails the binding closed.
+
+        ``as_of`` is distinct from ``assessment_window`` (below) and is **not**
+        derived from it: ``as_of`` is *when the policy applies*, whereas
+        ``assessment_window`` is *the period the assessment evidence was drawn
+        from*. An older evidence window may legitimately be evaluated under a
+        policy applicable at ``as_of``; whether that evidence is *fresh enough*
+        is a downstream evidence/readiness rule, not a policy-binding rule, and
+        this binder deliberately does not require the policy's effective period
+        to cover the evidence window.
+
+        This is a *structural* fail-closed gate, **not** a trust check: the
+        ``lifecycle_state`` and every ``content_digest`` remain caller-supplied
+        structural inputs. The binder never verifies a signature, approval,
+        issuance, or revocation, and never resolves a referenced policy body —
+        that is Policy-Authority and registry work, out of scope here.
         """
+
+        require_tzaware(as_of, "bind_policies.as_of")
 
         artifacts = [
             ("geography", geography, GeographyPolicy),
@@ -169,9 +208,6 @@ class AssessmentContext:
             artifacts.append(("valuation", valuation, ValuationPolicy))
         if readiness is not None:
             artifacts.append(("readiness", readiness, ReadinessPolicy))
-
-        if as_of is not None:
-            require_tzaware(as_of, "bind_policies.as_of")
 
         for label, artifact, expected_type in artifacts:
             if not isinstance(artifact, expected_type):
@@ -189,10 +225,10 @@ class AssessmentContext:
                     f"cross-tenant policy binding: {label} policy {meta.policy_id!r} belongs to "
                     f"tenant {meta.tenant_id!r} but the context tenant is {tenant_id!r}"
                 )
-            if as_of is not None and not meta.is_effective_at(as_of):
+            if not meta.is_effective_at(as_of):
                 raise PolicyContractError(
                     f"bind_policies fails closed: {label} policy {meta.policy_id!r} is not "
-                    f"effective at {as_of.isoformat()}"
+                    f"effective at as_of {as_of.isoformat()}"
                 )
 
         return cls(

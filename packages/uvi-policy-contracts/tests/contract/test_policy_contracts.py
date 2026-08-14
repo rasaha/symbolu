@@ -394,7 +394,7 @@ def test_bind_policies_happy_path():
 def test_bind_policies_fails_closed_on_non_active():
     revoked = geo(m={"life": PolicyLifecycleState.REVOKED})
     with pytest.raises(PolicyContractError):
-        AssessmentContext.bind_policies(context_id="c", tenant_id="t", subject_id="s", geography=revoked, domain=dom(), intended_outcome=io())
+        AssessmentContext.bind_policies(context_id="c", tenant_id="t", subject_id="s", geography=revoked, domain=dom(), intended_outcome=io(), as_of=MID)
 
 
 def test_bind_policies_fails_closed_outside_effective_period():
@@ -412,7 +412,7 @@ def test_bind_policies_rejects_cross_tenant_artifact():
         jurisdiction="US", reporting_currency="USD", functional_currency="USD",
     )
     with pytest.raises(PolicyContractError):
-        AssessmentContext.bind_policies(context_id="c", tenant_id="t", subject_id="s", geography=tenant_geo, domain=dom(), intended_outcome=io())
+        AssessmentContext.bind_policies(context_id="c", tenant_id="t", subject_id="s", geography=tenant_geo, domain=dom(), intended_outcome=io(), as_of=MID)
 
 
 def test_bind_policies_with_valuation_and_readiness():

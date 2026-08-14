@@ -2,6 +2,43 @@
 
 ## [0.1.0] — GV-2C-a: UVI policy & assessment-context contract shapes
 
+### Pre-merge hardening (independent-audit corrections; still 0.1.0, unreleased)
+
+Corrections to the blocking/temporal findings of the independent GV-2C-a audit,
+applied before merge. No new architecture, authority, or engine; the public
+symbol surface is unchanged (only `bind_policies`'s `as_of` becomes mandatory).
+
+- **GV2C-F1 — immutable sequences.** Every tuple-typed field in `policies.py`,
+  `thresholds.py`, and `context.py` is now normalized to a real `tuple` and
+  stored back inside `__post_init__` (via `object.__setattr__`), mirroring the
+  merged GV-2E-a `evidence.py` discipline. Scalar substitutes (`str`/`bytes`/
+  mapping/non-iterable) are rejected via a new `_util.coerce_tuple`; element-type
+  and uniqueness validation now run against the normalized tuple. A caller's
+  `list` can no longer mutate a constructed contract or its `canonical_digest()`.
+- **GV2C-F2 — mandatory evaluation time.** `AssessmentContext.bind_policies`
+  now requires a keyword-only, timezone-aware `as_of` (no default, never the
+  system clock). Every bound artifact — required *and* supplied optional
+  Valuation/Readiness — must be effective at `as_of`
+  (`effective_from <= as_of < effective_to`); temporal validation can no longer
+  be skipped. Lifecycle checks are preserved; an `APPROVED_ACTIVE` label cannot
+  override an invalid effective period.
+- **GV2C-F3 — `as_of` vs `assessment_window`.** Documented and tested as
+  distinct: policy-evaluation instant vs evidence-collection period; `as_of` is
+  not derived from the window and the effective period need not cover it.
+- **GV2C-F7 — honest wording.** "cross-tenant/subject rejection" corrected to
+  "cross-tenant rejection" (policies are tenant-scoped, not subject-scoped).
+- **GV2C-F4/F5/F6 — documentation only.** README now states that lifecycle↔time
+  reconciliation, threshold numeric/unit validation, and policy-body/digest
+  resolution are deferred (Policy Authority / downstream evaluator / registry);
+  no new behavior added.
+- Adversarial tests added
+  (`tests/contract/test_hardening_immutability_temporal.py`) proving sequence
+  immutability (incl. structural coverage that no tuple field is missed),
+  digest stability under caller-list mutation, and full temporal fail-closed
+  behavior; distribution verifier extended with the same probes.
+
+### Original GV-2C-a contents
+
 **New internal technical package.** Additive to the monorepo; changes no
 existing package. Implements milestone **M-2C.1** of the UVI ADR
 (`docs/architecture/ADR_UGENCE_VALUE_INTELLIGENCE_GV2C_GV2E_GV3R.md`): the

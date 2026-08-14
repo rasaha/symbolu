@@ -119,10 +119,40 @@ revoked = GeographyPolicy(metadata=meta(PolicyFamily.GEOGRAPHY, "geo", PolicyLif
                           jurisdiction="US", reporting_currency="USD", functional_currency="USD")
 try:
     AssessmentContext.bind_policies(context_id="c", tenant_id="t", subject_id="s",
-                                    geography=revoked, domain=dom, intended_outcome=io)
+                                    geography=revoked, domain=dom, intended_outcome=io, as_of=MID)
     raise SystemExit("fail-closed binder did not fire")
 except PolicyContractError:
     pass
+
+# as_of is mandatory (temporal validation cannot be omitted)
+try:
+    AssessmentContext.bind_policies(context_id="c", tenant_id="t", subject_id="s",
+                                    geography=geo, domain=dom, intended_outcome=io)
+    raise SystemExit("mandatory as_of guard did not fire")
+except TypeError:
+    pass
+# naive as_of rejected
+try:
+    AssessmentContext.bind_policies(context_id="c", tenant_id="t", subject_id="s",
+                                    geography=geo, domain=dom, intended_outcome=io,
+                                    as_of=datetime(2026, 6, 1))
+    raise SystemExit("naive as_of guard did not fire")
+except PolicyContractError:
+    pass
+
+# sequence fields are immutable: a caller list is coerced to tuple and cannot be
+# mutated into the frozen contract afterward
+gp = GeographyPolicy(metadata=meta(PolicyFamily.GEOGRAPHY, "geo2"), jurisdiction="US",
+                     reporting_currency="USD", functional_currency="USD",
+                     applicable_regulations=["reg-a"])
+assert isinstance(gp.applicable_regulations, tuple), type(gp.applicable_regulations)
+_d0 = gp.canonical_digest()
+try:
+    gp.applicable_regulations.append("x")  # tuple has no append
+    raise SystemExit("sequence field was not immutable")
+except AttributeError:
+    pass
+assert gp.canonical_digest() == _d0
 
 # no downstream/foreign package importable in this clean env
 for mod in ("governed_value", "ugence_governed_value", "agent_value_readiness",

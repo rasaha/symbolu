@@ -43,11 +43,24 @@ PR #1425, unmerged) are a **deferred dependency** and are not defined here.
 
 - **Envelope identity + no floating references.** Every `PolicyReference` and
   `PolicyArtifactMetadata` binds `policy_id + family + version + content_digest`;
-  a reference with no content digest is rejected (ADR §23 invariant 5).
+  a reference with no content digest is rejected (ADR §23 invariant 5). The
+  `content_digest` is **format/identity-validated only** (a lowercase 64-char
+  sha-256) — it is *not* compared against a resolved policy body; body
+  resolution and digest verification belong to a future registry (see
+  *Deferred*).
+- **Immutable sequences.** Every tuple-typed field is normalized to a real
+  `tuple` at construction (a caller `list` is copied; `str`/`bytes`/mappings and
+  non-iterables are rejected, never silently iterated element-by-element), so
+  mutating a caller-owned list afterward cannot alter a constructed contract or
+  its `canonical_digest()`.
 - **Literal XOR benchmark.** A `GovernedThreshold` is either an immutable policy
   literal **or** a `BenchmarkReference` — never both, never neither (ADR §15,
   D-3, §13). A threshold is a policy artifact, not a metric claim: it carries no
-  evidence axes.
+  evidence axes. `literal_value` is an **opaque governed literal** (a portable
+  string) and `governed_unit` an opaque unit label — this package *stores* them;
+  it does **not** parse numbers, reject NaN/inf, or guarantee unit-compatible
+  comparison. A downstream evaluator must validate numeric meaning and unit
+  compatibility when it compares a threshold against a `MetricClaim`.
 - **No caller multipliers (anti-gaming).** No policy shape has any field capable
   of expressing a caller-controlled ROI/value multiplier. Geography expresses
   currency, jurisdiction, benchmark references, and thresholds — never a scalar
@@ -60,11 +73,25 @@ PR #1425, unmerged) are a **deferred dependency** and are not defined here.
   always binds those three references, each of the correct family; Valuation and
   Readiness references are optional (ADR §6 precondition, §15).
 - **Cross-tenant rejection.** A `TENANT`-scoped reference must belong to the
-  context's tenant; `GLOBAL` references are always admissible.
-- **Fail-closed binder.** `AssessmentContext.bind_policies(...)` builds a context
-  from full artifacts and rejects any that is not `APPROVED_ACTIVE`, that belongs
-  to another tenant, or (when `as_of` is given) that is outside its effective
-  period. This is a *structural* fail-closed gate, not a trust check.
+  context's tenant; `GLOBAL` references are always admissible. (Policies are
+  tenant-scoped, not subject-scoped, so there is **no cross-subject** rejection —
+  only cross-tenant.)
+- **Fail-closed binder with mandatory evaluation time.**
+  `AssessmentContext.bind_policies(...)` takes a **required, keyword-only,
+  timezone-aware `as_of`** (no default; never read from the system clock, so
+  binding is deterministic). It rejects any bound artifact — required *or* a
+  supplied optional Valuation/Readiness — that is not `APPROVED_ACTIVE`, belongs
+  to another tenant, or is outside its effective period
+  (`effective_from <= as_of < effective_to`, an absent `effective_to` meaning no
+  upper bound). This is a *structural* fail-closed gate, not a trust check: the
+  lifecycle label and content digest remain caller-supplied structural inputs
+  until a Policy Authority and registry exist.
+- **`as_of` ≠ `assessment_window`.** `as_of` is *when policy applicability is
+  evaluated*; `assessment_window` is *the period the assessment evidence was
+  drawn from*. `as_of` is never derived from the window, and the policy effective
+  period is **not** required to cover the evidence window — an older evidence
+  window may legitimately be evaluated under a policy applicable at `as_of`;
+  whether evidence is fresh enough is a downstream evidence/readiness rule.
 - **Deterministic digests.** Every shape exposes `canonical_digest()` — a
   sorted-key sha-256 over its canonical serialization, matching the
   governance-contracts evidence discipline.
@@ -111,3 +138,14 @@ readiness evaluator + target-relative state machine, `ConditionSet` execution,
 value forecasting, attribution/verification engines, financial valuation +
 `ValuationEvidenceManifest` (owned by `governed-value`), and
 `SubjectContext`/`AssessedSystemBinding` (RA-owned, PR #1425). See ADR §24–§26.
+
+Two related consistency checks are also deferred, by design:
+
+- **Lifecycle ↔ time consistency beyond binder-time applicability.** A
+  `PolicyArtifactMetadata` may carry any `lifecycle_state` alongside any
+  effective period (they are caller-asserted). The binder enforces applicability
+  at `as_of`; reconciling a *label* like `EXPIRED`/`SUPERSEDED` with wall-clock
+  time, and authoritative revocation/supersession, is Policy-Authority work.
+- **Policy-body resolution / digest verification.** `content_digest` is checked
+  for format/identity only; verifying that it matches a resolved policy body is a
+  registry responsibility.
