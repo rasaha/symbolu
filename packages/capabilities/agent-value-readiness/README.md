@@ -1,0 +1,133 @@
+# ugence-agent-value-readiness
+
+> **⚠️ Experimental, internal, contracts-only, non-financial.**
+> These are the **contract shapes** for the Agent Value Readiness engine of
+> Ugence Value Intelligence — **not** the evaluator, **not** a deployment
+> authority, and **not** a customer-facing module.
+> - **No readiness evaluation, precedence calculus, or tier selection.**
+> - **No deployment authorization** — a determination is *advisory*, consumed by
+>   a separate human/deployment-governance process.
+> - **No money, currency, cost, benefit, or ROI** anywhere.
+> - **Caller-provided artifacts are not authority-verified.** Lifecycle labels,
+>   digests, condition approvals, and gate statuses are structural inputs;
+>   verifying them is Policy-Authority / GV-3R-b work.
+> - **Policy Authority and richer RA-owned subject/system binding are deferred.**
+
+The vocabulary for assessing whether an agent is ready for an intended outcome:
+
+```
+PreROIReadiness = f(Intelligence, Capabilities, Adoption
+                    | Geography, Domain, IntendedOutcome)
+```
+
+Intelligence, Capability, and Adoption are **non-financial leading indicators**.
+This is milestone **M-3R.1 (GV-3R-a)** of the UVI ADR
+(`docs/architecture/ADR_UGENCE_VALUE_INTELLIGENCE_GV2C_GV2E_GV3R.md`, §5–§10, §20).
+Evaluation — the precedence calculus, tier selection, authority resolution — is
+**GV-3R-b (M-3R.2)** and is out of scope here.
+
+- **Distribution:** `ugence-agent-value-readiness`
+- **Namespace:** `ugence_agent_value_readiness`
+- **Version:** 0.1.0
+- **Depends on:** stdlib **+ `ugence-governance-contracts>=0.2.0`** (evidence vocabulary) **+ `ugence-uvi-policy-contracts>=0.1.0`** (policy/context shapes) — never `governed-value`.
+- **Typing:** fully annotated; ships `py.typed`.
+
+## What's in it
+
+| Group | Symbols |
+|---|---|
+| Indicator results (distinct types) | `IntelligenceFitnessResult`, `CapabilityReadinessResult`, `AdoptionReadinessResult` |
+| Gate / condition / composite | `GateResult`, `ConditionSet`, `AdvisoryComposite` |
+| Determination envelope | `AgentValueReadinessDetermination` |
+| Readiness enums | `ReadinessClassification`, `GateStatus`, `ConditionStatus`, `ReadinessIndicatorClass`, `CapabilityDemonstration`, `IntelligenceDimension`, `CapabilityDimension`, `AdoptionDimension` |
+| Reused policy enums (re-exported) | `ReadinessTarget`, `RequirementClass` (owned by `ugence-uvi-policy-contracts`) |
+| Error | `ReadinessContractError` |
+
+## Type placement (why here, not governance-contracts)
+
+The ADR §20 lists `ReadinessTarget` / `GateStatus` / a minimal readiness
+determination as *candidate* neutral seams in `governance-contracts`
+("minimal, **multi-consumer only**"). This milestone places the readiness result
+vocabulary (`GateStatus`, `ReadinessClassification`, `AgentValueReadinessDetermination`)
+in **this leaf** and **reuses** `ReadinessTarget`/`RequirementClass` from
+`uvi-policy-contracts`, because:
+
+1. `ReadinessTarget` is already canonically owned by `uvi-policy-contracts` on
+   the merged default (GV-2C-a); splitting its sibling result enums into
+   `governance-contracts` would fork the readiness vocabulary across two neutral
+   packages.
+2. The ADR's "multi-consumer" precondition is **not met** in GV-3R-a — the sole
+   consumer of these result types is this leaf; there is no `governed-value`
+   integration in this milestone.
+3. `governance-contracts` is therefore **unchanged** (no version bump, no
+   `CONTRACT_VERSION` change).
+
+Promoting `GateStatus`/the determination to `governance-contracts` is a
+documented forward path for when a second consumer appears.
+
+## Structural guarantees
+
+- **Distinct indicator families.** Intelligence, Capability, and Adoption are
+  three distinct types; each carries a `ReadinessIndicatorClass`. Capability
+  distinguishes *exists* / *tested* / *met the threshold* (`CapabilityDemonstration`)
+  from *evidence sufficient* and *mandatory for target* — a missing critical
+  capability is representable as a mandatory blocking failure, never averaged away.
+- **Adoption ≠ ObservedAdoption.** `AdoptionReadinessResult.pre_deployment` is
+  locked `True`; it is a *predicted* pre-deployment indicator, never
+  post-deployment observed adoption, and never monetary benefit.
+- **Evidence reuse without elevation.** Every indicator binds a GV-2E-a
+  `MetricClaim` by value, preserving the five orthogonal evidence axes. A policy
+  *requirement* never manufactures evidence, and embedding a claim never elevates
+  its attestation/attribution/verification.
+- **Target-relative gates.** `GateResult` records applicability; a non-applicable
+  gate is diagnostic (`is_diagnostic`) and is **never** blocking (`is_blocking`
+  requires applicable + mandatory + FAIL) — a production-only gate can't block a
+  PILOT target. `GateResult` references an existing `PolicyGate`; it does not
+  redefine one.
+- **Non-waivable mandatory.** A `ConditionSet` may only govern a `CONDITIONAL`
+  concern; `APPROVED_ACTIVE` requires complete authority/owner/monitoring/evidence/time;
+  `EXPIRED`/`REVOKED` are never `is_active`.
+- **Advisory composite.** Optional; `Decimal` only (floats rejected), explicit
+  scale, declared method+version, `is_advisory` locked `True`. It can never
+  determine or elevate a tier, override a mandatory failure, or be multiplied
+  into ROI. No default weights; absent rather than fabricated.
+- **Determination consistency (local only).** `PILOT_READY`⇒PILOT target;
+  `DEPLOYMENT_READY`/`READY_WITH_CONDITIONS`⇒PRODUCTION; `READY_WITH_CONDITIONS`
+  needs conditions; a ready class cannot carry blocking/indeterminate gates;
+  `NOT_READY`/`NOT_ASSESSABLE` need a reason; blocking/indeterminate references
+  must point at genuinely applicable-mandatory FAIL/INDETERMINATE gates;
+  duplicate references rejected; cross-tenant/context binding rejected. **The
+  classification is a caller input — it is not computed from the gates here.**
+- **Immutable + deterministic.** Frozen dataclasses; every sequence normalized to
+  a real tuple (scalar substitutes rejected); `canonical_digest()` sha-256 stable
+  under caller-list mutation; naive timestamps and blank identifiers rejected.
+
+## Precedence representation (inputs/outputs only)
+
+GV-3R-a can *represent* the ratified precedence — invalid context ⇒
+`NOT_ASSESSABLE`; applicable mandatory `FAIL` ⇒ `NOT_READY` (FAIL dominates an
+unrelated `INDETERMINATE`); applicable mandatory `INDETERMINATE` ⇒
+`NOT_ASSESSABLE`; all applicable mandatory `PASS` ⇒ conditional-resolution — via
+its gate results, `blocking_gate_ids`, and `indeterminate_gate_ids`. **Selecting**
+the classification from those inputs is **GV-3R-b**.
+
+## Install & use
+
+```bash
+python -m build packages/capabilities/agent-value-readiness
+pip install --find-links dist ugence-agent-value-readiness   # resolves the two contract leaves
+```
+
+Independent-distribution proof (builds all three wheels, installs `--no-index`):
+
+```bash
+python packages/capabilities/agent-value-readiness/verify_agent_value_readiness_distribution.py
+```
+
+## Deferred (out of scope)
+
+The readiness evaluator (GV-3R-b), precedence/tier selection, deployment
+authorization, Policy Authority, policy/benchmark registry, evidence admission or
+verification, `SubjectContext`/`AssessedSystemBinding` (RA-owned, PR #1425),
+forecasting, realization-probability modeling, attributed/verified ROI, financial
+valuation, `governed-value` integration, and `ConditionSet` runtime enforcement.

@@ -1,0 +1,258 @@
+{
+  "distribution": "ugence-agent-value-readiness",
+  "namespace": "ugence_agent_value_readiness",
+  "package_version": "0.1.0",
+  "curated_api_module": "ugence_agent_value_readiness.api",
+  "note": "Machine-readable snapshot of the curated public API. Generated from the installed package; tests/packaging/test_public_api.py asserts equality. ReadinessTarget/RequirementClass are reused from ugence-uvi-policy-contracts.",
+  "symbols": {
+    "AdoptionDimension": {
+      "kind": "enum",
+      "values": [
+        "ELIGIBLE_POPULATION_COVERAGE",
+        "ELIGIBLE_WORKFLOW_COVERAGE",
+        "EXPECTED_UTILIZATION",
+        "WORKFLOW_SUITABILITY",
+        "USER_ACCEPTANCE_READINESS",
+        "TRUST_READINESS",
+        "TRAINING_READINESS",
+        "CHANGE_MANAGEMENT_READINESS",
+        "EXPECTED_OVERRIDE_RATE",
+        "EXPECTED_REJECTION_RATE",
+        "EXPECTED_ABANDONMENT_RATE",
+        "SUSTAINED_USAGE_CONDITIONS"
+      ]
+    },
+    "AdoptionReadinessResult": {
+      "kind": "dataclass",
+      "fields": [
+        "result_id",
+        "tenant_id",
+        "subject_id",
+        "context_id",
+        "task_or_outcome_ref",
+        "dimension",
+        "claim",
+        "requirement_class",
+        "applicable_targets",
+        "status",
+        "pre_deployment",
+        "threshold_ref",
+        "benchmark_ref",
+        "evidence_refs",
+        "reason_codes",
+        "evaluated_at"
+      ]
+    },
+    "AdvisoryComposite": {
+      "kind": "dataclass",
+      "fields": [
+        "method_id",
+        "method_version",
+        "score",
+        "scale_min",
+        "scale_max",
+        "component_result_refs",
+        "is_advisory",
+        "computed_at"
+      ]
+    },
+    "AgentValueReadinessDetermination": {
+      "kind": "dataclass",
+      "fields": [
+        "assessment_id",
+        "tenant_id",
+        "subject_id",
+        "context",
+        "readiness_policy_ref",
+        "requested_target",
+        "classification",
+        "created_at",
+        "intelligence_results",
+        "capability_results",
+        "adoption_results",
+        "gate_results",
+        "conditions",
+        "blocking_gate_ids",
+        "indeterminate_gate_ids",
+        "advisory_composite",
+        "reason_codes",
+        "evidence_digest"
+      ]
+    },
+    "CapabilityDemonstration": {
+      "kind": "enum",
+      "values": [
+        "NOT_PRESENT",
+        "PRESENT_UNTESTED",
+        "TESTED",
+        "MET_THRESHOLD"
+      ]
+    },
+    "CapabilityDimension": {
+      "kind": "enum",
+      "values": [
+        "FUNCTIONAL_COVERAGE",
+        "TOOL_READINESS",
+        "INTEGRATION_READINESS",
+        "WORKFLOW_COMPLETION",
+        "EXECUTION_RELIABILITY",
+        "AUTONOMY_BOUNDARIES",
+        "SECURITY_READINESS",
+        "GOVERNANCE_READINESS",
+        "OBSERVABILITY",
+        "AUDITABILITY",
+        "ESCALATION_READINESS",
+        "HUMAN_FALLBACK_READINESS"
+      ]
+    },
+    "CapabilityReadinessResult": {
+      "kind": "dataclass",
+      "fields": [
+        "result_id",
+        "tenant_id",
+        "subject_id",
+        "context_id",
+        "task_or_outcome_ref",
+        "dimension",
+        "claim",
+        "requirement_class",
+        "applicable_targets",
+        "status",
+        "demonstration",
+        "evidence_sufficient",
+        "threshold_ref",
+        "benchmark_ref",
+        "evidence_refs",
+        "reason_codes",
+        "evaluated_at"
+      ]
+    },
+    "ConditionSet": {
+      "kind": "dataclass",
+      "fields": [
+        "condition_id",
+        "source_gate_or_finding_ref",
+        "concern_requirement_class",
+        "current_status",
+        "approved_mitigation_ref",
+        "approving_authority_ref",
+        "accountable_owner",
+        "scope_exposure_limit",
+        "monitoring_requirement",
+        "evidence_refs",
+        "effective_from",
+        "effective_to",
+        "expiry",
+        "revocation_trigger"
+      ]
+    },
+    "ConditionStatus": {
+      "kind": "enum",
+      "values": [
+        "PROPOSED",
+        "APPROVED_ACTIVE",
+        "EXPIRED",
+        "REVOKED",
+        "SATISFIED"
+      ]
+    },
+    "GateResult": {
+      "kind": "dataclass",
+      "fields": [
+        "gate_id",
+        "readiness_policy_ref",
+        "gate_kind",
+        "requested_target",
+        "applicable",
+        "status",
+        "observed_claim_refs",
+        "threshold_ref",
+        "benchmark_ref",
+        "evidence_refs",
+        "reason_codes",
+        "window_ref",
+        "evaluated_at"
+      ]
+    },
+    "GateStatus": {
+      "kind": "enum",
+      "values": [
+        "PASS",
+        "FAIL",
+        "INDETERMINATE"
+      ]
+    },
+    "IntelligenceDimension": {
+      "kind": "enum",
+      "values": [
+        "REASONING_QUALITY",
+        "DECISION_QUALITY",
+        "ACCURACY",
+        "RELIABILITY",
+        "CONSISTENCY",
+        "CONFIDENCE_CALIBRATION",
+        "EXCEPTION_HANDLING",
+        "UNCERTAINTY_RECOGNITION",
+        "POPULATION_PERFORMANCE",
+        "LANGUAGE_PERFORMANCE",
+        "REGIONAL_PERFORMANCE"
+      ]
+    },
+    "IntelligenceFitnessResult": {
+      "kind": "dataclass",
+      "fields": [
+        "result_id",
+        "tenant_id",
+        "subject_id",
+        "context_id",
+        "task_or_outcome_ref",
+        "dimension",
+        "claim",
+        "requirement_class",
+        "applicable_targets",
+        "status",
+        "threshold_ref",
+        "benchmark_ref",
+        "evidence_refs",
+        "reason_codes",
+        "evaluated_at"
+      ]
+    },
+    "ReadinessClassification": {
+      "kind": "enum",
+      "values": [
+        "NOT_ASSESSABLE",
+        "NOT_READY",
+        "PILOT_READY",
+        "READY_WITH_CONDITIONS",
+        "DEPLOYMENT_READY"
+      ]
+    },
+    "ReadinessContractError": {
+      "kind": "exception"
+    },
+    "ReadinessIndicatorClass": {
+      "kind": "enum",
+      "values": [
+        "INTELLIGENCE",
+        "CAPABILITY",
+        "ADOPTION"
+      ]
+    },
+    "ReadinessTarget": {
+      "kind": "enum",
+      "values": [
+        "PILOT",
+        "PRODUCTION"
+      ]
+    },
+    "RequirementClass": {
+      "kind": "enum",
+      "values": [
+        "MANDATORY",
+        "CONDITIONAL",
+        "ADVISORY"
+      ]
+    }
+  }
+}
