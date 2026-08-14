@@ -1,0 +1,257 @@
+{
+  "distribution": "ugence-uvi-policy-contracts",
+  "namespace": "ugence_uvi_policy_contracts",
+  "package_version": "0.1.0",
+  "curated_api_module": "ugence_uvi_policy_contracts.api",
+  "note": "Machine-readable snapshot of the curated public API (ugence_uvi_policy_contracts.api.__all__). Generated from the installed package; tests/packaging/test_public_api.py asserts this file equals the actual package surface. Regenerate when the curated API changes.",
+  "symbols": {
+    "AssessmentContext": {
+      "kind": "dataclass",
+      "fields": [
+        "context_id",
+        "tenant_id",
+        "subject_id",
+        "geography_ref",
+        "domain_ref",
+        "intended_outcome_ref",
+        "purpose",
+        "valuation_ref",
+        "readiness_ref",
+        "additional_policy_refs",
+        "assessment_window",
+        "created_at",
+        "content_digest"
+      ]
+    },
+    "AssessmentPurpose": {
+      "kind": "enum",
+      "values": [
+        "PRE_ROI_READINESS",
+        "FORECAST",
+        "POST_DEPLOYMENT_VALUE"
+      ]
+    },
+    "ComparisonOperator": {
+      "kind": "enum",
+      "values": [
+        "GTE",
+        "GT",
+        "LTE",
+        "LT",
+        "EQ",
+        "NEQ"
+      ]
+    },
+    "ComponentEvidenceRequirement": {
+      "kind": "dataclass",
+      "fields": [
+        "component",
+        "requirement_class",
+        "required_source_basis",
+        "required_attribution",
+        "required_verification"
+      ]
+    },
+    "DomainPolicy": {
+      "kind": "dataclass",
+      "fields": [
+        "metadata",
+        "governed_outcome_unit",
+        "task_taxonomy",
+        "benefit_taxonomy",
+        "loss_taxonomy",
+        "permitted_valuation_methods",
+        "domain_benchmark_refs",
+        "gates",
+        "criticality_class"
+      ]
+    },
+    "GateCategory": {
+      "kind": "enum",
+      "values": [
+        "SAFETY",
+        "FAIRNESS",
+        "QUALITY",
+        "COMPLIANCE",
+        "SECURITY",
+        "PERFORMANCE",
+        "OTHER"
+      ]
+    },
+    "GeographyPolicy": {
+      "kind": "dataclass",
+      "fields": [
+        "metadata",
+        "jurisdiction",
+        "reporting_currency",
+        "functional_currency",
+        "applicable_regulations",
+        "language_requirements",
+        "residency_requirements",
+        "cost_benchmark_refs",
+        "regional_thresholds",
+        "valuation_policy_refs"
+      ]
+    },
+    "GovernedThreshold": {
+      "kind": "dataclass",
+      "fields": [
+        "threshold_id",
+        "governed_unit",
+        "comparator",
+        "literal_value",
+        "benchmark_ref"
+      ]
+    },
+    "HeadlineClassificationPolicy": {
+      "kind": "enum",
+      "values": [
+        "WEAKEST_REQUIRED_COMPONENT"
+      ]
+    },
+    "IntendedOutcomePolicy": {
+      "kind": "dataclass",
+      "fields": [
+        "metadata",
+        "target_outcome",
+        "task_definition",
+        "success_criteria",
+        "value_function_ref",
+        "counterfactual_specification",
+        "realization_lag",
+        "attribution_method",
+        "normalization_basis",
+        "required_effect_evidence",
+        "acceptance_thresholds",
+        "valuation_policy_refs"
+      ]
+    },
+    "MissingComponentBehavior": {
+      "kind": "enum",
+      "values": [
+        "FAIL_CLOSED",
+        "DEGRADE"
+      ]
+    },
+    "PolicyArtifactMetadata": {
+      "kind": "dataclass",
+      "fields": [
+        "policy_id",
+        "policy_family",
+        "version",
+        "content_digest",
+        "scope",
+        "tenant_id",
+        "lifecycle_state",
+        "effective_from",
+        "effective_to",
+        "issuer_ref",
+        "approval_ref",
+        "supersedes_ref",
+        "created_at"
+      ]
+    },
+    "PolicyContractError": {
+      "kind": "exception"
+    },
+    "PolicyFamily": {
+      "kind": "enum",
+      "values": [
+        "GEOGRAPHY",
+        "DOMAIN",
+        "INTENDED_OUTCOME",
+        "VALUATION",
+        "READINESS"
+      ]
+    },
+    "PolicyGate": {
+      "kind": "dataclass",
+      "fields": [
+        "gate_id",
+        "category",
+        "requirement_class",
+        "applicability",
+        "threshold",
+        "conditionally_compensable",
+        "description"
+      ]
+    },
+    "PolicyLifecycleState": {
+      "kind": "enum",
+      "values": [
+        "DRAFT",
+        "APPROVED_ACTIVE",
+        "EXPIRED",
+        "REVOKED",
+        "SUPERSEDED"
+      ]
+    },
+    "PolicyReference": {
+      "kind": "dataclass",
+      "fields": [
+        "policy_id",
+        "policy_family",
+        "version",
+        "content_digest",
+        "scope",
+        "tenant_id"
+      ]
+    },
+    "PolicyScope": {
+      "kind": "enum",
+      "values": [
+        "GLOBAL",
+        "TENANT"
+      ]
+    },
+    "ReadinessPolicy": {
+      "kind": "dataclass",
+      "fields": [
+        "metadata",
+        "gates",
+        "readiness_targets",
+        "composite_is_advisory"
+      ]
+    },
+    "ReadinessTarget": {
+      "kind": "enum",
+      "values": [
+        "PILOT",
+        "PRODUCTION"
+      ]
+    },
+    "RequirementClass": {
+      "kind": "enum",
+      "values": [
+        "MANDATORY",
+        "CONDITIONAL",
+        "ADVISORY"
+      ]
+    },
+    "ValuationPolicy": {
+      "kind": "dataclass",
+      "fields": [
+        "metadata",
+        "permitted_valuation_methods",
+        "required_components",
+        "headline_classification",
+        "missing_component_behavior",
+        "acceptance_thresholds"
+      ]
+    },
+    "ValueComponent": {
+      "kind": "enum",
+      "values": [
+        "GROSS_BENEFIT",
+        "AVOIDED_LOSS",
+        "ACTUAL_LOSS",
+        "RESIDUAL_EXPECTED_LOSS",
+        "OPERATING_COST",
+        "INVESTMENT",
+        "NORMALIZATION_UNIT",
+        "COUNTERFACTUAL_INPUT",
+        "ATTRIBUTION_INPUT"
+      ]
+    }
+  }
+}
