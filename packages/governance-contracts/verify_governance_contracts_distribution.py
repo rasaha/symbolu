@@ -33,7 +33,7 @@ _CHECK = r'''
 import dataclasses, importlib.util, json, sys
 
 import ugence_governance_contracts as g
-assert g.__version__ == "0.1.0", g.__version__
+assert g.__version__ == "0.2.0", g.__version__
 assert g.CONTRACT_VERSION == "1.0.0", g.CONTRACT_VERSION
 assert "site-packages" in g.__file__, g.__file__
 assert not any("/symbolu" in p or "governance_providers" in p for p in sys.path), sys.path
@@ -63,6 +63,27 @@ assert res.is_supported is True
 assert [m.value for m in ActionGovernanceOutcome] == [
     "AUTHORIZED", "AUTHORIZED_WITH_CONSTRAINTS", "DENIED", "INDETERMINATE", "EXPIRED"]
 assert FailureClass.RETRYABLE.value == "RETRYABLE"
+
+# GV-2E-a neutral evidence contracts ship and enforce structure
+from ugence_governance_contracts.api import (
+    SourceBasis, TransformationMethod, AttestationStatus, AttributionStatus,
+    VerificationStatus, EvidenceUsageScope, EvidenceContractError,
+    MetricClaim, MetricObservation, EvidenceReference, AssessmentWindow)
+from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+assert [m.value for m in SourceBasis] == ["REPORTED", "OBSERVED", "SYNTHETIC", "MIXED"]
+_c = MetricClaim(claim_id="c", tenant_id="t", subject_id="s", metric_id="m",
+                 value="1", governed_unit="u", source_basis=SourceBasis.REPORTED,
+                 transformation_method=TransformationMethod.DIRECT)
+assert len(_c.canonical_digest()) == 64
+# caller label alone cannot elevate: VERIFIED without references is rejected
+try:
+    MetricClaim(claim_id="c", tenant_id="t", subject_id="s", metric_id="m",
+                value="1", governed_unit="u", source_basis=SourceBasis.REPORTED,
+                transformation_method=TransformationMethod.DIRECT,
+                verification_status=VerificationStatus.VERIFIED)
+    raise SystemExit("evidence structural guard did not fire")
+except EvidenceContractError:
+    pass
 
 # NO unrelated Ugence package importable in this clean env
 for mod in ("governance_providers", "decision_governance", "actiongate_provider",

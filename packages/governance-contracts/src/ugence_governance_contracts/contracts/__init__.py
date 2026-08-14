@@ -21,6 +21,24 @@ from .execution import (
     ExecutionObservation,
     ExternalExecutionProvider,
 )
+from .evidence import (
+    AssessmentWindow,
+    AttestationStatus,
+    AttributionStatus,
+    BenchmarkReference,
+    ConfidenceBasis,
+    EvidenceContractError,
+    EvidenceProvenance,
+    EvidenceReference,
+    EvidenceUsageScope,
+    ForecastHorizon,
+    MetricClaim,
+    MetricObservation,
+    PopulationSlice,
+    SourceBasis,
+    TransformationMethod,
+    VerificationStatus,
+)
 
 __all__ = [
     "Provider", "BaseProvider",
@@ -30,4 +48,11 @@ __all__ = [
     "ActionGovernanceResult", "ActionGovernanceOutcome",
     "ExternalExecutionProvider", "ExecutionDispatchRequest",
     "ExecutionDispatchResult", "ExecutionObservation", "ExecutionBusinessOutcome",
+    # GV-2E-a neutral evidence contracts (additive)
+    "SourceBasis", "TransformationMethod", "AttestationStatus",
+    "AttributionStatus", "VerificationStatus", "EvidenceUsageScope",
+    "EvidenceContractError",
+    "EvidenceReference", "EvidenceProvenance", "BenchmarkReference",
+    "AssessmentWindow", "ForecastHorizon", "PopulationSlice", "ConfidenceBasis",
+    "MetricClaim", "MetricObservation",
 ]

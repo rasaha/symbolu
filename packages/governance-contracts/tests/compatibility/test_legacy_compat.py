@@ -58,8 +58,10 @@ def test_legacy_module_shims_preserve_identity():
 
 
 def test_contract_version_and_versions_preserved():
+    # CONTRACT_VERSION (the provider contract surface) is unchanged by GV-2E-a;
+    # only the package __version__ advanced (additive neutral evidence contracts).
     assert gp_api.CONTRACT_VERSION == canon.CONTRACT_VERSION == "1.0.0"
-    assert canon.__version__ == "0.1.0"
+    assert canon.__version__ == "0.2.0"
 
 
 def test_isinstance_works_across_boundary():
