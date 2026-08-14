@@ -120,6 +120,56 @@ typed `ProductionContainmentError`: envelope issuance and production ActionGate 
 non-executable `RiskDecision`. Reference/conformance mode (`production_mode=False`) retains the
 full flow. This is a breaking production-construction change; see the ADR's migration note.
 
+## Neutral v2 subject-context contracts (v0.3.0)
+
+An **additive, versioned** contract layer (`risk_authority.integrations`) that makes the
+Phase-4 ADR's neutral subject facts expressible and integrity-bound **without adding any
+execution authority**. Three frozen, closed, schema-tagged objects plus one pure validator:
+
+| Object | Schema tag | Carries |
+|---|---|---|
+| `SubjectContext` | `risk-subject-context-1` | neutral subject facts only — environment, region, zone, compute group, resource class, action type, magnitude before/after, asserted-at and validity window. **No** tenant id, subject id, evidence references, policy, control status, keys, envelopes or execution instructions. |
+| `SubjectBinding` | `risk-subject-binding-1` | binding anchors only — tenant, subject id/type (**derived** from the outer request), `recommendation_digest`, `context_digest`. |
+| `SubjectRiskEvaluationRequestV2` | `risk-subject-evaluation-request-2` | the v1 outer request plus the raw inspectable `subject_context` and an explicit outer `recommendation_digest`. |
+
+`validate_subject_binding(request)` is a **pure, deterministic, fail-closed** function: it
+re-validates the closed context, recomputes `context_digest` from the **raw** context,
+reconstructs `SubjectBinding` **exclusively** from authoritative outer request fields,
+recomputes `subject_digest`, and requires equality with the carried commitment. An altered
+raw context paired with a stale `subject_digest` fails deterministically. It resolves no
+policy, evaluates no risk, issues no envelope, calls no ActionGate, mints no credential and
+performs no execution — its `SubjectBindingValidation` result is an integrity finding whose
+every authority flag is fixed `False`.
+
+**Schema-tagged canonical hashing (honest description).** Digests use the existing
+`crypto.canonical.to_canonical_obj` / `canonical_bytes` and `crypto.hashing.digest` — a
+**bare SHA-256** over canonical bytes. No new hashing primitive and no cryptographic domain
+prefix are introduced. Separation between the three digests comes from each object embedding
+its own fixed `schema_version` inside its own canonical form, **plus** strict validation:
+a digest under one schema tag is never automatically accepted in another semantic slot.
+
+**Backward compatibility.** `risk-subject-evaluation-request-1` is untouched and remains
+byte-for-byte compatible: v1 construction, `to_dict`, `from_dict` and digests are unchanged,
+v1 requests acquire **no** serialized `subject_context` or `recommendation_digest` field, and
+no automatic v1↔v2 conversion exists (v2 is a successor class, not a subclass). The seam's
+`SUPPORTED_REQUEST_SCHEMA_VERSIONS` is **deliberately unchanged** in this release — a v2
+request presented to `RiskEvaluationSeam` still fails closed as
+`NOT_EVALUATED(UNSUPPORTED_SCHEMA_VERSION)`. Wiring the validator into the seam ahead of
+policy resolution, and the subject-aware `PolicyResolverPort` widening, are a later phase.
+
+> **Divergence from the merged ADR, recorded.** ADR §5.3 requires Risk Authority to
+> reconstruct `SubjectBinding` from `{outer tenant_id, outer subject_id, subject_type,
+> recommendation_digest, recomputed context_digest}` before policy resolution, but its
+> illustrated v2 request carries no `recommendation_digest`: the value's only home there is
+> *inside* `SubjectBinding`, it is absent from `evidence_references`, and it cannot be
+> recovered from `subject_digest` or `idempotency_key` (both one-way SHA-256 outputs).
+> Reconstruction was therefore impossible as illustrated. The explicit outer
+> `recommendation_digest` field on v2 is the narrowest versioned correction. Consequently
+> the ADR's illustrated `request_digest` (`sha256:b1973925…`) is **not** reproducible; the
+> `context_digest` (`sha256:9af3f626…`) and `subject_digest` (`sha256:eb4526a6…`) worked
+> examples, and the §5.3 tamper-demonstration digests, all reproduce byte-for-byte and are
+> pinned as test fixtures.
+
 ## Verify the distribution
 
 ```
