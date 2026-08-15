@@ -11,7 +11,9 @@ import pytest
 
 from ugence_governance_contracts.api import AssessmentWindow, MetricClaim, SourceBasis, TransformationMethod
 from ugence_uvi_policy_contracts.api import (
+    GateCategory,
     PolicyFamily,
+    PolicyGate,
     PolicyReference,
     ReadinessTarget,
     RequirementClass,
@@ -102,11 +104,33 @@ def test_blank_identifier_rejected():
         intel(result_id="  ")
 
 
+def _pgate(gid="g", kind=RequirementClass.MANDATORY, appl=(ReadinessTarget.PILOT,)):
+    return PolicyGate(gate_id=gid, category=GateCategory.SAFETY, requirement_class=kind, applicability=appl)
+
+
+def _rref():
+    return PolicyReference(policy_id="r", policy_family=PolicyFamily.READINESS, version="1", content_digest=D)
+
+
 def test_gate_result_naive_timestamp_rejected():
     with pytest.raises(ReadinessContractError):
-        GateResult(gate_id="g", readiness_policy_ref=PolicyReference(policy_id="r", policy_family=PolicyFamily.READINESS, version="1", content_digest=D),
-                   gate_kind=RequirementClass.MANDATORY, requested_target=ReadinessTarget.PILOT, applicable=True, status=GateStatus.PASS,
-                   evaluated_at=datetime(2026, 6, 1))
+        GateResult(policy_gate=_pgate(), readiness_policy_ref=_rref(), requested_target=ReadinessTarget.PILOT,
+                   status=GateStatus.PASS, evaluated_at=datetime(2026, 6, 1))
+
+
+def test_gate_result_embeds_policygate_immutably():
+    g = GateResult(policy_gate=_pgate("gg"), readiness_policy_ref=_rref(), requested_target=ReadinessTarget.PILOT, status=GateStatus.PASS)
+    d0 = g.canonical_digest()
+    # PolicyGate is frozen; the embedded gate cannot be reassigned.
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        g.policy_gate = _pgate("hacked")  # type: ignore[misc]
+    assert g.canonical_digest() == d0
+
+
+def test_gate_digest_changes_when_embedded_gate_changes():
+    a = GateResult(policy_gate=_pgate("g", RequirementClass.MANDATORY), readiness_policy_ref=_rref(), requested_target=ReadinessTarget.PILOT, status=GateStatus.PASS)
+    b = GateResult(policy_gate=_pgate("g", RequirementClass.ADVISORY), readiness_policy_ref=_rref(), requested_target=ReadinessTarget.PILOT, status=GateStatus.PASS)
+    assert a.canonical_digest() != b.canonical_digest()
 
 
 # --------------------------------------------------------------------------- #

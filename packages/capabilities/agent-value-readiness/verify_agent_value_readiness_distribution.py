@@ -56,7 +56,7 @@ from ugence_governance_contracts.api import MetricClaim, SourceBasis, Transforma
 from ugence_uvi_policy_contracts.api import (
     PolicyArtifactMetadata, PolicyReference, PolicyFamily, PolicyLifecycleState,
     AssessmentContext, GeographyPolicy, DomainPolicy, IntendedOutcomePolicy,
-    ReadinessTarget, RequirementClass)
+    ReadinessTarget, RequirementClass, PolicyGate, GateCategory)
 from ugence_agent_value_readiness.api import (
     IntelligenceFitnessResult, CapabilityReadinessResult, AdoptionReadinessResult,
     GateResult, GateStatus, ConditionSet, ConditionStatus, AdvisoryComposite,
@@ -76,10 +76,22 @@ rdy = PolicyReference(policy_id="r", policy_family=PolicyFamily.READINESS, versi
 claim = MetricClaim(claim_id="c1", tenant_id="t1", subject_id="a1", metric_id="accuracy", value="0.95", governed_unit="ratio", source_basis=SourceBasis.OBSERVED, transformation_method=TransformationMethod.DIRECT, assessment_window=WIN)
 intel = IntelligenceFitnessResult(result_id="ir1", tenant_id="t1", subject_id="a1", context_id="ctx1", task_or_outcome_ref="i", dimension=IntelligenceDimension.ACCURACY, claim=claim, requirement_class=RequirementClass.MANDATORY, applicable_targets=[ReadinessTarget.PILOT], status=GateStatus.PASS)
 assert intel.indicator_class is ReadinessIndicatorClass.INTELLIGENCE
-gate = GateResult(gate_id="g1", readiness_policy_ref=rdy, gate_kind=RequirementClass.MANDATORY, requested_target=ReadinessTarget.PILOT, applicable=True, status=GateStatus.PASS)
+pgate = PolicyGate(gate_id="g1", category=GateCategory.SAFETY, requirement_class=RequirementClass.MANDATORY, applicability=(ReadinessTarget.PILOT,))
+gate = GateResult(policy_gate=pgate, readiness_policy_ref=rdy, requested_target=ReadinessTarget.PILOT, status=GateStatus.PASS)
+assert gate.gate_id == "g1" and gate.gate_kind is RequirementClass.MANDATORY and gate.applicable is True
 det = AgentValueReadinessDetermination(assessment_id="a1", tenant_id="t1", subject_id="a1", context=ctx, readiness_policy_ref=rdy, requested_target=ReadinessTarget.PILOT, classification=ReadinessClassification.PILOT_READY, created_at=MID, intelligence_results=[intel], gate_results=[gate])
 assert len(det.canonical_digest()) == 64
 assert det.is_advisory is True
+assert det.blocking_gate_ids == ()  # derived from gate_results
+
+# GV3R-F1: a ready classification cannot hide an applicable mandatory FAIL
+_pg_fail = PolicyGate(gate_id="mf", category=GateCategory.SAFETY, requirement_class=RequirementClass.MANDATORY, applicability=(ReadinessTarget.PILOT,))
+_gr_fail = GateResult(policy_gate=_pg_fail, readiness_policy_ref=rdy, requested_target=ReadinessTarget.PILOT, status=GateStatus.FAIL)
+try:
+    AgentValueReadinessDetermination(assessment_id="a2", tenant_id="t1", subject_id="a1", context=ctx, readiness_policy_ref=rdy, requested_target=ReadinessTarget.PILOT, classification=ReadinessClassification.PILOT_READY, created_at=MID, gate_results=[_gr_fail])
+    raise SystemExit("GV3R-F1 hidden-mandatory-FAIL guard did not fire")
+except ReadinessContractError:
+    pass
 
 # non-waivable mandatory condition
 try:

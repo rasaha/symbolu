@@ -79,25 +79,43 @@ documented forward path for when a second consumer appears.
   `MetricClaim` by value, preserving the five orthogonal evidence axes. A policy
   *requirement* never manufactures evidence, and embedding a claim never elevates
   its attestation/attribution/verification.
-- **Target-relative gates.** `GateResult` records applicability; a non-applicable
-  gate is diagnostic (`is_diagnostic`) and is **never** blocking (`is_blocking`
-  requires applicable + mandatory + FAIL) — a production-only gate can't block a
-  PILOT target. `GateResult` references an existing `PolicyGate`; it does not
-  redefine one.
+- **Non-forgeable gate metadata.** `GateResult` **embeds the actual immutable
+  `PolicyGate` by value**; `gate_id`, gate kind, target applicability, the owned
+  threshold, `is_diagnostic`, and `is_blocking` are **derived** from it — there
+  are no caller-settable `gate_kind`/`applicable`/`threshold_ref` fields, so a
+  caller cannot relabel a mandatory gate advisory or mark an applicable gate
+  diagnostic. A non-applicable gate (`requested_target ∉ policy_gate.applicability`)
+  is diagnostic and never blocking — a production-only gate can't block a PILOT
+  target. (This binds the metadata *internally*; it does not prove the embedded
+  `PolicyGate` is itself authority-approved — that is GV-3R-b work.)
+- **Derived blocking sets.** `blocking_gate_ids` / `indeterminate_gate_ids` are
+  **derived properties** of the determination, computed from `gate_results` —
+  never caller-supplied summaries — so an applicable mandatory failure cannot be
+  hidden by omission.
 - **Non-waivable mandatory.** A `ConditionSet` may only govern a `CONDITIONAL`
   concern; `APPROVED_ACTIVE` requires complete authority/owner/monitoring/evidence/time;
-  `EXPIRED`/`REVOKED` are never `is_active`.
+  `EXPIRED`/`REVOKED` are never active. Activity at the determination time is
+  checked with `is_active_at(as_of)` (`effective_from <= as_of < effective_to/expiry`).
 - **Advisory composite.** Optional; `Decimal` only (floats rejected), explicit
   scale, declared method+version, `is_advisory` locked `True`. It can never
   determine or elevate a tier, override a mandatory failure, or be multiplied
   into ROI. No default weights; absent rather than fabricated.
-- **Determination consistency (local only).** `PILOT_READY`⇒PILOT target;
-  `DEPLOYMENT_READY`/`READY_WITH_CONDITIONS`⇒PRODUCTION; `READY_WITH_CONDITIONS`
-  needs conditions; a ready class cannot carry blocking/indeterminate gates;
-  `NOT_READY`/`NOT_ASSESSABLE` need a reason; blocking/indeterminate references
-  must point at genuinely applicable-mandatory FAIL/INDETERMINATE gates;
-  duplicate references rejected; cross-tenant/context binding rejected. **The
-  classification is a caller input — it is not computed from the gates here.**
+- **Determination consistency (local only, enforced against in-record facts).**
+  `PILOT_READY`⇒PILOT; `DEPLOYMENT_READY`/`READY_WITH_CONDITIONS`⇒PRODUCTION.
+  Precedence compatibility: any applicable mandatory **FAIL** ⇒ only `NOT_READY`
+  is consistent (FAIL dominates INDETERMINATE); an applicable mandatory
+  **INDETERMINATE** with no FAIL ⇒ only `NOT_ASSESSABLE`. A **ready class is
+  rejected if any `gate_result` is a blocking or applicable-mandatory-indeterminate
+  gate** (scanned from `gate_results`, not a summary). `READY_WITH_CONDITIONS`
+  requires every applicable unresolved CONDITIONAL concern to be covered by a
+  condition **active at the determination time**, and rejects conditions that
+  cover no such concern. `DEPLOYMENT_READY` rejects any unresolved conditional
+  concern or open active condition (historical `SATISFIED` allowed). Every
+  `gate_result` must belong to the determination's `readiness_policy_ref`
+  (id/version/digest/tenant/family). `NOT_READY`/`NOT_ASSESSABLE` need a reason;
+  cross-tenant/context binding and duplicates rejected. **The classification is a
+  caller input — it is not *computed* from the gates here; the contract only
+  rejects a classification that contradicts the record.**
 - **Immutable + deterministic.** Frozen dataclasses; every sequence normalized to
   a real tuple (scalar substitutes rejected); `canonical_digest()` sha-256 stable
   under caller-list mutation; naive timestamps and blank identifiers rejected.
@@ -123,6 +141,24 @@ Independent-distribution proof (builds all three wheels, installs `--no-index`):
 ```bash
 python packages/capabilities/agent-value-readiness/verify_agent_value_readiness_distribution.py
 ```
+
+## Extensibility & trust notes
+
+- **Dimension catalog (extensibility).** `IntelligenceDimension` /
+  `CapabilityDimension` / `AdoptionDimension` are the initial **shared canonical
+  taxonomy**, not an exhaustive universal model. Domain-specific metrics remain
+  expressible through the free-form governed `metric_id` on the embedded
+  `MetricClaim` and through policy-selected metrics; adding a new canonical
+  dimension is a **versioned contract evolution**, not a per-caller free-form
+  field. No scoring or financial-modifier field is added.
+- **What the embedded `PolicyGate` proves — and does not.** Embedding the gate
+  prevents *internal* metadata contradiction (kind/applicability/threshold can't
+  be forged relative to the gate). It does **not** prove the `PolicyGate` or its
+  `ReadinessPolicy` is authentic, authority-approved, or registry-resolved;
+  `APPROVED_ACTIVE` on a `ConditionSet` is a structurally-asserted label, not
+  proof a real authority approved it; a well-formed `content_digest` is not a
+  resolved-body proof. Those verifications belong to Policy Authority and
+  GV-3R-b. Readiness remains **advisory**; deployment governance is separate.
 
 ## Deferred (out of scope)
 

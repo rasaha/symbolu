@@ -2,6 +2,48 @@
 
 ## [0.1.0] — GV-3R-a: Agent Value Readiness contract shapes
 
+### Pre-merge hardening (independent-audit corrections; still 0.1.0, unreleased)
+
+Corrections to the GV-3R-a audit findings, applied before merge. No evaluator,
+tier selection, authority, or financial behavior added — only stronger *local*
+contract consistency. The public shape of `GateResult` and the determination
+changed (acceptable for an unmerged v0.1.0; no deprecated bypass retained).
+
+- **GV3R-F2/F4 — non-forgeable gate metadata.** `GateResult` now **embeds the
+  actual immutable `PolicyGate` by value**. `gate_id`, gate kind, target
+  applicability, owned threshold, `is_diagnostic`, and `is_blocking` are
+  **derived** from it; the caller-settable `gate_kind`/`applicable`/`threshold_ref`/
+  `benchmark_ref` fields are removed. A caller can no longer relabel a mandatory
+  gate advisory, mark an applicable gate diagnostic, or swap its threshold. A
+  `from_policy_gate()` factory is added for ergonomics (the direct constructor is
+  already safe). `ConditionSet.is_active_at(as_of)` adds a time-aware activity
+  check (`effective_from <= as_of < effective_to/expiry`).
+- **GV3R-F1 — derived blocking sets + ready-class scan.** `blocking_gate_ids` /
+  `indeterminate_gate_ids` are now **derived properties** computed from
+  `gate_results` (removed as constructor fields). A ready classification is
+  rejected if any `gate_result` is a blocking or applicable-mandatory-INDETERMINATE
+  gate — an applicable mandatory failure can no longer be hidden by omission.
+  Mixed FAIL/INDETERMINATE precedence compatibility is enforced (FAIL ⇒ only
+  `NOT_READY`; INDETERMINATE-without-FAIL ⇒ only `NOT_ASSESSABLE`).
+- **GV3R-F3/F4 — `READY_WITH_CONDITIONS` active coverage.** Requires every
+  applicable unresolved CONDITIONAL concern in `gate_results` to be covered by a
+  condition **active at the determination time** (`created_at`), and rejects a
+  condition that covers no such concern or points at the wrong gate. Proposed/
+  expired/revoked/satisfied/future-effective/expired-window conditions are not
+  active coverage.
+- **GV3R-F5 — `DEPLOYMENT_READY` cleanliness.** Rejects any unresolved conditional
+  concern or open (active) condition; historical `SATISFIED` conditions permitted.
+- **GV3R-F6 — single-policy gates.** Every `gate_result.readiness_policy_ref` must
+  equal the determination's `readiness_policy_ref` (id/version/digest/tenant/family).
+- **GV3R-F7 — extensibility documented.** README states the dimension enums are the
+  initial shared taxonomy (domain metrics via governed `metric_id`; new dimensions
+  are versioned contract evolution), and clarifies that the embedded `PolicyGate`
+  prevents internal metadata contradiction but does not prove policy authenticity.
+- Adversarial tests added (`tests/contract/test_determination_consistency.py`)
+  covering every finding; distribution verifier extended with the F1 guard.
+
+## [0.1.0] — GV-3R-a: Agent Value Readiness contract shapes (original)
+
 **New internal technical leaf.** Additive to the monorepo; changes no existing
 package. Implements milestone **M-3R.1** of the UVI ADR
 (`docs/architecture/ADR_UGENCE_VALUE_INTELLIGENCE_GV2C_GV2E_GV3R.md`, §5–§10,

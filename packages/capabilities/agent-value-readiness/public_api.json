@@ -3,7 +3,7 @@
   "namespace": "ugence_agent_value_readiness",
   "package_version": "0.1.0",
   "curated_api_module": "ugence_agent_value_readiness.api",
-  "note": "Machine-readable snapshot of the curated public API. Generated from the installed package; tests/packaging/test_public_api.py asserts equality. ReadinessTarget/RequirementClass are reused from ugence-uvi-policy-contracts.",
+  "note": "Machine-readable snapshot of the curated public API. Generated from the installed package; tests/packaging/test_public_api.py asserts equality. ReadinessTarget/RequirementClass are reused from ugence-uvi-policy-contracts. GateResult embeds a PolicyGate (kind/applicability derived, not caller-set); blocking/indeterminate gate ids are derived properties of the determination, not fields.",
   "symbols": {
     "AdoptionDimension": {
       "kind": "enum",
@@ -72,8 +72,6 @@
         "adoption_results",
         "gate_results",
         "conditions",
-        "blocking_gate_ids",
-        "indeterminate_gate_ids",
         "advisory_composite",
         "reason_codes",
         "evidence_digest"
@@ -159,15 +157,11 @@
     "GateResult": {
       "kind": "dataclass",
       "fields": [
-        "gate_id",
+        "policy_gate",
         "readiness_policy_ref",
-        "gate_kind",
         "requested_target",
-        "applicable",
         "status",
         "observed_claim_refs",
-        "threshold_ref",
-        "benchmark_ref",
         "evidence_refs",
         "reason_codes",
         "window_ref",

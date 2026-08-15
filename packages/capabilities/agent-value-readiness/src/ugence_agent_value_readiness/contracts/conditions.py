@@ -84,13 +84,38 @@ class ConditionSet:
 
     @property
     def is_active(self) -> bool:
-        """Only ``APPROVED_ACTIVE`` is active; EXPIRED/REVOKED never are.
+        """Only ``APPROVED_ACTIVE`` is active by *status*; EXPIRED/REVOKED never.
 
         A structural property of the recorded label — not a live authority or
-        clock check (that is GV-3R-b).
+        clock check. Prefer :meth:`is_active_at` when a determination time is
+        available; a determination uses the time-aware form so a not-yet-effective
+        or already-expired control cannot count as active coverage.
         """
 
         return self.current_status is ConditionStatus.APPROVED_ACTIVE
+
+    def is_active_at(self, as_of: datetime) -> bool:
+        """Whether this control is structurally active at ``as_of``.
+
+        Requires ``APPROVED_ACTIVE`` status **and** that ``as_of`` falls inside
+        the declared active window using a half-open convention:
+        ``effective_from <= as_of < effective_to`` and ``as_of < expiry`` when
+        those bounds are present. This is a *structural* time check against a
+        caller-supplied instant — it is **not** a live authority/revocation check
+        (that is GV-3R-b), and it never reads the system clock.
+        """
+
+        require_tzaware(as_of, "ConditionSet.is_active_at.as_of")
+        if self.current_status is not ConditionStatus.APPROVED_ACTIVE:
+            return False
+        # APPROVED_ACTIVE guarantees effective_from is present (enforced above).
+        if self.effective_from is not None and as_of < self.effective_from:
+            return False
+        if self.effective_to is not None and as_of >= self.effective_to:
+            return False
+        if self.expiry is not None and as_of >= self.expiry:
+            return False
+        return True
 
     def canonical_digest(self) -> str:
         return canonical_digest(self)

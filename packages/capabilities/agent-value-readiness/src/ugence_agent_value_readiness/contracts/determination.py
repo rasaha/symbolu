@@ -49,12 +49,6 @@ from .indicators import (
 
 __all__ = ["AgentValueReadinessDetermination"]
 
-_READY_CLASSES = (
-    ReadinessClassification.PILOT_READY,
-    ReadinessClassification.READY_WITH_CONDITIONS,
-    ReadinessClassification.DEPLOYMENT_READY,
-)
-
 
 @dataclass(frozen=True)
 class AgentValueReadinessDetermination:
@@ -73,8 +67,6 @@ class AgentValueReadinessDetermination:
     adoption_results: tuple[AdoptionReadinessResult, ...] = ()
     gate_results: tuple[GateResult, ...] = ()
     conditions: tuple[ConditionSet, ...] = ()
-    blocking_gate_ids: tuple[str, ...] = ()
-    indeterminate_gate_ids: tuple[str, ...] = ()
     advisory_composite: Optional[AdvisoryComposite] = None
     reason_codes: tuple[str, ...] = ()
     evidence_digest: str = ""
@@ -118,28 +110,6 @@ class AgentValueReadinessDetermination:
         object.__setattr__(self, "reason_codes", normalize_tokens(self.reason_codes, "determination.reason_codes"))
         validate_digest(self.evidence_digest, "determination.evidence_digest", required=False)
 
-        # -- blocking / indeterminate references point at real applicable gates
-        gates_by_id = {g.gate_id: g for g in self.gate_results}
-        object.__setattr__(self, "blocking_gate_ids", normalize_tokens(self.blocking_gate_ids, "determination.blocking_gate_ids"))
-        object.__setattr__(self, "indeterminate_gate_ids", normalize_tokens(self.indeterminate_gate_ids, "determination.indeterminate_gate_ids"))
-        for gid in self.blocking_gate_ids:
-            g = gates_by_id.get(gid)
-            if g is None:
-                raise ReadinessContractError(f"blocking_gate_ids references unknown gate {gid!r}")
-            if not g.is_blocking:
-                raise ReadinessContractError(
-                    f"blocking_gate_ids references gate {gid!r} that is not an applicable mandatory FAIL "
-                    "(a diagnostic/non-applicable gate can never be a blocker)"
-                )
-        for gid in self.indeterminate_gate_ids:
-            g = gates_by_id.get(gid)
-            if g is None:
-                raise ReadinessContractError(f"indeterminate_gate_ids references unknown gate {gid!r}")
-            if not g.is_applicable_mandatory_indeterminate:
-                raise ReadinessContractError(
-                    f"indeterminate_gate_ids references gate {gid!r} that is not an applicable mandatory INDETERMINATE"
-                )
-
         self._check_classification_consistency()
 
     # ------------------------------------------------------------------ #
@@ -169,6 +139,12 @@ class AgentValueReadinessDetermination:
                     f"determination.gate_results gate {g.gate_id!r} was evaluated for "
                     f"{g.requested_target.value}, not the requested {self.requested_target.value}"
                 )
+            # GV3R-F6: every gate must belong to the determination's ReadinessPolicy.
+            if g.readiness_policy_ref != self.readiness_policy_ref:
+                raise ReadinessContractError(
+                    f"determination.gate_results gate {g.gate_id!r} references a different "
+                    "ReadinessPolicy than the determination (id/version/digest/tenant/family must match)"
+                )
             if g.gate_id in seen:
                 raise ReadinessContractError(f"determination.gate_results duplicates gate_id {g.gate_id!r}")
             seen.add(g.gate_id)
@@ -186,44 +162,110 @@ class AgentValueReadinessDetermination:
         object.__setattr__(self, "conditions", coerced)
 
     def _check_classification_consistency(self) -> None:
-        """Reject obviously-contradictory records (ADR §6, §7, §14).
+        """Reject records whose caller-selected classification contradicts their
+        in-record gate/condition facts (ADR §6, §7, §14).
 
         This is a *local* consistency guard, NOT the precedence selector: it does
-        not compute the classification from the gates — it only refuses records
-        that contradict themselves.
+        not compute the classification. It derives the blocking / indeterminate /
+        unresolved-conditional facts from ``gate_results`` (never from a
+        caller-curated summary) and refuses a classification incompatible with
+        them.
         """
 
         cls = self.classification
         tgt = self.requested_target
 
+        blocking = self.blocking_gate_ids                 # applicable mandatory FAIL
+        indeterminate = self.indeterminate_gate_ids       # applicable mandatory INDETERMINATE
+        unresolved_conditional = self._unresolved_conditional_gate_ids()
+        active_conditions = tuple(c for c in self.conditions if c.is_active_at(self.created_at))
+        active_covered = {c.source_gate_or_finding_ref for c in active_conditions}
+
+        # -- target rules ---------------------------------------------------
         if cls is ReadinessClassification.PILOT_READY and tgt is not ReadinessTarget.PILOT:
             raise ReadinessContractError("PILOT_READY requires requested_target=PILOT")
         if cls is ReadinessClassification.DEPLOYMENT_READY and tgt is not ReadinessTarget.PRODUCTION:
             raise ReadinessContractError("DEPLOYMENT_READY requires requested_target=PRODUCTION")
-        if cls is ReadinessClassification.READY_WITH_CONDITIONS:
-            if tgt is not ReadinessTarget.PRODUCTION:
-                raise ReadinessContractError("READY_WITH_CONDITIONS requires requested_target=PRODUCTION")
-            if not self.conditions:
-                raise ReadinessContractError("READY_WITH_CONDITIONS requires at least one condition reference")
+        if cls is ReadinessClassification.READY_WITH_CONDITIONS and tgt is not ReadinessTarget.PRODUCTION:
+            raise ReadinessContractError("READY_WITH_CONDITIONS requires requested_target=PRODUCTION")
 
-        # No ready classification may co-exist with an applicable mandatory
-        # FAIL or INDETERMINATE.
-        if cls in _READY_CLASSES:
-            if self.blocking_gate_ids:
-                raise ReadinessContractError(f"{cls.value} cannot carry blocking (applicable mandatory FAIL) gates")
-            if self.indeterminate_gate_ids:
-                raise ReadinessContractError(f"{cls.value} cannot carry applicable mandatory INDETERMINATE gates")
+        # -- mandatory FAIL/INDETERMINATE precedence compatibility (ADR §7) --
+        # FAIL dominates: any applicable mandatory FAIL ⇒ only NOT_READY is
+        # consistent. Else any applicable mandatory INDETERMINATE ⇒ only
+        # NOT_ASSESSABLE is consistent.
+        if blocking and cls is not ReadinessClassification.NOT_READY:
+            raise ReadinessContractError(
+                f"{cls.value} is inconsistent: {len(blocking)} applicable mandatory FAIL gate(s) present "
+                "⇒ only NOT_READY is consistent (FAIL dominates)"
+            )
+        if not blocking and indeterminate and cls is not ReadinessClassification.NOT_ASSESSABLE:
+            raise ReadinessContractError(
+                f"{cls.value} is inconsistent: applicable mandatory INDETERMINATE gate(s) present with no FAIL "
+                "⇒ only NOT_ASSESSABLE is consistent"
+            )
 
+        # -- NOT_READY / NOT_ASSESSABLE need a stated reason ----------------
         if cls is ReadinessClassification.NOT_READY:
-            if not (self.blocking_gate_ids or self.reason_codes):
-                raise ReadinessContractError("NOT_READY requires a blocking gate reference or a reason code")
+            if not (blocking or self.reason_codes):
+                raise ReadinessContractError("NOT_READY requires a blocking gate or a reason code")
         if cls is ReadinessClassification.NOT_ASSESSABLE:
-            if not (self.indeterminate_gate_ids or self.reason_codes):
+            if not (indeterminate or self.reason_codes):
                 raise ReadinessContractError(
-                    "NOT_ASSESSABLE requires an indeterminate gate reference or a context/evidence reason code"
+                    "NOT_ASSESSABLE requires an indeterminate gate or a context/evidence reason code"
+                )
+
+        # -- READY_WITH_CONDITIONS: active coverage of unresolved conditionals
+        if cls is ReadinessClassification.READY_WITH_CONDITIONS:
+            if not active_conditions:
+                raise ReadinessContractError(
+                    "READY_WITH_CONDITIONS requires at least one condition active at the determination time"
+                )
+            uncovered = unresolved_conditional - active_covered
+            if uncovered:
+                raise ReadinessContractError(
+                    f"READY_WITH_CONDITIONS leaves unresolved conditional concern(s) {sorted(uncovered)} "
+                    "without an active compensating control"
+                )
+            spurious = active_covered - unresolved_conditional
+            if spurious:
+                raise ReadinessContractError(
+                    f"READY_WITH_CONDITIONS active condition(s) reference {sorted(spurious)} which are not "
+                    "an applicable unresolved CONDITIONAL concern in this determination"
+                )
+
+        # -- DEPLOYMENT_READY: nothing unresolved, no open control ----------
+        if cls is ReadinessClassification.DEPLOYMENT_READY:
+            if unresolved_conditional:
+                raise ReadinessContractError(
+                    f"DEPLOYMENT_READY leaves unresolved conditional concern(s) {sorted(unresolved_conditional)} "
+                    "(use READY_WITH_CONDITIONS)"
+                )
+            if active_conditions:
+                raise ReadinessContractError(
+                    "DEPLOYMENT_READY cannot carry an open (active) condition — an active control implies an "
+                    "unresolved concern (use READY_WITH_CONDITIONS). Historical SATISFIED conditions are allowed."
                 )
 
     # ------------------------------------------------------------------ #
+    def _unresolved_conditional_gate_ids(self) -> set[str]:
+        return {g.gate_id for g in self.gate_results if g.is_applicable_conditional_unresolved}
+
+    @property
+    def blocking_gate_ids(self) -> tuple[str, ...]:
+        """DERIVED: ids of every applicable mandatory FAIL gate in this record.
+
+        Computed from ``gate_results`` — never a caller-curated summary — so an
+        applicable mandatory failure cannot be hidden by omission.
+        """
+
+        return tuple(g.gate_id for g in self.gate_results if g.is_blocking)
+
+    @property
+    def indeterminate_gate_ids(self) -> tuple[str, ...]:
+        """DERIVED: ids of every applicable mandatory INDETERMINATE gate."""
+
+        return tuple(g.gate_id for g in self.gate_results if g.is_applicable_mandatory_indeterminate)
+
     @property
     def is_advisory(self) -> bool:
         """Always advisory — this determination is never a deployment authorization."""
