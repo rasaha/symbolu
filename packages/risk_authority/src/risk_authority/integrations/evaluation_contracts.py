@@ -905,14 +905,15 @@ class SubjectRiskEvaluationRequestV2:
     **Why ``recommendation_digest`` is an outer field.** ADR §5.3 step 3 requires Risk
     Authority to reconstruct :class:`SubjectBinding` from ``{outer tenant_id, outer
     subject_id, subject_type, recommendation_digest, recomputed context_digest}`` before
-    policy resolution, but the ADR's illustrated v2 request carries no such field: the
-    recommendation digest's only home there is *inside* ``SubjectBinding`` (§5.1 row 1),
-    it is absent from ``evidence_references`` (§5.1 rows 12-13, §5.3), and it cannot be
-    recovered from ``subject_digest`` or ``idempotency_key`` because both are one-way
-    SHA-256 outputs. Reconstruction was therefore impossible as illustrated. This
+    policy resolution, but the ADR's originally illustrated v2 request carried no such
+    field: the recommendation digest's only home there was *inside* ``SubjectBinding``
+    (§5.1 row 1), it was absent from ``evidence_references`` (§5.1 rows 12-13, §5.3), and
+    it cannot be recovered from ``subject_digest`` or ``idempotency_key`` because both are
+    one-way SHA-256 outputs. Reconstruction was therefore impossible as illustrated. This
     explicit outer field is the narrowest versioned correction: it is additive, confined
     to v2, keeps ``SubjectContext`` free of it, and preserves the derived-anchor rule.
-    Recorded as a divergence from the merged ADR §5.3 illustration; the ADR is unedited.
+    The original ADR §5.3 illustration omitted the outer ``recommendation_digest``; Phase 4
+    ADR Amendment 1 records the corrected v2 request shape implemented here.
 
     ``subject_context`` and ``recommendation_digest`` are required **together** — a
     request carrying one without the other is a half-bound request that could never be
