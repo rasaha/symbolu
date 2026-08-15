@@ -14,6 +14,10 @@ all wheels are local, zero third-party deps), then proves inside that env:
   * representative readiness contracts construct, digest, and enforce structure
     (distinct indicator types; non-waivable mandatory condition; advisory-composite
     Decimal + float rejection; target/classification consistency; immutability);
+  * the GV-3R-b evaluator selects the tier itself from a complete applicable gate
+    set — mandatory FAIL dominates, an omitted gate is never PASS, the composite
+    cannot move the tier, a naive evaluation time is rejected, evidence axes are
+    preserved, and the result authorizes nothing;
   * NO ``governed_value`` / capability / product / framework / third-party package
     is importable.
 
@@ -46,7 +50,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 import ugence_agent_value_readiness as r
-assert r.__version__ == "0.1.0", r.__version__
+assert r.__version__ == "0.2.0", r.__version__
 assert "site-packages" in r.__file__, r.__file__
 assert not any("/symbolu" in p for p in sys.path), sys.path
 import pathlib as _pl
@@ -56,13 +60,15 @@ from ugence_governance_contracts.api import MetricClaim, SourceBasis, Transforma
 from ugence_uvi_policy_contracts.api import (
     PolicyArtifactMetadata, PolicyReference, PolicyFamily, PolicyLifecycleState,
     AssessmentContext, GeographyPolicy, DomainPolicy, IntendedOutcomePolicy,
-    ReadinessTarget, RequirementClass, PolicyGate, GateCategory)
+    ReadinessPolicy, ReadinessTarget, RequirementClass, PolicyGate, GateCategory)
 from ugence_agent_value_readiness.api import (
     IntelligenceFitnessResult, CapabilityReadinessResult, AdoptionReadinessResult,
     GateResult, GateStatus, ConditionSet, ConditionStatus, AdvisoryComposite,
     AgentValueReadinessDetermination, ReadinessClassification, ReadinessIndicatorClass,
     IntelligenceDimension, CapabilityDimension, AdoptionDimension, CapabilityDemonstration,
-    ReadinessContractError)
+    ReadinessContractError,
+    ReadinessEvaluationCase, ReadinessEvaluationError, ReadinessEvaluationResult,
+    ReadinessRuleId, ReadinessReasonCode, ReadinessAdvisoryCode, evaluate_readiness)
 
 D = hashlib.sha256(b"c").hexdigest()
 T0 = datetime(2026, 1, 1, tzinfo=timezone.utc); T1 = datetime(2027, 1, 1, tzinfo=timezone.utc); MID = datetime(2026, 6, 1, tzinfo=timezone.utc)
@@ -117,10 +123,68 @@ im = IntelligenceFitnessResult(result_id="ir2", tenant_id="t1", subject_id="a1",
 d0 = im.canonical_digest(); evid.append("x")
 assert im.evidence_refs == ("e1",) and im.canonical_digest() == d0
 # no financial fields
-for shape in (IntelligenceFitnessResult, CapabilityReadinessResult, AdoptionReadinessResult, GateResult, ConditionSet, AdvisoryComposite, AgentValueReadinessDetermination):
+for shape in (IntelligenceFitnessResult, CapabilityReadinessResult, AdoptionReadinessResult, GateResult, ConditionSet, AdvisoryComposite, AgentValueReadinessDetermination, ReadinessEvaluationCase, ReadinessEvaluationResult):
     for f in dataclasses.fields(shape):
         low = f.name.lower()
         assert not any(t in low for t in ("money", "currency", "roi", "benefit", "cost", "multiplier", "revenue")), (shape.__name__, f.name)
+
+# ---- GV-3R-b: the deterministic determination evaluator ------------------- #
+PROD = ReadinessTarget.PRODUCTION
+def _rg(gid, kind, appl=(PROD,), comp=False):
+    return PolicyGate(gate_id=gid, category=GateCategory.SAFETY, requirement_class=kind, applicability=appl, conditionally_compensable=comp)
+rpol = ReadinessPolicy(metadata=meta(PolicyFamily.READINESS, "rp"), gates=(_rg("m1", RequirementClass.MANDATORY), _rg("m2", RequirementClass.MANDATORY)))
+ctx2 = AssessmentContext.bind_policies(context_id="ctx2", tenant_id="t1", subject_id="a1", geography=geo, domain=dom, intended_outcome=io, readiness=rpol, as_of=MID)
+_ind = dict(tenant_id="t1", subject_id="a1", context_id="ctx2", task_or_outcome_ref="task", requirement_class=RequirementClass.MANDATORY, applicable_targets=(PROD,), status=GateStatus.PASS)
+i2 = IntelligenceFitnessResult(result_id="i2", dimension=IntelligenceDimension.ACCURACY, claim=claim, **_ind)
+c2 = CapabilityReadinessResult(result_id="c2", dimension=CapabilityDimension.TOOL_READINESS, claim=claim, demonstration=CapabilityDemonstration.MET_THRESHOLD, evidence_sufficient=True, **_ind)
+a2 = AdoptionReadinessResult(result_id="a2", dimension=AdoptionDimension.EXPECTED_UTILIZATION, claim=claim, **_ind)
+
+def _case(statuses, composite=None):
+    grs = tuple(GateResult(policy_gate={g.gate_id: g for g in rpol.gates}[gid], readiness_policy_ref=rpol.reference, requested_target=PROD, status=st) for gid, st in statuses)
+    return ReadinessEvaluationCase(case_id="cv", tenant_id="t1", subject_id="a1", context=ctx2, readiness_policy=rpol, readiness_policy_ref=rpol.reference, requested_target=PROD, intelligence_results=(i2,), capability_results=(c2,), adoption_results=(a2,), gate_results=grs, advisory_composite=composite)
+
+ALL_PASS = (("m1", GateStatus.PASS), ("m2", GateStatus.PASS))
+ready = evaluate_readiness(_case(ALL_PASS), evaluation_time=MID)
+assert ready.classification is ReadinessClassification.DEPLOYMENT_READY, ready.classification
+assert ready.rule_id == ReadinessRuleId.DEPLOYMENT_READY.value
+# the evaluator SELECTS the tier: the case has no classification field to supply
+assert not any("classification" in f.name for f in dataclasses.fields(ReadinessEvaluationCase))
+# mandatory FAIL dominates an unrelated INDETERMINATE
+mixed = evaluate_readiness(_case((("m1", GateStatus.FAIL), ("m2", GateStatus.INDETERMINATE))), evaluation_time=MID)
+assert mixed.classification is ReadinessClassification.NOT_READY and mixed.rule_id == ReadinessRuleId.MANDATORY_FAIL.value
+# INDETERMINATE without FAIL is NOT_ASSESSABLE
+ind = evaluate_readiness(_case((("m1", GateStatus.INDETERMINATE), ("m2", GateStatus.PASS))), evaluation_time=MID)
+assert ind.classification is ReadinessClassification.NOT_ASSESSABLE
+# an omitted applicable mandatory gate is NEVER treated as PASS
+omitted = evaluate_readiness(_case((("m1", GateStatus.PASS),)), evaluation_time=MID)
+assert omitted.classification is ReadinessClassification.NOT_ASSESSABLE, omitted.classification
+assert omitted.trace.missing_required_gate_ids == ("m2",)
+# the advisory composite cannot move the tier (min vs max, same gates)
+def _comp(v): return AdvisoryComposite(method_id="m", method_version="1", score=Decimal(v), scale_min=Decimal("0"), scale_max=Decimal("100"), component_result_refs=("i2",))
+lo = evaluate_readiness(_case((("m1", GateStatus.FAIL), ("m2", GateStatus.PASS)), _comp("0")), evaluation_time=MID)
+hi = evaluate_readiness(_case((("m1", GateStatus.FAIL), ("m2", GateStatus.PASS)), _comp("100")), evaluation_time=MID)
+assert lo.classification is hi.classification is ReadinessClassification.NOT_READY
+assert lo.rule_id == hi.rule_id and lo.reason_codes == hi.reason_codes
+# no system clock: a naive evaluation_time is refused
+try:
+    evaluate_readiness(_case(ALL_PASS), evaluation_time=datetime(2026, 6, 1))
+    raise SystemExit("naive evaluation_time guard did not fire")
+except ReadinessEvaluationError:
+    pass
+# determinism: input order never changes the outcome
+rev = evaluate_readiness(_case(tuple(reversed(ALL_PASS))), evaluation_time=MID)
+assert rev.canonical_digest() == ready.canonical_digest()
+# evidence axes preserved; the result authorizes nothing
+assert ready.determination.intelligence_results[0].claim is claim
+assert ready.is_advisory is True and ready.authorizes_deployment is False
+assert ReadinessAdvisoryCode.ADVISORY_ONLY_NOT_DEPLOYMENT_AUTHORIZATION.value in ready.advisory_codes
+assert ReadinessAdvisoryCode.GATE_STATUS_STRUCTURALLY_SUPPLIED.value in ready.advisory_codes
+# a gate borrowed from another ReadinessPolicy is rejected outright
+try:
+    ReadinessEvaluationCase(case_id="cv", tenant_id="t1", subject_id="a1", context=ctx2, readiness_policy=rpol, readiness_policy_ref=rpol.reference, requested_target=PROD, gate_results=(GateResult(policy_gate=rpol.gates[0], readiness_policy_ref=rdy, requested_target=PROD, status=GateStatus.PASS),))
+    raise SystemExit("wrong-policy gate guard did not fire")
+except ReadinessEvaluationError:
+    pass
 
 for mod in ("governed_value", "ugence_governed_value", "governance_providers", "decision_governance", "ai_hiring", "pydantic"):
     assert importlib.util.find_spec(mod) is None, ("unrelated package present: " + mod)

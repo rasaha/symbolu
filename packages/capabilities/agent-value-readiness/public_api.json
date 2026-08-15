@@ -1,9 +1,9 @@
 {
   "distribution": "ugence-agent-value-readiness",
   "namespace": "ugence_agent_value_readiness",
-  "package_version": "0.1.0",
+  "package_version": "0.2.0",
   "curated_api_module": "ugence_agent_value_readiness.api",
-  "note": "Machine-readable snapshot of the curated public API. Generated from the installed package; tests/packaging/test_public_api.py asserts equality. ReadinessTarget/RequirementClass are reused from ugence-uvi-policy-contracts. GateResult embeds a PolicyGate (kind/applicability derived, not caller-set); blocking/indeterminate gate ids are derived properties of the determination, not fields.",
+  "note": "Machine-readable snapshot of the curated public API. Generated from the installed package; tests/packaging/test_public_api.py asserts equality. ReadinessTarget/RequirementClass are reused from ugence-uvi-policy-contracts. GateResult embeds a PolicyGate (kind/applicability derived, not caller-set); blocking/indeterminate gate ids are derived properties of the determination, not fields. GV-3R-b adds the single canonical evaluator entry point evaluate_readiness(case, *, evaluation_time): ReadinessEvaluationCase carries NO classification field \u2014 the evaluator selects the tier \u2014 and ReadinessEvaluationResult is advisory, never a deployment authorization.",
   "symbols": {
     "AdoptionDimension": {
       "kind": "enum",
@@ -125,6 +125,33 @@
         "evaluated_at"
       ]
     },
+    "ConditionDecision": {
+      "kind": "dataclass",
+      "fields": [
+        "condition_id",
+        "source_gate_or_finding_ref",
+        "decision_code",
+        "accepted"
+      ]
+    },
+    "ConditionDecisionCode": {
+      "kind": "enum",
+      "values": [
+        "GV3RB_COND_ACCEPTED_ACTIVE_COVERAGE",
+        "GV3RB_COND_STATUS_PROPOSED",
+        "GV3RB_COND_STATUS_EXPIRED",
+        "GV3RB_COND_STATUS_REVOKED",
+        "GV3RB_COND_STATUS_SATISFIED_HISTORICAL",
+        "GV3RB_COND_NOT_YET_EFFECTIVE",
+        "GV3RB_COND_WINDOW_ENDED",
+        "GV3RB_COND_EXPIRED_AT_EVALUATION_TIME",
+        "GV3RB_COND_CONCERN_NOT_A_POLICY_GATE",
+        "GV3RB_COND_CONCERN_NOT_APPLICABLE_TO_TARGET",
+        "GV3RB_COND_CONCERN_NOT_CONDITIONAL",
+        "GV3RB_COND_CONCERN_NOT_UNRESOLVED",
+        "GV3RB_COND_CONCERN_NOT_COMPENSABLE"
+      ]
+    },
     "ConditionSet": {
       "kind": "dataclass",
       "fields": [
@@ -212,6 +239,19 @@
         "evaluated_at"
       ]
     },
+    "ReadinessAdvisoryCode": {
+      "kind": "enum",
+      "values": [
+        "GV3RB_ADV_ADVISORY_ONLY_NOT_DEPLOYMENT_AUTHORIZATION",
+        "GV3RB_ADV_POLICY_AUTHENTICITY_NOT_VERIFIED",
+        "GV3RB_ADV_GATE_STATUS_STRUCTURALLY_SUPPLIED",
+        "GV3RB_ADV_EVIDENCE_CLASSIFICATION_PRESERVED",
+        "GV3RB_ADV_READINESS_IS_LEADING_INDICATOR_ONLY",
+        "GV3RB_ADV_CONDITION_APPROVAL_AUTHENTICITY_NOT_VERIFIED",
+        "GV3RB_ADV_CONDITION_SCOPE_NOT_TENANT_BOUND",
+        "GV3RB_ADV_COMPOSITE_CARRIED_NOT_USED_IN_SELECTION"
+      ]
+    },
     "ReadinessClassification": {
       "kind": "enum",
       "values": [
@@ -225,12 +265,103 @@
     "ReadinessContractError": {
       "kind": "exception"
     },
+    "ReadinessEvaluationCase": {
+      "kind": "dataclass",
+      "fields": [
+        "case_id",
+        "tenant_id",
+        "subject_id",
+        "context",
+        "readiness_policy",
+        "readiness_policy_ref",
+        "requested_target",
+        "intelligence_results",
+        "capability_results",
+        "adoption_results",
+        "gate_results",
+        "conditions",
+        "advisory_composite",
+        "evidence_refs",
+        "assessment_window_ref"
+      ]
+    },
+    "ReadinessEvaluationError": {
+      "kind": "exception"
+    },
+    "ReadinessEvaluationResult": {
+      "kind": "dataclass",
+      "fields": [
+        "determination",
+        "trace"
+      ]
+    },
+    "ReadinessEvaluationTrace": {
+      "kind": "dataclass",
+      "fields": [
+        "evaluator_id",
+        "formula_version",
+        "rule_id",
+        "classification",
+        "requested_target",
+        "evaluation_time",
+        "applicable_gate_ids",
+        "diagnostic_gate_ids",
+        "missing_required_gate_ids",
+        "mandatory_failure_gate_ids",
+        "mandatory_indeterminate_gate_ids",
+        "unresolved_conditional_gate_ids",
+        "non_compensable_conditional_gate_ids",
+        "uncovered_conditional_gate_ids",
+        "accepted_condition_ids",
+        "condition_decisions",
+        "assessability_gap_codes",
+        "reason_codes",
+        "advisory_codes",
+        "input_ref_ids",
+        "input_digest",
+        "advisory_composite_carried"
+      ]
+    },
     "ReadinessIndicatorClass": {
       "kind": "enum",
       "values": [
         "INTELLIGENCE",
         "CAPABILITY",
         "ADOPTION"
+      ]
+    },
+    "ReadinessReasonCode": {
+      "kind": "enum",
+      "values": [
+        "GV3RB_READINESS_POLICY_NOT_BOUND_TO_CONTEXT",
+        "GV3RB_READINESS_POLICY_REF_CONTEXT_MISMATCH",
+        "GV3RB_REQUESTED_TARGET_NOT_GOVERNED_BY_POLICY",
+        "GV3RB_INTELLIGENCE_RESULT_MISSING",
+        "GV3RB_CAPABILITY_RESULT_MISSING",
+        "GV3RB_ADOPTION_RESULT_MISSING",
+        "GV3RB_APPLICABLE_GATE_RESULT_MISSING",
+        "GV3RB_ACTIVE_CONDITION_WITHOUT_UNRESOLVED_CONCERN",
+        "GV3RB_MANDATORY_GATE_INDETERMINATE",
+        "GV3RB_MANDATORY_GATE_FAILED",
+        "GV3RB_CONDITIONAL_CONCERN_NOT_COMPENSABLE",
+        "GV3RB_CONDITIONAL_CONCERN_WITHOUT_ACTIVE_COVERAGE",
+        "GV3RB_ALL_APPLICABLE_MANDATORY_GATES_PASSED",
+        "GV3RB_CONDITIONAL_CONCERNS_COVERED_BY_ACTIVE_CONDITIONS",
+        "GV3RB_NO_UNRESOLVED_APPLICABLE_CONCERN",
+        "GV3RB_PILOT_SCOPE_IS_BOUNDED"
+      ]
+    },
+    "ReadinessRuleId": {
+      "kind": "enum",
+      "values": [
+        "GV3RB_R1_MANDATORY_FAIL",
+        "GV3RB_R2_ASSESSABILITY_GAP",
+        "GV3RB_R3_MANDATORY_INDETERMINATE",
+        "GV3RB_R4_CONDITIONAL_NOT_COMPENSABLE",
+        "GV3RB_R5_CONDITIONAL_UNCOVERED",
+        "GV3RB_R6_PILOT_READY",
+        "GV3RB_R7_READY_WITH_CONDITIONS",
+        "GV3RB_R8_DEPLOYMENT_READY"
       ]
     },
     "ReadinessTarget": {
@@ -247,6 +378,9 @@
         "CONDITIONAL",
         "ADVISORY"
       ]
+    },
+    "evaluate_readiness": {
+      "kind": "function"
     }
   }
 }

@@ -1,9 +1,15 @@
-"""Canonical public API for the Ugence Agent Value Readiness Contracts.
+"""Canonical public API for Ugence Agent Value Readiness.
 
-The deliberately small, supported public surface. The readiness result/enum
-vocabulary is defined in this package; the target and requirement-class enums are
-**reused** (not redefined) from ``ugence_uvi_policy_contracts`` and re-exported
-here for caller convenience — they remain canonically owned by that package.
+The deliberately small, supported public surface: the **contract shapes**
+(GV-3R-a) and the single canonical **determination evaluator** (GV-3R-b). The
+readiness result/enum vocabulary is defined in this package; the target and
+requirement-class enums are **reused** (not redefined) from
+``ugence_uvi_policy_contracts`` and re-exported here for caller convenience —
+they remain canonically owned by that package.
+
+:func:`evaluate_readiness` is the **only** classification path. Nothing else in
+this package selects a readiness tier, so there is no second calculation route
+that could diverge from the ratified precedence.
 """
 
 from __future__ import annotations
@@ -29,6 +35,18 @@ from .contracts import (
     ReadinessClassification,
     ReadinessContractError,
     ReadinessIndicatorClass,
+)
+from .evaluation import (
+    ConditionDecision,
+    ConditionDecisionCode,
+    ReadinessAdvisoryCode,
+    ReadinessEvaluationCase,
+    ReadinessEvaluationError,
+    ReadinessEvaluationResult,
+    ReadinessEvaluationTrace,
+    ReadinessReasonCode,
+    ReadinessRuleId,
+    evaluate_readiness,
 )
 
 __all__ = [
@@ -56,4 +74,15 @@ __all__ = [
     "AdvisoryComposite",
     # determination envelope
     "AgentValueReadinessDetermination",
+    # ---- GV-3R-b: the deterministic determination evaluator ---------------- #
+    "ReadinessEvaluationError",
+    "ReadinessEvaluationCase",
+    "ReadinessEvaluationTrace",
+    "ReadinessEvaluationResult",
+    "ConditionDecision",
+    "ReadinessRuleId",
+    "ReadinessReasonCode",
+    "ReadinessAdvisoryCode",
+    "ConditionDecisionCode",
+    "evaluate_readiness",
 ]

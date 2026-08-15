@@ -1,16 +1,19 @@
 # ugence-agent-value-readiness
 
-> **⚠️ Experimental, internal, contracts-only, non-financial.**
-> These are the **contract shapes** for the Agent Value Readiness engine of
-> Ugence Value Intelligence — **not** the evaluator, **not** a deployment
-> authority, and **not** a customer-facing module.
-> - **No readiness evaluation, precedence calculus, or tier selection.**
+> **⚠️ Experimental, internal, advisory, non-financial.**
+> The **contract shapes** (GV-3R-a) and the **deterministic readiness
+> determination evaluator** (GV-3R-b) for the Agent Value Readiness engine of
+> Ugence Value Intelligence — **not** a deployment authority, **not** a
+> metric-evaluation engine, and **not** a customer-facing module.
 > - **No deployment authorization** — a determination is *advisory*, consumed by
 >   a separate human/deployment-governance process.
+> - **No evidence admission or verification, no benchmark resolution, no
+>   metric-to-threshold calculation.** The evaluator consumes gate statuses
+>   recorded by an upstream evaluator; it does not compute them.
 > - **No money, currency, cost, benefit, or ROI** anywhere.
 > - **Caller-provided artifacts are not authority-verified.** Lifecycle labels,
 >   digests, condition approvals, and gate statuses are structural inputs;
->   verifying them is Policy-Authority / GV-3R-b work.
+>   verifying them is Policy-Authority work.
 > - **Policy Authority and richer RA-owned subject/system binding are deferred.**
 
 The vocabulary for assessing whether an agent is ready for an intended outcome:
@@ -21,14 +24,15 @@ PreROIReadiness = f(Intelligence, Capabilities, Adoption
 ```
 
 Intelligence, Capability, and Adoption are **non-financial leading indicators**.
-This is milestone **M-3R.1 (GV-3R-a)** of the UVI ADR
+This package implements milestones **M-3R.1 (GV-3R-a, contract shapes)** and
+**M-3R.2 (GV-3R-b, the determination evaluator)** of the UVI ADR
 (`docs/architecture/ADR_UGENCE_VALUE_INTELLIGENCE_GV2C_GV2E_GV3R.md`, §5–§10, §20).
-Evaluation — the precedence calculus, tier selection, authority resolution — is
-**GV-3R-b (M-3R.2)** and is out of scope here.
+Authority resolution (Policy Authority, condition-approval validation) remains
+out of scope.
 
 - **Distribution:** `ugence-agent-value-readiness`
 - **Namespace:** `ugence_agent_value_readiness`
-- **Version:** 0.1.0
+- **Version:** 0.2.0
 - **Depends on:** stdlib **+ `ugence-governance-contracts>=0.2.0`** (evidence vocabulary) **+ `ugence-uvi-policy-contracts>=0.1.0`** (policy/context shapes) — never `governed-value`.
 - **Typing:** fully annotated; ships `py.typed`.
 
@@ -41,7 +45,104 @@ Evaluation — the precedence calculus, tier selection, authority resolution —
 | Determination envelope | `AgentValueReadinessDetermination` |
 | Readiness enums | `ReadinessClassification`, `GateStatus`, `ConditionStatus`, `ReadinessIndicatorClass`, `CapabilityDemonstration`, `IntelligenceDimension`, `CapabilityDimension`, `AdoptionDimension` |
 | Reused policy enums (re-exported) | `ReadinessTarget`, `RequirementClass` (owned by `ugence-uvi-policy-contracts`) |
-| Error | `ReadinessContractError` |
+| **Evaluator (GV-3R-b)** | `evaluate_readiness`, `ReadinessEvaluationCase`, `ReadinessEvaluationResult`, `ReadinessEvaluationTrace`, `ConditionDecision` |
+| **Evaluator codes** | `ReadinessRuleId`, `ReadinessReasonCode`, `ReadinessAdvisoryCode`, `ConditionDecisionCode` |
+| Errors | `ReadinessContractError`, `ReadinessEvaluationError` |
+
+## The evaluator (GV-3R-b)
+
+```python
+from ugence_agent_value_readiness.api import evaluate_readiness
+
+result = evaluate_readiness(case, evaluation_time=when)   # tz-aware, mandatory
+result.classification   # ReadinessClassification, selected by the evaluator
+result.rule_id          # the single precedence rule that fired
+result.trace            # deterministic explanation
+```
+
+`ReadinessEvaluationCase` carries **no classification field** — the caller states
+the facts, the evaluator selects the tier. `evaluation_time` is mandatory and
+keyword-only; the **system clock is never read**, so an evaluation is fully
+reproducible.
+
+### Precedence (first matching rule wins)
+
+| Rule | Condition | Classification |
+|---|---|---|
+| `R1` | any applicable mandatory `FAIL` | `NOT_READY` |
+| `R2` | a structural assessability gap | `NOT_ASSESSABLE` |
+| `R3` | an applicable mandatory `INDETERMINATE`, no `FAIL` | `NOT_ASSESSABLE` |
+| `R4` | unresolved conditional concern, not compensable | `NOT_READY` |
+| `R5` | compensable concern with no active covering condition | `NOT_READY` |
+| `R6` | **PILOT**: all applicable mandatory `PASS`, concerns covered | `PILOT_READY` |
+| `R7` | **PRODUCTION**: concerns remain, all actively covered | `READY_WITH_CONDITIONS` |
+| `R8` | **PRODUCTION**: nothing unresolved, no open active condition | `DEPLOYMENT_READY` |
+
+`{FAIL, INDETERMINATE, PASS}` ⇒ `NOT_READY`; `{INDETERMINATE, PASS}` ⇒
+`NOT_ASSESSABLE`; `{PASS, PASS}` ⇒ conditional resolution. No condition,
+composite, Intelligence score, Capability strength or Adoption score overrides a
+mandatory failure.
+
+**Why `R1` precedes `R2`.** ADR §8 / D-6 state `MANDATORY FAIL ⇒ NOT_READY`
+without exception, and `AgentValueReadinessDetermination` structurally *rejects*
+any other classification while a blocking gate is in the record — so reporting a
+gap as `NOT_ASSESSABLE` would require dropping the failure from the record.
+Every assessability gap is still recorded in the trace and reason codes when
+`R1` fires.
+
+### Gate-set completeness
+
+The **`ReadinessPolicy` body is the authoritative gate inventory.** Applicable
+gates are those whose `applicability` contains the requested target; every
+applicable `MANDATORY` and `CONDITIONAL` gate needs exactly one `GateResult`.
+A missing one is `NOT_ASSESSABLE` — **never** a silent `PASS`. A gate result
+bound to another policy, naming a gate absent from the policy, embedding a
+redefined `PolicyGate`, duplicated, or evaluated for another target is rejected
+with a `ReadinessEvaluationError`. Missing **advisory** results never block: no
+ratified field marks an advisory gate assessability-required, and none is
+invented. Production-only gates stay diagnostic during a PILOT assessment.
+
+### Conditional compensation
+
+An unresolved applicable conditional concern (`FAIL`/`INDETERMINATE`) is covered
+only when the policy sets `conditionally_compensable=True` **and** a
+`ConditionSet` naming that exact gate is `APPROVED_ACTIVE` and active at
+`evaluation_time` (`effective_from <= t < effective_to/expiry`). Proposed,
+expired, revoked, satisfied, not-yet-effective and window-ended controls are not
+coverage. `CONDITIONAL` alone never implies compensable, and an uncovered
+concern is `NOT_READY` — never a silent `READY_WITH_CONDITIONS`.
+
+`PILOT_READY` may carry active pilot controls (the enum has no separate
+`PILOT_READY_WITH_CONDITIONS` tier); the bounded pilot scope, exposure and
+monitoring are the ones stated on the attached conditions.
+
+### What the evaluator does **not** do
+
+Every result carries standing advisories saying so: the determination is
+**advisory and authorizes no deployment** (`result.authorizes_deployment` is
+always `False`); the **policy's authenticity is not verified**; every
+**gate status is structurally supplied**, not independently verified — there is
+no evidence admission, no benchmark resolution and **no metric-to-threshold
+comparison** (the merged `GovernedThreshold` keeps opaque literal/unit
+semantics, and none are invented); every **`MetricClaim` keeps the exact
+evidence axes it arrived with** — `REPORTED`, `UNATTESTED`, `NOT_ATTRIBUTED` and
+`UNVERIFIED` are never upgraded; and readiness stays a **leading indicator**,
+never money or return. When conditions are used, two further advisories record
+that a condition's approval authenticity is unverified and that `ConditionSet`
+carries no tenant/subject field, so its scope was **not** matched against the
+assessed tenant.
+
+An `AdvisoryComposite` is validated and carried through **unchanged**, is never
+consulted when selecting the tier, and is proven inert: moving its score from
+scale minimum to maximum with all other inputs fixed yields an identical
+classification, rule and reason-code tuple.
+
+**The sharpest form of the trust limitation:** because the `ReadinessPolicy` is
+a caller-supplied, unverified artifact, a permissive policy yields a permissive
+answer — in the limit, a policy declaring no gates has nothing to fail. The
+evaluator proves conformance *to the supplied policy*, never that the policy is
+the authentic, authority-issued one. Closing that gap is Policy-Authority and
+registry work, and is deferred.
 
 ## Type placement (why here, not governance-contracts)
 
@@ -120,14 +221,13 @@ documented forward path for when a second consumer appears.
   a real tuple (scalar substitutes rejected); `canonical_digest()` sha-256 stable
   under caller-list mutation; naive timestamps and blank identifiers rejected.
 
-## Precedence representation (inputs/outputs only)
+## Contracts versus evaluator
 
-GV-3R-a can *represent* the ratified precedence — invalid context ⇒
-`NOT_ASSESSABLE`; applicable mandatory `FAIL` ⇒ `NOT_READY` (FAIL dominates an
-unrelated `INDETERMINATE`); applicable mandatory `INDETERMINATE` ⇒
-`NOT_ASSESSABLE`; all applicable mandatory `PASS` ⇒ conditional-resolution — via
-its gate results, `blocking_gate_ids`, and `indeterminate_gate_ids`. **Selecting**
-the classification from those inputs is **GV-3R-b**.
+The contract shapes still accept a caller-supplied `classification` and only
+*reject* one that contradicts their in-record facts — that local guard is
+unchanged. **Selecting** the classification is `evaluate_readiness`, and it is
+the single canonical path: no other public symbol produces a tier, so there is
+no second calculation route that could diverge from the ratified precedence.
 
 ## Install & use
 
@@ -162,8 +262,11 @@ python packages/capabilities/agent-value-readiness/verify_agent_value_readiness_
 
 ## Deferred (out of scope)
 
-The readiness evaluator (GV-3R-b), precedence/tier selection, deployment
-authorization, Policy Authority, policy/benchmark registry, evidence admission or
-verification, `SubjectContext`/`AssessedSystemBinding` (RA-owned, PR #1425),
-forecasting, realization-probability modeling, attributed/verified ROI, financial
-valuation, `governed-value` integration, and `ConditionSet` runtime enforcement.
+Deployment authorization, Policy Authority (signing/approval/issuance/
+revocation), policy and benchmark registry/resolver, evidence admission or
+verification, machine-evaluable threshold semantics and metric-to-threshold
+calculation, condition-authority resolution and runtime enforcement,
+`SubjectContext`/`AssessedSystemBinding` (RA-owned, PR #1425), a durable event
+bus or signed determination record, forecasting, realization-probability
+modeling, attributed/verified return, financial valuation, and `governed-value`
+integration.

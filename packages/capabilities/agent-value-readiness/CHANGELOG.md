@@ -1,5 +1,96 @@
 # Changelog — ugence-agent-value-readiness
 
+## [0.2.0] — GV-3R-b: deterministic readiness-determination evaluator
+
+**Additive.** Milestone **M-3R.2** of the UVI ADR
+(`docs/architecture/ADR_UGENCE_VALUE_INTELLIGENCE_GV2C_GV2E_GV3R.md`, §6–§9).
+Minor bump because this is a material new capability on top of a merged 0.1.0;
+every 0.1.0 symbol keeps its shape and behaviour, so existing callers are
+unaffected. **No other package is touched** — `governance-contracts`,
+`uvi-policy-contracts` and `governed-value` are unchanged.
+
+The determination stays **advisory, non-financial and fail-closed**: it is not a
+deployment authorization, not a Policy Authority, and it verifies no evidence.
+
+### Added
+- `evaluate_readiness(case, *, evaluation_time)` — the **single canonical
+  entry point** that selects one `ReadinessClassification` from a complete
+  applicable gate set. `evaluation_time` is mandatory, keyword-only and must be
+  timezone-aware; the **system clock is never read**.
+- `ReadinessEvaluationCase` — the immutable input. It carries the bound
+  `AssessmentContext`, the complete `ReadinessPolicy` **by value**, its exact
+  `PolicyReference`, the requested target, the Intelligence/Capability/Adoption
+  results, the `GateResult` tuple, `ConditionSet` records, an optional
+  `AdvisoryComposite`, and evidence/window references — and deliberately **no
+  classification field**. Rejects self-contradictory inputs with a typed
+  `ReadinessEvaluationError`: a gate bound to another policy, a gate absent from
+  the supplied policy, a redefined `PolicyGate`, duplicate gate/condition/result
+  ids, a gate evaluated for another target, cross-tenant/subject binding, or a
+  policy reference that is not the supplied policy's. `canonical_input_digest()`
+  is order-independent.
+- `ReadinessEvaluationResult` / `ReadinessEvaluationTrace` / `ConditionDecision`
+  — the advisory determination plus a deterministic, explanatory-only trace
+  (evaluator id, formula version, selected rule, applicable and diagnostic gate
+  ids, missing required gates, mandatory failures and indeterminates, unresolved
+  conditional concerns, per-condition accept/reject decisions, assessability
+  gaps, reason and advisory codes, input digest and reference set).
+  `authorizes_deployment` is permanently `False`.
+- Stable code enums: `ReadinessRuleId` (R1–R8), `ReadinessReasonCode`,
+  `ReadinessAdvisoryCode`, `ConditionDecisionCode`. Codes are emitted in enum
+  declaration order, never input order.
+
+### Determination algorithm (first matching rule wins)
+1. any applicable mandatory `FAIL` → `NOT_READY`
+2. a structural assessability gap → `NOT_ASSESSABLE`
+3. an applicable mandatory `INDETERMINATE` with no `FAIL` → `NOT_ASSESSABLE`
+4. an unresolved conditional concern that is not compensable → `NOT_READY`
+5. a compensable concern without active coverage → `NOT_READY`
+6. PILOT, everything above satisfied → `PILOT_READY` (carries its bounded pilot
+   controls; the enum has no `PILOT_READY_WITH_CONDITIONS` tier)
+7. PRODUCTION with concerns fully covered → `READY_WITH_CONDITIONS`
+8. PRODUCTION with nothing unresolved and no open active condition →
+   `DEPLOYMENT_READY`
+
+`R1` precedes `R2` because ADR §8/D-6 make a mandatory `FAIL` unconditional and
+`AgentValueReadinessDetermination` structurally rejects any other classification
+while a blocking gate is present; the gaps are still reported in the trace.
+
+### Invariants proven by tests
+- Gate-set completeness is derived from the `ReadinessPolicy`, so an omitted
+  applicable mandatory or conditional gate is `NOT_ASSESSABLE`, never `PASS`.
+- `{FAIL, INDETERMINATE, PASS}` ⇒ `NOT_READY`; `{INDETERMINATE, PASS}` ⇒
+  `NOT_ASSESSABLE`; `{PASS, PASS}` ⇒ conditional resolution.
+- `CONDITIONAL` alone is not compensable — the policy must set
+  `conditionally_compensable=True`; an uncovered concern is `NOT_READY`.
+- Proposed / expired / revoked / satisfied / not-yet-effective / window-ended
+  controls are not coverage; the half-open interval is preserved.
+- An active control over an applicable gate that is not unresolved is
+  internally inconsistent → `NOT_ASSESSABLE`; a `SATISFIED` control over a
+  passing gate is retained and permits `DEPLOYMENT_READY`.
+- Production-only gates stay diagnostic during PILOT and never block it.
+- Evidence axes are preserved exactly (`REPORTED`/`UNATTESTED`/
+  `NOT_ATTRIBUTED`/`UNVERIFIED` are never upgraded); no evidence type is
+  constructed anywhere in the evaluator.
+- The `AdvisoryComposite` is inert: minimum vs maximum score yields an identical
+  classification, rule and reason-code tuple.
+- Deterministic and order-independent: reversing the input tuples leaves the
+  classification, reason codes, gate sets, condition coverage, trace digest and
+  determination digest unchanged.
+
+### Not implemented (deliberate)
+No evidence admission or verification, no benchmark resolution, **no
+metric-to-threshold calculation** (the merged `GovernedThreshold` keeps opaque
+literal/unit semantics and none are invented), no policy-authenticity or
+condition-authority verification, no causal attribution, no deployment
+authorization, no durable event bus or signing, no money/return/forecast.
+`ConditionSet` carries no tenant/subject field, so condition **scope is not
+matched** against the assessed tenant — recorded as a standing advisory.
+
+### Also updated
+Curated `api` exports, `public_api.json` (version + 10 new symbols), README,
+distribution verifier (isolated multi-wheel `--no-index` proof now exercises the
+evaluator), and 87 new tests.
+
 ## [0.1.0] — GV-3R-a: Agent Value Readiness contract shapes
 
 ### Pre-merge hardening (independent-audit corrections; still 0.1.0, unreleased)
