@@ -79,9 +79,22 @@ EVALUATION_REQUEST_SCHEMA_VERSION_V2 = "risk-subject-evaluation-request-2"
 # The seam's accepted request set is DELIBERATELY unchanged in Phase 4A: this PR ships
 # contracts and pure validation only, and nothing wires ``validate_subject_binding``
 # into ``RiskEvaluationSeam``. Widening this set before that wiring exists would let a
-# v2 request reach policy resolution without its binding ever being reconciled. A v2
-# request presented to the seam today therefore fails closed as
-# ``NOT_EVALUATED(UNSUPPORTED_SCHEMA_VERSION)``. Widening is a Phase 4B step.
+# v2 request reach policy resolution without its binding ever being reconciled.
+#
+# Two DISTINCT fail-closed behaviors result — do not conflate them:
+#
+#   * a genuine :class:`SubjectRiskEvaluationRequestV2` object is rejected by the seam's
+#     **v1 type boundary** (``RiskEvaluationSeam.evaluate`` opens with an ``isinstance``
+#     guard) and raises ``SeamConfigurationError``. Because v2 is a successor class and
+#     not a subclass, this fires *before* the schema gate, before the clock is read and
+#     before any digest is computed. This is the stronger containment and is preserved
+#     deliberately — it is NOT weakened to match prose.
+#   * a **v1-class** object carrying an unsupported ``schema_version`` string reaches the
+#     membership gate below and returns the typed
+#     ``NOT_EVALUATED(UNSUPPORTED_SCHEMA_VERSION)`` non-decision.
+#
+# Widening is a Phase 4B step, and only after the validator is wired in (see the recorded
+# Phase 4B ordering in the section banner further down).
 SUPPORTED_REQUEST_SCHEMA_VERSIONS = frozenset({EVALUATION_REQUEST_SCHEMA_VERSION})
 
 _TS_FMT = "%Y-%m-%dT%H:%M:%S.%fZ"
@@ -586,6 +599,20 @@ class ReferenceControlEvidenceResolver:
 # trusted control result, or a risk decision — the field sets are closed and exclude
 # them structurally. ``SubjectBindingValidation`` is an integrity finding, not a grant.
 #
+# **Recorded Phase 4B / adapter ordering (load-bearing, NOT implemented here).**
+# Source authenticity is established outside this module, in this exact order:
+#
+#   1. reconstruct the real ``CapacityActionRecommendation``;
+#   2. independently recompute ``rec.digest()``;
+#   3. require equality with the outer ``recommendation_digest``;
+#   4. run :func:`validate_subject_binding`;
+#   5. perform trusted evidence (RA-5) and tenant/scope checks;
+#   6. only then permit policy resolution;
+#   7. only after all of the above widen ``SUPPORTED_REQUEST_SCHEMA_VERSIONS``.
+#
+# Phase 4A implements step 4 only. No placeholder authenticator and no permissive
+# resolver is added here — an absent check must stay visibly absent.
+#
 # **Recorded Phase 4B requirement — evaluation-time authority (ADR §10, F6).**
 # This PR deliberately changes NO evaluation-seam behavior, so caller time does not
 # become authoritative here and the deliberately-separate reference/test seam keeps
@@ -917,11 +944,16 @@ class SubjectRiskEvaluationRequestV2:
             raise SeamContractError(
                 f"schema_version must be {EVALUATION_REQUEST_SCHEMA_VERSION_V2!r}"
             )
-        for name in ("subject_type", "subject_id", "tenant_id",
-                     "requested_purpose", "requested_domain"):
+        for name in ("requested_purpose", "requested_domain"):
             v = getattr(self, name)
             if not isinstance(v, str) or v == "":
                 raise SeamContractError(f"{name} must be a non-empty string")
+        # Identity fields flow verbatim into the reconstructed SubjectBinding, so they
+        # are held to the SAME constraints here (non-empty + already NFC). Validating
+        # them only at the binding would mean an identical invalid value surfaced as a
+        # different error class depending on where it was discovered (audit F-5).
+        for name in ("subject_type", "subject_id", "tenant_id"):
+            _require_nfc_str(name, getattr(self, name), allow_empty=False)
         # Stricter than v1: the subject digest is recomputed by validate_subject_binding,
         # so it must be a real digest rather than any non-empty string.
         _require_digest("subject_digest", self.subject_digest)
@@ -1085,13 +1117,32 @@ def validate_subject_binding(
     at step 5, because step 2 re-derives the context digest rather than trusting the one
     committed inside the stale binding.
 
+    **Exact security guarantee — read this before relying on it.**
+    ``validate_subject_binding`` proves *internal canonical consistency* between the
+    supplied context, the outer binding fields and the carried digests. It does **not**
+    prove that those caller-supplied facts or ``recommendation_digest`` originate from an
+    authentic Cloud Scaling recommendation. Source authenticity must be established by
+    the future Cloud Scaling adapter, by reconstructing the actual
+    ``CapacityActionRecommendation``, recomputing ``rec.digest()`` and requiring equality
+    **before** the request may enter trusted evaluation. RA-5 and the evaluation seam
+    supply their own, separate evidence-admission and tenant/scope checks.
+
+    Concretely: this function detects **inconsistent or partial tampering** — an altered
+    field left paired with a stale digest. It does **not** detect a *fully self-consistent
+    fabricated request*, because a caller who recomputes ``context_digest``,
+    ``subject_digest`` and ``request_digest`` produces an internally consistent object by
+    construction. It therefore does not by itself provide recommendation authenticity,
+    provenance verification, cross-tenant authorization, trusted evidence admission, or
+    replay prevention against a caller capable of recomputing every digest.
+
     This function performs **no** policy resolution, risk evaluation, authority issuance,
     ActionGate call, credential handling or execution, and it is not wired into
     :class:`~risk_authority.api.evaluation_seam.RiskEvaluationSeam` by Phase 4A. It reads
     only its argument — no clock, no I/O, no ambient state — so it is a pure function.
 
-    :raises SubjectBindingError: the request is not a reconcilable v2 request, or the
-        reconstructed ``subject_digest`` does not equal the carried one.
+    :raises SubjectBindingError: the request is not a reconcilable v2 request, the binding
+        could not be reconstructed from the outer fields, or the reconstructed
+        ``subject_digest`` does not equal the carried one.
     :raises SeamContractError: the carried context is not a valid closed
         ``risk-subject-context-1`` object.
     """
@@ -1118,14 +1169,24 @@ def validate_subject_binding(
     # (2) recompute the context digest from the supplied raw context.
     context_digest = validated_context.digest()
 
-    # (3) reconstruct the binding from AUTHORITATIVE OUTER fields only.
-    binding = SubjectBinding(
-        tenant_id=request.tenant_id,
-        subject_id=request.subject_id,
-        subject_type=request.subject_type,
-        recommendation_digest=request.recommendation_digest,
-        context_digest=context_digest,
-    )
+    # (3) reconstruct the binding from AUTHORITATIVE OUTER fields only. The v2 request
+    #     already holds its identity fields to the binding's constraints, so this should
+    #     not fail; any residual contract error is reported as the documented validator
+    #     error type rather than leaking a differently-classed exception (audit F-5).
+    try:
+        binding = SubjectBinding(
+            tenant_id=request.tenant_id,
+            subject_id=request.subject_id,
+            subject_type=request.subject_type,
+            recommendation_digest=request.recommendation_digest,
+            context_digest=context_digest,
+        )
+    except SubjectBindingError:
+        raise
+    except SeamContractError as exc:
+        raise SubjectBindingError(
+            f"subject binding could not be reconstructed from the outer request: {exc}"
+        ) from exc
 
     # (4) recompute the subject digest.
     subject_digest = binding.digest()

@@ -37,6 +37,18 @@ REC_DIGEST = "sha256:" + "1" * 64
 # The frozen v1 identity this PR must not perturb.
 FROZEN_V1_DIGEST = "sha256:88e9e559e860a637aa0a4389d2f0bc4597767b052dbe9b23a24d30dd09869809"
 
+# The frozen canonical identity of `risk-subject-evaluation-request-2`, computed with the
+# existing RA canonicalizer over the fixture built by `v2_request()` below, and carried as
+# the corrected ADR §5.3 worked request digest (it supersedes the obsolete
+# `sha256:b1973925…`, which predates the outer `recommendation_digest` field).
+# Any field added, removed, renamed or re-serialized on v2 changes this value and fails
+# `test_v2_request_frozen_digest_fixture` — that is exactly its purpose.
+FROZEN_V2_REQUEST_DIGEST = "sha256:cd6dc88a3123959da32df7e03e936867416120099bdd303ebc954c6f04bdbcfb"
+
+# The ADR §5.3 worked request digest as corrected by Amendment 1 (same illustrative values
+# as the ADR, in the complete implemented v2 shape). Supersedes `sha256:b1973925…`.
+ADR_CORRECTED_REQUEST_DIGEST = "sha256:ac0bdada8d0c93cff831503772f1e3a0a75cc82ab3c41440407a0185443d5ece"
+
 
 def adr_context() -> SubjectContext:
     """The exact ``SubjectContext`` the merged ADR §5.3 worked example describes."""
@@ -225,6 +237,68 @@ def test_v2_request_without_a_context_is_v1_shaped_and_valid():
 
 def test_v2_request_digest_is_deterministic_across_independent_construction():
     assert v2_request().digest() == v2_request().digest()
+
+
+def test_v2_request_frozen_digest_fixture():
+    """Freeze the canonical identity of `risk-subject-evaluation-request-2`.
+
+    Direct construction, canonical serialization and `digest()` are all pinned, so an
+    accidental schema change to v2 cannot pass unnoticed the way it could when the only
+    assertions were self-referential."""
+
+    assert v2_request().digest() == FROZEN_V2_REQUEST_DIGEST
+
+
+def test_v2_request_frozen_digest_survives_a_from_dict_round_trip():
+    rebuilt = SubjectRiskEvaluationRequestV2.from_dict(v2_request().to_canonical_dict())
+    assert rebuilt.digest() == FROZEN_V2_REQUEST_DIGEST
+
+
+def test_v2_request_frozen_canonical_field_set():
+    # The exact serialized key set the frozen digest is computed over.
+    assert set(v2_request().to_canonical_dict()) == {
+        "schema_version", "subject_type", "subject_id", "subject_digest", "tenant_id",
+        "requested_purpose", "requested_domain", "requested_scope", "requested_risk_class",
+        "jurisdictions", "requested_tools", "requested_autonomy_level",
+        "requested_data_classes", "evidence_references", "correlation_id",
+        "idempotency_key", "evaluation_time", "subject_context", "recommendation_digest",
+    }
+
+
+def test_corrected_adr_worked_request_digest_reproduces():
+    """The ADR §5.3 worked request, as corrected by Amendment 1.
+
+    Same illustrative values as the ADR (four evidence references, the D-6 idempotency
+    key), now in the complete implemented v2 shape including the outer
+    `recommendation_digest`. This pins the ADR's own reference example against the
+    implementation, so the two cannot drift apart silently."""
+
+    adr_worked = SubjectRiskEvaluationRequestV2(
+        subject_type="cloud_scaling.capacity_action",
+        subject_id="wl-checkout-api",
+        subject_digest=ADR_SUBJECT_DIGEST,
+        tenant_id="tnt-acme",
+        requested_purpose="cloud_scaling.capacity_action",
+        requested_domain="cloud_scaling",
+        requested_scope=Scope(purposes=("cloud_scaling.capacity_action",)),
+        evidence_references=("sha256:aaa", "sha256:bbb", "sha256:ccc", "sha256:ddd"),
+        correlation_id="corr-42",
+        idempotency_key="sha256:42aaa799941a6661c39c3dbe45ea7e7b2ecfcc5d617a9fc09ee32cbbe8959dd0",
+        subject_context=adr_context(),
+        recommendation_digest=REC_DIGEST,
+    )
+    assert adr_worked.digest() == ADR_CORRECTED_REQUEST_DIGEST
+    # It reconciles, and the obsolete pre-amendment digest is not reproducible.
+    assert validate_subject_binding(adr_worked).subject_digest == ADR_SUBJECT_DIGEST
+    assert adr_worked.digest() != "sha256:b1973925e2cb80dcd69e993a1cc8d9f2743cb3b4e799f6772e88909ddd77bd0a"
+
+
+def test_v2_frozen_digest_is_computed_by_the_real_canonicalizer():
+    from risk_authority.crypto.canonical import canonical_bytes
+    from risk_authority.crypto.hashing import digest as ra_digest
+
+    assert ra_digest(v2_request().to_canonical_dict()) == FROZEN_V2_REQUEST_DIGEST
+    assert canonical_bytes(v2_request().to_canonical_dict()).startswith(b'{"correlation_id"')
 
 
 # --- pure binding validator ---------------------------------------------------------

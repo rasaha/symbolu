@@ -141,6 +141,37 @@ policy, evaluates no risk, issues no envelope, calls no ActionGate, mints no cre
 performs no execution — its `SubjectBindingValidation` result is an integrity finding whose
 every authority flag is fixed `False`.
 
+### Exact security guarantee — integrity, not authenticity
+
+`validate_subject_binding` proves **internal canonical consistency** between the supplied
+context, the outer binding fields and the carried digests. It does **not** prove that those
+caller-supplied facts or `recommendation_digest` originate from an authentic Cloud Scaling
+recommendation. Source authenticity must be established by the future Cloud Scaling adapter,
+by reconstructing the actual `CapacityActionRecommendation`, recomputing `rec.digest()` and
+requiring equality **before** the request may enter trusted evaluation. RA-5 and the
+evaluation seam provide their own, separate evidence-admission and tenant/scope checks.
+
+It detects **inconsistent or partial tampering** — an altered field left paired with a stale
+digest. It does **not** detect a *fully self-consistent fabricated request*: a caller who
+recomputes `context_digest`, `subject_digest` and `request_digest` produces an internally
+consistent object by construction, and the structural validator accepts it (this is asserted
+by an explicit test). This layer therefore does **not** provide recommendation authenticity,
+provenance verification, cross-tenant authorization, trusted evidence admission, or replay
+prevention against a caller capable of recomputing every digest.
+
+### Phase 4B / adapter ordering (documented, not implemented)
+
+1. reconstruct the real `CapacityActionRecommendation`;
+2. independently recompute `rec.digest()`;
+3. require equality with the outer `recommendation_digest`;
+4. run `validate_subject_binding`;
+5. perform trusted evidence (RA-5) and tenant/scope checks;
+6. only then permit policy resolution;
+7. only after that wiring, widen the supported request schemas.
+
+Phase 4A implements **step 4 only**. No placeholder authenticator and no permissive resolver
+is introduced — an absent check stays visibly absent.
+
 **Schema-tagged canonical hashing (honest description).** Digests use the existing
 `crypto.canonical.to_canonical_obj` / `canonical_bytes` and `crypto.hashing.digest` — a
 **bare SHA-256** over canonical bytes. No new hashing primitive and no cryptographic domain
@@ -152,23 +183,40 @@ a digest under one schema tag is never automatically accepted in another semanti
 byte-for-byte compatible: v1 construction, `to_dict`, `from_dict` and digests are unchanged,
 v1 requests acquire **no** serialized `subject_context` or `recommendation_digest` field, and
 no automatic v1↔v2 conversion exists (v2 is a successor class, not a subclass). The seam's
-`SUPPORTED_REQUEST_SCHEMA_VERSIONS` is **deliberately unchanged** in this release — a v2
-request presented to `RiskEvaluationSeam` still fails closed as
-`NOT_EVALUATED(UNSUPPORTED_SCHEMA_VERSION)`. Wiring the validator into the seam ahead of
-policy resolution, and the subject-aware `PolicyResolverPort` widening, are a later phase.
+`SUPPORTED_REQUEST_SCHEMA_VERSIONS` is **deliberately unchanged** in this release, which
+produces two *distinct* fail-closed behaviors — they must not be conflated:
 
-> **Divergence from the merged ADR, recorded.** ADR §5.3 requires Risk Authority to
+| Input to `RiskEvaluationSeam.evaluate` | Result |
+|---|---|
+| a genuine `SubjectRiskEvaluationRequestV2` object | raises **`SeamConfigurationError`** at the seam's v1 `isinstance` type boundary — before the schema gate, before the clock is read, before any digest is computed |
+| a **v1-class** object carrying an unsupported `schema_version` string | returns the typed **`NOT_EVALUATED(UNSUPPORTED_SCHEMA_VERSION)`** non-decision |
+
+The first is the stronger containment and is preserved deliberately; the seam was **not**
+weakened to match earlier prose. Both are asserted by tests that actually call
+`seam.evaluate(...)`. Wiring the validator into the seam ahead of policy resolution, and the
+subject-aware `PolicyResolverPort` widening, are a later phase.
+
+**Timestamp handling (deliberate v2 hardening).** The v2 contract layer requires explicit
+tz-aware UTC and rejects both naive datetimes and non-zero offsets, rather than normalizing
+them the way `crypto.canonical` and the v1 `evaluation_time` path do. This is an approved
+v2-only hardening: **v1 behavior is unchanged**, so the same field is handled leniently on
+v1 and strictly on v2 by design.
+
+> **ADR correction, owner-approved and applied.** ADR §5.3 requires Risk Authority to
 > reconstruct `SubjectBinding` from `{outer tenant_id, outer subject_id, subject_type,
-> recommendation_digest, recomputed context_digest}` before policy resolution, but its
-> illustrated v2 request carries no `recommendation_digest`: the value's only home there is
-> *inside* `SubjectBinding`, it is absent from `evidence_references`, and it cannot be
-> recovered from `subject_digest` or `idempotency_key` (both one-way SHA-256 outputs).
-> Reconstruction was therefore impossible as illustrated. The explicit outer
-> `recommendation_digest` field on v2 is the narrowest versioned correction. Consequently
-> the ADR's illustrated `request_digest` (`sha256:b1973925…`) is **not** reproducible; the
-> `context_digest` (`sha256:9af3f626…`) and `subject_digest` (`sha256:eb4526a6…`) worked
-> examples, and the §5.3 tamper-demonstration digests, all reproduce byte-for-byte and are
-> pinned as test fixtures.
+> recommendation_digest, recomputed context_digest}` before policy resolution, but the
+> originally merged ADR's illustrated v2 request carried no `recommendation_digest`: the
+> value's only home there was *inside* `SubjectBinding`, it was absent from
+> `evidence_references`, and it cannot be recovered from `subject_digest` or
+> `idempotency_key` (both one-way SHA-256 outputs). RA-side reconstruction was therefore
+> impossible as illustrated. The explicit outer `recommendation_digest` field on v2 is the
+> narrowest versioned correction, and the ADR has been amended to match (see its
+> "Amendment 1" note). The corrected §5.3 worked request digest is
+> `sha256:cd6dc88a…`, which supersedes the obsolete `sha256:b1973925…` **for the v2 worked
+> request only**. The `context_digest` (`sha256:9af3f626…`), `subject_digest`
+> (`sha256:eb4526a6…`) and tamper-demonstration fixtures are unchanged and still reproduce
+> byte-for-byte. All four, plus the corrected request digest, are pinned as test fixtures
+> and re-asserted from the installed wheel.
 
 ## Verify the distribution
 
