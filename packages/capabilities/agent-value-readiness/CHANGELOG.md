@@ -1,5 +1,207 @@
 # Changelog — ugence-agent-value-readiness
 
+## [0.2.0] — context-binding precedence correction (pre-merge, still 0.2.0/unreleased)
+
+Completes ADR §6 precondition row 0. Package version stays **0.2.0**; the
+evaluator formula constant advances **`GV-3R-b.2` → `GV-3R-b.3`** because
+evaluator precedence changed. No dependency version or `CONTRACT_VERSION` moves,
+and no ADR is touched.
+
+### Context-to-policy binding is an R0 precondition
+`GV3RB_READINESS_POLICY_NOT_BOUND_TO_CONTEXT` and
+`GV3RB_READINESS_POLICY_REF_CONTEXT_MISMATCH` previously ran in the later
+incomplete-input rule (`R2`), so a mandatory `FAIL` under a context that did not
+bind the evaluated policy produced `NOT_READY` — a gate-derived headline
+asserted from a context that does not govern that policy. Both conditions now
+run inside `GV3RB_R0_POLICY_PRECONDITION`, alongside the lifecycle and
+effective-period checks, as a **single canonical detection path** (they are not
+evaluated twice).
+
+- An absent binding, or a bound reference whose `PolicyReference` identity
+  (policy id, family, version, content digest, scope, tenant) is not the
+  supplied policy's, now yields `NOT_ASSESSABLE` via `R0` **before** any gate
+  precedence. Merged identity-comparison semantics are reused; no partial or
+  floating reference matching was introduced.
+- The established `R0` output convention applies unchanged: no gate headline is
+  asserted (`determination.gate_results == ()`, derived blocking/indeterminate
+  id sets empty) while the trace still carries mandatory failures, missing gates
+  and other diagnostics for audit. Diagnostic trace data never changes the `R0`
+  classification.
+- Combined `R0` failures (binding + lifecycle, binding + expiry, mismatch +
+  not-yet-effective, and all three plus a mandatory `FAIL`) each retain every
+  independently detectable reason, in stable declaration-driven order, with
+  input ordering unable to change the result, trace or digest.
+- Correctly bound cases are unaffected: mandatory `FAIL` → `NOT_READY`,
+  mandatory `INDETERMINATE` → its own rule, missing required gate → the
+  incomplete-input rule, and the PILOT / `READY_WITH_CONDITIONS` /
+  `DEPLOYMENT_READY` paths are unchanged.
+- These remain **structural reads of caller-supplied contracts**: they do not
+  authenticate a policy, verify its digest against a registry-resolved body, or
+  replace Policy Authority. All standing trust advisories are preserved and
+  `authorizes_deployment` stays permanently `False`.
+
+### Tests
+28 new tests (217 → **245**), all public-API, covering every binding-gap ×
+gate-state combination, each individually constructible identity-component
+mismatch (id, version, digest, scope/tenant — a family mismatch is already
+unconstructible on `AssessmentContext`), combined `R0` failures, the
+valid-binding regression matrix, and determinism/composite inertness under `R0`.
+The isolated multi-wheel `--no-index` verifier proves the binding precedence
+from a built wheel.
+
+## [0.2.0] — closure-audit corrections (pre-merge, still 0.2.0/unreleased)
+
+Two blocking findings from the GV-3R-b closure audit, corrected before merge.
+The package version stays **0.2.0** (nothing was ever released); the evaluator
+formula constant advances **`GV-3R-b.1` → `GV-3R-b.2`** because it identifies
+exact evaluator behaviour and that behaviour changed. No other package, and no
+ADR, is touched.
+
+### RA-01 — readiness requirements are policy/gate-driven (semantic fix)
+`GV-3R-b.1` required at least one `IntelligenceFitnessResult`,
+`CapabilityReadinessResult` **and** `AdoptionReadinessResult` applicable to the
+requested target, or the case was `NOT_ASSESSABLE`. That requirement is **not in
+the ratified sources**: ADR §6 defines the applicable set over
+`ReadinessPolicy.gates`; §6's precondition list and §7's precedence table
+contain no indicator clause; `ReadinessPolicy` has no field able to declare a
+required indicator family; and the merged `AgentValueReadinessDetermination`
+defaults all three indicator tuples to `()` and never references them in its
+consistency guard. The rule blocked valid indicator-sparse policies with no
+opt-out while being satisfiable by a single failing advisory claim.
+
+- **Removed** reason codes `GV3RB_INTELLIGENCE_RESULT_MISSING`,
+  `GV3RB_CAPABILITY_RESULT_MISSING`, `GV3RB_ADOPTION_RESULT_MISSING` and the
+  presence check behind them. No replacement presence heuristic was added.
+- Requirements surface **only** through an applicable `PolicyGate` and its
+  `GateResult`. Gate-inventory completeness, mandatory-FAIL dominance,
+  fail-closed omission handling and every other invariant are unchanged.
+- Supplied indicator records remain fully structurally validated (tenant,
+  subject, context, claim binding, uniqueness, immutability) and are carried
+  through as diagnostics that never change a tier.
+
+### AUD-01 — policy lifecycle and effective period are precondition row 0
+`GV-3R-b.1` never read the governing policy's metadata, so an expired, REVOKED,
+SUPERSEDED, DRAFT or not-yet-effective `ReadinessPolicy` produced
+`DEPLOYMENT_READY` — a fail-open against ADR §6's precondition, §7 row 0, and
+§23's fail-closed requirement. The context binder's `as_of` could not cover it:
+a context bound while the policy was valid still evaluated ready long after
+expiry.
+
+- **Added** rule `GV3RB_R0_POLICY_PRECONDITION` and reason codes
+  `GV3RB_READINESS_POLICY_NOT_APPROVED_ACTIVE` /
+  `GV3RB_READINESS_POLICY_NOT_EFFECTIVE_AT_EVALUATION_TIME`.
+- Uses the merged `PolicyLifecycleState` enum and
+  `PolicyArtifactMetadata.is_effective_at` — neither state machine nor
+  effective-period arithmetic is duplicated. Half-open
+  `effective_from <= evaluation_time < effective_to` preserved; the explicit,
+  timezone-aware `evaluation_time` remains the only time input.
+- `R0` precedes all gate rules: an invalid governing policy dominates a
+  mandatory `FAIL`. Under `R0` "no headline is asserted" (ADR §6), so the
+  determination carries **no** gate results while the trace still reports the
+  complete gate inventory and every failure diagnostically.
+- This is a **structural read of caller-supplied metadata**. It does not
+  authenticate, sign, resolve or approve the policy and does not replace Policy
+  Authority or registry resolution; all standing trust advisories are preserved.
+
+### Tests
+39 new tests (178 → **217**) covering the full RA-01 acceptance matrix, every
+non-`APPROVED_ACTIVE` lifecycle state the merged package defines
+(`DRAFT`/`EXPIRED`/`REVOKED`/`SUPERSEDED`), all six effective-period boundary
+cases, bound-while-valid-then-expired, precondition-vs-mandatory-FAIL
+precedence, and determinism/composite-inertness under `R0`. The isolated
+multi-wheel `--no-index` verifier proves both corrections from a built wheel.
+
+## [0.2.0] — GV-3R-b: deterministic readiness-determination evaluator
+
+**Additive.** Milestone **M-3R.2** of the UVI ADR
+(`docs/architecture/ADR_UGENCE_VALUE_INTELLIGENCE_GV2C_GV2E_GV3R.md`, §6–§9).
+Minor bump because this is a material new capability on top of a merged 0.1.0;
+every 0.1.0 symbol keeps its shape and behaviour, so existing callers are
+unaffected. **No other package is touched** — `governance-contracts`,
+`uvi-policy-contracts` and `governed-value` are unchanged.
+
+The determination stays **advisory, non-financial and fail-closed**: it is not a
+deployment authorization, not a Policy Authority, and it verifies no evidence.
+
+### Added
+- `evaluate_readiness(case, *, evaluation_time)` — the **single canonical
+  entry point** that selects one `ReadinessClassification` from a complete
+  applicable gate set. `evaluation_time` is mandatory, keyword-only and must be
+  timezone-aware; the **system clock is never read**.
+- `ReadinessEvaluationCase` — the immutable input. It carries the bound
+  `AssessmentContext`, the complete `ReadinessPolicy` **by value**, its exact
+  `PolicyReference`, the requested target, the Intelligence/Capability/Adoption
+  results, the `GateResult` tuple, `ConditionSet` records, an optional
+  `AdvisoryComposite`, and evidence/window references — and deliberately **no
+  classification field**. Rejects self-contradictory inputs with a typed
+  `ReadinessEvaluationError`: a gate bound to another policy, a gate absent from
+  the supplied policy, a redefined `PolicyGate`, duplicate gate/condition/result
+  ids, a gate evaluated for another target, cross-tenant/subject binding, or a
+  policy reference that is not the supplied policy's. `canonical_input_digest()`
+  is order-independent.
+- `ReadinessEvaluationResult` / `ReadinessEvaluationTrace` / `ConditionDecision`
+  — the advisory determination plus a deterministic, explanatory-only trace
+  (evaluator id, formula version, selected rule, applicable and diagnostic gate
+  ids, missing required gates, mandatory failures and indeterminates, unresolved
+  conditional concerns, per-condition accept/reject decisions, assessability
+  gaps, reason and advisory codes, input digest and reference set).
+  `authorizes_deployment` is permanently `False`.
+- Stable code enums: `ReadinessRuleId` (R1–R8), `ReadinessReasonCode`,
+  `ReadinessAdvisoryCode`, `ConditionDecisionCode`. Codes are emitted in enum
+  declaration order, never input order.
+
+### Determination algorithm (first matching rule wins)
+1. any applicable mandatory `FAIL` → `NOT_READY`
+2. a structural assessability gap → `NOT_ASSESSABLE`
+3. an applicable mandatory `INDETERMINATE` with no `FAIL` → `NOT_ASSESSABLE`
+4. an unresolved conditional concern that is not compensable → `NOT_READY`
+5. a compensable concern without active coverage → `NOT_READY`
+6. PILOT, everything above satisfied → `PILOT_READY` (carries its bounded pilot
+   controls; the enum has no `PILOT_READY_WITH_CONDITIONS` tier)
+7. PRODUCTION with concerns fully covered → `READY_WITH_CONDITIONS`
+8. PRODUCTION with nothing unresolved and no open active condition →
+   `DEPLOYMENT_READY`
+
+`R1` precedes `R2` because ADR §8/D-6 make a mandatory `FAIL` unconditional and
+`AgentValueReadinessDetermination` structurally rejects any other classification
+while a blocking gate is present; the gaps are still reported in the trace.
+
+### Invariants proven by tests
+- Gate-set completeness is derived from the `ReadinessPolicy`, so an omitted
+  applicable mandatory or conditional gate is `NOT_ASSESSABLE`, never `PASS`.
+- `{FAIL, INDETERMINATE, PASS}` ⇒ `NOT_READY`; `{INDETERMINATE, PASS}` ⇒
+  `NOT_ASSESSABLE`; `{PASS, PASS}` ⇒ conditional resolution.
+- `CONDITIONAL` alone is not compensable — the policy must set
+  `conditionally_compensable=True`; an uncovered concern is `NOT_READY`.
+- Proposed / expired / revoked / satisfied / not-yet-effective / window-ended
+  controls are not coverage; the half-open interval is preserved.
+- An active control over an applicable gate that is not unresolved is
+  internally inconsistent → `NOT_ASSESSABLE`; a `SATISFIED` control over a
+  passing gate is retained and permits `DEPLOYMENT_READY`.
+- Production-only gates stay diagnostic during PILOT and never block it.
+- Evidence axes are preserved exactly (`REPORTED`/`UNATTESTED`/
+  `NOT_ATTRIBUTED`/`UNVERIFIED` are never upgraded); no evidence type is
+  constructed anywhere in the evaluator.
+- The `AdvisoryComposite` is inert: minimum vs maximum score yields an identical
+  classification, rule and reason-code tuple.
+- Deterministic and order-independent: reversing the input tuples leaves the
+  classification, reason codes, gate sets, condition coverage, trace digest and
+  determination digest unchanged.
+
+### Not implemented (deliberate)
+No evidence admission or verification, no benchmark resolution, **no
+metric-to-threshold calculation** (the merged `GovernedThreshold` keeps opaque
+literal/unit semantics and none are invented), no policy-authenticity or
+condition-authority verification, no causal attribution, no deployment
+authorization, no durable event bus or signing, no money/return/forecast.
+`ConditionSet` carries no tenant/subject field, so condition **scope is not
+matched** against the assessed tenant — recorded as a standing advisory.
+
+### Also updated
+Curated `api` exports, `public_api.json` (version + 10 new symbols), README,
+distribution verifier (isolated multi-wheel `--no-index` proof now exercises the
+evaluator), and 87 new tests.
+
 ## [0.1.0] — GV-3R-a: Agent Value Readiness contract shapes
 
 ### Pre-merge hardening (independent-audit corrections; still 0.1.0, unreleased)
