@@ -1,5 +1,54 @@
 # Changelog — ugence-agent-value-readiness
 
+## [0.2.0] — context-binding precedence correction (pre-merge, still 0.2.0/unreleased)
+
+Completes ADR §6 precondition row 0. Package version stays **0.2.0**; the
+evaluator formula constant advances **`GV-3R-b.2` → `GV-3R-b.3`** because
+evaluator precedence changed. No dependency version or `CONTRACT_VERSION` moves,
+and no ADR is touched.
+
+### Context-to-policy binding is an R0 precondition
+`GV3RB_READINESS_POLICY_NOT_BOUND_TO_CONTEXT` and
+`GV3RB_READINESS_POLICY_REF_CONTEXT_MISMATCH` previously ran in the later
+incomplete-input rule (`R2`), so a mandatory `FAIL` under a context that did not
+bind the evaluated policy produced `NOT_READY` — a gate-derived headline
+asserted from a context that does not govern that policy. Both conditions now
+run inside `GV3RB_R0_POLICY_PRECONDITION`, alongside the lifecycle and
+effective-period checks, as a **single canonical detection path** (they are not
+evaluated twice).
+
+- An absent binding, or a bound reference whose `PolicyReference` identity
+  (policy id, family, version, content digest, scope, tenant) is not the
+  supplied policy's, now yields `NOT_ASSESSABLE` via `R0` **before** any gate
+  precedence. Merged identity-comparison semantics are reused; no partial or
+  floating reference matching was introduced.
+- The established `R0` output convention applies unchanged: no gate headline is
+  asserted (`determination.gate_results == ()`, derived blocking/indeterminate
+  id sets empty) while the trace still carries mandatory failures, missing gates
+  and other diagnostics for audit. Diagnostic trace data never changes the `R0`
+  classification.
+- Combined `R0` failures (binding + lifecycle, binding + expiry, mismatch +
+  not-yet-effective, and all three plus a mandatory `FAIL`) each retain every
+  independently detectable reason, in stable declaration-driven order, with
+  input ordering unable to change the result, trace or digest.
+- Correctly bound cases are unaffected: mandatory `FAIL` → `NOT_READY`,
+  mandatory `INDETERMINATE` → its own rule, missing required gate → the
+  incomplete-input rule, and the PILOT / `READY_WITH_CONDITIONS` /
+  `DEPLOYMENT_READY` paths are unchanged.
+- These remain **structural reads of caller-supplied contracts**: they do not
+  authenticate a policy, verify its digest against a registry-resolved body, or
+  replace Policy Authority. All standing trust advisories are preserved and
+  `authorizes_deployment` stays permanently `False`.
+
+### Tests
+28 new tests (217 → **245**), all public-API, covering every binding-gap ×
+gate-state combination, each individually constructible identity-component
+mismatch (id, version, digest, scope/tenant — a family mismatch is already
+unconstructible on `AssessmentContext`), combined `R0` failures, the
+valid-binding regression matrix, and determinism/composite inertness under `R0`.
+The isolated multi-wheel `--no-index` verifier proves the binding precedence
+from a built wheel.
+
 ## [0.2.0] — closure-audit corrections (pre-merge, still 0.2.0/unreleased)
 
 Two blocking findings from the GV-3R-b closure audit, corrected before merge.

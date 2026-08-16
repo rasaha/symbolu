@@ -28,12 +28,18 @@ EVALUATOR_ID = "ugence.agent-value-readiness.readiness-determination-evaluator"
 #: Version of the ratified determination rule set implemented here. Bumped only
 #: when the selection algorithm itself changes.
 #:
-#: ``GV-3R-b.2`` corrects two closure-audit findings against ``GV-3R-b.1``:
+#: ``GV-3R-b.2`` corrected two closure-audit findings against ``GV-3R-b.1``:
 #: the governing ``ReadinessPolicy``'s lifecycle state and effective period are
-#: now evaluated as ADR §6 precondition row 0, and the unratified requirement
-#: that all three indicator families be present was removed (requirements are
+#: evaluated as ADR §6 precondition row 0, and the unratified requirement that
+#: all three indicator families be present was removed (requirements are
 #: gate-driven).
-EVALUATOR_FORMULA_VERSION = "GV-3R-b.2"
+#:
+#: ``GV-3R-b.3`` completes ADR §6 row 0 by promoting the two
+#: context-to-readiness-policy **binding** gaps (no bound reference; bound
+#: reference that is not the supplied policy) out of the later incomplete-input
+#: rule and into the same R0 precondition — an invalid assessment context now
+#: yields ``NOT_ASSESSABLE`` before any gate precedence.
+EVALUATOR_FORMULA_VERSION = "GV-3R-b.3"
 
 
 class ReadinessRuleId(str, Enum):
@@ -43,11 +49,13 @@ class ReadinessRuleId(str, Enum):
     the first matching rule wins and is recorded on the trace.
     """
 
-    #: ADR §6 precondition / §7 row 0: the governing ReadinessPolicy is not
-    #: APPROVED_ACTIVE, or is not effective at ``evaluation_time``. Evaluated
-    #: **before** any gate precedence — a definite gate failure dominates other
-    #: gate-level uncertainty, but it never overrides an invalid governing
-    #: policy. No gate headline is asserted under an invalid policy.
+    #: ADR §6 precondition / §7 row 0: the governing **context or policy** is
+    #: invalid — the AssessmentContext does not bind the supplied
+    #: ReadinessPolicy, the bound reference is a different policy, the policy is
+    #: not APPROVED_ACTIVE, or it is not effective at ``evaluation_time``.
+    #: Evaluated **before** any gate precedence — a definite gate failure
+    #: dominates other gate-level uncertainty, but it never overrides an invalid
+    #: governing context or policy. No gate headline is asserted under one.
     POLICY_PRECONDITION = "GV3RB_R0_POLICY_PRECONDITION"
     #: Any applicable mandatory gate FAIL. Dominates every other consideration
     #: at gate level (ADR §8, D-6): no condition or composite overrides it.
@@ -74,7 +82,12 @@ class ReadinessRuleId(str, Enum):
 class ReadinessReasonCode(str, Enum):
     """Why the selected rule fired. Emitted in declaration order."""
 
-    # -- policy preconditions (ADR §6 precondition / §7 row 0) -------------- #
+    # -- context/policy preconditions (ADR §6 precondition / §7 row 0) ------ #
+    # Emitted in this declaration order. Every one of these means the governing
+    # context or policy cannot be trusted, so no gate-derived headline is
+    # asserted. All are structural reads of caller-supplied contracts — none
+    # authenticates a policy, resolves it through a registry, or verifies its
+    # digest against a real body.
     #: The supplied ReadinessPolicy's asserted ``lifecycle_state`` is not
     #: ``APPROVED_ACTIVE`` (i.e. DRAFT / EXPIRED / REVOKED / SUPERSEDED).
     #:
@@ -92,11 +105,16 @@ class ReadinessReasonCode(str, Enum):
         "GV3RB_READINESS_POLICY_NOT_EFFECTIVE_AT_EVALUATION_TIME"
     )
 
-    # -- assessability gaps ------------------------------------------------- #
-    #: The AssessmentContext binds no ReadinessPolicy reference at all.
+    #: The AssessmentContext binds no ReadinessPolicy reference at all, so the
+    #: assessment is not governed by the policy being evaluated.
     READINESS_POLICY_NOT_BOUND_TO_CONTEXT = "GV3RB_READINESS_POLICY_NOT_BOUND_TO_CONTEXT"
-    #: The context's bound readiness reference is not the supplied policy.
+    #: The context binds a readiness reference, but its governed identity is not
+    #: the supplied policy's. Compared with the merged ``PolicyReference``
+    #: equality, which covers policy id, family, version, content digest, scope
+    #: and tenant together — there is no partial or floating match.
     READINESS_POLICY_REF_CONTEXT_MISMATCH = "GV3RB_READINESS_POLICY_REF_CONTEXT_MISMATCH"
+
+    # -- assessability gaps (incomplete but governed input) ----------------- #
     #: The ReadinessPolicy does not govern the requested target.
     REQUESTED_TARGET_NOT_GOVERNED_BY_POLICY = "GV3RB_REQUESTED_TARGET_NOT_GOVERNED_BY_POLICY"
     #: An applicable MANDATORY/CONDITIONAL policy gate has no supplied result.

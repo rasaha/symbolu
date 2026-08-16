@@ -361,7 +361,7 @@ def test_row0_is_deterministic_and_classification_agrees():
     a, b = run(mk()), run(mk())
     assert a.canonical_digest() == b.canonical_digest()
     assert a.determination.classification is a.trace.classification
-    assert a.trace.formula_version == "GV-3R-b.2"
+    assert a.trace.formula_version == "GV-3R-b.3"
 
 
 def test_row0_still_requires_timezone_aware_time():

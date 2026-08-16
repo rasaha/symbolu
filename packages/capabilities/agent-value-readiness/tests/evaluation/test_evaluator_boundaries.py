@@ -297,7 +297,7 @@ def test_trace_is_explanatory_and_bound_to_its_determination():
     assert r.trace.requested_target is r.determination.requested_target
     assert r.trace.input_digest == r.determination.evidence_digest
     assert len(r.trace.input_digest) == 64
-    assert r.trace.evaluator_id and r.trace.formula_version == "GV-3R-b.2"
+    assert r.trace.evaluator_id and r.trace.formula_version == "GV-3R-b.3"
 
 
 def test_pilot_and_production_traces_report_the_same_gate_inventory_shape():

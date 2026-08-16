@@ -69,7 +69,7 @@ reproducible.
 
 | Rule | Condition | Classification |
 |---|---|---|
-| `R0` | governing policy not `APPROVED_ACTIVE`, or not effective at `evaluation_time` | `NOT_ASSESSABLE` |
+| `R0` | governing context/policy invalid: policy not bound to the context, bound reference is a different policy, policy not `APPROVED_ACTIVE`, or not effective at `evaluation_time` | `NOT_ASSESSABLE` |
 | `R1` | any applicable mandatory `FAIL` | `NOT_READY` |
 | `R2` | a structural assessability gap | `NOT_ASSESSABLE` |
 | `R3` | an applicable mandatory `INDETERMINATE`, no `FAIL` | `NOT_ASSESSABLE` |
@@ -84,14 +84,24 @@ reproducible.
 composite, Intelligence score, Capability strength or Adoption score overrides a
 mandatory failure.
 
-**`R0` is the ADR §6 precondition (§7 row 0)** and precedes every gate rule. The
-governing `ReadinessPolicy`'s own `metadata.lifecycle_state` and
-`metadata.is_effective_at(evaluation_time)` are read structurally at the
-explicit evaluation time (half-open `effective_from <= t < effective_to`). A
-definite mandatory `FAIL` dominates other *gate-level* uncertainty, but it never
-overrides an invalid governing policy. Under `R0` "no headline is asserted"
-(ADR §6): the determination carries **no** gate results, while the trace still
-reports the full gate inventory and every failure diagnostically.
+**`R0` is the ADR §6 precondition (§7 row 0)** and precedes every gate rule. It
+is the single canonical detection point for four conditions, any of which means
+the assessment is not governed by a valid policy:
+
+1. the `AssessmentContext` binds **no** readiness-policy reference;
+2. the bound reference is **not** the supplied policy — compared with the merged
+   `PolicyReference` equality, covering policy id, family, version, content
+   digest, scope and tenant together (no partial or floating match);
+3. the policy's `metadata.lifecycle_state` is not `APPROVED_ACTIVE`;
+4. `metadata.is_effective_at(evaluation_time)` is false (half-open
+   `effective_from <= t < effective_to`).
+
+A definite mandatory `FAIL` dominates other *gate-level* uncertainty, but it
+never overrides an invalid governing context or policy. Under `R0` "no headline
+is asserted" (ADR §6): the determination carries **no** gate results and its
+derived blocking/indeterminate id sets stay empty, while the trace still reports
+the full gate inventory and every failure **diagnostically** — visible for
+audit, never converted into a readiness headline.
 
 **Why `R1` precedes `R2`.** ADR §8 / D-6 state `MANDATORY FAIL ⇒ NOT_READY`
 without exception, and `AgentValueReadinessDetermination` structurally *rejects*
@@ -167,11 +177,14 @@ classification, rule and reason-code tuple.
 a caller-supplied, unverified artifact, a permissive policy yields a permissive
 answer — in the limit, a policy declaring no gates has nothing to fail. The
 evaluator proves conformance *to the supplied policy*, never that the policy is
-the authentic, authority-issued one. The `R0` lifecycle and effective-period
-checks are a **structural read of the supplied metadata** at the evaluation
-time: they do not authenticate, sign, resolve or approve the policy, and they do
-not replace Policy Authority or registry resolution. An `APPROVED_ACTIVE` label
-remains a caller assertion. Closing that gap is deferred.
+the authentic, authority-issued one. The `R0` binding, lifecycle and
+effective-period checks are a **structural read of caller-supplied contracts**
+at the evaluation time: they do not authenticate, sign, resolve or approve the
+policy, and they do not verify a `content_digest` against a registry-resolved
+body — matching digests only proves the context and the supplied policy claim
+the same identity. An `APPROVED_ACTIVE` label remains a caller assertion. None
+of this replaces Policy Authority or registry resolution; closing that gap is
+deferred.
 
 ## Type placement (why here, not governance-contracts)
 

@@ -30,7 +30,8 @@ Precedence (first matching rule wins)
 ======  =========================================================  =======================
 Rule    Condition                                                  Classification
 ======  =========================================================  =======================
-R0      governing policy not APPROVED_ACTIVE, or not effective     ``NOT_ASSESSABLE``
+R0      governing context/policy invalid (binding, lifecycle,      ``NOT_ASSESSABLE``
+        or effective period)
 R1      any applicable mandatory ``FAIL``                          ``NOT_READY``
 R2      a structural assessability gap                             ``NOT_ASSESSABLE``
 R3      an applicable mandatory ``INDETERMINATE`` (no ``FAIL``)    ``NOT_ASSESSABLE``
@@ -41,14 +42,24 @@ R7      PRODUCTION: concerns remain, all actively covered          ``READY_WITH_
 R8      PRODUCTION: nothing unresolved, no open active condition   ``DEPLOYMENT_READY``
 ======  =========================================================  =======================
 
-**R0 is the ADR §6 precondition (§7 row 0)** and precedes every gate rule: a
-definite mandatory ``FAIL`` dominates other *gate-level* uncertainty, but it
-never overrides an invalid governing policy. Under R0 "no headline is asserted"
-(ADR §6), so the determination carries **no** gate results while the trace still
-reports the complete gate inventory and every failure diagnostically — nothing
-is hidden, and no gate-derived tier is claimed under a policy that is not in
-force. R0 reads the supplied policy's own metadata structurally; it never
-authenticates the policy.
+**R0 is the ADR §6 precondition (§7 row 0)** and precedes every gate rule. It is
+the single canonical detection point for four conditions, any of which means the
+assessment is not governed by a valid policy:
+
+1. the ``AssessmentContext`` binds no readiness-policy reference;
+2. the bound reference is not the supplied policy (full ``PolicyReference``
+   identity: id, family, version, content digest, scope, tenant);
+3. the policy's ``lifecycle_state`` is not ``APPROVED_ACTIVE``;
+4. the policy is not effective at ``evaluation_time``.
+
+A definite mandatory ``FAIL`` dominates other *gate-level* uncertainty, but it
+never overrides an invalid governing context or policy. Under R0 "no headline is
+asserted" (ADR §6), so the determination carries **no** gate results while the
+trace still reports the complete gate inventory and every failure
+diagnostically — nothing is hidden, and no gate-derived tier is claimed under a
+context or policy that is not in force. R0 reads the supplied contracts
+structurally; it never authenticates a policy, resolves it through a registry,
+or verifies its digest against a real body.
 
 **Why R1 precedes R2.** ADR §8 / D-6 make a mandatory ``FAIL`` unconditional at
 gate level: ``MANDATORY FAIL ⇒ NOT_READY`` carries no exception clause, and the
@@ -213,25 +224,34 @@ def evaluate_readiness(
     uncovered = tuple(gid for gid in compensable_unresolved if gid not in accepted_by_gate)
     accepted_condition_ids = tuple(sorted(o.condition.condition_id for o in outcomes if o.accepted))
 
-    # -- ADR §6 precondition / §7 row 0: the GOVERNING POLICY itself --------- #
-    # Read structurally from the supplied policy's own metadata at the explicit
-    # evaluation time. This never authenticates the policy: an APPROVED_ACTIVE
-    # label remains a caller assertion, not proof an authority approved it.
+    # -- ADR §6 precondition / §7 row 0: the GOVERNING CONTEXT AND POLICY ---- #
+    # The single canonical detection point for "this assessment is not governed
+    # by a valid policy". Read structurally from the supplied context and the
+    # policy's own metadata at the explicit evaluation time. None of this
+    # authenticates the policy: an APPROVED_ACTIVE label and a well-formed
+    # content digest remain caller assertions, never proof that an authority
+    # approved the policy or that the digest matches a registry-resolved body.
     policy_preconditions: set[ReadinessReasonCode] = set()
+
+    # Context binding: the assessment must actually be governed by this policy.
+    bound = case.context.readiness_ref
+    if bound is None:
+        policy_preconditions.add(_RC.READINESS_POLICY_NOT_BOUND_TO_CONTEXT)
+    elif bound != case.readiness_policy_ref:
+        # PolicyReference equality compares policy id, family, version, content
+        # digest, scope and tenant together — the merged identity semantics, with
+        # no partial or floating match.
+        policy_preconditions.add(_RC.READINESS_POLICY_REF_CONTEXT_MISMATCH)
+
+    # Policy lifecycle and effective period at the explicit evaluation time.
     policy_meta = case.readiness_policy.metadata
     if policy_meta.lifecycle_state is not PolicyLifecycleState.APPROVED_ACTIVE:
         policy_preconditions.add(_RC.READINESS_POLICY_NOT_APPROVED_ACTIVE)
     if not policy_meta.is_effective_at(evaluation_time):
         policy_preconditions.add(_RC.READINESS_POLICY_NOT_EFFECTIVE_AT_EVALUATION_TIME)
 
-    # -- assessability gaps -------------------------------------------------- #
+    # -- assessability gaps (governed input, but incomplete) ----------------- #
     gaps: set[ReadinessReasonCode] = set()
-
-    bound = case.context.readiness_ref
-    if bound is None:
-        gaps.add(_RC.READINESS_POLICY_NOT_BOUND_TO_CONTEXT)
-    elif bound != case.readiness_policy_ref:
-        gaps.add(_RC.READINESS_POLICY_REF_CONTEXT_MISMATCH)
 
     if target not in case.readiness_policy.readiness_targets:
         gaps.add(_RC.REQUESTED_TARGET_NOT_GOVERNED_BY_POLICY)
@@ -258,7 +278,7 @@ def evaluate_readiness(
     if policy_preconditions:
         # ADR §6 precondition / §7 row 0. A definite mandatory FAIL dominates
         # other *gate-level* uncertainty, but it never overrides an invalid
-        # governing policy: under an invalid policy "no headline is asserted"
+        # governing context or policy: under one "no headline is asserted"
         # (ADR §6), so the determination carries no gate results and the full
         # gate inventory is reported diagnostically on the trace instead.
         rule = ReadinessRuleId.POLICY_PRECONDITION
@@ -345,8 +365,8 @@ def evaluate_readiness(
         intelligence_results=tuple(sorted(case.intelligence_results, key=lambda r: r.result_id)),
         capability_results=tuple(sorted(case.capability_results, key=lambda r: r.result_id)),
         adoption_results=tuple(sorted(case.adoption_results, key=lambda r: r.result_id)),
-        # Under an invalid governing policy no gate headline is asserted
-        # (ADR §6). Every supplied gate id and status is still reported
+        # Under an invalid governing context or policy no gate headline is
+        # asserted (ADR §6). Every supplied gate id and status is still reported
         # diagnostically on the trace, so nothing is hidden.
         gate_results=(
             ()

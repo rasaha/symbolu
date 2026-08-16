@@ -230,7 +230,31 @@ _fr = evaluate_readiness(_fail_case, evaluation_time=MID)
 assert _fr.classification is ReadinessClassification.NOT_ASSESSABLE, _fr.classification
 assert _fr.determination.gate_results == () and _fr.determination.blocking_gate_ids == ()
 assert _fr.trace.mandatory_failure_gate_ids == ("m1",)   # still reported diagnostically
-assert _fr.trace.formula_version == "GV-3R-b.2", _fr.trace.formula_version
+assert _fr.trace.formula_version == "GV-3R-b.3", _fr.trace.formula_version
+
+# context-to-policy BINDING is part of the same R0 precondition
+def _eval_binding(readiness_ref, when=MID, status=GateStatus.PASS):
+    _pol2 = _policy()
+    _c = AssessmentContext(context_id="ctx4", tenant_id="t1", subject_id="a1", geography_ref=geo.reference, domain_ref=dom.reference, intended_outcome_ref=io.reference, readiness_ref=readiness_ref)
+    _case = ReadinessEvaluationCase(case_id="cv", tenant_id="t1", subject_id="a1", context=_c, readiness_policy=_pol2, readiness_policy_ref=_pol2.reference, requested_target=PROD, gate_results=(GateResult(policy_gate=_pol2.gates[0], readiness_policy_ref=_pol2.reference, requested_target=PROD, status=status),))
+    return evaluate_readiness(_case, evaluation_time=when)
+
+# (a) no binding at all — even with every gate passing
+_nb = _eval_binding(None)
+assert _nb.classification is ReadinessClassification.NOT_ASSESSABLE, _nb.classification
+assert _nb.rule_id == ReadinessRuleId.POLICY_PRECONDITION.value, _nb.rule_id
+assert ReadinessReasonCode.READINESS_POLICY_NOT_BOUND_TO_CONTEXT.value in _nb.reason_codes
+# (b) bound to a DIFFERENT policy — and a mandatory FAIL cannot override it
+_mm = _eval_binding(PolicyReference(policy_id="other-rp", policy_family=PolicyFamily.READINESS, version="1", content_digest=D), status=GateStatus.FAIL)
+assert _mm.classification is ReadinessClassification.NOT_ASSESSABLE, _mm.classification
+assert _mm.rule_id == ReadinessRuleId.POLICY_PRECONDITION.value
+assert ReadinessReasonCode.READINESS_POLICY_REF_CONTEXT_MISMATCH.value in _mm.reason_codes
+assert _mm.determination.gate_results == () and _mm.determination.blocking_gate_ids == ()
+assert _mm.trace.mandatory_failure_gate_ids == ("m1",)   # diagnostic only
+# (c) correctly bound — normal gate precedence resumes
+_ok = _eval_binding(_policy().reference, status=GateStatus.FAIL)
+assert _ok.classification is ReadinessClassification.NOT_READY, _ok.classification
+assert _ok.rule_id == ReadinessRuleId.MANDATORY_FAIL.value
 
 for mod in ("governed_value", "ugence_governed_value", "governance_providers", "decision_governance", "ai_hiring", "pydantic"):
     assert importlib.util.find_spec(mod) is None, ("unrelated package present: " + mod)
