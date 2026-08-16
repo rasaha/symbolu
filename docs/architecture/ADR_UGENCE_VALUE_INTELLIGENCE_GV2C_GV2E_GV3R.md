@@ -6,6 +6,7 @@
 - **Date:** 2026-08-13.
 - **Scope:** milestones **GV-2C** (governed assessment context), **GV-2E** (evidence & benchmark contracts), **GV-3R** (Pre-ROI agent–outcome readiness) of the **Ugence Value Intelligence** capability. This ADR defines contracts, ownership, invariants and boundaries **only**. It introduces **no runtime code, no contracts, no packages, no authority, and no behavior**, and changes **no** existing package.
 - **Decision owners:** Ugence architecture owners for Value Intelligence, Policy Authority, Risk Authority, Decision Authority, Agent Runtime, and Runtime Assurance. Unresolved items requiring an owner ruling are listed in §26.
+- **Amendments:** **2026-08-16** — consistency-only amendment for the ratified [`ADR_UGENCE_POLICY_AUTHORITY.md`](ADR_UGENCE_POLICY_AUTHORITY.md) (one shared, platform-wide **Ugence Policy Authority**; UVI is its **first policy-family adapter**). It resolves the §26.1 open item and **strengthens** D-1 rather than weakening it. D-1's prohibition on a UVI-specific Policy Authority **stands unchanged**; D-2 … D-18 and all readiness/evidence/valuation semantics are **unchanged**.
 
 ## 2. Purpose and non-goals
 
@@ -36,6 +37,8 @@ The internal packages named throughout are **technical architecture**, not addit
 
 ### D-1 — Policy Authority
 The existing/planned **Ugence Policy Authority** owns policy **approval, signing/issuance, authorized publishers, effective periods, supersession, and revocation**. `policy-workflow-compiler` is **only a compiler** — it never approves, signs, issues, revokes, or mints policy authority. **No** UVI-specific Policy Authority and **no** new customer-facing module. Policy Authority is **not yet implemented in the repository for UVI value-policies** and is recorded here as an **explicit required dependency** (§19, §26). Reference implementations must never self-approve or self-sign UVI policies and must **fail closed** on unsigned/unapproved/expired/revoked/superseded/digest-mismatched policy artifacts.
+
+> *Amendment (2026-08-16) — D-1 unchanged and upheld.* The "existing/planned Ugence Policy Authority" is ratified in [`ADR_UGENCE_POLICY_AUTHORITY.md`](ADR_UGENCE_POLICY_AUTHORITY.md) as **one shared, platform-wide** authority — **internal platform infrastructure, not a customer-facing module** — with **UVI policy schemas as its first policy-family adapter**. This **satisfies** D-1 as written; it grants **no** exception to it. The prohibition on a **UVI-specific** Policy Authority **remains in force**, and a UVI-owned authority package/distribution is now prohibited **by name**. The Policy Authority remains an **external platform dependency** of UVI engines: engines consume exact resolved, digest-bound policy artifacts **by value** and import **no** authority internals (§21).
 
 ### D-2 — UVI policy representation
 `GeographyPolicy`, `DomainPolicy`, `IntendedOutcomePolicy`, `ValuationPolicy`, `ReadinessPolicy` are **not** forced into workflow-specific `WorkflowIR`. They live in a narrow internal **`uvi-policy-contracts`** technical package (schema + IR representation), governed by the Policy Authority. Not a customer-facing module.
@@ -239,6 +242,8 @@ A financial result combining inputs of different evidential quality must **not**
 
 Reference implementations must **fail closed** on unsigned, unapproved, expired, revoked, superseded, or digest-mismatched policy artifacts and must never self-approve/self-sign.
 
+> *Amendment (2026-08-16).* The three rows marked **required dependency on Policy Authority** are owned by the shared, platform-wide **Ugence Policy Authority** ratified in [`ADR_UGENCE_POLICY_AUTHORITY.md`](ADR_UGENCE_POLICY_AUTHORITY.md) — approval **verification** (approval itself stays external), signing/issuance, and policy-version revocation — with UVI as its first policy-family adapter. Building that authority is a **platform dependency milestone**, **not** a UVI engine milestone; UVI's milestones (§25) are unchanged.
+
 ## 20. Type-by-type package ownership (D-15)
 
 | Type | Owner package | Rationale |
@@ -311,7 +316,7 @@ Each milestone is independently reviewable, fails closed by default, and mints n
 
 ## 26. Unresolved issues (implementation detail only — no boundary/ownership change)
 
-1. **Policy Authority for UVI value-policies** — approval, signing/issuance, and policy-version revocation are **not yet implemented**; owner to confirm the existing/planned Policy Authority assumes these (D-1, D-16).
+1. ~~**Policy Authority for UVI value-policies**~~ — **RESOLVED (2026-08-16)** by [`ADR_UGENCE_POLICY_AUTHORITY.md`](ADR_UGENCE_POLICY_AUTHORITY.md): the **platform-wide Ugence Policy Authority** owns approval **verification**, signing/issuance, exact registration/resolution, and policy-version revocation, and **UVI is its first policy-family adapter**. It stays an **external platform dependency** of UVI engines. It remains **DEFERRED as implementation** — no such package exists yet, and building it is a **platform dependency milestone**, not a UVI engine milestone (D-1, D-16, §19).
 2. **RA-owned `SubjectContext` dependency** — PR #1425 is draft-only; owner to ratify/merge before UVI references `canonical_subject_context_ref` (D-14).
 3. **`SystemManifest` home** — `governance-contracts` vs `uvi-policy-contracts` vs an assessed-system contract, and confirmation it is a non-competing additive artifact (D-14, §20).
 4. **Producers of `AttributionAssessment` / `VerificationAssessment`** — a new attribution capability / DA extension, and a Runtime-Assurance extension vs new; whether `PARTIALLY_ATTRIBUTED` needs a DA reconciliation-contract extension (D-10).
