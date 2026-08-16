@@ -20,6 +20,14 @@ from .enums import (
     ReadinessIndicatorClass,
 )
 from .errors import ReadinessContractError
+from .evaluation import (
+    EvaluationTrace,
+    ReadinessEvaluationCase,
+    ReadinessEvaluationError,
+    ReadinessEvaluationResult,
+    ReadinessReasonCode,
+    ReadinessRule,
+)
 from .gates import GateResult
 from .indicators import (
     AdoptionReadinessResult,
@@ -29,6 +37,12 @@ from .indicators import (
 
 __all__ = [
     "ReadinessContractError",
+    "ReadinessEvaluationError",
+    "ReadinessRule",
+    "ReadinessReasonCode",
+    "ReadinessEvaluationCase",
+    "EvaluationTrace",
+    "ReadinessEvaluationResult",
     # enums
     "ReadinessClassification",
     "GateStatus",

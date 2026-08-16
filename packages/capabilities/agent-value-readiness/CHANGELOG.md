@@ -1,5 +1,57 @@
 # Changelog — ugence-agent-value-readiness
 
+## [0.2.0] — GV-3R-b: deterministic readiness evaluator
+
+**Additive material capability.** Adds the deterministic evaluator that consumes
+the GV-3R-a contract shapes and **selects** one advisory readiness classification.
+The GV-3R-a contract surface is unchanged; no other package is touched. Version
+advances 0.1.0 → 0.2.0.
+
+### Added
+- `contracts/evaluation.py`: `ReadinessEvaluationCase` (immutable input; **no
+  classification field**; validates tenant/subject/context consistency, binds the
+  `ReadinessPolicy` body to its reference, and rejects a gate bound to another
+  policy / a gate not in the policy / an embedded `PolicyGate` that doesn't match
+  the policy's gate / duplicate or mismatched-target gates — as
+  `ReadinessEvaluationError`; canonicalizes its sequences by stable id).
+  `ReadinessEvaluationResult` (determination + trace), `EvaluationTrace`,
+  `ReadinessRule`, `ReadinessReasonCode`, `ReadinessEvaluationError`.
+- `services/evaluator.py`: `evaluate_readiness(case, *, evaluation_time) ->
+  ReadinessEvaluationResult` (+ `EVALUATOR_VERSION = "gv3r-b-1.0.0"`). The single
+  canonical entry point. Selects the tier from the complete applicable gate set;
+  the caller supplies no classification.
+- Fail-closed decision ordering: a definite applicable mandatory FAIL dominates ⇒
+  `NOT_READY`; a missing applicable required (MANDATORY/CONDITIONAL) gate ⇒
+  `NOT_ASSESSABLE` (never silent PASS); a mandatory INDETERMINATE ⇒
+  `NOT_ASSESSABLE`; then conditional resolution. A conditional concern is
+  compensable only when `PolicyGate.conditionally_compensable is True` and an
+  active `ConditionSet` (`is_active_at(evaluation_time)`) references that exact
+  gate. Full PILOT (`PILOT_READY` carries bounded pilot controls; production-only
+  gates stay diagnostic) and PRODUCTION (`READY_WITH_CONDITIONS` /
+  `DEPLOYMENT_READY`) tables.
+- Deterministic, canonically-ordered outputs + evaluation trace (rule, reason
+  codes, applicable/diagnostic/mandatory-fail/mandatory-indeterminate/unresolved-
+  conditional gate ids, accepted/rejected conditions, assessability gaps, input
+  digest). `evaluation_time` is mandatory + timezone-aware; the system clock is
+  never read.
+
+### Boundary (unchanged posture)
+- Advisory only — authorizes no deployment; verifies no evidence/policy
+  authenticity; resolves no benchmark; computes no metric-to-threshold; performs
+  no attribution; **never** upgrades a MetricClaim evidence axis. Every result
+  carries trust advisories. No money/ROI/forecast; an `AdvisoryComposite` is
+  carried through unchanged and **never** consulted for the tier (proven by a
+  min↔max invariance test). `GateResult.status` remains structurally supplied and
+  authority-unverified.
+
+### Verification
+- New evaluator tests (`tests/contract/test_evaluator.py`, 29) cover the full
+  PILOT/PRODUCTION tables, FAIL-over-INDETERMINATE precedence, omitted-gate and
+  wrong-policy/tampered-gate attacks, conditional compensation/coverage/inactivity,
+  determinism (input-order independence), composite non-influence, evidence-axis
+  preservation, and the advisory/no-financial boundary. Distribution verifier
+  extended with an evaluator smoke check.
+
 ## [0.1.0] — GV-3R-a: Agent Value Readiness contract shapes
 
 ### Pre-merge hardening (independent-audit corrections; still 0.1.0, unreleased)

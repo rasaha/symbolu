@@ -24,7 +24,7 @@ Import the curated surface from :mod:`ugence_agent_value_readiness.api`.
 
 from __future__ import annotations
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 from .contracts import (  # noqa: E402
     AdoptionDimension,
@@ -36,20 +36,28 @@ from .contracts import (  # noqa: E402
     CapabilityReadinessResult,
     ConditionSet,
     ConditionStatus,
+    EvaluationTrace,
     GateResult,
     GateStatus,
     IntelligenceDimension,
     IntelligenceFitnessResult,
     ReadinessClassification,
     ReadinessContractError,
+    ReadinessEvaluationCase,
+    ReadinessEvaluationError,
+    ReadinessEvaluationResult,
     ReadinessIndicatorClass,
+    ReadinessReasonCode,
+    ReadinessRule,
 )
+from .services import EVALUATOR_VERSION, evaluate_readiness  # noqa: E402
 
 from . import api  # noqa: E402,F401
 
 __all__ = [
     "__version__",
     "ReadinessContractError",
+    "ReadinessEvaluationError",
     "ReadinessClassification",
     "GateStatus",
     "ConditionStatus",
@@ -58,6 +66,8 @@ __all__ = [
     "IntelligenceDimension",
     "CapabilityDimension",
     "AdoptionDimension",
+    "ReadinessRule",
+    "ReadinessReasonCode",
     "IntelligenceFitnessResult",
     "CapabilityReadinessResult",
     "AdoptionReadinessResult",
@@ -65,5 +75,10 @@ __all__ = [
     "ConditionSet",
     "AdvisoryComposite",
     "AgentValueReadinessDetermination",
+    "ReadinessEvaluationCase",
+    "EvaluationTrace",
+    "ReadinessEvaluationResult",
+    "evaluate_readiness",
+    "EVALUATOR_VERSION",
     "api",
 ]

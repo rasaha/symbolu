@@ -46,7 +46,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 import ugence_agent_value_readiness as r
-assert r.__version__ == "0.1.0", r.__version__
+assert r.__version__ == "0.2.0", r.__version__
 assert "site-packages" in r.__file__, r.__file__
 assert not any("/symbolu" in p for p in sys.path), sys.path
 import pathlib as _pl
@@ -121,6 +121,37 @@ for shape in (IntelligenceFitnessResult, CapabilityReadinessResult, AdoptionRead
     for f in dataclasses.fields(shape):
         low = f.name.lower()
         assert not any(t in low for t in ("money", "currency", "roi", "benefit", "cost", "multiplier", "revenue")), (shape.__name__, f.name)
+
+# GV-3R-b evaluator selects a classification deterministically and fails closed
+from ugence_agent_value_readiness.api import (
+    ReadinessEvaluationCase, evaluate_readiness, EVALUATOR_VERSION, ReadinessRule)
+from ugence_uvi_policy_contracts.api import ReadinessPolicy, PolicyGate as _PG
+_gm = _PG(gate_id="m", category=GateCategory.SAFETY, requirement_class=RequirementClass.MANDATORY, applicability=(ReadinessTarget.PRODUCTION,))
+_rp = ReadinessPolicy(metadata=meta(PolicyFamily.READINESS, "rp"), gates=(_gm,), readiness_targets=(ReadinessTarget.PRODUCTION,))
+_rpref = _rp.reference
+def _grp(status):
+    return GateResult(policy_gate=_gm, readiness_policy_ref=_rpref, requested_target=ReadinessTarget.PRODUCTION, status=status)
+def _case(status):
+    return ReadinessEvaluationCase(case_id="cs", tenant_id="t1", subject_id="a1", context=ctx, readiness_policy=_rp,
+                                   readiness_policy_ref=_rpref, requested_target=ReadinessTarget.PRODUCTION, gate_results=[_grp(status)])
+assert EVALUATOR_VERSION == "gv3r-b-1.0.0"
+_res = evaluate_readiness(_case(GateStatus.PASS), evaluation_time=MID)
+assert _res.classification is ReadinessClassification.DEPLOYMENT_READY
+assert _res.is_advisory is True
+assert "ADVISORY_NOT_DEPLOYMENT_AUTHORIZATION" in {c.value for c in _res.trace.reason_codes}
+assert evaluate_readiness(_case(GateStatus.FAIL), evaluation_time=MID).classification is ReadinessClassification.NOT_READY
+# missing required gate -> NOT_ASSESSABLE (never silent PASS)
+_empty = ReadinessEvaluationCase(case_id="cs", tenant_id="t1", subject_id="a1", context=ctx, readiness_policy=_rp,
+                                 readiness_policy_ref=_rpref, requested_target=ReadinessTarget.PRODUCTION, gate_results=[])
+assert evaluate_readiness(_empty, evaluation_time=MID).classification is ReadinessClassification.NOT_ASSESSABLE
+# no caller classification field on the evaluation case
+assert "classification" not in {f.name for f in dataclasses.fields(ReadinessEvaluationCase)}
+# evaluation_time never defaulted from the clock (keyword-only, mandatory)
+try:
+    evaluate_readiness(_case(GateStatus.PASS))
+    raise SystemExit("evaluation_time mandatory guard did not fire")
+except TypeError:
+    pass
 
 for mod in ("governed_value", "ugence_governed_value", "governance_providers", "decision_governance", "ai_hiring", "pydantic"):
     assert importlib.util.find_spec(mod) is None, ("unrelated package present: " + mod)

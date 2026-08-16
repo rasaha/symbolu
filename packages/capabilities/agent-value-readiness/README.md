@@ -28,7 +28,7 @@ Evaluation — the precedence calculus, tier selection, authority resolution —
 
 - **Distribution:** `ugence-agent-value-readiness`
 - **Namespace:** `ugence_agent_value_readiness`
-- **Version:** 0.1.0
+- **Version:** 0.2.0 (adds the GV-3R-b evaluator; GV-3R-a contract shapes unchanged)
 - **Depends on:** stdlib **+ `ugence-governance-contracts>=0.2.0`** (evidence vocabulary) **+ `ugence-uvi-policy-contracts>=0.1.0`** (policy/context shapes) — never `governed-value`.
 - **Typing:** fully annotated; ships `py.typed`.
 
@@ -141,6 +141,69 @@ Independent-distribution proof (builds all three wheels, installs `--no-index`):
 ```bash
 python packages/capabilities/agent-value-readiness/verify_agent_value_readiness_distribution.py
 ```
+
+## GV-3R-b — deterministic readiness evaluator (0.2.0)
+
+The single canonical entry point:
+
+```python
+from ugence_agent_value_readiness.api import evaluate_readiness, ReadinessEvaluationCase
+result = evaluate_readiness(case, evaluation_time=<tz-aware datetime>)
+result.classification            # the selected ReadinessClassification (advisory)
+result.determination             # the full AgentValueReadinessDetermination
+result.trace                     # deterministic EvaluationTrace (rule + reason codes)
+```
+
+`evaluate_readiness(case, *, evaluation_time)` **selects** one advisory
+classification — the caller supplies **no** classification (`ReadinessEvaluationCase`
+has no such field). It is:
+
+- **Advisory & non-authoritative.** It authorizes no deployment, verifies no
+  evidence, resolves no benchmark, calculates no metric-to-threshold, checks no
+  policy authenticity, and performs no attribution. It consumes `GateResult.status`
+  as **structurally supplied, authority-unverified** input — it is a
+  *determination evaluator over supplied gate results*, not a metric-evaluation
+  engine. Every result carries advisory reason codes (policy-authenticity /
+  condition-approval not verified, evidence retains its source classification,
+  not a deployment authorization) and preserves every MetricClaim's evidence
+  axes (never upgrades REPORTED→OBSERVED, UNATTESTED→ATTESTED, etc.).
+- **Non-financial.** No money/ROI/forecast. An `AdvisoryComposite`, if present,
+  is validated and **carried through unchanged but never consulted** for the tier
+  (a test proves min↔max score leaves the classification and rule unchanged).
+- **Fail-closed & complete.** The authoritative gate inventory is derived from the
+  supplied `ReadinessPolicy` body; every applicable **MANDATORY** and **CONDITIONAL**
+  gate must have exactly one `GateResult` — a missing one yields `NOT_ASSESSABLE`
+  (never a silent PASS), and a caller cannot omit a difficult gate. Structural
+  malformations (cross-tenant, a gate bound to another policy, an embedded
+  `PolicyGate` that doesn't match the policy's gate, a duplicate/mismatched-target
+  gate, a policy body that doesn't match its reference) raise
+  `ReadinessEvaluationError`.
+- **Deterministic.** Identical inputs + `evaluation_time` produce an identical
+  classification, ordered reason codes, gate sets, and digest; outputs are
+  canonically ordered by stable id and never depend on input order.
+  `evaluation_time` is a mandatory, timezone-aware keyword — the system clock is
+  never read.
+
+**Decision ordering (fail-closed):** a definite applicable **mandatory FAIL**
+dominates ⇒ `NOT_READY` (even if another required gate is missing — supplying it
+can't make it ready); else a missing applicable required gate ⇒ `NOT_ASSESSABLE`;
+else an applicable mandatory **INDETERMINATE** ⇒ `NOT_ASSESSABLE`; else conditional
+resolution. An unresolved applicable **CONDITIONAL** concern (FAIL/INDETERMINATE)
+is compensable **only if** `PolicyGate.conditionally_compensable is True` **and** an
+active (`is_active_at(evaluation_time)`) `ConditionSet` references that exact gate;
+otherwise ⇒ `NOT_READY`. **PILOT** ⇒ `PILOT_READY` when all applicable mandatory
+PASS and every unresolved conditional concern is compensable+covered (covering
+conditions are carried as bounded pilot controls; there is no
+`PILOT_READY_WITH_CONDITIONS`, and production-only gates stay diagnostic).
+**PRODUCTION** ⇒ `READY_WITH_CONDITIONS` when compensated conditional concerns
+remain, else `DEPLOYMENT_READY` (no unresolved concern, no open active condition;
+historical `SATISFIED` conditions retained only when their gate now PASSES).
+
+**Honest limitation:** the merged contracts express Intelligence/Capability/Adoption
+requirements *through gates*, not a separate policy flag — so the evaluator does
+**not** invent a standalone "Intelligence required" rule; a missing indicator
+manifests through the gate that depends on it (as a missing/indeterminate/failed
+`GateResult`). Indicator results are carried through unchanged.
 
 ## Extensibility & trust notes
 

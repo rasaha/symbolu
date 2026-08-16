@@ -1,9 +1,9 @@
 {
   "distribution": "ugence-agent-value-readiness",
   "namespace": "ugence_agent_value_readiness",
-  "package_version": "0.1.0",
+  "package_version": "0.2.0",
   "curated_api_module": "ugence_agent_value_readiness.api",
-  "note": "Machine-readable snapshot of the curated public API. Generated from the installed package; tests/packaging/test_public_api.py asserts equality. ReadinessTarget/RequirementClass are reused from ugence-uvi-policy-contracts. GateResult embeds a PolicyGate (kind/applicability derived, not caller-set); blocking/indeterminate gate ids are derived properties of the determination, not fields.",
+  "note": "Machine-readable snapshot of the curated public API. Generated from the installed package; tests/packaging/test_public_api.py asserts equality. ReadinessTarget/RequirementClass are reused from ugence-uvi-policy-contracts. GateResult embeds a PolicyGate; blocking/indeterminate ids are derived properties. evaluate_readiness is the GV-3R-b evaluator entry point.",
   "symbols": {
     "AdoptionDimension": {
       "kind": "enum",
@@ -154,6 +154,27 @@
         "SATISFIED"
       ]
     },
+    "EVALUATOR_VERSION": {
+      "kind": "str"
+    },
+    "EvaluationTrace": {
+      "kind": "dataclass",
+      "fields": [
+        "evaluator_version",
+        "selected_rule",
+        "requested_target",
+        "applicable_gate_ids",
+        "diagnostic_gate_ids",
+        "mandatory_fail_gate_ids",
+        "mandatory_indeterminate_gate_ids",
+        "unresolved_conditional_gate_ids",
+        "accepted_condition_ids",
+        "rejected_condition_reasons",
+        "assessability_gap_codes",
+        "reason_codes",
+        "input_digest"
+      ]
+    },
     "GateResult": {
       "kind": "dataclass",
       "fields": [
@@ -225,12 +246,73 @@
     "ReadinessContractError": {
       "kind": "exception"
     },
+    "ReadinessEvaluationCase": {
+      "kind": "dataclass",
+      "fields": [
+        "case_id",
+        "tenant_id",
+        "subject_id",
+        "context",
+        "readiness_policy",
+        "readiness_policy_ref",
+        "requested_target",
+        "intelligence_results",
+        "capability_results",
+        "adoption_results",
+        "gate_results",
+        "conditions",
+        "advisory_composite"
+      ]
+    },
+    "ReadinessEvaluationError": {
+      "kind": "exception"
+    },
+    "ReadinessEvaluationResult": {
+      "kind": "dataclass",
+      "fields": [
+        "determination",
+        "trace"
+      ]
+    },
     "ReadinessIndicatorClass": {
       "kind": "enum",
       "values": [
         "INTELLIGENCE",
         "CAPABILITY",
         "ADOPTION"
+      ]
+    },
+    "ReadinessReasonCode": {
+      "kind": "enum",
+      "values": [
+        "MISSING_APPLICABLE_MANDATORY_GATE",
+        "MISSING_APPLICABLE_CONDITIONAL_GATE",
+        "MANDATORY_GATE_INDETERMINATE",
+        "MANDATORY_GATE_FAIL",
+        "CONDITIONAL_CONCERN_NONCOMPENSABLE",
+        "CONDITIONAL_CONCERN_UNCOVERED",
+        "ALL_MANDATORY_PASS",
+        "CONDITIONAL_CONCERN_COMPENSATED",
+        "NO_UNRESOLVED_CONCERNS",
+        "CONDITION_INACTIVE_AT_EVALUATION",
+        "CONDITION_DOES_NOT_COVER_CONCERN",
+        "ADVISORY_POLICY_AUTHENTICITY_NOT_VERIFIED",
+        "ADVISORY_CONDITION_APPROVAL_NOT_VERIFIED",
+        "ADVISORY_EVIDENCE_RETAINS_SOURCE_CLASSIFICATION",
+        "ADVISORY_NOT_DEPLOYMENT_AUTHORIZATION"
+      ]
+    },
+    "ReadinessRule": {
+      "kind": "enum",
+      "values": [
+        "NOT_ASSESSABLE_INCOMPLETE",
+        "NOT_ASSESSABLE_MANDATORY_INDETERMINATE",
+        "NOT_READY_MANDATORY_FAIL",
+        "NOT_READY_CONDITIONAL_NONCOMPENSABLE",
+        "NOT_READY_CONDITIONAL_UNCOVERED",
+        "PILOT_READY",
+        "READY_WITH_CONDITIONS",
+        "DEPLOYMENT_READY"
       ]
     },
     "ReadinessTarget": {
@@ -247,6 +329,9 @@
         "CONDITIONAL",
         "ADVISORY"
       ]
+    },
+    "evaluate_readiness": {
+      "kind": "function"
     }
   }
 }

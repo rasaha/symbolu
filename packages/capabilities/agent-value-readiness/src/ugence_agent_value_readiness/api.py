@@ -22,18 +22,26 @@ from .contracts import (
     CapabilityReadinessResult,
     ConditionSet,
     ConditionStatus,
+    EvaluationTrace,
     GateResult,
     GateStatus,
     IntelligenceDimension,
     IntelligenceFitnessResult,
     ReadinessClassification,
     ReadinessContractError,
+    ReadinessEvaluationCase,
+    ReadinessEvaluationError,
+    ReadinessEvaluationResult,
     ReadinessIndicatorClass,
+    ReadinessReasonCode,
+    ReadinessRule,
 )
+from .services import EVALUATOR_VERSION, evaluate_readiness
 
 __all__ = [
     "__version__",
     "ReadinessContractError",
+    "ReadinessEvaluationError",
     # readiness enums (defined here)
     "ReadinessClassification",
     "GateStatus",
@@ -43,6 +51,8 @@ __all__ = [
     "IntelligenceDimension",
     "CapabilityDimension",
     "AdoptionDimension",
+    "ReadinessRule",
+    "ReadinessReasonCode",
     # reused policy enums (owned by uvi-policy-contracts, re-exported)
     "ReadinessTarget",
     "RequirementClass",
@@ -56,4 +66,10 @@ __all__ = [
     "AdvisoryComposite",
     # determination envelope
     "AgentValueReadinessDetermination",
+    # GV-3R-b evaluator (case / trace / result / entry point)
+    "ReadinessEvaluationCase",
+    "EvaluationTrace",
+    "ReadinessEvaluationResult",
+    "evaluate_readiness",
+    "EVALUATOR_VERSION",
 ]
