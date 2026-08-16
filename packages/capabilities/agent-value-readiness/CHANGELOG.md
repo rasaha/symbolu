@@ -1,5 +1,67 @@
 # Changelog — ugence-agent-value-readiness
 
+## [0.2.0] — closure-audit corrections (pre-merge, still 0.2.0/unreleased)
+
+Two blocking findings from the GV-3R-b closure audit, corrected before merge.
+The package version stays **0.2.0** (nothing was ever released); the evaluator
+formula constant advances **`GV-3R-b.1` → `GV-3R-b.2`** because it identifies
+exact evaluator behaviour and that behaviour changed. No other package, and no
+ADR, is touched.
+
+### RA-01 — readiness requirements are policy/gate-driven (semantic fix)
+`GV-3R-b.1` required at least one `IntelligenceFitnessResult`,
+`CapabilityReadinessResult` **and** `AdoptionReadinessResult` applicable to the
+requested target, or the case was `NOT_ASSESSABLE`. That requirement is **not in
+the ratified sources**: ADR §6 defines the applicable set over
+`ReadinessPolicy.gates`; §6's precondition list and §7's precedence table
+contain no indicator clause; `ReadinessPolicy` has no field able to declare a
+required indicator family; and the merged `AgentValueReadinessDetermination`
+defaults all three indicator tuples to `()` and never references them in its
+consistency guard. The rule blocked valid indicator-sparse policies with no
+opt-out while being satisfiable by a single failing advisory claim.
+
+- **Removed** reason codes `GV3RB_INTELLIGENCE_RESULT_MISSING`,
+  `GV3RB_CAPABILITY_RESULT_MISSING`, `GV3RB_ADOPTION_RESULT_MISSING` and the
+  presence check behind them. No replacement presence heuristic was added.
+- Requirements surface **only** through an applicable `PolicyGate` and its
+  `GateResult`. Gate-inventory completeness, mandatory-FAIL dominance,
+  fail-closed omission handling and every other invariant are unchanged.
+- Supplied indicator records remain fully structurally validated (tenant,
+  subject, context, claim binding, uniqueness, immutability) and are carried
+  through as diagnostics that never change a tier.
+
+### AUD-01 — policy lifecycle and effective period are precondition row 0
+`GV-3R-b.1` never read the governing policy's metadata, so an expired, REVOKED,
+SUPERSEDED, DRAFT or not-yet-effective `ReadinessPolicy` produced
+`DEPLOYMENT_READY` — a fail-open against ADR §6's precondition, §7 row 0, and
+§23's fail-closed requirement. The context binder's `as_of` could not cover it:
+a context bound while the policy was valid still evaluated ready long after
+expiry.
+
+- **Added** rule `GV3RB_R0_POLICY_PRECONDITION` and reason codes
+  `GV3RB_READINESS_POLICY_NOT_APPROVED_ACTIVE` /
+  `GV3RB_READINESS_POLICY_NOT_EFFECTIVE_AT_EVALUATION_TIME`.
+- Uses the merged `PolicyLifecycleState` enum and
+  `PolicyArtifactMetadata.is_effective_at` — neither state machine nor
+  effective-period arithmetic is duplicated. Half-open
+  `effective_from <= evaluation_time < effective_to` preserved; the explicit,
+  timezone-aware `evaluation_time` remains the only time input.
+- `R0` precedes all gate rules: an invalid governing policy dominates a
+  mandatory `FAIL`. Under `R0` "no headline is asserted" (ADR §6), so the
+  determination carries **no** gate results while the trace still reports the
+  complete gate inventory and every failure diagnostically.
+- This is a **structural read of caller-supplied metadata**. It does not
+  authenticate, sign, resolve or approve the policy and does not replace Policy
+  Authority or registry resolution; all standing trust advisories are preserved.
+
+### Tests
+39 new tests (178 → **217**) covering the full RA-01 acceptance matrix, every
+non-`APPROVED_ACTIVE` lifecycle state the merged package defines
+(`DRAFT`/`EXPIRED`/`REVOKED`/`SUPERSEDED`), all six effective-period boundary
+cases, bound-while-valid-then-expired, precondition-vs-mandatory-FAIL
+precedence, and determinism/composite-inertness under `R0`. The isolated
+multi-wheel `--no-index` verifier proves both corrections from a built wheel.
+
 ## [0.2.0] — GV-3R-b: deterministic readiness-determination evaluator
 
 **Additive.** Milestone **M-3R.2** of the UVI ADR

@@ -3,7 +3,7 @@
   "namespace": "ugence_agent_value_readiness",
   "package_version": "0.2.0",
   "curated_api_module": "ugence_agent_value_readiness.api",
-  "note": "Machine-readable snapshot of the curated public API. Generated from the installed package; tests/packaging/test_public_api.py asserts equality. ReadinessTarget/RequirementClass are reused from ugence-uvi-policy-contracts. GateResult embeds a PolicyGate (kind/applicability derived, not caller-set); blocking/indeterminate gate ids are derived properties of the determination, not fields. GV-3R-b adds the single canonical evaluator entry point evaluate_readiness(case, *, evaluation_time): ReadinessEvaluationCase carries NO classification field \u2014 the evaluator selects the tier \u2014 and ReadinessEvaluationResult is advisory, never a deployment authorization.",
+  "note": "Machine-readable snapshot of the curated public API. Generated from the installed package; tests/packaging/test_public_api.py asserts equality. ReadinessTarget/RequirementClass are reused from ugence-uvi-policy-contracts. GateResult embeds a PolicyGate (kind/applicability derived, not caller-set); blocking/indeterminate gate ids are derived properties of the determination, not fields. GV-3R-b adds the single canonical evaluator entry point evaluate_readiness(case, *, evaluation_time): ReadinessEvaluationCase carries NO classification field \u2014 the evaluator selects the tier \u2014 and ReadinessEvaluationResult is advisory, never a deployment authorization. Readiness requirements are policy/gate-driven: indicator records are diagnostics, not a global prerequisite. The governing ReadinessPolicy's lifecycle state and effective period are evaluated as ADR \u00a76 precondition row 0 at the explicit evaluation_time.",
   "symbols": {
     "AdoptionDimension": {
       "kind": "enum",
@@ -333,12 +333,11 @@
     "ReadinessReasonCode": {
       "kind": "enum",
       "values": [
+        "GV3RB_READINESS_POLICY_NOT_APPROVED_ACTIVE",
+        "GV3RB_READINESS_POLICY_NOT_EFFECTIVE_AT_EVALUATION_TIME",
         "GV3RB_READINESS_POLICY_NOT_BOUND_TO_CONTEXT",
         "GV3RB_READINESS_POLICY_REF_CONTEXT_MISMATCH",
         "GV3RB_REQUESTED_TARGET_NOT_GOVERNED_BY_POLICY",
-        "GV3RB_INTELLIGENCE_RESULT_MISSING",
-        "GV3RB_CAPABILITY_RESULT_MISSING",
-        "GV3RB_ADOPTION_RESULT_MISSING",
         "GV3RB_APPLICABLE_GATE_RESULT_MISSING",
         "GV3RB_ACTIVE_CONDITION_WITHOUT_UNRESOLVED_CONCERN",
         "GV3RB_MANDATORY_GATE_INDETERMINATE",
@@ -354,6 +353,7 @@
     "ReadinessRuleId": {
       "kind": "enum",
       "values": [
+        "GV3RB_R0_POLICY_PRECONDITION",
         "GV3RB_R1_MANDATORY_FAIL",
         "GV3RB_R2_ASSESSABILITY_GAP",
         "GV3RB_R3_MANDATORY_INDETERMINATE",

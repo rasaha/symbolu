@@ -286,19 +286,13 @@ def test_condition_naming_an_unknown_reference_is_recorded_not_accepted():
 # --------------------------------------------------------------------------- #
 # Attack: incomplete assessment inputs
 # --------------------------------------------------------------------------- #
-@pytest.mark.parametrize(
-    "field,code",
-    [
-        ("intelligence", ReadinessReasonCode.INTELLIGENCE_RESULT_MISSING),
-        ("capability", ReadinessReasonCode.CAPABILITY_RESULT_MISSING),
-        ("adoption", ReadinessReasonCode.ADOPTION_RESULT_MISSING),
-    ],
-)
-def test_missing_indicator_family_is_not_assessable(field, code):
+@pytest.mark.parametrize("field", ["intelligence", "capability", "adoption"])
+def test_missing_indicator_family_does_not_block(field):
+    """RA-01: requirements are gate-driven, not indicator-presence-driven."""
+
     p = readiness_policy([gate("m1", MANDATORY)])
     r = run(case(policy=p, gate_results=[gate_result(p, "m1", PASS)], **{field: ()}))
-    assert r.classification is CLS.NOT_ASSESSABLE
-    assert code.value in r.reason_codes
+    assert r.classification is CLS.DEPLOYMENT_READY, r.classification
 
 
 def test_unbound_readiness_policy_is_not_assessable():
@@ -332,7 +326,9 @@ def test_incomplete_inputs_do_not_raise():
     r = run(case(policy=p, gate_results=[], with_indicators=False,
                  ctx=context(p, bind_readiness=False)))
     assert r.classification is CLS.NOT_ASSESSABLE
-    assert len(r.trace.assessability_gap_codes) >= 4
+    gaps = set(r.trace.assessability_gap_codes)
+    assert ReadinessReasonCode.READINESS_POLICY_NOT_BOUND_TO_CONTEXT.value in gaps
+    assert ReadinessReasonCode.APPLICABLE_GATE_RESULT_MISSING.value in gaps
 
 
 def test_mandatory_fail_still_dominates_an_incomplete_case():
@@ -342,9 +338,8 @@ def test_mandatory_fail_still_dominates_an_incomplete_case():
     r = run(case(policy=p, gate_results=[gate_result(p, "m1", FAIL)], with_indicators=False))
     assert r.classification is CLS.NOT_READY
     assert r.rule_id == ReadinessRuleId.MANDATORY_FAIL.value
-    # the gaps are still reported, they simply do not win
+    # the gate-completeness gap is still reported, it simply does not win
     assert ReadinessReasonCode.APPLICABLE_GATE_RESULT_MISSING.value in r.reason_codes
-    assert ReadinessReasonCode.INTELLIGENCE_RESULT_MISSING.value in r.reason_codes
 
 
 # --------------------------------------------------------------------------- #

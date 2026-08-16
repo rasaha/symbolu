@@ -27,7 +27,13 @@ EVALUATOR_ID = "ugence.agent-value-readiness.readiness-determination-evaluator"
 
 #: Version of the ratified determination rule set implemented here. Bumped only
 #: when the selection algorithm itself changes.
-EVALUATOR_FORMULA_VERSION = "GV-3R-b.1"
+#:
+#: ``GV-3R-b.2`` corrects two closure-audit findings against ``GV-3R-b.1``:
+#: the governing ``ReadinessPolicy``'s lifecycle state and effective period are
+#: now evaluated as ADR §6 precondition row 0, and the unratified requirement
+#: that all three indicator families be present was removed (requirements are
+#: gate-driven).
+EVALUATOR_FORMULA_VERSION = "GV-3R-b.2"
 
 
 class ReadinessRuleId(str, Enum):
@@ -37,8 +43,14 @@ class ReadinessRuleId(str, Enum):
     the first matching rule wins and is recorded on the trace.
     """
 
+    #: ADR §6 precondition / §7 row 0: the governing ReadinessPolicy is not
+    #: APPROVED_ACTIVE, or is not effective at ``evaluation_time``. Evaluated
+    #: **before** any gate precedence — a definite gate failure dominates other
+    #: gate-level uncertainty, but it never overrides an invalid governing
+    #: policy. No gate headline is asserted under an invalid policy.
+    POLICY_PRECONDITION = "GV3RB_R0_POLICY_PRECONDITION"
     #: Any applicable mandatory gate FAIL. Dominates every other consideration
-    #: (ADR §8, D-6): no condition, composite, or indicator strength overrides it.
+    #: at gate level (ADR §8, D-6): no condition or composite overrides it.
     MANDATORY_FAIL = "GV3RB_R1_MANDATORY_FAIL"
     #: A structural assessability gap (context/policy binding, missing required
     #: gate result, missing indicator family, internally inconsistent input).
@@ -62,6 +74,24 @@ class ReadinessRuleId(str, Enum):
 class ReadinessReasonCode(str, Enum):
     """Why the selected rule fired. Emitted in declaration order."""
 
+    # -- policy preconditions (ADR §6 precondition / §7 row 0) -------------- #
+    #: The supplied ReadinessPolicy's asserted ``lifecycle_state`` is not
+    #: ``APPROVED_ACTIVE`` (i.e. DRAFT / EXPIRED / REVOKED / SUPERSEDED).
+    #:
+    #: This is a **structural read of caller-supplied metadata**. It is not proof
+    #: that a real authority approved, issued, signed or revoked the policy, and
+    #: it does not resolve the policy through a registry — that remains Policy
+    #: Authority work and is still disclaimed by the standing advisories.
+    READINESS_POLICY_NOT_APPROVED_ACTIVE = "GV3RB_READINESS_POLICY_NOT_APPROVED_ACTIVE"
+    #: ``evaluation_time`` falls outside the policy's declared effective period,
+    #: using the merged half-open convention
+    #: ``effective_from <= evaluation_time < effective_to``. Evaluated with
+    #: ``PolicyArtifactMetadata.is_effective_at`` against the explicit evaluation
+    #: time only — never a wall clock.
+    READINESS_POLICY_NOT_EFFECTIVE_AT_EVALUATION_TIME = (
+        "GV3RB_READINESS_POLICY_NOT_EFFECTIVE_AT_EVALUATION_TIME"
+    )
+
     # -- assessability gaps ------------------------------------------------- #
     #: The AssessmentContext binds no ReadinessPolicy reference at all.
     READINESS_POLICY_NOT_BOUND_TO_CONTEXT = "GV3RB_READINESS_POLICY_NOT_BOUND_TO_CONTEXT"
@@ -69,12 +99,6 @@ class ReadinessReasonCode(str, Enum):
     READINESS_POLICY_REF_CONTEXT_MISMATCH = "GV3RB_READINESS_POLICY_REF_CONTEXT_MISMATCH"
     #: The ReadinessPolicy does not govern the requested target.
     REQUESTED_TARGET_NOT_GOVERNED_BY_POLICY = "GV3RB_REQUESTED_TARGET_NOT_GOVERNED_BY_POLICY"
-    #: No IntelligenceFitnessResult applicable to the requested target.
-    INTELLIGENCE_RESULT_MISSING = "GV3RB_INTELLIGENCE_RESULT_MISSING"
-    #: No CapabilityReadinessResult applicable to the requested target.
-    CAPABILITY_RESULT_MISSING = "GV3RB_CAPABILITY_RESULT_MISSING"
-    #: No AdoptionReadinessResult applicable to the requested target.
-    ADOPTION_RESULT_MISSING = "GV3RB_ADOPTION_RESULT_MISSING"
     #: An applicable MANDATORY/CONDITIONAL policy gate has no supplied result.
     #: A missing gate is never treated as PASS.
     APPLICABLE_GATE_RESULT_MISSING = "GV3RB_APPLICABLE_GATE_RESULT_MISSING"

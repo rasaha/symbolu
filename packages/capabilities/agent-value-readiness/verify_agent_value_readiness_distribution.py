@@ -186,6 +186,52 @@ try:
 except ReadinessEvaluationError:
     pass
 
+# ---- RA-01: readiness requirements are policy/gate-driven ----------------- #
+# No indicator record of any family, complete + passing gate inventory: the tier
+# is decided by the gates, not by bare indicator presence.
+bare = ReadinessEvaluationCase(case_id="cv", tenant_id="t1", subject_id="a1", context=ctx2, readiness_policy=rpol, readiness_policy_ref=rpol.reference, requested_target=PROD, gate_results=tuple(GateResult(policy_gate={g.gate_id: g for g in rpol.gates}[gid], readiness_policy_ref=rpol.reference, requested_target=PROD, status=st) for gid, st in ALL_PASS))
+bare_r = evaluate_readiness(bare, evaluation_time=MID)
+assert bare_r.classification is ReadinessClassification.DEPLOYMENT_READY, bare_r.classification
+assert not bare.intelligence_results and not bare.capability_results and not bare.adoption_results
+# and no presence-based reason code survives anywhere in the vocabulary
+assert not any(c.name.endswith("_RESULT_MISSING") and c.name != "APPLICABLE_GATE_RESULT_MISSING" for c in ReadinessReasonCode), [c.name for c in ReadinessReasonCode]
+# omission of a *gate* still fails closed even with no indicators
+bare_missing = ReadinessEvaluationCase(case_id="cv", tenant_id="t1", subject_id="a1", context=ctx2, readiness_policy=rpol, readiness_policy_ref=rpol.reference, requested_target=PROD, gate_results=(GateResult(policy_gate=rpol.gates[0], readiness_policy_ref=rpol.reference, requested_target=PROD, status=GateStatus.PASS),))
+assert evaluate_readiness(bare_missing, evaluation_time=MID).classification is ReadinessClassification.NOT_ASSESSABLE
+
+# ---- AUD-01: policy lifecycle + effective period are precondition row 0 --- #
+def _policy(state=PolicyLifecycleState.APPROVED_ACTIVE, ef=T0, et=T1):
+    m = PolicyArtifactMetadata(policy_id="rp2", policy_family=PolicyFamily.READINESS, version="1", content_digest=D, lifecycle_state=state, effective_from=ef, effective_to=et)
+    return ReadinessPolicy(metadata=m, gates=(_rg("m1", RequirementClass.MANDATORY),))
+
+def _eval_policy(pol, when):
+    # direct context construction: the fail-closed binder refuses a non-active
+    # policy outright, so this is the only way to represent the case at all.
+    c = AssessmentContext(context_id="ctx3", tenant_id="t1", subject_id="a1", geography_ref=geo.reference, domain_ref=dom.reference, intended_outcome_ref=io.reference, readiness_ref=pol.reference)
+    case_ = ReadinessEvaluationCase(case_id="cv", tenant_id="t1", subject_id="a1", context=c, readiness_policy=pol, readiness_policy_ref=pol.reference, requested_target=PROD, gate_results=(GateResult(policy_gate=pol.gates[0], readiness_policy_ref=pol.reference, requested_target=PROD, status=GateStatus.PASS),))
+    return evaluate_readiness(case_, evaluation_time=when)
+
+assert _eval_policy(_policy(), MID).classification is ReadinessClassification.DEPLOYMENT_READY
+for _state in PolicyLifecycleState:
+    if _state is PolicyLifecycleState.APPROVED_ACTIVE:
+        continue
+    _r = _eval_policy(_policy(state=_state), MID)
+    assert _r.classification is ReadinessClassification.NOT_ASSESSABLE, (_state, _r.classification)
+    assert _r.rule_id == ReadinessRuleId.POLICY_PRECONDITION.value
+    assert ReadinessReasonCode.READINESS_POLICY_NOT_APPROVED_ACTIVE.value in _r.reason_codes
+# half-open effective period: [effective_from, effective_to)
+assert _eval_policy(_policy(), T0).classification is ReadinessClassification.DEPLOYMENT_READY
+assert _eval_policy(_policy(), T1).classification is ReadinessClassification.NOT_ASSESSABLE
+# an invalid governing policy dominates a mandatory FAIL and asserts no headline
+_pol = _policy(state=PolicyLifecycleState.REVOKED)
+_c3 = AssessmentContext(context_id="ctx3", tenant_id="t1", subject_id="a1", geography_ref=geo.reference, domain_ref=dom.reference, intended_outcome_ref=io.reference, readiness_ref=_pol.reference)
+_fail_case = ReadinessEvaluationCase(case_id="cv", tenant_id="t1", subject_id="a1", context=_c3, readiness_policy=_pol, readiness_policy_ref=_pol.reference, requested_target=PROD, gate_results=(GateResult(policy_gate=_pol.gates[0], readiness_policy_ref=_pol.reference, requested_target=PROD, status=GateStatus.FAIL),))
+_fr = evaluate_readiness(_fail_case, evaluation_time=MID)
+assert _fr.classification is ReadinessClassification.NOT_ASSESSABLE, _fr.classification
+assert _fr.determination.gate_results == () and _fr.determination.blocking_gate_ids == ()
+assert _fr.trace.mandatory_failure_gate_ids == ("m1",)   # still reported diagnostically
+assert _fr.trace.formula_version == "GV-3R-b.2", _fr.trace.formula_version
+
 for mod in ("governed_value", "ugence_governed_value", "governance_providers", "decision_governance", "ai_hiring", "pydantic"):
     assert importlib.util.find_spec(mod) is None, ("unrelated package present: " + mod)
 

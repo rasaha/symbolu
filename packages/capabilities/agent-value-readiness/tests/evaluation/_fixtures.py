@@ -63,15 +63,16 @@ ADVISORY = RequirementClass.ADVISORY
 WINDOW = AssessmentWindow(start=T0, end=NOW)
 
 
-def meta(family, pid, digest=D):
+def meta(family, pid, digest=D, state=PolicyLifecycleState.APPROVED_ACTIVE,
+         effective_from=T0, effective_to=T1):
     return PolicyArtifactMetadata(
         policy_id=pid,
         policy_family=family,
         version="1",
         content_digest=digest,
-        lifecycle_state=PolicyLifecycleState.APPROVED_ACTIVE,
-        effective_from=T0,
-        effective_to=T1,
+        lifecycle_state=state,
+        effective_from=effective_from,
+        effective_to=effective_to,
     )
 
 
@@ -85,31 +86,45 @@ def gate(gid, kind, applicability=BOTH, compensable=False, category=GateCategory
     )
 
 
-def readiness_policy(gates, pid="rp", targets=BOTH, digest=D):
-    return ReadinessPolicy(metadata=meta(PolicyFamily.READINESS, pid, digest), gates=tuple(gates),
-                           readiness_targets=tuple(targets))
+def readiness_policy(gates, pid="rp", targets=BOTH, digest=D,
+                     state=PolicyLifecycleState.APPROVED_ACTIVE,
+                     effective_from=T0, effective_to=T1):
+    return ReadinessPolicy(
+        metadata=meta(PolicyFamily.READINESS, pid, digest, state, effective_from, effective_to),
+        gates=tuple(gates), readiness_targets=tuple(targets))
 
 
-def context(policy, tenant="t1", subject="a1", bind_readiness=True):
-    return AssessmentContext.bind_policies(
-        context_id="ctx1",
-        tenant_id=tenant,
-        subject_id=subject,
-        geography=GeographyPolicy(
-            metadata=meta(PolicyFamily.GEOGRAPHY, "g"),
-            jurisdiction="US",
-            reporting_currency="USD",
-            functional_currency="USD",
-        ),
-        domain=DomainPolicy(metadata=meta(PolicyFamily.DOMAIN, "d"), governed_outcome_unit="ticket"),
-        intended_outcome=IntendedOutcomePolicy(
-            metadata=meta(PolicyFamily.INTENDED_OUTCOME, "i"),
-            target_outcome="o",
-            task_definition="t",
-        ),
-        readiness=policy if bind_readiness else None,
-        as_of=NOW,
+def _gdo():
+    return (
+        GeographyPolicy(metadata=meta(PolicyFamily.GEOGRAPHY, "g"), jurisdiction="US",
+                        reporting_currency="USD", functional_currency="USD"),
+        DomainPolicy(metadata=meta(PolicyFamily.DOMAIN, "d"), governed_outcome_unit="ticket"),
+        IntendedOutcomePolicy(metadata=meta(PolicyFamily.INTENDED_OUTCOME, "i"),
+                              target_outcome="o", task_definition="t"),
     )
+
+
+def context(policy, tenant="t1", subject="a1", bind_readiness=True, bind=False):
+    """Build an AssessmentContext.
+
+    ``bind=False`` (default) constructs the context directly, which a caller may
+    legitimately do and which is the only way to represent a context over a
+    policy the fail-closed binder would reject (a non-APPROVED_ACTIVE or
+    out-of-period policy). ``bind=True`` routes through
+    ``AssessmentContext.bind_policies`` at ``as_of=NOW``.
+    """
+
+    geo, dom, io = _gdo()
+    if bind:
+        return AssessmentContext.bind_policies(
+            context_id="ctx1", tenant_id=tenant, subject_id=subject,
+            geography=geo, domain=dom, intended_outcome=io,
+            readiness=policy if bind_readiness else None, as_of=NOW)
+    return AssessmentContext(
+        context_id="ctx1", tenant_id=tenant, subject_id=subject,
+        geography_ref=geo.reference, domain_ref=dom.reference,
+        intended_outcome_ref=io.reference,
+        readiness_ref=policy.reference if bind_readiness else None)
 
 
 def claim(

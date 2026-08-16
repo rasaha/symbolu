@@ -30,6 +30,7 @@ Precedence (first matching rule wins)
 ======  =========================================================  =======================
 Rule    Condition                                                  Classification
 ======  =========================================================  =======================
+R0      governing policy not APPROVED_ACTIVE, or not effective     ``NOT_ASSESSABLE``
 R1      any applicable mandatory ``FAIL``                          ``NOT_READY``
 R2      a structural assessability gap                             ``NOT_ASSESSABLE``
 R3      an applicable mandatory ``INDETERMINATE`` (no ``FAIL``)    ``NOT_ASSESSABLE``
@@ -40,17 +41,39 @@ R7      PRODUCTION: concerns remain, all actively covered          ``READY_WITH_
 R8      PRODUCTION: nothing unresolved, no open active condition   ``DEPLOYMENT_READY``
 ======  =========================================================  =======================
 
-**Why R1 precedes R2.** ADR §8 / D-6 make a mandatory ``FAIL`` unconditional:
-``MANDATORY FAIL ⇒ NOT_READY`` carries no exception clause, and the merged
-``AgentValueReadinessDetermination`` consistency guard *rejects* any
+**R0 is the ADR §6 precondition (§7 row 0)** and precedes every gate rule: a
+definite mandatory ``FAIL`` dominates other *gate-level* uncertainty, but it
+never overrides an invalid governing policy. Under R0 "no headline is asserted"
+(ADR §6), so the determination carries **no** gate results while the trace still
+reports the complete gate inventory and every failure diagnostically — nothing
+is hidden, and no gate-derived tier is claimed under a policy that is not in
+force. R0 reads the supplied policy's own metadata structurally; it never
+authenticates the policy.
+
+**Why R1 precedes R2.** ADR §8 / D-6 make a mandatory ``FAIL`` unconditional at
+gate level: ``MANDATORY FAIL ⇒ NOT_READY`` carries no exception clause, and the
+merged ``AgentValueReadinessDetermination`` consistency guard *rejects* any
 classification other than ``NOT_READY`` while a blocking gate is present — so a
-gap could not be reported as ``NOT_ASSESSABLE`` without discarding the failure
-from the record, which would hide it. Every assessability gap is still recorded
-in the trace and reason codes when R1 fires; nothing is silently dropped.
+completeness gap could not be reported as ``NOT_ASSESSABLE`` without discarding
+the failure from the record. Every assessability gap is still recorded in the
+trace and reason codes when R1 fires.
 
 A definite mandatory ``FAIL`` dominates unrelated ``INDETERMINATE`` results
-(``{FAIL, INDETERMINATE, PASS} ⇒ NOT_READY``). No condition, composite,
-Intelligence score, Capability strength or Adoption score can override it.
+(``{FAIL, INDETERMINATE, PASS} ⇒ NOT_READY``). No condition or composite can
+override it.
+
+Indicator requirements are **policy/gate-driven**
+-------------------------------------------------
+``IntelligenceFitnessResult`` / ``CapabilityReadinessResult`` /
+``AdoptionReadinessResult`` records are **diagnostics carried through the
+evaluation**, not a global prerequisite. The ratified applicable set (ADR §6) is
+defined over ``ReadinessPolicy.gates``; ``ReadinessPolicy`` has no field able to
+declare a required indicator family, and the merged determination contract
+permits a ready classification with no indicator records at all. A requirement
+for an indicator therefore surfaces through its **applicable policy gate and
+that gate's ``GateResult``**, never through bare tuple presence. Supplied
+indicator records remain fully structurally validated (tenant, subject, context,
+claim binding, uniqueness, immutability) and never elevate a tier.
 
 Determinism
 -----------
@@ -67,7 +90,12 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
 
-from ugence_uvi_policy_contracts.api import PolicyGate, ReadinessTarget, RequirementClass
+from ugence_uvi_policy_contracts.api import (
+    PolicyGate,
+    PolicyLifecycleState,
+    ReadinessTarget,
+    RequirementClass,
+)
 
 from ..contracts._util import require_tzaware
 from ..contracts.conditions import ConditionSet
@@ -185,6 +213,17 @@ def evaluate_readiness(
     uncovered = tuple(gid for gid in compensable_unresolved if gid not in accepted_by_gate)
     accepted_condition_ids = tuple(sorted(o.condition.condition_id for o in outcomes if o.accepted))
 
+    # -- ADR §6 precondition / §7 row 0: the GOVERNING POLICY itself --------- #
+    # Read structurally from the supplied policy's own metadata at the explicit
+    # evaluation time. This never authenticates the policy: an APPROVED_ACTIVE
+    # label remains a caller assertion, not proof an authority approved it.
+    policy_preconditions: set[ReadinessReasonCode] = set()
+    policy_meta = case.readiness_policy.metadata
+    if policy_meta.lifecycle_state is not PolicyLifecycleState.APPROVED_ACTIVE:
+        policy_preconditions.add(_RC.READINESS_POLICY_NOT_APPROVED_ACTIVE)
+    if not policy_meta.is_effective_at(evaluation_time):
+        policy_preconditions.add(_RC.READINESS_POLICY_NOT_EFFECTIVE_AT_EVALUATION_TIME)
+
     # -- assessability gaps -------------------------------------------------- #
     gaps: set[ReadinessReasonCode] = set()
 
@@ -196,13 +235,6 @@ def evaluate_readiness(
 
     if target not in case.readiness_policy.readiness_targets:
         gaps.add(_RC.REQUESTED_TARGET_NOT_GOVERNED_BY_POLICY)
-
-    if not _has_applicable(case.intelligence_results, target):
-        gaps.add(_RC.INTELLIGENCE_RESULT_MISSING)
-    if not _has_applicable(case.capability_results, target):
-        gaps.add(_RC.CAPABILITY_RESULT_MISSING)
-    if not _has_applicable(case.adoption_results, target):
-        gaps.add(_RC.ADOPTION_RESULT_MISSING)
 
     if missing_required:
         gaps.add(_RC.APPLICABLE_GATE_RESULT_MISSING)
@@ -216,14 +248,22 @@ def evaluate_readiness(
 
     # Recorded as an assessability gap for the trace (ADR §7 row 2), but it has
     # its own precedence rule (R3) so it is not folded into the R2 test.
-    gap_codes_for_trace = set(gaps)
+    gap_codes_for_trace = set(gaps) | set(policy_preconditions)
     if mandatory_indeterminate:
         gap_codes_for_trace.add(_RC.MANDATORY_GATE_INDETERMINATE)
 
     # -- rule selection (first match wins) ----------------------------------- #
     reasons: set[ReadinessReasonCode] = set(gap_codes_for_trace)
 
-    if mandatory_failures:
+    if policy_preconditions:
+        # ADR §6 precondition / §7 row 0. A definite mandatory FAIL dominates
+        # other *gate-level* uncertainty, but it never overrides an invalid
+        # governing policy: under an invalid policy "no headline is asserted"
+        # (ADR §6), so the determination carries no gate results and the full
+        # gate inventory is reported diagnostically on the trace instead.
+        rule = ReadinessRuleId.POLICY_PRECONDITION
+        classification = ReadinessClassification.NOT_ASSESSABLE
+    elif mandatory_failures:
         rule = ReadinessRuleId.MANDATORY_FAIL
         classification = ReadinessClassification.NOT_READY
         reasons.add(_RC.MANDATORY_GATE_FAILED)
@@ -305,7 +345,14 @@ def evaluate_readiness(
         intelligence_results=tuple(sorted(case.intelligence_results, key=lambda r: r.result_id)),
         capability_results=tuple(sorted(case.capability_results, key=lambda r: r.result_id)),
         adoption_results=tuple(sorted(case.adoption_results, key=lambda r: r.result_id)),
-        gate_results=tuple(sorted(case.gate_results, key=lambda g: g.gate_id)),
+        # Under an invalid governing policy no gate headline is asserted
+        # (ADR §6). Every supplied gate id and status is still reported
+        # diagnostically on the trace, so nothing is hidden.
+        gate_results=(
+            ()
+            if policy_preconditions
+            else tuple(sorted(case.gate_results, key=lambda g: g.gate_id))
+        ),
         conditions=attached,
         # Carried through unchanged; never consulted when selecting the tier.
         advisory_composite=case.advisory_composite,
@@ -357,12 +404,6 @@ def _ordered(enum_cls, selected) -> tuple[str, ...]:
 
     chosen = {c.value for c in selected}
     return tuple(member.value for member in enum_cls if member.value in chosen)
-
-
-def _has_applicable(results, target: ReadinessTarget) -> bool:
-    """Whether any indicator result declares itself applicable to ``target``."""
-
-    return any(target in r.applicable_targets for r in results)
 
 
 def _resolve_conditions(

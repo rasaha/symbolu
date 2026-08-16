@@ -69,6 +69,7 @@ reproducible.
 
 | Rule | Condition | Classification |
 |---|---|---|
+| `R0` | governing policy not `APPROVED_ACTIVE`, or not effective at `evaluation_time` | `NOT_ASSESSABLE` |
 | `R1` | any applicable mandatory `FAIL` | `NOT_READY` |
 | `R2` | a structural assessability gap | `NOT_ASSESSABLE` |
 | `R3` | an applicable mandatory `INDETERMINATE`, no `FAIL` | `NOT_ASSESSABLE` |
@@ -83,12 +84,37 @@ reproducible.
 composite, Intelligence score, Capability strength or Adoption score overrides a
 mandatory failure.
 
+**`R0` is the ADR §6 precondition (§7 row 0)** and precedes every gate rule. The
+governing `ReadinessPolicy`'s own `metadata.lifecycle_state` and
+`metadata.is_effective_at(evaluation_time)` are read structurally at the
+explicit evaluation time (half-open `effective_from <= t < effective_to`). A
+definite mandatory `FAIL` dominates other *gate-level* uncertainty, but it never
+overrides an invalid governing policy. Under `R0` "no headline is asserted"
+(ADR §6): the determination carries **no** gate results, while the trace still
+reports the full gate inventory and every failure diagnostically.
+
 **Why `R1` precedes `R2`.** ADR §8 / D-6 state `MANDATORY FAIL ⇒ NOT_READY`
 without exception, and `AgentValueReadinessDetermination` structurally *rejects*
 any other classification while a blocking gate is in the record — so reporting a
-gap as `NOT_ASSESSABLE` would require dropping the failure from the record.
-Every assessability gap is still recorded in the trace and reason codes when
-`R1` fires.
+completeness gap as `NOT_ASSESSABLE` would require dropping the failure from the
+record. Every assessability gap is still recorded in the trace and reason codes
+when `R1` fires.
+
+### Readiness requirements are policy/gate-driven
+
+Applicable requirements come from **`ReadinessPolicy.gates`**. The presence of
+`IntelligenceFitnessResult` / `CapabilityReadinessResult` /
+`AdoptionReadinessResult` records is **not** globally mandatory: the ratified
+applicable set (ADR §6) is defined over gates, `ReadinessPolicy` has no field
+able to declare a required indicator family, and the merged determination
+contract permits a ready classification with no indicator records at all. A
+requirement for an indicator therefore surfaces through **its applicable policy
+gate and that gate's `GateResult`**, never through bare tuple presence.
+
+Supplied indicator records remain **fully structurally validated** (tenant,
+subject, context binding, claim binding, uniqueness, immutability) and are
+carried through as diagnostics. A failing, advisory, reported or unverified
+indicator neither unlocks nor blocks a tier — the tier stays gate-driven.
 
 ### Gate-set completeness
 
@@ -141,8 +167,11 @@ classification, rule and reason-code tuple.
 a caller-supplied, unverified artifact, a permissive policy yields a permissive
 answer — in the limit, a policy declaring no gates has nothing to fail. The
 evaluator proves conformance *to the supplied policy*, never that the policy is
-the authentic, authority-issued one. Closing that gap is Policy-Authority and
-registry work, and is deferred.
+the authentic, authority-issued one. The `R0` lifecycle and effective-period
+checks are a **structural read of the supplied metadata** at the evaluation
+time: they do not authenticate, sign, resolve or approve the policy, and they do
+not replace Policy Authority or registry resolution. An `APPROVED_ACTIVE` label
+remains a caller assertion. Closing that gap is deferred.
 
 ## Type placement (why here, not governance-contracts)
 
