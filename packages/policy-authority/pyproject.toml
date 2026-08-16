@@ -1,0 +1,58 @@
+# Independent distribution for the shared, platform-wide Ugence Policy Authority.
+#
+# Internal platform infrastructure — NOT a customer-facing module, NOT a product,
+# and NOT a UVI engine. There is exactly one Policy Authority in Ugence, ratified
+# in docs/architecture/ADR_UGENCE_POLICY_AUTHORITY.md (P-1, P-10). It issues,
+# signs, registers, resolves, verifies and revokes policy versions for any policy
+# family that registers an adapter; **UVI policy schemas are its first adapter**
+# (P-2, P-9), shipped inside this distribution per ADR §10.3 with the core/adapter
+# boundary preserved in code.
+#
+# Approval remains EXTERNAL (P-5): the authority verifies externally produced
+# approval evidence through an injected boundary the composition root configures;
+# it never approves its own policy. It implements NO readiness evaluator, NO
+# financial valuation, NO forecasting, NO benchmark registry, NO runtime
+# authorization, and NO production persistence.
+#
+# Ed25519 signing follows the repository's existing stdlib-only RFC 8032 authority
+# convention (risk_authority/crypto/signing.py) WITHOUT importing that package — a
+# reverse dependency on another authority's internals is forbidden (UVI ADR §21).
+#
+# Build:    python -m build packages/policy-authority
+# Verify:   python packages/policy-authority/verify_policy_authority_distribution.py
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-policy-authority"
+dynamic = ["version"]
+description = "Ugence Policy Authority — shared platform-wide policy issuance, registry, trusted resolution and policy-version revocation (internal platform infrastructure)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["ugence", "policy", "authority", "issuance", "revocation", "platform"]
+# Exactly one direct runtime dependency: the UVI policy contracts, needed only by
+# the first policy-family adapter. The generic core is stdlib-only and imports no
+# policy family at all. ``ugence-governance-contracts`` is deliberately NOT
+# declared — nothing here imports it (an automated test enforces both facts).
+dependencies = ["ugence-uvi-policy-contracts>=0.1.0"]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_policy_authority.__version__" }
+
+# Exactly one top-level namespace ships. Tests, fixtures and probes are excluded.
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_policy_authority*"]
+
+[tool.setuptools.package-data]
+ugence_policy_authority = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
