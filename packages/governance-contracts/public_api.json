@@ -1,10 +1,10 @@
 {
   "distribution": "ugence-governance-contracts",
   "namespace": "ugence_governance_contracts",
-  "package_version": "0.2.0",
+  "package_version": "0.3.0",
   "contract_version": "1.0.0",
   "curated_api_module": "ugence_governance_contracts.api",
-  "note": "Machine-readable snapshot of the curated public API (ugence_governance_contracts.api.__all__). Generated from the installed package; tests/packaging/test_public_api.py asserts this file equals the actual package surface. Regenerate when the curated API changes (a contract/version transition).",
+  "note": "Machine-readable snapshot of the curated public API (ugence_governance_contracts.api.__all__). Generated from the installed package; tests/packaging/test_public_api.py asserts this file equals the actual package surface. Regenerate when the curated API changes (a contract/version transition). CONTRACT_VERSION is the PROVIDER-contract surface and stays 1.0.0: the GV-2E-a evidence family and the M-3R.3 neutral assessed-system identity family (AssessedSystemBinding, SystemBindingAuthenticityStatus, SystemIdentityContractError) are additive neutral families that do not change the provider contract. AssessedSystemBinding is the SINGLE canonical assessed-system identity contract for the platform (UVI ADR §20); ugence-agent-value-readiness re-exports these exact objects and defines no copy, subclass or parallel schema, so 'is' identity holds across both public APIs. Every binding field is a platform-neutral primitive (str/datetime): this leaf imports no UVI, readiness, authority or risk package, so no dependency cycle is possible. authenticity_status is a permanently STRUCTURAL_UNVERIFIED property and authenticity_verified a permanently-False property — no ratified system-binding verifier exists. SystemManifest and the RA-owned SubjectContext are NOT minted here; they are referenced by opaque, co-required ref+digest tokens.",
   "symbols": {
     "ActionGovernanceOutcome": {
       "kind": "enum",
@@ -86,6 +86,26 @@
         "explanation_refs",
         "provider_trace_id",
         "fingerprint"
+      ]
+    },
+    "AssessedSystemBinding": {
+      "kind": "dataclass",
+      "fields": [
+        "binding_id",
+        "tenant_id",
+        "subject_id",
+        "context_id",
+        "context_digest",
+        "system_id",
+        "system_version",
+        "configuration_id",
+        "configuration_digest",
+        "canonical_subject_context_ref",
+        "system_manifest_ref",
+        "system_manifest_digest",
+        "deployment_environment_ref",
+        "effective_from",
+        "effective_to"
       ]
     },
     "AssessmentWindow": {
@@ -409,6 +429,16 @@
         "SYNTHETIC",
         "MIXED"
       ]
+    },
+    "SystemBindingAuthenticityStatus": {
+      "kind": "enum",
+      "values": [
+        "STRUCTURAL_UNVERIFIED"
+      ]
+    },
+    "SystemIdentityContractError": {
+      "kind": "exception",
+      "failure_class": null
     },
     "TransformationMethod": {
       "kind": "enum",

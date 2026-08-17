@@ -42,11 +42,25 @@ UVI ADR D-1, D-16, §19 and §23.2 (fail closed on unsigned / unapproved /
 expired / revoked / superseded / digest-mismatched policy artifacts) and shared
 Policy Authority ADR §5 and §10.4 — and defines no milestone of its own. It
 **does not define a new readiness classification** and **does not replace or
-alter GV-3R-b**, whose precedence is untouched. It sits operationally *between*
-the deterministic evaluator and future **M-3R.3** integration work; **M-3R.3
-still owns** the `IntelligenceFitness` / `CapabilityReadiness` /
-`AdoptionReadiness` catalogs and `AssessedSystemBinding` wiring, and **remains
-open and unimplemented here**.
+alter GV-3R-b**, whose precedence is untouched.
+
+**Milestone M-3R.3 is implemented by this package.** It adds the
+`IntelligenceFitness` / `CapabilityReadiness` / `AdoptionReadiness` **indicator
+catalogs** and wires the **`AssessedSystemBinding`** through that *same* single
+entry point, answering two questions — *which exact system/configuration is being
+assessed?* and *which governed indicator definitions may describe that
+assessment?* — with no second classification algorithm and no new readiness tier.
+
+**Ownership (UVI ADR §20).** `AssessedSystemBinding`,
+`SystemBindingAuthenticityStatus` and `SystemIdentityContractError` are **owned by
+`ugence-governance-contracts`** (>= 0.3.0). This package **consumes** them: what
+it exports are **direct re-exports of the identical objects**, so
+`readiness_api.AssessedSystemBinding is governance_api.AssessedSystemBinding` and
+there is exactly one class identity, one canonical serialization and one digest.
+No copy, subclass, adapter or parallel schema exists here. What *is*
+readiness-owned: the three indicator catalogs and their definitions, the
+admission rules, the adapter that checks a binding against this assessment's
+`AssessmentContext`, the orchestration gap codes, and the trace.
 
 Policy **issuance, signing, approval verification, registration and revocation**
 stay with the shared Ugence Policy Authority; this package only **consumes** its
@@ -54,7 +68,7 @@ public trusted-resolution service.
 
 - **Distribution:** `ugence-agent-value-readiness`
 - **Namespace:** `ugence_agent_value_readiness`
-- **Version:** 0.3.0
+- **Version:** 0.4.0
 - **Depends on:** stdlib **+ `ugence-governance-contracts>=0.2.0`** (evidence vocabulary) **+ `ugence-uvi-policy-contracts>=0.1.0`** (policy/context shapes) **+ `ugence-policy-authority>=0.1.0`** (public trusted policy resolution only) — never `governed-value`, and never an authority internal.
 - **Typing:** fully annotated; ships `py.typed`.
 
@@ -67,6 +81,8 @@ public trusted-resolution service.
 | Determination envelope | `AgentValueReadinessDetermination` |
 | Readiness enums | `ReadinessClassification`, `GateStatus`, `ConditionStatus`, `ReadinessIndicatorClass`, `CapabilityDemonstration`, `IntelligenceDimension`, `CapabilityDimension`, `AdoptionDimension` |
 | Reused policy enums (re-exported) | `ReadinessTarget`, `RequirementClass` (owned by `ugence-uvi-policy-contracts`) |
+| **Assessed-system binding (M-3R.3)** | `AssessedSystemBinding`, `SystemBindingAuthenticityStatus` |
+| **Indicator catalogs (M-3R.3)** | `IntelligenceFitnessCatalog`, `CapabilityReadinessCatalog`, `AdoptionReadinessCatalog`, `IntelligenceFitnessIndicatorDefinition`, `CapabilityReadinessIndicatorDefinition`, `AdoptionReadinessIndicatorDefinition`, `ReadinessIndicatorCatalogSet` |
 | **Evaluator (GV-3R-b)** | `evaluate_readiness`, `ReadinessEvaluationCase`, `ReadinessEvaluationResult`, `ReadinessEvaluationTrace`, `ConditionDecision` |
 | **Evaluator codes** | `ReadinessRuleId`, `ReadinessReasonCode`, `ReadinessAdvisoryCode`, `ConditionDecisionCode` |
 | **Trusted orchestration** | `assess_readiness`, `ReadinessAssessmentRequest`, `ReadinessAssessmentOutcome`, `ReadinessAssessmentTrace`, `ReadinessAssessmentDisposition`, `READINESS_ORCHESTRATOR_VERSION` |
@@ -240,7 +256,7 @@ ratified `evaluate_readiness` exactly once over a freshly built case. An
 automated test proves no module outside the evaluator names a
 `ReadinessClassification` member or builds a `ReadinessEvaluationResult`.
 
-`READINESS_ORCHESTRATOR_VERSION` is `ugence.readiness-orchestration/v0.1` — a
+`READINESS_ORCHESTRATOR_VERSION` is `ugence.readiness-orchestration/v0.2` — a
 **platform-neutral capability identifier**, deliberately not an ADR milestone
 label, and separate from `EVALUATOR_FORMULA_VERSION`, which stays `GV-3R-b.3`.
 Every `ReadinessTrustGapCode` value carries the `READINESS_ORCHESTRATION_`
@@ -520,11 +536,74 @@ python packages/capabilities/agent-value-readiness/adversarial_probes.py
   resolved-body proof. Those verifications belong to Policy Authority and
   GV-3R-b. Readiness remains **advisory**; deployment governance is separate.
 
+## M-3R.3 — indicator catalogs and assessed-system binding
+
+### Catalogs define vocabulary; gates define requirements
+
+A catalog entry says exactly one thing: **"this is a recognized indicator
+definition."** It never says "this result is true, observed, attributed or
+verified". **Catalog membership is not evidence verification** — a supplied
+result's `MetricClaim` and all five evidence axes are carried through unchanged.
+
+Requirements come from the governing `ReadinessPolicy`'s gates, never from a
+catalog. There is no `required` flag, weight, multiplier, score, threshold value,
+benchmark value, tier, evidence status or monetary field on any catalog shape.
+**Binding an Intelligence, Capability or Adoption catalog makes no family
+globally mandatory**: a policy with no applicable Intelligence gate requires no
+Intelligence result merely because an Intelligence catalog exists, and zero
+indicators still produce the existing result when every policy-required gate is
+complete and verified. Domain-specific extension goes through the governed
+`metric_id`; the dimension enums are closed and cannot gain a runtime value.
+
+Catalog **entry order is canonicalized** to ascending `indicator_id` at
+construction, so input order is **not** digest-significant: two catalogs supplied
+in different orders are equal and share a canonical digest.
+
+### What `AssessedSystemBinding` proves, and what it does not
+
+It proves **internal consistency and digest-bound identity**. Two different
+systems, versions, configurations, tenants, subjects, contexts or manifest
+digests can never share a `canonical_digest()`, so a result bound to one binding
+is mechanically detectable when replayed under another.
+
+It does **not** prove the named system was ever really deployed, that
+`configuration_digest` was computed over the real configuration, that
+`system_manifest_ref` resolves to anything, or that any authority attested any of
+it. **`AssessedSystemBinding` is structural unless a verifier proves
+authenticity** — and no ratified system-binding verifier exists, so
+`authenticity_status` is a permanently `STRUCTURAL_UNVERIFIED` *property* and
+`authenticity_verified` a permanently `False` *property*. Neither is a settable
+field. A fully self-consistent binding a caller fabricated passes every check and
+is still only structural; every outcome carries the standing, permanently
+`OUT_OF_SCOPE` `SYSTEM_BINDING_AUTHENTICITY_NOT_VERIFIED` disposition saying so.
+
+`SystemManifest` **remains unresolved and unimplemented** — its home is an open
+owner decision (ADR §26.3), so no such type is minted in either package. PR
+#1432's RA-owned subject binding **remains additive and is not forked**
+(draft-only and unmerged, ADR D-14, §26.2): it is represented here **only**
+through the opaque `canonical_subject_context_ref` token, so a ratified contract
+can be pointed at later with no shape change and no version bump.
+
+### One required path
+
+`assess_readiness` **requires** an exact `AssessedSystemBinding`. A missing one
+produces `NOT_EVALUATED` — never a headline readiness result. No lower-trust
+unbound entry point is retained: the consumer audit found zero reverse
+dependencies on this package, and a retained unbound path would be a trivial
+bypass of every check above. Policy-resolution failure still **dominates**: under
+it no binding or catalog code is emitted at all.
+
+Readiness remains **advisory**. This package mints **no deployment
+authorization**.
+
 ## Deferred (out of scope)
 
-**Milestone M-3R.3 — the `IntelligenceFitness` / `CapabilityReadiness` /
-`AdoptionReadiness` catalogs and `AssessedSystemBinding` wiring — is open and
-unimplemented.** Nothing in this package implements, consumes or completes it.
+The **Benchmark Registry** and benchmark-value governance remain separate.
+**TAP / evidence verification** remains separate. **Condition runtime
+enforcement** remains separate. **Forecasting and every ROI stage** remain
+separate. **Structured policy successor/supersession references** remain
+separate. Agent Value Readiness contracts being structurally complete does
+**not** mean the UVI/ROI roadmap is complete.
 
 Also deferred: deployment authorization; policy signing, approval, issuance and revocation
 (owned by the shared Ugence Policy Authority, consumed here through its public
@@ -534,7 +613,9 @@ the verifier seam and ships only its deny-all default — it implements no
 verifier);
 machine-evaluable threshold semantics and metric-to-threshold calculation;
 structured successor/supersession references; **condition runtime enforcement**;
-`SubjectContext`/`AssessedSystemBinding` (RA-owned, PR #1425); a durable event
+the RA-owned canonical `SubjectContext` (draft-only, unmerged — referenced here
+only as an opaque `canonical_subject_context_ref` token); a ratified
+system-binding **authenticity verifier**; a durable event
 bus or **signed** determination record; forecasting, realization-probability
 modeling, attributed/verified return, financial valuation, and `governed-value`
 integration.

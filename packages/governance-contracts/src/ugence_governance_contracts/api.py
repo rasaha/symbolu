@@ -43,6 +43,7 @@ from .contracts import (
     AssertionGovernanceProvider,
     AssertionGovernanceRequest,
     AssertionGovernanceResult,
+    AssessedSystemBinding,
     AssessmentWindow,
     AttestationStatus,
     AttributionStatus,
@@ -64,6 +65,8 @@ from .contracts import (
     PopulationSlice,
     Provider,
     SourceBasis,
+    SystemBindingAuthenticityStatus,
+    SystemIdentityContractError,
     TransformationMethod,
     VerificationStatus,
 )
@@ -91,4 +94,7 @@ __all__ = [
     "EvidenceReference", "EvidenceProvenance", "BenchmarkReference",
     "AssessmentWindow", "ForecastHorizon", "PopulationSlice", "ConfidenceBasis",
     "MetricClaim", "MetricObservation",
+    # M-3R.3 neutral assessed-system identity (additive)
+    "AssessedSystemBinding", "SystemBindingAuthenticityStatus",
+    "SystemIdentityContractError",
 ]

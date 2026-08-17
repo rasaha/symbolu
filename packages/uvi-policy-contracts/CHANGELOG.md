@@ -95,6 +95,10 @@ first-class UVI policy families — schema + IR only, **no authority minted**.
   attribution/verification engine, financial valuation, or `governed-value`
   integration. `AssessedSystemBinding`/`SubjectContext` (RA-owned, PR #1425,
   unmerged) are a deferred dependency and are intentionally excluded.
+  *(Historical. `AssessedSystemBinding` is no longer deferred: it is owned by
+  `ugence-governance-contracts` >= 0.3.0 per UVI ADR §20 and consumed by
+  `ugence-agent-value-readiness`. It is still not defined in this package. The
+  RA-owned `SubjectContext` remains deferred and unmerged.)*
 
 ### Placement note
 - `AssessmentContext` is placed here (rather than in `governance-contracts`, the

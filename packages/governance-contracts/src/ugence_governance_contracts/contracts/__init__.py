@@ -21,6 +21,11 @@ from .execution import (
     ExecutionObservation,
     ExternalExecutionProvider,
 )
+from .system_identity import (
+    AssessedSystemBinding,
+    SystemBindingAuthenticityStatus,
+    SystemIdentityContractError,
+)
 from .evidence import (
     AssessmentWindow,
     AttestationStatus,
@@ -55,4 +60,8 @@ __all__ = [
     "EvidenceReference", "EvidenceProvenance", "BenchmarkReference",
     "AssessmentWindow", "ForecastHorizon", "PopulationSlice", "ConfidenceBasis",
     "MetricClaim", "MetricObservation",
+    # M-3R.3 neutral assessed-system identity (additive)
+    "AssessedSystemBinding",
+    "SystemBindingAuthenticityStatus",
+    "SystemIdentityContractError",
 ]

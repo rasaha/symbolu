@@ -29,10 +29,12 @@ from ugence_uvi_policy_contracts.api import PolicyReference, ReadinessTarget
 from ..contracts.enums import ConditionStatus, GateStatus, ReadinessClassification
 from ..evaluation.codes import EVALUATOR_FORMULA_VERSION
 from ..evaluation.trace import ReadinessEvaluationResult
+from ..contracts.enums import ReadinessIndicatorClass
 from .codes import (
     ORCHESTRATOR_ID,
     READINESS_ORCHESTRATOR_VERSION,
     ReadinessAssessmentStatus,
+    ReadinessIndicatorAdmissionStatus,
     ReadinessInputVerificationStatus,
     ReadinessTrustAdvisoryState,
 )
@@ -45,6 +47,7 @@ from ._util import (
 from .errors import ReadinessAssessmentError
 
 __all__ = [
+    "IndicatorAdmissionSummary",
     "GateVerificationSummary",
     "ConditionVerificationSummary",
     "ReadinessAssessmentDisposition",
@@ -68,6 +71,90 @@ def _tuple_of_str(value, name) -> tuple[str, ...]:
 # --------------------------------------------------------------------------- #
 # Per-input sanitization summaries
 # --------------------------------------------------------------------------- #
+@dataclass(frozen=True)
+class IndicatorAdmissionSummary:
+    """What happened to one supplied indicator result, and why (M-3R.3).
+
+    ``admitted`` records only that the result claims a **recognized indicator
+    definition**, in the right family, for the assessed system, applicable to the
+    requested target. That is a vocabulary decision and nothing more: it is not
+    evidence verification, and it never elevates the result's ``MetricClaim``
+    axes — a catalog says "this is a recognized indicator definition", never
+    "this result is true, observed, attributed or verified".
+
+    An excluded result influences readiness in no way and is never silently
+    dropped: it keeps its stable ``ReadinessIndicatorAdmissionStatus`` and the
+    precise trust-gap codes that excluded it.
+    """
+
+    result_id: str
+    indicator_class: ReadinessIndicatorClass
+    indicator_id: str
+    admission_status: ReadinessIndicatorAdmissionStatus
+    admitted: bool
+    catalog_id: str = ""
+    catalog_version: str = ""
+    trust_gap_codes: tuple[str, ...] = ()
+    detail: str = ""
+
+    def __post_init__(self) -> None:
+        _nonempty(self.result_id, "IndicatorAdmissionSummary.result_id")
+        if not isinstance(self.indicator_class, ReadinessIndicatorClass):
+            raise ReadinessAssessmentError(
+                "IndicatorAdmissionSummary.indicator_class must be a ReadinessIndicatorClass"
+            )
+        _require_str(self.indicator_id, "IndicatorAdmissionSummary.indicator_id")
+        if not isinstance(self.admission_status, ReadinessIndicatorAdmissionStatus):
+            raise ReadinessAssessmentError(
+                "IndicatorAdmissionSummary.admission_status must be a "
+                "ReadinessIndicatorAdmissionStatus"
+            )
+        if not isinstance(self.admitted, bool):
+            raise ReadinessAssessmentError("IndicatorAdmissionSummary.admitted must be a bool")
+        _require_str(self.catalog_id, "IndicatorAdmissionSummary.catalog_id")
+        _require_str(self.catalog_version, "IndicatorAdmissionSummary.catalog_version")
+        _tuple_of_str(self.trust_gap_codes, "IndicatorAdmissionSummary.trust_gap_codes")
+        _require_str(self.detail, "IndicatorAdmissionSummary.detail")
+        # "Admitted but uncataloged" and "excluded for no stated reason" are both
+        # unrepresentable, exactly as for gate and condition summaries.
+        if self.admitted:
+            if self.admission_status is not ReadinessIndicatorAdmissionStatus.ADMITTED:
+                raise ReadinessAssessmentError(
+                    "an admitted IndicatorAdmissionSummary must carry ADMITTED"
+                )
+            if self.trust_gap_codes:
+                raise ReadinessAssessmentError(
+                    "an admitted IndicatorAdmissionSummary must carry no trust gap"
+                )
+            if not (self.indicator_id and self.catalog_id and self.catalog_version):
+                raise ReadinessAssessmentError(
+                    "an admitted IndicatorAdmissionSummary must name the indicator definition "
+                    "and the exact catalog identity and version that recognized it"
+                )
+        else:
+            if self.admission_status is ReadinessIndicatorAdmissionStatus.ADMITTED:
+                raise ReadinessAssessmentError(
+                    "an excluded IndicatorAdmissionSummary must not carry ADMITTED"
+                )
+            if not self.trust_gap_codes:
+                raise ReadinessAssessmentError(
+                    "an excluded IndicatorAdmissionSummary must name at least one trust gap"
+                )
+
+    def canonical_payload(self) -> dict:
+        return {
+            "result_id": self.result_id,
+            "indicator_class": self.indicator_class.value,
+            "indicator_id": self.indicator_id,
+            "admission_status": self.admission_status.value,
+            "admitted": self.admitted,
+            "catalog_id": self.catalog_id,
+            "catalog_version": self.catalog_version,
+            "trust_gap_codes": list(self.trust_gap_codes),
+            "detail": self.detail,
+        }
+
+
 @dataclass(frozen=True)
 class GateVerificationSummary:
     """What happened to one supplied gate result, and why.
@@ -291,6 +378,14 @@ class ReadinessAssessmentTrace:
     rejected_gate_ids: tuple[str, ...] = ()
     admitted_condition_ids: tuple[str, ...] = ()
     rejected_condition_ids: tuple[str, ...] = ()
+    system_binding_accepted: bool = False
+    system_binding_ref: str = ""
+    system_binding_digest: str = ""
+    indicator_catalog_set_digest: str = ""
+    catalog_families_bound: tuple[str, ...] = ()
+    indicator_admissions: tuple[IndicatorAdmissionSummary, ...] = ()
+    admitted_indicator_result_ids: tuple[str, ...] = ()
+    excluded_indicator_result_ids: tuple[str, ...] = ()
     trust_gap_codes: tuple[str, ...] = ()
     dispositions: tuple[ReadinessAssessmentDisposition, ...] = ()
     orchestrator_id: str = ORCHESTRATOR_ID
@@ -349,9 +444,43 @@ class ReadinessAssessmentTrace:
             "rejected_gate_ids",
             "admitted_condition_ids",
             "rejected_condition_ids",
+            "catalog_families_bound",
+            "admitted_indicator_result_ids",
+            "excluded_indicator_result_ids",
             "trust_gap_codes",
         ):
             _tuple_of_str(getattr(self, name), f"ReadinessAssessmentTrace.{name}")
+        if not isinstance(self.system_binding_accepted, bool):
+            raise ReadinessAssessmentError(
+                "ReadinessAssessmentTrace.system_binding_accepted must be a bool"
+            )
+        _require_str(self.system_binding_ref, "ReadinessAssessmentTrace.system_binding_ref")
+        _require_str(self.system_binding_digest, "ReadinessAssessmentTrace.system_binding_digest")
+        _require_str(
+            self.indicator_catalog_set_digest,
+            "ReadinessAssessmentTrace.indicator_catalog_set_digest",
+        )
+        _tuple_of(
+            self.indicator_admissions,
+            IndicatorAdmissionSummary,
+            "ReadinessAssessmentTrace.indicator_admissions",
+        )
+        # Structural acceptance and authenticity are deliberately different
+        # facts. `system_binding_accepted` says the binding was internally
+        # consistent with this assessment's tenant, subject, context and
+        # instant — nothing more. Authenticity is never established here, and
+        # the standing SYSTEM_BINDING_AUTHENTICITY_NOT_VERIFIED disposition says
+        # so on every outcome, accepted or not.
+        if self.system_binding_accepted:
+            if not (self.system_binding_ref and self.system_binding_digest):
+                raise ReadinessAssessmentError(
+                    "an accepted system binding must name its reference and canonical digest"
+                )
+        elif self.system_binding_ref or self.system_binding_digest:
+            raise ReadinessAssessmentError(
+                "a ReadinessAssessmentTrace that did not accept its system binding must not "
+                "carry a binding reference or digest"
+            )
         _tuple_of(
             self.dispositions,
             ReadinessAssessmentDisposition,
@@ -411,6 +540,14 @@ class ReadinessAssessmentTrace:
             "rejected_gate_ids": list(self.rejected_gate_ids),
             "admitted_condition_ids": list(self.admitted_condition_ids),
             "rejected_condition_ids": list(self.rejected_condition_ids),
+            "system_binding_accepted": self.system_binding_accepted,
+            "system_binding_ref": self.system_binding_ref,
+            "system_binding_digest": self.system_binding_digest,
+            "indicator_catalog_set_digest": self.indicator_catalog_set_digest,
+            "catalog_families_bound": list(self.catalog_families_bound),
+            "indicator_admissions": [s.canonical_payload() for s in self.indicator_admissions],
+            "admitted_indicator_result_ids": list(self.admitted_indicator_result_ids),
+            "excluded_indicator_result_ids": list(self.excluded_indicator_result_ids),
             "trust_gap_codes": list(self.trust_gap_codes),
             "dispositions": [d.canonical_payload() for d in self.dispositions],
             "orchestrator_id": self.orchestrator_id,
@@ -542,6 +679,31 @@ class ReadinessAssessmentOutcome:
     @property
     def condition_verifications(self) -> tuple[ConditionVerificationSummary, ...]:
         return self.trace.condition_verifications
+
+    @property
+    def indicator_admissions(self) -> tuple[IndicatorAdmissionSummary, ...]:
+        return self.trace.indicator_admissions
+
+    @property
+    def system_binding_accepted(self) -> bool:
+        """Whether the assessed-system binding passed every structural check.
+
+        Structural acceptance only. It is **never** a claim that the described
+        system was really deployed or that any authority attested the binding —
+        see :attr:`system_binding_authenticity_verified`.
+        """
+
+        return self.trace.system_binding_accepted
+
+    @property
+    def system_binding_authenticity_verified(self) -> bool:
+        """Always ``False`` — no ratified system-binding verifier exists.
+
+        A read-only property, not a field: there is no assignment, constructor
+        argument or subclass hook that can make it ``True``.
+        """
+
+        return False
 
     @property
     def trust_gap_codes(self) -> tuple[str, ...]:

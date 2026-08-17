@@ -103,13 +103,28 @@ verified realized result.
 **Neutral references.** `EvidenceReference`, `EvidenceProvenance`,
 `BenchmarkReference`, `AssessmentWindow`, `ForecastHorizon`, `PopulationSlice`,
 `ConfidenceBasis` — immutable, digest-bound, timezone-aware, reusing the existing
-plain `tenant_id`/`subject_id` convention. The RA-owned canonical neutral
-subject-context contract is a **deferred dependency**; `AssessedSystemBinding` /
-`SubjectContext` are intentionally out of scope for GV-2E-a and are not defined
-here (no competing subject-context contract).
+plain `tenant_id`/`subject_id` convention.
+
+**Assessed-system identity (M-3R.3).** `AssessedSystemBinding` **is owned by this
+package** (UVI ADR §20) and lives in `contracts/system_identity.py` alongside
+`SystemBindingAuthenticityStatus` and `SystemIdentityContractError`. It is the
+single canonical answer to *which exact system, at which version, in which
+configuration, does this result describe?* — `ugence-agent-value-readiness`
+**re-exports these exact objects** and defines no copy, subclass or parallel
+schema. Every field is a platform-neutral primitive (`str` / `datetime`), so this
+leaf needs no UVI policy shape or readiness type to define it and no dependency
+cycle is possible; comparing a binding against an engine's own assessment context
+is that engine's adapter responsibility.
+
+The binding is **structural**: `authenticity_status` is a permanently
+`STRUCTURAL_UNVERIFIED` property and `authenticity_verified` a permanently-`False`
+property, because no ratified system-binding verifier exists. The RA-owned
+canonical neutral `SubjectContext` remains a **deferred dependency** (unmerged);
+it and `SystemManifest` are **not** minted here — both are referenced by opaque,
+co-required ref + digest tokens.
 
 **Compatibility.** Purely additive; `CONTRACT_VERSION` (the provider contract
-surface) is unchanged at `1.0.0`; the package version advances to `0.2.0`. The
+surface) is unchanged at `1.0.0`; the package version advances to `0.3.0`. The
 `governed-value` 0.2.0 kernel is unchanged; its compatibility mapping is
 **documentation only**: `EvidenceStatus.REPORTED → SourceBasis.REPORTED +
 TransformationMethod.DIRECT`; `AuthorityStatus.UNVERIFIED → AttestationStatus.UNATTESTED

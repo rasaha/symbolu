@@ -60,6 +60,14 @@ from ugence_uvi_policy_contracts.api import (
 )
 
 from ugence_agent_value_readiness.api import (
+    AdoptionReadinessCatalog,
+    AdoptionReadinessIndicatorDefinition,
+    AssessedSystemBinding,
+    CapabilityReadinessCatalog,
+    CapabilityReadinessIndicatorDefinition,
+    IntelligenceFitnessCatalog,
+    IntelligenceFitnessIndicatorDefinition,
+    ReadinessIndicatorCatalogSet,
     AdoptionDimension,
     AdoptionReadinessResult,
     CapabilityDemonstration,
@@ -87,6 +95,9 @@ T_MID = datetime(2026, 6, 1, tzinfo=timezone.utc)
 T_LATER = datetime(2026, 9, 1, tzinfo=timezone.utc)
 T_TO = datetime(2027, 1, 1, tzinfo=timezone.utc)
 T_AFTER = datetime(2027, 6, 1, tzinfo=timezone.utc)
+
+#: Sentinel distinguishing "not supplied" from an explicit ``None``.
+_UNSET = object()
 
 TENANT = "t1"
 SUBJECT = "a1"
@@ -427,9 +438,28 @@ def claim(cid="c1", tenant=TENANT, subject=SUBJECT) -> MetricClaim:
     )
 
 
-def indicators(target=PROD, tenant=TENANT, subject=SUBJECT, context_id=CONTEXT_ID):
-    """One applicable result for each of the three distinct indicator families."""
+def indicators(
+    target=PROD,
+    tenant=TENANT,
+    subject=SUBJECT,
+    context_id=CONTEXT_ID,
+    system_binding=None,
+):
+    """One applicable result for each of the three distinct indicator families.
 
+    When ``system_binding`` is supplied every result declares it, so the results
+    are admissible on the bound orchestration path. Without one they are
+    catalog- and system-unbound, exactly as an M-3R.1 record was.
+    """
+
+    bound = (
+        dict(
+            system_binding_ref=system_binding.binding_id,
+            system_binding_digest=system_binding.canonical_digest(),
+        )
+        if system_binding is not None
+        else {}
+    )
     common = dict(
         tenant_id=tenant,
         subject_id=subject,
@@ -438,11 +468,13 @@ def indicators(target=PROD, tenant=TENANT, subject=SUBJECT, context_id=CONTEXT_I
         requirement_class=MANDATORY,
         applicable_targets=(target,),
         status=GateStatus.PASS,
+        **bound,
     )
     return (
         (
             IntelligenceFitnessResult(
                 result_id="ir1",
+                indicator_id="ind-int-accuracy",
                 dimension=IntelligenceDimension.ACCURACY,
                 claim=claim("c-int", tenant, subject),
                 **common,
@@ -451,6 +483,7 @@ def indicators(target=PROD, tenant=TENANT, subject=SUBJECT, context_id=CONTEXT_I
         (
             CapabilityReadinessResult(
                 result_id="cr1",
+                indicator_id="ind-cap-tools",
                 dimension=CapabilityDimension.TOOL_READINESS,
                 claim=claim("c-cap", tenant, subject),
                 demonstration=CapabilityDemonstration.MET_THRESHOLD,
@@ -461,11 +494,117 @@ def indicators(target=PROD, tenant=TENANT, subject=SUBJECT, context_id=CONTEXT_I
         (
             AdoptionReadinessResult(
                 result_id="ar1",
+                indicator_id="ind-ado-utilization",
                 dimension=AdoptionDimension.EXPECTED_UTILIZATION,
                 claim=claim("c-ado", tenant, subject),
                 **common,
             ),
         ),
+    )
+
+
+SYSTEM_ID = "agent-sys-1"
+SYSTEM_VERSION = "1.4.2"
+CONFIG_ID = "cfg-prod-a"
+CONFIG_DIGEST = hashlib.sha256(b"configuration-a-bytes").hexdigest()
+CONFIG_DIGEST_B = hashlib.sha256(b"configuration-b-bytes").hexdigest()
+
+
+def binding(
+    *,
+    ctx,
+    tenant=TENANT,
+    subject=SUBJECT,
+    binding_id="bind-1",
+    system_id=SYSTEM_ID,
+    system_version=SYSTEM_VERSION,
+    configuration_id=CONFIG_ID,
+    configuration_digest=CONFIG_DIGEST,
+    **kwargs,
+) -> AssessedSystemBinding:
+    """The exact assessed system for ``ctx`` — structural, never authenticated."""
+
+    return AssessedSystemBinding(
+        binding_id=binding_id,
+        tenant_id=tenant,
+        subject_id=subject,
+        context_id=ctx.context_id,
+        context_digest=ctx.canonical_digest(),
+        system_id=system_id,
+        system_version=system_version,
+        configuration_id=configuration_id,
+        configuration_digest=configuration_digest,
+        **kwargs,
+    )
+
+
+def catalogs(
+    *,
+    target=PROD,
+    tenant="",
+    intelligence=True,
+    capability=True,
+    adoption=True,
+    metric_id="accuracy",
+) -> ReadinessIndicatorCatalogSet:
+    """A catalog set recognizing exactly the :func:`indicators` definitions."""
+
+    intel = (
+        IntelligenceFitnessCatalog(
+            catalog_id="cat-int",
+            catalog_version="1.0.0",
+            tenant_id=tenant,
+            entries=(
+                IntelligenceFitnessIndicatorDefinition(
+                    indicator_id="ind-int-accuracy",
+                    dimension=IntelligenceDimension.ACCURACY,
+                    metric_id=metric_id,
+                    task_or_outcome_ref="task",
+                    applicable_targets=(target,),
+                ),
+            ),
+        )
+        if intelligence
+        else None
+    )
+    cap = (
+        CapabilityReadinessCatalog(
+            catalog_id="cat-cap",
+            catalog_version="1.0.0",
+            tenant_id=tenant,
+            entries=(
+                CapabilityReadinessIndicatorDefinition(
+                    indicator_id="ind-cap-tools",
+                    dimension=CapabilityDimension.TOOL_READINESS,
+                    metric_id=metric_id,
+                    task_or_outcome_ref="task",
+                    applicable_targets=(target,),
+                ),
+            ),
+        )
+        if capability
+        else None
+    )
+    ado = (
+        AdoptionReadinessCatalog(
+            catalog_id="cat-ado",
+            catalog_version="1.0.0",
+            tenant_id=tenant,
+            entries=(
+                AdoptionReadinessIndicatorDefinition(
+                    indicator_id="ind-ado-utilization",
+                    dimension=AdoptionDimension.EXPECTED_UTILIZATION,
+                    metric_id=metric_id,
+                    task_or_outcome_ref="task",
+                    applicable_targets=(target,),
+                ),
+            ),
+        )
+        if adoption
+        else None
+    )
+    return ReadinessIndicatorCatalogSet(
+        intelligence=intel, capability=cap, adoption=ado
     )
 
 
@@ -484,12 +623,24 @@ def request(
     policy_ref=None,
     assessment_id=ASSESSMENT_ID,
     evidence_refs=(),
+    system_binding=_UNSET,
+    indicator_catalogs=_UNSET,
 ) -> ReadinessAssessmentRequest:
     ctx = ctx if ctx is not None else context(policy, tenant=tenant, subject=subject)
+    # The bound path is the only path, so the default request carries a valid
+    # binding. A test proves a *missing* binding by passing ``system_binding=None``.
+    if system_binding is _UNSET:
+        system_binding = binding(ctx=ctx, tenant=tenant, subject=subject)
+    if indicator_catalogs is _UNSET:
+        indicator_catalogs = catalogs(target=target) if with_indicators else None
     intel = cap = ado = ()
     if with_indicators:
         intel, cap, ado = indicators(
-            target=target, tenant=tenant, subject=subject, context_id=ctx.context_id
+            target=target,
+            tenant=tenant,
+            subject=subject,
+            context_id=ctx.context_id,
+            system_binding=system_binding,
         )
     return ReadinessAssessmentRequest(
         assessment_id=assessment_id,
@@ -506,6 +657,8 @@ def request(
         adoption_results=ado,
         advisory_composite=composite,
         evidence_refs=tuple(evidence_refs),
+        system_binding=system_binding,
+        indicator_catalogs=indicator_catalogs,
     )
 
 

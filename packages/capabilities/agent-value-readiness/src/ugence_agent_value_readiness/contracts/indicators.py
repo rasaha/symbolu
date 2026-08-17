@@ -11,6 +11,21 @@ None carries money, currency, cost, benefit, or ROI. A policy *requirement* for
 evidence never manufactures evidence, and embedding a claim never elevates its
 axes: whatever attestation/attribution/verification the claim carries is exactly
 what it carried before.
+
+M-3R.3 adds three **appended, optional** identity fields to each result:
+
+* ``indicator_id`` — the stable id of the governed catalog definition this
+  result claims to report against (see :mod:`~.catalogs`);
+* ``system_binding_ref`` / ``system_binding_digest`` — the neutral
+  governance-contracts ``AssessedSystemBinding`` the result was produced
+  against, co-required as a pair (both or neither).
+
+All three default to absent, so every M-3R.1 / M-3R.2 construction remains valid
+and the standalone evaluator is untouched. The orchestration boundary
+**requires** them on its bound path: a result naming no catalog definition, or
+carrying a different system binding, is either unrecognized vocabulary or a
+replay from another system version or configuration, and is excluded there
+rather than silently evaluated.
 """
 
 from __future__ import annotations
@@ -28,6 +43,7 @@ from ._util import (
     normalize_tokens,
     require_nonempty,
     require_tzaware,
+    validate_digest,
 )
 from .enums import (
     AdoptionDimension,
@@ -94,6 +110,34 @@ def _validate_common(self, owner: str) -> None:
     object.__setattr__(self, "reason_codes", normalize_tokens(self.reason_codes, f"{owner}.reason_codes"))
     if self.evaluated_at is not None:
         require_tzaware(self.evaluated_at, f"{owner}.evaluated_at")
+    _validate_system_binding(self, owner)
+
+
+def _validate_system_binding(self, owner: str) -> None:
+    """Normalize the optional assessed-system binding identity (M-3R.3).
+
+    The pair is co-required: a binding reference without its canonical digest
+    could be pointed at any system, and a digest without a reference names
+    nothing. Absent means "this result declares no system binding" — which the
+    orchestration boundary refuses on its bound path.
+    """
+
+    indicator_id = getattr(self, "indicator_id")
+    if not isinstance(indicator_id, str):
+        raise ReadinessContractError(f"{owner}.indicator_id must be a string")
+    object.__setattr__(self, "indicator_id", indicator_id.strip())
+
+    for name in ("system_binding_ref", "system_binding_digest"):
+        value = getattr(self, name)
+        if not isinstance(value, str):
+            raise ReadinessContractError(f"{owner}.{name} must be a string")
+        object.__setattr__(self, name, value.strip())
+    validate_digest(self.system_binding_digest, f"{owner}.system_binding_digest", required=False)
+    if bool(self.system_binding_ref) != bool(self.system_binding_digest):
+        raise ReadinessContractError(
+            f"{owner}.system_binding_ref and .system_binding_digest are co-required: a result "
+            "either declares the exact assessed system it was produced against, or declares none"
+        )
 
 
 @dataclass(frozen=True)
@@ -115,6 +159,9 @@ class IntelligenceFitnessResult:
     evidence_refs: tuple[str, ...] = ()
     reason_codes: tuple[str, ...] = ()
     evaluated_at: Optional[datetime] = None
+    indicator_id: str = ""
+    system_binding_ref: str = ""
+    system_binding_digest: str = ""
 
     def __post_init__(self) -> None:
         if not isinstance(self.dimension, IntelligenceDimension):
@@ -125,6 +172,18 @@ class IntelligenceFitnessResult:
     @property
     def indicator_class(self) -> ReadinessIndicatorClass:
         return ReadinessIndicatorClass.INTELLIGENCE
+
+    @property
+    def system_bound(self) -> bool:
+        """Whether this result names the exact assessed system it describes."""
+
+        return bool(self.system_binding_ref and self.system_binding_digest)
+
+    @property
+    def catalog_bound(self) -> bool:
+        """Whether this result names the governed indicator definition it claims."""
+
+        return bool(self.indicator_id)
 
     def canonical_digest(self) -> str:
         return canonical_digest(self)
@@ -160,6 +219,9 @@ class CapabilityReadinessResult:
     evidence_refs: tuple[str, ...] = ()
     reason_codes: tuple[str, ...] = ()
     evaluated_at: Optional[datetime] = None
+    indicator_id: str = ""
+    system_binding_ref: str = ""
+    system_binding_digest: str = ""
 
     def __post_init__(self) -> None:
         if not isinstance(self.dimension, CapabilityDimension):
@@ -174,6 +236,18 @@ class CapabilityReadinessResult:
     @property
     def indicator_class(self) -> ReadinessIndicatorClass:
         return ReadinessIndicatorClass.CAPABILITY
+
+    @property
+    def system_bound(self) -> bool:
+        """Whether this result names the exact assessed system it describes."""
+
+        return bool(self.system_binding_ref and self.system_binding_digest)
+
+    @property
+    def catalog_bound(self) -> bool:
+        """Whether this result names the governed indicator definition it claims."""
+
+        return bool(self.indicator_id)
 
     def canonical_digest(self) -> str:
         return canonical_digest(self)
@@ -207,6 +281,9 @@ class AdoptionReadinessResult:
     evidence_refs: tuple[str, ...] = ()
     reason_codes: tuple[str, ...] = ()
     evaluated_at: Optional[datetime] = None
+    indicator_id: str = ""
+    system_binding_ref: str = ""
+    system_binding_digest: str = ""
 
     def __post_init__(self) -> None:
         if not isinstance(self.dimension, AdoptionDimension):
@@ -222,6 +299,18 @@ class AdoptionReadinessResult:
     @property
     def indicator_class(self) -> ReadinessIndicatorClass:
         return ReadinessIndicatorClass.ADOPTION
+
+    @property
+    def system_bound(self) -> bool:
+        """Whether this result names the exact assessed system it describes."""
+
+        return bool(self.system_binding_ref and self.system_binding_digest)
+
+    @property
+    def catalog_bound(self) -> bool:
+        """Whether this result names the governed indicator definition it claims."""
+
+        return bool(self.indicator_id)
 
     def canonical_digest(self) -> str:
         return canonical_digest(self)

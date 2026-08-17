@@ -7,6 +7,11 @@ target-relative, expressed through explicit classifications, never a scalar.
 ``ReadinessTarget``, ``RequirementClass``, ``GateCategory`` are **reused** from
 ``ugence_uvi_policy_contracts`` (they are canonically owned there since GV-2C-a)
 and are re-exported from this package's API for convenience — not redefined here.
+
+``SystemBindingAuthenticityStatus`` is likewise **not** defined here: it belongs
+to the neutral ``ugence_governance_contracts`` leaf alongside
+``AssessedSystemBinding`` (UVI ADR §20), and this package re-exports the exact
+same object.
 """
 
 from __future__ import annotations

@@ -16,7 +16,9 @@ from enum import Enum
 __all__ = [
     "ORCHESTRATOR_ID",
     "READINESS_ORCHESTRATOR_VERSION",
+    "SYSTEM_BINDING_AUTHENTICITY_ADVISORY",
     "ReadinessAssessmentStatus",
+    "ReadinessIndicatorAdmissionStatus",
     "ReadinessInputVerificationStatus",
     "ReadinessTrustAdvisoryState",
     "ReadinessTrustGapCode",
@@ -30,17 +32,32 @@ ORCHESTRATOR_ID = "ugence.agent-value-readiness.trusted-readiness-orchestrator"
 #: is independently rechecked, or what fails closed).
 #:
 #: The identifier is deliberately **platform-neutral**: it names a capability,
-#: not an ADR milestone, and asserts **no** roadmap position. In particular it
-#: does not claim, consume or complete UVI ADR §25 ``M-3R.3``, which owns the
-#: Intelligence/Capability/Adoption **catalogs** and ``AssessedSystemBinding``
-#: wiring — neither of which this package implements. That milestone remains
-#: open and unimplemented.
+#: not an ADR milestone, and asserts **no** roadmap position.
+#:
+#: ``v0.2`` advances ``v0.1`` because the orchestration boundary itself changed:
+#: :func:`~..service.assess_readiness` now **requires** an exact
+#: ``AssessedSystemBinding`` and admits only catalog-recognized indicator
+#: results. There is exactly **one** entry point — no lower-trust unbound path
+#: is retained, so no second classification algorithm and no bypass exists.
 #:
 #: It is also deliberately **separate** from ``EVALUATOR_FORMULA_VERSION``
 #: (``GV-3R-b.3``): this boundary wraps the deterministic evaluator and
 #: introduces no second classification algorithm, so the evaluator's formula
 #: version does not move.
-READINESS_ORCHESTRATOR_VERSION = "ugence.readiness-orchestration/v0.1"
+READINESS_ORCHESTRATOR_VERSION = "ugence.readiness-orchestration/v0.2"
+
+#: The stable advisory token for the permanent system-binding trust boundary.
+#:
+#: An ``AssessedSystemBinding`` is a **structural** artifact: it proves internal
+#: consistency and digest-bound identity, never that the described system was
+#: really deployed or that any authority attested it. Orchestration therefore
+#: records this as a standing, permanently ``OUT_OF_SCOPE`` disposition rather
+#: than silently implying the binding was authenticated. It is a fixed token in
+#: the neutral ``READINESS_ORCHESTRATION_`` namespace — never free-form text —
+#: and closing it requires a separately ratified system-binding verifier.
+SYSTEM_BINDING_AUTHENTICITY_ADVISORY = (
+    "READINESS_ORCHESTRATION_SYSTEM_BINDING_AUTHENTICITY_NOT_VERIFIED"
+)
 
 
 class ReadinessAssessmentStatus(str, Enum):
@@ -55,6 +72,34 @@ class ReadinessAssessmentStatus(str, Enum):
     NOT_EVALUATED = "NOT_EVALUATED"
     #: The deterministic GV-3R-b evaluator ran exactly once over sanitized input.
     EVALUATED = "EVALUATED"
+
+
+class ReadinessIndicatorAdmissionStatus(str, Enum):
+    """Whether one supplied indicator result entered the sanitized case (M-3R.3).
+
+    Admission is a **vocabulary** decision, not an evidence decision: it records
+    that the result claims a recognized indicator definition, for the assessed
+    system, under the assessed context. It asserts nothing about whether the
+    underlying metric is true, observed, attributed or verified — those axes
+    live on the result's own ``MetricClaim`` and are carried through unchanged.
+
+    An excluded result influences readiness in **no** way. It is not downgraded,
+    not treated as a failure, and not silently dropped: it keeps a summary
+    naming the exact stable reason it was excluded.
+    """
+
+    #: Recognized by the bound catalog for its family and bound to this system.
+    ADMITTED = "ADMITTED"
+    #: No catalog is bound for this result's readiness family.
+    CATALOG_MISSING = "CATALOG_MISSING"
+    #: The bound catalog defines no entry with this indicator identity.
+    NOT_CATALOGED = "NOT_CATALOGED"
+    #: The cataloged definition disagrees about dimension, metric or target.
+    DEFINITION_MISMATCH = "DEFINITION_MISMATCH"
+    #: The result names a different assessed system binding, or names none.
+    SYSTEM_BINDING_MISMATCH = "SYSTEM_BINDING_MISMATCH"
+    #: More than one result was supplied for the same indicator identity.
+    DUPLICATE = "DUPLICATE"
 
 
 class ReadinessInputVerificationStatus(str, Enum):
@@ -162,6 +207,24 @@ class ReadinessTrustGapCode(str, Enum):
         "READINESS_ORCHESTRATION_POLICY_ARTIFACT_NOT_EFFECTIVE_AT_EVALUATION_TIME"
     )
 
+    # -- assessed-system binding (M-3R.3) ---------------------------------- #
+    #: No ``AssessedSystemBinding`` was supplied. There is exactly one
+    #: orchestration path and it requires one: an assessment that cannot say
+    #: **which** system it describes is ``NOT_EVALUATED``, never a headline.
+    SYSTEM_BINDING_REQUIRED = "READINESS_ORCHESTRATION_SYSTEM_BINDING_REQUIRED"
+    #: The binding names a different ``AssessmentContext`` identity or carries a
+    #: different canonical context digest than the assessment's own context.
+    SYSTEM_BINDING_CONTEXT_MISMATCH = "READINESS_ORCHESTRATION_SYSTEM_BINDING_CONTEXT_MISMATCH"
+    #: The binding's tenant is not the assessed tenant.
+    SYSTEM_BINDING_TENANT_MISMATCH = "READINESS_ORCHESTRATION_SYSTEM_BINDING_TENANT_MISMATCH"
+    #: The binding's subject is not the assessed subject.
+    SYSTEM_BINDING_SUBJECT_MISMATCH = "READINESS_ORCHESTRATION_SYSTEM_BINDING_SUBJECT_MISMATCH"
+    #: The binding's declared half-open effective period does not cover the
+    #: evaluation instant.
+    SYSTEM_BINDING_NOT_EFFECTIVE_AT_EVALUATION_TIME = (
+        "READINESS_ORCHESTRATION_SYSTEM_BINDING_NOT_EFFECTIVE_AT_EVALUATION_TIME"
+    )
+
     # -- gate-result verification ------------------------------------------ #
     #: No gate-result verifier was configured. Production default: deny.
     GATE_VERIFIER_NOT_CONFIGURED = "READINESS_ORCHESTRATION_GATE_VERIFIER_NOT_CONFIGURED"
@@ -239,6 +302,41 @@ class ReadinessTrustGapCode(str, Enum):
     #: The condition is not active at the evaluation instant (proposed, expired,
     #: revoked, satisfied, not yet effective, or its window has elapsed).
     CONDITION_NOT_ACTIVE_AT_EVALUATION_TIME = "READINESS_ORCHESTRATION_CONDITION_NOT_ACTIVE_AT_EVALUATION_TIME"
+
+    # -- indicator catalogs (M-3R.3) --------------------------------------- #
+    #: An indicator result was supplied for a readiness family with no bound
+    #: catalog, so no governed definition could recognize it. The result is
+    #: excluded; it is never treated as a requirement, a failure or a pass.
+    INDICATOR_CATALOG_MISSING = "READINESS_ORCHESTRATION_INDICATOR_CATALOG_MISSING"
+    #: A bound catalog does not govern the readiness family it was bound under —
+    #: an Adoption catalog can never stand in for an Intelligence one.
+    INDICATOR_CATALOG_FAMILY_MISMATCH = "READINESS_ORCHESTRATION_INDICATOR_CATALOG_FAMILY_MISMATCH"
+    #: A bound catalog is tenant-scoped to a different tenant, or the supplied
+    #: catalog set's canonical digest is not the one the request bound.
+    INDICATOR_CATALOG_REFERENCE_MISMATCH = (
+        "READINESS_ORCHESTRATION_INDICATOR_CATALOG_REFERENCE_MISMATCH"
+    )
+    #: The bound catalog for that family defines no entry with this indicator
+    #: identity. An uncataloged indicator is excluded and influences nothing.
+    INDICATOR_NOT_CATALOGED = "READINESS_ORCHESTRATION_INDICATOR_NOT_CATALOGED"
+    #: The cataloged definition binds a different family-specific dimension.
+    INDICATOR_CATALOG_DIMENSION_MISMATCH = (
+        "READINESS_ORCHESTRATION_INDICATOR_CATALOG_DIMENSION_MISMATCH"
+    )
+    #: The cataloged definition binds a different governed ``metric_id``, or a
+    #: different task/outcome reference than the result reports against.
+    INDICATOR_CATALOG_METRIC_MISMATCH = "READINESS_ORCHESTRATION_INDICATOR_CATALOG_METRIC_MISMATCH"
+    #: The cataloged definition does not apply to the requested readiness target.
+    INDICATOR_CATALOG_TARGET_MISMATCH = "READINESS_ORCHESTRATION_INDICATOR_CATALOG_TARGET_MISMATCH"
+    #: The result declares a different ``AssessedSystemBinding`` than the one
+    #: this assessment binds, or declares none. A result produced against one
+    #: system version or configuration is never replayed under another.
+    INDICATOR_RESULT_SYSTEM_BINDING_MISMATCH = (
+        "READINESS_ORCHESTRATION_INDICATOR_RESULT_SYSTEM_BINDING_MISMATCH"
+    )
+    #: More than one result was supplied for the same indicator identity. Every
+    #: copy is excluded — a conflict is never resolved by picking one.
+    INDICATOR_RESULT_DUPLICATE = "READINESS_ORCHESTRATION_INDICATOR_RESULT_DUPLICATE"
 
     # -- evaluator invocation ---------------------------------------------- #
     #: The sanitized case was still refused by the deterministic evaluator.

@@ -31,6 +31,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
 
+from ugence_governance_contracts.api import AssessedSystemBinding
 from ugence_uvi_policy_contracts.api import (
     AssessmentContext,
     PolicyFamily,
@@ -40,6 +41,7 @@ from ugence_uvi_policy_contracts.api import (
 )
 
 from ..contracts._util import coerce_tuple, normalize_tokens, require_nonempty, require_tzaware
+from ..contracts.catalogs import ReadinessIndicatorCatalogSet
 from ..contracts.composite import AdvisoryComposite
 from ..contracts.conditions import ConditionSet
 from ..contracts.enums import ConditionStatus, GateStatus
@@ -109,6 +111,22 @@ class ReadinessAssessmentRequest:
     Every sequence is normalized to a real tuple at construction, so mutating a
     caller-owned list afterwards can never reach the frozen request or change
     its :meth:`canonical_digest`.
+
+    M-3R.3 adds two shapes, both **optional on the dataclass and required by the
+    boundary**:
+
+    * ``system_binding`` — the exact governance-contracts ``AssessedSystemBinding``
+      this assessment is about. ``None`` is representable so that "no binding was
+      supplied" is a typed ``NOT_EVALUATED`` outcome rather than a constructor
+      exception; there is no second, unbound orchestration path.
+    * ``indicator_catalogs`` — the governed
+      :class:`~..contracts.catalogs.ReadinessIndicatorCatalogSet` an indicator
+      result must be recognized by. Binding a catalog for a family makes **no**
+      family required: requirements come from the resolved policy's gates.
+
+    Both participate in :meth:`canonical_digest` by canonical digest, so an
+    assessment of one system configuration can never share a request fingerprint
+    with an assessment of another.
     """
 
     assessment_id: str
@@ -126,6 +144,8 @@ class ReadinessAssessmentRequest:
     advisory_composite: Optional[AdvisoryComposite] = None
     evidence_refs: tuple[str, ...] = ()
     assessment_window_ref: str = ""
+    system_binding: Optional[AssessedSystemBinding] = None
+    indicator_catalogs: Optional[ReadinessIndicatorCatalogSet] = None
 
     def __post_init__(self) -> None:
         _raise_as_assessment_error(
@@ -189,6 +209,23 @@ class ReadinessAssessmentRequest:
         _require_str(
             self.assessment_window_ref, "ReadinessAssessmentRequest.assessment_window_ref"
         )
+        # M-3R.3 shapes are type-checked here and *semantically* checked by the
+        # orchestrator, which emits stable typed gap codes for every mismatch
+        # rather than raising — a caller must not be able to distinguish a
+        # rejected binding from a rejected catalog by exception type.
+        if self.system_binding is not None and not isinstance(
+            self.system_binding, AssessedSystemBinding
+        ):
+            raise ReadinessAssessmentError(
+                "ReadinessAssessmentRequest.system_binding must be an AssessedSystemBinding"
+            )
+        if self.indicator_catalogs is not None and not isinstance(
+            self.indicator_catalogs, ReadinessIndicatorCatalogSet
+        ):
+            raise ReadinessAssessmentError(
+                "ReadinessAssessmentRequest.indicator_catalogs must be a "
+                "ReadinessIndicatorCatalogSet"
+            )
 
     # ------------------------------------------------------------------ #
     def _normalize_sequence(self, field: str, expected: type) -> None:
@@ -267,6 +304,16 @@ class ReadinessAssessmentRequest:
                 ),
                 "evidence_refs": sorted(self.evidence_refs),
                 "assessment_window_ref": self.assessment_window_ref,
+                "system_binding": (
+                    self.system_binding.canonical_digest()
+                    if self.system_binding is not None
+                    else None
+                ),
+                "indicator_catalogs": (
+                    self.indicator_catalogs.canonical_digest()
+                    if self.indicator_catalogs is not None
+                    else None
+                ),
             }
         )
 

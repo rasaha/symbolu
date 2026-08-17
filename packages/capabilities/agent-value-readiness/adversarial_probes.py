@@ -78,7 +78,8 @@ from ugence_uvi_policy_contracts.api import (  # noqa: E402
 )
 
 import ugence_agent_value_readiness as R  # noqa: E402
-from ugence_agent_value_readiness.api import (  # noqa: E402
+from ugence_agent_value_readiness.api import (
+    AssessedSystemBinding,  # noqa: E402
     READINESS_ORCHESTRATOR_VERSION,
     AdoptionDimension,
     AdoptionReadinessResult,
@@ -364,8 +365,35 @@ def condition(cid="probe-cond", source="c1", status=ConditionStatus.APPROVED_ACT
     return ConditionSet(**kw)
 
 
+def system_binding(ctx, tenant="t1", subject="a1", **kw):
+    """The exact assessed system — structural identity only, never authenticated."""
+
+    base = dict(
+        binding_id="probe-binding",
+        tenant_id=tenant,
+        subject_id=subject,
+        context_id=ctx.context_id,
+        context_digest=ctx.canonical_digest(),
+        system_id="probe-system",
+        system_version="1.0.0",
+        configuration_id="probe-config",
+        configuration_digest=hashlib.sha256(b"probe-configuration").hexdigest(),
+    )
+    base.update(kw)
+    return AssessedSystemBinding(**base)
+
+
 def make_request(gate_results=(), conditions=(), **kwargs):
     kwargs.setdefault("context", context())
+    # M-3R.3: there is exactly one orchestration path and it requires a binding,
+    # so the default probe request carries one. A probe that tests the *absence*
+    # of a binding passes ``system_binding=None`` explicitly.
+    if "system_binding" not in kwargs:
+        kwargs["system_binding"] = system_binding(
+            kwargs["context"],
+            tenant=kwargs.get("tenant_id", "t1"),
+            subject=kwargs.get("subject_id", "a1"),
+        )
     return ReadinessAssessmentRequest(
         assessment_id=kwargs.pop("assessment_id", "probe-assessment"),
         tenant_id=kwargs.pop("tenant_id", "t1"),
@@ -1018,13 +1046,14 @@ def _():
 
 @probe("the orchestrator version is platform-neutral and claims no milestone")
 def _():
-    assert READINESS_ORCHESTRATOR_VERSION == "ugence.readiness-orchestration/v0.1"
-    # Platform-neutral: it names a capability, never an ADR milestone. It makes
-    # no claim on M-3R.3, which remains open and unimplemented.
+    assert READINESS_ORCHESTRATOR_VERSION == "ugence.readiness-orchestration/v0.2"
+    # Platform-neutral: it names a capability, never an ADR milestone. M-3R.3
+    # is implemented (v0.2 carries the binding and catalog stages), but the
+    # identifier still names no milestone — that is the invariant under test.
     lowered = READINESS_ORCHESTRATOR_VERSION.lower()
     for token in ("gv-3r", "gv3r", "m-3r", "m3r", "milestone"):
         assert token not in lowered, token
-    assert R.__version__ == "0.3.0"
+    assert R.__version__ == "0.4.0"
     outcome = run(make_request(ALL_PASS))
     assert outcome.trace.evaluator_formula_version == "GV-3R-b.3"
     assert outcome.evaluation.trace.formula_version == "GV-3R-b.3"

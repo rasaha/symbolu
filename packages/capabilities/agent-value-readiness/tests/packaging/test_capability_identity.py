@@ -1,10 +1,10 @@
 """The delivered capability identity says exactly what was built — no more.
 
 Trusted Readiness Orchestration is an **additive integration capability**
-implementing already-ratified UVI ADR D-1 / D-16 / §19 / §23.2 requirements. It
-is **not** milestone `M-3R.3`, which owns the Intelligence / Capability /
-Adoption catalogs and `AssessedSystemBinding` wiring and remains open and
-unimplemented here.
+implementing already-ratified UVI ADR D-1 / D-16 / §19 / §23.2 requirements.
+Milestone `M-3R.3` adds the Intelligence / Capability / Adoption catalogs and
+the `AssessedSystemBinding` wiring **through that same single entry point** —
+it adds no second classification algorithm and no new readiness tier.
 
 These guards pin that identity against the **delivered tree** — source,
 documentation, the public snapshot, the verifier and the probes. They
@@ -66,7 +66,7 @@ def _delivered_files():
 # 1-2. Version identity
 # --------------------------------------------------------------------------- #
 def test_the_orchestrator_version_is_the_platform_neutral_identifier():
-    assert api.READINESS_ORCHESTRATOR_VERSION == "ugence.readiness-orchestration/v0.1"
+    assert api.READINESS_ORCHESTRATOR_VERSION == "ugence.readiness-orchestration/v0.2"
 
 
 def test_the_orchestrator_version_names_no_adr_milestone():
@@ -117,11 +117,26 @@ def test_every_trust_gap_value_carries_the_neutral_namespace():
         assert member.value[len(GAP_PREFIX) :], member.value
 
 
+#: The 42 orchestration codes merged before M-3R.3. None may be renamed,
+#: repurposed or dropped; M-3R.3 only appends.
+MERGED_GAP_CODE_COUNT = 42
+#: The stable codes M-3R.3 adds: 5 system-binding + 9 catalog/indicator.
+M3R3_GAP_CODE_COUNT = 14
+
+
 def test_the_trust_gap_vocabulary_has_the_expected_cardinality():
-    """Renaming a namespace must not add, drop or merge a reason code."""
+    """M-3R.3 appends exactly its own codes and touches no merged one."""
 
     members = list(api.ReadinessTrustGapCode)
-    assert len(members) == 42
+    assert len(members) == MERGED_GAP_CODE_COUNT + M3R3_GAP_CODE_COUNT
+
+    m3r3 = [
+        m
+        for m in members
+        if m.name.startswith(("SYSTEM_BINDING_", "INDICATOR_CATALOG_", "INDICATOR_NOT_", "INDICATOR_RESULT_"))
+    ]
+    assert len(m3r3) == M3R3_GAP_CODE_COUNT, [m.name for m in m3r3]
+    assert len(members) - len(m3r3) == MERGED_GAP_CODE_COUNT
 
 
 def test_the_namespace_mapping_is_one_to_one_with_no_aliases():
@@ -175,93 +190,162 @@ def test_the_retired_reason_code_namespace_is_absent_from_the_delivered_tree():
 
 
 # --------------------------------------------------------------------------- #
-# 4-5. M-3R.3 is neither claimed nor implemented
+# 4-5. M-3R.3 is implemented, and claims exactly what it delivers
 # --------------------------------------------------------------------------- #
-COMPLETION_CLAIMS = (
-    "m-3r.3 is implemented",
-    "m-3r.3 implemented",
-    "m-3r.3 is complete",
-    "m-3r.3 complete",
-    "implements m-3r.3",
-    "completes m-3r.3",
-    "milestone m-3r.3 delivered",
-    "milestone m-3r.3+",
+#: Claims that would overstate the milestone or the wider roadmap.
+OVERCLAIMS = (
+    "benchmark registry is implemented",
+    "evidence verification is implemented",
+    "tap verification is implemented",
+    "condition enforcement is implemented",
+    "roi roadmap is complete",
+    "uvi roadmap is complete",
+    "this outcome authorizes deployment",
+    "deployment authorization is granted",
+    "grants deployment authorization",
 )
 
 
-def test_nothing_claims_m3r3_is_implemented_or_completed():
+#: Words that turn a claim into its denial. A guard that ignores them would
+#: flag the very sentences that keep the roadmap boundary honest.
+NEGATIONS = ("not ", "never", "no ", "n't", "remain", "stay", "separate", "deferred")
+
+
+def test_nothing_overclaims_a_deferred_capability():
+    """A deferred capability may be *named* — only never claimed as delivered.
+
+    The check is sentence-scoped and negation-aware: "the Benchmark Registry
+    remains separate" must pass, while "the Benchmark Registry is implemented"
+    must fail.
+    """
+
     offenders = {}
     for path in _delivered_files():
-        lowered = path.read_text().lower()
-        hits = [claim for claim in COMPLETION_CLAIMS if claim in lowered]
-        if hits:
-            offenders[str(path.relative_to(DIST_ROOT))] = hits
+        # Markdown emphasis is stripped first, so "does **not** mean" reads as
+        # a negation rather than as the token "not*".
+        text = path.read_text().lower().replace("\n", " ")
+        for mark in ("**", "*", "`", "_"):
+            text = text.replace(mark, " ")
+        for sentence in text.split("."):
+            hits = [claim for claim in OVERCLAIMS if claim in sentence]
+            if hits and not any(word in sentence for word in NEGATIONS):
+                offenders.setdefault(str(path.relative_to(DIST_ROOT)), []).extend(hits)
     assert not offenders, offenders
 
 
-def test_every_m3r3_mention_states_it_remains_open():
-    """`M-3R.3` may be named only to say it is still open and unimplemented."""
+def test_the_overclaim_guard_actually_catches_an_overclaim():
+    """The guard is not vacuous: an affirmative claim is detected."""
 
-    openness = (
-        "open",
-        "unimplemented",
-        "not implement",
-        "future",
-        "still owns",
-        "untouched",
-        "no claim",
-        "claims no",
-        "does not claim",
-    )
-    offenders = {}
-    for path in _delivered_files():
-        for number, line in enumerate(path.read_text().splitlines(), 1):
-            if "M-3R.3" not in line:
-                continue
-            window = " ".join(
-                path.read_text().splitlines()[max(0, number - 6) : number + 6]
-            ).lower()
-            if not any(word in window for word in openness):
-                offenders.setdefault(str(path.relative_to(DIST_ROOT)), []).append(number)
-    assert not offenders, offenders
+    affirmative = "the benchmark registry is implemented here "
+    assert any(claim in affirmative for claim in OVERCLAIMS)
+    assert not any(word in affirmative for word in NEGATIONS)
 
 
-def test_no_indicator_catalog_or_assessed_system_binding_was_introduced():
-    """The two M-3R.3 deliverables are absent from the public surface."""
+def test_the_two_m3r3_deliverables_are_on_the_public_surface():
+    """Both halves of the milestone ship, and both are curated exports."""
 
-    forbidden = ("assessedsystembinding", "systemmanifest", "indicatorcatalog", "catalog")
+    assert "AssessedSystemBinding" in api.__all__
+    for name in (
+        "IntelligenceFitnessCatalog",
+        "CapabilityReadinessCatalog",
+        "AdoptionReadinessCatalog",
+        "IntelligenceFitnessIndicatorDefinition",
+        "CapabilityReadinessIndicatorDefinition",
+        "AdoptionReadinessIndicatorDefinition",
+        "ReadinessIndicatorCatalogSet",
+    ):
+        assert name in api.__all__, name
+
+
+def test_no_system_manifest_was_invented():
+    """`SystemManifest`'s home is an open owner decision (ADR §26.3).
+
+    The binding references it by opaque ref + digest and mints no such type.
+    """
+
     for name in api.__all__:
-        assert not any(token in name.lower() for token in forbidden), name
+        assert "systemmanifest" not in name.lower().replace("_", ""), name
 
-    # And no module defines one either.
+    import ast
+
     for path in (p for p in PKG_ROOT.rglob("*.py") if "__pycache__" not in p.parts):
-        import ast
-
         tree = ast.parse(path.read_text(), filename=str(path))
         for node in ast.walk(tree):
             if isinstance(node, ast.ClassDef):
+                assert "systemmanifest" not in node.name.lower(), (path.name, node.name)
+
+
+def test_no_benchmark_registry_or_evidence_verifier_was_introduced():
+    """M-3R.3's explicit non-goals stay out of the public surface."""
+
+    import ast
+
+    for path in (p for p in PKG_ROOT.rglob("*.py") if "__pycache__" not in p.parts):
+        tree = ast.parse(path.read_text(), filename=str(path))
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.ClassDef, ast.FunctionDef)):
                 lowered = node.name.lower()
-                assert "assessedsystembinding" not in lowered, (path.name, node.name)
-                assert "catalog" not in lowered, (path.name, node.name)
+                for banned in ("benchmarkregistry", "evidenceverifier", "verifyevidence"):
+                    assert banned not in lowered.replace("_", ""), (path.name, node.name)
+
+
+def test_no_catalog_or_binding_type_carries_requirement_or_financial_vocabulary():
+    """Catalogs define vocabulary; gates define requirements (ADR §6, D-6)."""
+
+    banned_fields = (
+        "required",
+        "mandatory",
+        "weight",
+        "multiplier",
+        "score",
+        "threshold_value",
+        "benchmark_value",
+        "tier",
+        "classification",
+        "money",
+        "currency",
+        "cost",
+        "benefit",
+        "revenue",
+        "roi",
+        "value_amount",
+        "evidence_status",
+        "verification_status",
+    )
+    catalog_types = [
+        api.AssessedSystemBinding,
+        api.IntelligenceFitnessIndicatorDefinition,
+        api.CapabilityReadinessIndicatorDefinition,
+        api.AdoptionReadinessIndicatorDefinition,
+        api.IntelligenceFitnessCatalog,
+        api.CapabilityReadinessCatalog,
+        api.AdoptionReadinessCatalog,
+        api.ReadinessIndicatorCatalogSet,
+    ]
+    for cls in catalog_types:
+        for field in dataclasses.fields(cls):
+            lowered = field.name.lower()
+            for banned in banned_fields:
+                assert banned not in lowered, (cls.__name__, field.name)
 
 
 # --------------------------------------------------------------------------- #
 # 6-7. Package version and public API shape
 # --------------------------------------------------------------------------- #
-def test_the_package_version_is_unchanged():
-    assert R.__version__ == "0.3.0"
+def test_the_package_version_is_bumped_for_m3r3():
+    assert R.__version__ == "0.4.0"
     snapshot = json.loads((DIST_ROOT / "public_api.json").read_text())
-    assert snapshot["package_version"] == "0.3.0"
+    assert snapshot["package_version"] == "0.4.0"
 
 
 def test_the_snapshot_pins_the_exact_orchestrator_version_value():
     snapshot = json.loads((DIST_ROOT / "public_api.json").read_text())
     entry = snapshot["symbols"]["READINESS_ORCHESTRATOR_VERSION"]
-    assert entry == {"kind": "str", "value": "ugence.readiness-orchestration/v0.1"}
+    assert entry == {"kind": "str", "value": "ugence.readiness-orchestration/v0.2"}
 
 
-def test_the_public_api_surface_is_otherwise_unchanged():
-    """Only the version constant's value moved — no symbol, field or code did."""
+def test_the_public_api_snapshot_matches_the_actual_surface():
+    """Every exported name, dataclass field order and enum value is pinned."""
 
     snapshot = json.loads((DIST_ROOT / "public_api.json").read_text())["symbols"]
 

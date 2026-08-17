@@ -25,6 +25,14 @@ then proves inside that env:
     an unconfigured resolver or verifier denies, an unverified PASS cannot unlock
     readiness, an unverified condition cannot compensate, and no permissive
     verifier is present in the installed distribution;
+  * M-3R.3 holds from the wheel — ``assess_readiness`` REQUIRES an exact
+    ``AssessedSystemBinding`` (a missing one is ``NOT_EVALUATED``, never a
+    headline), a cross-tenant binding fails closed, two configurations of one
+    system cannot share a binding digest, binding a catalog creates NO
+    requirement for any indicator family, catalog entry order is not
+    digest-significant, the binding's authenticity is permanently
+    ``STRUCTURAL_UNVERIFIED``, and policy-resolution failure still dominates
+    every binding and catalog code;
   * the evaluator remains usable with NO orchestration configuration at all;
   * NO ``governed_value`` / capability / product / framework / third-party package
     is importable.
@@ -59,7 +67,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 import ugence_agent_value_readiness as r
-assert r.__version__ == "0.3.0", r.__version__
+assert r.__version__ == "0.4.0", r.__version__
 assert "site-packages" in r.__file__, r.__file__
 assert not any("/symbolu" in p for p in sys.path), sys.path
 import pathlib as _pl
@@ -275,9 +283,14 @@ from ugence_agent_value_readiness.api import (
     DenyAllGateResultVerifier, DenyAllReadinessPolicyResolver, GateResultVerification,
     PolicyAuthorityReadinessPolicyResolver, ReadinessAssessmentRequest, ReadinessAssessmentStatus,
     ReadinessInputVerificationStatus, ReadinessTrustAdvisoryState, ReadinessTrustGapCode,
+    AdoptionReadinessCatalog, AdoptionReadinessIndicatorDefinition, AssessedSystemBinding,
+    CapabilityReadinessCatalog, CapabilityReadinessIndicatorDefinition,
+    IntelligenceFitnessCatalog, IntelligenceFitnessIndicatorDefinition,
+    ReadinessIndicatorAdmissionStatus, ReadinessIndicatorCatalogSet,
+    SYSTEM_BINDING_AUTHENTICITY_ADVISORY, SystemBindingAuthenticityStatus,
     assess_readiness)
 
-assert READINESS_ORCHESTRATOR_VERSION == "ugence.readiness-orchestration/v0.1", READINESS_ORCHESTRATOR_VERSION
+assert READINESS_ORCHESTRATOR_VERSION == "ugence.readiness-orchestration/v0.2", READINESS_ORCHESTRATOR_VERSION
 # Platform-neutral identity: the shipped wheel claims no ADR milestone.
 for _tok in ("gv-3r", "gv3r", "m-3r", "m3r", "milestone"):
     assert _tok not in READINESS_ORCHESTRATOR_VERSION.lower(), _tok
@@ -312,8 +325,35 @@ class _V:
 
 def _gr(gid, st):
     return GateResult(policy_gate={g.gate_id: g for g in opol.gates}[gid], readiness_policy_ref=opol.reference, requested_target=PROD, status=st)
-def _req(grs, conds=()):
-    return ReadinessAssessmentRequest(assessment_id="orch-1", tenant_id="t1", subject_id="a1", context=octx, readiness_policy_ref=opol.reference, requested_target=PROD, evaluation_time=MID, gate_results=tuple(grs), conditions=tuple(conds))
+# ---- M-3R.3: the assessed-system binding and the indicator catalogs ------- #
+# There is exactly one orchestration path and it REQUIRES a binding, so every
+# request below carries one. The binding is structural: it proves identity and
+# digest consistency, never that the described system was really deployed.
+_obinding = AssessedSystemBinding(
+    binding_id="orch-binding", tenant_id="t1", subject_id="a1",
+    context_id=octx.context_id, context_digest=octx.canonical_digest(),
+    system_id="orch-system", system_version="1.0.0", configuration_id="orch-config",
+    configuration_digest=hashlib.sha256(b"orch-configuration").hexdigest())
+assert _obinding.authenticity_status is SystemBindingAuthenticityStatus.STRUCTURAL_UNVERIFIED
+assert _obinding.authenticity_verified is False
+assert [m.value for m in SystemBindingAuthenticityStatus] == ["STRUCTURAL_UNVERIFIED"]
+
+_ocatalogs = ReadinessIndicatorCatalogSet(
+    intelligence=IntelligenceFitnessCatalog(
+        catalog_id="wheel-int", catalog_version="1.0.0",
+        entries=(IntelligenceFitnessIndicatorDefinition(
+            indicator_id="ind-accuracy", dimension=IntelligenceDimension.ACCURACY,
+            metric_id="accuracy"),)),
+    capability=CapabilityReadinessCatalog(catalog_id="wheel-cap", catalog_version="1.0.0"),
+    adoption=AdoptionReadinessCatalog(catalog_id="wheel-ado", catalog_version="1.0.0"))
+# Catalog entry order is canonicalized, so it is not digest-significant.
+assert IntelligenceFitnessCatalog(catalog_id="k", catalog_version="1", entries=(
+    IntelligenceFitnessIndicatorDefinition(indicator_id="b", dimension=IntelligenceDimension.ACCURACY, metric_id="m"),
+    IntelligenceFitnessIndicatorDefinition(indicator_id="a", dimension=IntelligenceDimension.RELIABILITY, metric_id="m"),
+)).indicator_ids == ("a", "b")
+
+def _req(grs, conds=(), system_binding=_obinding, indicator_catalogs=None):
+    return ReadinessAssessmentRequest(assessment_id="orch-1", tenant_id="t1", subject_id="a1", context=octx, readiness_policy_ref=opol.reference, requested_target=PROD, evaluation_time=MID, gate_results=tuple(grs), conditions=tuple(conds), system_binding=system_binding, indicator_catalogs=indicator_catalogs)
 
 _all_pass = (_gr("m1", GateStatus.PASS), _gr("c1", GateStatus.PASS))
 _ok = assess_readiness(_req(_all_pass), policy_resolver=_resolver, gate_verifier=_V(), condition_verifier=_V())
@@ -322,8 +362,49 @@ assert _ok.classification is ReadinessClassification.DEPLOYMENT_READY, _ok.class
 assert _ok.trust_gap_codes == (), _ok.trust_gap_codes
 assert _ok.is_advisory is True and _ok.authorizes_deployment is False
 assert _ok.trace.evaluator_formula_version == "GV-3R-b.3"
-assert _ok.trace.orchestrator_version == "ugence.readiness-orchestration/v0.1"
+assert _ok.trace.orchestrator_version == "ugence.readiness-orchestration/v0.2"
 assert _ok.trace.issuance_record_ref == "orch-rec"
+assert _ok.system_binding_accepted is True
+assert _ok.system_binding_authenticity_verified is False
+assert _ok.trace.system_binding_ref == "orch-binding"
+assert _ok.trace.system_binding_digest == _obinding.canonical_digest()
+
+# A missing binding is NOT_EVALUATED — never a headline readiness result.
+_unbound = assess_readiness(_req(_all_pass, system_binding=None), policy_resolver=_resolver, gate_verifier=_V(), condition_verifier=_V())
+assert _unbound.status is ReadinessAssessmentStatus.NOT_EVALUATED, _unbound.status
+assert _unbound.classification is None and _unbound.evaluation is None
+assert ReadinessTrustGapCode.SYSTEM_BINDING_REQUIRED.value in _unbound.trust_gap_codes
+assert _unbound.trace.system_binding_ref == "" and _unbound.trace.system_binding_digest == ""
+
+# Structural acceptance and authenticity stay separate on every outcome.
+for _outcome in (_ok, _unbound):
+    _auth = [d for d in _outcome.dispositions if d.advisory_code == SYSTEM_BINDING_AUTHENTICITY_ADVISORY]
+    assert len(_auth) == 1, _auth
+    assert _auth[0].state is ReadinessTrustAdvisoryState.OUT_OF_SCOPE
+
+# Binding a catalog creates NO requirement: zero indicators still evaluates.
+_catalogued = assess_readiness(_req(_all_pass, indicator_catalogs=_ocatalogs), policy_resolver=_resolver, gate_verifier=_V(), condition_verifier=_V())
+assert _catalogued.classification is ReadinessClassification.DEPLOYMENT_READY, _catalogued.classification
+assert _catalogued.trace.catalog_families_bound == ("INTELLIGENCE", "CAPABILITY", "ADOPTION")
+assert _catalogued.indicator_admissions == ()
+assert _catalogued.trust_gap_codes == (), _catalogued.trust_gap_codes
+
+# A cross-tenant binding fails closed.
+_cross = AssessedSystemBinding(binding_id="orch-binding", tenant_id="another-tenant", subject_id="a1", context_id=octx.context_id, context_digest=octx.canonical_digest(), system_id="orch-system", system_version="1.0.0", configuration_id="orch-config", configuration_digest=hashlib.sha256(b"orch-configuration").hexdigest())
+_cross_out = assess_readiness(_req(_all_pass, system_binding=_cross), policy_resolver=_resolver, gate_verifier=_V(), condition_verifier=_V())
+assert _cross_out.status is ReadinessAssessmentStatus.NOT_EVALUATED
+assert ReadinessTrustGapCode.SYSTEM_BINDING_TENANT_MISMATCH.value in _cross_out.trust_gap_codes
+
+# Two configurations of one system can never share a binding digest.
+_cfg_b = AssessedSystemBinding(binding_id="orch-binding", tenant_id="t1", subject_id="a1", context_id=octx.context_id, context_digest=octx.canonical_digest(), system_id="orch-system", system_version="1.0.0", configuration_id="orch-config-b", configuration_digest=hashlib.sha256(b"orch-configuration-b").hexdigest())
+assert _obinding.system_id == _cfg_b.system_id
+assert _obinding.canonical_digest() != _cfg_b.canonical_digest()
+
+# Policy-resolution failure dominates: no binding or catalog code appears.
+_dominated = assess_readiness(_req(_all_pass, system_binding=None, indicator_catalogs=_ocatalogs))
+assert _dominated.status is ReadinessAssessmentStatus.NOT_EVALUATED
+assert ReadinessTrustGapCode.POLICY_RESOLVER_NOT_CONFIGURED.value in _dominated.trust_gap_codes
+assert not any("SYSTEM_BINDING" in _c or "INDICATOR" in _c for _c in _dominated.trust_gap_codes)
 
 # production defaults deny, and a denial asserts no headline at all
 _denied = assess_readiness(_req(_all_pass))
@@ -407,6 +488,11 @@ def main() -> int:
 
     print("[1/4] build the readiness wheel + its contract leaves and the shared authority")
     for name, src in SOURCES.items():
+        # A stale ``build/lib`` tree from an earlier build silently resurrects
+        # deleted modules into the wheel — which is exactly how a duplicate
+        # ``AssessedSystemBinding`` implementation could ship after the ADR §20
+        # move. Remove it so every wheel is built from the source tree alone.
+        shutil.rmtree(src / "build", ignore_errors=True)
         _run([sys.executable, "-m", "build", "--wheel", str(src), "-o", str(findlinks)])
     wheel = _latest(findlinks, "ugence_agent_value_readiness-*.whl")
     print(f"      built {wheel.name}")
@@ -417,7 +503,37 @@ def main() -> int:
     with zipfile.ZipFile(wheel) as z:
         names = set(z.namelist())
     assert "ugence_agent_value_readiness/py.typed" in names, "wheel is missing py.typed"
+    for banned in ("test", "fixture", "conftest", "probe", "adversarial"):
+        offenders = [n for n in names if banned in n.lower()]
+        assert not offenders, f"wheel ships {banned} artifacts: {sorted(offenders)[:5]}"
+
+    # ADR §20: the assessed-system binding is owned by governance-contracts.
+    # The readiness wheel must contain NO definition of it — not a module, not a
+    # copy, not a subclass. A stale build tree is the realistic way this
+    # regresses, so it is asserted against the built artifact itself.
+    assert "ugence_agent_value_readiness/contracts/binding.py" not in names, (
+        "the readiness wheel still ships the pre-move binding module"
+    )
+    for member in names:
+        if not member.endswith(".py"):
+            continue
+        with zipfile.ZipFile(wheel) as z:
+            source = z.read(member).decode("utf-8")
+        assert "class AssessedSystemBinding" not in source, (
+            f"the readiness wheel defines AssessedSystemBinding in {member}"
+        )
+        assert "class SystemBindingAuthenticityStatus" not in source, (
+            f"the readiness wheel defines SystemBindingAuthenticityStatus in {member}"
+        )
+
+    governance_wheel = _latest(findlinks, "ugence_governance_contracts-*.whl")
+    with zipfile.ZipFile(governance_wheel) as z:
+        governance_names = set(z.namelist())
+    assert "ugence_governance_contracts/contracts/system_identity.py" in governance_names, (
+        "the governance wheel does not ship the assessed-system identity contract"
+    )
     print("      wheel contains only ugence_agent_value_readiness/ (+ py.typed) + dist-info")
+    print("      and defines NO AssessedSystemBinding — it lives in the governance wheel")
 
     print("[3/4] create an isolated venv and install ONLY these local wheels (--no-index)")
     with tempfile.TemporaryDirectory() as td:
