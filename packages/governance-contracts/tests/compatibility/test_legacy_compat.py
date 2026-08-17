@@ -62,7 +62,7 @@ def test_contract_version_and_versions_preserved():
     # and unchanged again by the M-3R.3 neutral assessed-system identity family;
     # only the package __version__ advances (additive neutral contract families).
     assert gp_api.CONTRACT_VERSION == canon.CONTRACT_VERSION == "1.0.0"
-    assert canon.__version__ == "0.3.0"
+    assert canon.__version__ == "0.3.1"
 
 
 def test_isinstance_works_across_boundary():

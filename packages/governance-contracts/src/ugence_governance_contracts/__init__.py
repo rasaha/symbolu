@@ -16,7 +16,7 @@ Import the curated surface from :mod:`ugence_governance_contracts.api`.
 
 from __future__ import annotations
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 #: The provider-contract version this package publishes (unchanged from the
 #: pre-migration ``governance_providers`` framework value). The GV-2E-a evidence

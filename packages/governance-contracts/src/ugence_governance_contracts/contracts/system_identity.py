@@ -63,6 +63,30 @@ on an unratified artifact.
 ``deployment_environment_ref`` is likewise an opaque token: no environment
 enumeration is ratified anywhere in the repository, so none is invented.
 
+Instants are canonicalized in UTC
+---------------------------------
+Two timezone-aware datetimes that name the **same instant** are equal in Python
+and hash alike, so two bindings that differ only in the offset their instants
+were written with are the *same* binding. Canonicalization must agree: every
+aware datetime participating in :meth:`AssessedSystemBinding.canonical_bytes` is
+re-expressed in UTC — ``astimezone(timezone.utc)``, a pure arithmetic shift —
+*before* the package's established sorted-key JSON serialization runs. So
+``2026-08-17T10:00:00+00:00``, ``2026-08-17T15:30:00+05:30`` and
+``2026-08-17T06:00:00-04:00`` produce byte-identical canonical bytes and one
+digest, while a genuinely different instant still produces a different one.
+
+Naive datetimes remain **rejected**, at construction and again at
+canonicalization. A value with no offset does not name an instant, and guessing
+UTC for it would silently invent one; that is a rejection, never a default.
+
+This is a *correction*, not a second protocol: there is no legacy-digest
+fallback, dual acceptance rule, alias or translation layer. Bindings already
+expressed in UTC keep their exact pre-correction canonical bytes and digest —
+normalizing a UTC instant to UTC is the identity. A binding previously written
+with a non-UTC offset now canonicalizes to the UTC-normalized value it should
+always have had, so any digest recorded for such a representation changes to
+that value.
+
 Nothing here is money, cost, benefit, ROI, an approval, or a deployment
 authorization.
 """
@@ -74,7 +98,7 @@ import hashlib
 import json
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
 
@@ -135,16 +159,56 @@ def _require_tzaware(dt: object, name: str) -> None:
         raise SystemIdentityContractError(f"{name} must be timezone-aware")
 
 
-def _canonical_digest(obj) -> str:
-    """Deterministic sha-256 over a canonical JSON serialization.
+def _to_utc(value: datetime, name: str) -> datetime:
+    """Re-express an aware instant in UTC; reject a naive one.
 
-    The package's established fingerprint pattern (sorted-key, tight separators,
-    ``default=str``) — identical inputs yield an identical digest.
+    ``astimezone(timezone.utc)`` with an **explicit** target is pure arithmetic:
+    it subtracts the value's own ``utcoffset()``. No system clock, locale or
+    environment variable is consulted, and the local timezone is never inferred
+    — unlike the zero-argument ``astimezone()``, which is deliberately not used.
+
+    For a value already at offset ``+00:00`` this is the identity, which is what
+    keeps every pre-existing all-UTC canonical byte sequence and digest stable.
+    """
+
+    _require_tzaware(value, name)
+    return value.astimezone(timezone.utc)
+
+
+def _canonical_payload(obj) -> dict:
+    """The dataclass payload with every instant normalized to UTC.
+
+    Normalization happens **here**, on the plain payload, immediately before the
+    package's established serialization step — the serializer itself is
+    untouched. Every field of :class:`AssessedSystemBinding` is a scalar, so a
+    single pass over the payload reaches every datetime that participates in
+    canonicalization, including any added later.
     """
 
     payload = dataclasses.asdict(obj)
+    owner = type(obj).__name__
+    for name, value in payload.items():
+        if isinstance(value, datetime):
+            payload[name] = _to_utc(value, f"{owner}.{name}")
+    return payload
+
+
+def _canonical_bytes(obj) -> bytes:
+    """Deterministic canonical JSON bytes over the UTC-normalized payload.
+
+    The package's established fingerprint pattern (sorted-key, tight separators,
+    ``default=str``) — identical inputs yield identical bytes.
+    """
+
+    payload = _canonical_payload(obj)
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
-    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+    return encoded.encode("utf-8")
+
+
+def _canonical_digest(obj) -> str:
+    """Deterministic sha-256 over :func:`_canonical_bytes`."""
+
+    return hashlib.sha256(_canonical_bytes(obj)).hexdigest()
 
 
 # --------------------------------------------------------------------------- #
@@ -314,13 +378,32 @@ class AssessedSystemBinding:
             return False
         return True
 
+    def canonical_bytes(self) -> bytes:
+        """The exact bytes :meth:`canonical_digest` is computed over.
+
+        Every aware datetime is re-expressed in UTC before serialization, so two
+        bindings that are ``==`` — including ones whose instants were written
+        with different offsets — produce **byte-identical** output:
+
+        .. code-block:: python
+
+            if binding_a == binding_b:
+                assert binding_a.canonical_bytes() == binding_b.canonical_bytes()
+
+        A naive datetime is rejected here as it is at construction; UTC is never
+        assumed for a value that names no instant.
+        """
+
+        return _canonical_bytes(self)
+
     def canonical_digest(self) -> str:
         """Deterministic sha-256 over the **complete** binding identity.
 
         Two bindings that differ in any coordinate — including the system
         version, the configuration digest, the manifest digest or the tenant —
-        produce different digests. It is an identity fingerprint, not evidence,
-        not a signature and not an authenticity proof.
+        produce different digests, and two bindings that are equal produce the
+        same one. It is an identity fingerprint, not evidence, not a signature
+        and not an authenticity proof.
         """
 
         return _canonical_digest(self)

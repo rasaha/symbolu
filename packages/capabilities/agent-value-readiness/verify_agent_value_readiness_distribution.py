@@ -67,7 +67,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 import ugence_agent_value_readiness as r
-assert r.__version__ == "0.4.0", r.__version__
+assert r.__version__ == "0.4.1", r.__version__
 assert "site-packages" in r.__file__, r.__file__
 assert not any("/symbolu" in p for p in sys.path), sys.path
 import pathlib as _pl
@@ -337,6 +337,39 @@ _obinding = AssessedSystemBinding(
 assert _obinding.authenticity_status is SystemBindingAuthenticityStatus.STRUCTURAL_UNVERIFIED
 assert _obinding.authenticity_verified is False
 assert [m.value for m in SystemBindingAuthenticityStatus] == ["STRUCTURAL_UNVERIFIED"]
+
+# ADR §20 ownership, asserted from the INSTALLED wheels rather than the source
+# tree: these are the identical governance objects, not a copy or a subclass.
+import ugence_governance_contracts.api as _gapi
+from ugence_agent_value_readiness.api import SystemIdentityContractError as _SICE
+assert AssessedSystemBinding is _gapi.AssessedSystemBinding
+assert SystemBindingAuthenticityStatus is _gapi.SystemBindingAuthenticityStatus
+assert _SICE is _gapi.SystemIdentityContractError
+assert AssessedSystemBinding.__module__ == "ugence_governance_contracts.contracts.system_identity"
+assert AssessedSystemBinding.__subclasses__() == [], AssessedSystemBinding.__subclasses__()
+
+# The shared seam canonicalizes instants in UTC, so equal bindings are byte-equal
+# in the installed distribution too. Naive instants stay rejected.
+from datetime import timezone as _tzc, timedelta as _tdc
+def _at(_dt):
+    return AssessedSystemBinding(
+        binding_id="orch-binding", tenant_id="t1", subject_id="a1",
+        context_id=octx.context_id, context_digest=octx.canonical_digest(),
+        system_id="orch-system", system_version="1.0.0", configuration_id="orch-config",
+        configuration_digest=hashlib.sha256(b"orch-configuration").hexdigest(),
+        effective_from=_dt)
+_u = _at(datetime(2026, 8, 17, 10, 0, tzinfo=_tzc.utc))
+_i = _at(datetime(2026, 8, 17, 15, 30, tzinfo=_tzc(_tdc(hours=5, minutes=30))))
+_e = _at(datetime(2026, 8, 17, 6, 0, tzinfo=_tzc(_tdc(hours=-4))))
+assert _u == _i == _e
+assert _u.canonical_bytes() == _i.canonical_bytes() == _e.canonical_bytes()
+assert _u.canonical_digest() == _i.canonical_digest() == _e.canonical_digest()
+assert _at(datetime(2026, 8, 17, 10, 0, 1, tzinfo=_tzc.utc)).canonical_digest() != _u.canonical_digest()
+try:
+    _at(datetime(2026, 8, 17, 10, 0))
+    raise SystemExit("a naive datetime was accepted from the wheel")
+except _SICE:
+    pass
 
 _ocatalogs = ReadinessIndicatorCatalogSet(
     intelligence=IntelligenceFitnessCatalog(
