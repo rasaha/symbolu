@@ -34,7 +34,7 @@ import importlib.util, sys
 from datetime import datetime, timezone
 
 import risk_authority as ra
-assert ra.__version__ == "0.2.0", ra.__version__
+assert ra.__version__ == "0.3.0", ra.__version__
 assert "site-packages" in ra.__file__, ra.__file__
 assert not any("/symbolu" in p for p in sys.path), sys.path
 
@@ -192,6 +192,125 @@ refapp = RiskAuthorityApplication(workflow_source=psrc, key_record=key, clock=la
 assert isinstance(refapp._authority_service, ReferenceDecisionAuthority)
 print("ISOLATED SINGLE-WHEEL RISK-AUTHORITY FACADE CONTAINMENT VERIFICATION OK")
 print("ISOLATED SINGLE-WHEEL RISK-AUTHORITY SEAM (PR-1) VERIFICATION OK")
+
+# --- Phase 4A: v2 subject-context contracts + pure binding validation, installed ------
+from datetime import timedelta
+from risk_authority.integrations import (SubjectContext, SubjectBinding,
+    SubjectRiskEvaluationRequestV2, SubjectBindingValidation, SubjectBindingError,
+    validate_subject_binding, SUBJECT_CONTEXT_SCHEMA_VERSION, SUBJECT_BINDING_SCHEMA_VERSION,
+    EVALUATION_REQUEST_SCHEMA_VERSION, EVALUATION_REQUEST_SCHEMA_VERSION_V2,
+    SUPPORTED_REQUEST_SCHEMA_VERSIONS)
+
+assert SUBJECT_CONTEXT_SCHEMA_VERSION == "risk-subject-context-1"
+assert SUBJECT_BINDING_SCHEMA_VERSION == "risk-subject-binding-1"
+assert EVALUATION_REQUEST_SCHEMA_VERSION_V2 == "risk-subject-evaluation-request-2"
+# The seam's accepted set is unchanged by Phase 4A (validation is not wired in yet).
+assert SUPPORTED_REQUEST_SCHEMA_VERSIONS == frozenset({EVALUATION_REQUEST_SCHEMA_VERSION})
+
+vt0 = datetime(2026, 8, 13, 4, 0, 0, tzinfo=timezone.utc)
+vctx = SubjectContext(action_type="scale_up", subject_asserted_at=vt0, subject_valid_from=vt0,
+    subject_valid_until=vt0 + timedelta(minutes=15), environment="prod", region="eu-west-1",
+    zone=None, compute_group="cluster-7", resource_class="web",
+    magnitude_before=6, magnitude_after=9)
+# The ADR §5.3 worked example reproduces byte-for-byte from the installed wheel.
+assert vctx.digest() == "sha256:9af3f626a08e888a2916215a59c965e221179388ba3987cbbc6b2e0e64cfdbb0", vctx.digest()
+vbind = SubjectBinding(tenant_id="tnt-acme", subject_id="wl-checkout-api",
+    subject_type="cloud_scaling.capacity_action",
+    recommendation_digest="sha256:" + "1" * 64, context_digest=vctx.digest())
+assert vbind.digest() == "sha256:eb4526a6679470e603bbc757cde7cfac9c7b2258256eaecef729e356a1df6c38", vbind.digest()
+# strict round trips
+assert SubjectContext.from_dict(vctx.to_canonical_dict()) == vctx
+assert SubjectBinding.from_dict(vbind.to_canonical_dict()) == vbind
+
+vreq = SubjectRiskEvaluationRequestV2(subject_type="cloud_scaling.capacity_action",
+    subject_id="wl-checkout-api", subject_digest=vbind.digest(), tenant_id="tnt-acme",
+    requested_purpose="cloud_scaling.capacity_action", requested_domain="cloud_scaling",
+    requested_scope=Scope(purposes=("cloud_scaling.capacity_action",)),
+    evidence_references=("sha256:aaa", "sha256:bbb"), correlation_id="corr-42",
+    subject_context=vctx, recommendation_digest="sha256:" + "1" * 64)
+assert SubjectRiskEvaluationRequestV2.from_dict(vreq.to_canonical_dict()).digest() == vreq.digest()
+
+# Frozen canonical identity of risk-subject-evaluation-request-2 (audit F-3), asserted
+# from the INSTALLED wheel so a packaging or serialization drift is caught here too.
+# This is also the corrected ADR 5.3 worked request digest.
+assert vreq.digest() == "sha256:cd6dc88a3123959da32df7e03e936867416120099bdd303ebc954c6f04bdbcfb", vreq.digest()
+assert SubjectRiskEvaluationRequestV2.from_dict(vreq.to_canonical_dict()).digest() == vreq.digest()
+
+vres = validate_subject_binding(vreq)
+assert isinstance(vres, SubjectBindingValidation)
+assert vres.subject_digest == vbind.digest() and vres.context_digest == vctx.digest()
+# validating a binding grants NOTHING
+assert (vres.policy_resolved, vres.risk_evaluated, vres.authority_granted, vres.envelope_issued,
+        vres.actiongate_invoked, vres.actuation_performed, vres.effect_verified,
+        vres.executable) == (False,) * 8
+
+# altered raw context + stale subject_digest fails closed
+vtampered = SubjectContext(action_type="scale_up", subject_asserted_at=vt0, subject_valid_from=vt0,
+    subject_valid_until=vt0 + timedelta(minutes=15), environment="staging", region="eu-west-1",
+    zone=None, compute_group="cluster-7", resource_class="web",
+    magnitude_before=6, magnitude_after=9)
+try:
+    validate_subject_binding(SubjectRiskEvaluationRequestV2(
+        subject_type="cloud_scaling.capacity_action", subject_id="wl-checkout-api",
+        subject_digest=vbind.digest(), tenant_id="tnt-acme",
+        requested_purpose="cloud_scaling.capacity_action", requested_domain="cloud_scaling",
+        requested_scope=Scope(purposes=("cloud_scaling.capacity_action",)),
+        subject_context=vtampered, recommendation_digest="sha256:" + "1" * 64))
+    raise AssertionError("stale subject_digest over an altered context was accepted")
+except SubjectBindingError:
+    pass
+# a v1 request is never auto-converted into the v2 validator
+try:
+    validate_subject_binding(sreq)
+    raise AssertionError("a v1 request was accepted by the v2 binding validator")
+except SubjectBindingError:
+    pass
+
+# Integrity, NOT authenticity (audit F-2): a FULLY self-consistent fabricated request is
+# accepted by the pure structural validator -- every digest recomputed by the caller, a
+# foreign tenant, and a recommendation_digest corresponding to no recommendation. This is
+# expected: Phase 4A proves canonical consistency; source authenticity is the future
+# adapter's job (reconstruct the recommendation, recompute rec.digest(), require equality).
+vforged_ctx = SubjectContext(action_type="scale_up", subject_asserted_at=vt0,
+    subject_valid_from=vt0, subject_valid_until=vt0 + timedelta(minutes=15),
+    environment="staging", magnitude_before=1, magnitude_after=99999)
+vforged_bind = SubjectBinding(tenant_id="tnt-victim", subject_id="wl-someone-else",
+    subject_type="cloud_scaling.capacity_action", recommendation_digest="sha256:" + "f" * 64,
+    context_digest=vforged_ctx.digest())
+vforged = SubjectRiskEvaluationRequestV2(subject_type="cloud_scaling.capacity_action",
+    subject_id="wl-someone-else", subject_digest=vforged_bind.digest(),
+    tenant_id="tnt-victim", requested_purpose="cloud_scaling.capacity_action",
+    requested_domain="cloud_scaling",
+    requested_scope=Scope(purposes=("cloud_scaling.capacity_action",)),
+    subject_context=vforged_ctx, recommendation_digest="sha256:" + "f" * 64)
+assert validate_subject_binding(vforged).tenant_id == "tnt-victim"
+# ...and it still cannot enter the seam, so consistency-only is not a hole today.
+try:
+    seam.evaluate(vforged)
+    raise AssertionError("the seam accepted a v2 request")
+except SeamConfigurationError:
+    pass
+
+# The two DISTINCT seam fail-closed behaviors (audit F-1), asserted from the wheel:
+#   genuine v2 object  -> SeamConfigurationError at the v1 isinstance type boundary
+#   v1 object + foreign schema tag -> typed NOT_EVALUATED(UNSUPPORTED_SCHEMA_VERSION)
+try:
+    seam.evaluate(vreq)
+    raise AssertionError("the seam accepted a genuine v2 request object")
+except SeamConfigurationError:
+    pass
+_stale = SubjectRiskEvaluationRequest(subject_type="x", subject_id="s", subject_digest="d",
+    tenant_id="t", requested_purpose="SCALE", requested_domain="SCALING",
+    requested_scope=sscope, evaluation_time=now,
+    schema_version=EVALUATION_REQUEST_SCHEMA_VERSION_V2)
+_r = seam.evaluate(_stale)
+assert _r.disposition is SubjectRiskDisposition.NOT_EVALUATED, _r.disposition
+assert _r.non_decision_reason is SubjectRiskNonDecisionReason.UNSUPPORTED_SCHEMA_VERSION
+# v1 remains byte-for-byte intact alongside the new layer
+assert SubjectRiskEvaluationRequest.from_dict(sreq.to_canonical_dict()).digest() == sreq.digest()
+assert "subject_context" not in sreq.to_canonical_dict()
+assert "recommendation_digest" not in sreq.to_canonical_dict()
+print("ISOLATED SINGLE-WHEEL RISK-AUTHORITY v2 SUBJECT-CONTEXT (PHASE 4A) VERIFICATION OK")
 
 print("ISOLATED SINGLE-WHEEL RISK-AUTHORITY VERIFICATION OK")
 '''
