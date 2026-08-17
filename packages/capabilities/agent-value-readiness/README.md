@@ -243,9 +243,9 @@ automated test proves no module outside the evaluator names a
 `READINESS_ORCHESTRATOR_VERSION` is `ugence.readiness-orchestration/v0.1` — a
 **platform-neutral capability identifier**, deliberately not an ADR milestone
 label, and separate from `EVALUATOR_FORMULA_VERSION`, which stays `GV-3R-b.3`.
-The `GV3RC_` prefix on `ReadinessTrustGapCode` values is a **frozen opaque
-token**: it participates in canonical trace digests, so it is retained
-unchanged, and it carries no milestone meaning.
+Every `ReadinessTrustGapCode` value carries the `READINESS_ORCHESTRATION_`
+namespace — a platform-neutral capability prefix that names no ADR milestone.
+These are stable tokens consumers may branch on.
 
 ### The four stages, and what each failure means
 

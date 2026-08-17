@@ -110,140 +110,138 @@ class ReadinessTrustGapCode(str, Enum):
     Emitted in declaration order. Every gap is explicit: nothing is silently
     accepted, downgraded to a warning, or folded into a generic failure.
 
-    The ``GV3RC_`` prefix is a **frozen, opaque token**, retained deliberately.
-    It is an identifier consumers may already branch on and it participates in
-    canonical trace digests, so renaming it would change published behaviour to
-    make a cosmetic point. It carries **no** milestone meaning: it does not name
-    an ADR milestone, does not assert a roadmap position, and specifically makes
-    no claim on ``M-3R.3``. Values here are never repurposed.
+    Every value carries the ``READINESS_ORCHESTRATION_`` namespace: a
+    platform-neutral capability prefix that names no ADR milestone and asserts
+    no roadmap position. Values are stable tokens consumers may branch on and
+    are never repurposed.
     """
 
     # -- policy resolution -------------------------------------------------- #
     #: No trusted readiness-policy resolver was configured. Production default.
-    POLICY_RESOLVER_NOT_CONFIGURED = "GV3RC_POLICY_RESOLVER_NOT_CONFIGURED"
+    POLICY_RESOLVER_NOT_CONFIGURED = "READINESS_ORCHESTRATION_POLICY_RESOLVER_NOT_CONFIGURED"
     #: The configured resolver raised. A failure is never a resolution.
-    POLICY_RESOLVER_ERROR = "GV3RC_POLICY_RESOLVER_ERROR"
+    POLICY_RESOLVER_ERROR = "READINESS_ORCHESTRATION_POLICY_RESOLVER_ERROR"
     #: The configured resolver returned something that is not a
     #: ``PolicyResolution`` — a duck-typed answer is refused, not inspected.
-    POLICY_RESOLVER_MALFORMED_RESULT = "GV3RC_POLICY_RESOLVER_MALFORMED_RESULT"
+    POLICY_RESOLVER_MALFORMED_RESULT = "READINESS_ORCHESTRATION_POLICY_RESOLVER_MALFORMED_RESULT"
     #: The shared authority did not resolve the exact reference at that instant.
-    POLICY_RESOLUTION_UNRESOLVED = "GV3RC_POLICY_RESOLUTION_UNRESOLVED"
+    POLICY_RESOLUTION_UNRESOLVED = "READINESS_ORCHESTRATION_POLICY_RESOLUTION_UNRESOLVED"
     #: The answer is explicitly historical. A historical answer describes the
     #: past and never implies current validity, so it cannot govern a readiness
     #: assessment at ``evaluation_time``.
     POLICY_RESOLUTION_HISTORICAL_NOT_ACCEPTED = (
-        "GV3RC_POLICY_RESOLUTION_HISTORICAL_NOT_ACCEPTED"
+        "READINESS_ORCHESTRATION_POLICY_RESOLUTION_HISTORICAL_NOT_ACCEPTED"
     )
     #: The resolution carries no issuance record to bind provenance to.
     POLICY_RESOLUTION_ISSUANCE_RECORD_MISSING = (
-        "GV3RC_POLICY_RESOLUTION_ISSUANCE_RECORD_MISSING"
+        "READINESS_ORCHESTRATION_POLICY_RESOLUTION_ISSUANCE_RECORD_MISSING"
     )
     #: The resolved artifact is not a ``ReadinessPolicy``.
     POLICY_RESOLUTION_ARTIFACT_NOT_A_READINESS_POLICY = (
-        "GV3RC_POLICY_RESOLUTION_ARTIFACT_NOT_A_READINESS_POLICY"
+        "READINESS_ORCHESTRATION_POLICY_RESOLUTION_ARTIFACT_NOT_A_READINESS_POLICY"
     )
     #: The resolved artifact's complete ``PolicyReference`` (family, id, version,
     #: content digest, scope, tenant) is not the requested one.
-    POLICY_RESOLUTION_REFERENCE_MISMATCH = "GV3RC_POLICY_RESOLUTION_REFERENCE_MISMATCH"
+    POLICY_RESOLUTION_REFERENCE_MISMATCH = "READINESS_ORCHESTRATION_POLICY_RESOLUTION_REFERENCE_MISMATCH"
     #: The requested reference's tenant identity is not the assessed tenant.
-    POLICY_RESOLUTION_TENANT_MISMATCH = "GV3RC_POLICY_RESOLUTION_TENANT_MISMATCH"
+    POLICY_RESOLUTION_TENANT_MISMATCH = "READINESS_ORCHESTRATION_POLICY_RESOLUTION_TENANT_MISMATCH"
     #: The resolution's ``as_of`` is not the requested evaluation instant.
-    POLICY_RESOLUTION_AS_OF_MISMATCH = "GV3RC_POLICY_RESOLUTION_AS_OF_MISMATCH"
+    POLICY_RESOLUTION_AS_OF_MISMATCH = "READINESS_ORCHESTRATION_POLICY_RESOLUTION_AS_OF_MISMATCH"
     #: The ``AssessmentContext`` does not bind exactly this readiness policy.
     POLICY_RESOLUTION_CONTEXT_BINDING_MISMATCH = (
-        "GV3RC_POLICY_RESOLUTION_CONTEXT_BINDING_MISMATCH"
+        "READINESS_ORCHESTRATION_POLICY_RESOLUTION_CONTEXT_BINDING_MISMATCH"
     )
     #: The resolved policy does not govern the requested ``ReadinessTarget``.
-    POLICY_RESOLUTION_TARGET_NOT_GOVERNED = "GV3RC_POLICY_RESOLUTION_TARGET_NOT_GOVERNED"
+    POLICY_RESOLUTION_TARGET_NOT_GOVERNED = "READINESS_ORCHESTRATION_POLICY_RESOLUTION_TARGET_NOT_GOVERNED"
     #: Defence in depth: the resolved artifact's own metadata is not
     #: ``APPROVED_ACTIVE`` even though resolution succeeded.
-    POLICY_ARTIFACT_NOT_APPROVED_ACTIVE = "GV3RC_POLICY_ARTIFACT_NOT_APPROVED_ACTIVE"
+    POLICY_ARTIFACT_NOT_APPROVED_ACTIVE = "READINESS_ORCHESTRATION_POLICY_ARTIFACT_NOT_APPROVED_ACTIVE"
     #: Defence in depth: the resolved artifact is not effective at the
     #: evaluation instant even though resolution succeeded.
     POLICY_ARTIFACT_NOT_EFFECTIVE_AT_EVALUATION_TIME = (
-        "GV3RC_POLICY_ARTIFACT_NOT_EFFECTIVE_AT_EVALUATION_TIME"
+        "READINESS_ORCHESTRATION_POLICY_ARTIFACT_NOT_EFFECTIVE_AT_EVALUATION_TIME"
     )
 
     # -- gate-result verification ------------------------------------------ #
     #: No gate-result verifier was configured. Production default: deny.
-    GATE_VERIFIER_NOT_CONFIGURED = "GV3RC_GATE_VERIFIER_NOT_CONFIGURED"
+    GATE_VERIFIER_NOT_CONFIGURED = "READINESS_ORCHESTRATION_GATE_VERIFIER_NOT_CONFIGURED"
     #: The configured gate verifier raised for at least one gate result.
-    GATE_VERIFIER_ERROR = "GV3RC_GATE_VERIFIER_ERROR"
+    GATE_VERIFIER_ERROR = "READINESS_ORCHESTRATION_GATE_VERIFIER_ERROR"
     #: The gate verifier returned something that is not a
     #: ``GateResultVerification`` — a duck-typed attestation is refused.
-    GATE_VERIFIER_MALFORMED_RESULT = "GV3RC_GATE_VERIFIER_MALFORMED_RESULT"
+    GATE_VERIFIER_MALFORMED_RESULT = "READINESS_ORCHESTRATION_GATE_VERIFIER_MALFORMED_RESULT"
     #: The verifier did not report ``VERIFIED`` for a supplied gate result.
-    GATE_RESULT_NOT_VERIFIED = "GV3RC_GATE_RESULT_NOT_VERIFIED"
+    GATE_RESULT_NOT_VERIFIED = "READINESS_ORCHESTRATION_GATE_RESULT_NOT_VERIFIED"
     #: The verifier reported ``VERIFIED`` without attesting the supporting
     #: evidence / benchmark / threshold evaluation the gate actually relies on.
     GATE_RESULT_SUPPORTING_VERIFICATION_INCOMPLETE = (
-        "GV3RC_GATE_RESULT_SUPPORTING_VERIFICATION_INCOMPLETE"
+        "READINESS_ORCHESTRATION_GATE_RESULT_SUPPORTING_VERIFICATION_INCOMPLETE"
     )
     #: The gate result is bound to a different readiness policy.
-    GATE_RESULT_POLICY_REFERENCE_MISMATCH = "GV3RC_GATE_RESULT_POLICY_REFERENCE_MISMATCH"
+    GATE_RESULT_POLICY_REFERENCE_MISMATCH = "READINESS_ORCHESTRATION_GATE_RESULT_POLICY_REFERENCE_MISMATCH"
     #: The gate result was evaluated for a different ``ReadinessTarget``.
-    GATE_RESULT_TARGET_MISMATCH = "GV3RC_GATE_RESULT_TARGET_MISMATCH"
+    GATE_RESULT_TARGET_MISMATCH = "READINESS_ORCHESTRATION_GATE_RESULT_TARGET_MISMATCH"
     #: The gate result names a gate that the **resolved** policy does not define.
-    GATE_RESULT_GATE_NOT_IN_RESOLVED_POLICY = "GV3RC_GATE_RESULT_GATE_NOT_IN_RESOLVED_POLICY"
+    GATE_RESULT_GATE_NOT_IN_RESOLVED_POLICY = "READINESS_ORCHESTRATION_GATE_RESULT_GATE_NOT_IN_RESOLVED_POLICY"
     #: The embedded ``PolicyGate`` is not canonically identical to the resolved
     #: policy's gate of that id.
-    GATE_RESULT_GATE_BODY_MISMATCH = "GV3RC_GATE_RESULT_GATE_BODY_MISMATCH"
+    GATE_RESULT_GATE_BODY_MISMATCH = "READINESS_ORCHESTRATION_GATE_RESULT_GATE_BODY_MISMATCH"
     #: More than one result was supplied for the same gate id. Every copy is
     #: rejected — a conflict is never resolved by picking one.
-    GATE_RESULT_DUPLICATE = "GV3RC_GATE_RESULT_DUPLICATE"
+    GATE_RESULT_DUPLICATE = "READINESS_ORCHESTRATION_GATE_RESULT_DUPLICATE"
     #: A returned verification coordinate (gate, policy, tenant, subject,
     #: context, target or instant) is not the one that was requested.
     GATE_RESULT_VERIFICATION_BINDING_MISMATCH = (
-        "GV3RC_GATE_RESULT_VERIFICATION_BINDING_MISMATCH"
+        "READINESS_ORCHESTRATION_GATE_RESULT_VERIFICATION_BINDING_MISMATCH"
     )
     #: The verifier verified a different ``GateStatus`` than the one claimed.
-    GATE_RESULT_VERIFIED_STATUS_MISMATCH = "GV3RC_GATE_RESULT_VERIFIED_STATUS_MISMATCH"
+    GATE_RESULT_VERIFIED_STATUS_MISMATCH = "READINESS_ORCHESTRATION_GATE_RESULT_VERIFIED_STATUS_MISMATCH"
     #: A rejected gate result names an applicable mandatory or conditional gate,
     #: so that required gate is **absent** for evaluator purposes.
-    REQUIRED_GATE_RESULT_UNVERIFIED = "GV3RC_REQUIRED_GATE_RESULT_UNVERIFIED"
+    REQUIRED_GATE_RESULT_UNVERIFIED = "READINESS_ORCHESTRATION_REQUIRED_GATE_RESULT_UNVERIFIED"
 
     # -- condition verification -------------------------------------------- #
     #: No condition verifier was configured. Production default: no coverage.
-    CONDITION_VERIFIER_NOT_CONFIGURED = "GV3RC_CONDITION_VERIFIER_NOT_CONFIGURED"
+    CONDITION_VERIFIER_NOT_CONFIGURED = "READINESS_ORCHESTRATION_CONDITION_VERIFIER_NOT_CONFIGURED"
     #: The configured condition verifier raised for at least one condition.
-    CONDITION_VERIFIER_ERROR = "GV3RC_CONDITION_VERIFIER_ERROR"
+    CONDITION_VERIFIER_ERROR = "READINESS_ORCHESTRATION_CONDITION_VERIFIER_ERROR"
     #: The condition verifier returned something that is not a
     #: ``ConditionSetVerification``.
-    CONDITION_VERIFIER_MALFORMED_RESULT = "GV3RC_CONDITION_VERIFIER_MALFORMED_RESULT"
+    CONDITION_VERIFIER_MALFORMED_RESULT = "READINESS_ORCHESTRATION_CONDITION_VERIFIER_MALFORMED_RESULT"
     #: The verifier did not report ``VERIFIED`` for a supplied condition, or did
     #: not independently establish it as ``APPROVED_ACTIVE`` in agreement with
     #: the supplied record.
-    CONDITION_NOT_VERIFIED = "GV3RC_CONDITION_NOT_VERIFIED"
+    CONDITION_NOT_VERIFIED = "READINESS_ORCHESTRATION_CONDITION_NOT_VERIFIED"
     #: The verifier reported ``VERIFIED`` without attesting the approval
     #: authority, the approval evidence, or the owner/monitoring obligations.
-    CONDITION_APPROVAL_NOT_VERIFIED = "GV3RC_CONDITION_APPROVAL_NOT_VERIFIED"
+    CONDITION_APPROVAL_NOT_VERIFIED = "READINESS_ORCHESTRATION_CONDITION_APPROVAL_NOT_VERIFIED"
     #: A returned verification coordinate is not the one that was requested.
-    CONDITION_VERIFICATION_BINDING_MISMATCH = "GV3RC_CONDITION_VERIFICATION_BINDING_MISMATCH"
+    CONDITION_VERIFICATION_BINDING_MISMATCH = "READINESS_ORCHESTRATION_CONDITION_VERIFICATION_BINDING_MISMATCH"
     #: The verification names a different condition identity.
-    CONDITION_IDENTITY_MISMATCH = "GV3RC_CONDITION_IDENTITY_MISMATCH"
+    CONDITION_IDENTITY_MISMATCH = "READINESS_ORCHESTRATION_CONDITION_IDENTITY_MISMATCH"
     #: The verification carries a different canonical condition digest.
-    CONDITION_DIGEST_MISMATCH = "GV3RC_CONDITION_DIGEST_MISMATCH"
+    CONDITION_DIGEST_MISMATCH = "READINESS_ORCHESTRATION_CONDITION_DIGEST_MISMATCH"
     #: The verification covers a different concern than the condition names —
     #: one condition can never cover two concerns by identity ambiguity.
-    CONDITION_SOURCE_REFERENCE_MISMATCH = "GV3RC_CONDITION_SOURCE_REFERENCE_MISMATCH"
+    CONDITION_SOURCE_REFERENCE_MISMATCH = "READINESS_ORCHESTRATION_CONDITION_SOURCE_REFERENCE_MISMATCH"
     #: More than one condition was supplied under the same condition id. Every
     #: copy is rejected.
-    CONDITION_DUPLICATE = "GV3RC_CONDITION_DUPLICATE"
+    CONDITION_DUPLICATE = "READINESS_ORCHESTRATION_CONDITION_DUPLICATE"
     #: The condition names a reference the **resolved** policy does not define
     #: as a gate.
-    CONDITION_CONCERN_NOT_IN_RESOLVED_POLICY = "GV3RC_CONDITION_CONCERN_NOT_IN_RESOLVED_POLICY"
+    CONDITION_CONCERN_NOT_IN_RESOLVED_POLICY = "READINESS_ORCHESTRATION_CONDITION_CONCERN_NOT_IN_RESOLVED_POLICY"
     #: The covered gate is not ``RequirementClass.CONDITIONAL`` — a mandatory
     #: concern is never compensable (D-6).
-    CONDITION_CONCERN_NOT_CONDITIONAL = "GV3RC_CONDITION_CONCERN_NOT_CONDITIONAL"
+    CONDITION_CONCERN_NOT_CONDITIONAL = "READINESS_ORCHESTRATION_CONDITION_CONCERN_NOT_CONDITIONAL"
     #: The resolved policy does not mark the covered gate
     #: ``conditionally_compensable``.
-    CONDITION_CONCERN_NOT_COMPENSABLE = "GV3RC_CONDITION_CONCERN_NOT_COMPENSABLE"
+    CONDITION_CONCERN_NOT_COMPENSABLE = "READINESS_ORCHESTRATION_CONDITION_CONCERN_NOT_COMPENSABLE"
     #: The condition is not active at the evaluation instant (proposed, expired,
     #: revoked, satisfied, not yet effective, or its window has elapsed).
-    CONDITION_NOT_ACTIVE_AT_EVALUATION_TIME = "GV3RC_CONDITION_NOT_ACTIVE_AT_EVALUATION_TIME"
+    CONDITION_NOT_ACTIVE_AT_EVALUATION_TIME = "READINESS_ORCHESTRATION_CONDITION_NOT_ACTIVE_AT_EVALUATION_TIME"
 
     # -- evaluator invocation ---------------------------------------------- #
     #: The sanitized case was still refused by the deterministic evaluator.
     #: Defensive: the request contract already rejects self-contradictory input.
     #: Reaching it produces ``NOT_EVALUATED``, never a partial headline.
-    EVALUATOR_REJECTED_SANITIZED_CASE = "GV3RC_EVALUATOR_REJECTED_SANITIZED_CASE"
+    EVALUATOR_REJECTED_SANITIZED_CASE = "READINESS_ORCHESTRATION_EVALUATOR_REJECTED_SANITIZED_CASE"

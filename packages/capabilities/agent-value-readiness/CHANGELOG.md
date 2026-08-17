@@ -29,10 +29,9 @@ evaluator is untouched.
 did not change. `READINESS_ORCHESTRATOR_VERSION` is
 **`ugence.readiness-orchestration/v0.1`**: a platform-neutral capability
 identifier that names no ADR milestone and asserts no roadmap position. The
-`GV3RC_` prefix on `ReadinessTrustGapCode` values is retained as a **frozen
-opaque token** — it participates in canonical trace digests, so renaming it
-would change published behaviour to make a cosmetic point; it carries no
-milestone meaning. No other package is touched: `governance-contracts`,
+`ReadinessTrustGapCode` values all carry the neutral
+`READINESS_ORCHESTRATION_` namespace. No other package is touched:
+`governance-contracts`,
 `uvi-policy-contracts`, `ugence-policy-authority` and `governed-value` are all
 unchanged, and **no ADR is modified**.
 

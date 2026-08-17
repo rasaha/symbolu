@@ -33,9 +33,12 @@ SELF = pathlib.Path(__file__).resolve()
 RETIRED_LABEL = "GV-3R" + "-c"
 RETIRED_COMPACT = "GV3R" + "-c"
 
-#: The frozen, opaque trust-gap code prefix. It is NOT a milestone label: it
-#: participates in canonical trace digests, so it is retained deliberately.
-FROZEN_GAP_PREFIX = "GV3RC" + "_"
+#: The retired reason-code namespace, assembled so this file never contains it.
+RETIRED_CODE_TOKEN = "GV3" + "RC"
+RETIRED_CODE_PREFIX = RETIRED_CODE_TOKEN + "_"
+
+#: The neutral namespace every orchestration trust-gap value must now carry.
+GAP_PREFIX = "READINESS_ORCHESTRATION_"
 
 
 def _delivered_files():
@@ -101,15 +104,74 @@ def test_the_retired_working_label_is_absent_from_every_delivered_artifact():
     assert not offenders, offenders
 
 
-def test_the_frozen_gap_code_prefix_is_documented_as_carrying_no_milestone():
-    """The one retained `GV3RC_` token is explained, not silently left behind."""
-
-    codes = (PKG_ROOT / "orchestration" / "codes.py").read_text()
-    assert FROZEN_GAP_PREFIX in codes
-    assert "frozen" in codes.lower() and "opaque" in codes.lower()
-    # Every gap code still carries the frozen prefix — it was NOT renamed.
+def test_no_trust_gap_name_or_value_carries_the_retired_namespace():
     for member in api.ReadinessTrustGapCode:
-        assert member.value.startswith(FROZEN_GAP_PREFIX), member
+        assert RETIRED_CODE_TOKEN not in member.value, member.value
+        assert RETIRED_CODE_TOKEN not in member.name, member.name
+
+
+def test_every_trust_gap_value_carries_the_neutral_namespace():
+    for member in api.ReadinessTrustGapCode:
+        assert member.value.startswith(GAP_PREFIX), member.value
+        # The suffix is real vocabulary, not an empty namespace.
+        assert member.value[len(GAP_PREFIX) :], member.value
+
+
+def test_the_trust_gap_vocabulary_has_the_expected_cardinality():
+    """Renaming a namespace must not add, drop or merge a reason code."""
+
+    members = list(api.ReadinessTrustGapCode)
+    assert len(members) == 42
+
+
+def test_the_namespace_mapping_is_one_to_one_with_no_aliases():
+    """Names, values and semantic suffixes are each unique — no collisions."""
+
+    members = list(api.ReadinessTrustGapCode)
+    names = [m.name for m in members]
+    values = [m.value for m in members]
+    suffixes = [m.value[len(GAP_PREFIX) :] for m in members]
+
+    assert len(set(names)) == len(members)
+    assert len(set(values)) == len(members)
+    assert len(set(suffixes)) == len(members)
+    # Each member's name IS its semantic suffix, so the rename touched only the
+    # namespace and preserved every suffix exactly.
+    assert names == suffixes
+
+    # An alias would show up as an enum member whose name is not canonical.
+    assert list(api.ReadinessTrustGapCode.__members__) == names
+
+
+def test_no_deprecated_alias_or_translation_table_ships():
+    """The API is unreleased, so nothing translates or accepts an old token."""
+
+    source = "\n".join(
+        path.read_text()
+        for path in (PKG_ROOT / "orchestration").rglob("*.py")
+        if "__pycache__" not in path.parts
+    )
+    assert RETIRED_CODE_TOKEN not in source
+    for banned in ("deprecated", "legacy_code", "code_alias", "LEGACY_", "_ALIAS"):
+        assert banned not in source, banned
+    # Constructing from a retired token must fail, not silently translate.
+    import pytest
+
+    with pytest.raises(ValueError):
+        api.ReadinessTrustGapCode(RETIRED_CODE_PREFIX + "POLICY_RESOLVER_NOT_CONFIGURED")
+
+
+def test_the_retired_reason_code_namespace_is_absent_from_the_delivered_tree():
+    offenders = {}
+    for path in _delivered_files():
+        hits = [
+            line.strip()
+            for line in path.read_text().splitlines()
+            if RETIRED_CODE_TOKEN in line
+        ]
+        if hits:
+            offenders[str(path.relative_to(DIST_ROOT))] = hits[:3]
+    assert not offenders, offenders
 
 
 # --------------------------------------------------------------------------- #
