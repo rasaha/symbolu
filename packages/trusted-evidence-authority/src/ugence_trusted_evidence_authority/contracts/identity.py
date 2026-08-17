@@ -30,20 +30,28 @@ Stages 2-6 of §12, every one of them:
 argument, assignment or subclass hook that can raise it. Raising it requires a
 verifier, trust anchors and signature verification — **TEV-2** (ADR §30).
 
-Why the verification-side coordinates are absent
-------------------------------------------------
-ADR §9 lists seventeen coordinates a *verification result* binds. Rows 14-16 —
-**verifier authority identity and key identifier**, **verification protocol and
-version**, **verification status and reason codes** — and row 6, the **explicit
-verification instant**, describe an act TAP performs. No TEV-1 object performs
-it. Carrying those fields on a caller-constructible contract would produce
-precisely the artifact ADR §10 forbids consumers from trusting: a structurally
-valid object naming an authority, a protocol and a status that nobody issued.
-They belong to the signed receipt of §13, which ships with the signing that
-makes it meaningful (E-11, TEV-2). ADR §13.3 is explicit that there is no
-"trusted but unsigned" state.
+Which ADR §9 coordinates live here
+----------------------------------
+ADR §9 lists seventeen coordinates. This contract carries the **evidence-side**
+rows — **1-5, 7-13 and 17**: identifier, type and schema, content digest,
+producer and issuer, observation and collection instants, tenant, assessment
+context, subject, assessed-system binding, **claim or metric identity (row 11)**,
+**units and measurement semantics (row 12)**, provenance references, and the
+validity interval.
 
-Rows 1-5 and 7-13 and 17 — the evidence-side coordinates — are here.
+Rows 6 and 14-16 — the **verification instant**, the **verifier authority and
+key identifier**, the **verification protocol and version**, and the
+**verification status and reason codes** — describe an act a verifier performs,
+so they are not coordinates *of the evidence*. They live on
+:class:`~.receipts.EvidenceVerificationReceiptPayload`, the structural receipt
+payload this package also defines (ADR §13, §30, §32 — "*shape = TEV-1, service
+= TEV-2*"). Putting them there rather than here keeps the evidence contract
+describing only the evidence, and keeps every declared verification coordinate
+in one object that is explicitly, permanently unverified.
+
+Rows 11-12 are carried by :class:`EvidenceClaimBinding`, whose applicability is
+declared rather than inferred, so "this evidence backs no claim" is a decision on
+the record rather than an omission.
 
 Why geography / domain / intended outcome are here, and how
 -----------------------------------------------------------
@@ -116,6 +124,7 @@ __all__ = [
     "EvidenceSchemaRef",
     "EvidenceObservation",
     "EvidenceScopeBinding",
+    "EvidenceClaimBinding",
     "EvidenceProvenanceChain",
     "CanonicalEvidenceIdentity",
 ]
@@ -363,6 +372,138 @@ class EvidenceScopeBinding:
 
 
 @dataclass(frozen=True)
+class EvidenceClaimBinding:
+    """What the evidence backs, and in what units (ADR §9 rows 11-12).
+
+    ADR §9 row 11 requires **claim or metric identity** "*where the evidence
+    backs a claim or metric*; absent for raw non-metric evidence, **explicitly**",
+    and row 12 requires **units and measurement semantics** "*required whenever
+    #11 is present*". Those two rules are co-dependent, so they are one closed
+    contract rather than four loose strings — and never a metadata dictionary.
+
+    Applicability is declared, never inferred
+    -----------------------------------------
+    ``applicability`` has **no default**: row 11's "absent ... explicitly" is a
+    decision the caller must record, exactly as §15 requires of geography and
+    domain. An empty string and ``None`` are **not** "not applicable" — under
+    ``APPLICABLE`` they are refusals, and under ``NOT_APPLICABLE`` the whole
+    group must be empty. There is no partial state:
+
+    ==================  ==========================================================
+    ``APPLICABLE``      at least one of ``claim_ref`` / ``metric_ref`` (row 11 is
+                        "claim **or** metric identity"), **and** both ``unit`` and
+                        ``measurement_semantics_ref`` (row 12 makes them
+                        co-required with row 11)
+    ``NOT_APPLICABLE``  all four empty — raw non-metric evidence, on the record
+    ==================  ==========================================================
+
+    Every other combination fails closed. A claim without a unit is an
+    uninterpretable measurement; a unit without a claim measures nothing.
+
+    ``metric_ref`` is separate from ``claim_ref`` because row 11 names them as
+    alternatives: evidence may back a narrative claim, a named metric, or both,
+    and collapsing them would lose which one it is.
+
+    This records identity and semantics only
+    ----------------------------------------
+    No conversion, normalization, dimensional analysis, comparison or evaluation
+    happens here or anywhere in this package. ADR §18 assigns comparison to the
+    consuming evaluation engine and §7.2 row 5 keeps result calculation away from
+    every authority in this design. ``unit`` is an opaque declared token: no unit
+    vocabulary is ratified anywhere in the ADR, so none is invented.
+    """
+
+    applicability: ApplicabilityDeclaration
+    claim_ref: str = ""
+    metric_ref: str = ""
+    unit: str = ""
+    measurement_semantics_ref: str = ""
+
+    _GROUP = ("claim_ref", "metric_ref", "unit", "measurement_semantics_ref")
+
+    def __post_init__(self) -> None:
+        require_exact_type(
+            self.applicability,
+            ApplicabilityDeclaration,
+            "EvidenceClaimBinding.applicability",
+        )
+        for name in EvidenceClaimBinding._GROUP:
+            require_canonical_str(
+                getattr(self, name), f"EvidenceClaimBinding.{name}", allow_empty=True
+            )
+
+        if self.applicability is ApplicabilityDeclaration.APPLICABLE:
+            if not (self.claim_ref or self.metric_ref):
+                raise TrustedEvidenceContractError(
+                    "EvidenceClaimBinding declared APPLICABLE must name a claim "
+                    "or a metric (ADR §9 row 11 — 'claim or metric identity'); "
+                    "declaring that the evidence backs something without saying "
+                    "what records no identity"
+                )
+            missing = [n for n in ("unit", "measurement_semantics_ref")
+                       if not getattr(self, n)]
+            if missing:
+                raise TrustedEvidenceContractError(
+                    "EvidenceClaimBinding declared APPLICABLE must carry "
+                    f"{' and '.join('.' + n for n in missing)}: ADR §9 row 12 "
+                    "makes units and measurement semantics required whenever a "
+                    "claim or metric identity is present, so a partial group "
+                    "fails closed rather than yielding an uninterpretable value"
+                )
+        else:
+            present = [n for n in EvidenceClaimBinding._GROUP if getattr(self, n)]
+            if present:
+                raise TrustedEvidenceContractError(
+                    "EvidenceClaimBinding declared NOT_APPLICABLE must leave "
+                    f"every coordinate empty (got {', '.join(present)}); raw "
+                    "non-metric evidence is a recorded decision (ADR §9 row 11), "
+                    "not a half-filled claim"
+                )
+
+    @classmethod
+    def not_applicable(cls) -> "EvidenceClaimBinding":
+        """Declare the evidence non-metric — a decision, not an omission."""
+
+        return cls(applicability=ApplicabilityDeclaration.NOT_APPLICABLE)
+
+    @classmethod
+    def applicable(
+        cls,
+        *,
+        unit: str,
+        measurement_semantics_ref: str,
+        claim_ref: str = "",
+        metric_ref: str = "",
+    ) -> "EvidenceClaimBinding":
+        """Declare the evidence claim/metric-backed, with its units.
+
+        ``unit`` and ``measurement_semantics_ref`` are keyword-required because
+        ADR §9 row 12 makes them co-required with row 11; at least one of
+        ``claim_ref`` / ``metric_ref`` must also be supplied.
+        """
+
+        return cls(
+            applicability=ApplicabilityDeclaration.APPLICABLE,
+            claim_ref=claim_ref,
+            metric_ref=metric_ref,
+            unit=unit,
+            measurement_semantics_ref=measurement_semantics_ref,
+        )
+
+    @property
+    def claim_identity(self) -> tuple:
+        """The coordinate tuple a cross-claim or cross-unit replay must move."""
+
+        return (
+            self.applicability.value,
+            self.claim_ref,
+            self.metric_ref,
+            self.unit,
+            self.measurement_semantics_ref,
+        )
+
+
+@dataclass(frozen=True)
 class EvidenceProvenanceChain:
     """Provenance / chain-of-custody references (ADR §9 row 13, §7.1 row 7).
 
@@ -415,6 +556,9 @@ class CanonicalEvidenceIdentity:
     content_digest: str
     observation: EvidenceObservation
     scope: EvidenceScopeBinding
+    #: ADR §9 rows 11-12, positioned between scope (rows 7-10) and provenance
+    #: (row 13) so the declared field order follows the ADR's own row order.
+    claim: EvidenceClaimBinding
     provenance: EvidenceProvenanceChain
     lifecycle_state: EvidenceLifecycleState
     geography: ApplicabilityCoordinate
@@ -441,6 +585,9 @@ class CanonicalEvidenceIdentity:
         )
         require_exact_type(
             self.scope, EvidenceScopeBinding, "CanonicalEvidenceIdentity.scope"
+        )
+        require_exact_type(
+            self.claim, EvidenceClaimBinding, "CanonicalEvidenceIdentity.claim"
         )
         require_exact_type(
             self.provenance,
@@ -540,7 +687,7 @@ class CanonicalEvidenceIdentity:
             self.content_digest,
             self.observation.producer_id,
             self.observation.issuer_id,
-        ) + self.scope.scope_identity
+        ) + self.scope.scope_identity + self.claim.claim_identity
 
     def is_valid_at(self, instant: datetime) -> bool:
         """Half-open ``[valid_from, valid_to)`` membership (ADR §17.9).

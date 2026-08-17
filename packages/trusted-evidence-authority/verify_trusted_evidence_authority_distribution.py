@@ -57,11 +57,16 @@ assert not hasattr(u, "CONTRACT_VERSION"), "no CONTRACT_VERSION is minted"
 
 from ugence_trusted_evidence_authority.api import (
     EVIDENCE_IDENTITY_DIGEST_DOMAIN, EVIDENCE_LIFECYCLE_TRANSITIONS,
-    EVIDENCE_TRUST_STAGE_ORDER, TRUSTED_EVIDENCE_CANONICALIZATION_VERSION,
+    EVIDENCE_TRUST_STAGE_ORDER,
+    EVIDENCE_VERIFICATION_RECEIPT_PAYLOAD_DIGEST_DOMAIN,
+    RECEIPT_REPORTABLE_TRUST_STAGES,
+    TRUSTED_EVIDENCE_CANONICALIZATION_VERSION,
     TRUSTED_EVIDENCE_REFUSAL_REASONS, ApplicabilityCoordinate,
-    ApplicabilityDeclaration, CanonicalEvidenceIdentity, EvidenceLifecycleState,
+    ApplicabilityDeclaration, CanonicalEvidenceIdentity,
+    DeclaredVerificationOutcome, EvidenceClaimBinding, EvidenceLifecycleState,
     EvidenceObservation, EvidenceProvenanceChain, EvidenceSchemaRef,
     EvidenceScopeBinding, EvidenceStructuralStatus, EvidenceTrustStage,
+    EvidenceVerificationReceiptPayload,
     EvidenceVerificationRequest, TrustedEvidenceCanonicalizationError,
     TrustedEvidenceContractError, TrustedEvidenceLifecycleError,
     TrustedEvidenceRefusalReason, canonical_bytes, canonical_digest,
@@ -97,6 +102,9 @@ def ident(**kw):
     base = dict(evidence_id="ev-1", evidence_type="CONTROL_TEST_RESULT",
                 schema=EvidenceSchemaRef(schema_id="ugence.evidence.control-test", schema_version="1"),
                 content_digest=C, observation=obs(), scope=sc(),
+                claim=EvidenceClaimBinding.applicable(
+                    claim_ref="claim-1", metric_ref="metric-resolution-rate",
+                    unit="ratio", measurement_semantics_ref="semantics-1"),
                 provenance=EvidenceProvenanceChain(chain_ref="chain-1",
                                                    custody_refs=("custody-1", "custody-2")),
                 lifecycle_state=EvidenceLifecycleState.SUBMITTED,
@@ -132,7 +140,7 @@ LITERAL = (b'{"body":{"schema_id":"ugence.evidence.control-test","schema_version
 s = EvidenceSchemaRef(schema_id="ugence.evidence.control-test", schema_version="1")
 assert canonical_bytes(s) == LITERAL, canonical_bytes(s)
 assert canonical_digest(s) == hashlib.sha256(LITERAL).hexdigest()
-assert ident().canonical_digest() == "5fec72b52d13264c31519013a74704fee03cea66f5ebfa22258a3d51f562cf40", ident().canonical_digest()
+assert ident().canonical_digest() == "26ee959e4c87cc0660895a269c2805af1065ba4f634c9c73070848de7bf51029", ident().canonical_digest()
 assert hashlib.sha256(ident().canonical_bytes()).hexdigest() == ident().canonical_digest()
 
 framed = json.loads(canonical_bytes(ident()).decode("utf-8"))
@@ -228,8 +236,150 @@ assert len(list(R)) == 19
 assert R.TRUSTED_EVIDENCE_INDETERMINATE in TRUSTED_EVIDENCE_REFUSAL_REASONS
 for name in api.__all__:
     low = name.lower().replace("_", "")
-    for banned in ("receipt", "verifier", "trustanchor", "keyring", "signer", "signature"):
+    for banned in ("verifier", "trustanchor", "keyring", "signer", "signature",
+                   "verificationresult", "signedreceipt"):
         assert banned not in low, name
+    # The receipt *payload* ships (ADR §30/§32); nothing is called a receipt,
+    # because §13.3 rules that an unsigned artifact is not one.
+    assert not name.endswith("Receipt"), name
+assert "EvidenceVerificationReceiptPayload" in api.__all__
+
+# ---- A-02: claim/metric/units co-requirement --------------------------------
+for kw in (dict(claim_ref="c", unit="u", measurement_semantics_ref="s"),
+           dict(metric_ref="m", unit="u", measurement_semantics_ref="s")):
+    EvidenceClaimBinding(applicability=ApplicabilityDeclaration.APPLICABLE, **kw)
+for kw in (dict(unit="u", measurement_semantics_ref="s"), dict(claim_ref="c", unit="u"),
+           dict(claim_ref="c", measurement_semantics_ref="s"), dict(claim_ref="c"), {}):
+    refuses(lambda k=kw: EvidenceClaimBinding(
+        applicability=ApplicabilityDeclaration.APPLICABLE, **k))
+for f in ("claim_ref", "metric_ref", "unit", "measurement_semantics_ref"):
+    refuses(lambda f=f: EvidenceClaimBinding(
+        applicability=ApplicabilityDeclaration.NOT_APPLICABLE, **{f: "x"}))
+refuses(lambda: EvidenceClaimBinding(), TypeError)
+_base_claim = ident().canonical_digest()
+for variant in (EvidenceClaimBinding.applicable(claim_ref="other", unit="ratio",
+                                                measurement_semantics_ref="semantics-1"),
+                EvidenceClaimBinding.applicable(claim_ref="claim-1", unit="percent",
+                                                measurement_semantics_ref="semantics-1"),
+                EvidenceClaimBinding.applicable(claim_ref="claim-1", unit="ratio",
+                                                measurement_semantics_ref="other"),
+                EvidenceClaimBinding.not_applicable()):
+    assert ident(claim=variant).canonical_digest() != _base_claim
+
+# ---- A-03: NFC refused at construction, and again at canonicalization -------
+import unicodedata
+NFD = "caf\u0065\u0301-id"
+NFC = "caf\u00e9-id"
+assert unicodedata.normalize("NFC", NFD) == NFC != NFD, "fixture is already NFC"
+refuses(lambda: EvidenceSchemaRef(schema_id=NFD, schema_version="1"))
+refuses(lambda: ident(evidence_id=NFD))
+refuses(lambda: EvidenceProvenanceChain(chain_ref="c", custody_refs=("ok", NFD)))
+refuses(lambda: ApplicabilityCoordinate.applicable(NFD))
+refuses(lambda: EvidenceClaimBinding.applicable(claim_ref=NFD, unit="u",
+                                                measurement_semantics_ref="s"))
+assert EvidenceSchemaRef(schema_id=NFC, schema_version="1").schema_id == NFC
+_bypass = EvidenceSchemaRef(schema_id="ok", schema_version="1")
+object.__setattr__(_bypass, "schema_id", NFD)
+refuses(lambda: canonical_bytes(_bypass), TrustedEvidenceCanonicalizationError)
+
+# ---- A-01: the structural receipt payload -----------------------------------
+RT = datetime(2026, 6, 1, 8, 0, 0, 750000, tzinfo=UTC)
+def rcpt(**kw):
+    base = dict(
+        receipt_id="receipt-1",
+        schema=EvidenceSchemaRef(schema_id="ugence.receipt.evidence-verification",
+                                 schema_version="1"),
+        source_evidence_identity_digest=ident().canonical_digest(),
+        evidence_content_digest=C,
+        verification_request_digest=req().canonical_digest(),
+        scope=sc(), verified_at=RT,
+        verifier_authority_id="Ugence Root Trust Authority",
+        verifier_key_id="root-signing-key",
+        verification_protocol_id="ugence.tap.verification",
+        verification_protocol_version="1",
+        declared_outcome=DeclaredVerificationOutcome.DECLARED_ADMITTED,
+        declared_cleared_stages=tuple(RECEIPT_REPORTABLE_TRUST_STAGES),
+        declared_unattempted_stages=(), declared_refusal_reasons=(),
+        evidence_valid_from=V0, evidence_valid_to=V1,
+        receipt_valid_from=datetime(2026, 6, 1, tzinfo=UTC),
+        receipt_valid_to=datetime(2026, 12, 1, tzinfo=UTC))
+    base.update(kw); return EvidenceVerificationReceiptPayload(**base)
+
+_r = rcpt()
+# A second, independent receipt vector: this fixture deliberately differs from
+# the test suite's (an authoritative-sounding verifier and key), so it pins its
+# own digest rather than reusing the suite's.
+assert _r.canonical_digest() == "53b4c28caf7fec4b9c739a0b408b9830980b032073ccf9b887f43d979c8cd4c0", _r.canonical_digest()
+assert hashlib.sha256(_r.canonical_bytes()).hexdigest() == _r.canonical_digest()
+_rf = json.loads(_r.canonical_bytes())
+assert _rf["domain"] == EVIDENCE_VERIFICATION_RECEIPT_PAYLOAD_DIGEST_DOMAIN
+assert _rf["domain"] != EVIDENCE_IDENTITY_DIGEST_DOMAIN
+assert _rf["type"] == "EvidenceVerificationReceiptPayload"
+for other in (ident(), sc(), obs(), req(), ident().claim, ident().provenance,
+              EvidenceSchemaRef(schema_id="x", schema_version="1")):
+    assert canonical_bytes(other) != _r.canonical_bytes()
+    assert canonical_digest(other) != _r.canonical_digest()
+    assert json.loads(canonical_bytes(other))["domain"] != _rf["domain"]
+
+# declared != established, even at maximum declared favourability
+assert _r.declares_admission is True
+assert set(_r.declared_cleared_stages) == set(RECEIPT_REPORTABLE_TRUST_STAGES)
+assert _r.structural_status is EvidenceStructuralStatus.STRUCTURAL_UNVERIFIED
+assert _r.authenticity_verified is False
+assert _r.established_trust_stages == (EvidenceTrustStage.STRUCTURALLY_CONSTRUCTIBLE,)
+assert EvidenceTrustStage.CRYPTOGRAPHICALLY_AUTHENTIC in _r.unestablished_trust_stages
+assert EvidenceTrustStage.POLICY_SUFFICIENT in _r.unestablished_trust_stages
+assert _r.envelope_verification_reason is R.TRUSTED_EVIDENCE_VERIFICATION_NOT_PERFORMED
+
+# no signature field, anywhere
+_rnames = {f.name for f in dataclasses.fields(EvidenceVerificationReceiptPayload)}
+for banned in ("signature", "signed", "signer", "envelope", "trust_anchor",
+               "public_key", "algorithm", "certificate"):
+    assert banned not in _rnames, banned
+assert not any("sign" in k.lower() for k in _rf["body"])
+for banned in ("signature", "signed", "trust_anchor", "verified"):
+    refuses(lambda b=banned: rcpt(**{b: b"x"}), TypeError)
+
+# forgery routes
+refuses(lambda: setattr(_r, "authenticity_verified", True), dataclasses.FrozenInstanceError)
+refuses(lambda: object.__setattr__(_r, "authenticity_verified", True), AttributeError)
+_r.__dict__["authenticity_verified"] = True
+assert _r.authenticity_verified is False
+for attempt in ("DECLARED_VERIFIED", "AUTHORITY_VERIFIED", "OK"):
+    refuses(lambda a=attempt: DeclaredVerificationOutcome(a), ValueError)
+
+# stage/outcome coherence
+for f in ("declared_cleared_stages", "declared_unattempted_stages"):
+    refuses(lambda f=f: rcpt(**{f: (EvidenceTrustStage.POLICY_SUFFICIENT,)}))
+refuses(lambda: rcpt(declared_cleared_stages=(EvidenceTrustStage.CURRENTLY_VALID,),
+                     declared_unattempted_stages=(EvidenceTrustStage.CURRENTLY_VALID,)))
+refuses(lambda: rcpt(declared_refusal_reasons=(R.TRUSTED_EVIDENCE_STALE,)))
+refuses(lambda: rcpt(declared_cleared_stages=()))
+refuses(lambda: rcpt(declared_outcome=DeclaredVerificationOutcome.DECLARED_REFUSED,
+                     declared_refusal_reasons=()))
+refuses(lambda: rcpt(declared_outcome=DeclaredVerificationOutcome.DECLARED_INDETERMINATE,
+                     declared_cleared_stages=(EvidenceTrustStage.STRUCTURALLY_CONSTRUCTIBLE,),
+                     declared_refusal_reasons=(R.TRUSTED_EVIDENCE_STALE,)))
+refuses(lambda: rcpt(verified_at=datetime(2026, 6, 1)))
+
+# reordered order-irrelevant sets are equivalent
+_a = rcpt(declared_cleared_stages=(EvidenceTrustStage.STRUCTURALLY_CONSTRUCTIBLE,
+                                   EvidenceTrustStage.CURRENTLY_VALID))
+_b = rcpt(declared_cleared_stages=(EvidenceTrustStage.CURRENTLY_VALID,
+                                   EvidenceTrustStage.STRUCTURALLY_CONSTRUCTIBLE))
+assert _a.canonical_bytes() == _b.canonical_bytes()
+
+# the two validity intervals are distinct and half-open
+_v = rcpt(evidence_valid_from=datetime(2026, 1, 1, tzinfo=UTC),
+          evidence_valid_to=datetime(2026, 2, 1, tzinfo=UTC),
+          receipt_valid_from=datetime(2026, 6, 1, tzinfo=UTC),
+          receipt_valid_to=datetime(2026, 12, 1, tzinfo=UTC))
+assert _v.receipt_is_valid_at(datetime(2026, 7, 1, tzinfo=UTC)) is True
+assert _v.evidence_is_valid_at(datetime(2026, 7, 1, tzinfo=UTC)) is False
+assert _v.receipt_is_valid_at(datetime(2026, 12, 1, tzinfo=UTC)) is False
+assert _v.receipt_is_valid_at(datetime(2026, 6, 1, tzinfo=UTC)) is True
+refuses(lambda: rcpt(receipt_valid_from=V1, receipt_valid_to=V0))
+refuses(lambda: rcpt(evidence_valid_from=V1, evidence_valid_to=V0))
 
 # ---- installed surface == committed public_api.json ------------------------
 def kind(o):

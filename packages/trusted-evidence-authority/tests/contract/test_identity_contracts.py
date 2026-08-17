@@ -84,6 +84,7 @@ def test_declared_field_order_is_pinned():
         "content_digest",
         "observation",
         "scope",
+        "claim",
         "provenance",
         "lifecycle_state",
         "geography",

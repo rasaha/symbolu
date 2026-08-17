@@ -16,9 +16,11 @@ import pytest
 from _builders import (
     CONTENT_DIGEST,
     OTHER_DIGEST,
+    claim,
     identity,
     observation,
     provenance,
+    receipt,
     scope,
     schema,
 )
@@ -26,7 +28,13 @@ from ugence_trusted_evidence_authority.api import (
     ApplicabilityCoordinate,
     ApplicabilityDeclaration,
     CanonicalEvidenceIdentity,
+    DeclaredVerificationOutcome,
+    EvidenceClaimBinding,
     EvidenceLifecycleState,
+    EvidenceSchemaRef,
+    EvidenceTrustStage,
+    EvidenceVerificationReceiptPayload,
+    TrustedEvidenceRefusalReason,
 )
 
 BASELINE = identity()
@@ -81,6 +89,15 @@ MUTATIONS = {
             assessed_system_binding_digest="",
         )
     ),
+    "claim.claim_ref": dict(claim=claim(claim_ref="claim-2")),
+    "claim.metric_ref": dict(claim=claim(metric_ref="metric-2")),
+    "claim.unit": dict(claim=claim(unit="percent")),
+    "claim.measurement_semantics_ref": dict(
+        claim=claim(measurement_semantics_ref="semantics-2")
+    ),
+    "claim.applicability": dict(claim=EvidenceClaimBinding.not_applicable()),
+    "claim/metric-only": dict(claim=claim(claim_ref="")),
+    "claim/claim-only": dict(claim=claim(metric_ref="")),
     "provenance.chain_ref": dict(provenance=provenance(chain_ref="chain-2")),
     "provenance.custody_refs/content": dict(
         provenance=provenance(custody_refs=("custody-1", "custody-3"))
@@ -184,3 +201,156 @@ def test_two_identities_differing_only_in_the_evidence_id_share_no_digest():
         identity(evidence_id="ev-1").canonical_digest()
         != identity(evidence_id="ev-1 ".strip() + "x").canonical_digest()
     )
+
+
+# --------------------------------------------------------------------------- #
+# Receipt-payload mutation matrix
+# --------------------------------------------------------------------------- #
+
+RECEIPT_BASELINE = receipt()
+RECEIPT_BASELINE_DIGEST = RECEIPT_BASELINE.canonical_digest()
+
+_S = EvidenceTrustStage
+_R = TrustedEvidenceRefusalReason
+
+#: One mutation per receipt-payload field. Every one must move the digest.
+RECEIPT_MUTATIONS = {
+    "receipt_id": dict(receipt_id="receipt-2"),
+    "schema.schema_id": dict(
+        schema=EvidenceSchemaRef(schema_id="ugence.receipt.other", schema_version="1")
+    ),
+    "schema.schema_version": dict(
+        schema=EvidenceSchemaRef(
+            schema_id="ugence.receipt.evidence-verification", schema_version="2"
+        )
+    ),
+    "source_evidence_identity_digest": dict(source_evidence_identity_digest=OTHER_DIGEST),
+    "evidence_content_digest": dict(evidence_content_digest=OTHER_DIGEST),
+    "verification_request_digest": dict(verification_request_digest=OTHER_DIGEST),
+    "scope.tenant_id": dict(scope=scope(tenant_id="tenant-2")),
+    "scope.subject_ref": dict(scope=scope(subject_ref="subject-2")),
+    "scope.assessment_purpose_ref": dict(scope=scope(assessment_purpose_ref="purpose-2")),
+    "scope.usage_scope_ref": dict(scope=scope(usage_scope_ref="scope-2")),
+    "scope.assessed_system_binding_ref": dict(scope=scope(assessed_system_binding_ref="bind-2")),
+    "verified_at": dict(verified_at=RECEIPT_BASELINE.verified_at + timedelta(microseconds=1)),
+    "verifier_authority_id": dict(verifier_authority_id="verifier-authority-2"),
+    "verifier_key_id": dict(verifier_key_id="key-2"),
+    "verification_protocol_id": dict(verification_protocol_id="ugence.tap.other"),
+    "verification_protocol_version": dict(verification_protocol_version="2"),
+    "declared_outcome": dict(
+        declared_outcome=DeclaredVerificationOutcome.DECLARED_REFUSED,
+        declared_cleared_stages=(_S.STRUCTURALLY_CONSTRUCTIBLE,),
+        declared_refusal_reasons=(_R.TRUSTED_EVIDENCE_TENANT_MISMATCH,),
+    ),
+    "declared_cleared_stages": dict(
+        declared_cleared_stages=(_S.STRUCTURALLY_CONSTRUCTIBLE, _S.CURRENTLY_VALID)
+    ),
+    "declared_unattempted_stages": dict(
+        declared_cleared_stages=(_S.STRUCTURALLY_CONSTRUCTIBLE,),
+        declared_unattempted_stages=(_S.PROVENANCE_VERIFIED,),
+    ),
+    "declared_refusal_reasons": dict(
+        declared_outcome=DeclaredVerificationOutcome.DECLARED_REFUSED,
+        declared_cleared_stages=(_S.STRUCTURALLY_CONSTRUCTIBLE,),
+        declared_refusal_reasons=(_R.TRUSTED_EVIDENCE_STALE,),
+    ),
+    "evidence_valid_from": dict(
+        evidence_valid_from=RECEIPT_BASELINE.evidence_valid_from + timedelta(seconds=1)
+    ),
+    "evidence_valid_from/absent": dict(evidence_valid_from=None),
+    "evidence_valid_to": dict(
+        evidence_valid_to=RECEIPT_BASELINE.evidence_valid_to + timedelta(seconds=1)
+    ),
+    "evidence_valid_to/absent": dict(evidence_valid_to=None),
+    "receipt_valid_from": dict(
+        receipt_valid_from=RECEIPT_BASELINE.receipt_valid_from + timedelta(seconds=1)
+    ),
+    "receipt_valid_from/absent": dict(receipt_valid_from=None),
+    "receipt_valid_to": dict(
+        receipt_valid_to=RECEIPT_BASELINE.receipt_valid_to + timedelta(seconds=1)
+    ),
+    "receipt_valid_to/absent": dict(receipt_valid_to=None),
+}
+
+
+@pytest.mark.parametrize("coordinate", sorted(RECEIPT_MUTATIONS))
+def test_every_receipt_coordinate_changes_the_digest(coordinate):
+    mutated = receipt(**RECEIPT_MUTATIONS[coordinate])
+    assert mutated != RECEIPT_BASELINE, coordinate
+    assert mutated.canonical_bytes() != RECEIPT_BASELINE.canonical_bytes(), coordinate
+    assert mutated.canonical_digest() != RECEIPT_BASELINE_DIGEST, coordinate
+
+
+def test_the_receipt_mutation_matrix_covers_every_declared_field():
+    covered = {key.split("/")[0].split(".")[0] for key in RECEIPT_MUTATIONS}
+    declared = {
+        f.name for f in dataclasses.fields(EvidenceVerificationReceiptPayload)
+    }
+    assert declared - covered == set()
+
+
+def test_all_mutated_receipt_digests_are_pairwise_distinct():
+    digests = {
+        name: receipt(**kw).canonical_digest() for name, kw in RECEIPT_MUTATIONS.items()
+    }
+    assert len(set(digests.values())) == len(digests)
+
+
+def test_evidence_and_receipt_validity_move_the_digest_independently():
+    """The two intervals are separate coordinates, not one reused pair."""
+
+    evidence_shift = receipt(
+        evidence_valid_to=RECEIPT_BASELINE.evidence_valid_to + timedelta(days=1)
+    )
+    receipt_shift = receipt(
+        receipt_valid_to=RECEIPT_BASELINE.receipt_valid_to + timedelta(days=1)
+    )
+    assert evidence_shift.canonical_digest() != RECEIPT_BASELINE_DIGEST
+    assert receipt_shift.canonical_digest() != RECEIPT_BASELINE_DIGEST
+    assert evidence_shift.canonical_digest() != receipt_shift.canonical_digest()
+
+
+def test_reordered_stage_and_reason_input_produces_identical_bytes():
+    """Order-irrelevant collections: reordering must NOT move the digest."""
+
+    forward = receipt(
+        declared_cleared_stages=(_S.STRUCTURALLY_CONSTRUCTIBLE, _S.CURRENTLY_VALID)
+    )
+    backward = receipt(
+        declared_cleared_stages=(_S.CURRENTLY_VALID, _S.STRUCTURALLY_CONSTRUCTIBLE)
+    )
+    assert forward.canonical_bytes() == backward.canonical_bytes()
+
+    a = receipt(
+        declared_outcome=DeclaredVerificationOutcome.DECLARED_REFUSED,
+        declared_cleared_stages=(_S.STRUCTURALLY_CONSTRUCTIBLE,),
+        declared_refusal_reasons=(_R.TRUSTED_EVIDENCE_STALE, _R.TRUSTED_EVIDENCE_REVOKED),
+    )
+    b = receipt(
+        declared_outcome=DeclaredVerificationOutcome.DECLARED_REFUSED,
+        declared_cleared_stages=(_S.STRUCTURALLY_CONSTRUCTIBLE,),
+        declared_refusal_reasons=(_R.TRUSTED_EVIDENCE_REVOKED, _R.TRUSTED_EVIDENCE_STALE),
+    )
+    assert a.canonical_bytes() == b.canonical_bytes()
+
+
+def test_custody_order_still_moves_the_digest_where_order_is_meaningful():
+    """Contrast with the order-irrelevant collections above."""
+
+    forward = identity(provenance=provenance(custody_refs=("a", "b")))
+    backward = identity(provenance=provenance(custody_refs=("b", "a")))
+    assert forward.canonical_digest() != backward.canonical_digest()
+
+
+def test_cross_claim_and_cross_unit_replay_is_detectable():
+    base = identity()
+    for replayed in (
+        claim(claim_ref="claim-other"),
+        claim(metric_ref="metric-other"),
+        claim(unit="percent"),
+        claim(measurement_semantics_ref="semantics-other"),
+        EvidenceClaimBinding.not_applicable(),
+    ):
+        mutated = identity(claim=replayed)
+        assert mutated.canonical_digest() != base.canonical_digest()
+        assert mutated.coordinate_identity != base.coordinate_identity

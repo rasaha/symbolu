@@ -9,13 +9,16 @@ from __future__ import annotations
 
 from .canonical import (
     EVIDENCE_IDENTITY_DIGEST_DOMAIN,
+    EVIDENCE_VERIFICATION_RECEIPT_PAYLOAD_DIGEST_DOMAIN,
     TRUSTED_EVIDENCE_CANONICALIZATION_VERSION,
     canonical_bytes,
     canonical_digest,
 )
 from .enums import (
     EVIDENCE_TRUST_STAGE_ORDER,
+    RECEIPT_REPORTABLE_TRUST_STAGES,
     ApplicabilityDeclaration,
+    DeclaredVerificationOutcome,
     EvidenceLifecycleState,
     EvidenceStructuralStatus,
     EvidenceTrustStage,
@@ -28,6 +31,7 @@ from .errors import (
 from .identity import (
     ApplicabilityCoordinate,
     CanonicalEvidenceIdentity,
+    EvidenceClaimBinding,
     EvidenceObservation,
     EvidenceProvenanceChain,
     EvidenceScopeBinding,
@@ -39,6 +43,7 @@ from .lifecycle import (
     require_valid_lifecycle_transition,
 )
 from .reasons import TRUSTED_EVIDENCE_REFUSAL_REASONS, TrustedEvidenceRefusalReason
+from .receipts import EvidenceVerificationReceiptPayload
 from .requests import EvidenceVerificationRequest
 
 __all__ = [
@@ -48,6 +53,7 @@ __all__ = [
     "TrustedEvidenceLifecycleError",
     # enums
     "ApplicabilityDeclaration",
+    "DeclaredVerificationOutcome",
     "EvidenceLifecycleState",
     "EvidenceStructuralStatus",
     "EvidenceTrustStage",
@@ -57,9 +63,11 @@ __all__ = [
     "EvidenceSchemaRef",
     "EvidenceObservation",
     "EvidenceScopeBinding",
+    "EvidenceClaimBinding",
     "EvidenceProvenanceChain",
     "CanonicalEvidenceIdentity",
     "EvidenceVerificationRequest",
+    "EvidenceVerificationReceiptPayload",
     # canonicalization
     "canonical_bytes",
     "canonical_digest",
@@ -69,7 +77,9 @@ __all__ = [
     # pinned constants
     "TRUSTED_EVIDENCE_CANONICALIZATION_VERSION",
     "EVIDENCE_IDENTITY_DIGEST_DOMAIN",
+    "EVIDENCE_VERIFICATION_RECEIPT_PAYLOAD_DIGEST_DOMAIN",
     "EVIDENCE_TRUST_STAGE_ORDER",
+    "RECEIPT_REPORTABLE_TRUST_STAGES",
     "EVIDENCE_LIFECYCLE_TRANSITIONS",
     "TRUSTED_EVIDENCE_REFUSAL_REASONS",
 ]

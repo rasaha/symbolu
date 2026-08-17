@@ -16,7 +16,8 @@ and mints **no authority**.
 
 | | |
 |---|---|
-| **Canonical evidence identity** | `CanonicalEvidenceIdentity` plus the nested `EvidenceSchemaRef`, `EvidenceObservation`, `EvidenceScopeBinding`, `EvidenceProvenanceChain`, `ApplicabilityCoordinate` |
+| **Canonical evidence identity** | `CanonicalEvidenceIdentity` plus the nested `EvidenceSchemaRef`, `EvidenceObservation`, `EvidenceScopeBinding`, `EvidenceClaimBinding`, `EvidenceProvenanceChain`, `ApplicabilityCoordinate` |
+| **Receipt payload** | `EvidenceVerificationReceiptPayload` + `DeclaredVerificationOutcome` — the §13 receipt *shape*, unsigned and permanently unverified |
 | **One canonicalization path, one digest path** | `canonical_bytes` / `canonical_digest`, versioned and domain-separated |
 | **Trust-stage vocabulary** | `EvidenceTrustStage` — the six distinct ADR §12 stages, plus the ratified `EVIDENCE_TRUST_STAGE_ORDER` |
 | **Lifecycle** | `EvidenceLifecycleState` and the closed ADR §28 relation `EVIDENCE_LIFECYCLE_TRANSITIONS` |
@@ -27,9 +28,13 @@ and mints **no authority**.
 ## What this package is **not**
 
 It is **not a verifier**. It performs no trust-anchor resolution, no
-cryptography, no key management or revocation, no authenticity decision, and it
-issues no receipt. There is no placeholder verifier, no permissive stub, and no
-field reserved for a later milestone. All of that is **TEV-2** (ADR §30).
+cryptography, no key management or revocation, and no authenticity decision.
+There is no placeholder verifier, no permissive stub, and no field reserved for a
+later milestone. All of that is **TEV-2** (ADR §30).
+
+In particular **it issues no receipt.** It defines the receipt *payload shape*,
+which §30 and §32 assign to TEV-1 — but that payload is unsigned, carries no
+signature field, and is explicitly not a receipt (§13.3).
 
 It is explicitly **not**:
 
@@ -116,29 +121,90 @@ free-form metadata dictionary — the canonical encoder rejects mappings outrigh
 | `scope.subject_ref` | §9.9 | opaque; no subject payload crosses the seam (§27.4) |
 | `scope.assessed_system_binding_ref` + `_digest` | §9.10 | co-required; absence is **explicit**, never defaulted |
 | `scope.assessment_purpose_ref`, `usage_scope_ref` | §7.1 r5 | opaque tokens — no evidence-side vocabulary is ratified, so none is invented |
+| `claim.claim_ref` / `claim.metric_ref` | §9.11 | "claim **or** metric identity"; at least one under `APPLICABLE` |
+| `claim.unit`, `claim.measurement_semantics_ref` | §9.12 | **co-required** whenever row 11 is present; partial combinations fail closed |
+| `claim.applicability` | §9.11 | "absent for raw non-metric evidence, **explicitly**" — never inferred from `""` or `None` |
 | `provenance.chain_ref`, `custody_refs` | §9.13 | custody order is semantic; duplicates refused |
 | `lifecycle_state` | §28 | what the artifact *asserts* — never verified here |
 | `geography`, `domain`, `intended_outcome` | §15 r6–8, UVI D-13 | explicitly `APPLICABLE` with a value or `NOT_APPLICABLE` — **never omitted** |
 | `valid_from` / `valid_to` | §9.17 | half-open `[valid_from, valid_to)` (§17.9) |
 
-### Coordinates deliberately **not** here
+### Coordinates that live on the receipt payload instead
 
 ADR §9 rows 6 and 14–16 — the **verification instant**, the **verifier authority
 and key identifier**, the **verification protocol/version**, and the
-**verification status and reason codes** — describe an act TAP performs. No TEV-1
-object performs it. Carrying them on a caller-constructible contract would
-produce exactly the artifact §10 forbids consumers from trusting: a structurally
-valid object naming an authority, a protocol and a status that nobody issued.
-
-**No receipt type ships either.** ADR E-11 makes the receipt *signed*, and §13.3
-is unambiguous: "a receipt that is unsigned … is **not** a receipt. There is no
-'trusted but unsigned' state." TEV-1 cannot sign, so the receipt shape lands with
-the signing that makes it meaningful — **TEV-2**.
+**verification status and reason codes** — describe an act a verifier performs,
+so they are not coordinates *of the evidence*. They live on
+`EvidenceVerificationReceiptPayload` (below), which keeps every declared
+verification coordinate in one object that is explicitly, permanently unverified.
 
 **No `SystemManifest`** is defined, named as owned, or placed (DD-11 stays open).
 **No supersession** exists: the ratified *evidence* lifecycle (§28) has no
 supersession arrow — that is the *benchmark* lifecycle (§29), itself deferred to
 DD-4 — so no supersession state and no supersession refusal code is minted.
+
+---
+
+## The receipt payload
+
+ADR §30 assigns "receipt shape (§13)" to **TEV-1**, and the §32 status ledger is
+explicit: *"Signed, immutable TAP verification receipt (§13) … shape = TEV-1,
+service = TEV-2."* `EvidenceVerificationReceiptPayload` is that shape.
+
+**Payload, not receipt.** §13.3 rules that "a receipt that is unsigned … is
+**not** a receipt. There is no 'trusted but unsigned' state." Nothing here is
+signed, so nothing here is called a receipt. What exists is the canonical content
+a TEV-2 signer will sign — and §13.3 requires exactly that content, its
+canonicalization version and its domain tag to be "unambiguous, versioned, and
+**fixed before signing exists**".
+
+**No signature field**, not even optional, not even a placeholder. TEV-1 owns the
+payload and its canonical bytes; TEV-2 owns the signature, the envelope, the key
+trust and the revocation check.
+
+| Field group | ADR |
+|---|---|
+| `receipt_id`, `schema` | receipt identity and version |
+| `source_evidence_identity_digest`, `evidence_content_digest` | §13.1.2, §9.3 — binds digests, never payloads (§27.5) |
+| `verification_request_digest` | what was asked |
+| `scope` | §13.1.3 — tenant / context / subject / system / purpose / usage scope |
+| `verified_at` | §9 row 6, §13.1.5 |
+| `verifier_authority_id`, `verifier_key_id` | §9 row 14 — the key id is an **opaque coordinate**; no key format, algorithm or trust-anchor semantics is implied |
+| `verification_protocol_id`, `verification_protocol_version` | §9 row 15 |
+| `declared_outcome`, `declared_refusal_reasons` | §9 row 16 |
+| `declared_cleared_stages`, `declared_unattempted_stages` | §13.1.1 — stages **1–5 only** (§12) |
+| `evidence_valid_from` / `_to`, `receipt_valid_from` / `_to` | §13.1.6 — two **distinct** half-open intervals |
+
+The canonicalization version and the receipt domain tag are bound by the
+canonical **frame**, not carried as fields, so a caller cannot edit them and a
+receipt digest can never be mistaken for an evidence-identity digest.
+
+### Declared is not established
+
+Every verification coordinate on a payload is a **declaration written by whoever
+built the object**. `DeclaredVerificationOutcome` members carry a `DECLARED_`
+prefix for exactly that reason, and the honest properties are unmoved by them:
+
+```python
+payload = EvidenceVerificationReceiptPayload(...)   # declaring every stage cleared,
+                                                    # under an authoritative name
+payload.declares_admission          # True  — what the payload SAYS
+payload.declared_cleared_stages     # all five reportable stages — what it SAYS
+
+payload.structural_status           # STRUCTURAL_UNVERIFIED — what is ESTABLISHED
+payload.authenticity_verified       # False. Always.
+payload.unestablished_trust_stages  # still contains CRYPTOGRAPHICALLY_AUTHENTIC
+payload.envelope_verification_reason # TRUSTED_EVIDENCE_VERIFICATION_NOT_PERFORMED
+```
+
+`structural_status` and `authenticity_verified` are read-only **properties**, so
+they have no backing field: `object.__setattr__` — the usual frozen-dataclass
+bypass — raises rather than shadowing them, and a doctored instance dictionary
+loses to the data descriptor.
+
+A payload authorizes nothing (§13.2): not deployment, not runtime action, not
+policy approval, not benchmark acceptance, not readiness classification, not
+economic value, not causal attribution.
 
 ---
 
@@ -152,15 +218,21 @@ dual-acceptance fallback.
  "domain":"ugence.trusted-evidence-authority/evidence-identity/v1", "type":"<ContractName>"}
 ```
 
+* Two domains, one encoder: evidence identity and its nested coordinates use
+  `EVIDENCE_IDENTITY_DIGEST_DOMAIN`; the receipt payload uses
+  `EVIDENCE_VERIFICATION_RECEIPT_PAYLOAD_DIGEST_DOMAIN`. A receipt digest can
+  therefore never be reused as an evidence digest (§26.6), and the frame's
+  `type` separates every contract within a domain.
 * UTF-8 JSON, `sort_keys=True`, `separators=(",", ":")`, `ensure_ascii=False`.
 * **Field inclusion is total** — nothing is dropped when empty; `None` is an
   explicit JSON `null`, distinct from `""`.
 * Datetimes must be **timezone-aware**, are normalized to UTC via an explicit
   `astimezone(timezone.utc)`, and render `%Y-%m-%dT%H:%M:%S.%fZ` — **microseconds
   preserved**. Naive datetimes are **rejected**, never assumed UTC (§22.4).
-* Strings must be **NFC**; non-canonical input is rejected, never silently
-  normalized — folding NFD onto NFC would map two different artifacts onto one
-  digest.
+* Strings must be **NFC**, enforced **at construction and again at
+  canonicalization** — the two-boundary discipline ADR §22.4 fixes for naive
+  datetimes. Non-canonical input is rejected, never silently normalized: folding
+  NFD onto NFC would map two different artifacts onto one digest.
 * `bool` is dispatched before `int`. **`float` is rejected outright**, which
   subsumes `nan`/`inf`/`-inf`.
 * Mappings and `bytes` are rejected — no TEV-1 contract carries either, and
@@ -233,8 +305,8 @@ digest, so changing an encoding rule requires a new version string.
 ```python
 from ugence_trusted_evidence_authority.api import (
     ApplicabilityCoordinate, ApplicabilityDeclaration, CanonicalEvidenceIdentity,
-    EvidenceLifecycleState, EvidenceObservation, EvidenceProvenanceChain,
-    EvidenceSchemaRef, EvidenceScopeBinding,
+    EvidenceClaimBinding, EvidenceLifecycleState, EvidenceObservation,
+    EvidenceProvenanceChain, EvidenceSchemaRef, EvidenceScopeBinding,
 )
 from datetime import datetime, timezone
 
@@ -255,6 +327,10 @@ ident = CanonicalEvidenceIdentity(
         assessment_purpose_ref="purpose-readiness", usage_scope_ref="scope-general",
         assessed_system_applicability=ApplicabilityDeclaration.APPLICABLE,
         assessed_system_binding_ref="bind-1", assessed_system_binding_digest=bind_sha256_hex,
+    ),
+    claim=EvidenceClaimBinding.applicable(
+        metric_ref="control-pass-rate", unit="ratio",
+        measurement_semantics_ref="semantics/control-pass-rate/v1",
     ),
     provenance=EvidenceProvenanceChain(chain_ref="chain-1", custody_refs=("collector-a",)),
     lifecycle_state=EvidenceLifecycleState.SUBMITTED,
@@ -296,7 +372,11 @@ module, helper, fixture or conftest — and recomputes every expected digest wit
 
 ## Status
 
-**TEV-1 implemented.** TEV-2 (verification service, trust anchors, key trust and
-revocation, signing, signed receipts, independent verification), BR-1/BR-2
-(Benchmark Registry), UVI-EV-1 / M-3R.4 (Readiness integration) and GV-F → GV-V
-remain **DEFERRED** per ADR §30. No consumer integration exists.
+**TEV-1 implemented**, including the §13 receipt *payload shape* that §30 and the
+§32 ledger assign to this milestone.
+
+**TEV-2 remains DEFERRED**: the verification service, trust anchors, key trust and
+revocation, signing, the signed envelope that turns a payload into a receipt, and
+independent signature verification. So do BR-1/BR-2 (Benchmark Registry),
+UVI-EV-1 / M-3R.4 (Readiness integration) and GV-F → GV-V, per ADR §30. No
+consumer integration exists.

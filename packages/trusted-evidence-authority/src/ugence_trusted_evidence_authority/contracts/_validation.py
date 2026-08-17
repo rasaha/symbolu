@@ -20,14 +20,25 @@ The merged ``AssessedSystemBinding`` strips and stores the stripped form, so
 ``" sys-a "`` and ``"sys-a"`` share a digest. These contracts **reject padding
 instead**. Stripping is a silent normalization of a value the caller actually
 wrote, and ADR §22 requires the digest to be a faithful function of the
-committed bytes — the same reasoning that makes this package reject non-NFC
-strings rather than fold them. Rejecting also keeps a single rule: whatever the
-caller supplies is exactly what is digested.
+committed bytes. Rejecting also keeps a single rule: whatever the caller
+supplies is exactly what is digested.
+
+Unicode **NFC is required at construction**, not only at canonicalization. ADR
+§22.4 fixes the pattern for naive datetimes: they are rejected "at the boundary
+**and again** at canonicalization". A canonical string is the same kind of
+coordinate and gets the same two-boundary treatment. Enforcing NFC only in the
+encoder would let a non-NFC identifier construct successfully with every
+structural invariant apparently satisfied, failing much later when something
+finally asked for its bytes — and an object that cannot be canonicalized is not
+structurally valid, so it must not exist in the first place. The encoder keeps
+its own NFC check as defense in depth, so a value arriving by any other route
+still fails closed.
 """
 
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections.abc import Mapping
 from datetime import datetime
 from typing import Optional
@@ -80,16 +91,27 @@ def require_exact_type(value: object, expected: type, name: str) -> None:
 
 
 def require_canonical_str(value: object, name: str, *, allow_empty: bool) -> str:
-    """Require a ``str`` carrying no leading/trailing whitespace.
+    """Require a canonical ``str``: exact type, unpadded, and Unicode NFC.
 
-    ``bool`` and every other non-``str`` are refused. An all-whitespace value is
-    refused whether or not ``allow_empty`` is set — it is padding around
-    nothing, not an explicit absence.
+    ``bool``, every other non-``str``, and every ``str`` **subclass** are
+    refused — a subclass could override ``__eq__``, ``__hash__`` or
+    ``__str__`` and thereby change what a comparison or a digest sees.
+
+    An all-whitespace value is refused whether or not ``allow_empty`` is set:
+    it is padding around nothing, not an explicit absence.
+
+    A non-NFC value is refused here, **at construction**, and again by the
+    canonical encoder. Neither boundary normalizes it. Silently folding NFD onto
+    NFC would map two structurally different coordinates onto one digest, so a
+    digest over one would attest a value nobody wrote; rejecting keeps the digest
+    a faithful function of the exact bytes the caller committed to.
     """
 
     if type(value) is not str:
         raise _fail(
-            f"{name} must be a string (got {type(value).__name__})",
+            f"{name} must be a string (got {type(value).__name__}); str "
+            "subclasses are refused because a subclass can change what "
+            "comparison and canonicalization see",
             TrustedEvidenceRefusalReason.TRUSTED_EVIDENCE_MALFORMED_CONTRACT,
         )
     if value != value.strip():
@@ -97,6 +119,13 @@ def require_canonical_str(value: object, name: str, *, allow_empty: bool) -> str
             f"{name} must be a canonical string with no leading or trailing "
             "whitespace; padding is refused, never trimmed, so the digest stays "
             "a faithful function of the exact value supplied",
+            TrustedEvidenceRefusalReason.TRUSTED_EVIDENCE_MALFORMED_CONTRACT,
+        )
+    if unicodedata.normalize("NFC", value) != value:
+        raise _fail(
+            f"{name} must be Unicode NFC-normalized; a non-canonical string is "
+            "refused at construction and never silently normalized, so two "
+            "differently-spelled coordinates can never share one digest",
             TrustedEvidenceRefusalReason.TRUSTED_EVIDENCE_MALFORMED_CONTRACT,
         )
     if not value and not allow_empty:

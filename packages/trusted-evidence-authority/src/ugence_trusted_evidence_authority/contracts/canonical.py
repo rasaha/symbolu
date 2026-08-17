@@ -104,6 +104,7 @@ from .errors import TrustedEvidenceCanonicalizationError
 __all__ = [
     "TRUSTED_EVIDENCE_CANONICALIZATION_VERSION",
     "EVIDENCE_IDENTITY_DIGEST_DOMAIN",
+    "EVIDENCE_VERIFICATION_RECEIPT_PAYLOAD_DIGEST_DOMAIN",
     "canonical_bytes",
     "canonical_digest",
 ]
@@ -116,12 +117,38 @@ TRUSTED_EVIDENCE_CANONICALIZATION_VERSION = (
 
 #: The domain-separation tag bound into every evidence-identity digest.
 #:
-#: Distinct from any receipt or benchmark domain, neither of which exists yet
-#: (TEV-2 / BR-1). ADR §26.6: a signature or digest valid in one domain must not
-#: be reusable in another.
+#: Covers the evidence-identity family: the identity itself, its nested
+#: coordinates, and the verification *request* that names one. All describe the
+#: same artifact class — an evidence item and what a caller expects of it.
 EVIDENCE_IDENTITY_DIGEST_DOMAIN = (
     "ugence.trusted-evidence-authority/evidence-identity/v1"
 )
+
+#: The domain-separation tag bound into every receipt-payload digest.
+#:
+#: A receipt is a **different artifact class** from the evidence it attests
+#: (ADR §13.1.8 — it "remains distinct from the underlying evidence"), so it gets
+#: its own domain. ADR §26.6 requires that a digest or signature valid in one
+#: domain must not be reusable in another, and §13.3 requires the domain tag to
+#: be "unambiguous, versioned, and **fixed before signing exists**" — which is
+#: precisely why it is minted at TEV-1, under DD-9, rather than waiting for the
+#: TEV-2 signer that will bind it.
+EVIDENCE_VERIFICATION_RECEIPT_PAYLOAD_DIGEST_DOMAIN = (
+    "ugence.trusted-evidence-authority/evidence-verification-receipt-payload/v1"
+)
+
+#: Contract type name -> domain tag, for every type outside the default domain.
+#:
+#: The single source of truth for domain selection. Keyed by type name so this
+#: module stays import-cycle-free (the contracts import the encoder, never the
+#: reverse). Domain separation does not rest on this mapping alone: the frame
+#: also binds the contract type name, so two types can never collide even inside
+#: one domain.
+_DOMAIN_BY_TYPE_NAME = {
+    "EvidenceVerificationReceiptPayload": (
+        EVIDENCE_VERIFICATION_RECEIPT_PAYLOAD_DIGEST_DOMAIN
+    ),
+}
 
 _TIMESTAMP_FMT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
@@ -210,10 +237,11 @@ def canonical_bytes(contract: Any) -> bytes:
             "canonical_bytes expects a trusted-evidence contract instance "
             f"(got {type(contract).__name__})"
         )
+    type_name = type(contract).__name__
     framed = {
         "canonicalization": TRUSTED_EVIDENCE_CANONICALIZATION_VERSION,
-        "domain": EVIDENCE_IDENTITY_DIGEST_DOMAIN,
-        "type": type(contract).__name__,
+        "domain": _DOMAIN_BY_TYPE_NAME.get(type_name, EVIDENCE_IDENTITY_DIGEST_DOMAIN),
+        "type": type_name,
         "body": _to_canonical_obj(contract, "$"),
     }
     return json.dumps(

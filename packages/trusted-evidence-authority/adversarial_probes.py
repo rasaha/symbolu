@@ -28,11 +28,15 @@ from datetime import datetime, timedelta, timezone
 from ugence_trusted_evidence_authority.api import (  # noqa: F401
     EVIDENCE_LIFECYCLE_TRANSITIONS,
     EVIDENCE_IDENTITY_DIGEST_DOMAIN,
+    EVIDENCE_VERIFICATION_RECEIPT_PAYLOAD_DIGEST_DOMAIN,
+    RECEIPT_REPORTABLE_TRUST_STAGES,
     TRUSTED_EVIDENCE_CANONICALIZATION_VERSION,
     TRUSTED_EVIDENCE_REFUSAL_REASONS,
     ApplicabilityCoordinate,
     ApplicabilityDeclaration,
     CanonicalEvidenceIdentity,
+    DeclaredVerificationOutcome,
+    EvidenceClaimBinding,
     EvidenceLifecycleState,
     EvidenceObservation,
     EvidenceProvenanceChain,
@@ -40,6 +44,7 @@ from ugence_trusted_evidence_authority.api import (  # noqa: F401
     EvidenceScopeBinding,
     EvidenceStructuralStatus,
     EvidenceTrustStage,
+    EvidenceVerificationReceiptPayload,
     EvidenceVerificationRequest,
     TrustedEvidenceCanonicalizationError,
     TrustedEvidenceContractError,
@@ -121,6 +126,12 @@ def build_identity(**overrides) -> CanonicalEvidenceIdentity:
             assessed_system_applicability=ApplicabilityDeclaration.APPLICABLE,
             assessed_system_binding_ref="probe-binding",
             assessed_system_binding_digest=BINDING,
+        ),
+        claim=EvidenceClaimBinding.applicable(
+            claim_ref="probe-claim",
+            metric_ref="probe-metric",
+            unit="probe-unit",
+            measurement_semantics_ref="probe-semantics",
         ),
         provenance=EvidenceProvenanceChain(
             chain_ref="probe-chain", custody_refs=("link-a", "link-b")
@@ -668,14 +679,20 @@ def probe_stage_six_cannot_be_requested_from_tap():
 
 
 @probe
-def probe_no_verifier_receipt_or_key_type_is_exported():
+def probe_no_verifier_signed_receipt_or_key_type_is_exported():
+    """The receipt *payload* ships; nothing signed, and no verifier, does."""
+
     import ugence_trusted_evidence_authority.api as api_module
 
     for name in api_module.__all__:
-        lowered = name.lower().replace("_", "")
-        for forbidden in ("receipt", "verifier", "trustanchor", "keyring", "signer",
-                          "signature", "verificationresult"):
-            assert forbidden not in lowered, name
+        flattened = name.lower().replace("_", "")
+        for forbidden in ("verifier", "trustanchor", "keyring", "signer",
+                          "signature", "verificationresult", "signedreceipt"):
+            assert forbidden not in flattened, name
+        # Nothing is called a *receipt*: §13.3 — an unsigned artifact is not one.
+        if name.endswith("Receipt"):
+            raise AssertionError(f"unsigned type named as a receipt: {name}")
+    assert "EvidenceVerificationReceiptPayload" in api_module.__all__
 
 
 @probe
@@ -735,6 +752,405 @@ def probe_this_harness_imports_only_the_curated_api_and_the_stdlib():
             "ugence_trusted_evidence_authority",
             "ugence_trusted_evidence_authority.api",
         ), f"probe harness imports a non-curated module: {module}"
+
+
+
+# --------------------------------------------------------------------------- #
+# G. Claim / metric / units (ADR §9 rows 11-12) — audit finding A-02
+# --------------------------------------------------------------------------- #
+@probe
+def probe_claim_applicability_must_be_declared_not_inferred():
+    expect_refusal(lambda: EvidenceClaimBinding(), TypeError)
+    declared = EvidenceClaimBinding.not_applicable()
+    assert declared.applicability is ApplicabilityDeclaration.NOT_APPLICABLE
+    assert declared.claim_identity == ("NOT_APPLICABLE", "", "", "", "")
+
+
+@probe
+def probe_the_claim_units_co_requirement_holds():
+    for kw in (
+        dict(claim_ref="c", unit="u", measurement_semantics_ref="s"),
+        dict(metric_ref="m", unit="u", measurement_semantics_ref="s"),
+        dict(claim_ref="c", metric_ref="m", unit="u", measurement_semantics_ref="s"),
+    ):
+        EvidenceClaimBinding(applicability=ApplicabilityDeclaration.APPLICABLE, **kw)
+    for kw in (
+        dict(unit="u", measurement_semantics_ref="s"),
+        dict(claim_ref="c", measurement_semantics_ref="s"),
+        dict(claim_ref="c", unit="u"),
+        dict(claim_ref="c"),
+        {},
+    ):
+        expect_refusal(
+            lambda k=kw: EvidenceClaimBinding(
+                applicability=ApplicabilityDeclaration.APPLICABLE, **k
+            )
+        )
+    for field in ("claim_ref", "metric_ref", "unit", "measurement_semantics_ref"):
+        expect_refusal(
+            lambda f=field: EvidenceClaimBinding(
+                applicability=ApplicabilityDeclaration.NOT_APPLICABLE, **{f: "x"}
+            )
+        )
+
+
+@probe
+def probe_empty_string_and_none_are_not_not_applicable():
+    expect_refusal(
+        lambda: EvidenceClaimBinding(
+            applicability=ApplicabilityDeclaration.APPLICABLE,
+            claim_ref="", metric_ref="", unit="", measurement_semantics_ref="",
+        )
+    )
+    expect_refusal(
+        lambda: EvidenceClaimBinding(
+            applicability=ApplicabilityDeclaration.APPLICABLE,
+            claim_ref=None, unit="u", measurement_semantics_ref="s",
+        )
+    )
+
+
+@probe
+def probe_every_claim_coordinate_moves_the_evidence_digest():
+    base = build_identity()
+    variants = [
+        EvidenceClaimBinding.applicable(
+            claim_ref="other", metric_ref="probe-metric",
+            unit="probe-unit", measurement_semantics_ref="probe-semantics"),
+        EvidenceClaimBinding.applicable(
+            claim_ref="probe-claim", metric_ref="other",
+            unit="probe-unit", measurement_semantics_ref="probe-semantics"),
+        EvidenceClaimBinding.applicable(
+            claim_ref="probe-claim", metric_ref="probe-metric",
+            unit="other", measurement_semantics_ref="probe-semantics"),
+        EvidenceClaimBinding.applicable(
+            claim_ref="probe-claim", metric_ref="probe-metric",
+            unit="probe-unit", measurement_semantics_ref="other"),
+        EvidenceClaimBinding.not_applicable(),
+    ]
+    digests = {base.canonical_digest()}
+    for variant in variants:
+        mutated = build_identity(claim=variant)
+        assert mutated.canonical_digest() != base.canonical_digest()
+        assert mutated.coordinate_identity != base.coordinate_identity
+        digests.add(mutated.canonical_digest())
+    assert len(digests) == len(variants) + 1
+
+
+@probe
+def probe_the_claim_contract_computes_nothing():
+    forbidden = {"convert", "normalize", "compare", "evaluate", "calculate", "result"}
+    assert not (set(dir(EvidenceClaimBinding)) & forbidden)
+
+
+# --------------------------------------------------------------------------- #
+# H. Receipt payload (ADR §13) — audit finding A-01
+# --------------------------------------------------------------------------- #
+RECEIPT_T = datetime(2026, 7, 1, 6, 0, 0, 500000, tzinfo=UTC)
+RCPT_FROM = datetime(2026, 7, 1, tzinfo=UTC)
+RCPT_TO = datetime(2026, 11, 1, tzinfo=UTC)
+
+
+def build_receipt(**overrides) -> EvidenceVerificationReceiptPayload:
+    """The most favourable-looking payload a caller can build."""
+
+    base = dict(
+        receipt_id="probe-receipt",
+        schema=EvidenceSchemaRef(schema_id="probe.receipt", schema_version="1"),
+        source_evidence_identity_digest=build_identity().canonical_digest(),
+        evidence_content_digest=CONTENT,
+        verification_request_digest=build_request().canonical_digest(),
+        scope=build_identity().scope,
+        verified_at=RECEIPT_T,
+        verifier_authority_id="Ugence Root Trust Authority",
+        verifier_key_id="root-signing-key",
+        verification_protocol_id="probe.protocol",
+        verification_protocol_version="1",
+        declared_outcome=DeclaredVerificationOutcome.DECLARED_ADMITTED,
+        declared_cleared_stages=tuple(RECEIPT_REPORTABLE_TRUST_STAGES),
+        declared_unattempted_stages=(),
+        declared_refusal_reasons=(),
+        evidence_valid_from=T_FROM,
+        evidence_valid_to=T_TO,
+        receipt_valid_from=RCPT_FROM,
+        receipt_valid_to=RCPT_TO,
+    )
+    base.update(overrides)
+    return EvidenceVerificationReceiptPayload(**base)
+
+
+@probe
+def probe_a_maximally_favourable_payload_is_still_structurally_unverified():
+    payload = build_receipt()
+    assert payload.declares_admission is True
+    assert set(payload.declared_cleared_stages) == set(RECEIPT_REPORTABLE_TRUST_STAGES)
+    assert payload.structural_status is EvidenceStructuralStatus.STRUCTURAL_UNVERIFIED
+    assert payload.authenticity_verified is False
+    assert payload.established_trust_stages == (
+        EvidenceTrustStage.STRUCTURALLY_CONSTRUCTIBLE,
+    )
+    assert (
+        EvidenceTrustStage.CRYPTOGRAPHICALLY_AUTHENTIC
+        in payload.unestablished_trust_stages
+    )
+    assert EvidenceTrustStage.POLICY_SUFFICIENT in payload.unestablished_trust_stages
+    assert (
+        payload.envelope_verification_reason
+        is R.TRUSTED_EVIDENCE_VERIFICATION_NOT_PERFORMED
+    )
+
+
+@probe
+def probe_the_payload_carries_no_signature_of_any_kind():
+    names = {f.name for f in dataclasses.fields(EvidenceVerificationReceiptPayload)}
+    for forbidden in ("signature", "signed", "signer", "envelope", "trust_anchor",
+                      "public_key", "algorithm", "certificate", "key_material"):
+        assert forbidden not in names, forbidden
+    for forbidden in ("signature", "signed", "trust_anchor"):
+        expect_refusal(lambda f=forbidden: build_receipt(**{f: b"x"}), TypeError)
+    body = json.loads(canonical_bytes(build_receipt()))["body"]
+    assert not any("sign" in k.lower() for k in body)
+
+
+@probe
+def probe_receipt_forgery_routes_are_all_closed():
+    payload = build_receipt()
+    for truthy in (True, 1, "true", [1], {"a": 1}):
+        expect_refusal(lambda t=truthy: build_receipt(verified=t), TypeError)
+        expect_refusal(
+            lambda t=truthy: build_receipt(authenticity_verified=t), TypeError
+        )
+    expect_refusal(
+        lambda: setattr(payload, "authenticity_verified", True),
+        dataclasses.FrozenInstanceError,
+    )
+    expect_refusal(
+        lambda: object.__setattr__(payload, "authenticity_verified", True),
+        AttributeError,
+    )
+    payload.__dict__["authenticity_verified"] = True
+    assert payload.authenticity_verified is False
+    for attempt in ("DECLARED_VERIFIED", "AUTHORITY_VERIFIED", "ADMITTED", "OK"):
+        expect_refusal(lambda a=attempt: DeclaredVerificationOutcome(a), ValueError)
+
+    class ForgedReceipt(EvidenceVerificationReceiptPayload):
+        @property
+        def authenticity_verified(self):
+            return True
+
+    forged = ForgedReceipt(
+        **{f.name: getattr(payload, f.name) for f in dataclasses.fields(payload)}
+    )
+    assert canonical_digest(forged) != payload.canonical_digest()
+    assert b'"type":"ForgedReceipt"' in canonical_bytes(forged)
+
+    class Lookalike:
+        pass
+
+    fake = Lookalike()
+    for field in dataclasses.fields(payload):
+        setattr(fake, field.name, getattr(payload, field.name))
+    fake.authenticity_verified = True
+    expect_refusal(lambda: canonical_bytes(fake), TrustedEvidenceCanonicalizationError)
+
+
+@probe
+def probe_a_monkeypatched_property_never_reaches_the_receipt_digest():
+    payload = build_receipt()
+    before = payload.canonical_digest()
+    original = EvidenceVerificationReceiptPayload.authenticity_verified
+    try:
+        EvidenceVerificationReceiptPayload.authenticity_verified = property(
+            lambda self: True
+        )
+        assert payload.canonical_digest() == before
+        assert b"authenticity_verified" not in payload.canonical_bytes()
+    finally:
+        EvidenceVerificationReceiptPayload.authenticity_verified = original
+    assert build_receipt().authenticity_verified is False
+
+
+@probe
+def probe_receipt_stage_and_outcome_coherence():
+    for field in ("declared_cleared_stages", "declared_unattempted_stages"):
+        expect_refusal(
+            lambda f=field: build_receipt(
+                **{f: (EvidenceTrustStage.POLICY_SUFFICIENT,)}
+            )
+        )
+    expect_refusal(
+        lambda: build_receipt(
+            declared_cleared_stages=(EvidenceTrustStage.CURRENTLY_VALID,),
+            declared_unattempted_stages=(EvidenceTrustStage.CURRENTLY_VALID,),
+        )
+    )
+    expect_refusal(
+        lambda: build_receipt(declared_refusal_reasons=(R.TRUSTED_EVIDENCE_STALE,))
+    )
+    expect_refusal(lambda: build_receipt(declared_cleared_stages=()))
+    expect_refusal(
+        lambda: build_receipt(
+            declared_outcome=DeclaredVerificationOutcome.DECLARED_REFUSED,
+            declared_refusal_reasons=(),
+        )
+    )
+    expect_refusal(
+        lambda: build_receipt(
+            declared_outcome=DeclaredVerificationOutcome.DECLARED_INDETERMINATE,
+            declared_cleared_stages=(EvidenceTrustStage.STRUCTURALLY_CONSTRUCTIBLE,),
+            declared_refusal_reasons=(R.TRUSTED_EVIDENCE_STALE,),
+        )
+    )
+    ok = build_receipt(
+        declared_outcome=DeclaredVerificationOutcome.DECLARED_INDETERMINATE,
+        declared_cleared_stages=(EvidenceTrustStage.STRUCTURALLY_CONSTRUCTIBLE,),
+        declared_refusal_reasons=(R.TRUSTED_EVIDENCE_INDETERMINATE,),
+    )
+    assert ok.declares_admission is False
+    assert ok.authenticity_verified is False
+
+
+@probe
+def probe_receipt_and_evidence_validity_are_never_conflated():
+    payload = build_receipt(
+        evidence_valid_from=datetime(2026, 1, 1, tzinfo=UTC),
+        evidence_valid_to=datetime(2026, 2, 1, tzinfo=UTC),
+        receipt_valid_from=datetime(2026, 7, 1, tzinfo=UTC),
+        receipt_valid_to=datetime(2026, 12, 1, tzinfo=UTC),
+    )
+    instant = datetime(2026, 8, 1, tzinfo=UTC)
+    assert payload.receipt_is_valid_at(instant) is True
+    assert payload.evidence_is_valid_at(instant) is False
+    tick = timedelta(microseconds=1)
+    assert payload.receipt_is_valid_at(datetime(2026, 7, 1, tzinfo=UTC)) is True
+    assert payload.receipt_is_valid_at(datetime(2026, 12, 1, tzinfo=UTC)) is False
+    assert payload.receipt_is_valid_at(datetime(2026, 12, 1, tzinfo=UTC) - tick) is True
+    expect_refusal(lambda: payload.receipt_is_valid_at(datetime(2026, 8, 1)))
+    expect_refusal(
+        lambda: build_receipt(receipt_valid_from=RCPT_TO, receipt_valid_to=RCPT_FROM)
+    )
+    expect_refusal(
+        lambda: build_receipt(evidence_valid_from=T_TO, evidence_valid_to=T_FROM)
+    )
+
+
+@probe
+def probe_receipt_domain_separation_and_independent_digest():
+    payload = build_receipt()
+    frame = json.loads(canonical_bytes(payload))
+    assert frame["domain"] == EVIDENCE_VERIFICATION_RECEIPT_PAYLOAD_DIGEST_DOMAIN
+    assert frame["type"] == "EvidenceVerificationReceiptPayload"
+    assert (
+        EVIDENCE_VERIFICATION_RECEIPT_PAYLOAD_DIGEST_DOMAIN
+        == "ugence.trusted-evidence-authority/"
+        "evidence-verification-receipt-payload/v1"
+    )
+    assert (
+        EVIDENCE_VERIFICATION_RECEIPT_PAYLOAD_DIGEST_DOMAIN
+        != EVIDENCE_IDENTITY_DIGEST_DOMAIN
+    )
+    assert (
+        hashlib.sha256(canonical_bytes(payload)).hexdigest()
+        == canonical_digest(payload)
+    )
+    ident = build_identity()
+    for other in (
+        ident, ident.schema, ident.scope, ident.observation, ident.provenance,
+        ident.claim, build_request(),
+    ):
+        assert canonical_bytes(other) != canonical_bytes(payload)
+        assert canonical_digest(other) != canonical_digest(payload)
+        assert json.loads(canonical_bytes(other))["domain"] != frame["domain"]
+
+
+@probe
+def probe_receipt_reordered_sets_are_equivalent_and_every_field_is_load_bearing():
+    a = build_receipt(
+        declared_cleared_stages=(
+            EvidenceTrustStage.STRUCTURALLY_CONSTRUCTIBLE,
+            EvidenceTrustStage.CURRENTLY_VALID,
+        )
+    )
+    b = build_receipt(
+        declared_cleared_stages=(
+            EvidenceTrustStage.CURRENTLY_VALID,
+            EvidenceTrustStage.STRUCTURALLY_CONSTRUCTIBLE,
+        )
+    )
+    assert a.canonical_bytes() == b.canonical_bytes()
+
+    base = build_receipt()
+    mutations = {
+        "receipt_id": dict(receipt_id="probe-receipt-2"),
+        "source_evidence_identity_digest": dict(source_evidence_identity_digest=OTHER),
+        "evidence_content_digest": dict(evidence_content_digest=OTHER),
+        "verification_request_digest": dict(verification_request_digest=OTHER),
+        "verified_at": dict(verified_at=RECEIPT_T + timedelta(microseconds=1)),
+        "verifier_authority_id": dict(verifier_authority_id="other-authority"),
+        "verifier_key_id": dict(verifier_key_id="other-key"),
+        "verification_protocol_id": dict(verification_protocol_id="other.protocol"),
+        "verification_protocol_version": dict(verification_protocol_version="2"),
+        "declared_cleared_stages": dict(
+            declared_cleared_stages=(EvidenceTrustStage.STRUCTURALLY_CONSTRUCTIBLE,)
+        ),
+        "evidence_valid_to": dict(evidence_valid_to=T_TO + timedelta(seconds=1)),
+        "receipt_valid_to": dict(receipt_valid_to=RCPT_TO + timedelta(seconds=1)),
+    }
+    digests = {base.canonical_digest()}
+    for name, kw in mutations.items():
+        mutated = build_receipt(**kw)
+        assert mutated.canonical_digest() != base.canonical_digest(), name
+        digests.add(mutated.canonical_digest())
+    assert len(digests) == len(mutations) + 1
+
+
+@probe
+def probe_receipt_required_coordinates_cannot_be_blank():
+    for name in ("receipt_id", "verifier_authority_id", "verifier_key_id",
+                 "verification_protocol_id", "verification_protocol_version"):
+        for bad in ("", "  ", " padded", None, 1, True):
+            expect_refusal(lambda n=name, b=bad: build_receipt(**{n: b}))
+    for name in ("source_evidence_identity_digest", "evidence_content_digest",
+                 "verification_request_digest"):
+        for bad in ("", "nope", CONTENT.upper()):
+            expect_refusal(lambda n=name, b=bad: build_receipt(**{n: b}))
+    expect_refusal(lambda: build_receipt(verified_at=datetime(2026, 7, 1)))
+
+
+# --------------------------------------------------------------------------- #
+# I. NFC at construction (audit finding A-03)
+# --------------------------------------------------------------------------- #
+@probe
+def probe_non_nfc_strings_are_refused_at_construction():
+    import unicodedata
+
+    nfd = "caf\u0065\u0301-id"
+    nfc = "caf\u00e9-id"
+    assert unicodedata.normalize("NFC", nfd) == nfc != nfd, "fixture is already NFC"
+
+    expect_refusal(lambda: EvidenceSchemaRef(schema_id=nfd, schema_version="1"))
+    expect_refusal(lambda: build_identity(evidence_id=nfd))
+    expect_refusal(lambda: build_identity(evidence_type=nfd))
+    expect_refusal(
+        lambda: EvidenceProvenanceChain(chain_ref="c", custody_refs=("ok", nfd))
+    )
+    expect_refusal(lambda: ApplicabilityCoordinate.applicable(nfd))
+    expect_refusal(
+        lambda: EvidenceClaimBinding.applicable(
+            claim_ref=nfd, unit="u", measurement_semantics_ref="s"
+        )
+    )
+    expect_refusal(lambda: build_request(expected_tenant_id=nfd))
+    expect_refusal(lambda: build_receipt(verifier_authority_id=nfd))
+
+    accepted = EvidenceSchemaRef(schema_id=nfc, schema_version="1")
+    assert accepted.schema_id == nfc != nfd
+
+    built = EvidenceSchemaRef(schema_id="ok", schema_version="1")
+    object.__setattr__(built, "schema_id", nfd)
+    expect_refusal(
+        lambda: canonical_bytes(built), TrustedEvidenceCanonicalizationError
+    )
 
 
 def main() -> int:

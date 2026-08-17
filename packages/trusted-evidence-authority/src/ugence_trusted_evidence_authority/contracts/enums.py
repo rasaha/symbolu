@@ -15,10 +15,12 @@ from enum import Enum
 
 __all__ = [
     "ApplicabilityDeclaration",
+    "DeclaredVerificationOutcome",
     "EvidenceLifecycleState",
     "EvidenceStructuralStatus",
     "EvidenceTrustStage",
     "EVIDENCE_TRUST_STAGE_ORDER",
+    "RECEIPT_REPORTABLE_TRUST_STAGES",
 ]
 
 
@@ -83,6 +85,51 @@ EVIDENCE_TRUST_STAGE_ORDER: tuple = (
     EvidenceTrustStage.CURRENTLY_VALID,
     EvidenceTrustStage.POLICY_SUFFICIENT,
 )
+
+
+#: The stages a receipt may report on — ADR §12 stages 1-5.
+#:
+#: Stage 6 is excluded by ratified rule, not by convenience: §12 states that "a
+#: receipt therefore records stages 1-5 and **never asserts stage 6 globally**",
+#: because policy sufficiency is requirement-relative and belongs to the
+#: consuming evaluation engine under a Policy Authority requirement. A receipt
+#: payload naming ``POLICY_SUFFICIENT`` in either its cleared or its
+#: not-attempted list is refused.
+RECEIPT_REPORTABLE_TRUST_STAGES: tuple = tuple(
+    s for s in EVIDENCE_TRUST_STAGE_ORDER if s is not EvidenceTrustStage.POLICY_SUFFICIENT
+)
+
+
+class DeclaredVerificationOutcome(str, Enum):
+    """The outcome a receipt payload **declares** — payload content, not proof.
+
+    Every member carries the ``DECLARED_`` prefix deliberately. ADR §10 lists
+    "a lifecycle label" and "an unsigned or untrusted verification object" among
+    the enumerated non-proofs, and §10.5 extends that to "a structurally valid
+    receipt whose signature, key, or trust anchor did not verify". A TEV-1
+    payload is exactly such an object: any caller can construct one and write any
+    outcome into it. The prefix keeps the reader's eye on the difference between
+    *what the payload says* and *what has been established*, which is the whole
+    substance of E-3 and E-7.
+
+    Reading a ``DECLARED_ADMITTED`` payload therefore establishes nothing. The
+    payload's :attr:`~..receipts.EvidenceVerificationReceiptPayload.structural_status`
+    stays ``STRUCTURAL_UNVERIFIED`` and its ``unestablished_trust_stages`` still
+    contains ``CRYPTOGRAPHICALLY_AUTHENTIC``, whatever the declared outcome says.
+
+    There is no member meaning "verified by an authority". Reaching that state
+    requires TEV-2's signed envelope, its trust anchors and its signature
+    verification, none of which exists here.
+    """
+
+    #: The declaring verifier states the requested stages cleared. Not a pass:
+    #: nothing has checked that the declaration came from a real verifier.
+    DECLARED_ADMITTED = "DECLARED_ADMITTED"
+    #: The declaring verifier states it refused, with reason codes.
+    DECLARED_REFUSED = "DECLARED_REFUSED"
+    #: The declaring verifier states it could not decide. ADR §11 — "a verifier
+    #: that cannot decide has not verified"; this is a refusal, never a pass.
+    DECLARED_INDETERMINATE = "DECLARED_INDETERMINATE"
 
 
 class EvidenceStructuralStatus(str, Enum):

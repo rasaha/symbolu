@@ -13,9 +13,10 @@ import json
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from _builders import identity, observation, request, schema
+from _builders import identity, observation, receipt, request, schema
 from ugence_trusted_evidence_authority.api import (
     EVIDENCE_IDENTITY_DIGEST_DOMAIN,
+    EVIDENCE_VERIFICATION_RECEIPT_PAYLOAD_DIGEST_DOMAIN,
     TRUSTED_EVIDENCE_CANONICALIZATION_VERSION,
     ApplicabilityCoordinate,
     TrustedEvidenceCanonicalizationError,
@@ -40,8 +41,20 @@ PINNED_SCHEMA_BYTES = (
 
 #: The digest of a representative full evidence identity, pinned so an
 #: unintended encoder or field-order change is caught.
+#:
+#: Changed by the A-02 correction, which added the mandatory ADR §9 row 11-12
+#: ``claim`` coordinate to the identity body. The previous pin was
+#: ``5fec72b52d13264c31519013a74704fee03cea66f5ebfa22258a3d51f562cf40``; the sole
+#: cause of the change is the new ``"claim"`` key in the canonical body. There is
+#: no legacy-digest acceptance path — this pin replaces the old one outright, as
+#: PR #1444 has never merged.
 PINNED_IDENTITY_DIGEST = (
-    "5fec72b52d13264c31519013a74704fee03cea66f5ebfa22258a3d51f562cf40"
+    "26ee959e4c87cc0660895a269c2805af1065ba4f634c9c73070848de7bf51029"
+)
+
+#: The digest of a representative receipt payload, under its own domain tag.
+PINNED_RECEIPT_DIGEST = (
+    "d381c723123c583711b0ce08b0e3fe534e3a065182442a3772b8523c7f18b90a"
 )
 
 
@@ -69,6 +82,58 @@ def test_pinned_digest_is_reconstructible_from_literal_bytes_and_hashlib_alone()
 
 def test_pinned_digest_for_a_full_evidence_identity():
     assert identity().canonical_digest() == PINNED_IDENTITY_DIGEST
+
+
+def test_the_identity_digest_change_is_caused_only_by_the_new_claim_key():
+    """The A-02 pin change is explained, not merely accepted.
+
+    The previous pin covered a body without ADR §9 rows 11-12. Removing the one
+    new key from the current canonical body must reproduce the old byte sequence
+    exactly — proving the digest moved because a coordinate was *added*, not
+    because the encoder changed.
+    """
+
+    body = json.loads(canonical_bytes(identity()).decode("utf-8"))["body"]
+    assert "claim" in body
+    del body["claim"]
+    reconstructed = json.dumps(
+        {
+            "body": body,
+            "canonicalization": TRUSTED_EVIDENCE_CANONICALIZATION_VERSION,
+            "domain": EVIDENCE_IDENTITY_DIGEST_DOMAIN,
+            "type": "CanonicalEvidenceIdentity",
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")
+    assert (
+        hashlib.sha256(reconstructed).hexdigest()
+        == "5fec72b52d13264c31519013a74704fee03cea66f5ebfa22258a3d51f562cf40"
+    )
+
+
+def test_pinned_digest_for_a_receipt_payload():
+    assert receipt().canonical_digest() == PINNED_RECEIPT_DIGEST
+    assert (
+        hashlib.sha256(receipt().canonical_bytes()).hexdigest()
+        == PINNED_RECEIPT_DIGEST
+    )
+
+
+def test_contract_types_untouched_by_the_correction_keep_their_bytes():
+    """Only the identity gained a key; its siblings are byte-identical.
+
+    ``EvidenceSchemaRef``'s pinned bytes above are unchanged, which also shows
+    the A-03 NFC correction moved no digest: it rejects values that were never
+    canonicalizable, and leaves every valid NFC value exactly as it was.
+    """
+
+    assert canonical_bytes(schema()) == PINNED_SCHEMA_BYTES
+    assert (
+        canonical_digest(schema())
+        == "54b9bd615aa13dd133f88580128b4c4094363c75f96b6bcf1d3b2f582683fa62"
+    )
 
 
 def test_digest_is_computed_solely_from_canonical_bytes():
@@ -110,6 +175,62 @@ def test_the_pinned_constants_are_the_declared_strings():
         EVIDENCE_IDENTITY_DIGEST_DOMAIN
         == "ugence.trusted-evidence-authority/evidence-identity/v1"
     )
+    assert (
+        EVIDENCE_VERIFICATION_RECEIPT_PAYLOAD_DIGEST_DOMAIN
+        == "ugence.trusted-evidence-authority/"
+        "evidence-verification-receipt-payload/v1"
+    )
+
+
+def test_the_receipt_domain_is_distinct_from_the_evidence_identity_domain():
+    """ADR §26.6 — a digest valid in one domain must not be reusable in another."""
+
+    assert (
+        EVIDENCE_VERIFICATION_RECEIPT_PAYLOAD_DIGEST_DOMAIN
+        != EVIDENCE_IDENTITY_DIGEST_DOMAIN
+    )
+    assert json.loads(canonical_bytes(receipt()))["domain"] == (
+        EVIDENCE_VERIFICATION_RECEIPT_PAYLOAD_DIGEST_DOMAIN
+    )
+    assert json.loads(canonical_bytes(identity()))["domain"] == (
+        EVIDENCE_IDENTITY_DIGEST_DOMAIN
+    )
+
+
+def test_receipt_bytes_cannot_collide_with_any_evidence_family_contract():
+    """Every evidence-family encoding differs from the receipt's, twice over.
+
+    The domain tag separates the artifact classes, and the type name separates
+    every contract within a class — so a collision needs both to coincide.
+    """
+
+    from _builders import claim, observation, provenance, scope
+
+    payload = receipt()
+    payload_bytes = canonical_bytes(payload)
+    payload_frame = json.loads(payload_bytes)
+
+    family = [
+        identity(),
+        schema(),
+        scope(),
+        observation(),
+        provenance(),
+        claim(),
+        ApplicabilityCoordinate.applicable("US"),
+        request(),
+    ]
+    for other in family:
+        other_bytes = canonical_bytes(other)
+        assert other_bytes != payload_bytes, type(other).__name__
+        assert canonical_digest(other) != canonical_digest(payload)
+        frame = json.loads(other_bytes)
+        assert frame["domain"] != payload_frame["domain"], type(other).__name__
+        assert frame["type"] != payload_frame["type"], type(other).__name__
+
+    # ... and every pair within the family is distinct too.
+    digests = [canonical_digest(o) for o in family] + [canonical_digest(payload)]
+    assert len(set(digests)) == len(digests)
 
 
 # --------------------------------------------------------------------------- #

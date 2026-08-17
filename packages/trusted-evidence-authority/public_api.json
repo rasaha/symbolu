@@ -28,6 +28,7 @@
         "content_digest",
         "observation",
         "scope",
+        "claim",
         "provenance",
         "lifecycle_state",
         "geography",
@@ -35,6 +36,14 @@
         "intended_outcome",
         "valid_from",
         "valid_to"
+      ]
+    },
+    "DeclaredVerificationOutcome": {
+      "kind": "enum",
+      "values": [
+        "DECLARED_ADMITTED",
+        "DECLARED_REFUSED",
+        "DECLARED_INDETERMINATE"
       ]
     },
     "EVIDENCE_IDENTITY_DIGEST_DOMAIN": {
@@ -71,6 +80,20 @@
         "CONTEXT_SYSTEM_BOUND",
         "CURRENTLY_VALID",
         "POLICY_SUFFICIENT"
+      ]
+    },
+    "EVIDENCE_VERIFICATION_RECEIPT_PAYLOAD_DIGEST_DOMAIN": {
+      "kind": "constant",
+      "value": "ugence.trusted-evidence-authority/evidence-verification-receipt-payload/v1"
+    },
+    "EvidenceClaimBinding": {
+      "kind": "dataclass",
+      "fields": [
+        "applicability",
+        "claim_ref",
+        "metric_ref",
+        "unit",
+        "measurement_semantics_ref"
       ]
     },
     "EvidenceLifecycleState": {
@@ -138,6 +161,30 @@
         "POLICY_SUFFICIENT"
       ]
     },
+    "EvidenceVerificationReceiptPayload": {
+      "kind": "dataclass",
+      "fields": [
+        "receipt_id",
+        "schema",
+        "source_evidence_identity_digest",
+        "evidence_content_digest",
+        "verification_request_digest",
+        "scope",
+        "verified_at",
+        "verifier_authority_id",
+        "verifier_key_id",
+        "verification_protocol_id",
+        "verification_protocol_version",
+        "declared_outcome",
+        "declared_cleared_stages",
+        "declared_unattempted_stages",
+        "declared_refusal_reasons",
+        "evidence_valid_from",
+        "evidence_valid_to",
+        "receipt_valid_from",
+        "receipt_valid_to"
+      ]
+    },
     "EvidenceVerificationRequest": {
       "kind": "dataclass",
       "fields": [
@@ -153,6 +200,16 @@
         "requested_trust_stages",
         "expected_assessed_system_binding_ref",
         "expected_assessed_system_binding_digest"
+      ]
+    },
+    "RECEIPT_REPORTABLE_TRUST_STAGES": {
+      "kind": "constant",
+      "value": [
+        "STRUCTURALLY_CONSTRUCTIBLE",
+        "CRYPTOGRAPHICALLY_AUTHENTIC",
+        "PROVENANCE_VERIFIED",
+        "CONTEXT_SYSTEM_BOUND",
+        "CURRENTLY_VALID"
       ]
     },
     "TRUSTED_EVIDENCE_CANONICALIZATION_VERSION": {

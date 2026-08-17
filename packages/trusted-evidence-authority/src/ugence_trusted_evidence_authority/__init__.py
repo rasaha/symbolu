@@ -10,21 +10,37 @@ What this package is
 --------------------
 * canonical evidence identity and coordinates (:class:`CanonicalEvidenceIdentity`
   and the nested :class:`EvidenceSchemaRef`, :class:`EvidenceObservation`,
-  :class:`EvidenceScopeBinding`, :class:`EvidenceProvenanceChain`,
-  :class:`ApplicabilityCoordinate`);
+  :class:`EvidenceScopeBinding`, :class:`EvidenceClaimBinding`,
+  :class:`EvidenceProvenanceChain`, :class:`ApplicabilityCoordinate`) — the
+  evidence-side rows of ADR §9, including the claim/metric identity of row 11 and
+  the units and measurement semantics of row 12;
 * one deterministic canonicalization path and one digest path, versioned and
   domain-separated;
 * the ADR §12 six-stage trust vocabulary and the ADR §28 lifecycle relation;
 * the typed ADR §11 refusal vocabulary, every member of which is a refusal;
-* the input contract a future TEV-2 verifier will accept.
+* the input contract a future TEV-2 verifier will accept
+  (:class:`EvidenceVerificationRequest`);
+* the **structural receipt payload** (:class:`EvidenceVerificationReceiptPayload`)
+  — the §13 receipt *shape*, which §30 and the §32 ledger both assign to TEV-1
+  ("*shape = TEV-1, service = TEV-2*"). It carries ADR §9 rows 6 and 14-16, the
+  verification coordinates that describe an act rather than the evidence.
 
 What this package is **not**
 ----------------------------
 It is **not** a verifier and mints **no** authority. It performs no
 trust-anchor resolution, no cryptography, no key management, no revocation
-service, no authenticity decision, and issues no receipt. It contains no
-placeholder verifier, no permissive stub, and no field reserved for a later
-milestone. TEV-2 owns all of that (ADR §30).
+service and no authenticity decision. It contains no placeholder verifier, no
+permissive stub, and no field reserved for a later milestone. TEV-2 owns all of
+that (ADR §30).
+
+In particular **it issues no receipt.** The payload it defines is unsigned, and
+ADR §13.3 rules that "a receipt that is unsigned … is **not** a receipt. There
+is no 'trusted but unsigned' state." The payload carries **no signature field**,
+not even an optional or placeholder one: TEV-1 fixes the canonical content, its
+canonicalization version and its domain tag — which §13.3 requires be settled
+"before signing exists" — and TEV-2 adds the signature, the envelope, the key
+trust and the revocation check. Every verification coordinate on a payload is a
+**declaration written by its caller**, never an established fact.
 
 It is explicitly **not** ``ugence-tap-provider`` (the assertion-support scorer,
 ADR §6.1 — "assertion-support scoring and evidence verification are different
@@ -64,11 +80,15 @@ from .contracts import (  # noqa: E402
     EVIDENCE_IDENTITY_DIGEST_DOMAIN,
     EVIDENCE_LIFECYCLE_TRANSITIONS,
     EVIDENCE_TRUST_STAGE_ORDER,
+    EVIDENCE_VERIFICATION_RECEIPT_PAYLOAD_DIGEST_DOMAIN,
+    RECEIPT_REPORTABLE_TRUST_STAGES,
     TRUSTED_EVIDENCE_CANONICALIZATION_VERSION,
     TRUSTED_EVIDENCE_REFUSAL_REASONS,
     ApplicabilityCoordinate,
     ApplicabilityDeclaration,
     CanonicalEvidenceIdentity,
+    DeclaredVerificationOutcome,
+    EvidenceClaimBinding,
     EvidenceLifecycleState,
     EvidenceObservation,
     EvidenceProvenanceChain,
@@ -76,6 +96,7 @@ from .contracts import (  # noqa: E402
     EvidenceScopeBinding,
     EvidenceStructuralStatus,
     EvidenceTrustStage,
+    EvidenceVerificationReceiptPayload,
     EvidenceVerificationRequest,
     TrustedEvidenceCanonicalizationError,
     TrustedEvidenceContractError,
@@ -95,6 +116,7 @@ __all__ = [
     "TrustedEvidenceCanonicalizationError",
     "TrustedEvidenceLifecycleError",
     "ApplicabilityDeclaration",
+    "DeclaredVerificationOutcome",
     "EvidenceLifecycleState",
     "EvidenceStructuralStatus",
     "EvidenceTrustStage",
@@ -103,16 +125,20 @@ __all__ = [
     "EvidenceSchemaRef",
     "EvidenceObservation",
     "EvidenceScopeBinding",
+    "EvidenceClaimBinding",
     "EvidenceProvenanceChain",
     "CanonicalEvidenceIdentity",
     "EvidenceVerificationRequest",
+    "EvidenceVerificationReceiptPayload",
     "canonical_bytes",
     "canonical_digest",
     "is_valid_lifecycle_transition",
     "require_valid_lifecycle_transition",
     "TRUSTED_EVIDENCE_CANONICALIZATION_VERSION",
     "EVIDENCE_IDENTITY_DIGEST_DOMAIN",
+    "EVIDENCE_VERIFICATION_RECEIPT_PAYLOAD_DIGEST_DOMAIN",
     "EVIDENCE_TRUST_STAGE_ORDER",
+    "RECEIPT_REPORTABLE_TRUST_STAGES",
     "EVIDENCE_LIFECYCLE_TRANSITIONS",
     "TRUSTED_EVIDENCE_REFUSAL_REASONS",
     "api",

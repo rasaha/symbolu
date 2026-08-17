@@ -49,22 +49,45 @@ def test_no_verified_state_exists_anywhere_in_the_public_api():
                 assert member.name != "VERIFIED", (name, member)
 
 
-def test_no_receipt_or_verification_result_type_is_exported():
-    """§13.3 — there is no 'trusted but unsigned' state, so no unsigned receipt."""
+def test_the_receipt_type_is_a_payload_and_is_named_as_one():
+    """§13.3 — there is no 'trusted but unsigned' state, so nothing is a *receipt*.
 
+    ADR §30 and the §32 ledger assign the receipt **shape** to TEV-1, so the
+    shape ships. It is named ``…ReceiptPayload``, never ``…Receipt``, because
+    §13.3 rules that an unsigned artifact "is **not** a receipt".
+    """
+
+    receipt_symbols = [n for n in api.__all__ if "receipt" in n.lower()]
+    assert "EvidenceVerificationReceiptPayload" in receipt_symbols
+    for name in receipt_symbols:
+        if not name.isupper():  # constants may name the domain they separate
+            assert name.endswith("Payload") or "PAYLOAD" in name, name
+        assert not name.endswith("Receipt"), name
+
+
+def test_no_signed_receipt_verifier_or_result_type_is_exported():
     for name in api.__all__:
-        lowered = name.lower()
-        assert "receipt" not in lowered, name
-        assert "verificationresult" not in lowered.replace("_", ""), name
-        assert not lowered.startswith("verify"), name
+        flattened = name.lower().replace("_", "")
+        for forbidden in ("verificationresult", "signedreceipt", "verifier",
+                          "trustanchor", "keyring", "signer", "signature"):
+            assert forbidden not in flattened, name
+        assert not name.lower().startswith("verify"), name
 
 
 def test_no_public_field_anywhere_is_named_like_a_trust_flag():
+    """No field asserts trust. Coordinates that *record* an act are fine.
+
+    ``verified_at`` is deliberately **not** forbidden: it is ADR §9 row 6, the
+    verification instant a receipt payload records, and recording when a claimed
+    verification happened is not claiming it succeeded. What stays banned is any
+    field that would *assert* a trust outcome — the flags §10 enumerates.
+    """
+
     forbidden = {
         "verified", "is_verified", "authentic", "is_authentic", "trusted",
-        "is_trusted", "signature", "signed", "key_id", "trust_anchor",
-        "verifier_id", "verification_status", "verified_at", "attested",
-        "admitted", "approved",
+        "is_trusted", "signature", "signed", "trust_anchor",
+        "verification_status", "attested", "admitted", "approved",
+        "authorized", "authorizes_deployment",
     }
     for name in api.__all__:
         obj = getattr(api, name)

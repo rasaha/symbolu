@@ -19,13 +19,17 @@ from ugence_trusted_evidence_authority.api import (
     ApplicabilityCoordinate,
     ApplicabilityDeclaration,
     CanonicalEvidenceIdentity,
+    DeclaredVerificationOutcome,
+    EvidenceClaimBinding,
     EvidenceLifecycleState,
     EvidenceObservation,
     EvidenceProvenanceChain,
     EvidenceSchemaRef,
     EvidenceScopeBinding,
     EvidenceTrustStage,
+    EvidenceVerificationReceiptPayload,
     EvidenceVerificationRequest,
+    TrustedEvidenceRefusalReason,
 )
 
 CONTENT_DIGEST = hashlib.sha256(b"evidence-content").hexdigest()
@@ -77,6 +81,19 @@ def scope(**kw) -> EvidenceScopeBinding:
     )
 
 
+def claim(**kw) -> EvidenceClaimBinding:
+    return EvidenceClaimBinding(
+        **{
+            "applicability": ApplicabilityDeclaration.APPLICABLE,
+            "claim_ref": "claim-1",
+            "metric_ref": "metric-resolution-rate",
+            "unit": "ratio",
+            "measurement_semantics_ref": "semantics-1",
+            **kw,
+        }
+    )
+
+
 def provenance(**kw) -> EvidenceProvenanceChain:
     return EvidenceProvenanceChain(
         **{"chain_ref": "chain-1", "custody_refs": ("custody-1", "custody-2"), **kw}
@@ -92,6 +109,7 @@ def identity(**kw) -> CanonicalEvidenceIdentity:
             "content_digest": CONTENT_DIGEST,
             "observation": observation(),
             "scope": scope(),
+            "claim": claim(),
             "provenance": provenance(),
             "lifecycle_state": EvidenceLifecycleState.SUBMITTED,
             "geography": ApplicabilityCoordinate.applicable("US"),
@@ -121,6 +139,69 @@ def request(**kw) -> EvidenceVerificationRequest:
             "requested_trust_stages": (
                 EvidenceTrustStage.CRYPTOGRAPHICALLY_AUTHENTIC,
                 EvidenceTrustStage.CURRENTLY_VALID,
+            ),
+            **kw,
+        }
+    )
+
+
+VERIFIED_AT = datetime(2026, 6, 1, 8, 0, 0, 750000, tzinfo=timezone.utc)
+RECEIPT_VALID_FROM = datetime(2026, 6, 1, tzinfo=timezone.utc)
+RECEIPT_VALID_TO = datetime(2026, 12, 1, tzinfo=timezone.utc)
+
+
+def receipt(**kw) -> EvidenceVerificationReceiptPayload:
+    """A representative *declared-admitted* payload.
+
+    Deliberately the most favourable-looking shape a caller can build — every
+    reportable stage cleared, an authoritative-sounding verifier — so the tests
+    that assert it is still structurally unverified are testing the case that
+    matters.
+    """
+
+    base = dict(
+        receipt_id="receipt-1",
+        schema=EvidenceSchemaRef(
+            schema_id="ugence.receipt.evidence-verification", schema_version="1"
+        ),
+        source_evidence_identity_digest=identity().canonical_digest(),
+        evidence_content_digest=CONTENT_DIGEST,
+        verification_request_digest=request().canonical_digest(),
+        scope=scope(),
+        verified_at=VERIFIED_AT,
+        verifier_authority_id="verifier-authority-1",
+        verifier_key_id="key-1",
+        verification_protocol_id="ugence.tap.verification",
+        verification_protocol_version="1",
+        declared_outcome=DeclaredVerificationOutcome.DECLARED_ADMITTED,
+        declared_cleared_stages=(
+            EvidenceTrustStage.STRUCTURALLY_CONSTRUCTIBLE,
+            EvidenceTrustStage.CRYPTOGRAPHICALLY_AUTHENTIC,
+            EvidenceTrustStage.PROVENANCE_VERIFIED,
+            EvidenceTrustStage.CONTEXT_SYSTEM_BOUND,
+            EvidenceTrustStage.CURRENTLY_VALID,
+        ),
+        declared_unattempted_stages=(),
+        declared_refusal_reasons=(),
+        evidence_valid_from=VALID_FROM,
+        evidence_valid_to=VALID_TO,
+        receipt_valid_from=RECEIPT_VALID_FROM,
+        receipt_valid_to=RECEIPT_VALID_TO,
+    )
+    base.update(kw)
+    return EvidenceVerificationReceiptPayload(**base)
+
+
+def refused_receipt(**kw) -> EvidenceVerificationReceiptPayload:
+    return receipt(
+        **{
+            "declared_outcome": DeclaredVerificationOutcome.DECLARED_REFUSED,
+            "declared_cleared_stages": (
+                EvidenceTrustStage.STRUCTURALLY_CONSTRUCTIBLE,
+            ),
+            "declared_unattempted_stages": (EvidenceTrustStage.CURRENTLY_VALID,),
+            "declared_refusal_reasons": (
+                TrustedEvidenceRefusalReason.TRUSTED_EVIDENCE_TENANT_MISMATCH,
             ),
             **kw,
         }

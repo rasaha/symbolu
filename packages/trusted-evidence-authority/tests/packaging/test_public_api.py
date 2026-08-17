@@ -136,12 +136,31 @@ def test_pinned_constants_are_snapshotted_with_their_values():
     assert set(constants) == {
         "TRUSTED_EVIDENCE_CANONICALIZATION_VERSION",
         "EVIDENCE_IDENTITY_DIGEST_DOMAIN",
+        "EVIDENCE_VERIFICATION_RECEIPT_PAYLOAD_DIGEST_DOMAIN",
         "EVIDENCE_TRUST_STAGE_ORDER",
+        "RECEIPT_REPORTABLE_TRUST_STAGES",
         "EVIDENCE_LIFECYCLE_TRANSITIONS",
         "TRUSTED_EVIDENCE_REFUSAL_REASONS",
     }
     for entry in constants.values():
         assert "value" in entry
+
+
+def test_the_two_digest_domains_are_snapshotted_and_distinct():
+    documented = json.loads(_PUBLIC_API_JSON.read_text(encoding="utf-8"))
+    identity_domain = documented["symbols"]["EVIDENCE_IDENTITY_DIGEST_DOMAIN"]["value"]
+    receipt_domain = documented["symbols"][
+        "EVIDENCE_VERIFICATION_RECEIPT_PAYLOAD_DIGEST_DOMAIN"
+    ]["value"]
+    assert identity_domain != receipt_domain
+    assert identity_domain == api.EVIDENCE_IDENTITY_DIGEST_DOMAIN
+    assert receipt_domain == api.EVIDENCE_VERIFICATION_RECEIPT_PAYLOAD_DIGEST_DOMAIN
+
+
+def test_the_curated_surface_size_is_pinned():
+    """A symbol added or removed without updating the manifest fails here."""
+
+    assert len([n for n in api.__all__ if n != "__version__"]) == 29
 
 
 def test_enum_member_order_is_snapshotted_not_just_the_member_set():
