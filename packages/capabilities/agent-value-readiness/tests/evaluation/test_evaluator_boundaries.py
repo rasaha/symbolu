@@ -346,4 +346,4 @@ def test_pilot_and_production_traces_report_the_same_gate_inventory_shape():
 
 
 def test_package_version_is_bumped():
-    assert R.__version__ == "0.3.0"
+    assert R.__version__ == "0.4.0"

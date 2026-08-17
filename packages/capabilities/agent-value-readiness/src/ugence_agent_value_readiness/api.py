@@ -27,21 +27,30 @@ from ugence_uvi_policy_contracts.api import ReadinessTarget, RequirementClass
 from . import __version__
 from .contracts import (
     AdoptionDimension,
+    AdoptionReadinessCatalog,
+    AdoptionReadinessIndicatorDefinition,
     AdoptionReadinessResult,
     AdvisoryComposite,
+    AssessedSystemBinding,
     AgentValueReadinessDetermination,
     CapabilityDemonstration,
     CapabilityDimension,
+    CapabilityReadinessCatalog,
+    CapabilityReadinessIndicatorDefinition,
     CapabilityReadinessResult,
     ConditionSet,
     ConditionStatus,
     GateResult,
     GateStatus,
     IntelligenceDimension,
+    IntelligenceFitnessCatalog,
+    IntelligenceFitnessIndicatorDefinition,
     IntelligenceFitnessResult,
     ReadinessClassification,
     ReadinessContractError,
+    ReadinessIndicatorCatalogSet,
     ReadinessIndicatorClass,
+    SystemBindingAuthenticityStatus,
 )
 from .evaluation import (
     ConditionDecision,
@@ -57,6 +66,7 @@ from .evaluation import (
 )
 from .orchestration import (
     READINESS_ORCHESTRATOR_VERSION,
+    SYSTEM_BINDING_AUTHENTICITY_ADVISORY,
     ConditionSetVerification,
     ConditionSetVerifier,
     ConditionVerificationRequest,
@@ -68,6 +78,7 @@ from .orchestration import (
     GateResultVerifier,
     GateVerificationRequest,
     GateVerificationSummary,
+    IndicatorAdmissionSummary,
     PolicyAuthorityReadinessPolicyResolver,
     ReadinessAssessmentDisposition,
     ReadinessAssessmentError,
@@ -75,6 +86,7 @@ from .orchestration import (
     ReadinessAssessmentRequest,
     ReadinessAssessmentStatus,
     ReadinessAssessmentTrace,
+    ReadinessIndicatorAdmissionStatus,
     ReadinessInputVerificationStatus,
     ReadinessPolicyResolver,
     ReadinessTrustAdvisoryState,
@@ -94,6 +106,7 @@ __all__ = [
     "IntelligenceDimension",
     "CapabilityDimension",
     "AdoptionDimension",
+    "SystemBindingAuthenticityStatus",
     # reused policy enums (owned by uvi-policy-contracts, re-exported)
     "ReadinessTarget",
     "RequirementClass",
@@ -107,6 +120,15 @@ __all__ = [
     "AdvisoryComposite",
     # determination envelope
     "AgentValueReadinessDetermination",
+    # ---- M-3R.3: indicator catalogs + assessed-system binding ------------ #
+    "AssessedSystemBinding",
+    "IntelligenceFitnessIndicatorDefinition",
+    "CapabilityReadinessIndicatorDefinition",
+    "AdoptionReadinessIndicatorDefinition",
+    "IntelligenceFitnessCatalog",
+    "CapabilityReadinessCatalog",
+    "AdoptionReadinessCatalog",
+    "ReadinessIndicatorCatalogSet",
     # ---- GV-3R-b: the deterministic determination evaluator ---------------- #
     "ReadinessEvaluationError",
     "ReadinessEvaluationCase",
@@ -120,8 +142,10 @@ __all__ = [
     "evaluate_readiness",
     # ---- Trusted Readiness Orchestration (additive integration) ---------- #
     "READINESS_ORCHESTRATOR_VERSION",
+    "SYSTEM_BINDING_AUTHENTICITY_ADVISORY",
     "ReadinessAssessmentError",
     "ReadinessAssessmentStatus",
+    "ReadinessIndicatorAdmissionStatus",
     "ReadinessInputVerificationStatus",
     "ReadinessTrustAdvisoryState",
     "ReadinessTrustGapCode",
@@ -132,6 +156,7 @@ __all__ = [
     "ConditionSetVerification",
     "GateVerificationSummary",
     "ConditionVerificationSummary",
+    "IndicatorAdmissionSummary",
     "ReadinessAssessmentDisposition",
     "ReadinessAssessmentTrace",
     "ReadinessAssessmentOutcome",

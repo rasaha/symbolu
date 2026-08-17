@@ -88,8 +88,10 @@ from ugence_uvi_policy_contracts.api import (
     RequirementClass,
 )
 
+from ..contracts.binding import AssessedSystemBinding
+from ..contracts.catalogs import ReadinessIndicatorCatalogSet
 from ..contracts.conditions import ConditionSet
-from ..contracts.enums import ConditionStatus
+from ..contracts.enums import ConditionStatus, ReadinessIndicatorClass
 from ..contracts.gates import GateResult
 from ..evaluation.case import ReadinessEvaluationCase
 from ..evaluation.codes import EVALUATOR_FORMULA_VERSION, ReadinessAdvisoryCode
@@ -98,7 +100,9 @@ from ..evaluation.evaluator import evaluate_readiness
 from .codes import (
     ORCHESTRATOR_ID,
     READINESS_ORCHESTRATOR_VERSION,
+    SYSTEM_BINDING_AUTHENTICITY_ADVISORY,
     ReadinessAssessmentStatus,
+    ReadinessIndicatorAdmissionStatus,
     ReadinessInputVerificationStatus,
     ReadinessTrustAdvisoryState,
     ReadinessTrustGapCode,
@@ -119,6 +123,7 @@ from .errors import ReadinessAssessmentError
 from .trace import (
     ConditionVerificationSummary,
     GateVerificationSummary,
+    IndicatorAdmissionSummary,
     ReadinessAssessmentDisposition,
     ReadinessAssessmentOutcome,
     ReadinessAssessmentTrace,
@@ -130,6 +135,7 @@ _G = ReadinessTrustGapCode
 _V = ReadinessInputVerificationStatus
 _S = ReadinessTrustAdvisoryState
 _A = ReadinessAdvisoryCode
+_I = ReadinessIndicatorAdmissionStatus
 
 
 def assess_readiness(
@@ -176,7 +182,21 @@ def assess_readiness(
         return _not_evaluated(request, resolution, gaps, policy_accepted=False)
 
     # ------------------------------------------------------------------ #
-    # Stage 2 — gate-result verification against the RESOLVED policy
+    # Stage 2 — the assessed-system binding (M-3R.3)
+    #
+    # Deliberately *after* policy resolution, so a policy-resolution failure
+    # still dominates and no binding or catalog code can appear alongside one.
+    # A missing or contradictory binding is NOT_EVALUATED: an assessment that
+    # cannot say which exact system it describes has no honest headline.
+    # ------------------------------------------------------------------ #
+    binding = _validate_system_binding(request, gaps)
+    if gaps or binding is None:
+        return _not_evaluated(
+            request, resolution, gaps, policy_accepted=True, system_binding_accepted=False
+        )
+
+    # ------------------------------------------------------------------ #
+    # Stage 3 — gate-result verification against the RESOLVED policy
     # ------------------------------------------------------------------ #
     resolved_gates: dict[str, PolicyGate] = {g.gate_id: g for g in resolved_policy.gates}
     gate_summaries, admitted_gates = _verify_gate_results(
@@ -184,14 +204,26 @@ def assess_readiness(
     )
 
     # ------------------------------------------------------------------ #
-    # Stage 3 — condition verification against the RESOLVED policy
+    # Stage 4 — condition verification against the RESOLVED policy
     # ------------------------------------------------------------------ #
     condition_summaries, admitted_conditions = _verify_conditions(
         request, resolved_gates, condition_verifier, gaps
     )
 
     # ------------------------------------------------------------------ #
-    # Stage 4 — exactly one call into the ratified evaluator
+    # Stage 5 — indicator admission against the bound catalogs (M-3R.3)
+    #
+    # Subtraction, never substitution: an uncataloged, misfamilied, replayed or
+    # duplicated indicator result is *excluded*, never downgraded and never
+    # converted into a pass, a failure or a requirement. Because the ratified
+    # precedence derives its requirements from the resolved policy body and
+    # never from indicator records, excluding one cannot unlock a tier — and an
+    # assessment with zero indicators still evaluates normally.
+    # ------------------------------------------------------------------ #
+    indicator_summaries, admitted_indicators = _admit_indicators(request, binding, gaps)
+
+    # ------------------------------------------------------------------ #
+    # Stage 6 — exactly one call into the ratified evaluator
     # ------------------------------------------------------------------ #
     try:
         case = ReadinessEvaluationCase(
@@ -203,9 +235,10 @@ def assess_readiness(
             readiness_policy=resolved_policy,
             readiness_policy_ref=request.readiness_policy_ref,
             requested_target=request.requested_target,
-            intelligence_results=request.intelligence_results,
-            capability_results=request.capability_results,
-            adoption_results=request.adoption_results,
+            # Only catalog-admitted, system-bound indicator records.
+            intelligence_results=admitted_indicators[ReadinessIndicatorClass.INTELLIGENCE],
+            capability_results=admitted_indicators[ReadinessIndicatorClass.CAPABILITY],
+            adoption_results=admitted_indicators[ReadinessIndicatorClass.ADOPTION],
             gate_results=admitted_gates,
             conditions=admitted_conditions,
             advisory_composite=request.advisory_composite,
@@ -222,10 +255,12 @@ def assess_readiness(
             request,
             resolution,
             gaps,
-            # Stage 1 did hold here; only the evaluator refused.
+            # Stages 1-2 did hold here; only the evaluator refused.
             policy_accepted=True,
+            system_binding_accepted=True,
             gate_summaries=gate_summaries,
             condition_summaries=condition_summaries,
+            indicator_summaries=indicator_summaries,
         )
 
     trace = _build_trace(
@@ -234,9 +269,11 @@ def assess_readiness(
         gaps,
         gate_summaries=gate_summaries,
         condition_summaries=condition_summaries,
+        indicator_summaries=indicator_summaries,
         conditions_supplied=bool(request.conditions),
         composite_supplied=request.advisory_composite is not None,
         policy_accepted=True,
+        system_binding_accepted=True,
     )
     return ReadinessAssessmentOutcome(
         status=ReadinessAssessmentStatus.EVALUATED,
@@ -348,7 +385,203 @@ def _resolve(
 
 
 # --------------------------------------------------------------------------- #
-# Stage 2 — gate-result verification
+# Stage 2 — the assessed-system binding (M-3R.3)
+# --------------------------------------------------------------------------- #
+def _validate_system_binding(
+    request: ReadinessAssessmentRequest, gaps: set
+) -> Optional[AssessedSystemBinding]:
+    """Prove the binding describes *this* assessment, and nothing wider.
+
+    Every check is a structural identity check the orchestrator performs itself.
+    None of them establishes authenticity: a fully self-consistent binding a
+    caller fabricated passes here and is still only a **structural** artifact.
+    That permanent boundary is stated on every outcome as the standing
+    ``SYSTEM_BINDING_AUTHENTICITY_NOT_VERIFIED`` disposition.
+    """
+
+    binding = request.system_binding
+    if binding is None:
+        gaps.add(_G.SYSTEM_BINDING_REQUIRED)
+        return None
+
+    if binding.tenant_id != request.tenant_id:
+        gaps.add(_G.SYSTEM_BINDING_TENANT_MISMATCH)
+    if binding.subject_id != request.subject_id:
+        gaps.add(_G.SYSTEM_BINDING_SUBJECT_MISMATCH)
+    # Both the context *identity* and its exact canonical digest must match, so
+    # neither a renamed context nor a same-named-but-different-content one can
+    # carry a determination produced under a different policy binding.
+    if (
+        binding.context_id != request.context.context_id
+        or binding.context_digest != request.context_digest
+    ):
+        gaps.add(_G.SYSTEM_BINDING_CONTEXT_MISMATCH)
+    if not binding.is_effective_at(request.evaluation_time):
+        gaps.add(_G.SYSTEM_BINDING_NOT_EFFECTIVE_AT_EVALUATION_TIME)
+
+    if gaps:
+        return None
+    return binding
+
+
+# --------------------------------------------------------------------------- #
+# Stage 5 — indicator admission against the bound catalogs (M-3R.3)
+# --------------------------------------------------------------------------- #
+_INDICATOR_FIELDS = (
+    (ReadinessIndicatorClass.INTELLIGENCE, "intelligence_results"),
+    (ReadinessIndicatorClass.CAPABILITY, "capability_results"),
+    (ReadinessIndicatorClass.ADOPTION, "adoption_results"),
+)
+
+
+def _admit_indicators(
+    request: ReadinessAssessmentRequest,
+    binding: AssessedSystemBinding,
+    gaps: set,
+) -> tuple[tuple[IndicatorAdmissionSummary, ...], dict]:
+    """Admit only indicator results a bound catalog recognizes for this system.
+
+    A catalog answers exactly one question — *is this a recognized indicator
+    definition?* — and admission answers exactly that. It performs no evidence
+    admission, no benchmark resolution, no threshold comparison and no
+    verification, and it never touches the result's ``MetricClaim`` axes.
+
+    Catalog **presence** creates no requirement. A bound Intelligence catalog
+    does not make an Intelligence result mandatory, and an unbound family does
+    not make its results forbidden in principle — it only means nothing here can
+    recognize them, so they are excluded. Requirements come from the resolved
+    policy's gates, exactly as the ratified precedence already derives them.
+    """
+
+    catalogs = request.indicator_catalogs or ReadinessIndicatorCatalogSet()
+    binding_digest = binding.canonical_digest()
+    summaries: list[IndicatorAdmissionSummary] = []
+    admitted: dict = {family: [] for family, _ in _INDICATOR_FIELDS}
+
+    # A tenant-scoped catalog belonging to another tenant is refused outright,
+    # before any result is considered, so a foreign catalog can never recognize
+    # anything. A global (empty-tenant) catalog is always admissible.
+    scoped_out: set[str] = set()
+    for catalog in catalogs.catalogs:
+        if catalog.tenant_id and catalog.tenant_id != request.tenant_id:
+            gaps.add(_G.INDICATOR_CATALOG_REFERENCE_MISMATCH)
+            scoped_out.add(catalog.catalog_id)
+
+    # Duplicate indicator identity is computed across *all three* families, so
+    # the same indicator id cannot be claimed once as Capability and once as
+    # Adoption to have both counted.
+    claimed: list[str] = []
+    for _family, field in _INDICATOR_FIELDS:
+        claimed.extend(r.indicator_id for r in getattr(request, field) if r.indicator_id)
+    duplicates = _duplicate_keys(claimed)
+
+    for family, field in _INDICATOR_FIELDS:
+        catalog = catalogs.catalog_for(family)
+        if catalog is not None and catalog.catalog_id in scoped_out:
+            catalog = None
+        # Defensive: a catalog can only reach a family slot of its own type, so
+        # this can never fire from the public constructors. It is kept because
+        # "which family is this catalog for?" must never be answered by position
+        # alone.
+        if catalog is not None and catalog.family is not family:
+            gaps.add(_G.INDICATOR_CATALOG_FAMILY_MISMATCH)
+            catalog = None
+
+        # Canonical id order — never the order the caller supplied.
+        for result in sorted(
+            getattr(request, field), key=lambda r: (r.result_id, r.canonical_digest())
+        ):
+            status, reject, detail = _admission_verdict(
+                result, catalog, duplicates, request, binding_digest
+            )
+            admitted_here = status is _I.ADMITTED
+            if admitted_here:
+                admitted[family].append(result)
+            else:
+                gaps.update(reject)
+
+            summaries.append(
+                IndicatorAdmissionSummary(
+                    result_id=result.result_id,
+                    indicator_class=family,
+                    indicator_id=result.indicator_id,
+                    admission_status=status,
+                    admitted=admitted_here,
+                    catalog_id=catalog.catalog_id if admitted_here else "",
+                    catalog_version=catalog.catalog_version if admitted_here else "",
+                    trust_gap_codes=_ordered_codes(reject),
+                    detail=detail,
+                )
+            )
+
+    return tuple(summaries), {family: tuple(items) for family, items in admitted.items()}
+
+
+def _admission_verdict(result, catalog, duplicates, request, binding_digest):
+    """The stable verdict for one indicator result. Order of checks is fixed."""
+
+    # Replay first: a result produced against another system version or
+    # configuration must not even be looked up in this assessment's catalogs.
+    if (
+        not result.system_bound
+        or result.system_binding_ref != request.system_binding.binding_id
+        or result.system_binding_digest != binding_digest
+    ):
+        return (
+            _I.SYSTEM_BINDING_MISMATCH,
+            [_G.INDICATOR_RESULT_SYSTEM_BINDING_MISMATCH],
+            (
+                "the result declares no assessed-system binding"
+                if not result.system_bound
+                else "the result declares a different assessed system binding"
+            ),
+        )
+
+    if result.indicator_id and result.indicator_id in duplicates:
+        return (
+            _I.DUPLICATE,
+            [_G.INDICATOR_RESULT_DUPLICATE],
+            "more than one result was supplied for this indicator id",
+        )
+
+    if catalog is None:
+        return (
+            _I.CATALOG_MISSING,
+            [_G.INDICATOR_CATALOG_MISSING],
+            "no catalog is bound for this readiness family",
+        )
+
+    definition = catalog.lookup(result.indicator_id) if result.indicator_id else None
+    if definition is None:
+        return (
+            _I.NOT_CATALOGED,
+            [_G.INDICATOR_NOT_CATALOGED],
+            "the bound catalog defines no entry with this indicator id",
+        )
+
+    reject: list = []
+    if definition.dimension is not result.dimension:
+        reject.append(_G.INDICATOR_CATALOG_DIMENSION_MISMATCH)
+    if definition.metric_id != result.claim.metric_id:
+        reject.append(_G.INDICATOR_CATALOG_METRIC_MISMATCH)
+    if definition.task_or_outcome_ref and (
+        definition.task_or_outcome_ref != result.task_or_outcome_ref
+    ):
+        reject.append(_G.INDICATOR_CATALOG_METRIC_MISMATCH)
+    if not definition.applies_to(request.requested_target):
+        reject.append(_G.INDICATOR_CATALOG_TARGET_MISMATCH)
+    if reject:
+        return (
+            _I.DEFINITION_MISMATCH,
+            reject,
+            "the cataloged definition does not describe this result",
+        )
+
+    return _I.ADMITTED, [], ""
+
+
+# --------------------------------------------------------------------------- #
+# Stage 3 — gate-result verification
 # --------------------------------------------------------------------------- #
 def _verify_gate_results(
     request: ReadinessAssessmentRequest,
@@ -719,8 +952,10 @@ def _not_evaluated(
     gaps: set,
     *,
     policy_accepted: bool,
+    system_binding_accepted: bool = False,
     gate_summaries: tuple = (),
     condition_summaries: tuple = (),
+    indicator_summaries: tuple = (),
 ) -> ReadinessAssessmentOutcome:
     """A refusal. No classification and no determination, ever."""
 
@@ -730,9 +965,11 @@ def _not_evaluated(
         gaps,
         gate_summaries=gate_summaries,
         condition_summaries=condition_summaries,
+        indicator_summaries=indicator_summaries,
         conditions_supplied=bool(request.conditions),
         composite_supplied=request.advisory_composite is not None,
         policy_accepted=policy_accepted,
+        system_binding_accepted=system_binding_accepted,
     )
     return ReadinessAssessmentOutcome(
         status=ReadinessAssessmentStatus.NOT_EVALUATED, trace=trace, evaluation=None
@@ -746,9 +983,11 @@ def _build_trace(
     *,
     gate_summaries: tuple,
     condition_summaries: tuple,
+    indicator_summaries: tuple,
     conditions_supplied: bool,
     composite_supplied: bool,
     policy_accepted: bool,
+    system_binding_accepted: bool,
 ) -> ReadinessAssessmentTrace:
     # The authority's own answer is reported verbatim — including the case where
     # it resolved but a later independent recheck still refused the artifact, so
@@ -778,6 +1017,26 @@ def _build_trace(
     rejected_condition_ids = tuple(
         sorted(s.condition_id for s in condition_summaries if not s.admitted)
     )
+    admitted_indicator_ids = tuple(
+        sorted(s.result_id for s in indicator_summaries if s.admitted)
+    )
+    excluded_indicator_ids = tuple(
+        sorted(s.result_id for s in indicator_summaries if not s.admitted)
+    )
+
+    # Binding material is disclosed only once the binding was structurally
+    # accepted, mirroring the policy-material rule above.
+    if system_binding_accepted and request.system_binding is not None:
+        system_binding_ref = request.system_binding.binding_id
+        system_binding_digest = request.system_binding.canonical_digest()
+    else:
+        system_binding_ref = ""
+        system_binding_digest = ""
+    catalogs = request.indicator_catalogs
+    catalog_set_digest = catalogs.canonical_digest() if catalogs is not None else ""
+    catalog_families = (
+        tuple(f.value for f in catalogs.families_present) if catalogs is not None else ()
+    )
 
     return ReadinessAssessmentTrace(
         assessment_id=request.assessment_id,
@@ -799,6 +1058,14 @@ def _build_trace(
         rejected_gate_ids=rejected_gate_ids,
         admitted_condition_ids=admitted_condition_ids,
         rejected_condition_ids=rejected_condition_ids,
+        system_binding_accepted=system_binding_accepted,
+        system_binding_ref=system_binding_ref,
+        system_binding_digest=system_binding_digest,
+        indicator_catalog_set_digest=catalog_set_digest,
+        catalog_families_bound=catalog_families,
+        indicator_admissions=tuple(indicator_summaries),
+        admitted_indicator_result_ids=admitted_indicator_ids,
+        excluded_indicator_result_ids=excluded_indicator_ids,
         trust_gap_codes=_ordered_codes(gaps),
         dispositions=_dispositions(
             resolved=policy_accepted,
@@ -808,6 +1075,8 @@ def _build_trace(
             rejected_condition_ids=rejected_condition_ids,
             conditions_supplied=conditions_supplied,
             composite_supplied=composite_supplied,
+            system_binding_accepted=system_binding_accepted,
+            excluded_indicator_ids=excluded_indicator_ids,
         ),
         orchestrator_id=ORCHESTRATOR_ID,
         orchestrator_version=READINESS_ORCHESTRATOR_VERSION,
@@ -824,6 +1093,8 @@ def _dispositions(
     rejected_condition_ids: tuple,
     conditions_supplied: bool,
     composite_supplied: bool,
+    system_binding_accepted: bool,
+    excluded_indicator_ids: tuple,
 ) -> tuple[ReadinessAssessmentDisposition, ...]:
     """Reconcile every standing GV-3R-b advisory against what was actually proven.
 
@@ -877,11 +1148,35 @@ def _dispositions(
             ),
         ),
         ReadinessAssessmentDisposition(
+            advisory_code=SYSTEM_BINDING_AUTHENTICITY_ADVISORY,
+            # Permanently OUT_OF_SCOPE. Structural acceptance and authenticity
+            # are different facts, and no ratified system-binding verifier
+            # exists, so this can never be marked resolved.
+            state=_S.OUT_OF_SCOPE,
+            detail=(
+                "permanent boundary: the assessed-system binding is structural — "
+                + (
+                    "it was accepted as internally consistent with this assessment's tenant, "
+                    "subject, context and instant, "
+                    if system_binding_accepted
+                    else "it was not accepted, "
+                )
+                + "and nothing here proves the described system was really deployed or that "
+                "any authority attested it"
+            ),
+        ),
+        ReadinessAssessmentDisposition(
             advisory_code=_A.EVIDENCE_CLASSIFICATION_PRESERVED.value,
             state=_S.OUT_OF_SCOPE,
             detail=(
                 "permanent guarantee: evidence axes are carried through unchanged and never "
-                "elevated by orchestration"
+                "elevated by orchestration — catalog admission is a vocabulary decision and "
+                + (
+                    f"{len(excluded_indicator_ids)} indicator result(s) were excluded without "
+                    "influencing readiness in any way"
+                    if excluded_indicator_ids
+                    else "no indicator result was elevated by being recognized"
+                )
             ),
         ),
         ReadinessAssessmentDisposition(

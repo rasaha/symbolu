@@ -13,9 +13,9 @@ It implements requirements that are **already ratified** — UVI ADR D-1, D-16,
 §19 and §23.2 ("fail closed on unsigned/unapproved/expired/revoked/superseded/
 digest-mismatched policy artifacts"), and Policy Authority ADR §10.4 — and
 defines no new milestone of its own. It sits operationally **between** the
-merged deterministic evaluator (M-3R.2) and the still-open ``M-3R.3``, which
-continues to own the Intelligence/Capability/Adoption catalogs and
-``AssessedSystemBinding`` wiring; neither is implemented here.
+merged deterministic evaluator (M-3R.2) and ``M-3R.3``, which wires the
+Intelligence/Capability/Adoption catalogs and the ``AssessedSystemBinding``
+through this same single entry point.
 
 It adds **no second classification algorithm** and defines **no new readiness
 classification**: the readiness tier is selected by exactly one function,
@@ -33,7 +33,9 @@ from .authority import PolicyAuthorityReadinessPolicyResolver
 from .codes import (
     ORCHESTRATOR_ID,
     READINESS_ORCHESTRATOR_VERSION,
+    SYSTEM_BINDING_AUTHENTICITY_ADVISORY,
     ReadinessAssessmentStatus,
+    ReadinessIndicatorAdmissionStatus,
     ReadinessInputVerificationStatus,
     ReadinessTrustAdvisoryState,
     ReadinessTrustGapCode,
@@ -56,6 +58,7 @@ from .service import assess_readiness
 from .trace import (
     ConditionVerificationSummary,
     GateVerificationSummary,
+    IndicatorAdmissionSummary,
     ReadinessAssessmentDisposition,
     ReadinessAssessmentOutcome,
     ReadinessAssessmentTrace,
@@ -64,8 +67,10 @@ from .trace import (
 __all__ = [
     "ORCHESTRATOR_ID",
     "READINESS_ORCHESTRATOR_VERSION",
+    "SYSTEM_BINDING_AUTHENTICITY_ADVISORY",
     "ReadinessAssessmentError",
     "ReadinessAssessmentStatus",
+    "ReadinessIndicatorAdmissionStatus",
     "ReadinessInputVerificationStatus",
     "ReadinessTrustAdvisoryState",
     "ReadinessTrustGapCode",
@@ -76,6 +81,7 @@ __all__ = [
     "ConditionSetVerification",
     "GateVerificationSummary",
     "ConditionVerificationSummary",
+    "IndicatorAdmissionSummary",
     "ReadinessAssessmentDisposition",
     "ReadinessAssessmentTrace",
     "ReadinessAssessmentOutcome",

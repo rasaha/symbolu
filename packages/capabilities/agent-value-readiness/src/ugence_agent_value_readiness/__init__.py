@@ -39,25 +39,34 @@ Import the curated surface from :mod:`ugence_agent_value_readiness.api`.
 
 from __future__ import annotations
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 from .contracts import (  # noqa: E402
     AdoptionDimension,
+    AdoptionReadinessCatalog,
+    AdoptionReadinessIndicatorDefinition,
     AdoptionReadinessResult,
     AdvisoryComposite,
+    AssessedSystemBinding,
     AgentValueReadinessDetermination,
     CapabilityDemonstration,
     CapabilityDimension,
+    CapabilityReadinessCatalog,
+    CapabilityReadinessIndicatorDefinition,
     CapabilityReadinessResult,
     ConditionSet,
     ConditionStatus,
     GateResult,
     GateStatus,
     IntelligenceDimension,
+    IntelligenceFitnessCatalog,
+    IntelligenceFitnessIndicatorDefinition,
     IntelligenceFitnessResult,
     ReadinessClassification,
     ReadinessContractError,
+    ReadinessIndicatorCatalogSet,
     ReadinessIndicatorClass,
+    SystemBindingAuthenticityStatus,
 )
 from .evaluation import (  # noqa: E402
     ConditionDecision,
@@ -74,6 +83,7 @@ from .evaluation import (  # noqa: E402
 
 from .orchestration import (  # noqa: E402
     READINESS_ORCHESTRATOR_VERSION,
+    SYSTEM_BINDING_AUTHENTICITY_ADVISORY,
     ConditionSetVerification,
     ConditionSetVerifier,
     ConditionVerificationRequest,
@@ -85,6 +95,7 @@ from .orchestration import (  # noqa: E402
     GateResultVerifier,
     GateVerificationRequest,
     GateVerificationSummary,
+    IndicatorAdmissionSummary,
     PolicyAuthorityReadinessPolicyResolver,
     ReadinessAssessmentDisposition,
     ReadinessAssessmentError,
@@ -92,6 +103,7 @@ from .orchestration import (  # noqa: E402
     ReadinessAssessmentRequest,
     ReadinessAssessmentStatus,
     ReadinessAssessmentTrace,
+    ReadinessIndicatorAdmissionStatus,
     ReadinessInputVerificationStatus,
     ReadinessPolicyResolver,
     ReadinessTrustAdvisoryState,
@@ -112,6 +124,7 @@ __all__ = [
     "IntelligenceDimension",
     "CapabilityDimension",
     "AdoptionDimension",
+    "SystemBindingAuthenticityStatus",
     "IntelligenceFitnessResult",
     "CapabilityReadinessResult",
     "AdoptionReadinessResult",
@@ -119,6 +132,15 @@ __all__ = [
     "ConditionSet",
     "AdvisoryComposite",
     "AgentValueReadinessDetermination",
+    # ---- M-3R.3: indicator catalogs + assessed-system binding ------------ #
+    "AssessedSystemBinding",
+    "IntelligenceFitnessIndicatorDefinition",
+    "CapabilityReadinessIndicatorDefinition",
+    "AdoptionReadinessIndicatorDefinition",
+    "IntelligenceFitnessCatalog",
+    "CapabilityReadinessCatalog",
+    "AdoptionReadinessCatalog",
+    "ReadinessIndicatorCatalogSet",
     # GV-3R-b evaluator
     "ReadinessEvaluationError",
     "ReadinessEvaluationCase",
@@ -132,8 +154,10 @@ __all__ = [
     "evaluate_readiness",
     # Trusted Readiness Orchestration
     "READINESS_ORCHESTRATOR_VERSION",
+    "SYSTEM_BINDING_AUTHENTICITY_ADVISORY",
     "ReadinessAssessmentError",
     "ReadinessAssessmentStatus",
+    "ReadinessIndicatorAdmissionStatus",
     "ReadinessInputVerificationStatus",
     "ReadinessTrustAdvisoryState",
     "ReadinessTrustGapCode",
@@ -144,6 +168,7 @@ __all__ = [
     "ConditionSetVerification",
     "GateVerificationSummary",
     "ConditionVerificationSummary",
+    "IndicatorAdmissionSummary",
     "ReadinessAssessmentDisposition",
     "ReadinessAssessmentTrace",
     "ReadinessAssessmentOutcome",

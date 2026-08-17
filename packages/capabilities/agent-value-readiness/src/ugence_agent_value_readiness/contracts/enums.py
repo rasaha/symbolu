@@ -22,6 +22,7 @@ __all__ = [
     "IntelligenceDimension",
     "CapabilityDimension",
     "AdoptionDimension",
+    "SystemBindingAuthenticityStatus",
 ]
 
 
@@ -68,6 +69,27 @@ class ConditionStatus(str, Enum):
     EXPIRED = "EXPIRED"
     REVOKED = "REVOKED"
     SATISFIED = "SATISFIED"
+
+
+class SystemBindingAuthenticityStatus(str, Enum):
+    """How much an :class:`AssessedSystemBinding` actually proves (M-3R.3).
+
+    The enum has exactly **one** member because exactly one thing is provable
+    today. Constructing a binding is a *structural* act: it records which system,
+    version and configuration a caller says was assessed, and makes swapping any
+    of them detectable through the canonical digest. It does **not** establish
+    that the named system was really deployed, that the configuration digest was
+    computed over the real configuration, or that any of it was attested by an
+    authority.
+
+    A second member (an authority-verified status) is deliberately **absent**:
+    admitting one would require a ratified system-binding verifier, which no
+    merged contract defines. Adding it later is additive.
+    """
+
+    #: The binding is internally consistent and digest-bound; external
+    #: authenticity was never established and is not claimed.
+    STRUCTURAL_UNVERIFIED = "STRUCTURAL_UNVERIFIED"
 
 
 class ReadinessIndicatorClass(str, Enum):
