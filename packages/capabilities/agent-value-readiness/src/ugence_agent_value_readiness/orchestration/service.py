@@ -1,13 +1,20 @@
 """The fail-closed trusted readiness orchestration boundary.
 
-An **additive integration capability**, not a roadmap milestone. It implements
-requirements that are already ratified — UVI ADR D-1, D-16, §19 and §23.2, and
-Policy Authority ADR §10.4 — and claims no milestone of its own. In particular
-it does **not** implement, consume or complete UVI ADR §25 ``M-3R.3``, which
-owns the Intelligence/Capability/Adoption catalogs and ``AssessedSystemBinding``
-wiring; that milestone remains open and unimplemented. This boundary sits
-operationally between the merged deterministic evaluator (M-3R.2) and that
-future integration work.
+The trust boundary wrapping the ratified GV-3R-b evaluator. It implements
+requirements that were already ratified — UVI ADR D-1, D-16, §19 and §23.2, and
+Policy Authority ADR §10.4 — **and** UVI ADR §25 milestone ``M-3R.3``, whose two
+halves are the assessed-system binding stage and the indicator-catalog admission
+stage below. Neither adds a second classification algorithm and neither defines a
+new readiness tier.
+
+Ownership, after ADR §20
+------------------------
+``AssessedSystemBinding`` and ``SystemBindingAuthenticityStatus`` are owned by
+the neutral ``ugence_governance_contracts`` leaf and merely **consumed** here —
+this package holds no copy, subclass or parallel schema of either. What is
+readiness-owned is everything in this module: the *adapter* that checks a
+binding against this assessment's ``AssessmentContext``, the indicator catalogs
+and their admission rules, the orchestration gap codes, and the trace.
 
 One canonical entry point — :func:`assess_readiness` — wraps the ratified
 GV-3R-b evaluator in a trust boundary and proves, for a single assessment, that
@@ -35,24 +42,38 @@ second-guesses a classification, and it never accepts one from a caller.
 
 Stage order, and why it is fixed
 --------------------------------
-======  ===================================  =========================================
-stage   what it establishes                  on failure
-======  ===================================  =========================================
-1       trusted policy resolution            ``NOT_EVALUATED``; **no** later stage runs
-2       gate-result verification             the result is absent for the evaluator
-3       condition verification                the control provides no coverage
-4       one ``evaluate_readiness`` call       an advisory determination + trace
-======  ===================================  =========================================
+Six stages, in exactly this order. Each row matches the corresponding block in
+:func:`assess_readiness`; the precedence column states what the stage's failure
+does to everything after it.
 
-**Policy-resolution failure dominates all gate information.** Under it, no gate
-verifier and no condition verifier is called, ``evaluate_readiness`` never runs,
-no classification or determination is produced, and the failure outcome
-preserves no usable policy material — only the stable typed gap codes and the
-reference the caller already holds.
+======  ====================================  ==========================================
+stage   what it establishes                   on failure
+======  ====================================  ==========================================
+1       trusted policy resolution             ``NOT_EVALUATED``; **no** later stage runs
+2       the assessed-system binding (M-3R.3)  ``NOT_EVALUATED``; **no** later stage runs
+3       gate-result verification              that result is absent for the evaluator
+4       condition verification                that control provides no coverage
+5       indicator admission (M-3R.3)          that indicator is excluded; nothing else
+6       one ``evaluate_readiness`` call        an advisory determination + trace
+======  ====================================  ==========================================
+
+**Policy-resolution failure dominates everything, including M-3R.3.** Under it,
+no binding check runs, no gate or condition verifier is called, no indicator is
+admitted, ``evaluate_readiness`` never runs, no classification or determination
+is produced, and the failure outcome preserves no usable policy material — only
+the stable typed gap codes and the reference the caller already holds. No
+binding or catalog gap code can ever appear alongside a policy-resolution gap.
+
+**Binding failure dominates every gate, condition and indicator.** An assessment
+that cannot say *which exact system* it describes has no honest headline, so
+stage 2 refuses before any verifier is consulted. Stage 5, by contrast, is
+deliberately non-dominating: an excluded indicator changes nothing, because
+indicator records are diagnostics under the ratified precedence.
 
 Sanitization is subtraction, never substitution
 -----------------------------------------------
-An unverified gate result is treated as **absent**, not as ``PASS``, not as
+An unverified gate result — and an uncataloged, misfamilied, replayed or
+duplicated indicator result — is treated as **absent**, not as ``PASS``, not as
 ``INDETERMINATE`` and not as a caller-flavoured hint. Because the ratified
 precedence derives its required-gate inventory from the **resolved policy body**
 (never from the supplied results), a removed required result becomes a missing
@@ -88,7 +109,8 @@ from ugence_uvi_policy_contracts.api import (
     RequirementClass,
 )
 
-from ..contracts.binding import AssessedSystemBinding
+from ugence_governance_contracts.api import AssessedSystemBinding
+
 from ..contracts.catalogs import ReadinessIndicatorCatalogSet
 from ..contracts.conditions import ConditionSet
 from ..contracts.enums import ConditionStatus, ReadinessIndicatorClass

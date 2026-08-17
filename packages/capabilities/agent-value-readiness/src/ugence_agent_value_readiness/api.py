@@ -8,6 +8,15 @@ requirement-class enums are **reused** (not redefined) from
 ``ugence_uvi_policy_contracts`` and re-exported here for caller convenience —
 they remain canonically owned by that package.
 
+``AssessedSystemBinding``, ``SystemBindingAuthenticityStatus`` and
+``SystemIdentityContractError`` are likewise **reused, not redefined**: the
+neutral assessed-system identity contract is owned by
+``ugence_governance_contracts`` (UVI ADR §20). What this module exports is the
+**identical object** — ``readiness_api.AssessedSystemBinding is
+governance_api.AssessedSystemBinding`` — so there is exactly one class identity,
+one canonical serialization and one digest across both public APIs. No copy,
+subclass, adapter or parallel schema exists here.
+
 :func:`evaluate_readiness` is the **only** classification path. Nothing else in
 this package selects a readiness tier, so there is no second calculation route
 that could diverge from the ratified precedence — :func:`assess_readiness` adds
@@ -51,6 +60,7 @@ from .contracts import (
     ReadinessIndicatorCatalogSet,
     ReadinessIndicatorClass,
     SystemBindingAuthenticityStatus,
+    SystemIdentityContractError,
 )
 from .evaluation import (
     ConditionDecision,
@@ -122,6 +132,7 @@ __all__ = [
     "AgentValueReadinessDetermination",
     # ---- M-3R.3: indicator catalogs + assessed-system binding ------------ #
     "AssessedSystemBinding",
+    "SystemIdentityContractError",
     "IntelligenceFitnessIndicatorDefinition",
     "CapabilityReadinessIndicatorDefinition",
     "AdoptionReadinessIndicatorDefinition",

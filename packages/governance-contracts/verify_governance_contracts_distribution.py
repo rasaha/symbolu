@@ -33,7 +33,7 @@ _CHECK = r'''
 import dataclasses, importlib.util, json, sys
 
 import ugence_governance_contracts as g
-assert g.__version__ == "0.2.0", g.__version__
+assert g.__version__ == "0.3.0", g.__version__
 assert g.CONTRACT_VERSION == "1.0.0", g.CONTRACT_VERSION
 assert "site-packages" in g.__file__, g.__file__
 assert not any("/symbolu" in p or "governance_providers" in p for p in sys.path), sys.path
@@ -85,10 +85,60 @@ try:
 except EvidenceContractError:
     pass
 
+# M-3R.3 neutral assessed-system identity ships and enforces structure
+from ugence_governance_contracts.api import (
+    AssessedSystemBinding, SystemBindingAuthenticityStatus, SystemIdentityContractError)
+import dataclasses as _dc, hashlib as _hl
+_d = _hl.sha256(b"cfg").hexdigest()
+def _bind(**kw):
+    base = dict(binding_id="b", tenant_id="t", subject_id="s", context_id="c",
+                context_digest=_d, system_id="sys", system_version="1",
+                configuration_id="cfg", configuration_digest=_d)
+    base.update(kw)
+    return AssessedSystemBinding(**base)
+
+# The binding is OWNED here — this is the single canonical definition site.
+assert AssessedSystemBinding.__module__ == "ugence_governance_contracts.contracts.system_identity"
+assert AssessedSystemBinding.__subclasses__() == [], AssessedSystemBinding.__subclasses__()
+assert len(_bind().canonical_digest()) == 64
+# Replay across system version / configuration / tenant / subject is detectable.
+for _kw in ({"system_version": "2"}, {"configuration_id": "other"},
+            {"tenant_id": "other"}, {"subject_id": "other"}):
+    assert _bind().canonical_digest() != _bind(**_kw).canonical_digest(), _kw
+# Authenticity is a permanently structural PROPERTY, never a settable field.
+assert [m.value for m in SystemBindingAuthenticityStatus] == ["STRUCTURAL_UNVERIFIED"]
+assert _bind().authenticity_status is SystemBindingAuthenticityStatus.STRUCTURAL_UNVERIFIED
+assert _bind().authenticity_verified is False
+_names = {f.name for f in _dc.fields(AssessedSystemBinding)}
+assert "authenticity_status" not in _names and "authenticity_verified" not in _names
+try:
+    _bind(authenticity_status="AUTHORITY_VERIFIED")
+    raise SystemExit("authenticity is settable from the wheel")
+except TypeError:
+    pass
+# Structural guard fires as the governance-owned error.
+try:
+    _bind(system_manifest_ref="m")
+    raise SystemExit("system-identity structural guard did not fire")
+except SystemIdentityContractError:
+    pass
+# Every field is a platform-neutral primitive -> no cycle is representable.
+from datetime import datetime as _dtc
+for _f in _dc.fields(AssessedSystemBinding):
+    _v = getattr(_bind(), _f.name)
+    assert _v is None or isinstance(_v, (str, _dtc)), _f.name
+# No SystemManifest was minted.
+from ugence_governance_contracts import api as _api
+assert not any("systemmanifest" in _n.lower().replace("_", "") for _n in _api.__all__)
+
 # NO unrelated Ugence package importable in this clean env
 for mod in ("governance_providers", "decision_governance", "actiongate_provider",
             "tap_provider", "ai_hiring", "ugence_console_api", "platform_freeze",
-            "pydantic"):
+            "pydantic",
+            # The neutral leaf must never require a UVI / readiness / authority
+            # / risk package to operate: that absence IS the cycle proof.
+            "ugence_agent_value_readiness", "ugence_uvi_policy_contracts",
+            "ugence_policy_authority", "risk_authority"):
     assert importlib.util.find_spec(mod) is None, ("unrelated package present: " + mod)
 
 print("ISOLATED SINGLE-WHEEL GOVERNANCE-CONTRACTS VERIFICATION OK")

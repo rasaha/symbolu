@@ -1047,8 +1047,9 @@ def _():
 @probe("the orchestrator version is platform-neutral and claims no milestone")
 def _():
     assert READINESS_ORCHESTRATOR_VERSION == "ugence.readiness-orchestration/v0.2"
-    # Platform-neutral: it names a capability, never an ADR milestone. It makes
-    # no claim on M-3R.3, which remains open and unimplemented.
+    # Platform-neutral: it names a capability, never an ADR milestone. M-3R.3
+    # is implemented (v0.2 carries the binding and catalog stages), but the
+    # identifier still names no milestone — that is the invariant under test.
     lowered = READINESS_ORCHESTRATOR_VERSION.lower()
     for token in ("gv-3r", "gv3r", "m-3r", "m3r", "milestone"):
         assert token not in lowered, token

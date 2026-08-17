@@ -149,6 +149,41 @@ def _gap_namespace():
     assert len({m.name for m in members}) == len(members)
 
 
+@probe("the moved binding is owned by governance-contracts, not re-implemented")
+def _binding_ownership():
+    import ugence_governance_contracts as G
+    from ugence_governance_contracts import api as gapi
+
+    # Exactly one class identity across both public APIs.
+    assert api.AssessedSystemBinding is gapi.AssessedSystemBinding
+    assert api.SystemBindingAuthenticityStatus is gapi.SystemBindingAuthenticityStatus
+    assert api.SystemIdentityContractError is gapi.SystemIdentityContractError
+    assert (
+        api.AssessedSystemBinding.__module__
+        == "ugence_governance_contracts.contracts.system_identity"
+    )
+    # No copy, subclass, adapter or parallel schema anywhere.
+    assert api.AssessedSystemBinding.__subclasses__() == []
+    readiness_root = pathlib.Path(R.__file__).resolve().parent
+    assert not (readiness_root / "contracts" / "binding.py").exists()
+    # Readiness errors stay readiness-owned; the binding's error does not.
+    assert api.ReadinessContractError is not api.SystemIdentityContractError
+    # One-way arrow.
+    assert not hasattr(G, "assess_readiness")
+
+
+@probe("the binding digest is byte-identical to the pre-move implementation")
+def _digest_invariance():
+    pinned = "cdbafaaba667b4496f309d01ba7c75788033f68f93d8042ab311f39ddc50b43d"
+    moved = api.AssessedSystemBinding(
+        binding_id="bind-1", tenant_id="t1", subject_id="a1", context_id="ctx1",
+        context_digest="baba834176cee0f39f8dc6e4a29d7c5afe1861e6b410c3ed9acb538a795d2fdf",
+        system_id="agent-sys-1", system_version="1.4.2", configuration_id="cfg-prod-a",
+        configuration_digest="b8d582270bcab6ca49bc8ef3b9916fa6f77fd84a35be1c1d884eec31746a29a6",
+    )
+    assert moved.canonical_digest() == pinned, moved.canonical_digest()
+
+
 @probe("the M-3R.3 semantic categories all exist as stable codes")
 def _gap_coverage():
     required = {
@@ -226,9 +261,9 @@ def _tenant_subject_replay():
 
 @probe("a manifest reference must be digest-bound, and vice versa")
 def _manifest_pair():
-    assert _raises(api.ReadinessContractError, make_binding, system_manifest_ref="m")
+    assert _raises(api.SystemIdentityContractError, make_binding, system_manifest_ref="m")
     assert _raises(
-        api.ReadinessContractError, make_binding, system_manifest_digest=DIGEST_A
+        api.SystemIdentityContractError, make_binding, system_manifest_digest=DIGEST_A
     )
     both = make_binding(system_manifest_ref="m", system_manifest_digest=DIGEST_A)
     assert both.system_manifest_ref == "m"
@@ -243,10 +278,10 @@ def _no_system_manifest():
 @probe("the binding rejects naive timestamps and inverted intervals")
 def _binding_time():
     naive = datetime(2026, 6, 1)
-    assert _raises(api.ReadinessContractError, make_binding, effective_from=naive)
-    assert _raises(api.ReadinessContractError, make_binding, effective_to=naive)
+    assert _raises(api.SystemIdentityContractError, make_binding, effective_from=naive)
+    assert _raises(api.SystemIdentityContractError, make_binding, effective_to=naive)
     assert _raises(
-        api.ReadinessContractError, make_binding, effective_from=T_TO, effective_to=T_FROM
+        api.SystemIdentityContractError, make_binding, effective_from=T_TO, effective_to=T_FROM
     )
 
 

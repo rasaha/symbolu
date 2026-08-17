@@ -67,6 +67,7 @@ from .contracts import (  # noqa: E402
     ReadinessIndicatorCatalogSet,
     ReadinessIndicatorClass,
     SystemBindingAuthenticityStatus,
+    SystemIdentityContractError,
 )
 from .evaluation import (  # noqa: E402
     ConditionDecision,
@@ -134,6 +135,7 @@ __all__ = [
     "AgentValueReadinessDetermination",
     # ---- M-3R.3: indicator catalogs + assessed-system binding ------------ #
     "AssessedSystemBinding",
+    "SystemIdentityContractError",
     "IntelligenceFitnessIndicatorDefinition",
     "CapabilityReadinessIndicatorDefinition",
     "AdoptionReadinessIndicatorDefinition",

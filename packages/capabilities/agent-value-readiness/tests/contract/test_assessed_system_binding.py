@@ -1,5 +1,9 @@
 """Adversarial tests for the M-3R.3 ``AssessedSystemBinding``.
 
+The contract is owned by the neutral ``ugence-governance-contracts`` leaf (UVI
+ADR §20) and imported from there directly, so these tests exercise exactly the
+object readiness consumes — there is no readiness-owned copy to test instead.
+
 The binding exists to make one attack mechanically detectable: reusing a
 favourable result produced for system version A under system version B, another
 configuration, another tenant, another subject, or another policy context.
@@ -17,10 +21,10 @@ from datetime import datetime, timezone
 
 import pytest
 
-from ugence_agent_value_readiness.api import (
+from ugence_governance_contracts.api import (
     AssessedSystemBinding,
-    ReadinessContractError,
     SystemBindingAuthenticityStatus,
+    SystemIdentityContractError,
 )
 
 CTX_DIGEST = hashlib.sha256(b"context-a").hexdigest()
@@ -68,7 +72,7 @@ def binding(**kw) -> AssessedSystemBinding:
 )
 @pytest.mark.parametrize("blank", ["", "   ", "\t"])
 def test_no_identity_coordinate_may_be_blank(field, blank):
-    with pytest.raises(ReadinessContractError):
+    with pytest.raises(SystemIdentityContractError):
         binding(**{field: blank})
 
 
@@ -78,7 +82,7 @@ def test_no_identity_coordinate_may_be_blank(field, blank):
 )
 @pytest.mark.parametrize("substitute", [None, 7, b"x", ["x"], {"x": 1}])
 def test_non_string_identity_coordinates_are_rejected(field, substitute):
-    with pytest.raises(ReadinessContractError):
+    with pytest.raises(SystemIdentityContractError):
         binding(**{field: substitute})
 
 
@@ -87,7 +91,7 @@ def test_non_string_identity_coordinates_are_rejected(field, substitute):
     "bad", ["", "not-a-digest", CTX_DIGEST.upper(), CTX_DIGEST[:-1], CTX_DIGEST + "a", None, 7]
 )
 def test_a_required_digest_must_be_lowercase_sha256_hex(field, bad):
-    with pytest.raises(ReadinessContractError):
+    with pytest.raises(SystemIdentityContractError):
         binding(**{field: bad})
 
 
@@ -104,9 +108,9 @@ def test_identity_is_whitespace_normalized():
 # Deferred references: opaque, co-required, never minted here
 # --------------------------------------------------------------------------- #
 def test_a_manifest_reference_and_its_digest_are_co_required():
-    with pytest.raises(ReadinessContractError):
+    with pytest.raises(SystemIdentityContractError):
         binding(system_manifest_ref="manifest-1")
-    with pytest.raises(ReadinessContractError):
+    with pytest.raises(SystemIdentityContractError):
         binding(system_manifest_digest=MANIFEST_DIGEST)
 
     both = binding(system_manifest_ref="manifest-1", system_manifest_digest=MANIFEST_DIGEST)
@@ -135,7 +139,7 @@ def test_the_deferred_references_are_opaque_tokens_with_no_invented_semantics():
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize("field", ["effective_from", "effective_to"])
 def test_a_naive_timestamp_is_rejected(field):
-    with pytest.raises(ReadinessContractError):
+    with pytest.raises(SystemIdentityContractError):
         binding(**{field: NAIVE})
 
 
@@ -148,9 +152,9 @@ def test_the_effective_period_is_half_open():
 
 
 def test_an_inverted_or_empty_effective_period_is_rejected():
-    with pytest.raises(ReadinessContractError):
+    with pytest.raises(SystemIdentityContractError):
         binding(effective_from=T_TO, effective_to=T_FROM)
-    with pytest.raises(ReadinessContractError):
+    with pytest.raises(SystemIdentityContractError):
         binding(effective_from=T_FROM, effective_to=T_FROM)
 
 
@@ -161,7 +165,7 @@ def test_an_absent_bound_is_open_on_that_side():
 
 
 def test_is_effective_at_requires_an_explicit_timezone_aware_instant():
-    with pytest.raises(ReadinessContractError):
+    with pytest.raises(SystemIdentityContractError):
         binding().is_effective_at(NAIVE)
 
 

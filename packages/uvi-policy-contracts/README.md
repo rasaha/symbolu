@@ -25,8 +25,10 @@ executor; a forecasting engine; an attribution or verification engine; a
 financial calculator; or any `governed-value` integration. Selecting a value
 here **mints no authority** — trust evaluation (signature, approval, revocation,
 freshness) belongs to the Policy Authority and later admission milestones, which
-are explicitly out of scope. `AssessedSystemBinding` / `SubjectContext` (RA-owned,
-PR #1425, unmerged) are a **deferred dependency** and are not defined here.
+are explicitly out of scope. `AssessedSystemBinding` is **owned by
+`ugence-governance-contracts`** (UVI ADR §20) and is not defined here; the
+RA-owned `SubjectContext` (PR #1425, unmerged) remains a **deferred dependency**
+and is likewise not defined here.
 
 ## What's in it
 
@@ -136,8 +138,10 @@ python packages/uvi-policy-contracts/verify_uvi_policy_contracts_distribution.py
 Policy Authority (approval/signing/issuance/revocation), benchmark registry,
 readiness evaluator + target-relative state machine, `ConditionSet` execution,
 value forecasting, attribution/verification engines, financial valuation +
-`ValuationEvidenceManifest` (owned by `governed-value`), and
-`SubjectContext`/`AssessedSystemBinding` (RA-owned, PR #1425). See ADR §24–§26.
+`ValuationEvidenceManifest` (owned by `governed-value`), and the RA-owned
+`SubjectContext` (PR #1425, unmerged). `AssessedSystemBinding` is **not** deferred
+— it is owned by `ugence-governance-contracts` (ADR §20) and consumed by
+`ugence-agent-value-readiness`. See ADR §24–§26.
 
 Two related consistency checks are also deferred, by design:
 

@@ -488,6 +488,11 @@ def main() -> int:
 
     print("[1/4] build the readiness wheel + its contract leaves and the shared authority")
     for name, src in SOURCES.items():
+        # A stale ``build/lib`` tree from an earlier build silently resurrects
+        # deleted modules into the wheel — which is exactly how a duplicate
+        # ``AssessedSystemBinding`` implementation could ship after the ADR §20
+        # move. Remove it so every wheel is built from the source tree alone.
+        shutil.rmtree(src / "build", ignore_errors=True)
         _run([sys.executable, "-m", "build", "--wheel", str(src), "-o", str(findlinks)])
     wheel = _latest(findlinks, "ugence_agent_value_readiness-*.whl")
     print(f"      built {wheel.name}")
@@ -498,7 +503,37 @@ def main() -> int:
     with zipfile.ZipFile(wheel) as z:
         names = set(z.namelist())
     assert "ugence_agent_value_readiness/py.typed" in names, "wheel is missing py.typed"
+    for banned in ("test", "fixture", "conftest", "probe", "adversarial"):
+        offenders = [n for n in names if banned in n.lower()]
+        assert not offenders, f"wheel ships {banned} artifacts: {sorted(offenders)[:5]}"
+
+    # ADR §20: the assessed-system binding is owned by governance-contracts.
+    # The readiness wheel must contain NO definition of it — not a module, not a
+    # copy, not a subclass. A stale build tree is the realistic way this
+    # regresses, so it is asserted against the built artifact itself.
+    assert "ugence_agent_value_readiness/contracts/binding.py" not in names, (
+        "the readiness wheel still ships the pre-move binding module"
+    )
+    for member in names:
+        if not member.endswith(".py"):
+            continue
+        with zipfile.ZipFile(wheel) as z:
+            source = z.read(member).decode("utf-8")
+        assert "class AssessedSystemBinding" not in source, (
+            f"the readiness wheel defines AssessedSystemBinding in {member}"
+        )
+        assert "class SystemBindingAuthenticityStatus" not in source, (
+            f"the readiness wheel defines SystemBindingAuthenticityStatus in {member}"
+        )
+
+    governance_wheel = _latest(findlinks, "ugence_governance_contracts-*.whl")
+    with zipfile.ZipFile(governance_wheel) as z:
+        governance_names = set(z.namelist())
+    assert "ugence_governance_contracts/contracts/system_identity.py" in governance_names, (
+        "the governance wheel does not ship the assessed-system identity contract"
+    )
     print("      wheel contains only ugence_agent_value_readiness/ (+ py.typed) + dist-info")
+    print("      and defines NO AssessedSystemBinding — it lives in the governance wheel")
 
     print("[3/4] create an isolated venv and install ONLY these local wheels (--no-index)")
     with tempfile.TemporaryDirectory() as td:

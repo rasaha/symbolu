@@ -10,6 +10,32 @@ every existing field keeps its position; the new request fields are appended and
 defaulted. The behavioural change is that `assess_readiness` now **requires** a
 binding.
 
+### Ownership: the binding is a shared contract, consumed not owned
+Per UVI ADR §20's type-by-type table, **`AssessedSystemBinding` is owned by
+`ugence-governance-contracts`** (>= 0.3.0), together with
+`SystemBindingAuthenticityStatus` and `SystemIdentityContractError`. This package
+**consumes** them and re-exports the **identical objects** —
+`readiness_api.AssessedSystemBinding is governance_api.AssessedSystemBinding` —
+so exactly one class identity, one canonical serialization and one digest exist
+platform-wide. There is no readiness-owned copy, compatibility subclass,
+translation model or parallel schema, and a packaging guard fails the build if
+one appears.
+
+**Agent Value Readiness owns** the readiness-specific half: the three indicator
+definitions and catalogs, `ReadinessIndicatorCatalogSet`,
+`IndicatorAdmissionSummary`, the binding-to-`AssessmentContext` adapter, the
+admission rules, the `READINESS_ORCHESTRATION_` gap codes, and the orchestration
+trace and dispositions.
+
+**Moving the class changed no bytes.** The binding's canonical serialization,
+its digest, its dataclass field order, and every admitted indicator record,
+determination, evaluation trace, orchestration trace, disposition and policy
+coordinate are byte-identical to the readiness-owned implementation they
+replaced — pinned as literals in
+`tests/packaging/test_assessed_system_binding_ownership.py`. Dependency direction
+is one-way, `agent-value-readiness → governance-contracts`; the neutral leaf
+imports no UVI, readiness, authority or risk package, so no cycle is possible.
+
 ### The two questions M-3R.3 answers
 1. **Which exact system/configuration is being assessed?** — `AssessedSystemBinding`.
 2. **Which governed indicator definitions may describe that assessment?** — the
@@ -44,18 +70,21 @@ binding.
   selected by exactly one function, called exactly once.
 
 ### Deferred references — nothing unratified was invented
-- **`SystemManifest` is not minted.** ADR §26.3 leaves its home an open owner
-  decision, so the binding carries `system_manifest_ref` + `system_manifest_digest`
-  as a **co-required opaque pair** — the reference/digest discipline ADR §16
-  names — and defines no manifest type.
-- **The RA-owned `SubjectContext` is not forked.** It is draft-only and unmerged
-  (ADR D-14, §26.2), so `canonical_subject_context_ref` is an opaque token. When
-  that contract is ratified the token points at it with no shape change here.
+- **`SystemManifest` remains unresolved and unimplemented.** ADR §26.3 leaves
+  its home an open owner decision, so the binding carries `system_manifest_ref` +
+  `system_manifest_digest` as a **co-required opaque pair** — the
+  reference/digest discipline ADR §16 names — and **neither package** defines a
+  manifest type.
+- **PR #1432's RA-owned subject binding remains additive and is not forked.** It
+  is draft-only and unmerged (ADR D-14, §26.2), so it is represented **only**
+  through the opaque `canonical_subject_context_ref` token. When that contract is
+  ratified the token points at it with no shape change and no version bump.
 - **No environment enumeration is invented**: `deployment_environment_ref` is an
   opaque token.
 
 ### Version identity
-- Package **0.3.0 → 0.4.0**.
+- Package **0.3.0 → 0.4.0**; minimum `ugence-governance-contracts` raised to
+  **>= 0.3.0**, the first version containing `AssessedSystemBinding`.
 - `EVALUATOR_FORMULA_VERSION` **stays exactly `GV-3R-b.3`** — the classification
   algorithm did not move. Every evaluator module is byte-identical to the merged
   0.3.0 tree, pinned by sha-256 in `tests/evaluation/test_evaluator_invariance_m3r3.py`.
@@ -163,10 +192,11 @@ evaluator is untouched.
   or alter GV-3R-b**: the ratified precedence is untouched and the tier is still
   selected by exactly one function, called exactly once.
 - It sits operationally **between** the deterministic evaluator (M-3R.2) and
-  future **M-3R.3** integration work. **M-3R.3 still owns** the
-  `IntelligenceFitness` / `CapabilityReadiness` / `AdoptionReadiness` catalogs
-  and `AssessedSystemBinding` wiring; **neither is implemented here, and that
-  milestone remains open.**
+  **M-3R.3** integration work. **M-3R.3 still owns** the `IntelligenceFitness` /
+  `CapabilityReadiness` / `AdoptionReadiness` catalogs and `AssessedSystemBinding`
+  wiring; **neither is implemented here, and that milestone remains open.**
+  *(Historical, accurate as of 0.3.0 — M-3R.3 is implemented in 0.4.0 above, and
+  `AssessedSystemBinding` now lives in `ugence-governance-contracts` per ADR §20.)*
 - The output remains **advisory** and **never authorizes deployment**.
 
 ### Version identity
@@ -300,6 +330,8 @@ wheels and proves the orchestration boundary, its deny-by-default posture and
 the absence of any permissive verifier from the installed distribution.
 
 ### Not implemented (deliberate)
+*(Historical, accurate as of 0.3.0. M-3R.3 is implemented in 0.4.0 above.)*
+
 **Milestone M-3R.3 is untouched and remains open**: no `IntelligenceFitness` /
 `CapabilityReadiness` / `AdoptionReadiness` catalog and no
 `AssessedSystemBinding` wiring is introduced. Also absent: benchmark registry,

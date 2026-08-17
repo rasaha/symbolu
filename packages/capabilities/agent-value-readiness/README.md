@@ -44,12 +44,23 @@ Policy Authority ADR §5 and §10.4 — and defines no milestone of its own. It
 **does not define a new readiness classification** and **does not replace or
 alter GV-3R-b**, whose precedence is untouched.
 
-**Milestone M-3R.3** adds the `IntelligenceFitness` / `CapabilityReadiness` /
-`AdoptionReadiness` **indicator catalogs** and the **`AssessedSystemBinding`**
-wiring through that *same* single entry point. It answers two questions —
-*which exact system/configuration is being assessed?* and *which governed
-indicator definitions may describe that assessment?* — and adds no second
-classification algorithm and no new readiness tier.
+**Milestone M-3R.3 is implemented by this package.** It adds the
+`IntelligenceFitness` / `CapabilityReadiness` / `AdoptionReadiness` **indicator
+catalogs** and wires the **`AssessedSystemBinding`** through that *same* single
+entry point, answering two questions — *which exact system/configuration is being
+assessed?* and *which governed indicator definitions may describe that
+assessment?* — with no second classification algorithm and no new readiness tier.
+
+**Ownership (UVI ADR §20).** `AssessedSystemBinding`,
+`SystemBindingAuthenticityStatus` and `SystemIdentityContractError` are **owned by
+`ugence-governance-contracts`** (>= 0.3.0). This package **consumes** them: what
+it exports are **direct re-exports of the identical objects**, so
+`readiness_api.AssessedSystemBinding is governance_api.AssessedSystemBinding` and
+there is exactly one class identity, one canonical serialization and one digest.
+No copy, subclass, adapter or parallel schema exists here. What *is*
+readiness-owned: the three indicator catalogs and their definitions, the
+admission rules, the adapter that checks a binding against this assessment's
+`AssessmentContext`, the orchestration gap codes, and the trace.
 
 Policy **issuance, signing, approval verification, registration and revocation**
 stay with the shared Ugence Policy Authority; this package only **consumes** its
@@ -566,10 +577,12 @@ field. A fully self-consistent binding a caller fabricated passes every check an
 is still only structural; every outcome carries the standing, permanently
 `OUT_OF_SCOPE` `SYSTEM_BINDING_AUTHENTICITY_NOT_VERIFIED` disposition saying so.
 
-`SystemManifest` is **not** minted here (its home is an open owner decision, ADR
-§26.3) and the RA-owned `SubjectContext` is **not** forked (draft-only and
-unmerged, ADR D-14, §26.2): both are carried as opaque, digest-bound references
-so a ratified contract can be pointed at with no shape change.
+`SystemManifest` **remains unresolved and unimplemented** — its home is an open
+owner decision (ADR §26.3), so no such type is minted in either package. PR
+#1432's RA-owned subject binding **remains additive and is not forked**
+(draft-only and unmerged, ADR D-14, §26.2): it is represented here **only**
+through the opaque `canonical_subject_context_ref` token, so a ratified contract
+can be pointed at later with no shape change and no version bump.
 
 ### One required path
 

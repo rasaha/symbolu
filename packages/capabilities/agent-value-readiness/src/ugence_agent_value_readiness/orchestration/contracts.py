@@ -31,6 +31,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
 
+from ugence_governance_contracts.api import AssessedSystemBinding
 from ugence_uvi_policy_contracts.api import (
     AssessmentContext,
     PolicyFamily,
@@ -40,7 +41,6 @@ from ugence_uvi_policy_contracts.api import (
 )
 
 from ..contracts._util import coerce_tuple, normalize_tokens, require_nonempty, require_tzaware
-from ..contracts.binding import AssessedSystemBinding
 from ..contracts.catalogs import ReadinessIndicatorCatalogSet
 from ..contracts.composite import AdvisoryComposite
 from ..contracts.conditions import ConditionSet
@@ -115,7 +115,7 @@ class ReadinessAssessmentRequest:
     M-3R.3 adds two shapes, both **optional on the dataclass and required by the
     boundary**:
 
-    * ``system_binding`` — the exact :class:`~..contracts.binding.AssessedSystemBinding`
+    * ``system_binding`` — the exact governance-contracts ``AssessedSystemBinding``
       this assessment is about. ``None`` is representable so that "no binding was
       supplied" is a typed ``NOT_EVALUATED`` outcome rather than a constructor
       exception; there is no second, unbound orchestration path.

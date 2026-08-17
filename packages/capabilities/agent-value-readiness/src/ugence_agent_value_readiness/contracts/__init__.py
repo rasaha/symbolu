@@ -6,7 +6,16 @@ readiness evaluator, tier selector, deployment authority, or financial value.
 
 from __future__ import annotations
 
-from .binding import AssessedSystemBinding
+# ``AssessedSystemBinding`` / ``SystemBindingAuthenticityStatus`` are owned by
+# the neutral governance-contracts leaf (UVI ADR §20). These are **direct
+# re-exports of the same objects** — this package defines no copy, subclass,
+# adapter or parallel schema, so ``is`` identity holds across both public APIs.
+from ugence_governance_contracts.api import (
+    AssessedSystemBinding,
+    SystemBindingAuthenticityStatus,
+    SystemIdentityContractError,
+)
+
 from .catalogs import (
     AdoptionReadinessCatalog,
     AdoptionReadinessIndicatorDefinition,
@@ -28,7 +37,6 @@ from .enums import (
     IntelligenceDimension,
     ReadinessClassification,
     ReadinessIndicatorClass,
-    SystemBindingAuthenticityStatus,
 )
 from .errors import ReadinessContractError
 from .gates import GateResult
@@ -62,6 +70,7 @@ __all__ = [
     "AgentValueReadinessDetermination",
     # ---- M-3R.3: indicator catalogs + assessed-system binding ---------- #
     "AssessedSystemBinding",
+    "SystemIdentityContractError",
     "IntelligenceFitnessIndicatorDefinition",
     "CapabilityReadinessIndicatorDefinition",
     "AdoptionReadinessIndicatorDefinition",

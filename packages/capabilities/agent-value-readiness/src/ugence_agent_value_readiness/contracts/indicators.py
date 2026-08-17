@@ -16,9 +16,9 @@ M-3R.3 adds three **appended, optional** identity fields to each result:
 
 * ``indicator_id`` — the stable id of the governed catalog definition this
   result claims to report against (see :mod:`~.catalogs`);
-* ``system_binding_ref`` / ``system_binding_digest`` — the
-  :class:`~.binding.AssessedSystemBinding` the result was produced against,
-  co-required as a pair (both or neither).
+* ``system_binding_ref`` / ``system_binding_digest`` — the neutral
+  governance-contracts ``AssessedSystemBinding`` the result was produced
+  against, co-required as a pair (both or neither).
 
 All three default to absent, so every M-3R.1 / M-3R.2 construction remains valid
 and the standalone evaluator is untouched. The orchestration boundary
