@@ -12,6 +12,66 @@
 
 ---
 
+## Amendment 3 (2026-08-17) — normative `subject_digest` coverage; integrity is not authenticity
+
+**Narrow clarifying amendment, applied after independent audit finding F-2.** It changes no contract, no digest and no behavior. It states precisely what `subject_digest` commits to, corrects one threat-model row that overstated its reach (§15), and records the authenticity boundary in normative terms.
+
+### What `subject_digest` binds
+
+`subject_digest = digest(SubjectBinding)`, and `SubjectBinding` carries exactly:
+
+```
+{schema_version, tenant_id, subject_id, subject_type, recommendation_digest, context_digest}
+```
+
+Normatively: **`subject_digest` binds the canonical subject / subject-context identity only** — the tenant, the subject identity and type, the recommendation digest, and (transitively, via `context_digest`) every neutral fact inside `SubjectContext`.
+
+### What `subject_digest` does NOT bind
+
+It does **not** bind any of the request's *routing* fields:
+
+| Field | Bound by `subject_digest`? | Bound by `request_digest`? |
+|---|---|---|
+| `purpose` (`requested_purpose`) | **No** | Yes |
+| `domain` (`requested_domain`) | **No** | Yes |
+| `risk_class` (`requested_risk_class`) | **No** | Yes |
+| `requested_scope` | **No** | Yes |
+| `evidence_references` | **No** | Yes |
+
+Consequences, stated plainly:
+
+- **Substituting one of these routed request fields can leave `subject_digest` unchanged.** Substitution of any single field above produces a byte-identical `subject_digest`; only `request_digest` moves.
+- Because the substituted request still reconciles, binding validation passes and the subject-aware resolver **routes on the substituted value**.
+- Therefore **subject-digest equality is not whole-request authenticity.** It is equality of the subject identity commitment, nothing wider.
+
+This is not a defect: routing fields have their own commitment (`request_digest`), and the seam's tenant/scope checks plus RA-5's binding-tuple re-check are the controls that govern them. It is recorded because any document that implies otherwise would overstate the guarantee.
+
+### Integrity versus authenticity (normative)
+
+- **Phase 4B validates structural and binding integrity.** It re-parses the carried `SubjectContext` through its closed contract, recomputes `context_digest`, reconstructs `SubjectBinding` from authoritative outer fields, recomputes `subject_digest`, and requires equality — all before any policy or evidence resolution.
+- **Phase 4B does not authenticate a fully self-consistent request or recommendation.** A caller able to recompute every digest produces an internally consistent request by construction; such a request passes integrity validation. It obtains **no execution authority** — every outcome terminates at a non-executable `SubjectRiskDecision`.
+- **Recommendation authenticity remains a deferred adapter responsibility.** Establishing that `recommendation_digest` corresponds to a genuine `CapacityActionRecommendation` requires reconstructing that recommendation, independently recomputing `rec.digest()`, and requiring equality **before** the request may enter the trusted evaluation path (§7, §12). That check is **not implemented** anywhere today, and no placeholder for it exists.
+
+Neither `subject_digest` nor `rec.digest()` authenticates the whole request. §15's cross-scope row is corrected accordingly, and §7's acceptance invariant now points here for which digest moves.
+
+### Scope of this amendment
+
+No schema, field, digest or version changes. The frozen v1 request digest `sha256:88e9e559…` and the frozen v2 request digest `sha256:cd6dc88a…` are unchanged, `subject_digest` is **not** expanded to cover the routing fields, and Phase 5/6 remain excluded. The claims above are pinned by executable tests in `packages/risk_authority/tests/adversarial/test_phase4b_digest_coverage.py`, which substitute each uncovered field and assert the digest does not move — and which also assert these documents continue to state the boundary.
+
+## Amendment 2 (2026-08-17) — Phase 4B: ratified resolver shape, evaluation-time identifier, D-4 status
+
+**Narrow amendment recording three implementation-phase choices this ADR deliberately left open.** It changes no design decision, adds no scope, and grants no authority. Implemented in `ugence-risk-authority 0.4.0` (Cloud Scaling Phase 4B).
+
+**(1) `PolicyResolverPort` widening — successor protocol, not an added keyword.** §5.6, §16 and §20's residual list left the exact shape open ("an added keyword `subject_context: Optional[SubjectContext] = None`, or a `resolve` successor"). The **successor protocol is ratified**: a distinct `SubjectAwarePolicyResolverPort` with method `resolve_with_subject_context(...)` and a declared `is_subject_context_aware = True`.
+
+Rationale, which the keyword option cannot satisfy: an existing resolver whose `resolve` accepts `**kwargs` — or one later given the keyword and ignoring it — would **silently accept a v2 request while dropping the subject context entirely**, so policy would route without ever seeing the scaling facts the whole v2 contract exists to expose. A distinct method name makes support a matter of *structural presence*, so a legacy resolver simply does not satisfy it. Capability is **declared, never inferred**: the seam performs no signature introspection and accepts no permissive `**kwargs` probe, and it requires *both* the declared flag and the method. v1 continues to use `PolicyResolverPort.resolve(...)` unchanged; a v2 request against a v1-only resolver **fails closed** with no fallback.
+
+**(2) Caller-supplied evaluation time — the typed identifier.** §10 and §12 require the trusted production v2 path to reject a caller-supplied `evaluation_time` as a fail-closed non-decision, but named no reason code. The **owner-ratified identifier is `SubjectRiskNonDecisionReason.CALLER_SUPPLIED_EVALUATION_TIME`** (`"caller_supplied_evaluation_time"`). It was minted rather than reused because no existing member described the condition — the subject is valid and the schema is supported, so `INVALID_SUBJECT` or `UNSUPPORTED_SCHEMA_VERSION` would have misattributed the rejection in the audit record. The addition is purely additive: no member was renamed or removed, and reference-mode time injection (§10) is unchanged.
+
+**(3) D-4 remains unratified, and is now an explicit adapter blocker.** D-4's purpose/domain identifiers (`"cloud_scaling.capacity_action"`, `"cloud_scaling"`, `subject_type`, the `action_type` set) are still **proposed, not owner-ratified**. Phase 4B therefore froze **none** of them into Risk Authority: the seam, the successor port and the neutral context are entirely domain-neutral, RA imports no Cloud Scaling type, and no cloud-scaling enum is hardcoded. D-4 ratification remains a prerequisite for the Cloud Scaling adapter, not for Phase 4B.
+
+**Scope and containment.** `SUPPORTED_REQUEST_SCHEMA_VERSIONS` now admits **both** canonical schemas — but only because `validate_subject_binding` was wired ahead of policy resolution in the *same atomic change*; the ordering is the security property. Admission gates on the **(request class, schema tag) pair**, so a v1-class object carrying the v2 tag still fails closed. **v1 is unchanged** (frozen digest `sha256:88e9e559…`), and Phase 4A's frozen v2 request digest `sha256:cd6dc88a…` is unchanged. Phase 4B remains **non-executing**: every valid v2 request terminates at a non-executable `SubjectRiskDecision`, and it establishes **no** recommendation authenticity — §7's adapter obligation (reconstruct the recommendation, recompute `rec.digest()`, require equality) is unchanged and **still unimplemented**. Phases 5 and 6 remain excluded.
+
 ## Amendment 1 (2026-08-15) — outer `recommendation_digest` on the v2 request
 
 **Owner-approved narrow correction, applied after independent audit of the Phase 4A implementation PR.**
@@ -289,7 +349,7 @@ This is consistent with existing RA precedent: `Scope` is already a nested, clos
 
 ### 5.6 Policy-resolver access (design)
 
-`risk-subject-evaluation-request-2` adds **two co-required** fields: `subject_context: Optional[SubjectContext]` and the outer `recommendation_digest: Optional[str]` (Amendment 1). They must be supplied **together** — a request carrying one without the other is half-bound and can never be reconciled, so it fails closed at construction; with both absent the request is behaviorally equivalent to v1. `PolicyResolverPort` gains a **backward-compatible** widening so the resolver may inspect `subject_context` (e.g., an added keyword `subject_context: Optional[SubjectContext] = None`, or a `resolve` successor); v1 resolvers that ignore it keep working. This is an additive, versioned RA-side change (§16) — **not implemented in this PR**.
+`risk-subject-evaluation-request-2` adds **two co-required** fields: `subject_context: Optional[SubjectContext]` and the outer `recommendation_digest: Optional[str]` (Amendment 1). They must be supplied **together** — a request carrying one without the other is half-bound and can never be reconciled, so it fails closed at construction; with both absent the request is behaviorally equivalent to v1. `PolicyResolverPort` gains a **backward-compatible** widening so the resolver may inspect `subject_context`; v1 resolvers keep working unchanged. This is an additive, versioned RA-side change (§16) — **not implemented in this ADR**. *(Amendment 2: the ratified shape is the successor protocol `SubjectAwarePolicyResolverPort.resolve_with_subject_context(...)`, not an added keyword — an added keyword would let a `**kwargs`-accepting resolver silently drop the context. Implemented in `ugence-risk-authority 0.4.0`.)*
 
 ## 6. Required subject and scope dimensions
 
@@ -297,7 +357,7 @@ This is consistent with existing RA precedent: `Scope` is already a nested, clos
 
 ## 7. Recommendation and evidence digest binding
 
-- `subject_digest = digest(SubjectBinding)`, and `SubjectBinding` carries `recommendation_digest = rec.digest()` and `context_digest`. The evidence digests (forecast / cost / topology / state) live in the **outer** `evidence_references`, bound by `request_digest`. **Any change to the recommendation digest, any neutral subject fact, or any evidence reference changes `subject_digest` or `request_digest`** (acceptance invariant); each fact has a single source-of-truth object, so a change is reflected deterministically.
+- `subject_digest = digest(SubjectBinding)`, and `SubjectBinding` carries `recommendation_digest = rec.digest()` and `context_digest`. The evidence digests (forecast / cost / topology / state) live in the **outer** `evidence_references`, bound by `request_digest`. **Any change to the recommendation digest, any neutral subject fact, or any evidence reference changes `subject_digest` or `request_digest`** (acceptance invariant); each fact has a single source-of-truth object, so a change is reflected deterministically. **Which of the two digests moves is load-bearing and is specified exactly in Amendment 3** — an evidence-reference change moves `request_digest` only, leaving `subject_digest` byte-identical.
 - The adapter independently recomputes `rec.digest()` from the reconstructed recommendation and requires equality with the value placed in `SubjectBinding` before projecting → a **recommendation-digest mismatch fails closed**, no seam call. Independently, **Risk Authority recomputes `context_digest` from the supplied raw `subject_context`, reconstructs `SubjectBinding`, and recomputes `subject_digest`, requiring equality with the carried `subject_digest` before policy resolution** (§5.3); any mismatch is a fail-closed non-decision (§12).
 
 ## 8. Policy-resolution request semantics
@@ -372,7 +432,8 @@ For `SubjectContext`, `SubjectBinding`, `SubjectRiskEvaluationRequest_v2` and an
 | Caller forges a `PASS` / supplies control results | No field exists; RA-5 admission is the only path to control satisfaction |
 | Caller injects policy / risk class / envelope | No field exists in `SubjectRiskEvaluationRequest` |
 | Digest-swap (pair a recommendation with another's digest) | Recommendation `__post_init__` rebinds every input digest; adapter recomputes `rec.digest()` |
-| Cross-tenant / cross-scope replay | `tenant_id` + scope bound into `subject_digest`; RA-5 binding tuple re-check; seam `TENANT_SCOPE_MISMATCH` |
+| Cross-tenant / cross-subject replay | `tenant_id` and `subject_id` bound into `subject_digest`; RA-5 binding tuple re-check; seam `TENANT_SCOPE_MISMATCH` |
+| Cross-**scope** replay | **NOT covered by `subject_digest`** (see Amendment 3) — `requested_scope` is bound by `request_digest` only; RA-5 binding tuple re-check and the seam's tenant/scope checks are the controls that apply |
 | Stale / expired recommendation replay | adapter validity-window re-check vs `now` (fail closed) |
 | Scope-injection via overloaded fields | `requested_scope` is minimal; topology dims live only in `subject_digest`, never in scope |
 | Action-type / capacity spoofing | bound into `subject_digest`; any change alters the digest |
@@ -411,7 +472,7 @@ Phase 4 performs **no** envelope issuance, **no** ActionGate authorization, **no
 - **D-6 — Idempotency: APPROVED** — the idempotency key is a digest of canonical `tenant_id + subject_id + recommendation.digest() + evaluation purpose + request schema_version`. **Timestamps alone must not** define idempotency (§5.1, row 14a).
 - **D-7 — Documentation-tense cleanup: OUT OF SCOPE for this PR.** The Phase-3 ADR header still reads "PROPOSED" though merged (#1421), and the seam's `TrustedControlEvidenceResolverPort` docstring still says RA-5 "will implement" though RA-5 is merged (#1408). These are **recorded separately** and **must not expand this ADR PR**.
 
-Residual items for the implementation phase (not blockers to ratifying this design): the exact `PolicyResolverPort` widening shape (optional keyword vs successor method), and the final `ugence-risk-authority` version number for the v2 bump.
+Residual items for the implementation phase (not blockers to ratifying this design): the exact `PolicyResolverPort` widening shape (optional keyword vs successor method), and the final `ugence-risk-authority` version number for the v2 bump. *(Both settled by Amendment 2: successor protocol; `ugence-risk-authority 0.4.0`.)*
 
 ---
 

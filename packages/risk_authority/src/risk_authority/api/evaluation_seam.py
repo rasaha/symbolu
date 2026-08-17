@@ -33,16 +33,22 @@ from ..domain.enums import AuthorityType, RiskClass, RiskOutcome, RiskRecommenda
 from ..domain.errors import AuthorityDeniedError, RiskAuthorityError
 from ..domain.evidence import ControlEvidenceRecord
 from ..integrations.evaluation_contracts import (
+    EVALUATION_REQUEST_SCHEMA_VERSION,
+    EVALUATION_REQUEST_SCHEMA_VERSION_V2,
     ReferenceControlEvidenceResolver,
     ReferencePolicyResolver,
+    SeamContractError,
+    SubjectBindingValidation,
     SubjectRiskDecision,
     SubjectRiskDisposition,
     SubjectRiskEvaluationRequest,
+    SubjectRiskEvaluationRequestV2,
     SubjectRiskNonDecisionReason,
-    SUPPORTED_REQUEST_SCHEMA_VERSIONS,
     PolicyResolverPort,
     TrustedControlEvidenceResolverPort,
     disposition_for_outcome,
+    is_subject_aware_policy_resolver,
+    validate_subject_binding,
 )
 from ..integrations.control_assurance import ControlAssurancePort
 from ..integrations.ingress import TrustedEvidenceIngressPort
@@ -67,6 +73,27 @@ _RECOMMENDATION_TO_OUTCOME = {
     RiskRecommendation.ESCALATE: RiskOutcome.ESCALATE,
     RiskRecommendation.DENY: RiskOutcome.DENY,
 }
+
+# The two canonical request contracts this seam admits, and — critically — the schema tag
+# each one is allowed to carry. The public ``SUPPORTED_REQUEST_SCHEMA_VERSIONS`` is the
+# UNION of these; it declares what the seam supports overall but is deliberately not the
+# admission rule, because a union cannot express "this tag belongs to that class". Gating
+# on the pair is what stops a v1-class object carrying the v2 tag from masquerading as a
+# genuine v2 request (and vice versa) now that both tags are supported values.
+_SUPPORTED_SCHEMAS_BY_CLASS = {
+    SubjectRiskEvaluationRequest: frozenset({EVALUATION_REQUEST_SCHEMA_VERSION}),
+    SubjectRiskEvaluationRequestV2: frozenset({EVALUATION_REQUEST_SCHEMA_VERSION_V2}),
+}
+
+_AnySubjectRequest = SubjectRiskEvaluationRequest | SubjectRiskEvaluationRequestV2
+
+
+def _supported_schema_versions_for(request) -> frozenset:
+    """The schema tags ``request``'s own contract class may carry (fail closed otherwise)."""
+
+    if isinstance(request, SubjectRiskEvaluationRequestV2):
+        return _SUPPORTED_SCHEMAS_BY_CLASS[SubjectRiskEvaluationRequestV2]
+    return _SUPPORTED_SCHEMAS_BY_CLASS[SubjectRiskEvaluationRequest]
 
 
 @dataclass(frozen=True)
@@ -212,43 +239,186 @@ class RiskEvaluationSeam:
         )
 
     # ------------------------------------------------------------------ evaluate
-    def evaluate(self, request: SubjectRiskEvaluationRequest) -> SubjectRiskDecision:
-        """Evaluate ``request`` and return a stop-at-decision result (fail closed)."""
+    def evaluate(self, request: _AnySubjectRequest) -> SubjectRiskDecision:
+        """Evaluate ``request`` and return a stop-at-decision result (fail closed).
+
+        Accepts the two canonical request contracts and **only** those two, dispatching
+        on their real types rather than on a schema string or a duck-typed attribute set:
+
+        * :class:`SubjectRiskEvaluationRequest` (``…-request-1``) — the v1 path, byte-for
+          -byte unchanged from PR-1;
+        * :class:`SubjectRiskEvaluationRequestV2` (``…-request-2``) — admitted by Phase 4B
+          only after ``_admit_v2`` has cleared every ordered gate it documents.
+
+        Anything else still raises :class:`SeamConfigurationError` at this type boundary,
+        before the clock is read and before any digest is computed. v2 is a *successor*
+        class, not a subclass, so it cannot arrive through the v1 branch and a v1 object
+        cannot arrive through the v2 branch — the masquerade both directions is structural,
+        not a string comparison."""
+
+        if isinstance(request, SubjectRiskEvaluationRequestV2):
+            admitted = self._admit_v2(request)
+            if isinstance(admitted, SubjectRiskDecision):
+                return admitted  # a typed non-decision — nothing downstream was reached
+            validation, now = admitted
+            return self._evaluate_admitted(request, now=now, validation=validation)
         if not isinstance(request, SubjectRiskEvaluationRequest):
-            raise SeamConfigurationError("request must be a SubjectRiskEvaluationRequest")
+            raise SeamConfigurationError(
+                "request must be a SubjectRiskEvaluationRequest or "
+                "SubjectRiskEvaluationRequestV2"
+            )
+        return self._evaluate_admitted(request, now=None, validation=None)
+
+    # --------------------------------------------------------------- v2 admission
+    def _admit_v2(
+        self, request: SubjectRiskEvaluationRequestV2
+    ) -> "SubjectRiskDecision | tuple[SubjectBindingValidation, datetime]":
+        """Run the load-bearing v2 admission gates, in this exact order.
+
+        Returns the validated binding plus the authoritative evaluation time, or a typed
+        fail-closed :class:`SubjectRiskDecision` non-decision.
+
+        Ordering is the security property, not an implementation detail. Until every gate
+        below has passed, **no** policy resolver, evidence resolver, Decision Authority
+        operation or other downstream collaborator observes the request at all — the only
+        ambient thing touched is the trusted clock, and only to stamp a rejection record
+        (never the caller's time, which is never authoritative anywhere on this path).
+        """
+
+        # (1) canonical v2 contract type — established by the caller's isinstance
+        #     dispatch, so a duck-typed look-alike never reaches this method.
+        # (2) the v2 schema identifier must be supported FOR THIS REQUEST CLASS. Unknown
+        #     and future tags fail closed through the established typed path.
+        if request.schema_version not in _SUPPORTED_SCHEMAS_BY_CLASS[SubjectRiskEvaluationRequestV2]:
+            return self._non_decision(
+                request, self._clock(),
+                SubjectRiskNonDecisionReason.UNSUPPORTED_SCHEMA_VERSION,
+                f"schema:{request.schema_version}")
+
+        # (3) caller-supplied evaluation_time on the TRUSTED PRODUCTION path (ADR §10/§12).
+        #     Rejected fail-closed and never silently ignored; the caller's value never
+        #     becomes the clock, and the rejection is stamped with the TRUSTED clock so a
+        #     caller cannot even influence the timestamp of its own rejection. The labelled
+        #     reference seam is deliberately untouched — it remains the only place an
+        #     explicit clock may be injected.
+        if self._production and request.evaluation_time is not None:
+            return self._non_decision(
+                request, self._clock(),
+                SubjectRiskNonDecisionReason.CALLER_SUPPLIED_EVALUATION_TIME,
+                "evaluation_time:caller_supplied")
+
+        # (4)-(8) validate the closed SubjectContext, recompute context_digest, reconstruct
+        #     SubjectBinding from the authoritative OUTER fields, recompute subject_digest
+        #     and require every carried/recomputed binding to match. All five steps live in
+        #     the Phase 4A validator and run before anything downstream exists.
+        try:
+            validation = validate_subject_binding(request)
+        except SeamContractError as exc:
+            return self._non_decision(
+                request, self._clock(),
+                SubjectRiskNonDecisionReason.INVALID_SUBJECT,
+                f"binding:{type(exc).__name__}")
+        if validation.context is None:  # defensive: a validation must carry its context
+            return self._non_decision(
+                request, self._clock(),
+                SubjectRiskNonDecisionReason.INVALID_SUBJECT,
+                "binding:missing_validated_context")
+
+        # Only now may a clock-dependent check run, and only over VALIDATED facts.
         now = request.evaluation_time or self._clock()
+        context = validation.context
+        if now > context.subject_valid_until:
+            return self._non_decision(
+                request, now, SubjectRiskNonDecisionReason.EXPIRED_SUBJECT,
+                "subject_validity:expired")
+        if now < context.subject_valid_from:
+            return self._non_decision(
+                request, now, SubjectRiskNonDecisionReason.EXPIRED_SUBJECT,
+                "subject_validity:not_yet_valid")
+
+        return validation, now
+
+    def _non_decision(
+        self,
+        request: _AnySubjectRequest,
+        now: datetime,
+        reason: SubjectRiskNonDecisionReason,
+        *codes: str,
+    ) -> SubjectRiskDecision:
+        """Build the typed fail-closed non-decision (identical shape for v1 and v2)."""
+
+        return SubjectRiskDecision(
+            request_digest=request.digest(),
+            subject_digest=request.subject_digest,
+            tenant_id=request.tenant_id,
+            disposition=SubjectRiskDisposition.NOT_EVALUATED,
+            evaluator_principal_id=self._evaluator_principal_id,
+            evaluated_at=now,
+            non_decision_reason=reason,
+            reason_codes=tuple(codes),
+            correlation_id=request.correlation_id,
+            idempotency_key=request.idempotency_key,
+        )
+
+    # ------------------------------------------------------------ shared evaluation
+    def _evaluate_admitted(
+        self,
+        request: _AnySubjectRequest,
+        *,
+        now: Optional[datetime],
+        validation: Optional[SubjectBindingValidation],
+    ) -> SubjectRiskDecision:
+        """The existing RA evaluation path, shared by v1 and admitted v2 requests.
+
+        ``validation`` is ``None`` for v1 (the v1 flow is unchanged) and the reconciled
+        binding for v2, which selects subject-aware policy resolution."""
+
+        if now is None:
+            now = request.evaluation_time or self._clock()
         req_digest = request.digest()
 
         def _not_evaluated(reason: SubjectRiskNonDecisionReason, *codes: str) -> SubjectRiskDecision:
-            return SubjectRiskDecision(
-                request_digest=req_digest,
-                subject_digest=request.subject_digest,
-                tenant_id=request.tenant_id,
-                disposition=SubjectRiskDisposition.NOT_EVALUATED,
-                evaluator_principal_id=self._evaluator_principal_id,
-                evaluated_at=now,
-                non_decision_reason=reason,
-                reason_codes=tuple(codes),
-                correlation_id=request.correlation_id,
-                idempotency_key=request.idempotency_key,
-            )
+            return self._non_decision(request, now, reason, *codes)
 
-        if request.schema_version not in SUPPORTED_REQUEST_SCHEMA_VERSIONS:
+        # Each canonical request class admits ONLY its own schema tag. Gating on the
+        # (class, tag) pair — not on membership in the public union — is what keeps a
+        # v1-class object carrying the v2 tag from masquerading as a genuine v2 request
+        # now that the v2 tag is a supported value.
+        if request.schema_version not in _supported_schema_versions_for(request):
             return _not_evaluated(SubjectRiskNonDecisionReason.UNSUPPORTED_SCHEMA_VERSION,
                                   f"schema:{request.schema_version}")
 
         risk_class = request.requested_risk_class or RiskClass.HIGH
 
         # --- 1. Trusted policy resolution (caller never selects policy). ----------
+        # A v2 request REQUIRES an explicitly subject-aware resolver. There is no
+        # fallback to the v1 method: a resolver that cannot see the validated context
+        # must never silently route a v2 request while dropping the subject facts.
+        if validation is not None and not is_subject_aware_policy_resolver(self._policy_resolver):
+            return _not_evaluated(SubjectRiskNonDecisionReason.NO_AUTHORITATIVE_POLICY,
+                                  "resolver:not_subject_context_aware")
         try:
-            workflow = self._policy_resolver.resolve(
-                tenant_id=request.tenant_id,
-                purpose=request.requested_purpose,
-                domain=request.requested_domain,
-                risk_class=request.requested_risk_class,
-                requested_scope=request.requested_scope,
-                now=now,
-            )
+            if validation is not None:
+                workflow = self._policy_resolver.resolve_with_subject_context(
+                    tenant_id=request.tenant_id,
+                    purpose=request.requested_purpose,
+                    domain=request.requested_domain,
+                    risk_class=request.requested_risk_class,
+                    requested_scope=request.requested_scope,
+                    # The re-validated context, never the raw caller-supplied object.
+                    subject_context=validation.context,
+                    evidence_references=request.evidence_references,
+                    now=now,
+                )
+            else:
+                workflow = self._policy_resolver.resolve(
+                    tenant_id=request.tenant_id,
+                    purpose=request.requested_purpose,
+                    domain=request.requested_domain,
+                    risk_class=request.requested_risk_class,
+                    requested_scope=request.requested_scope,
+                    now=now,
+                )
         except Exception as exc:  # noqa: BLE001 - ambiguity / resolver failure ⇒ fail closed
             return _not_evaluated(SubjectRiskNonDecisionReason.AMBIGUOUS_POLICY,
                                   f"resolver_error:{type(exc).__name__}")

@@ -353,6 +353,23 @@ def test_v1_round_trip_is_unchanged():
     assert rebuilt.digest() == FROZEN_V1_DIGEST
 
 
-def test_seam_supported_request_schema_set_is_unchanged_by_phase_4a():
-    # Phase 4A ships contracts + pure validation only; wiring is Phase 4B.
-    assert SUPPORTED_REQUEST_SCHEMA_VERSIONS == frozenset({EVALUATION_REQUEST_SCHEMA_VERSION})
+def test_seam_supported_request_schema_set_is_widened_to_both_canonical_schemas():
+    # Phase 4B: v2 is admitted, and v1 remains admitted alongside it. This supersedes the
+    # Phase 4A assertion that the set contained v1 only; the widening was made in the same
+    # atomic change that wired validate_subject_binding ahead of policy resolution.
+    assert SUPPORTED_REQUEST_SCHEMA_VERSIONS == frozenset({
+        EVALUATION_REQUEST_SCHEMA_VERSION,
+        EVALUATION_REQUEST_SCHEMA_VERSION_V2,
+    })
+
+
+def test_the_supported_schema_union_is_not_by_itself_the_admission_rule():
+    # The union declares what the seam supports overall; admission gates on the
+    # (request class, schema tag) PAIR. A v1-class object carrying the v2 tag is a member
+    # of this set and must still be refused — see the seam tests for the behavioral proof.
+    from risk_authority.api.evaluation_seam import _supported_schema_versions_for
+
+    assert _supported_schema_versions_for(v1_request()) == frozenset({
+        EVALUATION_REQUEST_SCHEMA_VERSION})
+    assert _supported_schema_versions_for(v2_request()) == frozenset({
+        EVALUATION_REQUEST_SCHEMA_VERSION_V2})

@@ -111,18 +111,48 @@ def test_a_v2_request_is_not_an_instance_of_the_v1_request():
     assert not issubclass(SubjectRiskEvaluationRequestV2, SubjectRiskEvaluationRequest)
 
 
-def test_the_seam_still_fails_closed_on_a_v2_schema_version():
+def test_the_v2_schema_is_supported_only_because_the_validator_is_wired_in():
+    """Phase 4B supersedes the Phase 4A assertion that v2 was NOT a supported schema.
+
+    The widening and the wiring are one atomic change, and the ordering between them is
+    the whole point: widening first would have let a v2 request reach policy resolution
+    with its binding never reconciled. This asserts both halves together, so the schema
+    set can never be widened again without the validator still being wired ahead of
+    resolution."""
+
+    from risk_authority.api import evaluation_seam
     from risk_authority.integrations import (
         EVALUATION_REQUEST_SCHEMA_VERSION_V2,
         SUPPORTED_REQUEST_SCHEMA_VERSIONS,
     )
-    assert EVALUATION_REQUEST_SCHEMA_VERSION_V2 not in SUPPORTED_REQUEST_SCHEMA_VERSIONS
+
+    assert EVALUATION_REQUEST_SCHEMA_VERSION_V2 in SUPPORTED_REQUEST_SCHEMA_VERSIONS
+    assert "validate_subject_binding" in inspect.getsource(evaluation_seam)
 
 
-def test_the_evaluation_seam_module_is_unchanged_by_this_layer():
-    from risk_authority.api import evaluation_seam
+def test_the_seam_validates_the_binding_before_it_resolves_any_policy():
+    """A source-order invariant over the executable body, not over prose.
 
-    source = inspect.getsource(evaluation_seam)
-    for token in ("SubjectContext", "SubjectBinding", "validate_subject_binding",
-                  "SubjectRiskEvaluationRequestV2"):
-        assert token not in source, token
+    Docstrings are stripped first, so a comment promising the ordering cannot satisfy
+    this; only the actual call order can. It is the static counterpart to the counting
+    -spy ordering tests in ``test_phase4b_seam_admission.py``."""
+
+    from risk_authority.api.evaluation_seam import RiskEvaluationSeam
+
+    admit = _executable_source(RiskEvaluationSeam._admit_v2)
+    core = _executable_source(RiskEvaluationSeam._evaluate_admitted)
+
+    # The v2 admission gate validates and never resolves policy or evidence itself.
+    assert "validate_subject_binding" in admit
+    for forbidden in ("resolve_with_subject_context", "_resolve_evidence",
+                      "issue_decision", "issue_envelope", "authorize_action"):
+        assert forbidden not in admit, forbidden
+
+    # The evaluation-time rejection precedes the binding validation, which in turn is
+    # not something the shared core can skip: the core never validates, so a v2 request
+    # can only reach it through _admit_v2.
+    assert admit.index("CALLER_SUPPLIED_EVALUATION_TIME") < admit.index("validate_subject_binding")
+    assert "validate_subject_binding" not in core
+
+    # ...and within the core, policy resolution precedes evidence resolution.
+    assert core.index("resolve_with_subject_context") < core.index("_resolve_evidence")
