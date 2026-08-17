@@ -1,5 +1,81 @@
 # Changelog — ugence-governance-contracts
 
+## [0.3.1] — assessed-system binding instants canonicalize in UTC (fix)
+
+**Patch.** No public symbol, field, enum value, default or authority meaning
+changed, nothing was added to the curated API, and `CONTRACT_VERSION` (the
+**provider** contract surface) is **unchanged at `1.0.0`** — this corrects a
+defect inside an existing contract rather than changing a surface. Only the
+package `__version__` advances, to `0.3.1`. Remains a stdlib-only leaf.
+
+### Fixed — equality and digest disagreed about timezone-aware instants
+Two timezone-aware datetimes naming the **same instant** are equal in Python and
+hash alike, so two `AssessedSystemBinding` values differing only in the offset
+their `effective_from` / `effective_to` were written with are the *same* binding.
+Canonicalization did not agree: it serialized each instant with the offset it
+arrived in, so equal bindings produced **three different canonical byte
+sequences and three different digests**.
+
+That is an inconsistency in an identity fingerprint the whole platform compares
+on — a binding could fail a digest comparison against itself. Every aware
+datetime participating in canonicalization is now re-expressed in UTC
+(`astimezone(timezone.utc)`, pure arithmetic) immediately **before** the existing
+sorted-key JSON serialization, which is otherwise untouched. So
+
+| written as | canonicalizes as |
+|---|---|
+| `2026-08-17T10:00:00+00:00` | `2026-08-17 10:00:00+00:00` |
+| `2026-08-17T15:30:00+05:30` | `2026-08-17 10:00:00+00:00` |
+| `2026-08-17T06:00:00-04:00` | `2026-08-17 10:00:00+00:00` |
+
+all three yield identical canonical bytes and one digest. The invariant now
+holds unconditionally:
+
+```python
+if binding_a == binding_b:
+    assert binding_a.canonical_bytes() == binding_b.canonical_bytes()
+    assert binding_a.canonical_digest() == binding_b.canonical_digest()
+```
+
+A **genuinely different instant still changes** the bytes and the digest, down to
+the microsecond, and every non-datetime coordinate — tenant, subject, context,
+system, version, configuration, manifest — separates bindings exactly as before.
+
+### Added — `AssessedSystemBinding.canonical_bytes()`
+A method on the existing class, exposing the exact bytes `canonical_digest()`
+hashes so a consumer can verify the digest independently. **No new public
+contract symbol**: `api.__all__` is unchanged and no export was added.
+
+### Unchanged — naive datetimes are still rejected
+A value with no offset names no instant, so UTC is never assumed for it. Naive
+values are refused at construction *and* again at canonicalization, and the
+rejection is a `SystemIdentityContractError`, not a silent default.
+
+### Compatibility — honest about what moves
+Bindings already expressed in UTC keep their **exact** pre-correction canonical
+bytes and digest: normalizing a UTC instant to UTC is the identity, and merged-
+default byte and digest literals are pinned in the tests to prove no drift. A
+digest previously recorded for a binding written with a **non-UTC offset** does
+change — to the UTC-normalized value it should always have had. There is
+deliberately **no** legacy-digest fallback, dual acceptance rule, alias or
+translation layer: this is one deterministic canonicalization, not a second
+protocol.
+
+Canonicalization consults no system clock, locale or environment; an AST guard
+asserts this over the module, including that `astimezone` is never called in its
+local-timezone-inferring zero-argument form.
+
+### Hardened — the distribution verifier removes stale build output
+`verify_governance_contracts_distribution.py` now removes the package-local
+`build/` tree immediately before building, so a module deleted from source
+cannot be resurrected from `build/lib` into a fresh wheel. The removal target is
+`<resolved package root>/build` and nothing else — never a broad path, an
+environment variable or a repository-root walk — and a symlink there is refused
+rather than followed. The verifier continues to inspect the completed **wheel**,
+and now asserts it defines `AssessedSystemBinding` exactly once. A seeded
+regression test plants the duplicate definition in `build/lib`, demonstrates an
+unclean build really does ship it, then proves the hardened path does not.
+
 ## [0.3.0] — neutral assessed-system identity (additive)
 
 **Additive, backward-compatible.** No existing public symbol, field, enum value,

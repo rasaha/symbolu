@@ -1,5 +1,44 @@
 # Changelog — ugence-agent-value-readiness
 
+## [0.4.1] — governance dependency floor raised to 0.3.1 (metadata + docs)
+
+**Patch.** No readiness symbol, field, enum value, default, classification,
+gap code, trace field or authorization meaning changed. No source module in this
+package was modified. `READINESS_ORCHESTRATOR_VERSION` remains
+`ugence.readiness-orchestration/v0.2` and `EVALUATOR_FORMULA_VERSION` remains
+exactly **`GV-3R-b.3`** — the classification algorithm did not move, and neither
+did the evaluator's source.
+
+### Changed — dependency floor
+`ugence-governance-contracts>=0.3.0` → **`>=0.3.1`**, the first version whose
+`AssessedSystemBinding` canonicalization normalizes timezone-aware instants to
+UTC. Because this package **re-exports the identical governance class** rather
+than holding a copy, the shared binding's canonical bytes and digest are the
+ones readiness consumes; the floor makes that requirement explicit instead of
+leaving it to resolution luck. The package version advances to `0.4.1`
+accordingly.
+
+### Fixed — an inaccurate stage number in `orchestration/service.py`
+A section comment labelled condition verification **Stage 3** when it is
+**Stage 4**; gate-result verification is Stage 3. Corrected, and every other
+stage number and description in the module was re-checked against the actual
+execution order in `assess_readiness` (1 policy resolution, 2 assessed-system
+binding, 3 gate-result verification, 4 condition verification, 5 indicator
+admission, 6 the single evaluator call). **Comment only** — no execution order
+and no runtime behaviour changed.
+
+### Added — readiness semantic-invariance regression
+`tests/orchestration/test_binding_timezone_equivalence_invariance.py` drives
+timezone-equivalent bindings through the public `assess_readiness` entry point
+and asserts they produce an identical binding digest, admission result, admitted
+indicator set, classification, evaluator rule, reason codes, evaluation digest,
+orchestration trace digest and dispositions. It also re-proves that cross-system,
+cross-configuration, cross-tenant and cross-context replay stay rejected, that a
+binding not effective at the evaluation time is still refused, that binding
+authenticity remains non-forgeable, that a genuinely different instant remains
+distinct, that RA-01 remains gate-driven with no family-count heuristic, and that
+`authorizes_deployment` remains permanently `False`.
+
 ## [0.4.0] — M-3R.3: indicator catalogs and assessed-system binding
 
 Implements UVI ADR §25 milestone **M-3R.3**: the `IntelligenceFitness` /

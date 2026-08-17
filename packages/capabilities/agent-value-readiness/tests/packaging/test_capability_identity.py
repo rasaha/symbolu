@@ -333,9 +333,9 @@ def test_no_catalog_or_binding_type_carries_requirement_or_financial_vocabulary(
 # 6-7. Package version and public API shape
 # --------------------------------------------------------------------------- #
 def test_the_package_version_is_bumped_for_m3r3():
-    assert R.__version__ == "0.4.0"
+    assert R.__version__ == "0.4.1"
     snapshot = json.loads((DIST_ROOT / "public_api.json").read_text())
-    assert snapshot["package_version"] == "0.4.0"
+    assert snapshot["package_version"] == "0.4.1"
 
 
 def test_the_snapshot_pins_the_exact_orchestrator_version_value():

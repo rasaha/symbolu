@@ -123,8 +123,20 @@ canonical neutral `SubjectContext` remains a **deferred dependency** (unmerged);
 it and `SystemManifest` are **not** minted here — both are referenced by opaque,
 co-required ref + digest tokens.
 
+**Canonicalization (0.3.1).** Every timezone-aware datetime in the binding is
+normalized to UTC before serialization, so equal bindings are byte-equal:
+`2026-08-17T10:00:00+00:00`, `2026-08-17T15:30:00+05:30` and
+`2026-08-17T06:00:00-04:00` produce identical `canonical_bytes()` and one
+`canonical_digest()`. **Naive datetimes are rejected** — a value with no offset
+names no instant, and UTC is never assumed for it. A genuinely different instant
+still changes both. This fixes an equality/digest inconsistency in which equal
+bindings produced different digests; no readiness classification or authorization
+semantics changed. Digests previously recorded for a **non-UTC-offset**
+representation now resolve to their UTC-normalized value — there is no
+legacy-digest fallback or dual acceptance rule.
+
 **Compatibility.** Purely additive; `CONTRACT_VERSION` (the provider contract
-surface) is unchanged at `1.0.0`; the package version advances to `0.3.0`. The
+surface) is unchanged at `1.0.0`; the package version advances to `0.3.1`. The
 `governed-value` 0.2.0 kernel is unchanged; its compatibility mapping is
 **documentation only**: `EvidenceStatus.REPORTED → SourceBasis.REPORTED +
 TransformationMethod.DIRECT`; `AuthorityStatus.UNVERIFIED → AttestationStatus.UNATTESTED

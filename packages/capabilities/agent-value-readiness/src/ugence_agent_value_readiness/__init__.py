@@ -39,7 +39,7 @@ Import the curated surface from :mod:`ugence_agent_value_readiness.api`.
 
 from __future__ import annotations
 
-__version__ = "0.4.0"
+__version__ = "0.4.1"
 
 from .contracts import (  # noqa: E402
     AdoptionDimension,

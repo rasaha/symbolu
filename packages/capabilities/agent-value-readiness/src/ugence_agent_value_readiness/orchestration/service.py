@@ -776,7 +776,7 @@ def _run_gate_verifier(
 
 
 # --------------------------------------------------------------------------- #
-# Stage 3 — condition verification
+# Stage 4 — condition verification
 # --------------------------------------------------------------------------- #
 def _verify_conditions(
     request: ReadinessAssessmentRequest,

@@ -1053,7 +1053,7 @@ def _():
     lowered = READINESS_ORCHESTRATOR_VERSION.lower()
     for token in ("gv-3r", "gv3r", "m-3r", "m3r", "milestone"):
         assert token not in lowered, token
-    assert R.__version__ == "0.4.0"
+    assert R.__version__ == "0.4.1"
     outcome = run(make_request(ALL_PASS))
     assert outcome.trace.evaluator_formula_version == "GV-3R-b.3"
     assert outcome.evaluation.trace.formula_version == "GV-3R-b.3"
