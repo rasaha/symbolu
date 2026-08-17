@@ -296,6 +296,49 @@ its tag is now a supported value. Unknown and future tags continue to fail close
 typed way, and anything that is neither canonical class still raises `SeamConfigurationError`
 at the type boundary.
 
+### What `subject_digest` covers (normative)
+
+`subject_digest = digest(SubjectBinding)`, and `SubjectBinding` carries exactly
+`{schema_version, tenant_id, subject_id, subject_type, recommendation_digest,
+context_digest}`. It therefore
+**binds the canonical subject / subject-context identity only**.
+
+It does **not** bind the request's routing fields:
+
+| Field | In `subject_digest`? | In `request_digest`? |
+|---|---|---|
+| `requested_purpose` | **No** | Yes |
+| `requested_domain` | **No** | Yes |
+| `requested_risk_class` | **No** | Yes |
+| `requested_scope` | **No** | Yes |
+| `evidence_references` | **No** | Yes |
+
+Three consequences follow, and none of them may be softened:
+
+* **Substituting one of these routed request fields can leave `subject_digest`
+  unchanged** — substituting any single field above yields a byte-identical
+  `subject_digest`; only `request_digest` moves.
+* Because such a request still reconciles, binding validation passes and the
+  subject-aware resolver **routes on the substituted value**.
+* **subject-digest equality is not whole-request authenticity** — it is equality of the
+  subject identity commitment and nothing wider.
+
+This is not a defect — the routing fields have their own commitment in `request_digest`,
+and the seam's tenant/scope checks and RA-5's binding-tuple re-check are the controls that
+govern them. It is documented because any statement implying wider coverage would
+overstate the guarantee.
+
+**Phase 4B validates structural and binding integrity. Phase 4B does not authenticate a
+fully self-consistent request or recommendation.** Neither `subject_digest` nor
+`rec.digest()` authenticates the whole request. Recommendation authenticity remains a
+**deferred adapter responsibility**: reconstruct the real `CapacityActionRecommendation`,
+independently recompute `rec.digest()`, and require equality before the request may enter
+the trusted evaluation path. That check is not implemented anywhere today.
+
+These claims are pinned by executable tests
+(`tests/adversarial/test_phase4b_digest_coverage.py`), which substitute each uncovered
+field, assert the subject digest does not move, and assert this section keeps saying so.
+
 ### What admission does *not* mean
 
 Admitting a v2 request proves **binding integrity**, never source authenticity. A fully

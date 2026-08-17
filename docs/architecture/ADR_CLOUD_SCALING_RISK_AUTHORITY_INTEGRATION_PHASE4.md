@@ -12,6 +12,52 @@
 
 ---
 
+## Amendment 3 (2026-08-17) — normative `subject_digest` coverage; integrity is not authenticity
+
+**Narrow clarifying amendment, applied after independent audit finding F-2.** It changes no contract, no digest and no behavior. It states precisely what `subject_digest` commits to, corrects one threat-model row that overstated its reach (§15), and records the authenticity boundary in normative terms.
+
+### What `subject_digest` binds
+
+`subject_digest = digest(SubjectBinding)`, and `SubjectBinding` carries exactly:
+
+```
+{schema_version, tenant_id, subject_id, subject_type, recommendation_digest, context_digest}
+```
+
+Normatively: **`subject_digest` binds the canonical subject / subject-context identity only** — the tenant, the subject identity and type, the recommendation digest, and (transitively, via `context_digest`) every neutral fact inside `SubjectContext`.
+
+### What `subject_digest` does NOT bind
+
+It does **not** bind any of the request's *routing* fields:
+
+| Field | Bound by `subject_digest`? | Bound by `request_digest`? |
+|---|---|---|
+| `purpose` (`requested_purpose`) | **No** | Yes |
+| `domain` (`requested_domain`) | **No** | Yes |
+| `risk_class` (`requested_risk_class`) | **No** | Yes |
+| `requested_scope` | **No** | Yes |
+| `evidence_references` | **No** | Yes |
+
+Consequences, stated plainly:
+
+- **Substituting one of these routed request fields can leave `subject_digest` unchanged.** Substitution of any single field above produces a byte-identical `subject_digest`; only `request_digest` moves.
+- Because the substituted request still reconciles, binding validation passes and the subject-aware resolver **routes on the substituted value**.
+- Therefore **subject-digest equality is not whole-request authenticity.** It is equality of the subject identity commitment, nothing wider.
+
+This is not a defect: routing fields have their own commitment (`request_digest`), and the seam's tenant/scope checks plus RA-5's binding-tuple re-check are the controls that govern them. It is recorded because any document that implies otherwise would overstate the guarantee.
+
+### Integrity versus authenticity (normative)
+
+- **Phase 4B validates structural and binding integrity.** It re-parses the carried `SubjectContext` through its closed contract, recomputes `context_digest`, reconstructs `SubjectBinding` from authoritative outer fields, recomputes `subject_digest`, and requires equality — all before any policy or evidence resolution.
+- **Phase 4B does not authenticate a fully self-consistent request or recommendation.** A caller able to recompute every digest produces an internally consistent request by construction; such a request passes integrity validation. It obtains **no execution authority** — every outcome terminates at a non-executable `SubjectRiskDecision`.
+- **Recommendation authenticity remains a deferred adapter responsibility.** Establishing that `recommendation_digest` corresponds to a genuine `CapacityActionRecommendation` requires reconstructing that recommendation, independently recomputing `rec.digest()`, and requiring equality **before** the request may enter the trusted evaluation path (§7, §12). That check is **not implemented** anywhere today, and no placeholder for it exists.
+
+Neither `subject_digest` nor `rec.digest()` authenticates the whole request. §15's cross-scope row is corrected accordingly, and §7's acceptance invariant now points here for which digest moves.
+
+### Scope of this amendment
+
+No schema, field, digest or version changes. The frozen v1 request digest `sha256:88e9e559…` and the frozen v2 request digest `sha256:cd6dc88a…` are unchanged, `subject_digest` is **not** expanded to cover the routing fields, and Phase 5/6 remain excluded. The claims above are pinned by executable tests in `packages/risk_authority/tests/adversarial/test_phase4b_digest_coverage.py`, which substitute each uncovered field and assert the digest does not move — and which also assert these documents continue to state the boundary.
+
 ## Amendment 2 (2026-08-17) — Phase 4B: ratified resolver shape, evaluation-time identifier, D-4 status
 
 **Narrow amendment recording three implementation-phase choices this ADR deliberately left open.** It changes no design decision, adds no scope, and grants no authority. Implemented in `ugence-risk-authority 0.4.0` (Cloud Scaling Phase 4B).
@@ -311,7 +357,7 @@ This is consistent with existing RA precedent: `Scope` is already a nested, clos
 
 ## 7. Recommendation and evidence digest binding
 
-- `subject_digest = digest(SubjectBinding)`, and `SubjectBinding` carries `recommendation_digest = rec.digest()` and `context_digest`. The evidence digests (forecast / cost / topology / state) live in the **outer** `evidence_references`, bound by `request_digest`. **Any change to the recommendation digest, any neutral subject fact, or any evidence reference changes `subject_digest` or `request_digest`** (acceptance invariant); each fact has a single source-of-truth object, so a change is reflected deterministically.
+- `subject_digest = digest(SubjectBinding)`, and `SubjectBinding` carries `recommendation_digest = rec.digest()` and `context_digest`. The evidence digests (forecast / cost / topology / state) live in the **outer** `evidence_references`, bound by `request_digest`. **Any change to the recommendation digest, any neutral subject fact, or any evidence reference changes `subject_digest` or `request_digest`** (acceptance invariant); each fact has a single source-of-truth object, so a change is reflected deterministically. **Which of the two digests moves is load-bearing and is specified exactly in Amendment 3** — an evidence-reference change moves `request_digest` only, leaving `subject_digest` byte-identical.
 - The adapter independently recomputes `rec.digest()` from the reconstructed recommendation and requires equality with the value placed in `SubjectBinding` before projecting → a **recommendation-digest mismatch fails closed**, no seam call. Independently, **Risk Authority recomputes `context_digest` from the supplied raw `subject_context`, reconstructs `SubjectBinding`, and recomputes `subject_digest`, requiring equality with the carried `subject_digest` before policy resolution** (§5.3); any mismatch is a fail-closed non-decision (§12).
 
 ## 8. Policy-resolution request semantics
@@ -386,7 +432,8 @@ For `SubjectContext`, `SubjectBinding`, `SubjectRiskEvaluationRequest_v2` and an
 | Caller forges a `PASS` / supplies control results | No field exists; RA-5 admission is the only path to control satisfaction |
 | Caller injects policy / risk class / envelope | No field exists in `SubjectRiskEvaluationRequest` |
 | Digest-swap (pair a recommendation with another's digest) | Recommendation `__post_init__` rebinds every input digest; adapter recomputes `rec.digest()` |
-| Cross-tenant / cross-scope replay | `tenant_id` + scope bound into `subject_digest`; RA-5 binding tuple re-check; seam `TENANT_SCOPE_MISMATCH` |
+| Cross-tenant / cross-subject replay | `tenant_id` and `subject_id` bound into `subject_digest`; RA-5 binding tuple re-check; seam `TENANT_SCOPE_MISMATCH` |
+| Cross-**scope** replay | **NOT covered by `subject_digest`** (see Amendment 3) — `requested_scope` is bound by `request_digest` only; RA-5 binding tuple re-check and the seam's tenant/scope checks are the controls that apply |
 | Stale / expired recommendation replay | adapter validity-window re-check vs `now` (fail closed) |
 | Scope-injection via overloaded fields | `requested_scope` is minimal; topology dims live only in `subject_digest`, never in scope |
 | Action-type / capacity spoofing | bound into `subject_digest`; any change alters the digest |
