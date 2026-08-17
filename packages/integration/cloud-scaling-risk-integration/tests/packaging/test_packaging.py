@@ -144,6 +144,106 @@ def test_the_isolated_install_verifier_exists():
     assert verifier.read_text(encoding="utf-8").startswith("#!/usr/bin/env python3")
 
 
+# --- F-2: the offline guarantee must stay structurally enforced ------------------------
+#
+# The verifier's own negative controls prove the guarantee holds when it runs. These
+# static checks are the cheap regression guard for the flags themselves: a dropped
+# `--no-index` would otherwise turn "offline installation" back into "installation that
+# happened to find a cached wheel", and nothing would visibly fail.
+
+
+def _verifier_source() -> str:
+    return (ROOT / "scripts" / "verify_isolated_install.py").read_text(encoding="utf-8")
+
+
+def _verifier_command_tokens() -> set[str]:
+    """String literals appearing in the verifier's command/env lists and dicts.
+
+    Scanned from the **AST** rather than the raw text, so a docstring explaining why
+    ``--upgrade`` is not used does not read as the verifier using it. Only literals in
+    list/dict positions — where command arguments and environment values actually live —
+    are collected.
+    """
+
+    tree = ast.parse(_verifier_source())
+    tokens: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.List, ast.Tuple)):
+            for element in node.elts:
+                if isinstance(element, ast.Constant) and isinstance(element.value, str):
+                    tokens.add(element.value)
+        elif isinstance(node, ast.Dict):
+            for key, value in zip(node.keys, node.values):
+                for item in (key, value):
+                    if isinstance(item, ast.Constant) and isinstance(item.value, str):
+                        tokens.add(item.value)
+    return tokens
+
+
+def test_the_offline_install_disables_the_index_three_independent_ways():
+    tokens = _verifier_command_tokens()
+    source = _verifier_source()
+    assert "--no-index" in tokens, "the offline install no longer passes --no-index"
+    assert "PIP_NO_INDEX" in tokens, "PIP_NO_INDEX is no longer set"
+    assert "PIP_DISABLE_PIP_VERSION_CHECK" in tokens
+    assert "OFFLINE_SENTINEL_INDEX" in source
+
+
+def test_the_verifier_never_upgrades_pip():
+    """`pip install --upgrade pip` is a network fetch and would falsify "offline"."""
+
+    assert "--upgrade" not in _verifier_command_tokens(), (
+        "an --upgrade install reintroduces index access into the verifier"
+    )
+
+
+def test_the_verifier_uses_no_editable_install_and_no_real_index_url():
+    tokens = _verifier_command_tokens()
+    assert not {"-e", "--editable"} & tokens, (
+        "an editable install would put the monorepo source tree on sys.path"
+    )
+    for token in tokens:
+        for host in ("pypi.org", "files.pythonhosted.org"):
+            assert host not in token, f"a real package-index URL appears: {token}"
+
+
+def test_the_verifier_requires_every_distribution_before_going_offline():
+    source = _verifier_source()
+    assert "REQUIRED_DISTRIBUTIONS" in source
+    assert "refusing to enter the offline phase" in source, (
+        "the verifier must fail immediately on an incomplete wheelhouse"
+    )
+
+
+def test_the_verifier_reports_success_only_after_every_step():
+    source = _verifier_source()
+    assert "EXPECTED_STEPS" in source
+    assert "refusing to report success" in source, (
+        "VERIFIED must be unreachable unless every step recorded completion"
+    )
+
+
+def test_the_verifier_has_negative_controls():
+    source = _verifier_source()
+    assert "expect_offline_install_failure" in source
+    assert "NEGATIVE PROBE FAILED" in source
+
+
+def test_no_test_or_conftest_file_would_ship_in_the_wheel():
+    """Only the runtime package is packaged: tests and conftest stay out."""
+
+    metadata = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    find = metadata["tool"]["setuptools"]["packages"]["find"]
+    assert find["where"] == ["src"]
+    assert find["include"] == ["ugence_cloud_scaling_risk_integration*"]
+    # The tests and conftest live outside `src/`, so they cannot be collected.
+    assert (ROOT / "tests").exists() and not (ROOT / "src" / "tests").exists()
+    assert (ROOT / "conftest.py").exists()
+    assert not (PKG / "conftest.py").exists()
+    for path in PKG.rglob("*.py"):
+        assert not path.name.startswith("test_"), f"a test file lives inside src/: {path}"
+
+
 def test_every_public_name_is_importable_from_the_package_root():
     for name in ugence_cloud_scaling_risk_integration.__all__:
         assert hasattr(ugence_cloud_scaling_risk_integration, name), name

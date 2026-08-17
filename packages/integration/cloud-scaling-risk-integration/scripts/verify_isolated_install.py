@@ -32,11 +32,14 @@ Exit code 0 on success; non-zero on the first failed step.
 from __future__ import annotations
 
 import json
+import os
+import shutil
 import subprocess
 import sys
 import tempfile
 import venv
 from pathlib import Path
+from typing import Sequence
 
 PKG = Path(__file__).resolve().parents[1]
 REPO = PKG.parents[2]  # packages/integration/cloud-scaling-risk-integration -> repo
@@ -47,6 +50,25 @@ FIRST_PARTY = [
     REPO / "packages" / "capabilities" / "cloud-scaling-controller",
     PKG,
 ]
+
+# Every distribution that must be present in the wheelhouse before the offline phase
+# starts. Checked explicitly so an incomplete wheelhouse fails immediately with a clear
+# message, rather than failing obscurely mid-install (or, worse, being silently rescued
+# by an index because someone dropped a flag).
+REQUIRED_DISTRIBUTIONS = (
+    "ugence_cloud_scaling_risk_integration-",
+    "ugence_cloud_scaling_controller-",
+    "ugence_risk_authority-",
+    "numpy-",  # the controller's only third-party runtime dependency
+)
+
+# An unroutable sentinel used wherever an index URL must be supplied. If index resolution
+# were ever attempted despite --no-index, it fails loudly here instead of quietly
+# succeeding against the real PyPI.
+OFFLINE_SENTINEL_INDEX = "http://offline.invalid/simple"
+
+#: Number of steps that must complete before the verifier may report success.
+EXPECTED_STEPS = 8
 
 # The controller's Phase-3 test builders, copied into the clean environment so the probe
 # can construct a GENUINE recommendation there. Only the builders travel — the adapter
@@ -62,11 +84,30 @@ from datetime import timedelta
 
 EXPECTED = json.loads(sys.argv[1])
 
-# 1. The adapter must come from site-packages, not the repository checkout.
+# 1. Every package under test must come from site-packages, not the repo checkout.
 import ugence_cloud_scaling_risk_integration as adapter_pkg
-loc = pathlib.Path(adapter_pkg.__file__).resolve()
-assert "site-packages" in loc.parts, f"not installed from site-packages: {loc}"
+import ugence_cloud_scaling_controller as controller_pkg
+import risk_authority as ra_pkg
+
+for name, mod in (("adapter", adapter_pkg), ("controller", controller_pkg),
+                  ("risk_authority", ra_pkg)):
+    loc = pathlib.Path(mod.__file__).resolve()
+    assert "site-packages" in loc.parts, f"{name} not installed from site-packages: {loc}"
+    assert "symbolu" not in loc.parts, f"{name} resolved into the monorepo checkout: {loc}"
 assert adapter_pkg.__version__ == EXPECTED["version"], adapter_pkg.__version__
+
+# No monorepo path may be on sys.path at all.
+for entry in sys.path:
+    resolved = str(pathlib.Path(entry).resolve()) if entry else ""
+    assert "/symbolu/packages" not in resolved, f"monorepo source on sys.path: {entry}"
+
+# Tests and unrelated source files must not have been shipped inside the wheel.
+adapter_dir = pathlib.Path(adapter_pkg.__file__).resolve().parent
+shipped = sorted(p.name for p in adapter_dir.rglob("*") if p.is_file())
+for leaked in shipped:
+    assert not leaked.startswith("test_"), f"a test file shipped in the wheel: {leaked}"
+    assert leaked != "conftest.py", "conftest.py shipped in the wheel"
+assert "py.typed" in shipped, "py.typed missing from the installed package"
 
 from ugence_cloud_scaling_risk_integration import (
     AdapterOutcomeStatus, AdapterRejectionReason, CloudScalingRiskAdapter,
@@ -269,7 +310,90 @@ def source_expectations() -> dict:
     }
 
 
+def make_python(env_dir: Path) -> Path:
+    """Create a clean virtualenv and return its interpreter.
+
+    ``with_pip=True`` bootstraps pip from the local ``ensurepip`` bundle — no index
+    access — and pip is deliberately **not** upgraded afterwards, because
+    ``pip install --upgrade pip`` is itself a network fetch and would make the phrase
+    "offline installation" false.
+    """
+
+    venv.EnvBuilder(with_pip=True).create(env_dir)
+    python = env_dir / "bin" / "python"
+    if not python.exists():  # pragma: no cover - Windows layout
+        python = env_dir / "Scripts" / "python.exe"
+    return python
+
+
+def offline_install(
+    python: Path, wheelhouse: Path, requirement: str, *, extra_args: Sequence[str] = ()
+) -> subprocess.CompletedProcess:
+    """Install ``requirement`` with index access structurally disabled.
+
+    Three independent belts, so a single flag being dropped in a future edit cannot
+    silently restore network access:
+
+    * ``--no-index`` on the command line;
+    * ``PIP_NO_INDEX=1`` in the environment (covers anything pip re-invokes);
+    * ``PIP_INDEX_URL`` / ``PIP_EXTRA_INDEX_URL`` pointed at an unroutable sentinel, so
+      that if index resolution were somehow attempted it fails loudly rather than
+      quietly succeeding against PyPI.
+
+    ``PIP_DISABLE_PIP_VERSION_CHECK`` and ``PIP_NO_PYTHON_VERSION_WARNING`` suppress
+    pip's own opportunistic network chatter. No editable install is used anywhere: an
+    editable install would put the monorepo source tree on ``sys.path`` and defeat the
+    entire point of the exercise.
+    """
+
+    env = dict(os.environ)
+    env.update(
+        {
+            "PIP_NO_INDEX": "1",
+            "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+            "PIP_NO_PYTHON_VERSION_WARNING": "1",
+            "PIP_INDEX_URL": OFFLINE_SENTINEL_INDEX,
+            "PIP_EXTRA_INDEX_URL": OFFLINE_SENTINEL_INDEX,
+            # Never silently reuse a previously downloaded artifact: the wheelhouse must
+            # be the only source, or "offline" would just mean "warm cache".
+            "PIP_NO_CACHE_DIR": "1",
+        }
+    )
+    cmd = [
+        str(python), "-m", "pip", "install", "--quiet",
+        "--no-index",
+        "--no-cache-dir",
+        "--find-links", str(wheelhouse),
+        *extra_args,
+        requirement,
+    ]
+    print("$", " ".join(cmd), flush=True)
+    return subprocess.run(cmd, check=True, env=env)
+
+
+def expect_offline_install_failure(
+    python: Path, wheelhouse: Path, requirement: str, *, why: str
+) -> None:
+    """Assert that an offline install *fails*. A negative control for the positive path."""
+
+    try:
+        offline_install(python, wheelhouse, requirement)
+    except subprocess.CalledProcessError:
+        print(f"  [ok] install failed as required — {why}", flush=True)
+        return
+    raise SystemExit(
+        f"NEGATIVE PROBE FAILED: the install unexpectedly SUCCEEDED — {why}. "
+        "The offline guarantee is not being enforced."
+    )
+
+
 def main() -> int:
+    steps: list[str] = []
+
+    def done(step: str) -> None:
+        steps.append(step)
+        print(f"  [step complete] {step}", flush=True)
+
     expected = source_expectations()
     print("source expectations:")
     for key, value in expected.items():
@@ -279,27 +403,118 @@ def main() -> int:
         tmp_path = Path(tmp)
         wheelhouse = tmp_path / "wheelhouse"
         wheelhouse.mkdir()
-        env_dir = tmp_path / "env"
 
-        print("\n--- building first-party wheels ---", flush=True)
+        # === PHASE A — collection. Network access is legitimate HERE and only here. ===
+        # Every distribution the adapter needs, first- and third-party, is materialized
+        # into the local wheelhouse before the offline phase begins. Calling an install
+        # "offline" because a wheel happened to be cached would be false; the wheelhouse
+        # is built explicitly so the offline phase can be genuinely index-free.
+        print("\n=== PHASE A (online): build + collect every required wheel ===",
+              flush=True)
         for project in FIRST_PARTY:
             run([sys.executable, "-m", "build", "--wheel", "--outdir", str(wheelhouse),
                  str(project)])
+        done("first-party wheels built")
 
-        print("\n--- creating a clean virtualenv ---", flush=True)
-        venv.EnvBuilder(with_pip=True).create(env_dir)
-        python = env_dir / "bin" / "python"
-        if not python.exists():  # pragma: no cover - Windows layout
-            python = env_dir / "Scripts" / "python.exe"
+        # Resolve the full dependency closure, taking first-party from the wheelhouse and
+        # third-party (numpy, via the controller) from the index — into the wheelhouse.
+        run([
+            sys.executable, "-m", "pip", "download", "--quiet",
+            "--only-binary=:all:",
+            "--dest", str(wheelhouse),
+            "--find-links", str(wheelhouse),
+            "ugence-cloud-scaling-risk-integration",
+        ])
+        collected = sorted(p.name for p in wheelhouse.glob("*.whl"))
+        print(f"  wheelhouse now holds {len(collected)} wheel(s):", flush=True)
+        for name in collected:
+            print(f"    - {name}", flush=True)
+        for required in REQUIRED_DISTRIBUTIONS:
+            if not any(name.startswith(required) for name in collected):
+                raise SystemExit(
+                    f"required distribution {required!r} is absent from the wheelhouse; "
+                    "refusing to enter the offline phase with an incomplete wheelhouse"
+                )
+        done("dependency closure collected into the wheelhouse")
 
-        print("\n--- installing the adapter from the wheelhouse ---", flush=True)
-        run([str(python), "-m", "pip", "install", "--quiet", "--upgrade", "pip"])
-        run([str(python), "-m", "pip", "install", "--quiet",
-             "--find-links", str(wheelhouse),
-             "ugence-cloud-scaling-risk-integration"])
+        # === PHASE B — genuinely offline installation. No index, no cache, no source. ===
+        print("\n=== PHASE B (offline): install with the index structurally disabled ===",
+              flush=True)
+        env_dir = tmp_path / "env"
+        python = make_python(env_dir)
+        done("clean virtualenv created (pip from local ensurepip, never upgraded)")
 
+        offline_install(python, wheelhouse, "ugence-cloud-scaling-risk-integration")
+        done("adapter installed offline from the local wheelhouse only")
+
+        # === PHASE C — negative controls. An "offline" claim nobody tested is a guess. ===
+        print("\n=== PHASE C: negative controls on the offline guarantee ===", flush=True)
+
+        # (1) Remove a required wheel: the install MUST fail rather than reach the index.
+        crippled = tmp_path / "crippled-wheelhouse"
+        crippled.mkdir()
+        removed = None
+        for wheel in wheelhouse.glob("*.whl"):
+            if wheel.name.startswith("ugence_risk_authority-"):
+                removed = wheel.name
+                continue
+            shutil.copy2(wheel, crippled / wheel.name)
+        if removed is None:
+            raise SystemExit("could not identify the risk-authority wheel to remove")
+        print(f"  removed {removed} from a copy of the wheelhouse", flush=True)
+        crippled_env = make_python(tmp_path / "env-crippled")
+        expect_offline_install_failure(
+            crippled_env, crippled, "ugence-cloud-scaling-risk-integration",
+            why="a required wheel was absent from the wheelhouse",
+        )
+        done("negative control: missing wheel causes failure, not an index fetch")
+
+        # (2) A bogus remote index cannot rescue that install — proving the failure above
+        #     is a real absence and not merely a misconfigured URL.
+        bogus_env = make_python(tmp_path / "env-bogus")
+        try:
+            subprocess.run(
+                [
+                    str(bogus_env), "-m", "pip", "install", "--quiet",
+                    "--no-cache-dir",
+                    "--index-url", OFFLINE_SENTINEL_INDEX,
+                    "--find-links", str(crippled),
+                    "ugence-cloud-scaling-risk-integration",
+                ],
+                check=True,
+                env={**os.environ, "PIP_NO_CACHE_DIR": "1",
+                     "PIP_DISABLE_PIP_VERSION_CHECK": "1"},
+                timeout=300,
+            )
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+            print("  [ok] a bogus index could not supply the missing distribution",
+                  flush=True)
+        else:
+            raise SystemExit(
+                "NEGATIVE PROBE FAILED: the install succeeded against a bogus index — "
+                "something other than the wheelhouse supplied the distribution"
+            )
+        done("negative control: a bogus index cannot rescue an incomplete wheelhouse")
+
+        # (3) The crippled environment must NOT have the adapter importable.
+        probe = subprocess.run(
+            [str(crippled_env), "-c", "import ugence_cloud_scaling_risk_integration"],
+            capture_output=True,
+        )
+        if probe.returncode == 0:
+            raise SystemExit(
+                "NEGATIVE PROBE FAILED: the adapter is importable in an environment "
+                "whose installation failed — a failed install left a usable package"
+            )
+        print("  [ok] the failed installation left nothing importable", flush=True)
+        done("negative control: a failed install cannot yield a working package")
+
+        # === PHASE D — behavior probes inside the isolated environment. ===
+        print("\n=== PHASE D: behavior probes in the isolated environment ===", flush=True)
         # The controller's Phase-3 builders are test-only and are not shipped in any
         # wheel; copy just that module so the probe can build a genuine recommendation.
+        # It imports nothing from the monorepo itself — the probe asserts that every
+        # package it uses resolves to site-packages.
         probe_dir = tmp_path / "probe"
         probe_dir.mkdir()
         (probe_dir / "ph_helpers.py").write_text(
@@ -308,12 +523,25 @@ def main() -> int:
         probe_file = probe_dir / "probe.py"
         probe_file.write_text(_PROBE, encoding="utf-8")
 
-        print("\n--- running the isolated behavior probe ---", flush=True)
-        # cwd is the probe directory and NOT the repository, so nothing can be imported
-        # from the monorepo checkout.
-        run([str(python), str(probe_file), json.dumps(expected)], cwd=str(probe_dir))
+        # cwd is the probe directory and NOT the repository, and PYTHONPATH is cleared,
+        # so nothing can be imported from the monorepo checkout.
+        probe_env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+        run([str(python), str(probe_file), json.dumps(expected)],
+            cwd=str(probe_dir), env=probe_env)
+        done("import, public-API, digest and non-execution probes passed")
 
-    print("\nISOLATED PHASE 4C ADAPTER DISTRIBUTION VERIFIED")
+    # VERIFIED is printed only after EVERY step above recorded completion. Any failed
+    # subprocess raises CalledProcessError (check=True) and never reaches this line, so
+    # a non-zero exit is the only possible outcome of a partial run.
+    if len(steps) != EXPECTED_STEPS:
+        raise SystemExit(
+            f"refusing to report success: {len(steps)} of {EXPECTED_STEPS} steps "
+            f"completed ({steps})"
+        )
+    print(f"\nall {EXPECTED_STEPS} verification steps completed:", flush=True)
+    for step in steps:
+        print(f"  - {step}")
+    print("\nISOLATED PHASE 4C ADAPTER DISTRIBUTION VERIFIED (genuinely offline)")
     return 0
 
 

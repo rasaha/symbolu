@@ -50,8 +50,9 @@ claims, and conflating them would overstate the guarantee.
 
 For a **canonical serialized recommendation**, the adapter:
 
-1. accepts only the canonical controller type or its canonical serialized form — a
-   duck-typed look-alike is refused at the type boundary;
+1. accepts only the **exact** canonical controller type or its canonical serialized form
+   — a duck-typed look-alike *and a subclass* are refused at the type boundary, before
+   anything on the object is invoked (see "Exact-type admission" below);
 2. reconstructs it through the controller's own strict `from_dict`, which rejects unknown
    and missing fields and re-runs the full `__post_init__` revalidation (digest
    rebinding, candidate-set equality, score/feasibility/cost recomputation, temporal
@@ -68,6 +69,24 @@ content was altered while `evidence_digest` was left stale reconstructs cleanly 
 then rejected here. This is **not** the vacuous self-referential check
 (`rec.digest() == rec.digest()`), which would prove nothing and which this package
 explicitly refuses to perform.
+
+### Exact-type admission
+
+Admission is `type(source) is CapacityActionRecommendation`, **not** `isinstance`. Every
+value the adapter reads — `digest()`, `to_canonical_dict()`, `_digest_payload()`, the
+embedded objects' serializers — is reached through dynamic dispatch, so a subclass
+overriding any one of them controls what gets "recomputed". Recomputing with the unbound
+base method is *not* a sufficient fix: `CapacityActionRecommendation.digest(source)`
+still calls `self._digest_payload()` → `self.to_canonical_dict()`, so an override further
+down the chain is reached anyway and silently produces a digest over attacker-supplied
+content. The guard therefore runs **before any attribute of the object is touched**;
+only `type()` and `isinstance()` are consulted.
+
+A caller holding a legitimate subclass is not locked out: serialize it and submit the
+canonical document, which reconstructs an exact base instance and re-digests from
+content. (Note that the *document* produced by a hostile subclass is untrusted too — its
+`evidence_digest` is filled via `self.digest()` — but the serialized path recomputes from
+content and rejects the mismatch, which is the correct outcome.)
 
 For a **live in-process object** there is no carried digest — `evidence_digest` is
 excluded from the dataclass and computed on demand — and the object has already passed
@@ -245,9 +264,17 @@ python -m pytest packages/integration/cloud-scaling-risk-integration/tests -q
 # Build
 python -m build packages/integration/cloud-scaling-risk-integration
 
-# Offline isolated-install verification (source-vs-installed digest equality)
+# Genuinely offline isolated-install verification (source-vs-installed digest equality)
 python packages/integration/cloud-scaling-risk-integration/scripts/verify_isolated_install.py
 ```
+
+The verifier collects the **full** dependency closure (first-party wheels plus numpy)
+into a local wheelhouse first, then installs from that wheelhouse with the index
+structurally disabled — `--no-index`, `PIP_NO_INDEX=1`, an unroutable sentinel index, no
+cache, no pip upgrade, no editable install. It then proves the guarantee by negative
+control: a missing wheel fails the install, a bogus index cannot rescue it, and a failed
+install leaves nothing importable. `VERIFIED` is printed only after all eight steps
+record completion, and any failed subprocess exits non-zero.
 
 The suite includes **gate-removal probes** (`tests/test_gate_removal_probes.py`): each
 disables one security gate and asserts the corresponding attack *now succeeds*. A probe

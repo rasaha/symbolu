@@ -17,8 +17,9 @@ What Phase 4C establishes here
 This module establishes the *Cloud Scaling recommendation boundary* that Phase 4A/4B
 deliberately left open. For a serialized recommendation it:
 
-1. accepts **only** the canonical controller type or its canonical serialized form —
-   a duck-typed look-alike is refused at the type boundary;
+1. accepts **only** the **exact** canonical controller type or its canonical serialized
+   form — a duck-typed look-alike *and a subclass* are both refused at the type
+   boundary, before anything on the object is invoked (see "Exact-type admission");
 2. reconstructs the serialized form through the controller's own strict
    ``CapacityActionRecommendation.from_dict``, which rejects unknown and missing fields
    and re-runs the full ``__post_init__`` revalidation (digest rebinding, candidate-set
@@ -34,6 +35,26 @@ derived purely from the record's *content*, while the compared value comes purel
 the *input document*. A payload whose content was altered while ``evidence_digest`` was
 left stale reconstructs successfully and then fails here. This is not the forbidden
 self-referential check (``rec.digest() == rec.digest()``), which would prove nothing.
+
+Exact-type admission
+--------------------
+Admission is by ``type(source) is CapacityActionRecommendation``, **not** by
+``isinstance``. This is load-bearing rather than pedantic: every value the adapter would
+go on to read — ``digest()``, ``to_canonical_dict()``, ``_digest_payload()``, the
+embedded objects' own serializers — is reached through dynamic dispatch, so a subclass
+overriding any one of them controls what gets "recomputed". A subclass overriding
+``digest()`` to return an attacker-chosen value would have its value adopted as the
+authenticated ``recommendation_digest``.
+
+Calling the base method unbound (``CapacityActionRecommendation.digest(source)``) does
+**not** fix this: that method still calls ``self.to_canonical_dict()`` and
+``self._digest_payload()``, so an override further down the chain is reached anyway.
+Exact-type admission is the only correction that holds, and it runs **before any
+attribute of ``source`` is touched** — only ``type()`` and ``isinstance()`` are consulted.
+
+A caller holding a legitimate subclass is not locked out: serializing it and submitting
+the canonical document reconstructs an exact base instance whose digest is recomputed
+from content.
 
 The in-process object path
 --------------------------
@@ -161,9 +182,13 @@ class AuthenticatedRecommendation:
 
     def __post_init__(self) -> None:
         _assert_no_authority(self)
-        if not isinstance(self.recommendation, CapacityActionRecommendation):
-            raise RecommendationInputError(
-                "recommendation must be a CapacityActionRecommendation"
+        # Exact type, not isinstance: this record is the token the projection trusts,
+        # so a subclass must not be representable inside it even if some future caller
+        # constructed one directly rather than through the admission path above.
+        if type(self.recommendation) is not CapacityActionRecommendation:
+            raise UnsupportedRecommendationSourceError(
+                "recommendation must be exactly a CapacityActionRecommendation, not a "
+                f"subclass ({type(self.recommendation).__name__})"
             )
         _require_digest_syntax("recommendation_digest", self.recommendation_digest)
 
@@ -192,8 +217,11 @@ class AuthenticatedAbstention:
 
     def __post_init__(self) -> None:
         _assert_no_authority(self)
-        if not isinstance(self.abstention, RecommendationAbstention):
-            raise RecommendationInputError("abstention must be a RecommendationAbstention")
+        if type(self.abstention) is not RecommendationAbstention:
+            raise UnsupportedRecommendationSourceError(
+                "abstention must be exactly a RecommendationAbstention, not a subclass "
+                f"({type(self.abstention).__name__})"
+            )
         if self.abstention_digest is not None:
             _require_digest_syntax("abstention_digest", self.abstention_digest)
 
@@ -272,6 +300,53 @@ def _reconcile(
     return expectations[0][0]
 
 
+_CONTROLLER_TYPES = (CapacityActionRecommendation, RecommendationAbstention)
+
+
+def _reject_subclass(source: Any) -> None:
+    """Refuse a *subclass* of a controller artifact, without touching the object.
+
+    Admission is by **exact type**, not by ``isinstance``. A subclass is refused because
+    every value the adapter would go on to read — the digest, the canonical dict, the
+    digest payload, the subject, the selected plan — is reached through dynamic dispatch
+    and can therefore be overridden. Admitting the subclass and then calling
+    ``CapacityActionRecommendation.digest(source)`` unbound is **not** sufficient: that
+    base method still calls ``self.to_canonical_dict()``, ``self._digest_payload()`` and
+    the embedded objects' own serializers, so an override anywhere in that chain would be
+    reached anyway and the recomputation would no longer be derived from canonical
+    content.
+
+    Nothing on ``source`` is invoked here — not a method, not a property, not a
+    serializer. Only ``type()`` and ``isinstance()`` are consulted, and even a hostile
+    ``__instancecheck__`` on the object's metaclass can only steer the object toward the
+    unsupported-source rejection below, never toward admission.
+
+    A caller holding a legitimate subclass may still use the adapter: serialize it and
+    submit the canonical document, which is reconstructed into an exact base instance
+    whose digest is recomputed from content.
+    """
+
+    if isinstance(source, _CONTROLLER_TYPES):
+        raise UnsupportedRecommendationSourceError(
+            f"{type(source).__name__} is a SUBCLASS of a canonical controller artifact; "
+            "admission requires the exact canonical type. A subclass may override "
+            "digest(), to_canonical_dict() or any serialization helper reached by "
+            "dynamic dispatch, so its digest would not be derived from canonical "
+            "content. Submit the canonical serialized document instead — it is "
+            "reconstructed into an exact base instance and re-digested from content."
+        )
+
+
+def _require_exact_reconstruction(value: Any, expected: type) -> None:
+    """Require strict reconstruction to have produced the exact canonical base type."""
+
+    if type(value) is not expected:  # pragma: no cover - from_dict constructs via cls()
+        raise UnsupportedRecommendationSourceError(
+            f"strict reconstruction produced {type(value).__name__}, not the exact "
+            f"canonical {expected.__name__}"
+        )
+
+
 def _carried_digest(document: Mapping[str, Any]) -> Optional[str]:
     value = document.get(CARRIED_DIGEST_FIELD)
     return value if value is not None else None
@@ -308,8 +383,23 @@ def authenticate_controller_output(
             "expected_recommendation_digest", expected_recommendation_digest
         )
 
+    # --- admission by EXACT type, before ``source`` is touched at all -----------------
+    # This is the first thing that happens to an in-process object: no method, property,
+    # serializer or digest function is called on it until its exact type is established.
+    # ``isinstance`` is deliberately NOT the rule here — see ``_reject_subclass`` for why
+    # a subclass must be refused rather than admitted through the base contract.
+    source_type = type(source)
+
+    if source_type is not CapacityActionRecommendation and (
+        source_type is not RecommendationAbstention
+    ):
+        # Refuse a subclass BEFORE any other branch, so a subclass that also implements
+        # ``Mapping`` cannot divert itself into the serialized path and have its own
+        # ``get``/``keys`` consulted.
+        _reject_subclass(source)
+
     # --- live controller artifacts -------------------------------------------------
-    if isinstance(source, CapacityActionRecommendation):
+    if source_type is CapacityActionRecommendation:
         # No carried digest exists on an in-process object, so the caller's independent
         # expectation is the only thing that can make this check load-bearing.
         expectation_source = _reconcile(
@@ -324,7 +414,7 @@ def authenticate_controller_output(
             expectation_source=expectation_source,
         )
 
-    if isinstance(source, RecommendationAbstention):
+    if source_type is RecommendationAbstention:
         # An abstention is never projected, so an expectation is optional here; when one
         # is supplied it is still checked, and a mismatch still fails closed.
         object_abstention_source = None
@@ -369,6 +459,10 @@ def authenticate_controller_output(
             raise RecommendationInputError(
                 f"canonical recommendation failed strict reconstruction: {exc}"
             ) from exc
+        # ``from_dict`` is invoked on the base class and constructs via ``cls(...)``, so
+        # it yields the exact base type. Asserted rather than assumed: the whole point of
+        # the serialized path is that what gets digested is an exact canonical instance.
+        _require_exact_reconstruction(recommendation, CapacityActionRecommendation)
         recomputed = recommendation.digest()
         expectation_source = _reconcile(
             recomputed,
@@ -389,6 +483,7 @@ def authenticate_controller_output(
             raise RecommendationInputError(
                 f"canonical abstention failed strict reconstruction: {exc}"
             ) from exc
+        _require_exact_reconstruction(abstention, RecommendationAbstention)
         recomputed = abstention.digest()
         abstention_source = None
         if carried is not None or expected_recommendation_digest is not None:
