@@ -57,8 +57,11 @@ __all__ = [
     "validate_subject_binding",
     "SubjectRiskDecision",
     "PolicyResolverPort",
+    "SubjectAwarePolicyResolverPort",
+    "is_subject_aware_policy_resolver",
     "TrustedControlEvidenceResolverPort",
     "ReferencePolicyResolver",
+    "ReferenceSubjectAwarePolicyResolver",
     "ReferenceControlEvidenceResolver",
     "SeamContractError",
 ]
@@ -76,26 +79,27 @@ SUBJECT_CONTEXT_SCHEMA_VERSION = "risk-subject-context-1"
 SUBJECT_BINDING_SCHEMA_VERSION = "risk-subject-binding-1"
 EVALUATION_REQUEST_SCHEMA_VERSION_V2 = "risk-subject-evaluation-request-2"
 
-# The seam's accepted request set is DELIBERATELY unchanged in Phase 4A: this PR ships
-# contracts and pure validation only, and nothing wires ``validate_subject_binding``
-# into ``RiskEvaluationSeam``. Widening this set before that wiring exists would let a
-# v2 request reach policy resolution without its binding ever being reconciled.
+# The seam's accepted request set, widened in Phase 4B to admit v2 — but ONLY in the
+# same atomic change that wired ``validate_subject_binding`` ahead of policy resolution.
+# Widening it before that wiring existed would have let a v2 request reach policy
+# resolution with its binding never reconciled, which is exactly why Phase 4A left it
+# alone.
 #
-# Two DISTINCT fail-closed behaviors result — do not conflate them:
+# This declaration is the UNION of the schemas the seam admits. It is deliberately NOT
+# the admission rule on its own: the seam gates on the **(request class, schema tag)
+# pair**, so each canonical request class accepts only its own tag —
+# ``SubjectRiskEvaluationRequest`` only ``…-request-1`` and
+# ``SubjectRiskEvaluationRequestV2`` only ``…-request-2``. Membership in this set alone
+# never admits a request. That pairing is what stops a **v1-class object carrying the v2
+# tag** from masquerading as a genuine v2 request now that the v2 tag is a supported
+# value: it is a v1-class object, so its supported set is ``{…-request-1}`` and it fails
+# closed through the established typed ``NOT_EVALUATED(UNSUPPORTED_SCHEMA_VERSION)`` path.
 #
-#   * a genuine :class:`SubjectRiskEvaluationRequestV2` object is rejected by the seam's
-#     **v1 type boundary** (``RiskEvaluationSeam.evaluate`` opens with an ``isinstance``
-#     guard) and raises ``SeamConfigurationError``. Because v2 is a successor class and
-#     not a subclass, this fires *before* the schema gate, before the clock is read and
-#     before any digest is computed. This is the stronger containment and is preserved
-#     deliberately — it is NOT weakened to match prose.
-#   * a **v1-class** object carrying an unsupported ``schema_version`` string reaches the
-#     membership gate below and returns the typed
-#     ``NOT_EVALUATED(UNSUPPORTED_SCHEMA_VERSION)`` non-decision.
-#
-# Widening is a Phase 4B step, and only after the validator is wired in (see the recorded
-# Phase 4B ordering in the section banner further down).
-SUPPORTED_REQUEST_SCHEMA_VERSIONS = frozenset({EVALUATION_REQUEST_SCHEMA_VERSION})
+# Unknown/future tags on either class continue to fail closed the same typed way.
+SUPPORTED_REQUEST_SCHEMA_VERSIONS = frozenset({
+    EVALUATION_REQUEST_SCHEMA_VERSION,
+    EVALUATION_REQUEST_SCHEMA_VERSION_V2,
+})
 
 _TS_FMT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
@@ -137,6 +141,14 @@ class SubjectRiskNonDecisionReason(str, Enum):
 
     UNSUPPORTED_SCHEMA_VERSION = "unsupported_schema_version"
     INVALID_SUBJECT = "invalid_subject"
+    # Phase 4B, owner-ratified. ADR §10/§12 require a caller-supplied ``evaluation_time``
+    # on a TRUSTED PRODUCTION v2 path to fail closed as a typed non-decision — never
+    # silently ignored, never authoritative. No pre-existing member described that case:
+    # the subject is not invalid and the schema is supported, so reusing INVALID_SUBJECT
+    # or UNSUPPORTED_SCHEMA_VERSION would have misattributed the rejection in the audit
+    # record. This member names exactly the condition it reports. Reference/test mode is
+    # untouched — it remains the only place an explicit clock may be supplied (ADR §10).
+    CALLER_SUPPLIED_EVALUATION_TIME = "caller_supplied_evaluation_time"
     EXPIRED_SUBJECT = "expired_subject"
     NO_AUTHORITATIVE_POLICY = "no_authoritative_policy"
     AMBIGUOUS_POLICY = "ambiguous_policy"
@@ -516,6 +528,84 @@ class PolicyResolverPort(Protocol):
 
 
 @runtime_checkable
+class SubjectAwarePolicyResolverPort(Protocol):
+    """Trusted policy resolution that **explicitly** consumes validated neutral subject context.
+
+    An **additive successor boundary** to :class:`PolicyResolverPort` (Phase 4B), not a
+    widening of it. Two rules follow, and both are load-bearing:
+
+    * a v1 request is resolved through ``PolicyResolverPort.resolve(...)`` exactly as
+      before — this protocol is never consulted for v1, so every existing resolver keeps
+      working untouched;
+    * a v2 request is resolved **only** through :meth:`resolve_with_subject_context`. If
+      the composed resolver does not implement this protocol the seam fails closed; it
+      never falls back to the v1 method.
+
+    **Why a successor method rather than an added keyword.** ADR §5.6/§16 left the shape
+    open ("an added keyword ``subject_context`` … or a ``resolve`` successor"). An added
+    keyword is unsafe in exactly the case that matters: an existing resolver whose
+    ``resolve`` accepts ``**kwargs`` (or which is later given the keyword and ignores it)
+    would silently accept a v2 request and route policy while **dropping the subject
+    context entirely** — the caller would believe scaling facts governed the decision when
+    they never reached the policy. A distinct method name makes support a matter of
+    *structural presence*: a legacy resolver does not define
+    ``resolve_with_subject_context``, so ``isinstance`` against this runtime-checkable
+    protocol is ``False`` and the request fails closed. Support is declared, never
+    inferred — the seam performs **no** signature introspection and accepts **no**
+    permissive ``**kwargs`` fallback.
+
+    Implementations additionally declare ``is_subject_context_aware = True``. The explicit
+    flag and the method are checked **together**, mirroring the repository's existing
+    ``is_production_authoritative`` convention: presence of a similarly-named method alone
+    never confers v2 capability, and the declaration alone never does either.
+
+    The resolver receives only **validated** neutral facts: the ``subject_context`` handed
+    over is the object :func:`validate_subject_binding` re-validated and whose digest it
+    reconciled against the request's carried binding. It is called strictly *after* that
+    reconciliation succeeds, so a resolver can never observe an unvalidated context.
+    Outer authoritative identity (``subject_id``), requested scope, trusted evidence,
+    policy and the risk decision remain separate concerns and are **not** merged into the
+    context: ``tenant_id`` and the evidence references are passed as their own arguments
+    exactly as v1 passes them, and ``subject_id`` is deliberately not passed at all.
+
+    A production resolver sets ``is_production_authoritative = True``; the production
+    factory refuses a reference-grade one exactly as it does for v1."""
+
+    is_production_authoritative: bool
+    is_subject_context_aware: bool
+
+    def resolve_with_subject_context(
+        self,
+        *,
+        tenant_id: str,
+        purpose: str,
+        domain: str,
+        risk_class: Optional[RiskClass],
+        requested_scope: Scope,
+        subject_context: "SubjectContext",
+        evidence_references: tuple[str, ...],
+        now: datetime,
+    ) -> Optional[WorkflowIR]: ...
+
+
+def is_subject_aware_policy_resolver(resolver: Any) -> bool:
+    """Whether ``resolver`` may resolve policy for a v2 request (fail closed if not).
+
+    Requires **both** the declared ``is_subject_context_aware = True`` capability flag and
+    structural conformance to :class:`SubjectAwarePolicyResolverPort` (i.e. the
+    ``resolve_with_subject_context`` method actually exists). Neither alone is enough.
+
+    This is a presence check, not introspection: it never inspects a signature, never
+    probes for ``**kwargs``, and never calls the resolver to find out. A v1-only resolver
+    fails it and a v2 request against such a seam fails closed."""
+
+    return (
+        getattr(resolver, "is_subject_context_aware", False) is True
+        and isinstance(resolver, SubjectAwarePolicyResolverPort)
+    )
+
+
+@runtime_checkable
 class TrustedControlEvidenceResolverPort(Protocol):
     """Trusted resolution of evidence *references* to admittable control-evidence records.
 
@@ -551,6 +641,35 @@ class ReferencePolicyResolver:
     is_production_authoritative: bool = field(default=False, init=False)
 
     def resolve(self, *, tenant_id, purpose, domain, risk_class, requested_scope, now):
+        return self.by_purpose_domain.get((purpose, domain))
+
+
+@dataclass(frozen=True)
+class ReferenceSubjectAwarePolicyResolver:
+    """Reference-only **subject-aware** policy resolver (Phase 4B).
+
+    **Conformance/testing only — never production-authoritative**, exactly like
+    :class:`ReferencePolicyResolver`, and refused by ``RiskEvaluationSeam.production``
+    by the same ``is_production_authoritative`` guard. It exists so the v2 path has a
+    visibly non-authoritative reference implementation to conform against; it must never
+    appear in a production composition root.
+
+    It resolves on ``(purpose, domain)`` like the v1 reference resolver and additionally
+    exposes the received context through ``last_subject_context`` so a conformance test
+    can assert the neutral facts genuinely arrived. It routes on ``(purpose, domain)``
+    only — deliberately not on the context — because a reference component must not model
+    domain policy."""
+
+    by_purpose_domain: Mapping[tuple[str, str], WorkflowIR]
+    is_production_authoritative: bool = field(default=False, init=False)
+    is_subject_context_aware: bool = field(default=True, init=False)
+    # A mutable observation slot on a frozen dataclass: conformance-only, never authority.
+    last_subject_context: list = field(default_factory=list, init=False, compare=False)
+
+    def resolve_with_subject_context(self, *, tenant_id, purpose, domain, risk_class,
+                                     requested_scope, subject_context, evidence_references,
+                                     now):
+        self.last_subject_context.append(subject_context)
         return self.by_purpose_domain.get((purpose, domain))
 
 
@@ -599,33 +718,35 @@ class ReferenceControlEvidenceResolver:
 # trusted control result, or a risk decision — the field sets are closed and exclude
 # them structurally. ``SubjectBindingValidation`` is an integrity finding, not a grant.
 #
-# **Recorded Phase 4B / adapter ordering (load-bearing, NOT implemented here).**
+# **Ordering (load-bearing). Which steps exist where, as of Phase 4B.**
 # Source authenticity is established outside this module, in this exact order:
 #
-#   1. reconstruct the real ``CapacityActionRecommendation``;
-#   2. independently recompute ``rec.digest()``;
-#   3. require equality with the outer ``recommendation_digest``;
-#   4. run :func:`validate_subject_binding`;
-#   5. perform trusted evidence (RA-5) and tenant/scope checks;
-#   6. only then permit policy resolution;
-#   7. only after all of the above widen ``SUPPORTED_REQUEST_SCHEMA_VERSIONS``.
+#   1. reconstruct the real ``CapacityActionRecommendation``;      <- adapter, NOT BUILT
+#   2. independently recompute ``rec.digest()``;                   <- adapter, NOT BUILT
+#   3. require equality with the outer ``recommendation_digest``;  <- adapter, NOT BUILT
+#   4. run :func:`validate_subject_binding`;                       <- Phase 4A (here)
+#   5. subject-aware policy resolution over the validated context; <- Phase 4B (seam)
+#   6. trusted evidence (RA-5) + the existing RA evaluation path;  <- Phase 4B (seam)
+#   7. ``SUPPORTED_REQUEST_SCHEMA_VERSIONS`` widened to admit v2.  <- Phase 4B (above)
 #
-# Phase 4A implements step 4 only. No placeholder authenticator and no permissive
-# resolver is added here — an absent check must stay visibly absent.
+# Phase 4B wires steps 4-7 into ``RiskEvaluationSeam`` in one atomic change, in that
+# order. **Steps 1-3 remain absent**: no placeholder authenticator and no permissive
+# resolver is added here or in the seam — an absent check must stay visibly absent, so
+# admitting v2 still does NOT establish that a recommendation is authentic (see the
+# integrity-vs-authenticity note on :func:`validate_subject_binding`).
 #
-# **Recorded Phase 4B requirement — evaluation-time authority (ADR §10, F6).**
-# This PR deliberately changes NO evaluation-seam behavior, so caller time does not
-# become authoritative here and the deliberately-separate reference/test seam keeps
-# working. The requirement is recorded, not implemented:
+# **Evaluation-time authority (ADR §10/§12, F6) — IMPLEMENTED in Phase 4B, at the seam.**
 #
-#     A trusted PRODUCTION v2 evaluation MUST REJECT (fail closed, NOT_EVALUATED) a
-#     caller-supplied ``evaluation_time``. It must never be silently ignored. Trusted
-#     production time comes ONLY from Risk Authority's injected clock. Reference/test
-#     mode remains the ONLY place an explicit clock may be supplied.
+#     A trusted PRODUCTION v2 evaluation REJECTS (fail closed,
+#     ``NOT_EVALUATED(CALLER_SUPPLIED_EVALUATION_TIME)``) a caller-supplied
+#     ``evaluation_time``. It is never silently ignored. Trusted production time comes
+#     ONLY from Risk Authority's injected clock. Reference/test mode remains the ONLY
+#     place an explicit clock may be supplied.
 #
-# That rejection belongs to the evaluation seam, not to this data contract: enforcing
-# it here would also break the reference seam, which legitimately injects time. The
-# ``evaluation_time`` field below is therefore validated for *shape* only.
+# That rejection lives in the evaluation seam, not in this data contract: enforcing it
+# here would also break the reference seam, which legitimately injects time, and would
+# make the v1 contract's own ``evaluation_time`` unusable. The ``evaluation_time`` field
+# below is therefore still validated for *shape* only — the seam owns the authority rule.
 # ---------------------------------------------------------------------------
 
 
@@ -970,10 +1091,11 @@ class SubjectRiskEvaluationRequestV2:
             if not isinstance(seq, tuple) or any(not isinstance(x, str) or x == "" for x in seq):
                 raise SeamContractError(f"{name} must be a tuple of non-empty strings")
         if self.evaluation_time is not None:
-            # NOTE (Phase 4B): a *shape* check only. Whether a caller-supplied
-            # evaluation_time is permitted at all belongs to the evaluation seam, which
-            # this PR leaves unchanged — see the recorded Phase 4B requirement in the
-            # section banner above.
+            # A *shape* check only, deliberately. Whether a caller-supplied
+            # evaluation_time is permitted at all is an authority question owned by the
+            # evaluation seam: as of Phase 4B the trusted PRODUCTION v2 path rejects it
+            # fail-closed, while the labelled reference seam still legitimately injects
+            # time (ADR §10). Enforcing it here would collapse that distinction.
             _require_utc("evaluation_time", self.evaluation_time)
         if self.subject_context is not None and not isinstance(self.subject_context, SubjectContext):
             raise SeamContractError("subject_context must be a SubjectContext or None")
@@ -1075,6 +1197,13 @@ class SubjectBindingValidation:
     context_digest: str
     subject_digest: str
     binding: SubjectBinding
+    # The re-validated context whose digest was reconciled above (Phase 4B, additive and
+    # optional so the Phase 4A construction signature keeps working unchanged). The seam
+    # hands exactly THIS object to a subject-aware resolver rather than the raw
+    # caller-supplied one, so the resolver can only ever observe validated facts. When
+    # present it is bound to ``context_digest`` at construction, so a validation result
+    # cannot carry a context that disagrees with the digest it claims to have reconciled.
+    context: Optional[SubjectContext] = None
     # Fixed non-authority invariants — validating a binding is not an evaluation.
     policy_resolved: bool = False
     risk_evaluated: bool = False
@@ -1095,6 +1224,13 @@ class SubjectBindingValidation:
                 )
         if not isinstance(self.binding, SubjectBinding):
             raise SeamContractError("binding must be a SubjectBinding")
+        if self.context is not None:
+            if not isinstance(self.context, SubjectContext):
+                raise SeamContractError("context must be a SubjectContext or None")
+            if self.context.digest() != self.context_digest:
+                raise SeamContractError(
+                    "context must be the context context_digest was computed from"
+                )
 
 
 def validate_subject_binding(
@@ -1137,9 +1273,14 @@ def validate_subject_binding(
     replay prevention against a caller capable of recomputing every digest.
 
     This function performs **no** policy resolution, risk evaluation, authority issuance,
-    ActionGate call, credential handling or execution, and it is not wired into
-    :class:`~risk_authority.api.evaluation_seam.RiskEvaluationSeam` by Phase 4A. It reads
-    only its argument — no clock, no I/O, no ambient state — so it is a pure function.
+    ActionGate call, credential handling or execution. It reads only its argument — no
+    clock, no I/O, no ambient state — so it is a pure function.
+
+    Phase 4B wires it into :class:`~risk_authority.api.evaluation_seam.RiskEvaluationSeam`
+    as the gate every v2 request must clear **before** any policy resolver, evidence
+    resolver or clock-dependent evaluation runs. Being called by the seam does not
+    strengthen what it proves: the guarantee below is unchanged, so admitting a v2 request
+    still establishes integrity, never authenticity.
 
     :raises SubjectBindingError: the request is not a reconcilable v2 request, the binding
         could not be reconstructed from the outer fields, or the reconstructed
@@ -1208,4 +1349,6 @@ def validate_subject_binding(
         context_digest=context_digest,
         subject_digest=subject_digest,
         binding=binding,
+        # The re-validated context from step 1 — never the raw caller-supplied object.
+        context=validated_context,
     )
