@@ -1,0 +1,64 @@
+# Independent distribution for the Ugence Trusted Evidence Authority (TEV-1).
+#
+# The platform Trust Assurance role's contract package, ratified in
+# docs/architecture/ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md
+# (E-1, E-2, §6.2) and implementing milestone TEV-1 of §30: canonical evidence
+# identity and coordinates, one deterministic canonicalization/digest path, the
+# §12 six-stage trust vocabulary, the §28 lifecycle relation, the §11 typed
+# refusal vocabulary, and the input contract a future TEV-2 verifier accepts.
+#
+# Internal platform infrastructure — NOT a customer-facing module, NOT a
+# product, and NOT a fourth UVI engine (B-2). It mints NO authority: no
+# verifier, no trust anchor, no key management, no signature, no receipt, no
+# admission decision. Those are TEV-2. It is explicitly NOT ugence-tap-provider
+# (§6.1), NOT risk_authority.integrations.tap (RA-scoped, preserved by E-13),
+# NOT the truth_assurance_pipeline research corpus, and NOT the Policy
+# Authority, Benchmark Registry, Decision Authority, ActionGate, Readiness or
+# Governed Value.
+#
+# A leaf with ZERO runtime dependencies: stdlib only, no Ugence package, no
+# third-party package. ADR §23 permits TAP to depend on governance-contracts;
+# TEV-1 takes the narrower zero-dependency option because DD-2 (which contracts
+# land in that leaf) is explicitly blocked on "the concrete contract shapes from
+# TEV-1/BR-1" and pre-empting it here would decide DD-2 by implementation.
+# AssessedSystemBinding is referenced by opaque reference + digest and is never
+# redefined (§14). An automated test enforces both facts.
+#
+# Build:    python -m build packages/trusted-evidence-authority
+# Verify:   python packages/trusted-evidence-authority/verify_trusted_evidence_authority_distribution.py
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-trusted-evidence-authority"
+dynamic = ["version"]
+description = "Ugence Trusted Evidence Authority — TEV-1 trusted-evidence contract shapes, canonical evidence identity and typed refusal vocabulary (internal platform infrastructure; no verifier)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["ugence", "trusted-evidence", "tap", "contracts", "platform"]
+# Zero runtime dependencies. Not even the neutral governance-contracts leaf:
+# nothing here imports it (an automated test enforces the fact).
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_trusted_evidence_authority.__version__" }
+
+# Exactly one top-level namespace ships. Tests, probes and fixtures are excluded.
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_trusted_evidence_authority*"]
+
+# The package is fully type-annotated; ship the PEP 561 marker so typed
+# consumers get the contract types under mypy/pyright.
+[tool.setuptools.package-data]
+ugence_trusted_evidence_authority = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

@@ -192,7 +192,7 @@ RA-5's `EvidenceAdmissionPort` and its `ControlAssurancePort` boundary are **unc
 not reopened**. RA-5 remains the ratified owner of *RA-scoped control-evidence admission*
 for `ControlResult` production. This ADR ratifies the **platform-wide** role that RA-5
 deliberately left unnamed; alignment of RA-5's seam to the platform receipt is a separate,
-later, separately-reviewed decision (§32, DD-6).
+later, separately-reviewed decision (§31, DD-6).
 
 ### E-14 — TAP imports no engine and mints no runtime authority
 TAP imports no readiness engine, no `governed-value`, no Policy Authority internal, and no
@@ -235,7 +235,7 @@ Approval binds an exact **content digest**, not a name and not an intent.
 The benchmark **publisher/signer** is a distinct, explicitly identified role (§16.1).
 **Benchmark signing is not silently assigned to the Policy Authority.** Whether the
 Policy Authority is *entitled* to act as benchmark approval verifier for a given benchmark
-family is a separate owner decision (§32, DD-3) and requires an explicit entitlement in
+family is a separate owner decision (§31, DD-3) and requires an explicit entitlement in
 the relevant authority contract.
 
 ### B-7 — Registration ordering is fixed and atomic in outcome
@@ -272,14 +272,15 @@ resolutions.
 
 ## 6. Naming and placement rulings
 
-### 6.1 The "TAP" name — a three-way collision, already documented
+### 6.1 The "TAP" name — a four-way collision, already documented
 
-RA-5 SPEC §3.1 re-verified three distinct things sharing the name. This ADR **restates and
+RA-5 SPEC §3.1 re-verified the distinct things sharing the name. This ADR **restates and
 preserves** that finding and adds the platform ruling:
 
 | Artifact | Path | What it is | Ruling |
 |---|---|---|---|
 | `ugence-tap-provider` | `packages/providers/tap/` | **Assertion-support scorer** — a peer of ActionGate. `TapOutcome` = {SUPPORTED, UNSUPPORTED, CONSTRAINED, INDETERMINATE, UNKNOWN}; emits an `evidence_coverage` ratio and a SHA-256 **fingerprint (a hash, not a signature)**; `evaluate()` takes no `now` and no first-class tenant/workflow. | **NOT** the evidence verification owner. Remains an RA-5 Control-Assurance evaluator *candidate*. Unchanged by this ADR. |
+| `EvidenceAdmissionPort` / `ReferenceEvidenceAdmission` | `packages/risk_authority/.../risk_authority/integrations/tap.py` | The **RA-scoped evidence-admission seam** ratified by RA-5, admitting control evidence backing a `ControlResult` bound to `tenant / risk_case / policy_digest / workflow_ir_digest / control_id`. | **RA-scoped, NOT the platform verification owner.** RA-5 remains its ratified owner and it is **unchanged and not reopened** (E-13); platform-wide extension was considered and **rejected** (§25.3). Alignment with the platform receipt is DD-6. |
 | `truth_assurance_pipeline/` | repo root | Synthetic research corpus (TAP-E1…E7), self-described as not production-ready. | Research lineage only. **Not** a platform capability. |
 | **TAP — the Trust Assurance role** | *(no package; DEFERRED)* | The umbrella retained by RA-5 SPEC §3.2. | **Ratified here as the owner of trusted evidence admission and verification (E-1, E-2).** |
 
@@ -292,7 +293,7 @@ verification result.
 ### 6.2 Ratified canonical names
 
 Proposed canonical names, unless a later merged convention requires a different
-equivalent. **Package creation is DEFERRED (§31); no distribution is created here.**
+equivalent. **Package creation is DEFERRED (§30); no distribution is created here.**
 
 | Aspect | Trusted evidence verification | Benchmark Registry |
 |---|---|---|
@@ -455,7 +456,7 @@ justified per row; nothing is optional merely to ease implementation.
 | 14 | **Verifier authority identity and key identifier** | required |
 | 15 | **Verification protocol / version** | required |
 | 16 | **Verification status and stable reason codes** | required |
-| 17 | **Validity / effective period** | required where the evidence carries one; a half-open interval (§21) |
+| 17 | **Validity / effective period** | required where the evidence carries one; a half-open interval (§17.9) |
 
 **Both instants are mandatory and distinct** (#5, #6). Collapsing observation time into
 verification time destroys freshness reasoning; omitting verification time makes staleness
@@ -509,7 +510,7 @@ warning; none degrades to allow; none is silently dropped.
 
 **Indeterminate is a refusal, not a pass.** A verifier that cannot decide has not verified.
 Reason codes above are **illustrative of the required namespace shape**; the exact
-vocabulary is an implementation detail (§32, DD-1), but stability, typing and
+vocabulary is an implementation detail (§31, DD-1), but stability, typing and
 namespace-scoping are ratified now.
 
 ---
@@ -597,7 +598,7 @@ Existing ownership is **preserved unchanged**:
    `STRUCTURAL_UNVERIFIED` **property**, not a field — "raising it requires a ratified
    system-binding verifier, which no merged contract defines." A **distinct trusted
    binding-verification mechanism** would be required, and **none is created here**
-   (§32, DD-5).
+   (§31, DD-5).
 6. **`canonical_subject_context_ref` remains an opaque, digest-bound bridge** to Risk
    Authority's subject-context contract. It stays an opaque token in Governance Contracts.
 7. **Governance Contracts and Readiness must not import Risk Authority.** This one-way
@@ -640,7 +641,7 @@ per row.
 | 12 | **Population / cohort** | required |
 | 13 | **Aggregation semantics** | required |
 | 14 | **Observation window** | required |
-| 15 | **Effective period** | required; half-open (§21) |
+| 15 | **Effective period** | required; half-open (§17.9) |
 | 16 | **Source / provenance requirements** | required |
 | 17 | **Approval reference** | required |
 | 18 | **Publisher identity** | required |

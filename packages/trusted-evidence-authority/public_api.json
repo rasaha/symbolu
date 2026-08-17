@@ -1,0 +1,232 @@
+{
+  "distribution": "ugence-trusted-evidence-authority",
+  "namespace": "ugence_trusted_evidence_authority",
+  "package_version": "0.1.0",
+  "curated_api_module": "ugence_trusted_evidence_authority.api",
+  "note": "Machine-readable snapshot of the curated public API (ugence_trusted_evidence_authority.api.__all__). Generated from the package surface; tests/packaging/test_public_api.py asserts this file equals the actual package surface, and verify_trusted_evidence_authority_distribution.py asserts the same for the built wheel and the isolated installed runtime. Regenerate when the curated API changes.",
+  "symbols": {
+    "ApplicabilityCoordinate": {
+      "kind": "dataclass",
+      "fields": [
+        "declaration",
+        "value"
+      ]
+    },
+    "ApplicabilityDeclaration": {
+      "kind": "enum",
+      "values": [
+        "APPLICABLE",
+        "NOT_APPLICABLE"
+      ]
+    },
+    "CanonicalEvidenceIdentity": {
+      "kind": "dataclass",
+      "fields": [
+        "evidence_id",
+        "evidence_type",
+        "schema",
+        "content_digest",
+        "observation",
+        "scope",
+        "provenance",
+        "lifecycle_state",
+        "geography",
+        "domain",
+        "intended_outcome",
+        "valid_from",
+        "valid_to"
+      ]
+    },
+    "EVIDENCE_IDENTITY_DIGEST_DOMAIN": {
+      "kind": "constant",
+      "value": "ugence.trusted-evidence-authority/evidence-identity/v1"
+    },
+    "EVIDENCE_LIFECYCLE_TRANSITIONS": {
+      "kind": "constant",
+      "value": {
+        "PRODUCED": [
+          "EXPIRED",
+          "REVOKED",
+          "SUBMITTED"
+        ],
+        "SUBMITTED": [
+          "EXPIRED",
+          "RETAINED",
+          "REVOKED"
+        ],
+        "RETAINED": [
+          "EXPIRED",
+          "REVOKED"
+        ],
+        "EXPIRED": [],
+        "REVOKED": []
+      }
+    },
+    "EVIDENCE_TRUST_STAGE_ORDER": {
+      "kind": "constant",
+      "value": [
+        "STRUCTURALLY_CONSTRUCTIBLE",
+        "CRYPTOGRAPHICALLY_AUTHENTIC",
+        "PROVENANCE_VERIFIED",
+        "CONTEXT_SYSTEM_BOUND",
+        "CURRENTLY_VALID",
+        "POLICY_SUFFICIENT"
+      ]
+    },
+    "EvidenceLifecycleState": {
+      "kind": "enum",
+      "values": [
+        "PRODUCED",
+        "SUBMITTED",
+        "RETAINED",
+        "EXPIRED",
+        "REVOKED"
+      ]
+    },
+    "EvidenceObservation": {
+      "kind": "dataclass",
+      "fields": [
+        "producer_id",
+        "collected_at",
+        "observed_from",
+        "observed_to",
+        "issuer_id"
+      ]
+    },
+    "EvidenceProvenanceChain": {
+      "kind": "dataclass",
+      "fields": [
+        "chain_ref",
+        "custody_refs"
+      ]
+    },
+    "EvidenceSchemaRef": {
+      "kind": "dataclass",
+      "fields": [
+        "schema_id",
+        "schema_version"
+      ]
+    },
+    "EvidenceScopeBinding": {
+      "kind": "dataclass",
+      "fields": [
+        "tenant_id",
+        "assessment_context_ref",
+        "assessment_context_digest",
+        "subject_ref",
+        "assessment_purpose_ref",
+        "usage_scope_ref",
+        "assessed_system_applicability",
+        "assessed_system_binding_ref",
+        "assessed_system_binding_digest"
+      ]
+    },
+    "EvidenceStructuralStatus": {
+      "kind": "enum",
+      "values": [
+        "STRUCTURAL_UNVERIFIED"
+      ]
+    },
+    "EvidenceTrustStage": {
+      "kind": "enum",
+      "values": [
+        "STRUCTURALLY_CONSTRUCTIBLE",
+        "CRYPTOGRAPHICALLY_AUTHENTIC",
+        "PROVENANCE_VERIFIED",
+        "CONTEXT_SYSTEM_BOUND",
+        "CURRENTLY_VALID",
+        "POLICY_SUFFICIENT"
+      ]
+    },
+    "EvidenceVerificationRequest": {
+      "kind": "dataclass",
+      "fields": [
+        "evidence",
+        "expected_content_digest",
+        "expected_tenant_id",
+        "expected_assessment_context_ref",
+        "expected_assessment_context_digest",
+        "expected_subject_ref",
+        "expected_assessment_purpose_ref",
+        "expected_usage_scope_ref",
+        "as_of",
+        "requested_trust_stages",
+        "expected_assessed_system_binding_ref",
+        "expected_assessed_system_binding_digest"
+      ]
+    },
+    "TRUSTED_EVIDENCE_CANONICALIZATION_VERSION": {
+      "kind": "constant",
+      "value": "ugence.trusted-evidence-authority/canonicalization/v1"
+    },
+    "TRUSTED_EVIDENCE_REFUSAL_REASONS": {
+      "kind": "constant",
+      "value": [
+        "TRUSTED_EVIDENCE_CONTENT_DIGEST_MISMATCH",
+        "TRUSTED_EVIDENCE_CONTEXT_MISMATCH",
+        "TRUSTED_EVIDENCE_IDENTITY_COORDINATE_MISSING",
+        "TRUSTED_EVIDENCE_INDETERMINATE",
+        "TRUSTED_EVIDENCE_INVALID_LIFECYCLE_TRANSITION",
+        "TRUSTED_EVIDENCE_MALFORMED_CONTRACT",
+        "TRUSTED_EVIDENCE_MISSING",
+        "TRUSTED_EVIDENCE_NOT_YET_VALID",
+        "TRUSTED_EVIDENCE_PROVENANCE_MISMATCH",
+        "TRUSTED_EVIDENCE_PURPOSE_SCOPE_MISMATCH",
+        "TRUSTED_EVIDENCE_REVOKED",
+        "TRUSTED_EVIDENCE_SCHEMA_UNSUPPORTED",
+        "TRUSTED_EVIDENCE_STALE",
+        "TRUSTED_EVIDENCE_SUBJECT_MISMATCH",
+        "TRUSTED_EVIDENCE_SYSTEM_BINDING_MISMATCH",
+        "TRUSTED_EVIDENCE_TENANT_MISMATCH",
+        "TRUSTED_EVIDENCE_TYPE_UNSUPPORTED",
+        "TRUSTED_EVIDENCE_VERIFICATION_NOT_PERFORMED",
+        "TRUSTED_EVIDENCE_VERIFIER_UNAVAILABLE"
+      ]
+    },
+    "TrustedEvidenceCanonicalizationError": {
+      "kind": "exception"
+    },
+    "TrustedEvidenceContractError": {
+      "kind": "exception"
+    },
+    "TrustedEvidenceLifecycleError": {
+      "kind": "exception"
+    },
+    "TrustedEvidenceRefusalReason": {
+      "kind": "enum",
+      "values": [
+        "TRUSTED_EVIDENCE_MISSING",
+        "TRUSTED_EVIDENCE_MALFORMED_CONTRACT",
+        "TRUSTED_EVIDENCE_SCHEMA_UNSUPPORTED",
+        "TRUSTED_EVIDENCE_TYPE_UNSUPPORTED",
+        "TRUSTED_EVIDENCE_IDENTITY_COORDINATE_MISSING",
+        "TRUSTED_EVIDENCE_CONTENT_DIGEST_MISMATCH",
+        "TRUSTED_EVIDENCE_TENANT_MISMATCH",
+        "TRUSTED_EVIDENCE_CONTEXT_MISMATCH",
+        "TRUSTED_EVIDENCE_SUBJECT_MISMATCH",
+        "TRUSTED_EVIDENCE_SYSTEM_BINDING_MISMATCH",
+        "TRUSTED_EVIDENCE_PURPOSE_SCOPE_MISMATCH",
+        "TRUSTED_EVIDENCE_PROVENANCE_MISMATCH",
+        "TRUSTED_EVIDENCE_NOT_YET_VALID",
+        "TRUSTED_EVIDENCE_STALE",
+        "TRUSTED_EVIDENCE_REVOKED",
+        "TRUSTED_EVIDENCE_INVALID_LIFECYCLE_TRANSITION",
+        "TRUSTED_EVIDENCE_VERIFICATION_NOT_PERFORMED",
+        "TRUSTED_EVIDENCE_VERIFIER_UNAVAILABLE",
+        "TRUSTED_EVIDENCE_INDETERMINATE"
+      ]
+    },
+    "canonical_bytes": {
+      "kind": "function"
+    },
+    "canonical_digest": {
+      "kind": "function"
+    },
+    "is_valid_lifecycle_transition": {
+      "kind": "function"
+    },
+    "require_valid_lifecycle_transition": {
+      "kind": "function"
+    }
+  }
+}
