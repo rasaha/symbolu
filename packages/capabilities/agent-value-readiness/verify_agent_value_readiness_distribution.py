@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
-"""Reproducible proof that the Agent Value Readiness contracts install and operate
-from a built wheel, with ONLY the two neutral contract leaves as cross-package
-dependencies and NO ``governed-value`` or other foreign package on the path.
+"""Reproducible proof that Agent Value Readiness installs and operates from a
+built wheel, with ONLY the two neutral contract leaves and the shared Ugence
+Policy Authority as cross-package dependencies, and NO ``governed-value`` or
+other foreign package on the path.
 
-Builds ``ugence-agent-value-readiness`` and its two dependencies
-(``ugence-uvi-policy-contracts``, ``ugence-governance-contracts``) into a local
-find-links directory, installs the former (pip resolves the latter two) into a
-fresh venv with no system site packages and no monorepo path (``--no-index`` —
-all wheels are local, zero third-party deps), then proves inside that env:
+Builds ``ugence-agent-value-readiness`` and its three dependencies
+(``ugence-uvi-policy-contracts``, ``ugence-governance-contracts``,
+``ugence-policy-authority``) into a local find-links directory, installs the
+first (pip resolves the rest) into a fresh venv with no system site packages and
+no monorepo path (``--no-index`` — all wheels are local, zero third-party deps),
+then proves inside that env:
 
   * ``ugence_agent_value_readiness`` imports from site-packages, ships py.typed;
   * the curated API resolves;
@@ -18,6 +20,12 @@ all wheels are local, zero third-party deps), then proves inside that env:
     set — mandatory FAIL dominates, an omitted gate is never PASS, the composite
     cannot move the tier, a naive evaluation time is rejected, evidence axes are
     preserved, and the result authorizes nothing;
+  * the trusted orchestration boundary fails closed from the wheel — a policy
+    issued and signed through the shared authority resolves and evaluates, while
+    an unconfigured resolver or verifier denies, an unverified PASS cannot unlock
+    readiness, an unverified condition cannot compensate, and no permissive
+    verifier is present in the installed distribution;
+  * the evaluator remains usable with NO orchestration configuration at all;
   * NO ``governed_value`` / capability / product / framework / third-party package
     is importable.
 
@@ -42,6 +50,7 @@ SOURCES = {
     "ugence_agent_value_readiness": PKG,
     "ugence_uvi_policy_contracts": REPO / "packages" / "uvi-policy-contracts",
     "ugence_governance_contracts": REPO / "packages" / "governance-contracts",
+    "ugence_policy_authority": REPO / "packages" / "policy-authority",
 }
 
 _CHECK = r'''
@@ -50,7 +59,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 import ugence_agent_value_readiness as r
-assert r.__version__ == "0.2.0", r.__version__
+assert r.__version__ == "0.3.0", r.__version__
 assert "site-packages" in r.__file__, r.__file__
 assert not any("/symbolu" in p for p in sys.path), sys.path
 import pathlib as _pl
@@ -256,6 +265,115 @@ _ok = _eval_binding(_policy().reference, status=GateStatus.FAIL)
 assert _ok.classification is ReadinessClassification.NOT_READY, _ok.classification
 assert _ok.rule_id == ReadinessRuleId.MANDATORY_FAIL.value
 
+# ---- Trusted Readiness Orchestration, from the wheel --------------------- #
+from ugence_policy_authority.api import (
+    ApprovalEvidenceRef, ApprovalVerification, ApprovalVerificationStatus, Ed25519PolicySigner,
+    InMemoryPolicyRegistry, KeyEntitlement, PolicyKeyRing, PolicyResolutionStatus, SigningKey,
+    UviPolicyFamilyAdapter, default_uvi_adapters, issue_policy)
+from ugence_agent_value_readiness.api import (
+    READINESS_ORCHESTRATOR_VERSION, ConditionSetVerification, DenyAllConditionSetVerifier,
+    DenyAllGateResultVerifier, DenyAllReadinessPolicyResolver, GateResultVerification,
+    PolicyAuthorityReadinessPolicyResolver, ReadinessAssessmentRequest, ReadinessAssessmentStatus,
+    ReadinessInputVerificationStatus, ReadinessTrustAdvisoryState, ReadinessTrustGapCode,
+    assess_readiness)
+
+assert READINESS_ORCHESTRATOR_VERSION == "ugence.readiness-orchestration/v0.1", READINESS_ORCHESTRATOR_VERSION
+# Platform-neutral identity: the shipped wheel claims no ADR milestone.
+for _tok in ("gv-3r", "gv3r", "m-3r", "m3r", "milestone"):
+    assert _tok not in READINESS_ORCHESTRATOR_VERSION.lower(), _tok
+
+_ADAPTER = UviPolicyFamilyAdapter()
+def _digest_bound(gates, comp_gate=True):
+    def _m(dig):
+        return PolicyArtifactMetadata(policy_id="orch-rp", policy_family=PolicyFamily.READINESS, version="1", content_digest=dig, lifecycle_state=PolicyLifecycleState.APPROVED_ACTIVE, effective_from=T0, effective_to=T1)
+    draft = ReadinessPolicy(metadata=_m("0" * 64), gates=gates)
+    return ReadinessPolicy(metadata=_m(_ADAPTER.describe(draft).body_digest()), gates=gates)
+
+_ogates = (_rg("m1", RequirementClass.MANDATORY), _rg("c1", RequirementClass.CONDITIONAL, comp=True))
+opol = _digest_bound(_ogates)
+octx = AssessmentContext(context_id="octx", tenant_id="t1", subject_id="a1", geography_ref=geo.reference, domain_ref=dom.reference, intended_outcome_ref=io.reference, readiness_ref=opol.reference)
+
+class _Approval:
+    def verify_approval(self, *, coordinate, policy_body_digest, approval, as_of):
+        return ApprovalVerification(verified=True, status=ApprovalVerificationStatus.APPROVED, coordinate=coordinate, policy_body_digest=policy_body_digest, approving_authority_id="board", approval_ref=approval.approval_ref, approval_digest=approval.approval_digest, verified_at=as_of)
+
+_signer = Ed25519PolicySigner(authority_id="auth", key_id="k1", signing_key=SigningKey.from_seed(bytes([5]) * 32))
+_registry = InMemoryPolicyRegistry(); _adapters = default_uvi_adapters()
+issue_policy(policy=opol, record_id="orch-rec", approval=ApprovalEvidenceRef(approval_ref="A", approval_digest=hashlib.sha256(b"a").hexdigest(), approving_authority_id="board"), approval_verifier=_Approval(), signer=_signer, registry=_registry, adapters=_adapters, issued_at=T0)
+_resolver = PolicyAuthorityReadinessPolicyResolver(registry=_registry, signature_verifier=PolicyKeyRing([_signer.verification_key(entitlements=(KeyEntitlement.ISSUE_POLICY,))]), adapters=_adapters)
+
+class _V:
+    def __init__(self, ok=True): self.ok = ok
+    def _s(self): return ReadinessInputVerificationStatus.VERIFIED if self.ok else ReadinessInputVerificationStatus.EVIDENCE_NOT_VERIFIED
+    def verify_gate_result(self, q):
+        return GateResultVerification(status=self._s(), verifier_id="v", gate_id=q.gate_id, gate_digest=q.gate_digest, readiness_policy_ref=q.readiness_policy_ref, tenant_id=q.tenant_id, subject_id=q.subject_id, context_digest=q.context_digest, requested_target=q.requested_target, verified_at=q.evaluation_time, verified_status=q.claimed_status if self.ok else None, evidence_verified=self.ok, benchmark_resolved=self.ok, threshold_evaluation_verified=self.ok)
+    def verify_condition(self, q):
+        return ConditionSetVerification(status=self._s(), verifier_id="v", condition_id=q.condition_id, condition_digest=q.condition_digest, source_gate_or_finding_ref=q.source_gate_or_finding_ref, covered_gate_id=q.covered_gate_id, gate_digest=q.gate_digest, readiness_policy_ref=q.readiness_policy_ref, tenant_id=q.tenant_id, subject_id=q.subject_id, context_digest=q.context_digest, requested_target=q.requested_target, verified_at=q.evaluation_time, verified_status=q.claimed_status if self.ok else None, approval_authority_verified=self.ok, approval_evidence_verified=self.ok, owner_and_monitoring_verified=self.ok, effective_from=q.effective_from, effective_to=q.effective_to, expiry=q.expiry)
+
+def _gr(gid, st):
+    return GateResult(policy_gate={g.gate_id: g for g in opol.gates}[gid], readiness_policy_ref=opol.reference, requested_target=PROD, status=st)
+def _req(grs, conds=()):
+    return ReadinessAssessmentRequest(assessment_id="orch-1", tenant_id="t1", subject_id="a1", context=octx, readiness_policy_ref=opol.reference, requested_target=PROD, evaluation_time=MID, gate_results=tuple(grs), conditions=tuple(conds))
+
+_all_pass = (_gr("m1", GateStatus.PASS), _gr("c1", GateStatus.PASS))
+_ok = assess_readiness(_req(_all_pass), policy_resolver=_resolver, gate_verifier=_V(), condition_verifier=_V())
+assert _ok.status is ReadinessAssessmentStatus.EVALUATED, _ok.status
+assert _ok.classification is ReadinessClassification.DEPLOYMENT_READY, _ok.classification
+assert _ok.trust_gap_codes == (), _ok.trust_gap_codes
+assert _ok.is_advisory is True and _ok.authorizes_deployment is False
+assert _ok.trace.evaluator_formula_version == "GV-3R-b.3"
+assert _ok.trace.orchestrator_version == "ugence.readiness-orchestration/v0.1"
+assert _ok.trace.issuance_record_ref == "orch-rec"
+
+# production defaults deny, and a denial asserts no headline at all
+_denied = assess_readiness(_req(_all_pass))
+assert _denied.status is ReadinessAssessmentStatus.NOT_EVALUATED
+assert _denied.classification is None and _denied.evaluation is None
+assert _denied.trace.issuance_record_ref == "" and _denied.trace.resolved_policy_digest == ""
+assert ReadinessTrustGapCode.POLICY_RESOLVER_NOT_CONFIGURED.value in _denied.trust_gap_codes
+
+# an unverified PASS cannot unlock readiness; an unverified FAIL cannot force NOT_READY
+_unverified = assess_readiness(_req(_all_pass), policy_resolver=_resolver, gate_verifier=_V(ok=False))
+assert _unverified.classification is ReadinessClassification.NOT_ASSESSABLE, _unverified.classification
+_unverified_fail = assess_readiness(_req((_gr("m1", GateStatus.FAIL), _gr("c1", GateStatus.PASS))), policy_resolver=_resolver, gate_verifier=_V(ok=False))
+assert _unverified_fail.classification is ReadinessClassification.NOT_ASSESSABLE
+
+# a verified mandatory FAIL still dominates
+_fail = assess_readiness(_req((_gr("m1", GateStatus.FAIL), _gr("c1", GateStatus.PASS))), policy_resolver=_resolver, gate_verifier=_V())
+assert _fail.classification is ReadinessClassification.NOT_READY, _fail.classification
+
+# an unverified condition cannot compensate; a verified one compensates its exact concern
+_cond = ConditionSet(condition_id="cd1", source_gate_or_finding_ref="c1", concern_requirement_class=RequirementClass.CONDITIONAL, current_status=ConditionStatus.APPROVED_ACTIVE, approved_mitigation_ref="m", approving_authority_ref="a", accountable_owner="o", scope_exposure_limit="10%", monitoring_requirement="weekly", evidence_refs=("ev",), revocation_trigger="breach", effective_from=T0)
+_unresolved = (_gr("m1", GateStatus.PASS), _gr("c1", GateStatus.FAIL))
+_no_cover = assess_readiness(_req(_unresolved, (_cond,)), policy_resolver=_resolver, gate_verifier=_V())
+assert _no_cover.classification is ReadinessClassification.NOT_READY, _no_cover.classification
+_covered = assess_readiness(_req(_unresolved, (_cond,)), policy_resolver=_resolver, gate_verifier=_V(), condition_verifier=_V())
+assert _covered.classification is ReadinessClassification.READY_WITH_CONDITIONS, _covered.classification
+
+# trust advisories are reconciled, never deleted
+_states = {d.advisory_code: d.state for d in _covered.dispositions}
+assert set(_covered.evaluation.advisory_codes) <= set(_states)
+assert ReadinessTrustAdvisoryState.RESOLVED_BY_POLICY_RESOLUTION in _states.values()
+assert ReadinessTrustAdvisoryState.RESOLVED_BY_CONDITION_VERIFICATION in _states.values()
+
+# the deny-all defaults really deny, and carry no permissive switch
+assert DenyAllReadinessPolicyResolver().resolve_readiness_policy(reference=opol.reference, expected_tenant_id="", as_of=MID).status is PolicyResolutionStatus.UNRESOLVED
+import inspect as _inspect
+for _cls in (DenyAllGateResultVerifier, DenyAllConditionSetVerifier):
+    assert list(_inspect.signature(_cls).parameters) == [], _cls
+
+# no permissive verifier ships in the INSTALLED distribution
+import ast as _ast, pathlib as _pathlib
+_root = _pathlib.Path(r.__file__).resolve().parent
+_tokens = ("allowall", "allow_all", "acceptall", "accept_all", "trustall", "trust_all", "alwaysvalid", "always_valid", "fakeverifier", "testverifier", "stubverifier", "insecure", "bypass")
+for _p in _root.rglob("*.py"):
+    for _n in _ast.walk(_ast.parse(_p.read_text())):
+        if isinstance(_n, (_ast.ClassDef, _ast.FunctionDef)):
+            assert not any(t in _n.name.lower() for t in _tokens), (_p.name, _n.name)
+
+# the evaluator remains usable with NO orchestration configuration whatsoever
+assert evaluate_readiness(_case(ALL_PASS), evaluation_time=MID).classification is ReadinessClassification.DEPLOYMENT_READY
+
 for mod in ("governed_value", "ugence_governed_value", "governance_providers", "decision_governance", "ai_hiring", "pydantic"):
     assert importlib.util.find_spec(mod) is None, ("unrelated package present: " + mod)
 
@@ -287,7 +405,7 @@ def main() -> int:
         shutil.rmtree(findlinks)
     findlinks.mkdir()
 
-    print("[1/4] build the readiness wheel + its two contract-leaf dependencies")
+    print("[1/4] build the readiness wheel + its contract leaves and the shared authority")
     for name, src in SOURCES.items():
         _run([sys.executable, "-m", "build", "--wheel", str(src), "-o", str(findlinks)])
     wheel = _latest(findlinks, "ugence_agent_value_readiness-*.whl")

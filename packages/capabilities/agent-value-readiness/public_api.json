@@ -1,9 +1,9 @@
 {
   "distribution": "ugence-agent-value-readiness",
   "namespace": "ugence_agent_value_readiness",
-  "package_version": "0.2.0",
+  "package_version": "0.3.0",
   "curated_api_module": "ugence_agent_value_readiness.api",
-  "note": "Machine-readable snapshot of the curated public API. Generated from the installed package; tests/packaging/test_public_api.py asserts equality. ReadinessTarget/RequirementClass are reused from ugence-uvi-policy-contracts. GateResult embeds a PolicyGate (kind/applicability derived, not caller-set); blocking/indeterminate gate ids are derived properties of the determination, not fields. GV-3R-b adds the single canonical evaluator entry point evaluate_readiness(case, *, evaluation_time): ReadinessEvaluationCase carries NO classification field \u2014 the evaluator selects the tier \u2014 and ReadinessEvaluationResult is advisory, never a deployment authorization. Readiness requirements are policy/gate-driven: indicator records are diagnostics, not a global prerequisite. The governing ReadinessPolicy's lifecycle state and effective period are evaluated as ADR \u00a76 precondition row 0 at the explicit evaluation_time.",
+  "note": "Machine-readable snapshot of the curated public API. Generated from the installed package; tests/packaging/test_public_api.py asserts equality. ReadinessTarget/RequirementClass are reused from ugence-uvi-policy-contracts. GateResult embeds a PolicyGate (kind/applicability derived, not caller-set); blocking/indeterminate gate ids are derived properties of the determination, not fields. GV-3R-b adds the single canonical evaluator entry point evaluate_readiness(case, *, evaluation_time): ReadinessEvaluationCase carries NO classification field \u2014 the evaluator selects the tier \u2014 and ReadinessEvaluationResult is advisory, never a deployment authorization. Readiness requirements are policy/gate-driven: indicator records are diagnostics, not a global prerequisite. The governing ReadinessPolicy's lifecycle state and effective period are evaluated as ADR \u00a76 precondition row 0 at the explicit evaluation_time. Trusted Readiness Orchestration adds the single canonical boundary assess_readiness(request, *, policy_resolver, gate_verifier, condition_verifier) around that one evaluator \u2014 no second classification algorithm exists and no new readiness classification is defined. It is an ADDITIVE INTEGRATION CAPABILITY implementing already-ratified UVI ADR D-1/D-16/\u00a719/\u00a723.2 requirements; it is NOT milestone M-3R.3, which owns the Intelligence/Capability/Adoption catalogs and AssessedSystemBinding wiring and remains open and unimplemented here. READINESS_ORCHESTRATOR_VERSION is platform-neutral and names no milestone; every ReadinessTrustGapCode value carries the neutral READINESS_ORCHESTRATION_ namespace, which likewise names no milestone. Every injected boundary defaults to None, which DENIES: the exact ReadinessPolicy must resolve through the shared Ugence Policy Authority's public resolution service, and only independently verified gate results and conditions reach the evaluator. ReadinessAssessmentRequest carries no classification, no trust boolean, no policy body and no financial field; ReadinessAssessmentOutcome is advisory, unsigned, and authorizes_deployment is a permanently-False property, not a field. No allow-all or testing verifier is exported \u2014 that absence is the boundary.",
   "symbols": {
     "AdoptionDimension": {
       "kind": "enum",
@@ -171,6 +171,35 @@
         "revocation_trigger"
       ]
     },
+    "ConditionSetVerification": {
+      "kind": "dataclass",
+      "fields": [
+        "status",
+        "verifier_id",
+        "condition_id",
+        "condition_digest",
+        "source_gate_or_finding_ref",
+        "covered_gate_id",
+        "gate_digest",
+        "readiness_policy_ref",
+        "tenant_id",
+        "subject_id",
+        "context_digest",
+        "requested_target",
+        "verified_at",
+        "verified_status",
+        "approval_authority_verified",
+        "approval_evidence_verified",
+        "owner_and_monitoring_verified",
+        "effective_from",
+        "effective_to",
+        "expiry",
+        "detail"
+      ]
+    },
+    "ConditionSetVerifier": {
+      "kind": "class"
+    },
     "ConditionStatus": {
       "kind": "enum",
       "values": [
@@ -180,6 +209,57 @@
         "REVOKED",
         "SATISFIED"
       ]
+    },
+    "ConditionVerificationRequest": {
+      "kind": "dataclass",
+      "fields": [
+        "assessment_id",
+        "tenant_id",
+        "subject_id",
+        "context_digest",
+        "readiness_policy_ref",
+        "requested_target",
+        "evaluation_time",
+        "condition_id",
+        "condition_digest",
+        "source_gate_or_finding_ref",
+        "policy_gate",
+        "gate_digest",
+        "claimed_status",
+        "approving_authority_ref",
+        "approved_mitigation_ref",
+        "accountable_owner",
+        "scope_exposure_limit",
+        "monitoring_requirement",
+        "revocation_trigger",
+        "evidence_refs",
+        "effective_from",
+        "effective_to",
+        "expiry"
+      ]
+    },
+    "ConditionVerificationSummary": {
+      "kind": "dataclass",
+      "fields": [
+        "condition_id",
+        "source_gate_or_finding_ref",
+        "claimed_status",
+        "verification_status",
+        "admitted",
+        "verifier_id",
+        "condition_digest",
+        "trust_gap_codes",
+        "detail"
+      ]
+    },
+    "DenyAllConditionSetVerifier": {
+      "kind": "class"
+    },
+    "DenyAllGateResultVerifier": {
+      "kind": "class"
+    },
+    "DenyAllReadinessPolicyResolver": {
+      "kind": "class"
     },
     "GateResult": {
       "kind": "dataclass",
@@ -195,12 +275,68 @@
         "evaluated_at"
       ]
     },
+    "GateResultVerification": {
+      "kind": "dataclass",
+      "fields": [
+        "status",
+        "verifier_id",
+        "gate_id",
+        "gate_digest",
+        "readiness_policy_ref",
+        "tenant_id",
+        "subject_id",
+        "context_digest",
+        "requested_target",
+        "verified_at",
+        "verified_status",
+        "evidence_verified",
+        "benchmark_resolved",
+        "threshold_evaluation_verified",
+        "detail"
+      ]
+    },
+    "GateResultVerifier": {
+      "kind": "class"
+    },
     "GateStatus": {
       "kind": "enum",
       "values": [
         "PASS",
         "FAIL",
         "INDETERMINATE"
+      ]
+    },
+    "GateVerificationRequest": {
+      "kind": "dataclass",
+      "fields": [
+        "assessment_id",
+        "tenant_id",
+        "subject_id",
+        "context_digest",
+        "readiness_policy_ref",
+        "requested_target",
+        "evaluation_time",
+        "policy_gate",
+        "gate_digest",
+        "claimed_status",
+        "gate_result_digest",
+        "observed_claim_refs",
+        "evidence_refs",
+        "reason_codes",
+        "window_ref"
+      ]
+    },
+    "GateVerificationSummary": {
+      "kind": "dataclass",
+      "fields": [
+        "gate_id",
+        "claimed_status",
+        "verification_status",
+        "admitted",
+        "verifier_id",
+        "gate_digest",
+        "trust_gap_codes",
+        "detail"
       ]
     },
     "IntelligenceDimension": {
@@ -239,6 +375,20 @@
         "evaluated_at"
       ]
     },
+    "PolicyAuthorityReadinessPolicyResolver": {
+      "kind": "dataclass",
+      "fields": [
+        "registry",
+        "signature_verifier",
+        "adapters",
+        "approval_verifier",
+        "historical_resolution"
+      ]
+    },
+    "READINESS_ORCHESTRATOR_VERSION": {
+      "kind": "str",
+      "value": "ugence.readiness-orchestration/v0.1"
+    },
     "ReadinessAdvisoryCode": {
       "kind": "enum",
       "values": [
@@ -250,6 +400,81 @@
         "GV3RB_ADV_CONDITION_APPROVAL_AUTHENTICITY_NOT_VERIFIED",
         "GV3RB_ADV_CONDITION_SCOPE_NOT_TENANT_BOUND",
         "GV3RB_ADV_COMPOSITE_CARRIED_NOT_USED_IN_SELECTION"
+      ]
+    },
+    "ReadinessAssessmentDisposition": {
+      "kind": "dataclass",
+      "fields": [
+        "advisory_code",
+        "state",
+        "detail"
+      ]
+    },
+    "ReadinessAssessmentError": {
+      "kind": "exception"
+    },
+    "ReadinessAssessmentOutcome": {
+      "kind": "dataclass",
+      "fields": [
+        "status",
+        "trace",
+        "evaluation"
+      ]
+    },
+    "ReadinessAssessmentRequest": {
+      "kind": "dataclass",
+      "fields": [
+        "assessment_id",
+        "tenant_id",
+        "subject_id",
+        "context",
+        "readiness_policy_ref",
+        "requested_target",
+        "evaluation_time",
+        "gate_results",
+        "conditions",
+        "intelligence_results",
+        "capability_results",
+        "adoption_results",
+        "advisory_composite",
+        "evidence_refs",
+        "assessment_window_ref"
+      ]
+    },
+    "ReadinessAssessmentStatus": {
+      "kind": "enum",
+      "values": [
+        "NOT_EVALUATED",
+        "EVALUATED"
+      ]
+    },
+    "ReadinessAssessmentTrace": {
+      "kind": "dataclass",
+      "fields": [
+        "assessment_id",
+        "tenant_id",
+        "subject_id",
+        "context_digest",
+        "readiness_policy_ref",
+        "requested_target",
+        "evaluation_time",
+        "request_digest",
+        "policy_resolution_status",
+        "policy_resolution_reason",
+        "policy_resolution_accepted",
+        "issuance_record_ref",
+        "resolved_policy_digest",
+        "gate_verifications",
+        "condition_verifications",
+        "admitted_gate_ids",
+        "rejected_gate_ids",
+        "admitted_condition_ids",
+        "rejected_condition_ids",
+        "trust_gap_codes",
+        "dispositions",
+        "orchestrator_id",
+        "orchestrator_version",
+        "evaluator_formula_version"
       ]
     },
     "ReadinessClassification": {
@@ -330,6 +555,22 @@
         "ADOPTION"
       ]
     },
+    "ReadinessInputVerificationStatus": {
+      "kind": "enum",
+      "values": [
+        "VERIFIED",
+        "NO_VERIFIER_CONFIGURED",
+        "EVIDENCE_NOT_VERIFIED",
+        "BENCHMARK_NOT_RESOLVED",
+        "THRESHOLD_EVALUATION_NOT_VERIFIED",
+        "APPROVAL_NOT_VERIFIED",
+        "REFERENCE_MISMATCH",
+        "VERIFIER_ERROR"
+      ]
+    },
+    "ReadinessPolicyResolver": {
+      "kind": "class"
+    },
     "ReadinessReasonCode": {
       "kind": "enum",
       "values": [
@@ -371,6 +612,63 @@
         "PRODUCTION"
       ]
     },
+    "ReadinessTrustAdvisoryState": {
+      "kind": "enum",
+      "values": [
+        "RESOLVED_BY_POLICY_RESOLUTION",
+        "RESOLVED_BY_GATE_VERIFICATION",
+        "RESOLVED_BY_CONDITION_VERIFICATION",
+        "UNRESOLVED",
+        "OUT_OF_SCOPE"
+      ]
+    },
+    "ReadinessTrustGapCode": {
+      "kind": "enum",
+      "values": [
+        "READINESS_ORCHESTRATION_POLICY_RESOLVER_NOT_CONFIGURED",
+        "READINESS_ORCHESTRATION_POLICY_RESOLVER_ERROR",
+        "READINESS_ORCHESTRATION_POLICY_RESOLVER_MALFORMED_RESULT",
+        "READINESS_ORCHESTRATION_POLICY_RESOLUTION_UNRESOLVED",
+        "READINESS_ORCHESTRATION_POLICY_RESOLUTION_HISTORICAL_NOT_ACCEPTED",
+        "READINESS_ORCHESTRATION_POLICY_RESOLUTION_ISSUANCE_RECORD_MISSING",
+        "READINESS_ORCHESTRATION_POLICY_RESOLUTION_ARTIFACT_NOT_A_READINESS_POLICY",
+        "READINESS_ORCHESTRATION_POLICY_RESOLUTION_REFERENCE_MISMATCH",
+        "READINESS_ORCHESTRATION_POLICY_RESOLUTION_TENANT_MISMATCH",
+        "READINESS_ORCHESTRATION_POLICY_RESOLUTION_AS_OF_MISMATCH",
+        "READINESS_ORCHESTRATION_POLICY_RESOLUTION_CONTEXT_BINDING_MISMATCH",
+        "READINESS_ORCHESTRATION_POLICY_RESOLUTION_TARGET_NOT_GOVERNED",
+        "READINESS_ORCHESTRATION_POLICY_ARTIFACT_NOT_APPROVED_ACTIVE",
+        "READINESS_ORCHESTRATION_POLICY_ARTIFACT_NOT_EFFECTIVE_AT_EVALUATION_TIME",
+        "READINESS_ORCHESTRATION_GATE_VERIFIER_NOT_CONFIGURED",
+        "READINESS_ORCHESTRATION_GATE_VERIFIER_ERROR",
+        "READINESS_ORCHESTRATION_GATE_VERIFIER_MALFORMED_RESULT",
+        "READINESS_ORCHESTRATION_GATE_RESULT_NOT_VERIFIED",
+        "READINESS_ORCHESTRATION_GATE_RESULT_SUPPORTING_VERIFICATION_INCOMPLETE",
+        "READINESS_ORCHESTRATION_GATE_RESULT_POLICY_REFERENCE_MISMATCH",
+        "READINESS_ORCHESTRATION_GATE_RESULT_TARGET_MISMATCH",
+        "READINESS_ORCHESTRATION_GATE_RESULT_GATE_NOT_IN_RESOLVED_POLICY",
+        "READINESS_ORCHESTRATION_GATE_RESULT_GATE_BODY_MISMATCH",
+        "READINESS_ORCHESTRATION_GATE_RESULT_DUPLICATE",
+        "READINESS_ORCHESTRATION_GATE_RESULT_VERIFICATION_BINDING_MISMATCH",
+        "READINESS_ORCHESTRATION_GATE_RESULT_VERIFIED_STATUS_MISMATCH",
+        "READINESS_ORCHESTRATION_REQUIRED_GATE_RESULT_UNVERIFIED",
+        "READINESS_ORCHESTRATION_CONDITION_VERIFIER_NOT_CONFIGURED",
+        "READINESS_ORCHESTRATION_CONDITION_VERIFIER_ERROR",
+        "READINESS_ORCHESTRATION_CONDITION_VERIFIER_MALFORMED_RESULT",
+        "READINESS_ORCHESTRATION_CONDITION_NOT_VERIFIED",
+        "READINESS_ORCHESTRATION_CONDITION_APPROVAL_NOT_VERIFIED",
+        "READINESS_ORCHESTRATION_CONDITION_VERIFICATION_BINDING_MISMATCH",
+        "READINESS_ORCHESTRATION_CONDITION_IDENTITY_MISMATCH",
+        "READINESS_ORCHESTRATION_CONDITION_DIGEST_MISMATCH",
+        "READINESS_ORCHESTRATION_CONDITION_SOURCE_REFERENCE_MISMATCH",
+        "READINESS_ORCHESTRATION_CONDITION_DUPLICATE",
+        "READINESS_ORCHESTRATION_CONDITION_CONCERN_NOT_IN_RESOLVED_POLICY",
+        "READINESS_ORCHESTRATION_CONDITION_CONCERN_NOT_CONDITIONAL",
+        "READINESS_ORCHESTRATION_CONDITION_CONCERN_NOT_COMPENSABLE",
+        "READINESS_ORCHESTRATION_CONDITION_NOT_ACTIVE_AT_EVALUATION_TIME",
+        "READINESS_ORCHESTRATION_EVALUATOR_REJECTED_SANITIZED_CASE"
+      ]
+    },
     "RequirementClass": {
       "kind": "enum",
       "values": [
@@ -378,6 +676,9 @@
         "CONDITIONAL",
         "ADVISORY"
       ]
+    },
+    "assess_readiness": {
+      "kind": "function"
     },
     "evaluate_readiness": {
       "kind": "function"

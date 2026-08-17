@@ -1,5 +1,168 @@
 # Changelog — ugence-agent-value-readiness
 
+## [0.3.0] — Trusted Readiness Orchestration
+
+**Additive integration capability, not a roadmap milestone.** A fail-closed
+**trust boundary around** the merged GV-3R-b evaluator. Minor bump because this
+is a material new capability on top of a merged 0.2.0; every 0.2.0 symbol keeps
+its shape and behaviour, so existing callers are unaffected and the standalone
+evaluator is untouched.
+
+### What this is, and what it is not
+- It implements requirements that are **already ratified**: UVI ADR **D-1**,
+  **D-16**, **§19** and **§23.2** (fail closed on unsigned / unapproved /
+  expired / revoked / superseded / digest-mismatched policy artifacts), and
+  shared Policy Authority ADR **§5** and **§10.4**. It defines **no new
+  milestone**.
+- It **does not define a new readiness classification** and **does not replace
+  or alter GV-3R-b**: the ratified precedence is untouched and the tier is still
+  selected by exactly one function, called exactly once.
+- It sits operationally **between** the deterministic evaluator (M-3R.2) and
+  future **M-3R.3** integration work. **M-3R.3 still owns** the
+  `IntelligenceFitness` / `CapabilityReadiness` / `AdoptionReadiness` catalogs
+  and `AssessedSystemBinding` wiring; **neither is implemented here, and that
+  milestone remains open.**
+- The output remains **advisory** and **never authorizes deployment**.
+
+### Version identity
+`EVALUATOR_FORMULA_VERSION` **stays `GV-3R-b.3`** — the classification algorithm
+did not change. `READINESS_ORCHESTRATOR_VERSION` is
+**`ugence.readiness-orchestration/v0.1`**: a platform-neutral capability
+identifier that names no ADR milestone and asserts no roadmap position. The
+`ReadinessTrustGapCode` values all carry the neutral
+`READINESS_ORCHESTRATION_` namespace. No other package is touched:
+`governance-contracts`,
+`uvi-policy-contracts`, `ugence-policy-authority` and `governed-value` are all
+unchanged, and **no ADR is modified**.
+
+### Added — the single canonical orchestration entry point
+- `assess_readiness(request, *, policy_resolver=None, gate_verifier=None,
+  condition_verifier=None)` — resolves, verifies, sanitizes, then calls the one
+  ratified `evaluate_readiness` **exactly once** over a freshly built case. It
+  never accepts, recomputes or second-guesses a classification.
+- `ReadinessAssessmentRequest` — the immutable input. It carries the assessment
+  id, `AssessmentContext`, exact readiness `PolicyReference`, requested target,
+  mandatory timezone-aware `evaluation_time`, gate results, conditions, the
+  three indicator families, an optional advisory composite and
+  evidence/window references — and deliberately **no** classification, **no**
+  caller-supplied trust boolean, **no** policy lifecycle conclusion, **no**
+  deployment authorization, **no** financial field, **no** system-clock default
+  and **no policy body**, so nothing can disagree with the resolved policy.
+- `ReadinessAssessmentOutcome` / `ReadinessAssessmentTrace` /
+  `GateVerificationSummary` / `ConditionVerificationSummary` /
+  `ReadinessAssessmentDisposition` — the advisory outcome and its deterministic
+  provenance trace. `authorizes_deployment` is a permanently-`False` **property**,
+  not a field; the outcome is **unsigned**.
+- Stable enums: `ReadinessAssessmentStatus`, `ReadinessInputVerificationStatus`,
+  `ReadinessTrustGapCode`, `ReadinessTrustAdvisoryState`. Codes are emitted in
+  enum declaration order, never input order.
+- Injected trust boundaries: the `ReadinessPolicyResolver` /
+  `GateResultVerifier` / `ConditionSetVerifier` protocols, their
+  `DenyAll…` production defaults, and
+  `PolicyAuthorityReadinessPolicyResolver` — a thin adapter onto the shared
+  authority's **public** `resolve_policy`.
+- `GateVerificationRequest` / `GateResultVerification` /
+  `ConditionVerificationRequest` / `ConditionSetVerification` — the complete
+  binding handed to a verifier and the answer it returns. A non-`VERIFIED`
+  answer structurally **cannot** carry a verified status or a satisfied
+  supporting-verification flag.
+- `ReadinessAssessmentError` (subclasses `ReadinessContractError`).
+
+### Dependency
+- Adds `ugence-policy-authority>=0.1.0`, **public API only**. Four automated
+  boundary tests enforce it: no authority internal (`…core`, `…adapters`) is
+  named; only the `orchestration` subpackage may import the authority at all;
+  the `contracts` and `evaluation` subpackages stay authority-free so the
+  evaluator remains independently usable; and the authority imports no engine.
+  No signature, approval, revocation, registry, canonicalization or lifecycle
+  logic is reproduced here, and no `PolicyResolution` / `PolicyReference` /
+  lifecycle / digest type is duplicated.
+
+### Fail-closed behaviour
+- **Production defaults deny.** No resolver ⇒ `NOT_EVALUATED`. No gate verifier
+  ⇒ no gate result can influence the classification. No condition verifier ⇒ no
+  control provides coverage.
+- **Policy-resolution failure dominates all gate information**: no verifier is
+  called, `evaluate_readiness` never runs, no classification or determination is
+  produced, and the failure outcome preserves **no usable policy material**.
+- Resolution is independently rechecked after the fact: resolved status, policy
+  and issuance record present, artifact is a `ReadinessPolicy`, complete
+  `PolicyReference` equality, tenant binding, context binding, target governed,
+  `as_of` equals the evaluation instant, historical answers refused, and — as
+  defence in depth — the resolved artifact still `APPROVED_ACTIVE` and effective.
+  What the **authority** answered and whether the **orchestrator accepted** it
+  are reported as two separate trace facts (`policy_resolution_status` /
+  `policy_resolution_reason` versus `policy_resolution_accepted`), so a resolved
+  answer this assessment refused can never be read as an accepted one; only an
+  accepted resolution may carry policy material, and only an accepted trace can
+  back an `EVALUATED` outcome.
+- A verifier object without a callable verification method is recorded as a gap
+  **up front**, exactly as a malformed resolver is, so a broken composition root
+  is never quieter than an absent one.
+- A verifier exception, malformed return or duck-typed object produces a stable
+  fail-closed gap. Nothing ever falls back to caller metadata, and no shared
+  state is mutated.
+- **No allow-all, permissive or "testing" verifier ships** in the wheel or the
+  public API; an AST test and the isolated wheel verifier both assert it.
+
+### Sanitization and precedence (GV-3R-b algorithm unchanged)
+Sanitization is **subtraction, never substitution**. An unverified result is
+*absent*, so a verified mandatory `FAIL` still dominates missing or unverified
+required gates (`NOT_READY`), an unverified `PASS`/`FAIL`/`INDETERMINATE`
+influences nothing, a missing verified required gate is `NOT_ASSESSABLE`,
+unverified advisory results neither block nor elevate, production-only gates
+stay diagnostic for `PILOT`, and duplicate / wrong-policy / wrong-target /
+unknown / tampered gates are rejected with stable codes rather than silently
+accepted. Input order cannot change the classification, reasons, trace or digest.
+
+### Conditions
+A control compensates only when the resolved policy marks the exact concern
+`CONDITIONAL` **and** `conditionally_compensable`, the control is active at the
+evaluation instant under the merged half-open interval, and the configured
+verifier attests its identity, canonical digest, source-gate reference, approval
+authority, approval evidence, owner/monitoring obligations, status, window and —
+because the merged `ConditionSet` has no tenant field — its tenant, subject and
+context binding. A mandatory concern remains non-waivable (D-6). Rejected
+controls stay visible in the trace with a stable reason. No runtime enforcement
+is implemented.
+
+### Indicators and evidence
+Intelligence, Capability and Adoption remain distinct and diagnostic; **no**
+global "all three families required" heuristic was reintroduced; indicator
+absence alone never blocks a gate-complete policy; supplied indicators keep
+their exact tenant / subject / context binding; `MetricClaim` evidence axes are
+carried through unchanged with no `REPORTED→OBSERVED`, `OBSERVED→ATTRIBUTED` or
+`ATTRIBUTED→VERIFIED` elevation; and neither a favourable indicator nor a
+maximal composite can rescue a mandatory failure.
+
+### Trust-advisory reconciliation
+Every standing GV-3R-b advisory receives an explicit disposition —
+`RESOLVED_BY_POLICY_RESOLUTION`, `RESOLVED_BY_GATE_VERIFICATION`,
+`RESOLVED_BY_CONDITION_VERIFICATION`, `UNRESOLVED`, or `OUT_OF_SCOPE` for a
+permanent boundary. Nothing is marked resolved because a caller supplied a
+boolean or a structurally complete record, and **benchmark/evidence authenticity
+stays `UNRESOLVED` unless the configured gate verifier proves it**.
+
+### Tests
+154 new tests (245 → **399**), all public-API, across policy resolution, gate
+verification, condition verification, indicator/evidence honesty, the outcome
+envelope and disposition, and determinism/immutability — plus an AST scan
+proving no wall clock, randomness, uuid, environment, network or mutable module
+global exists anywhere in the package. A new **39-probe** from-scratch
+adversarial harness (`adversarial_probes.py`) attacks the public API with no
+shared fixtures. The isolated multi-wheel `--no-index` verifier now builds four
+wheels and proves the orchestration boundary, its deny-by-default posture and
+the absence of any permissive verifier from the installed distribution.
+
+### Not implemented (deliberate)
+**Milestone M-3R.3 is untouched and remains open**: no `IntelligenceFitness` /
+`CapabilityReadiness` / `AdoptionReadiness` catalog and no
+`AssessedSystemBinding` wiring is introduced. Also absent: benchmark registry,
+TAP/evidence verification implementations, structured successor references,
+deployment authorization, condition runtime enforcement, signed readiness
+determinations (a separately ratified authority owner is required), forecasting
+and financial valuation.
+
 ## [0.2.0] — context-binding precedence correction (pre-merge, still 0.2.0/unreleased)
 
 Completes ADR §6 precondition row 0. Package version stays **0.2.0**; the
