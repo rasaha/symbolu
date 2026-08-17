@@ -6,7 +6,9 @@
 - **Date:** 2026-08-13.
 - **Scope:** milestones **GV-2C** (governed assessment context), **GV-2E** (evidence & benchmark contracts), **GV-3R** (Pre-ROI agent–outcome readiness) of the **Ugence Value Intelligence** capability. This ADR defines contracts, ownership, invariants and boundaries **only**. It introduces **no runtime code, no contracts, no packages, no authority, and no behavior**, and changes **no** existing package.
 - **Decision owners:** Ugence architecture owners for Value Intelligence, Policy Authority, Risk Authority, Decision Authority, Agent Runtime, and Runtime Assurance. Unresolved items requiring an owner ruling are listed in §26.
-- **Amendments:** **2026-08-16** — consistency-only amendment for the ratified [`ADR_UGENCE_POLICY_AUTHORITY.md`](ADR_UGENCE_POLICY_AUTHORITY.md) (one shared, platform-wide **Ugence Policy Authority**; UVI is its **first policy-family adapter**). It resolves the §26.1 open item and **strengthens** D-1 rather than weakening it. D-1's prohibition on a UVI-specific Policy Authority **stands unchanged**; D-2 … D-18 and all readiness/evidence/valuation semantics are **unchanged**.
+- **Amendments:**
+  **2026-08-17** — additive amendment for the ratified [`ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md`](ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md): the **benchmark registry** is **one shared, platform-wide Ugence Benchmark Registry** with UVI as its first consumer, and **trusted evidence verification** is owned by **TAP**, a platform-wide evidence admission/verification authority. This **resolves the §26.5 home question**, **upholds D-3** with two clarifications (see D-3's amendment note), and supplies the missing *mechanism* by which D-8's `VerificationStatus` could ever be **earned rather than asserted** — D-8's axes, D-9's synthetic restrictions, D-10's honest chain, D-11/D-12's valuation rules and D-14's assessed-system boundary are **all unchanged**. No `SystemManifest` is minted and §26.3 stays open.
+  **2026-08-16** — consistency-only amendment for the ratified [`ADR_UGENCE_POLICY_AUTHORITY.md`](ADR_UGENCE_POLICY_AUTHORITY.md) (one shared, platform-wide **Ugence Policy Authority**; UVI is its **first policy-family adapter**). It resolves the §26.1 open item and **strengthens** D-1 rather than weakening it. D-1's prohibition on a UVI-specific Policy Authority **stands unchanged**; D-2 … D-18 and all readiness/evidence/valuation semantics are **unchanged**.
 
 ## 2. Purpose and non-goals
 
@@ -45,6 +47,27 @@ The existing/planned **Ugence Policy Authority** owns policy **approval, signing
 
 ### D-3 — Benchmark registry
 An internal **UVI benchmark registry**: domain owners curate candidates; **Policy Authority governs admission and permitted uses**; **benchmark versions are immutable**; updates produce new versions; assessments bind exact **benchmark id + version + content digest**; expired/revoked/superseded benchmarks are **never silently substituted**; **registry resolution creates no policy authority**. Thresholds are either **immutable policy literals** (intrinsic to the signed policy) or **`BenchmarkReference`** (separately maintained, reusable, or frequently-updated data).
+
+> *Amendment (2026-08-17) — D-3 upheld; two clarifications, no substantive change.*
+> [`ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md`](ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md)
+> ratifies D-3's substance in full — immutability, digest-bound resolution, no silent
+> substitution, and "registry resolution creates no policy authority" — and adds:
+> **(1) Home.** "Internal **UVI** benchmark registry" is read as *internal **platform**
+> infrastructure*, **not UVI-owned**: **one shared, platform-wide Ugence Benchmark
+> Registry**, with UVI as its **first consumer**. This matches §21, which already draws
+> the benchmark registry as a peer of the UVI engines depending only on
+> `governance-contracts`, and follows the precedent by which §26.1 was resolved. A
+> UVI-specific benchmark registry is now prohibited by name.
+> **(2) "Policy Authority governs admission."** Read as governing **permitted uses** —
+> policy may require, reference and constrain the use of exact benchmark coordinates —
+> **not** as making the Policy Authority the benchmark **approver or signer**. Benchmark
+> approval is **external** to the Registry, which **verifies** approval rather than
+> producing it, and the authorized **publisher/signer** is a distinct named role. The
+> opposite reading would contradict
+> [`ADR_UGENCE_POLICY_AUTHORITY.md`](ADR_UGENCE_POLICY_AUTHORITY.md) §6.9/§19.9/§20,
+> which disclaim benchmark-value governance three times.
+> **D-3 is not weakened**, and D-1…D-18 are otherwise unchanged. The Registry remains
+> **DEFERRED as implementation** — no such package exists.
 
 ### D-4 — Readiness engine
 Placed provisionally at **`packages/capabilities/agent-value-readiness`**, an internal UVI engine. It evaluates `PreROIReadiness = f(IntelligenceFitness, CapabilityReadiness, AdoptionReadiness | GeographyPolicy, DomainPolicy, IntendedOutcomePolicy)` — **non-financial** leading indicators — and produces an **evidence-based advisory determination**. It does **not** authorize deployment, approve policy, mint runtime authority, or calculate financial ROI. Deployment/human-governance processes consume determinations; Risk Authority and ActionGate retain runtime authorization.
@@ -320,7 +343,14 @@ Each milestone is independently reviewable, fails closed by default, and mints n
 2. **RA-owned `SubjectContext` dependency** — PR #1425 is draft-only; owner to ratify/merge before UVI references `canonical_subject_context_ref` (D-14).
 3. **`SystemManifest` home** — `governance-contracts` vs `uvi-policy-contracts` vs an assessed-system contract, and confirmation it is a non-competing additive artifact (D-14, §20).
 4. **Producers of `AttributionAssessment` / `VerificationAssessment`** — a new attribution capability / DA extension, and a Runtime-Assurance extension vs new; whether `PARTIALLY_ATTRIBUTED` needs a DA reconciliation-contract extension (D-10).
-5. **Benchmark registry home & attestation cadence** (D-3).
+5. **Benchmark registry home** — **RESOLVED (2026-08-17)** by
+   [`ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md`](ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md):
+   **one shared, platform-wide Ugence Benchmark Registry** (internal platform
+   infrastructure, not a UVI-owned leaf and not a fourth UVI engine), with **UVI as its
+   first consumer**. It stays an **external platform dependency** of UVI engines and
+   remains **DEFERRED as implementation** — no such package exists, and building it is a
+   **platform dependency milestone**, not a UVI engine milestone. **Attestation cadence**
+   (D-3) **remains open** and is tracked as DD-8 in that ADR.
 6. **`agent-value-readiness` placement** — `packages/capabilities/*` (provisional, D-4) vs top-level leaf.
 7. **`FinancialValuation` eligibility & classification-stamping** location — `IntendedOutcomePolicy` vs a distinct `ValuationPolicy` (D-11).
 8. **Whether `SourceBasis.SYNTHETIC` is admitted beyond readiness** (D-9).

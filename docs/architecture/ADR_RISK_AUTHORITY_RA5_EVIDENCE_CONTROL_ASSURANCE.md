@@ -98,6 +98,33 @@ closes this. Discovery surfaced two facts that shape the decision:
   Implementation of RA-5 remains a distinct, future, separately-reviewed
   milestone — this ADR accepts the *design*, not any code.
 
+## Amendment (2026-08-17) — cross-reference only; no RA-5 decision changed
+
+[`ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md`](ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md)
+ratifies a **platform-wide** trusted evidence admission/verification authority under the
+"TAP" umbrella that `RISK_AUTHORITY_RA5_SPEC.md` §3.2 deliberately retained without naming
+an owner. Recorded here so the two are not read as competing evidence authorities:
+
+- **RA-5's `EvidenceAdmissionPort` remains the RA-scoped instance** — admission of *control
+  evidence* backing a `ControlResult`, bound to
+  `tenant / risk_case / policy_digest / workflow_ir_digest / control_id`, inside
+  `ugence-risk-authority`. Its scope, contracts and ports are **unchanged**.
+- **Extending that port platform-wide was considered and rejected** by the new ADR (§25.3):
+  it would force `governance-contracts` and Readiness to import Risk Authority, which is
+  prohibited, or silently widen a ratified RA-scoped contract without review.
+- **The non-collapse rule is preserved and extended** — assertion-support scoring
+  (`ugence-tap-provider`) and evidence admission/verification remain **different trust
+  questions, never merged**. `ugence-tap-provider` stays a Control-Assurance evaluator
+  *candidate*, **not** the admission or verification owner.
+- **A TAP evidence-verification receipt is not an authorization artifact.** Decision 3
+  stands: the Ed25519-signed `RiskAuthorizationEnvelope` remains the sole machine-execution
+  authority, and RA keeps the non-compensatory aggregation rule.
+- **Alignment** of RA-5's seam with the platform receipt is a separate, later,
+  separately-reviewed decision (DD-6 in that ADR).
+
+**No RA-5 decision, precondition resolution, port, contract, verdict or scope statement is
+changed by this amendment.**
+
 ## Scope statement
 
 Documentation/design only. No production code changed, no RA-5 package or adapters

@@ -173,6 +173,31 @@ artifacts** across Ugence policy domains. It owns:
 A successful resolution proves **issuance authenticity and current validity**. It proves
 **nothing** about whether the policy is wise, correct, lawful, or commercially sound.
 
+> *Amendment (2026-08-17) — rows 4 and 9 redirect to named owners; both disclaimers stand.*
+> Ratified by
+> [`ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md`](ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md).
+>
+> **Row 4 — evidence admission.** The *disclaimer* is **upheld**: the Policy Authority does
+> not own evidence admission. The *redirect* is **corrected**: **evidence producers produce
+> evidence; they do not admit or verify it.** Naming producers as the owner of admission
+> would ratify exactly the self-verification §11.4 forbids for approval and that UVI ADR
+> §23.10 prohibits ("reference producers never self-attest/self-verify/self-approve").
+> Evidence admission and verification are owned by **TAP — the Ugence Trusted Evidence
+> Authority**, a platform-wide role distinct from `ugence-tap-provider`. UVI ADR D-8/D-9
+> remain the correct reference for the evidence **classification axes** — which is what
+> this row pointed at — and are unchanged.
+>
+> **Row 9 — benchmark-value governance.** **Upheld unchanged in substance**: still not the
+> Policy Authority's, still deferred. The owner is now named — the **shared, platform-wide
+> Ugence Benchmark Registry**. The Policy Authority **may** issue policies referencing
+> **exact benchmark coordinates**; that is a citation, not ownership, and a policy
+> reference to a benchmark is **not** proof that the benchmark resolved successfully.
+> Benchmark **signing is not assigned to the Policy Authority**; any entitlement to act as
+> a benchmark approval **verifier** must be explicit in the relevant authority contract.
+>
+> **P-1 … P-11, §11, §13, §14, §15 and the §20 ledger are unchanged.** Both capabilities
+> remain **DEFERRED as implementation** — neither package exists.
+
 ---
 
 ## 7. Why shared, and why now
