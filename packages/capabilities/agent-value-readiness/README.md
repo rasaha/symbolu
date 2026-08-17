@@ -69,7 +69,7 @@ public trusted-resolution service.
 - **Distribution:** `ugence-agent-value-readiness`
 - **Namespace:** `ugence_agent_value_readiness`
 - **Version:** 0.4.0
-- **Depends on:** stdlib **+ `ugence-governance-contracts>=0.2.0`** (evidence vocabulary) **+ `ugence-uvi-policy-contracts>=0.1.0`** (policy/context shapes) **+ `ugence-policy-authority>=0.1.0`** (public trusted policy resolution only) — never `governed-value`, and never an authority internal.
+- **Depends on:** stdlib **+ `ugence-governance-contracts>=0.3.1`** (evidence vocabulary + the assessed-system identity contract) **+ `ugence-uvi-policy-contracts>=0.1.0`** (policy/context shapes) **+ `ugence-policy-authority>=0.1.0`** (public trusted policy resolution only) — never `governed-value`, and never an authority internal.
 - **Typing:** fully annotated; ships `py.typed`.
 
 ## What's in it

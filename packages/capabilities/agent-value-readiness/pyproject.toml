@@ -30,8 +30,9 @@ license = { text = "Proprietary" }
 authors = [{ name = "Rakesh Mohan" }]
 keywords = ["ugence", "value-intelligence", "readiness", "contracts", "agent"]
 # Depends on the neutral governance-contracts leaf (evidence vocabulary AND the
-# assessed-system identity contract, >=0.3.0 — the first version containing
-# AssessedSystemBinding), the
+# assessed-system identity contract, >=0.3.1 — the first version whose binding
+# canonicalization normalizes aware instants to UTC, so equal bindings share a
+# digest), the
 # uvi-policy-contracts leaf (policy/context shapes), and the PUBLIC API of the
 # shared, platform-wide Ugence Policy Authority (trusted policy resolution only).
 # No governed-value and no third-party runtime dependency. The authority
@@ -39,7 +40,7 @@ keywords = ["ugence", "value-intelligence", "readiness", "contracts", "agent"]
 # imported, and the authority imports no engine (UVI ADR §21; Policy Authority
 # ADR §10.4). An automated dependency-boundary test enforces both directions.
 dependencies = [
-    "ugence-governance-contracts>=0.3.0",
+    "ugence-governance-contracts>=0.3.1",
     "ugence-uvi-policy-contracts>=0.1.0",
     "ugence-policy-authority>=0.1.0",
 ]

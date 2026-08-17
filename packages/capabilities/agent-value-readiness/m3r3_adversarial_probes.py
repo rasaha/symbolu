@@ -120,7 +120,7 @@ print(f"M-3R.3 adversarial probes — {R.__version__} / {api.READINESS_ORCHESTRA
 
 @probe("the package version is exactly 0.4.0")
 def _version():
-    assert R.__version__ == "0.4.0", R.__version__
+    assert R.__version__ == "0.4.1", R.__version__
 
 
 @probe("the orchestrator version advanced to v0.2 and names no milestone")
