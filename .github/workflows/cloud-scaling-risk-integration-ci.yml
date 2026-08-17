@@ -101,7 +101,11 @@ jobs:
       - name: Install build tooling (host environment)
         run: |
           python -m pip install --upgrade pip
-          pip install build wheel pytest
+          # numpy is required by the HOST step that computes the source-side expected
+          # digests: it imports the controller from the source tree, and the controller
+          # imports numpy. It is unrelated to the isolated environment, which gets its
+          # own numpy from the local wheelhouse with no index reachable.
+          pip install build wheel pytest numpy
       - name: Genuinely offline isolated install + negative controls + source-vs-installed
         # Phase A (online) builds first-party wheels and downloads the full dependency
         # closure — including numpy — into a local wheelhouse. Phase B installs from that
