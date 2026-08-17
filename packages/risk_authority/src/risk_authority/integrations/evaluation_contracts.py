@@ -24,12 +24,15 @@ actuation_performed = effect_verified = executable = False``).
 
 from __future__ import annotations
 
+import re
+import unicodedata
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any, Mapping, Optional, Protocol, runtime_checkable
 
 from ..crypto.canonical import to_canonical_obj
+from ..crypto.hashing import DIGEST_PREFIX
 from ..crypto.hashing import digest as _digest
 from ..domain.enums import RiskClass, RiskOutcome
 from ..domain.errors import RiskAuthorityError
@@ -38,11 +41,20 @@ from ..domain.workflow_ir import WorkflowIR
 
 __all__ = [
     "EVALUATION_REQUEST_SCHEMA_VERSION",
+    "EVALUATION_REQUEST_SCHEMA_VERSION_V2",
     "EVALUATION_RESULT_SCHEMA_VERSION",
+    "SUBJECT_BINDING_SCHEMA_VERSION",
+    "SUBJECT_CONTEXT_SCHEMA_VERSION",
     "SUPPORTED_REQUEST_SCHEMA_VERSIONS",
     "SubjectRiskDisposition",
     "SubjectRiskNonDecisionReason",
     "SubjectRiskEvaluationRequest",
+    "SubjectRiskEvaluationRequestV2",
+    "SubjectContext",
+    "SubjectBinding",
+    "SubjectBindingValidation",
+    "SubjectBindingError",
+    "validate_subject_binding",
     "SubjectRiskDecision",
     "PolicyResolverPort",
     "TrustedControlEvidenceResolverPort",
@@ -53,9 +65,43 @@ __all__ = [
 
 EVALUATION_REQUEST_SCHEMA_VERSION = "risk-subject-evaluation-request-1"
 EVALUATION_RESULT_SCHEMA_VERSION = "risk-subject-decision-1"
+
+# --- v2 subject-context contract layer (Cloud Scaling Phase 4A, ADR §5.2-§5.4) ---
+# Each of the three objects below carries its own fixed schema tag *inside* its own
+# canonical form. Separation between them is achieved by that embedded tag plus strict
+# validation — NOT by the hash construction, which is the existing bare SHA-256 over
+# canonical bytes (``crypto.hashing.digest``). See the module note on schema-tagged
+# canonical hashing below.
+SUBJECT_CONTEXT_SCHEMA_VERSION = "risk-subject-context-1"
+SUBJECT_BINDING_SCHEMA_VERSION = "risk-subject-binding-1"
+EVALUATION_REQUEST_SCHEMA_VERSION_V2 = "risk-subject-evaluation-request-2"
+
+# The seam's accepted request set is DELIBERATELY unchanged in Phase 4A: this PR ships
+# contracts and pure validation only, and nothing wires ``validate_subject_binding``
+# into ``RiskEvaluationSeam``. Widening this set before that wiring exists would let a
+# v2 request reach policy resolution without its binding ever being reconciled.
+#
+# Two DISTINCT fail-closed behaviors result — do not conflate them:
+#
+#   * a genuine :class:`SubjectRiskEvaluationRequestV2` object is rejected by the seam's
+#     **v1 type boundary** (``RiskEvaluationSeam.evaluate`` opens with an ``isinstance``
+#     guard) and raises ``SeamConfigurationError``. Because v2 is a successor class and
+#     not a subclass, this fires *before* the schema gate, before the clock is read and
+#     before any digest is computed. This is the stronger containment and is preserved
+#     deliberately — it is NOT weakened to match prose.
+#   * a **v1-class** object carrying an unsupported ``schema_version`` string reaches the
+#     membership gate below and returns the typed
+#     ``NOT_EVALUATED(UNSUPPORTED_SCHEMA_VERSION)`` non-decision.
+#
+# Widening is a Phase 4B step, and only after the validator is wired in (see the recorded
+# Phase 4B ordering in the section banner further down).
 SUPPORTED_REQUEST_SCHEMA_VERSIONS = frozenset({EVALUATION_REQUEST_SCHEMA_VERSION})
 
 _TS_FMT = "%Y-%m-%dT%H:%M:%S.%fZ"
+
+# The established repository digest syntax: the ``crypto.hashing`` prefix + lowercase
+# SHA-256 hex. Built from DIGEST_PREFIX so it stays tied to the existing primitive.
+_DIGEST_RE = re.compile("^" + re.escape(DIGEST_PREFIX) + "[0-9a-f]{64}$")
 
 
 class SeamContractError(RiskAuthorityError):
@@ -525,3 +571,641 @@ class ReferenceControlEvidenceResolver:
             if rec is not None:
                 out.append(rec)
         return tuple(out)
+
+
+# ---------------------------------------------------------------------------
+# v2 neutral subject-context contract layer (Cloud Scaling Phase 4A)
+#
+# Three canonical, frozen, closed, schema-tagged objects and one pure validator:
+#
+#     SubjectContext  --digest-->  context_digest
+#     SubjectBinding  --digest-->  subject_digest      (carries context_digest)
+#     SubjectRiskEvaluationRequestV2 --digest--> request_digest  (carries subject_digest)
+#
+# **Schema-tagged canonical hashing (honest description).** ``crypto.hashing.digest``
+# is a *bare* SHA-256 over ``canonical_bytes`` — it is NOT a domain-separated or keyed
+# construction, and this layer introduces no new hashing primitive and no cryptographic
+# domain prefix. Separation between the three digests comes from each object embedding
+# its own fixed ``schema_version`` inside its own canonical form (so different objects
+# necessarily produce different canonical bytes) *plus* strict validation at every
+# consumer: a digest computed under one schema tag is never automatically accepted in
+# another semantic slot, because the only consumer that interprets a digest —
+# ``validate_subject_binding`` — recomputes it from a re-validated object rather than
+# trusting the carried value.
+#
+# **Authority boundary.** Nothing here resolves policy, evaluates risk, issues an
+# envelope, calls ActionGate, mints or accepts a credential, actuates a provider, or
+# verifies an effect. There is no field through which a caller can supply a PASS, a
+# trusted control result, or a risk decision — the field sets are closed and exclude
+# them structurally. ``SubjectBindingValidation`` is an integrity finding, not a grant.
+#
+# **Recorded Phase 4B / adapter ordering (load-bearing, NOT implemented here).**
+# Source authenticity is established outside this module, in this exact order:
+#
+#   1. reconstruct the real ``CapacityActionRecommendation``;
+#   2. independently recompute ``rec.digest()``;
+#   3. require equality with the outer ``recommendation_digest``;
+#   4. run :func:`validate_subject_binding`;
+#   5. perform trusted evidence (RA-5) and tenant/scope checks;
+#   6. only then permit policy resolution;
+#   7. only after all of the above widen ``SUPPORTED_REQUEST_SCHEMA_VERSIONS``.
+#
+# Phase 4A implements step 4 only. No placeholder authenticator and no permissive
+# resolver is added here — an absent check must stay visibly absent.
+#
+# **Recorded Phase 4B requirement — evaluation-time authority (ADR §10, F6).**
+# This PR deliberately changes NO evaluation-seam behavior, so caller time does not
+# become authoritative here and the deliberately-separate reference/test seam keeps
+# working. The requirement is recorded, not implemented:
+#
+#     A trusted PRODUCTION v2 evaluation MUST REJECT (fail closed, NOT_EVALUATED) a
+#     caller-supplied ``evaluation_time``. It must never be silently ignored. Trusted
+#     production time comes ONLY from Risk Authority's injected clock. Reference/test
+#     mode remains the ONLY place an explicit clock may be supplied.
+#
+# That rejection belongs to the evaluation seam, not to this data contract: enforcing
+# it here would also break the reference seam, which legitimately injects time. The
+# ``evaluation_time`` field below is therefore validated for *shape* only.
+# ---------------------------------------------------------------------------
+
+
+class SubjectBindingError(SeamContractError):
+    """Raised when a v2 subject binding cannot be reconstructed or does not reconcile.
+
+    A subclass of :class:`SeamContractError` (and therefore of ``RiskAuthorityError``)
+    so a caller may catch either. It signals a **fail-closed non-decision**: no risk
+    evaluation happened and no authority of any kind was produced."""
+
+
+def _require_nfc_str(name: str, value: Any, *, allow_empty: bool, token: bool = False) -> str:
+    """Validate a canonical string: no silent NFC coercion by the canonicalizer.
+
+    The RA canonicalizer NFC-normalizes every string, so accepting a non-NFC input here
+    would silently change the value that ends up in the digest. Rejecting it keeps
+    direct-construction and ``from_dict`` parity exact. ``token=True`` additionally
+    rejects surrounding whitespace (``action_type`` is a canonical enum token, not a
+    free-form label)."""
+
+    if isinstance(value, bool) or not isinstance(value, str):
+        raise SeamContractError(f"{name} must be a string")
+    if value == "" and not allow_empty:
+        raise SeamContractError(f"{name} must be a non-empty string")
+    if unicodedata.normalize("NFC", value) != value:
+        raise SeamContractError(f"{name} must already be NFC-normalized")
+    if token and value.strip() != value:
+        raise SeamContractError(f"{name} must not carry leading/trailing whitespace")
+    return value
+
+
+def _require_digest(name: str, value: Any) -> str:
+    """Validate the repository's established digest syntax (``sha256:`` + 64 lc hex)."""
+
+    if isinstance(value, bool) or not isinstance(value, str):
+        raise SeamContractError(f"{name} must be a string")
+    if not _DIGEST_RE.match(value):
+        raise SeamContractError(
+            f"{name} must be a canonical digest ('{DIGEST_PREFIX}' + 64 lowercase hex)"
+        )
+    return value
+
+
+def _require_canonical_int(name: str, value: Any) -> Optional[int]:
+    """Canonical integer or ``None``. ``bool`` and ``float`` are rejected outright.
+
+    ``bool`` is a subclass of ``int`` in Python, so it must be excluded explicitly or
+    ``True`` would silently canonicalize as a magnitude. ``float`` is rejected here as
+    well as by ``to_canonical_obj`` so the failure is a typed contract error at
+    construction rather than a ``TypeError`` at digest time."""
+
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        raise SeamContractError(f"{name} must be an int, not a bool")
+    if isinstance(value, float):
+        raise SeamContractError(f"{name} must be an int, not a float")
+    if not isinstance(value, int):
+        raise SeamContractError(f"{name} must be an int or None")
+    return value
+
+
+def _require_utc(name: str, value: Any) -> datetime:
+    """Require an explicit, timezone-aware UTC datetime.
+
+    Naive datetimes are rejected rather than assumed-UTC, and a non-zero offset is
+    rejected rather than converted: both would be silent coercions of a value that the
+    digest is about to freeze. Callers pass ``tzinfo=timezone.utc`` explicitly, which is
+    exactly what ``from_dict`` produces — so direct construction and reconstruction have
+    identical validity rules."""
+
+    if not isinstance(value, datetime):
+        raise SeamContractError(f"{name} must be a datetime")
+    offset = value.utcoffset()
+    if value.tzinfo is None or offset is None:
+        raise SeamContractError(f"{name} must be timezone-aware UTC (naive datetime rejected)")
+    if offset != timedelta(0):
+        raise SeamContractError(f"{name} must be UTC (non-UTC offset rejected)")
+    return value
+
+
+@dataclass(frozen=True)
+class SubjectContext:
+    """Strict, closed, frozen **neutral subject facts** (schema ``risk-subject-context-1``).
+
+    This is a neutral subject-fact contract, **not** a generic attribute map. The field
+    set is closed and deliberately excludes ``tenant_id``, ``subject_id``, evidence
+    references, caller-selected policy identifiers, risk decisions, control results,
+    keys/credentials, authorization envelopes, execution instructions and executable
+    flags — identity and evidence references are authoritative on the **outer** request
+    (ADR §5.1 F2), and the rest have no legitimate home in a subject fact.
+
+    Encoding rules (ADR §5.2): canonical enum string for ``action_type``; canonical
+    integers only for magnitudes (``bool``/``float`` rejected); explicit UTC timestamps;
+    ``None`` is a distinct sentinel that is never coerced to ``""`` or ``0``, so
+    "no environment" and ``environment = ""`` yield **different** ``context_digest``s."""
+
+    action_type: str
+    subject_asserted_at: datetime
+    subject_valid_from: datetime
+    subject_valid_until: datetime
+    environment: Optional[str] = None
+    region: Optional[str] = None
+    zone: Optional[str] = None
+    compute_group: Optional[str] = None
+    resource_class: Optional[str] = None
+    magnitude_before: Optional[int] = None
+    magnitude_after: Optional[int] = None
+    schema_version: str = SUBJECT_CONTEXT_SCHEMA_VERSION
+
+    _OPTIONAL_STRINGS = ("environment", "region", "zone", "compute_group", "resource_class")
+
+    def __post_init__(self) -> None:
+        # The schema tag is fixed, not caller-chosen: a foreign tag is a cross-schema
+        # substitution attempt and fails closed here rather than at digest comparison.
+        if self.schema_version != SUBJECT_CONTEXT_SCHEMA_VERSION:
+            raise SeamContractError(
+                f"schema_version must be {SUBJECT_CONTEXT_SCHEMA_VERSION!r}"
+            )
+        _require_nfc_str("action_type", self.action_type, allow_empty=False, token=True)
+        for name in self._OPTIONAL_STRINGS:
+            value = getattr(self, name)
+            if value is not None:
+                # "" is a legitimate *named* value, distinct from the None sentinel
+                # (ADR §5.2 "Missing-vs-named", §6).
+                _require_nfc_str(name, value, allow_empty=True)
+        for name in ("magnitude_before", "magnitude_after"):
+            _require_canonical_int(name, getattr(self, name))
+        for name in ("subject_asserted_at", "subject_valid_from", "subject_valid_until"):
+            _require_utc(name, getattr(self, name))
+        if not (self.subject_valid_from <= self.subject_asserted_at <= self.subject_valid_until):
+            raise SeamContractError(
+                "temporal ordering must satisfy "
+                "subject_valid_from <= subject_asserted_at <= subject_valid_until"
+            )
+
+    def to_canonical_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "environment": self.environment,
+            "region": self.region,
+            "zone": self.zone,
+            "compute_group": self.compute_group,
+            "resource_class": self.resource_class,
+            "action_type": self.action_type,
+            "magnitude_before": self.magnitude_before,
+            "magnitude_after": self.magnitude_after,
+            "subject_asserted_at": _fmt_ts(self.subject_asserted_at),
+            "subject_valid_from": _fmt_ts(self.subject_valid_from),
+            "subject_valid_until": _fmt_ts(self.subject_valid_until),
+        }
+
+    def digest(self) -> str:
+        """The schema-tagged canonical identity of these neutral facts."""
+
+        return _digest(self.to_canonical_dict())
+
+    _ALLOWED_KEYS = frozenset({
+        "schema_version", "environment", "region", "zone", "compute_group",
+        "resource_class", "action_type", "magnitude_before", "magnitude_after",
+        "subject_asserted_at", "subject_valid_from", "subject_valid_until",
+    })
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "SubjectContext":
+        if not isinstance(data, Mapping):
+            raise SeamContractError("subject_context data must be a mapping")
+        unknown = set(data) - cls._ALLOWED_KEYS
+        if unknown:
+            raise SeamContractError(f"unknown subject_context field(s): {sorted(unknown)}")
+        if "schema_version" not in data:
+            raise SeamContractError("subject_context requires an explicit schema_version")
+        for name in ("action_type", "subject_asserted_at", "subject_valid_from",
+                     "subject_valid_until"):
+            if name not in data:
+                raise SeamContractError(f"subject_context requires {name}")
+        return cls(
+            schema_version=data["schema_version"],
+            environment=data.get("environment"),
+            region=data.get("region"),
+            zone=data.get("zone"),
+            compute_group=data.get("compute_group"),
+            resource_class=data.get("resource_class"),
+            action_type=data["action_type"],
+            # Magnitudes are passed through untouched so a float/bool is REJECTED by
+            # __post_init__ rather than silently narrowed by an int() coercion.
+            magnitude_before=data.get("magnitude_before"),
+            magnitude_after=data.get("magnitude_after"),
+            subject_asserted_at=_parse_ts(data["subject_asserted_at"]),
+            subject_valid_from=_parse_ts(data["subject_valid_from"]),
+            subject_valid_until=_parse_ts(data["subject_valid_until"]),
+        )
+
+
+@dataclass(frozen=True)
+class SubjectBinding:
+    """Frozen, closed binding anchors (schema ``risk-subject-binding-1``).
+
+    Carries **only** binding anchors. ``tenant_id`` / ``subject_id`` / ``subject_type``
+    are **derived** from the outer request when validating one (they are not independent
+    second sources of truth, and ``SubjectContext`` carries no identity copy at all), and
+    both digest fields must satisfy the established digest syntax."""
+
+    tenant_id: str
+    subject_id: str
+    subject_type: str
+    recommendation_digest: str
+    context_digest: str
+    schema_version: str = SUBJECT_BINDING_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        if self.schema_version != SUBJECT_BINDING_SCHEMA_VERSION:
+            raise SeamContractError(
+                f"schema_version must be {SUBJECT_BINDING_SCHEMA_VERSION!r}"
+            )
+        for name in ("tenant_id", "subject_id", "subject_type"):
+            _require_nfc_str(name, getattr(self, name), allow_empty=False)
+        for name in ("recommendation_digest", "context_digest"):
+            _require_digest(name, getattr(self, name))
+
+    def to_canonical_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "tenant_id": self.tenant_id,
+            "subject_id": self.subject_id,
+            "subject_type": self.subject_type,
+            "recommendation_digest": self.recommendation_digest,
+            "context_digest": self.context_digest,
+        }
+
+    def digest(self) -> str:
+        """The schema-tagged canonical identity of this binding (the ``subject_digest``)."""
+
+        return _digest(self.to_canonical_dict())
+
+    _ALLOWED_KEYS = frozenset({
+        "schema_version", "tenant_id", "subject_id", "subject_type",
+        "recommendation_digest", "context_digest",
+    })
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "SubjectBinding":
+        if not isinstance(data, Mapping):
+            raise SeamContractError("subject_binding data must be a mapping")
+        unknown = set(data) - cls._ALLOWED_KEYS
+        if unknown:
+            raise SeamContractError(f"unknown subject_binding field(s): {sorted(unknown)}")
+        for name in sorted(cls._ALLOWED_KEYS):
+            if name not in data:
+                raise SeamContractError(f"subject_binding requires {name}")
+        return cls(
+            schema_version=data["schema_version"],
+            tenant_id=data["tenant_id"],
+            subject_id=data["subject_id"],
+            subject_type=data["subject_type"],
+            recommendation_digest=data["recommendation_digest"],
+            context_digest=data["context_digest"],
+        )
+
+
+@dataclass(frozen=True)
+class SubjectRiskEvaluationRequestV2:
+    """A v2 subject-risk evaluation request (schema ``risk-subject-evaluation-request-2``).
+
+    A **successor** contract, not a subclass of :class:`SubjectRiskEvaluationRequest`:
+    v1 is left byte-for-byte untouched, and because a v2 request is not an instance of
+    the v1 type it cannot silently flow into a v1-typed call site. There is no automatic
+    v1↔v2 conversion in either direction.
+
+    The **outer request remains the sole authority** for tenant, subject identity and
+    type, evidence references, requested purpose/domain/scope, and correlation and
+    idempotency data. It adds exactly two fields over v1:
+
+    * ``subject_context`` — the raw, immutable, inspectable layered commitment (ADR §5.3);
+    * ``recommendation_digest`` — the authoritative recommendation digest.
+
+    **Why ``recommendation_digest`` is an outer field.** ADR §5.3 step 3 requires Risk
+    Authority to reconstruct :class:`SubjectBinding` from ``{outer tenant_id, outer
+    subject_id, subject_type, recommendation_digest, recomputed context_digest}`` before
+    policy resolution, but the ADR's originally illustrated v2 request carried no such
+    field: the recommendation digest's only home there was *inside* ``SubjectBinding``
+    (§5.1 row 1), it was absent from ``evidence_references`` (§5.1 rows 12-13, §5.3), and
+    it cannot be recovered from ``subject_digest`` or ``idempotency_key`` because both are
+    one-way SHA-256 outputs. Reconstruction was therefore impossible as illustrated. This
+    explicit outer field is the narrowest versioned correction: it is additive, confined
+    to v2, keeps ``SubjectContext`` free of it, and preserves the derived-anchor rule.
+    The original ADR §5.3 illustration omitted the outer ``recommendation_digest``; Phase 4
+    ADR Amendment 1 records the corrected v2 request shape implemented here.
+
+    ``subject_context`` and ``recommendation_digest`` are required **together** — a
+    request carrying one without the other is a half-bound request that could never be
+    reconciled, so it fails closed at construction rather than at validation time. With
+    both absent the request is behaviorally equivalent to v1."""
+
+    subject_type: str
+    subject_id: str
+    subject_digest: str
+    tenant_id: str
+    requested_purpose: str
+    requested_domain: str
+    requested_scope: Scope
+    requested_risk_class: Optional[RiskClass] = None
+    jurisdictions: tuple[str, ...] = ()
+    requested_tools: tuple[str, ...] = ()
+    requested_autonomy_level: int = 0
+    requested_data_classes: tuple[str, ...] = ()
+    evidence_references: tuple[str, ...] = ()
+    correlation_id: Optional[str] = None
+    idempotency_key: Optional[str] = None
+    evaluation_time: Optional[datetime] = None
+    subject_context: Optional[SubjectContext] = None
+    recommendation_digest: Optional[str] = None
+    schema_version: str = EVALUATION_REQUEST_SCHEMA_VERSION_V2
+
+    def __post_init__(self) -> None:
+        if self.schema_version != EVALUATION_REQUEST_SCHEMA_VERSION_V2:
+            raise SeamContractError(
+                f"schema_version must be {EVALUATION_REQUEST_SCHEMA_VERSION_V2!r}"
+            )
+        for name in ("requested_purpose", "requested_domain"):
+            v = getattr(self, name)
+            if not isinstance(v, str) or v == "":
+                raise SeamContractError(f"{name} must be a non-empty string")
+        # Identity fields flow verbatim into the reconstructed SubjectBinding, so they
+        # are held to the SAME constraints here (non-empty + already NFC). Validating
+        # them only at the binding would mean an identical invalid value surfaced as a
+        # different error class depending on where it was discovered (audit F-5).
+        for name in ("subject_type", "subject_id", "tenant_id"):
+            _require_nfc_str(name, getattr(self, name), allow_empty=False)
+        # Stricter than v1: the subject digest is recomputed by validate_subject_binding,
+        # so it must be a real digest rather than any non-empty string.
+        _require_digest("subject_digest", self.subject_digest)
+        if not isinstance(self.requested_scope, Scope):
+            raise SeamContractError("requested_scope must be a Scope")
+        if self.requested_risk_class is not None and not isinstance(self.requested_risk_class, RiskClass):
+            raise SeamContractError("requested_risk_class must be a RiskClass or None")
+        if isinstance(self.requested_autonomy_level, bool) or not isinstance(self.requested_autonomy_level, int) \
+                or self.requested_autonomy_level < 0:
+            raise SeamContractError("requested_autonomy_level must be an int >= 0")
+        for name in ("jurisdictions", "requested_tools", "requested_data_classes", "evidence_references"):
+            seq = getattr(self, name)
+            if not isinstance(seq, tuple) or any(not isinstance(x, str) or x == "" for x in seq):
+                raise SeamContractError(f"{name} must be a tuple of non-empty strings")
+        if self.evaluation_time is not None:
+            # NOTE (Phase 4B): a *shape* check only. Whether a caller-supplied
+            # evaluation_time is permitted at all belongs to the evaluation seam, which
+            # this PR leaves unchanged — see the recorded Phase 4B requirement in the
+            # section banner above.
+            _require_utc("evaluation_time", self.evaluation_time)
+        if self.subject_context is not None and not isinstance(self.subject_context, SubjectContext):
+            raise SeamContractError("subject_context must be a SubjectContext or None")
+        if self.recommendation_digest is not None:
+            _require_digest("recommendation_digest", self.recommendation_digest)
+        if (self.subject_context is None) != (self.recommendation_digest is None):
+            raise SeamContractError(
+                "subject_context and recommendation_digest must be supplied together "
+                "(a half-bound request can never be reconciled)"
+            )
+        object.__setattr__(self, "requested_scope", self.requested_scope.normalized())
+
+    def to_canonical_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "subject_type": self.subject_type,
+            "subject_id": self.subject_id,
+            "subject_digest": self.subject_digest,
+            "tenant_id": self.tenant_id,
+            "requested_purpose": self.requested_purpose,
+            "requested_domain": self.requested_domain,
+            "requested_scope": _scope_to_dict(self.requested_scope),
+            "requested_risk_class": (self.requested_risk_class.value if self.requested_risk_class else None),
+            "jurisdictions": list(self.jurisdictions),
+            "requested_tools": list(self.requested_tools),
+            "requested_autonomy_level": self.requested_autonomy_level,
+            "requested_data_classes": list(self.requested_data_classes),
+            "evidence_references": list(self.evidence_references),
+            "correlation_id": self.correlation_id,
+            "idempotency_key": self.idempotency_key,
+            "evaluation_time": _fmt_ts(self.evaluation_time),
+            "subject_context": (self.subject_context.to_canonical_dict()
+                                if self.subject_context is not None else None),
+            "recommendation_digest": self.recommendation_digest,
+        }
+
+    def digest(self) -> str:
+        return _digest(self.to_canonical_dict())
+
+    _ALLOWED_KEYS = frozenset({
+        "schema_version", "subject_type", "subject_id", "subject_digest", "tenant_id",
+        "requested_purpose", "requested_domain", "requested_scope", "requested_risk_class",
+        "jurisdictions", "requested_tools", "requested_autonomy_level",
+        "requested_data_classes", "evidence_references", "correlation_id",
+        "idempotency_key", "evaluation_time", "subject_context", "recommendation_digest",
+    })
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "SubjectRiskEvaluationRequestV2":
+        if not isinstance(data, Mapping):
+            raise SeamContractError("request data must be a mapping")
+        unknown = set(data) - cls._ALLOWED_KEYS
+        if unknown:
+            raise SeamContractError(f"unknown request field(s): {sorted(unknown)}")
+        if "schema_version" not in data:
+            raise SeamContractError("request requires an explicit schema_version")
+        rc = data.get("requested_risk_class")
+        ctx = data.get("subject_context")
+        return cls(
+            schema_version=data["schema_version"],
+            subject_type=data["subject_type"],
+            subject_id=data["subject_id"],
+            subject_digest=data["subject_digest"],
+            tenant_id=data["tenant_id"],
+            requested_purpose=data["requested_purpose"],
+            requested_domain=data["requested_domain"],
+            requested_scope=_scope_from_dict(data["requested_scope"]),
+            requested_risk_class=(RiskClass(rc) if rc is not None else None),
+            jurisdictions=tuple(data.get("jurisdictions", ())),
+            requested_tools=tuple(data.get("requested_tools", ())),
+            requested_autonomy_level=int(data.get("requested_autonomy_level", 0)),
+            requested_data_classes=tuple(data.get("requested_data_classes", ())),
+            evidence_references=tuple(data.get("evidence_references", ())),
+            correlation_id=data.get("correlation_id"),
+            idempotency_key=data.get("idempotency_key"),
+            evaluation_time=_parse_ts(data.get("evaluation_time")),
+            subject_context=(SubjectContext.from_dict(ctx) if ctx is not None else None),
+            recommendation_digest=data.get("recommendation_digest"),
+        )
+
+
+@dataclass(frozen=True)
+class SubjectBindingValidation:
+    """The typed successful outcome of :func:`validate_subject_binding`.
+
+    An **integrity finding, not a grant**: it states that the request's carried
+    ``subject_digest`` reconciles with a binding reconstructed from authoritative outer
+    fields over a re-validated context. It is an in-process return value and is never
+    serialized or transported, so it deliberately carries no schema tag of its own — it
+    is not a wire contract and must not become one.
+
+    Every authority flag is fixed ``False`` and enforced at construction, mirroring
+    :class:`SubjectRiskDecision`: reaching this result grants nothing."""
+
+    tenant_id: str
+    subject_id: str
+    subject_type: str
+    recommendation_digest: str
+    context_digest: str
+    subject_digest: str
+    binding: SubjectBinding
+    # Fixed non-authority invariants — validating a binding is not an evaluation.
+    policy_resolved: bool = False
+    risk_evaluated: bool = False
+    authority_granted: bool = False
+    envelope_issued: bool = False
+    actiongate_invoked: bool = False
+    actuation_performed: bool = False
+    effect_verified: bool = False
+    executable: bool = False
+
+    def __post_init__(self) -> None:
+        for flag in ("policy_resolved", "risk_evaluated", "authority_granted",
+                     "envelope_issued", "actiongate_invoked", "actuation_performed",
+                     "effect_verified", "executable"):
+            if getattr(self, flag) is not False:
+                raise SeamContractError(
+                    f"{flag} must be False — binding validation grants no authority"
+                )
+        if not isinstance(self.binding, SubjectBinding):
+            raise SeamContractError("binding must be a SubjectBinding")
+
+
+def validate_subject_binding(
+    request: "SubjectRiskEvaluationRequestV2",
+) -> SubjectBindingValidation:
+    """Pure, deterministic, fail-closed reconciliation of a v2 request's subject binding.
+
+    Performs the ADR §5.3 pre-resolution steps **in order**:
+
+    1. validate the closed :class:`SubjectContext` (re-validated through ``from_dict``
+       over its own canonical form, so a mutated instance cannot slip past);
+    2. recompute ``context_digest`` from the supplied **raw** context;
+    3. reconstruct :class:`SubjectBinding` **exclusively** from authoritative outer
+       request fields, the authoritative ``recommendation_digest``, and the recomputed
+       ``context_digest`` — never from any value carried inside the binding itself;
+    4. recompute ``subject_digest`` from that reconstruction;
+    5. require equality with the request's carried ``subject_digest``;
+    6. return the typed :class:`SubjectBindingValidation`.
+
+    An altered raw context paired with a stale ``subject_digest`` fails deterministically
+    at step 5, because step 2 re-derives the context digest rather than trusting the one
+    committed inside the stale binding.
+
+    **Exact security guarantee — read this before relying on it.**
+    ``validate_subject_binding`` proves *internal canonical consistency* between the
+    supplied context, the outer binding fields and the carried digests. It does **not**
+    prove that those caller-supplied facts or ``recommendation_digest`` originate from an
+    authentic Cloud Scaling recommendation. Source authenticity must be established by
+    the future Cloud Scaling adapter, by reconstructing the actual
+    ``CapacityActionRecommendation``, recomputing ``rec.digest()`` and requiring equality
+    **before** the request may enter trusted evaluation. RA-5 and the evaluation seam
+    supply their own, separate evidence-admission and tenant/scope checks.
+
+    Concretely: this function detects **inconsistent or partial tampering** — an altered
+    field left paired with a stale digest. It does **not** detect a *fully self-consistent
+    fabricated request*, because a caller who recomputes ``context_digest``,
+    ``subject_digest`` and ``request_digest`` produces an internally consistent object by
+    construction. It therefore does not by itself provide recommendation authenticity,
+    provenance verification, cross-tenant authorization, trusted evidence admission, or
+    replay prevention against a caller capable of recomputing every digest.
+
+    This function performs **no** policy resolution, risk evaluation, authority issuance,
+    ActionGate call, credential handling or execution, and it is not wired into
+    :class:`~risk_authority.api.evaluation_seam.RiskEvaluationSeam` by Phase 4A. It reads
+    only its argument — no clock, no I/O, no ambient state — so it is a pure function.
+
+    :raises SubjectBindingError: the request is not a reconcilable v2 request, the binding
+        could not be reconstructed from the outer fields, or the reconstructed
+        ``subject_digest`` does not equal the carried one.
+    :raises SeamContractError: the carried context is not a valid closed
+        ``risk-subject-context-1`` object.
+    """
+
+    if not isinstance(request, SubjectRiskEvaluationRequestV2):
+        raise SubjectBindingError(
+            "binding validation requires a SubjectRiskEvaluationRequestV2 "
+            f"({EVALUATION_REQUEST_SCHEMA_VERSION_V2}); no v1 conversion is performed"
+        )
+    if request.schema_version != EVALUATION_REQUEST_SCHEMA_VERSION_V2:
+        raise SubjectBindingError(
+            f"unsupported request schema_version: {request.schema_version!r}"
+        )
+    context = request.subject_context
+    if context is None:
+        raise SubjectBindingError("v2 request carries no subject_context to reconcile")
+    if request.recommendation_digest is None:
+        raise SubjectBindingError("v2 request carries no authoritative recommendation_digest")
+
+    # (1) validate the closed context — re-parsed from its own canonical form so that a
+    #     frozen-dataclass bypass (object.__setattr__) is caught here, not trusted.
+    validated_context = SubjectContext.from_dict(context.to_canonical_dict())
+
+    # (2) recompute the context digest from the supplied raw context.
+    context_digest = validated_context.digest()
+
+    # (3) reconstruct the binding from AUTHORITATIVE OUTER fields only. The v2 request
+    #     already holds its identity fields to the binding's constraints, so this should
+    #     not fail; any residual contract error is reported as the documented validator
+    #     error type rather than leaking a differently-classed exception (audit F-5).
+    try:
+        binding = SubjectBinding(
+            tenant_id=request.tenant_id,
+            subject_id=request.subject_id,
+            subject_type=request.subject_type,
+            recommendation_digest=request.recommendation_digest,
+            context_digest=context_digest,
+        )
+    except SubjectBindingError:
+        raise
+    except SeamContractError as exc:
+        raise SubjectBindingError(
+            f"subject binding could not be reconstructed from the outer request: {exc}"
+        ) from exc
+
+    # (4) recompute the subject digest.
+    subject_digest = binding.digest()
+
+    # (5) require equality with the carried commitment — fail closed on any mismatch.
+    if subject_digest != request.subject_digest:
+        raise SubjectBindingError(
+            "subject_digest mismatch: the reconstructed binding does not reconcile with "
+            "the digest carried on the request (fail closed, no evaluation performed)"
+        )
+
+    # (6) typed success — an integrity finding that grants nothing.
+    return SubjectBindingValidation(
+        tenant_id=request.tenant_id,
+        subject_id=request.subject_id,
+        subject_type=request.subject_type,
+        recommendation_digest=request.recommendation_digest,
+        context_digest=context_digest,
+        subject_digest=subject_digest,
+        binding=binding,
+    )

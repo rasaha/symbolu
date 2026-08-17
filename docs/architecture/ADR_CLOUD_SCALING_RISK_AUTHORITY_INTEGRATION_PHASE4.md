@@ -12,6 +12,25 @@
 
 ---
 
+## Amendment 1 (2026-08-15) — outer `recommendation_digest` on the v2 request
+
+**Owner-approved narrow correction, applied after independent audit of the Phase 4A implementation PR.**
+
+§5.3 requires Risk Authority to reconstruct `SubjectBinding` from `{outer tenant_id, outer subject_id, subject_type, recommendation_digest, recomputed context_digest}` **before policy resolution**. As originally merged, this ADR **omitted the only reconstructible source of `recommendation_digest`**: the value's sole home was *inside* `SubjectBinding` (§5.1 row 1), it was absent from `evidence_references` (§5.1 rows 12–13 and the §5.3 pseudocode carry only the forecast / cost / topology / state digests), and it cannot be recovered from `subject_digest` or `idempotency_key` because **both are one-way SHA-256 outputs**. RA-side binding reconstruction was therefore impossible as illustrated.
+
+The owner approved the narrowest versioned correction: an explicit **outer `recommendation_digest`** field on `risk-subject-evaluation-request-2` **only**. It is additive, confined to v2, keeps `SubjectContext` free of it, and preserves the derived-anchor rule — the outer request remains the sole authority, exactly as it already is for `tenant_id` and `subject_id`.
+
+Scope of this amendment:
+
+- **`risk-subject-evaluation-request-1` is unchanged** — v1 construction, serialization, reconstruction and digests remain byte-for-byte identical, and v1 acquires no new serialized field.
+- The corrected §5.3 worked request JSON is the **complete implemented v2 canonical shape** (it additionally includes the inherited `jurisdictions`, `requested_tools`, `requested_autonomy_level` and `requested_data_classes` fields that the real request contract has always serialized but the pre-amendment illustration omitted).
+- The corrected `request_digest = sha256:ac0bdada…` **supersedes only the previous v2 worked request digest** `sha256:b1973925…`. The `context_digest` (`sha256:9af3f626…`), `subject_digest` (`sha256:eb4526a6…`) and the §5.3 tamper-demonstration digests are **unchanged and still reproduce byte-for-byte**.
+- This amendment **grants no authority and does not activate v2 evaluation**. `SUPPORTED_REQUEST_SCHEMA_VERSIONS` still admits v1 only; a v2 request cannot reach policy resolution.
+
+**Integrity is not authenticity.** The RA-side reconstruction this amendment makes possible proves *internal canonical consistency* between the supplied context, the outer binding fields and the carried digests. It does **not** prove that `recommendation_digest` corresponds to an authentic `CapacityActionRecommendation` — a caller who recomputes every digest produces a self-consistent request by construction. Source authenticity remains the adapter's obligation under §7 (reconstruct the recommendation, recompute `rec.digest()`, require equality **before** the request may enter trusted evaluation), with RA-5 admission and the seam's tenant/scope checks supplying their own separate guarantees.
+
+---
+
 ## Repository evidence used (verified at default-branch tip `d52a0234`)
 
 All contract shapes below were read from source on the default branch, not from prior summaries.
@@ -91,7 +110,7 @@ Each fact has exactly **one** canonical home. "Hashed via" names the single obje
 
 | # | Risk-relevant field | Source (`CapacityActionRecommendation`) | Single canonical home | Hashed via |
 |---|---|---|---|---|
-| 1 | recommendation digest | `.digest()` (`evidence_digest`, `sha256:`) | `SubjectBinding.recommendation_digest` | `subject_digest` |
+| 1 | recommendation digest | `.digest()` (`evidence_digest`, `sha256:`) | **outer** `recommendation_digest` (authoritative, v2); `SubjectBinding.recommendation_digest` **derived** from it | `request_digest` + `subject_digest` |
 | 2 | subject / workload id | `.subject.workload_id` | **outer** `subject_id` (sole authority); `SubjectBinding.subject_id` **derived** from it (not in `SubjectContext`) | `request_digest` + `subject_digest` |
 | 3 | tenant | `.subject.tenant_id` | **outer** `tenant_id` (authoritative) + `SubjectBinding.tenant_id` (binding anchor) | `request_digest` + `subject_digest` |
 | 4 | environment | `.subject.environment` | `SubjectContext.environment` | `context_digest` |
@@ -109,7 +128,7 @@ Each fact has exactly **one** canonical home. "Hashed via" names the single obje
 | 15 | risk class | *(absent — advisory)* | outer `requested_risk_class = None` (RA classifies) | `request_digest` |
 | 16 | purpose / domain id | canonical constants (adapter) | outer `requested_purpose` / `requested_domain` (D-4) | `request_digest` |
 
-Note the deliberate split (F2): **tenant**, **subject identity** and **evidence references** live on the **outer request**, which is their sole authoritative source; `SubjectContext` holds only *neutral subject facts* (#4–#11) and **not** tenant, subject id, or evidence references. `SubjectBinding.tenant_id` and `SubjectBinding.subject_id` are binding anchors **derived from the outer request** (not second sources of truth) and are recomputed/reconciled by RA before policy resolution (§5.3). Emitted request: `subject_type="cloud_scaling.capacity_action"`, `requested_scope=Scope(purposes=("cloud_scaling.capacity_action",))` (**minimal — never overloaded** with topology), all executable flags fixed `False` by the `SubjectRiskDecision` contract.
+Note the deliberate split (F2): **tenant**, **subject identity**, **evidence references** and (per Amendment 1) the **recommendation digest** live on the **outer request**, which is their sole authoritative source; `SubjectContext` holds only *neutral subject facts* (#4–#11) and **not** tenant, subject id, or evidence references. `SubjectBinding.tenant_id`, `SubjectBinding.subject_id` and `SubjectBinding.recommendation_digest` are binding anchors **derived from the outer request** (not second sources of truth) and are recomputed/reconciled by RA before policy resolution (§5.3). Emitted request: `subject_type="cloud_scaling.capacity_action"`, `requested_scope=Scope(purposes=("cloud_scaling.capacity_action",))` (**minimal — never overloaded** with topology), all executable flags fixed `False` by the `SubjectRiskDecision` contract.
 
 Under the ratified decision (D-2) the neutral facts #4–#11 are carried in the strict RA-owned **v2 `SubjectContext`** (§5.2), individually visible to policy resolution while remaining domain-neutral and non-authoritative. Digest-only anchoring (D-1) is rejected because it cannot expose those facts to `PolicyResolverPort` (see §8, §20).
 
@@ -197,6 +216,8 @@ request = SubjectRiskEvaluationRequest_v2(
     subject_id          = outer_subject_id,           # AUTHORITATIVE subject identity (sole source)
     subject_type        = "cloud_scaling.capacity_action",
     subject_digest      = subject_digest,             # binds (1)+(2)
+    recommendation_digest = rec.digest(),             # AUTHORITATIVE source digest (Amendment 1);
+                                                      # the ONLY reconstructible source RA has
     requested_purpose   = "cloud_scaling.capacity_action",       # D-4 (to ratify)
     requested_domain    = "cloud_scaling",                        # D-4 (to ratify)
     requested_risk_class= None,                       # RA classifies
@@ -242,13 +263,13 @@ Any inequality — including a raw `subject_context` altered while `subject_dige
 
 `SubjectRiskEvaluationRequest_v2` canonical form (`evidence_references` illustrative; `idempotency_key` per D-6) →
 ```json
-{"correlation_id":"corr-42","evaluation_time":null,"evidence_references":["sha256:aaa","sha256:bbb","sha256:ccc","sha256:ddd"],"idempotency_key":"sha256:42aaa799941a6661c39c3dbe45ea7e7b2ecfcc5d617a9fc09ee32cbbe8959dd0","requested_domain":"cloud_scaling","requested_purpose":"cloud_scaling.capacity_action","requested_risk_class":null,"requested_scope":{"actors":[],"data_allow":[],"data_deny":[],"destinations":[],"jurisdictions":[],"max_autonomy_level":0,"max_transaction_minor_units":null,"models":[],"purposes":["cloud_scaling.capacity_action"],"tools_allow":[],"tools_deny":[]},"schema_version":"risk-subject-evaluation-request-2","subject_context":{"action_type":"scale_up","compute_group":"cluster-7","environment":"prod","magnitude_after":9,"magnitude_before":6,"region":"eu-west-1","resource_class":"web","schema_version":"risk-subject-context-1","subject_asserted_at":"2026-08-13T04:00:00.000000Z","subject_valid_from":"2026-08-13T04:00:00.000000Z","subject_valid_until":"2026-08-13T04:15:00.000000Z","zone":null},"subject_digest":"sha256:eb4526a6679470e603bbc757cde7cfac9c7b2258256eaecef729e356a1df6c38","subject_id":"wl-checkout-api","subject_type":"cloud_scaling.capacity_action","tenant_id":"tnt-acme"}
+{"correlation_id":"corr-42","evaluation_time":null,"evidence_references":["sha256:aaa","sha256:bbb","sha256:ccc","sha256:ddd"],"idempotency_key":"sha256:42aaa799941a6661c39c3dbe45ea7e7b2ecfcc5d617a9fc09ee32cbbe8959dd0","jurisdictions":[],"recommendation_digest":"sha256:1111111111111111111111111111111111111111111111111111111111111111","requested_autonomy_level":0,"requested_data_classes":[],"requested_domain":"cloud_scaling","requested_purpose":"cloud_scaling.capacity_action","requested_risk_class":null,"requested_scope":{"actors":[],"data_allow":[],"data_deny":[],"destinations":[],"jurisdictions":[],"max_autonomy_level":0,"max_transaction_minor_units":null,"models":[],"purposes":["cloud_scaling.capacity_action"],"tools_allow":[],"tools_deny":[]},"requested_tools":[],"schema_version":"risk-subject-evaluation-request-2","subject_context":{"action_type":"scale_up","compute_group":"cluster-7","environment":"prod","magnitude_after":9,"magnitude_before":6,"region":"eu-west-1","resource_class":"web","schema_version":"risk-subject-context-1","subject_asserted_at":"2026-08-13T04:00:00.000000Z","subject_valid_from":"2026-08-13T04:00:00.000000Z","subject_valid_until":"2026-08-13T04:15:00.000000Z","zone":null},"subject_digest":"sha256:eb4526a6679470e603bbc757cde7cfac9c7b2258256eaecef729e356a1df6c38","subject_id":"wl-checkout-api","subject_type":"cloud_scaling.capacity_action","tenant_id":"tnt-acme"}
 ```
-`request_digest = sha256:b1973925e2cb80dcd69e993a1cc8d9f2743cb3b4e799f6772e88909ddd77bd0a`
+`request_digest = sha256:ac0bdada8d0c93cff831503772f1e3a0a75cc82ab3c41440407a0185443d5ece` (Amendment 1; supersedes the pre-amendment `sha256:b1973925…`, which predates the outer `recommendation_digest` field and the inherited request fields)
 
 **Tamper demonstration — altered raw context with a stale digest fails before policy resolution.** Suppose the raw `subject_context` is altered `environment: "prod" → "staging"` while the committed `subject_digest` is left stale. RA's **step 2** recomputes `context_digest' = sha256:7d0c44ea7a501417f3cb0f454ceaa70eabbc4c65587d547066470d2796e88164` (≠ the `sha256:9af3f626…dbb0` bound inside the stale `subject_digest`). **Step 3** reconstructs the binding with `context_digest'` and recomputes `subject_digest' = sha256:24875cdc6ff29904bd83ad012b62fae93f97ca2531703ee261c0de8cd6744ab9`, which **≠** the carried `subject_digest = sha256:eb4526a6…6c38`. **Step 4** therefore fails closed (`NOT_EVALUATED`) **before the resolver reads any fact** — the resolver never routes on the altered `staging` value. (Verified against the RA canonicalizer.)
 
-Two independent implementers using the RA canonicalizer over the same curated inputs produce these exact digests.
+Two independent implementers using the RA canonicalizer over the same curated inputs produce these exact digests. The canonical forms above are the **complete implemented shapes** (Amendment 1) and are reproduced byte-for-byte by the Risk Authority conformance suite and by the installed-wheel distribution verifier.
 
 ### 5.4 Authoritative canonicalizer and schema-tagged canonical hashing (F4, F5)
 
@@ -268,7 +289,7 @@ This is consistent with existing RA precedent: `Scope` is already a nested, clos
 
 ### 5.6 Policy-resolver access (design)
 
-`risk-subject-evaluation-request-2` adds an **optional** `subject_context: Optional[SubjectContext]`. `PolicyResolverPort` gains a **backward-compatible** widening so the resolver may inspect `subject_context` (e.g., an added keyword `subject_context: Optional[SubjectContext] = None`, or a `resolve` successor); v1 resolvers that ignore it keep working. This is an additive, versioned RA-side change (§16) — **not implemented in this PR**.
+`risk-subject-evaluation-request-2` adds **two co-required** fields: `subject_context: Optional[SubjectContext]` and the outer `recommendation_digest: Optional[str]` (Amendment 1). They must be supplied **together** — a request carrying one without the other is half-bound and can never be reconciled, so it fails closed at construction; with both absent the request is behaviorally equivalent to v1. `PolicyResolverPort` gains a **backward-compatible** widening so the resolver may inspect `subject_context` (e.g., an added keyword `subject_context: Optional[SubjectContext] = None`, or a `resolve` successor); v1 resolvers that ignore it keep working. This is an additive, versioned RA-side change (§16) — **not implemented in this PR**.
 
 ## 6. Required subject and scope dimensions
 
@@ -321,6 +342,7 @@ Every case below **fails closed** to a typed non-decision (or a deny/escalate) a
 | **non-canonical value** (float, exponent/representation-dependent decimal string, non-UTC/mis-formatted timestamp, empty required string, `bool` for an int) | canonicalizer/validator rejects → fail closed, no seam call |
 | **layered-commitment mismatch** (RA recompute of `context_digest`/`subject_digest` from the raw `subject_context` ≠ carried `subject_digest`; e.g. altered raw context with a stale digest) | fail-closed non-decision **before policy resolution** (§5.3), no authority |
 | **binding-anchor mismatch** (reconstructed `SubjectBinding` from outer `tenant_id`/`subject_id` ≠ carried `subject_digest`) | fail-closed non-decision, no authority |
+| **missing, malformed or inconsistent outer `recommendation_digest`** (absent while `subject_context` is present, not `sha256:`+64 lowercase hex, or not the digest bound inside the carried `subject_digest`) | strict validation / binding reconstruction rejects → fail closed, no authority |
 | recommendation-digest mismatch | adapter re-check fails → fail closed, no seam call |
 | expired recommendation / beyond forecast validity | adapter validity re-check → typed non-evaluation (no seam call) |
 | missing required scope / ambiguous subject | `SubjectError` / strict projection → fail closed |
@@ -361,7 +383,7 @@ For `SubjectContext`, `SubjectBinding`, `SubjectRiskEvaluationRequest_v2` and an
 - Projection schema `cloud-scaling-risk-subject-projection-1`; adapter distribution starts at `0.1.0`.
 - Consumes **already-merged** contracts: controller `0.4.0`, risk-authority `0.2.0`.
 - **v2 subject-context migration (D-2), RA-owned, additive, versioned, backward-compatible:**
-  - New `SubjectContext` (schema `risk-subject-context-1`), new `SubjectBinding` (schema `risk-subject-binding-1`), and new request schema `risk-subject-evaluation-request-2` with an **optional** `subject_context` field — three schema-tagged digests (§5.4).
+  - New `SubjectContext` (schema `risk-subject-context-1`), new `SubjectBinding` (schema `risk-subject-binding-1`), and new request schema `risk-subject-evaluation-request-2` carrying **two co-required** additive fields — `subject_context` and the outer `recommendation_digest` (Amendment 1) — three schema-tagged digests (§5.4).
   - **v1 preserved:** `risk-subject-evaluation-request-1` requests remain valid and continue to validate/round-trip unchanged; a v2 request with `subject_context = None` is behaviorally equivalent to v1. `SUPPORTED_REQUEST_SCHEMA_VERSIONS` becomes `{…-1, …-2}`.
   - `PolicyResolverPort` widening is additive (optional keyword / successor method) so existing resolvers keep working — a **bounded, documented migration**, not a breaking change.
   - Requires a **versioned `ugence-risk-authority` minor bump** (e.g. `0.2.0 → 0.3.0`) owned by Risk Authority; **not implemented in this PR**.
@@ -398,7 +420,7 @@ Residual items for the implementation phase (not blockers to ratifying this desi
 - Controller package has **no** Risk Authority import; adapter has **one-way** dependencies only.
 - Adapter **cannot author or select policy**; caller **cannot supply control results** or authority-bearing artifacts.
 - **One authoritative digest chain** (§5.3): each fact has a single source-of-truth object; the raw `subject_context` is a **layered commitment** RA recomputes (`context_digest`, then `SubjectBinding` → `subject_digest`) and reconciles against the carried `subject_digest` **before policy resolution**; any mismatch — including altered raw context with a stale digest — fails closed before the resolver reads a fact. Each of `risk-subject-context-1` / `risk-subject-binding-1` / `risk-subject-evaluation-request-2` is **schema-tagged**; a digest under one tag must not be accepted in another's slot (enforced by `schema_version` + validation, not by the bare SHA-256 primitive).
-- `subject_id` and `tenant_id` are authoritative on the **outer request only**; `SubjectContext` carries neither. `SubjectBinding.tenant_id` / `SubjectBinding.subject_id` are **derived** from the outer request and RA-recomputed — no independent third copy exists to disagree.
+- `subject_id`, `tenant_id` and the **recommendation digest** are authoritative on the **outer request only**; `SubjectContext` carries none of them. `SubjectBinding.tenant_id` / `SubjectBinding.subject_id` / `SubjectBinding.recommendation_digest` are **derived** from the outer request and RA-recomputed — no independent third copy exists to disagree.
 - Caller-supplied `evaluation_time` on a trusted production path is **fail-closed rejected**; trusted production time comes only from RA's injected clock.
 - Adapter **never** passes the controller's raw `to_canonical_dict()` to the RA canonicalizer; it builds a curated neutral object.
 - Cross-tenant and cross-scope reuse **fails closed**; missing scope ≠ named scope; missing optional (`None`) ≠ named value.
