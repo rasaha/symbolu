@@ -1,4 +1,4 @@
-"""Error taxonomy for the GV-3R-c trusted readiness orchestration boundary."""
+"""Error taxonomy for the trusted readiness orchestration boundary."""
 
 from __future__ import annotations
 

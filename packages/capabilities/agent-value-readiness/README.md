@@ -2,9 +2,9 @@
 
 > **⚠️ Experimental, internal, advisory, non-financial.**
 > The **contract shapes** (GV-3R-a), the **deterministic readiness determination
-> evaluator** (GV-3R-b), and the **fail-closed trusted orchestration boundary**
-> around that evaluator (GV-3R-c) for the Agent Value Readiness engine of Ugence
-> Value Intelligence — **not** a deployment authority, **not** a Policy
+> evaluator** (GV-3R-b), and **Trusted Readiness Orchestration** — a fail-closed
+> trust boundary around that evaluator — for the Agent Value Readiness engine of
+> Ugence Value Intelligence. **Not** a deployment authority, **not** a Policy
 > Authority, **not** a metric-evaluation engine, and **not** a customer-facing
 > module.
 > - **No deployment authorization** — a determination is *advisory*, consumed by
@@ -31,14 +31,25 @@ PreROIReadiness = f(Intelligence, Capabilities, Adoption
 ```
 
 Intelligence, Capability, and Adoption are **non-financial leading indicators**.
-This package implements **M-3R.1 (GV-3R-a, contract shapes)**, **M-3R.2
-(GV-3R-b, the determination evaluator)** and, additively, **GV-3R-c — trusted
-readiness orchestration** around that evaluator, per the UVI ADR
+This package implements **M-3R.1 (GV-3R-a, contract shapes)** and **M-3R.2
+(GV-3R-b, the determination evaluator)** of the UVI ADR
 (`docs/architecture/ADR_UGENCE_VALUE_INTELLIGENCE_GV2C_GV2E_GV3R.md`, §5–§10,
-§19, §20, §23) and the shared Policy Authority ADR
-(`docs/architecture/ADR_UGENCE_POLICY_AUTHORITY.md`, §5, §10.4). Policy
-**issuance, signing, approval verification, registration and revocation** stay
-with the shared Ugence Policy Authority; this package only **consumes** its
+§19, §20, §23), plus **Trusted Readiness Orchestration** around that evaluator.
+
+**Trusted Readiness Orchestration is an additive integration capability, not a
+roadmap milestone.** It implements requirements that are **already ratified** —
+UVI ADR D-1, D-16, §19 and §23.2 (fail closed on unsigned / unapproved /
+expired / revoked / superseded / digest-mismatched policy artifacts) and shared
+Policy Authority ADR §5 and §10.4 — and defines no milestone of its own. It
+**does not define a new readiness classification** and **does not replace or
+alter GV-3R-b**, whose precedence is untouched. It sits operationally *between*
+the deterministic evaluator and future **M-3R.3** integration work; **M-3R.3
+still owns** the `IntelligenceFitness` / `CapabilityReadiness` /
+`AdoptionReadiness` catalogs and `AssessedSystemBinding` wiring, and **remains
+open and unimplemented here**.
+
+Policy **issuance, signing, approval verification, registration and revocation**
+stay with the shared Ugence Policy Authority; this package only **consumes** its
 public trusted-resolution service.
 
 - **Distribution:** `ugence-agent-value-readiness`
@@ -58,7 +69,7 @@ public trusted-resolution service.
 | Reused policy enums (re-exported) | `ReadinessTarget`, `RequirementClass` (owned by `ugence-uvi-policy-contracts`) |
 | **Evaluator (GV-3R-b)** | `evaluate_readiness`, `ReadinessEvaluationCase`, `ReadinessEvaluationResult`, `ReadinessEvaluationTrace`, `ConditionDecision` |
 | **Evaluator codes** | `ReadinessRuleId`, `ReadinessReasonCode`, `ReadinessAdvisoryCode`, `ConditionDecisionCode` |
-| **Orchestration (GV-3R-c)** | `assess_readiness`, `ReadinessAssessmentRequest`, `ReadinessAssessmentOutcome`, `ReadinessAssessmentTrace`, `ReadinessAssessmentDisposition`, `READINESS_ORCHESTRATOR_VERSION` |
+| **Trusted orchestration** | `assess_readiness`, `ReadinessAssessmentRequest`, `ReadinessAssessmentOutcome`, `ReadinessAssessmentTrace`, `ReadinessAssessmentDisposition`, `READINESS_ORCHESTRATOR_VERSION` |
 | **Orchestration verification** | `GateVerificationRequest`, `GateResultVerification`, `GateVerificationSummary`, `ConditionVerificationRequest`, `ConditionSetVerification`, `ConditionVerificationSummary` |
 | **Orchestration codes** | `ReadinessAssessmentStatus`, `ReadinessInputVerificationStatus`, `ReadinessTrustGapCode`, `ReadinessTrustAdvisoryState` |
 | **Injected trust boundaries** | `ReadinessPolicyResolver`, `GateResultVerifier`, `ConditionSetVerifier` (protocols); `DenyAllReadinessPolicyResolver`, `DenyAllGateResultVerifier`, `DenyAllConditionSetVerifier` (production defaults); `PolicyAuthorityReadinessPolicyResolver` (adapter onto the shared authority) |
@@ -199,12 +210,13 @@ policy, and they do not verify a `content_digest` against a registry-resolved
 body — matching digests only proves the context and the supplied policy claim
 the same identity. An `APPROVED_ACTIVE` label remains a caller assertion. None
 of this replaces Policy Authority or registry resolution — **that gap is what
-GV-3R-c closes**, by requiring the exact policy to resolve through the shared
-authority's public trusted-resolution service before any gate is even looked at.
-A permissive *policy* still yields a permissive answer; what GV-3R-c adds is the
-proof that the policy is the authentic, authority-issued one.
+trusted orchestration closes**, by requiring the exact policy to resolve through
+the shared authority's public trusted-resolution service before any gate is even
+looked at. A permissive *policy* still yields a permissive answer; what
+orchestration adds is the proof that the policy is the authentic,
+authority-issued one.
 
-## The orchestration boundary (GV-3R-c)
+## Trusted Readiness Orchestration
 
 ```python
 from ugence_agent_value_readiness.api import assess_readiness
@@ -222,11 +234,18 @@ outcome.dispositions      # what happened to each standing GV-3R-b advisory
 outcome.authorizes_deployment   # permanently False
 ```
 
-`assess_readiness` **adds no second classification algorithm.** It resolves,
-verifies, sanitizes, then calls the one ratified `evaluate_readiness` exactly
-once over a freshly built case. An automated test proves no module outside the
-evaluator names a `ReadinessClassification` member or builds a
-`ReadinessEvaluationResult`.
+`assess_readiness` **adds no second classification algorithm and defines no new
+readiness classification.** It resolves, verifies, sanitizes, then calls the one
+ratified `evaluate_readiness` exactly once over a freshly built case. An
+automated test proves no module outside the evaluator names a
+`ReadinessClassification` member or builds a `ReadinessEvaluationResult`.
+
+`READINESS_ORCHESTRATOR_VERSION` is `ugence.readiness-orchestration/v0.1` — a
+**platform-neutral capability identifier**, deliberately not an ADR milestone
+label, and separate from `EVALUATOR_FORMULA_VERSION`, which stays `GV-3R-b.3`.
+The `GV3RC_` prefix on `ReadinessTrustGapCode` values is a **frozen opaque
+token**: it participates in canonical trace digests, so it is retained
+unchanged, and it carries no milestone meaning.
 
 ### The four stages, and what each failure means
 
@@ -324,8 +343,8 @@ target or instant admitted.
 ### Trust-advisory reconciliation
 
 The standalone evaluator is right to emit its advisories: it genuinely cannot
-verify an external trust boundary. GV-3R-c never deletes or contradicts one — it
-states, per advisory, which configured boundary closed it:
+verify an external trust boundary. Orchestration never deletes or contradicts
+one — it states, per advisory, which configured boundary closed it:
 
 | GV-3R-b advisory | Disposition under a fully configured assessment |
 |---|---|
@@ -503,11 +522,16 @@ python packages/capabilities/agent-value-readiness/adversarial_probes.py
 
 ## Deferred (out of scope)
 
-Deployment authorization; policy signing, approval, issuance and revocation
+**Milestone M-3R.3 — the `IntelligenceFitness` / `CapabilityReadiness` /
+`AdoptionReadiness` catalogs and `AssessedSystemBinding` wiring — is open and
+unimplemented.** Nothing in this package implements, consumes or completes it.
+
+Also deferred: deployment authorization; policy signing, approval, issuance and revocation
 (owned by the shared Ugence Policy Authority, consumed here through its public
 resolution service only); the **benchmark registry** and benchmark-value
-governance; **TAP/evidence verification** implementations (GV-3R-c defines the
-verifier seam and ships only its deny-all default — it implements no verifier);
+governance; **TAP/evidence verification** implementations (orchestration defines
+the verifier seam and ships only its deny-all default — it implements no
+verifier);
 machine-evaluable threshold semantics and metric-to-threshold calculation;
 structured successor/supersession references; **condition runtime enforcement**;
 `SubjectContext`/`AssessedSystemBinding` (RA-owned, PR #1425); a durable event

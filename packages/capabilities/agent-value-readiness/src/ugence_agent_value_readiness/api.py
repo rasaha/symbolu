@@ -2,7 +2,7 @@
 
 The deliberately small, supported public surface: the **contract shapes**
 (GV-3R-a), the single canonical **determination evaluator** (GV-3R-b), and the
-single canonical **trusted orchestration boundary** around it (GV-3R-c). The
+single canonical **trusted orchestration boundary** around it. The
 readiness result/enum vocabulary is defined in this package; the target and
 requirement-class enums are **reused** (not redefined) from
 ``ugence_uvi_policy_contracts`` and re-exported here for caller convenience —
@@ -118,7 +118,7 @@ __all__ = [
     "ReadinessAdvisoryCode",
     "ConditionDecisionCode",
     "evaluate_readiness",
-    # ---- GV-3R-c: the trusted readiness orchestration boundary ------------ #
+    # ---- Trusted Readiness Orchestration (additive integration) ---------- #
     "READINESS_ORCHESTRATOR_VERSION",
     "ReadinessAssessmentError",
     "ReadinessAssessmentStatus",

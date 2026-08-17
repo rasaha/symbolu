@@ -3,7 +3,7 @@
 ``ugence_agent_value_readiness`` resolves from this package's src layout;
 ``ugence_governance_contracts``, ``ugence_uvi_policy_contracts`` and
 ``ugence_policy_authority`` (the shared Policy Authority whose **public** trusted
-resolution service GV-3R-c orchestrates against) resolve from their sibling
+resolution service the orchestration boundary consumes) resolve from their sibling
 packages' src layouts. No installed wheel is required to run the in-tree tests.
 """
 

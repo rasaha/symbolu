@@ -284,7 +284,7 @@ def test_condition_authenticity_advisories_appear_only_with_conditions():
 def test_only_one_public_entry_point_selects_a_classification():
     """Two services are exported; exactly one of them selects a tier.
 
-    ``assess_readiness`` (GV-3R-c) adds a fail-closed trust boundary *around*
+    ``assess_readiness`` adds a fail-closed trust boundary *around*
     this evaluator and delegates the classification to it. That is proved
     structurally below: no module outside the evaluator names a
     ``ReadinessClassification`` member or builds a ``ReadinessEvaluationResult``.

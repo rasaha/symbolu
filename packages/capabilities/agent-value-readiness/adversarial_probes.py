@@ -1016,9 +1016,14 @@ def _():
     assert ReadinessTrustAdvisoryState.RESOLVED_BY_POLICY_RESOLUTION not in denied_states
 
 
-@probe("the orchestrator version is exported and the evaluator formula is unchanged")
+@probe("the orchestrator version is platform-neutral and claims no milestone")
 def _():
-    assert READINESS_ORCHESTRATOR_VERSION == "GV-3R-c.1"
+    assert READINESS_ORCHESTRATOR_VERSION == "ugence.readiness-orchestration/v0.1"
+    # Platform-neutral: it names a capability, never an ADR milestone. It makes
+    # no claim on M-3R.3, which remains open and unimplemented.
+    lowered = READINESS_ORCHESTRATOR_VERSION.lower()
+    for token in ("gv-3r", "gv3r", "m-3r", "m3r", "milestone"):
+        assert token not in lowered, token
     assert R.__version__ == "0.3.0"
     outcome = run(make_request(ALL_PASS))
     assert outcome.trace.evaluator_formula_version == "GV-3R-b.3"

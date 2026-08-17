@@ -1,4 +1,4 @@
-"""The three injected trust boundaries GV-3R-c orchestrates against.
+"""The three injected trust boundaries this package orchestrates against.
 
 Each protocol is a **seam for dependency injection**, not an implementation:
 this package ships no resolver that resolves, no verifier that verifies, and no

@@ -165,6 +165,50 @@ def test_no_package_anywhere_imports_an_authority_internal():
     assert not offenders, offenders
 
 
+def test_no_package_reaches_an_authority_internal_through_a_dynamic_import():
+    """Closes the escape the AST import scan alone cannot see.
+
+    ``importlib.import_module("ugence_policy_authority.core.signing")`` is not
+    an ``ast.Import`` node, so the structural scan above would miss it. Here we
+    flag any string literal that **is** an authority internal module path —
+    exactly the shape a dynamic import needs.
+
+    Prose that *names* an internal in order to forbid it is deliberately not
+    flagged: the check is on module paths standing alone as values, never on
+    sentences that mention one, so documenting the boundary stays possible.
+    """
+
+    internals = (f"{SELF}.core", f"{SELF}.adapters")
+    offenders = {}
+    for path in (REPO_ROOT / "packages").rglob("*.py"):
+        if str(path).startswith(str(DIST_ROOT)):
+            continue
+        try:
+            tree = ast.parse(path.read_text(), filename=str(path))
+        except (OSError, UnicodeDecodeError, SyntaxError):  # pragma: no cover
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Constant) or not isinstance(node.value, str):
+                continue
+            value = node.value.strip()
+            if any(value == token or value.startswith(token + ".") for token in internals):
+                offenders.setdefault(str(path.relative_to(REPO_ROOT)), set()).add(value)
+    assert not offenders, offenders
+
+
+def test_the_public_surface_a_consumer_may_name_really_is_public():
+    """The allow-list names the curated API, not an arbitrary pair of modules."""
+
+    import ugence_policy_authority
+    from ugence_policy_authority import api
+
+    assert PUBLIC_MODULES == {SELF, f"{SELF}.api"}
+    # Both entries resolve to the same curated surface, so allowing them grants
+    # no more than the documented public API.
+    assert set(api.__all__) <= set(dir(ugence_policy_authority)) | {"__version__"}
+    assert "resolve_policy" in api.__all__
+
+
 def test_the_superseded_uvi_specific_authority_name_appears_nowhere():
     """``ugence_uvi_policy_authority`` was prohibited by name (ADR §8)."""
 

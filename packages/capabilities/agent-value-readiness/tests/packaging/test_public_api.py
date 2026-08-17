@@ -38,6 +38,10 @@ def _actual_surface() -> dict:
             entry["values"] = [m.value for m in obj]
         elif isinstance(obj, type) and dataclasses.is_dataclass(obj):
             entry["fields"] = [f.name for f in dataclasses.fields(obj)]
+        elif isinstance(obj, str):
+            # Exported string constants are identities consumers pin, so the
+            # snapshot records the exact value, not merely the type.
+            entry["value"] = obj
         symbols[name] = entry
     return {
         "distribution": "ugence-agent-value-readiness",

@@ -1,4 +1,4 @@
-"""Stdlib-only validation helpers shared by the GV-3R-c orchestration shapes.
+"""Stdlib-only validation helpers shared by the orchestration shapes.
 
 They mirror the package's existing contract discipline — sequences coerced to
 real tuples (scalar substitutes rejected), digests as lowercase sha-256 hex,

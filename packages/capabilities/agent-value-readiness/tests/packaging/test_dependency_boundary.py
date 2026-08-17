@@ -4,8 +4,8 @@ AST-scans every module and asserts the readiness leaf never imports
 ``governed-value``, any other capability/product/authority package, or a
 third-party runtime dependency (ADR §21).
 
-GV-3R-c adds exactly one new arrow — ``ugence_policy_authority`` — and it is
-kept honest here in four ways:
+Trusted orchestration adds exactly one new arrow — ``ugence_policy_authority``
+— and it is kept honest here in four ways:
 
 1. only the authority's **public** surface may be imported (never ``.core``,
    never ``.adapters``, never any other private module);

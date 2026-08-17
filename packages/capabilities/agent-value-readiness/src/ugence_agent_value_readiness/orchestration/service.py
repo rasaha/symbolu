@@ -1,4 +1,13 @@
-"""The fail-closed readiness orchestration boundary (GV-3R-c, milestone M-3R.3+).
+"""The fail-closed trusted readiness orchestration boundary.
+
+An **additive integration capability**, not a roadmap milestone. It implements
+requirements that are already ratified — UVI ADR D-1, D-16, §19 and §23.2, and
+Policy Authority ADR §10.4 — and claims no milestone of its own. In particular
+it does **not** implement, consume or complete UVI ADR §25 ``M-3R.3``, which
+owns the Intelligence/Capability/Adoption catalogs and ``AssessedSystemBinding``
+wiring; that milestone remains open and unimplemented. This boundary sits
+operationally between the merged deterministic evaluator (M-3R.2) and that
+future integration work.
 
 One canonical entry point — :func:`assess_readiness` — wraps the ratified
 GV-3R-b evaluator in a trust boundary and proves, for a single assessment, that
@@ -17,11 +26,12 @@ GV-3R-b evaluator in a trust boundary and proves, for a single assessment, that
 
 What it is not
 --------------
-**No second classification algorithm exists here.** The readiness tier is
-selected by exactly one function — the GV-3R-b ``evaluate_readiness`` — called
-at most once, over a freshly built case. This module removes untrusted inputs;
-it never re-derives, adjusts, overrides or second-guesses a classification, and
-it never accepts one from a caller.
+**No second classification algorithm exists here, and no new readiness
+classification is defined.** The readiness tier is selected by exactly one
+function — the GV-3R-b ``evaluate_readiness`` — called at most once, over a
+freshly built case, and the ratified precedence is untouched. This module
+removes untrusted inputs; it never re-derives, adjusts, overrides or
+second-guesses a classification, and it never accepts one from a caller.
 
 Stage order, and why it is fixed
 --------------------------------

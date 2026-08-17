@@ -1,4 +1,4 @@
-"""Stable identity, status and trust-gap vocabulary for GV-3R-c orchestration.
+"""Stable identity, status and trust-gap vocabulary for trusted orchestration.
 
 Every value is a stable token a consumer may branch on; values are never
 repurposed. Codes are emitted in **enum declaration order**, never in the order
@@ -25,15 +25,22 @@ __all__ = [
 #: Identity of the single canonical orchestration entry point.
 ORCHESTRATOR_ID = "ugence.agent-value-readiness.trusted-readiness-orchestrator"
 
-#: Version of the ratified orchestration rule set implemented here. Bumped only
-#: when the orchestration boundary itself changes (which stage runs, in what
-#: order, what is independently rechecked, or what fails closed).
+#: Version of the orchestration rule set implemented here. Bumped only when the
+#: orchestration boundary itself changes (which stage runs, in what order, what
+#: is independently rechecked, or what fails closed).
 #:
-#: It is deliberately **separate** from
-#: ``EVALUATOR_FORMULA_VERSION`` (``GV-3R-b.3``): GV-3R-c adds a fail-closed
-#: trust boundary *around* the deterministic evaluator and introduces no second
-#: classification algorithm, so the evaluator's formula version does not move.
-READINESS_ORCHESTRATOR_VERSION = "GV-3R-c.1"
+#: The identifier is deliberately **platform-neutral**: it names a capability,
+#: not an ADR milestone, and asserts **no** roadmap position. In particular it
+#: does not claim, consume or complete UVI ADR §25 ``M-3R.3``, which owns the
+#: Intelligence/Capability/Adoption **catalogs** and ``AssessedSystemBinding``
+#: wiring — neither of which this package implements. That milestone remains
+#: open and unimplemented.
+#:
+#: It is also deliberately **separate** from ``EVALUATOR_FORMULA_VERSION``
+#: (``GV-3R-b.3``): this boundary wraps the deterministic evaluator and
+#: introduces no second classification algorithm, so the evaluator's formula
+#: version does not move.
+READINESS_ORCHESTRATOR_VERSION = "ugence.readiness-orchestration/v0.1"
 
 
 class ReadinessAssessmentStatus(str, Enum):
@@ -78,7 +85,7 @@ class ReadinessInputVerificationStatus(str, Enum):
 
 
 class ReadinessTrustAdvisoryState(str, Enum):
-    """What GV-3R-c did about one standing GV-3R-b honesty advisory.
+    """What orchestration did about one standing GV-3R-b honesty advisory.
 
     The standalone evaluator emits advisories precisely because it cannot verify
     external trust boundaries. Orchestration never deletes them: it records, per
@@ -102,6 +109,13 @@ class ReadinessTrustGapCode(str, Enum):
 
     Emitted in declaration order. Every gap is explicit: nothing is silently
     accepted, downgraded to a warning, or folded into a generic failure.
+
+    The ``GV3RC_`` prefix is a **frozen, opaque token**, retained deliberately.
+    It is an identifier consumers may already branch on and it participates in
+    canonical trace digests, so renaming it would change published behaviour to
+    make a cosmetic point. It carries **no** milestone meaning: it does not name
+    an ADR milestone, does not assert a roadmap position, and specifically makes
+    no claim on ``M-3R.3``. Values here are never repurposed.
     """
 
     # -- policy resolution -------------------------------------------------- #

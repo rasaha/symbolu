@@ -1,4 +1,4 @@
-"""Builders and **test-only** fakes for the GV-3R-c orchestration tests.
+"""Builders and **test-only** fakes for the orchestration tests.
 
 Everything here lives under ``tests/`` on purpose. The distribution ships **no**
 allow-all resolver and **no** permissive gate or condition verifier; the

@@ -87,7 +87,7 @@ def test_the_outcome_carries_both_versions_and_neither_replaces_the_other():
     assert outcome.trace.orchestrator_version == READINESS_ORCHESTRATOR_VERSION
     assert outcome.trace.evaluator_formula_version == EVALUATOR_FORMULA_VERSION
     assert outcome.evaluation.trace.formula_version == EVALUATOR_FORMULA_VERSION
-    assert READINESS_ORCHESTRATOR_VERSION == "GV-3R-c.1"
+    assert READINESS_ORCHESTRATOR_VERSION == "ugence.readiness-orchestration/v0.1"
     assert EVALUATOR_FORMULA_VERSION == "GV-3R-b.3"
 
 

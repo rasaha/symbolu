@@ -1,4 +1,4 @@
-"""The additive GV-3R-c orchestration contracts.
+"""The additive trusted-orchestration contracts.
 
 Four shapes, all frozen, tuple-normalized, timezone-safe and canonically
 digestible:

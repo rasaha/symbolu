@@ -1,18 +1,40 @@
 # Changelog — ugence-agent-value-readiness
 
-## [0.3.0] — GV-3R-c: trusted readiness orchestration
+## [0.3.0] — Trusted Readiness Orchestration
 
-**Additive.** A fail-closed **trust boundary around** the merged GV-3R-b
-evaluator. Minor bump because this is a material new capability on top of a
-merged 0.2.0; every 0.2.0 symbol keeps its shape and behaviour, so existing
-callers are unaffected and the standalone evaluator is untouched.
+**Additive integration capability, not a roadmap milestone.** A fail-closed
+**trust boundary around** the merged GV-3R-b evaluator. Minor bump because this
+is a material new capability on top of a merged 0.2.0; every 0.2.0 symbol keeps
+its shape and behaviour, so existing callers are unaffected and the standalone
+evaluator is untouched.
 
+### What this is, and what it is not
+- It implements requirements that are **already ratified**: UVI ADR **D-1**,
+  **D-16**, **§19** and **§23.2** (fail closed on unsigned / unapproved /
+  expired / revoked / superseded / digest-mismatched policy artifacts), and
+  shared Policy Authority ADR **§5** and **§10.4**. It defines **no new
+  milestone**.
+- It **does not define a new readiness classification** and **does not replace
+  or alter GV-3R-b**: the ratified precedence is untouched and the tier is still
+  selected by exactly one function, called exactly once.
+- It sits operationally **between** the deterministic evaluator (M-3R.2) and
+  future **M-3R.3** integration work. **M-3R.3 still owns** the
+  `IntelligenceFitness` / `CapabilityReadiness` / `AdoptionReadiness` catalogs
+  and `AssessedSystemBinding` wiring; **neither is implemented here, and that
+  milestone remains open.**
+- The output remains **advisory** and **never authorizes deployment**.
+
+### Version identity
 `EVALUATOR_FORMULA_VERSION` **stays `GV-3R-b.3`** — the classification algorithm
-did not change, and **no second classification algorithm was introduced**. The
-new `READINESS_ORCHESTRATOR_VERSION = "GV-3R-c.1"` identifies the orchestration
-rule set separately. No other package is touched: `governance-contracts`,
+did not change. `READINESS_ORCHESTRATOR_VERSION` is
+**`ugence.readiness-orchestration/v0.1`**: a platform-neutral capability
+identifier that names no ADR milestone and asserts no roadmap position. The
+`GV3RC_` prefix on `ReadinessTrustGapCode` values is retained as a **frozen
+opaque token** — it participates in canonical trace digests, so renaming it
+would change published behaviour to make a cosmetic point; it carries no
+milestone meaning. No other package is touched: `governance-contracts`,
 `uvi-policy-contracts`, `ugence-policy-authority` and `governed-value` are all
-unchanged, and no ADR is modified.
+unchanged, and **no ADR is modified**.
 
 ### Added — the single canonical orchestration entry point
 - `assess_readiness(request, *, policy_resolver=None, gate_verifier=None,
@@ -134,11 +156,13 @@ wheels and proves the orchestration boundary, its deny-by-default posture and
 the absence of any permissive verifier from the installed distribution.
 
 ### Not implemented (deliberate)
-No benchmark registry, no TAP/evidence verification implementation, no
-structured successor references, no deployment authorization, no condition
-runtime enforcement, no signed readiness determination (a signed determination
-needs a separately ratified authority owner), no forecasting and no financial
-valuation.
+**Milestone M-3R.3 is untouched and remains open**: no `IntelligenceFitness` /
+`CapabilityReadiness` / `AdoptionReadiness` catalog and no
+`AssessedSystemBinding` wiring is introduced. Also absent: benchmark registry,
+TAP/evidence verification implementations, structured successor references,
+deployment authorization, condition runtime enforcement, signed readiness
+determinations (a separately ratified authority owner is required), forecasting
+and financial valuation.
 
 ## [0.2.0] — context-binding precedence correction (pre-merge, still 0.2.0/unreleased)
 

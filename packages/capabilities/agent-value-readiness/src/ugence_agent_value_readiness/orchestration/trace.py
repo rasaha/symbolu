@@ -214,7 +214,7 @@ class ConditionVerificationSummary:
 # --------------------------------------------------------------------------- #
 @dataclass(frozen=True)
 class ReadinessAssessmentDisposition:
-    """What GV-3R-c did about one standing GV-3R-b honesty advisory.
+    """What orchestration did about one standing GV-3R-b honesty advisory.
 
     The standalone evaluator is right to emit its advisories: it genuinely
     cannot verify an external trust boundary. Orchestration therefore never

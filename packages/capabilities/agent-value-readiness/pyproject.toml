@@ -9,7 +9,7 @@
 # intended outcome under a Geography/Domain/Intended-Outcome + Readiness policy
 # context, the single deterministic determination evaluator over it (GV-3R-b),
 # and the fail-closed trusted orchestration boundary around that evaluator
-# (GV-3R-c). It implements NO deployment authority, NO condition enforcement and
+# capability. It implements NO deployment authority, NO condition enforcement and
 # NO financial value, and it mints no policy authority: the exact ReadinessPolicy
 # is resolved through the PUBLIC API of the shared Ugence Policy Authority, whose
 # internals are never imported.

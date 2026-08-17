@@ -20,7 +20,7 @@ then proves inside that env:
     set — mandatory FAIL dominates, an omitted gate is never PASS, the composite
     cannot move the tier, a naive evaluation time is rejected, evidence axes are
     preserved, and the result authorizes nothing;
-  * the GV-3R-c orchestration boundary fails closed from the wheel — a policy
+  * the trusted orchestration boundary fails closed from the wheel — a policy
     issued and signed through the shared authority resolves and evaluates, while
     an unconfigured resolver or verifier denies, an unverified PASS cannot unlock
     readiness, an unverified condition cannot compensate, and no permissive
@@ -265,7 +265,7 @@ _ok = _eval_binding(_policy().reference, status=GateStatus.FAIL)
 assert _ok.classification is ReadinessClassification.NOT_READY, _ok.classification
 assert _ok.rule_id == ReadinessRuleId.MANDATORY_FAIL.value
 
-# ---- GV-3R-c: the trusted orchestration boundary, from the wheel ---------- #
+# ---- Trusted Readiness Orchestration, from the wheel --------------------- #
 from ugence_policy_authority.api import (
     ApprovalEvidenceRef, ApprovalVerification, ApprovalVerificationStatus, Ed25519PolicySigner,
     InMemoryPolicyRegistry, KeyEntitlement, PolicyKeyRing, PolicyResolutionStatus, SigningKey,
@@ -277,7 +277,10 @@ from ugence_agent_value_readiness.api import (
     ReadinessInputVerificationStatus, ReadinessTrustAdvisoryState, ReadinessTrustGapCode,
     assess_readiness)
 
-assert READINESS_ORCHESTRATOR_VERSION == "GV-3R-c.1", READINESS_ORCHESTRATOR_VERSION
+assert READINESS_ORCHESTRATOR_VERSION == "ugence.readiness-orchestration/v0.1", READINESS_ORCHESTRATOR_VERSION
+# Platform-neutral identity: the shipped wheel claims no ADR milestone.
+for _tok in ("gv-3r", "gv3r", "m-3r", "m3r", "milestone"):
+    assert _tok not in READINESS_ORCHESTRATOR_VERSION.lower(), _tok
 
 _ADAPTER = UviPolicyFamilyAdapter()
 def _digest_bound(gates, comp_gate=True):
@@ -319,7 +322,7 @@ assert _ok.classification is ReadinessClassification.DEPLOYMENT_READY, _ok.class
 assert _ok.trust_gap_codes == (), _ok.trust_gap_codes
 assert _ok.is_advisory is True and _ok.authorizes_deployment is False
 assert _ok.trace.evaluator_formula_version == "GV-3R-b.3"
-assert _ok.trace.orchestrator_version == "GV-3R-c.1"
+assert _ok.trace.orchestrator_version == "ugence.readiness-orchestration/v0.1"
 assert _ok.trace.issuance_record_ref == "orch-rec"
 
 # production defaults deny, and a denial asserts no headline at all

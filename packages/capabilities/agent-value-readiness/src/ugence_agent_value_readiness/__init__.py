@@ -14,7 +14,7 @@ benefit, realized value, or ROI.
 
 The package holds the contract shapes (GV-3R-a, M-3R.1), the deterministic
 readiness-determination evaluator (GV-3R-b, M-3R.2), and the trusted
-orchestration boundary around that evaluator (GV-3R-c) — see ADR
+trusted orchestration boundary around that evaluator — see ADR
 ``docs/architecture/ADR_UGENCE_VALUE_INTELLIGENCE_GV2C_GV2E_GV3R.md`` (§5–§10,
 §19, §20, §23) and ``docs/architecture/ADR_UGENCE_POLICY_AUTHORITY.md`` (§5,
 §10.4). The evaluator selects one advisory classification from a complete
@@ -130,7 +130,7 @@ __all__ = [
     "ReadinessAdvisoryCode",
     "ConditionDecisionCode",
     "evaluate_readiness",
-    # GV-3R-c orchestration
+    # Trusted Readiness Orchestration
     "READINESS_ORCHESTRATOR_VERSION",
     "ReadinessAssessmentError",
     "ReadinessAssessmentStatus",

@@ -1,15 +1,25 @@
-"""GV-3R-c — trusted readiness orchestration around the GV-3R-b evaluator.
+"""Trusted Readiness Orchestration around the GV-3R-b evaluator.
 
-One canonical entry point (:func:`assess_readiness`) wraps the merged
-deterministic evaluator in a **fail-closed trust boundary**: the exact
-``ReadinessPolicy`` must resolve through a configured shared Policy Authority
-boundary at the evaluation instant, every gate result and every compensating
-control must be attested by a configured verifier under the complete tenant /
-subject / context / target / policy / gate / time binding, and only sanitized
-inputs reach ``evaluate_readiness``.
+An **additive integration capability**, not a new roadmap milestone. One
+canonical entry point (:func:`assess_readiness`) wraps the merged deterministic
+evaluator in a **fail-closed trust boundary**: the exact ``ReadinessPolicy``
+must resolve through a configured shared Policy Authority boundary at the
+evaluation instant, every gate result and every compensating control must be
+attested by a configured verifier under the complete tenant / subject / context
+/ target / policy / gate / time binding, and only sanitized inputs reach
+``evaluate_readiness``.
 
-It adds **no second classification algorithm**: the readiness tier is selected
-by exactly one function, exactly once, and never by this package.
+It implements requirements that are **already ratified** — UVI ADR D-1, D-16,
+§19 and §23.2 ("fail closed on unsigned/unapproved/expired/revoked/superseded/
+digest-mismatched policy artifacts"), and Policy Authority ADR §10.4 — and
+defines no new milestone of its own. It sits operationally **between** the
+merged deterministic evaluator (M-3R.2) and the still-open ``M-3R.3``, which
+continues to own the Intelligence/Capability/Adoption catalogs and
+``AssessedSystemBinding`` wiring; neither is implemented here.
+
+It adds **no second classification algorithm** and defines **no new readiness
+classification**: the readiness tier is selected by exactly one function,
+exactly once, and never by this package.
 
 The production defaults deny. Nothing here resolves a policy or verifies an
 input on its own, and no allow-all or "testing" verifier exists in this
