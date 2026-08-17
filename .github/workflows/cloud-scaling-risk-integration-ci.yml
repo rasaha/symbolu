@@ -57,7 +57,8 @@ jobs:
             packages/integration/cloud-scaling-risk-integration/tests/test_authenticity.py \
             packages/integration/cloud-scaling-risk-integration/tests/test_adversarial.py \
             packages/integration/cloud-scaling-risk-integration/tests/test_gate_removal_probes.py \
-            packages/integration/cloud-scaling-risk-integration/tests/test_phase_boundary.py -q
+            packages/integration/cloud-scaling-risk-integration/tests/test_phase_boundary.py \
+            packages/integration/cloud-scaling-risk-integration/tests/test_token_integrity.py -q
       - name: Frozen-digest regression (v1 + Phase 4A v2 must be byte-identical)
         run: |
           python -m pytest \

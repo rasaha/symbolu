@@ -50,7 +50,10 @@ from risk_authority.integrations import (
 from ugence_cloud_scaling_controller.canonical.identity import CapacitySubject
 from ugence_cloud_scaling_controller.planning.candidates import ResourceChange
 
-from .authenticity import AuthenticatedRecommendation
+from .authenticity import (
+    AuthenticatedRecommendation,
+    _validate_authenticated_recommendation,
+)
 from .errors import ProjectionError
 from .identifiers import (
     DOMAIN_CLOUD_SCALING,
@@ -274,20 +277,33 @@ def project_recommendation(
         not reconcile locally.
     """
 
-    if not isinstance(authenticated, AuthenticatedRecommendation):
+    # --- consumption boundary: re-establish the token's own invariant ------------------
+    # Exact type, not ``isinstance``, and re-validated rather than trusted from
+    # construction. Holding an ``AuthenticatedRecommendation`` is what entitles a caller
+    # to project, so a token that was never validly constructed must not be projectable:
+    # ``object.__new__`` skips ``__post_init__`` entirely, ``object.__setattr__`` rewrites
+    # a frozen field after the fact, and a token subclass can make ``recommendation`` a
+    # property returning a different object on each read. All of this happens **before**
+    # any context, binding or request is constructed — nothing downstream observes a token
+    # that failed here.
+    if type(authenticated) is not AuthenticatedRecommendation:
         raise ProjectionError(
             "project_recommendation requires an AuthenticatedRecommendation — a "
             "recommendation may not be projected before its digest has been reconciled "
-            "against an independent expectation"
+            "against an independent expectation "
+            f"(got {type(authenticated).__name__})"
         )
+    # The validated values are used from here on rather than re-read from the token, so
+    # there is no window between the check and the use.
+    recommendation, recommendation_digest = _validate_authenticated_recommendation(
+        authenticated
+    )
 
-    recommendation = authenticated.recommendation
     subject: CapacitySubject = recommendation.subject
 
     # --- authoritative outer identity (never duplicated inside SubjectContext) --------
     tenant_id = _require_identity("subject.tenant_id (outer tenant_id)", subject.tenant_id)
     subject_id = _require_identity("subject.workload_id (outer subject_id)", subject.workload_id)
-    recommendation_digest = authenticated.recommendation_digest
 
     # --- curated neutral subject facts ------------------------------------------------
     change = _primary_change(recommendation)

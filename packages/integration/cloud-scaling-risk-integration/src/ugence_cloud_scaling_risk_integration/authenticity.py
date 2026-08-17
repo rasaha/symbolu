@@ -56,6 +56,34 @@ A caller holding a legitimate subclass is not locked out: serializing it and sub
 the canonical document reconstructs an exact base instance whose digest is recomputed
 from content.
 
+The authenticated token's own integrity invariant
+------------------------------------------------
+:class:`AuthenticatedRecommendation` is the *token* every downstream consumer trusts: a
+caller holding one is entitled to assume its ``recommendation_digest`` is the digest of
+its ``recommendation``. Nothing but this module establishes that, so the invariant is
+enforced here rather than assumed:
+
+    ``token.recommendation_digest == token.recommendation.digest()``
+
+It is checked in ``__post_init__`` so no *supported* construction can produce a
+mismatched token, and **re-checked at every consumption boundary** so an *unsupported*
+one cannot be consumed either. The second check is the load-bearing one: a frozen
+dataclass is not a security boundary. ``object.__new__`` skips ``__post_init__`` entirely,
+``object.__setattr__`` rewrites a frozen field afterwards, and a subclass can replace
+``recommendation`` with a property that returns a different object on each access.
+Consumers therefore require the **exact** ``AuthenticatedRecommendation`` type — not
+``isinstance`` — and recompute the digest from the embedded record before using it.
+
+Requiring the exact embedded ``CapacityActionRecommendation`` type *before* invoking
+``digest()`` is what makes that recomputation trustworthy: it is the same exact-type
+discipline described above, applied to the token's contents, and it removes the
+subclass-dispatch risk that would otherwise let the recomputation be chosen by the
+attacker.
+
+**This is content-integrity, not signed producer authenticity.** It proves the token's
+digest describes the token's content. It does not prove who authored that content — see
+"What Phase 4C still does NOT prove" below, which this correction does not narrow.
+
 The in-process object path
 --------------------------
 A live :class:`CapacityActionRecommendation` carries no digest field of its own —
@@ -181,16 +209,11 @@ class AuthenticatedRecommendation:
     executable: bool = False
 
     def __post_init__(self) -> None:
-        _assert_no_authority(self)
-        # Exact type, not isinstance: this record is the token the projection trusts,
-        # so a subclass must not be representable inside it even if some future caller
-        # constructed one directly rather than through the admission path above.
-        if type(self.recommendation) is not CapacityActionRecommendation:
-            raise UnsupportedRecommendationSourceError(
-                "recommendation must be exactly a CapacityActionRecommendation, not a "
-                f"subclass ({type(self.recommendation).__name__})"
-            )
-        _require_digest_syntax("recommendation_digest", self.recommendation_digest)
+        # The single authoritative routine, run on the supported construction path so a
+        # mismatched token cannot be minted by hand. It is deliberately the *same*
+        # routine every consumer re-runs: one definition of "valid token", not two that
+        # could drift apart. See ``_validate_authenticated_recommendation``.
+        _validate_authenticated_recommendation(self)
 
 
 @dataclass(frozen=True)
@@ -216,14 +239,7 @@ class AuthenticatedAbstention:
     executable: bool = False
 
     def __post_init__(self) -> None:
-        _assert_no_authority(self)
-        if type(self.abstention) is not RecommendationAbstention:
-            raise UnsupportedRecommendationSourceError(
-                "abstention must be exactly a RecommendationAbstention, not a subclass "
-                f"({type(self.abstention).__name__})"
-            )
-        if self.abstention_digest is not None:
-            _require_digest_syntax("abstention_digest", self.abstention_digest)
+        _validate_authenticated_abstention(self)
 
 
 _AUTHORITY_FLAGS = (
@@ -238,9 +254,17 @@ _AUTHORITY_FLAGS = (
 )
 
 
-def _assert_no_authority(record: Any) -> None:
+def _assert_no_authority_fields(record: Any, kind: str) -> None:
+    """Every non-authority flag must still be exactly ``False``.
+
+    Re-read from the token rather than trusted from construction: the flags have no
+    setter, but ``object.__setattr__`` does not need one, and a forged ``True`` is
+    **rejected** rather than normalized — normalizing would launder the very claim the
+    invariant exists to refuse.
+    """
+
     for flag in _AUTHORITY_FLAGS:
-        if getattr(record, flag) is not False:
+        if _token_field(record, flag, kind) is not False:
             raise RecommendationAuthenticityError(
                 f"{flag} must be False — authenticating an input grants no authority"
             )
@@ -254,6 +278,182 @@ def _require_digest_syntax(name: str, value: Any) -> str:
             f"{name} must be a canonical digest ('sha256:' + 64 lowercase hex)"
         )
     return value
+
+
+#: Sentinel for "the attribute is absent", distinct from an attribute whose value is
+#: ``None``. A fabricated token built with ``object.__new__`` has no fields at all, and
+#: an ``AttributeError`` escaping a validation routine would be an *uncontrolled* failure
+#: where the contract promises a controlled, typed, fail-closed one.
+_MISSING: Final[object] = object()
+
+
+def _token_field(token: Any, name: str, kind: str) -> Any:
+    """Read one field of a possibly-fabricated token without ever raising ``AttributeError``.
+
+    Only reached after the token's **exact** type has been established, so the read
+    cannot be intercepted by a subclass property; this guards against the token having
+    been constructed through ``object.__new__`` (which runs neither ``__init__`` nor
+    ``__post_init__`` and therefore leaves the instance with no fields set at all).
+    """
+
+    value = getattr(token, name, _MISSING)
+    if value is _MISSING:
+        raise RecommendationAuthenticityError(
+            f"{kind} is missing its required {name!r} field; it was not produced by a "
+            "supported constructor (fail closed, nothing consumed)"
+        )
+    return value
+
+
+def _require_exact_token(token: Any, expected: type, kind: str) -> None:
+    """Require the **exact** token type, before any attribute of it is read.
+
+    ``isinstance`` is deliberately not the rule. A subclass of the token can replace any
+    field with a property, so the value validated and the value later consumed need not
+    be the same object; it can also define its own ``__init__`` and never reach
+    ``__post_init__``. Requiring the exact type removes both possibilities outright, and
+    is checked here **before** anything on ``token`` is read, so only ``type()`` is
+    consulted on an untrusted object.
+    """
+
+    if type(token) is not expected:
+        raise UnsupportedRecommendationSourceError(
+            f"{kind} must be exactly a {expected.__name__}, not "
+            f"{type(token).__name__}: a subclass may override any field with a property "
+            "or bypass __post_init__ entirely, so its invariants cannot be relied upon"
+        )
+
+
+def _validate_authenticated_recommendation(
+    token: Any,
+) -> tuple[CapacityActionRecommendation, str]:
+    """The authoritative validity check for an :class:`AuthenticatedRecommendation`.
+
+    Run at construction *and* re-run at every consumption boundary, because a frozen
+    dataclass is not a security boundary: ``object.__new__`` skips ``__post_init__``,
+    ``object.__setattr__`` rewrites a frozen field after the fact, and a subclass can
+    make any field a property. Nothing but re-checking catches those.
+
+    It establishes, in order and refusing to touch anything it has not yet typed:
+
+    1. the **exact** ``AuthenticatedRecommendation`` token type;
+    2. that every non-authority flag is still ``False``;
+    3. the **exact** embedded ``CapacityActionRecommendation`` type;
+    4. that ``recommendation_digest`` is syntactically canonical;
+    5. that it **equals the digest recomputed from the embedded recommendation**.
+
+    Step 3 is what makes step 5 meaningful: with the exact base type established, the
+    ``digest()`` call cannot be redirected by subclass dispatch, so the recomputation is
+    derived from canonical content rather than chosen by whoever built the token.
+
+    :returns: the validated ``(recommendation, digest)`` pair. Consumers should use the
+        returned values rather than re-reading the token, so there is no window between
+        the check and the use.
+    :raises UnsupportedRecommendationSourceError: wrong exact token or recommendation type.
+    :raises RecommendationAuthenticityError: missing field, malformed digest, a forged
+        authority flag, or a digest that does not describe the carried content.
+    """
+
+    _require_exact_token(token, AuthenticatedRecommendation, "an authenticated recommendation")
+    _assert_no_authority_fields(token, "an authenticated recommendation")
+
+    recommendation = _token_field(token, "recommendation", "an authenticated recommendation")
+    if type(recommendation) is not CapacityActionRecommendation:
+        raise UnsupportedRecommendationSourceError(
+            "recommendation must be exactly a CapacityActionRecommendation, not a "
+            f"subclass ({type(recommendation).__name__}): every value the projection "
+            "reads is reached by dynamic dispatch, so a subclass would choose its own "
+            "'recomputed' digest"
+        )
+
+    digest = _require_digest_syntax(
+        "recommendation_digest",
+        _token_field(token, "recommendation_digest", "an authenticated recommendation"),
+    )
+    # The invariant itself. Recomputed from the exact canonical record, then compared —
+    # a syntactically valid but incorrect digest fails exactly here.
+    recomputed = _recompute(recommendation, "recommendation")
+    if digest != recomputed:
+        raise RecommendationAuthenticityError(
+            "authenticated recommendation digest does not describe its recommendation: "
+            f"the token carries {digest} but the embedded recommendation hashes to "
+            f"{recomputed}. The token was not produced by a supported constructor, or "
+            "was mutated after construction (fail closed: nothing is projected, no "
+            "request is built and the evaluation seam is not reached)"
+        )
+    return recommendation, digest
+
+
+def _validate_authenticated_abstention(token: Any) -> RecommendationAbstention:
+    """The authoritative validity check for an :class:`AuthenticatedAbstention`.
+
+    The symmetric counterpart of :func:`_validate_authenticated_recommendation`, with the
+    same exact-type and fabrication defences. No digest semantics are invented for
+    abstentions: ``abstention_digest`` stays optional exactly as before. What is enforced
+    is that a digest which *is* present actually describes the carried abstention — the
+    same content-integrity property, applied to the field that already claims it.
+    """
+
+    _require_exact_token(token, AuthenticatedAbstention, "an authenticated abstention")
+    _assert_no_authority_fields(token, "an authenticated abstention")
+
+    abstention = _token_field(token, "abstention", "an authenticated abstention")
+    if type(abstention) is not RecommendationAbstention:
+        raise UnsupportedRecommendationSourceError(
+            "abstention must be exactly a RecommendationAbstention, not a subclass "
+            f"({type(abstention).__name__})"
+        )
+
+    carried = _token_field(token, "abstention_digest", "an authenticated abstention")
+    if carried is not None:
+        digest = _require_digest_syntax("abstention_digest", carried)
+        recomputed = _recompute(abstention, "abstention")
+        if digest != recomputed:
+            raise RecommendationAuthenticityError(
+                "authenticated abstention digest does not describe its abstention: the "
+                f"token carries {digest} but the embedded abstention hashes to "
+                f"{recomputed} (fail closed, nothing consumed)"
+            )
+    return abstention
+
+
+def _validate_authenticated_output(token: Any) -> None:
+    """Re-validate either authenticated token at a consumption boundary.
+
+    Dispatches on **exact** type so an object that is neither token — including one
+    subclassing either — is refused rather than silently taking a branch.
+    """
+
+    token_type = type(token)
+    if token_type is AuthenticatedRecommendation:
+        _validate_authenticated_recommendation(token)
+    elif token_type is AuthenticatedAbstention:
+        _validate_authenticated_abstention(token)
+    else:
+        raise UnsupportedRecommendationSourceError(
+            "expected exactly an AuthenticatedRecommendation or an "
+            f"AuthenticatedAbstention; got {token_type.__name__}"
+        )
+
+
+def _recompute(record: Any, artifact: str) -> str:
+    """Recompute a canonical controller digest, converting any failure into a typed one.
+
+    The record's exact canonical type has already been established, so this cannot reach
+    overridden code — but a record fabricated field-by-field can still be internally
+    incoherent enough that the controller's own digest machinery raises. That must
+    surface as a controlled fail-closed rejection, never as an arbitrary exception
+    escaping a validation routine.
+    """
+
+    try:
+        value = record.digest()
+    except Exception as exc:  # noqa: BLE001 - any failure here is a rejected token
+        raise RecommendationAuthenticityError(
+            f"the embedded {artifact} could not be canonically digested, so its "
+            f"authenticated digest cannot be verified: {exc}"
+        ) from exc
+    return _require_digest_syntax(f"recomputed {artifact} digest", value)
 
 
 def _reconcile(

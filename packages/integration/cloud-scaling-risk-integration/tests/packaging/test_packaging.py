@@ -223,6 +223,21 @@ def test_the_verifier_reports_success_only_after_every_step():
     )
 
 
+def test_the_verifier_banner_names_only_the_stage_it_verified():
+    """The run reaches the network in phase A; the banner must not claim otherwise."""
+
+    source = _verifier_source()
+    assert "OFFLINE ISOLATED INSTALLATION STAGE VERIFIED" in source
+    assert "PHASE A" in source and "PHASE B" in source, (
+        "the online collection phase and the offline installation phase must be labelled "
+        "distinctly, so the scope of the offline claim is legible"
+    )
+    assert "defense in depth" in source.lower(), (
+        "the sentinel index must be described as defense in depth: --no-index and "
+        "PIP_NO_INDEX are the actual prohibition"
+    )
+
+
 def test_the_verifier_has_negative_controls():
     source = _verifier_source()
     assert "expect_offline_install_failure" in source

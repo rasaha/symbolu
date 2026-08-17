@@ -27,7 +27,14 @@ cloud-provider API, scale anything, verify an effect, or learn from outcomes.
 
 Phase 5 (envelope issuance, ActionGate authorization, provider execution) and Phase 6
 (effect verification, recommendation learning) remain excluded, and no capability toward
-either is introduced here. Every outcome carries `authorization_performed`,
+either is introduced here. Stated at the precision the tests actually check: envelope
+issuance, ActionGate invocation, credential issuance, provider execution, effect
+verification and learning are **not implemented in this package, not imported by any
+module of this package, not publicly exported by this package, and not called by any
+Phase 4C path**. That is deliberately narrower than "not reachable in the process": Risk
+Authority may transitively load envelope- or ActionGate-related modules through its own
+package initialization, and claiming otherwise would be false. Every outcome carries
+`authorization_performed`,
 `envelope_issued`, `actiongate_invoked`, `credential_issued`, `actuation_performed`,
 `effect_verified` and `executable` fixed `False` — and a forged `True` on a returned
 decision is **rejected**, never normalized.
@@ -94,6 +101,44 @@ excluded from the dataclass and computed on demand — and the object has alread
 `expected_recommendation_digest` from an independent source. Without one the adapter
 **fails closed** rather than claiming an authenticity it cannot establish.
 
+### The authenticated token's own integrity invariant
+
+`AuthenticatedRecommendation` is the **token** every downstream consumer trusts: holding
+one is what entitles a caller to project a recommendation into a v2 request. So the token
+must not be able to lie about itself. This invariant is enforced:
+
+```
+token.recommendation_digest == token.recommendation.digest()
+```
+
+It is checked in `__post_init__`, so **no supported construction can mint a mismatched
+token** — a hand-built token pairing an exact canonical recommendation with a
+syntactically perfect but incorrect digest is refused. And it is **re-checked at every
+consumption boundary** (`project_recommendation`, `CloudScalingRiskAdapter.project`,
+`CloudScalingRiskAdapter.evaluate`), which is the load-bearing half: a frozen dataclass is
+not a security boundary. `object.__new__` skips `__post_init__` entirely,
+`object.__setattr__` rewrites a frozen field afterwards, and a token *subclass* can make
+`recommendation` a property returning a different object on each read — against which
+"validate, then use" is not a defence at any level of care, because the value validated is
+by construction not the value consumed.
+
+Consumers therefore require the **exact** `AuthenticatedRecommendation` type, not
+`isinstance`, before reading anything; establish the **exact** embedded
+`CapacityActionRecommendation` type before invoking `digest()`, so the recomputation
+cannot be redirected by subclass dispatch; and use the values the check returned rather
+than re-reading the token. Every rejection is a controlled typed failure raised **before**
+any clock read, any `SubjectContext`, any `SubjectBinding`, any v2 request and any seam
+call — asserted as such in `tests/test_token_integrity.py`, which counts clock reads,
+construction calls, seam calls and resolver calls rather than only checking the error.
+
+`AuthenticatedAbstention` gets the symmetric exact-type treatment. No digest semantics are
+invented for abstentions — `abstention_digest` remains optional — but a digest that *is*
+carried must describe the carried abstention.
+
+**This is content integrity, not signed producer authenticity.** It proves the token's
+digest describes the token's content; it proves nothing about who authored that content,
+and it narrows none of the limits below.
+
 ### What Phase 4C does **not** prove
 
 - **It is not a signature.** The controller digest is a canonical content *identity* over
@@ -109,7 +154,9 @@ excluded from the dataclass and computed on demand — and the object has alread
   a signed provenance chain over the controller's output, which does not exist anywhere
   in the repository today and which Phase 4C does not invent. No placeholder
   authenticator was added, because a placeholder would read as a control while providing
-  none.
+  none. **The token-integrity invariant above does not narrow this**: such a forgery
+  satisfies it precisely because the forgery *is* content-consistent. That case is
+  asserted as a passing test rather than left implicit.
 - **Subject-digest equality is not whole-request authenticity.** Per ADR Amendment 3,
   substituting a *routing* field (`requested_purpose`, `requested_domain`,
   `requested_risk_class`, `requested_scope`, `evidence_references`) moves `request_digest`
@@ -264,17 +311,36 @@ python -m pytest packages/integration/cloud-scaling-risk-integration/tests -q
 # Build
 python -m build packages/integration/cloud-scaling-risk-integration
 
-# Genuinely offline isolated-install verification (source-vs-installed digest equality)
+# Offline isolated-installation stage verification (source-vs-installed digest equality).
+# Phase A of this script is ONLINE by design; phase B is the offline stage it verifies.
+# See the phase table below.
 python packages/integration/cloud-scaling-risk-integration/scripts/verify_isolated_install.py
 ```
 
-The verifier collects the **full** dependency closure (first-party wheels plus numpy)
-into a local wheelhouse first, then installs from that wheelhouse with the index
-structurally disabled — `--no-index`, `PIP_NO_INDEX=1`, an unroutable sentinel index, no
-cache, no pip upgrade, no editable install. It then proves the guarantee by negative
-control: a missing wheel fails the install, a bogus index cannot rescue it, and a failed
-install leaves nothing importable. `VERIFIED` is printed only after all eight steps
-record completion, and any failed subprocess exits non-zero.
+**The verifier run as a whole is not offline, and does not claim to be.** It has
+distinct phases, and only one of them is the guarantee:
+
+| Phase | Network | What it does |
+|---|---|---|
+| **A** | **online** | builds the first-party wheels and downloads the full dependency closure (including numpy) into a local wheelhouse |
+| **B** | **genuinely offline** | installs into a throwaway virtualenv from that wheelhouse alone — this is the isolated-installation stage being verified |
+| **C** | offline | negative controls on the phase-B guarantee |
+| **D** | offline | behavior probes inside the isolated environment |
+
+Phase A must reach an index; that is what collecting a dependency closure means. The
+claim under test is scoped to **phase B**, and the closing banner names it:
+`OFFLINE ISOLATED INSTALLATION STAGE VERIFIED`.
+
+Inside phase B the index is disabled by `--no-index` and `PIP_NO_INDEX=1` — those two are
+the actual prohibition. The unroutable sentinel index URL is **defense in depth**: it
+supplies no protection of its own, and exists so that if a future edit dropped a flag,
+resolution fails loudly against an unroutable host instead of quietly succeeding against
+the real PyPI. Phase B additionally uses no cache, no pip upgrade and no editable install.
+
+Phase C proves the guarantee by negative control rather than asserting it: a missing wheel
+fails the install, a bogus index cannot rescue it, and a failed install leaves nothing
+importable. The banner is printed only after all eight steps record completion, and any
+failed subprocess exits non-zero.
 
 The suite includes **gate-removal probes** (`tests/test_gate_removal_probes.py`): each
 disables one security gate and asserts the corresponding attack *now succeeds*. A probe

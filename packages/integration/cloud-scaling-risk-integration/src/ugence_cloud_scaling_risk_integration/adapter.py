@@ -51,6 +51,8 @@ from risk_authority.integrations import SubjectRiskDecision
 from .authenticity import (
     AuthenticatedAbstention,
     AuthenticatedRecommendation,
+    _validate_authenticated_abstention,
+    _validate_authenticated_output,
     authenticate_controller_output,
 )
 from .errors import (
@@ -142,7 +144,13 @@ class CloudScalingRiskAdapter:
         authenticated = authenticate_controller_output(
             source, expected_recommendation_digest=expected_recommendation_digest
         )
-        if isinstance(authenticated, AuthenticatedAbstention):
+        # Defensive revalidation at the public boundary. ``authenticate_controller_output``
+        # cannot return an invalid token today, so this is redundant *now* — which is the
+        # point: the invariant every consumer relies on is re-established at the boundary
+        # that relies on it, not inherited from a caller's good behavior. It runs before
+        # any context, binding or request exists and before the seam is reachable.
+        _validate_authenticated_output(authenticated)
+        if type(authenticated) is AuthenticatedAbstention:
             raise ProjectionError(
                 "a controller abstention is not a recommendation and is never projected "
                 "into a Risk Authority request"
@@ -169,6 +177,13 @@ class CloudScalingRiskAdapter:
             authenticated = authenticate_controller_output(
                 source, expected_recommendation_digest=expected_recommendation_digest
             )
+            # Defensive revalidation of the token before anything is done with it: the
+            # exact token type, the exact embedded canonical type, the digest syntax and
+            # the digest-equals-content invariant. Placed inside this try so a token that
+            # fails it produces the same typed fail-closed outcome as a bad input would,
+            # never an escaping exception. Nothing has yet read the clock, built a
+            # context, a binding or a request, or touched the seam.
+            _validate_authenticated_output(authenticated)
         except UnsupportedRecommendationSourceError as exc:
             return self._rejected(
                 AdapterRejectionReason.UNSUPPORTED_INPUT_TYPE, str(exc)
@@ -187,12 +202,31 @@ class CloudScalingRiskAdapter:
             )
 
         # --- gate 2: upstream abstention ---------------------------------------------
-        if isinstance(authenticated, AuthenticatedAbstention):
+        if type(authenticated) is AuthenticatedAbstention:
             return self._abstained(authenticated)
 
         # --- gate 3: projection -------------------------------------------------------
         try:
             projection = project_recommendation(authenticated)
+        except RecommendationInputError as exc:
+            # ``project_recommendation`` re-runs the token check independently of the
+            # revalidation above; if the two ever disagreed, the stricter one must still
+            # produce a typed outcome rather than an escaping exception.
+            return self._rejected(
+                AdapterRejectionReason.UNSUPPORTED_INPUT_TYPE,
+                str(exc),
+                tenant_id=_safe_tenant(authenticated),
+                subject_id=_safe_subject(authenticated),
+                recommendation_digest=getattr(authenticated, "recommendation_digest", None),
+            )
+        except RecommendationAuthenticityError as exc:
+            return self._rejected(
+                AdapterRejectionReason.RECOMMENDATION_DIGEST_MISMATCH,
+                str(exc),
+                tenant_id=_safe_tenant(authenticated),
+                subject_id=_safe_subject(authenticated),
+                recommendation_digest=getattr(authenticated, "recommendation_digest", None),
+            )
         except ProjectionError as exc:
             return self._rejected(
                 AdapterRejectionReason.PROJECTION_FAILED,
@@ -297,7 +331,12 @@ class CloudScalingRiskAdapter:
         them is claimed, because nothing beyond them was evaluated.
         """
 
-        abstention = authenticated.abstention
+        # Symmetric defensive revalidation: exact token type, exact canonical abstention
+        # type, and a carried digest that actually describes the carried abstention. An
+        # abstention never reaches the seam by construction, so this closes the remaining
+        # bypass — a fabricated abstention token reporting an upstream non-evaluation it
+        # cannot substantiate.
+        abstention = _validate_authenticated_abstention(authenticated)
         references = tuple(
             sorted(
                 {

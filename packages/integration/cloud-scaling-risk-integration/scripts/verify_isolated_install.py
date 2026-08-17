@@ -9,6 +9,26 @@ risk-authority). The verifier therefore builds a local wheelhouse of those FIRST
 wheels and installs the adapter from it, allowing only third-party wheels (numpy, a
 controller dependency) from the index.
 
+**Scope of the claim, stated precisely.** This script's run is *not* offline as a whole,
+and does not claim to be. It has four phases:
+
+  * **Phase A (online)** — build the first-party wheels and download the full dependency
+    closure, numpy included, into a local wheelhouse. Reaching an index here is what
+    collecting a closure *means*; pretending otherwise would be the over-claim.
+  * **Phase B (genuinely offline)** — the isolated-installation stage under test: install
+    into a throwaway virtualenv from that wheelhouse alone, with no index reachable.
+  * **Phase C (offline)** — negative controls that prove the phase-B guarantee.
+  * **Phase D (offline)** — behavior probes inside the isolated environment.
+
+Only **phase B** is the guarantee, and the closing banner names exactly that:
+``OFFLINE ISOLATED INSTALLATION STAGE VERIFIED``.
+
+Within phase B, ``--no-index`` and ``PIP_NO_INDEX=1`` are the *actual* index prohibition.
+The unroutable ``OFFLINE_SENTINEL_INDEX`` is **defense in depth** and provides no
+protection of its own: it exists so that if a future edit dropped one of those flags,
+resolution fails loudly against an unroutable host rather than quietly succeeding against
+the real PyPI.
+
 It then proves, inside that clean environment:
 
   * ``ugence_cloud_scaling_risk_integration`` imports from site-packages, not the repo;
@@ -22,7 +42,13 @@ It then proves, inside that clean environment:
   * an expired recommendation never reaches the seam;
   * an abstention never reaches the seam and manufactures no subject digest;
   * every execution/authorization flag is False, and a forged True is rejected;
-  * NO envelope issuer, ActionGate, credential or execution symbol is reachable;
+  * an authenticated token whose digest does not describe its recommendation is
+    REJECTED — at construction, and again at every consumption boundary, including
+    tokens built through ``object.__new__`` or mutated with ``object.__setattr__``;
+  * NO envelope issuer, ActionGate, credential or execution symbol is implemented in,
+    imported by, publicly exported by or called from the installed adapter (a
+    dependency may still load such modules through its own package initialization —
+    the claim is about the adapter, not about the process);
   * NO out-of-scope monorepo package (symbolu/agentic/apps/…) is importable.
 
 Run:  python packages/integration/cloud-scaling-risk-integration/scripts/verify_isolated_install.py
@@ -62,8 +88,10 @@ REQUIRED_DISTRIBUTIONS = (
     "numpy-",  # the controller's only third-party runtime dependency
 )
 
-# An unroutable sentinel used wherever an index URL must be supplied. If index resolution
-# were ever attempted despite --no-index, it fails loudly here instead of quietly
+# An unroutable sentinel used wherever an index URL must be supplied. It is DEFENSE IN
+# DEPTH and is not what makes the offline phase offline: --no-index and PIP_NO_INDEX=1 are
+# the actual index prohibition. The sentinel exists so that if a future edit dropped one of
+# those flags, resolution fails loudly against an unroutable host instead of quietly
 # succeeding against the real PyPI.
 OFFLINE_SENTINEL_INDEX = "http://offline.invalid/simple"
 
@@ -234,7 +262,115 @@ for flag in ("authorization_performed", "envelope_issued", "actiongate_invoked",
         raise AssertionError(f"a forged {flag}=True was accepted")
 assert outcome.grants_authority is False
 
-# 12. No Phase 5/6 capability is reachable from the public surface.
+# 11b. The authenticated token's own content-integrity invariant, from the wheel.
+#      A token could previously be hand-built with an exact canonical recommendation and
+#      a syntactically valid but incorrect digest; a consumer would then accept a token
+#      whose name claimed a reconciliation that never happened. Verified here against the
+#      INSTALLED code, and at all three consumption boundaries, because a source-only
+#      check would not prove what a deployed wheel does.
+from dataclasses import fields as _dc_fields
+
+from ugence_cloud_scaling_risk_integration import (
+    AuthenticatedRecommendation, RecommendationAuthenticityError,
+    UnsupportedRecommendationSourceError,
+)
+
+WRONG_DIGEST = "sha256:" + "9" * 64
+assert rec.digest() != WRONG_DIGEST
+
+# (a) supported construction cannot mint a mismatched token.
+try:
+    AuthenticatedRecommendation(
+        recommendation=rec,
+        recommendation_digest=WRONG_DIGEST,
+        expectation_source="caller_supplied_expectation",
+    )
+except RecommendationAuthenticityError:
+    pass
+else:
+    raise AssertionError("a mismatched authenticated token was constructed")
+
+# (b) a token subclass is refused at construction.
+class _SubclassToken(AuthenticatedRecommendation):
+    pass
+
+try:
+    _SubclassToken(
+        recommendation=rec,
+        recommendation_digest=rec.digest(),
+        expectation_source="caller_supplied_expectation",
+    )
+except UnsupportedRecommendationSourceError:
+    pass
+else:
+    raise AssertionError("a token subclass was constructed")
+
+# (c) a constructor-bypassed token (object.__new__, so __post_init__ never ran) is
+#     refused at every consumption boundary, and nothing observes it.
+_forged = object.__new__(AuthenticatedRecommendation)
+object.__setattr__(_forged, "recommendation", rec)
+object.__setattr__(_forged, "recommendation_digest", WRONG_DIGEST)
+object.__setattr__(_forged, "expectation_source", "caller_supplied_expectation")
+for _f in _dc_fields(AuthenticatedRecommendation):
+    if _f.name not in ("recommendation", "recommendation_digest", "expectation_source"):
+        object.__setattr__(_forged, _f.name, False)
+assert type(_forged) is AuthenticatedRecommendation
+
+class _CountingSeam:
+    calls = 0
+    def evaluate(self, request):
+        _CountingSeam.calls += 1
+        raise AssertionError("the seam was reached with a forged authenticated token")
+
+_reads = []
+_token_adapter = CloudScalingRiskAdapter(
+    seam=_CountingSeam(), clock=lambda: (_reads.append(1) or FIXED_NOW))
+
+try:
+    project_recommendation(_forged)
+except (RecommendationAuthenticityError, UnsupportedRecommendationSourceError):
+    pass
+else:
+    raise AssertionError("project_recommendation accepted a forged token")
+
+try:
+    _token_adapter.project(_forged)
+except (RecommendationAuthenticityError, UnsupportedRecommendationSourceError):
+    pass
+else:
+    raise AssertionError(".project accepted a forged token")
+
+_outcome = _token_adapter.evaluate(_forged)
+assert _outcome.status is AdapterOutcomeStatus.PROJECTION_REJECTED
+assert _outcome.decision is None and _outcome.projection is None
+assert _CountingSeam.calls == 0, "the seam was reached with a forged token"
+assert _reads == [], "the trusted clock was read for a forged token"
+
+# (d) post-construction mutation of a validly built token is caught at consumption.
+_mutated = authenticate_controller_output(
+    rec, expected_recommendation_digest=rec.digest())
+object.__setattr__(_mutated, "recommendation_digest", WRONG_DIGEST)
+try:
+    project_recommendation(_mutated)
+except RecommendationAuthenticityError:
+    pass
+else:
+    raise AssertionError("a mutated token was projected")
+
+# (e) positive control: the legitimate token path is unchanged.
+_valid = authenticate_controller_output(
+    rec, expected_recommendation_digest=rec.digest())
+assert _valid.recommendation_digest == _valid.recommendation.digest()
+assert project_recommendation(_valid).request_digest == EXPECTED["request_digest"]
+
+# (f) the invariant is enforced without widening the public API.
+assert "_validate_authenticated_recommendation" not in adapter_pkg.__all__
+assert not hasattr(adapter_pkg, "_validate_authenticated_recommendation")
+
+# 12. No Phase 5/6 capability is publicly exported by the installed adapter. Scoped
+#     deliberately to this package's own surface: Risk Authority may transitively load
+#     envelope- or ActionGate-related modules through its own package initialization,
+#     so a process-wide 'nothing is reachable' assertion would be false.
 for name in adapter_pkg.__all__:
     lowered = name.lower()
     for forbidden in ("envelope", "authorize", "actiongate", "credential", "execute",
@@ -404,7 +540,7 @@ def main() -> int:
         wheelhouse = tmp_path / "wheelhouse"
         wheelhouse.mkdir()
 
-        # === PHASE A — collection. Network access is legitimate HERE and only here. ===
+        # === PHASE A — collection. ONLINE by design, and the only phase that is. ===
         # Every distribution the adapter needs, first- and third-party, is materialized
         # into the local wheelhouse before the offline phase begins. Calling an install
         # "offline" because a wheel happened to be cached would be false; the wheelhouse
@@ -437,7 +573,9 @@ def main() -> int:
                 )
         done("dependency closure collected into the wheelhouse")
 
-        # === PHASE B — genuinely offline installation. No index, no cache, no source. ===
+        # === PHASE B — the genuinely offline stage this verifier exists to prove. =======
+        # No index, no cache, no source tree. --no-index and PIP_NO_INDEX=1 are the actual
+        # prohibition; the sentinel index URL is defense in depth behind them.
         print("\n=== PHASE B (offline): install with the index structurally disabled ===",
               flush=True)
         env_dir = tmp_path / "env"
@@ -541,7 +679,9 @@ def main() -> int:
     print(f"\nall {EXPECTED_STEPS} verification steps completed:", flush=True)
     for step in steps:
         print(f"  - {step}")
-    print("\nISOLATED PHASE 4C ADAPTER DISTRIBUTION VERIFIED (genuinely offline)")
+    # Names the phase that was actually verified. The run as a whole reached the network
+    # in phase A by design; the guarantee is that phase B installed with no index reachable.
+    print("\nOFFLINE ISOLATED INSTALLATION STAGE VERIFIED")
     return 0
 
 
