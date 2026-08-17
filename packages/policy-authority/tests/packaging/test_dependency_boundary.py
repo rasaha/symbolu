@@ -2,7 +2,15 @@
 
 The authority imports **no** engine: not readiness, not governed-value, not
 Risk/Decision Authority internals, not Agent Runtime, Runtime Assurance,
-forecasting, or the benchmark-value service. Nothing imports it back.
+forecasting, or the benchmark-value service. That is the reverse-dependency
+direction, and it is absolute.
+
+The forward direction is the ratified one: engines **consume** the authority.
+ADR §10.4 states it exactly — "UVI engines consume exact resolved policy
+artifacts; they do **not** import authority internals." A consumer may therefore
+name ``ugence_policy_authority`` or ``ugence_policy_authority.api``, and may
+name nothing else: every ``…core`` / ``…adapters`` module stays internal, and
+the scan below enforces that repository-wide.
 """
 
 from __future__ import annotations
@@ -127,8 +135,38 @@ def test_the_distribution_and_namespace_are_the_canonical_shared_names():
     assert DIST_ROOT.name == "policy-authority"
 
 
-def test_no_reverse_dependency_exists_anywhere_in_the_repository():
-    """No other package imports this authority — the arrow is one-way."""
+#: The only modules of this authority a consumer may name. Everything else is
+#: an internal, whatever its import form.
+PUBLIC_MODULES = {SELF, f"{SELF}.api"}
+
+
+def test_no_package_anywhere_imports_an_authority_internal():
+    """Consumers may use the public surface; internals stay internal."""
+
+    offenders = {}
+    for path in (REPO_ROOT / "packages").rglob("*.py"):
+        if str(path).startswith(str(DIST_ROOT)):
+            continue
+        try:
+            tree = ast.parse(path.read_text(), filename=str(path))
+        except (OSError, UnicodeDecodeError, SyntaxError):  # pragma: no cover
+            continue
+        for node in ast.walk(tree):
+            names = set()
+            if isinstance(node, ast.Import):
+                names = {a.name for a in node.names}
+            elif isinstance(node, ast.ImportFrom) and node.module and not node.level:
+                names = {node.module}
+            for name in names:
+                if name.split(".")[0] != SELF:
+                    continue
+                if name not in PUBLIC_MODULES:
+                    offenders.setdefault(str(path.relative_to(REPO_ROOT)), set()).add(name)
+    assert not offenders, offenders
+
+
+def test_the_superseded_uvi_specific_authority_name_appears_nowhere():
+    """``ugence_uvi_policy_authority`` was prohibited by name (ADR §8)."""
 
     offenders = []
     for path in (REPO_ROOT / "packages").rglob("*.py"):
@@ -138,9 +176,16 @@ def test_no_reverse_dependency_exists_anywhere_in_the_repository():
             source = path.read_text()
         except (OSError, UnicodeDecodeError):  # pragma: no cover
             continue
-        if "ugence_policy_authority" in source or "ugence_uvi_policy_authority" in source:
+        if "ugence_uvi_policy_authority" in source:
             offenders.append(str(path.relative_to(REPO_ROOT)))
     assert not offenders, offenders
+
+
+def test_no_consumer_is_imported_back_by_this_authority():
+    """The reverse direction stays empty — a cycle would be a second system."""
+
+    for path in sorted(PKG_ROOT.rglob("*.py")):
+        assert not (_roots(path) & PROHIBITED), path
 
 
 def test_the_ed25519_convention_is_reproduced_not_imported():

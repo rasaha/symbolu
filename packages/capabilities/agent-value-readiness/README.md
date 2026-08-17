@@ -1,20 +1,27 @@
 # ugence-agent-value-readiness
 
 > **⚠️ Experimental, internal, advisory, non-financial.**
-> The **contract shapes** (GV-3R-a) and the **deterministic readiness
-> determination evaluator** (GV-3R-b) for the Agent Value Readiness engine of
-> Ugence Value Intelligence — **not** a deployment authority, **not** a
-> metric-evaluation engine, and **not** a customer-facing module.
+> The **contract shapes** (GV-3R-a), the **deterministic readiness determination
+> evaluator** (GV-3R-b), and the **fail-closed trusted orchestration boundary**
+> around that evaluator (GV-3R-c) for the Agent Value Readiness engine of Ugence
+> Value Intelligence — **not** a deployment authority, **not** a Policy
+> Authority, **not** a metric-evaluation engine, and **not** a customer-facing
+> module.
 > - **No deployment authorization** — a determination is *advisory*, consumed by
 >   a separate human/deployment-governance process.
 > - **No evidence admission or verification, no benchmark resolution, no
 >   metric-to-threshold calculation.** The evaluator consumes gate statuses
->   recorded by an upstream evaluator; it does not compute them.
+>   recorded by an upstream evaluator; it does not compute them. Whether those
+>   statuses are *trusted* is the configured gate verifier's answer, never this
+>   package's.
 > - **No money, currency, cost, benefit, or ROI** anywhere.
-> - **Caller-provided artifacts are not authority-verified.** Lifecycle labels,
->   digests, condition approvals, and gate statuses are structural inputs;
->   verifying them is Policy-Authority work.
-> - **Policy Authority and richer RA-owned subject/system binding are deferred.**
+> - **Nothing is trusted by default.** Used standalone, the evaluator treats
+>   lifecycle labels, digests, condition approvals and gate statuses as
+>   structural caller inputs. Used through `assess_readiness`, each becomes the
+>   responsibility of a configured trust boundary that **denies** when absent.
+> - **No allow-all or "testing" verifier ships** — that absence is the boundary.
+> - **Benchmark registry, evidence/TAP verification, condition enforcement and
+>   RA-owned subject/system binding remain deferred.**
 
 The vocabulary for assessing whether an agent is ready for an intended outcome:
 
@@ -24,16 +31,20 @@ PreROIReadiness = f(Intelligence, Capabilities, Adoption
 ```
 
 Intelligence, Capability, and Adoption are **non-financial leading indicators**.
-This package implements milestones **M-3R.1 (GV-3R-a, contract shapes)** and
-**M-3R.2 (GV-3R-b, the determination evaluator)** of the UVI ADR
-(`docs/architecture/ADR_UGENCE_VALUE_INTELLIGENCE_GV2C_GV2E_GV3R.md`, §5–§10, §20).
-Authority resolution (Policy Authority, condition-approval validation) remains
-out of scope.
+This package implements **M-3R.1 (GV-3R-a, contract shapes)**, **M-3R.2
+(GV-3R-b, the determination evaluator)** and, additively, **GV-3R-c — trusted
+readiness orchestration** around that evaluator, per the UVI ADR
+(`docs/architecture/ADR_UGENCE_VALUE_INTELLIGENCE_GV2C_GV2E_GV3R.md`, §5–§10,
+§19, §20, §23) and the shared Policy Authority ADR
+(`docs/architecture/ADR_UGENCE_POLICY_AUTHORITY.md`, §5, §10.4). Policy
+**issuance, signing, approval verification, registration and revocation** stay
+with the shared Ugence Policy Authority; this package only **consumes** its
+public trusted-resolution service.
 
 - **Distribution:** `ugence-agent-value-readiness`
 - **Namespace:** `ugence_agent_value_readiness`
-- **Version:** 0.2.0
-- **Depends on:** stdlib **+ `ugence-governance-contracts>=0.2.0`** (evidence vocabulary) **+ `ugence-uvi-policy-contracts>=0.1.0`** (policy/context shapes) — never `governed-value`.
+- **Version:** 0.3.0
+- **Depends on:** stdlib **+ `ugence-governance-contracts>=0.2.0`** (evidence vocabulary) **+ `ugence-uvi-policy-contracts>=0.1.0`** (policy/context shapes) **+ `ugence-policy-authority>=0.1.0`** (public trusted policy resolution only) — never `governed-value`, and never an authority internal.
 - **Typing:** fully annotated; ships `py.typed`.
 
 ## What's in it
@@ -47,7 +58,11 @@ out of scope.
 | Reused policy enums (re-exported) | `ReadinessTarget`, `RequirementClass` (owned by `ugence-uvi-policy-contracts`) |
 | **Evaluator (GV-3R-b)** | `evaluate_readiness`, `ReadinessEvaluationCase`, `ReadinessEvaluationResult`, `ReadinessEvaluationTrace`, `ConditionDecision` |
 | **Evaluator codes** | `ReadinessRuleId`, `ReadinessReasonCode`, `ReadinessAdvisoryCode`, `ConditionDecisionCode` |
-| Errors | `ReadinessContractError`, `ReadinessEvaluationError` |
+| **Orchestration (GV-3R-c)** | `assess_readiness`, `ReadinessAssessmentRequest`, `ReadinessAssessmentOutcome`, `ReadinessAssessmentTrace`, `ReadinessAssessmentDisposition`, `READINESS_ORCHESTRATOR_VERSION` |
+| **Orchestration verification** | `GateVerificationRequest`, `GateResultVerification`, `GateVerificationSummary`, `ConditionVerificationRequest`, `ConditionSetVerification`, `ConditionVerificationSummary` |
+| **Orchestration codes** | `ReadinessAssessmentStatus`, `ReadinessInputVerificationStatus`, `ReadinessTrustGapCode`, `ReadinessTrustAdvisoryState` |
+| **Injected trust boundaries** | `ReadinessPolicyResolver`, `GateResultVerifier`, `ConditionSetVerifier` (protocols); `DenyAllReadinessPolicyResolver`, `DenyAllGateResultVerifier`, `DenyAllConditionSetVerifier` (production defaults); `PolicyAuthorityReadinessPolicyResolver` (adapter onto the shared authority) |
+| Errors | `ReadinessContractError`, `ReadinessEvaluationError`, `ReadinessAssessmentError` |
 
 ## The evaluator (GV-3R-b)
 
@@ -173,9 +188,9 @@ consulted when selecting the tier, and is proven inert: moving its score from
 scale minimum to maximum with all other inputs fixed yields an identical
 classification, rule and reason-code tuple.
 
-**The sharpest form of the trust limitation:** because the `ReadinessPolicy` is
-a caller-supplied, unverified artifact, a permissive policy yields a permissive
-answer — in the limit, a policy declaring no gates has nothing to fail. The
+**The sharpest form of the trust limitation (standalone use):** because the
+`ReadinessPolicy` is then a caller-supplied, unverified artifact, a permissive
+policy yields a permissive answer — in the limit, a policy declaring no gates has nothing to fail. The
 evaluator proves conformance *to the supplied policy*, never that the policy is
 the authentic, authority-issued one. The `R0` binding, lifecycle and
 effective-period checks are a **structural read of caller-supplied contracts**
@@ -183,8 +198,186 @@ at the evaluation time: they do not authenticate, sign, resolve or approve the
 policy, and they do not verify a `content_digest` against a registry-resolved
 body — matching digests only proves the context and the supplied policy claim
 the same identity. An `APPROVED_ACTIVE` label remains a caller assertion. None
-of this replaces Policy Authority or registry resolution; closing that gap is
-deferred.
+of this replaces Policy Authority or registry resolution — **that gap is what
+GV-3R-c closes**, by requiring the exact policy to resolve through the shared
+authority's public trusted-resolution service before any gate is even looked at.
+A permissive *policy* still yields a permissive answer; what GV-3R-c adds is the
+proof that the policy is the authentic, authority-issued one.
+
+## The orchestration boundary (GV-3R-c)
+
+```python
+from ugence_agent_value_readiness.api import assess_readiness
+
+outcome = assess_readiness(
+    request,                                # carries no classification, no policy body
+    policy_resolver=configured_resolver,    # omit -> DENY
+    gate_verifier=configured_gate_verifier, # omit -> DENY
+    condition_verifier=configured_verifier, # omit -> DENY
+)
+outcome.status            # EVALUATED | NOT_EVALUATED
+outcome.classification    # the GV-3R-b tier, or None when nothing was evaluated
+outcome.trust_gap_codes   # stable, typed, ordered — every gap is explicit
+outcome.dispositions      # what happened to each standing GV-3R-b advisory
+outcome.authorizes_deployment   # permanently False
+```
+
+`assess_readiness` **adds no second classification algorithm.** It resolves,
+verifies, sanitizes, then calls the one ratified `evaluate_readiness` exactly
+once over a freshly built case. An automated test proves no module outside the
+evaluator names a `ReadinessClassification` member or builds a
+`ReadinessEvaluationResult`.
+
+### The four stages, and what each failure means
+
+| Stage | Establishes | On failure |
+|---|---|---|
+| 1 — policy resolution | the exact `ReadinessPolicy` resolved through the configured shared Policy Authority boundary at `evaluation_time` | `NOT_EVALUATED`; **no** later stage runs, no verifier is called, no classification exists |
+| 2 — gate verification | each gate result was attested under its complete binding | that result is **absent** for the evaluator |
+| 3 — condition verification | each compensating control was attested for its exact concern | that control provides **no coverage** |
+| 4 — evaluation | one `evaluate_readiness` call over sanitized input | an advisory determination + deterministic trace |
+
+**Policy-resolution failure dominates all gate information.** Under it the
+outcome preserves **no usable policy material** — no issuance-record reference,
+no resolved-policy digest — only the typed gap codes and the reference the
+caller already holds.
+
+### What resolution must prove before anything else runs
+
+Resolution status is `RESOLVED`; a policy **and** issuance record are present;
+the artifact is a `ReadinessPolicy`; its complete `PolicyReference` (family, id,
+version, content digest, scope, tenant) equals the requested one; the requested
+reference's tenant identity is the assessed tenant; the `AssessmentContext`
+binds exactly this reference; the resolved policy governs the requested target;
+the resolution's `as_of` **is** the requested evaluation instant; the answer is
+not historical; and — as defence in depth — the resolved artifact's own metadata
+is still `APPROVED_ACTIVE` and effective at that instant. Each of those is
+rechecked by the orchestrator itself, so a lax resolver cannot get a mismatched
+policy admitted.
+
+### Sanitization and precedence
+
+Sanitization is **subtraction, never substitution**. An unverified result is
+absent — not `PASS`, not `INDETERMINATE`, not a caller-flavoured hint — and the
+merged GV-3R-b precedence is untouched:
+
+| Supplied input | Effect on the classification |
+|---|---|
+| verified mandatory `FAIL` | dominates missing/unverified required gates ⇒ `NOT_READY` |
+| unverified `FAIL` | none — the gate is absent, so the case is incomplete |
+| unverified `PASS` | none — it cannot unlock any tier |
+| unverified `INDETERMINATE` | none |
+| missing or unverified **required** gate | `NOT_ASSESSABLE`, unless a verified mandatory `FAIL` already proves `NOT_READY` |
+| unverified **advisory** result | never blocks and never elevates |
+| production-only gate under `PILOT` | diagnostic, as before |
+| duplicate, wrong-policy, wrong-target, unknown or tampered gate | every copy rejected with a stable gap code — never silently accepted |
+| verified active condition over its exact compensable concern | coverage ⇒ `READY_WITH_CONDITIONS` |
+| unverified, proposed, expired, revoked, satisfied, future-effective or elapsed condition | no coverage |
+| condition over a mandatory concern | refused — a mandatory failure is never waivable (D-6) |
+
+Input order never affects the classification, the reason codes, the trace or any
+digest: inputs are processed in canonical id order and gap codes are emitted in
+enum declaration order.
+
+### Verifier contracts
+
+A `GateResultVerifier` is asked about **one** gate result under its complete
+binding — tenant, subject, `AssessmentContext` digest, requested target, policy
+reference, the gate **as resolved** (not the caller's copy), its canonical
+digest, the claimed status, and the evaluation instant. It answers with a stable
+`ReadinessInputVerificationStatus`: `VERIFIED`, `NO_VERIFIER_CONFIGURED`,
+`EVIDENCE_NOT_VERIFIED`, `BENCHMARK_NOT_RESOLVED`,
+`THRESHOLD_EVALUATION_NOT_VERIFIED`, `APPROVAL_NOT_VERIFIED`,
+`REFERENCE_MISMATCH` or `VERIFIER_ERROR` — never a free-form reason.
+
+The orchestrator then **rechecks every coordinate the verifier returned** and
+rejects a duck-typed object outright. A `VERIFIED` answer must also cover what
+the gate actually relies on: the cited evidence, the threshold evaluation, and a
+referenced benchmark's resolution. Evidence and benchmark authenticity are the
+**gate verifier's** responsibility, never the orchestrator's.
+
+A `ConditionSetVerifier` is asked about one control covering one exact concern,
+and must independently establish its identity and canonical digest, its approval
+authority and approval evidence, its owner/monitoring obligations, its status,
+its window, and — because the merged `ConditionSet` carries no tenant field —
+its tenant, subject and context binding. Coverage additionally requires the gate
+to be `CONDITIONAL`, the policy to mark it `conditionally_compensable`, and the
+control to be active at the evaluation instant under the half-open interval.
+
+### Deny by default
+
+Omitting a resolver or a verifier is not "unchecked", it is **denied**:
+`DenyAllReadinessPolicyResolver`, `DenyAllGateResultVerifier` and
+`DenyAllConditionSetVerifier` are the production defaults, and they take no
+constructor argument that could relax them. A verifier that raises, times out,
+or returns a malformed object produces a stable fail-closed gap — never an
+acceptance, and never a fallback to caller metadata. **No allow-all, permissive
+or "testing" verifier exists in this distribution**; a test that needs one
+writes it inside its own test module, where it can never ship.
+
+Supplying a real resolver or verifier is a **composition-root trust decision**.
+A lax implementation is still constrained: because every returned coordinate is
+rechecked, it can only weaken the claim about the input it was asked about — it
+can never get a mismatched policy, gate, condition, tenant, subject, context,
+target or instant admitted.
+
+### Trust-advisory reconciliation
+
+The standalone evaluator is right to emit its advisories: it genuinely cannot
+verify an external trust boundary. GV-3R-c never deletes or contradicts one — it
+states, per advisory, which configured boundary closed it:
+
+| GV-3R-b advisory | Disposition under a fully configured assessment |
+|---|---|
+| `POLICY_AUTHENTICITY_NOT_VERIFIED` | `RESOLVED_BY_POLICY_RESOLUTION` |
+| `GATE_STATUS_STRUCTURALLY_SUPPLIED` (incl. evidence + benchmark authenticity) | `RESOLVED_BY_GATE_VERIFICATION` |
+| `CONDITION_APPROVAL_AUTHENTICITY_NOT_VERIFIED` | `RESOLVED_BY_CONDITION_VERIFICATION` |
+| `CONDITION_SCOPE_NOT_TENANT_BOUND` | `RESOLVED_BY_CONDITION_VERIFICATION` |
+| `ADVISORY_ONLY_NOT_DEPLOYMENT_AUTHORIZATION` | `OUT_OF_SCOPE` — a permanent boundary |
+| `EVIDENCE_CLASSIFICATION_PRESERVED` | `OUT_OF_SCOPE` — a permanent guarantee |
+| `READINESS_IS_LEADING_INDICATOR_ONLY` | `OUT_OF_SCOPE` |
+| `COMPOSITE_CARRIED_NOT_USED_IN_SELECTION` | `OUT_OF_SCOPE` |
+
+Each of the first four is `RESOLVED_BY_…` only when **every** input of its kind
+was verified: one unverified gate result or control leaves the corresponding
+advisory `UNRESOLVED`, with a detail naming how many were refused.
+**Benchmark and evidence authenticity stay unresolved unless the configured gate
+verifier proves them.** No advisory is ever marked resolved because a caller
+supplied a boolean or a structurally complete record.
+
+### The outcome envelope
+
+The trace reports what the **authority** answered
+(`policy_resolution_status` / `policy_resolution_reason`) and, separately,
+whether the **orchestrator accepted** it after its own rechecks
+(`policy_resolution_accepted`). A legitimately resolved policy this assessment
+still had to refuse — a context binding a different policy, an ungoverned
+target, an `as_of` that is not the evaluation instant — is therefore never
+readable as an accepted one. Acceptance and policy material are the same fact
+stated twice: an accepted trace must carry the issuance-record reference and
+resolved-policy digest, an unaccepted one must carry neither, and only an
+accepted trace can back an `EVALUATED` outcome.
+
+`NOT_EVALUATED` carries **no** evaluation result and **no** classification — the
+constructor rejects one — and must name at least one trust gap. `EVALUATED`
+carries exactly one `ReadinessEvaluationResult` whose assessment id, tenant,
+subject, context digest, policy reference, target and instant all agree with the
+trace. The trace has **no classification field at all**, so a trace/evaluation
+mismatch is unrepresentable rather than merely rejected; the summaries,
+dispositions and gap codes are read-only views, not settable fields.
+
+The outcome is **not signed**: a signed readiness determination requires a
+separately ratified authority owner. Constructing an outcome by hand is possible
+and proves **nothing** — exactly as a hand-assembled `PolicyResolution` proves
+nothing about the shared Policy Authority. Only `assess_readiness` performs
+orchestration.
+
+### The evaluator stays independently usable
+
+Nothing above is required to use GV-3R-b. `evaluate_readiness` needs no
+resolver, no verifier, no authority wiring and no runtime configuration; the
+`contracts` and `evaluation` subpackages import no authority module at all, and
+an automated boundary test enforces that.
 
 ## Type placement (why here, not governance-contracts)
 
@@ -275,13 +468,19 @@ no second calculation route that could diverge from the ratified precedence.
 
 ```bash
 python -m build packages/capabilities/agent-value-readiness
-pip install --find-links dist ugence-agent-value-readiness   # resolves the two contract leaves
+pip install --find-links dist ugence-agent-value-readiness   # resolves the contract leaves + the shared authority
 ```
 
-Independent-distribution proof (builds all three wheels, installs `--no-index`):
+Independent-distribution proof (builds all four wheels, installs `--no-index`):
 
 ```bash
 python packages/capabilities/agent-value-readiness/verify_agent_value_readiness_distribution.py
+```
+
+Independent adversarial probes (public API only, no shared test fixtures):
+
+```bash
+python packages/capabilities/agent-value-readiness/adversarial_probes.py
 ```
 
 ## Extensibility & trust notes
@@ -304,11 +503,14 @@ python packages/capabilities/agent-value-readiness/verify_agent_value_readiness_
 
 ## Deferred (out of scope)
 
-Deployment authorization, Policy Authority (signing/approval/issuance/
-revocation), policy and benchmark registry/resolver, evidence admission or
-verification, machine-evaluable threshold semantics and metric-to-threshold
-calculation, condition-authority resolution and runtime enforcement,
-`SubjectContext`/`AssessedSystemBinding` (RA-owned, PR #1425), a durable event
-bus or signed determination record, forecasting, realization-probability
+Deployment authorization; policy signing, approval, issuance and revocation
+(owned by the shared Ugence Policy Authority, consumed here through its public
+resolution service only); the **benchmark registry** and benchmark-value
+governance; **TAP/evidence verification** implementations (GV-3R-c defines the
+verifier seam and ships only its deny-all default — it implements no verifier);
+machine-evaluable threshold semantics and metric-to-threshold calculation;
+structured successor/supersession references; **condition runtime enforcement**;
+`SubjectContext`/`AssessedSystemBinding` (RA-owned, PR #1425); a durable event
+bus or **signed** determination record; forecasting, realization-probability
 modeling, attributed/verified return, financial valuation, and `governed-value`
 integration.

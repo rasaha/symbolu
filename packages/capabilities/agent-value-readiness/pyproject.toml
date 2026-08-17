@@ -7,9 +7,12 @@
 #
 # It defines the vocabulary for assessing whether an agent is ready for an
 # intended outcome under a Geography/Domain/Intended-Outcome + Readiness policy
-# context. It implements NO readiness evaluator, NO tier selection, NO deployment
-# authority, and NO financial value. It depends only on the Python standard
-# library and the two neutral contract leaves.
+# context, the single deterministic determination evaluator over it (GV-3R-b),
+# and the fail-closed trusted orchestration boundary around that evaluator
+# (GV-3R-c). It implements NO deployment authority, NO condition enforcement and
+# NO financial value, and it mints no policy authority: the exact ReadinessPolicy
+# is resolved through the PUBLIC API of the shared Ugence Policy Authority, whose
+# internals are never imported.
 #
 # Build:    python -m build packages/capabilities/agent-value-readiness
 # Verify:   python packages/capabilities/agent-value-readiness/verify_agent_value_readiness_distribution.py
@@ -20,18 +23,23 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ugence-agent-value-readiness"
 dynamic = ["version"]
-description = "Ugence Agent Value Readiness Contracts — non-financial readiness contract shapes (internal technical leaf, contracts only)."
+description = "Ugence Agent Value Readiness — non-financial readiness contract shapes, the deterministic determination evaluator, and its fail-closed trusted orchestration boundary (internal technical leaf)."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Proprietary" }
 authors = [{ name = "Rakesh Mohan" }]
 keywords = ["ugence", "value-intelligence", "readiness", "contracts", "agent"]
-# Depends ONLY on the neutral governance-contracts leaf (evidence vocabulary) and
-# the uvi-policy-contracts leaf (policy/context shapes). No governed-value, no
-# third-party runtime dependency. Every arrow points at a contract leaf (ADR §21).
+# Depends on the neutral governance-contracts leaf (evidence vocabulary), the
+# uvi-policy-contracts leaf (policy/context shapes), and the PUBLIC API of the
+# shared, platform-wide Ugence Policy Authority (trusted policy resolution only).
+# No governed-value and no third-party runtime dependency. The authority
+# dependency is one-way and public-surface only: no authority internal is ever
+# imported, and the authority imports no engine (UVI ADR §21; Policy Authority
+# ADR §10.4). An automated dependency-boundary test enforces both directions.
 dependencies = [
     "ugence-governance-contracts>=0.2.0",
     "ugence-uvi-policy-contracts>=0.1.0",
+    "ugence-policy-authority>=0.1.0",
 ]
 
 [project.optional-dependencies]

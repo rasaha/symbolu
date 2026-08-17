@@ -282,11 +282,49 @@ def test_condition_authenticity_advisories_appear_only_with_conditions():
 # One canonical path, one trace
 # --------------------------------------------------------------------------- #
 def test_only_one_public_entry_point_selects_a_classification():
+    """Two services are exported; exactly one of them selects a tier.
+
+    ``assess_readiness`` (GV-3R-c) adds a fail-closed trust boundary *around*
+    this evaluator and delegates the classification to it. That is proved
+    structurally below: no module outside the evaluator names a
+    ``ReadinessClassification`` member or builds a ``ReadinessEvaluationResult``.
+    """
+
+    import ast
+    import pathlib
+
     callables = [
         name for name in R.api.__all__
         if callable(getattr(R.api, name)) and not isinstance(getattr(R.api, name), type)
     ]
-    assert callables == ["evaluate_readiness"]
+    assert sorted(callables) == ["assess_readiness", "evaluate_readiness"]
+
+    package_root = pathlib.Path(R.__file__).resolve().parent
+    members = {m.name for m in R.ReadinessClassification}
+    selectors, producers = [], []
+    for path in sorted(package_root.rglob("*.py")):
+        relative = str(path.relative_to(package_root))
+        tree = ast.parse(path.read_text(), filename=str(path))
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Attribute)
+                and isinstance(node.value, ast.Name)
+                and node.value.id == "ReadinessClassification"
+                and node.attr in members
+            ):
+                selectors.append(relative)
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id == "ReadinessEvaluationResult"
+            ):
+                producers.append(relative)
+
+    # Only the evaluator names a tier or builds a result. The orchestration
+    # boundary does neither — it can only remove untrusted inputs.
+    assert set(selectors) <= {"evaluation/evaluator.py", "contracts/determination.py"}
+    assert set(producers) == {"evaluation/evaluator.py"}
+    assert not any(s.startswith("orchestration/") for s in selectors + producers)
 
 
 def test_trace_is_explanatory_and_bound_to_its_determination():
@@ -308,4 +346,4 @@ def test_pilot_and_production_traces_report_the_same_gate_inventory_shape():
 
 
 def test_package_version_is_bumped():
-    assert R.__version__ == "0.2.0"
+    assert R.__version__ == "0.3.0"
