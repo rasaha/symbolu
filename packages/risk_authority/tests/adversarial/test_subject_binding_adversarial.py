@@ -25,6 +25,7 @@ from risk_authority.integrations import (
     EVALUATION_REQUEST_SCHEMA_VERSION_V2,
     InMemoryWorkflowIRSource,
     ReferencePolicyResolver,
+    ReferenceSubjectAwarePolicyResolver,
     SeamContractError,
     SubjectBinding,
     SubjectBindingError,
@@ -569,12 +570,41 @@ def test_fully_self_consistent_fabricated_request_is_accepted_by_the_structural_
             result.effect_verified, result.executable) == (False,) * 8
 
 
-def test_the_fabricated_request_still_cannot_enter_the_evaluation_seam():
-    # The consistency-only guarantee is not a hole today, because v2 is not accepted by
-    # the seam at all: it cannot reach policy resolution, evidence resolution, risk
-    # evaluation, decision issuance, envelope issuance, ActionGate or execution.
-    with pytest.raises(SeamConfigurationError):
-        reference_seam().evaluate(self_consistent_forgery())
+def test_the_fabricated_request_is_admitted_by_binding_validation_not_authenticated():
+    """Phase 4B admits v2 — and this is exactly where the integrity/authenticity line sits.
+
+    In Phase 4A this request could not enter the seam at all, so the consistency-only
+    guarantee had no consequence. Phase 4B wires binding validation in and admits v2, so
+    a **fully self-consistent structurally forged** request — foreign tenant, someone
+    else's workload, a recommendation digest of all-f's corresponding to no recommendation
+    that ever existed — now passes the binding gate and is evaluated on its merits.
+
+    That is the deliberate, documented boundary, not a defect: ``validate_subject_binding``
+    proves internal canonical consistency, and Phase 4B adds **no** authenticity check.
+    Establishing that ``recommendation_digest`` came from an authentic
+    ``CapacityActionRecommendation`` is the future Cloud Scaling adapter's job
+    (reconstruct it, recompute ``rec.digest()``, require equality) and is NOT done here.
+
+    What Phase 4B still guarantees for such a request is containment, asserted below: the
+    outcome terminates at a non-executable risk decision and grants nothing."""
+
+    result = subject_aware_reference_seam().evaluate(self_consistent_forgery())
+
+    # Admitted: it was NOT rejected as an invalid subject/binding.
+    assert result.non_decision_reason is not SubjectRiskNonDecisionReason.INVALID_SUBJECT
+    # ...and containment holds regardless of the disposition it reached.
+    assert (result.authorization_performed, result.envelope_issued,
+            result.actiongate_invoked, result.actuation_performed,
+            result.effect_verified, result.executable) == (False,) * 6
+
+
+def test_a_forged_request_admitted_on_a_legacy_resolver_seam_still_fails_closed():
+    # The same forgery against a seam whose resolver is v1-only never reaches policy at
+    # all: no v2 request may fall back to a resolver that cannot see the subject context.
+    result = reference_seam().evaluate(self_consistent_forgery())
+    assert result.disposition is SubjectRiskDisposition.NOT_EVALUATED
+    assert result.non_decision_reason is SubjectRiskNonDecisionReason.NO_AUTHORITATIVE_POLICY
+    assert "resolver:not_subject_context_aware" in result.reason_codes
 
 
 def test_validator_does_not_dereference_or_verify_the_recommendation_digest():
@@ -603,13 +633,45 @@ def reference_seam():
             by_purpose_domain={("cloud_scaling.capacity_action", "cloud_scaling"): wf}))
 
 
-def test_a_genuine_v2_object_is_rejected_by_the_seams_v1_type_boundary():
-    # NOT NOT_EVALUATED(UNSUPPORTED_SCHEMA_VERSION): because v2 is a successor class and
-    # not a subclass, the seam's isinstance guard fires FIRST — before the schema gate,
-    # before the clock is read and before any digest is computed. This is the stronger
-    # containment and is asserted here so it cannot regress into the weaker path.
+def subject_aware_reference_seam():
+    """A labelled reference seam whose resolver is explicitly subject-aware."""
+
+    now = T0
+    wf = WorkflowIR(workflow_ir_id="scaling-pol", version="1.0.0",
+                    status=WorkflowStatus.ACTIVE, rules=(), source_refs=(),
+                    effective_at=now).with_digest()
+    src = InMemoryWorkflowIRSource()
+    src.register(wf)
+    key = SigningKeyRecord("k", SigningKey.from_seed(bytes(range(32))))
+    return RiskEvaluationSeam.reference(
+        workflow_source=src, key_record=key, clock=lambda: now,
+        policy_resolver=ReferenceSubjectAwarePolicyResolver(
+            by_purpose_domain={("cloud_scaling.capacity_action", "cloud_scaling"): wf}))
+
+
+def test_a_genuine_v2_object_is_admitted_only_through_a_subject_aware_resolver():
+    # Phase 4B supersedes the Phase 4A behavior (v2 raising SeamConfigurationError at the
+    # v1 type boundary). v2 is now a recognized seam input — but ONLY where the composed
+    # resolver is explicitly subject-aware. Against a v1-only resolver it fails closed
+    # rather than silently routing with the subject context dropped.
+    legacy = reference_seam().evaluate(v2_request())
+    assert legacy.disposition is SubjectRiskDisposition.NOT_EVALUATED
+    assert legacy.non_decision_reason is SubjectRiskNonDecisionReason.NO_AUTHORITATIVE_POLICY
+
+    admitted = subject_aware_reference_seam().evaluate(v2_request())
+    assert admitted.non_decision_reason is not SubjectRiskNonDecisionReason.INVALID_SUBJECT
+    assert admitted.executable is False
+
+
+@pytest.mark.parametrize("alien", [
+    object(), "a string", 42, None, {"schema_version": EVALUATION_REQUEST_SCHEMA_VERSION_V2},
+])
+def test_the_seam_type_boundary_still_refuses_anything_that_is_not_a_canonical_request(alien):
+    # Widening the seam to two contract classes must not widen it to duck-typed inputs:
+    # dispatch is on the real types, so a look-alike mapping carrying the v2 tag is
+    # refused at the boundary before the clock is read or any digest is computed.
     with pytest.raises(SeamConfigurationError):
-        reference_seam().evaluate(v2_request())
+        reference_seam().evaluate(alien)
 
 
 def test_a_v1_object_with_an_unsupported_schema_tag_reaches_the_supported_schema_gate():

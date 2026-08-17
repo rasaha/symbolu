@@ -159,18 +159,21 @@ by an explicit test). This layer therefore does **not** provide recommendation a
 provenance verification, cross-tenant authorization, trusted evidence admission, or replay
 prevention against a caller capable of recomputing every digest.
 
-### Phase 4B / adapter ordering (documented, not implemented)
+### Ordering — what exists where, as of v0.4.0
 
-1. reconstruct the real `CapacityActionRecommendation`;
-2. independently recompute `rec.digest()`;
-3. require equality with the outer `recommendation_digest`;
-4. run `validate_subject_binding`;
-5. perform trusted evidence (RA-5) and tenant/scope checks;
-6. only then permit policy resolution;
-7. only after that wiring, widen the supported request schemas.
+| # | Step | Where |
+|---|---|---|
+| 1 | reconstruct the real `CapacityActionRecommendation` | Cloud Scaling adapter — **not built** |
+| 2 | independently recompute `rec.digest()` | Cloud Scaling adapter — **not built** |
+| 3 | require equality with the outer `recommendation_digest` | Cloud Scaling adapter — **not built** |
+| 4 | run `validate_subject_binding` | Phase 4A contract layer, **wired into the seam** in Phase 4B |
+| 5 | subject-aware policy resolution over the validated context | Phase 4B seam |
+| 6 | trusted evidence (RA-5) + the existing RA evaluation path | Phase 4B seam |
+| 7 | widen `SUPPORTED_REQUEST_SCHEMA_VERSIONS` to admit v2 | Phase 4B, same atomic change as step 4 |
 
-Phase 4A implements **step 4 only**. No placeholder authenticator and no permissive resolver
-is introduced — an absent check stays visibly absent.
+**Steps 1–3 remain absent.** No placeholder authenticator and no permissive resolver was
+introduced — an absent check stays visibly absent. Admitting a v2 request therefore still
+does **not** establish that a recommendation is authentic.
 
 **Schema-tagged canonical hashing (honest description).** Digests use the existing
 `crypto.canonical.to_canonical_obj` / `canonical_bytes` and `crypto.hashing.digest` — a
@@ -182,19 +185,7 @@ a digest under one schema tag is never automatically accepted in another semanti
 **Backward compatibility.** `risk-subject-evaluation-request-1` is untouched and remains
 byte-for-byte compatible: v1 construction, `to_dict`, `from_dict` and digests are unchanged,
 v1 requests acquire **no** serialized `subject_context` or `recommendation_digest` field, and
-no automatic v1↔v2 conversion exists (v2 is a successor class, not a subclass). The seam's
-`SUPPORTED_REQUEST_SCHEMA_VERSIONS` is **deliberately unchanged** in this release, which
-produces two *distinct* fail-closed behaviors — they must not be conflated:
-
-| Input to `RiskEvaluationSeam.evaluate` | Result |
-|---|---|
-| a genuine `SubjectRiskEvaluationRequestV2` object | raises **`SeamConfigurationError`** at the seam's v1 `isinstance` type boundary — before the schema gate, before the clock is read, before any digest is computed |
-| a **v1-class** object carrying an unsupported `schema_version` string | returns the typed **`NOT_EVALUATED(UNSUPPORTED_SCHEMA_VERSION)`** non-decision |
-
-The first is the stronger containment and is preserved deliberately; the seam was **not**
-weakened to match earlier prose. Both are asserted by tests that actually call
-`seam.evaluate(...)`. Wiring the validator into the seam ahead of policy resolution, and the
-subject-aware `PolicyResolverPort` widening, are a later phase.
+no automatic v1↔v2 conversion exists (v2 is a successor class, not a subclass).
 
 **Timestamp handling (deliberate v2 hardening).** The v2 contract layer requires explicit
 tz-aware UTC and rejects both naive datetimes and non-zero offsets, rather than normalizing
@@ -217,6 +208,114 @@ v1 and strictly on v2 by design.
 > (`sha256:eb4526a6…`) and tamper-demonstration fixtures are unchanged and still reproduce
 > byte-for-byte. All four, plus the corrected request digest, are pinned as test fixtures
 > and re-asserted from the installed wheel.
+
+## Validated v2 seam admission (v0.4.0)
+
+Phase 4B activates the v2 contract at `RiskEvaluationSeam` — **behind** mandatory binding
+validation and subject-aware policy resolution. It remains non-executing, and it does **not**
+establish that a Cloud Scaling recommendation is authentic.
+
+### Load-bearing order (production v2)
+
+`RiskEvaluationSeam.evaluate` dispatches on the real request type and, for a v2 request,
+clears these gates in exactly this order before anything downstream exists:
+
+1. confirm the canonical v2 contract type (structural — not a schema string, not duck typing);
+2. confirm the v2 schema identifier is supported **for that request class**;
+3. reject a caller-supplied `evaluation_time` on the trusted production path;
+4. validate the closed `SubjectContext`;
+5. recompute `context_digest`;
+6. reconstruct `SubjectBinding` from the authoritative **outer** request fields;
+7. recompute `subject_digest`;
+8. require every carried/recomputed binding to match;
+9. only then invoke **subject-aware** policy resolution;
+10. only then invoke trusted evidence resolution and the remaining existing RA path.
+
+No policy resolver, evidence resolver, clock-dependent evaluation or Decision Authority
+operation observes an unvalidated v2 context. This is proven with counting spies that assert
+an **empty** downstream call log on every rejection path, not by reading the source.
+
+### Subject-aware resolver boundary
+
+v2 requires an explicit successor port, `SubjectAwarePolicyResolverPort`:
+
+```python
+class MyResolver:
+    is_production_authoritative = True
+    is_subject_context_aware = True          # declared capability
+
+    def resolve_with_subject_context(self, *, tenant_id, purpose, domain, risk_class,
+                                     requested_scope, subject_context,
+                                     evidence_references, now): ...
+```
+
+* **v1 is untouched** — it keeps using `PolicyResolverPort.resolve(...)`, so every existing
+  resolver keeps working. A subject-aware resolver may implement both and serve both.
+* **v2 requires the successor method** — `is_subject_aware_policy_resolver()` requires *both*
+  the declared flag *and* the method to exist. Neither alone is enough.
+* **No v2 fallback** to a v1-only resolver: a v2 request against one fails closed with
+  `NOT_EVALUATED(NO_AUTHORITATIVE_POLICY)` and reason code `resolver:not_subject_context_aware`.
+* **No introspection.** Capability is declared, never inferred — no signature inspection, no
+  permissive `**kwargs` probe. This is why a successor *method* was chosen over an added
+  keyword (ADR §5.6 left both open): a resolver accepting `**kwargs` would have silently
+  accepted a v2 request while dropping the subject context entirely.
+* Reference components stay visibly non-authoritative: `ReferenceSubjectAwarePolicyResolver`
+  is `is_production_authoritative = False` and is refused by `RiskEvaluationSeam.production`.
+
+The resolver receives only **validated neutral** facts — the context object the validator
+re-validated and reconciled. Outer authoritative identity, requested scope, trusted evidence,
+policy and the risk decision stay distinct: `tenant_id` and `evidence_references` are passed
+as their own arguments, `subject_id` is not passed at all, and `SubjectContext` carries no
+identity. Risk Authority imports no Cloud Scaling type and hardcodes no cloud-scaling enum.
+
+### Evaluation-time authority
+
+| Path | Caller-supplied `evaluation_time` |
+|---|---|
+| v1 (any mode) | honored, exactly as before — **unchanged** |
+| v2, labelled reference seam | honored (ADR §10: the only place an explicit clock may be injected) |
+| **v2, trusted production seam** | **rejected fail-closed**: `NOT_EVALUATED(CALLER_SUPPLIED_EVALUATION_TIME)` |
+
+It is never silently ignored and never becomes the authoritative clock. The rejection record
+is stamped with the **trusted** clock, so a caller cannot influence even the timestamp of its
+own rejection. Rejection happens at gate 3 — before any policy or evidence resolution.
+
+`CALLER_SUPPLIED_EVALUATION_TIME` is a new, owner-ratified member of
+`SubjectRiskNonDecisionReason`. It was minted rather than reused because no existing member
+described the condition: the subject is valid and the schema is supported, so reusing
+`INVALID_SUBJECT` or `UNSUPPORTED_SCHEMA_VERSION` would have misattributed the rejection in
+the audit record. The addition is purely additive — no member was renamed or removed.
+
+### Schema admission and the masquerade rule
+
+`SUPPORTED_REQUEST_SCHEMA_VERSIONS` now declares **both** `…-request-1` and `…-request-2`.
+That union is not the admission rule: the seam gates on the **(request class, schema tag)
+pair**, so each canonical class admits only its own tag. A **v1-class object carrying the v2
+tag** is therefore still refused with `NOT_EVALUATED(UNSUPPORTED_SCHEMA_VERSION)` even though
+its tag is now a supported value. Unknown and future tags continue to fail closed the same
+typed way, and anything that is neither canonical class still raises `SeamConfigurationError`
+at the type boundary.
+
+### What admission does *not* mean
+
+Admitting a v2 request proves **binding integrity**, never source authenticity. A fully
+self-consistent, structurally forged v2 request — foreign tenant, someone else's workload, a
+`recommendation_digest` corresponding to no recommendation that ever existed — **passes**
+binding validation, because every digest can be recomputed by its author. This is asserted
+by name in the adversarial suite rather than glossed over.
+
+What still holds for such a request is containment: it terminates at a **non-executable**
+`SubjectRiskDecision` with every execution flag structurally `False`, no envelope, no
+ActionGate, no credential, no actuation. Establishing authenticity remains the future Cloud
+Scaling adapter's responsibility (steps 1–3 above).
+
+### Not in this release
+
+No Cloud Scaling adapter, no execution envelope, no ActionGate call, no provider or
+Kubernetes invocation, no credential issuance, no effect verification, and no Phase 5/6
+behavior. The ADR's **D-4** purpose/domain identifiers remain **proposed, not owner-ratified**,
+so none are frozen into Risk Authority; Phase 4B is entirely domain-neutral and D-4 stays an
+explicit blocker for the adapter.
 
 ## Verify the distribution
 

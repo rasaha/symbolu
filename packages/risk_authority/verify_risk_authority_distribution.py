@@ -34,7 +34,7 @@ import importlib.util, sys
 from datetime import datetime, timezone
 
 import risk_authority as ra
-assert ra.__version__ == "0.3.0", ra.__version__
+assert ra.__version__ == "0.4.0", ra.__version__
 assert "site-packages" in ra.__file__, ra.__file__
 assert not any("/symbolu" in p for p in sys.path), sys.path
 
@@ -204,8 +204,10 @@ from risk_authority.integrations import (SubjectContext, SubjectBinding,
 assert SUBJECT_CONTEXT_SCHEMA_VERSION == "risk-subject-context-1"
 assert SUBJECT_BINDING_SCHEMA_VERSION == "risk-subject-binding-1"
 assert EVALUATION_REQUEST_SCHEMA_VERSION_V2 == "risk-subject-evaluation-request-2"
-# The seam's accepted set is unchanged by Phase 4A (validation is not wired in yet).
-assert SUPPORTED_REQUEST_SCHEMA_VERSIONS == frozenset({EVALUATION_REQUEST_SCHEMA_VERSION})
+# Phase 4B: the accepted set now admits BOTH canonical schemas, because the validator is
+# wired ahead of policy resolution (asserted behaviorally in the Phase 4B block below).
+assert SUPPORTED_REQUEST_SCHEMA_VERSIONS == frozenset({
+    EVALUATION_REQUEST_SCHEMA_VERSION, EVALUATION_REQUEST_SCHEMA_VERSION_V2})
 
 vt0 = datetime(2026, 8, 13, 4, 0, 0, tzinfo=timezone.utc)
 vctx = SubjectContext(action_type="scale_up", subject_asserted_at=vt0, subject_valid_from=vt0,
@@ -284,21 +286,13 @@ vforged = SubjectRiskEvaluationRequestV2(subject_type="cloud_scaling.capacity_ac
     requested_scope=Scope(purposes=("cloud_scaling.capacity_action",)),
     subject_context=vforged_ctx, recommendation_digest="sha256:" + "f" * 64)
 assert validate_subject_binding(vforged).tenant_id == "tnt-victim"
-# ...and it still cannot enter the seam, so consistency-only is not a hole today.
-try:
-    seam.evaluate(vforged)
-    raise AssertionError("the seam accepted a v2 request")
-except SeamConfigurationError:
-    pass
+# Phase 4B admits v2, so the consistency-only guarantee now has consequences: this
+# forgery IS admitted by binding validation. That is the documented boundary, not a
+# defect -- source authenticity remains the future Cloud Scaling adapter's job. What
+# still holds is containment, asserted in the Phase 4B block below.
 
-# The two DISTINCT seam fail-closed behaviors (audit F-1), asserted from the wheel:
-#   genuine v2 object  -> SeamConfigurationError at the v1 isinstance type boundary
-#   v1 object + foreign schema tag -> typed NOT_EVALUATED(UNSUPPORTED_SCHEMA_VERSION)
-try:
-    seam.evaluate(vreq)
-    raise AssertionError("the seam accepted a genuine v2 request object")
-except SeamConfigurationError:
-    pass
+# A v1-CLASS object carrying the v2 tag must NOT masquerade as v2 now that the v2 tag is
+# a supported value: admission gates on the (class, tag) pair, not on set membership.
 _stale = SubjectRiskEvaluationRequest(subject_type="x", subject_id="s", subject_digest="d",
     tenant_id="t", requested_purpose="SCALE", requested_domain="SCALING",
     requested_scope=sscope, evaluation_time=now,
@@ -311,6 +305,100 @@ assert SubjectRiskEvaluationRequest.from_dict(sreq.to_canonical_dict()).digest()
 assert "subject_context" not in sreq.to_canonical_dict()
 assert "recommendation_digest" not in sreq.to_canonical_dict()
 print("ISOLATED SINGLE-WHEEL RISK-AUTHORITY v2 SUBJECT-CONTEXT (PHASE 4A) VERIFICATION OK")
+
+# --- Phase 4B: validated v2 seam admission + subject-aware policy resolution ----------
+from risk_authority.integrations import (SubjectAwarePolicyResolverPort,
+    ReferenceSubjectAwarePolicyResolver, is_subject_aware_policy_resolver)
+
+# The new public surface is present in the INSTALLED wheel.
+assert hasattr(SubjectRiskNonDecisionReason, "CALLER_SUPPLIED_EVALUATION_TIME")
+assert SubjectRiskNonDecisionReason.CALLER_SUPPLIED_EVALUATION_TIME.value == "caller_supplied_evaluation_time"
+# Capability is DECLARED, never inferred: neither half alone confers v2 capability.
+assert is_subject_aware_policy_resolver(ReferencePolicyResolver(by_purpose_domain={})) is False
+assert is_subject_aware_policy_resolver(ReferenceSubjectAwarePolicyResolver(by_purpose_domain={})) is True
+class _KwargsSniffer:
+    is_production_authoritative = True
+    is_subject_context_aware = True
+    def resolve(self, **kw): raise AssertionError("must never be reached")
+assert is_subject_aware_policy_resolver(_KwargsSniffer()) is False
+
+# A trusted clock INSIDE the fixture's validity window [vt0, vt0+15m].
+vnow = vt0 + timedelta(minutes=5)
+vsrc = InMemoryWorkflowIRSource()
+vwf = vsrc.register(WorkflowIR(workflow_ir_id="scaling-pol", version="1.0.0",
+    status=WorkflowStatus.ACTIVE, rules=(), source_refs=(), effective_at=vt0).with_digest())
+
+# (a) a genuine v2 request IS admitted through an explicitly subject-aware resolver, and
+#     terminates at a NON-EXECUTABLE decision.
+vres_seam = RiskEvaluationSeam.reference(workflow_source=vsrc, key_record=key,
+    clock=lambda: vnow,
+    policy_resolver=ReferenceSubjectAwarePolicyResolver(by_purpose_domain={
+        ("cloud_scaling.capacity_action", "cloud_scaling"): vwf}))
+_ok = vres_seam.evaluate(vreq)
+assert _ok.non_decision_reason is not SubjectRiskNonDecisionReason.INVALID_SUBJECT, _ok
+assert (_ok.authorization_performed, _ok.envelope_issued, _ok.actiongate_invoked,
+        _ok.actuation_performed, _ok.effect_verified, _ok.executable) == (False,) * 6
+
+# (b) the SAME request against a v1-only resolver fails closed -- no fallback.
+vlegacy_seam = RiskEvaluationSeam.reference(workflow_source=vsrc, key_record=key,
+    clock=lambda: vnow,
+    policy_resolver=ReferencePolicyResolver(by_purpose_domain={
+        ("cloud_scaling.capacity_action", "cloud_scaling"): vwf}))
+_nf = vlegacy_seam.evaluate(vreq)
+assert _nf.disposition is SubjectRiskDisposition.NOT_EVALUATED, _nf
+assert _nf.non_decision_reason is SubjectRiskNonDecisionReason.NO_AUTHORITATIVE_POLICY
+assert "resolver:not_subject_context_aware" in _nf.reason_codes
+
+# (c) binding mismatches fail closed at the seam, from the wheel.
+_bad = SubjectRiskEvaluationRequestV2(subject_type="cloud_scaling.capacity_action",
+    subject_id="wl-checkout-api", subject_digest="sha256:" + "b" * 64, tenant_id="tnt-acme",
+    requested_purpose="cloud_scaling.capacity_action", requested_domain="cloud_scaling",
+    requested_scope=Scope(purposes=("cloud_scaling.capacity_action",)),
+    subject_context=vctx, recommendation_digest="sha256:" + "1" * 64)
+_br = vres_seam.evaluate(_bad)
+assert _br.disposition is SubjectRiskDisposition.NOT_EVALUATED
+assert _br.non_decision_reason is SubjectRiskNonDecisionReason.INVALID_SUBJECT
+
+# (d) a caller-supplied evaluation_time is REJECTED fail-closed on the trusted PRODUCTION
+#     path, and the caller value never becomes the clock.
+class _PEv:
+    is_production_authoritative = True
+    def resolve(self, **kw): return ()
+class _PSAR:
+    is_production_authoritative = True
+    is_subject_context_aware = True
+    def resolve_with_subject_context(self, **kw): return vwf
+    def resolve(self, **kw): return vwf
+from risk_authority.domain import AuthorityGrant, AuthorityType, RiskClass
+vgrant = AuthorityGrant(principal_id="prod-evaluator", tenant_id="tnt-acme",
+    authority_type=AuthorityType.RISK_APPROVAL, domains=("cloud_scaling",),
+    allowed_risk_classes=(RiskClass.LOW, RiskClass.MEDIUM, RiskClass.HIGH), max_autonomy=5,
+    delegated_by="root", grantable_scope=Scope(purposes=("cloud_scaling.capacity_action",)))
+vprod = RiskEvaluationSeam.production(workflow_source=vsrc, policy_resolver=_PSAR(),
+    evidence_resolver=_PEv(), evidence_admission=_PA(), control_assurance=_PA(),
+    evidence_ingress=_PA(), decision_authority=_PDA(), evaluator_grant=vgrant,
+    key_record=key, clock=lambda: vnow)
+_caller_time = vt0 + timedelta(minutes=1)
+_tr = vprod.evaluate(SubjectRiskEvaluationRequestV2.from_dict(
+    {**vreq.to_canonical_dict(), "evaluation_time": "2026-08-13T04:01:00.000000Z"}))
+assert _tr.disposition is SubjectRiskDisposition.NOT_EVALUATED, _tr
+assert _tr.non_decision_reason is SubjectRiskNonDecisionReason.CALLER_SUPPLIED_EVALUATION_TIME
+assert _tr.evaluated_at == vnow and _tr.evaluated_at != _caller_time
+
+# (e) a reference resolver can never enter the production composition root.
+try:
+    RiskEvaluationSeam.production(workflow_source=vsrc,
+        policy_resolver=ReferenceSubjectAwarePolicyResolver(by_purpose_domain={}),
+        evidence_resolver=_PEv(), evidence_admission=_PA(), control_assurance=_PA(),
+        evidence_ingress=_PA(), decision_authority=_PDA(), evaluator_grant=vgrant,
+        key_record=key, clock=lambda: vnow)
+    raise AssertionError("production accepted a reference subject-aware resolver")
+except SeamConfigurationError:
+    pass
+
+# (f) v1 remains byte-for-byte intact after the widening.
+assert sreq.digest() == SubjectRiskEvaluationRequest.from_dict(sreq.to_canonical_dict()).digest()
+print("ISOLATED SINGLE-WHEEL RISK-AUTHORITY v2 SEAM ADMISSION (PHASE 4B) VERIFICATION OK")
 
 print("ISOLATED SINGLE-WHEEL RISK-AUTHORITY VERIFICATION OK")
 '''
