@@ -286,10 +286,16 @@ contract-shape packages (`ugence-governance-contracts`,
 `__version__`. TEV-1 follows the contract-shape convention rather than inventing
 a constant for symmetry. The versioning that *is* load-bearing here is bound into
 the digest as `TRUSTED_EVIDENCE_CANONICALIZATION_VERSION`, so changing an
-encoding rule requires a new version string. Fixing that constant and the
-evidence-identity domain tag is authorized: **DD-9 explicitly leaves the exact
-byte constants to TEV-1/TEV-2.** The receipt and benchmark domain tags are not
-minted, since their artifacts do not exist.
+encoding rule requires a new version string. Fixing that constant and **both**
+domain tags is authorized: **DD-9 explicitly leaves the exact byte constants to
+TEV-1/TEV-2.** TEV-1 therefore mints the evidence-identity domain tag **and the
+receipt-payload domain tag** — the latter because the structural
+`EvidenceVerificationReceiptPayload` contract exists in this release, and §13.3
+requires its canonical content, canonicalization version and domain tag to be
+fixed *before signing exists*. Minting that tag separates byte spaces and
+confers no trust: signed receipt issuance and cryptographic verification remain
+**TEV-2**. The **Benchmark Registry** domain tag remains unminted, since no
+benchmark artifact exists (BR-1/BR-2).
 
 ### Nothing here authorizes anything
 

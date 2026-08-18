@@ -255,9 +255,25 @@ The digest is sha-256 over exactly those bytes. The package tests pin a
 hand-written literal byte string and reconstruct its digest with `hashlib`
 alone, so a third party can recompute any digest without package internals.
 
-The evidence-identity domain tag and canonicalization version are fixed here
-because **DD-9 explicitly leaves the exact byte constants to TEV-1/TEV-2**. The
-receipt and benchmark domains are *not* minted — their artifacts do not exist.
+The canonicalization version and **both** domain tags are fixed here because
+**DD-9 explicitly leaves the exact byte constants to TEV-1/TEV-2**. TEV-1 mints
+`EVIDENCE_IDENTITY_DIGEST_DOMAIN` for the evidence-identity family, and it also
+mints `EVIDENCE_VERIFICATION_RECEIPT_PAYLOAD_DIGEST_DOMAIN` — because
+`EvidenceVerificationReceiptPayload` exists in this package, and §13.3 requires
+its canonical content, canonicalization version and domain tag to be
+"unambiguous, versioned, and **fixed before signing exists**". Fixing the tag now
+is TEV-2's precondition, not a pre-emption of it.
+
+Minting that domain grants nothing. The receipt payload it separates stays
+**caller-constructible** and permanently `STRUCTURAL_UNVERIFIED`; the tag
+supplies **no** signature, **no** authenticity decision, **no** trust-anchor
+resolution, **no** key validation, **no** revocation checking, **no** issuance,
+**no** authorization and **no** authority-issued receipt. Signing and authority
+issuance — the signed receipt — remain **TEV-2**. A domain tag separates byte
+spaces; it confers no trust.
+
+Only the **Benchmark Registry** domain remains unminted: no benchmark artifact
+exists, and its tag belongs to its own ratified milestone (BR-1/BR-2).
 
 ---
 
