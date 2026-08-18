@@ -26,12 +26,30 @@ import sys
 from datetime import datetime, timedelta, timezone
 
 from ugence_trusted_evidence_authority.api import (  # noqa: F401
+    ED25519_PUBLIC_KEY_SIZE,
+    ED25519_SEED_SIZE,
+    ED25519_SIGNATURE_SIZE,
     EVIDENCE_LIFECYCLE_TRANSITIONS,
     EVIDENCE_IDENTITY_DIGEST_DOMAIN,
     EVIDENCE_VERIFICATION_RECEIPT_PAYLOAD_DIGEST_DOMAIN,
     RECEIPT_REPORTABLE_TRUST_STAGES,
+    SIGNED_EVIDENCE_SUBMISSION_DIGEST_DOMAIN,
+    SIGNED_EVIDENCE_SUBMISSION_SCHEMA_V1,
+    SIGNED_INPUT_LENGTH_PREFIX_BYTES,
+    SIGNED_RECEIPT_ENVELOPE_DIGEST_DOMAIN,
+    SIGNED_RECEIPT_ENVELOPE_SCHEMA_V1,
+    TEV1_TRUSTED_EVIDENCE_REFUSAL_REASONS,
+    TEV2_TRUSTED_EVIDENCE_REFUSAL_REASONS,
+    TRUST_ANCHOR_RECORD_DIGEST_DOMAIN,
     TRUSTED_EVIDENCE_CANONICALIZATION_VERSION,
+    TRUSTED_EVIDENCE_PROTOCOL_V1_ID,
+    TRUSTED_EVIDENCE_PROTOCOL_V1_VERSION,
+    TRUSTED_EVIDENCE_RECEIPT_ID_DOMAIN,
     TRUSTED_EVIDENCE_REFUSAL_REASONS,
+    TRUSTED_EVIDENCE_SIGNATURE_ENCODING_V1,
+    TRUSTED_EVIDENCE_SIGNATURE_PROFILE_V1,
+    TRUSTED_EVIDENCE_SIGNED_EVIDENCE_INPUT_DOMAIN,
+    TRUSTED_EVIDENCE_SIGNED_RECEIPT_INPUT_DOMAIN,
     ApplicabilityCoordinate,
     ApplicabilityDeclaration,
     CanonicalEvidenceIdentity,
@@ -50,10 +68,43 @@ from ugence_trusted_evidence_authority.api import (  # noqa: F401
     TrustedEvidenceContractError,
     TrustedEvidenceLifecycleError,
     TrustedEvidenceRefusalReason,
+    DenyAllTrustAnchorDirectory,
+    Ed25519EvidenceAuthenticityProtocol,
+    Ed25519ReceiptSigner,
+    EvidenceAdmissionOutcome,
+    EvidenceVerificationAuditRecord,
+    EvidenceVerificationAuthority,
+    EvidenceVerificationDetermination,
+    KeyRevocation,
+    ProtocolExecutionResult,
+    ReceiptIssuer,
+    ReceiptSigningInput,
+    ReceiptVerification,
+    ReceiptVerificationOutcome,
+    SignedEvidenceSubmission,
+    SignedEvidenceVerificationReceipt,
+    SignedReceiptVerifier,
+    StaticTrustAnchorDirectory,
+    TrustAnchorCapability,
+    TrustAnchorCoordinate,
+    TrustAnchorRecord,
+    TrustAnchorResolution,
+    TrustedEvidenceSigningKey,
+    TrustedEvidenceVerificationKey,
+    audit_record_for_determination,
+    audit_record_for_receipt_verification,
     canonical_bytes,
     canonical_digest,
+    decode_public_key,
+    decode_signature,
+    derive_receipt_id,
+    encode_public_key,
+    encode_signature,
+    framed_signed_input,
     is_valid_lifecycle_transition,
     require_valid_lifecycle_transition,
+    signed_evidence_input_bytes,
+    signed_receipt_input_bytes,
 )
 
 UTC = timezone.utc
@@ -187,7 +238,19 @@ def probe_no_verified_state_exists():
 def probe_every_refusal_reason_is_a_refusal():
     assert set(R) == set(TRUSTED_EVIDENCE_REFUSAL_REASONS)
     assert R.TRUSTED_EVIDENCE_INDETERMINATE in TRUSTED_EVIDENCE_REFUSAL_REASONS
-    assert len(list(R)) == 19
+    assert len(list(R)) == 40
+    # TEV-1's nineteen keep their exact ordinal positions; TEV-2 appended 21.
+    assert [m.name for m in R][:19] == sorted(
+        [m.name for m in R][:19], key=[m.name for m in R].index
+    )
+    assert list(R)[18] is R.TRUSTED_EVIDENCE_INDETERMINATE
+    assert list(R)[19] is R.TRUSTED_EVIDENCE_ENVELOPE_MALFORMED
+    # Still no success state anywhere in the vocabulary.
+    for member in R:
+        head = member.value.removeprefix("TRUSTED_EVIDENCE_").split("NOT_", 1)[0]
+        words = {w for w in head.split("_") if w}
+        assert not (words & {"OK", "PASS", "ADMITTED", "SUCCESS", "VERIFIED",
+                             "VALID", "AUTHENTIC", "TRUSTED", "APPROVED"}), member
 
 
 @probe
@@ -679,28 +742,47 @@ def probe_stage_six_cannot_be_requested_from_tap():
 
 
 @probe
-def probe_no_verifier_signed_receipt_or_key_type_is_exported():
-    """The receipt *payload* ships; nothing signed, and no verifier, does."""
+def probe_only_a_signed_artifact_is_named_a_receipt():
+    """§13.3 — an unsigned artifact is not a receipt, and is not named as one."""
+
+    import ugence_trusted_evidence_authority.api as api_module
+
+    assert "EvidenceVerificationReceiptPayload" in api_module.__all__
+    assert "EvidenceVerificationReceipt" not in api_module.__all__
+    assert not hasattr(api_module, "EvidenceVerificationReceipt")
+    for name in api_module.__all__:
+        if name.endswith("Receipt") and "_" not in name and not name.isupper():
+            assert name.startswith("Signed"), name
+
+
+@probe
+def probe_no_later_milestone_capability_is_exported():
+    """TEV-2's ceiling: Benchmark Registry, Readiness and ROI stay absent."""
 
     import ugence_trusted_evidence_authority.api as api_module
 
     for name in api_module.__all__:
         flattened = name.lower().replace("_", "")
-        for forbidden in ("verifier", "trustanchor", "keyring", "signer",
-                          "signature", "verificationresult", "signedreceipt"):
-            assert forbidden not in flattened, name
-        # Nothing is called a *receipt*: §13.3 — an unsigned artifact is not one.
-        if name.endswith("Receipt"):
-            raise AssertionError(f"unsigned type named as a receipt: {name}")
-    assert "EvidenceVerificationReceiptPayload" in api_module.__all__
+        for forbidden in ("benchmark", "readiness", "roi", "forecast",
+                          "attribution", "valuation", "actiongate",
+                          "deployment", "credential", "kms", "hsm",
+                          "certificate", "riskauthority", "cloudscaling",
+                          "governedvalue", "policyapplicability"):
+            assert forbidden not in flattened, (name, forbidden)
 
 
 @probe
 def probe_no_public_object_exposes_an_authorization_surface():
     import ugence_trusted_evidence_authority.api as api_module
 
-    forbidden = {"authorize", "authorizes_deployment", "approve", "grant", "admit",
-                 "sign", "verify", "revoke", "resolve", "register", "issue"}
+    # TEV-2 verifies, signs, issues and resolves — those are its ratified verbs
+    # (ADR §30). What must stay absent everywhere is the *authorization*
+    # vocabulary: E-14 keeps TAP off the runtime path and §13.2 / E-12 keep a
+    # receipt from authorizing anything.
+    forbidden = {"authorize", "authorizes_deployment", "authorize_deployment",
+                 "authorize_action", "approve", "grant", "allow", "permit",
+                 "deploy", "enact", "execute", "authorization",
+                 "evaluate_policy", "compute_readiness", "compute_roi"}
     for name in api_module.__all__:
         obj = getattr(api_module, name)
         if isinstance(obj, type):
@@ -713,7 +795,7 @@ def probe_the_package_version_and_typing_marker():
 
     import ugence_trusted_evidence_authority as pkg
 
-    assert pkg.__version__ == "0.1.0"
+    assert pkg.__version__ == "0.2.0"
     assert not hasattr(pkg, "CONTRACT_VERSION")
     assert (pathlib.Path(pkg.__file__).resolve().parent / "py.typed").is_file()
 
@@ -903,6 +985,8 @@ def probe_a_maximally_favourable_payload_is_still_structurally_unverified():
 @probe
 def probe_the_payload_carries_no_signature_of_any_kind():
     names = {f.name for f in dataclasses.fields(EvidenceVerificationReceiptPayload)}
+    # Unchanged by TEV-2: the envelope **wraps** this payload, and retrofitted
+    # no field into it. Every digest TEV-1 pinned is therefore still exact.
     for forbidden in ("signature", "signed", "signer", "envelope", "trust_anchor",
                       "public_key", "algorithm", "certificate", "key_material"):
         assert forbidden not in names, forbidden
@@ -1151,6 +1235,907 @@ def probe_non_nfc_strings_are_refused_at_construction():
     expect_refusal(
         lambda: canonical_bytes(built), TrustedEvidenceCanonicalizationError
     )
+
+
+
+
+# =========================================================================== #
+# TEV-2 — the verification-authority layer
+#
+# Built from the curated public API alone, exactly like everything above. The
+# signed bytes are reconstructed here **by hand** — from the documented framing
+# rules, with ``int.to_bytes`` and ``b"".join`` — and compared against what the
+# package produces, so a probe failure means the package changed its signing
+# input rather than that this file merely agrees with itself.
+# =========================================================================== #
+
+# --------------------------------------------------------------------------- #
+# NON-PRODUCTION probe keys. Fixed, public, hard-coded byte patterns committed
+# to a public source tree. NEVER usable as production key material.
+# --------------------------------------------------------------------------- #
+NON_PRODUCTION_PROBE_PRODUCER_SEED = bytes(range(96, 128))
+NON_PRODUCTION_PROBE_AUTHORITY_SEED = bytes(range(128, 160))
+NON_PRODUCTION_PROBE_ATTACKER_SEED = bytes(range(160, 192))
+
+PROBE_PRODUCER_AUTHORITY = "probe-producer-authority-nonprod"
+PROBE_PRODUCER_KEY = "probe-producer-key-nonprod"
+PROBE_VERIFIER_AUTHORITY = "probe-verifier-authority-nonprod"
+PROBE_VERIFIER_KEY = "probe-verifier-key-nonprod"
+PROBE_ANCHOR_SET = "probe-anchor-set-nonprod"
+
+T_KEY_FROM = datetime(2026, 1, 1, tzinfo=UTC)
+T_KEY_TO = datetime(2027, 1, 1, tzinfo=UTC)
+T_VERIFIED = datetime(2026, 7, 1, 12, 0, 0, 500000, tzinfo=UTC)
+
+
+def probe_producer_key():
+    return TrustedEvidenceSigningKey(NON_PRODUCTION_PROBE_PRODUCER_SEED)
+
+
+def probe_authority_key():
+    return TrustedEvidenceSigningKey(NON_PRODUCTION_PROBE_AUTHORITY_SEED)
+
+
+def probe_attacker_key():
+    return TrustedEvidenceSigningKey(NON_PRODUCTION_PROBE_ATTACKER_SEED)
+
+
+def probe_producer_anchor(**kw):
+    return TrustAnchorRecord(**{
+        "authority_id": PROBE_PRODUCER_AUTHORITY,
+        "key_id": PROBE_PRODUCER_KEY,
+        "capability": TrustAnchorCapability.EVIDENCE_PRODUCTION,
+        "public_key": encode_public_key(
+            probe_producer_key().verification_key.public_key_bytes),
+        "trust_anchor_set_id": PROBE_ANCHOR_SET,
+        "trust_anchor_set_version": "1",
+        "effective_from": T_KEY_FROM,
+        "effective_to": T_KEY_TO,
+        **kw,
+    })
+
+
+def probe_authority_anchor(**kw):
+    return TrustAnchorRecord(**{
+        "authority_id": PROBE_VERIFIER_AUTHORITY,
+        "key_id": PROBE_VERIFIER_KEY,
+        "capability": TrustAnchorCapability.RECEIPT_ISSUANCE,
+        "public_key": encode_public_key(
+            probe_authority_key().verification_key.public_key_bytes),
+        "trust_anchor_set_id": PROBE_ANCHOR_SET,
+        "trust_anchor_set_version": "1",
+        "effective_from": T_KEY_FROM,
+        "effective_to": T_KEY_TO,
+        **kw,
+    })
+
+
+def probe_directory(*anchors):
+    return StaticTrustAnchorDirectory(
+        anchors or (probe_producer_anchor(), probe_authority_anchor()),
+        trust_anchor_set_id=PROBE_ANCHOR_SET,
+        trust_anchor_set_version="1",
+    )
+
+
+def probe_submission(evidence=None, *, key=None, **kw):
+    evidence = build_identity() if evidence is None else evidence
+    key = probe_producer_key() if key is None else key
+    authority_id = kw.pop("producer_authority_id", PROBE_PRODUCER_AUTHORITY)
+    key_id = kw.pop("producer_key_id", PROBE_PRODUCER_KEY)
+    signature = kw.pop("signature", encode_signature(key.sign(
+        signed_evidence_input_bytes(
+            evidence=evidence,
+            producer_authority_id=authority_id,
+            producer_key_id=key_id))))
+    return SignedEvidenceSubmission(**{
+        "envelope_schema": SIGNED_EVIDENCE_SUBMISSION_SCHEMA_V1,
+        "evidence": evidence,
+        "evidence_identity_digest": canonical_digest(evidence),
+        "producer_authority_id": authority_id,
+        "producer_key_id": key_id,
+        "signature_profile": TRUSTED_EVIDENCE_SIGNATURE_PROFILE_V1,
+        "signed_input_domain": TRUSTED_EVIDENCE_SIGNED_EVIDENCE_INPUT_DOMAIN,
+        "signature": signature,
+        **kw,
+    })
+
+
+def probe_signer(**kw):
+    return Ed25519ReceiptSigner(**{
+        "signer_authority_id": PROBE_VERIFIER_AUTHORITY,
+        "signing_key_id": PROBE_VERIFIER_KEY,
+        "signing_key": probe_authority_key(),
+        **kw,
+    })
+
+
+def probe_authority(anchors=None, **kw):
+    return EvidenceVerificationAuthority(**{
+        "authority_id": PROBE_VERIFIER_AUTHORITY,
+        "trust_anchors": probe_directory() if anchors is None else anchors,
+        "protocol": Ed25519EvidenceAuthenticityProtocol(),
+        "receipt_schema": EvidenceSchemaRef(
+            schema_id="ugence.receipt.evidence-verification", schema_version="1"),
+        **kw,
+    })
+
+
+def probe_determination(**kw):
+    authority = probe_authority(kw.pop("anchors", None), **kw.pop("authority_kw", {}))
+    return authority.verify(
+        kw.pop("submission", probe_submission()),
+        kw.pop("request", build_request()),
+        verified_at=kw.pop("verified_at", T_VERIFIED),
+        verifier_key_id=kw.pop("verifier_key_id", PROBE_VERIFIER_KEY),
+        **kw,
+    )
+
+
+def probe_envelope(**kw):
+    return ReceiptIssuer(signer=probe_signer()).issue(probe_determination(**kw))
+
+
+def probe_reverifier(anchors=None):
+    return SignedReceiptVerifier(
+        trust_anchors=probe_directory() if anchors is None else anchors)
+
+
+def _refusal_of(envelope=None, *, anchors=None, at=None, **expected):
+    result = probe_reverifier(anchors).verify(
+        probe_envelope() if envelope is None else envelope,
+        evaluated_at=T_MID if at is None else at,
+        **expected,
+    )
+    assert result.outcome is ReceiptVerificationOutcome.REFUSED, result
+    assert not result.verified
+    return result.refusal_reason
+
+
+# --------------------------------------------------------------------------- #
+# Pinned TEV-2 vectors — every one reproducible from the fixtures above with no
+# clock, no randomness and no ambient state. Recomputed on every probe run.
+# --------------------------------------------------------------------------- #
+PINNED_AUTHORITY_PUBLIC_KEY = "cd14b37f956e953194ff7fb73b3d81dcc561d61a7538094b7c3e1a643ee5f3aa"
+PINNED_RECEIPT_ID = "receipt-87b7f25038c7aebdd5bdc798873d7aa434c7cd83c1e791ac49a734f23e754a4f"
+PINNED_RECEIPT_PAYLOAD_DIGEST = "176f98a11d187f371d5e4a1df6f01d2f2078b4977e12113abfa11430a3933db3"
+PINNED_RECEIPT_SIGNED_INPUT_DIGEST = "47720f148e3722b92e45c4c2fbddab0eeaeb39b05b05c1c50a7f9056a731dba2"
+PINNED_RECEIPT_SIGNATURE = (
+    "c3603daa2bfdc06d1a4f810c9690c9f18981f1e2cfb52ed7f656d0ee25e3564a"
+    "459e96ad84b3539b1b2a7b3fb2aa729d6b39c83a3ea4eaa9f0f50ff1156c990e"
+)
+PINNED_ENVELOPE_DIGEST = "ea82f19fe1ffcb03394b166af926a14e45bb1e5d8e78265a5774ff5f046ab263"
+PINNED_EVIDENCE_SIGNATURE = (
+    "9d8e3f0834293dcd2810aadd8289cefc55451c2ecc78fa087bc01c32b29aa634"
+    "f31e2ccff814b0e06ce13440a996e8b8f43eb9170c1a50dd93fc474203a15109"
+)
+PINNED_SUBMISSION_DIGEST = "e9ee5dd99072028c13b28ffa6ac8f529c9b4d1695cf7ac2705a578bf1a33d046"
+
+
+# --------------------------------------------------------------------------- #
+# Signed-byte reconstruction, done independently
+# --------------------------------------------------------------------------- #
+
+@probe
+def probe_the_signed_input_frame_is_reconstructible_from_documented_rules():
+    """Rebuild both frames by hand and compare. No package internals used."""
+
+    def frame(elements):
+        width = SIGNED_INPUT_LENGTH_PREFIX_BYTES
+        out = [len(elements).to_bytes(width, "big")]
+        for element in elements:
+            out.append(len(element).to_bytes(width, "big"))
+            out.append(element)
+        return b"".join(out)
+
+    assert SIGNED_INPUT_LENGTH_PREFIX_BYTES == 8
+    evidence = build_identity()
+    payload = build_receipt()
+
+    expected_evidence = frame((
+        TRUSTED_EVIDENCE_SIGNED_EVIDENCE_INPUT_DOMAIN.encode("utf-8"),
+        SIGNED_EVIDENCE_SUBMISSION_SCHEMA_V1.encode("utf-8"),
+        TRUSTED_EVIDENCE_SIGNATURE_PROFILE_V1.encode("utf-8"),
+        TRUSTED_EVIDENCE_CANONICALIZATION_VERSION.encode("utf-8"),
+        EVIDENCE_IDENTITY_DIGEST_DOMAIN.encode("utf-8"),
+        PROBE_PRODUCER_AUTHORITY.encode("utf-8"),
+        PROBE_PRODUCER_KEY.encode("utf-8"),
+        canonical_bytes(evidence),
+    ))
+    assert signed_evidence_input_bytes(
+        evidence=evidence,
+        producer_authority_id=PROBE_PRODUCER_AUTHORITY,
+        producer_key_id=PROBE_PRODUCER_KEY,
+    ) == expected_evidence
+
+    expected_receipt = frame((
+        TRUSTED_EVIDENCE_SIGNED_RECEIPT_INPUT_DOMAIN.encode("utf-8"),
+        SIGNED_RECEIPT_ENVELOPE_SCHEMA_V1.encode("utf-8"),
+        TRUSTED_EVIDENCE_SIGNATURE_PROFILE_V1.encode("utf-8"),
+        TRUSTED_EVIDENCE_CANONICALIZATION_VERSION.encode("utf-8"),
+        EVIDENCE_VERIFICATION_RECEIPT_PAYLOAD_DIGEST_DOMAIN.encode("utf-8"),
+        PROBE_VERIFIER_AUTHORITY.encode("utf-8"),
+        PROBE_VERIFIER_KEY.encode("utf-8"),
+        payload.verification_protocol_id.encode("utf-8"),
+        payload.verification_protocol_version.encode("utf-8"),
+        canonical_digest(payload).encode("utf-8"),
+        canonical_bytes(payload),
+    ))
+    assert signed_receipt_input_bytes(
+        payload=payload,
+        signer_authority_id=PROBE_VERIFIER_AUTHORITY,
+        signing_key_id=PROBE_VERIFIER_KEY,
+    ) == expected_receipt
+
+    assert expected_evidence != expected_receipt
+
+
+@probe
+def probe_the_frame_is_length_unambiguous():
+    """Moving an element boundary must change the bytes (no concatenation bug)."""
+
+    assert framed_signed_input((b"ab", b"c")) != framed_signed_input((b"a", b"bc"))
+    assert framed_signed_input((b"a",)) != framed_signed_input((b"a", b""))
+    assert framed_signed_input((b"",)) != framed_signed_input((b"", b""))
+    expect_refusal(lambda: framed_signed_input(()))
+    expect_refusal(lambda: framed_signed_input((b"ok", "not-bytes")))
+    expect_refusal(lambda: framed_signed_input([b"a"]))
+
+
+@probe
+def probe_a_fixed_signature_vector_verifies_and_is_pinned():
+    """One end-to-end vector, pinned byte-for-byte and reproduced here.
+
+    Every value below derives from fixed inputs with no clock and no randomness,
+    so it is stable across machines and runs. If the signing input, the
+    canonicalization, the profile, the framing or the key derivation changes,
+    this probe fails.
+    """
+
+    envelope = probe_envelope()
+
+    assert envelope.payload_canonical_digest == PINNED_RECEIPT_PAYLOAD_DIGEST
+    assert envelope.envelope_digest() == PINNED_ENVELOPE_DIGEST
+    assert envelope.signature == PINNED_RECEIPT_SIGNATURE
+    assert envelope.payload.receipt_id == PINNED_RECEIPT_ID
+    assert hashlib.sha256(envelope.signed_input_bytes()).hexdigest() == (
+        PINNED_RECEIPT_SIGNED_INPUT_DIGEST)
+
+    public = encode_public_key(probe_authority_key().verification_key.public_key_bytes)
+    assert public == PINNED_AUTHORITY_PUBLIC_KEY
+
+    # It verifies against a key rebuilt from the pinned hex, not from the signer
+    # object, so the check does not route through the thing it is testing.
+    rebuilt = TrustedEvidenceVerificationKey(decode_public_key(public))
+    assert rebuilt.verify(envelope.signed_input_bytes(), envelope.signature_bytes())
+
+    verification = probe_reverifier().verify(envelope, evaluated_at=T_MID)
+    assert verification.outcome is ReceiptVerificationOutcome.VERIFIED
+    assert verification.verified is True
+
+    submission = probe_submission()
+    assert submission.signature == PINNED_EVIDENCE_SIGNATURE
+    assert canonical_digest(submission) == PINNED_SUBMISSION_DIGEST
+
+
+@probe
+def probe_rfc8032_test_vectors_reproduce_exactly():
+    """Conformance to the standard, not to this implementation.
+
+    RFC 8032 §7.1 TEST 1 and TEST 2, verbatim from the RFC. These are published
+    **non-production** keys — among the best-known Ed25519 private keys in
+    existence — and reproducing them proves the module implements the standard
+    algorithm rather than a bespoke look-alike.
+    """
+
+    vectors = [
+        (
+            "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
+            "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+            b"",
+            "e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e06522490155"
+            "5fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b",
+        ),
+        (
+            "4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4fb8a6fb",
+            "3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c",
+            bytes([0x72]),
+            "92a009a9f0d4cab8720e820b5f642540a2b27b5416503f8fb3762223ebdb69da"
+            "085ac1e43e15996e458f3613d0f11d8c387b2eaeb4302aeeb00d291612bb0c00",
+        ),
+    ]
+    for seed_hex, public_hex, message, signature_hex in vectors:
+        key = TrustedEvidenceSigningKey(bytes.fromhex(seed_hex))
+        assert encode_public_key(key.verification_key.public_key_bytes) == public_hex
+        assert encode_signature(key.sign(message)) == signature_hex
+        verifier = TrustedEvidenceVerificationKey(bytes.fromhex(public_hex))
+        assert verifier.verify(message, bytes.fromhex(signature_hex))
+        tampered = bytearray(bytes.fromhex(signature_hex))
+        tampered[0] ^= 0x01
+        assert not verifier.verify(message, bytes(tampered))
+
+
+# --------------------------------------------------------------------------- #
+# Every principal refusal class, demonstrated
+# --------------------------------------------------------------------------- #
+
+@probe
+def probe_every_principal_refusal_class_is_demonstrable():
+    """One live refusal per class. A class that cannot be reached is not a gate."""
+
+    envelope = probe_envelope()
+    demonstrated = {}
+
+    demonstrated["anchor_not_configured"] = _refusal_of(
+        envelope, anchors=DenyAllTrustAnchorDirectory())
+    assert demonstrated["anchor_not_configured"] is (
+        R.TRUSTED_EVIDENCE_TRUST_ANCHOR_NOT_CONFIGURED)
+
+    demonstrated["anchor_missing"] = _refusal_of(
+        envelope, anchors=probe_directory(probe_producer_anchor()))
+    assert demonstrated["anchor_missing"] is R.TRUSTED_EVIDENCE_TRUST_ANCHOR_MISSING
+
+    class AmbiguousResolver:
+        def resolve(self, coordinate):
+            return TrustAnchorResolution.refused(
+                coordinate, R.TRUSTED_EVIDENCE_TRUST_ANCHOR_AMBIGUOUS)
+
+    demonstrated["anchor_ambiguous"] = _refusal_of(
+        envelope, anchors=AmbiguousResolver())
+    assert demonstrated["anchor_ambiguous"] is (
+        R.TRUSTED_EVIDENCE_TRUST_ANCHOR_AMBIGUOUS)
+
+    demonstrated["key_not_yet_valid"] = _refusal_of(
+        envelope, anchors=probe_directory(probe_authority_anchor(
+            effective_from=datetime(2026, 12, 1, tzinfo=UTC))))
+    assert demonstrated["key_not_yet_valid"] is R.TRUSTED_EVIDENCE_KEY_NOT_YET_VALID
+
+    demonstrated["key_expired"] = _refusal_of(
+        envelope, anchors=probe_directory(probe_authority_anchor(
+            effective_to=datetime(2026, 2, 1, tzinfo=UTC))))
+    assert demonstrated["key_expired"] is R.TRUSTED_EVIDENCE_KEY_EXPIRED
+
+    demonstrated["key_disabled"] = _refusal_of(
+        envelope, anchors=probe_directory(probe_authority_anchor(disabled=True)))
+    assert demonstrated["key_disabled"] is R.TRUSTED_EVIDENCE_KEY_DISABLED
+
+    demonstrated["key_revoked"] = _refusal_of(
+        envelope, anchors=probe_directory(probe_authority_anchor(
+            revocation=KeyRevocation(effective_at=T_KEY_FROM))))
+    assert demonstrated["key_revoked"] is R.TRUSTED_EVIDENCE_KEY_REVOKED
+
+    wrong_key_anchor = probe_authority_anchor(
+        public_key=encode_public_key(
+            probe_attacker_key().verification_key.public_key_bytes))
+    demonstrated["signature_invalid"] = _refusal_of(
+        envelope, anchors=probe_directory(wrong_key_anchor))
+    assert demonstrated["signature_invalid"] is R.TRUSTED_EVIDENCE_SIGNATURE_INVALID
+
+    early = probe_envelope(
+        receipt_valid_from=datetime(2026, 8, 1, tzinfo=UTC),
+        receipt_valid_to=datetime(2026, 9, 1, tzinfo=UTC))
+    demonstrated["receipt_not_yet_valid"] = _refusal_of(early, at=T_MID)
+    assert demonstrated["receipt_not_yet_valid"] is (
+        R.TRUSTED_EVIDENCE_RECEIPT_NOT_YET_VALID)
+    demonstrated["receipt_expired"] = _refusal_of(
+        early, at=datetime(2026, 9, 1, tzinfo=UTC))
+    assert demonstrated["receipt_expired"] is R.TRUSTED_EVIDENCE_RECEIPT_EXPIRED
+
+    for kwarg, reason in (
+        ("expected_tenant_id", R.TRUSTED_EVIDENCE_TENANT_MISMATCH),
+        ("expected_assessment_context_ref", R.TRUSTED_EVIDENCE_CONTEXT_MISMATCH),
+        ("expected_subject_ref", R.TRUSTED_EVIDENCE_SUBJECT_MISMATCH),
+        ("expected_assessment_purpose_ref", R.TRUSTED_EVIDENCE_PURPOSE_SCOPE_MISMATCH),
+        ("expected_usage_scope_ref", R.TRUSTED_EVIDENCE_PURPOSE_SCOPE_MISMATCH),
+        ("expected_verification_protocol_id", R.TRUSTED_EVIDENCE_PROTOCOL_UNSUPPORTED),
+        ("expected_verification_protocol_version",
+         R.TRUSTED_EVIDENCE_PROTOCOL_VERSION_MISMATCH),
+    ):
+        got = _refusal_of(envelope, **{kwarg: "a-different-value"})
+        assert got is reason, (kwarg, got)
+        demonstrated[kwarg] = got
+
+    demonstrated["system_binding"] = _refusal_of(
+        envelope, expected_assessed_system_binding_digest=OTHER)
+    assert demonstrated["system_binding"] is (
+        R.TRUSTED_EVIDENCE_SYSTEM_BINDING_MISMATCH)
+    demonstrated["content_digest"] = _refusal_of(
+        envelope, expected_evidence_content_digest=OTHER)
+    assert demonstrated["content_digest"] is R.TRUSTED_EVIDENCE_CONTENT_DIGEST_MISMATCH
+
+    # E-3: a producing key can never satisfy a receipt-issuance coordinate.
+    producer_shaped = TrustAnchorRecord(
+        authority_id=PROBE_VERIFIER_AUTHORITY,
+        key_id=PROBE_VERIFIER_KEY,
+        capability=TrustAnchorCapability.EVIDENCE_PRODUCTION,
+        public_key=encode_public_key(
+            probe_authority_key().verification_key.public_key_bytes),
+        trust_anchor_set_id=PROBE_ANCHOR_SET,
+        trust_anchor_set_version="1")
+    demonstrated["capability"] = _refusal_of(
+        envelope, anchors=probe_directory(producer_shaped))
+    assert demonstrated["capability"] is R.TRUSTED_EVIDENCE_TRUST_ANCHOR_MISSING
+
+    assert len(demonstrated) >= 18
+
+
+@probe
+def probe_the_verification_side_refusals_are_all_reachable():
+    """The authority's own fail-closed surface, not the re-verifier's."""
+
+    determination = probe_determination(
+        anchors=probe_directory(probe_authority_anchor()))
+    assert determination.outcome is EvidenceAdmissionOutcome.REFUSED
+    assert R.TRUSTED_EVIDENCE_TRUST_ANCHOR_MISSING in determination.refusal_reasons
+
+    forged = probe_submission(key=probe_attacker_key())
+    determination = probe_determination(submission=forged)
+    assert determination.outcome is EvidenceAdmissionOutcome.REFUSED
+    assert R.TRUSTED_EVIDENCE_SIGNATURE_INVALID in determination.refusal_reasons
+
+    revoked = build_identity(lifecycle_state=EvidenceLifecycleState.REVOKED)
+    determination = probe_determination(
+        submission=probe_submission(revoked),
+        request=build_request(evidence=revoked))
+    assert R.TRUSTED_EVIDENCE_REVOKED in determination.refusal_reasons
+
+    determination = probe_determination(
+        request=build_request(expected_tenant_id="a-different-tenant"))
+    assert R.TRUSTED_EVIDENCE_TENANT_MISMATCH in determination.refusal_reasons
+
+    determination = probe_determination(
+        request=build_request(as_of=datetime(2026, 12, 1, tzinfo=UTC)))
+    assert R.TRUSTED_EVIDENCE_STALE in determination.refusal_reasons
+
+    class RefusingProtocol:
+        protocol_id = TRUSTED_EVIDENCE_PROTOCOL_V1_ID
+        protocol_version = TRUSTED_EVIDENCE_PROTOCOL_V1_VERSION
+
+        def run_protocol(self, **kw):
+            return ProtocolExecutionResult(
+                protocol_id=self.protocol_id,
+                protocol_version=self.protocol_version,
+                refusal_reasons=(R.TRUSTED_EVIDENCE_INDETERMINATE,))
+
+    authority = probe_authority(protocol=RefusingProtocol())
+    determination = authority.verify(
+        probe_submission(), build_request(),
+        verified_at=T_VERIFIED, verifier_key_id=PROBE_VERIFIER_KEY)
+    assert determination.outcome is EvidenceAdmissionOutcome.REFUSED
+    assert R.TRUSTED_EVIDENCE_INDETERMINATE in determination.refusal_reasons
+    assert determination.receipt_payload is None
+
+
+@probe
+def probe_indeterminate_is_never_a_pass_and_no_third_outcome_exists():
+    assert [m.name for m in EvidenceAdmissionOutcome] == ["ADMITTED", "REFUSED"]
+    assert [m.name for m in ReceiptVerificationOutcome] == ["VERIFIED", "REFUSED"]
+    for banned in ("UNKNOWN", "PARTIAL", "PENDING", "BEST_EFFORT", "DEGRADED",
+                   "INDETERMINATE", "WARNING", "ADVISORY"):
+        assert banned not in EvidenceAdmissionOutcome.__members__
+        assert banned not in ReceiptVerificationOutcome.__members__
+
+
+# --------------------------------------------------------------------------- #
+# Forgery, replay and substitution
+# --------------------------------------------------------------------------- #
+
+@probe
+def probe_a_determination_cannot_be_manufactured():
+    """§8.1.5 — no consumer may manufacture verification."""
+
+    for token in (True, 1, "token", [], {}, object(), None, EvidenceAdmissionOutcome):
+        expect_refusal(lambda t=token: EvidenceVerificationDetermination(
+            outcome=EvidenceAdmissionOutcome.ADMITTED,
+            verification_request_digest=CONTENT,
+            verifier_authority_id=PROBE_VERIFIER_AUTHORITY,
+            verifier_key_id=PROBE_VERIFIER_KEY,
+            verification_protocol_id=TRUSTED_EVIDENCE_PROTOCOL_V1_ID,
+            verification_protocol_version=TRUSTED_EVIDENCE_PROTOCOL_V1_VERSION,
+            verified_at=T_VERIFIED, evaluated_at=T_MID,
+            cleared_stages=tuple(RECEIPT_REPORTABLE_TRUST_STAGES),
+            receipt_payload=build_receipt(), issuance_token=t))
+
+
+@probe
+def probe_a_receipt_verification_cannot_be_manufactured():
+    coordinate = TrustAnchorCoordinate(
+        authority_id=PROBE_VERIFIER_AUTHORITY, key_id=PROBE_VERIFIER_KEY,
+        capability=TrustAnchorCapability.RECEIPT_ISSUANCE)
+    for token in (None, True, 1, "verified", object()):
+        expect_refusal(lambda t=token: ReceiptVerification(
+            outcome=ReceiptVerificationOutcome.VERIFIED,
+            evaluated_at=T_MID, coordinate=coordinate,
+            envelope_digest=CONTENT, payload_canonical_digest=CONTENT,
+            verification_token=t))
+
+
+@probe
+def probe_there_is_no_public_route_to_signing_arbitrary_bytes():
+    """The signer takes a package-minted instruction, never free bytes."""
+
+    for token in (None, True, 1, "token", object(), []):
+        expect_refusal(lambda t=token: ReceiptSigningInput(
+            signed_input=b"attacker-chosen bytes",
+            signer_authority_id=PROBE_VERIFIER_AUTHORITY,
+            signing_key_id=PROBE_VERIFIER_KEY,
+            signature_profile=TRUSTED_EVIDENCE_SIGNATURE_PROFILE_V1,
+            issuance_token=t))
+    signer = probe_signer()
+    for bad in (b"raw bytes", "a string", None, 42, build_receipt()):
+        expect_refusal(lambda b=bad: signer.sign_receipt(b))
+    import ugence_trusted_evidence_authority.api as api_module
+    for name in api_module.__all__:
+        assert name not in ("sign", "sign_bytes", "sign_payload"), name
+
+
+@probe
+def probe_a_refused_determination_is_never_signed():
+    determination = probe_determination(
+        request=build_request(expected_tenant_id="a-different-tenant"))
+    assert determination.outcome is EvidenceAdmissionOutcome.REFUSED
+    assert determination.receipt_payload is None
+    expect_refusal(lambda: ReceiptIssuer(signer=probe_signer()).issue(determination))
+
+
+@probe
+def probe_swapping_the_payload_after_signing_is_caught():
+    envelope = probe_envelope()
+    other = build_receipt(receipt_id="a-different-receipt")
+
+    expect_refusal(lambda: dataclasses.replace(envelope, payload=other))
+    swapped = dataclasses.replace(
+        envelope, payload=other, payload_canonical_digest=canonical_digest(other))
+    assert _refusal_of(swapped) is R.TRUSTED_EVIDENCE_SIGNATURE_INVALID
+    expect_refusal(lambda: dataclasses.replace(
+        envelope, payload_canonical_digest=OTHER))
+
+
+@probe
+def probe_authority_and_key_substitution_are_caught():
+    envelope = probe_envelope()
+    for field, value in (("signer_authority_id", "another-authority"),
+                         ("signing_key_id", "another-key")):
+        relabelled = dataclasses.replace(envelope, **{field: value})
+        assert _refusal_of(relabelled) is R.TRUSTED_EVIDENCE_TRUST_ANCHOR_MISSING
+
+    relabelled = dataclasses.replace(envelope, signing_key_id="another-key")
+    forged_anchor = probe_authority_anchor(key_id="another-key")
+    assert _refusal_of(
+        relabelled, anchors=probe_directory(forged_anchor)
+    ) is R.TRUSTED_EVIDENCE_SIGNATURE_INVALID
+
+
+@probe
+def probe_cross_domain_substitution_is_impossible():
+    """An evidence signature can never verify as a receipt signature."""
+
+    evidence = build_identity()
+    payload = build_receipt()
+    key = probe_authority_key()
+
+    evidence_frame = signed_evidence_input_bytes(
+        evidence=evidence,
+        producer_authority_id=PROBE_VERIFIER_AUTHORITY,
+        producer_key_id=PROBE_VERIFIER_KEY)
+    receipt_frame = signed_receipt_input_bytes(
+        payload=payload,
+        signer_authority_id=PROBE_VERIFIER_AUTHORITY,
+        signing_key_id=PROBE_VERIFIER_KEY)
+    assert evidence_frame != receipt_frame
+
+    public = key.verification_key
+    assert public.verify(evidence_frame, key.sign(evidence_frame))
+    assert not public.verify(receipt_frame, key.sign(evidence_frame))
+    assert not public.verify(evidence_frame, key.sign(receipt_frame))
+
+    domains = {
+        EVIDENCE_IDENTITY_DIGEST_DOMAIN,
+        EVIDENCE_VERIFICATION_RECEIPT_PAYLOAD_DIGEST_DOMAIN,
+        TRUST_ANCHOR_RECORD_DIGEST_DOMAIN,
+        SIGNED_EVIDENCE_SUBMISSION_DIGEST_DOMAIN,
+        SIGNED_RECEIPT_ENVELOPE_DIGEST_DOMAIN,
+        TRUSTED_EVIDENCE_SIGNED_EVIDENCE_INPUT_DOMAIN,
+        TRUSTED_EVIDENCE_SIGNED_RECEIPT_INPUT_DOMAIN,
+        TRUSTED_EVIDENCE_RECEIPT_ID_DOMAIN,
+    }
+    assert len(domains) == 8
+
+
+@probe
+def probe_signature_truncation_extension_and_noncanonical_encoding_are_refused():
+    envelope = probe_envelope()
+    good = envelope.signature
+    for bad in (good[:-2], good + "00", good.upper(), "0x" + good[2:],
+                " " + good[1:], good[:-1] + "g", ""):
+        expect_refusal(lambda b=bad: dataclasses.replace(envelope, signature=b))
+    for bad in (None, 42, b"\x00" * 64, ["hex"], {"sig": good}):
+        expect_refusal(lambda b=bad: dataclasses.replace(envelope, signature=b))
+
+    flipped = bytearray(envelope.signature_bytes())
+    flipped[0] ^= 0x01
+    tampered = dataclasses.replace(envelope, signature=encode_signature(bytes(flipped)))
+    assert _refusal_of(tampered) is R.TRUSTED_EVIDENCE_SIGNATURE_INVALID
+
+
+@probe
+def probe_algorithm_confusion_and_profile_downgrade_are_refused():
+    envelope = probe_envelope()
+    for bad in ("none", "None", "NONE", "hmac-sha256", "ed25519", "rsa-pss",
+                TRUSTED_EVIDENCE_SIGNATURE_PROFILE_V1.replace("/v1", "/v2"),
+                TRUSTED_EVIDENCE_SIGNATURE_PROFILE_V1.upper(), ""):
+        expect_refusal(lambda b=bad: dataclasses.replace(envelope, signature_profile=b))
+        expect_refusal(lambda b=bad: probe_authority_anchor(signature_profile=b))
+    assert TRUSTED_EVIDENCE_SIGNATURE_PROFILE_V1.endswith("/v1")
+    assert "ed25519" in TRUSTED_EVIDENCE_SIGNATURE_PROFILE_V1
+    assert TRUSTED_EVIDENCE_SIGNATURE_ENCODING_V1.endswith("base16-lower/v1")
+
+
+@probe
+def probe_a_previously_valid_receipt_stops_verifying_after_revocation():
+    """§13.3 — "not silently honoured". A signature is never grandfathered."""
+
+    envelope = probe_envelope()
+    assert probe_reverifier().verify(envelope, evaluated_at=T_MID).verified
+
+    revoke_at = datetime(2026, 8, 1, tzinfo=UTC)
+    revoked_directory = probe_directory(
+        probe_producer_anchor(),
+        probe_authority_anchor(revocation=KeyRevocation(effective_at=revoke_at)))
+
+    still_good = probe_reverifier(revoked_directory).verify(
+        envelope, evaluated_at=datetime(2026, 7, 31, tzinfo=UTC))
+    assert still_good.verified
+    at_instant = probe_reverifier(revoked_directory).verify(
+        envelope, evaluated_at=revoke_at)
+    assert at_instant.refusal_reason is R.TRUSTED_EVIDENCE_KEY_REVOKED
+    after = probe_reverifier(revoked_directory).verify(
+        envelope, evaluated_at=datetime(2026, 9, 1, tzinfo=UTC))
+    assert after.refusal_reason is R.TRUSTED_EVIDENCE_KEY_REVOKED
+
+    # The refusal keeps enough typed evidence to explain itself.
+    assert envelope.payload.verified_at < revoke_at
+    assert after.evaluated_at >= revoke_at
+    assert after.coordinate.key_id == PROBE_VERIFIER_KEY
+
+
+@probe
+def probe_duplicate_and_partial_trust_anchor_lookups_are_refused():
+    anchor = probe_authority_anchor()
+    expect_refusal(lambda: StaticTrustAnchorDirectory((anchor, anchor)))
+    expect_refusal(lambda: probe_directory().with_anchor(probe_authority_anchor()))
+
+    directory = probe_directory()
+    for absent in ("latest", "default", "any", "first", "find", "search",
+                   "resolve_by_authority", "get"):
+        assert not hasattr(directory, absent), absent
+    for coordinate in (
+        TrustAnchorCoordinate(authority_id=PROBE_VERIFIER_AUTHORITY,
+                              key_id="not-the-key",
+                              capability=TrustAnchorCapability.RECEIPT_ISSUANCE),
+        TrustAnchorCoordinate(authority_id="not-the-authority",
+                              key_id=PROBE_VERIFIER_KEY,
+                              capability=TrustAnchorCapability.RECEIPT_ISSUANCE),
+        TrustAnchorCoordinate(authority_id=PROBE_VERIFIER_AUTHORITY,
+                              key_id=PROBE_VERIFIER_KEY,
+                              capability=TrustAnchorCapability.EVIDENCE_PRODUCTION),
+    ):
+        resolution = directory.resolve(coordinate)
+        assert resolution.anchor is None
+        assert resolution.refusal_reason is R.TRUSTED_EVIDENCE_TRUST_ANCHOR_MISSING
+
+
+@probe
+def probe_the_trust_directory_is_immutable_after_construction():
+    directory = probe_directory()
+    for attempt in (
+        lambda: setattr(directory, "_anchors", {}),
+        lambda: setattr(directory, "anchors", {}),
+        lambda: delattr(directory, "_anchors"),
+    ):
+        expect_refusal(attempt, AttributeError)
+    expect_refusal(lambda: directory.anchors.clear(), AttributeError, TypeError)
+    anchors = [probe_authority_anchor()]
+    built = StaticTrustAnchorDirectory(anchors)
+    anchors.append(probe_producer_anchor())
+    assert len(built.anchors) == 1
+
+
+@probe
+def probe_reconstruction_routes_cannot_forge_a_verified_envelope():
+    import copy
+    import pickle
+
+    envelope = probe_envelope()
+    for clone in (copy.copy(envelope), copy.deepcopy(envelope),
+                  pickle.loads(pickle.dumps(envelope))):
+        assert clone == envelope
+        assert clone.envelope_digest() == envelope.envelope_digest()
+        assert probe_reverifier().verify(clone, evaluated_at=T_MID).verified
+        # And with no trust configured, a round-tripped envelope still refuses.
+        assert not probe_reverifier(DenyAllTrustAnchorDirectory()).verify(
+            clone, evaluated_at=T_MID).verified
+
+    # Doctoring a refused result in place does not change what re-verifying the
+    # *envelope* says, which is the only thing a consumer may rely on.
+    refused = probe_reverifier(DenyAllTrustAnchorDirectory()).verify(
+        envelope, evaluated_at=T_MID)
+    assert not refused.verified
+    try:
+        object.__setattr__(refused, "outcome", ReceiptVerificationOutcome.VERIFIED)
+    except Exception:
+        pass
+    assert not probe_reverifier(DenyAllTrustAnchorDirectory()).verify(
+        envelope, evaluated_at=T_MID).verified
+
+
+@probe
+def probe_a_duck_typed_envelope_lookalike_is_refused():
+    envelope = probe_envelope()
+
+    class Lookalike:
+        envelope_schema = SIGNED_RECEIPT_ENVELOPE_SCHEMA_V1
+        payload = envelope.payload
+        payload_canonical_digest = envelope.payload_canonical_digest
+        signature_profile = TRUSTED_EVIDENCE_SIGNATURE_PROFILE_V1
+        signed_input_domain = TRUSTED_EVIDENCE_SIGNED_RECEIPT_INPUT_DOMAIN
+        signer_authority_id = PROBE_VERIFIER_AUTHORITY
+        signing_key_id = PROBE_VERIFIER_KEY
+        signature = envelope.signature
+        verified = True
+
+        def envelope_digest(self):
+            return envelope.envelope_digest()
+
+        def signed_input_bytes(self):
+            return envelope.signed_input_bytes()
+
+        def signature_bytes(self):
+            return envelope.signature_bytes()
+
+    expect_refusal(lambda: probe_reverifier().verify(Lookalike(), evaluated_at=T_MID))
+
+    class Subclass(SignedEvidenceVerificationReceipt):
+        pass
+
+    forged = Subclass(
+        envelope_schema=envelope.envelope_schema,
+        payload=envelope.payload,
+        payload_canonical_digest=envelope.payload_canonical_digest,
+        signature_profile=envelope.signature_profile,
+        signed_input_domain=envelope.signed_input_domain,
+        signer_authority_id=envelope.signer_authority_id,
+        signing_key_id=envelope.signing_key_id,
+        signature=envelope.signature)
+    expect_refusal(lambda: probe_reverifier().verify(forged, evaluated_at=T_MID))
+
+
+@probe
+def probe_naive_datetimes_are_refused_at_every_tev2_boundary():
+    envelope = probe_envelope()
+    naive = datetime(2026, 7, 1, 12, 0, 0)
+    expect_refusal(lambda: probe_reverifier().verify(envelope, evaluated_at=naive))
+    expect_refusal(lambda: KeyRevocation(effective_at=naive))
+    expect_refusal(lambda: probe_authority_anchor(effective_from=naive))
+    expect_refusal(lambda: probe_authority_anchor(effective_to=naive))
+    expect_refusal(lambda: probe_authority_anchor().lifecycle_refusal_at(naive))
+    expect_refusal(lambda: probe_determination(verified_at=naive))
+    expect_refusal(lambda: derive_receipt_id(
+        verification_request_digest=CONTENT,
+        verifier_authority_id="a", verifier_key_id="b",
+        verification_protocol_id="c", verification_protocol_version="1",
+        verified_at=naive))
+
+
+@probe
+def probe_no_tev2_entry_point_defaults_its_instant():
+    """§22.10 — the evaluation instant is a parameter, never an ambient read."""
+
+    import inspect
+
+    for owner, method, parameter in (
+        (SignedReceiptVerifier, "verify", "evaluated_at"),
+        (EvidenceVerificationAuthority, "verify", "verified_at"),
+        (TrustAnchorRecord, "lifecycle_refusal_at", "instant"),
+        (KeyRevocation, "is_revoked_at", "instant"),
+    ):
+        signature = inspect.signature(getattr(owner, method))
+        assert signature.parameters[parameter].default is inspect.Parameter.empty
+
+
+@probe
+def probe_private_key_material_never_escapes():
+    seed = NON_PRODUCTION_PROBE_AUTHORITY_SEED
+    key = TrustedEvidenceSigningKey(seed)
+    envelope = probe_envelope()
+    verification = probe_reverifier().verify(envelope, evaluated_at=T_MID)
+    record = audit_record_for_receipt_verification(
+        verification, envelope, tenant_id="tenant-1")
+
+    hexed = seed.hex()
+    for rendering in (
+        "%r" % (key,), "%s" % (key,),
+        "%r" % (probe_signer(),),
+        "%r" % (ReceiptIssuer(signer=probe_signer()),),
+        canonical_bytes(envelope).decode("utf-8"),
+        canonical_bytes(record).decode("utf-8"),
+        canonical_bytes(probe_authority_anchor()).decode("utf-8"),
+        json.dumps(dataclasses.asdict(envelope), default=str),
+        "%r" % (verification,),
+    ):
+        assert hexed not in rendering
+
+    assert not hasattr(envelope, "seed")
+    assert not hasattr(verification, "seed")
+    assert not hasattr(probe_authority_anchor(), "seed")
+    assert probe_authority_anchor().public_key != hexed
+    try:
+        probe_signer().sign_receipt(b"not a signing input")
+    except Exception as exc:
+        assert hexed not in str(exc)
+        assert hexed not in repr(exc)
+
+
+@probe
+def probe_the_envelope_authorizes_nothing():
+    envelope = probe_envelope()
+    verification = probe_reverifier().verify(envelope, evaluated_at=T_MID)
+    assert verification.verified
+
+    for obj in (envelope, verification, envelope.payload):
+        for forbidden in ("authorize", "authorizes_deployment", "allow", "permit",
+                          "approve", "grant", "deploy", "execute",
+                          "policy_sufficient", "is_authorized"):
+            assert not hasattr(obj, forbidden), (type(obj).__name__, forbidden)
+
+    assert EvidenceTrustStage.POLICY_SUFFICIENT not in (
+        verification.established_trust_stages)
+    assert EvidenceTrustStage.POLICY_SUFFICIENT not in (
+        envelope.payload.declared_cleared_stages)
+    assert envelope.payload.structural_status is (
+        EvidenceStructuralStatus.STRUCTURAL_UNVERIFIED)
+    assert envelope.payload.authenticity_verified is False
+
+
+@probe
+def probe_audit_records_are_deterministic_and_carry_no_payload():
+    determination = probe_determination()
+    envelope = ReceiptIssuer(signer=probe_signer()).issue(determination)
+    a = audit_record_for_determination(determination, tenant_id="tenant-1",
+                                       envelope=envelope)
+    b = audit_record_for_determination(determination, tenant_id="tenant-1",
+                                       envelope=envelope)
+    assert canonical_bytes(a) == canonical_bytes(b)
+    assert canonical_digest(a) == canonical_digest(b)
+
+    body = json.loads(canonical_bytes(a))["body"]
+    for key in body:
+        assert "payload" not in key or key.endswith("_digest"), key
+    assert "scope" not in body
+    assert "evidence" not in body
+
+    refused = probe_determination(
+        request=build_request(expected_tenant_id="another-tenant"))
+    record = audit_record_for_determination(refused, tenant_id="tenant-1")
+    assert record.outcome == "REFUSED"
+    assert R.TRUSTED_EVIDENCE_TENANT_MISMATCH in record.refusal_reasons
+    assert record.receipt_payload_digest == ""
+
+    expect_refusal(lambda: audit_record_for_determination(
+        refused, tenant_id="tenant-1", envelope=envelope))
+
+
+@probe
+def probe_receipt_ids_are_deterministic_and_re_verification_mints_a_new_one():
+    first = probe_determination()
+    again = probe_determination()
+    assert first.receipt_payload.receipt_id == again.receipt_payload.receipt_id
+
+    later = probe_determination(verified_at=T_VERIFIED + timedelta(seconds=1))
+    assert later.receipt_payload.receipt_id != first.receipt_payload.receipt_id
+    assert first.receipt_payload.verified_at == T_VERIFIED
+    assert first.receipt_payload.receipt_id.startswith("receipt-")
+    assert len(first.receipt_payload.receipt_id) == len("receipt-") + 64
 
 
 def main() -> int:

@@ -399,11 +399,54 @@ def test_canonical_bytes_refuses_a_non_dataclass():
 
 
 def test_there_is_exactly_one_public_serialization_and_one_digest_function():
-    """No alternate/legacy digest path and no dual-acceptance fallback."""
+    """No alternate/legacy digest path and no dual-acceptance fallback.
+
+    TEV-2 added functions whose names contain "bytes", but none of them is a
+    second serializer:
+
+    * ``signed_evidence_input_bytes`` and ``signed_receipt_input_bytes`` build
+      **signing inputs**, not canonical encodings — and each is built *from*
+      ``canonical_bytes``, so there is still exactly one path from a contract to
+      its canonical form;
+    * ``framed_signed_input`` frames byte strings that are already bytes and
+      never touches a contract.
+
+    The test therefore asserts the stronger property directly: exactly one
+    public function turns a contract into canonical bytes, exactly one turns a
+    contract into a digest, and every signing-input builder provably routes
+    through the first of those rather than re-encoding anything itself.
+    """
+
+    import ast
+    import inspect
 
     from ugence_trusted_evidence_authority import api
+    from ugence_trusted_evidence_authority.authority import envelope as envelope_mod
 
-    serializers = [n for n in api.__all__ if "bytes" in n or "dumps" in n]
-    digesters = [n for n in api.__all__ if "digest" in n.lower() and n.isupper() is False]
-    assert serializers == ["canonical_bytes"]
+    digesters = [n for n in api.__all__ if "digest" in n.lower() and not n.isupper()]
     assert digesters == ["canonical_digest"]
+
+    signing_input_builders = {
+        "signed_evidence_input_bytes",
+        "signed_receipt_input_bytes",
+        "framed_signed_input",
+    }
+    serializers = [n for n in api.__all__ if "bytes" in n or "dumps" in n]
+    assert set(serializers) - signing_input_builders == {"canonical_bytes"}
+
+    # No signing-input builder re-implements encoding: each either calls
+    # canonical_bytes or only frames bytes it was handed.
+    source = inspect.getsource(envelope_mod)
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef):
+            continue
+        if node.name not in ("signed_evidence_input_bytes", "signed_receipt_input_bytes"):
+            continue
+        called = {
+            n.func.id
+            for n in ast.walk(node)
+            if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
+        }
+        assert "canonical_bytes" in called, node.name
+        assert "dumps" not in inspect.getsource(envelope_mod), "no second serializer"
