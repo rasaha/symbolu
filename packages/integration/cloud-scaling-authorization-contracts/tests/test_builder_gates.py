@@ -349,3 +349,89 @@ def test_a_tampered_context_magnitude_is_rejected_before_reconciliation_complete
                 reconcile_phase4(projection, decision)
         finally:
             object.__setattr__(projection.context, "magnitude_after", original)
+
+
+# ======================================================================================
+# Reconciler re-derivation gates — isolated via a projection that skipped its constructor
+# ======================================================================================
+
+
+def _fabricated_projection(projection, **overrides):
+    """An EXACT ``CapacityRiskSubjectProjection`` that never ran ``__post_init__``.
+
+    ``object.__new__`` produces a genuine instance of the exact type, so Phase 5A's
+    exact-type admission accepts it — correctly, because it *is* the type. What it has not
+    done is pass Phase 4C's own constructor checks. That is the whole reason Phase 5A
+    re-derives the chain instead of trusting it.
+    """
+
+    fake = type(projection).__new__(type(projection))
+    for field in type(projection).__dataclass_fields__:
+        object.__setattr__(fake, field, getattr(projection, field))
+    for field, value in overrides.items():
+        object.__setattr__(fake, field, value)
+    return fake
+
+
+#: Only the two digests whose re-derivation gate was **measured** to be individually
+#: load-bearing. ``context_digest`` and ``request_digest`` were measured too and are NOT
+#: listed: each is backed by a sibling gate that fires on the same input with the same typed
+#: reason (``p_context.digest() != p_context_digest`` for the first, the projection-versus-
+#: decision ``request_digest`` comparison for the second), so removing either one alone is
+#: not observable. The property is enforced twice; the individual gate is not isolatable.
+#: Listing them here would count a sibling-gate failure as coverage — the exact defect the
+#: audit raised — so they are documented instead of claimed.
+@pytest.mark.parametrize(
+    "field,reason",
+    [
+        ("subject_digest", "subject_digest_mismatch"),
+        ("recommendation_digest", "recommendation_mismatch"),
+    ],
+)
+def test_a_fabricated_projection_with_a_tampered_digest_is_refused(
+    projection, decision, field, reason
+):
+    """G-10: the reconciler's independent re-derivation, isolated.
+
+    These guards duplicate checks that ``CapacityRiskSubjectProjection.__post_init__``
+    already performs, so a *legitimately constructed* projection can never reach them — which
+    is why an ordinary mutation of them looks survivable. They are not redundant: a
+    projection built through ``object.__new__`` skips that constructor entirely while
+    remaining the exact admitted type, and then **only** Phase 5A's own re-derivation stands
+    between a forged digest chain and a candidate.
+
+    Phase 5A's stated design is to re-derive rather than trust. This is the test that makes
+    that claim mean something.
+    """
+
+    from ugence_cloud_scaling_authorization_contracts import (
+        ReconciliationError,
+        reconcile_phase4,
+    )
+
+    fake = _fabricated_projection(projection, **{field: "sha256:" + "0" * 64})
+    assert type(fake) is type(projection)  # the exact-type gate admits it
+
+    with pytest.raises(ReconciliationError) as exc:
+        reconcile_phase4(fake, decision)
+    assert exc.value.reason.value == reason
+
+
+def test_a_fabricated_projection_yields_no_candidate(
+    projection, decision, attestation, target_scope, policy_binding
+):
+    """And the full production entry point refuses it too — no candidate, no partial."""
+
+    from ugence_cloud_scaling_authorization_contracts import ReconciliationError
+
+    fake = _fabricated_projection(projection, context_digest="sha256:" + "0" * 64)
+    built = None
+    with pytest.raises(ReconciliationError):
+        built = build_capacity_authorization_candidate(
+            projection=fake,
+            decision=decision,
+            producer_attestation=attestation,
+            policy_binding=policy_binding,
+            target_scope=target_scope,
+        )
+    assert built is None
