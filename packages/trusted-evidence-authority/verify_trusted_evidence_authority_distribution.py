@@ -3,12 +3,33 @@
 operate from a built wheel, with **no** cross-package dependency and no monorepo
 source on the path.
 
-Builds ``ugence-trusted-evidence-authority`` into a local find-links directory,
-installs it into a fresh virtualenv with no system site packages and no monorepo
-path (``--no-index`` — the wheel is local and declares zero dependencies), then
-proves inside that env:
+Builds ``ugence-trusted-evidence-authority`` into a temporary local wheelhouse,
+prepares that wheelhouse with the two maintained cryptographic backends the
+package declares — ``cryptography`` and ``PyNaCl`` — and then installs into a
+fresh virtualenv with **no system site packages, no ``PYTHONPATH``, no monorepo
+path and no index** (``--no-index``, ``PIP_NO_INDEX=1``). The preparation step
+is the only one allowed to reach an index, and it is not the step being
+verified: the install that follows resolves every dependency from the local
+wheelhouse or fails. The wheelhouse is temporary and is never committed —
+vendoring third-party wheels into the repository would put unreviewed binaries
+under version control and make this proof circular.
+
+The package is **not** zero-dependency, and an earlier revision of this file
+claimed it was. It declares exactly two runtime dependencies, both maintained
+cryptographic backends, because the handwritten Ed25519 implementation the
+zero-dependency claim was built around was found unsafe by the independent
+TEV-2 closure audit and has been deleted.
+
+Proved inside that env:
 
   * ``ugence_trusted_evidence_authority`` imports from site-packages;
+  * ``PYTHONPATH`` is unset and no monorepo path is on ``sys.path``, so nothing
+    below could be satisfied by source rather than by the installed wheel;
+  * both backends load from **this env's** site-packages, so a host-installed
+    copy cannot silently satisfy them, and their exact versions are reported;
+  * the installed distribution list contains nothing beyond the package, the
+    two backends and their own declared dependencies;
+  * the declared runtime metadata names exactly those two backends;
   * the curated public API resolves and ships ``py.typed``;
   * the installed surface equals the committed ``public_api.json`` exactly —
     every symbol, kind, enum member **and order**, dataclass field **and
@@ -21,7 +42,12 @@ proves inside that env:
     a receipt is signed, and the envelope re-verifies against a resolved trust
     anchor, with pinned signature bytes and pinned digests;
   * the RFC 8032 §7.1 published Ed25519 vectors reproduce exactly, proving the
-    installed signer implements the standard algorithm;
+    installed signer calls the standard algorithm — and, because these vectors
+    were pinned before the backend was replaced, that the replacement moved no
+    byte any verifier depends on;
+  * the strict point-validation corpus is refused at construction, so no
+    identity, small-order or non-canonical key can enter a trust-anchor store
+    from the installed wheel either;
   * the principal TEV-2 refusal classes fire from the installed wheel —
     revoked, expired and not-yet-valid keys, an unconfigured trust anchor, an
     invalid signature, a swapped payload, and a replayed coordinate;
@@ -33,7 +59,8 @@ proves inside that env:
   * the independent ``adversarial_probes.py`` harness passes against the
     installed wheel, importing only the curated API;
   * **no** Ugence package, capability, product, console, platform tool or
-    third-party package is importable.
+    third-party package other than the two declared cryptographic backends and
+    their own dependencies is importable.
 
 Run:  python packages/trusted-evidence-authority/verify_trusted_evidence_authority_distribution.py
 Exit code 0 on success; non-zero on the first failed step.
@@ -41,6 +68,7 @@ Exit code 0 on success; non-zero on the first failed step.
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
@@ -58,12 +86,57 @@ _CHECK = r'''
 import dataclasses, enum, hashlib, importlib.util, json, pathlib, sys
 from datetime import datetime, timedelta, timezone
 
+import importlib.metadata as _md
+import os as _os
+
+# ---------------------------------------------------------------------- #
+# Isolation, proved before anything is imported from the package
+# ---------------------------------------------------------------------- #
+# PYTHONPATH leakage would let the monorepo source satisfy the import and
+# make every assertion below meaningless.
+assert not _os.environ.get("PYTHONPATH", ""), (
+    "PYTHONPATH is set inside the isolated env: " + repr(_os.environ.get("PYTHONPATH"))
+)
+assert not any("/symbolu" in p for p in sys.path), sys.path
+assert not any(p in ("", ".") for p in sys.path[1:]), sys.path
+
 import ugence_trusted_evidence_authority as u
 assert u.__version__ == "0.2.0", u.__version__
 assert "site-packages" in u.__file__, u.__file__
 assert not any("/symbolu" in p for p in sys.path), sys.path
 assert (pathlib.Path(u.__file__).resolve().parent / "py.typed").is_file(), "py.typed not installed"
 assert not hasattr(u, "CONTRACT_VERSION"), "no CONTRACT_VERSION is minted"
+
+# ---------------------------------------------------------------------- #
+# The two cryptographic backends: present, from this env, and named
+# ---------------------------------------------------------------------- #
+# The package is no longer zero-dependency. It declares `cryptography` and
+# `PyNaCl`, both installed here from a prepared local wheelhouse with
+# `--no-index`. Each is asserted to load from *this* env's site-packages, so a
+# host-installed copy satisfying the import would fail rather than pass
+# silently, and each version is printed so the proof names what it verified.
+import cryptography as _cryptography
+import nacl as _nacl
+
+_SITE = str(pathlib.Path(u.__file__).resolve().parent.parent)
+_backend_versions = []
+for _dist, _module in (("cryptography", _cryptography), ("PyNaCl", _nacl)):
+    _where = str(pathlib.Path(_module.__file__).resolve().parent)
+    assert _where.startswith(_SITE), (_dist, _where, _SITE)
+    assert "site-packages" in _where, (_dist, _where)
+    _version = _md.version(_dist)
+    assert _version, _dist
+    _backend_versions.append((_dist, _version))
+
+# Declared metadata must match what is installed: a dependency the metadata
+# does not name is one an isolated install would silently take from the host.
+_requires = [r for r in (_md.requires("ugence-trusted-evidence-authority") or [])
+             if "extra ==" not in r]
+_declared = sorted(r.split(">")[0].split("<")[0].split("=")[0].split("!")[0].split(";")[0].strip()
+                   for r in _requires)
+assert _declared == ["PyNaCl", "cryptography"], _declared
+print("      backends:", ", ".join(f"{n}=={v}" for n, v in _backend_versions))
+print("      declared runtime dependencies:", _requires)
 
 from ugence_trusted_evidence_authority.api import (
     EVIDENCE_IDENTITY_DIGEST_DOMAIN, EVIDENCE_LIFECYCLE_TRANSITIONS,
@@ -83,7 +156,9 @@ from ugence_trusted_evidence_authority.api import (
     DenyAllTrustAnchorDirectory, Ed25519EvidenceAuthenticityProtocol,
     Ed25519ReceiptSigner, EvidenceAdmissionOutcome,
     EvidenceVerificationAuthority, KeyRevocation, ReceiptIssuer,
-    ReceiptVerificationOutcome, SignedEvidenceSubmission,
+    ReceiptScopeExpectation, ReceiptVerificationKind,
+    ReceiptVerificationOutcome, ScopeBoundVerificationResult,
+    SignatureOnlyVerificationResult, SignedEvidenceSubmission,
     SignedEvidenceVerificationReceipt, SignedReceiptVerifier,
     StaticTrustAnchorDirectory, TrustAnchorCapability, TrustAnchorCoordinate,
     TrustAnchorRecord, TrustedEvidenceSigningKey,
@@ -521,20 +596,55 @@ _hand = b"".join([len(_elements).to_bytes(_w, "big")] + [
     piece for e in _elements for piece in (len(e).to_bytes(_w, "big"), e)])
 assert _env.signed_input_bytes() == _hand
 
-# Independent re-verification, and a key rebuilt from the published hex.
-_verified = SignedReceiptVerifier(trust_anchors=_directory()).verify(
-    _env, evaluated_at=_AT, expected_tenant_id=_env.payload.scope.tenant_id)
+# Independent re-verification, in both of its explicit forms, and a key
+# rebuilt from the published hex.
+_expectation = ReceiptScopeExpectation.from_scope(
+    _env.payload.scope,
+    evidence_content_digest=_env.payload.evidence_content_digest,
+    verification_protocol_id=_env.payload.verification_protocol_id,
+    verification_protocol_version=_env.payload.verification_protocol_version)
+_verified = SignedReceiptVerifier(
+    trust_anchors=_directory()).verify_signature(_env, evaluated_at=_AT)
+assert type(_verified) is SignatureOnlyVerificationResult
 assert _verified.outcome is ReceiptVerificationOutcome.VERIFIED
 assert _verified.verified is True and _verified.refusal_reason is None
+assert _verified.verification_kind is ReceiptVerificationKind.SIGNATURE_ONLY
+assert _verified.scope_bound is False
+assert (EvidenceTrustStage.CONTEXT_SYSTEM_BOUND
+        not in _verified.established_trust_stages)
+
+_bound = SignedReceiptVerifier(trust_anchors=_directory()).verify_bound(
+    _env, _expectation, evaluated_at=_AT)
+assert type(_bound) is ScopeBoundVerificationResult
+assert _bound.outcome is ReceiptVerificationOutcome.VERIFIED
+assert _bound.verification_kind is ReceiptVerificationKind.SCOPE_BOUND
+assert _bound.scope_bound is True
+assert EvidenceTrustStage.CONTEXT_SYSTEM_BOUND in _bound.established_trust_stages
+assert _bound.scope_expectation_digest == _expectation.expectation_digest()
+# The two kinds are structurally distinct and never compare equal.
+assert _bound != _verified and _verified != _bound
+# verify_bound refuses anything that is not exactly an expectation, so no
+# caller can reach a "bound" answer without stating what they required.
+for _not_an_expectation in (None, "", " ", False, 0, (), [], {},
+                            _env.payload.scope):
+    refuses(lambda e=_not_an_expectation: SignedReceiptVerifier(
+        trust_anchors=_directory()).verify_bound(_env, e, evaluated_at=_AT),
+        TrustedEvidenceContractError)
+
 assert TrustedEvidenceVerificationKey(
     bytes.fromhex(_anchor().public_key)).verify(
         _env.signed_input_bytes(), _env.signature_bytes())
 
 # The principal refusal classes fire from the installed wheel.
-def _refuses_with(reason, *, anchors=None, at=None, envelope=None, **expected):
-    result = SignedReceiptVerifier(
-        trust_anchors=anchors or _directory()).verify(
-            envelope or _env, evaluated_at=at or _AT, **expected)
+def _refuses_with(reason, *, anchors=None, at=None, envelope=None,
+                  expectation=None):
+    verifier = SignedReceiptVerifier(trust_anchors=anchors or _directory())
+    target = _env if envelope is None else envelope
+    when = _AT if at is None else at
+    if expectation is None:
+        result = verifier.verify_signature(target, evaluated_at=when)
+    else:
+        result = verifier.verify_bound(target, expectation, evaluated_at=when)
     assert result.outcome is ReceiptVerificationOutcome.REFUSED, reason
     assert result.verified is False
     assert result.refusal_reason is reason, (reason, result.refusal_reason)
@@ -555,9 +665,11 @@ _refuses_with(R.TRUSTED_EVIDENCE_SIGNATURE_INVALID, anchors=_directory(
     _producer_anchor, _anchor(public_key=encode_public_key(
         _prod_key.verification_key.public_key_bytes))))
 _refuses_with(R.TRUSTED_EVIDENCE_TENANT_MISMATCH,
-              expected_tenant_id="a-different-tenant")
+              expectation=dataclasses.replace(
+                  _expectation, tenant_id="a-different-tenant"))
 _refuses_with(R.TRUSTED_EVIDENCE_CONTENT_DIGEST_MISMATCH,
-              expected_evidence_content_digest=OTHER)
+              expectation=dataclasses.replace(
+                  _expectation, evidence_content_digest=OTHER))
 
 # A tampered signature, and a swapped payload.
 _flipped = bytearray(_env.signature_bytes()); _flipped[0] ^= 0x01
@@ -647,8 +759,40 @@ for mod in ("ugence_governance_contracts", "ugence_uvi_policy_contracts",
             "agent_value_readiness", "ugence_agent_value_readiness", "risk_authority",
             "governance_providers", "decision_governance", "actiongate_provider",
             "tap_provider", "ugence_tap_provider", "truth_assurance_pipeline",
-            "ai_hiring", "ugence_console_api", "platform_freeze", "pydantic"):
+            "ai_hiring", "ugence_console_api", "platform_freeze", "pydantic",
+            "numpy", "requests", "httpx", "ecdsa", "OpenSSL", "Crypto", "jwt"):
     assert importlib.util.find_spec(mod) is None, ("unrelated package present: " + mod)
+
+# ---- the strict point corpus is refused from the installed wheel too --------
+# Closure-audit F-01/F-03. An identity-point anchor admits a universal forgery,
+# so the refusal has to hold in the artifact that actually ships, not only in
+# the source tree.
+for _hexed in ("01" + "00" * 31,                    # identity, canonical
+               "01" + "00" * 30 + "80",             # identity, non-canonical
+               "ec" + "ff" * 30 + "7f",             # order 2
+               "00" * 32,                           # order 4
+               "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05",
+               "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac03fa",
+               "ed" + "ff" * 30 + "7f",             # y = p
+               "ff" * 32):
+    try:
+        TrustedEvidenceVerificationKey(bytes.fromhex(_hexed))
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("installed wheel accepted an untrustworthy point: " + _hexed)
+    refuses(lambda h=_hexed: _anchor(public_key=h), TrustedEvidenceContractError)
+
+# RFC 8032 §5.1.7 — S at or above the group order is a malleable restatement.
+_L = 2 ** 252 + 27742317777372353535851937790883648493
+_sig = _auth_key.sign(b"malleability")
+_vk = _auth_key.verification_key
+assert _vk.verify(b"malleability", _sig) is True
+assert _vk.verify(b"malleability", _sig[:32] + _L.to_bytes(32, "little")) is False
+assert _vk.verify(
+    b"malleability",
+    _sig[:32] + ((int.from_bytes(_sig[32:], "little") + _L) % 2 ** 256).to_bytes(32, "little"),
+) is False
 
 print("ISOLATED TRUSTED-EVIDENCE-AUTHORITY VERIFICATION OK")
 '''
@@ -702,16 +846,73 @@ def _wheel_members(wheel: Path):
     return names, tops, foreign
 
 
+#: The two maintained cryptographic backends the package declares, with the
+#: ranges pyproject pins. The wheelhouse is prepared from these requirement
+#: strings, so a drift between pyproject and this file is a build failure rather
+#: than an install that quietly resolves something else.
+BACKEND_REQUIREMENTS = ("cryptography>=41.0.7,<47.0.0", "PyNaCl>=1.5.0,<2.0.0")
+
+
+def _declared_backend_requirements() -> list:
+    """Read the declared runtime dependencies out of ``pyproject.toml``."""
+
+    import tomllib
+
+    data = tomllib.loads((PKG / "pyproject.toml").read_text(encoding="utf-8"))
+    return list(data["project"]["dependencies"])
+
+
+def _prepare_wheelhouse(wheelhouse: Path) -> list:
+    """Download the declared backends into a temporary local wheelhouse.
+
+    This is the one step that is *allowed* to reach an index, and it is not the
+    step being verified: it prepares the offline corpus. The verification
+    install that follows is strictly ``--no-index``, so nothing it resolves can
+    come from a network or from the host environment.
+
+    The wheelhouse is temporary and is never committed. Vendoring third-party
+    wheels into the repository would put unreviewed binaries under version
+    control and make the "installs from a wheelhouse" proof circular.
+    """
+
+    declared = _declared_backend_requirements()
+    if sorted(declared) != sorted(BACKEND_REQUIREMENTS):
+        raise SystemExit(
+            "pyproject declares runtime dependencies this verifier does not "
+            f"prepare a wheelhouse for.\n  pyproject: {sorted(declared)}\n"
+            f"  verifier:  {sorted(BACKEND_REQUIREMENTS)}"
+        )
+    print(f"      preparing wheelhouse for: {', '.join(declared)}")
+    result = subprocess.run(
+        [sys.executable, "-m", "pip", "download", "--quiet",
+         "--only-binary=:all:", "-d", str(wheelhouse), *declared],
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        raise SystemExit(
+            "could not prepare the offline wheelhouse. The verification install "
+            "is --no-index by design, so it cannot fall back to an index or to "
+            "the host environment, and this verifier will not pretend the proof "
+            "held.\n"
+            "Prepare the wheelhouse out of band and re-run, or make an index "
+            f"reachable for the preparation step only.\n{result.stderr.strip()}"
+        )
+    prepared = sorted(p.name for p in wheelhouse.glob("*.whl"))
+    print(f"      wheelhouse: {len(prepared)} wheels — {prepared}")
+    return prepared
+
+
 def main() -> int:
     findlinks = PKG / "_dist_wheels"
     _safe_rmtree(findlinks, label="find-links directory")
     _safe_rmtree(PKG / "build", label="build tree")
     findlinks.mkdir()
 
-    print(f"[1/5] build the {DISTRIBUTION} wheel (zero declared dependencies)")
+    print(f"[1/5] build the {DISTRIBUTION} wheel and prepare an offline wheelhouse")
     _run([sys.executable, "-m", "build", "--wheel", str(PKG), "-o", str(findlinks)])
     wheel = _latest(findlinks, f"{NAMESPACE}-*.whl")
     print(f"      built {wheel.name}")
+    _prepare_wheelhouse(findlinks)
 
     print("[2/5] assert the wheel ships exactly one namespace + dist-info + py.typed")
     names, tops, foreign = _wheel_members(wheel)
@@ -727,19 +928,49 @@ def main() -> int:
     assert len(modules) == len(set(modules)), "duplicate module entries in the wheel"
     print(f"      {len(modules)} modules, top-level: {sorted(tops)}")
 
-    print("[3/5] create an isolated venv and install ONLY this local wheel (--no-index)")
+    print("[3/5] install into a fresh venv from the local wheelhouse only (--no-index)")
     with tempfile.TemporaryDirectory() as td:
         env = Path(td) / "venv"
         venv.create(env, with_pip=True, clear=True, system_site_packages=False)
         python = env / "bin" / "python"
+
+        # No system site packages, no PYTHONPATH, no index. Every dependency
+        # must resolve from the prepared wheelhouse or the install fails —
+        # which is what makes "installs standalone" a claim and not a hope.
+        isolated_env = {
+            k: v for k, v in os.environ.items()
+            if k not in ("PYTHONPATH", "PYTHONHOME", "PYTHONSTARTUP")
+        }
+        isolated_env["PIP_NO_INDEX"] = "1"
+        isolated_env["PIP_DISABLE_PIP_VERSION_CHECK"] = "1"
         _run([str(python), "-m", "pip", "install", "--quiet", "--no-index",
-              "--find-links", str(findlinks), DISTRIBUTION])
+              "--find-links", str(findlinks), DISTRIBUTION], env=isolated_env)
+
+        installed = subprocess.run(
+            [str(python), "-m", "pip", "list", "--format=freeze"],
+            capture_output=True, text=True, check=True, env=isolated_env)
+        distributions = sorted(
+            line for line in installed.stdout.split()
+            if not line.lower().startswith(("pip==", "setuptools==", "wheel=="))
+        )
+        print(f"      installed: {distributions}")
+        expected_prefixes = (
+            f"{DISTRIBUTION}==", "cryptography==", "PyNaCl==", "cffi==",
+            "pycparser==",
+        )
+        unexpected = [d for d in distributions
+                      if not d.startswith(expected_prefixes)]
+        assert not unexpected, f"unexpected distributions installed: {unexpected}"
+        for required in (f"{DISTRIBUTION}==", "cryptography==", "PyNaCl=="):
+            assert any(d.startswith(required) for d in distributions), required
 
         print("[4/5] run the isolated proof (cwd has no monorepo source)")
-        _run([str(python), "-c", _CHECK, str(PKG / "public_api.json")], cwd=str(td))
+        _run([str(python), "-c", _CHECK, str(PKG / "public_api.json")],
+             cwd=str(td), env=isolated_env)
 
         print("[5/5] run the independent adversarial probes against the installed wheel")
-        _run([str(python), str(PKG / "adversarial_probes.py")], cwd=str(td))
+        _run([str(python), str(PKG / "adversarial_probes.py")],
+             cwd=str(td), env=isolated_env)
 
     _safe_rmtree(findlinks, label="find-links directory")
     _safe_rmtree(PKG / "build", label="build tree")

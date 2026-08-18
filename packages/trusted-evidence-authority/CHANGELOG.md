@@ -9,6 +9,50 @@ curated TEV-1 symbols remains exported unchanged**, all four TEV-1 pinned
 digests are byte-identical, and the refusal vocabulary was extended by
 appending, so TEV-1's nineteen codes keep their exact ordinal positions.
 
+### Closure-audit corrections (F-01 … F-09; still 0.2.0, unreleased)
+
+Findings from the independent TEV-2 closure audit, corrected before merge. The
+package has never merged or released at this version, so unsafe APIs are
+**removed** rather than preserved behind a compatibility alias.
+
+**The safest correction was architectural: handwritten Ed25519 is gone from
+every production path.** `authority/ed25519.py` — a pure-Python RFC 8032
+implementation — is deleted and replaced by `authority/backend.py`, which calls
+`cryptography` (OpenSSL) for signing, verification and public-key derivation and
+libsodium through `PyNaCl` for strict point validation. There is no fallback,
+no optional import and no vendored copy: if either backend is absent the package
+fails to import.
+
+The justification the earlier revision gave rested on reading ADR §23 as a
+prohibition on third-party cryptographic libraries. **It is not one.** §23 is the
+consumer and dependency matrix and governs the direction of dependencies
+*between Ugence packages*; every entry in it names a Ugence component. Reading
+it as covering maintained third-party primitives was an overread, and the
+similar handwritten code in two other packages was a convention, not a security
+argument.
+
+| Finding | Correction |
+|---|---|
+| **F-01** non-canonical and small-order encodings not refused where RFC 8032 §5.1.3 requires | strict libsodium point validation; the full corpus is a permanent test |
+| **F-02** no differential check against a second implementation | `cryptography` and libsodium are cross-checked over 1,800 valid triples, the RFC vectors, and the whole malformed corpus |
+| **F-03** a worthless public key could become a trust anchor — an identity-point anchor admits a **universal forgery** | `TrustAnchorRecord` validates the point at construction, so such a key can never enter an anchor store |
+| **F-04** signature-only and scope-bound verification returned the same type, so a result could report a scope it never checked | two operations, two never-equal result types; only `ScopeBoundVerificationResult` reports `CONTEXT_SYSTEM_BOUND` |
+| **F-05** `expected_*=None` arguments meant `None`, `""`, `0` and `False` silently skipped their own checks | `verify_bound` requires exactly a `ReceiptScopeExpectation`, every coordinate mandatory and compared unconditionally |
+| **F-06** the malformed corpus was never a standing test | `test_backend_strict_corpus.py` and `test_backend_differential.py`, both in CI |
+| **F-07** documentation asserted authority the implementation did not have | the §23 claim, the zero-dependency claim, the "no seed accessor" claim and the gate count are all corrected here and in the README |
+| **F-08** `TrustedEvidenceSigningKey` exposed its seed as a public dataclass field | not a dataclass, no `__dict__`, no accessor; pickling, copying and attribute assignment all raise; only a backend key object is retained |
+| **F-09** the re-verifier's payload-digest gate was counted as load-bearing without proof | proved load-bearing — it is the only gate that catches an envelope whose `__post_init__` never ran — and the two genuinely unreachable gates are now reported as redundancy, not as gates |
+
+**The pinned vectors did not move.** Every RFC 8032 §7.1 vector and every pinned
+TEV-2 signature, digest and receipt id reproduces byte-for-byte after the
+substitution. Nothing was re-pinned to match the new backend; the vectors are
+what proves the substitution changed nothing a verifier depends on.
+
+**Structural sweeps added.** No condition in the authority layer tests bare
+truthiness, no `or`-default appears anywhere in the package, and no
+`dict.get(key, fallback)` supplies a silent substitute — all AST-enforced, so a
+new gate cannot be written the old way even when every behavioural test passes.
+
 ### The three roles, kept apart (ADR §8 — "no row may absorb another")
 
 * **`EvidenceVerificationAuthority`** — verifies an evidence submission against
@@ -26,9 +70,16 @@ appending, so TEV-1's nineteen codes keep their exact ordinal positions.
   own fields plus a trust-anchor resolver and an explicit instant. Holds no key,
   issues nothing, and never trusts what the envelope asserts about itself.
 
-A `EvidenceVerificationDetermination` and a `ReceiptVerification` **cannot be
-constructed by a caller at all**: each demands a private token the curated API
-does not export. ADR §8.1.5 — "no consumer may manufacture verification" —
+* **`SignedReceiptVerifier`** answers two different questions with two
+  operations: `verify_signature(envelope, evaluated_at=…)` and
+  `verify_bound(envelope, expectation, evaluated_at=…)`. They return
+  `SignatureOnlyVerificationResult` and `ScopeBoundVerificationResult`, which
+  are structurally distinct and never compare equal, and only the bound form
+  establishes `CONTEXT_SYSTEM_BOUND`.
+
+An `EvidenceVerificationDetermination` and either verification result **cannot
+be constructed by a caller at all**: each demands a private token the curated
+API does not export. ADR §8.1.5 — "no consumer may manufacture verification" —
 becomes unrepresentable rather than merely disbelieved.
 
 ### No arbitrary-signing capability
@@ -62,17 +113,17 @@ domain must not verify in another" holds by construction. The receipt frame
 binds the payload twice — by digest and by full canonical bytes — so a swapped
 payload, a swapped digest, or a disagreeing pair are all signature failures.
 
-**Ed25519 is implemented to the RFC in-package rather than imported.** ADR §23
-draws TAP's only permitted dependency arrow at `governance-contracts`; TEV-1
-shipped narrower still at zero runtime dependencies with a merged test enforcing
-it; the isolated `--no-index` install proof depends on that staying true; and
-DD-10 keeps production key custody deferred, "reference-grade first". This is the
-convention `risk_authority/crypto/signing.py` and
-`ugence_policy_authority/core/ed25519.py` already established for the same
-reasons. The module uses the RFC's own extended-coordinate group law (§5.1.4)
-and reproduces all five published §7.1 vectors byte-for-byte, including the
-§5.1.7 malleability check. It is **not** constant-time, and the README and
-module docstring say so.
+**Ed25519 is imported, not implemented.** `cryptography` (OpenSSL) supplies
+signing, verification and public-key derivation; libsodium through `PyNaCl`
+supplies the strict point validation `cryptography` defers to verify time and so
+cannot perform when a trust anchor is constructed. Both are imported from
+`authority/backend.py` and nowhere else, with no optional-import fallback.
+
+All five published RFC 8032 §7.1 vectors reproduce byte-for-byte, including the
+§5.1.7 malleability refusal, and the two backends are differentially cross-
+checked against each other. This package makes no timing claim of its own: side-
+channel resistance is the backends' property, not something asserted on top of
+them. Production key custody stays behind `ReceiptSignerPort` (DD-10).
 
 ### Trust anchors, key lifecycle and revocation
 
@@ -192,14 +243,18 @@ monorepo imports this one**, and a test enforces that.
 
 | Check | Result |
 |---|---|
-| Package suite | **981 passed** (was 649) |
-| Independent adversarial probes | **77 passed** (was 49) — source and inside the wheel |
-| RFC 8032 §7.1 conformance | all **5** published vectors reproduce byte-for-byte |
+| Package suite | **1 158 passed** (TEV-1 baseline 649) |
+| Independent adversarial probes | **83 passed** — source and inside the wheel |
+| RFC 8032 §7.1 conformance | all **5** published vectors reproduce byte-for-byte, under both backends |
+| Strict malformed corpus | every untrustworthy point refused at construction; every malformed signature a fail-closed `False` |
+| Differential agreement (`cryptography` vs libsodium) | **1 800** valid triples, the RFC vectors and the full mutation corpus — zero disagreements |
+| Gate-deletion mutants | **18 run, 16 killed.** The two survivors are structurally unreachable and are reported as redundancy, not as gates |
 | TEV-1 pinned digests | all **4** unchanged |
 | TEV-1 curated symbols | all **29** present, same field and member order |
-| Public API parity (source · manifest · wheel · isolated install) | **PASS** — 83 symbols |
-| Wheel + sdist build, isolated `--no-index` install | **VERIFIED** |
-| Dependency and reverse-dependency guards | **PASS** — still zero runtime dependencies |
+| Public API parity (source · manifest · wheel · isolated install) | **PASS** — 87 symbols |
+| Wheel build, isolated `--no-index` install from a prepared wheelhouse | **VERIFIED** — backends resolved from the wheelhouse, versions reported |
+| Dependency and reverse-dependency guards | **PASS** — exactly two runtime dependencies, imported from one module |
+| Truthiness / `or`-default / silent-`get` AST sweeps | **PASS** |
 | No-clock / nondeterminism AST scans | **PASS** |
 | Platform-freeze substantive digest | **unchanged** |
 
@@ -207,8 +262,11 @@ monorepo imports this one**, and a test enforces that.
 
 `.github/workflows/trusted-evidence-authority-ci.yml` — resolves the Low finding
 carried from the TEV-1 closure audit (F-03). Five jobs covering the package
-suite, the independent probes, the wheel/sdist build with isolated install,
-public-API parity, and the platform-freeze verifier. It publishes nothing, uses
+suite (including the strict corpus, the differential backend suite, the
+re-verification gate proofs and the truthiness sweep), the independent probes,
+the wheel build with isolated wheelhouse installation, public-API parity, and
+the platform-freeze verifier. Both cryptographic backends are installed
+explicitly and their versions printed. It publishes nothing, uses
 no secret and contacts no external trust service; all key material it touches is
 fixed, hard-coded and unmistakably non-production.
 

@@ -38,7 +38,7 @@ every time.
 | **Verification authority** | `EvidenceVerificationAuthority` + `EvidenceVerificationProtocolPort` — typed admitted/refused determinations |
 | **Signed receipt** | `SignedEvidenceVerificationReceipt` — the ADR E-11 artifact, wrapping the TEV-1 payload |
 | **Issuance** | `ReceiptIssuer` + `ReceiptSignerPort` — the only route from an admission to a signature |
-| **Independent re-verification** | `SignedReceiptVerifier` → `ReceiptVerification`, computed never stored |
+| **Independent re-verification** | `SignedReceiptVerifier.verify_signature` → `SignatureOnlyVerificationResult`; `.verify_bound` → `ScopeBoundVerificationResult`. Two questions, two never-equal types, computed never stored |
 | **Deterministic audit** | `EvidenceVerificationAuditRecord` — digests, never payloads |
 
 ## What this package is **not**
@@ -351,54 +351,92 @@ code advertises a check; none is shipped for a check that does not exist.
 
 ## Dependencies
 
-**Zero.** Standard library only — no Ugence package, no third-party package.
-**TEV-2 signs, and this is still true.**
+**Two, both maintained cryptographic backends. No Ugence package, nothing else.**
 
-ADR §23 permits TAP to depend on `governance-contracts`. TEV-1 took the
+| Distribution | Range | Used for |
+|---|---|---|
+| `cryptography` | `>=41.0.7,<47.0.0` | Ed25519 signing, verification, public-key derivation (OpenSSL) |
+| `PyNaCl` | `>=1.5.0,<2.0.0` | strict Ed25519 point validation (`crypto_core_ed25519_is_valid_point`, libsodium) |
+
+Both are imported from exactly one module — `authority/backend.py` — and a test
+AST-scans the package to prove no second module reaches either. Neither import
+is optional: there is no `try`/`except ImportError` fallback, no feature probe
+and no degraded mode. If a backend is absent the package fails to import, which
+is the only safe outcome.
+
+ADR §23 permits TAP to depend on `governance-contracts`. This package takes the
 narrower option because **DD-2** — which contracts land in that leaf — is
 explicitly blocked on "the concrete contract shapes from TEV-1/BR-1", and
-importing it now would decide DD-2 by implementation. TEV-2 keeps that posture.
+importing it now would decide DD-2 by implementation.
 
-### Why Ed25519 is implemented here rather than imported
+### Why cryptography is imported and not implemented
 
-The instruction for TEV-2 was to prefer Ed25519 **through the maintained
-cryptography library** *unless the ADR or repository constraints require
-otherwise*. Three constraints require otherwise, and **the algorithm profile is
-unchanged either way — this is Ed25519, RFC 8032, PureEdDSA over edwards25519
-with SHA-512**:
+An earlier revision of this package implemented Ed25519 to RFC 8032 in pure
+Python and described itself as a zero-dependency stdlib leaf. **That was wrong,
+and it has been removed.**
 
-1. **ADR §23 fixes the dependency matrix.** TAP "may consume
-   `governance-contracts` only"; a third-party runtime dependency is not an
-   arrow the ratified matrix draws. TEV-1 shipped narrower still, with a merged
-   test asserting the distribution declares no dependencies and no module
-   imports anything but the standard library. Adding `cryptography` would break
-   a merged, ratified test.
-2. **The isolated `--no-index` install proof depends on it.** The distribution
-   verifier installs the wheel into a clean virtualenv with `--no-index` and
-   runs the adversarial probes inside it. A compiled third-party dependency
-   cannot resolve there, so the strongest packaging proof this package has would
-   have to be weakened.
-3. **DD-10 keeps production key custody deferred** — "reference-grade first".
+The justification given at the time rested on reading ADR §23 as a prohibition
+on third-party cryptographic libraries. §23 is the **consumer and dependency
+matrix**: it governs the direction of dependencies *between Ugence packages* —
+"TAP may consume `governance-contracts` only; must never import Benchmark
+Registry, Policy Authority, any engine, Risk Authority". Every entry in it names
+a Ugence component. It says nothing about maintained third-party cryptographic
+primitives, and reading it as if it did was an overread. Nor did the presence of
+similar handwritten code in two other packages authorize it here: a convention
+is not a security argument.
 
-This is the convention two merged authorities already established for the same
-reasons: `risk_authority/crypto/signing.py` and
-`ugence_policy_authority/core/ed25519.py` each ship the same pure-Python RFC
-8032 implementation, and Policy Authority's records that it "reproduces this
-convention rather than importing `risk_authority`, which would create a reverse
-dependency on another authority's internals".
+The independent TEV-2 closure audit found concrete vulnerabilities in that
+implementation, and they were not stylistic:
 
-It is a **standard algorithm implemented to its RFC**, using the RFC's own
-extended-coordinate group law (§5.1.4), and all five published §7.1 test vectors
-reproduce byte-for-byte. It is **not** constant-time — Python's integers offer
-no constant-time arithmetic — and a production deployment must verify with a
-vetted library and hold signing keys in an HSM or managed KMS (DD-10). The
-signer is behind a port precisely so that substitution needs no caller change. `AssessedSystemBinding`
-remains Governance Contracts' single definition (§14.1); this package references
-it by opaque reference and digest and never redefines it.
+| Finding | What it was |
+|---|---|
+| **F-01** | non-canonical and small-order encodings were not refused where RFC 8032 §5.1.3 requires ("if x = 0 and x_0 = 1, decoding fails") |
+| **F-03** | a correctly-sized but cryptographically worthless public key could be registered as a trust anchor — and an **identity-point anchor admits a universal forgery**: with A = identity, `[S]B = R + [k]A` holds for `R = [S]B` and any `S` an attacker chooses, so a signature that verifies can be minted with no key at all |
+| **F-06** | the strict malformed corpus was never a permanent test, so a regression would not have been noticed |
 
-Tests enforce both directions: nothing outside the standard library is imported,
-and **no package in the monorepo imports this one** — TEV-1 authorizes no
-consumer integration (UVI-EV-1 is DEFERRED).
+The correction was architectural rather than a patch: delete the implementation
+and call maintained backends. `cryptography` supplies signing and verification;
+`PyNaCl` supplies the strict point check that `cryptography` deliberately defers
+to verify time and therefore cannot perform when a trust anchor is constructed.
+That is *less* trusted code in this repository, not more.
+
+**The pinned signature vectors did not move.** Every RFC 8032 §7.1 vector and
+every pinned TEV-2 signature, digest and receipt id reproduces byte-for-byte
+after the substitution, which is what proves it changed nothing a verifier
+depends on. Nothing was re-pinned to match the new backend.
+
+The two backends are also cross-checked against each other: a differential suite
+runs 1,800 valid (key, message, signature) triples plus the RFC vectors and the
+full malformed corpus through both, and any disagreement — on derivation, on
+signature bytes, on acceptance, or on refusal — is a failure.
+
+Timing is **not** claimed. `cryptography` and libsodium are the implementations
+this package relies on for side-channel resistance, and this package adds no
+constant-time claim of its own on top of theirs. Production key custody stays
+behind `ReceiptSignerPort` (DD-10), so an HSM- or KMS-backed signer drops in
+without touching a caller. `AssessedSystemBinding` remains Governance Contracts'
+single definition (§14.1); this package references it by opaque reference and
+digest and never redefines it.
+
+### The isolated install proof, and how it survives having dependencies
+
+The distribution verifier still installs into a clean virtualenv with
+`--no-index`, `PIP_NO_INDEX=1`, no system site packages and no `PYTHONPATH`.
+What changed is where the dependencies come from: the verifier first prepares a
+**temporary local wheelhouse** containing the two declared backends, and that
+preparation step is the only one permitted to reach an index. The verified
+install resolves everything from the wheelhouse or fails.
+
+No third-party wheel is committed to this repository. The verifier reports the
+exact distributions and versions it installed, and fails if a dependency is
+satisfied from the host, if `PYTHONPATH` leaks in, if monorepo source shadows
+the installed wheel, if the declared metadata is missing, or if the install
+falls back to an index.
+
+Tests enforce both directions: nothing outside the standard library and the two
+declared backends is imported, the backends are imported from exactly one
+module, and **no package in the monorepo imports this one** — TEV-1/TEV-2
+authorize no consumer integration (UVI-EV-1 is DEFERRED).
 
 ### Versioning judgement
 
@@ -511,6 +549,24 @@ of the merged Policy Authority and Risk Authority signers. The token closes the
 **public API** route, which is what it is for. The load-bearing secret is the
 signing key, which lives only behind the port.
 
+#### The signing key holds no seed (closure-audit F-08)
+
+`TrustedEvidenceSigningKey` previously retained the caller's raw seed as a
+public dataclass field, so `key.seed` returned it and `dataclasses.asdict(key)`
+walked to it. It no longer does:
+
+* it is **not a dataclass** and has no `__dict__` — nothing to enumerate;
+* it retains only the backend private-key object, never the seed bytes;
+* there is no `seed`, `private_bytes`, `export`, `raw` or equivalent accessor;
+* `__setattr__`, `__delattr__`, `__reduce__`, `__copy__` and `__deepcopy__` all
+  raise, so it cannot be mutated, pickled, copied or deep-copied;
+* `repr` and `str` are both exactly `TrustedEvidenceSigningKey(<redacted>)`.
+
+There is also no `generate()`: key generation needs entropy, `os`, `secrets` and
+`random` are banned package-wide so every output is a pure function of its
+inputs, and credential issuance is outside the TEV-2 boundary. A seed enters
+through the constructor from the composition root and nowhere else.
+
 ### The signature profile (DD-9)
 
 One strict v1 profile. Not selectable, not negotiable, no `none`, no alias, no
@@ -604,21 +660,33 @@ evidence. §17.1's historical resolution is a Benchmark Registry concept and is
 BR-2's. Offering a plausible-looking answer would resolve a question the ADR
 retains elsewhere, so the API offers none.
 
-### Verified means verified — and nothing more
+### Verified means verified — and exactly which question was asked
 
-`ReceiptVerification.verified` is a read-only property derived from a closed
-two-member outcome, and the only code path that produces `VERIFIED` is the one
-that reaches an actual signature check returning true. It is never stored and
-never caller-settable; a `ReceiptVerification` cannot be constructed by a caller
-at all.
+`verified` is a read-only property derived from a closed two-member outcome, and
+the only code paths that produce `VERIFIED` are the ones that reach an actual
+signature check returning true. It is never stored and never caller-settable;
+neither result type can be constructed by a caller at all.
 
-`True` means: an anchor resolved at the exact coordinate, was entitled to issue
-receipts, was in its validity window, was not disabled, was not revoked at the
-evaluation instant, and its public key verified the reconstructed frame; and the
-payload digest, the caller's expected coordinates and the receipt's own validity
-all agreed.
+**Which question was asked is part of the answer.** This was closure-audit
+finding **F-04**: the previous single `verify()` took optional `expected_*`
+arguments, and a caller who passed none received the same `verified is True`
+object as a caller who passed all of them. The difference lived only in prose.
 
-It does **not** mean the evidence is true, that a claim is valuable, that
+| Operation | Result type | `True` means |
+|---|---|---|
+| `verify_signature(envelope, evaluated_at=…)` | `SignatureOnlyVerificationResult` | an anchor resolved at the exact coordinate, was entitled to issue receipts, was in its validity window, was not disabled, was not revoked at the evaluation instant, its public key verified the reconstructed frame, the payload digest recomputed correctly, and the receipt was within its own validity. **Nothing about your tenant, context, subject or system.** |
+| `verify_bound(envelope, expectation, evaluated_at=…)` | `ScopeBoundVerificationResult` | all of the above, **and** every one of nine required coordinates matched an expectation you stated explicitly |
+
+Only the bound form reports `CONTEXT_SYSTEM_BOUND`, the two types never compare
+equal, and a signature-only result carries no scope field to misread. The
+expectation is mandatory and positional and must be exactly a
+`ReceiptScopeExpectation`: `None`, `""`, `0`, `False`, an empty collection, a
+mapping, a duck-typed object and a subclass are all refused, because each of
+those used to be accepted as "no expectation stated" and silently skip the
+coordinate checks (**F-05**). Every coordinate of an expectation is required at
+construction and compared unconditionally — there is nothing optional to omit.
+
+Neither answer means the evidence is true, that a claim is valuable, that
 attribution holds, or that anything is authorized (§13.2, E-12). Stage 6 is
 never established, by anything, ever (§12).
 
@@ -641,6 +709,8 @@ resolved here.
 | Decision | Taken | Authority |
 |---|---|---|
 | Signature algorithm profile | Ed25519, RFC 8032 PureEdDSA/SHA-512, single strict v1 | DD-9 ("algorithm identifiers"), §22.8 |
+| Cryptographic provider | `cryptography` (OpenSSL) for sign/verify/derive; `PyNaCl` (libsodium) for strict point validation. Nothing implemented in-package | not delegated by the ADR — a security decision, corrected after the closure audit |
+| Re-verification question shape | two explicit operations and two never-equal result types, not one call with optional arguments | §13.3 "independent verification"; §12 stage 4 is a separate stage, so it needs a separate answer |
 | Signed-byte construction | length-prefixed frame, domain tag as element 0 | §13.3 domain separation; §22.1 |
 | Signature encoding | bare lowercase base16, one spelling | DD-9 ("encodings") |
 | Signer-authority identity | `signer_authority_id`, bound into the frame | §9 row 14 |
@@ -662,17 +732,27 @@ resolved here.
 ## Build and verify
 
 ```bash
+pip install "cryptography>=41.0.7,<47.0.0" "PyNaCl>=1.5.0,<2.0.0" pytest build
+
 python -m build packages/trusted-evidence-authority
 python packages/trusted-evidence-authority/verify_trusted_evidence_authority_distribution.py
 python -m pytest packages/trusted-evidence-authority -q
-python packages/trusted-evidence-authority/adversarial_probes.py
+PYTHONPATH=packages/trusted-evidence-authority/src \
+  python packages/trusted-evidence-authority/adversarial_probes.py
 ```
 
 The distribution verifier builds the wheel, asserts it ships exactly one
 top-level namespace plus dist-info and `py.typed` (no tests, probes, fixtures,
-build tree, foreign package or duplicate module), installs it into a fresh
-`--no-index` virtualenv with no monorepo path, and re-runs the surface-parity
-check and the independent adversarial probes against that installed runtime.
+build tree, foreign package or duplicate module), prepares a **temporary local
+wheelhouse** holding the two declared backends, and installs from that
+wheelhouse into a fresh virtualenv with `--no-index`, `PIP_NO_INDEX=1`, no
+system site packages and no `PYTHONPATH`. It reports the exact distributions and
+versions installed, and fails if a dependency is satisfied from the host, if
+`PYTHONPATH` leaks in, if monorepo source shadows the installed wheel, if the
+declared metadata is missing, or if the install falls back to an index. It then
+re-runs the surface-parity check, the strict point corpus and the independent
+adversarial probes against that installed runtime. No third-party wheel is
+committed to this repository.
 
 `adversarial_probes.py` imports **only** the curated public API — no test
 module, helper, fixture or conftest — and recomputes every expected digest with
