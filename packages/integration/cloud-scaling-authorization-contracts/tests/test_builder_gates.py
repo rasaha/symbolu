@@ -42,18 +42,34 @@ The accurate sequence:
 Surviving mutations, classified — a guard may be listed here **only** if its removal
 creates no new constructible invalid candidate:
 
-* **Sibling-backed.** ``context_digest`` and ``request_digest`` re-derivation — each is
-  backed by another gate that fires on the same input with the same typed reason, so
-  removing one alone is unobservable. Also the ``action_type`` D-4 check and the
-  ``SubjectRiskDisposition`` type check. ``action_type`` reads from the **context**, and
+* **Sibling-backed.** ``context_digest`` re-derivation — ``validation.context_digest`` and
+  ``p_context.digest()`` are each compared against ``p_context_digest``, so the two back one
+  another and removing either alone is unobservable. Also the ``action_type`` D-4 check and
+  the ``SubjectRiskDisposition`` type check. ``action_type`` reads from the **context**, and
   ``context.action_type`` participates in ``context_digest``, so a fabricated context
   carrying a different action cannot keep its digest and the context-digest re-derivation
   fires first. That is precisely why ``subject_type`` / ``requested_purpose`` /
   ``requested_domain`` *are* genuine and covered above: they live on the **request**, whose
   digest a fabricator can recompute consistently.
-* **Unreachable defence in depth.** ``_require_int`` / ``_require_datetime`` on projected
-  magnitudes and timestamps. Those values sit inside the context digest, so tampering trips
-  the digest re-derivation first. They guard a route no public entry point can take.
+
+  **Correction.** ``request_digest`` re-derivation was also listed as sibling-backed here.
+  **The closure audit refuted that, and the refutation is confirmed.** The named sibling —
+  ``p_request_digest != d_request_digest`` — compares the projection's copy to the
+  decision's, and a fabricator controls both, so making them agree defeats it. The genuine
+  check is ``p_request.digest() != p_request_digest``, which recomputes the digest from the
+  carried request object; it is an independent re-derivation, not a sibling, and it is
+  closed by ``test_reconciliation_integrity`` (M-1).
+* **Unreachable defence in depth.** ``_require_int`` on the projected magnitudes. Those
+  values *do* sit inside the context digest, so tampering trips the digest re-derivation
+  first; the guard covers a route no public entry point can take.
+
+  **Correction.** An earlier revision of this list also placed ``_require_datetime`` here,
+  on the same "inside the context digest" reasoning. **That was wrong, and measured to be
+  wrong.** ``valid_from``, ``valid_until`` and ``asserted_at`` do *not* participate in the
+  context digest: an ordinarily constructed projection accepts a naive value for any of
+  them and its ``context_digest`` is unchanged. The timezone-awareness guard is therefore
+  reachable through ordinary construction, was a genuine uncovered lapse rather than
+  unreachable depth, and is closed by ``test_reconciliation_integrity`` (L-1).
 * **Non-security validation.** Message-shaping and formatting guards whose removal changes
   only the text of a refusal, never whether one occurs.
 
