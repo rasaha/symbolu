@@ -60,21 +60,37 @@ __all__ = [
 
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
-#: Semantic Versioning 2.0.0, anchored, in its published form.
+#: Semantic Versioning 2.0.0 core plus pre-release, **without build metadata**,
+#: anchored, in its published form.
 #:
 #: ADR §15 row 3 names the coordinate a **semantic version**, so an exact
-#: ``MAJOR.MINOR.PATCH`` (with optional pre-release and build metadata) is what
-#: the coordinate admits. Requiring the full grammar is what makes a *range*
+#: ``MAJOR.MINOR.PATCH`` with an optional pre-release is what the coordinate
+#: admits. Requiring the full core grammar is what makes a *range*
 #: structurally unrepresentable: ``^1.2``, ``1.x``, ``>=2.0``, ``1.2.3 - 1.4.0``
 #: and ``1.2 || 1.3`` all fail to parse, so B-8's "a floating reference must be
 #: *unrepresentable*" holds in the type rather than in prose. Leading zeroes in
 #: numeric identifiers are rejected by the published grammar itself, so ``1.02.0``
 #: and ``1.2.0`` cannot both name one version.
+#:
+#: **Build metadata (``+...``) is refused, not merely ignored.** SemVer 2.0.0
+#: item 10 rules that build metadata "MUST be ignored when determining version
+#: precedence" — so ``1.2.3``, ``1.2.3+a`` and ``1.2.3+build.7`` are three
+#: distinct coordinate strings naming *precedence-equivalent* versions. Nothing
+#: in the governing ADR (docs/architecture/
+#: ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md §15 row 3) authorizes
+#: build metadata as meaningful benchmark identity, and B-10 makes registration
+#: append-only at "the same exact coordinate", where "any other reuse of an
+#: occupied slot is a typed conflict". If build metadata could vary the
+#: coordinate string while identity semantics considered the versions
+#: interchangeable, precedence-equivalent versions could occupy separate
+#: append-only slots — precisely the kind of two-spellings-of-one-thing gap
+#: B-8's "unrepresentable, not merely discouraged" rule exists to close. So
+#: the coordinate a caller supplies must already be free of build metadata;
+#: this package does not admit it and never strips it silently.
 _SEMVER_RE = re.compile(
     r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)"
     r"(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)"
-    r"(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?"
-    r"(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$"
+    r"(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?$"
 )
 
 #: Tokens that name a *moving* target rather than an exact one.
@@ -225,7 +241,8 @@ def require_exact_coordinate_token(value: object, name: str) -> str:
 
 
 def require_exact_semantic_version(value: object, name: str) -> str:
-    """Require an exact Semantic Versioning 2.0.0 string (ADR §15 row 3).
+    """Require an exact Semantic Versioning 2.0.0 core-plus-prerelease string
+    (ADR §15 row 3), **without build metadata**.
 
     Runs :func:`require_exact_coordinate_token` first, so a floating token gets
     the floating-token message rather than a grammar complaint, then requires the
@@ -233,15 +250,22 @@ def require_exact_semantic_version(value: object, name: str) -> str:
     (``1.2.x``), a comparator (``>=1.2.3``) and a leading-zero spelling
     (``1.02.0``) are all refused — each of them either names more than one
     version or gives one version two spellings, and B-8 admits neither.
+
+    **Build metadata (``1.2.3+build``) is refused too.** SemVer 2.0.0 rules
+    that build metadata is ignored for precedence, so ``1.2.3`` and
+    ``1.2.3+build`` would be two coordinate spellings of one precedence-
+    equivalent version — exactly the "two spellings, one thing" gap B-8
+    exists to close, and the ADR authorizes no exception for it.
     """
 
     text = require_exact_coordinate_token(value, name)
     if not _SEMVER_RE.match(text):
         raise _fail(
-            f"{name} must be an exact Semantic Versioning 2.0.0 string "
-            f"(got {text!r}); ADR §15 row 3 names the coordinate a semantic "
-            "version, and a partial version, range or comparator names more "
-            "than one version",
+            f"{name} must be an exact Semantic Versioning 2.0.0 string with "
+            f"no build metadata (got {text!r}); ADR §15 row 3 names the "
+            "coordinate a semantic version, and a partial version, range, "
+            "comparator or build-metadata suffix either names more than one "
+            "version or gives one version two spellings",
             BenchmarkRefusalReason.BENCHMARK_COORDINATE_NOT_EXACT,
         )
     return text

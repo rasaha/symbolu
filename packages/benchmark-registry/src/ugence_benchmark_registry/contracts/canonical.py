@@ -108,8 +108,32 @@ Every canonical byte sequence is framed as::
 
 so the same body under two contract types can never produce the same bytes. The
 ``type`` element is what keeps the nested coordinate contracts distinct inside
-the one domain, and it is also why an unregistered type — a subclass, a
-lookalike, a foreign dataclass — cannot borrow a registered type's bytes.
+the one domain.
+
+Only the exact registered BR-1 contract classes are canonicalizable
+---------------------------------------------------------------------
+Framing alone is not the security boundary — a `type` string is only trustworthy
+once the object producing it is known to be genuine. **Membership in the
+contract-type registry is decided by class *identity* (``type(contract) is
+SomeExactClass``), never by ``__name__`` or ``__module__``.** A subclass, a
+same-named foreign dataclass defined anywhere else, a same-named class whose
+``__module__`` was forged to match this package, and an arbitrary dataclass or
+duck type are all refused outright — none of them reaches the encoder, and none
+of them produces bytes or a digest, "borrowed" or otherwise. The registry
+mapping contract classes to their domain is populated exactly once, by
+:mod:`.identity` at import time, and is then sealed: it is a closed,
+:class:`~types.MappingProxyType` set, and no caller — including code inside this
+package — can register a new type into it afterwards.
+
+Before producing bytes, :func:`canonical_bytes` also **revalidates the complete
+exact contract graph**: every dataclass node reachable from the root re-runs its
+own ``__post_init__`` invariants. This is what catches a frozen instance
+corrupted after construction via ``object.__setattr__`` — a swapped nested
+object of the wrong exact type, an invalid semantic version, an inexact
+coordinate token, a malformed applicability or supersession value, a duplicate
+reference — anything whose state could not have come from the public
+constructors is refused here, before a single byte is produced. A revalidation
+failure never repairs the object; it refuses it.
 
 The content digest is not this digest
 -------------------------------------
@@ -138,9 +162,10 @@ import unicodedata
 from dataclasses import fields, is_dataclass
 from datetime import datetime, timezone
 from enum import Enum
+from types import MappingProxyType
 from typing import Any
 
-from .errors import BenchmarkCanonicalizationError
+from .errors import BenchmarkCanonicalizationError, BenchmarkContractError
 
 __all__ = [
     "BENCHMARK_REGISTRY_CANONICALIZATION_VERSION",
@@ -167,39 +192,63 @@ BENCHMARK_DEFINITION_IDENTITY_DIGEST_DOMAIN = (
     "ugence.benchmark-registry/benchmark-definition-identity/v1"
 )
 
-#: Contract type name -> domain tag. Every BR-1 contract is enumerated.
+#: Registered contract class -> domain tag, keyed by class **identity**, never
+#: by name or module. This is the single source of truth for "is this object an
+#: exact BR-1 contract, and if so, which domain does it belong to" — the only
+#: question :func:`canonical_bytes` and the graph revalidator ever ask.
 #:
-#: The single source of truth for domain selection, keyed by type name so this
-#: module stays import-cycle-free (the contracts import the encoder, never the
-#: reverse). Enumerated rather than served by a ``.get`` default, so no type can
-#: silently acquire a domain it was never assigned. Domain separation does not
-#: rest on this mapping alone: the frame also binds the contract type name, so
-#: two types can never collide even inside one domain.
-_DOMAIN_BY_TYPE_NAME = {
-    "BenchmarkApplicabilityCoordinate": BENCHMARK_DEFINITION_IDENTITY_DIGEST_DOMAIN,
-    "BenchmarkScope": BENCHMARK_DEFINITION_IDENTITY_DIGEST_DOMAIN,
-    "BenchmarkCoordinate": BENCHMARK_DEFINITION_IDENTITY_DIGEST_DOMAIN,
-    "BenchmarkMeasurementSemantics": BENCHMARK_DEFINITION_IDENTITY_DIGEST_DOMAIN,
-    "BenchmarkEffectivePeriod": BENCHMARK_DEFINITION_IDENTITY_DIGEST_DOMAIN,
-    "BenchmarkSourceRequirements": BENCHMARK_DEFINITION_IDENTITY_DIGEST_DOMAIN,
-    "BenchmarkApprovalReference": BENCHMARK_DEFINITION_IDENTITY_DIGEST_DOMAIN,
-    "BenchmarkSupersessionDeclaration": BENCHMARK_DEFINITION_IDENTITY_DIGEST_DOMAIN,
-    "CanonicalBenchmarkDefinitionIdentity": (
-        BENCHMARK_DEFINITION_IDENTITY_DIGEST_DOMAIN
-    ),
-}
+#: Starts empty and is populated exactly once, by :mod:`.identity` calling
+#: :func:`_register_contract_type` for each of the nine BR-1 contract classes
+#: immediately after defining them, then :func:`_seal_contract_types`.
+#: Keeping registration in :mod:`.identity` rather than importing the classes
+#: here keeps this module import-cycle-free (the contracts import the encoder,
+#: never the reverse) without weakening the check to a name comparison.
+_REGISTERED_CONTRACT_TYPES: dict = {}
 
-#: The domain an unregistered dataclass is framed under.
-#:
-#: Named rather than inlined as a ``.get`` default, so the fallback is visible
-#: where it is chosen and greppable from anywhere. It is safe rather than lax:
-#: ``type`` is itself a framed element, so a subclass, a lookalike or any foreign
-#: dataclass gets bytes that differ from every registered type's and can never be
-#: presented as one. What the fallback must never do is give an unregistered type
-#: a *registered* type's bytes, and it does not.
-UNREGISTERED_TYPE_DIGEST_DOMAIN = BENCHMARK_DEFINITION_IDENTITY_DIGEST_DOMAIN
+#: ``True`` once :func:`_seal_contract_types` has run. Registration
+#: before sealing is the one-time package-initialization path; any attempt to
+#: register after sealing — including from inside this package — is refused,
+#: so the mapping is closed for the lifetime of the process.
+_CONTRACT_TYPES_SEALED = False
 
 _TIMESTAMP_FMT = "%Y-%m-%dT%H:%M:%S.%fZ"
+
+
+def _register_contract_type(cls: type, domain: str) -> None:
+    """Register ``cls`` as an exact, canonicalizable BR-1 contract type.
+
+    Private to this package's own module-initialization path. Refuses to run
+    once :func:`_seal_contract_types` has been called, and refuses
+    anything that is not itself a dataclass, so the registry can never be
+    grown by a caller — including one holding a reference to this "private"
+    function — after package import completes.
+    """
+
+    if _CONTRACT_TYPES_SEALED:
+        raise RuntimeError(
+            "the BR-1 contract-type registry is sealed; no type may be "
+            "registered after package initialization"
+        )
+    if not (isinstance(cls, type) and is_dataclass(cls)):
+        raise TypeError(
+            f"only a dataclass type may be registered as a BR-1 contract "
+            f"type (got {cls!r})"
+        )
+    _REGISTERED_CONTRACT_TYPES[cls] = domain
+
+
+def _seal_contract_types() -> None:
+    """Freeze the contract-type registry into a closed, immutable mapping.
+
+    Called exactly once, by :mod:`.identity` after registering all nine BR-1
+    contract classes. After this call the registry is a
+    :class:`~types.MappingProxyType` and every further
+    :func:`_register_contract_type` call raises.
+    """
+
+    global _CONTRACT_TYPES_SEALED, _REGISTERED_CONTRACT_TYPES
+    _REGISTERED_CONTRACT_TYPES = MappingProxyType(dict(_REGISTERED_CONTRACT_TYPES))
+    _CONTRACT_TYPES_SEALED = True
 
 
 def _require_nfc(value: str, path: str) -> str:
@@ -250,6 +299,15 @@ def _to_canonical_obj(value: Any, path: str) -> Any:
     if isinstance(value, datetime):
         return _format_datetime(value, path)
     if is_dataclass(value) and not isinstance(value, type):
+        if type(value) not in _REGISTERED_CONTRACT_TYPES:
+            raise BenchmarkCanonicalizationError(
+                f"{path}: type {type(value).__name__!r} "
+                f"(module {type(value).__module__!r}) is not a registered "
+                "BR-1 contract type; only the exact classes this package "
+                "defines can be canonicalized, and neither the name nor the "
+                "module of a foreign, subclassed or duck-typed object is "
+                "ever treated as authority"
+            )
         return {
             _require_nfc(f.name, f"{path}.{f.name}"): _to_canonical_obj(
                 getattr(value, f.name), f"{path}.{f.name}"
@@ -264,12 +322,86 @@ def _to_canonical_obj(value: Any, path: str) -> Any:
     )
 
 
+def _require_registered_exact_type(contract: Any, path: str) -> type:
+    """Return ``type(contract)`` iff it is an exact registered BR-1 contract.
+
+    The only check that matters here is class **identity** against the sealed
+    registry — never ``__name__``, never ``__module__``. A subclass fails this
+    (subclassing produces a different class object even when it inherits every
+    method), a foreign dataclass of the same name fails this, and a foreign
+    class whose ``__module__`` was forged to look like this package's still
+    fails this, because none of them *is* the exact object this package
+    registered.
+    """
+
+    if not is_dataclass(contract) or isinstance(contract, type):
+        raise BenchmarkCanonicalizationError(
+            f"{path}: canonical_bytes expects a benchmark contract instance "
+            f"(got {type(contract).__name__})"
+        )
+    cls = type(contract)
+    if cls not in _REGISTERED_CONTRACT_TYPES:
+        raise BenchmarkCanonicalizationError(
+            f"{path}: type {cls.__name__!r} (module {cls.__module__!r}) is "
+            "not a registered BR-1 contract type; only the exact classes "
+            "this package defines can be canonicalized. Subclasses, "
+            "same-named foreign dataclasses (including ones with a forged "
+            "matching module), duck types and arbitrary dataclasses are all "
+            "refused — class-name matching is never used as authority"
+        )
+    return cls
+
+
+def _revalidate_exact_contract_graph(contract: Any, path: str) -> None:
+    """Re-run every reachable node's own structural invariants.
+
+    Defends against a frozen instance corrupted after construction via
+    ``object.__setattr__``: each dataclass node in the graph must
+    independently pass the same ``__post_init__`` checks its public
+    constructor would have enforced — including the exact-type checks it runs
+    on its own nested fields, which is what catches a wrong-typed or
+    same-named-lookalike object substituted at any depth. A node whose state
+    could not have come from the public constructors is refused here, before
+    a single byte is produced; nothing is silently repaired.
+    """
+
+    cls = _require_registered_exact_type(contract, path)
+    try:
+        cls.__post_init__(contract)
+    except BenchmarkContractError as exc:
+        raise BenchmarkCanonicalizationError(
+            f"{path}: {cls.__name__} failed structural revalidation before "
+            f"canonicalization ({exc}); an object whose state could not "
+            "have passed its own public constructor is refused rather than "
+            "canonicalized"
+        ) from exc
+    for f in fields(contract):
+        _revalidate_value(getattr(contract, f.name), f"{path}.{f.name}")
+
+
+def _revalidate_value(value: Any, path: str) -> None:
+    if is_dataclass(value) and not isinstance(value, type):
+        _revalidate_exact_contract_graph(value, path)
+    elif isinstance(value, (list, tuple)):
+        for index, item in enumerate(value):
+            _revalidate_value(item, f"{path}[{index}]")
+
+
 def canonical_bytes(contract: Any) -> bytes:
     """Return the exact UTF-8 bytes :func:`canonical_digest` is computed over.
 
-    ``contract`` must be a frozen dataclass instance from this package. The
-    returned bytes are the framed, domain-separated, version-labelled encoding
-    described in the module docstring.
+    ``contract`` must be an exact instance of one of the nine registered BR-1
+    contract classes — never a subclass, a same-named foreign dataclass, a
+    duck type, or any other dataclass. Membership is decided by class
+    identity against the sealed contract-type registry, never by name. The
+    returned bytes are the framed, domain-separated, version-labelled
+    encoding described in the module docstring.
+
+    Before any byte is produced, the complete contract graph reachable from
+    ``contract`` is revalidated (see :func:`_revalidate_exact_contract_graph`),
+    so an instance corrupted after construction via ``object.__setattr__``
+    into a state its public constructor would have refused is refused here
+    too.
 
     Two contracts that compare equal always produce byte-identical output,
     including when their instants were written with different UTC offsets::
@@ -282,18 +414,10 @@ def canonical_bytes(contract: Any) -> bytes:
     coordinate by coordinate by the package tests.
     """
 
-    if not is_dataclass(contract) or isinstance(contract, type):
-        raise BenchmarkCanonicalizationError(
-            "canonical_bytes expects a benchmark contract instance "
-            f"(got {type(contract).__name__})"
-        )
-    type_name = type(contract).__name__
-    # Membership, then an explicitly named domain — never a ``.get`` default
-    # that would leave the fallback invisible at the call site.
-    if type_name in _DOMAIN_BY_TYPE_NAME:
-        domain = _DOMAIN_BY_TYPE_NAME[type_name]
-    else:
-        domain = UNREGISTERED_TYPE_DIGEST_DOMAIN
+    cls = _require_registered_exact_type(contract, "$")
+    domain = _REGISTERED_CONTRACT_TYPES[cls]
+    _revalidate_exact_contract_graph(contract, "$")
+    type_name = cls.__name__
     framed = {
         "canonicalization": BENCHMARK_REGISTRY_CANONICALIZATION_VERSION,
         "domain": domain,

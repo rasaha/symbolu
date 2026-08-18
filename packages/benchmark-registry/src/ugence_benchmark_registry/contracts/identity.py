@@ -135,7 +135,13 @@ from ._validation import (
     require_optional_aware_datetime,
     require_strictly_before,
 )
-from .canonical import canonical_bytes, canonical_digest
+from .canonical import (
+    BENCHMARK_DEFINITION_IDENTITY_DIGEST_DOMAIN,
+    _register_contract_type,
+    _seal_contract_types,
+    canonical_bytes,
+    canonical_digest,
+)
 from .enums import (
     BenchmarkApplicabilityDeclaration,
     BenchmarkLifecycleState,
@@ -1046,3 +1052,32 @@ BENCHMARK_IDENTITY_COORDINATES: tuple = (
     "lifecycle_state",
     "supersession",
 )
+
+
+# --------------------------------------------------------------------------- #
+# Canonicalization registry (closes the boundary the encoder enforces)
+# --------------------------------------------------------------------------- #
+# Every BR-1 contract class is registered here, by class object, exactly once,
+# then the registry is sealed. This is the *only* place any type is ever added
+# to :mod:`.canonical`'s contract-type registry: no other module in this
+# package calls ``_register_contract_type``, and after ``_seal_contract_type_
+# registry()`` runs — at BR-1 package import time, before any application code
+# can run — no further registration is possible from anywhere, including from
+# inside this package. ``canonical_bytes``/``canonical_digest`` therefore only
+# ever recognize these nine exact classes; a subclass, a same-named foreign
+# dataclass (however its ``__module__`` is set) or an arbitrary dataclass is
+# refused, never silently accepted under a borrowed name.
+for _cls in (
+    BenchmarkApplicabilityCoordinate,
+    BenchmarkScope,
+    BenchmarkCoordinate,
+    BenchmarkMeasurementSemantics,
+    BenchmarkEffectivePeriod,
+    BenchmarkSourceRequirements,
+    BenchmarkApprovalReference,
+    BenchmarkSupersessionDeclaration,
+    CanonicalBenchmarkDefinitionIdentity,
+):
+    _register_contract_type(_cls, BENCHMARK_DEFINITION_IDENTITY_DIGEST_DOMAIN)
+del _cls
+_seal_contract_types()
