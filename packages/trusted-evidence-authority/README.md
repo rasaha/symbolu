@@ -32,9 +32,16 @@ cryptography, no key management or revocation, and no authenticity decision.
 There is no placeholder verifier, no permissive stub, and no field reserved for a
 later milestone. All of that is **TEV-2** (ADR §30).
 
-In particular **it issues no receipt.** It defines the receipt *payload shape*,
-which §30 and §32 assign to TEV-1 — but that payload is unsigned, carries no
-signature field, and is explicitly not a receipt (§13.3).
+In particular **it issues no signed, authority-issued receipt.** It *does*
+export `EvidenceVerificationReceiptPayload`, the structural receipt-payload
+shape §30 and the §32 ledger assign to TEV-1. That payload is a **declarative
+contract, not proof of verification**: it is caller-constructible, it may carry
+a caller-declared outcome, refusal reasons, stage declarations,
+verifier/key/protocol identifiers and verification coordinates, and **none of
+those declarations establishes authenticity**. It carries no signature field and
+is explicitly not a receipt (§13.3). Signing, signed envelopes, cryptographic
+verification, trust-anchor resolution, key validation, key revocation, receipt
+issuance and receipt re-verification remain **TEV-2**.
 
 It is explicitly **not**:
 
@@ -80,9 +87,11 @@ verification, which is TEV-2.
 Per ADR §10, none of the following is proof of verification, and the package
 holds to that structurally: a `verified=True` flag (there is no such parameter);
 a lifecycle label; an authority **name**; a caller-supplied confidence score
-(there is no such field); an unsigned verification object (there is no such
-type). **Possession, parsing, canonicalization and digest equality prove
-nothing** (§8.1.3).
+(there is no such field); and **an unsigned verification object** — which is
+precisely what a caller-built `EvidenceVerificationReceiptPayload` is, which is
+why it always reports `STRUCTURAL_UNVERIFIED` no matter what it declares.
+**Possession, parsing, canonicalization and digest equality prove nothing**
+(§8.1.3).
 
 ### The six stages are never collapsed
 

@@ -5,12 +5,18 @@
 # (E-1, E-2, §6.2) and implementing milestone TEV-1 of §30: canonical evidence
 # identity and coordinates, one deterministic canonicalization/digest path, the
 # §12 six-stage trust vocabulary, the §28 lifecycle relation, the §11 typed
-# refusal vocabulary, and the input contract a future TEV-2 verifier accepts.
+# refusal vocabulary, the input contract a future TEV-2 verifier accepts, and
+# the structural EvidenceVerificationReceiptPayload — the §13 receipt shape §30
+# and the §32 ledger assign to TEV-1 ("shape = TEV-1, service = TEV-2").
 #
 # Internal platform infrastructure — NOT a customer-facing module, NOT a
 # product, and NOT a fourth UVI engine (B-2). It mints NO authority: no
-# verifier, no trust anchor, no key management, no signature, no receipt, no
-# admission decision. Those are TEV-2. It is explicitly NOT ugence-tap-provider
+# verifier, no trust anchor, no key management, no signature, no signed or
+# authority-issued receipt, no admission decision. The receipt payload it does
+# export is caller-constructible and permanently STRUCTURAL_UNVERIFIED; signing,
+# signed envelopes, cryptographic verification, trust-anchor resolution, key
+# validation, key revocation, receipt issuance and receipt re-verification are
+# TEV-2. It is explicitly NOT ugence-tap-provider
 # (§6.1), NOT risk_authority.integrations.tap (RA-scoped, preserved by E-13),
 # NOT the truth_assurance_pipeline research corpus, and NOT the Policy
 # Authority, Benchmark Registry, Decision Authority, ActionGate, Readiness or

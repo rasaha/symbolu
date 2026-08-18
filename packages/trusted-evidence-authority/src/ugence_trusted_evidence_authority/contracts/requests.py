@@ -7,15 +7,27 @@ carries **no verdict, no status, no verifier identity, no key identifier, no
 protocol version and no signature** — every one of which is something only the
 act of verification can produce.
 
-There is deliberately no result type in this package
-----------------------------------------------------
-A caller-constructible ``EvidenceVerificationResult`` or receipt would be
-exactly the artifact ADR §10 enumerates as a non-proof: "an unsigned or
-untrusted verification object — including a structurally valid receipt whose
-signature, key, or trust anchor did not verify". §13.3 puts it beyond doubt: "a
-receipt that is unsigned ... is **not** a receipt. There is no 'trusted but
-unsigned' state." TEV-1 cannot sign, so TEV-1 ships no receipt. The receipt
-shape lands with the signing that makes it meaningful (E-11, TEV-2).
+The request is an input; the receipt payload is the matching output shape
+------------------------------------------------------------------------
+TEV-1 also exports :class:`~.receipts.EvidenceVerificationReceiptPayload`, the
+structural payload shape ADR §30 and the §32 ledger assign to this milestone
+("*shape = TEV-1, service = TEV-2*"). This request and that payload are the two
+halves of the same seam: a caller states what TAP should check against, and the
+payload states what a verifier declares it found.
+
+**Neither is a verification result.** The payload is caller-constructible, it
+carries only *declared* coordinates — outcome, refusal reasons, stage
+declarations, verifier/key/protocol identifiers, verification instant — and it
+always reports ``STRUCTURAL_UNVERIFIED`` with ``authenticity_verified`` False.
+ADR §10 enumerates "an unsigned or untrusted verification object" among the
+non-proofs, and §13.3 rules that "a receipt that is unsigned ... is **not** a
+receipt", which is exactly why the type is named ``…ReceiptPayload`` and never
+``…Receipt``. Signing, signed envelopes, cryptographic verification,
+trust-anchor resolution, key validation, key revocation, receipt issuance and
+receipt re-verification all remain **TEV-2**.
+
+This request contract itself carries no declared verification coordinates at
+all: the verdict-shaped fields live on the payload, not here.
 
 What the request *can* answer, and what it cannot
 -------------------------------------------------
@@ -30,8 +42,9 @@ meaningful.
 
 Accordingly the method returns **only refusals**. There is no success value: an
 empty tuple means "no structural mismatch was detected among the coordinates
-compared", and the method's own contract says so. No caller can obtain a
-positive verification object from this package, because none exists.
+compared", and the method's own contract says so. Nothing a caller can build
+from this package — including a receipt payload declaring every stage cleared —
+establishes authenticity.
 """
 
 from __future__ import annotations

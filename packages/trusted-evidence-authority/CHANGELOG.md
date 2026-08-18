@@ -226,14 +226,22 @@ authorize/approve/sign/verify/revoke/resolve/register surface.
 
 Trust-anchor resolution, signature creation or verification, key management /
 rotation / revocation, evidence authenticity decisions, a verifier service or
-adapter, and **signed evidence-verification receipts** — all **TEV-2**. The
-receipt *shape* is deferred with the signing that makes it meaningful: E-11 makes
-the receipt signed and §13.3 rules that "a receipt that is unsigned … is **not**
-a receipt. There is no 'trusted but unsigned' state", so a caller-constructible
-receipt type would be precisely the artifact §10.5 forbids consumers from
-trusting. ADR §9 rows 6 and 14–16 (verification instant, verifier authority and
-key identifier, protocol/version, verification status) are omitted for the same
-reason.
+adapter, **signing**, **signed envelopes**, **receipt issuance** and **receipt
+re-verification** — all **TEV-2**.
+
+> **Superseded before merge.** This section originally stated that the receipt
+> *shape* and ADR §9 rows 6 and 14–16 were deferred to TEV-2. **That rationale
+> was withdrawn by the A-01 correction above and does not describe the shipped
+> package.** The corrected boundary is: **TEV-1 exports
+> `EvidenceVerificationReceiptPayload`**, which carries ADR §9 rows 6 and 14–16.
+> It is a structural, declarative payload contract — **not** an authority-issued
+> receipt and **not** proof of verification. It may carry a caller-declared
+> outcome, refusal reasons, stage declarations, verifier/key/protocol
+> identifiers and verification coordinates; **none of those declarations
+> establishes authenticity**. It always reports `STRUCTURAL_UNVERIFIED` and
+> `authenticity_verified` remains `False`. What stays with TEV-2 is signing,
+> signed envelopes, cryptographic verification, trust-anchor resolution, key
+> validation, key revocation, receipt issuance and receipt re-verification.
 
 Also absent: Benchmark Registry contracts or resolution (**BR-1/BR-2**), Policy
 Authority integration, RA-5 replacement or generalization, Readiness integration

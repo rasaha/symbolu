@@ -69,11 +69,32 @@ Domain separation and versioning
 --------------------------------
 ADR §22.1 requires every digest to bind a canonicalization version and a
 domain-separation tag, and **DD-9 explicitly leaves the exact byte constants to
-TEV-1/TEV-2**. This module resolves them for the *evidence-identity* domain
-only. The receipt domain and the benchmark domain are deliberately **not**
-minted here: their artifacts do not exist yet (TEV-2, BR-1), and a tag without
-an artifact is an unused constant that a later milestone would have to either
-honour or break.
+TEV-1/TEV-2**. This module resolves them for **two** domains, because TEV-1
+ships two artifact classes:
+
+* :data:`EVIDENCE_IDENTITY_DIGEST_DOMAIN` — the evidence-identity family:
+  :class:`~.identity.CanonicalEvidenceIdentity`, its nested coordinates, and the
+  verification *request* that names one.
+* :data:`EVIDENCE_VERIFICATION_RECEIPT_PAYLOAD_DIGEST_DOMAIN` — the structural
+  :class:`~.receipts.EvidenceVerificationReceiptPayload`, which TEV-1 defines
+  (ADR §30 and the §32 ledger: "*shape = TEV-1, service = TEV-2*").
+
+**TEV-1 mints the receipt-payload domain deliberately.** ADR §13.3 requires the
+canonical payload, its canonicalization version and its domain tag to be
+"unambiguous, versioned, and **fixed before signing exists**", and DD-9 leaves
+those byte constants to this milestone. Fixing the tag now is therefore the
+precondition for TEV-2's signer, not a pre-emption of it.
+
+Minting the domain grants nothing. The payload it separates is
+**caller-constructible** and permanently ``STRUCTURAL_UNVERIFIED``; defining its
+domain supplies **no** signing, **no** signed envelope, **no** authenticity
+decision, **no** trust-anchor resolution, **no** key validation, **no**
+revocation checking, and **no** authority-issued receipt. All of those are
+TEV-2. A domain tag separates byte spaces; it confers no trust.
+
+The **benchmark** domain remains unminted: no benchmark artifact exists, and its
+tag belongs to its own ratified milestone (BR-1/BR-2). A tag without an artifact
+is an unused constant a later milestone would have to either honour or break.
 
 Every canonical byte sequence is framed as::
 
@@ -126,13 +147,18 @@ EVIDENCE_IDENTITY_DIGEST_DOMAIN = (
 
 #: The domain-separation tag bound into every receipt-payload digest.
 #:
-#: A receipt is a **different artifact class** from the evidence it attests
-#: (ADR §13.1.8 — it "remains distinct from the underlying evidence"), so it gets
-#: its own domain. ADR §26.6 requires that a digest or signature valid in one
-#: domain must not be reusable in another, and §13.3 requires the domain tag to
-#: be "unambiguous, versioned, and **fixed before signing exists**" — which is
-#: precisely why it is minted at TEV-1, under DD-9, rather than waiting for the
+#: A receipt payload is a **different artifact class** from the evidence it
+#: describes (ADR §13.1.8 — it "remains distinct from the underlying evidence"),
+#: so it gets its own domain. ADR §26.6 requires that a digest or signature valid
+#: in one domain must not be reusable in another, and §13.3 requires the domain
+#: tag to be "unambiguous, versioned, and **fixed before signing exists**" —
+#: which is precisely why TEV-1 mints it, under DD-9, rather than waiting for the
 #: TEV-2 signer that will bind it.
+#:
+#: The tag separates byte spaces and nothing more. The payload it separates stays
+#: caller-constructible and permanently ``STRUCTURAL_UNVERIFIED``; signing,
+#: signed envelopes, authenticity decisions, trust-anchor resolution, key
+#: validation, revocation checking and authority-issued receipts are all TEV-2.
 EVIDENCE_VERIFICATION_RECEIPT_PAYLOAD_DIGEST_DOMAIN = (
     "ugence.trusted-evidence-authority/evidence-verification-receipt-payload/v1"
 )
@@ -144,6 +170,10 @@ EVIDENCE_VERIFICATION_RECEIPT_PAYLOAD_DIGEST_DOMAIN = (
 #: reverse). Domain separation does not rest on this mapping alone: the frame
 #: also binds the contract type name, so two types can never collide even inside
 #: one domain.
+#:
+#: TEV-1 ships exactly one entry — the structural receipt payload. Everything
+#: else falls back to the evidence-identity domain. Membership here assigns a
+#: byte space; it grants no trust to any type it names.
 _DOMAIN_BY_TYPE_NAME = {
     "EvidenceVerificationReceiptPayload": (
         EVIDENCE_VERIFICATION_RECEIPT_PAYLOAD_DIGEST_DOMAIN

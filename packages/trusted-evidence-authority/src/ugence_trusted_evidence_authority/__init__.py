@@ -33,14 +33,16 @@ service and no authenticity decision. It contains no placeholder verifier, no
 permissive stub, and no field reserved for a later milestone. TEV-2 owns all of
 that (ADR §30).
 
-In particular **it issues no receipt.** The payload it defines is unsigned, and
-ADR §13.3 rules that "a receipt that is unsigned … is **not** a receipt. There
-is no 'trusted but unsigned' state." The payload carries **no signature field**,
-not even an optional or placeholder one: TEV-1 fixes the canonical content, its
-canonicalization version and its domain tag — which §13.3 requires be settled
-"before signing exists" — and TEV-2 adds the signature, the envelope, the key
-trust and the revocation check. Every verification coordinate on a payload is a
-**declaration written by its caller**, never an established fact.
+In particular **it issues no signed, authority-issued receipt.** It *does*
+export the structural **receipt payload** shape, but that payload is unsigned,
+and ADR §13.3 rules that "a receipt that is unsigned … is **not** a receipt.
+There is no 'trusted but unsigned' state." The payload carries **no signature
+field**, not even an optional or placeholder one: TEV-1 fixes the canonical
+content, its canonicalization version and its domain tag — which §13.3 requires
+be settled "before signing exists" — and TEV-2 adds the signature, the signed
+envelope, key validation, key revocation, receipt issuance and receipt
+re-verification. Every verification coordinate on a payload is a **declaration
+written by its caller**, never an established fact.
 
 It is explicitly **not** ``ugence-tap-provider`` (the assertion-support scorer,
 ADR §6.1 — "assertion-support scoring and evidence verification are different

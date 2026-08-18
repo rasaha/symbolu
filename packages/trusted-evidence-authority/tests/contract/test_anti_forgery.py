@@ -10,8 +10,14 @@ duck-typed lookalike; and copying a valid contract across scopes.
 
 The structural reason all of them fail is the same: **no verified state exists in
 this package to reach.** ``EvidenceStructuralStatus`` has one member, and it is
-``STRUCTURAL_UNVERIFIED``. There is no receipt type, no result type, and no
-member of the refusal vocabulary that means success.
+``STRUCTURAL_UNVERIFIED``; no member of the refusal vocabulary means success; and
+no verifier, trust anchor, key or signature exists to produce one.
+
+TEV-1 *does* export a structural receipt payload, and that changes nothing here:
+a payload declaring every reportable stage cleared under an authority-looking
+verifier still reports ``STRUCTURAL_UNVERIFIED`` with ``authenticity_verified``
+False. Its own forgery routes are exercised in
+``tests/contract/test_receipt_payload.py``.
 """
 
 from __future__ import annotations
