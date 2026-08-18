@@ -26,9 +26,6 @@ import sys
 from datetime import datetime, timedelta, timezone
 
 from ugence_trusted_evidence_authority.api import (  # noqa: F401
-    ED25519_PUBLIC_KEY_SIZE,
-    ED25519_SEED_SIZE,
-    ED25519_SIGNATURE_SIZE,
     EVIDENCE_LIFECYCLE_TRANSITIONS,
     EVIDENCE_IDENTITY_DIGEST_DOMAIN,
     EVIDENCE_VERIFICATION_RECEIPT_PAYLOAD_DIGEST_DOMAIN,
@@ -38,8 +35,6 @@ from ugence_trusted_evidence_authority.api import (  # noqa: F401
     SIGNED_INPUT_LENGTH_PREFIX_BYTES,
     SIGNED_RECEIPT_ENVELOPE_DIGEST_DOMAIN,
     SIGNED_RECEIPT_ENVELOPE_SCHEMA_V1,
-    TEV1_TRUSTED_EVIDENCE_REFUSAL_REASONS,
-    TEV2_TRUSTED_EVIDENCE_REFUSAL_REASONS,
     TRUST_ANCHOR_RECORD_DIGEST_DOMAIN,
     TRUSTED_EVIDENCE_CANONICALIZATION_VERSION,
     TRUSTED_EVIDENCE_PROTOCOL_V1_ID,
@@ -72,7 +67,6 @@ from ugence_trusted_evidence_authority.api import (  # noqa: F401
     Ed25519EvidenceAuthenticityProtocol,
     Ed25519ReceiptSigner,
     EvidenceAdmissionOutcome,
-    EvidenceVerificationAuditRecord,
     EvidenceVerificationAuthority,
     EvidenceVerificationDetermination,
     KeyRevocation,
@@ -96,7 +90,6 @@ from ugence_trusted_evidence_authority.api import (  # noqa: F401
     canonical_bytes,
     canonical_digest,
     decode_public_key,
-    decode_signature,
     derive_receipt_id,
     encode_public_key,
     encode_signature,

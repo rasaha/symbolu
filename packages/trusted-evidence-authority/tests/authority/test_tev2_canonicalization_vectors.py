@@ -18,7 +18,6 @@ from __future__ import annotations
 import hashlib
 import json
 
-import pytest
 from _authority_builders import (
     VERIFIER_AUTHORITY_ID,
     VERIFIER_KEY_ID,

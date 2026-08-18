@@ -131,6 +131,13 @@ def test_the_signature_reproduces_the_rfc_vector_byte_for_byte(
 def test_the_rfc_signature_verifies_under_the_rfc_public_key(
     seed_hex, public_hex, message_hex, signature_hex
 ):
+    """Verification is checked against the RFC's *own* signature bytes.
+
+    Note this path never touches ``seed_hex``: it proves the verifier accepts a
+    signature it did not produce, which is the property a third party relies on.
+    """
+
+    del seed_hex  # deliberately unused: verification needs no private material
     verifier = TrustedEvidenceVerificationKey(bytes.fromhex(public_hex))
     assert verifier.verify(bytes.fromhex(message_hex), bytes.fromhex(signature_hex))
 
@@ -161,10 +168,8 @@ def test_the_sizes_are_the_rfc_sizes():
 def test_a_signature_with_s_at_or_above_the_group_order_is_refused():
     """RFC 8032 §5.1.7 malleability check — a naive implementation omits this."""
 
-    seed_hex, public_hex, message_hex, signature_hex = (
-        "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
+    public_hex, signature_hex = (
         "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
-        "",
         "e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e06522490155"
         "5fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b",
     )

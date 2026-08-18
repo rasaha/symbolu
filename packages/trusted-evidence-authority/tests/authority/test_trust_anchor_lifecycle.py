@@ -14,8 +14,6 @@ import pytest
 from _authority_builders import (
     KEY_FROM,
     KEY_TO,
-    PRODUCER_AUTHORITY_ID,
-    PRODUCER_KEY_ID,
     TRUST_ANCHOR_SET_ID,
     TRUST_ANCHOR_SET_VERSION,
     VERIFIER_AUTHORITY_ID,

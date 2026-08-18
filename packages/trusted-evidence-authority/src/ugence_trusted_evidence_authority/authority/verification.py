@@ -72,7 +72,6 @@ from ..contracts.reasons import TrustedEvidenceRefusalReason
 from ..contracts.receipts import EvidenceVerificationReceiptPayload
 from ..contracts.requests import EvidenceVerificationRequest
 from .envelope import SignedEvidenceSubmission, signed_evidence_input_bytes
-from .profile import TRUSTED_EVIDENCE_SIGNATURE_PROFILE_V1
 from .trust import (
     TrustAnchorCapability,
     TrustAnchorCoordinate,

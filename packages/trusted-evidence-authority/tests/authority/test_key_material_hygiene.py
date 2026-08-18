@@ -26,7 +26,6 @@ from _authority_builders import (
     NON_PRODUCTION_PRODUCER_SEED,
     NON_PRODUCTION_RFC8032_TEST1_SEED,
     authority_anchor,
-    authority_signing_key,
     determination,
     envelope,
     issuer,

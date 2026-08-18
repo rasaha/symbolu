@@ -34,10 +34,8 @@ from datetime import datetime, timedelta, timezone
 
 from _builders import (  # noqa: F401 - re-exported for TEV-2 tests
     AS_OF,
-    CONTENT_DIGEST,
     identity,
     request,
-    schema,
 )
 from ugence_trusted_evidence_authority.api import (
     SIGNED_EVIDENCE_SUBMISSION_SCHEMA_V1,

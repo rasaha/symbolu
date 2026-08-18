@@ -35,11 +35,7 @@ from _builders import (
 )
 from _authority_builders import (
     PRODUCER_AUTHORITY_ID,
-    PRODUCER_KEY_ID,
-    TRUST_ANCHOR_SET_ID,
-    TRUST_ANCHOR_SET_VERSION,
     VERIFIER_KEY_ID,
-    authority_anchor,
     producer_anchor,
 )
 from ugence_trusted_evidence_authority.api import (
