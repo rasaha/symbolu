@@ -91,7 +91,13 @@ jobs:
           # required by the platform-freeze verifier: it snapshots `decision_governance`,
           # which imports `ugence_decision_authority`, which is built on pydantic. Without
           # it the verifier fails on an import, not on a freeze violation.
-          pip install pytest numpy build pydantic
+          # `cryptography` + `PyNaCl` are TEV's declared runtime dependencies. This job
+          # runs the TEV suite (the F-1 coverage gap), and TEV deliberately has no
+          # pure-Python cryptographic fallback, so without them the TEV steps below fail at
+          # import rather than on a boundary violation. Bounds mirror TEV's own pyproject
+          # and its dedicated workflow.
+          pip install pytest numpy build pydantic \
+                      "cryptography>=41.0.7,<47.0.0" "PyNaCl>=1.5.0,<2.0.0"
           pip install -e packages/risk_authority
           pip install -e packages/capabilities/cloud-scaling-controller
           pip install -e packages/integration/cloud-scaling-risk-integration
