@@ -118,25 +118,78 @@ ceiling moves the candidate digest.
 This is **content binding, not trust**. It says the evidence you read is the evidence that
 was bound. It says nothing about whether that evidence is genuine, which remains Phase 5B's.
 
-## Gate coverage and mutation residue
+## Gate coverage — measured
 
-Every security-relevant gate — one whose removal would let a new invalid candidate be
-constructed — is covered by a test that exercises **that gate**, not a sibling. This was
-established in stages, and the history is kept rather than smoothed over:
+The canonical guard inventory is deterministic and reproducible from the source alone:
+**87** raw `raise` sites -> **85** loose guards -> **81** strict guards -> **49 canonical
+in-scope guards** across `reconciliation.py` and `candidate.py`, in source order. Guard 11
+is `p_tenant != d_tenant` and guard 13 is `p_subject_digest != d_subject_digest`; both
+anchors are asserted by the suite so a line shift cannot silently renumber the inventory.
 
-1. an exhaustive guard sweep closed six untested gaps in the builder, plus the
-   schema-version, candidate exact-type and reconciler re-derivation gates;
-2. an **independent closure audit then found two further lapses** the sweep had not
-   reached — the projection-versus-decision **tenant** and **subject-digest** gates in
-   `reconcile_phase4`. Removing either let a candidate be built across the mismatch under a
-   byte-identical candidate digest, because the candidate takes both facts from the
-   *projection*. Both are now closed by focused tests.
+Every one of the 49 is mutated — its `if` header rewritten to `if False:` — in a disposable
+copy, and the full suite is re-run against it. A run is scored only if it collected the
+whole suite; a run that failed to collect is recorded as invalid, never as a kill.
 
-Mutations that still survive are classified, and qualify only because their removal creates
-no new constructible invalid candidate: **sibling-backed** (the same property enforced twice,
-so neither removal is observable), **unreachable defence in depth** (guarding a route no
-public entry point can take, because the value is already inside a digest that is
-re-derived), and **non-security validation** (removal changes only a message).
+| | at `dd1c8724` | at this head |
+|---|---|---|
+| directly mutation-killed | 28 | **33** |
+| survived | 21 | **16** |
+| survivors admitting an invalid candidate | 5 | **0** |
+
+**This section previously claimed that "every security-relevant gate is covered by a test
+that exercises that gate". That claim was false**, and it is replaced rather than softened.
+At `dd1c8724` twenty-one guards survived mutation, and five of them — not the four the
+closure audit named — admitted an invalid candidate once removed. The earlier sweep that
+reported only **19 of 49** guards was incomplete and is disclosed here rather than dropped.
+
+Survivors are classified only after a **direct public-builder attack submitted with that
+guard alone neutralised**. Reasoning is not accepted in place of the attack:
+
+| classification | count | meaning |
+|---|---|---|
+| intentionally sibling-backed | 13 | another guard rejects the same input; proven by the attack still being refused |
+| unreachable defence in depth | 2 | the value is validated upstream and a later gate forces agreement |
+| non-security validation | 1 | removal changes only whether the refusal is typed, never whether one occurs |
+| **unresolved survivors** | **0** | |
+
+Three survivors (guards 2, 18 and 20) fail closed with an untyped `AttributeError` rather
+than a typed rejection. No candidate is constructed in any of them; this is disclosed as a
+robustness observation, not as coverage.
+
+### The five gates closed here
+
+Each was independently re-attacked through the public builder **before** anything was
+written, and each refused: the shipped package admitted no invalid candidate. What was real
+is that no test exercised them, so deleting one would have created a genuine admission in
+silence. Each is now closed by a test that carries its own admission proof (with the gate
+removed, the attack is admitted) and its own misattribution proof (with the sibling removed
+instead, the attack is still refused).
+
+| | canonical guard | property |
+|---|---|---|
+| H-1 | 26 | the decision snapshot's tenant must be the reconciled Phase 4 tenant |
+| H-2 | 27 | the decision snapshot's domain must be the D-4 ratified constant |
+| M-1 | 9 | the carried `request_digest` must equal the request's own re-derived digest |
+| L-1 | 3 | every authoritative validity timestamp must be timezone-aware |
+| N-1 | 32 | the projection's evidence references must be the request's |
+
+**No duplicate gate was added.** All five already reconcile against an independent source of
+truth. A second gate beside any of them would make the pair mutually sibling-backed and
+permanently unkillable by mutation — it would destroy the coverage property, not add to it.
+
+**N-1 was found here, not by the audit.** Attacking all 21 survivors surfaced a fifth guard
+of the same family, and it is the most reachable: no forced construction is needed, because
+`evidence_references` is a projection field that ordinary construction lets a caller set to
+anything while every carried digest stays valid.
+
+**Timestamps are not digest-protected.** An earlier revision classified the timezone
+requirement as unreachable depth "because the values sit inside the context digest". They do
+not: `valid_from`, `valid_until` and `asserted_at` are outside it. A naive timestamp matters
+because the shared canonicalizer *attaches* UTC to a naive `datetime` — so without guard 3 a
+naive local-time fact is silently reinterpreted as a different instant and bound into a
+candidate digest that then validates perfectly. Phase 5A rejects it instead: it never
+attaches UTC, never converts from ambient local time and never normalizes a malformed
+timestamp into a valid one.
 
 ## Canonicalization
 
