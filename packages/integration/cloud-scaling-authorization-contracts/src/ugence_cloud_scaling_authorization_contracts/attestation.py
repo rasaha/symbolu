@@ -30,7 +30,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Final, Mapping
+from typing import Any, ClassVar, Final, Mapping
 
 from .canonical import (
     canonical_digest,
@@ -88,13 +88,20 @@ class ProducerAttestationEvidence:
     producer_key_id: str
     signature_algorithm: str
     signature: str
-    #: The producer's own label for the recommendation. Phase 4C's digest chain carries
-    #: no recommendation id — ``SubjectContext`` has no field for one — so there is no
-    #: Phase 4 value to cross-check this against, and Phase 5A does not pretend to. It is
-    #: bound here, inside the signing payload, so that the id is covered by the producer's
-    #: signature and an id substitution becomes detectable by the Phase 5B verifier. The
-    #: authoritative recommendation binding remains ``recommendation_digest``, which Phase
-    #: 5A does cross-check against the projection.
+    #: The producer's own label for the recommendation.
+    #:
+    #: **Accurate statement of the binding.** The recommendation ID *is* transitively
+    #: bound by the Phase 4C canonical digest chain — changing it changes
+    #: ``recommendation_digest`` and therefore ``request_digest``. What it is *not* is
+    #: directly recoverable from the resulting digest, and it is not exposed as an
+    #: independently cross-checkable field on the projection or the decision. So Phase
+    #: 5A cannot compare a supplied ID against a Phase 4 field, and does not claim to.
+    #:
+    #: It is bound here, inside the signing payload, so the ID is covered by the
+    #: producer's signature and an ID substitution becomes detectable by the Phase 5B
+    #: verifier. A caller who substitutes the ID *and* re-derives the chain produces a
+    #: different ``recommendation_digest``, which Phase 5A does cross-check; a caller who
+    #: substitutes only the ID and keeps a stale digest fails that same check.
     recommendation_id: str
     recommendation_digest: str
     signing_purpose: str
@@ -191,7 +198,12 @@ class ProducerAttestationEvidence:
     def digest(self) -> str:
         return canonical_digest(self.to_canonical_dict())
 
-    _ALLOWED_KEYS: Final[frozenset[str]] = frozenset(
+    #: ``ClassVar``, not ``Final``: ``Final`` alone does not make a name a class
+    #: variable, so a bare ``Final`` annotation inside a dataclass body becomes a
+    #: real **field** — reachable as a constructor keyword, present in
+    #: ``dataclasses.fields()`` and part of ``__eq__``. A caller could then hand in
+    #: its own key set. ``ClassVar`` is what actually excludes it from the fields.
+    _ALLOWED_KEYS: ClassVar[frozenset[str]] = frozenset(
         {
             "schema_version",
             "producer_id",

@@ -102,6 +102,22 @@ the wrong cloud account is exactly the substitution this field exists to prevent
 
 ---
 
+## What the candidate digest covers
+
+**Everything the candidate carries.** The payload binds the *complete canonical form* of
+`ExecutionTargetScope`, `PolicyTargetBindingReference` and `ProducerAttestationEvidence` —
+not a derived digest standing in for them, and not a hand-picked subset of their fields.
+
+That distinction is load-bearing. Binding only a digest while still *carrying* the object
+lets the two disagree: the object can be swapped for a rogue one while the stale digest
+continues to validate, and the candidate then carries evidence its digest never covered. A
+candidate can never carry different policy or attestation evidence under the same digest —
+substituting a policy issuer, a policy key, a signature byte, an account or a magnitude
+ceiling moves the candidate digest.
+
+This is **content binding, not trust**. It says the evidence you read is the evidence that
+was bound. It says nothing about whether that evidence is genuine, which remains Phase 5B's.
+
 ## Canonicalization
 
 `risk_authority.crypto.canonical` and its hashing conventions, reached **only** through

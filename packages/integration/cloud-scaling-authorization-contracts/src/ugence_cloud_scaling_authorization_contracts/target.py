@@ -23,7 +23,7 @@ provenance and freshness independently, before any envelope is issued.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Final, Mapping, Optional
+from typing import Any, ClassVar, Final, Mapping, Optional
 
 from .canonical import (
     canonical_digest,
@@ -180,7 +180,12 @@ class ExecutionTargetScope:
     def digest(self) -> str:
         return canonical_digest(self.to_canonical_dict())
 
-    _ALLOWED_KEYS: Final[frozenset[str]] = frozenset(
+    #: ``ClassVar``, not ``Final``: ``Final`` alone does not make a name a class
+    #: variable, so a bare ``Final`` annotation inside a dataclass body becomes a
+    #: real **field** — reachable as a constructor keyword, present in
+    #: ``dataclasses.fields()`` and part of ``__eq__``. A caller could then hand in
+    #: its own key set. ``ClassVar`` is what actually excludes it from the fields.
+    _ALLOWED_KEYS: ClassVar[frozenset[str]] = frozenset(
         {
             "schema_version",
             "tenant_id",
@@ -198,7 +203,7 @@ class ExecutionTargetScope:
             "max_permitted_delta",
         }
     )
-    _REQUIRED_KEYS: Final[frozenset[str]] = frozenset(
+    _REQUIRED_KEYS: ClassVar[frozenset[str]] = frozenset(
         {
             "tenant_id",
             "account_id",
@@ -346,7 +351,12 @@ class PolicyTargetBindingReference:
     def digest(self) -> str:
         return canonical_digest(self.to_canonical_dict())
 
-    _ALLOWED_KEYS: Final[frozenset[str]] = frozenset(
+    #: ``ClassVar``, not ``Final``: ``Final`` alone does not make a name a class
+    #: variable, so a bare ``Final`` annotation inside a dataclass body becomes a
+    #: real **field** — reachable as a constructor keyword, present in
+    #: ``dataclasses.fields()`` and part of ``__eq__``. A caller could then hand in
+    #: its own key set. ``ClassVar`` is what actually excludes it from the fields.
+    _ALLOWED_KEYS: ClassVar[frozenset[str]] = frozenset(
         {
             "schema_version",
             "policy_id",

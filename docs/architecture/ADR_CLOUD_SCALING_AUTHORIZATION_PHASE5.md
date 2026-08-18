@@ -149,14 +149,30 @@ public reconciliation contract was found to be missing**, so no blocker was rais
 
 ### §6.2 The recommendation identifier
 
-Phase 4C's digest chain carries **no recommendation id** — the closed v2 `SubjectContext`
-has no field for one. There is therefore no Phase 4 value for Phase 5A to cross-check a
-supplied id against, and Phase 5A does not pretend otherwise.
+**Corrected by the F-5 audit finding.** An earlier revision of this section claimed Phase
+4C's digest chain "carries no recommendation id". That was **wrong**, and the corrected
+statement is:
 
-The id is instead carried **inside the producer attestation's signing payload**, so it is
-covered by the producer's signature and an id substitution becomes detectable by the Phase
-5B verifier. The authoritative recommendation binding remains `recommendation_digest`,
-which both the projection and the attestation carry and which Phase 5A *does* cross-check.
+> The recommendation ID **is transitively bound** by the Phase 4C canonical digest chain,
+> but it is **not directly recoverable** from the resulting digest and is **not exposed as
+> an independently cross-checkable decision field**.
+
+Changing the recommendation ID changes `recommendation_digest`, and therefore
+`request_digest` and every digest downstream of it. What the closed v2 `SubjectContext`
+lacks is a *field* holding the ID, so Phase 5A has no Phase 4 attribute to compare a
+supplied ID against — which is a different and much narrower statement than "the chain does
+not carry it".
+
+The Phase 5A conclusion is unchanged by the correction:
+
+* candidate construction carries the recommendation ID explicitly;
+* it must reconcile with the projection/recommendation source — a substituted ID paired
+  with a re-derived chain yields a different `recommendation_digest`, and paired with a
+  stale digest fails the same cross-check;
+* producer-attestation evidence binds the ID inside its signed payload;
+* Phase 5A establishes **structural and content consistency only**;
+* **Phase 5B must independently verify the producer signature.** A fully self-consistent
+  but unverified attestation remains non-authoritative here.
 
 ## §7. Deferred decisions
 

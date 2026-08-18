@@ -341,6 +341,62 @@ for f in type(projection).__dataclass_fields__:
     object.__setattr__(fake, f, getattr(projection, f))
 rejects("object.__new__ fabrication", lambda: p5a.reconcile_phase4(fake, decision))
 
+# --- 7b. AUDIT REMEDIATION (F-2/F-4) verified from inside the installed wheel ------------
+import dataclasses as _dc
+
+# F-4: annotated class constants must not be dataclass fields or constructor keywords.
+for cls in (p5a.ProducerAttestationEvidence, p5a.ExecutionTargetScope,
+            p5a.PolicyTargetBindingReference, p5a.CapacityAuthorizationCandidate):
+    leaked = [f.name for f in _dc.fields(cls) if f.name.startswith("_")]
+    if leaked:
+        raise AssertionError(f"{cls.__name__} exposes class constants as fields: {leaked}")
+    import inspect as _insp
+    sig_leak = [k for k in _insp.signature(cls).parameters if k.startswith("_")]
+    if sig_leak:
+        raise AssertionError(f"{cls.__name__} accepts class constants as keywords: {sig_leak}")
+rejects("class constant as a constructor keyword",
+        lambda: make_scope(_ALLOWED_KEYS=frozenset({"anything"})))
+
+# F-2: the candidate digest must cover the COMPLETE carried artifacts.
+_payload = candidate.digest_payload()
+for _key, _obj in (("target_scope", candidate.target_scope),
+                   ("policy_binding", candidate.policy_binding),
+                   ("producer_attestation", candidate.producer_attestation)):
+    if _key not in _payload or _payload[_key] != _obj.to_canonical_dict():
+        raise AssertionError(f"{_key} is not bound in full inside the installed wheel")
+if _payload["producer_attestation"]["signature"] != candidate.producer_attestation.signature:
+    raise AssertionError("producer signature bytes are not digest-bound in the wheel")
+if _payload["policy_binding"]["policy_signature"] != candidate.policy_binding.policy_signature:
+    raise AssertionError("policy signature is not digest-bound in the wheel")
+_unbound = (set(type(candidate).__dataclass_fields__) - set(_payload) - {"candidate_digest"})
+if _unbound:
+    raise AssertionError(f"candidate fields carried but not digest-bound: {sorted(_unbound)}")
+
+# F-2: the rogue-policy-issuer attack must be closed inside the wheel too.
+import copy as _copy
+_rogue = make_policy(scope, policy_issuer="attacker.rogue-authority",
+                     policy_key_id="rogue-key-1")
+_t = _copy.copy(candidate)
+object.__setattr__(_t, "policy_binding", _rogue)
+if _t.digest() == _t.candidate_digest:
+    raise AssertionError("rogue policy issuer rides along under an unchanged digest")
+rejects("rogue policy issuer with a preserved candidate digest", lambda: type(candidate)(
+    **{**{f: getattr(candidate, f) for f in type(candidate).__dataclass_fields__},
+       "policy_binding": _rogue}))
+
+# ...and forged producer signature bytes.
+_forged = make_attestation(projection.recommendation_digest)
+object.__setattr__(_forged, "signature", "de" * 32)
+_t2 = _copy.copy(candidate)
+object.__setattr__(_t2, "producer_attestation", _forged)
+if _t2.digest() == _t2.candidate_digest:
+    raise AssertionError("forged producer signature rides along under an unchanged digest")
+
+# Both trust states remain the single unverified value.
+for _o in (candidate.producer_attestation, candidate.policy_binding, candidate):
+    if _o.trust_state.value != "PRESENT_BUT_NOT_TRUST_VERIFIED":
+        raise AssertionError("trust state drift inside the wheel")
+
 # --- 8. no authority/execution/clock symbol exists in the installed package --------------
 import ast, pkgutil
 

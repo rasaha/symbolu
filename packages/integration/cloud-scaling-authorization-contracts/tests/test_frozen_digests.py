@@ -60,6 +60,15 @@ FROZEN_POLICY_BINDING_DIGEST = (
     "sha256:8961f6b2b78e811d556b7e43af99807eb368e65ca3b0fa7c6109aa952b5b9808"
 )
 FROZEN_CANDIDATE_DIGEST = (
+    "sha256:db72ffffc5bf4ecfe8a5f9fe187efb5e8439355e559fcc34b391cc4c9282a313"
+)
+#: Superseded by the F-2 audit remediation. The pre-remediation candidate digest bound
+#: ``policy_binding``/``producer_attestation`` only through derived scalars while still
+#: *carrying* the objects, so a rogue policy issuer or forged producer signature could ride
+#: along under an unchanged, self-validating digest. The payload now binds both artifacts'
+#: complete canonical forms — two added keys, nothing removed — so the digest moved. Pinned
+#: here so a silent revert to the weaker payload is caught rather than re-baselined.
+SUPERSEDED_PRE_F2_CANDIDATE_DIGEST = (
     "sha256:61718405a6affa83e96184a6c7259666fb266766db0fb09bc7502141625d2ed5"
 )
 
@@ -133,3 +142,36 @@ def test_the_ra_illustrative_fixture_is_not_a_phase5a_digest():
         FROZEN_POLICY_BINDING_DIGEST, FROZEN_CANDIDATE_DIGEST,
     }
     assert RA_ILLUSTRATIVE_FIXTURE not in frozen
+
+
+
+def test_the_pre_f2_candidate_digest_is_not_reachable(frozen_chain):
+    """The weaker pre-remediation payload must never be produced again.
+
+    If a future edit dropped ``policy_binding`` or ``producer_attestation`` back out of the
+    canonical payload, the candidate digest would return to the superseded value. Pinning
+    it as a *negative* anchor makes that revert a test failure rather than a re-baseline.
+    """
+
+    *_, candidate = frozen_chain
+    assert candidate.candidate_digest != SUPERSEDED_PRE_F2_CANDIDATE_DIGEST
+    assert candidate.candidate_digest == FROZEN_CANDIDATE_DIGEST
+
+
+def test_only_the_candidate_digest_moved_in_the_f2_remediation(frozen_chain):
+    """Every upstream Phase 4 / Phase 5 binding digest is unchanged by F-2.
+
+    F-2 changed only what the *candidate* payload covers. A moved upstream digest would
+    mean the remediation had reached into a frozen contract it must not touch.
+    """
+
+    projection, decision, attestation, scope, binding, _ = frozen_chain
+    assert projection.recommendation_digest == FROZEN_RECOMMENDATION_DIGEST
+    assert projection.context_digest == FROZEN_CONTEXT_DIGEST
+    assert projection.subject_digest == FROZEN_SUBJECT_DIGEST
+    assert projection.request_digest == FROZEN_REQUEST_DIGEST
+    assert projection.idempotency_key == FROZEN_IDEMPOTENCY_KEY
+    assert decision.decision_digest == FROZEN_DECISION_DIGEST
+    assert attestation.signing_payload_digest == FROZEN_PRODUCER_SIGNING_PAYLOAD_DIGEST
+    assert scope.digest() == FROZEN_TARGET_SCOPE_DIGEST
+    assert binding.digest() == FROZEN_POLICY_BINDING_DIGEST

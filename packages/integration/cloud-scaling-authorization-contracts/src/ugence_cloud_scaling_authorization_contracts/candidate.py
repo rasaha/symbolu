@@ -133,7 +133,19 @@ def _digest_payload(
         "magnitude_before": magnitude_before,
         "magnitude_after": magnitude_after,
         "requested_delta": requested_delta,
+        # The COMPLETE canonical form of every carried artifact — not a digest standing
+        # in for it, and not a hand-picked subset of its fields. Binding only a digest
+        # while still *carrying* the object lets the two disagree: the object can be
+        # swapped for a rogue one while the stale digest continues to validate, and the
+        # candidate then carries evidence the digest never covered. These three lines are
+        # what make "the candidate cannot carry different evidence under the same digest"
+        # true rather than aspirational.
         "target_scope": target_scope.to_canonical_dict(),
+        "policy_binding": policy_binding.to_canonical_dict(),
+        "producer_attestation": producer_attestation.to_canonical_dict(),
+        # The derived digests and signing identity stay bound as well. They are redundant
+        # given the full forms above, and deliberately so: a reader auditing the payload
+        # sees the identity it expects without having to descend into a nested object.
         "target_scope_digest": target_scope_digest,
         "policy_binding_digest": policy_binding_digest,
         "producer_signing_payload_digest": producer_signing_payload_digest,

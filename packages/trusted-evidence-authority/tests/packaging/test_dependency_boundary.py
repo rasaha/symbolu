@@ -127,6 +127,68 @@ def _repo_root():
     return None
 
 
+#: Callables that perform a dynamic import from a module-name string.
+_DYNAMIC_IMPORT_FUNCS = frozenset({"import_module", "__import__"})
+
+
+def _names_an_import_of_self(name) -> bool:
+    """True when ``name`` is this package or a submodule of it.
+
+    ``ugence_trusted_evidence_authority_extras`` is deliberately NOT a match: only the
+    exact name or a dotted submodule counts.
+    """
+
+    return isinstance(name, str) and (name == SELF or name.startswith(SELF + "."))
+
+
+def _imports_self(tree) -> bool:
+    """AST-detect a real import of TEV-1 anywhere in ``tree``.
+
+    Detects, per ADR §30's reverse-dependency rule:
+
+    * ``import ugence_trusted_evidence_authority`` (and dotted submodules, and ``as``
+      aliases, and multiline parenthesised forms — all of which the AST normalizes);
+    * ``from ugence_trusted_evidence_authority[.sub] import X``;
+    * ``importlib.import_module("ugence_trusted_evidence_authority…")`` and
+      ``__import__("…")`` where the module name is a **string literal argument**.
+
+    It deliberately does NOT match a bare string constant that is not handed to a
+    dynamic-import callable. A consumer that lists this package in a *forbidden-import
+    denylist* — in order to prove it does not import it — is asserting the boundary, not
+    crossing it, and the previous raw-substring scan flagged exactly that as a violation.
+    Comments, docstrings, error messages and test descriptions are likewise not imports;
+    the AST never sees comments at all, and a docstring is an ``Expr`` constant, not a call.
+
+    Known and accepted limitation: a dynamic import whose module name arrives through a
+    variable (``importlib.import_module(some_name)``) is not statically decidable and is
+    not matched. That is a property of static analysis, not a gap introduced here — and
+    the previous substring scan did not detect it correctly either, since it could not
+    distinguish such a call from any other mention of the string.
+    """
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            if any(_names_an_import_of_self(a.name) for a in node.names):
+                return True
+        elif isinstance(node, ast.ImportFrom):
+            # ``level > 0`` is a relative import, which can never name another package.
+            if node.level == 0 and _names_an_import_of_self(node.module):
+                return True
+        elif isinstance(node, ast.Call):
+            func = node.func
+            called = (
+                func.attr if isinstance(func, ast.Attribute)
+                else func.id if isinstance(func, ast.Name)
+                else None
+            )
+            if called not in _DYNAMIC_IMPORT_FUNCS:
+                continue
+            for arg in node.args[:1]:
+                if isinstance(arg, ast.Constant) and _names_an_import_of_self(arg.value):
+                    return True
+    return False
+
+
 def test_no_consumer_imports_this_package():
     repo = _repo_root()
     if repo is None:
@@ -143,9 +205,66 @@ def test_no_consumer_imports_this_package():
             text = path.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
             continue
-        if SELF in text:
+        try:
+            tree = ast.parse(text, filename=str(path))
+        except SyntaxError:
+            continue  # not importable Python for this interpreter; nothing to import
+        if _imports_self(tree):
             importers.append(str(path.relative_to(repo)))
     assert not importers, (
         "TEV-1 authorizes no consumer integration (ADR §30: UVI-EV-1 DEFERRED); "
-        f"unexpected references: {importers}"
+        f"unexpected imports: {importers}"
     )
+
+
+# --- the detector itself is tested, because a boundary test that cannot fail is not a
+# --- boundary test, and one that fires on a denylist entry blocks correct consumers.
+
+_REAL_IMPORTS = (
+    f"import {SELF}",
+    f"import {SELF}.contracts",
+    f"import {SELF} as tev",
+    f"import os, {SELF}",
+    f"from {SELF} import canonical_digest",
+    f"from {SELF}.contracts import EvidenceObservation",
+    f"from {SELF} import (\n    canonical_digest,\n    canonical_bytes,\n)",
+    f"from {SELF} import canonical_digest as cd",
+    f'importlib.import_module("{SELF}")',
+    f'importlib.import_module("{SELF}.contracts")',
+    f'import_module("{SELF}")',
+    f'__import__("{SELF}")',
+)
+
+_NOT_IMPORTS = (
+    # a forbidden-import denylist — asserting the boundary, not crossing it
+    f'FORBIDDEN = ("ugence_policy_authority", "{SELF}")',
+    f'FORBIDDEN = {{\n    "{SELF}",\n}}',
+    # a negative control that asserts the package is NOT importable
+    f'for m in ("symbolu", "{SELF}"):\n'
+    f'    try:\n        importlib.import_module(m)\n'
+    f'    except ImportError:\n        pass\n'
+    f'    else:\n        raise AssertionError(m)',
+    # prose and diagnostics
+    f'"""This package must never import {SELF}."""',
+    f'# {SELF} is deliberately not imported',
+    f'raise AssertionError("do not import {SELF}")',
+    f'def test_does_not_import_{SELF}():\n    pass',
+    f'NAME = "{SELF}"',
+    # a similarly-named but different distribution
+    f"import {SELF}_extras",
+)
+
+
+def test_detector_catches_every_real_import_form():
+    for source in _REAL_IMPORTS:
+        assert _imports_self(ast.parse(source)), f"missed a real import: {source!r}"
+
+
+def test_detector_ignores_denylists_prose_and_negative_controls():
+    for source in _NOT_IMPORTS:
+        assert not _imports_self(ast.parse(source)), f"false positive on: {source!r}"
+
+
+def test_detector_ignores_relative_imports():
+    assert not _imports_self(ast.parse("from . import canonical"))
+    assert not _imports_self(ast.parse("from .contracts import EvidenceObservation"))

@@ -20,6 +20,7 @@ on:
       - "packages/integration/cloud-scaling-risk-integration/**"
       - "packages/capabilities/cloud-scaling-controller/**"
       - "packages/risk_authority/**"
+      - "packages/trusted-evidence-authority/**"
       - "docs/architecture/ADR_CLOUD_SCALING_AUTHORIZATION_PHASE5.md"
       - ".github/workflows/cloud-scaling-authorization-contracts-ci.yml"
   push:
@@ -63,7 +64,11 @@ jobs:
             packages/integration/cloud-scaling-authorization-contracts/tests/test_non_reachability.py \
             packages/integration/cloud-scaling-authorization-contracts/tests/test_import_boundary.py \
             packages/integration/cloud-scaling-authorization-contracts/tests/test_time_authority.py \
-            packages/integration/cloud-scaling-authorization-contracts/tests/test_validated_pair.py -q
+            packages/integration/cloud-scaling-authorization-contracts/tests/test_validated_pair.py \
+            packages/integration/cloud-scaling-authorization-contracts/tests/test_builder_gates.py \
+            packages/integration/cloud-scaling-authorization-contracts/tests/test_digest_completeness.py \
+            packages/integration/cloud-scaling-authorization-contracts/tests/test_class_constants.py \
+            packages/integration/cloud-scaling-authorization-contracts/tests/test_recommendation_identity.py -q
       - name: Frozen-digest regression (the production-shaped chain must be byte-identical)
         run: |
           python -m pytest \
@@ -96,6 +101,16 @@ jobs:
         run: python -m pytest packages/capabilities/cloud-scaling-controller/tests -q
       - name: Phase 4C adapter suite (must remain green + unchanged)
         run: python -m pytest packages/integration/cloud-scaling-risk-integration/tests -q
+      # F-1 coverage gap. The Phase 5A workflow did not run TEV-1, so a Phase 5A change
+      # that turned TEV-1's reverse-dependency test red reached the head with CI green.
+      # TEV-1 is a stdlib-only leaf and its suite is fast; running it on every Phase 5A
+      # change closes the gap. This does NOT modify or weaken TEV-1's own workflow.
+      - name: TEV-1 consumer-boundary regression (F-1 — must remain green)
+        run: |
+          python -m pytest \
+            packages/trusted-evidence-authority/tests/packaging/test_dependency_boundary.py -q
+      - name: TEV-1 complete suite (must remain green + unchanged)
+        run: python -m pytest packages/trusted-evidence-authority -q
       - name: Risk Authority distribution verifier (v2 Phase 4A/4B digests)
         run: python packages/risk_authority/verify_risk_authority_distribution.py
       - name: Platform freeze verifier (substantive digest must not move)
