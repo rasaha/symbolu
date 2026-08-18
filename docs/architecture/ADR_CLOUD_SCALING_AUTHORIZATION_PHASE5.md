@@ -133,6 +133,24 @@ Canonicalization is `risk_authority.crypto.canonical` through public APIs only. 
 introduces no fourth canonicalization scheme and never compares against digests produced by
 the separate Cloud Scaling Operations canonicalizer.
 
+### §6.0 Why the projection↔decision binding gates are load-bearing
+
+A closure audit found that two `reconcile_phase4` gates — the direct
+projection-versus-decision **tenant** comparison and the **subject-digest** comparison —
+were unexercised, and that removing either let a candidate be built across the mismatch.
+
+The reason they matter more than they look is worth recording as design rationale. A
+`CapacityAuthorizationCandidate` takes its `tenant_id` and `subject_digest` from the
+**projection**, never from the decision. So a decision issued for another tenant, or made
+about another workload, leaves *no trace whatsoever* in the resulting candidate — the
+candidate digest is byte-identical to a legitimate one. These two comparisons are therefore
+the only point in the entire chain at which such a disagreement is observable at all. They
+are not redundant with the request-digest check between them: a decision can be replayed or
+mis-routed with a matching request digest and a differing tenant or subject.
+
+Both are now covered by focused tests that isolate each gate, measured to fail only when
+that specific gate is removed.
+
 ### §6.1 Revalidating the decision snapshot without a private symbol
 
 Risk Authority binds `decision_digest == digest(to_canonical_obj(decision_snapshot))`

@@ -16,6 +16,44 @@ constructor with ``object.__setattr__``, and any digest that depends on it is re
 binding checks still pass. That is not an artificial scenario: it is exactly what a
 fabricated or replayed artifact looks like, and the builder's independent re-check is the
 only thing standing behind it.
+
+--------------------------------------------------------------------------------------
+Mutation-residue disclosure — corrected, and deliberately kept in full
+--------------------------------------------------------------------------------------
+
+An earlier revision of this docstring and of the PR body stated that the only package-wide
+mutation residues were the ``_require_int`` / ``_require_datetime`` helpers and the
+``context_digest`` / ``request_digest`` sibling re-derivation. **That disclosure was
+incomplete**, and it is recorded here rather than quietly replaced.
+
+The accurate sequence:
+
+1. The F-3 remediation swept the builder and closed **six** discovered gaps, plus the
+   schema-version, candidate exact-type and reconciler re-derivation gates.
+2. An **independent closure audit then found two further property lapses** that the sweep
+   had not reached — both in ``reconcile_phase4``, both security-relevant:
+   the projection-versus-decision **tenant** gate and the projection-versus-decision
+   **subject-digest** gate. Removing either allowed a candidate to be built across the
+   mismatch, carrying a byte-identical candidate digest.
+3. Those two are closed by ``test_a_decision_issued_for_another_tenant_is_refused`` and
+   ``test_a_decision_made_about_another_subject_is_refused`` below, each measured to fail
+   only for its own gate.
+
+Surviving mutations, classified — a guard may be listed here **only** if its removal
+creates no new constructible invalid candidate:
+
+* **Sibling-backed.** ``context_digest`` and ``request_digest`` re-derivation. Each is
+  backed by another gate that fires on the same input with the same typed reason, so
+  removing one alone is unobservable. The property is enforced twice.
+* **Unreachable defence in depth.** ``_require_int`` / ``_require_datetime`` on projected
+  magnitudes and timestamps. Those values sit inside the context digest, so tampering trips
+  the digest re-derivation first. They guard a route no public entry point can take.
+* **Non-security validation.** Message-shaping and formatting guards whose removal changes
+  only the text of a refusal, never whether one occurs.
+
+The standing rule, which the closure audit's two findings enforce: **no security-relevant
+guard whose removal creates a new constructible invalid candidate may survive without a
+focused test.** Gate kills are credited only to tests that exercise the gate itself.
 """
 
 from __future__ import annotations
@@ -435,3 +473,169 @@ def test_a_fabricated_projection_yields_no_candidate(
             target_scope=target_scope,
         )
     assert built is None
+
+
+# ======================================================================================
+# F-A: the projection-versus-decision binding gates, isolated
+# ======================================================================================
+#
+# The independent closure audit found that neither of these gates was exercised by any
+# test, and that removing either one lets a candidate be built across the mismatch.
+#
+# Nothing caught them because the existing cross-tenant and cross-subject tests build two
+# *different projections* and evaluate each separately. That makes the decision disagree
+# with the projection on `request_digest` too, so the request-digest gate — which sits
+# between these two — fires first and the kill was credited to the wrong check.
+#
+# The isolation technique here is different and much sharper: take the genuine decision
+# for THIS projection and change exactly one field on it. `dataclasses.replace` re-runs
+# `SubjectRiskDecision.__post_init__`, so the result is an internally valid decision — its
+# snapshots still bind, its digests still reconcile, every unrelated fact still matches.
+# Only the single disputed field differs.
+#
+# Both lapses were reproduced before these tests were written. In each case a candidate was
+# constructed across the mismatch **carrying the unchanged frozen candidate digest**, because
+# the candidate takes its tenant and subject from the *projection* — so a decision issued for
+# another tenant or another workload leaves no trace at all downstream. That is what makes
+# these gates security-relevant rather than tidy: they are the only place the disagreement
+# is observable.
+
+
+def _decision_variant(decision, **overrides):
+    """A genuine, internally valid ``SubjectRiskDecision`` differing in one field.
+
+    ``dataclasses.replace`` re-runs ``__post_init__``, so the returned decision has passed
+    Risk Authority's own construction checks — snapshot/digest binding included. This is not
+    a fabricated object: it is exactly the artifact a mis-routed or replayed evaluation would
+    hand to Phase 5A.
+    """
+
+    import dataclasses
+
+    return dataclasses.replace(decision, **overrides)
+
+
+def test_a_decision_issued_for_another_tenant_is_refused(
+    projection, decision, attestation, target_scope, policy_binding
+):
+    """F-A/1: the projection-versus-decision **tenant** gate, isolated.
+
+    The decision is internally valid and agrees with the projection on everything —
+    `request_digest`, `subject_digest`, the decision snapshot, the recommendation, the
+    action, the policy binding, the attestation and the target scope. Its own `tenant_id`
+    names a different tenant, and that is the only disagreement.
+
+    Without this gate a candidate is built for the projection's tenant on the authority of a
+    risk decision issued for somebody else's, and — because the candidate takes its tenant
+    from the projection — the resulting candidate digest is byte-identical to a legitimate
+    one. There is no downstream artifact in which the substitution could later be noticed.
+    """
+
+    from ugence_cloud_scaling_authorization_contracts import (
+        AuthorizationCandidateRejectionReason as Reason,
+    )
+    from ugence_cloud_scaling_authorization_contracts import ReconciliationError
+
+    foreign = _decision_variant(decision, tenant_id="tenant-victim")
+    # Everything that could otherwise absorb the failure is asserted to still agree.
+    assert foreign.tenant_id != projection.tenant_id
+    assert foreign.request_digest == projection.request_digest
+    assert foreign.subject_digest == projection.subject_digest
+    assert foreign.decision_digest == decision.decision_digest
+    assert foreign.decision_snapshot["tenant_id"] == projection.tenant_id
+
+    built = None
+    with pytest.raises(ReconciliationError) as exc:
+        built = build_capacity_authorization_candidate(
+            projection=projection,
+            decision=foreign,
+            producer_attestation=attestation,
+            policy_binding=policy_binding,
+            target_scope=target_scope,
+        )
+
+    assert built is None, "no candidate may exist after a tenant mismatch"
+    assert exc.value.reason is Reason.TENANT_MISMATCH
+    # Attribution: the *direct* projection-vs-decision comparison, not the decision-snapshot
+    # tenant check further down, which shares this reason code. The snapshot still names the
+    # projection's tenant (asserted above), so that sibling gate cannot be the source — and
+    # the message names both sides of the direct comparison.
+    assert "vs decision" in str(exc.value)
+    assert "tenant-victim" in str(exc.value)
+
+
+def test_a_decision_made_about_another_subject_is_refused(
+    projection, decision, attestation, target_scope, policy_binding
+):
+    """F-A/2: the projection-versus-decision **subject-digest** gate, isolated.
+
+    Same construction, one field: the decision carries the `subject_digest` of a *different
+    real workload*, produced by projecting a genuine recommendation for that workload rather
+    than by inventing a digest-shaped string.
+
+    Tenant, request digest, decision snapshot and every Phase 5 binding still agree, so
+    neither the tenant gate above nor the request-digest gate between them can fire. Without
+    this gate, a risk decision made about one workload authorises a capacity action against
+    another — again under a byte-identical candidate digest.
+    """
+
+    from ugence_cloud_scaling_authorization_contracts import (
+        AuthorizationCandidateRejectionReason as Reason,
+    )
+    from ugence_cloud_scaling_authorization_contracts import ReconciliationError
+
+    other = build_projection(
+        build_recommendation(subject=production_subject(workload_id="payments-api"))
+    )
+    assert other.subject_digest != projection.subject_digest
+
+    foreign = _decision_variant(decision, subject_digest=other.subject_digest)
+    assert foreign.tenant_id == projection.tenant_id          # tenant gate cannot fire
+    assert foreign.request_digest == projection.request_digest  # request gate cannot fire
+    assert foreign.decision_digest == decision.decision_digest
+
+    built = None
+    with pytest.raises(ReconciliationError) as exc:
+        built = build_capacity_authorization_candidate(
+            projection=projection,
+            decision=foreign,
+            producer_attestation=attestation,
+            policy_binding=policy_binding,
+            target_scope=target_scope,
+        )
+
+    assert built is None, "no candidate may exist after a subject mismatch"
+    assert exc.value.reason is Reason.SUBJECT_MISMATCH
+    assert "subject_digest" in str(exc.value)
+
+
+@pytest.mark.parametrize("field", ["tenant_id", "subject_digest"])
+def test_the_projection_decision_binding_reaches_no_later_authority(
+    projection, decision, attestation, target_scope, policy_binding, field
+):
+    """Both mismatches fail closed before anything downstream is touched.
+
+    Reconciliation runs before any part of a candidate is constructed, so a mismatch here
+    cannot produce a partial artifact — and there is no collaborator to reach in any case:
+    the builder takes no resolver, issuer, gate, broker, executor or clock.
+    """
+
+    import inspect
+
+    from ugence_cloud_scaling_authorization_contracts import ReconciliationError
+
+    other = build_projection(
+        build_recommendation(subject=production_subject(workload_id="payments-api"))
+    )
+    value = "tenant-victim" if field == "tenant_id" else other.subject_digest
+    foreign = _decision_variant(decision, **{field: value})
+
+    with pytest.raises(ReconciliationError):
+        build_capacity_authorization_candidate(
+            projection=projection, decision=foreign, producer_attestation=attestation,
+            policy_binding=policy_binding, target_scope=target_scope,
+        )
+
+    assert set(inspect.signature(build_capacity_authorization_candidate).parameters) == {
+        "projection", "decision", "producer_attestation", "policy_binding", "target_scope",
+    }

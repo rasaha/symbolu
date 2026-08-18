@@ -118,6 +118,26 @@ ceiling moves the candidate digest.
 This is **content binding, not trust**. It says the evidence you read is the evidence that
 was bound. It says nothing about whether that evidence is genuine, which remains Phase 5B's.
 
+## Gate coverage and mutation residue
+
+Every security-relevant gate — one whose removal would let a new invalid candidate be
+constructed — is covered by a test that exercises **that gate**, not a sibling. This was
+established in stages, and the history is kept rather than smoothed over:
+
+1. an exhaustive guard sweep closed six untested gaps in the builder, plus the
+   schema-version, candidate exact-type and reconciler re-derivation gates;
+2. an **independent closure audit then found two further lapses** the sweep had not
+   reached — the projection-versus-decision **tenant** and **subject-digest** gates in
+   `reconcile_phase4`. Removing either let a candidate be built across the mismatch under a
+   byte-identical candidate digest, because the candidate takes both facts from the
+   *projection*. Both are now closed by focused tests.
+
+Mutations that still survive are classified, and qualify only because their removal creates
+no new constructible invalid candidate: **sibling-backed** (the same property enforced twice,
+so neither removal is observable), **unreachable defence in depth** (guarding a route no
+public entry point can take, because the value is already inside a digest that is
+re-derived), and **non-security validation** (removal changes only a message).
+
 ## Canonicalization
 
 `risk_authority.crypto.canonical` and its hashing conventions, reached **only** through

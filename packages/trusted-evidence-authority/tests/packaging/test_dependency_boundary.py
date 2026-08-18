@@ -127,8 +127,14 @@ def _repo_root():
     return None
 
 
-#: Callables that perform a dynamic import from a module-name string.
-_DYNAMIC_IMPORT_FUNCS = frozenset({"import_module", "__import__"})
+#: The one builtin that performs a dynamic import from a module-name string. Every other
+#: dynamic-import callable is **derived from the file's own import statements** (see
+#: ``_dynamic_import_callables``) rather than guessed from a list of likely names.
+_BUILTIN_DYNAMIC_IMPORT = "__import__"
+
+#: The attribute name that performs a dynamic import on ``importlib`` however that module
+#: is bound — ``importlib.import_module`` and ``il.import_module`` alike.
+_IMPORTLIB_CALLABLE = "import_module"
 
 
 def _names_an_import_of_self(name) -> bool:
@@ -141,6 +147,34 @@ def _names_an_import_of_self(name) -> bool:
     return isinstance(name, str) and (name == SELF or name.startswith(SELF + "."))
 
 
+def _dynamic_import_callables(tree) -> set:
+    """Names that call ``importlib.import_module``, derived from this file's own imports.
+
+    ``from importlib import import_module as im`` binds ``im`` to the dynamic importer, so
+    ``im("…")`` is an import. The alias is read **out of the AST import statement** — the
+    detector never carries a hardcoded guess like ``im`` or ``load``, because a guess list
+    is defeated by the next name somebody picks.
+
+    Only ``from importlib import import_module [as X]`` binds a bare callable name.
+    ``import importlib as il`` binds the *module*, and ``il.import_module(…)`` is matched
+    separately by attribute name, so no alias tracking is needed for that shape.
+
+    Aliases are collected from the whole module rather than only its top level, so a
+    function-local ``from importlib import import_module as im`` is seen too. The trade-off
+    is deliberate and conservative: the detector may consider a name importer-bound in a
+    scope where Python would not, which can only ever produce a *stricter* boundary, never
+    a missed import.
+    """
+
+    callables = {_BUILTIN_DYNAMIC_IMPORT}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.level == 0 and node.module == "importlib":
+            for alias in node.names:
+                if alias.name == _IMPORTLIB_CALLABLE:
+                    callables.add(alias.asname or alias.name)
+    return callables
+
+
 def _imports_self(tree) -> bool:
     """AST-detect a real import of TEV-1 anywhere in ``tree``.
 
@@ -149,22 +183,34 @@ def _imports_self(tree) -> bool:
     * ``import ugence_trusted_evidence_authority`` (and dotted submodules, and ``as``
       aliases, and multiline parenthesised forms — all of which the AST normalizes);
     * ``from ugence_trusted_evidence_authority[.sub] import X``;
-    * ``importlib.import_module("ugence_trusted_evidence_authority…")`` and
-      ``__import__("…")`` where the module name is a **string literal argument**.
+    * ``importlib.import_module("…")``, including through an aliased ``importlib``;
+    * ``from importlib import import_module [as anything]`` followed by a call through that
+      binding — **the alias is resolved from the import statement, not guessed** — wherever
+      the call appears, including inside functions, conditionals and ``try`` blocks;
+    * ``__import__("…")``;
+
+    in every case where the module name is a **static string literal** equal to, or a dotted
+    submodule of, this package.
 
     It deliberately does NOT match a bare string constant that is not handed to a
     dynamic-import callable. A consumer that lists this package in a *forbidden-import
     denylist* — in order to prove it does not import it — is asserting the boundary, not
-    crossing it, and the previous raw-substring scan flagged exactly that as a violation.
-    Comments, docstrings, error messages and test descriptions are likewise not imports;
-    the AST never sees comments at all, and a docstring is an ``Expr`` constant, not a call.
+    crossing it, and the raw-substring scan this replaced flagged exactly that as a
+    violation. Comments, docstrings, error messages and test descriptions are likewise not
+    imports; the AST never sees comments at all, and a docstring is an ``Expr`` constant,
+    not a call. A function named ``im`` is only an importer if ``im`` was actually bound to
+    ``importlib.import_module`` in the same file.
 
-    Known and accepted limitation: a dynamic import whose module name arrives through a
-    variable (``importlib.import_module(some_name)``) is not statically decidable and is
-    not matched. That is a property of static analysis, not a gap introduced here — and
-    the previous substring scan did not detect it correctly either, since it could not
-    distinguish such a call from any other mention of the string.
+    **Stated limitations — this is not data-flow analysis.** A dynamic import whose module
+    name arrives through a variable, an f-string, a concatenation or a container lookup is
+    not statically decidable and is not matched. Neither is a callable re-exported through a
+    third module, nor an importer alias that is later rebound to something else (the
+    detector keeps treating the original binding as an importer, which is the conservative
+    direction). Claiming otherwise would require whole-program data-flow analysis, which is
+    explicitly out of scope here.
     """
+
+    dynamic_callables = _dynamic_import_callables(tree)
 
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -176,12 +222,14 @@ def _imports_self(tree) -> bool:
                 return True
         elif isinstance(node, ast.Call):
             func = node.func
-            called = (
-                func.attr if isinstance(func, ast.Attribute)
-                else func.id if isinstance(func, ast.Name)
-                else None
-            )
-            if called not in _DYNAMIC_IMPORT_FUNCS:
+            if isinstance(func, ast.Attribute):
+                # ``<anything>.import_module(…)`` — covers ``importlib`` under any alias.
+                is_dynamic = func.attr == _IMPORTLIB_CALLABLE
+            elif isinstance(func, ast.Name):
+                is_dynamic = func.id in dynamic_callables
+            else:
+                is_dynamic = False
+            if not is_dynamic:
                 continue
             for arg in node.args[:1]:
                 if isinstance(arg, ast.Constant) and _names_an_import_of_self(arg.value):
@@ -231,8 +279,20 @@ _REAL_IMPORTS = (
     f"from {SELF} import canonical_digest as cd",
     f'importlib.import_module("{SELF}")',
     f'importlib.import_module("{SELF}.contracts")',
-    f'import_module("{SELF}")',
+    # ``import_module`` bound by its own from-import, then called. The *unbound* form
+    # ``import_module("…")`` with no import statement is deliberately absent: it is not
+    # executable Python, and treating a bare name as an importer without a binding is the
+    # hardcoded-guess behaviour the AST-derived resolution replaced.
+    f'from importlib import import_module\nimport_module("{SELF}")',
     f'__import__("{SELF}")',
+    # --- F-B: importer aliases resolved from the import statement, not guessed ----------
+    f"from importlib import import_module as im\nim(\"{SELF}\")",
+    f"from importlib import import_module as load\nload(\"{SELF}\")",
+    f"from importlib import import_module as im\nim(\"{SELF}.authority.signing\")",
+    f"from importlib import import_module as im\ndef f():\n    return im(\"{SELF}\")",
+    f"from importlib import import_module as im\ntry:\n    im(\"{SELF}\")\nexcept ImportError:\n    pass",
+    f"from importlib import import_module as z\nif True:\n    z(\"{SELF}\")",
+    f"import importlib as il\nil.import_module(\"{SELF}\")",
 )
 
 _NOT_IMPORTS = (
@@ -252,6 +312,15 @@ _NOT_IMPORTS = (
     f'NAME = "{SELF}"',
     # a similarly-named but different distribution
     f"import {SELF}_extras",
+    # --- F-B negatives: the alias resolution must not over-match --------------------------
+    # an ordinary function named ``im`` with no importlib alias in the file
+    f'def im(x):\n    return x\nim("{SELF}")',
+    # a string that merely mentions the importer
+    f'MSG = "call import_module({SELF}) is forbidden"',
+    # an unrelated module bound to the same short name
+    f'import json as im\nim.dumps("{SELF}")',
+    # a module name that is not a static string — explicitly out of scope, see _imports_self
+    f'from importlib import import_module as im\nname = "{SELF}"\nim(name)',
 )
 
 
