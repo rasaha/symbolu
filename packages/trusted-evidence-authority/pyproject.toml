@@ -1,34 +1,46 @@
-# Independent distribution for the Ugence Trusted Evidence Authority (TEV-1).
+# Independent distribution for the Ugence Trusted Evidence Authority (TEV-1 + TEV-2).
 #
-# The platform Trust Assurance role's contract package, ratified in
+# The platform Trust Assurance role's package, ratified in
 # docs/architecture/ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md
-# (E-1, E-2, §6.2) and implementing milestone TEV-1 of §30: canonical evidence
-# identity and coordinates, one deterministic canonicalization/digest path, the
-# §12 six-stage trust vocabulary, the §28 lifecycle relation, the §11 typed
-# refusal vocabulary, the input contract a future TEV-2 verifier accepts, and
-# the structural EvidenceVerificationReceiptPayload — the §13 receipt shape §30
-# and the §32 ledger assign to TEV-1 ("shape = TEV-1, service = TEV-2").
+# (E-1, E-2, §6.2).
+#
+# TEV-1 (§30) — contract shapes: canonical evidence identity and coordinates,
+# one deterministic canonicalization/digest path, the §12 six-stage trust
+# vocabulary, the §28 lifecycle relation, the §11 typed refusal vocabulary, the
+# verification request, and the structural EvidenceVerificationReceiptPayload
+# ("shape = TEV-1, service = TEV-2", §32).
+#
+# TEV-2 (§30) — the verification authority: evidence-verification orchestration
+# behind an explicit protocol port, trust-anchor and public-key resolution by
+# exact coordinate, key validity and revocation evaluation, receipt-payload
+# issuance only after successful verification, Ed25519 signing of the
+# already-ratified payload, the immutable signed receipt envelope, independent
+# envelope re-verification, typed fail-closed outcomes and deterministic audit
+# records.
 #
 # Internal platform infrastructure — NOT a customer-facing module, NOT a
-# product, and NOT a fourth UVI engine (B-2). It mints NO authority: no
-# verifier, no trust anchor, no key management, no signature, no signed or
-# authority-issued receipt, no admission decision. The receipt payload it does
-# export is caller-constructible and permanently STRUCTURAL_UNVERIFIED; signing,
-# signed envelopes, cryptographic verification, trust-anchor resolution, key
-# validation, key revocation, receipt issuance and receipt re-verification are
-# TEV-2. It is explicitly NOT ugence-tap-provider
-# (§6.1), NOT risk_authority.integrations.tap (RA-scoped, preserved by E-13),
+# product, and NOT a fourth UVI engine (B-2). It mints no *runtime* authority:
+# a verified receipt authorizes no deployment, no runtime action, no policy
+# sufficiency, no economic value and no causal attribution (§13.2, E-12), and
+# E-14 keeps TAP off the runtime path. There is no allow-all resolver and no
+# permissive stub; with no trust anchor configured the answer is deny (E-8).
+# It is explicitly NOT ugence-tap-provider (§6.1), NOT
+# risk_authority.integrations.tap (RA-scoped, preserved unchanged by E-13),
 # NOT the truth_assurance_pipeline research corpus, and NOT the Policy
 # Authority, Benchmark Registry, Decision Authority, ActionGate, Readiness or
 # Governed Value.
 #
 # A leaf with ZERO runtime dependencies: stdlib only, no Ugence package, no
-# third-party package. ADR §23 permits TAP to depend on governance-contracts;
-# TEV-1 takes the narrower zero-dependency option because DD-2 (which contracts
-# land in that leaf) is explicitly blocked on "the concrete contract shapes from
-# TEV-1/BR-1" and pre-empting it here would decide DD-2 by implementation.
-# AssessedSystemBinding is referenced by opaque reference + digest and is never
-# redefined (§14). An automated test enforces both facts.
+# third-party package — and this is still true now that TEV-2 signs. ADR §23
+# permits TAP to depend on governance-contracts; the narrower zero-dependency
+# option is kept because DD-2 (which contracts land in that leaf) is explicitly
+# blocked on "the concrete contract shapes from TEV-1/BR-1". Ed25519 is
+# implemented to RFC 8032 in-package rather than imported, the convention
+# risk_authority and ugence-policy-authority already established, so the
+# isolated --no-index install proof holds; see the README for the full
+# justification and the security posture. AssessedSystemBinding is referenced by
+# opaque reference + digest and is never redefined (§14). Automated tests
+# enforce every one of these facts.
 #
 # Build:    python -m build packages/trusted-evidence-authority
 # Verify:   python packages/trusted-evidence-authority/verify_trusted_evidence_authority_distribution.py
@@ -39,14 +51,19 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ugence-trusted-evidence-authority"
 dynamic = ["version"]
-description = "Ugence Trusted Evidence Authority — TEV-1 trusted-evidence contract shapes, canonical evidence identity and typed refusal vocabulary (internal platform infrastructure; no verifier)."
+description = "Ugence Trusted Evidence Authority — trusted-evidence contracts and the TEV-2 verification authority: trust anchors, key trust and revocation, Ed25519-signed verification receipts and independent re-verification (internal platform infrastructure)."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Proprietary" }
 authors = [{ name = "Rakesh Mohan" }]
-keywords = ["ugence", "trusted-evidence", "tap", "contracts", "platform"]
-# Zero runtime dependencies. Not even the neutral governance-contracts leaf:
-# nothing here imports it (an automated test enforces the fact).
+keywords = [
+    "ugence", "trusted-evidence", "tap", "contracts", "platform",
+    "verification", "trust-anchor", "ed25519", "signed-receipt",
+]
+# Zero runtime dependencies, TEV-2 included. Not even the neutral
+# governance-contracts leaf, and no cryptography library: nothing here imports
+# anything but the standard library (an automated test enforces the fact, and
+# the isolated --no-index install proof depends on it).
 dependencies = []
 
 [project.optional-dependencies]
@@ -55,7 +72,8 @@ test = ["pytest>=7.0"]
 [tool.setuptools.dynamic]
 version = { attr = "ugence_trusted_evidence_authority.__version__" }
 
-# Exactly one top-level namespace ships. Tests, probes and fixtures are excluded.
+# Exactly one top-level namespace ships, including the authority subpackage.
+# Tests, probes, fixtures and every non-production test key are excluded.
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["ugence_trusted_evidence_authority*"]

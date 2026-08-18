@@ -1,5 +1,218 @@
 # Changelog — ugence-trusted-evidence-authority
 
+## [0.2.0] — TEV-2: the verification authority, signed receipts and independent re-verification
+
+Implements milestone **TEV-2** of ADR §30 — "TAP Verification Service and signed
+receipts: the verification authority, trust anchors, key trust/revocation,
+signing, independent verification". Additive over TEV-1: **every one of the 29
+curated TEV-1 symbols remains exported unchanged**, all four TEV-1 pinned
+digests are byte-identical, and the refusal vocabulary was extended by
+appending, so TEV-1's nineteen codes keep their exact ordinal positions.
+
+### The three roles, kept apart (ADR §8 — "no row may absorb another")
+
+* **`EvidenceVerificationAuthority`** — verifies an evidence submission against
+  a TEV-1 `EvidenceVerificationRequest` and produces a typed
+  `EvidenceVerificationDetermination`. Holds no signing key; has no method that
+  signs or issues. Runs a fixed ordered sequence — structural, lifecycle,
+  integrity and scope, temporal, protocol, stage coverage — and **re-checks
+  independently** what the protocol reports, which is ADR §8.1's closing rule
+  applied literally: "a lax or compromised verifier must still be unable to get
+  a mismatched artifact admitted".
+* **`ReceiptIssuer`** — turns an **admitted** determination into the ADR E-11
+  signed envelope. Performs no verification, resolves no trust anchor, and
+  raises rather than signing a refusal.
+* **`SignedReceiptVerifier`** — independently re-verifies an envelope from its
+  own fields plus a trust-anchor resolver and an explicit instant. Holds no key,
+  issues nothing, and never trusts what the envelope asserts about itself.
+
+A `EvidenceVerificationDetermination` and a `ReceiptVerification` **cannot be
+constructed by a caller at all**: each demands a private token the curated API
+does not export. ADR §8.1.5 — "no consumer may manufacture verification" —
+becomes unrepresentable rather than merely disbelieved.
+
+### No arbitrary-signing capability
+
+`ReceiptSignerPort` takes a package-minted `ReceiptSigningInput`, not free
+bytes. The only route to one runs `verify → ADMITTED determination → issue`, so
+there is no public oracle that will sign a caller's chosen bytes. An HSM- or
+KMS-backed signer implements the same port and drops in without a caller change
+(DD-10). Stated plainly rather than overclaimed: the token closes the *public
+API* route; code that already imports private module attributes is not defended
+against, and no Python-level mechanism could be — the load-bearing secret is the
+signing key, which lives only behind the port.
+
+### Cryptographic profile (DD-9)
+
+One strict v1 profile — **Ed25519** (RFC 8032, PureEdDSA over edwards25519 with
+SHA-512), one canonical encoding (bare lowercase base16), two domain-separated
+length-prefixed signing frames. No `none`, no alias, no caller-selected
+algorithm, no negotiation, no permissive fallback; an unsupported profile or
+encoding is a refusal (§22.8).
+
+Base16 over base64 because a byte string has exactly one lowercase-hex spelling,
+matching TEV-1's digest convention; base64's unconstrained trailing bits would
+let a different envelope carry the same signature.
+
+Signed inputs are **length-prefixed frames**, never concatenations: the element
+count is bound first, then each element's own big-endian length, so no boundary
+can be moved and no frame can be extended or truncated into another valid one.
+The domain tag is element 0 of each frame, so §13.3's "a signature valid in one
+domain must not verify in another" holds by construction. The receipt frame
+binds the payload twice — by digest and by full canonical bytes — so a swapped
+payload, a swapped digest, or a disagreeing pair are all signature failures.
+
+**Ed25519 is implemented to the RFC in-package rather than imported.** ADR §23
+draws TAP's only permitted dependency arrow at `governance-contracts`; TEV-1
+shipped narrower still at zero runtime dependencies with a merged test enforcing
+it; the isolated `--no-index` install proof depends on that staying true; and
+DD-10 keeps production key custody deferred, "reference-grade first". This is the
+convention `risk_authority/crypto/signing.py` and
+`ugence_policy_authority/core/ed25519.py` already established for the same
+reasons. The module uses the RFC's own extended-coordinate group law (§5.1.4)
+and reproduces all five published §7.1 vectors byte-for-byte, including the
+§5.1.7 malleability check. It is **not** constant-time, and the README and
+module docstring say so.
+
+### Trust anchors, key lifecycle and revocation
+
+* Exact-coordinate resolution over `(authority_id, key_id, capability)` only.
+  No `latest()`, no default key, no partial match, no authority-name-only
+  acceptance, no first-key-wins; duplicate coordinates refused at construction
+  (§26.9 — guessing is an unsigned authority decision).
+* `TrustAnchorCapability` is single-valued, so ADR E-3's producer/verifier
+  separation is unrepresentable to violate: one key, one role.
+* Key validity is half-open `[effective_from, effective_to)` (§17.9);
+  `KeyRevocation` is **dated**, and revocation outranks every other lifecycle
+  state (§13.3).
+* `TrustAnchorResolverPort` plus a deterministic `StaticTrustAnchorDirectory`
+  and an explicit `DenyAllTrustAnchorDirectory` — E-8's "the production default
+  is deny", made constructible rather than implicit. **No network retrieval.**
+* A record carries a public key as canonical hex and nothing else. The encoder
+  rejects `bytes` outright and no public contract declares a bytes field, so
+  private material cannot reach a record, digest, canonical byte sequence,
+  `repr` or audit trail even by mistake.
+
+### Time and revocation semantics — the delegated choice, and why
+
+Every instant is an explicit parameter with no default; no clock is read
+anywhere (§22.9, §22.10); naive datetimes are refused at every boundary.
+
+Re-verification answers the **current** trust question. ADR §13.3 settles it:
+"key revocation is checked **at verification time**; a receipt signed by a key
+that was later revoked is **not silently honoured**." Key window, revocation and
+receipt validity are all evaluated at the caller's `evaluated_at`, never at the
+payload's `verified_at`, so a previously valid receipt stops verifying once its
+key is revoked. The refusal retains typed evidence — the reason, the evaluation
+instant and the resolved coordinate — so it can be explained rather than merely
+asserted.
+
+**Historical re-verification is deliberately not offered.** It would need an
+as-of-T trust semantics no merged clause defines for evidence; §17.1's
+historical resolution is a Benchmark Registry concept and is BR-2's. Offering a
+plausible answer would resolve a question the ADR retains elsewhere.
+
+### Refusal vocabulary — additive, one namespace
+
+Twenty-one codes **appended** to `TrustedEvidenceRefusalReason`, discharging the
+ADR §11 rows TEV-1 recorded as "**TEV-2.**" — producer attribution (row 4), the
+key-lifecycle family (row 5), `SIGNATURE_INVALID` (row 6) — plus the envelope,
+profile, encoding, trust-anchor, protocol and receipt-validity conditions §13.3
+requires.
+
+A separate TEV-2 enum was considered and **rejected**: DD-1 delegates "the exact
+typed reason-code vocabulary … for evidence verification" in the singular, and
+§22.11 requires a namespace "stable across versions, never reused for a
+different meaning" — two parallel enums would be exactly the duplicate,
+conflicting namespace that rule prevents.
+
+TEV-1's nineteen keep their **exact declaration order and ordinal positions**,
+pinned by the new `TEV1_TRUSTED_EVIDENCE_REFUSAL_REASONS`; the additive block is
+`TEV2_TRUSTED_EVIDENCE_REFUSAL_REASONS`. §22.13's ordering sorts by declaration
+index, so interleaving would have silently re-ordered a refusal sequence a
+merged receipt was issued under.
+
+Still **no success state**. `TRUSTED_EVIDENCE_INDETERMINATE` remains a refusal,
+and both new outcome enums (`EvidenceAdmissionOutcome`,
+`ReceiptVerificationOutcome`) have exactly two members, so no
+`UNKNOWN`/`PARTIAL`/`PENDING`/`BEST_EFFORT` state exists to read optimistically.
+
+`UNIT_MISMATCH` / `METRIC_MISMATCH` remain absent — requirement-relative, so §12
+assigns them to the consuming evaluation engine — as do benchmark refusals
+(BR-1/BR-2).
+
+### Canonicalization
+
+Five new domain tags, minted in the one module that owns domain selection.
+**Every TEV-1 entry is untouched**: adding keys to the map left each existing
+key's value byte-identical, so `54b9bd61…`, `26ee959e…`, `d381c723…` and
+`53b4c28c…` all reproduce exactly — the first three in the suite, the fourth in
+the distribution verifier. The canonicalization version is unchanged at `v1`,
+and no encoding rule moved.
+
+Two token-guarded findings — `EvidenceVerificationDetermination` and
+`ReceiptVerification` — are deliberately **not canonicalizable**. They carry a
+private capability token, and §22.2's total-field-inclusion rule admits no
+conditional omission, so rather than weaken a ratified invariant the types
+simply have no digest. The auditable counterpart is
+`EvidenceVerificationAuditRecord`.
+
+### TEV-1 compatibility
+
+* All **29** curated TEV-1 symbols remain exported, from `api` and from the
+  package root, with the same kind, the same dataclass fields **in the same
+  order** and the same enum members **in the same order** — asserted by name and
+  positionally, not merely as sets.
+* `EvidenceVerificationReceiptPayload` gained **no field**. The envelope
+  **wraps** it. Its `structural_status` is still permanently
+  `STRUCTURAL_UNVERIFIED`, its `authenticity_verified` still `False`, and
+  `CRYPTOGRAPHICALLY_AUTHENTIC` still appears in its
+  `unestablished_trust_stages`. §13.3's signature-exclusion rule is satisfied
+  literally: the content digest covers payload bytes containing no signature.
+* The `contracts` subpackage is newly asserted to define **no** signing, key or
+  trust-anchor code, and to import nothing from the authority layer — the seam
+  that keeps the envelope a wrapper rather than a retrofit.
+
+### What TEV-2 still does not do
+
+A verified receipt authorizes nothing — not deployment, not runtime action, not
+policy sufficiency, not economic value, not causal attribution (§13.2, E-12).
+Possession is not validity (§8.1.3). Stage 6 is never asserted (§12).
+
+Not implemented, per ADR §30 and §31: Benchmark Registry (BR-1/BR-2), policy
+applicability resolution, Readiness / UVI-EV-1 / M-3R.4 integration, RA-5
+replacement (E-13; alignment is DD-6), Cloud Scaling integration, ActionGate or
+deployment authorization, credential issuance, forecasting/attribution/
+valuation/ROI (GV-F → GV-V), network trust-anchor retrieval, cloud KMS (DD-10),
+certificate-authority infrastructure, receipt persistence or distribution
+services, and generic multi-algorithm cryptographic agility. **No package in the
+monorepo imports this one**, and a test enforces that.
+
+### Verification
+
+| Check | Result |
+|---|---|
+| Package suite | **981 passed** (was 649) |
+| Independent adversarial probes | **77 passed** (was 49) — source and inside the wheel |
+| RFC 8032 §7.1 conformance | all **5** published vectors reproduce byte-for-byte |
+| TEV-1 pinned digests | all **4** unchanged |
+| TEV-1 curated symbols | all **29** present, same field and member order |
+| Public API parity (source · manifest · wheel · isolated install) | **PASS** — 83 symbols |
+| Wheel + sdist build, isolated `--no-index` install | **VERIFIED** |
+| Dependency and reverse-dependency guards | **PASS** — still zero runtime dependencies |
+| No-clock / nondeterminism AST scans | **PASS** |
+| Platform-freeze substantive digest | **unchanged** |
+
+### Dedicated CI
+
+`.github/workflows/trusted-evidence-authority-ci.yml` — resolves the Low finding
+carried from the TEV-1 closure audit (F-03). Five jobs covering the package
+suite, the independent probes, the wheel/sdist build with isolated install,
+public-API parity, and the platform-freeze verifier. It publishes nothing, uses
+no secret and contacts no external trust service; all key material it touches is
+fixed, hard-coded and unmistakably non-production.
+
+
 ## [0.1.0] — TEV-1: trusted evidence contracts
 
 ### Closure-audit corrections (A-01, A-02, A-03; still 0.1.0, unreleased)
