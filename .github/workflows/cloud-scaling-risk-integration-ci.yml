@@ -1,0 +1,129 @@
+name: cloud-scaling-risk-integration-ci
+
+# Scoped CI for the Cloud Scaling Phase 4C adapter
+# (ugence-cloud-scaling-risk-integration): the one-way, non-executing projection of an
+# advisory CapacityActionRecommendation into the Risk Authority v2 subject-risk contract.
+#
+# This workflow is additive and path-scoped: it does NOT touch or weaken
+# cloud-scaling-controller-package-ci or risk-authority-ci. It runs the adapter suite
+# (including the adversarial and gate-removal probes), proves the Cloud Scaling
+# Controller and Risk Authority baselines remain green and unchanged, re-verifies the
+# frozen v1/v2 request digests, and builds + installs the wheel offline to prove that
+# installed behavior matches source behavior digest for digest.
+
+on:
+  pull_request:
+    paths:
+      - "packages/integration/cloud-scaling-risk-integration/**"
+      - "packages/capabilities/cloud-scaling-controller/**"
+      - "packages/risk_authority/**"
+      - "docs/architecture/ADR_CLOUD_SCALING_RISK_AUTHORITY_INTEGRATION_PHASE4.md"
+      - ".github/workflows/cloud-scaling-risk-integration-ci.yml"
+  push:
+    branches:
+      - "claude/cloud-scaling-phase-4c-**"
+      - "claude/setup-symbolu-monorepo-**"
+    paths:
+      - "packages/integration/cloud-scaling-risk-integration/**"
+      - ".github/workflows/cloud-scaling-risk-integration-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  adapter-suite:
+    name: Phase 4C adapter suite (source)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install tooling + first-party packages (editable)
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest build numpy
+          pip install -e packages/risk_authority
+          pip install -e packages/capabilities/cloud-scaling-controller
+          pip install -e packages/integration/cloud-scaling-risk-integration
+      - name: Adapter suite (projection, authenticity, adversarial, time, abstention)
+        run: python -m pytest packages/integration/cloud-scaling-risk-integration/tests -q
+      - name: Security gates — adversarial + gate-removal probes (explicit acceptance gate)
+        run: |
+          python -m pytest \
+            packages/integration/cloud-scaling-risk-integration/tests/test_authenticity.py \
+            packages/integration/cloud-scaling-risk-integration/tests/test_adversarial.py \
+            packages/integration/cloud-scaling-risk-integration/tests/test_gate_removal_probes.py \
+            packages/integration/cloud-scaling-risk-integration/tests/test_phase_boundary.py \
+            packages/integration/cloud-scaling-risk-integration/tests/test_token_integrity.py -q
+      - name: Frozen-digest regression (v1 + Phase 4A v2 must be byte-identical)
+        run: |
+          python -m pytest \
+            packages/integration/cloud-scaling-risk-integration/tests/test_frozen_digests.py -q
+
+  baseline-regression:
+    name: Controller + Risk Authority baselines remain green & unchanged
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install tooling
+        run: |
+          python -m pip install --upgrade pip
+          # `build` is required by the Risk Authority distribution verifier below, which
+          # builds and installs the RA wheel into a throwaway environment.
+          pip install pytest numpy build
+          pip install -e packages/risk_authority
+          pip install -e packages/capabilities/cloud-scaling-controller
+      - name: Risk Authority conformance suite (must remain green + unchanged)
+        run: python -m pytest packages/risk_authority/tests -q
+      - name: Cloud Scaling Controller suite (must remain green + unchanged)
+        run: python -m pytest packages/capabilities/cloud-scaling-controller/tests -q
+      - name: Risk Authority distribution verifier (v2 Phase 4A/4B digests)
+        run: python packages/risk_authority/verify_risk_authority_distribution.py
+
+  isolated-install:
+    name: Wheel build + offline isolated install + source-vs-installed probes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      # Host-side tooling only. This is the RUNNER environment, not the isolated
+      # installation under test: the verifier builds its own throwaway virtualenv and
+      # installs into it with the index structurally disabled (--no-index, PIP_NO_INDEX,
+      # an unroutable sentinel index, no cache, no pip upgrade, no editable install).
+      - name: Install build tooling (host environment)
+        run: |
+          python -m pip install --upgrade pip
+          # numpy is required by the HOST step that computes the source-side expected
+          # digests: it imports the controller from the source tree, and the controller
+          # imports numpy. It is unrelated to the isolated environment, which gets its
+          # own numpy from the local wheelhouse with no index reachable.
+          pip install build wheel pytest numpy
+      - name: Genuinely offline isolated install + negative controls + source-vs-installed
+        # Phase A (online) builds first-party wheels and downloads the full dependency
+        # closure — including numpy — into a local wheelhouse. Phase B installs from that
+        # wheelhouse alone with no index reachable. Phase C proves the guarantee by
+        # negative control: a missing wheel fails, a bogus index cannot rescue it, and a
+        # failed install leaves nothing importable.
+        run: python packages/integration/cloud-scaling-risk-integration/scripts/verify_isolated_install.py
+      - name: Build sdist + wheel (distribution artifacts)
+        run: python -m build packages/integration/cloud-scaling-risk-integration
+      - name: Package boundary tests (declared deps, no reverse cycle, leaves preserved)
+        run: |
+          pip install -e packages/risk_authority \
+                      -e packages/capabilities/cloud-scaling-controller \
+                      -e packages/integration/cloud-scaling-risk-integration
+          python -m pytest packages/integration/cloud-scaling-risk-integration/tests/packaging -q
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cloud-scaling-risk-integration-dist
+          path: packages/integration/cloud-scaling-risk-integration/dist/*
+          if-no-files-found: warn
