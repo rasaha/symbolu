@@ -42,9 +42,15 @@ The accurate sequence:
 Surviving mutations, classified — a guard may be listed here **only** if its removal
 creates no new constructible invalid candidate:
 
-* **Sibling-backed.** ``context_digest`` and ``request_digest`` re-derivation. Each is
+* **Sibling-backed.** ``context_digest`` and ``request_digest`` re-derivation — each is
   backed by another gate that fires on the same input with the same typed reason, so
-  removing one alone is unobservable. The property is enforced twice.
+  removing one alone is unobservable. Also the ``action_type`` D-4 check and the
+  ``SubjectRiskDisposition`` type check. ``action_type`` reads from the **context**, and
+  ``context.action_type`` participates in ``context_digest``, so a fabricated context
+  carrying a different action cannot keep its digest and the context-digest re-derivation
+  fires first. That is precisely why ``subject_type`` / ``requested_purpose`` /
+  ``requested_domain`` *are* genuine and covered above: they live on the **request**, whose
+  digest a fabricator can recompute consistently.
 * **Unreachable defence in depth.** ``_require_int`` / ``_require_datetime`` on projected
   magnitudes and timestamps. Those values sit inside the context digest, so tampering trips
   the digest re-derivation first. They guard a route no public entry point can take.
@@ -639,3 +645,87 @@ def test_the_projection_decision_binding_reaches_no_later_authority(
     assert set(inspect.signature(build_capacity_authorization_candidate).parameters) == {
         "projection", "decision", "producer_attestation", "policy_binding", "target_scope",
     }
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("subject_type", "some.other_subject_type"),
+        ("requested_purpose", "some.other_purpose"),
+        ("requested_domain", "some_other_domain"),
+    ],
+)
+def test_a_request_carrying_a_non_D4_identifier_is_refused(
+    projection, decision, attestation, target_scope, policy_binding, field, value
+):
+    """F-A/3: the three D-4 identifier gates, isolated.
+
+    Found by the same sweep that confirmed F-A/1 and F-A/2, and genuine for the same
+    reason: the candidate's ``subject_type``, ``purpose`` and ``domain`` are **module-owned
+    constants**, never copied from the request. So if a request carrying some other
+    purpose, domain or subject type reaches reconciliation, the candidate does not merely
+    carry a wrong value — it **misstates** all three as the ratified D-4 values while the
+    request it bound was never a Cloud Scaling capacity action at all.
+
+    Reproduced before this test existed: with the ``subject_type`` gate neutralized, a
+    candidate was constructed from a request whose ``subject_type`` was
+    ``some.other_subject_type``, and the candidate reported
+    ``cloud_scaling.capacity_subject``.
+
+    Isolation: the alternate request is built through Risk Authority's public contracts and
+    is internally consistent; ``subject_type`` additionally needs a rebuilt
+    ``SubjectBinding`` because it participates in the subject digest. The decision is
+    ``dataclasses.replace``d onto the resulting digests, so the subject-digest and
+    request-digest gates cannot absorb the failure. Only the D-4 identifier check remains.
+    """
+
+    import dataclasses
+
+    from risk_authority.integrations import SubjectBinding
+    from ugence_cloud_scaling_authorization_contracts import (
+        AuthorizationCandidateRejectionReason as Reason,
+    )
+    from ugence_cloud_scaling_authorization_contracts import ReconciliationError
+
+    overrides = {field: value}
+    binding = projection.binding
+    if field == "subject_type":
+        # subject_type is inside the SubjectBinding, so the binding must be rebuilt for the
+        # fabricated projection to stay internally consistent.
+        binding = SubjectBinding(
+            tenant_id=projection.tenant_id,
+            subject_id=projection.subject_id,
+            subject_type=value,
+            recommendation_digest=projection.recommendation_digest,
+            context_digest=projection.context_digest,
+        )
+        overrides["subject_digest"] = binding.digest()
+
+    request = dataclasses.replace(projection.request, **overrides)
+    fabricated = _fabricated_projection(
+        projection,
+        request=request,
+        binding=binding,
+        subject_digest=binding.digest(),
+        request_digest=request.digest(),
+    )
+    aligned = dataclasses.replace(
+        decision, subject_digest=binding.digest(), request_digest=request.digest()
+    )
+    # The gates that could otherwise absorb the failure are satisfied.
+    assert aligned.subject_digest == fabricated.subject_digest
+    assert aligned.request_digest == fabricated.request_digest
+
+    built = None
+    with pytest.raises(ReconciliationError) as exc:
+        built = build_capacity_authorization_candidate(
+            projection=fabricated,
+            decision=aligned,
+            producer_attestation=attestation,
+            policy_binding=policy_binding,
+            target_scope=target_scope,
+        )
+
+    assert built is None
+    assert exc.value.reason is Reason.D4_IDENTIFIER_MISMATCH
+    assert value in str(exc.value)
