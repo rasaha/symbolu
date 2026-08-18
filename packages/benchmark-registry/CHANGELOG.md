@@ -17,9 +17,12 @@ fourth UVI engine (B-2). This distribution is its contract layer.
   of coordinates that names **one** benchmark version. Every field mandatory with
   no default, so a partial coordinate cannot be constructed; every identifier an
   exact token, so a wildcard cannot be written; the version an exact Semantic
-  Versioning 2.0.0 string, so a range, a comparator, a two-component version or a
-  leading-zero second spelling cannot be written either. B-8's "a floating
-  reference must be **unrepresentable**" holds in the type.
+  Versioning 2.0.0 core-plus-prerelease string with **no build metadata**, so a
+  range, a comparator, a two-component version, a leading-zero second spelling
+  or a `+build` suffix cannot be written either — build metadata is ignored for
+  SemVer precedence, so admitting it would let precedence-equivalent versions
+  occupy separate append-only coordinates (B-10). B-8's "a floating reference
+  must be **unrepresentable**" holds in the type.
 * `CanonicalBenchmarkDefinitionIdentity` — all twenty §15 coordinates, every one
   mandatory and every one in the digest.
 * `BenchmarkScope` (`PLATFORM_WIDE` | `TENANT`) — §15 row 5's "may denote a
@@ -67,7 +70,16 @@ fourth UVI engine (B-2). This distribution is its contract layer.
   and no insignificant whitespace; total field inclusion; explicit `null`; UTC
   normalization with microseconds preserved; naive datetimes, non-NFC strings,
   padded strings, floats (and therefore `nan`/`inf`), mappings, `bytes` and
-  unknown types all **refused**, never coerced, never normalized.
+  unknown types all **refused**, never coerced, never normalized. Only the
+  exact registered BR-1 contract classes are canonicalizable — membership is
+  decided by class **identity** against a closed, sealed registry populated
+  once at import, never by `__name__` or `__module__`, so a subclass, a
+  same-named foreign dataclass (however its `__module__` is set), a duck type
+  or an arbitrary dataclass is refused outright rather than merely producing
+  different bytes. The complete contract graph is revalidated before any byte
+  is produced, so an instance corrupted after construction via
+  `object.__setattr__` into a state its public constructor would have refused
+  is refused here too.
 * `BENCHMARK_REGISTRY_CANONICALIZATION_VERSION` =
   `ugence.benchmark-registry/canonicalization/v1`.
 * `BENCHMARK_DEFINITION_IDENTITY_DIGEST_DOMAIN` =
@@ -88,7 +100,10 @@ fourth UVI engine (B-2). This distribution is its contract layer.
 * Applicability, scope and temporal-bound declarations are cross-checked against
   the values they carry; neither half is silently repaired into the other.
 * Subclasses and duck-typed lookalikes are refused at every load-bearing
-  boundary (`type(x) is T`, never `isinstance`).
+  boundary (`type(x) is T`, never `isinstance`) — including the
+  canonicalization boundary itself, where a same-named foreign dataclass
+  (even with a forged `__module__`) is refused by class identity, never by
+  name.
 
 ### Explicitly **not** in this version
 

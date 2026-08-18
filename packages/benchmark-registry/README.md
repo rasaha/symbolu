@@ -204,8 +204,9 @@ not merely discouraged."* `BenchmarkCoordinate` is where that is made literal.
 | Refused | How |
 |---|---|
 | `latest`, `current`, `newest`, `head`, `tip`, `any`, `default`, `active`, `stable`, `*`, `-`, `?` — in any letter case | an explicit floating-token check on every coordinate identifier |
-| `^1.2.3`, `~1.2.3`, `>=1.2.3`, `1.2.x`, `1.2`, `1.2.3 - 1.4.0`, `1.2.3 \|\| 1.3.0` | the version must parse as an exact Semantic Versioning 2.0.0 string |
+| `^1.2.3`, `~1.2.3`, `>=1.2.3`, `1.2.x`, `1.2`, `1.2.3 - 1.4.0`, `1.2.3 \|\| 1.3.0` | the version must parse as an exact Semantic Versioning 2.0.0 core-plus-prerelease string |
 | `1.02.0` (a second spelling of `1.2.0`) | the published semver grammar rejects leading zeroes |
+| `1.2.3+a`, `1.2.3+build.7`, `1.2.3-alpha+build` (SemVer **build metadata**) | refused, not merely ignored: SemVer 2.0.0 ignores build metadata for precedence, so `1.2.3` and `1.2.3+build` would be two coordinate spellings of one precedence-equivalent version — a "two spellings, one thing" gap B-8 exists to close, and the governing ADR authorizes no exception for it |
 | a wildcard or range character anywhere (`* ? % ^ ~ > < \| , [ ] { }`) | refused in every coordinate token |
 | a **partial** coordinate | every field is mandatory with no default; omission is a `TypeError` |
 | a padded or non-NFC identifier | refused, never trimmed and never normalized |
@@ -280,9 +281,21 @@ Every canonical byte sequence is framed as
 {"body": {...}, "canonicalization": <version>, "domain": <tag>, "type": <name>}
 ```
 
-so the same body under two contract types can never produce the same bytes, and a
-subclass or lookalike gets its own bytes rather than borrowing a registered
-type's.
+so the same body under two contract types can never produce the same bytes.
+
+**Only the exact registered BR-1 contract classes are canonicalizable.**
+Membership is decided by class *identity* (`type(contract) is SomeExactClass`)
+against a closed, sealed registry populated once at package import — never by
+`__name__` or `__module__`. A subclass, a same-named foreign dataclass defined
+anywhere else (even with its `__module__` forged to match this package), a
+duck type, or an arbitrary dataclass is refused outright: none of them reaches
+the encoder, and none of them produces bytes or a digest, "borrowed" or
+otherwise. No caller — including code inside this package — can register a
+new type into the closed mapping after import. Before producing bytes,
+`canonical_bytes` also revalidates the complete exact contract graph reachable
+from the root, so a frozen instance corrupted after construction via
+`object.__setattr__` into a state its public constructor would have refused is
+refused here too, rather than silently canonicalized.
 
 **Exactly one domain is minted (DD-9).** BR-1 introduces exactly one artifact
 class — the benchmark-definition identity and the coordinates that make it up.
