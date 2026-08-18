@@ -71,12 +71,19 @@ class UnsupportedRecommendationSourceError(RecommendationInputError):
 
 
 class RecommendationAuthenticityError(CloudScalingRiskIntegrationError):
-    """The recommendation's source authenticity could not be established.
+    """The recommendation's content-integrity binding could not be established.
 
     Raised when the independently carried (or caller-supplied expected) recommendation
     digest is absent, malformed, or does not equal the digest recomputed from the
-    reconstructed recommendation. See the module docstring of
-    :mod:`~ugence_cloud_scaling_risk_integration.authenticity` for exactly what this
+    reconstructed recommendation.
+
+    The property this error reports on is **content integrity**: that the digest
+    describes the content it is carried with. It is deliberately *not* producer identity
+    and *not* signed source provenance — the digest is an unkeyed SHA-256 over a
+    domain-separated preimage, so a fully self-consistent forgery carrying its own
+    genuine digest satisfies the binding and remains structurally admissible. The name
+    of this exception is retained for API compatibility; see the module docstring of
+    :mod:`~ugence_cloud_scaling_risk_integration.authenticity` for exactly what the
     check does and does not prove.
     """
 

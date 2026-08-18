@@ -113,14 +113,30 @@ token.recommendation_digest == token.recommendation.digest()
 
 It is checked in `__post_init__`, so **no supported construction can mint a mismatched
 token** — a hand-built token pairing an exact canonical recommendation with a
-syntactically perfect but incorrect digest is refused. And it is **re-checked at every
-consumption boundary** (`project_recommendation`, `CloudScalingRiskAdapter.project`,
-`CloudScalingRiskAdapter.evaluate`), which is the load-bearing half: a frozen dataclass is
-not a security boundary. `object.__new__` skips `__post_init__` entirely,
-`object.__setattr__` rewrites a frozen field afterwards, and a token *subclass* can make
-`recommendation` a property returning a different object on each read — against which
-"validate, then use" is not a defence at any level of care, because the value validated is
-by construction not the value consumed.
+syntactically perfect but incorrect digest is refused. And it is **re-established at the
+point of consumption**, which is the load-bearing half: a frozen dataclass is not a
+security boundary. `object.__new__` skips `__post_init__` entirely, `object.__setattr__`
+rewrites a frozen field afterwards, and a token *subclass* can make `recommendation` a
+property returning a different object on each read — against which "validate, then use"
+is not a defence at any level of care, because the value validated is by construction not
+the value consumed.
+
+**Which boundary is attacker-reachable, precisely.** The three call sites are *not*
+equivalent, and the distinction matters when reasoning about the threat model:
+
+| Entry point | Accepts | Role of the token check |
+|---|---|---|
+| `project_recommendation` | an `AuthenticatedRecommendation` **token** supplied by the caller | **the attacker-reachable boundary.** A hand-minted, bypassed, mutated or subclassed token arrives here directly, and `_validate_authenticated_recommendation` is what refuses it. |
+| `CloudScalingRiskAdapter.project` | a **raw** controller artifact or its canonical mapping — never a caller-supplied token | its `_validate_authenticated_output` call re-validates a token the adapter *itself* just minted via `authenticate_controller_output`. Deliberate defense in depth against a future refactor, not a live attacker path. |
+| `CloudScalingRiskAdapter.evaluate` | likewise a **raw** artifact or mapping | as above, inside the gate-1 `try` so any disagreement still becomes a typed fail-closed outcome. |
+
+A forged token handed straight to `.project` or `.evaluate` is therefore rejected as an
+**unsupported input source** — it is not a `CapacityActionRecommendation`, a
+`RecommendationAbstention` or a canonical mapping — *before* any token validation runs.
+That is a correct rejection, but it is a different gate, and the defense-in-depth
+revalidation inside those two methods is unreachable today by construction. It is kept
+deliberately: the invariant every consumer relies on is re-established at the boundary
+that relies on it rather than inherited from a caller's good behavior.
 
 Consumers therefore require the **exact** `AuthenticatedRecommendation` type, not
 `isinstance`, before reading anything; establish the **exact** embedded

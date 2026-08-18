@@ -552,6 +552,112 @@ def test_a_token_with_no_fields_at_all_fails_closed_with_a_typed_error(recommend
         project_recommendation(empty)
 
 
+@pytest.fixture
+def substitute_recommendation():
+    """A genuine recommendation for a *different* subject, with a genuine digest.
+
+    Deliberately self-consistent: its digest really is its own digest, and its subject
+    facts really are its own. A projection built from it would reconcile perfectly — it
+    would simply describe the wrong workload. That is what makes it the right probe for
+    the check-then-use window: no internal-consistency assertion can catch it, only
+    comparing against the value the validator actually returned.
+    """
+
+    import ph_helpers as H
+    from conftest import build_recommendation
+
+    return build_recommendation(
+        predicted=12,
+        current=6,
+        subject=H.subject(workload_id="substituted-workload"),
+        recommendation_id="rec-substituted",
+    )
+
+
+def test_the_projection_uses_the_validated_pair_and_never_re_reads_the_token(
+    monkeypatch, recommendation, substitute_recommendation
+):
+    """``project_recommendation`` must consume the pair the validator returned.
+
+    The token here is **exactly** an ``AuthenticatedRecommendation``, built normally, so
+    the exact-type gate admits it and the validated-pair discipline is what is actually
+    under test. A subclass would be refused before this code path is reached and would
+    therefore prove nothing about it — which is why the hostile properties are installed
+    on the class *after* a legitimate token already exists.
+
+    Each protected field answers honestly on its **first** read and substitutes a
+    different, internally self-consistent recommendation on every read after that. A
+    consumer that re-reads the token — rather than using the ``(recommendation, digest)``
+    pair ``_validate_authenticated_recommendation`` returned — would validate one
+    recommendation and project a different one, binding a Risk Authority request to a
+    workload nobody authenticated. The window is narrow but real: ``object.__setattr__``
+    on a frozen field is all a concurrent caller needs.
+
+    ``monkeypatch`` restores the class even if an assertion below fails, so no state
+    leaks into any other test.
+    """
+
+    honest, substitute = recommendation, substitute_recommendation
+    assert honest.digest() != substitute.digest()
+    assert honest.subject.workload_id != substitute.subject.workload_id
+
+    token = authenticate_controller_output(
+        honest, expected_recommendation_digest=honest.digest()
+    )
+    # The reference answer, computed before any hostile property exists.
+    expected = project_recommendation(token)
+
+    reads = {"recommendation": 0, "recommendation_digest": 0}
+
+    def _substituting_recommendation(self):
+        reads["recommendation"] += 1
+        return honest if reads["recommendation"] == 1 else substitute
+
+    def _substituting_digest(self):
+        reads["recommendation_digest"] += 1
+        if reads["recommendation_digest"] == 1:
+            return honest.digest()
+        return substitute.digest()  # self-consistent with the substituted record
+
+    # Installed on the exact class, after the token exists: `raising=False` because a
+    # dataclass field without a default is not a class attribute, and monkeypatch then
+    # removes the property again on teardown — pass or fail.
+    monkeypatch.setattr(
+        AuthenticatedRecommendation,
+        "recommendation",
+        property(_substituting_recommendation),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        AuthenticatedRecommendation,
+        "recommendation_digest",
+        property(_substituting_digest),
+        raising=False,
+    )
+
+    projection = project_recommendation(token)
+
+    # --- the projection describes what was validated, not what was substituted --------
+    assert projection.recommendation_digest == honest.digest(), (
+        "the projection carries a digest read from the token after validation; consumers "
+        "must use the (recommendation, digest) pair the validator returned"
+    )
+    assert projection.recommendation_digest != substitute.digest()
+    assert projection.subject_id == honest.subject.workload_id
+    assert projection.subject_id != substitute.subject.workload_id
+    assert projection.tenant_id == honest.subject.tenant_id
+    assert projection.context.magnitude_after == expected.context.magnitude_after
+    assert projection.context_digest == expected.context_digest
+    assert projection.subject_digest == expected.subject_digest
+    assert projection.request_digest == expected.request_digest
+    assert projection.idempotency_key == expected.idempotency_key
+
+    # --- and each protected field was consulted exactly once --------------------------
+    assert reads == {"recommendation": 1, "recommendation_digest": 1}, (
+        f"the token was re-read after validation: {reads}"
+    )
+
+
 # =====================================================================================
 # 3. positive controls — the valid paths are unchanged
 # =====================================================================================
