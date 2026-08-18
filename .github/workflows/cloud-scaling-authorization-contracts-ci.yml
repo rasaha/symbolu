@@ -82,8 +82,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           # `build` is required by the Risk Authority distribution verifier below, which
-          # builds and installs the RA wheel into a throwaway environment.
-          pip install pytest numpy build
+          # builds and installs the RA wheel into a throwaway environment. `pydantic` is
+          # required by the platform-freeze verifier: it snapshots `decision_governance`,
+          # which imports `ugence_decision_authority`, which is built on pydantic. Without
+          # it the verifier fails on an import, not on a freeze violation.
+          pip install pytest numpy build pydantic
           pip install -e packages/risk_authority
           pip install -e packages/capabilities/cloud-scaling-controller
           pip install -e packages/integration/cloud-scaling-risk-integration
