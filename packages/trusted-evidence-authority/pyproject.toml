@@ -30,17 +30,26 @@
 # Authority, Benchmark Registry, Decision Authority, ActionGate, Readiness or
 # Governed Value.
 #
-# A leaf with ZERO runtime dependencies: stdlib only, no Ugence package, no
-# third-party package — and this is still true now that TEV-2 signs. ADR §23
-# permits TAP to depend on governance-contracts; the narrower zero-dependency
+# A leaf with NO Ugence dependency and exactly TWO third-party runtime
+# dependencies, both cryptographic and both maintained: `cryptography` (OpenSSL)
+# for Ed25519 signing, verification and public-key derivation, and `PyNaCl`
+# (libsodium) for strict Ed25519 point validation. Nothing else. ADR §23 permits
+# TAP to depend on governance-contracts; the narrower no-Ugence-dependency
 # option is kept because DD-2 (which contracts land in that leaf) is explicitly
-# blocked on "the concrete contract shapes from TEV-1/BR-1". Ed25519 is
-# implemented to RFC 8032 in-package rather than imported, the convention
-# risk_authority and ugence-policy-authority already established, so the
-# isolated --no-index install proof holds; see the README for the full
-# justification and the security posture. AssessedSystemBinding is referenced by
-# opaque reference + digest and is never redefined (§14). Automated tests
-# enforce every one of these facts.
+# blocked on "the concrete contract shapes from TEV-1/BR-1".
+#
+# An earlier revision of this package implemented Ed25519 to RFC 8032 in-package
+# and described itself as zero-dependency. The independent TEV-2 closure audit
+# found real vulnerabilities in that implementation, and the correction was to
+# delete it. ADR §23 does not forbid maintained third-party cryptographic
+# primitives — it governs the direction of dependencies *between Ugence
+# packages* — and the earlier claim that it did was an overread. The isolated
+# --no-index install proof still holds: it installs from a prepared local
+# wheelhouse rather than from an empty dependency set, and fails if any
+# dependency is satisfied from the host instead. See the README for the full
+# security posture. AssessedSystemBinding is referenced by opaque reference +
+# digest and is never redefined (§14). Automated tests enforce every one of
+# these facts.
 #
 # Build:    python -m build packages/trusted-evidence-authority
 # Verify:   python packages/trusted-evidence-authority/verify_trusted_evidence_authority_distribution.py
@@ -60,11 +69,18 @@ keywords = [
     "ugence", "trusted-evidence", "tap", "contracts", "platform",
     "verification", "trust-anchor", "ed25519", "signed-receipt",
 ]
-# Zero runtime dependencies, TEV-2 included. Not even the neutral
-# governance-contracts leaf, and no cryptography library: nothing here imports
-# anything but the standard library (an automated test enforces the fact, and
-# the isolated --no-index install proof depends on it).
-dependencies = []
+# Exactly two runtime dependencies, both maintained cryptographic backends, both
+# bounded on each side so a future major version cannot change signature or
+# validation behaviour silently. No Ugence package, and nothing else at all: a
+# test AST-scans every module and fails on any other third-party import, and on
+# a backend import from any module other than authority/backend.py.
+#
+# Lower bounds are the versions this package is verified against; upper bounds
+# exclude the next major of each project.
+dependencies = [
+    "cryptography>=41.0.7,<47.0.0",
+    "PyNaCl>=1.5.0,<2.0.0",
+]
 
 [project.optional-dependencies]
 test = ["pytest>=7.0"]

@@ -33,6 +33,17 @@ performs no signature check, admits no evidence, and issues no receipt. A
 resolved anchor is an input to verification, never a substitute for it — ADR
 §8.1.3, "possession is not validity", applied to key material.
 
+Strict point validation at construction (closure-audit F-03)
+-------------------------------------------------------------
+A public key is validated the moment an anchor is constructed, not when a
+signature is later checked. The distinction is the whole finding: against an
+**identity** or **small-order** public key the signature equation *succeeds* for
+a signature anyone can forge without a private key, so "we will notice at verify
+time" is false. :class:`TrustAnchorRecord` therefore refuses identity,
+small-order/torsion, non-canonical, off-curve and malformed keys up front, using
+libsodium's maintained ``crypto_core_ed25519_is_valid_point``. A key that cannot
+be trusted never enters the store.
+
 Private key material never appears here
 ---------------------------------------
 :class:`TrustAnchorRecord` carries a **public** key as canonical hex and nothing
@@ -82,12 +93,31 @@ from ..contracts.canonical import (
 )
 from ..contracts.errors import TrustedEvidenceContractError
 from ..contracts.reasons import TrustedEvidenceRefusalReason
-from .ed25519 import TrustedEvidenceVerificationKey
+from .backend import TrustedEvidenceVerificationKey
 from .profile import (
     TRUSTED_EVIDENCE_SIGNATURE_ENCODING_V1,
     TRUSTED_EVIDENCE_SIGNATURE_PROFILE_V1,
     decode_public_key,
 )
+
+
+def _require_trusted_point(public_key: object, name: str) -> bytes:
+    """Decode the canonical hex **and** strictly validate the curve point.
+
+    Two separate refusals, both mapped onto typed reasons: a bad *encoding* is
+    ``TRUSTED_EVIDENCE_SIGNATURE_ENCODING_INVALID``, and a well-encoded but
+    untrustworthy *point* is ``TRUSTED_EVIDENCE_MALFORMED_CONTRACT``. Strict
+    validation is libsodium's maintained
+    ``crypto_core_ed25519_is_valid_point`` — see :mod:`.backend`; nothing here
+    reconstructs curve arithmetic.
+    """
+
+    raw = decode_public_key(public_key, name)
+    try:
+        TrustedEvidenceVerificationKey(raw)
+    except ValueError as exc:
+        raise _fail(str(exc), _R.TRUSTED_EVIDENCE_MALFORMED_CONTRACT) from None
+    return raw
 
 __all__ = [
     "TRUST_ANCHOR_RECORD_DIGEST_DOMAIN",
@@ -255,10 +285,18 @@ class TrustAnchorRecord:
         require_exact_type(
             self.capability, TrustAnchorCapability, "TrustAnchorRecord.capability"
         )
-        # Validates the encoding *and* proves the material decodes to a real
-        # 32-byte Ed25519 public key, so a malformed anchor cannot be configured
-        # and then fail obscurely at verification time.
-        decode_public_key(self.public_key, "TrustAnchorRecord.public_key")
+        # Validates the encoding **and strictly validates the point**, so a
+        # malformed, non-canonical, identity, small-order or off-curve key can
+        # never enter a trust-anchor store at all.
+        #
+        # This placement is closure-audit finding F-03. Previously the record
+        # only checked that the hex decoded to 32 bytes, so an anchor could be
+        # created with the identity point — for which *no private key exists* —
+        # and a signature forged for it drove the independent re-verifier to
+        # VERIFIED. A universal forgery. Validation now happens here, at
+        # construction, because a later signature check is not a substitute:
+        # against a low-order key the signature check *passes*.
+        _require_trusted_point(self.public_key, "TrustAnchorRecord.public_key")
         if self.signature_profile != TRUSTED_EVIDENCE_SIGNATURE_PROFILE_V1:
             raise _fail(
                 "TrustAnchorRecord.signature_profile must be exactly "
@@ -310,10 +348,14 @@ class TrustAnchorRecord:
         )
 
     def verification_key(self) -> TrustedEvidenceVerificationKey:
-        """Decode the public half for signature checking. Public material only."""
+        """The public half, for signature checking. Public material only.
+
+        Re-validates the point rather than caching it, so this cannot become a
+        route around the construction-time check.
+        """
 
         return TrustedEvidenceVerificationKey(
-            decode_public_key(self.public_key, "TrustAnchorRecord.public_key")
+            _require_trusted_point(self.public_key, "TrustAnchorRecord.public_key")
         )
 
     def lifecycle_refusal_at(self, instant: datetime):
@@ -335,7 +377,7 @@ class TrustAnchorRecord:
         require_aware_datetime(instant, "TrustAnchorRecord.lifecycle_refusal_at.instant")
         if self.revocation is not None and self.revocation.is_revoked_at(instant):
             return _R.TRUSTED_EVIDENCE_KEY_REVOKED
-        if self.disabled:
+        if self.disabled is True:
             return _R.TRUSTED_EVIDENCE_KEY_DISABLED
         if self.effective_from is not None and instant < self.effective_from:
             return _R.TRUSTED_EVIDENCE_KEY_NOT_YET_VALID
@@ -562,7 +604,7 @@ class StaticTrustAnchorDirectory:
             TrustAnchorCoordinate,
             "StaticTrustAnchorDirectory.resolve.coordinate",
         )
-        if not self._anchors:
+        if len(self._anchors) == 0:
             # E-8 — nothing configured is not "nothing to check"; it is deny.
             return TrustAnchorResolution.refused(
                 coordinate, _R.TRUSTED_EVIDENCE_TRUST_ANCHOR_NOT_CONFIGURED

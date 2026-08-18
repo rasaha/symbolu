@@ -21,8 +21,17 @@ What is still true after TEV-2
   policy sufficiency, not economic value, not causal attribution (§13.2, E-12).
   A *verified* receipt authorizes exactly as much: nothing.
 * **Possession is not validity** (§8.1.3). Holding an envelope, or a
-  :class:`~.reverification.ReceiptVerification` object, establishes nothing —
-  trust is recomputed at an explicit instant, every time.
+  verification result object, establishes nothing — trust is recomputed at an
+  explicit instant, every time.
+* **Signature-only is not scope-bound.**
+  :meth:`~.reverification.SignedReceiptVerifier.verify_signature` and
+  :meth:`~.reverification.SignedReceiptVerifier.verify_bound` answer different
+  questions and return different, never-equal types. Only the bound form
+  establishes ``CONTEXT_SYSTEM_BOUND``.
+* **Cryptography is not implemented here.** Ed25519 signing and verification
+  come from ``cryptography``; strict trust-anchor point validation comes from
+  libsodium via ``PyNaCl``. There is no in-package curve arithmetic and no
+  fallback to any.
 * **A signature alone is not trusted verification.** A signature says a key
   signed a frame; whether that key was resolved, entitled, in-window and
   unrevoked is a separate check, and §13.3 rules that a receipt "whose signature
@@ -57,7 +66,7 @@ from .audit import (
     audit_record_for_determination,
     audit_record_for_receipt_verification,
 )
-from .ed25519 import (
+from .backend import (
     ED25519_PUBLIC_KEY_SIZE,
     ED25519_SEED_SIZE,
     ED25519_SIGNATURE_SIZE,
@@ -88,8 +97,12 @@ from .profile import (
     framed_signed_input,
 )
 from .reverification import (
-    ReceiptVerification,
+    RECEIPT_SCOPE_EXPECTATION_DIGEST_DOMAIN,
+    ReceiptScopeExpectation,
+    ReceiptVerificationKind,
     ReceiptVerificationOutcome,
+    ScopeBoundVerificationResult,
+    SignatureOnlyVerificationResult,
     SignedReceiptVerifier,
 )
 from .signing import Ed25519ReceiptSigner, ReceiptSignerPort, ReceiptSigningInput
@@ -170,9 +183,13 @@ __all__ = [
     "ReceiptSignerPort",
     "Ed25519ReceiptSigner",
     "ReceiptIssuer",
-    # independent re-verification
+    # independent re-verification — two explicit operations, two result types
+    "RECEIPT_SCOPE_EXPECTATION_DIGEST_DOMAIN",
+    "ReceiptVerificationKind",
     "ReceiptVerificationOutcome",
-    "ReceiptVerification",
+    "ReceiptScopeExpectation",
+    "SignatureOnlyVerificationResult",
+    "ScopeBoundVerificationResult",
     "SignedReceiptVerifier",
     # deterministic audit
     "EvidenceVerificationAuditRecord",

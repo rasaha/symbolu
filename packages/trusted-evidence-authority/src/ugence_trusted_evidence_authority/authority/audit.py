@@ -53,7 +53,10 @@ from ..contracts.canonical import canonical_bytes, canonical_digest
 from ..contracts.errors import TrustedEvidenceContractError
 from ..contracts.reasons import TrustedEvidenceRefusalReason
 from .envelope import SignedEvidenceVerificationReceipt
-from .reverification import ReceiptVerification
+from .reverification import (
+    ScopeBoundVerificationResult,
+    SignatureOnlyVerificationResult,
+)
 from .verification import EvidenceAdmissionOutcome, EvidenceVerificationDetermination
 
 __all__ = [
@@ -70,9 +73,12 @@ _REASON_ORDER = tuple(TrustedEvidenceRefusalReason)
 class EvidenceVerificationAuditRecord:
     """One immutable, deterministic record of one trusted-evidence act.
 
-    ``act`` names which act this is — ``"EVIDENCE_VERIFICATION"`` or
-    ``"RECEIPT_REVERIFICATION"`` — so the two can never be read for one another
-    even though they share a shape.
+    ``act`` names which act this is — ``"EVIDENCE_VERIFICATION"``,
+    ``"RECEIPT_REVERIFICATION_SIGNATURE_ONLY"`` or
+    ``"RECEIPT_REVERIFICATION_SCOPE_BOUND"`` — so the three can never be read
+    for one another even though they share a shape. The two re-verification
+    kinds are distinguished in the record itself because conflating them was
+    closure-audit finding F-04.
 
     ``outcome`` is the string value of whichever outcome vocabulary applies. It
     is recorded as text rather than as an enum member precisely because the two
@@ -94,6 +100,10 @@ class EvidenceVerificationAuditRecord:
     receipt_payload_digest: str = ""
     receipt_envelope_digest: str = ""
     trust_anchor_digest: str = ""
+    #: For a scope-bound re-verification, the digest of the exact expectation
+    #: that was required. Empty for every other act, so an audit reader can
+    #: distinguish "bound to these coordinates" from "signature only".
+    scope_expectation_digest: str = ""
 
     def __post_init__(self) -> None:
         for name in (
@@ -123,6 +133,7 @@ class EvidenceVerificationAuditRecord:
             "receipt_payload_digest",
             "receipt_envelope_digest",
             "trust_anchor_digest",
+            "scope_expectation_digest",
         ):
             require_optional_digest(
                 getattr(self, name), f"EvidenceVerificationAuditRecord.{name}"
@@ -222,23 +233,31 @@ def audit_record_for_determination(
 
 
 def audit_record_for_receipt_verification(
-    verification: ReceiptVerification,
+    verification,
     envelope: SignedEvidenceVerificationReceipt,
     *,
     tenant_id: str,
 ) -> EvidenceVerificationAuditRecord:
     """Build the audit record for one independent re-verification act.
 
+    Accepts either verification result type and records **which kind it was**
+    in :attr:`~EvidenceVerificationAuditRecord.act`, so an audit trail can never
+    present a signature-only check as a scope-bound one (closure-audit F-04).
+
     Records the evaluation instant the caller supplied, which is what makes a
     later reader able to see *when* trust was asked about — the distinction that
     carries the whole weight of §13.3's revocation rule.
     """
 
-    require_exact_type(
-        verification,
-        ReceiptVerification,
-        "audit_record_for_receipt_verification.verification",
-    )
+    if type(verification) not in (
+        SignatureOnlyVerificationResult,
+        ScopeBoundVerificationResult,
+    ):
+        raise TrustedEvidenceContractError(
+            "audit_record_for_receipt_verification.verification must be exactly "
+            "a SignatureOnlyVerificationResult or a ScopeBoundVerificationResult "
+            f"(got {type(verification).__name__})"
+        )
     require_exact_type(
         envelope,
         SignedEvidenceVerificationReceipt,
@@ -255,8 +274,9 @@ def audit_record_for_receipt_verification(
     reasons = (
         () if verification.refusal_reason is None else (verification.refusal_reason,)
     )
+    scope_digest = getattr(verification, "scope_expectation_digest", "")
     return EvidenceVerificationAuditRecord(
-        act="RECEIPT_REVERIFICATION",
+        act=f"RECEIPT_REVERIFICATION_{verification.verification_kind.value}",
         outcome=verification.outcome.value,
         evaluated_at=verification.evaluated_at,
         tenant_id=tenant_id,
@@ -270,4 +290,5 @@ def audit_record_for_receipt_verification(
         receipt_payload_digest=verification.payload_canonical_digest,
         receipt_envelope_digest=verification.envelope_digest,
         trust_anchor_digest=verification.trust_anchor_digest,
+        scope_expectation_digest=scope_digest,
     )

@@ -289,14 +289,14 @@ class ProtocolExecutionResult:
         object.__setattr__(
             self, "refusal_reasons", _ordered_reasons(self.refusal_reasons)
         )
-        if self.cleared_stages and self.refusal_reasons:
+        if len(self.cleared_stages) > 0 and len(self.refusal_reasons) > 0:
             raise _fail(
                 "ProtocolExecutionResult reports both cleared stages and "
                 "refusals; a protocol run either established stages or failed "
                 "closed, and E-9 admits no partial pass",
                 _R.TRUSTED_EVIDENCE_MALFORMED_CONTRACT,
             )
-        if not self.cleared_stages and not self.refusal_reasons:
+        if len(self.cleared_stages) == 0 and len(self.refusal_reasons) == 0:
             raise _fail(
                 "ProtocolExecutionResult reports neither a cleared stage nor a "
                 "refusal; an untyped silence is not an outcome (E-9)",
@@ -535,8 +535,8 @@ class EvidenceVerificationDetermination:
             self, "refusal_reasons", _ordered_reasons(self.refusal_reasons)
         )
         admitted = self.outcome is EvidenceAdmissionOutcome.ADMITTED
-        if admitted:
-            if self.refusal_reasons:
+        if admitted is True:
+            if len(self.refusal_reasons) > 0:
                 raise _fail(
                     "an ADMITTED determination carries refusal reasons; every "
                     "member of the vocabulary is a refusal, so an admission "
@@ -555,7 +555,7 @@ class EvidenceVerificationDetermination:
                 "EvidenceVerificationDetermination.receipt_payload",
             )
         else:
-            if not self.refusal_reasons:
+            if len(self.refusal_reasons) == 0:
                 raise _fail(
                     "a REFUSED determination must carry at least one stable "
                     "typed reason code (ADR E-9, §11)",
@@ -774,7 +774,7 @@ class EvidenceVerificationAuthority:
         # 3. integrity and scope — re-checked here, never taken from a caller
         #    or from the protocol (ADR §8.1's independent re-check).
         mismatches = request.structural_scope_mismatches()
-        if mismatches:
+        if len(mismatches) > 0:
             return refuse(mismatches)
 
         # 4. temporal — the evidence's own half-open interval at as_of (§17.9).
@@ -795,7 +795,7 @@ class EvidenceVerificationAuthority:
             return refuse((_R.TRUSTED_EVIDENCE_PROTOCOL_UNSUPPORTED,))
         if result.protocol_version != self._protocol.protocol_version:
             return refuse((_R.TRUSTED_EVIDENCE_PROTOCOL_VERSION_MISMATCH,))
-        if result.refusal_reasons:
+        if len(result.refusal_reasons) > 0:
             return refuse(result.refusal_reasons)
 
         # The authority's own stages, established by the checks above and not
@@ -807,7 +807,7 @@ class EvidenceVerificationAuthority:
 
         # 6. coverage — every requested stage must actually be established.
         missing = [s for s in request.requested_trust_stages if s not in cleared]
-        if missing:
+        if len(missing) > 0:
             return refuse((_R.TRUSTED_EVIDENCE_VERIFICATION_NOT_PERFORMED,))
 
         cleared_stages = _ordered_stages(

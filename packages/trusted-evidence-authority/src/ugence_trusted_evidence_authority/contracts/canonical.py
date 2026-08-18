@@ -245,8 +245,30 @@ EVIDENCE_VERIFICATION_AUDIT_RECORD_DIGEST_DOMAIN = (
 #: value byte-identical, so every TEV-1 digest — including the four pinned
 #: vectors — is exactly what it was before TEV-2, and the package tests pin all
 #: four to prove it.
+#: The domain an unregistered dataclass is framed under. Named rather than
+#: inlined as a ``.get`` default, so the fallback is visible where it is chosen
+#: and greppable from anywhere. Its value is TEV-1's evidence-identity domain,
+#: unchanged, because changing it would move every TEV-1 pinned digest.
+UNREGISTERED_TYPE_DIGEST_DOMAIN = EVIDENCE_IDENTITY_DIGEST_DOMAIN
+
 _DOMAIN_BY_TYPE_NAME = {
     # -- TEV-1 (frozen) ---------------------------------------------------- #
+    #
+    # The evidence-identity family. These were previously served by a *default*
+    # on the lookup below rather than by entries here, which meant any
+    # unregistered type silently acquired the evidence-identity domain — a
+    # silent cross-domain assignment, and exactly the class of defect the
+    # closure-audit truthiness sweep looks for. They are enumerated now and the
+    # lookup has no fallback. Every value is the domain that type already used,
+    # so no digest moves: the four pinned TEV-1 vectors are unchanged.
+    "CanonicalEvidenceIdentity": EVIDENCE_IDENTITY_DIGEST_DOMAIN,
+    "EvidenceSchemaRef": EVIDENCE_IDENTITY_DIGEST_DOMAIN,
+    "EvidenceObservation": EVIDENCE_IDENTITY_DIGEST_DOMAIN,
+    "EvidenceScopeBinding": EVIDENCE_IDENTITY_DIGEST_DOMAIN,
+    "EvidenceClaimBinding": EVIDENCE_IDENTITY_DIGEST_DOMAIN,
+    "EvidenceProvenanceChain": EVIDENCE_IDENTITY_DIGEST_DOMAIN,
+    "ApplicabilityCoordinate": EVIDENCE_IDENTITY_DIGEST_DOMAIN,
+    "EvidenceVerificationRequest": EVIDENCE_IDENTITY_DIGEST_DOMAIN,
     "EvidenceVerificationReceiptPayload": (
         EVIDENCE_VERIFICATION_RECEIPT_PAYLOAD_DIGEST_DOMAIN
     ),
@@ -259,11 +281,16 @@ _DOMAIN_BY_TYPE_NAME = {
     "SignedEvidenceSubmission": SIGNED_EVIDENCE_SUBMISSION_DIGEST_DOMAIN,
     "SignedEvidenceVerificationReceipt": SIGNED_RECEIPT_ENVELOPE_DIGEST_DOMAIN,
     # -- TEV-2: protocol reports, never attested artifacts ----------------- #
-    # ``EvidenceVerificationDetermination`` and ``ReceiptVerification`` are
-    # deliberately **absent**: both carry a private capability token, and the
-    # encoder's total-field-inclusion rule (§22.2) admits no conditional
-    # omission, so neither type is canonicalizable at all. Their auditable
-    # counterpart is ``EvidenceVerificationAuditRecord``, below.
+    # ``EvidenceVerificationDetermination``, ``SignatureOnlyVerificationResult``
+    # and ``ScopeBoundVerificationResult`` are deliberately **absent**: each
+    # carries a private capability token, and the encoder's
+    # total-field-inclusion rule (§22.2) admits no conditional omission, so none
+    # of them is canonicalizable at all. Their auditable counterpart is
+    # ``EvidenceVerificationAuditRecord``, below. ``ReceiptSigningInput`` is
+    # absent for the same reason, and ``ReceiptScopeExpectation`` because it is
+    # a consumer's *question*, not an artifact — it carries its own
+    # ``expectation_digest()`` in its own domain, and giving it a second
+    # spelling here would be the second digest §22.11 refuses.
     "ProtocolExecutionResult": EVIDENCE_VERIFICATION_RESULT_DIGEST_DOMAIN,
     # -- TEV-2: deterministic audit ---------------------------------------- #
     "EvidenceVerificationAuditRecord": (
@@ -359,9 +386,24 @@ def canonical_bytes(contract: Any) -> bytes:
             f"(got {type(contract).__name__})"
         )
     type_name = type(contract).__name__
+    # Membership, then an explicitly named domain — never a ``.get`` default
+    # that would leave the fallback invisible at the call site. Both branches
+    # are ratified TEV-1 behaviour and neither moves a digest.
+    #
+    # An unregistered type takes :data:`UNREGISTERED_TYPE_DIGEST_DOMAIN`, and
+    # that is safe rather than lax: ``type`` is itself a framed field, so a
+    # subclass, a look-alike or any foreign dataclass gets bytes that differ
+    # from every registered type's and can never be presented as one. It is the
+    # property ``test_a_subclass_can_lie_about_itself_but_gets_its_own_digest``
+    # pins. What the fallback must never do is give an unregistered type a
+    # *registered* type's domain, and it does not.
+    if type_name in _DOMAIN_BY_TYPE_NAME:
+        domain = _DOMAIN_BY_TYPE_NAME[type_name]
+    else:
+        domain = UNREGISTERED_TYPE_DIGEST_DOMAIN
     framed = {
         "canonicalization": TRUSTED_EVIDENCE_CANONICALIZATION_VERSION,
-        "domain": _DOMAIN_BY_TYPE_NAME.get(type_name, EVIDENCE_IDENTITY_DIGEST_DOMAIN),
+        "domain": domain,
         "type": type_name,
         "body": _to_canonical_obj(contract, "$"),
     }

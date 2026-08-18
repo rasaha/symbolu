@@ -61,7 +61,7 @@ from typing import Protocol, runtime_checkable
 from ..contracts._validation import require_exact_type, require_identifier
 from ..contracts.errors import TrustedEvidenceContractError
 from ..contracts.reasons import TrustedEvidenceRefusalReason
-from .ed25519 import TrustedEvidenceSigningKey
+from .backend import TrustedEvidenceSigningKey
 from .profile import (
     TRUSTED_EVIDENCE_SIGNATURE_PROFILE_V1,
     encode_public_key,
@@ -129,7 +129,7 @@ class ReceiptSigningInput:
                 f"(got {type(self.signed_input).__name__})",
                 _R.TRUSTED_EVIDENCE_MALFORMED_CONTRACT,
             )
-        if not self.signed_input:
+        if len(self.signed_input) == 0:
             raise _fail(
                 "ReceiptSigningInput.signed_input must not be empty; a signature "
                 "over nothing covers nothing",
@@ -191,10 +191,10 @@ class ReceiptSignerPort(Protocol):
 class Ed25519ReceiptSigner:
     """The reference :class:`ReceiptSignerPort` over the RFC 8032 implementation.
 
-    Holds a :class:`~.ed25519.TrustedEvidenceSigningKey` and nothing else. The
-    seed is reachable only through this object, never lands in a record, an
-    envelope, a determination, an audit entry or a ``repr``, and there is no
-    accessor that returns it.
+    Holds a :class:`~.backend.TrustedEvidenceSigningKey` and nothing else, and
+    that key holds only a backend private-key object — never the caller's raw
+    seed bytes (closure-audit **F-08**). There is no accessor that returns
+    private material from either object, and neither can be pickled or copied.
 
     Not a dataclass, and not frozen-by-decorator but frozen-by-refusal:
     ``__setattr__`` raises after construction, so a signing key cannot be

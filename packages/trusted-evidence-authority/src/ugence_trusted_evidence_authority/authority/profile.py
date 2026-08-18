@@ -88,7 +88,7 @@ __all__ = [
 from ..contracts._validation import require_canonical_str
 from ..contracts.errors import TrustedEvidenceContractError
 from ..contracts.reasons import TrustedEvidenceRefusalReason
-from .ed25519 import ED25519_PUBLIC_KEY_SIZE, ED25519_SIGNATURE_SIZE
+from .backend import ED25519_PUBLIC_KEY_SIZE, ED25519_SIGNATURE_SIZE
 
 #: The one ratified TEV-2 signature profile (DD-9). Exact-match only.
 #:
@@ -226,7 +226,7 @@ def framed_signed_input(elements: tuple) -> bytes:
             "framed_signed_input expects a tuple of byte strings "
             f"(got {type(elements).__name__})"
         )
-    if not elements:
+    if len(elements) == 0:
         raise TrustedEvidenceContractError(
             "framed_signed_input requires at least one element; an empty frame "
             "would be a signature over nothing"

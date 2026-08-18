@@ -118,5 +118,5 @@ def require_valid_lifecycle_transition(
         raise TrustedEvidenceLifecycleError(
             f"{current.value} -> {proposed.value} is not a ratified evidence "
             f"lifecycle transition (ADR §28); admissible next states from "
-            f"{current.value}: {admissible or 'none — terminal state'}"
+            f"{current.value}: {admissible if len(admissible) > 0 else 'none — terminal state'}"
         )

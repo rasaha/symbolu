@@ -207,12 +207,22 @@ def signed_receipt_input_bytes(
     and cross-protocol replay routes at the cryptographic layer rather than only
     at the field-comparison layer.
 
-    Elements 9 and 10 bind the payload **twice**: once by digest and once by its
-    full canonical bytes. The digest alone would let a second-preimage argument
-    carry weight it should not have to; the bytes alone would leave the
-    envelope's declared digest field unbound to the signature. Binding both
-    means a swapped payload, a swapped payload digest, or a payload/digest pair
-    that disagree are all signature failures, not merely field mismatches.
+    Elements 9 and 10 bind the payload **twice**: once by the digest this
+    function recomputes from it, and once by its full canonical bytes. The
+    digest alone would let a second-preimage argument carry weight it should
+    not have to; the bytes alone would leave the digest unbound, so a verifier
+    reading the digest would be reading something the signature never covered.
+
+    Note precisely *which* digest is bound: the one recomputed here, **not** the
+    envelope's declared ``payload_canonical_digest`` field. The signer signs
+    what it computed, never a value handed to it. A swapped payload is therefore
+    a signature failure — but a tampered *declared field* is not, and nothing at
+    this layer catches it. Two separate checks do: the envelope refuses a
+    mismatched declared digest at construction, and
+    :class:`~.reverification.SignedReceiptVerifier` recomputes it again for
+    artifacts whose constructor never ran (an unpickled envelope, or one a
+    deserializer rebuilt field by field). Both are load-bearing, they are
+    different gates, and conflating them was closure-audit finding **F-09**.
 
     Nothing self-referential is bound. The envelope digest is **not** an element
     — it is computed *over* the signature, so including it would be exactly the
