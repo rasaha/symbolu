@@ -1,0 +1,161 @@
+name: trusted-evidence-authority-ci
+
+# Scoped CI for the independent ugence-trusted-evidence-authority leaf package —
+# the platform Trust Assurance role (ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md,
+# E-1/E-2/§6.2), at milestone TEV-2 (§30: the verification authority, trust anchors,
+# key trust/revocation, signing, independent verification).
+#
+# Resolves the Low finding carried from the TEV-1 closure audit ("no dedicated TEV
+# package CI"). Runs the package suite and the independent adversarial probes, builds
+# a clean wheel and sdist, verifies isolated --no-index installation and public-API
+# parity across source/manifest/wheel/installed runtime, re-asserts the dependency and
+# reverse-dependency guards and the no-clock/nondeterminism scans, reproduces the
+# pinned TEV-1 and TEV-2 byte vectors, and runs the platform-freeze verifier.
+#
+# It publishes nothing, uses no secret, and contacts no external trust service. All
+# cryptographic key material it touches is fixed, hard-coded, unmistakably
+# non-production test material (see tests/_authority_builders.py).
+
+on:
+  pull_request:
+    paths:
+      - "packages/trusted-evidence-authority/**"
+      - "docs/architecture/ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md"
+      - ".github/workflows/trusted-evidence-authority-ci.yml"
+  push:
+    # Feature branches AND the repository's actual default branch, so a merge
+    # touching the package (matching the path filter) gets a recorded CI run.
+    branches:
+      - "claude/setup-symbolu-monorepo-**"
+      - "claude/tev-**"
+      - "claude/trusted-evidence-**"
+    paths:
+      - "packages/trusted-evidence-authority/**"
+      - "docs/architecture/ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md"
+      - ".github/workflows/trusted-evidence-authority-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  package-suite:
+    name: Trusted Evidence package suite (source)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        # The package itself is a zero-dependency stdlib leaf (ADR §23); pytest
+        # is the only thing the suite needs.
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+      - name: Package suite (contracts, authority, canonicalization, packaging)
+        run: python -m pytest packages/trusted-evidence-authority/tests -q
+      - name: TEV-1 backward compatibility — the four pinned digests and the 29 symbols
+        run: |
+          python -m pytest \
+            packages/trusted-evidence-authority/tests/authority/test_tev2_canonicalization_vectors.py \
+            packages/trusted-evidence-authority/tests/contract/test_canonicalization.py \
+            packages/trusted-evidence-authority/tests/packaging/test_public_api.py -q
+      - name: RFC 8032 conformance — the published Ed25519 vectors
+        run: |
+          python -m pytest \
+            packages/trusted-evidence-authority/tests/authority/test_ed25519_rfc8032.py -q
+      - name: Anti-forgery, replay, revocation and time-boundary matrices
+        run: |
+          python -m pytest \
+            packages/trusted-evidence-authority/tests/authority/test_anti_forgery_and_replay.py \
+            packages/trusted-evidence-authority/tests/authority/test_trust_anchor_lifecycle.py \
+            packages/trusted-evidence-authority/tests/contract/test_anti_forgery.py -q
+      - name: Key-material hygiene — no seed reaches any artifact
+        run: |
+          python -m pytest \
+            packages/trusted-evidence-authority/tests/authority/test_key_material_hygiene.py -q
+      - name: Dependency and reverse-dependency guards
+        run: |
+          python -m pytest \
+            packages/trusted-evidence-authority/tests/packaging/test_dependency_boundary.py -q
+      - name: No-clock and nondeterminism scans
+        run: |
+          python -m pytest \
+            packages/trusted-evidence-authority/tests/packaging/test_no_clock_or_environment.py -q
+      - name: Milestone boundary — TEV-2 stops where the ADR says it stops
+        run: |
+          python -m pytest \
+            packages/trusted-evidence-authority/tests/packaging/test_milestone_boundary.py -q
+
+  adversarial-probes:
+    name: Independent adversarial probes (source)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Independent probe harness (curated API + stdlib only)
+        # Imports no test module, no _builders helper, no conftest and no
+        # private submodule; reconstructs the signed bytes by hand and verifies
+        # a fixed signature vector.
+        env:
+          PYTHONPATH: packages/trusted-evidence-authority/src
+        run: python packages/trusted-evidence-authority/adversarial_probes.py
+
+  isolated-install:
+    name: Wheel + sdist build and isolated installation verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install build pytest
+      - name: Build wheel + sdist, install into a clean --no-index venv, prove the leaf
+        # Also runs the adversarial probes *inside* the installed wheel and
+        # asserts source/manifest/wheel/installed public-API parity.
+        run: python packages/trusted-evidence-authority/verify_trusted_evidence_authority_distribution.py
+
+  api-parity:
+    name: Public API parity (source vs committed manifest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+      - name: public_api.json equals the actual curated surface
+        run: |
+          python -m pytest \
+            packages/trusted-evidence-authority/tests/packaging/test_public_api.py -q
+      - name: py.typed marker ships
+        run: |
+          test -f packages/trusted-evidence-authority/src/ugence_trusted_evidence_authority/py.typed
+
+  freeze:
+    name: Platform-freeze verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pydantic
+      - name: Freeze verification (blocking — frozen artifacts must be unchanged)
+        run: python -m platform_freeze.verify --manifest platform/PLATFORM_FREEZE_V1.json

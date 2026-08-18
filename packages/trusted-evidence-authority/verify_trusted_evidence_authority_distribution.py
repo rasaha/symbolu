@@ -14,7 +14,17 @@ proves inside that env:
     every symbol, kind, enum member **and order**, dataclass field **and
     order**, and pinned constant value;
   * representative contracts construct, canonicalize and digest, and the pinned
-    canonical bytes and digest reproduce byte-for-byte;
+    canonical bytes and digest reproduce byte-for-byte — including the four
+    TEV-1 vectors, unchanged;
+  * the TEV-2 verification authority, signer and independent re-verifier work
+    end to end inside the installed wheel: an evidence submission is verified,
+    a receipt is signed, and the envelope re-verifies against a resolved trust
+    anchor, with pinned signature bytes and pinned digests;
+  * the RFC 8032 §7.1 published Ed25519 vectors reproduce exactly, proving the
+    installed signer implements the standard algorithm;
+  * the principal TEV-2 refusal classes fire from the installed wheel —
+    revoked, expired and not-yet-valid keys, an unconfigured trust anchor, an
+    invalid signature, a swapped payload, and a replayed coordinate;
   * the structural invariants fire (blank/padded identifier, malformed digest,
     naive datetime, reversed interval, duplicate custody link, applicability
     XOR, co-required binding pair, closed lifecycle relation);
@@ -49,7 +59,7 @@ import dataclasses, enum, hashlib, importlib.util, json, pathlib, sys
 from datetime import datetime, timedelta, timezone
 
 import ugence_trusted_evidence_authority as u
-assert u.__version__ == "0.1.0", u.__version__
+assert u.__version__ == "0.2.0", u.__version__
 assert "site-packages" in u.__file__, u.__file__
 assert not any("/symbolu" in p for p in sys.path), sys.path
 assert (pathlib.Path(u.__file__).resolve().parent / "py.typed").is_file(), "py.typed not installed"
@@ -61,7 +71,26 @@ from ugence_trusted_evidence_authority.api import (
     EVIDENCE_VERIFICATION_RECEIPT_PAYLOAD_DIGEST_DOMAIN,
     RECEIPT_REPORTABLE_TRUST_STAGES,
     TRUSTED_EVIDENCE_CANONICALIZATION_VERSION,
-    TRUSTED_EVIDENCE_REFUSAL_REASONS, ApplicabilityCoordinate,
+    TRUSTED_EVIDENCE_REFUSAL_REASONS,
+    TEV1_TRUSTED_EVIDENCE_REFUSAL_REASONS,
+    TEV2_TRUSTED_EVIDENCE_REFUSAL_REASONS,
+    SIGNED_EVIDENCE_SUBMISSION_SCHEMA_V1,
+    SIGNED_RECEIPT_ENVELOPE_SCHEMA_V1,
+    TRUSTED_EVIDENCE_SIGNATURE_PROFILE_V1,
+    TRUSTED_EVIDENCE_SIGNATURE_ENCODING_V1,
+    TRUSTED_EVIDENCE_SIGNED_EVIDENCE_INPUT_DOMAIN,
+    TRUSTED_EVIDENCE_SIGNED_RECEIPT_INPUT_DOMAIN,
+    DenyAllTrustAnchorDirectory, Ed25519EvidenceAuthenticityProtocol,
+    Ed25519ReceiptSigner, EvidenceAdmissionOutcome,
+    EvidenceVerificationAuthority, KeyRevocation, ReceiptIssuer,
+    ReceiptVerificationOutcome, SignedEvidenceSubmission,
+    SignedEvidenceVerificationReceipt, SignedReceiptVerifier,
+    StaticTrustAnchorDirectory, TrustAnchorCapability, TrustAnchorCoordinate,
+    TrustAnchorRecord, TrustedEvidenceSigningKey,
+    TrustedEvidenceVerificationKey, audit_record_for_determination,
+    encode_public_key, encode_signature, signed_evidence_input_bytes,
+    signed_receipt_input_bytes,
+    ApplicabilityCoordinate,
     ApplicabilityDeclaration, CanonicalEvidenceIdentity,
     DeclaredVerificationOutcome, EvidenceClaimBinding, EvidenceLifecycleState,
     EvidenceObservation, EvidenceProvenanceChain, EvidenceSchemaRef,
@@ -232,17 +261,30 @@ for field, code in (("tenant_id", R.TRUSTED_EVIDENCE_TENANT_MISMATCH),
     assert code in req(evidence=replayed).structural_scope_mismatches(), field
 
 assert set(R) == set(TRUSTED_EVIDENCE_REFUSAL_REASONS)
-assert len(list(R)) == 19
+assert len(list(R)) == 40
 assert R.TRUSTED_EVIDENCE_INDETERMINATE in TRUSTED_EVIDENCE_REFUSAL_REASONS
+# TEV-1's nineteen keep their exact ordinal positions; TEV-2 appended 21.
+assert list(R)[18] is R.TRUSTED_EVIDENCE_INDETERMINATE
+assert list(R)[19] is R.TRUSTED_EVIDENCE_ENVELOPE_MALFORMED
+assert list(R)[-1] is R.TRUSTED_EVIDENCE_RECEIPT_EXPIRED
 for name in api.__all__:
     low = name.lower().replace("_", "")
-    for banned in ("verifier", "trustanchor", "keyring", "signer", "signature",
-                   "verificationresult", "signedreceipt"):
+    # No *later* milestone leaked in. TEV-2's own verifier, signer, trust
+    # anchors and signed receipt are expected and asserted present below.
+    for banned in ("benchmark", "readiness", "roi", "forecast", "attribution",
+                   "valuation", "actiongate", "deployment", "credential",
+                   "kms", "hsm", "certificate", "riskauthority",
+                   "cloudscaling", "governedvalue", "policyapplicability"):
         assert banned not in low, name
-    # The receipt *payload* ships (ADR §30/§32); nothing is called a receipt,
-    # because §13.3 rules that an unsigned artifact is not one.
-    assert not name.endswith("Receipt"), name
+    # §13.3 — an unsigned artifact is not a receipt, and is not named as one.
+    if name.endswith("Receipt") and not name.isupper() and "_" not in name:
+        assert name.startswith("Signed"), name
 assert "EvidenceVerificationReceiptPayload" in api.__all__
+assert "EvidenceVerificationReceipt" not in api.__all__
+for required in ("EvidenceVerificationAuthority", "SignedReceiptVerifier",
+                 "SignedEvidenceVerificationReceipt", "TrustAnchorRecord",
+                 "ReceiptIssuer", "Ed25519ReceiptSigner"):
+    assert required in api.__all__, required
 
 # ---- A-02: claim/metric/units co-requirement --------------------------------
 for kw in (dict(claim_ref="c", unit="u", measurement_semantics_ref="s"),
@@ -380,6 +422,184 @@ assert _v.receipt_is_valid_at(datetime(2026, 12, 1, tzinfo=UTC)) is False
 assert _v.receipt_is_valid_at(datetime(2026, 6, 1, tzinfo=UTC)) is True
 refuses(lambda: rcpt(receipt_valid_from=V1, receipt_valid_to=V0))
 refuses(lambda: rcpt(evidence_valid_from=V1, evidence_valid_to=V0))
+
+# ---- TEV-2: the verification authority, end to end inside the wheel ---------
+#
+# NOT PRODUCTION KEYS. Fixed, published or trivially-patterned byte ranges,
+# committed to a public source tree purely so this proof is deterministic.
+NON_PRODUCTION_VERIFY_PRODUCER_SEED = bytes(range(192, 224))
+NON_PRODUCTION_VERIFY_AUTHORITY_SEED = bytes(range(224, 256))
+
+_prod_key = TrustedEvidenceSigningKey(NON_PRODUCTION_VERIFY_PRODUCER_SEED)
+_auth_key = TrustedEvidenceSigningKey(NON_PRODUCTION_VERIFY_AUTHORITY_SEED)
+_PA, _PK = "dist-producer-authority-nonprod", "dist-producer-key-nonprod"
+_VA, _VK = "dist-verifier-authority-nonprod", "dist-verifier-key-nonprod"
+_KF = datetime(2026, 1, 1, tzinfo=UTC)
+_KT = datetime(2027, 1, 1, tzinfo=UTC)
+_VT = datetime(2026, 6, 1, 8, 0, 0, 750000, tzinfo=UTC)
+_AT = datetime(2026, 6, 1, tzinfo=UTC)
+
+# RFC 8032 §7.1 TEST 1 — the installed signer implements the standard algorithm.
+_rfc = TrustedEvidenceSigningKey(bytes.fromhex(
+    "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60"))
+assert encode_public_key(_rfc.verification_key.public_key_bytes) == (
+    "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a")
+assert encode_signature(_rfc.sign(b"")) == (
+    "e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8"
+    "821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b")
+
+def _anchor(**kw):
+    base = dict(authority_id=_VA, key_id=_VK,
+                capability=TrustAnchorCapability.RECEIPT_ISSUANCE,
+                public_key=encode_public_key(
+                    _auth_key.verification_key.public_key_bytes),
+                trust_anchor_set_id="dist-set", trust_anchor_set_version="1",
+                effective_from=_KF, effective_to=_KT)
+    base.update(kw); return TrustAnchorRecord(**base)
+
+_producer_anchor = _anchor(
+    authority_id=_PA, key_id=_PK,
+    capability=TrustAnchorCapability.EVIDENCE_PRODUCTION,
+    public_key=encode_public_key(_prod_key.verification_key.public_key_bytes))
+
+def _directory(*anchors):
+    return StaticTrustAnchorDirectory(
+        anchors or (_producer_anchor, _anchor()),
+        trust_anchor_set_id="dist-set", trust_anchor_set_version="1")
+
+_evidence = ident()
+_submission = SignedEvidenceSubmission(
+    envelope_schema=SIGNED_EVIDENCE_SUBMISSION_SCHEMA_V1,
+    evidence=_evidence,
+    evidence_identity_digest=_evidence.canonical_digest(),
+    producer_authority_id=_PA, producer_key_id=_PK,
+    signature_profile=TRUSTED_EVIDENCE_SIGNATURE_PROFILE_V1,
+    signed_input_domain=TRUSTED_EVIDENCE_SIGNED_EVIDENCE_INPUT_DOMAIN,
+    signature=encode_signature(_prod_key.sign(signed_evidence_input_bytes(
+        evidence=_evidence, producer_authority_id=_PA, producer_key_id=_PK))))
+
+_signer = Ed25519ReceiptSigner(
+    signer_authority_id=_VA, signing_key_id=_VK, signing_key=_auth_key)
+_authority = EvidenceVerificationAuthority(
+    authority_id=_VA, trust_anchors=_directory(),
+    protocol=Ed25519EvidenceAuthenticityProtocol(),
+    receipt_schema=EvidenceSchemaRef(
+        schema_id="ugence.receipt.evidence-verification", schema_version="1"))
+
+_det = _authority.verify(_submission, req(), verified_at=_VT, verifier_key_id=_VK)
+assert _det.outcome is EvidenceAdmissionOutcome.ADMITTED, _det.refusal_reasons
+assert _det.admitted is True and _det.refusal_reasons == ()
+
+_env = ReceiptIssuer(signer=_signer).issue(_det)
+assert isinstance(_env, SignedEvidenceVerificationReceipt)
+assert _env.envelope_schema == SIGNED_RECEIPT_ENVELOPE_SCHEMA_V1
+assert _env.signed_input_domain == TRUSTED_EVIDENCE_SIGNED_RECEIPT_INPUT_DOMAIN
+assert _env.signature_encoding == TRUSTED_EVIDENCE_SIGNATURE_ENCODING_V1
+
+# Pinned TEV-2 vectors, reproduced from the installed wheel.
+assert _env.payload.receipt_id == "receipt-90f644a29950267a8af2a836ff8ed67288f8ed91611239a62b1aa593997a8479", _env.payload.receipt_id
+assert _env.payload_canonical_digest == "70f5bcc7edd8a5c396a4afba5c0787955f1440b11d797afb763a50df35bf47b0", _env.payload_canonical_digest
+assert _env.envelope_digest() == "9dc4b08950abaa96a0bea65c313afd101ee18143c63e13bae10fc6574d2bea57", _env.envelope_digest()
+assert _env.signature == ("2f322fbae9cbb2d0d11ebbd244bb33762c4d1d02442cbfdccea4d3ddeb641df6" "e31f6718e9ed3fb0db8d4d40b7de9a5749cb976c1bd3ea15b7011eae31d1b001"), _env.signature
+assert _submission.signature == ("1573c4f355ffe9cd970c0718e6b603e9d12a032af9dc8c314eac722d461e9e47" "8127e264d02223b6e1551b27ee8b003f8d1cadf426fa30505dec68da54e24f0c"), _submission.signature
+assert hashlib.sha256(_env.signed_input_bytes()).hexdigest() == "f009f27699306664e74dfec7ff1d5fbaa052f28487db8044c42486486ac9aebe"
+
+# The signed input is reconstructible from the documented rules alone.
+_w = 8
+_elements = (
+    TRUSTED_EVIDENCE_SIGNED_RECEIPT_INPUT_DOMAIN.encode("utf-8"),
+    SIGNED_RECEIPT_ENVELOPE_SCHEMA_V1.encode("utf-8"),
+    TRUSTED_EVIDENCE_SIGNATURE_PROFILE_V1.encode("utf-8"),
+    TRUSTED_EVIDENCE_CANONICALIZATION_VERSION.encode("utf-8"),
+    EVIDENCE_VERIFICATION_RECEIPT_PAYLOAD_DIGEST_DOMAIN.encode("utf-8"),
+    _VA.encode("utf-8"), _VK.encode("utf-8"),
+    _env.payload.verification_protocol_id.encode("utf-8"),
+    _env.payload.verification_protocol_version.encode("utf-8"),
+    _env.payload.canonical_digest().encode("utf-8"),
+    canonical_bytes(_env.payload))
+_hand = b"".join([len(_elements).to_bytes(_w, "big")] + [
+    piece for e in _elements for piece in (len(e).to_bytes(_w, "big"), e)])
+assert _env.signed_input_bytes() == _hand
+
+# Independent re-verification, and a key rebuilt from the published hex.
+_verified = SignedReceiptVerifier(trust_anchors=_directory()).verify(
+    _env, evaluated_at=_AT, expected_tenant_id=_env.payload.scope.tenant_id)
+assert _verified.outcome is ReceiptVerificationOutcome.VERIFIED
+assert _verified.verified is True and _verified.refusal_reason is None
+assert TrustedEvidenceVerificationKey(
+    bytes.fromhex(_anchor().public_key)).verify(
+        _env.signed_input_bytes(), _env.signature_bytes())
+
+# The principal refusal classes fire from the installed wheel.
+def _refuses_with(reason, *, anchors=None, at=None, envelope=None, **expected):
+    result = SignedReceiptVerifier(
+        trust_anchors=anchors or _directory()).verify(
+            envelope or _env, evaluated_at=at or _AT, **expected)
+    assert result.outcome is ReceiptVerificationOutcome.REFUSED, reason
+    assert result.verified is False
+    assert result.refusal_reason is reason, (reason, result.refusal_reason)
+
+_refuses_with(R.TRUSTED_EVIDENCE_TRUST_ANCHOR_NOT_CONFIGURED,
+              anchors=DenyAllTrustAnchorDirectory())
+_refuses_with(R.TRUSTED_EVIDENCE_TRUST_ANCHOR_MISSING,
+              anchors=_directory(_producer_anchor))
+_refuses_with(R.TRUSTED_EVIDENCE_KEY_REVOKED, anchors=_directory(
+    _producer_anchor, _anchor(revocation=KeyRevocation(effective_at=_KF))))
+_refuses_with(R.TRUSTED_EVIDENCE_KEY_EXPIRED, anchors=_directory(
+    _producer_anchor, _anchor(effective_to=datetime(2026, 2, 1, tzinfo=UTC))))
+_refuses_with(R.TRUSTED_EVIDENCE_KEY_NOT_YET_VALID, anchors=_directory(
+    _producer_anchor, _anchor(effective_from=datetime(2026, 12, 1, tzinfo=UTC))))
+_refuses_with(R.TRUSTED_EVIDENCE_KEY_DISABLED, anchors=_directory(
+    _producer_anchor, _anchor(disabled=True)))
+_refuses_with(R.TRUSTED_EVIDENCE_SIGNATURE_INVALID, anchors=_directory(
+    _producer_anchor, _anchor(public_key=encode_public_key(
+        _prod_key.verification_key.public_key_bytes))))
+_refuses_with(R.TRUSTED_EVIDENCE_TENANT_MISMATCH,
+              expected_tenant_id="a-different-tenant")
+_refuses_with(R.TRUSTED_EVIDENCE_CONTENT_DIGEST_MISMATCH,
+              expected_evidence_content_digest=OTHER)
+
+# A tampered signature, and a swapped payload.
+_flipped = bytearray(_env.signature_bytes()); _flipped[0] ^= 0x01
+_refuses_with(R.TRUSTED_EVIDENCE_SIGNATURE_INVALID, envelope=dataclasses.replace(
+    _env, signature=encode_signature(bytes(_flipped))))
+_other_payload = rcpt(receipt_id="a-different-receipt")
+_refuses_with(R.TRUSTED_EVIDENCE_SIGNATURE_INVALID, envelope=dataclasses.replace(
+    _env, payload=_other_payload,
+    payload_canonical_digest=_other_payload.canonical_digest()))
+refuses(lambda: dataclasses.replace(_env, payload=_other_payload),
+        TrustedEvidenceContractError)
+
+# No arbitrary-signing route, and no manufactured success, from the wheel.
+refuses(lambda: ReceiptIssuer(signer=_signer).issue(_authority.verify(
+    _submission, req(expected_tenant_id="other"), verified_at=_VT,
+    verifier_key_id=_VK)), TrustedEvidenceContractError)
+for _bad in (b"bytes", "string", None, 42):
+    refuses(lambda b=_bad: _signer.sign_receipt(b), TrustedEvidenceContractError)
+
+# The wrapped TEV-1 payload is untouched by all of this.
+assert _env.payload.structural_status is EvidenceStructuralStatus.STRUCTURAL_UNVERIFIED
+assert _env.payload.authenticity_verified is False
+assert EvidenceTrustStage.POLICY_SUFFICIENT not in _env.payload.declared_cleared_stages
+
+# Private key material reaches nothing that leaves the process.
+_hex = NON_PRODUCTION_VERIFY_AUTHORITY_SEED.hex()
+_record = audit_record_for_determination(_det, tenant_id="tenant-1", envelope=_env)
+for _rendering in (repr(_auth_key), str(_auth_key), repr(_signer),
+                   canonical_bytes(_env).decode("utf-8"),
+                   canonical_bytes(_record).decode("utf-8"),
+                   canonical_bytes(_anchor()).decode("utf-8")):
+    assert _hex not in _rendering
+assert repr(_auth_key) == "TrustedEvidenceSigningKey(<redacted>)"
+
+# The refusal vocabulary is one namespace: TEV-1's nineteen, plus TEV-2's.
+assert len(TEV1_TRUSTED_EVIDENCE_REFUSAL_REASONS) == 19
+assert TEV1_TRUSTED_EVIDENCE_REFUSAL_REASONS.isdisjoint(
+    TEV2_TRUSTED_EVIDENCE_REFUSAL_REASONS)
+assert (TEV1_TRUSTED_EVIDENCE_REFUSAL_REASONS
+        | TEV2_TRUSTED_EVIDENCE_REFUSAL_REASONS) == TRUSTED_EVIDENCE_REFUSAL_REASONS
+assert set(list(TrustedEvidenceRefusalReason)[:19]) == (
+    TEV1_TRUSTED_EVIDENCE_REFUSAL_REASONS)
 
 # ---- installed surface == committed public_api.json ------------------------
 def kind(o):
