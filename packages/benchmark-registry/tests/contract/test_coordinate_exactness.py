@@ -52,6 +52,15 @@ INEXACT_VERSIONS = [
     "",
     " 1.2.3",
     "1.2.3 ",
+    # Build metadata (F-3): SemVer 2.0.0 ignores it for precedence, so
+    # "1.2.3" and "1.2.3+build" would be two coordinate spellings of one
+    # precedence-equivalent version. The governing ADR authorizes no
+    # exception, so it is refused, not merely ignored.
+    "1.2.3+a",
+    "1.2.3+build.7",
+    "1.2.3-alpha+build",
+    "1.0.0+build.5",
+    "1.0.0-alpha.1+exp.sha.5114f85",
 ]
 
 
@@ -107,8 +116,8 @@ def test_an_inexact_version_is_refused(version):
 
 
 @pytest.mark.parametrize(
-    "version", ["0.0.1", "1.0.0", "1.4.0", "10.20.30", "1.0.0-rc.1", "1.0.0+build.5",
-                "1.0.0-alpha.1+exp.sha.5114f85"]
+    "version", ["0.0.1", "1.0.0", "1.4.0", "10.20.30", "1.0.0-rc.1", "1.2.3-alpha",
+                "1.2.3-alpha.1"]
 )
 def test_an_exact_semantic_version_is_accepted(version):
     assert b.coordinate(benchmark_version=version).benchmark_version == version

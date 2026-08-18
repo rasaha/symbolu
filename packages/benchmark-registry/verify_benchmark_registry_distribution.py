@@ -326,31 +326,91 @@ def leaves(contract, prefix=""):
     return found
 
 
-MUTATIONS = {
-    str: "MUTATED-BY-THE-VERIFIER",
-    datetime: datetime(2030, 5, 5, tzinfo=timezone.utc),
-    tuple: ("mutated-by-the-verifier",),
-    type(None): datetime(2031, 1, 1, tzinfo=timezone.utc),
-    BenchmarkScopeKind: BenchmarkScopeKind.PLATFORM_WIDE,
-    BenchmarkApplicabilityDeclaration: BenchmarkApplicabilityDeclaration.NOT_APPLICABLE,
-    TemporalBoundDeclaration: TemporalBoundDeclaration.OPEN_ENDED,
-    BenchmarkLifecycleState: BenchmarkLifecycleState.AUTHORED,
-    BenchmarkSupersessionStatus: "MUTATED-STATUS",
+# Per-path (not per-type) replacements: a generic same-typed replacement is
+# not always *valid* — ``benchmark_version`` must stay an exact semver, for
+# instance. ``canonical_digest`` now revalidates the whole graph before
+# producing a digest, so a replacement that leaves the object in a state no
+# public constructor could have produced is refused rather than silently
+# digested — matching packages/benchmark-registry/tests/contract/
+# test_digest_coverage.py.
+PER_PATH_MUTATIONS = {
+    "coordinate.benchmark_id": "bmk-mutated-by-the-verifier",
+    "coordinate.benchmark_family": "family-mutated-by-the-verifier",
+    "coordinate.benchmark_version": "9.9.9",
+    "content_digest": OTHER,
+    "measurement.intended_outcome_ref": "outcome-mutated-by-the-verifier",
+    "measurement.metric_ref": "metric-mutated-by-the-verifier",
+    "measurement.unit": "hours",
+    "measurement.measurement_protocol_ref": "protocol-mutated-by-the-verifier",
+    "measurement.population_ref": "cohort-mutated-by-the-verifier",
+    "measurement.aggregation_semantics_ref": "aggregation-mutated-by-the-verifier",
+    "measurement.observation_window_ref": "window-mutated-by-the-verifier",
+    "effective_period.effective_from": datetime(2026, 2, 1, tzinfo=timezone.utc),
+    "effective_period.effective_to": datetime(2028, 1, 1, tzinfo=timezone.utc),
+    "source_requirements.source_ref": "source-mutated-by-the-verifier",
+    "source_requirements.provenance_requirement_refs": ("mutated-by-the-verifier",),
+    "approval.approval_ref": "approval-mutated-by-the-verifier",
+    "approval.approval_authority_ref": "authority-mutated-by-the-verifier",
+    "approval.approved_content_digest": OTHER,
+    "publisher_id": "publisher-mutated-by-the-verifier",
+    "lifecycle_state": BenchmarkLifecycleState.AUTHORED,
+    "coordinate.scope.tenant_id": "tenant-mutated-by-the-verifier",
+    "coordinate.scope.kind": BenchmarkScopeKind.PLATFORM_WIDE,
+    "coordinate.geography.value": "US",
+    "coordinate.geography.declaration": BenchmarkApplicabilityDeclaration.NOT_APPLICABLE,
+    "coordinate.domain.value": "field-service",
+    "coordinate.domain.declaration": BenchmarkApplicabilityDeclaration.NOT_APPLICABLE,
+    "effective_period.end_declaration": TemporalBoundDeclaration.OPEN_ENDED,
+    # supersession.status has exactly one ratified value (DD-4); no valid
+    # alternate exists, so its digest sensitivity is proved separately below.
+}
+# A handful of leaves cannot move alone without leaving a cross-field
+# invariant violated (B-5's approval/content-digest binding; scope,
+# applicability and effective-period self-consistency). The companion is
+# moved alongside so the whole object stays one the public constructors
+# could have produced.
+COMPANION_FIXUPS = {
+    "content_digest": {"approval.approved_content_digest": OTHER},
+    "approval.approved_content_digest": {"content_digest": OTHER},
+    "coordinate.scope.kind": {"coordinate.scope.tenant_id": ""},
+    "coordinate.geography.declaration": {"coordinate.geography.value": ""},
+    "coordinate.domain.declaration": {"coordinate.domain.value": ""},
+    "effective_period.end_declaration": {"effective_period.effective_to": None},
 }
 paths = leaves(identity())
 assert len(paths) == 28, len(paths)
-for path in paths:
+assert set(paths) - {"supersession.status"} == set(PER_PATH_MUTATIONS), (
+    set(paths) - {"supersession.status"} ^ set(PER_PATH_MUTATIONS)
+)
+
+
+def _resolve(root, dotted):
+    target_path, _, leaf = dotted.rpartition(".")
+    owner = root
+    if target_path:
+        for part in target_path.split("."):
+            owner = getattr(owner, part)
+    return owner, leaf
+
+
+for path in PER_PATH_MUTATIONS:
     item = identity()
     before = item.canonical_digest()
-    owner = item
-    parts = path.split(".")
-    for part in parts[:-1]:
-        owner = getattr(owner, part)
-    current = getattr(owner, parts[-1])
-    replacement = MUTATIONS[type(current)]
+    owner, leaf = _resolve(item, path)
+    current = getattr(owner, leaf)
+    replacement = PER_PATH_MUTATIONS[path]
     assert replacement != current, path
-    object.__setattr__(owner, parts[-1], replacement)
+    object.__setattr__(owner, leaf, replacement)
+    for companion_path, companion_value in COMPANION_FIXUPS.get(path, {}).items():
+        c_owner, c_leaf = _resolve(item, companion_path)
+        object.__setattr__(c_owner, c_leaf, companion_value)
     assert item.canonical_digest() != before, path
+
+# supersession.status: no valid alternate exists, so corruption is refused,
+# never silently canonicalized.
+item = identity()
+object.__setattr__(item.supersession, "status", "MUTATED-STATUS")
+refuses(lambda: item.canonical_digest(), BenchmarkCanonicalizationError)
 
 # ---------------------------------------------------------------------- #
 # Exact-only coordinates
@@ -362,6 +422,15 @@ for token in ("latest", "LATEST", "current", "newest", "head", "*", "any"):
 for token in ("^1.2.3", "~1.2.3", ">=1.2.3", "1.2.x", "1.2", "1.2.3.4", "v1.2.3",
               "1.02.0"):
     refuses(lambda t=token: coordinate(benchmark_version=t), BenchmarkContractError)
+
+# F-3: build metadata is refused, not merely ignored (precedence-equivalent
+# versions must not occupy separate append-only coordinates).
+for token in ("1.2.3+a", "1.2.3+build.7", "1.2.3-alpha+build"):
+    error = refuses(lambda t=token: coordinate(benchmark_version=t),
+                    BenchmarkContractError)
+    assert error.reason is _R.BENCHMARK_COORDINATE_NOT_EXACT, token
+for token in ("1.2.3", "1.2.3-alpha", "1.2.3-alpha.1"):
+    assert coordinate(benchmark_version=token).benchmark_version == token
 for field in [f.name for f in dataclasses.fields(BenchmarkCoordinate)]:
     kwargs = {f.name: getattr(coordinate(), f.name)
               for f in dataclasses.fields(BenchmarkCoordinate)}
@@ -449,8 +518,12 @@ a = BenchmarkSourceRequirements(source_ref="s",
 c = BenchmarkSourceRequirements(source_ref="s",
                                 provenance_requirement_refs=("r-b", "r-a"))
 assert canonical_bytes(a) == canonical_bytes(c)
+# Graph revalidation re-runs the contract's own order-normalization before
+# any byte is produced, so a hand-placed out-of-order tuple is restored to
+# its canonical sorted order rather than encoded as given.
 object.__setattr__(c, "provenance_requirement_refs", ("r-b", "r-a"))
-assert b'["r-b","r-a"]' in canonical_bytes(c)
+assert b'["r-a","r-b"]' in canonical_bytes(c)
+assert b'["r-b","r-a"]' not in canonical_bytes(c)
 
 # ---------------------------------------------------------------------- #
 # Lifecycle relation
@@ -503,8 +576,10 @@ class Forged(CanonicalBenchmarkDefinitionIdentity):
 
 forged = Forged(**{f.name: getattr(identity(), f.name)
                    for f in dataclasses.fields(CanonicalBenchmarkDefinitionIdentity)})
-assert forged.canonical_digest() != identity().canonical_digest()
-assert b'"type":"Forged"' in canonical_bytes(forged)
+# Only the exact registered class canonicalizes; a subclass is refused
+# outright, never merely relabeled with its own ``type`` tag.
+refuses(lambda: forged.canonical_digest(), BenchmarkCanonicalizationError)
+refuses(lambda: canonical_bytes(forged), BenchmarkCanonicalizationError)
 
 
 class LooksLikeAScope:
@@ -513,6 +588,89 @@ class LooksLikeAScope:
 
 
 refuses(lambda: coordinate(scope=LooksLikeAScope()), BenchmarkContractError)
+
+# F-1 — a same-named foreign dataclass, its ``__module__`` forged to match
+# this package, must not be able to borrow the genuine bytes or digest.
+_genuine_min = coordinate(
+    benchmark_id="bmk-min", benchmark_family="family-min", benchmark_version="0.1.0",
+    scope=BenchmarkScope.platform_wide(),
+    geography=BenchmarkApplicabilityCoordinate.not_applicable(),
+    domain=BenchmarkApplicabilityCoordinate.not_applicable(),
+)
+_genuine_min_digest = _genuine_min.canonical_digest()
+
+
+@dataclasses.dataclass(frozen=True)
+class _ForeignScope:
+    kind: object
+    tenant_id: str
+
+
+@dataclasses.dataclass(frozen=True)
+class _ForeignApplicabilityCoordinate:
+    declaration: object
+    value: str
+
+
+@dataclasses.dataclass(frozen=True)
+class _ForeignCoordinate:
+    benchmark_id: str
+    benchmark_family: str
+    benchmark_version: str
+    scope: object
+    geography: object
+    domain: object
+
+
+for _cls, _name in (
+    (_ForeignScope, "BenchmarkScope"),
+    (_ForeignApplicabilityCoordinate, "BenchmarkApplicabilityCoordinate"),
+    (_ForeignCoordinate, "BenchmarkCoordinate"),
+):
+    _cls.__name__ = _name
+    _cls.__qualname__ = _name
+    _cls.__module__ = "ugence_benchmark_registry.contracts.identity"
+
+_forged_coordinate = _ForeignCoordinate(
+    benchmark_id="bmk-min", benchmark_family="family-min", benchmark_version="0.1.0",
+    scope=_ForeignScope(kind=BenchmarkScopeKind.PLATFORM_WIDE, tenant_id=""),
+    geography=_ForeignApplicabilityCoordinate(
+        declaration=BenchmarkApplicabilityDeclaration.NOT_APPLICABLE, value=""
+    ),
+    domain=_ForeignApplicabilityCoordinate(
+        declaration=BenchmarkApplicabilityDeclaration.NOT_APPLICABLE, value=""
+    ),
+)
+refuses(lambda: canonical_bytes(_forged_coordinate), BenchmarkCanonicalizationError)
+assert _genuine_min.canonical_digest() == _genuine_min_digest
+
+# And a same-named foreign class carrying a value the real constructor would
+# refuse (a floating ``benchmark_version``) must not slip through by
+# bypassing ``__post_init__`` entirely.
+
+
+@dataclasses.dataclass(frozen=True)
+class _ForeignCoordinateWithInvalidVersion:
+    benchmark_id: str
+    benchmark_family: str
+    benchmark_version: str
+    scope: object
+    geography: object
+    domain: object
+
+
+_ForeignCoordinateWithInvalidVersion.__name__ = "BenchmarkCoordinate"
+_ForeignCoordinateWithInvalidVersion.__qualname__ = "BenchmarkCoordinate"
+_ForeignCoordinateWithInvalidVersion.__module__ = (
+    "ugence_benchmark_registry.contracts.identity"
+)
+_evil = _ForeignCoordinateWithInvalidVersion(
+    benchmark_id="bmk-min", benchmark_family="family-min", benchmark_version="latest",
+    scope=BenchmarkScope.platform_wide(),
+    geography=BenchmarkApplicabilityCoordinate.not_applicable(),
+    domain=BenchmarkApplicabilityCoordinate.not_applicable(),
+)
+refuses(lambda: canonical_bytes(_evil), BenchmarkCanonicalizationError)
 
 # Cross-tenant replay is detectable.
 assert identity().canonical_digest() != identity(

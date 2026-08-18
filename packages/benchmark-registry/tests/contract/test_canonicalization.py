@@ -151,14 +151,27 @@ def test_two_contract_types_never_share_canonical_bytes():
         seen[digest] = type(contract).__name__
 
 
-def test_a_subclass_gets_its_own_bytes_and_cannot_borrow_a_registered_type():
+def test_a_subclass_is_refused_rather_than_given_its_own_bytes():
+    """Only the exact registered class canonicalizes — a subclass is refused.
+
+    Earlier this package let a subclass through and relied on the ``type``
+    element in the frame to keep its bytes from colliding with the genuine
+    class's — which does stop a subclass from *borrowing* a registered type's
+    bytes, but does not stop a **same-named** foreign class from doing so,
+    since the frame's ``type`` element was a name string, not a class
+    identity. The canonicalization-boundary correction closes both: only
+    ``type(contract) is`` one of the nine exact registered classes is ever
+    accepted, so a subclass — which is a different class object even though
+    it shares every inherited method — is refused outright rather than
+    merely relabeled.
+    """
+
     class Impostor(BenchmarkScope):
         pass
 
     impostor = Impostor(kind=BenchmarkScope.platform_wide().kind, tenant_id="")
-    real = BenchmarkScope.platform_wide()
-    assert canonical_bytes(impostor) != canonical_bytes(real)
-    assert b'"type":"Impostor"' in canonical_bytes(impostor)
+    with pytest.raises(BenchmarkCanonicalizationError):
+        canonical_bytes(impostor)
 
 
 # --------------------------------------------------------------------------- #
@@ -232,14 +245,17 @@ def test_every_float_is_refused(value):
         canonical_bytes(period)
 
 
-def test_the_float_refusal_says_why_a_non_finite_number_can_never_be_encoded():
-    """The dedicated ``float`` branch exists to make the refusal actionable.
+def test_a_non_finite_float_is_refused_by_graph_revalidation_before_encoding():
+    """A ``float`` substituted for a typed field never reaches the encoder.
 
-    Falling through to the generic unknown-type refusal would raise the same
-    exception type, so this branch is a **diagnostic** refinement rather than an
-    additional gate — and ADR §16.3's "stable typed refusal reason" is worth
-    little if the caller cannot tell a non-finite number from an unsupported
-    class. The message is therefore pinned.
+    Every leaf in this package's contracts is exactly typed, so graph
+    revalidation (the canonicalization-boundary correction) always refuses a
+    ``float`` at that leaf's own ``__post_init__`` check before
+    :func:`canonical_bytes` reaches the encoder's dedicated ``float`` branch.
+    The refusal is still a :class:`BenchmarkCanonicalizationError`, and the
+    offending type is still named in the message — just earlier, and by the
+    field's own type-exactness check rather than the encoder's float-specific
+    one.
     """
 
     period = BenchmarkEffectivePeriod.open_ended(b.EFFECTIVE_FROM)
@@ -247,8 +263,16 @@ def test_the_float_refusal_says_why_a_non_finite_number_can_never_be_encoded():
     with pytest.raises(BenchmarkCanonicalizationError) as excinfo:
         canonical_bytes(period)
     message = str(excinfo.value)
-    assert "float is not canonicalizable" in message
-    assert "nan/inf/-inf" in message
+    assert "failed structural revalidation" in message
+    assert "float" in message
+
+    # The encoder's own dedicated nan/inf/-inf-rejecting branch in
+    # ``_to_canonical_obj`` is no longer reachable through the public API for
+    # this reason: every leaf in this package's schema is exactly typed, so
+    # graph revalidation always intercepts a wrongly-typed leaf first. It is
+    # kept as defence in depth for a future, less strictly typed field. See
+    # the F-2 mutation ledger for the full accounting of this and the other
+    # branches revalidation has shadowed.
 
 
 def test_a_mapping_is_refused_by_the_encoder():
@@ -293,17 +317,47 @@ def test_canonical_bytes_refuses_a_non_dataclass():
             canonical_bytes(value)
 
 
-def test_a_bool_serializes_as_a_boolean_never_as_an_integer():
+def test_a_bool_substituted_for_a_typed_field_is_refused_by_revalidation():
+    """No field in this package's schema is ever legitimately a ``bool``.
+
+    Before the canonicalization-boundary correction, a ``bool`` written over
+    any field via ``object.__setattr__`` reached the encoder unchecked, where
+    the dedicated ``bool``-before-``int`` dispatch order serialized it as a
+    JSON boolean. Graph revalidation now refuses it earlier — at the field's
+    own exact-type check — because no state built from the public
+    constructors could ever hold a ``bool`` at ``effective_from`` (a
+    ``datetime``-typed field). The ``bool``-before-``int`` dispatch order in
+    the encoder itself is retained as defence in depth (see the F-2 mutation
+    ledger); it is no longer reachable through the public API for the same
+    reason the float branch is not.
+    """
+
     period = BenchmarkEffectivePeriod.open_ended(b.EFFECTIVE_FROM)
     object.__setattr__(period, "effective_from", True)
-    assert b'"effective_from":true' in canonical_bytes(period)
+    with pytest.raises(BenchmarkCanonicalizationError):
+        canonical_bytes(period)
 
 
 def test_none_and_empty_string_are_distinct():
-    scope = BenchmarkScope.platform_wide()
-    with_empty = canonical_bytes(scope)
-    object.__setattr__(scope, "tenant_id", None)
-    assert canonical_bytes(scope) != with_empty
+    """Demonstrated with two legitimately-constructed values, not corruption.
+
+    ``BenchmarkScope.tenant_id`` never legitimately holds ``None`` (it is
+    typed ``str``, defaulting to ``""`` for ``PLATFORM_WIDE``), so a
+    ``None``-vs-``""`` comparison at that one field can no longer be shown by
+    corrupting it — that state could not have come from the public
+    constructor, and graph revalidation now refuses it, correctly. The
+    ``None``-serializes-as-``null``-and-differs-from-``""`` property is still
+    true and still proved: :class:`BenchmarkEffectivePeriod.effective_to` is
+    legitimately ``None`` when ``OPEN_ENDED``, and the same identity's
+    ``coordinate.scope.tenant_id`` is legitimately ``""`` when
+    ``PLATFORM_WIDE`` — both appear in one pinned canonical body
+    (:data:`MINIMAL_CANONICAL_BYTES`), as distinct JSON tokens.
+    """
+
+    open_ended = b.minimal_identity()
+    raw = canonical_bytes(open_ended).decode("utf-8")
+    assert '"tenant_id":""' in raw
+    assert '"effective_to":null' in raw
 
 
 # --------------------------------------------------------------------------- #
@@ -335,11 +389,32 @@ def test_the_encoder_itself_preserves_sequence_order():
     raw = canonical_bytes(requirements).decode("utf-8")
     assert '["r-alpha","r-beta","r-gamma"]' in raw
 
-    # And a hand-placed out-of-order tuple is rendered in the order given.
+
+def test_graph_revalidation_renormalizes_a_hand_placed_out_of_order_tuple():
+    """A corrupted, out-of-order collection is renormalized, not preserved.
+
+    Before the canonicalization-boundary correction, a tuple hand-placed via
+    ``object.__setattr__`` reached the encoder exactly as written, since
+    nothing re-ran the contract's own order-normalization. Graph
+    revalidation now re-runs :class:`BenchmarkSourceRequirements`'s own
+    ``__post_init__`` — the same normalization the public constructor
+    applies — before any byte is produced, so a hand-placed out-of-order
+    tuple is restored to its canonical sorted order rather than encoded as
+    given. This is not a repair of *invalid* state (the entries are all
+    valid, non-duplicate references — only their order was tampered with),
+    so it is not refused; it is renormalized, the same outcome the public
+    constructor would have produced from those same entries in any order.
+    """
+
+    requirements = b.source_requirements(
+        provenance_requirement_refs=("r-alpha", "r-beta", "r-gamma")
+    )
     object.__setattr__(
         requirements, "provenance_requirement_refs", ("r-gamma", "r-alpha")
     )
-    assert '["r-gamma","r-alpha"]' in canonical_bytes(requirements).decode("utf-8")
+    raw = canonical_bytes(requirements).decode("utf-8")
+    assert '["r-alpha","r-gamma"]' in raw
+    assert '["r-gamma","r-alpha"]' not in raw
 
 
 # --------------------------------------------------------------------------- #

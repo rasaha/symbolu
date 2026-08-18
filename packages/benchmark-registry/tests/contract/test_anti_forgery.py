@@ -89,10 +89,14 @@ def test_a_subclass_cannot_override_the_status_and_still_be_accepted():
             for f in dataclasses.fields(CanonicalBenchmarkDefinitionIdentity)
         }
     )
-    # The subclass can lie about itself, but it gets its own canonical bytes and
-    # therefore its own digest: it can never be presented as the real identity.
-    assert forged.canonical_bytes() != b.identity().canonical_bytes()
-    assert b'"type":"Forged"' in forged.canonical_bytes()
+    # The subclass can lie about itself, but the canonicalization boundary
+    # accepts only the nine exact registered BR-1 classes — a subclass is a
+    # different class object even though it inherits every method, so it is
+    # refused outright rather than merely given its own (differently-typed)
+    # bytes. It can never be canonicalized, let alone presented as the real
+    # identity.
+    with pytest.raises(BenchmarkContractError):
+        forged.canonical_bytes()
 
 
 def test_no_success_state_exists_to_construct():

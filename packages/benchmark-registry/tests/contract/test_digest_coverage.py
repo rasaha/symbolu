@@ -27,6 +27,7 @@ import pytest
 from ugence_benchmark_registry.api import (
     BENCHMARK_IDENTITY_COORDINATES,
     BenchmarkApplicabilityDeclaration,
+    BenchmarkCanonicalizationError,
     BenchmarkLifecycleState,
     BenchmarkScopeKind,
     CanonicalBenchmarkDefinitionIdentity,
@@ -115,6 +116,36 @@ MUTATIONS = {
     "supersession.status": "UNDETERMINED-SENTINEL-FOR-DIGEST-COVERAGE",
 }
 
+#: A handful of leaves cannot be moved alone without leaving the *rest* of the
+#: graph inconsistent with a cross-field invariant this package enforces
+#: structurally (ADR B-5's approval/content-digest binding; B-3/B-4's role
+#: separation is untouched by any of these; and the scope/applicability/
+#: effective-period self-consistency rules). Since the BR-1 canonicalization-
+#: boundary correction, ``canonical_bytes``/``canonical_digest`` revalidate the
+#: complete graph before producing bytes, so a state that could not have come
+#: from the public constructors — including one made only *momentarily* true by
+#: moving one field via ``object.__setattr__`` — is refused rather than
+#: canonicalized. For these leaves the companion field named here is moved
+#: alongside the leaf under test, so the whole object stays a state its public
+#: constructors could have produced, and the digest-sensitivity proof holds
+#: without relying on a state the package now correctly rejects.
+_COMPANION_FIXUPS = {
+    "content_digest": {"approval.approved_content_digest": b.OTHER_CONTENT_DIGEST},
+    "approval.approved_content_digest": {"content_digest": b.OTHER_CONTENT_DIGEST},
+    "coordinate.scope.kind": {"coordinate.scope.tenant_id": ""},
+    "coordinate.geography.declaration": {"coordinate.geography.value": ""},
+    "coordinate.domain.declaration": {"coordinate.domain.value": ""},
+    "effective_period.end_declaration": {"effective_period.effective_to": None},
+}
+
+#: ``supersession.status`` has exactly one ratified value until DD-4 lands
+#: (:class:`~ugence_benchmark_registry.contracts.enums.BenchmarkSupersessionStatus`
+#: has one member), so there is no second value *any* state that could have
+#: come from the public constructors could hold there — not even with a
+#: companion fixup. Its digest sensitivity is proved separately, below, by
+#: showing the corrupted state is refused rather than silently canonicalized.
+_NO_VALID_ALTERNATE = {"supersession.status"}
+
 
 def test_the_leaf_set_is_exactly_the_mutation_set():
     """A new coordinate must be given a mutation, or this fails.
@@ -153,16 +184,19 @@ def test_every_leaf_is_present_in_the_canonical_body(path):
     _body_at(IDENTITY, path)
 
 
-@pytest.mark.parametrize("path", sorted(MUTATIONS))
+@pytest.mark.parametrize("path", sorted(set(MUTATIONS) - _NO_VALID_ALTERNATE))
 def test_every_leaf_is_independently_digest_sensitive(path):
-    """Move exactly one coordinate; the digest must move with it.
+    """Move exactly one coordinate (and its companion, if it has one); the
+    digest must move with it.
 
     The mutation is applied with ``object.__setattr__`` **after** a valid
     identity was constructed, deliberately: it isolates the encoder's coverage
-    from the constructor's cross-field invariants, so a coordinate is proved
-    digest-bound even where a legal constructor call could not move it alone
-    (``approval.approved_content_digest`` must equal ``content_digest``, and
-    ``supersession.status`` has one admissible value).
+    from the constructor's cross-field invariants. Where moving the leaf alone
+    would leave the graph in a state no public constructor could have produced
+    — a companion field entry exists in :data:`_COMPANION_FIXUPS` — the
+    companion is moved in the same step, so the object stays one the public
+    constructors could have produced and the graph-revalidation the
+    canonicalization boundary now performs does not refuse it.
     """
 
     original = b.identity()
@@ -171,7 +205,34 @@ def test_every_leaf_is_independently_digest_sensitive(path):
     owner = _resolve(original, target_path) if target_path else original
     assert getattr(owner, leaf) != MUTATIONS[path], path
     object.__setattr__(owner, leaf, MUTATIONS[path])
+    for companion_path, companion_value in _COMPANION_FIXUPS.get(path, {}).items():
+        c_target_path, _, c_leaf = companion_path.rpartition(".")
+        c_owner = _resolve(original, c_target_path) if c_target_path else original
+        object.__setattr__(c_owner, c_leaf, companion_value)
     assert original.canonical_digest() != before, path
+
+
+def test_the_single_admissible_supersession_status_is_refused_rather_than_moved():
+    """``supersession.status`` cannot be proved digest-sensitive by corruption.
+
+    It has exactly one ratified value until DD-4 lands, so there is no second
+    value any state the public constructors could produce would hold there —
+    unlike the other leaves in :data:`_COMPANION_FIXUPS`, no companion fixup
+    can make a moved ``status`` valid again. Its presence in the canonical
+    body is already proved by
+    :func:`test_every_leaf_is_present_in_the_canonical_body`; what this proves
+    is that the canonicalization boundary now correctly refuses the one way
+    that leaf could previously be moved at all — silently, via
+    ``object.__setattr__`` — rather than producing a digest over a state no
+    constructor could have built.
+    """
+
+    original = b.identity()
+    object.__setattr__(
+        original.supersession, "status", MUTATIONS["supersession.status"]
+    )
+    with pytest.raises(BenchmarkCanonicalizationError):
+        original.canonical_digest()
 
 
 def test_the_identity_coordinate_tuple_and_the_digest_agree():

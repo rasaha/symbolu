@@ -267,32 +267,87 @@ def _p09():
                 found.append(path)
         return found
 
-    mutations = {
-        str: "MUTATED-PROBE-VALUE",
-        datetime: datetime(2030, 5, 5, tzinfo=timezone.utc),
-        tuple: ("mutated-probe",),
-        BenchmarkScopeKind: BenchmarkScopeKind.PLATFORM_WIDE,
-        BenchmarkApplicabilityDeclaration: (
-            BenchmarkApplicabilityDeclaration.NOT_APPLICABLE
-        ),
-        TemporalBoundDeclaration: TemporalBoundDeclaration.OPEN_ENDED,
-        BenchmarkLifecycleState: BenchmarkLifecycleState.AUTHORED,
-        BenchmarkSupersessionStatus: "MUTATED-PROBE-STATUS",
-        type(None): datetime(2031, 1, 1, tzinfo=timezone.utc),
+    # Per-path (not per-type) replacements: a generic same-typed replacement is
+    # not always a *valid* replacement — ``benchmark_version`` must stay an
+    # exact semver, for instance. Since the canonicalization-boundary
+    # correction, ``canonical_digest`` revalidates the whole graph before
+    # producing a digest, so a replacement that leaves the object in a state
+    # no public constructor could have produced is now correctly refused
+    # rather than silently digested — matching what the digest-coverage test
+    # suite proves in full (tests/contract/test_digest_coverage.py).
+    per_path = {
+        "coordinate.benchmark_id": "bmk-mutated-probe",
+        "coordinate.benchmark_family": "family-mutated-probe",
+        "coordinate.benchmark_version": "9.9.9",
+        "content_digest": OTHER_DIGEST,
+        "measurement.intended_outcome_ref": "outcome-mutated-probe",
+        "measurement.metric_ref": "metric-mutated-probe",
+        "measurement.unit": "hours",
+        "measurement.measurement_protocol_ref": "protocol-mutated-probe",
+        "measurement.population_ref": "cohort-mutated-probe",
+        "measurement.aggregation_semantics_ref": "aggregation-mutated-probe",
+        "measurement.observation_window_ref": "window-mutated-probe",
+        "effective_period.effective_from": datetime(2026, 2, 1, tzinfo=timezone.utc),
+        "effective_period.effective_to": datetime(2028, 1, 1, tzinfo=timezone.utc),
+        "source_requirements.source_ref": "source-mutated-probe",
+        "source_requirements.provenance_requirement_refs": ("mutated-probe",),
+        "approval.approval_ref": "approval-mutated-probe",
+        "approval.approval_authority_ref": "authority-mutated-probe",
+        "publisher_id": "publisher-mutated-probe",
+        "lifecycle_state": BenchmarkLifecycleState.AUTHORED,
+        "coordinate.scope.tenant_id": "tenant-mutated-probe",
+        "coordinate.geography.value": "US",
+        "coordinate.domain.value": "field-service",
     }
+    # A handful of leaves cannot move alone without breaking a cross-field
+    # invariant (B-5's approval/content-digest binding; scope, applicability
+    # and effective-period self-consistency); moving the companion alongside
+    # keeps the whole object a state the public constructors could produce.
+    companions = {
+        "content_digest": {"approval.approved_content_digest": OTHER_DIGEST},
+        "approval.approved_content_digest": {"content_digest": OTHER_DIGEST},
+        "coordinate.scope.kind": {"coordinate.scope.tenant_id": ""},
+        "coordinate.geography.declaration": {"coordinate.geography.value": ""},
+        "coordinate.domain.declaration": {"coordinate.domain.value": ""},
+        "effective_period.end_declaration": {"effective_period.effective_to": None},
+    }
+    per_path["approval.approved_content_digest"] = OTHER_DIGEST
+    per_path["coordinate.scope.kind"] = BenchmarkScopeKind.PLATFORM_WIDE
+    per_path["coordinate.geography.declaration"] = (
+        BenchmarkApplicabilityDeclaration.NOT_APPLICABLE
+    )
+    per_path["coordinate.domain.declaration"] = (
+        BenchmarkApplicabilityDeclaration.NOT_APPLICABLE
+    )
+    per_path["effective_period.end_declaration"] = TemporalBoundDeclaration.OPEN_ENDED
+    # supersession.status has exactly one ratified value (DD-4) — no valid
+    # alternate exists, and the graph-revalidation gate now correctly refuses
+    # any other value. Its digest sensitivity is proved separately by P-27.
+
+    def resolve(root, dotted):
+        target_path, _, leaf = dotted.rpartition(".")
+        owner = root
+        if target_path:
+            for part in target_path.split("."):
+                owner = getattr(owner, part)
+        return owner, leaf
+
     paths = leaves(identity())
     assert len(paths) == 28, len(paths)
-    for path in paths:
+    assert set(paths) - {"supersession.status"} == set(per_path), (
+        set(paths) - {"supersession.status"} ^ set(per_path)
+    )
+    for path in per_path:
         item = identity()
         before = item.canonical_digest()
-        owner = item
-        parts = path.split(".")
-        for part in parts[:-1]:
-            owner = getattr(owner, part)
-        original = getattr(owner, parts[-1])
-        replacement = mutations[type(original)]
+        owner, leaf = resolve(item, path)
+        original = getattr(owner, leaf)
+        replacement = per_path[path]
         assert replacement != original, path
-        object.__setattr__(owner, parts[-1], replacement)
+        object.__setattr__(owner, leaf, replacement)
+        for companion_path, companion_value in companions.get(path, {}).items():
+            c_owner, c_leaf = resolve(item, companion_path)
+            object.__setattr__(c_owner, c_leaf, companion_value)
         assert item.canonical_digest() != before, path
 
 
@@ -380,7 +435,7 @@ def _p17():
     refuses(lambda: canonical_bytes(scope), BenchmarkCanonicalizationError)
 
 
-@probe("P-18 an order-irrelevant set is canonicalized; the encoder never reorders")
+@probe("P-18 an order-irrelevant set is canonicalized; corrupted order is renormalized")
 def _p18():
     forward = BenchmarkSourceRequirements(
         source_ref="s", provenance_requirement_refs=("r-a", "r-b", "r-c")
@@ -389,8 +444,12 @@ def _p18():
         source_ref="s", provenance_requirement_refs=("r-c", "r-a", "r-b")
     )
     assert canonical_bytes(forward) == canonical_bytes(jumbled)
+    # A hand-placed out-of-order tuple is no longer rendered as given: graph
+    # revalidation re-runs the contract's own order-normalization before any
+    # byte is produced, so the corrupted order is restored, not preserved.
     object.__setattr__(jumbled, "provenance_requirement_refs", ("r-c", "r-a"))
-    assert b'["r-c","r-a"]' in canonical_bytes(jumbled)
+    assert b'["r-a","r-c"]' in canonical_bytes(jumbled)
+    assert b'["r-c","r-a"]' not in canonical_bytes(jumbled)
     refuses(
         lambda: BenchmarkSourceRequirements(
             source_ref="s", provenance_requirement_refs=("r-a", "r-a")
@@ -496,12 +555,21 @@ def _p26():
         assert "is_current" not in name.lower()
 
 
-@probe("P-27 supersession participates in the digest")
+@probe("P-27 supersession's one admissible value cannot be moved and stay valid")
 def _p27():
+    """``supersession.status`` has exactly one ratified value until DD-4.
+
+    There is no second value any state the public constructors could produce
+    would hold there, so its digest sensitivity can no longer be shown by
+    corrupting it — that state is now correctly refused. This proves the
+    refusal instead: the leaf's presence in the canonical body is already
+    proved by P-07/P-09, and BENCHMARK_MALFORMED_CONTRACT-style refusal for
+    any other value is what the canonicalization boundary now guarantees.
+    """
+
     item = identity()
-    before = item.canonical_digest()
     object.__setattr__(item.supersession, "status", "OTHER")
-    assert item.canonical_digest() != before
+    refuses(lambda: item.canonical_digest(), BenchmarkCanonicalizationError)
 
 
 # =========================================================================== #
@@ -642,7 +710,7 @@ def _p38():
     assert item.structural_status is BenchmarkStructuralStatus.STRUCTURAL_UNVERIFIED
 
 
-@probe("P-39 a subclass that lies about itself gets its own digest")
+@probe("P-39 a subclass that lies about itself cannot be canonicalized at all")
 def _p39():
     class Forged(CanonicalBenchmarkDefinitionIdentity):
         @property
@@ -653,8 +721,10 @@ def _p39():
     forged = Forged(**{f.name: getattr(real, f.name)
                        for f in dataclasses.fields(
                            CanonicalBenchmarkDefinitionIdentity)})
-    assert forged.canonical_digest() != real.canonical_digest()
-    assert b'"type":"Forged"' in canonical_bytes(forged)
+    # Only the exact registered class canonicalizes; a subclass is refused
+    # outright, never merely relabeled with its own ``type`` tag.
+    refuses(lambda: forged.canonical_digest(), BenchmarkCanonicalizationError)
+    refuses(lambda: canonical_bytes(forged), BenchmarkCanonicalizationError)
 
 
 @probe("P-40 a duck-typed lookalike is refused at a load-bearing boundary")
@@ -807,6 +877,139 @@ def _p51():
     ):
         error = refuses(lambda f=build: f(SneakyStr("value")), BenchmarkContractError)
         assert error.reason is _R.BENCHMARK_MALFORMED_CONTRACT, error.reason
+
+
+@probe("P-52 a same-named foreign dataclass cannot borrow the genuine bytes")
+def _p52():
+    """F-1 — the canonicalization-boundary correction's headline attack.
+
+    Before the correction, a foreign dataclass named exactly
+    ``BenchmarkCoordinate`` — defined nowhere near this package, its
+    ``__module__`` forged to match — was accepted by ``canonical_bytes``
+    because domain selection was keyed by ``type(contract).__name__``, a
+    string, not by class identity. If its fields serialized to the same
+    body, it produced *byte-identical, digest-identical* output to the
+    genuine class. Class-identity dispatch (``type(contract) is
+    SomeExactClass``) closes this: the foreign class is a different object
+    regardless of its name or module, and is refused.
+    """
+
+    genuine = coordinate(
+        benchmark_id="bmk-min", benchmark_family="family-min",
+        benchmark_version="0.1.0", scope=BenchmarkScope.platform_wide(),
+        geography=BenchmarkApplicabilityCoordinate.not_applicable(),
+        domain=BenchmarkApplicabilityCoordinate.not_applicable(),
+    )
+    genuine_digest = genuine.canonical_digest()
+
+    # Distinct Python identifiers so they never shadow the genuine imports in
+    # this function's scope — the forgery is in ``__name__``/``__qualname__``/
+    # ``__module__``, exactly as an attacker would need to fake it, not in
+    # what the local variable is called.
+    @dataclasses.dataclass(frozen=True)
+    class _ForeignScope:
+        kind: object
+        tenant_id: str
+
+    @dataclasses.dataclass(frozen=True)
+    class _ForeignApplicabilityCoordinate:
+        declaration: object
+        value: str
+
+    @dataclasses.dataclass(frozen=True)
+    class _ForeignCoordinate:
+        benchmark_id: str
+        benchmark_family: str
+        benchmark_version: str
+        scope: object
+        geography: object
+        domain: object
+
+    for cls, name in (
+        (_ForeignScope, "BenchmarkScope"),
+        (_ForeignApplicabilityCoordinate, "BenchmarkApplicabilityCoordinate"),
+        (_ForeignCoordinate, "BenchmarkCoordinate"),
+    ):
+        cls.__name__ = name
+        cls.__qualname__ = name
+        cls.__module__ = "ugence_benchmark_registry.contracts.identity"
+
+    forged = _ForeignCoordinate(
+        benchmark_id="bmk-min", benchmark_family="family-min",
+        benchmark_version="0.1.0",
+        scope=_ForeignScope(kind=BenchmarkScopeKind.PLATFORM_WIDE, tenant_id=""),
+        geography=_ForeignApplicabilityCoordinate(
+            declaration=BenchmarkApplicabilityDeclaration.NOT_APPLICABLE, value=""
+        ),
+        domain=_ForeignApplicabilityCoordinate(
+            declaration=BenchmarkApplicabilityDeclaration.NOT_APPLICABLE, value=""
+        ),
+    )
+    refuses(lambda: canonical_bytes(forged), BenchmarkCanonicalizationError)
+    refuses(
+        lambda: __import__(
+            "ugence_benchmark_registry.contracts.canonical", fromlist=["canonical_digest"]
+        ).canonical_digest(forged),
+        BenchmarkCanonicalizationError,
+    )
+    # And the genuine digest is unaffected by the attempt.
+    assert genuine.canonical_digest() == genuine_digest
+
+
+@probe("P-53 an invalid value inside a same-named foreign contract is still refused")
+def _p53():
+    """A same-named foreign class carrying a value the real constructor would
+    reject (a floating ``benchmark_version``) must not slip through by
+    virtue of bypassing ``__post_init__`` entirely."""
+
+    @dataclasses.dataclass(frozen=True)
+    class EvilCoordinate:
+        benchmark_id: str
+        benchmark_family: str
+        benchmark_version: str
+        scope: object
+        geography: object
+        domain: object
+
+    EvilCoordinate.__name__ = "BenchmarkCoordinate"
+    EvilCoordinate.__qualname__ = "BenchmarkCoordinate"
+    EvilCoordinate.__module__ = "ugence_benchmark_registry.contracts.identity"
+
+    evil = EvilCoordinate(
+        benchmark_id="bmk-min", benchmark_family="family-min",
+        benchmark_version="latest",  # a floating token the real type refuses
+        scope=BenchmarkScope.platform_wide(),
+        geography=BenchmarkApplicabilityCoordinate.not_applicable(),
+        domain=BenchmarkApplicabilityCoordinate.not_applicable(),
+    )
+    refuses(lambda: canonical_bytes(evil), BenchmarkCanonicalizationError)
+
+
+@probe("P-54 the contract-type registry cannot be widened by any caller")
+def _p54():
+    from ugence_benchmark_registry.contracts import canonical as _canonical
+
+    refuses(
+        lambda: _canonical._register_contract_type(
+            dataclasses.make_dataclass("Evil", [("x", int)]),
+            BENCHMARK_DEFINITION_IDENTITY_DIGEST_DOMAIN,
+        ),
+        RuntimeError,
+    )
+    assert isinstance(_canonical._REGISTERED_CONTRACT_TYPES, type(
+        __import__("types").MappingProxyType({})
+    ))
+
+
+@probe("P-55 a semver with build metadata is unrepresentable (F-3)")
+def _p55():
+    for version in ("1.2.3+a", "1.2.3+build.7", "1.2.3-alpha+build"):
+        error = refuses(
+            lambda v=version: coordinate(benchmark_version=v), BenchmarkContractError
+        )
+        assert error.reason is _R.BENCHMARK_COORDINATE_NOT_EXACT, (version, error.reason)
+    for version in ("1.2.3", "1.2.3-alpha", "1.2.3-alpha.1"):
+        assert coordinate(benchmark_version=version).benchmark_version == version
 
 
 @probe("P-50 the package imports nothing outside the standard library")
