@@ -55,7 +55,7 @@ SEED_HEX = SEED.hex()
 def _every_public_artifact():
     signed = envelope()
     result = determination()
-    verification = reverifier().verify(signed, evaluated_at=AS_OF)
+    verification = reverifier().verify_signature(signed, evaluated_at=AS_OF)
     return {
         "envelope": signed,
         "payload": signed.payload,
@@ -110,7 +110,7 @@ def test_no_public_artifact_renders_or_canonicalizes_the_seed(name):
 
 def test_a_seed_is_not_retrievable_from_any_verification_result():
     signed = envelope()
-    verification = reverifier().verify(signed, evaluated_at=AS_OF)
+    verification = reverifier().verify_signature(signed, evaluated_at=AS_OF)
     for obj in (signed, verification, determination()):
         for attribute in ("seed", "signing_key", "private_key", "secret",
                           "key_material", "_signing_key"):

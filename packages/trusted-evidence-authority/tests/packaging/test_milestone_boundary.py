@@ -89,7 +89,9 @@ REQUIRED_TEV2_CLASS_NAMES = {
     "SignedEvidenceSubmission",
     "SignedEvidenceVerificationReceipt",
     "SignedReceiptVerifier",
-    "ReceiptVerification",
+    "ReceiptScopeExpectation",
+    "SignatureOnlyVerificationResult",
+    "ScopeBoundVerificationResult",
     "ReceiptIssuer",
     "ReceiptSignerPort",
     "TrustAnchorRecord",
@@ -129,23 +131,31 @@ def test_no_benchmark_registry_type_is_defined(forbidden):
     assert forbidden not in api.__all__
 
 
-def test_no_third_party_cryptography_is_imported():
-    """TEV-2 signs, and still imports no third-party cryptography.
+def test_cryptography_comes_only_from_the_two_ratified_backends():
+    """TEV-2 signs, and implements none of it.
 
-    The dependency posture is unchanged: ADR §23 draws TAP's only permitted
-    arrow at ``governance-contracts``, TEV-1 shipped narrower still at zero
-    runtime dependencies, and the isolated ``--no-index`` install proof depends
-    on that staying true. Ed25519 is implemented to RFC 8032 in
-    ``authority/ed25519.py`` — the convention two merged authorities in this
-    repository already established for exactly this reason — and its conformance
-    is proved against the RFC's own published vectors.
+    Ed25519 signing, verification and public-key derivation come from
+    ``cryptography`` (OpenSSL); strict point validation comes from libsodium
+    through ``PyNaCl``. Both are imported from ``authority/backend.py`` and
+    nowhere else, so there is exactly one module to review and exactly one set
+    of validation rules in force.
 
-    ``hmac``, ``secrets``, ``ecdsa`` and ``nacl`` remain banned outright:
-    ``hmac`` is not a signature scheme, ``secrets`` is an entropy source this
-    package must not have, and the other two would be a second algorithm.
+    An earlier revision implemented RFC 8032 in ``authority/ed25519.py``,
+    justified partly by reading ADR §23 as a prohibition on third-party
+    cryptography. §23 is the *Ugence package* dependency matrix and says no such
+    thing. The independent closure audit found the handwritten implementation
+    unsafe (F-01, F-02, F-03, F-06), and it is now deleted — this test asserts
+    it has not come back.
+
+    ``hmac``, ``secrets`` and ``ecdsa`` remain banned outright: ``hmac`` is not
+    a signature scheme, ``secrets`` is an entropy source this package must not
+    have, and ``ecdsa`` would be both a second algorithm and an unmaintained
+    pure-Python one.
     """
 
-    banned_modules = {"hmac", "secrets", "cryptography", "nacl", "ecdsa"}
+    banned_modules = {"hmac", "secrets", "ecdsa"}
+    backends = {"cryptography", "nacl"}
+    backend_importers = set()
     for path in _sources():
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for node in ast.walk(tree):
@@ -154,7 +164,43 @@ def test_no_third_party_cryptography_is_imported():
                 roots = {a.name.split(".")[0] for a in node.names}
             elif isinstance(node, ast.ImportFrom) and node.module and not node.level:
                 roots = {node.module.split(".")[0]}
-            assert not (roots & banned_modules), (path.name, sorted(roots & banned_modules))
+            assert not (roots & banned_modules), (
+                path.name, sorted(roots & banned_modules)
+            )
+            if roots & backends:
+                backend_importers.add(path.name)
+    assert backend_importers == {"backend.py"}, sorted(backend_importers)
+
+
+def test_the_handwritten_implementation_is_gone_and_stays_gone():
+    """No module implements curve arithmetic, and none is named for one.
+
+    The audit's finding was not "the implementation had a bug" but "a
+    production path depended on handwritten cryptography". The correction only
+    holds if it cannot quietly return, so both the file name and the arithmetic
+    it contained are asserted absent.
+    """
+
+    for path in _sources():
+        assert path.name != "ed25519.py", path
+
+    # The primitives an in-package implementation would need. Searching for the
+    # operations rather than the module name catches a rename.
+    banned_symbols = {
+        "_point_add", "_point_double", "_scalarmult", "_decode_point",
+        "_encode_point", "_recover_x", "_edwards_add", "_sha512_modq",
+    }
+    banned_constants = {
+        "2**255 - 19", "2 ** 255 - 19", "57896044618658097711785492504343953926634992332820282019728792003956564819949",
+    }
+    for path in _sources():
+        source = path.read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=str(path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef):
+                assert node.name not in banned_symbols, (path.name, node.name)
+        for constant in banned_constants:
+            assert constant not in source, (path.name, constant)
 
 
 def test_the_contracts_subpackage_still_defines_no_signing_surface():
@@ -251,10 +297,13 @@ def test_hashlib_is_used_only_for_digests_and_the_rfc8032_hash():
     """``hashlib`` appears in exactly two places, each for its documented job.
 
     ``contracts/canonical.py`` uses sha-256 for the one digest path;
-    ``authority/ed25519.py`` uses sha-512 because RFC 8032 specifies SHA-512 as
-    Ed25519's internal hash; ``authority/verification.py`` uses sha-256 to
-    derive a deterministic receipt id. No fourth module hashes anything, and no
-    module substitutes a hash for a signature.
+    ``authority/verification.py`` uses sha-256 to derive a deterministic receipt
+    id; ``authority/reverification.py`` uses sha-256 for the scope-expectation
+    digest. No fourth module hashes anything, and no module substitutes a hash
+    for a signature.
+
+    Ed25519's internal SHA-512 is **not** in this list any more, and its absence
+    is the point: the hash is inside ``cryptography``, not inside this package.
     """
 
     users = []
@@ -265,7 +314,11 @@ def test_hashlib_is_used_only_for_digests_and_the_rfc8032_hash():
                 a.name == "hashlib" for a in node.names
             ):
                 users.append(path.name)
-    assert sorted(set(users)) == ["canonical.py", "ed25519.py", "verification.py"]
+    assert sorted(set(users)) == [
+        "canonical.py",
+        "reverification.py",
+        "verification.py",
+    ]
 
 
 # --------------------------------------------------------------------------- #

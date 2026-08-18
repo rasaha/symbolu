@@ -45,11 +45,15 @@ from ugence_trusted_evidence_authority.api import (
     TRUSTED_EVIDENCE_SIGNED_RECEIPT_INPUT_DOMAIN,
     DenyAllTrustAnchorDirectory,
     EvidenceAdmissionOutcome,
+    EvidenceTrustStage,
     EvidenceVerificationDetermination,
     KeyRevocation,
+    ReceiptScopeExpectation,
     ReceiptSigningInput,
-    ReceiptVerification,
+    ReceiptVerificationKind,
     ReceiptVerificationOutcome,
+    ScopeBoundVerificationResult,
+    SignatureOnlyVerificationResult,
     SignedEvidenceVerificationReceipt,
     TrustAnchorCapability,
     TrustAnchorCoordinate,
@@ -67,14 +71,39 @@ UTC = timezone.utc
 TRUTHY = [True, 1, "true", "yes", [1], (1,), {"a": 1}, {1}, object(), 1.0]
 
 
-def refusal(signed=None, *, anchors=None, at=None, **expected):
-    result = reverifier(anchors).verify(
+def refusal(signed=None, *, anchors=None, at=None):
+    """Signature-only refusal reason for one envelope at one instant."""
+
+    result = reverifier(anchors).verify_signature(
         envelope() if signed is None else signed,
         evaluated_at=AS_OF if at is None else at,
-        **expected,
     )
     assert result.outcome is ReceiptVerificationOutcome.REFUSED, result
     assert result.verified is False
+    return result.refusal_reason
+
+
+def expectation_for(signed):
+    """The exact expectation an honest consumer of ``signed`` would state."""
+
+    payload = signed.payload
+    return ReceiptScopeExpectation.from_scope(
+        payload.scope,
+        evidence_content_digest=payload.evidence_content_digest,
+        verification_protocol_id=payload.verification_protocol_id,
+        verification_protocol_version=payload.verification_protocol_version,
+    )
+
+
+def bound_refusal(field, value, *, signed=None):
+    """Scope-bound refusal reason when exactly one coordinate is wrong."""
+
+    signed = envelope() if signed is None else signed
+    expectation = dataclasses.replace(expectation_for(signed), **{field: value})
+    result = reverifier().verify_bound(signed, expectation, evaluated_at=AS_OF)
+    assert result.outcome is ReceiptVerificationOutcome.REFUSED, result
+    assert result.verified is False
+    assert result.scope_expectation_digest == expectation.expectation_digest()
     return result.refusal_reason
 
 
@@ -102,14 +131,26 @@ def test_a_determination_cannot_be_manufactured_with_any_token(token):
 
 
 @pytest.mark.parametrize("token", TRUTHY + [None])
-def test_a_receipt_verification_cannot_be_manufactured_with_any_token(token):
+@pytest.mark.parametrize(
+    "result_type", [SignatureOnlyVerificationResult, ScopeBoundVerificationResult]
+)
+def test_a_receipt_verification_cannot_be_manufactured_with_any_token(
+    result_type, token
+):
+    """Neither verification result type can be minted by a caller.
+
+    Both are checked, because after the closure-audit F-04 split there are two
+    of them and a token gate that guarded only one would leave the other as a
+    route to a self-declared ``VERIFIED``.
+    """
+
     coordinate = TrustAnchorCoordinate(
         authority_id=VERIFIER_AUTHORITY_ID,
         key_id=VERIFIER_KEY_ID,
         capability=TrustAnchorCapability.RECEIPT_ISSUANCE,
     )
     with pytest.raises(TrustedEvidenceContractError):
-        ReceiptVerification(
+        result_type(
             outcome=ReceiptVerificationOutcome.VERIFIED,
             evaluated_at=AS_OF,
             coordinate=coordinate,
@@ -153,7 +194,7 @@ def test_no_public_callable_signs_bytes():
 
 def test_a_verified_property_cannot_be_set_on_any_result():
     result = determination()
-    verification = reverifier().verify(envelope(), evaluated_at=AS_OF)
+    verification = reverifier().verify_signature(envelope(), evaluated_at=AS_OF)
     for obj, attribute in (
         (result, "admitted"),
         (verification, "verified"),
@@ -168,7 +209,7 @@ def test_object_setattr_on_a_result_does_not_change_what_reverifying_says():
     """A doctored in-process object is a lie only its holder believes."""
 
     signed = envelope()
-    refused = reverifier(DenyAllTrustAnchorDirectory()).verify(
+    refused = reverifier(DenyAllTrustAnchorDirectory()).verify_signature(
         signed, evaluated_at=AS_OF
     )
     assert not refused.verified
@@ -177,7 +218,7 @@ def test_object_setattr_on_a_result_does_not_change_what_reverifying_says():
     except Exception:
         pass
     # Re-asking the question — the only thing a consumer may rely on — refuses.
-    assert not reverifier(DenyAllTrustAnchorDirectory()).verify(
+    assert not reverifier(DenyAllTrustAnchorDirectory()).verify_signature(
         signed, evaluated_at=AS_OF
     ).verified
 
@@ -203,7 +244,7 @@ def test_a_subclass_or_lookalike_envelope_is_refused():
         pass
 
     with pytest.raises(TrustedEvidenceContractError):
-        reverifier().verify(PlainSubclass(**fields), evaluated_at=AS_OF)
+        reverifier().verify_signature(PlainSubclass(**fields), evaluated_at=AS_OF)
 
     class Lookalike:
         payload = signed.payload
@@ -224,7 +265,7 @@ def test_a_subclass_or_lookalike_envelope_is_refused():
             return signed.envelope_digest()
 
     with pytest.raises(TrustedEvidenceContractError):
-        reverifier().verify(Lookalike(), evaluated_at=AS_OF)
+        reverifier().verify_signature(Lookalike(), evaluated_at=AS_OF)
 
 
 @pytest.mark.parametrize("clone", ["copy", "deepcopy", "pickle"])
@@ -237,8 +278,8 @@ def test_reconstruction_round_trips_change_nothing_about_trust(clone):
     }[clone]()
     assert rebuilt == signed
     assert rebuilt.envelope_digest() == signed.envelope_digest()
-    assert reverifier().verify(rebuilt, evaluated_at=AS_OF).verified
-    assert not reverifier(DenyAllTrustAnchorDirectory()).verify(
+    assert reverifier().verify_signature(rebuilt, evaluated_at=AS_OF).verified
+    assert not reverifier(DenyAllTrustAnchorDirectory()).verify_signature(
         rebuilt, evaluated_at=AS_OF
     ).verified
 
@@ -460,57 +501,218 @@ def test_a_producer_key_cannot_sign_a_receipt_that_verifies():
 # --------------------------------------------------------------------------- #
 
 @pytest.mark.parametrize(
-    "kwarg,expected",
+    "field,value,expected",
     [
-        ("expected_tenant_id", R.TRUSTED_EVIDENCE_TENANT_MISMATCH),
-        ("expected_assessment_context_ref", R.TRUSTED_EVIDENCE_CONTEXT_MISMATCH),
-        ("expected_subject_ref", R.TRUSTED_EVIDENCE_SUBJECT_MISMATCH),
-        ("expected_assessment_purpose_ref", R.TRUSTED_EVIDENCE_PURPOSE_SCOPE_MISMATCH),
-        ("expected_usage_scope_ref", R.TRUSTED_EVIDENCE_PURPOSE_SCOPE_MISMATCH),
-        ("expected_verification_protocol_id", R.TRUSTED_EVIDENCE_PROTOCOL_UNSUPPORTED),
+        ("tenant_id", "a-different-value", R.TRUSTED_EVIDENCE_TENANT_MISMATCH),
         (
-            "expected_verification_protocol_version",
+            "assessment_context_ref",
+            "a-different-value",
+            R.TRUSTED_EVIDENCE_CONTEXT_MISMATCH,
+        ),
+        ("subject_ref", "a-different-value", R.TRUSTED_EVIDENCE_SUBJECT_MISMATCH),
+        (
+            "assessment_purpose_ref",
+            "a-different-value",
+            R.TRUSTED_EVIDENCE_PURPOSE_SCOPE_MISMATCH,
+        ),
+        (
+            "usage_scope_ref",
+            "a-different-value",
+            R.TRUSTED_EVIDENCE_PURPOSE_SCOPE_MISMATCH,
+        ),
+        (
+            "verification_protocol_id",
+            "a-different-value",
+            R.TRUSTED_EVIDENCE_PROTOCOL_UNSUPPORTED,
+        ),
+        (
+            "verification_protocol_version",
+            "a-different-value",
             R.TRUSTED_EVIDENCE_PROTOCOL_VERSION_MISMATCH,
         ),
-    ],
-)
-def test_replay_under_a_different_coordinate_is_mechanically_detected(kwarg, expected):
-    assert refusal(**{kwarg: "a-different-value"}) is expected
-
-
-@pytest.mark.parametrize(
-    "kwarg,expected",
-    [
         (
-            "expected_assessed_system_binding_digest",
+            "assessed_system_binding_digest",
+            OTHER_DIGEST,
             R.TRUSTED_EVIDENCE_SYSTEM_BINDING_MISMATCH,
         ),
-        ("expected_evidence_content_digest", R.TRUSTED_EVIDENCE_CONTENT_DIGEST_MISMATCH),
+        (
+            "evidence_content_digest",
+            OTHER_DIGEST,
+            R.TRUSTED_EVIDENCE_CONTENT_DIGEST_MISMATCH,
+        ),
     ],
 )
-def test_replay_across_a_digest_bound_axis_is_detected(kwarg, expected):
-    assert refusal(**{kwarg: OTHER_DIGEST}) is expected
+def test_replay_under_a_different_coordinate_is_mechanically_detected(
+    field, value, expected
+):
+    """Every declared coordinate bites, one at a time, with its own reason.
+
+    The parametrization is generated from
+    :attr:`ReceiptScopeExpectation.REQUIRED_COORDINATES` in the completeness
+    test below, so a coordinate added to the expectation without a case here is
+    a failure rather than a silent gap.
+    """
+
+    assert bound_refusal(field, value) is expected
 
 
-def test_an_unchecked_coordinate_is_documented_as_unchecked_not_as_passing():
-    """A verified result is not a scope decision unless a scope was asserted.
+def test_every_required_coordinate_has_a_replay_case():
+    """No declared coordinate may go unexercised by the matrix above."""
 
-    The ``expected_*`` arguments default to "not checked" so the §13.3 third
-    party holding only an envelope can still verify a signature. That default is
-    a real, documented weakening, and this test pins it: with nothing asserted,
-    a receipt for tenant A verifies for a caller who never said which tenant
-    they meant. A consumer binding evidence to its own scope must pass the
-    coordinates, and the test above proves those checks bite.
+    cases = test_replay_under_a_different_coordinate_is_mechanically_detected
+    covered = {case[0] for case in cases.pytestmark[0].args[1]}
+    assert covered == set(ReceiptScopeExpectation.REQUIRED_COORDINATES)
+
+
+def test_a_signature_only_result_never_reports_a_scope_it_did_not_check():
+    """F-04: the weakening is now typed, not documented in a docstring.
+
+    Before the correction a caller who passed no ``expected_*`` argument got the
+    *same* ``verified is True`` object as one who passed all of them, and the
+    difference lived only in prose. Now the two questions have two operations
+    and two never-equal result types, and only the bound one reports
+    ``CONTEXT_SYSTEM_BOUND``.
     """
 
     signed = envelope()
-    assert reverifier().verify(signed, evaluated_at=AS_OF).verified
-    assert not reverifier().verify(
-        signed, evaluated_at=AS_OF, expected_tenant_id="a-different-tenant"
-    ).verified
-    assert reverifier().verify(
-        signed, evaluated_at=AS_OF, expected_tenant_id=signed.payload.scope.tenant_id
-    ).verified
+    unbound = reverifier().verify_signature(signed, evaluated_at=AS_OF)
+    bound = reverifier().verify_bound(
+        signed, expectation_for(signed), evaluated_at=AS_OF
+    )
+
+    assert unbound.verified and bound.verified
+    assert type(unbound) is SignatureOnlyVerificationResult
+    assert type(bound) is ScopeBoundVerificationResult
+    assert unbound.verification_kind is ReceiptVerificationKind.SIGNATURE_ONLY
+    assert bound.verification_kind is ReceiptVerificationKind.SCOPE_BOUND
+    assert unbound.scope_bound is False and bound.scope_bound is True
+    # Two verified results over the same envelope at the same instant, and
+    # still not interchangeable in either direction.
+    assert unbound != bound and bound != unbound
+    assert hash(unbound) != hash(bound)
+    # Only the bound form claims the stage that means "bound to my context".
+    assert EvidenceTrustStage.CONTEXT_SYSTEM_BOUND in bound.established_trust_stages
+    assert (
+        EvidenceTrustStage.CONTEXT_SYSTEM_BOUND
+        not in unbound.established_trust_stages
+    )
+    # And a signature-only result carries no scope field at all to misread.
+    assert not hasattr(unbound, "scope_expectation_digest")
+
+
+def test_a_scope_bound_verification_requires_an_actual_expectation():
+    """F-05: nothing falsy, empty or duck-typed can stand in for one.
+
+    Each of these used to be accepted as "no expectation stated" and silently
+    skip the coordinate checks while still returning ``verified is True``.
+    """
+
+    signed = envelope()
+
+    class LooksLikeAnExpectation:
+        tenant_id = "tenant-1"
+        assessment_context_ref = "ctx-1"
+        subject_ref = "subject-1"
+        assessed_system_binding_digest = ""
+        assessment_purpose_ref = "purpose-1"
+        usage_scope_ref = "scope-1"
+        evidence_content_digest = CONTENT_DIGEST
+        verification_protocol_id = TRUSTED_EVIDENCE_PROTOCOL_V1_ID
+        verification_protocol_version = TRUSTED_EVIDENCE_PROTOCOL_V1_VERSION
+        REQUIRED_COORDINATES = ReceiptScopeExpectation.REQUIRED_COORDINATES
+
+        def expectation_digest(self):
+            return CONTENT_DIGEST
+
+    class ExpectationSubclass(ReceiptScopeExpectation):
+        pass
+
+    honest = expectation_for(signed)
+    for bad in (
+        None,
+        "",
+        " ",
+        False,
+        True,
+        0,
+        1,
+        (),
+        [],
+        {},
+        set(),
+        dataclasses.asdict(honest),
+        signed.payload.scope,
+        LooksLikeAnExpectation(),
+        LooksLikeAnExpectation,
+        ReceiptScopeExpectation,
+        object(),
+    ):
+        with pytest.raises(TrustedEvidenceContractError) as excinfo:
+            reverifier().verify_bound(signed, bad, evaluated_at=AS_OF)
+        assert "exactly a ReceiptScopeExpectation" in str(excinfo.value)
+
+    # A subclass is refused too: exact type, so no override of a comparison
+    # helper or of ``expectation_digest`` can enter the verification path.
+    subclass = ExpectationSubclass(**dataclasses.asdict(honest))
+    with pytest.raises(TrustedEvidenceContractError):
+        reverifier().verify_bound(signed, subclass, evaluated_at=AS_OF)
+
+    # And the expectation is positional and mandatory — it has no default.
+    with pytest.raises(TypeError):
+        reverifier().verify_bound(signed, evaluated_at=AS_OF)
+
+
+def test_the_expectation_itself_refuses_missing_and_falsy_coordinates():
+    """An expectation cannot be built with a coordinate left out or blanked.
+
+    This is the other half of F-05: forcing a caller to pass an expectation
+    object would achieve nothing if the object could carry ``None`` or ``""``
+    in a coordinate and have the comparison skip it.
+    """
+
+    honest = dataclasses.asdict(expectation_for(envelope()))
+    for name in ReceiptScopeExpectation.REQUIRED_COORDINATES:
+        missing = {k: v for k, v in honest.items() if k != name}
+        with pytest.raises(TypeError):
+            ReceiptScopeExpectation(**missing)
+        for falsy in (None, "", False, 0, [], (), {}):
+            if name == "assessed_system_binding_digest" and falsy == "":
+                # The one coordinate whose empty spelling is a ratified value:
+                # "this evidence binds no assessed system" (§9 row 10). It is
+                # still compared unconditionally — proved by the replay matrix.
+                continue
+            with pytest.raises(TrustedEvidenceContractError):
+                ReceiptScopeExpectation(**{**honest, name: falsy})
+
+
+def test_a_system_independent_expectation_states_its_absence_explicitly():
+    """The one empty-valued coordinate is minted deliberately, never defaulted."""
+
+    honest = dataclasses.asdict(expectation_for(envelope()))
+    honest.pop("assessed_system_binding_digest")
+    independent = ReceiptScopeExpectation.for_system_independent_evidence(**honest)
+    assert independent.assessed_system_binding_digest == ""
+    with pytest.raises(TrustedEvidenceContractError):
+        ReceiptScopeExpectation.for_system_independent_evidence(
+            **honest, assessed_system_binding_digest=""
+        )
+    # And it does not match an envelope that *does* bind a system.
+    signed = envelope()
+    assert signed.payload.scope.assessed_system_binding_digest != ""
+    result = reverifier().verify_bound(signed, independent, evaluated_at=AS_OF)
+    assert result.refusal_reason is R.TRUSTED_EVIDENCE_SYSTEM_BINDING_MISMATCH
+
+
+def test_a_complete_exact_expectation_verifies():
+    """The matrix would be vacuous if the all-correct case did not pass."""
+
+    signed = envelope()
+    result = reverifier().verify_bound(
+        signed, expectation_for(signed), evaluated_at=AS_OF
+    )
+    assert result.outcome is ReceiptVerificationOutcome.VERIFIED
+    assert result.refusal_reason is None
+    assert result.verified is True
 
 
 # --------------------------------------------------------------------------- #
@@ -519,18 +721,18 @@ def test_an_unchecked_coordinate_is_documented_as_unchecked_not_as_passing():
 
 def test_a_previously_valid_receipt_stops_verifying_once_its_key_is_revoked():
     signed = envelope()
-    assert reverifier().verify(signed, evaluated_at=AS_OF).verified
+    assert reverifier().verify_signature(signed, evaluated_at=AS_OF).verified
 
     revoke_at = AS_OF + timedelta(days=10)
     revoked = directory(
         producer_anchor(),
         authority_anchor(revocation=KeyRevocation(effective_at=revoke_at)),
     )
-    assert reverifier(revoked).verify(
+    assert reverifier(revoked).verify_signature(
         signed, evaluated_at=revoke_at - timedelta(microseconds=1)
     ).verified
     for instant in (revoke_at, revoke_at + timedelta(days=365)):
-        result = reverifier(revoked).verify(signed, evaluated_at=instant)
+        result = reverifier(revoked).verify_signature(signed, evaluated_at=instant)
         assert result.refusal_reason is R.TRUSTED_EVIDENCE_KEY_REVOKED
         # Enough typed evidence remains to explain the refusal rather than
         # merely assert it: the receipt predates the revocation.
@@ -553,11 +755,11 @@ def test_a_signature_is_never_grandfathered_by_its_signing_instant():
     # the revocation is in force. A grandfathering implementation would let
     # this through by comparing against ``verified_at`` and finding it "not yet
     # revoked at signing time"; this one refuses.
-    result = reverifier(revoked).verify(
+    result = reverifier(revoked).verify_signature(
         signed, evaluated_at=signed.payload.verified_at
     )
     assert result.refusal_reason is R.TRUSTED_EVIDENCE_KEY_REVOKED
-    later = reverifier(revoked).verify(
+    later = reverifier(revoked).verify_signature(
         signed, evaluated_at=signed.payload.verified_at + timedelta(days=1)
     )
     assert later.refusal_reason is R.TRUSTED_EVIDENCE_KEY_REVOKED
@@ -598,7 +800,7 @@ def test_no_historical_reverification_api_is_offered():
 )
 def test_the_receipts_own_validity_is_half_open(receipt_from, receipt_to, at, expected):
     signed = envelope(receipt_valid_from=receipt_from, receipt_valid_to=receipt_to)
-    result = reverifier().verify(signed, evaluated_at=at)
+    result = reverifier().verify_signature(signed, evaluated_at=at)
     assert result.refusal_reason is expected
 
 
@@ -615,7 +817,7 @@ def test_receipt_validity_is_never_confused_with_evidence_validity():
     instant = datetime(2026, 7, 15, tzinfo=UTC)
     assert payload.evidence_is_valid_at(instant)
     assert not payload.receipt_is_valid_at(instant)
-    assert reverifier().verify(signed, evaluated_at=instant).refusal_reason is (
+    assert reverifier().verify_signature(signed, evaluated_at=instant).refusal_reason is (
         R.TRUSTED_EVIDENCE_RECEIPT_NOT_YET_VALID
     )
 

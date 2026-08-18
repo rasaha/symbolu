@@ -215,7 +215,7 @@ def test_the_end_to_end_vector_is_pinned():
     assert submission().signature == PINNED_EVIDENCE_SIGNATURE
     assert canonical_digest(submission()) == PINNED_SUBMISSION_DIGEST
 
-    verification = reverifier().verify(signed, evaluated_at=AS_OF)
+    verification = reverifier().verify_signature(signed, evaluated_at=AS_OF)
     assert verification.verified is True
     assert verification.envelope_digest == PINNED_ENVELOPE_DIGEST
 

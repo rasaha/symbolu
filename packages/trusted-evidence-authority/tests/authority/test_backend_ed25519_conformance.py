@@ -1,17 +1,19 @@
 """Conformance to RFC 8032, proved against the RFC's own published vectors.
 
-The package implements Ed25519 in pure Python rather than importing a
-third-party library, for the reasons ``authority/ed25519.py`` documents at
-length: ADR §23 fixes TAP's dependency matrix, TEV-1 shipped a zero-dependency
-leaf with a test enforcing it, the isolated ``--no-index`` install proof depends
-on that staying true, and DD-10 keeps production key custody deferred behind a
-port. Two merged authorities in this repository — Risk Authority and Policy
-Authority — already established exactly this convention.
+The package does **not** implement Ed25519. Signing, verification and public-key
+derivation come from ``cryptography`` (OpenSSL), and strict trust-anchor point
+validation comes from libsodium through ``PyNaCl``; ``authority/backend.py`` is
+the only module that touches either, and there is no in-package curve
+arithmetic and no fallback to any. An earlier revision of this package shipped a
+handwritten pure-Python implementation, justified in part by a misreading of ADR
+§23 — which governs *Ugence package* dependency direction, not maintained
+third-party cryptographic primitives. Closure-audit findings F-01, F-02, F-03
+and F-06 were consequences of that choice, and the correction was to delete it.
 
-That choice is only defensible if the implementation is demonstrably **the
-standard algorithm**. These tests demonstrate it: every vector below is copied
-verbatim from RFC 8032 §7.1, and each is reproduced exactly — public key from
-seed, signature from message, and verification of the RFC's own signature bytes.
+These vectors remain, and remain load-bearing: they are what proves the backend
+this package actually calls is the standard algorithm, and — because they were
+pinned before the backend changed and reproduced unchanged after — that the
+substitution altered no byte any verifier depends on.
 
 The seeds here are the RFC's published test keys. They are, by construction,
 among the best-known Ed25519 private keys in existence and are **not production
@@ -189,9 +191,16 @@ def test_a_signature_with_s_at_or_above_the_group_order_is_refused():
     [b"", b"\x00" * 63, b"\x00" * 65, "a string", None, 42, bytearray(64)],
 )
 def test_malformed_signature_material_is_false_never_an_exception(bad):
-    """A single fail-closed boolean, so a caller has one thing to branch on."""
+    """A single fail-closed boolean, so a caller has one thing to branch on.
 
-    verifier = TrustedEvidenceVerificationKey(bytes(32))
+    The key here is a genuine one. The all-zero key this test previously used
+    is the identity point, and it is now refused at construction — which is
+    closure-audit F-03 closed, and the reason the test needed a real key.
+    """
+
+    verifier = TrustedEvidenceVerificationKey(
+        bytes.fromhex(RFC_8032_VECTORS[0].values[1])
+    )
     assert verifier.verify(b"message", bad) is False
 
 
@@ -201,6 +210,18 @@ def test_malformed_key_material_is_refused_at_construction(bad):
         TrustedEvidenceSigningKey(bad)
     with pytest.raises(ValueError):
         TrustedEvidenceVerificationKey(bad)
+
+
+def test_the_all_zero_public_key_is_refused_at_construction():
+    """The identity point is a universal-forgery key and never a trust anchor.
+
+    Correctly-sized but cryptographically worthless key material was accepted
+    before the correction (closure-audit **F-03**); the strict libsodium point
+    check now refuses it where it would enter the system.
+    """
+
+    with pytest.raises(ValueError):
+        TrustedEvidenceVerificationKey(bytes(ED25519_PUBLIC_KEY_SIZE))
 
 
 def test_no_key_generation_entry_point_exists():

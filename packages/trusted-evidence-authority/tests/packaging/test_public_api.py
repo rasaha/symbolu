@@ -161,6 +161,7 @@ def test_pinned_constants_are_snapshotted_with_their_values():
         "TRUSTED_EVIDENCE_PROTOCOL_V1_ID",
         "TRUSTED_EVIDENCE_PROTOCOL_V1_VERSION",
         "TRUSTED_EVIDENCE_RECEIPT_ID_DOMAIN",
+        "RECEIPT_SCOPE_EXPECTATION_DIGEST_DOMAIN",
     }
     for entry in constants.values():
         assert "value" in entry
@@ -262,9 +263,9 @@ def test_the_curated_surface_size_is_pinned():
     """A symbol added or removed without updating the manifest fails here."""
 
     exported = [n for n in api.__all__ if n != "__version__"]
-    assert len(exported) == 83
+    assert len(exported) == 87
     tev2_only = set(exported) - set(TEV1_CURATED_SYMBOLS)
-    assert len(tev2_only) == 54
+    assert len(tev2_only) == 58
 
 
 def test_enum_member_order_is_snapshotted_not_just_the_member_set():

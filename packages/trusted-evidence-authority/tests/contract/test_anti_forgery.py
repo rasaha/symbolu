@@ -53,9 +53,9 @@ def test_no_verified_state_an_artifact_can_carry_exists():
 
     Exactly one enum in the package has a ``VERIFIED`` member —
     ``ReceiptVerificationOutcome`` — and it is the outcome of an act, not a
-    state on an artifact. Its only ``VERIFIED`` value is produced by the single
-    code path that reaches a real signature check; a caller cannot construct a
-    ``ReceiptVerification`` at all, which the direct-construction test proves.
+    state on an artifact. Its only ``VERIFIED`` value is produced by the code
+    paths that reach a real signature check; a caller cannot construct either
+    verification result type at all, which the direct-construction test proves.
     """
 
     assert list(EvidenceStructuralStatus) == [
@@ -71,13 +71,17 @@ def test_no_verified_state_an_artifact_can_carry_exists():
 
     # And no dataclass field is typed as that outcome except the verification
     # result itself, so no artifact can carry a VERIFIED value.
-    from ugence_trusted_evidence_authority.api import ReceiptVerification
+    from ugence_trusted_evidence_authority.api import (
+        ScopeBoundVerificationResult,
+        SignatureOnlyVerificationResult,
+    )
 
+    results = (SignatureOnlyVerificationResult, ScopeBoundVerificationResult)
     for name in api.__all__:
         obj = getattr(api, name)
         if not (isinstance(obj, type) and dataclasses.is_dataclass(obj)):
             continue
-        if obj is ReceiptVerification:
+        if obj in results:
             continue
         for field in dataclasses.fields(obj):
             assert "ReceiptVerificationOutcome" not in str(field.type), (name, field.name)
@@ -118,6 +122,9 @@ def test_the_receipt_type_is_a_payload_and_is_named_as_one():
                 or name.endswith("Issuer")
                 or name.endswith("Signer")
                 or name.endswith("Input")
+                or name.endswith("Kind")
+                or name.endswith("Expectation")
+                or name.endswith("Result")
                 or name.endswith("Port")
             ), name
 

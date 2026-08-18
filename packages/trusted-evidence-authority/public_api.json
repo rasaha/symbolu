@@ -205,7 +205,8 @@
         "verified_at",
         "receipt_payload_digest",
         "receipt_envelope_digest",
-        "trust_anchor_digest"
+        "trust_anchor_digest",
+        "scope_expectation_digest"
       ]
     },
     "EvidenceVerificationAuthority": {
@@ -298,8 +299,26 @@
         "CURRENTLY_VALID"
       ]
     },
+    "RECEIPT_SCOPE_EXPECTATION_DIGEST_DOMAIN": {
+      "kind": "constant",
+      "value": "ugence.trusted-evidence-authority/receipt-scope-expectation/v1"
+    },
     "ReceiptIssuer": {
       "kind": "class"
+    },
+    "ReceiptScopeExpectation": {
+      "kind": "dataclass",
+      "fields": [
+        "tenant_id",
+        "assessment_context_ref",
+        "subject_ref",
+        "assessed_system_binding_digest",
+        "assessment_purpose_ref",
+        "usage_scope_ref",
+        "evidence_content_digest",
+        "verification_protocol_id",
+        "verification_protocol_version"
+      ]
     },
     "ReceiptSignerPort": {
       "kind": "class"
@@ -314,17 +333,11 @@
         "issuance_token"
       ]
     },
-    "ReceiptVerification": {
-      "kind": "dataclass",
-      "fields": [
-        "outcome",
-        "evaluated_at",
-        "coordinate",
-        "envelope_digest",
-        "payload_canonical_digest",
-        "refusal_reason",
-        "trust_anchor_digest",
-        "verification_token"
+    "ReceiptVerificationKind": {
+      "kind": "enum",
+      "values": [
+        "SIGNATURE_ONLY",
+        "SCOPE_BOUND"
       ]
     },
     "ReceiptVerificationOutcome": {
@@ -353,6 +366,33 @@
     "SIGNED_RECEIPT_ENVELOPE_SCHEMA_V1": {
       "kind": "constant",
       "value": "ugence.trusted-evidence-authority/signed-receipt-envelope/v1"
+    },
+    "ScopeBoundVerificationResult": {
+      "kind": "dataclass",
+      "fields": [
+        "outcome",
+        "evaluated_at",
+        "coordinate",
+        "envelope_digest",
+        "payload_canonical_digest",
+        "refusal_reason",
+        "trust_anchor_digest",
+        "verification_token",
+        "scope_expectation_digest"
+      ]
+    },
+    "SignatureOnlyVerificationResult": {
+      "kind": "dataclass",
+      "fields": [
+        "outcome",
+        "evaluated_at",
+        "coordinate",
+        "envelope_digest",
+        "payload_canonical_digest",
+        "refusal_reason",
+        "trust_anchor_digest",
+        "verification_token"
+      ]
     },
     "SignedEvidenceSubmission": {
       "kind": "dataclass",
@@ -615,16 +655,10 @@
       ]
     },
     "TrustedEvidenceSigningKey": {
-      "kind": "dataclass",
-      "fields": [
-        "seed"
-      ]
+      "kind": "class"
     },
     "TrustedEvidenceVerificationKey": {
-      "kind": "dataclass",
-      "fields": [
-        "public_key_bytes"
-      ]
+      "kind": "class"
     },
     "audit_record_for_determination": {
       "kind": "function"

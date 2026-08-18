@@ -103,7 +103,7 @@ def test_an_unconfigured_verifier_denies_rather_than_skipping_the_check():
         authority(trust_anchors=object())
     with pytest.raises(TrustedEvidenceContractError):
         reverifier(trust_anchors=object())
-    result = reverifier(DenyAllTrustAnchorDirectory()).verify(
+    result = reverifier(DenyAllTrustAnchorDirectory()).verify_signature(
         envelope(), evaluated_at=AS_OF
     )
     assert result.refusal_reason is R.TRUSTED_EVIDENCE_TRUST_ANCHOR_NOT_CONFIGURED
@@ -125,7 +125,7 @@ def test_the_happy_path_admits_signs_and_re_verifies():
     assert signed.signed_input_domain == TRUSTED_EVIDENCE_SIGNED_RECEIPT_INPUT_DOMAIN
     assert signed.payload is result.receipt_payload
 
-    verification = reverifier().verify(signed, evaluated_at=AS_OF)
+    verification = reverifier().verify_signature(signed, evaluated_at=AS_OF)
     assert verification.outcome is ReceiptVerificationOutcome.VERIFIED
     assert verification.verified is True
     assert verification.refusal_reason is None
@@ -165,7 +165,7 @@ def test_stage_six_is_never_established_even_by_a_verified_receipt():
     assert EvidenceTrustStage.POLICY_SUFFICIENT not in (
         signed.payload.declared_unattempted_stages
     )
-    verification = reverifier().verify(signed, evaluated_at=AS_OF)
+    verification = reverifier().verify_signature(signed, evaluated_at=AS_OF)
     assert EvidenceTrustStage.POLICY_SUFFICIENT not in (
         verification.established_trust_stages
     )
@@ -188,7 +188,7 @@ def test_a_verified_receipt_authorizes_nothing():
     """§13.2, E-12."""
 
     signed = envelope()
-    verification = reverifier().verify(signed, evaluated_at=AS_OF)
+    verification = reverifier().verify_signature(signed, evaluated_at=AS_OF)
     assert verification.verified
     for obj in (signed, verification, signed.payload):
         for forbidden in ("authorize", "allow", "permit", "approve", "grant",
@@ -502,7 +502,7 @@ def test_re_verification_mints_a_new_receipt_and_never_mutates_the_earlier_one()
     )
     # Both envelopes verify; neither invalidated the other.
     for signed in (issuer().issue(first), issuer().issue(later)):
-        assert reverifier().verify(signed, evaluated_at=AS_OF).verified
+        assert reverifier().verify_signature(signed, evaluated_at=AS_OF).verified
 
 
 def test_the_envelope_and_its_payload_are_frozen():
@@ -586,7 +586,7 @@ def test_the_envelope_digest_is_not_the_content_digest_and_is_not_signed():
     "call",
     [
         lambda: authority().verify(submission(), request(), verifier_key_id="k"),
-        lambda: reverifier().verify(envelope()),
+        lambda: reverifier().verify_signature(envelope()),
     ],
     ids=["verify", "reverify"],
 )
@@ -602,7 +602,7 @@ def test_a_naive_instant_is_refused_everywhere():
             submission(), request(), verified_at=naive, verifier_key_id=VERIFIER_KEY_ID
         )
     with pytest.raises(TrustedEvidenceContractError):
-        reverifier().verify(envelope(), evaluated_at=naive)
+        reverifier().verify_signature(envelope(), evaluated_at=naive)
 
 
 def test_the_same_inputs_produce_byte_identical_outputs():
@@ -622,7 +622,7 @@ def test_the_token_guarded_findings_are_not_canonicalizable_at_all():
     )
 
     result = determination()
-    verification = reverifier().verify(envelope(), evaluated_at=AS_OF)
+    verification = reverifier().verify_signature(envelope(), evaluated_at=AS_OF)
     for finding in (result, verification):
         assert not hasattr(finding, "canonical_bytes")
         assert not hasattr(finding, "canonical_digest")

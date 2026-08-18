@@ -19,9 +19,11 @@ non-zero with a report on the first failure.
 
 from __future__ import annotations
 
+import copy
 import dataclasses
 import hashlib
 import json
+import pickle
 import sys
 from datetime import datetime, timedelta, timezone
 
@@ -73,8 +75,11 @@ from ugence_trusted_evidence_authority.api import (  # noqa: F401
     ProtocolExecutionResult,
     ReceiptIssuer,
     ReceiptSigningInput,
-    ReceiptVerification,
+    ReceiptScopeExpectation,
+    ReceiptVerificationKind,
     ReceiptVerificationOutcome,
+    ScopeBoundVerificationResult,
+    SignatureOnlyVerificationResult,
     SignedEvidenceSubmission,
     SignedEvidenceVerificationReceipt,
     SignedReceiptVerifier,
@@ -1374,14 +1379,36 @@ def probe_reverifier(anchors=None):
         trust_anchors=probe_directory() if anchors is None else anchors)
 
 
-def _refusal_of(envelope=None, *, anchors=None, at=None, **expected):
-    result = probe_reverifier(anchors).verify(
+def _refusal_of(envelope=None, *, anchors=None, at=None):
+    result = probe_reverifier(anchors).verify_signature(
         probe_envelope() if envelope is None else envelope,
         evaluated_at=T_MID if at is None else at,
-        **expected,
     )
     assert result.outcome is ReceiptVerificationOutcome.REFUSED, result
     assert not result.verified
+    return result.refusal_reason
+
+
+def probe_expectation(envelope=None, **overrides):
+    """The exact expectation an honest consumer of ``envelope`` would state."""
+
+    payload = (probe_envelope() if envelope is None else envelope).payload
+    return dataclasses.replace(
+        ReceiptScopeExpectation.from_scope(
+            payload.scope,
+            evidence_content_digest=payload.evidence_content_digest,
+            verification_protocol_id=payload.verification_protocol_id,
+            verification_protocol_version=payload.verification_protocol_version),
+        **overrides)
+
+
+def _bound_refusal_of(envelope, field, value, *, anchors=None, at=None):
+    expectation = probe_expectation(envelope, **{field: value})
+    result = probe_reverifier(anchors).verify_bound(
+        envelope, expectation, evaluated_at=T_MID if at is None else at)
+    assert result.outcome is ReceiptVerificationOutcome.REFUSED, result
+    assert not result.verified
+    assert result.scope_expectation_digest == expectation.expectation_digest()
     return result.refusal_reason
 
 
@@ -1502,7 +1529,7 @@ def probe_a_fixed_signature_vector_verifies_and_is_pinned():
     rebuilt = TrustedEvidenceVerificationKey(decode_public_key(public))
     assert rebuilt.verify(envelope.signed_input_bytes(), envelope.signature_bytes())
 
-    verification = probe_reverifier().verify(envelope, evaluated_at=T_MID)
+    verification = probe_reverifier().verify_signature(envelope, evaluated_at=T_MID)
     assert verification.outcome is ReceiptVerificationOutcome.VERIFIED
     assert verification.verified is True
 
@@ -1614,27 +1641,30 @@ def probe_every_principal_refusal_class_is_demonstrable():
         early, at=datetime(2026, 9, 1, tzinfo=UTC))
     assert demonstrated["receipt_expired"] is R.TRUSTED_EVIDENCE_RECEIPT_EXPIRED
 
-    for kwarg, reason in (
-        ("expected_tenant_id", R.TRUSTED_EVIDENCE_TENANT_MISMATCH),
-        ("expected_assessment_context_ref", R.TRUSTED_EVIDENCE_CONTEXT_MISMATCH),
-        ("expected_subject_ref", R.TRUSTED_EVIDENCE_SUBJECT_MISMATCH),
-        ("expected_assessment_purpose_ref", R.TRUSTED_EVIDENCE_PURPOSE_SCOPE_MISMATCH),
-        ("expected_usage_scope_ref", R.TRUSTED_EVIDENCE_PURPOSE_SCOPE_MISMATCH),
-        ("expected_verification_protocol_id", R.TRUSTED_EVIDENCE_PROTOCOL_UNSUPPORTED),
-        ("expected_verification_protocol_version",
+    # Scope mismatches are reachable only through verify_bound, and every one
+    # of the nine declared coordinates is exercised independently.
+    for field, value, reason in (
+        ("tenant_id", "a-different-value", R.TRUSTED_EVIDENCE_TENANT_MISMATCH),
+        ("assessment_context_ref", "a-different-value",
+         R.TRUSTED_EVIDENCE_CONTEXT_MISMATCH),
+        ("subject_ref", "a-different-value", R.TRUSTED_EVIDENCE_SUBJECT_MISMATCH),
+        ("assessment_purpose_ref", "a-different-value",
+         R.TRUSTED_EVIDENCE_PURPOSE_SCOPE_MISMATCH),
+        ("usage_scope_ref", "a-different-value",
+         R.TRUSTED_EVIDENCE_PURPOSE_SCOPE_MISMATCH),
+        ("verification_protocol_id", "a-different-value",
+         R.TRUSTED_EVIDENCE_PROTOCOL_UNSUPPORTED),
+        ("verification_protocol_version", "a-different-value",
          R.TRUSTED_EVIDENCE_PROTOCOL_VERSION_MISMATCH),
+        ("assessed_system_binding_digest", OTHER,
+         R.TRUSTED_EVIDENCE_SYSTEM_BINDING_MISMATCH),
+        ("evidence_content_digest", OTHER,
+         R.TRUSTED_EVIDENCE_CONTENT_DIGEST_MISMATCH),
     ):
-        got = _refusal_of(envelope, **{kwarg: "a-different-value"})
-        assert got is reason, (kwarg, got)
-        demonstrated[kwarg] = got
-
-    demonstrated["system_binding"] = _refusal_of(
-        envelope, expected_assessed_system_binding_digest=OTHER)
-    assert demonstrated["system_binding"] is (
-        R.TRUSTED_EVIDENCE_SYSTEM_BINDING_MISMATCH)
-    demonstrated["content_digest"] = _refusal_of(
-        envelope, expected_evidence_content_digest=OTHER)
-    assert demonstrated["content_digest"] is R.TRUSTED_EVIDENCE_CONTENT_DIGEST_MISMATCH
+        got = _bound_refusal_of(envelope, field, value)
+        assert got is reason, (field, got)
+        demonstrated[field] = got
+    assert set(ReceiptScopeExpectation.REQUIRED_COORDINATES) <= set(demonstrated)
 
     # E-3: a producing key can never satisfy a receipt-issuance coordinate.
     producer_shaped = TrustAnchorRecord(
@@ -1731,16 +1761,18 @@ def probe_a_determination_cannot_be_manufactured():
 
 
 @probe
-def probe_a_receipt_verification_cannot_be_manufactured():
+def probe_neither_receipt_verification_result_can_be_manufactured():
     coordinate = TrustAnchorCoordinate(
         authority_id=PROBE_VERIFIER_AUTHORITY, key_id=PROBE_VERIFIER_KEY,
         capability=TrustAnchorCapability.RECEIPT_ISSUANCE)
-    for token in (None, True, 1, "verified", object()):
-        expect_refusal(lambda t=token: ReceiptVerification(
-            outcome=ReceiptVerificationOutcome.VERIFIED,
-            evaluated_at=T_MID, coordinate=coordinate,
-            envelope_digest=CONTENT, payload_canonical_digest=CONTENT,
-            verification_token=t))
+    for result_type in (SignatureOnlyVerificationResult,
+                        ScopeBoundVerificationResult):
+        for token in (None, True, 1, "verified", object()):
+            expect_refusal(lambda r=result_type, t=token: r(
+                outcome=ReceiptVerificationOutcome.VERIFIED,
+                evaluated_at=T_MID, coordinate=coordinate,
+                envelope_digest=CONTENT, payload_canonical_digest=CONTENT,
+                verification_token=t))
 
 
 @probe
@@ -1869,20 +1901,20 @@ def probe_a_previously_valid_receipt_stops_verifying_after_revocation():
     """§13.3 — "not silently honoured". A signature is never grandfathered."""
 
     envelope = probe_envelope()
-    assert probe_reverifier().verify(envelope, evaluated_at=T_MID).verified
+    assert probe_reverifier().verify_signature(envelope, evaluated_at=T_MID).verified
 
     revoke_at = datetime(2026, 8, 1, tzinfo=UTC)
     revoked_directory = probe_directory(
         probe_producer_anchor(),
         probe_authority_anchor(revocation=KeyRevocation(effective_at=revoke_at)))
 
-    still_good = probe_reverifier(revoked_directory).verify(
+    still_good = probe_reverifier(revoked_directory).verify_signature(
         envelope, evaluated_at=datetime(2026, 7, 31, tzinfo=UTC))
     assert still_good.verified
-    at_instant = probe_reverifier(revoked_directory).verify(
+    at_instant = probe_reverifier(revoked_directory).verify_signature(
         envelope, evaluated_at=revoke_at)
     assert at_instant.refusal_reason is R.TRUSTED_EVIDENCE_KEY_REVOKED
-    after = probe_reverifier(revoked_directory).verify(
+    after = probe_reverifier(revoked_directory).verify_signature(
         envelope, evaluated_at=datetime(2026, 9, 1, tzinfo=UTC))
     assert after.refusal_reason is R.TRUSTED_EVIDENCE_KEY_REVOKED
 
@@ -1944,21 +1976,21 @@ def probe_reconstruction_routes_cannot_forge_a_verified_envelope():
                   pickle.loads(pickle.dumps(envelope))):
         assert clone == envelope
         assert clone.envelope_digest() == envelope.envelope_digest()
-        assert probe_reverifier().verify(clone, evaluated_at=T_MID).verified
+        assert probe_reverifier().verify_signature(clone, evaluated_at=T_MID).verified
         # And with no trust configured, a round-tripped envelope still refuses.
-        assert not probe_reverifier(DenyAllTrustAnchorDirectory()).verify(
+        assert not probe_reverifier(DenyAllTrustAnchorDirectory()).verify_signature(
             clone, evaluated_at=T_MID).verified
 
     # Doctoring a refused result in place does not change what re-verifying the
     # *envelope* says, which is the only thing a consumer may rely on.
-    refused = probe_reverifier(DenyAllTrustAnchorDirectory()).verify(
+    refused = probe_reverifier(DenyAllTrustAnchorDirectory()).verify_signature(
         envelope, evaluated_at=T_MID)
     assert not refused.verified
     try:
         object.__setattr__(refused, "outcome", ReceiptVerificationOutcome.VERIFIED)
     except Exception:
         pass
-    assert not probe_reverifier(DenyAllTrustAnchorDirectory()).verify(
+    assert not probe_reverifier(DenyAllTrustAnchorDirectory()).verify_signature(
         envelope, evaluated_at=T_MID).verified
 
 
@@ -1986,7 +2018,7 @@ def probe_a_duck_typed_envelope_lookalike_is_refused():
         def signature_bytes(self):
             return envelope.signature_bytes()
 
-    expect_refusal(lambda: probe_reverifier().verify(Lookalike(), evaluated_at=T_MID))
+    expect_refusal(lambda: probe_reverifier().verify_signature(Lookalike(), evaluated_at=T_MID))
 
     class Subclass(SignedEvidenceVerificationReceipt):
         pass
@@ -2000,14 +2032,14 @@ def probe_a_duck_typed_envelope_lookalike_is_refused():
         signer_authority_id=envelope.signer_authority_id,
         signing_key_id=envelope.signing_key_id,
         signature=envelope.signature)
-    expect_refusal(lambda: probe_reverifier().verify(forged, evaluated_at=T_MID))
+    expect_refusal(lambda: probe_reverifier().verify_signature(forged, evaluated_at=T_MID))
 
 
 @probe
 def probe_naive_datetimes_are_refused_at_every_tev2_boundary():
     envelope = probe_envelope()
     naive = datetime(2026, 7, 1, 12, 0, 0)
-    expect_refusal(lambda: probe_reverifier().verify(envelope, evaluated_at=naive))
+    expect_refusal(lambda: probe_reverifier().verify_signature(envelope, evaluated_at=naive))
     expect_refusal(lambda: KeyRevocation(effective_at=naive))
     expect_refusal(lambda: probe_authority_anchor(effective_from=naive))
     expect_refusal(lambda: probe_authority_anchor(effective_to=naive))
@@ -2027,7 +2059,8 @@ def probe_no_tev2_entry_point_defaults_its_instant():
     import inspect
 
     for owner, method, parameter in (
-        (SignedReceiptVerifier, "verify", "evaluated_at"),
+        (SignedReceiptVerifier, "verify_signature", "evaluated_at"),
+        (SignedReceiptVerifier, "verify_bound", "evaluated_at"),
         (EvidenceVerificationAuthority, "verify", "verified_at"),
         (TrustAnchorRecord, "lifecycle_refusal_at", "instant"),
         (KeyRevocation, "is_revoked_at", "instant"),
@@ -2041,7 +2074,7 @@ def probe_private_key_material_never_escapes():
     seed = NON_PRODUCTION_PROBE_AUTHORITY_SEED
     key = TrustedEvidenceSigningKey(seed)
     envelope = probe_envelope()
-    verification = probe_reverifier().verify(envelope, evaluated_at=T_MID)
+    verification = probe_reverifier().verify_signature(envelope, evaluated_at=T_MID)
     record = audit_record_for_receipt_verification(
         verification, envelope, tenant_id="tenant-1")
 
@@ -2072,7 +2105,7 @@ def probe_private_key_material_never_escapes():
 @probe
 def probe_the_envelope_authorizes_nothing():
     envelope = probe_envelope()
-    verification = probe_reverifier().verify(envelope, evaluated_at=T_MID)
+    verification = probe_reverifier().verify_signature(envelope, evaluated_at=T_MID)
     assert verification.verified
 
     for obj in (envelope, verification, envelope.payload):
@@ -2129,6 +2162,206 @@ def probe_receipt_ids_are_deterministic_and_re_verification_mints_a_new_one():
     assert first.receipt_payload.verified_at == T_VERIFIED
     assert first.receipt_payload.receipt_id.startswith("receipt-")
     assert len(first.receipt_payload.receipt_id) == len("receipt-") + 64
+
+
+# --------------------------------------------------------------------------- #
+# The closure-audit corrections, probed from outside the package
+# --------------------------------------------------------------------------- #
+
+#: Points that must never become a verification key or a trust anchor. Every
+#: one is either small-order — carrying no discrete-logarithm security at all —
+#: or a spelling RFC 8032 §5.1.3 says must not decode.
+UNTRUSTWORTHY_POINTS = (
+    "01" + "00" * 31,                     # identity, canonical
+    "01" + "00" * 30 + "80",              # identity, non-canonical (x=0, x_0=1)
+    "ec" + "ff" * 30 + "7f",              # order 2
+    "ec" + "ff" * 31,                     # order 2, non-canonical sign bit
+    "00" * 32,                            # order 4
+    "00" * 31 + "80",                     # order 4, sign bit set
+    "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05",
+    "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac03fa",
+    "ed" + "ff" * 30 + "7f",              # y = p
+    "ee" + "ff" * 30 + "7f",              # y = p + 1
+    "ff" * 32,
+)
+
+
+@probe
+def probe_no_untrustworthy_point_can_become_a_key_or_an_anchor():
+    """Closure-audit F-01/F-03, from the curated API only.
+
+    An identity-point anchor admits a universal forgery: with A = identity the
+    verification equation holds for R = [S]B and any S at all. The correction
+    refuses the point where it would enter the system, so the forgery has no
+    key to be mounted against.
+    """
+
+    for hexed in UNTRUSTWORTHY_POINTS:
+        raw = bytes.fromhex(hexed)
+        try:
+            TrustedEvidenceVerificationKey(raw)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"accepted an untrustworthy point: {hexed}")
+        expect_refusal(lambda h=hexed: TrustAnchorRecord(
+            authority_id=PROBE_VERIFIER_AUTHORITY,
+            key_id=PROBE_VERIFIER_KEY,
+            capability=TrustAnchorCapability.RECEIPT_ISSUANCE,
+            public_key=h,
+            trust_anchor_set_id=PROBE_ANCHOR_SET,
+            trust_anchor_set_version="1"))
+
+    # And a genuine key still works, so the refusals above are not vacuous.
+    genuine = probe_authority_key().verification_key.public_key_bytes
+    assert TrustedEvidenceVerificationKey(genuine).public_key_bytes == genuine
+
+
+@probe
+def probe_no_in_package_curve_arithmetic_remains():
+    """The handwritten implementation is gone, checked from the outside.
+
+    Only the module names and the absence of an ``ed25519`` submodule are
+    checked here — the probe harness imports the curated API and the stdlib
+    only, and asserts that of itself, so it deliberately does not reach into
+    package internals to look.
+    """
+
+    import importlib
+
+    for absent in ("ugence_trusted_evidence_authority.authority.ed25519",
+                   "ugence_trusted_evidence_authority.ed25519"):
+        try:
+            importlib.import_module(absent)
+        except ImportError:
+            continue
+        raise AssertionError(f"{absent} still exists")
+
+    for banned in ("scalarmult", "point_add", "recover_x", "decode_point"):
+        assert not hasattr(TrustedEvidenceVerificationKey, banned), banned
+        assert not hasattr(TrustedEvidenceSigningKey, banned), banned
+
+
+@probe
+def probe_a_signature_only_answer_never_reports_a_scope():
+    """Closure-audit F-04 — the weakening is typed, not documented in prose."""
+
+    envelope = probe_envelope()
+    unbound = probe_reverifier().verify_signature(envelope, evaluated_at=T_MID)
+    bound = probe_reverifier().verify_bound(
+        envelope, probe_expectation(envelope), evaluated_at=T_MID)
+
+    assert unbound.verified and bound.verified
+    assert type(unbound) is SignatureOnlyVerificationResult
+    assert type(bound) is ScopeBoundVerificationResult
+    assert unbound.verification_kind is ReceiptVerificationKind.SIGNATURE_ONLY
+    assert bound.verification_kind is ReceiptVerificationKind.SCOPE_BOUND
+    assert unbound.scope_bound is False and bound.scope_bound is True
+    # Two verified answers about one envelope at one instant, never equal in
+    # either direction, and only one of them claims the binding stage.
+    assert unbound != bound and bound != unbound
+    assert EvidenceTrustStage.CONTEXT_SYSTEM_BOUND in bound.established_trust_stages
+    assert EvidenceTrustStage.CONTEXT_SYSTEM_BOUND not in (
+        unbound.established_trust_stages)
+    assert not hasattr(unbound, "scope_expectation_digest")
+    assert bound.scope_expectation_digest == (
+        probe_expectation(envelope).expectation_digest())
+
+
+@probe
+def probe_nothing_falsy_can_stand_in_for_a_scope_expectation():
+    """Closure-audit F-05 — every value that used to skip its own check."""
+
+    envelope = probe_envelope()
+
+    class Lookalike:
+        REQUIRED_COORDINATES = ReceiptScopeExpectation.REQUIRED_COORDINATES
+        tenant_id = assessment_context_ref = subject_ref = "x"
+        assessed_system_binding_digest = ""
+        assessment_purpose_ref = usage_scope_ref = "x"
+        evidence_content_digest = CONTENT
+        verification_protocol_id = TRUSTED_EVIDENCE_PROTOCOL_V1_ID
+        verification_protocol_version = TRUSTED_EVIDENCE_PROTOCOL_V1_VERSION
+
+        def expectation_digest(self):
+            return CONTENT
+
+    for bad in (None, "", " ", False, True, 0, 1, (), [], {}, set(),
+                envelope.payload.scope, Lookalike(), Lookalike,
+                ReceiptScopeExpectation, object()):
+        expect_refusal(lambda b=bad: probe_reverifier().verify_bound(
+            envelope, b, evaluated_at=T_MID))
+
+    # And the expectation itself admits no blank coordinate to skip.
+    honest = probe_expectation(envelope)
+    fields = {name: getattr(honest, name)
+              for name in ReceiptScopeExpectation.REQUIRED_COORDINATES}
+    for name in ReceiptScopeExpectation.REQUIRED_COORDINATES:
+        for falsy in (None, "", False, 0, [], (), {}):
+            if name == "assessed_system_binding_digest" and falsy == "":
+                continue  # the one ratified empty spelling (§9 row 10)
+            expect_refusal(lambda n=name, f=falsy: ReceiptScopeExpectation(
+                **{**fields, n: f}))
+
+
+@probe
+def probe_a_signing_key_exposes_no_seed_by_any_route():
+    """Closure-audit F-08 — the public accessor is gone, not merely undocumented."""
+
+    seed = NON_PRODUCTION_PROBE_AUTHORITY_SEED
+    key = TrustedEvidenceSigningKey(seed)
+    hexed = seed.hex()
+
+    assert not dataclasses.is_dataclass(key)
+    assert not hasattr(key, "__dict__")
+    for absent in ("seed", "seed_bytes", "private_bytes", "private_key",
+                   "to_bytes", "export", "raw", "_seed"):
+        assert not hasattr(key, absent), absent
+    for rendering in ("%r" % (key,), "%s" % (key,), format(key)):
+        assert hexed not in rendering
+        assert rendering == "TrustedEvidenceSigningKey(<redacted>)"
+
+    # Neither serialization nor duplication can lift it out.
+    for attempt in (lambda: pickle.dumps(key),
+                    lambda: copy.copy(key),
+                    lambda: copy.deepcopy(key),
+                    lambda: key.__reduce__()):
+        try:
+            attempt()
+        except (TypeError, AttributeError, Exception):
+            continue
+        raise AssertionError("key material escaped through serialization")
+
+    # And the key still signs, so the protection is not achieved by breaking it.
+    assert len(key.sign(b"a message")) == 64
+
+
+@probe
+def probe_the_reverifier_recomputes_the_payload_digest_it_is_handed():
+    """Closure-audit F-09 — the gate is load-bearing, shown by what it alone catches.
+
+    An envelope whose ``__post_init__`` never ran — an unpickled one, or one a
+    deserializer rebuilt field by field — carries a valid signature and a lying
+    declared digest. The signing frame binds the *recomputed* digest, so the
+    signature check passes and this is the only gate that refuses.
+    """
+
+    envelope = probe_envelope()
+    rebuilt = object.__new__(type(envelope))
+    for field in dataclasses.fields(envelope):
+        object.__setattr__(rebuilt, field.name, getattr(envelope, field.name))
+    object.__setattr__(rebuilt, "payload_canonical_digest", OTHER)
+
+    assert type(rebuilt) is type(envelope)
+    assert rebuilt.signed_input_bytes() == envelope.signed_input_bytes()
+    anchor_key = TrustedEvidenceVerificationKey(
+        bytes.fromhex(probe_authority_anchor().public_key))
+    assert anchor_key.verify(
+        rebuilt.signed_input_bytes(), rebuilt.signature_bytes()) is True
+
+    result = probe_reverifier().verify_signature(rebuilt, evaluated_at=T_MID)
+    assert result.outcome is ReceiptVerificationOutcome.REFUSED
+    assert result.refusal_reason is R.TRUSTED_EVIDENCE_PAYLOAD_DIGEST_MISMATCH
 
 
 def main() -> int:

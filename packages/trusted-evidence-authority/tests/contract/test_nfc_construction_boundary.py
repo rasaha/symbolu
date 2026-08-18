@@ -46,6 +46,7 @@ from ugence_trusted_evidence_authority.api import (
     EvidenceVerificationAuditRecord,
     KeyRevocation,
     ProtocolExecutionResult,
+    ReceiptScopeExpectation,
     TrustAnchorCapability,
     TrustAnchorCoordinate,
     TrustedEvidenceCanonicalizationError,
@@ -147,6 +148,27 @@ def audit(**kw):
     )
 
 
+def expectation(**overrides):
+    """A scope expectation matching the standard envelope, with overrides."""
+
+    payload = envelope().payload
+    fields = dict(
+        tenant_id=payload.scope.tenant_id,
+        assessment_context_ref=payload.scope.assessment_context_ref,
+        subject_ref=payload.scope.subject_ref,
+        assessed_system_binding_digest=(
+            payload.scope.assessed_system_binding_digest
+        ),
+        assessment_purpose_ref=payload.scope.assessment_purpose_ref,
+        usage_scope_ref=payload.scope.usage_scope_ref,
+        evidence_content_digest=payload.evidence_content_digest,
+        verification_protocol_id=payload.verification_protocol_id,
+        verification_protocol_version=payload.verification_protocol_version,
+    )
+    fields.update(overrides)
+    return ReceiptScopeExpectation(**fields)
+
+
 STRING_COORDINATES = [
     ("EvidenceSchemaRef.schema_id", lambda v: schema(schema_id=v)),
     ("EvidenceSchemaRef.schema_version", lambda v: schema(schema_version=v)),
@@ -196,6 +218,18 @@ STRING_COORDINATES = [
      lambda v: dataclasses.replace(envelope(), signer_authority_id=v)),
     ("SignedEvidenceVerificationReceipt.signing_key_id",
      lambda v: dataclasses.replace(envelope(), signing_key_id=v)),
+    ("ReceiptScopeExpectation.tenant_id", lambda v: expectation(tenant_id=v)),
+    ("ReceiptScopeExpectation.assessment_context_ref",
+     lambda v: expectation(assessment_context_ref=v)),
+    ("ReceiptScopeExpectation.subject_ref", lambda v: expectation(subject_ref=v)),
+    ("ReceiptScopeExpectation.assessment_purpose_ref",
+     lambda v: expectation(assessment_purpose_ref=v)),
+    ("ReceiptScopeExpectation.usage_scope_ref",
+     lambda v: expectation(usage_scope_ref=v)),
+    ("ReceiptScopeExpectation.verification_protocol_id",
+     lambda v: expectation(verification_protocol_id=v)),
+    ("ReceiptScopeExpectation.verification_protocol_version",
+     lambda v: expectation(verification_protocol_version=v)),
     ("ProtocolExecutionResult.protocol_id", lambda v: ProtocolExecutionResult(
         protocol_id=v, protocol_version="1",
         cleared_stages=(EvidenceTrustStage.STRUCTURALLY_CONSTRUCTIBLE,))),
