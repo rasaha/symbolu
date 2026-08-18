@@ -243,3 +243,109 @@ def test_no_candidate_and_no_collaborator_on_any_isolated_gate(
     with pytest.raises((TargetScopeError, MagnitudeBoundError)):
         built = _attempt(projection, decision, scope, policy=policy)
     assert built is None
+
+
+# ======================================================================================
+# Schema-version gates — surfaced by the remediated guard sweep
+# ======================================================================================
+
+
+def test_unsupported_schema_version_is_refused_on_every_artifact(
+    projection, decision, attestation, target_scope, policy_binding
+):
+    """G-7: each artifact's schema-version gate, with its own typed reason.
+
+    Also a sweep finding. Removing any of these gates does not make the artifact
+    *accepted* — the schema tag is inside the canonical payload, so a wrong tag fails the
+    digest check instead — but it changes a precise ``unsupported_schema_version`` refusal
+    into a generic digest failure. The reason code is what an operator reads, so it is part
+    of the contract, and a test that never asserts it lets the gate rot.
+    """
+
+    import dataclasses
+
+    from ugence_cloud_scaling_authorization_contracts import (
+        CandidateConstructionError,
+        CapacityAuthorizationCandidate,
+    )
+
+    for artifact in (attestation, target_scope, policy_binding):
+        with pytest.raises(CandidateConstructionError) as exc:
+            dataclasses.replace(artifact, schema_version="some-other-schema-1")
+        assert exc.value.reason.value == "unsupported_schema_version", (
+            f"{type(artifact).__name__} did not report unsupported_schema_version"
+        )
+
+    candidate = _attempt(projection, decision, target_scope, policy=policy_binding)
+    fields = {f: getattr(candidate, f) for f in candidate.__dataclass_fields__}
+    fields["schema_version"] = "some-other-schema-1"
+    with pytest.raises(CandidateConstructionError) as exc:
+        CapacityAuthorizationCandidate(**fields)
+    assert exc.value.reason.value == "unsupported_schema_version"
+
+
+def test_the_schema_tag_is_inside_the_candidate_digest(candidate):
+    """Defence in depth behind the gate above: the tag is covered by the digest too."""
+
+    assert candidate.digest_payload()["schema_version"] == candidate.schema_version
+
+
+def test_candidate_post_init_refuses_a_wrong_typed_carried_artifact(candidate):
+    """G-8: the candidate's own exact-type gate on its three carried artifacts.
+
+    The builder already type-checks its arguments, so this gate is only reachable when a
+    ``CapacityAuthorizationCandidate`` is constructed **directly** — which is a public,
+    supported thing to do (deserialization, reconstruction from an audit record). Without
+    it, a duck-typed look-alike would be carried and only fail later, on digest
+    computation, with a confusing error.
+    """
+
+    from ugence_cloud_scaling_authorization_contracts import ExactTypeError
+
+    class LooksLikeAScope:
+        def to_canonical_dict(self):
+            return candidate.target_scope.to_canonical_dict()
+
+        def digest(self):
+            return candidate.target_scope_digest
+
+    for field in ("target_scope", "policy_binding", "producer_attestation"):
+        fields = {f: getattr(candidate, f) for f in candidate.__dataclass_fields__}
+        fields[field] = LooksLikeAScope()
+        with pytest.raises(ExactTypeError) as exc:
+            type(candidate)(**fields)
+        assert exc.value.reason.value == "unsupported_exact_type", field
+
+
+def test_a_tampered_context_magnitude_is_rejected_before_reconciliation_completes(
+    projection, decision
+):
+    """The *property*, stated honestly — not a claim about a specific gate.
+
+    The reconciler also carries a ``_require_int`` guard on the projected magnitudes. That
+    guard is **unreachable through the public entry point**: the magnitudes are inside the
+    context digest, so any tampering trips the context-digest re-derivation first. Removing
+    ``_require_int`` therefore does *not* make this test fail, and claiming it does would be
+    exactly the misattribution this module exists to avoid — a downstream failure sold as
+    coverage of an upstream gate.
+
+    So this test asserts only what it actually proves: a fabricated context with a
+    non-integer or negative magnitude never yields reconciled facts. ``_require_int``
+    remains as defence in depth for any future caller that reaches
+    ``ReconciledPhase4Facts`` by another route, and is documented as unreachable rather
+    than covered.
+    """
+
+    from ugence_cloud_scaling_authorization_contracts import (
+        ReconciliationError,
+        reconcile_phase4,
+    )
+
+    original = projection.context.magnitude_after
+    for bad in (9.5, True, -1):
+        object.__setattr__(projection.context, "magnitude_after", bad)
+        try:
+            with pytest.raises(ReconciliationError):
+                reconcile_phase4(projection, decision)
+        finally:
+            object.__setattr__(projection.context, "magnitude_after", original)
