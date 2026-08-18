@@ -21,7 +21,9 @@ import dataclasses
 import unicodedata
 
 import pytest
+from _authority_builders import envelope, submission
 from _builders import (
+    RECEIPT_VALID_FROM,
     claim,
     identity,
     observation,
@@ -31,10 +33,22 @@ from _builders import (
     schema,
     scope,
 )
+from _authority_builders import (
+    PRODUCER_AUTHORITY_ID,
+    VERIFIER_KEY_ID,
+    producer_anchor,
+)
 from ugence_trusted_evidence_authority.api import (
     ApplicabilityCoordinate,
     EvidenceProvenanceChain,
     EvidenceSchemaRef,
+    EvidenceTrustStage,
+    EvidenceVerificationAuditRecord,
+    KeyRevocation,
+    ProtocolExecutionResult,
+    ReceiptScopeExpectation,
+    TrustAnchorCapability,
+    TrustAnchorCoordinate,
     TrustedEvidenceCanonicalizationError,
     TrustedEvidenceContractError,
     canonical_bytes,
@@ -113,6 +127,48 @@ def test_rejection_is_never_silent_normalization():
 # The boundary is uniform — every string coordinate, nested contracts included
 # --------------------------------------------------------------------------- #
 
+def audit(**kw):
+    """A minimal audit record with one overridable string coordinate."""
+
+    from _builders import CONTENT_DIGEST, VERIFIED_AT
+
+    return EvidenceVerificationAuditRecord(
+        **{
+            "act": "EVIDENCE_VERIFICATION",
+            "outcome": "ADMITTED",
+            "evaluated_at": VERIFIED_AT,
+            "tenant_id": "tenant-1",
+            "authority_id": "authority-1",
+            "key_id": "key-1",
+            "verification_protocol_id": "protocol-1",
+            "verification_protocol_version": "1",
+            "verification_request_digest": CONTENT_DIGEST,
+            **kw,
+        }
+    )
+
+
+def expectation(**overrides):
+    """A scope expectation matching the standard envelope, with overrides."""
+
+    payload = envelope().payload
+    fields = dict(
+        tenant_id=payload.scope.tenant_id,
+        assessment_context_ref=payload.scope.assessment_context_ref,
+        subject_ref=payload.scope.subject_ref,
+        assessed_system_binding_digest=(
+            payload.scope.assessed_system_binding_digest
+        ),
+        assessment_purpose_ref=payload.scope.assessment_purpose_ref,
+        usage_scope_ref=payload.scope.usage_scope_ref,
+        evidence_content_digest=payload.evidence_content_digest,
+        verification_protocol_id=payload.verification_protocol_id,
+        verification_protocol_version=payload.verification_protocol_version,
+    )
+    fields.update(overrides)
+    return ReceiptScopeExpectation(**fields)
+
+
 STRING_COORDINATES = [
     ("EvidenceSchemaRef.schema_id", lambda v: schema(schema_id=v)),
     ("EvidenceSchemaRef.schema_version", lambda v: schema(schema_version=v)),
@@ -143,6 +199,58 @@ STRING_COORDINATES = [
     ("EvidenceVerificationReceiptPayload.verifier_key_id", lambda v: receipt(verifier_key_id=v)),
     ("EvidenceVerificationReceiptPayload.verification_protocol_id", lambda v: receipt(verification_protocol_id=v)),
     ("EvidenceVerificationReceiptPayload.verification_protocol_version", lambda v: receipt(verification_protocol_version=v)),
+    # -- TEV-2 --------------------------------------------------------------
+    ("TrustAnchorCoordinate.authority_id", lambda v: TrustAnchorCoordinate(
+        authority_id=v, key_id=VERIFIER_KEY_ID,
+        capability=TrustAnchorCapability.RECEIPT_ISSUANCE)),
+    ("TrustAnchorCoordinate.key_id", lambda v: TrustAnchorCoordinate(
+        authority_id=PRODUCER_AUTHORITY_ID, key_id=v,
+        capability=TrustAnchorCapability.RECEIPT_ISSUANCE)),
+    ("KeyRevocation.reason_ref", lambda v: KeyRevocation(
+        effective_at=RECEIPT_VALID_FROM, reason_ref=v)),
+    ("TrustAnchorRecord.authority_id", lambda v: producer_anchor(authority_id=v)),
+    ("TrustAnchorRecord.key_id", lambda v: producer_anchor(key_id=v)),
+    ("TrustAnchorRecord.trust_anchor_set_id", lambda v: producer_anchor(trust_anchor_set_id=v)),
+    ("TrustAnchorRecord.trust_anchor_set_version", lambda v: producer_anchor(trust_anchor_set_version=v)),
+    ("SignedEvidenceSubmission.producer_authority_id", lambda v: submission(producer_authority_id=v)),
+    ("SignedEvidenceSubmission.producer_key_id", lambda v: submission(producer_key_id=v)),
+    ("SignedEvidenceVerificationReceipt.signer_authority_id",
+     lambda v: dataclasses.replace(envelope(), signer_authority_id=v)),
+    ("SignedEvidenceVerificationReceipt.signing_key_id",
+     lambda v: dataclasses.replace(envelope(), signing_key_id=v)),
+    ("ReceiptScopeExpectation.tenant_id", lambda v: expectation(tenant_id=v)),
+    ("ReceiptScopeExpectation.assessment_context_ref",
+     lambda v: expectation(assessment_context_ref=v)),
+    ("ReceiptScopeExpectation.subject_ref", lambda v: expectation(subject_ref=v)),
+    ("ReceiptScopeExpectation.assessment_purpose_ref",
+     lambda v: expectation(assessment_purpose_ref=v)),
+    ("ReceiptScopeExpectation.usage_scope_ref",
+     lambda v: expectation(usage_scope_ref=v)),
+    ("ReceiptScopeExpectation.verification_protocol_id",
+     lambda v: expectation(verification_protocol_id=v)),
+    ("ReceiptScopeExpectation.verification_protocol_version",
+     lambda v: expectation(verification_protocol_version=v)),
+    ("ProtocolExecutionResult.protocol_id", lambda v: ProtocolExecutionResult(
+        protocol_id=v, protocol_version="1",
+        cleared_stages=(EvidenceTrustStage.STRUCTURALLY_CONSTRUCTIBLE,))),
+    ("ProtocolExecutionResult.protocol_version", lambda v: ProtocolExecutionResult(
+        protocol_id="p", protocol_version=v,
+        cleared_stages=(EvidenceTrustStage.STRUCTURALLY_CONSTRUCTIBLE,))),
+    ("EvidenceVerificationAuditRecord.act", lambda v: audit(act=v)),
+    ("EvidenceVerificationAuditRecord.outcome", lambda v: audit(outcome=v)),
+    ("EvidenceVerificationAuditRecord.tenant_id", lambda v: audit(tenant_id=v)),
+    ("EvidenceVerificationAuditRecord.authority_id", lambda v: audit(authority_id=v)),
+    ("EvidenceVerificationAuditRecord.key_id", lambda v: audit(key_id=v)),
+    ("EvidenceVerificationAuditRecord.verification_protocol_id",
+     lambda v: audit(verification_protocol_id=v)),
+    ("EvidenceVerificationAuditRecord.verification_protocol_version",
+     lambda v: audit(verification_protocol_version=v)),
+    # Hex-encoded material still runs through the same canonical-string gate
+    # before its stricter base16 rule, so it is covered here rather than exempt.
+    ("SignedEvidenceVerificationReceipt.signature",
+     lambda v: dataclasses.replace(envelope(), signature=v)),
+    ("SignedEvidenceSubmission.signature", lambda v: submission(signature=v)),
+    ("TrustAnchorRecord.public_key", lambda v: producer_anchor(public_key=v)),
 ]
 
 
@@ -170,11 +278,28 @@ def test_the_string_coordinate_matrix_covers_every_declared_string_field():
 
     from ugence_trusted_evidence_authority import api
 
+    from ugence_trusted_evidence_authority.api import (
+        EvidenceVerificationDetermination,
+        ReceiptSigningInput,
+    )
+
+    # Token-guarded types are exempt **by identity**, never by a name pattern —
+    # a second unreachable type could not slip in behind these two. Neither is
+    # caller-constructible at all: their ``__post_init__`` demands a private
+    # token the curated API does not export, so no caller can supply *any*
+    # string to them, NFC or otherwise. The two tests immediately below prove
+    # that, so the exemption rests on a demonstrated property rather than on
+    # this comment. Every string that does reach them is produced inside the
+    # package from coordinates already covered by the matrix above.
+    token_guarded = {EvidenceVerificationDetermination, ReceiptSigningInput}
+
     covered = {name for name, _ in STRING_COORDINATES}
     uncovered = set()
     for symbol in api.__all__:
         obj = getattr(api, symbol)
         if not (isinstance(obj, type) and dataclasses.is_dataclass(obj)):
+            continue
+        if obj in token_guarded:
             continue
         for field in dataclasses.fields(obj):
             if field.type not in ("str", str):
@@ -186,7 +311,109 @@ def test_the_string_coordinate_matrix_covers_every_declared_string_field():
     # Digest-typed strings are validated by the stricter hex rule, which rejects
     # every non-ASCII value including any non-NFC one, so they are exempt.
     digest_fields = {n for n in uncovered if "digest" in n.rsplit(".", 1)[-1]}
-    assert uncovered - digest_fields == set(), sorted(uncovered - digest_fields)
+
+    # TEV-2 adds one more exempt class, *stricter* than the NFC rule rather
+    # than weaker: **pinned-constant fields**. ``envelope_schema``,
+    # ``signature_profile``, ``signature_encoding`` and ``signed_input_domain``
+    # are compared for equality against a single ratified constant, so every
+    # value but that one is refused, non-NFC spellings included.
+    #
+    # Hex-encoded material is **not** exempt: ``signature`` and ``public_key``
+    # run through the same canonical-string gate before their stricter base16
+    # rule, so they are covered by the matrix directly.
+    pinned_fields = {
+        n
+        for n in uncovered
+        if n.rsplit(".", 1)[-1]
+        in (
+            "envelope_schema",
+            "signature_profile",
+            "signature_encoding",
+            "signed_input_domain",
+        )
+    }
+    remaining = uncovered - digest_fields - pinned_fields
+    assert remaining == set(), sorted(remaining)
+
+
+def test_the_token_guarded_types_admit_no_caller_supplied_string_at_all():
+    """The exemption above, proved: neither type is caller-constructible.
+
+    A caller cannot reach these constructors with a non-NFC string because a
+    caller cannot reach these constructors, full stop. Attempted directly, with
+    every field otherwise valid, construction is refused.
+    """
+
+    from ugence_trusted_evidence_authority.api import (
+        TRUSTED_EVIDENCE_SIGNATURE_PROFILE_V1,
+        EvidenceAdmissionOutcome,
+        EvidenceVerificationDetermination,
+        ReceiptSigningInput,
+    )
+    from _builders import CONTENT_DIGEST, VERIFIED_AT
+
+    with pytest.raises(TrustedEvidenceContractError) as excinfo:
+        EvidenceVerificationDetermination(
+            outcome=EvidenceAdmissionOutcome.REFUSED,
+            verification_request_digest=CONTENT_DIGEST,
+            verifier_authority_id="authority-1",
+            verifier_key_id="key-1",
+            verification_protocol_id="protocol-1",
+            verification_protocol_version="1",
+            verified_at=VERIFIED_AT,
+            evaluated_at=VERIFIED_AT,
+            refusal_reasons=(),
+        )
+    assert "cannot be constructed directly" in str(excinfo.value)
+
+    with pytest.raises(TrustedEvidenceContractError) as excinfo:
+        ReceiptSigningInput(
+            signed_input=b"anything at all",
+            signer_authority_id="authority-1",
+            signing_key_id="key-1",
+            signature_profile=TRUSTED_EVIDENCE_SIGNATURE_PROFILE_V1,
+        )
+    assert "cannot be constructed directly" in str(excinfo.value)
+
+
+@pytest.mark.parametrize(
+    "build",
+    [
+        lambda v: dataclasses.replace(envelope(), signature=v),
+        lambda v: producer_anchor(public_key=v),
+    ],
+    ids=["SignedEvidenceVerificationReceipt.signature", "TrustAnchorRecord.public_key"],
+)
+def test_hex_material_also_refuses_an_nfc_string_that_is_not_base16(build):
+    """NFC is necessary but not sufficient for encoded material."""
+
+    with pytest.raises(TrustedEvidenceContractError) as excinfo:
+        build("Z" * 128)
+    assert "base16" in str(excinfo.value) or "characters" in str(excinfo.value)
+
+
+@pytest.mark.parametrize(
+    "build",
+    [
+        lambda v: dataclasses.replace(envelope(), envelope_schema=v),
+        lambda v: dataclasses.replace(envelope(), signature_profile=v),
+        lambda v: dataclasses.replace(envelope(), signed_input_domain=v),
+        lambda v: producer_anchor(signature_profile=v),
+        lambda v: producer_anchor(signature_encoding=v),
+    ],
+    ids=[
+        "envelope_schema",
+        "envelope.signature_profile",
+        "signed_input_domain",
+        "anchor.signature_profile",
+        "anchor.signature_encoding",
+    ],
+)
+def test_pinned_constant_fields_refuse_every_value_but_the_ratified_one(build):
+    """The second exemption, proved: a non-NFC spelling is simply not the constant."""
+
+    with pytest.raises(TrustedEvidenceContractError):
+        build(NFD_E_ACUTE)
 
 
 @pytest.mark.parametrize(

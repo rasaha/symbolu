@@ -1,7 +1,7 @@
 {
   "distribution": "ugence-trusted-evidence-authority",
   "namespace": "ugence_trusted_evidence_authority",
-  "package_version": "0.1.0",
+  "package_version": "0.2.0",
   "curated_api_module": "ugence_trusted_evidence_authority.api",
   "note": "Machine-readable snapshot of the curated public API (ugence_trusted_evidence_authority.api.__all__). Generated from the package surface; tests/packaging/test_public_api.py asserts this file equals the actual package surface, and verify_trusted_evidence_authority_distribution.py asserts the same for the built wheel and the isolated installed runtime. Regenerate when the curated API changes.",
   "symbols": {
@@ -46,6 +46,21 @@
         "DECLARED_INDETERMINATE"
       ]
     },
+    "DenyAllTrustAnchorDirectory": {
+      "kind": "class"
+    },
+    "ED25519_PUBLIC_KEY_SIZE": {
+      "kind": "constant",
+      "value": "32"
+    },
+    "ED25519_SEED_SIZE": {
+      "kind": "constant",
+      "value": "32"
+    },
+    "ED25519_SIGNATURE_SIZE": {
+      "kind": "constant",
+      "value": "64"
+    },
     "EVIDENCE_IDENTITY_DIGEST_DOMAIN": {
       "kind": "constant",
       "value": "ugence.trusted-evidence-authority/evidence-identity/v1"
@@ -85,6 +100,19 @@
     "EVIDENCE_VERIFICATION_RECEIPT_PAYLOAD_DIGEST_DOMAIN": {
       "kind": "constant",
       "value": "ugence.trusted-evidence-authority/evidence-verification-receipt-payload/v1"
+    },
+    "Ed25519EvidenceAuthenticityProtocol": {
+      "kind": "class"
+    },
+    "Ed25519ReceiptSigner": {
+      "kind": "class"
+    },
+    "EvidenceAdmissionOutcome": {
+      "kind": "enum",
+      "values": [
+        "ADMITTED",
+        "REFUSED"
+      ]
     },
     "EvidenceClaimBinding": {
       "kind": "dataclass",
@@ -161,6 +189,49 @@
         "POLICY_SUFFICIENT"
       ]
     },
+    "EvidenceVerificationAuditRecord": {
+      "kind": "dataclass",
+      "fields": [
+        "act",
+        "outcome",
+        "evaluated_at",
+        "tenant_id",
+        "authority_id",
+        "key_id",
+        "verification_protocol_id",
+        "verification_protocol_version",
+        "verification_request_digest",
+        "refusal_reasons",
+        "verified_at",
+        "receipt_payload_digest",
+        "receipt_envelope_digest",
+        "trust_anchor_digest",
+        "scope_expectation_digest"
+      ]
+    },
+    "EvidenceVerificationAuthority": {
+      "kind": "class"
+    },
+    "EvidenceVerificationDetermination": {
+      "kind": "dataclass",
+      "fields": [
+        "outcome",
+        "verification_request_digest",
+        "verifier_authority_id",
+        "verifier_key_id",
+        "verification_protocol_id",
+        "verification_protocol_version",
+        "verified_at",
+        "evaluated_at",
+        "cleared_stages",
+        "refusal_reasons",
+        "receipt_payload",
+        "issuance_token"
+      ]
+    },
+    "EvidenceVerificationProtocolPort": {
+      "kind": "class"
+    },
     "EvidenceVerificationReceiptPayload": {
       "kind": "dataclass",
       "fields": [
@@ -202,6 +273,22 @@
         "expected_assessed_system_binding_digest"
       ]
     },
+    "KeyRevocation": {
+      "kind": "dataclass",
+      "fields": [
+        "effective_at",
+        "reason_ref"
+      ]
+    },
+    "ProtocolExecutionResult": {
+      "kind": "dataclass",
+      "fields": [
+        "protocol_id",
+        "protocol_version",
+        "cleared_stages",
+        "refusal_reasons"
+      ]
+    },
     "RECEIPT_REPORTABLE_TRUST_STAGES": {
       "kind": "constant",
       "value": [
@@ -212,11 +299,134 @@
         "CURRENTLY_VALID"
       ]
     },
-    "TRUSTED_EVIDENCE_CANONICALIZATION_VERSION": {
+    "RECEIPT_SCOPE_EXPECTATION_DIGEST_DOMAIN": {
       "kind": "constant",
-      "value": "ugence.trusted-evidence-authority/canonicalization/v1"
+      "value": "ugence.trusted-evidence-authority/receipt-scope-expectation/v1"
     },
-    "TRUSTED_EVIDENCE_REFUSAL_REASONS": {
+    "ReceiptIssuer": {
+      "kind": "class"
+    },
+    "ReceiptScopeExpectation": {
+      "kind": "dataclass",
+      "fields": [
+        "tenant_id",
+        "assessment_context_ref",
+        "subject_ref",
+        "assessed_system_binding_digest",
+        "assessment_purpose_ref",
+        "usage_scope_ref",
+        "evidence_content_digest",
+        "verification_protocol_id",
+        "verification_protocol_version"
+      ]
+    },
+    "ReceiptSignerPort": {
+      "kind": "class"
+    },
+    "ReceiptSigningInput": {
+      "kind": "dataclass",
+      "fields": [
+        "signed_input",
+        "signer_authority_id",
+        "signing_key_id",
+        "signature_profile",
+        "issuance_token"
+      ]
+    },
+    "ReceiptVerificationKind": {
+      "kind": "enum",
+      "values": [
+        "SIGNATURE_ONLY",
+        "SCOPE_BOUND"
+      ]
+    },
+    "ReceiptVerificationOutcome": {
+      "kind": "enum",
+      "values": [
+        "VERIFIED",
+        "REFUSED"
+      ]
+    },
+    "SIGNED_EVIDENCE_SUBMISSION_DIGEST_DOMAIN": {
+      "kind": "constant",
+      "value": "ugence.trusted-evidence-authority/signed-evidence-submission-digest/v1"
+    },
+    "SIGNED_EVIDENCE_SUBMISSION_SCHEMA_V1": {
+      "kind": "constant",
+      "value": "ugence.trusted-evidence-authority/signed-evidence-submission/v1"
+    },
+    "SIGNED_INPUT_LENGTH_PREFIX_BYTES": {
+      "kind": "constant",
+      "value": "8"
+    },
+    "SIGNED_RECEIPT_ENVELOPE_DIGEST_DOMAIN": {
+      "kind": "constant",
+      "value": "ugence.trusted-evidence-authority/signed-receipt-envelope-digest/v1"
+    },
+    "SIGNED_RECEIPT_ENVELOPE_SCHEMA_V1": {
+      "kind": "constant",
+      "value": "ugence.trusted-evidence-authority/signed-receipt-envelope/v1"
+    },
+    "ScopeBoundVerificationResult": {
+      "kind": "dataclass",
+      "fields": [
+        "outcome",
+        "evaluated_at",
+        "coordinate",
+        "envelope_digest",
+        "payload_canonical_digest",
+        "refusal_reason",
+        "trust_anchor_digest",
+        "verification_token",
+        "scope_expectation_digest"
+      ]
+    },
+    "SignatureOnlyVerificationResult": {
+      "kind": "dataclass",
+      "fields": [
+        "outcome",
+        "evaluated_at",
+        "coordinate",
+        "envelope_digest",
+        "payload_canonical_digest",
+        "refusal_reason",
+        "trust_anchor_digest",
+        "verification_token"
+      ]
+    },
+    "SignedEvidenceSubmission": {
+      "kind": "dataclass",
+      "fields": [
+        "envelope_schema",
+        "evidence",
+        "evidence_identity_digest",
+        "producer_authority_id",
+        "producer_key_id",
+        "signature_profile",
+        "signed_input_domain",
+        "signature"
+      ]
+    },
+    "SignedEvidenceVerificationReceipt": {
+      "kind": "dataclass",
+      "fields": [
+        "envelope_schema",
+        "payload",
+        "payload_canonical_digest",
+        "signature_profile",
+        "signed_input_domain",
+        "signer_authority_id",
+        "signing_key_id",
+        "signature"
+      ]
+    },
+    "SignedReceiptVerifier": {
+      "kind": "class"
+    },
+    "StaticTrustAnchorDirectory": {
+      "kind": "class"
+    },
+    "TEV1_TRUSTED_EVIDENCE_REFUSAL_REASONS": {
       "kind": "constant",
       "value": [
         "TRUSTED_EVIDENCE_CONTENT_DIGEST_MISMATCH",
@@ -239,6 +449,156 @@
         "TRUSTED_EVIDENCE_VERIFICATION_NOT_PERFORMED",
         "TRUSTED_EVIDENCE_VERIFIER_UNAVAILABLE"
       ]
+    },
+    "TEV2_TRUSTED_EVIDENCE_REFUSAL_REASONS": {
+      "kind": "constant",
+      "value": [
+        "TRUSTED_EVIDENCE_AUTHORITY_MISMATCH",
+        "TRUSTED_EVIDENCE_ENVELOPE_MALFORMED",
+        "TRUSTED_EVIDENCE_KEY_CAPABILITY_MISMATCH",
+        "TRUSTED_EVIDENCE_KEY_DISABLED",
+        "TRUSTED_EVIDENCE_KEY_EXPIRED",
+        "TRUSTED_EVIDENCE_KEY_ID_MISMATCH",
+        "TRUSTED_EVIDENCE_KEY_NOT_YET_VALID",
+        "TRUSTED_EVIDENCE_KEY_REVOKED",
+        "TRUSTED_EVIDENCE_PAYLOAD_DIGEST_MISMATCH",
+        "TRUSTED_EVIDENCE_PRODUCER_UNAUTHORIZED",
+        "TRUSTED_EVIDENCE_PRODUCER_UNKNOWN",
+        "TRUSTED_EVIDENCE_PROTOCOL_UNSUPPORTED",
+        "TRUSTED_EVIDENCE_PROTOCOL_VERSION_MISMATCH",
+        "TRUSTED_EVIDENCE_RECEIPT_EXPIRED",
+        "TRUSTED_EVIDENCE_RECEIPT_NOT_YET_VALID",
+        "TRUSTED_EVIDENCE_SIGNATURE_ENCODING_INVALID",
+        "TRUSTED_EVIDENCE_SIGNATURE_INVALID",
+        "TRUSTED_EVIDENCE_SIGNATURE_PROFILE_UNSUPPORTED",
+        "TRUSTED_EVIDENCE_TRUST_ANCHOR_AMBIGUOUS",
+        "TRUSTED_EVIDENCE_TRUST_ANCHOR_MISSING",
+        "TRUSTED_EVIDENCE_TRUST_ANCHOR_NOT_CONFIGURED"
+      ]
+    },
+    "TRUSTED_EVIDENCE_CANONICALIZATION_VERSION": {
+      "kind": "constant",
+      "value": "ugence.trusted-evidence-authority/canonicalization/v1"
+    },
+    "TRUSTED_EVIDENCE_PROTOCOL_V1_ID": {
+      "kind": "constant",
+      "value": "ugence.trusted-evidence-authority/verification-protocol/ed25519-evidence-authenticity/v1"
+    },
+    "TRUSTED_EVIDENCE_PROTOCOL_V1_VERSION": {
+      "kind": "constant",
+      "value": "1"
+    },
+    "TRUSTED_EVIDENCE_RECEIPT_ID_DOMAIN": {
+      "kind": "constant",
+      "value": "ugence.trusted-evidence-authority/receipt-id/v1"
+    },
+    "TRUSTED_EVIDENCE_REFUSAL_REASONS": {
+      "kind": "constant",
+      "value": [
+        "TRUSTED_EVIDENCE_AUTHORITY_MISMATCH",
+        "TRUSTED_EVIDENCE_CONTENT_DIGEST_MISMATCH",
+        "TRUSTED_EVIDENCE_CONTEXT_MISMATCH",
+        "TRUSTED_EVIDENCE_ENVELOPE_MALFORMED",
+        "TRUSTED_EVIDENCE_IDENTITY_COORDINATE_MISSING",
+        "TRUSTED_EVIDENCE_INDETERMINATE",
+        "TRUSTED_EVIDENCE_INVALID_LIFECYCLE_TRANSITION",
+        "TRUSTED_EVIDENCE_KEY_CAPABILITY_MISMATCH",
+        "TRUSTED_EVIDENCE_KEY_DISABLED",
+        "TRUSTED_EVIDENCE_KEY_EXPIRED",
+        "TRUSTED_EVIDENCE_KEY_ID_MISMATCH",
+        "TRUSTED_EVIDENCE_KEY_NOT_YET_VALID",
+        "TRUSTED_EVIDENCE_KEY_REVOKED",
+        "TRUSTED_EVIDENCE_MALFORMED_CONTRACT",
+        "TRUSTED_EVIDENCE_MISSING",
+        "TRUSTED_EVIDENCE_NOT_YET_VALID",
+        "TRUSTED_EVIDENCE_PAYLOAD_DIGEST_MISMATCH",
+        "TRUSTED_EVIDENCE_PRODUCER_UNAUTHORIZED",
+        "TRUSTED_EVIDENCE_PRODUCER_UNKNOWN",
+        "TRUSTED_EVIDENCE_PROTOCOL_UNSUPPORTED",
+        "TRUSTED_EVIDENCE_PROTOCOL_VERSION_MISMATCH",
+        "TRUSTED_EVIDENCE_PROVENANCE_MISMATCH",
+        "TRUSTED_EVIDENCE_PURPOSE_SCOPE_MISMATCH",
+        "TRUSTED_EVIDENCE_RECEIPT_EXPIRED",
+        "TRUSTED_EVIDENCE_RECEIPT_NOT_YET_VALID",
+        "TRUSTED_EVIDENCE_REVOKED",
+        "TRUSTED_EVIDENCE_SCHEMA_UNSUPPORTED",
+        "TRUSTED_EVIDENCE_SIGNATURE_ENCODING_INVALID",
+        "TRUSTED_EVIDENCE_SIGNATURE_INVALID",
+        "TRUSTED_EVIDENCE_SIGNATURE_PROFILE_UNSUPPORTED",
+        "TRUSTED_EVIDENCE_STALE",
+        "TRUSTED_EVIDENCE_SUBJECT_MISMATCH",
+        "TRUSTED_EVIDENCE_SYSTEM_BINDING_MISMATCH",
+        "TRUSTED_EVIDENCE_TENANT_MISMATCH",
+        "TRUSTED_EVIDENCE_TRUST_ANCHOR_AMBIGUOUS",
+        "TRUSTED_EVIDENCE_TRUST_ANCHOR_MISSING",
+        "TRUSTED_EVIDENCE_TRUST_ANCHOR_NOT_CONFIGURED",
+        "TRUSTED_EVIDENCE_TYPE_UNSUPPORTED",
+        "TRUSTED_EVIDENCE_VERIFICATION_NOT_PERFORMED",
+        "TRUSTED_EVIDENCE_VERIFIER_UNAVAILABLE"
+      ]
+    },
+    "TRUSTED_EVIDENCE_SIGNATURE_ENCODING_V1": {
+      "kind": "constant",
+      "value": "ugence.trusted-evidence-authority/encoding/base16-lower/v1"
+    },
+    "TRUSTED_EVIDENCE_SIGNATURE_PROFILE_V1": {
+      "kind": "constant",
+      "value": "ugence.trusted-evidence-authority/signature/ed25519-sha512-pure/v1"
+    },
+    "TRUSTED_EVIDENCE_SIGNED_EVIDENCE_INPUT_DOMAIN": {
+      "kind": "constant",
+      "value": "ugence.trusted-evidence-authority/signed-evidence-input/v1"
+    },
+    "TRUSTED_EVIDENCE_SIGNED_RECEIPT_INPUT_DOMAIN": {
+      "kind": "constant",
+      "value": "ugence.trusted-evidence-authority/signed-receipt-input/v1"
+    },
+    "TRUST_ANCHOR_RECORD_DIGEST_DOMAIN": {
+      "kind": "constant",
+      "value": "ugence.trusted-evidence-authority/trust-anchor-record/v1"
+    },
+    "TrustAnchorCapability": {
+      "kind": "enum",
+      "values": [
+        "EVIDENCE_PRODUCTION",
+        "RECEIPT_ISSUANCE"
+      ]
+    },
+    "TrustAnchorCoordinate": {
+      "kind": "dataclass",
+      "fields": [
+        "authority_id",
+        "key_id",
+        "capability"
+      ]
+    },
+    "TrustAnchorRecord": {
+      "kind": "dataclass",
+      "fields": [
+        "authority_id",
+        "key_id",
+        "capability",
+        "public_key",
+        "trust_anchor_set_id",
+        "trust_anchor_set_version",
+        "signature_profile",
+        "signature_encoding",
+        "effective_from",
+        "effective_to",
+        "disabled",
+        "revocation"
+      ]
+    },
+    "TrustAnchorResolution": {
+      "kind": "dataclass",
+      "fields": [
+        "coordinate",
+        "anchor",
+        "refusal_reason"
+      ]
+    },
+    "TrustAnchorResolverPort": {
+      "kind": "class"
     },
     "TrustedEvidenceCanonicalizationError": {
       "kind": "exception"
@@ -270,8 +630,41 @@
         "TRUSTED_EVIDENCE_INVALID_LIFECYCLE_TRANSITION",
         "TRUSTED_EVIDENCE_VERIFICATION_NOT_PERFORMED",
         "TRUSTED_EVIDENCE_VERIFIER_UNAVAILABLE",
-        "TRUSTED_EVIDENCE_INDETERMINATE"
+        "TRUSTED_EVIDENCE_INDETERMINATE",
+        "TRUSTED_EVIDENCE_ENVELOPE_MALFORMED",
+        "TRUSTED_EVIDENCE_PAYLOAD_DIGEST_MISMATCH",
+        "TRUSTED_EVIDENCE_SIGNATURE_PROFILE_UNSUPPORTED",
+        "TRUSTED_EVIDENCE_SIGNATURE_ENCODING_INVALID",
+        "TRUSTED_EVIDENCE_AUTHORITY_MISMATCH",
+        "TRUSTED_EVIDENCE_KEY_ID_MISMATCH",
+        "TRUSTED_EVIDENCE_TRUST_ANCHOR_MISSING",
+        "TRUSTED_EVIDENCE_TRUST_ANCHOR_AMBIGUOUS",
+        "TRUSTED_EVIDENCE_TRUST_ANCHOR_NOT_CONFIGURED",
+        "TRUSTED_EVIDENCE_KEY_CAPABILITY_MISMATCH",
+        "TRUSTED_EVIDENCE_KEY_NOT_YET_VALID",
+        "TRUSTED_EVIDENCE_KEY_EXPIRED",
+        "TRUSTED_EVIDENCE_KEY_DISABLED",
+        "TRUSTED_EVIDENCE_KEY_REVOKED",
+        "TRUSTED_EVIDENCE_SIGNATURE_INVALID",
+        "TRUSTED_EVIDENCE_PRODUCER_UNKNOWN",
+        "TRUSTED_EVIDENCE_PRODUCER_UNAUTHORIZED",
+        "TRUSTED_EVIDENCE_PROTOCOL_UNSUPPORTED",
+        "TRUSTED_EVIDENCE_PROTOCOL_VERSION_MISMATCH",
+        "TRUSTED_EVIDENCE_RECEIPT_NOT_YET_VALID",
+        "TRUSTED_EVIDENCE_RECEIPT_EXPIRED"
       ]
+    },
+    "TrustedEvidenceSigningKey": {
+      "kind": "class"
+    },
+    "TrustedEvidenceVerificationKey": {
+      "kind": "class"
+    },
+    "audit_record_for_determination": {
+      "kind": "function"
+    },
+    "audit_record_for_receipt_verification": {
+      "kind": "function"
     },
     "canonical_bytes": {
       "kind": "function"
@@ -279,10 +672,34 @@
     "canonical_digest": {
       "kind": "function"
     },
+    "decode_public_key": {
+      "kind": "function"
+    },
+    "decode_signature": {
+      "kind": "function"
+    },
+    "derive_receipt_id": {
+      "kind": "function"
+    },
+    "encode_public_key": {
+      "kind": "function"
+    },
+    "encode_signature": {
+      "kind": "function"
+    },
+    "framed_signed_input": {
+      "kind": "function"
+    },
     "is_valid_lifecycle_transition": {
       "kind": "function"
     },
     "require_valid_lifecycle_transition": {
+      "kind": "function"
+    },
+    "signed_evidence_input_bytes": {
+      "kind": "function"
+    },
+    "signed_receipt_input_bytes": {
       "kind": "function"
     }
   }

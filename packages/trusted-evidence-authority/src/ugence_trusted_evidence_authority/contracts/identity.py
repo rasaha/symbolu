@@ -343,7 +343,7 @@ class EvidenceScopeBinding:
                 "must be digest-bound, and a digest must name the artifact it "
                 "was computed over (ADR §9 row 10, §14.2)"
             )
-        if not applicable and (ref or digest):
+        if applicable is False and (ref != "" or digest != ""):
             raise TrustedEvidenceContractError(
                 "EvidenceScopeBinding declares the assessed-system binding "
                 "NOT_APPLICABLE, so assessed_system_binding_ref and "
@@ -433,7 +433,7 @@ class EvidenceClaimBinding:
             )
 
         if self.applicability is ApplicabilityDeclaration.APPLICABLE:
-            if not (self.claim_ref or self.metric_ref):
+            if self.claim_ref == "" and self.metric_ref == "":
                 raise TrustedEvidenceContractError(
                     "EvidenceClaimBinding declared APPLICABLE must name a claim "
                     "or a metric (ADR §9 row 11 — 'claim or metric identity'); "
