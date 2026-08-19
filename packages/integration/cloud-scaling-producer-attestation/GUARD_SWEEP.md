@@ -66,7 +66,7 @@ error or a timeout is not a valid kill.
 | 47 | `verified.py:158` | `self.verification_profile_version != VERIFICATION_PROFILE_VERSION` | **killed** | test_a_verified_artifact_cannot_be_minted_under_another_profile_version | — |
 | 48 | `verified.py:173` | `self.artifact_digest != expected` | survived | — | sibling-backed — require_verified_producer_attestation recomputes the same digest at every consumption boundary, and that check IS killed; this one is unreachable at construction because the minting routine computes the digest it passes |
 | 49 | `verified.py:271` | `type(value) is not VerifiedProducerAttestation` | **killed** | test_a_duck_typed_look_alike_is_refused_at_consumption | — |
-| 50 | `verified.py:285` | `value.construction_token is not _VERIFICATION_TOKEN` | survived | — | UNRESOLVED — no reviewed classification; investigate |
+| 50 | `verified.py:285` | `value.construction_token is not _VERIFICATION_TOKEN` | survived | — | sibling-backed — the provenance-registry check on the next line refuses everything this one does. An artifact assembled outside the authoritative routine also names a determination that routine never reached, unless it is a faithful copy of a real one, which IS that determination and should pass (V-21). The token check is kept as the ratified construction guard and as the check that would still stand if a deployment ever scoped the registry differently — for example per-request rather than per-process. Its construction-time twin in __post_init__ IS killed, by V-1 and V-2 |
 | 51 | `verified.py:290` | `value.artifact_digest not in _MINTED_DIGESTS` | **killed** | test_a_borrowed_construction_token_does_not_mint_an_artifact | — |
 | 52 | `verified.py:297` | `value.artifact_digest != value.digest()` | **killed** | test_a_mutated_field_fails_revalidation[tenant_id]; test_a_mutated_field_fails_revalidation[subject_id] (+5 more) | — |
 | 53 | `verification.py:167` | `type(self.outcome) is not _Outcome` | **killed** | test_a_refusal_outcome_is_exact_typed | — |
@@ -111,7 +111,6 @@ error or a timeout is not a valid kill.
 
 | class | count |
 |---|---|
-| UNRESOLVED — no reviewed classification; investigate | 1 |
 | internal invariant — every refusal in this module is built by the single _refuse helper; not reachable from attacker input | 1 |
 | internal invariant — only this module constructs a result, and only ever with an artifact its own minting routine produced; not reachable from attacker input | 1 |
 | sibling-backed — a None resolver fails the is_production_authoritative check below, which refuses it with the same typed configuration error | 1 |
@@ -120,11 +119,12 @@ error or a timeout is not a valid kill.
 | sibling-backed — the hasattr(resolver, 'resolve') check below refuses None with the same typed configuration error | 1 |
 | sibling-backed — the hasattr(verifier, 'verify_producer_signature') check below refuses None with the same typed configuration error | 1 |
 | sibling-backed — the payload-digest comparison on the following line is a digest over the same two byte strings and refuses the identical inputs (killed by GI-20). Both are additionally fronted by the reconciliation group, which refuses a divergent tenant, subject, subject type, recommendation id or digest before either runs. Deliberately kept: it is the direct byte comparison the design specifies, and it would be the only survivor if a future edit made the digest check cover a different projection of the payload | 1 |
+| sibling-backed — the provenance-registry check on the next line refuses everything this one does. An artifact assembled outside the authoritative routine also names a determination that routine never reached, unless it is a faithful copy of a real one, which IS that determination and should pass (V-21). The token check is kept as the ratified construction guard and as the check that would still stand if a deployment ever scoped the registry differently — for example per-request rather than per-process. Its construction-time twin in __post_init__ IS killed, by V-1 and V-2 | 1 |
 | unreachable through the public API — TrustAnchorResolution refuses at construction to carry anything but a TrustAnchorRecord, and the resolution's own exact-type check above (killed by A-54) rejects a non-resolution; this guard covers a resolver that returns a genuine resolution subverted after construction | 1 |
 | unreachable through the public API — mint_producer_attestation is the only route to a signing input and always passes canonical_bytes(); a caller cannot construct one at all, because the token guard above rejects it first | 1 |
 | unreachable through the public API — the minted payload is never empty, and the token guard rejects a caller-assembled input before any content check | 1 |
 | unreachable through the public API — the minting routine passes the pinned constant, not a parameter; there is no caller-supplied profile to get wrong | 1 |
-| **unresolved survivors** | **1** |
+| **unresolved survivors** | **0** |
 
 Every survivor carries a **hand-written, reviewed** classification, keyed by its
 condition in `SURVIVOR_CLASSIFICATION` in `scripts/guard_sweep.py`. The classifier
