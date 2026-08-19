@@ -191,3 +191,105 @@ def test_the_controller_package_was_not_modified():
         text=True,
     ).stdout.strip()
     assert changed == "", f"the controller tree was modified:\n{changed}"
+
+
+# --------------------------------------------------------------------------------------- #
+# All ten Phase 5A frozen digests, re-verified from this side of the boundary
+# --------------------------------------------------------------------------------------- #
+
+#: The complete Phase 5A frozen set, re-asserted here rather than only inside Phase 5A's own
+#: suite. The point of duplicating them is exactly that they are duplicated: if Phase 5B-0A
+#: ever perturbed the chain Phase 5A pins — a shared canonicalization moving, a fixture
+#: drifting — this PR's own suite would fail, instead of the failure surfacing only in a
+#: neighbouring package's run.
+PHASE_5A_FROZEN_DIGESTS = {
+    "recommendation_digest": (
+        "sha256:1b69d6a4c45b06d96587443be3ca0eca3910f9d107d53aca0fe97b65c70b1b78"
+    ),
+    "context_digest": (
+        "sha256:d0bd58ff75993e4451575315f99678e0ac22b84f36bf7223cd9928cf9aee5f6f"
+    ),
+    "subject_digest": (
+        "sha256:13a27fea8c625e3d8d9d1c163e645ce690441dcc4c677d23600ace148dc3ad25"
+    ),
+    "request_digest": (
+        "sha256:06fb8dc06e693f843826a634685cbd6fc7b645cfc684d27d5fa4160a2311b568"
+    ),
+    "idempotency_key": (
+        "sha256:031179d6a8b9b1d77ec851e73b7a01f281ff88cf231677628c8012a170b4f41b"
+    ),
+    "decision_digest": (
+        "sha256:d08f94ba8ba174e3929da24efc151fa2cebb9743329a3a61c71f65e46aa23101"
+    ),
+    "producer_signing_payload_digest": (
+        "sha256:1035d2fc2ab8f4b443f815562f9f6ad8e4ce0032633f03a12e04e691c24cf2d0"
+    ),
+    "target_scope_digest": (
+        "sha256:b97f41c98353aaafdb9aef4fa12309b459900ce002affc206b5c3239b82c3baa"
+    ),
+    "policy_binding_digest": (
+        "sha256:8961f6b2b78e811d556b7e43af99807eb368e65ca3b0fa7c6109aa952b5b9808"
+    ),
+    "candidate_digest": (
+        "sha256:db72ffffc5bf4ecfe8a5f9fe187efb5e8439355e559fcc34b391cc4c9282a313"
+    ),
+}
+
+
+def test_all_ten_phase_5a_frozen_digests_still_reproduce():
+    """P-13: the complete frozen set, from the genuine chain, unchanged by this package."""
+
+    candidate = P5A.build_candidate()
+    produced = {
+        name: getattr(candidate, name) for name in PHASE_5A_FROZEN_DIGESTS
+    }
+    assert produced == PHASE_5A_FROZEN_DIGESTS
+    assert len(PHASE_5A_FROZEN_DIGESTS) == 10
+
+
+def test_the_ten_frozen_digests_are_independently_recomputable():
+    """P-14: recomputed from raw canonical bytes via ``hashlib``, not read back.
+
+    ``hashlib`` is banned inside both distributions precisely so each has one digest path.
+    Using it here is what makes this an independent check rather than a tautology.
+    """
+
+    import hashlib
+
+    from ugence_cloud_scaling_producer_attestation import canonical_bytes
+
+    candidate = P5A.build_candidate()
+    for name, artifact in (
+        ("target_scope_digest", candidate.target_scope),
+        ("policy_binding_digest", candidate.policy_binding),
+    ):
+        recomputed = "sha256:" + hashlib.sha256(
+            canonical_bytes(artifact.to_canonical_dict())
+        ).hexdigest()
+        assert recomputed == PHASE_5A_FROZEN_DIGESTS[name], name
+
+    recomputed_payload = "sha256:" + hashlib.sha256(
+        canonical_bytes(candidate.producer_attestation.signing_payload())
+    ).hexdigest()
+    assert recomputed_payload == (
+        PHASE_5A_FROZEN_DIGESTS["producer_signing_payload_digest"]
+    )
+    recomputed_candidate = "sha256:" + hashlib.sha256(
+        canonical_bytes(candidate.digest_payload())
+    ).hexdigest()
+    assert recomputed_candidate == PHASE_5A_FROZEN_DIGESTS["candidate_digest"]
+
+
+def test_a_successful_v2_verification_moves_no_phase_5a_frozen_digest():
+    """P-15: the whole point, as one assertion. Verifying changes nothing upstream."""
+
+    candidate = P5A.build_candidate()
+    before = {name: getattr(candidate, name) for name in PHASE_5A_FROZEN_DIGESTS}
+
+    result = build_verifier().verify(
+        candidate=candidate, attestation=build_attestation(candidate), as_of=AS_OF
+    )
+    assert result.verified_attestation is not None
+
+    after = {name: getattr(candidate, name) for name in PHASE_5A_FROZEN_DIGESTS}
+    assert after == before == PHASE_5A_FROZEN_DIGESTS
