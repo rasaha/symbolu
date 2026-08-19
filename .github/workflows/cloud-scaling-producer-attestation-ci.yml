@@ -105,11 +105,24 @@ jobs:
           # on pydantic. Without it the verifier fails on an import, not on a violation.
           pip install pytest numpy build pydantic \
                       "cryptography>=41.0.7,<47.0.0" "PyNaCl>=1.5.0,<2.0.0"
-          pip install -e packages/risk_authority
-          pip install -e packages/trusted-evidence-authority
-          pip install -e packages/capabilities/cloud-scaling-controller
-          pip install -e packages/integration/cloud-scaling-risk-integration
-          pip install -e packages/integration/cloud-scaling-authorization-contracts
+          # --no-deps throughout: the monorepo's first-party distributions are not on any
+          # index, so resolving their declared inter-dependencies would fail. Installing
+          # them all explicitly gives the same import graph without a network resolve.
+          # Suites 7 and 8 do NOT collect without the last four — they fail on
+          # ModuleNotFoundError before any test body runs, which would be reported as a
+          # collection error rather than as a result.
+          pip install --no-deps \
+            -e packages/risk_authority \
+            -e packages/trusted-evidence-authority \
+            -e packages/capabilities/cloud-scaling-controller \
+            -e packages/integration/cloud-scaling-risk-integration \
+            -e packages/integration/cloud-scaling-authorization-contracts \
+            -e packages/governance-contracts \
+            -e packages/governance-provider-framework \
+            -e packages/providers/tap \
+            -e packages/runtime/agent-runtime \
+            -e packages/integration/risk-authority-evidence-runtime \
+            -e packages/integration/risk-authority-status-runtime
       - name: 1 · Risk Authority conformance suite
         run: python -m pytest packages/risk_authority/tests
       - name: 2 · Policy Authority suite
@@ -133,11 +146,18 @@ jobs:
         run: python -m pytest packages/integration/risk-authority-runtime-assurance
       - name: 11 · Risk Authority execution assurance
         run: python -m pytest packages/integration/risk-authority-execution-assurance
-      - name: Governance contracts, ActionGate and Cloud Scaling Operations
+      - name: Governance contracts and ActionGate
         run: |
           python -m pytest packages/governance-contracts
           python -m pytest actiongate_provider
-          python -m pytest cloud_scaling_operations
+      - name: Cloud Scaling Operations (ships no suite; assert that, do not claim green)
+        # ``--co -q`` collects without running. The tree carries no tests, so reporting it
+        # as "passed" would be a claim nobody made. This step asserts the *absence* is what
+        # it is, and fails if a suite appears without this workflow noticing.
+        run: |
+          python -m pytest cloud_scaling_operations --co -q 2>&1 | tee /tmp/cso.txt
+          grep -q "no tests ran\|collected 0 items" /tmp/cso.txt \
+            || { echo "cloud_scaling_operations now ships tests; run them here"; exit 1; }
       - name: Risk Authority distribution verifier
         run: python packages/risk_authority/verify_risk_authority_distribution.py
       - name: Trusted Evidence Authority distribution verifier

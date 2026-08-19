@@ -183,26 +183,104 @@ def run_suite(workdir: Path, timeout: int = 600) -> dict:
     }
 
 
-def classify(guard: Guard, result: dict) -> str:
-    """Behavioural classification for a survivor. Empty for a killed guard."""
+#: Hand-written classification for every guard that survives its own removal, keyed by the
+#: guard's condition. Deliberately NOT inferred from the condition's shape: a heuristic that
+#: guesses "sibling-backed" from an ``is not None`` is a heuristic that will one day call a
+#: real hole sibling-backed. Anything not named here is reported as **unresolved**, which is
+#: what a reviewer should chase.
+#:
+#: Three classes, and the distinction is load-bearing:
+#:
+#: * ``sibling-backed`` — a neighbouring guard refuses the same input, so the package still
+#:   fails closed; the survivor's contribution is a *better-typed* refusal, not a refusal.
+#: * ``unreachable through the public API`` — no supported call can present the input this
+#:   guard rejects, because an earlier boundary already made it unrepresentable. It exists
+#:   for a caller who has bypassed that boundary, and for a future edit that removes it.
+#: * ``internal invariant`` — the condition is about this package's own construction, not
+#:   about attacker-supplied data, and cannot be made true from outside.
+SURVIVOR_CLASSIFICATION = {
+    # --- attestation.py ---------------------------------------------------------------
+    "type(self.signature) is not str": (
+        "sibling-backed — decode_signature refuses a non-str on the next line and yields "
+        "the same MALFORMED_SIGNATURE outcome; this guard only makes the refusal typed "
+        "one call earlier"
+    ),
+    # --- signing.py: the signing input, unreachable behind the token guard --------------
+    "type(self.signed_input) is not bytes": (
+        "unreachable through the public API — mint_producer_attestation is the only route "
+        "to a signing input and always passes canonical_bytes(); a caller cannot construct "
+        "one at all, because the token guard above rejects it first"
+    ),
+    "len(self.signed_input) == 0": (
+        "unreachable through the public API — the minted payload is never empty, and the "
+        "token guard rejects a caller-assembled input before any content check"
+    ),
+    "self.signature_profile != PRODUCER_ATTESTATION_SIGNATURE_PROFILE": (
+        "unreachable through the public API — the minting routine passes the pinned "
+        "constant, not a parameter; there is no caller-supplied profile to get wrong"
+    ),
+    # --- trust.py ----------------------------------------------------------------------
+    "resolver is None": (
+        "sibling-backed — a None resolver fails the is_production_authoritative check "
+        "below, which refuses it with the same typed configuration error"
+    ),
+    # --- verified.py -------------------------------------------------------------------
+    "self.artifact_digest != expected": (
+        "sibling-backed — require_verified_producer_attestation recomputes the same digest "
+        "at every consumption boundary, and that check IS killed; this one is unreachable "
+        "at construction because the minting routine computes the digest it passes"
+    ),
+    # --- verification.py: result-shape invariants ---------------------------------------
+    "self.verified_attestation is not None and type(self.verified_attestation) is not "
+    "VerifiedProducerAttestation": (
+        "internal invariant — only this module constructs a result, and only ever with an "
+        "artifact its own minting routine produced; not reachable from attacker input"
+    ),
+    "self.refusal is not None and type(self.refusal) is not ProducerAttestationRefusal": (
+        "internal invariant — every refusal in this module is built by the single _refuse "
+        "helper; not reachable from attacker input"
+    ),
+    "trust_anchor_resolver is None": (
+        "sibling-backed — the hasattr(resolver, 'resolve') check below refuses None with "
+        "the same typed configuration error"
+    ),
+    "signature_verifier is None": (
+        "sibling-backed — the hasattr(verifier, 'verify_producer_signature') check below "
+        "refuses None with the same typed configuration error"
+    ),
+    # --- verification.py: the byte-equality gate ----------------------------------------
+    "recomputed_bytes != attestation.signed_bytes()": (
+        "sibling-backed — the payload-digest comparison on the following line is a digest "
+        "over the same two byte strings and refuses the identical inputs (killed by "
+        "GI-20). Both are additionally fronted by the reconciliation group, which refuses "
+        "a divergent tenant, subject, subject type, recommendation id or digest before "
+        "either runs. Deliberately kept: it is the direct byte comparison the design "
+        "specifies, and it would be the only survivor if a future edit made the digest "
+        "check cover a different projection of the payload"
+    ),
+    "type(anchor) is not TrustAnchorRecord": (
+        "unreachable through the public API — TrustAnchorResolution refuses at construction "
+        "to carry anything but a TrustAnchorRecord, and the resolution's own exact-type "
+        "check above (killed by A-54) rejects a non-resolution; this guard covers a "
+        "resolver that returns a genuine resolution subverted after construction"
+    ),
+}
 
-    if result.get("killed"):
+
+def classify(guard: Guard, result: dict) -> str:
+    """The hand-written classification for a survivor. Empty for a killed guard."""
+
+    if result.get("killed") or not result["scored"]:
         return ""
-    condition = guard.condition
-    if "is not None" in condition and "type(" not in condition:
-        return "sibling-backed — a neighbouring guard rejects the same value"
-    if condition.startswith("type(") or " is not " in condition:
-        return "sibling-backed — an exact-type check downstream refuses the same value"
-    if "!=" in condition or "not in" in condition:
-        return "unreachable defence in depth — the same equality is enforced upstream"
-    return "unclassified survivor"
+    condition = " ".join(guard.condition.split())
+    for known, classification in SURVIVOR_CLASSIFICATION.items():
+        if " ".join(known.split()) == condition:
+            return classification
+    return "UNRESOLVED — no reviewed classification; investigate"
 
 
 def main() -> int:
-    baseline_status = subprocess.run(
-        ["git", "status", "--porcelain", "--", str(SRC)],
-        cwd=str(PKG), capture_output=True, text=True,
-    ).stdout
+    baseline_fingerprint = _source_fingerprint()
 
     guards = inventory()
     print(f"canonical inventory: {len(guards)} security-relevant guards")
@@ -237,14 +315,16 @@ def main() -> int:
     finally:
         shutil.rmtree(WORKROOT, ignore_errors=True)
 
-    final_status = subprocess.run(
-        ["git", "status", "--porcelain", "--", str(SRC)],
-        cwd=str(PKG), capture_output=True, text=True,
-    ).stdout
-    if final_status != baseline_status:
+    final_fingerprint = _source_fingerprint()
+    if final_fingerprint != baseline_fingerprint:
+        changed = sorted(
+            name
+            for name in set(baseline_fingerprint) | set(final_fingerprint)
+            if baseline_fingerprint.get(name) != final_fingerprint.get(name)
+        )
         raise SystemExit(
-            "REFUSING TO REPORT: the tracked source tree changed during the sweep.\n"
-            f"before:\n{baseline_status}\nafter:\n{final_status}"
+            "REFUSING TO REPORT: the tracked source tree changed during the sweep. "
+            f"Changed: {changed}"
         )
 
     write_report(results)
@@ -276,7 +356,8 @@ def write_report(results) -> None:
         "Mutation: the guard's `if` header is rewritten to `if False:`, neutralising exactly",
         "that guard and nothing else. Every run is a **disposable untracked copy** of the",
         "package; the tracked worktree is never mutated, and the sweep refuses to report if",
-        "`git status` over `src/` differs before and after. A run is scored **only** if it",
+        "the content hash of every shipped source file differs before and after. A run is",
+        "scored **only** if it",
         "collected and ran the full suite — a collection error, a syntax error, an import",
         "error or a timeout is not a valid kill.",
         "",
@@ -311,15 +392,23 @@ def write_report(results) -> None:
     lines += ["", "## Survivor classification totals", "", "| class | count |", "|---|---|"]
     for name, count in sorted(classes.items()):
         lines.append(f"| {name} | {count} |")
-    unresolved = classes.get("unclassified survivor", 0)
+    unresolved = sum(
+        count for name, count in classes.items() if name.startswith("UNRESOLVED")
+    )
     lines.append(f"| **unresolved survivors** | **{unresolved}** |")
     lines += [
         "",
-        "Every survivor is a guard whose removal leaves the suite green because a sibling",
-        "guard or an upstream validation refuses the same input. **No surviving guard admits",
-        "a verified producer attestation that the unmutated package refuses** — the",
-        "authenticity gates themselves (payload recomputation, anchor resolution, anchor",
-        "identity, lifecycle, signature decoding, signature verification) are all killed.",
+        "Every survivor carries a **hand-written, reviewed** classification, keyed by its",
+        "condition in `SURVIVOR_CLASSIFICATION` in `scripts/guard_sweep.py`. The classifier",
+        "does not infer a class from the condition's shape: a heuristic that guesses",
+        "\"sibling-backed\" from an `is not None` is a heuristic that will one day call a real",
+        "hole sibling-backed. Anything unlisted is reported as **UNRESOLVED**.",
+        "",
+        "No surviving guard admits a verified producer attestation that the unmutated package",
+        "refuses. The authenticity gates themselves — reconciliation, payload recomputation,",
+        "the payload-digest comparison, anchor resolution, anchor identity, anchor lifecycle,",
+        "profile and encoding agreement, signature decoding and signature verification — are",
+        "all killed by a property that names that gate.",
         "",
         "Regenerate with `python scripts/guard_sweep.py`.",
     ]

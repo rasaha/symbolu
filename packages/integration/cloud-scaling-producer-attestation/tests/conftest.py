@@ -82,6 +82,7 @@ MODULE_PROPERTY_CATEGORY = {
     "test_phase5a_invariants": "invariant",
     "test_packaging": "invariant",
     "test_property_ledger": "invariant",
+    "test_gate_isolation": "adversarial",
 }
 
 
