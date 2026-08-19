@@ -60,9 +60,9 @@ error or a timeout is not a valid kill.
 | 41 | `signing.py:387` | `production_mode and getattr(type(signer), 'is_reference_signer', False) is True` | **killed** | test_a_reference_signer_is_refused_in_production_mode | — |
 | 42 | `signing.py:400` | `signer.signature_profile != PRODUCER_ATTESTATION_SIGNATURE_PROFILE` | **killed** | test_a_signer_advertising_another_profile_is_refused | — |
 | 43 | `signing.py:435` | `type(signature) is not str` | **killed** | test_a_signer_returning_a_non_string_signature_is_refused | — |
-| 44 | `trust.py:183` | `resolver is None` | survived | — | sibling-backed — a None resolver fails the is_production_authoritative check below, which refuses it with the same typed configuration error |
-| 45 | `trust.py:191` | `type(resolver) is reference_type` | **killed** | test_the_reference_resolver_is_refused_in_production | — |
-| 46 | `trust.py:200` | `getattr(resolver, 'is_production_authoritative', False) is not True` | **killed** | test_a_production_resolver_declaring_nothing_is_refused_by_the_helper; test_an_unattested_resolver_is_refused_in_production (+1 more) | — |
+| 44 | `trust.py:211` | `resolver is None` | survived | — | sibling-backed — a None resolver fails the is_production_authoritative check below, which refuses it with the same typed configuration error |
+| 45 | `trust.py:218` | `isinstance(resolver, REFERENCE_GRADE_RESOLVERS)` | **killed** | test_the_reference_resolver_is_refused_in_production; test_every_reference_grade_subtype_is_refused_in_production[<lambda>-exact (+7 more) | — |
+| 46 | `trust.py:238` | `getattr(resolver, 'is_production_authoritative', False) is not True` | **killed** | test_a_production_resolver_declaring_nothing_is_refused_by_the_helper; test_an_unattested_resolver_is_refused_in_production (+3 more) | — |
 | 47 | `verified.py:181` | `self.construction_token is not _VERIFICATION_TOKEN` | **killed** | test_direct_construction_is_refused; test_no_caller_held_token_is_accepted[None] (+4 more) | — |
 | 48 | `verified.py:188` | `self.verification_profile != VERIFICATION_PROFILE` | **killed** | test_a_verified_artifact_cannot_be_minted_under_another_verification_profile | — |
 | 49 | `verified.py:192` | `self.verification_profile_version != VERIFICATION_PROFILE_VERSION` | **killed** | test_a_verified_artifact_cannot_be_minted_under_another_profile_version | — |
@@ -80,7 +80,7 @@ error or a timeout is not a valid kill.
 | 61 | `verification.py:247` | `signature_verifier is None` | survived | — | sibling-backed — the hasattr(verifier, 'verify_producer_signature') check below refuses None with the same typed configuration error |
 | 62 | `verification.py:252` | `not hasattr(trust_anchor_resolver, 'resolve')` | **killed** | test_a_resolver_without_a_resolve_method_is_refused_at_construction | — |
 | 63 | `verification.py:257` | `not hasattr(signature_verifier, 'verify_producer_signature')` | **killed** | test_a_signature_verifier_without_its_method_is_refused_at_construction | — |
-| 64 | `verification.py:261` | `production_mode` | **killed** | test_the_reference_resolver_is_refused_in_production; test_an_unattested_resolver_is_refused_in_production (+1 more) | — |
+| 64 | `verification.py:261` | `production_mode` | **killed** | test_the_reference_resolver_is_refused_in_production; test_an_unattested_resolver_is_refused_in_production (+2 more) | — |
 | 65 | `verification.py:263` | `getattr(signature_verifier, 'is_production_authoritative', False) is not True` | **killed** | test_a_non_production_signature_verifier_is_refused_in_production | — |
 | 66 | `verification.py:328` | `attestation is None` | **killed** | test_an_absent_attestation_is_refused; test_step_6a_the_absent_arm_is_refused (+1 more) | — |
 | 67 | `verification.py:333` | `type(attestation) is not ProducerAttestationV2` | **killed** | test_a_phase_5a_v1_attestation_object_is_refused_by_exact_type; test_a_subclass_attestation_is_refused (+5 more) | — |
@@ -99,7 +99,7 @@ error or a timeout is not a valid kill.
 | 80 | `verification.py:429` | `recomputed_bytes != attestation.signed_bytes()` | survived | — | sibling-backed — the payload-digest comparison on the following line is a digest over the same two byte strings and refuses the identical inputs (killed by GI-20). Both are additionally fronted by the reconciliation group, which refuses a divergent tenant, subject, subject type, recommendation id or digest before either runs. Deliberately kept: it is the direct byte comparison the design specifies, and it would be the only survivor if a future edit made the digest check cover a different projection of the payload |
 | 81 | `verification.py:435` | `canonical_digest(recomputed) != attestation.signing_payload_digest` | **killed** | test_a_mutated_attestation_fails_the_payload_recomputation; test_a_stale_payload_digest_fails_the_recomputation_gate | — |
 | 82 | `verification.py:452` | `type(resolution) is not TrustAnchorResolution` | **killed** | test_a_resolver_returning_a_wrong_typed_resolution_is_refused | — |
-| 83 | `verification.py:458` | `anchor is None` | **killed** | test_an_untrusted_producer_key_is_refused; test_a_foreign_issuer_is_refused (+9 more) | — |
+| 83 | `verification.py:458` | `anchor is None` | **killed** | test_an_untrusted_producer_key_is_refused; test_a_foreign_issuer_is_refused (+10 more) | — |
 | 84 | `verification.py:464` | `type(anchor) is not TrustAnchorRecord` | survived | — | unreachable through the public API — TrustAnchorResolution refuses at construction to carry anything but a TrustAnchorRecord, and the resolution's own exact-type check above (killed by A-54) rejects a non-resolution; this guard covers a resolver that returns a genuine resolution subverted after construction |
 | 85 | `verification.py:471` | `anchor.authority_id != attestation.issuer` | **killed** | test_a_resolver_answering_for_another_authority_is_refused | — |
 | 86 | `verification.py:477` | `anchor.key_id != attestation.producer_key_id` | **killed** | test_a_resolver_answering_with_another_key_id_is_refused | — |
@@ -139,5 +139,32 @@ refuses. The authenticity gates themselves — reconciliation, payload recomputa
 the payload-digest comparison, anchor resolution, anchor identity, anchor lifecycle,
 profile and encoding agreement, signature decoding and signature verification — are
 all killed by a property that names that gate.
+
+### What "killed" does and does not claim
+
+A **killed** row means a property fails when that `if` header alone is neutralised.
+That is a statement about **scoring** — the guard is exercised and attributed — and
+it is not, on its own, a statement that removing the guard opens an attack. Where a
+later guard would refuse the same value with a different message, killing the earlier
+one proves the earlier one is reached and diagnostic, not that it is the only thing
+standing between an attacker and admission.
+
+The three import-time capability separations in `identifiers.py` are the clearest
+case, and are called out here so the table is not over-read:
+
+* the catch-all `PRODUCER_ATTESTATION_CAPABILITY is not _DEDICATED` (#17) is the
+  **load-bearing** one. It is the check that fails closed on capability drift; remove
+  it and any capability that is not one of the two explicitly named ones — a member
+  added to the enum later, say — is admitted;
+* the explicit `RECEIPT_ISSUANCE` (#15) and `EVIDENCE_PRODUCTION` (#16) branches are
+  **scored for typed attribution and diagnostic precision**. Removing either one
+  alone does not open the attack: the catch-all below refuses the same value, because
+  neither borrowed capability is the dedicated one. They are killed because each
+  test asserts the phrase only that branch emits, which is what keeps them scored;
+  the design keeps them because a refusal that names the cross-domain reuse is worth
+  more to an operator than a generic drift message.
+
+`tests/test_gate_isolation.py::GI-4c` asserts this relationship directly rather than
+leaving it as prose.
 
 Regenerate with `python scripts/guard_sweep.py`.

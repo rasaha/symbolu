@@ -547,7 +547,7 @@
   {
     "index": 44,
     "module": "trust.py",
-    "lineno": 183,
+    "lineno": 211,
     "condition": "resolver is None",
     "scored": true,
     "killed": false,
@@ -557,26 +557,32 @@
   {
     "index": 45,
     "module": "trust.py",
-    "lineno": 191,
-    "condition": "type(resolver) is reference_type",
+    "lineno": 218,
+    "condition": "isinstance(resolver, REFERENCE_GRADE_RESOLVERS)",
     "scored": true,
     "killed": true,
     "failed": [
-      "tests/test_no_placeholder_verifier.py::test_the_reference_resolver_is_refused_in_production"
+      "tests/test_no_placeholder_verifier.py::test_the_reference_resolver_is_refused_in_production",
+      "tests/test_trust_reuse.py::test_every_reference_grade_subtype_is_refused_in_production[<lambda>-exact",
+      "tests/test_trust_reuse.py::test_every_reference_grade_subtype_is_refused_in_production[<lambda>-direct",
+      "tests/test_trust_reuse.py::test_every_reference_grade_subtype_is_refused_in_production[<lambda>-subclass",
+      "tests/test_trust_reuse.py::test_every_reference_grade_subtype_is_refused_in_production[<lambda>-deeper"
     ],
     "classification": ""
   },
   {
     "index": 46,
     "module": "trust.py",
-    "lineno": 200,
+    "lineno": 238,
     "condition": "getattr(resolver, 'is_production_authoritative', False) is not True",
     "scored": true,
     "killed": true,
     "failed": [
       "tests/test_gate_isolation.py::test_a_production_resolver_declaring_nothing_is_refused_by_the_helper",
       "tests/test_no_placeholder_verifier.py::test_an_unattested_resolver_is_refused_in_production",
-      "tests/test_trust_reuse.py::test_a_truthy_non_true_production_declaration_is_refused"
+      "tests/test_trust_reuse.py::test_a_truthy_non_true_production_declaration_is_refused",
+      "tests/test_trust_reuse.py::test_a_wrapper_that_is_not_a_subclass_is_refused_for_not_opting_in",
+      "tests/test_trust_reuse.py::test_a_deny_all_subclass_does_not_inherit_the_exemption"
     ],
     "classification": ""
   },
@@ -790,7 +796,8 @@
     "failed": [
       "tests/test_no_placeholder_verifier.py::test_the_reference_resolver_is_refused_in_production",
       "tests/test_no_placeholder_verifier.py::test_an_unattested_resolver_is_refused_in_production",
-      "tests/test_no_placeholder_verifier.py::test_a_non_production_signature_verifier_is_refused_in_production"
+      "tests/test_no_placeholder_verifier.py::test_a_non_production_signature_verifier_is_refused_in_production",
+      "tests/test_trust_reuse.py::test_a_reference_subclass_is_refused_at_verifier_construction_too"
     ],
     "classification": ""
   },
