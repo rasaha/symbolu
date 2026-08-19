@@ -279,6 +279,25 @@ def classify(guard: Guard, result: dict) -> str:
     return "UNRESOLVED — no reviewed classification; investigate"
 
 
+def _source_fingerprint() -> dict:
+    """Content hash of every shipped source file.
+
+    Deliberately the file *bytes*, not ``git status``. The property being asserted is "the
+    sweep did not modify the tracked tree", and a porcelain diff also fires when a file's
+    tracking state changes for an unrelated reason — an untracked tree being committed
+    mid-run, say — which is a false alarm that withholds a correct report. Hashing the
+    content measures exactly the thing and nothing else.
+    """
+
+    import hashlib
+
+    return {
+        str(path.relative_to(SRC)): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in sorted(SRC.rglob("*"))
+        if path.is_file() and "__pycache__" not in path.parts
+    }
+
+
 def main() -> int:
     baseline_fingerprint = _source_fingerprint()
 
