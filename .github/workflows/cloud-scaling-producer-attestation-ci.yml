@@ -122,7 +122,10 @@ jobs:
             -e packages/providers/tap \
             -e packages/runtime/agent-runtime \
             -e packages/integration/risk-authority-evidence-runtime \
-            -e packages/integration/risk-authority-status-runtime
+            -e packages/integration/risk-authority-status-runtime \
+            -e packages/providers/actiongate \
+            -e packages/capabilities/cloud-scaling-operations \
+            -e packages/integration/cloud-scaling-producer-attestation
       - name: 1 · Risk Authority conformance suite
         run: python -m pytest packages/risk_authority/tests
       - name: 2 · Policy Authority suite
@@ -146,35 +149,67 @@ jobs:
         run: python -m pytest packages/integration/risk-authority-runtime-assurance
       - name: 11 · Risk Authority execution assurance
         run: python -m pytest packages/integration/risk-authority-execution-assurance
-      - name: Governance contracts and ActionGate
+      - name: Governance contracts and ActionGate (real package trees)
+        # Filesystem paths, never the repo-root compatibility shims. ``actiongate_provider``
+        # and ``cloud_scaling_operations`` are one-file facade packages at the repo root;
+        # pointing pytest at them collected the facade and reported it as the package's
+        # suite. An independent closure audit measured the gap: the shim collects 37 tests
+        # while the real ActionGate package collects 62, and the shim collects none at all
+        # while the real Cloud Scaling Operations package collects 132. Both real suites
+        # pass; neither was being run here.
         run: |
-          python -m pytest packages/governance-contracts
-          python -m pytest actiongate_provider
-      - name: Cloud Scaling Operations (ships no suite; assert that, do not claim green)
-        # ``--co`` collects without running. The tree carries no tests, so reporting it as
-        # "passed" would be a claim nobody made. This step asserts the *absence* is what it
-        # is, and fails if a suite appears without this workflow noticing.
-        #
-        # pytest exits 5 for "no tests collected", and the step shell runs with -e -o
-        # pipefail, so the exit code must be captured rather than allowed to abort the step.
-        # Asserting on the documented exit code AND the message is stronger than either
-        # alone: a future suite that collects makes the code 0 or 1, and both fail here.
+          python -m pytest packages/governance-contracts/tests
+          python -m pytest packages/providers/actiongate/tests
+      - name: Cloud Scaling Operations (real package tree)
+        # Runs the suite rather than asserting its absence. The previous step asserted
+        # "ships no tests" against the repo-root shim, which is empty by construction, so
+        # the assertion could never fail and never noticed the 132 tests the real package
+        # does ship.
+        run: python -m pytest packages/capabilities/cloud-scaling-operations/tests
+      - name: Every regression target actually collected tests
+        # Zero collected is a failure, not a pass. pytest exits 5 for "no tests collected",
+        # and a step that treats 5 as success reports a green suite that never ran. This
+        # asserts each target collects a non-zero count, so a path that silently stops
+        # matching — a rename, a move, a shim reappearing — fails here instead of quietly
+        # shrinking the matrix.
         run: |
-          set +e
-          python -m pytest cloud_scaling_operations --co -q > /tmp/cso.txt 2>&1
-          status=$?
-          set -e
-          cat /tmp/cso.txt
-          if [ "$status" -ne 5 ]; then
-            echo "::error::cloud_scaling_operations pytest exited $status, not 5 (no tests"\
-                 "collected). It may now ship a suite — add it to this matrix and run it."
-            exit 1
-          fi
-          grep -qE "no tests (collected|ran)|collected 0 items" /tmp/cso.txt || {
-            echo "::error::unexpected collection output for cloud_scaling_operations"
-            exit 1
-          }
-          echo "cloud_scaling_operations ships no test suite (pytest exit 5) — asserted, not claimed green"
+          for target in \
+            packages/risk_authority/tests \
+            packages/policy-authority \
+            packages/trusted-evidence-authority/tests \
+            packages/capabilities/cloud-scaling-controller/tests \
+            packages/integration/cloud-scaling-risk-integration/tests \
+            packages/integration/cloud-scaling-authorization-contracts/tests \
+            packages/integration/risk-authority-evidence-runtime \
+            packages/integration/risk-authority-status-runtime \
+            packages/integration/risk-authority-runtime \
+            packages/integration/risk-authority-runtime-assurance \
+            packages/integration/risk-authority-execution-assurance \
+            packages/governance-contracts/tests \
+            packages/providers/actiongate/tests \
+            packages/capabilities/cloud-scaling-operations/tests \
+            packages/integration/cloud-scaling-producer-attestation/tests
+          do
+            set +e
+            # No ``-q``: the terse collect format suppresses the "N tests collected"
+            # summary line this gate reads.
+            python -m pytest "$target" --co > /tmp/collect.txt 2>&1
+            status=$?
+            set -e
+            if [ "$status" -ne 0 ]; then
+              echo "::error::$target failed collection (pytest exit $status)"
+              tail -30 /tmp/collect.txt
+              exit 1
+            fi
+            count=$(grep -oE '[0-9]+ tests? collected' /tmp/collect.txt | tail -1 | grep -oE '^[0-9]+')
+            if [ -z "$count" ] || [ "$count" -eq 0 ]; then
+              echo "::error::$target collected zero tests; a target that collects nothing"\
+                   "is a failure, not a green suite"
+              tail -30 /tmp/collect.txt
+              exit 1
+            fi
+            echo "$target: $count tests collected"
+          done
       - name: Risk Authority distribution verifier
         run: python packages/risk_authority/verify_risk_authority_distribution.py
       - name: Trusted Evidence Authority distribution verifier
