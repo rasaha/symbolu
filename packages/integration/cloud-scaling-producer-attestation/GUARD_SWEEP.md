@@ -12,6 +12,18 @@ scored **only** if it
 collected and ran the full suite — a collection error, a syntax error, an import
 error or a timeout is not a valid kill.
 
+**Baseline precondition.** Before any mutation, the sweep runs the suite *unmutated*
+and refuses to proceed unless it is green. A test that fails for a reason unrelated
+to the mutation fails on every run, so every guard looks killed and a genuinely
+surviving guard is published as load-bearing — the wrong direction for a security
+claim to be wrong in. This is not hypothetical: the packaging-distribution
+properties invoke `python -m build`, the sweep job installs pytest but not `build`,
+and one of them therefore errored on all 91 runs, converting two real survivors into
+kills. Those properties are now deselected in sweep runs — a mutated package builds
+into a distribution exactly as an unmutated one does, so they can score no guard —
+and this precondition is what stops the next instance of that class from being
+published as a result.
+
 | Result | **78 killed / 13 survived** |
 |---|---|
 

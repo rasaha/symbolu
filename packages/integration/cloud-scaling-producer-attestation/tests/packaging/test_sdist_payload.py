@@ -76,6 +76,27 @@ FORBIDDEN_FRAGMENTS = (
 )
 
 
+#: Every property in this module builds a distribution, so every one of them needs
+#: ``build`` on the interpreter running it and costs real wall-clock. The gate is
+#: **module-wide** for a reason worth stating: the gate-removal mutation sweep re-runs the
+#: whole suite once per guard, and a property that fails for an *environmental* reason
+#: rather than because of the mutation converts every survivor into a false kill and
+#: pollutes every guard's attribution. That is exactly what happened — the sweep job
+#: installs pytest but not ``build``, so the wheel property errored on all 91 runs, and two
+#: genuine survivors were reported killed by it. Nothing here can score a guard in ``src/``:
+#: a mutated package builds into a distribution exactly as an unmutated one does. So the
+#: sweep skips the module entirely, and the full suite and CI run it.
+_SKIP_REASON = (
+    "packaging-distribution properties (each builds an sdist or wheel, and the slow ones "
+    "also create a virtualenv); deselected by the guard sweep via "
+    "UGENCE_SKIP_SLOW_PACKAGING because they score no src/ guard and a missing build "
+    "backend would otherwise register as a kill; run by the full suite and by CI"
+)
+pytestmark = pytest.mark.skipif(
+    os.environ.get("UGENCE_SKIP_SLOW_PACKAGING") == "1", reason=_SKIP_REASON
+)
+
+
 def _build(kind: str, outdir: pathlib.Path) -> pathlib.Path:
     subprocess.run(
         [sys.executable, "-m", "build", f"--{kind}", "--outdir", str(outdir), str(PROJECT)],
@@ -184,10 +205,10 @@ def test_the_wheel_still_ships_no_tests_at_all(tmp_path_factory):
 # would multiply the sweep's runtime by the number of guards. The full suite — locally and
 # in CI — runs them.
 
-_SLOW_REASON = (
-    "slow packaging isolation (builds wheels and a virtualenv); deselected by the guard "
-    "sweep via UGENCE_SKIP_SLOW_PACKAGING, run by the full suite and by CI"
-)
+#: Retained as an explicit marker on the four isolation properties. It is subsumed by the
+#: module-wide gate above and is kept because it documents, at the property itself, which
+#: half of this module is the expensive one.
+_SLOW_REASON = _SKIP_REASON
 slow_packaging = pytest.mark.skipif(
     os.environ.get("UGENCE_SKIP_SLOW_PACKAGING") == "1", reason=_SLOW_REASON
 )

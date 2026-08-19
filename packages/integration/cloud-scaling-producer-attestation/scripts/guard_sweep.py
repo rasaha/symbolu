@@ -318,6 +318,51 @@ def _source_fingerprint() -> dict:
     }
 
 
+def _baseline_run() -> dict:
+    """Run the suite **unmutated** first, and refuse to sweep unless it is green.
+
+    Without this the sweep's headline number is not trustworthy, and the failure mode is
+    silent rather than loud. A test that fails for a reason unrelated to any mutation — a
+    missing build backend on the runner, a stale artifact, an environment gap — fails on
+    *every* run, so every guard looks killed, and a guard that genuinely survives is
+    reported as load-bearing. That is precisely the wrong direction for a security claim to
+    be wrong in: it manufactures reassurance.
+
+    This happened. The packaging-distribution properties invoke ``python -m build``, the
+    sweep job installs pytest but not ``build``, and one property therefore errored on all
+    91 runs — converting two genuine survivors into kills and appearing in every guard's
+    attribution list. The module is now deselected in sweep runs; this check is what makes
+    the next instance of the same class impossible to publish.
+    """
+
+    shutil.rmtree(WORKROOT, ignore_errors=True)
+    WORKROOT.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(
+        PKG,
+        WORKDIR,
+        ignore=shutil.ignore_patterns(
+            "__pycache__", ".pytest_cache", "dist", "build", "*.egg-info"
+        ),
+    )
+    try:
+        result = run_suite(WORKDIR)
+    except subprocess.TimeoutExpired:
+        raise SystemExit("baseline run timed out; the sweep would score noise")
+    finally:
+        shutil.rmtree(WORKROOT, ignore_errors=True)
+
+    if not result["scored"]:
+        raise SystemExit(f"baseline run was not scored ({result['why']}); refusing to sweep")
+    if result["failed"]:
+        listed = "\n  ".join(result["failed"][:20])
+        raise SystemExit(
+            "the UNMUTATED suite does not pass, so every mutation would inherit these "
+            "failures and be scored as killed. Fix the environment or the tests before "
+            f"sweeping.\n  {listed}"
+        )
+    return result
+
+
 def main() -> int:
     baseline_fingerprint = _source_fingerprint()
 
@@ -326,6 +371,9 @@ def main() -> int:
 
     if WORKROOT.exists():
         shutil.rmtree(WORKROOT)
+
+    baseline = _baseline_run()
+    print(f"baseline (unmutated): {baseline['passed']} passed, no failures")
 
     results = []
     try:
@@ -399,6 +447,18 @@ def write_report(results) -> None:
         "scored **only** if it",
         "collected and ran the full suite — a collection error, a syntax error, an import",
         "error or a timeout is not a valid kill.",
+        "",
+        "**Baseline precondition.** Before any mutation, the sweep runs the suite *unmutated*",
+        "and refuses to proceed unless it is green. A test that fails for a reason unrelated",
+        "to the mutation fails on every run, so every guard looks killed and a genuinely",
+        "surviving guard is published as load-bearing — the wrong direction for a security",
+        "claim to be wrong in. This is not hypothetical: the packaging-distribution",
+        "properties invoke `python -m build`, the sweep job installs pytest but not `build`,",
+        "and one of them therefore errored on all 91 runs, converting two real survivors into",
+        "kills. Those properties are now deselected in sweep runs — a mutated package builds",
+        "into a distribution exactly as an unmutated one does, so they can score no guard —",
+        "and this precondition is what stops the next instance of that class from being",
+        "published as a result.",
         "",
         f"| Result | **{len(killed)} killed / {len(survived)} survived** |",
         "|---|---|",
