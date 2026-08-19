@@ -1,0 +1,83 @@
+# Independent distribution for the Ugence Benchmark Registry Authority (BR-2).
+#
+# The authority/registry layer of the shared, platform-wide Benchmark Registry,
+# ratified in docs/architecture/ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md
+# (B-1, §6.2 as amended). ADR §6.2 records two layers: the FROZEN identity layer
+# (ugence-benchmark-registry, 0.1.0) and this separate authority/registry layer.
+# BR-2 behaviour never enters BR-1.
+#
+# BR-2A (this release, 0.1.0) — "Registry and exact-resolution CONTRACTS."
+# Record, event, envelope and request shapes; the registry lifecycle vocabulary
+# and its closed relation; exactly one structural representation bound to each
+# transition; typed refusals; ports as Protocols; fifteen new digest domains;
+# pure validation. Contracts only.
+#
+# NOT in this distribution and not started:
+#   BR-2B (0.2.0) admission engine, six-stage ordering, hash-chained event log,
+#                 process-local in-memory adapter, CAS slot claim, byte
+#                 idempotence, typed conflict, exact resolution. Its verifier is
+#                 injected and defaults to exact deny-all.
+#   BR-2C (0.3.0) audited Ed25519 verifier, composition-root trust-resolver
+#                 adapter, key entitlements and revocation. Blocked on a secure
+#                 cryptographic verifier and trust-resolver design, specified
+#                 and independently audited.
+#   BR-2D (0.4.0) durable adapter, production composition root, registry-event
+#                 signing. Blocked on ADR DD-10.
+#
+# This package ships NO admission engine, storage implementation, signature
+# verifier, key parser, trust-anchor store, approval verifier, clock read,
+# resolver, convenience resolver, selection API, supersession implementation,
+# adapter registry, identity allow-list, production composition root, or
+# cryptographic dependency. A capability that does not exist is unrepresentable
+# in the type surface, not merely unimplemented. Automated tests enforce every
+# one of those facts.
+#
+# EXACTLY ONE runtime dependency: the frozen BR-1 identity layer, pinned to its
+# 0.1 line. Nothing else, Ugence or third party. The isolated --no-index install
+# proof is therefore exact: only ugence-benchmark-registry may be resolved, from
+# a local wheelhouse, and the verifier fails if anything else is.
+#
+# Build:    python -m build packages/benchmark-registry-authority
+# Verify:   python packages/benchmark-registry-authority/verify_benchmark_registry_authority_distribution.py
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-benchmark-registry-authority"
+dynamic = ["version"]
+description = "Ugence Benchmark Registry Authority — BR-2A registry and exact-resolution contracts: the administrative lifecycle, its closed transition relation, nested-binding record and event shapes, typed refusals and inert ports (internal platform infrastructure; contracts only, no registry)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = [
+    "ugence", "benchmark-registry", "benchmark-registry-authority",
+    "contracts", "platform", "registry-lifecycle", "canonicalization", "digest",
+]
+# The frozen BR-1 identity layer, and the standard library. Nothing else.
+# Pinned to the 0.1 line: BR-2A binds BR-1's exact contract shapes, its
+# canonicalization version and its pinned digests, so a minor-version bump of
+# the identity layer is a BR-2 decision, not an automatic upgrade.
+dependencies = ["ugence-benchmark-registry==0.1.*"]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_benchmark_registry_authority.__version__" }
+
+# Exactly one top-level namespace ships. Tests, probes, fixtures, the
+# distribution verifier and the mutation sweep are all excluded.
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_benchmark_registry_authority*"]
+
+# The package is fully type-annotated; ship the PEP 561 marker so typed
+# consumers get the contract types under mypy/pyright.
+[tool.setuptools.package-data]
+ugence_benchmark_registry_authority = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
