@@ -377,8 +377,12 @@ def _consumer_importers(repo):
     """Every module outside this package that imports it, minus the authorized consumers."""
 
     own_tree = (repo / "packages" / "trusted-evidence-authority").resolve()
+    # Compared as path components, not as a string prefix. A bare ``startswith`` would also
+    # exempt a sibling directory whose name merely begins with an authorized one —
+    # ``…/cloud-scaling-producer-attestation-evil`` — which is a hole in the boundary the
+    # allowlist exists to keep narrow.
     authorized = tuple(
-        str((repo / prefix).resolve()) for prefix in AUTHORIZED_CONSUMERS
+        (repo / prefix).resolve().parts for prefix in AUTHORIZED_CONSUMERS
     )
     importers = []
     for path in repo.glob("packages/**/*.py"):
@@ -387,7 +391,7 @@ def _consumer_importers(repo):
             continue
         if "__pycache__" in resolved.parts or "build" in resolved.parts:
             continue
-        if any(str(resolved).startswith(prefix) for prefix in authorized):
+        if any(resolved.parts[: len(prefix)] == prefix for prefix in authorized):
             continue
         try:
             text = path.read_text(encoding="utf-8")
@@ -442,6 +446,25 @@ def test_the_reverse_dependency_detector_still_fires_on_an_unauthorized_consumer
 
     found = _consumer_importers(tmp_path)
     assert found == ["packages/some-other-consumer/mod.py"], found
+
+
+def test_a_sibling_whose_name_merely_starts_with_an_authorized_one_is_not_exempt(tmp_path):
+    """The allowlist matches path components, never a string prefix.
+
+    ``…/cloud-scaling-producer-attestation-evil`` starts with the authorized path as a
+    string. It is a different directory, it is not authorized, and it must still be
+    reported.
+    """
+
+    planted = tmp_path / (AUTHORIZED_CONSUMERS[0] + "-evil") / "mod.py"
+    planted.parent.mkdir(parents=True)
+    planted.write_text(f"import {SELF}\n", encoding="utf-8")
+    (tmp_path / "packages" / "trusted-evidence-authority").mkdir(parents=True)
+
+    found = _consumer_importers(tmp_path)
+    assert found == [
+        f"{AUTHORIZED_CONSUMERS[0]}-evil/mod.py"
+    ], found
 
 
 def test_the_authorized_consumer_is_exempt_from_the_same_scan(tmp_path):
