@@ -1,5 +1,58 @@
 # Changelog — ugence-trusted-evidence-authority
 
+## [0.3.0] — one reviewed consumer exception, and a dedicated lent capability
+
+Additive and backward-compatible over 0.2.0. **Every 0.2.0 symbol remains exported
+unchanged**, every pinned digest is byte-identical, both existing
+`TrustAnchorCapability` members keep their names, serialized spellings and
+declaration order, and every evidence and receipt behaviour is unchanged. The
+curated export count is unchanged at 87.
+
+### The sole consumer exception
+
+`packages/integration/cloud-scaling-producer-attestation` — Cloud Scaling Phase
+5B-0A, producer authenticity — is authorized to import this package's **public
+trust-anchor contracts and resolver port**, and nothing else. The purpose is to
+prevent a second trust-anchor model or store from being grown alongside this one.
+
+The exception does **not** authorize importing evidence payloads, observations,
+measurements, receipts, trust stages, evidence verification engines or admission
+behaviour; using this package as the authority that approves Cloud Scaling
+recommendations; any reverse import from this package into Cloud Scaling;
+production use of `StaticTrustAnchorDirectory`; a local key map or shadow
+trust-anchor registry; any change to this package's production behaviour; or a
+generic exception for future packages.
+
+`tests/packaging/test_dependency_boundary.py` enforces it: one named consumer
+package, an exact symbol grant (fifteen production symbols, one reference-grade
+symbol listed separately, one test-only symbol), and constrained import forms —
+no module binding in the consumer's production source, no internal submodule
+import, no star import, no dynamic import, and no exception for tests,
+`conftest.py`, docs paths, comments or `# noqa`. Semantic AST analysis, never a
+raw-text scan. A grant-level property additionally refuses evidence-domain
+surfaces from being added to the allowlist itself.
+
+ADR §30's **UVI-EV-1 remains DEFERRED**. It is readiness consuming receipts and
+resolved definitions, which is a different integration and is still refused.
+
+### The lent capability
+
+Adds one `TrustAnchorCapability` member,
+`CLOUD_SCALING_RECOMMENDATION_ATTESTATION`, so the consumer stops resolving its
+anchors under `EVIDENCE_PRODUCTION`. An independent closure audit showed why that
+mattered: because the repository keeps one trust-anchor store, sharing the
+capability made a key provisioned purely to sign Trusted Evidence equally entitled
+to attest a Cloud Scaling capacity recommendation.
+
+It is a vocabulary this package owns and lends, not authority it exercises. This
+package verifies nothing under it, and `tests/authority/test_lent_capability_disjointness.py`
+proves the disjointness behaviourally and structurally: an evidence submission
+whose producer holds only the lent capability is REFUSED; a receipt cannot be
+verified under it; the evidence path resolves only `EVIDENCE_PRODUCTION` and the
+receipt paths only `RECEIPT_ISSUANCE`; the lent member is referenced in exactly
+one file; and no cloud-scaling module is imported or named anywhere.
+
+
 ## [0.2.0] — TEV-2: the verification authority, signed receipts and independent re-verification
 
 Implements milestone **TEV-2** of ADR §30 — "TAP Verification Service and signed
@@ -536,8 +589,10 @@ and importing that leaf now would decide DD-2 by implementation.
 this package references it by opaque reference + digest and never redefines it.
 Nothing imports Risk Authority, Policy Authority, Readiness, Governed Value,
 ActionGate, Decision Authority, Agent Runtime, Cloud Scaling, a Benchmark
-Registry, or `ugence-tap-provider`. **No consumer imports this package** — TEV-1
-authorizes no integration — and a test asserts it.
+Registry, or `ugence-tap-provider`. **No consumer imported this package** at
+0.2.0 — TEV-1 authorized no integration — and a test asserted it. That changed at
+**0.3.0**, which records one reviewed consumer exception under an exact symbol
+grant; see the 0.3.0 entry above.
 
 This package is **not** `ugence-tap-provider` (§6.1), **not**
 `risk_authority.integrations.tap` (RA-scoped; preserved unchanged by E-13, whose

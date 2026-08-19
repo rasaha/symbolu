@@ -142,15 +142,55 @@ evidence item — different schema tag, different signing purpose, different fie
 verifier specified against one payload has not verified another. A new verification protocol
 is therefore required, and it resolves every key through the established anchor store.
 
-**Capability ruling.** `PRODUCER_ATTESTATION_CAPABILITY` is
-`TrustAnchorCapability.EVIDENCE_PRODUCTION`. TEV ratifies exactly two capabilities and
-exactly one per anchor: production ("signs on behalf of a **producer**") and receipt
-issuance ("signs on behalf of the **verifying authority**"). A Cloud Scaling producer
-attestation is a producer signing a claim about its own output, so it is the producer role.
-Choosing it inherits ADR E-3's producer/verifier separation for free: a receipt-issuance key
-physically cannot verify a producer attestation here, and a producer key physically cannot
-issue a receipt there. The capability is not a parameter of the lookup — a caller cannot ask
-for verification under the other one, because there is nothing to pass.
+**Capability ruling (revised).** `PRODUCER_ATTESTATION_CAPABILITY` is
+`TrustAnchorCapability.CLOUD_SCALING_RECOMMENDATION_ATTESTATION` — a **dedicated**
+capability, added to TEV's trust-anchor contract for this signing domain and used by
+nothing else.
+
+The first revision of this ADR ruled for `EVIDENCE_PRODUCTION`, reasoning that a producer
+attestation "is the producer role". An independent closure audit rejected that ruling with
+a demonstration. Because this repository deliberately keeps **one** trust-anchor store, the
+capability is not a label describing a role — it is the component of the coordinate an
+anchor is actually resolved by. Sharing it made a key provisioned purely to sign Trusted
+Evidence, such as a telemetry agent holding no Cloud Scaling grant of any kind, equally
+entitled to attest a capacity recommendation. The audit signed and verified exactly that.
+
+Domain separation inside the signed bytes does not close it, and §5 above should be read
+with that limit in mind: the schema tag and the signing purpose stop a *signature* from
+being replayed across domains, but they say nothing about which *keys* a domain trusts.
+Neither does `trust_anchor_set_id`, a naming convention or deployment documentation — none
+of them is what the anchor is resolved by. Only the capability is, so the entitlement is
+named there.
+
+The three capabilities are mutually disjoint and compared by exact identity in both
+directions:
+
+* a receipt-issuance key cannot verify a producer attestation here;
+* an evidence-production key cannot either — the refusal is a typed `ANCHOR_UNKNOWN`
+  reached before any artifact is constructed;
+* the dedicated capability grants nothing back inside TEV: it produces no evidence and
+  issues no receipt, and TEV's own suite asserts both.
+
+The capability is still not a parameter of the lookup — a caller cannot ask for
+verification under another domain's capability, because there is nothing to pass. One key
+may hold several capabilities, but each is a separate, explicitly configured anchor record;
+nothing derives one grant from another. Which keys receive this capability is the
+composition root's decision, not this package's and not TEV's.
+
+**What TEV does and does not do here.** TEV supplies a reusable trust-anchor contract and
+the capability coordinate. It performs no Cloud Scaling verification, and it neither admits
+nor approves a Cloud Scaling recommendation. The verification routine in §10 is this
+package's, over this package's payload.
+
+**The TEV dependency is an exact symbol grant.** The authorization recorded in TEV's
+`tests/packaging/test_dependency_boundary.py` names one consumer package *and* the exact
+public trust-anchor symbols it may import: fifteen production symbols, one reference-grade
+symbol listed separately, one test-only contract-error type. Every evidence, observation,
+measurement, claim, receipt, trust-stage, admission and verification-engine surface fails
+that boundary, as do module bindings in production source, internal-submodule imports, star
+imports, dynamic imports and aliased forbidden symbols. An earlier revision exempted the
+consumer's whole directory, which the audit showed let the entire TEV public API through
+unreported.
 
 ## §8. Ruling — `StaticTrustAnchorDirectory` is reference grade, and is refused in production
 
