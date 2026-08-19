@@ -17,8 +17,12 @@ two named cryptographic distributions, one importing module, and every §23
 arrow still unbroken.
 
 The reverse direction is asserted too: no package in the monorepo imports this
-one. TEV-1/TEV-2 authorize no consumer integration (ADR §30 — UVI-EV-1 is
-DEFERRED), so an import from a consumer would be scope expansion.
+one, apart from the single consumer named in :data:`AUTHORIZED_CONSUMERS`. ADR
+§30's UVI-EV-1 — *readiness* consuming receipts and resolved definitions — is
+still DEFERRED, and an import driven by that milestone would still be scope
+expansion. What the allowlist records is a different, separately ratified
+integration; see :data:`AUTHORIZED_CONSUMERS` for exactly which, and why the
+blanket refusal is unchanged for everybody else.
 """
 
 from __future__ import annotations
@@ -344,17 +348,46 @@ def _imports_self(tree) -> bool:
     return False
 
 
-def test_no_consumer_imports_this_package():
-    repo = _repo_root()
-    if repo is None:
-        return  # running outside the monorepo (installed wheel); nothing to scan
+#: The **only** consumers authorized to import this package, as repo-relative path
+#: prefixes. Deliberately a closed, hand-maintained list rather than a pattern: adding a
+#: consumer must be a deliberate edit here, reviewed against a ratified authorization, and
+#: everything not on it is still refused by the blanket assertion below.
+#:
+#: ``packages/integration/cloud-scaling-producer-attestation`` — **Cloud Scaling Phase
+#: 5B-0A, producer authenticity.** Authorized by the ratified Phase 5B architecture brief
+#: (Revision 3 §20.7 §3 and §10), which fixes this package's dependency topology as Risk
+#: Authority + this package + the Phase 5A authorization contracts, and requires it to
+#: "reuse TEV's ``TrustAnchorCoordinate``, ``TrustAnchorRecord``, ``TrustAnchorCapability``,
+#: ``TrustAnchorResolution``, ``TrustAnchorResolverPort``, ``KeyRevocation``,
+#: ``StaticTrustAnchorDirectory`` and ``DenyAllTrustAnchorDirectory`` … create no second
+#: trust-anchor store and no local key map".
+#:
+#: This is **not** ADR §30's UVI-EV-1, which remains DEFERRED. UVI-EV-1 is readiness
+#: consuming *receipts and resolved definitions*. Phase 5B-0A consumes the *trust-anchor
+#: contracts*, which are payload-neutral — they import no evidence contract and presume
+#: nothing about what the signed bytes contain — plus the Ed25519 backend types. It
+#: consumes no receipt, admits no evidence, and reuses no evidence verifier; its own suite
+#: asserts each of those absences structurally.
+AUTHORIZED_CONSUMERS = (
+    "packages/integration/cloud-scaling-producer-attestation",
+)
+
+
+def _consumer_importers(repo):
+    """Every module outside this package that imports it, minus the authorized consumers."""
+
     own_tree = (repo / "packages" / "trusted-evidence-authority").resolve()
+    authorized = tuple(
+        str((repo / prefix).resolve()) for prefix in AUTHORIZED_CONSUMERS
+    )
     importers = []
     for path in repo.glob("packages/**/*.py"):
         resolved = path.resolve()
         if str(resolved).startswith(str(own_tree)):
             continue
         if "__pycache__" in resolved.parts or "build" in resolved.parts:
+            continue
+        if any(str(resolved).startswith(prefix) for prefix in authorized):
             continue
         try:
             text = path.read_text(encoding="utf-8")
@@ -366,10 +399,60 @@ def test_no_consumer_imports_this_package():
             continue  # not importable Python for this interpreter; nothing to import
         if _imports_self(tree):
             importers.append(str(path.relative_to(repo)))
+    return importers
+
+
+def test_no_unauthorized_consumer_imports_this_package():
+    repo = _repo_root()
+    if repo is None:
+        return  # running outside the monorepo (installed wheel); nothing to scan
+    importers = _consumer_importers(repo)
     assert not importers, (
-        "TEV-1 authorizes no consumer integration (ADR §30: UVI-EV-1 DEFERRED); "
-        f"unexpected imports: {importers}"
+        "TEV authorizes consumer integration only for the packages named in "
+        f"AUTHORIZED_CONSUMERS ({list(AUTHORIZED_CONSUMERS)}); ADR §30's UVI-EV-1 remains "
+        f"DEFERRED. Unexpected imports: {importers}"
     )
+
+
+def test_the_consumer_allowlist_is_exactly_the_ratified_set():
+    """The allowlist is a closed list, not a pattern, and it has not grown unnoticed.
+
+    A boundary whose exception list can be widened silently is not a boundary. Growing it
+    must fail here first, so the widening is reviewed against a ratified authorization
+    rather than noticed later.
+    """
+
+    assert AUTHORIZED_CONSUMERS == (
+        "packages/integration/cloud-scaling-producer-attestation",
+    )
+
+
+def test_the_reverse_dependency_detector_still_fires_on_an_unauthorized_consumer(tmp_path):
+    """A boundary test that cannot fail is not a boundary test.
+
+    Plants an importing module at a path that is **not** on the allowlist and asserts the
+    scan reports it — so the allowlist above narrows the assertion to one reviewed
+    consumer, and does not disable it.
+    """
+
+    planted = tmp_path / "packages" / "some-other-consumer" / "mod.py"
+    planted.parent.mkdir(parents=True)
+    planted.write_text(f"import {SELF}\n", encoding="utf-8")
+    (tmp_path / "packages" / "trusted-evidence-authority").mkdir(parents=True)
+
+    found = _consumer_importers(tmp_path)
+    assert found == ["packages/some-other-consumer/mod.py"], found
+
+
+def test_the_authorized_consumer_is_exempt_from_the_same_scan(tmp_path):
+    """...and the exemption is real: the identical module on the allowlisted path passes."""
+
+    allowed = tmp_path / AUTHORIZED_CONSUMERS[0] / "mod.py"
+    allowed.parent.mkdir(parents=True)
+    allowed.write_text(f"import {SELF}\n", encoding="utf-8")
+    (tmp_path / "packages" / "trusted-evidence-authority").mkdir(parents=True)
+
+    assert _consumer_importers(tmp_path) == []
 
 
 # --- the detector itself is tested, because a boundary test that cannot fail is not a
