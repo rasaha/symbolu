@@ -260,6 +260,13 @@ refuses("expired", attestation,
 refuses("receipt-issuance key", attestation,
         directory(anchor(capability=tev.TrustAnchorCapability.RECEIPT_ISSUANCE)),
         O.ANCHOR_UNKNOWN)
+# The cross-domain reuse an independent closure audit found, asserted against the
+# INSTALLED wheel rather than the source tree: a key provisioned purely to sign Trusted
+# Evidence must not attest a capacity recommendation. Everything but the anchor's
+# capability is identical to the positive control above, which verified.
+refuses("evidence-production key", attestation,
+        directory(anchor(capability=tev.TrustAnchorCapability.EVIDENCE_PRODUCTION)),
+        O.ANCHOR_UNKNOWN)
 
 # the reference resolver is refused in production, inside the wheel too
 try:

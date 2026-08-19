@@ -240,9 +240,8 @@ def _assert_domain_separation() -> None:
             "equally entitled to attest a capacity recommendation — the exact cross-domain "
             "privilege reuse the dedicated capability exists to refuse"
         )
-    if PRODUCER_ATTESTATION_CAPABILITY is not (
-        TrustAnchorCapability.CLOUD_SCALING_RECOMMENDATION_ATTESTATION
-    ):
+    _DEDICATED = TrustAnchorCapability.CLOUD_SCALING_RECOMMENDATION_ATTESTATION
+    if PRODUCER_ATTESTATION_CAPABILITY is not _DEDICATED:
         raise ImportError(
             "the producer-attestation capability drifted from the one dedicated Cloud "
             "Scaling capability; this package fails closed rather than resolving anchors "

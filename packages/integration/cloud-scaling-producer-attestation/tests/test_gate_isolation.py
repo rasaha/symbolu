@@ -150,18 +150,77 @@ def test_admitting_the_v1_purpose_fails_the_separation(monkeypatch):
         identifiers._assert_domain_separation()
 
 
-def test_the_receipt_issuance_capability_fails_the_separation(monkeypatch):
-    """GI-4: a producer attestation may never be verified under the receipt capability."""
+#: The three import-time capability separations, each with the phrase that only *that*
+#: check emits. The phrase is what makes each gate individually load-bearing: the final
+#: check refuses every wrong value, so a test that only asserted ``ImportError`` would
+#: still pass with either specific check disabled and would silently stop scoring them.
+#: Matching the message means disabling a specific check changes which refusal is
+#: reached, and the parametrised case for that check fails.
+CAPABILITY_SEPARATIONS = [
+    (
+        TrustAnchorCapability.RECEIPT_ISSUANCE,
+        "receipt-issuance",
+        "collapse ADR E-3's producer/verifier separation",
+    ),
+    (
+        TrustAnchorCapability.EVIDENCE_PRODUCTION,
+        "evidence-production",
+        "cross-domain privilege reuse the dedicated capability exists to refuse",
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    "capability, label, expected_phrase",
+    CAPABILITY_SEPARATIONS,
+    ids=[label for _, label, _ in CAPABILITY_SEPARATIONS],
+)
+def test_a_borrowed_capability_fails_the_separation_with_its_own_refusal(
+    monkeypatch, capability, label, expected_phrase
+):
+    """GI-4: neither TEV capability may verify a Cloud Scaling producer attestation.
+
+    ``RECEIPT_ISSUANCE`` would collapse ADR E-3's producer/verifier separation.
+    ``EVIDENCE_PRODUCTION`` is the cross-domain privilege reuse an independent closure
+    audit demonstrated: because the repository keeps one trust-anchor store, sharing that
+    capability made a key trusted to sign Trusted Evidence equally entitled to attest a
+    capacity recommendation.
+
+    Each is asserted by the phrase only its own check emits, so each check is scored on
+    its own rather than on the catch-all below it.
+    """
 
     from ugence_cloud_scaling_producer_attestation import identifiers
 
     monkeypatch.setattr(
-        identifiers,
-        "PRODUCER_ATTESTATION_CAPABILITY",
-        TrustAnchorCapability.RECEIPT_ISSUANCE,
+        identifiers, "PRODUCER_ATTESTATION_CAPABILITY", capability
     )
-    with pytest.raises(ImportError):
+    with pytest.raises(ImportError) as excinfo:
         identifiers._assert_domain_separation()
+    assert expected_phrase in str(excinfo.value), str(excinfo.value)
+
+
+def test_any_other_capability_fails_the_separation_as_drift(monkeypatch):
+    """GI-4b: the catch-all, scored on a value the two specific checks do not name.
+
+    A capability that is neither of the two named ones and is not the dedicated member —
+    a member added to the enum later, say — must still fail closed. Nothing above this
+    check refuses it, so this case scores the final assertion and only it.
+    """
+
+    from ugence_cloud_scaling_producer_attestation import identifiers
+
+    class _UnratifiedCapability:
+        """Not a TrustAnchorCapability member at all. Drift, in its most literal form."""
+
+        name = "SOME_FUTURE_CAPABILITY"
+
+    monkeypatch.setattr(
+        identifiers, "PRODUCER_ATTESTATION_CAPABILITY", _UnratifiedCapability()
+    )
+    with pytest.raises(ImportError) as excinfo:
+        identifiers._assert_domain_separation()
+    assert "drifted from the one dedicated Cloud Scaling capability" in str(excinfo.value)
 
 
 def test_the_reference_signer_refuses_to_publish_a_receipt_issuance_anchor(monkeypatch):

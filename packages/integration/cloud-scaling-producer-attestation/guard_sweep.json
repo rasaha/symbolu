@@ -131,7 +131,7 @@
   {
     "index": 10,
     "module": "identifiers.py",
-    "lineno": 166,
+    "lineno": 202,
     "condition": "PRODUCER_ATTESTATION_V2_SCHEMA_VERSION == PHASE_5A_V1_SCHEMA_VERSION",
     "scored": true,
     "killed": true,
@@ -143,7 +143,7 @@
   {
     "index": 11,
     "module": "identifiers.py",
-    "lineno": 173,
+    "lineno": 209,
     "condition": "PRODUCER_ATTESTATION_V2_SIGNING_PURPOSE == _D4_ROUTING_PURPOSE",
     "scored": true,
     "killed": true,
@@ -155,7 +155,7 @@
   {
     "index": 12,
     "module": "identifiers.py",
-    "lineno": 179,
+    "lineno": 215,
     "condition": "PRODUCER_ATTESTATION_V2_SIGNING_PURPOSE in KNOWN_POLICY_SIGNING_PURPOSES",
     "scored": true,
     "killed": true,
@@ -167,7 +167,7 @@
   {
     "index": 13,
     "module": "identifiers.py",
-    "lineno": 185,
+    "lineno": 221,
     "condition": "SUPPORTED_V2_SIGNING_PURPOSES & KNOWN_POLICY_SIGNING_PURPOSES",
     "scored": true,
     "killed": true,
@@ -179,7 +179,7 @@
   {
     "index": 14,
     "module": "identifiers.py",
-    "lineno": 189,
+    "lineno": 225,
     "condition": "_PHASE_5A_V1_SIGNING_PURPOSE in SUPPORTED_V2_SIGNING_PURPOSES",
     "scored": true,
     "killed": true,
@@ -191,19 +191,43 @@
   {
     "index": 15,
     "module": "identifiers.py",
-    "lineno": 194,
+    "lineno": 230,
     "condition": "PRODUCER_ATTESTATION_CAPABILITY is TrustAnchorCapability.RECEIPT_ISSUANCE",
     "scored": true,
     "killed": true,
     "failed": [
-      "tests/test_gate_isolation.py::test_the_receipt_issuance_capability_fails_the_separation"
+      "tests/test_gate_isolation.py::test_a_borrowed_capability_fails_the_separation_with_its_own_refusal[receipt-issuance]"
     ],
     "classification": ""
   },
   {
     "index": 16,
     "module": "identifiers.py",
-    "lineno": 199,
+    "lineno": 235,
+    "condition": "PRODUCER_ATTESTATION_CAPABILITY is TrustAnchorCapability.EVIDENCE_PRODUCTION",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_gate_isolation.py::test_a_borrowed_capability_fails_the_separation_with_its_own_refusal[evidence-production]"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 17,
+    "module": "identifiers.py",
+    "lineno": 244,
+    "condition": "PRODUCER_ATTESTATION_CAPABILITY is not _DEDICATED",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_gate_isolation.py::test_any_other_capability_fails_the_separation_as_drift"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 18,
+    "module": "identifiers.py",
+    "lineno": 250,
     "condition": "PRODUCER_ATTESTATION_SIGNATURE_PROFILE != _TEV_PROFILE_V1",
     "scored": true,
     "killed": true,
@@ -213,9 +237,9 @@
     "classification": ""
   },
   {
-    "index": 17,
+    "index": 19,
     "module": "identifiers.py",
-    "lineno": 204,
+    "lineno": 255,
     "condition": "PRODUCER_ATTESTATION_SIGNATURE_ENCODING != _TEV_ENCODING_V1",
     "scored": true,
     "killed": true,
@@ -225,9 +249,9 @@
     "classification": ""
   },
   {
-    "index": 18,
+    "index": 20,
     "module": "identifiers.py",
-    "lineno": 206,
+    "lineno": 257,
     "condition": "SUBJECT_TYPE_CAPACITY_SUBJECT != _D4_SUBJECT_TYPE",
     "scored": true,
     "killed": true,
@@ -237,7 +261,7 @@
     "classification": ""
   },
   {
-    "index": 19,
+    "index": 21,
     "module": "attestation.py",
     "lineno": 153,
     "condition": "self.schema_version != PRODUCER_ATTESTATION_V2_SCHEMA_VERSION",
@@ -249,7 +273,7 @@
     "classification": ""
   },
   {
-    "index": 20,
+    "index": 22,
     "module": "attestation.py",
     "lineno": 172,
     "condition": "self.subject_type != SUBJECT_TYPE_CAPACITY_SUBJECT",
@@ -261,7 +285,7 @@
     "classification": ""
   },
   {
-    "index": 21,
+    "index": 23,
     "module": "attestation.py",
     "lineno": 179,
     "condition": "purpose not in SUPPORTED_V2_SIGNING_PURPOSES",
@@ -277,7 +301,7 @@
     "classification": ""
   },
   {
-    "index": 22,
+    "index": 24,
     "module": "attestation.py",
     "lineno": 190,
     "condition": "algorithm not in SUPPORTED_V2_SIGNATURE_ALGORITHMS",
@@ -290,7 +314,7 @@
     "classification": ""
   },
   {
-    "index": 23,
+    "index": 25,
     "module": "attestation.py",
     "lineno": 197,
     "condition": "self.signature_profile != PRODUCER_ATTESTATION_SIGNATURE_PROFILE",
@@ -302,7 +326,7 @@
     "classification": ""
   },
   {
-    "index": 24,
+    "index": 26,
     "module": "attestation.py",
     "lineno": 203,
     "condition": "self.signature_encoding != PRODUCER_ATTESTATION_SIGNATURE_ENCODING",
@@ -314,7 +338,7 @@
     "classification": ""
   },
   {
-    "index": 25,
+    "index": 27,
     "module": "attestation.py",
     "lineno": 214,
     "condition": "type(self.signature) is not str",
@@ -324,7 +348,7 @@
     "classification": "sibling-backed \u2014 decode_signature refuses a non-str on the next line and yields the same MALFORMED_SIGNATURE outcome; this guard only makes the refusal typed one call earlier"
   },
   {
-    "index": 26,
+    "index": 28,
     "module": "attestation.py",
     "lineno": 234,
     "condition": "self.signing_payload_digest != expected",
@@ -336,7 +360,7 @@
     "classification": ""
   },
   {
-    "index": 27,
+    "index": 29,
     "module": "attestation.py",
     "lineno": 323,
     "condition": "not isinstance(data, Mapping)",
@@ -349,7 +373,7 @@
     "classification": ""
   },
   {
-    "index": 28,
+    "index": 30,
     "module": "attestation.py",
     "lineno": 330,
     "condition": "unknown",
@@ -364,7 +388,7 @@
     "classification": ""
   },
   {
-    "index": 29,
+    "index": 31,
     "module": "attestation.py",
     "lineno": 337,
     "condition": "missing",
@@ -379,7 +403,7 @@
     "classification": ""
   },
   {
-    "index": 30,
+    "index": 32,
     "module": "signing.py",
     "lineno": 120,
     "condition": "self.issuance_token is not _SIGNING_INPUT_TOKEN",
@@ -395,7 +419,7 @@
     "classification": ""
   },
   {
-    "index": 31,
+    "index": 33,
     "module": "signing.py",
     "lineno": 128,
     "condition": "type(self.signed_input) is not bytes",
@@ -405,7 +429,7 @@
     "classification": "unreachable through the public API \u2014 mint_producer_attestation is the only route to a signing input and always passes canonical_bytes(); a caller cannot construct one at all, because the token guard above rejects it first"
   },
   {
-    "index": 32,
+    "index": 34,
     "module": "signing.py",
     "lineno": 133,
     "condition": "len(self.signed_input) == 0",
@@ -415,7 +439,7 @@
     "classification": "unreachable through the public API \u2014 the minted payload is never empty, and the token guard rejects a caller-assembled input before any content check"
   },
   {
-    "index": 33,
+    "index": 35,
     "module": "signing.py",
     "lineno": 147,
     "condition": "self.signature_profile != PRODUCER_ATTESTATION_SIGNATURE_PROFILE",
@@ -425,7 +449,7 @@
     "classification": "unreachable through the public API \u2014 the minting routine passes the pinned constant, not a parameter; there is no caller-supplied profile to get wrong"
   },
   {
-    "index": 34,
+    "index": 36,
     "module": "signing.py",
     "lineno": 295,
     "condition": "signing_input.issuer != self._issuer",
@@ -437,7 +461,7 @@
     "classification": ""
   },
   {
-    "index": 35,
+    "index": 37,
     "module": "signing.py",
     "lineno": 300,
     "condition": "signing_input.producer_key_id != self._producer_key_id",
@@ -449,7 +473,7 @@
     "classification": ""
   },
   {
-    "index": 36,
+    "index": 38,
     "module": "signing.py",
     "lineno": 305,
     "condition": "signing_input.producer_id != self._producer_id",
@@ -461,7 +485,7 @@
     "classification": ""
   },
   {
-    "index": 37,
+    "index": 39,
     "module": "signing.py",
     "lineno": 333,
     "condition": "PRODUCER_ATTESTATION_CAPABILITY is TrustAnchorCapability.RECEIPT_ISSUANCE",
@@ -473,7 +497,7 @@
     "classification": ""
   },
   {
-    "index": 38,
+    "index": 40,
     "module": "signing.py",
     "lineno": 385,
     "condition": "signer is None",
@@ -485,7 +509,7 @@
     "classification": ""
   },
   {
-    "index": 39,
+    "index": 41,
     "module": "signing.py",
     "lineno": 387,
     "condition": "production_mode and getattr(type(signer), 'is_reference_signer', False) is True",
@@ -497,7 +521,7 @@
     "classification": ""
   },
   {
-    "index": 40,
+    "index": 42,
     "module": "signing.py",
     "lineno": 400,
     "condition": "signer.signature_profile != PRODUCER_ATTESTATION_SIGNATURE_PROFILE",
@@ -509,7 +533,7 @@
     "classification": ""
   },
   {
-    "index": 41,
+    "index": 43,
     "module": "signing.py",
     "lineno": 435,
     "condition": "type(signature) is not str",
@@ -521,7 +545,7 @@
     "classification": ""
   },
   {
-    "index": 42,
+    "index": 44,
     "module": "trust.py",
     "lineno": 183,
     "condition": "resolver is None",
@@ -531,7 +555,7 @@
     "classification": "sibling-backed \u2014 a None resolver fails the is_production_authoritative check below, which refuses it with the same typed configuration error"
   },
   {
-    "index": 43,
+    "index": 45,
     "module": "trust.py",
     "lineno": 191,
     "condition": "type(resolver) is reference_type",
@@ -543,7 +567,7 @@
     "classification": ""
   },
   {
-    "index": 44,
+    "index": 46,
     "module": "trust.py",
     "lineno": 200,
     "condition": "getattr(resolver, 'is_production_authoritative', False) is not True",
@@ -557,9 +581,9 @@
     "classification": ""
   },
   {
-    "index": 45,
+    "index": 47,
     "module": "verified.py",
-    "lineno": 147,
+    "lineno": 181,
     "condition": "self.construction_token is not _VERIFICATION_TOKEN",
     "scored": true,
     "killed": true,
@@ -573,9 +597,9 @@
     "classification": ""
   },
   {
-    "index": 46,
+    "index": 48,
     "module": "verified.py",
-    "lineno": 154,
+    "lineno": 188,
     "condition": "self.verification_profile != VERIFICATION_PROFILE",
     "scored": true,
     "killed": true,
@@ -585,9 +609,9 @@
     "classification": ""
   },
   {
-    "index": 47,
+    "index": 49,
     "module": "verified.py",
-    "lineno": 158,
+    "lineno": 192,
     "condition": "self.verification_profile_version != VERIFICATION_PROFILE_VERSION",
     "scored": true,
     "killed": true,
@@ -597,9 +621,9 @@
     "classification": ""
   },
   {
-    "index": 48,
+    "index": 50,
     "module": "verified.py",
-    "lineno": 173,
+    "lineno": 207,
     "condition": "self.artifact_digest != expected",
     "scored": true,
     "killed": false,
@@ -607,9 +631,9 @@
     "classification": "sibling-backed \u2014 require_verified_producer_attestation recomputes the same digest at every consumption boundary, and that check IS killed; this one is unreachable at construction because the minting routine computes the digest it passes"
   },
   {
-    "index": 49,
+    "index": 51,
     "module": "verified.py",
-    "lineno": 271,
+    "lineno": 305,
     "condition": "type(value) is not VerifiedProducerAttestation",
     "scored": true,
     "killed": true,
@@ -619,9 +643,9 @@
     "classification": ""
   },
   {
-    "index": 50,
+    "index": 52,
     "module": "verified.py",
-    "lineno": 285,
+    "lineno": 319,
     "condition": "value.construction_token is not _VERIFICATION_TOKEN",
     "scored": true,
     "killed": false,
@@ -629,9 +653,9 @@
     "classification": "sibling-backed \u2014 the provenance-registry check on the next line refuses everything this one does. An artifact assembled outside the authoritative routine also names a determination that routine never reached, unless it is a faithful copy of a real one, which IS that determination and should pass (V-21). The token check is kept as the ratified construction guard and as the check that would still stand if a deployment ever scoped the registry differently \u2014 for example per-request rather than per-process. Its construction-time twin in __post_init__ IS killed, by V-1 and V-2"
   },
   {
-    "index": 51,
+    "index": 53,
     "module": "verified.py",
-    "lineno": 290,
+    "lineno": 324,
     "condition": "value.artifact_digest not in _MINTED_DIGESTS",
     "scored": true,
     "killed": true,
@@ -641,9 +665,9 @@
     "classification": ""
   },
   {
-    "index": 52,
+    "index": 54,
     "module": "verified.py",
-    "lineno": 297,
+    "lineno": 331,
     "condition": "value.artifact_digest != value.digest()",
     "scored": true,
     "killed": true,
@@ -657,7 +681,7 @@
     "classification": ""
   },
   {
-    "index": 53,
+    "index": 55,
     "module": "verification.py",
     "lineno": 167,
     "condition": "type(self.outcome) is not _Outcome",
@@ -669,7 +693,7 @@
     "classification": ""
   },
   {
-    "index": 54,
+    "index": 56,
     "module": "verification.py",
     "lineno": 172,
     "condition": "self.outcome is _Outcome.VERIFIED",
@@ -681,7 +705,7 @@
     "classification": ""
   },
   {
-    "index": 55,
+    "index": 57,
     "module": "verification.py",
     "lineno": 194,
     "condition": "(self.verified_attestation is None) == (self.refusal is None)",
@@ -693,7 +717,7 @@
     "classification": ""
   },
   {
-    "index": 56,
+    "index": 58,
     "module": "verification.py",
     "lineno": 199,
     "condition": "self.verified_attestation is not None and type(self.verified_attestation) is not VerifiedProducerAttestation",
@@ -703,7 +727,7 @@
     "classification": "internal invariant \u2014 only this module constructs a result, and only ever with an artifact its own minting routine produced; not reachable from attacker input"
   },
   {
-    "index": 57,
+    "index": 59,
     "module": "verification.py",
     "lineno": 206,
     "condition": "self.refusal is not None and type(self.refusal) is not ProducerAttestationRefusal",
@@ -713,7 +737,7 @@
     "classification": "internal invariant \u2014 every refusal in this module is built by the single _refuse helper; not reachable from attacker input"
   },
   {
-    "index": 58,
+    "index": 60,
     "module": "verification.py",
     "lineno": 242,
     "condition": "trust_anchor_resolver is None",
@@ -723,7 +747,7 @@
     "classification": "sibling-backed \u2014 the hasattr(resolver, 'resolve') check below refuses None with the same typed configuration error"
   },
   {
-    "index": 59,
+    "index": 61,
     "module": "verification.py",
     "lineno": 247,
     "condition": "signature_verifier is None",
@@ -733,7 +757,7 @@
     "classification": "sibling-backed \u2014 the hasattr(verifier, 'verify_producer_signature') check below refuses None with the same typed configuration error"
   },
   {
-    "index": 60,
+    "index": 62,
     "module": "verification.py",
     "lineno": 252,
     "condition": "not hasattr(trust_anchor_resolver, 'resolve')",
@@ -745,7 +769,7 @@
     "classification": ""
   },
   {
-    "index": 61,
+    "index": 63,
     "module": "verification.py",
     "lineno": 257,
     "condition": "not hasattr(signature_verifier, 'verify_producer_signature')",
@@ -757,7 +781,7 @@
     "classification": ""
   },
   {
-    "index": 62,
+    "index": 64,
     "module": "verification.py",
     "lineno": 261,
     "condition": "production_mode",
@@ -771,7 +795,7 @@
     "classification": ""
   },
   {
-    "index": 63,
+    "index": 65,
     "module": "verification.py",
     "lineno": 263,
     "condition": "getattr(signature_verifier, 'is_production_authoritative', False) is not True",
@@ -783,7 +807,7 @@
     "classification": ""
   },
   {
-    "index": 64,
+    "index": 66,
     "module": "verification.py",
     "lineno": 328,
     "condition": "attestation is None",
@@ -797,7 +821,7 @@
     "classification": ""
   },
   {
-    "index": 65,
+    "index": 67,
     "module": "verification.py",
     "lineno": 333,
     "condition": "type(attestation) is not ProducerAttestationV2",
@@ -813,7 +837,7 @@
     "classification": ""
   },
   {
-    "index": 66,
+    "index": 68,
     "module": "verification.py",
     "lineno": 338,
     "condition": "type(candidate) is not CapacityAuthorizationCandidate",
@@ -825,7 +849,7 @@
     "classification": ""
   },
   {
-    "index": 67,
+    "index": 69,
     "module": "verification.py",
     "lineno": 343,
     "condition": "type(as_of) is not datetime or as_of.tzinfo is None or as_of.utcoffset() is None",
@@ -839,7 +863,7 @@
     "classification": ""
   },
   {
-    "index": 68,
+    "index": 70,
     "module": "verification.py",
     "lineno": 352,
     "condition": "attestation.schema_version != PRODUCER_ATTESTATION_V2_SCHEMA_VERSION",
@@ -851,7 +875,7 @@
     "classification": ""
   },
   {
-    "index": 69,
+    "index": 71,
     "module": "verification.py",
     "lineno": 357,
     "condition": "attestation.signing_purpose not in SUPPORTED_V2_SIGNING_PURPOSES",
@@ -863,7 +887,7 @@
     "classification": ""
   },
   {
-    "index": 70,
+    "index": 72,
     "module": "verification.py",
     "lineno": 362,
     "condition": "attestation.signature_algorithm not in SUPPORTED_V2_SIGNATURE_ALGORITHMS",
@@ -875,7 +899,7 @@
     "classification": ""
   },
   {
-    "index": 71,
+    "index": 73,
     "module": "verification.py",
     "lineno": 367,
     "condition": "attestation.signature_profile != PRODUCER_ATTESTATION_SIGNATURE_PROFILE",
@@ -887,7 +911,7 @@
     "classification": ""
   },
   {
-    "index": 72,
+    "index": 74,
     "module": "verification.py",
     "lineno": 372,
     "condition": "attestation.signature_encoding != PRODUCER_ATTESTATION_SIGNATURE_ENCODING",
@@ -899,7 +923,7 @@
     "classification": ""
   },
   {
-    "index": 73,
+    "index": 75,
     "module": "verification.py",
     "lineno": 381,
     "condition": "attestation.recommendation_id != candidate.recommendation_id",
@@ -912,7 +936,7 @@
     "classification": ""
   },
   {
-    "index": 74,
+    "index": 76,
     "module": "verification.py",
     "lineno": 386,
     "condition": "attestation.recommendation_digest != candidate.recommendation_digest",
@@ -926,7 +950,7 @@
     "classification": ""
   },
   {
-    "index": 75,
+    "index": 77,
     "module": "verification.py",
     "lineno": 392,
     "condition": "attestation.tenant_id != candidate.tenant_id",
@@ -940,7 +964,7 @@
     "classification": ""
   },
   {
-    "index": 76,
+    "index": 78,
     "module": "verification.py",
     "lineno": 397,
     "condition": "attestation.subject_id != candidate.subject_id",
@@ -953,7 +977,7 @@
     "classification": ""
   },
   {
-    "index": 77,
+    "index": 79,
     "module": "verification.py",
     "lineno": 402,
     "condition": "attestation.subject_type != candidate.subject_type",
@@ -965,7 +989,7 @@
     "classification": ""
   },
   {
-    "index": 78,
+    "index": 80,
     "module": "verification.py",
     "lineno": 429,
     "condition": "recomputed_bytes != attestation.signed_bytes()",
@@ -975,7 +999,7 @@
     "classification": "sibling-backed \u2014 the payload-digest comparison on the following line is a digest over the same two byte strings and refuses the identical inputs (killed by GI-20). Both are additionally fronted by the reconciliation group, which refuses a divergent tenant, subject, subject type, recommendation id or digest before either runs. Deliberately kept: it is the direct byte comparison the design specifies, and it would be the only survivor if a future edit made the digest check cover a different projection of the payload"
   },
   {
-    "index": 79,
+    "index": 81,
     "module": "verification.py",
     "lineno": 435,
     "condition": "canonical_digest(recomputed) != attestation.signing_payload_digest",
@@ -988,7 +1012,7 @@
     "classification": ""
   },
   {
-    "index": 80,
+    "index": 82,
     "module": "verification.py",
     "lineno": 452,
     "condition": "type(resolution) is not TrustAnchorResolution",
@@ -1000,7 +1024,7 @@
     "classification": ""
   },
   {
-    "index": 81,
+    "index": 83,
     "module": "verification.py",
     "lineno": 458,
     "condition": "anchor is None",
@@ -1016,7 +1040,7 @@
     "classification": ""
   },
   {
-    "index": 82,
+    "index": 84,
     "module": "verification.py",
     "lineno": 464,
     "condition": "type(anchor) is not TrustAnchorRecord",
@@ -1026,7 +1050,7 @@
     "classification": "unreachable through the public API \u2014 TrustAnchorResolution refuses at construction to carry anything but a TrustAnchorRecord, and the resolution's own exact-type check above (killed by A-54) rejects a non-resolution; this guard covers a resolver that returns a genuine resolution subverted after construction"
   },
   {
-    "index": 83,
+    "index": 85,
     "module": "verification.py",
     "lineno": 471,
     "condition": "anchor.authority_id != attestation.issuer",
@@ -1038,7 +1062,7 @@
     "classification": ""
   },
   {
-    "index": 84,
+    "index": 86,
     "module": "verification.py",
     "lineno": 477,
     "condition": "anchor.key_id != attestation.producer_key_id",
@@ -1050,7 +1074,7 @@
     "classification": ""
   },
   {
-    "index": 85,
+    "index": 87,
     "module": "verification.py",
     "lineno": 482,
     "condition": "anchor.capability is not PRODUCER_ATTESTATION_CAPABILITY",
@@ -1062,7 +1086,7 @@
     "classification": ""
   },
   {
-    "index": 86,
+    "index": 88,
     "module": "verification.py",
     "lineno": 491,
     "condition": "lifecycle is not None",
@@ -1078,7 +1102,7 @@
     "classification": ""
   },
   {
-    "index": 87,
+    "index": 89,
     "module": "verification.py",
     "lineno": 495,
     "condition": "anchor.signature_profile != attestation.signature_profile",
@@ -1090,7 +1114,7 @@
     "classification": ""
   },
   {
-    "index": 88,
+    "index": 90,
     "module": "verification.py",
     "lineno": 500,
     "condition": "anchor.signature_encoding != attestation.signature_encoding",
@@ -1102,7 +1126,7 @@
     "classification": ""
   },
   {
-    "index": 89,
+    "index": 91,
     "module": "verification.py",
     "lineno": 528,
     "condition": "accepted is not True",
