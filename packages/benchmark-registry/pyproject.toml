@@ -1,0 +1,79 @@
+# Independent distribution for the Ugence Benchmark Registry (BR-1).
+#
+# The shared, platform-wide Benchmark Registry's contract package, ratified in
+# docs/architecture/ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md
+# (B-1, §6.2).
+#
+# BR-1 (§30) — contract shapes only: the exact benchmark coordinate, the
+# complete twenty-coordinate benchmark-definition identity of §15, one
+# deterministic canonicalization/digest path, the §29 lifecycle vocabulary and
+# its closed transition relation, the §15 row 20 supersession declaration, and
+# the §16.3 typed refusal vocabulary. "Contracts only; no registry."
+#
+# BR-2 (§30) — NOT in this distribution and not started: the registry and
+# trusted resolver, §16.2's six-stage admission ordering, append-only
+# registration, byte-identical idempotence and typed conflict, exact-coordinate
+# resolution, publisher signature and key trust, trust anchors, signed
+# revocation, cross-tenant non-disclosure and historical resolution.
+#
+# Internal platform infrastructure — NOT a customer-facing module, NOT a
+# product, and NOT a fourth UVI engine (B-2). It computes nothing (B-12): no
+# observation, no benchmark result, no comparison, no readiness, no ROI. It
+# mints no runtime authority: nothing it produces authorizes deployment, runtime
+# action, policy sufficiency, evidence admission, economic value or causal
+# attribution. There is no resolver, no registry, no permissive stub and no
+# placeholder for a later milestone; possession of a contract from this package
+# is not validity (B-9).
+#
+# A leaf with NO runtime dependency at all — Ugence or third-party. ADR §23
+# permits the Benchmark Registry to depend on governance-contracts; the narrower
+# zero-dependency option is kept because DD-2 (which contracts land in that
+# leaf) is explicitly blocked on "the concrete contract shapes from TEV-1/BR-1".
+# BenchmarkReference stays Governance Contracts' single merged definition and is
+# never redefined here (§6.3); AssessedSystemBinding likewise (§14); no
+# SystemManifest is defined (DD-11). Automated tests enforce every one of these
+# facts, including the reverse direction: no package in the monorepo imports
+# this one, because §30 authorizes no consumer integration at BR-1.
+#
+# Build:    python -m build packages/benchmark-registry
+# Verify:   python packages/benchmark-registry/verify_benchmark_registry_distribution.py
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-benchmark-registry"
+dynamic = ["version"]
+description = "Ugence Benchmark Registry — BR-1 benchmark-definition contracts: exact digest-bound benchmark identity, lifecycle vocabulary, deterministic canonicalization and typed refusals (internal platform infrastructure; contracts only, no registry)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = [
+    "ugence", "benchmark-registry", "contracts", "platform",
+    "benchmark-definition", "canonicalization", "digest",
+]
+# No runtime dependency at all. The isolated --no-index install proof is
+# therefore exact: nothing may be resolved from the host, from an index, or
+# from a wheelhouse, and the verifier fails if anything is.
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_benchmark_registry.__version__" }
+
+# Exactly one top-level namespace ships. Tests, probes and fixtures are excluded.
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_benchmark_registry*"]
+
+# The package is fully type-annotated; ship the PEP 561 marker so typed
+# consumers get the contract types under mypy/pyright.
+[tool.setuptools.package-data]
+ugence_benchmark_registry = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
