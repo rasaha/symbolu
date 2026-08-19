@@ -114,16 +114,35 @@ Only the exact registered BR-1 contract classes are canonicalizable
 ---------------------------------------------------------------------
 Framing alone is not the security boundary — a `type` string is only trustworthy
 once the object producing it is known to be genuine. **Membership in the
-contract-type registry is decided by class *identity* (``type(contract) is
-SomeExactClass``), never by ``__name__`` or ``__module__``.** A subclass, a
-same-named foreign dataclass defined anywhere else, a same-named class whose
-``__module__`` was forged to match this package, and an arbitrary dataclass or
-duck type are all refused outright — none of them reaches the encoder, and none
-of them produces bytes or a digest, "borrowed" or otherwise. The registry
-mapping contract classes to their domain is populated exactly once, by
-:mod:`.identity` at import time, and is then sealed: it is a closed,
-:class:`~types.MappingProxyType` set, and no caller — including code inside this
-package — can register a new type into it afterwards.
+contract-type registry is decided by class *identity* (``cls is
+SomeExactClass``, checked with the interpreter's ``is`` primitive, which has no
+dunder method for any class or metaclass to override), never by ``__name__``,
+``__module__``, or the class object's own ``__eq__``/``__hash__``.** A
+subclass, a same-named foreign dataclass defined anywhere else, a same-named
+class whose ``__module__`` was forged to match this package, an arbitrary
+dataclass or duck type, and a foreign class whose **metaclass** forges the
+class object's own equality or hash to collide with a genuine registered class
+are all refused outright — none of them reaches the encoder, and none of them
+produces bytes or a digest, "borrowed" or otherwise.
+
+The registry mapping contract classes to their domain is populated exactly
+once, by :mod:`.identity` at import time, and is then sealed. It is built and
+held entirely inside a closure (:func:`_build_exact_type_boundary`): the only
+module-level names are the functions the closure returns, never the mapping
+itself. This matters because a :class:`~types.MappingProxyType` alone stops a
+mapping from being *mutated* but does nothing to stop a module attribute that
+*holds* one from being **rebound outright** — ``canonical._REGISTERED_X =
+{Evil: domain}`` is always legal Python for any code that imported the module,
+regardless of a leading underscore, and every subsequent call into an
+*unmodified* :func:`canonical_bytes` would then trust it, because the encoder
+reads a module global by name at call time. With no such name exposed, no
+caller — including code inside this package — can widen or replace the
+registry by any means short of reaching into the closure's cells directly
+(``func.__closure__``), which is possible in CPython but is a fundamentally
+different, much deeper capability than mapping mutation or attribute
+replacement — equivalent to being able to rebind ``canonical_bytes`` itself,
+or any other name in this process, and is not defended against here or
+anywhere else in the standard library.
 
 Before producing bytes, :func:`canonical_bytes` also **revalidates the complete
 exact contract graph**: every dataclass node reachable from the root re-runs its
@@ -192,63 +211,108 @@ BENCHMARK_DEFINITION_IDENTITY_DIGEST_DOMAIN = (
     "ugence.benchmark-registry/benchmark-definition-identity/v1"
 )
 
-#: Registered contract class -> domain tag, keyed by class **identity**, never
-#: by name or module. This is the single source of truth for "is this object an
-#: exact BR-1 contract, and if so, which domain does it belong to" — the only
-#: question :func:`canonical_bytes` and the graph revalidator ever ask.
+#: The closed contract-type registry, built once below by
+#: :func:`_build_exact_type_boundary` and exposed only through the four
+#: closures it returns. There is deliberately **no module-level name bound to
+#: the registry's backing dict or to a `MappingProxyType` wrapping it** — a
+#: `MappingProxyType` stops the mapping from being *mutated* (no
+#: ``__setitem__``), but it does nothing to stop a module attribute that
+#: *holds* one from being **rebound** wholesale (``some_module.NAME = ...`` is
+#: always legal from any code that imported the module; leading underscores
+#: are a convention, not an access-control mechanism). A registry exposed as
+#: ``canonical._REGISTERED_CONTRACT_TYPES`` could be replaced outright by any
+#: caller — ``canonical._REGISTERED_CONTRACT_TYPES = {Evil: domain}`` — and
+#: every subsequent call to the *unmodified* ``canonical_bytes`` would trust
+#: it, because the encoder reads the module global by name at call time.
+#: Closing over the dict instead means there is no such name to rebind: the
+#: only module-level surface is the four functions themselves, and rebinding
+#: one of *those* replaces a function wholesale (indistinguishable from
+#: replacing ``canonical_bytes`` itself) rather than quietly widening which
+#: types are trusted while the rest of the module keeps behaving normally.
 #:
-#: Starts empty and is populated exactly once, by :mod:`.identity` calling
-#: :func:`_register_contract_type` for each of the nine BR-1 contract classes
-#: immediately after defining them, then :func:`_seal_contract_types`.
-#: Keeping registration in :mod:`.identity` rather than importing the classes
-#: here keeps this module import-cycle-free (the contracts import the encoder,
-#: never the reverse) without weakening the check to a name comparison.
-_REGISTERED_CONTRACT_TYPES: dict = {}
+#: Lookup is by class **identity**, checked with ``is`` — never ``in``/``[]``
+#: on the backing dict, which would dispatch to ``__hash__``/``__eq__`` on
+#: whichever operand's type defines them. A class object's default
+#: ``__eq__``/``__hash__`` (inherited from :class:`type`) already is
+#: identity-based, but a **custom metaclass** can override the *type object's*
+#: ``__eq__``/``__hash__`` (the metaclass's dunders govern comparisons of the
+#: class itself, not of its instances) to make an unrelated class object
+#: compare equal to, and hash the same as, a genuine registered class — which
+#: would defeat a dict-membership check while never touching the registry's
+#: contents. ``is`` has no dunder to override; it is the interpreter's own
+#: object-identity primitive.
+def _build_exact_type_boundary():
+    types_: dict = {}
+    sealed = False
 
-#: ``True`` once :func:`_seal_contract_types` has run. Registration
-#: before sealing is the one-time package-initialization path; any attempt to
-#: register after sealing — including from inside this package — is refused,
-#: so the mapping is closed for the lifetime of the process.
-_CONTRACT_TYPES_SEALED = False
+    def record(cls: type, domain: str) -> None:
+        """Register ``cls`` as an exact, canonicalizable BR-1 contract type.
+
+        Private to this package's own module-initialization path. Refuses to
+        run once :func:`seal` has been called, and refuses anything that is
+        not itself a dataclass, so the registry can never be grown by a
+        caller — including one holding a reference to this "private"
+        function — after package import completes.
+        """
+
+        if sealed:
+            raise RuntimeError(
+                "the BR-1 contract-type registry is sealed; no type may be "
+                "registered after package initialization"
+            )
+        if not (isinstance(cls, type) and is_dataclass(cls)):
+            raise TypeError(
+                f"only a dataclass type may be registered as a BR-1 "
+                f"contract type (got {cls!r})"
+            )
+        types_[cls] = domain
+
+    def seal() -> None:
+        """Close the registry. Called exactly once, by :mod:`.identity`
+        after registering all nine BR-1 contract classes."""
+
+        nonlocal sealed, types_
+        types_ = MappingProxyType(dict(types_))
+        sealed = True
+
+    def domain_for(cls: type) -> Any:
+        """Return the registered domain for ``cls`` by identity, or ``None``.
+
+        Iterates the registered classes and compares each with ``cls is
+        registered_cls``. Dict iteration itself never consults ``__eq__`` or
+        ``__hash__`` (those only matter for ``in``/``[]``/insertion), so this
+        is immune to a metaclass forging either on a foreign class's type
+        object.
+        """
+
+        for registered_cls, domain in types_.items():
+            if cls is registered_cls:
+                return domain
+        return None
+
+    def snapshot() -> Any:
+        """A read-only **copy** for introspection only (tests, probes).
+
+        Never consulted by :func:`canonical_bytes`, :func:`canonical_digest`,
+        or the encoder — those call :func:`domain_for` against the closure's
+        own ``registry``, which this snapshot cannot reach or influence in
+        either direction: mutating, replacing, or discarding the returned
+        mapping has no effect on what the encoder trusts.
+        """
+
+        return MappingProxyType(dict(types_))
+
+    return record, seal, domain_for, snapshot
+
+
+(
+    _register_contract_type,
+    _seal_contract_types,
+    _domain_for_contract_type,
+    _contract_type_registry_snapshot,
+) = _build_exact_type_boundary()
 
 _TIMESTAMP_FMT = "%Y-%m-%dT%H:%M:%S.%fZ"
-
-
-def _register_contract_type(cls: type, domain: str) -> None:
-    """Register ``cls`` as an exact, canonicalizable BR-1 contract type.
-
-    Private to this package's own module-initialization path. Refuses to run
-    once :func:`_seal_contract_types` has been called, and refuses
-    anything that is not itself a dataclass, so the registry can never be
-    grown by a caller — including one holding a reference to this "private"
-    function — after package import completes.
-    """
-
-    if _CONTRACT_TYPES_SEALED:
-        raise RuntimeError(
-            "the BR-1 contract-type registry is sealed; no type may be "
-            "registered after package initialization"
-        )
-    if not (isinstance(cls, type) and is_dataclass(cls)):
-        raise TypeError(
-            f"only a dataclass type may be registered as a BR-1 contract "
-            f"type (got {cls!r})"
-        )
-    _REGISTERED_CONTRACT_TYPES[cls] = domain
-
-
-def _seal_contract_types() -> None:
-    """Freeze the contract-type registry into a closed, immutable mapping.
-
-    Called exactly once, by :mod:`.identity` after registering all nine BR-1
-    contract classes. After this call the registry is a
-    :class:`~types.MappingProxyType` and every further
-    :func:`_register_contract_type` call raises.
-    """
-
-    global _CONTRACT_TYPES_SEALED, _REGISTERED_CONTRACT_TYPES
-    _REGISTERED_CONTRACT_TYPES = MappingProxyType(dict(_REGISTERED_CONTRACT_TYPES))
-    _CONTRACT_TYPES_SEALED = True
 
 
 def _require_nfc(value: str, path: str) -> str:
@@ -299,7 +363,7 @@ def _to_canonical_obj(value: Any, path: str) -> Any:
     if isinstance(value, datetime):
         return _format_datetime(value, path)
     if is_dataclass(value) and not isinstance(value, type):
-        if type(value) not in _REGISTERED_CONTRACT_TYPES:
+        if _domain_for_contract_type(type(value)) is None:
             raise BenchmarkCanonicalizationError(
                 f"{path}: type {type(value).__name__!r} "
                 f"(module {type(value).__module__!r}) is not a registered "
@@ -340,14 +404,16 @@ def _require_registered_exact_type(contract: Any, path: str) -> type:
             f"(got {type(contract).__name__})"
         )
     cls = type(contract)
-    if cls not in _REGISTERED_CONTRACT_TYPES:
+    if _domain_for_contract_type(cls) is None:
         raise BenchmarkCanonicalizationError(
             f"{path}: type {cls.__name__!r} (module {cls.__module__!r}) is "
             "not a registered BR-1 contract type; only the exact classes "
             "this package defines can be canonicalized. Subclasses, "
             "same-named foreign dataclasses (including ones with a forged "
-            "matching module), duck types and arbitrary dataclasses are all "
-            "refused — class-name matching is never used as authority"
+            "matching module or a metaclass forging the class object's own "
+            "equality/hash), duck types and arbitrary dataclasses are all "
+            "refused — class-name matching and class-object equality are "
+            "never used as authority, only interpreter-level identity"
         )
     return cls
 
@@ -415,7 +481,7 @@ def canonical_bytes(contract: Any) -> bytes:
     """
 
     cls = _require_registered_exact_type(contract, "$")
-    domain = _REGISTERED_CONTRACT_TYPES[cls]
+    domain = _domain_for_contract_type(cls)
     _revalidate_exact_contract_graph(contract, "$")
     type_name = cls.__name__
     framed = {

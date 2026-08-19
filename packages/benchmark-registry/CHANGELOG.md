@@ -72,14 +72,21 @@ fourth UVI engine (B-2). This distribution is its contract layer.
   padded strings, floats (and therefore `nan`/`inf`), mappings, `bytes` and
   unknown types all **refused**, never coerced, never normalized. Only the
   exact registered BR-1 contract classes are canonicalizable — membership is
-  decided by class **identity** against a closed, sealed registry populated
-  once at import, never by `__name__` or `__module__`, so a subclass, a
-  same-named foreign dataclass (however its `__module__` is set), a duck type
-  or an arbitrary dataclass is refused outright rather than merely producing
-  different bytes. The complete contract graph is revalidated before any byte
-  is produced, so an instance corrupted after construction via
-  `object.__setattr__` into a state its public constructor would have refused
-  is refused here too.
+  decided by class **identity**, compared with Python's `is` (which no class
+  or metaclass can override), against a closed registry populated once at
+  import, never by `__name__`, `__module__`, or the class object's own
+  `__eq__`/`__hash__`, so a subclass, a same-named foreign dataclass (however
+  its `__module__` is set), a duck type, an arbitrary dataclass, or a foreign
+  class whose metaclass forges the class object's own equality/hash to
+  collide with a genuine registered class is refused outright rather than
+  merely producing different bytes. The registry itself is held entirely
+  inside a closure, with no module-level name bound to the mapping, so it
+  cannot be widened by rebinding a module attribute — a `MappingProxyType`
+  alone stops the mapping being *mutated* but not a caller from replacing the
+  *name that holds it* wholesale. The complete contract graph is revalidated
+  before any byte is produced, so an instance corrupted after construction
+  via `object.__setattr__` into a state its public constructor would have
+  refused is refused here too.
 * `BENCHMARK_REGISTRY_CANONICALIZATION_VERSION` =
   `ugence.benchmark-registry/canonicalization/v1`.
 * `BENCHMARK_DEFINITION_IDENTITY_DIGEST_DOMAIN` =
@@ -142,7 +149,7 @@ integration at BR-1, and a test enforces it in both directions.
 ### Verification
 
 * **582** package tests (contract + packaging).
-* **51** independent adversarial probes, importing only the curated API and the
+* **57** independent adversarial probes, importing only the curated API and the
   standard library — run against the source tree **and** inside the installed
   wheel.
 * Wheel **and sdist** built from a clean tree; isolated `--no-index` install into

@@ -987,6 +987,27 @@ def _p53():
 
 @probe("P-54 the contract-type registry cannot be widened by any caller")
 def _p54():
+    """The registry cannot be widened through its intended function, and —
+    the correction to this correction — cannot be widened by rebinding a
+    module attribute either, because there is no module attribute that
+    holds it.
+
+    The original P-54 only checked that calling the private
+    ``_register_contract_type`` function raised post-seal, and that
+    ``canonical._REGISTERED_CONTRACT_TYPES`` was a ``MappingProxyType``. That
+    left a direct attack unprobed: a ``MappingProxyType`` stops the mapping
+    from being *mutated*, but nothing stops the *module attribute holding
+    it* from being reassigned wholesale — ``canonical._REGISTERED_CONTRACT_
+    TYPES = {Evil: domain}`` is ordinary, always-legal Python for any code
+    that imported the module, and the unmodified ``canonical_bytes`` would
+    then trust it, because it read that name from the module's globals at
+    call time. This probe reproduces exactly that attack and confirms it no
+    longer has anywhere to land: the registry lives inside a closure with no
+    module-level name of its own, so setting ``canonical._REGISTERED_
+    CONTRACT_TYPES`` (or any other guessed name) creates an inert new
+    attribute nothing consults.
+    """
+
     from ugence_benchmark_registry.contracts import canonical as _canonical
 
     refuses(
@@ -996,9 +1017,100 @@ def _p54():
         ),
         RuntimeError,
     )
-    assert isinstance(_canonical._REGISTERED_CONTRACT_TYPES, type(
-        __import__("types").MappingProxyType({})
-    ))
+    assert not hasattr(_canonical, "_REGISTERED_CONTRACT_TYPES")
+
+    @dataclasses.dataclass(frozen=True)
+    class Evil:
+        benchmark_version: str = "latest"
+
+        def __post_init__(self) -> None:  # attacker-authored, always passes
+            pass
+
+    # The attack: reassign the guessed module attribute wholesale, then call
+    # the real, unmodified public API against the attacker's own instance.
+    _canonical._REGISTERED_CONTRACT_TYPES = {
+        Evil: BENCHMARK_DEFINITION_IDENTITY_DIGEST_DOMAIN
+    }
+    try:
+        refuses(lambda: _canonical.canonical_bytes(Evil()), BenchmarkCanonicalizationError)
+        refuses(lambda: _canonical.canonical_digest(Evil()), BenchmarkCanonicalizationError)
+    finally:
+        del _canonical._REGISTERED_CONTRACT_TYPES
+
+    # The read-only introspection snapshot cannot be turned into a weapon
+    # either: mutating or replacing it has no effect on what the encoder
+    # trusts, because the encoder never reads it.
+    snapshot = _canonical._contract_type_registry_snapshot()
+    assert isinstance(snapshot, type(__import__("types").MappingProxyType({})))
+    try:
+        snapshot[Evil] = BENCHMARK_DEFINITION_IDENTITY_DIGEST_DOMAIN
+        raise AssertionError("snapshot must be immutable")
+    except TypeError:
+        pass
+    refuses(lambda: _canonical.canonical_bytes(Evil()), BenchmarkCanonicalizationError)
+
+
+@probe("P-56 a metaclass forging the class object's own equality/hash cannot borrow the genuine bytes")
+def _p56():
+    """The 'class identity' claim, attacked directly.
+
+    ``canonical.py`` states membership is decided by ``cls is
+    SomeExactClass``. The vulnerable implementation this replaces actually
+    used ``in``/``[]`` against a ``dict`` keyed by class objects — which
+    dispatches to ``__hash__``/``__eq__``, not to ``is``. A *type object*'s
+    own equality and hash are governed by its **metaclass**, not by the
+    class itself (the class's own ``__eq__``/``__hash__`` govern its
+    *instances*). A foreign class built with a metaclass that forges the
+    type object's ``__eq__``/``__hash__`` to collide with a genuine
+    registered class defeats a dict-membership check while being a
+    completely different object holding attacker-chosen fields — including
+    ``benchmark_version="latest"``, and an attacker-authored ``__post_init__``
+    that graph revalidation would then call as if it were the genuine type's.
+    This probe reproduces that attack exactly and confirms the corrected
+    identity check refuses it: comparing with ``is`` has no dunder method for
+    any metaclass to override.
+    """
+
+    genuine = BenchmarkCoordinate
+
+    class _SpoofMeta(type):
+        def __eq__(cls, other):
+            return other is genuine or other is cls
+
+        def __hash__(cls):
+            return hash(genuine)
+
+    @dataclasses.dataclass(frozen=True)
+    class _ForeignBase(metaclass=_SpoofMeta):
+        pass
+
+    @dataclasses.dataclass(frozen=True)
+    class _Foreign(_ForeignBase):
+        benchmark_id: str = "attacker-id"
+        benchmark_family: str = "attacker-family"
+        benchmark_version: str = "latest"  # the real type would refuse this
+        scope: object = None
+        geography: object = None
+        domain: object = None
+
+        def __post_init__(self) -> None:  # attacker-authored, always passes
+            pass
+
+    _Foreign.__name__ = "BenchmarkCoordinate"
+    _Foreign.__qualname__ = "BenchmarkCoordinate"
+    _Foreign.__module__ = genuine.__module__
+
+    assert _Foreign is not genuine
+    assert _Foreign == genuine, "the metaclass forgery must actually fool dict equality"
+
+    forged = _Foreign()
+    refuses(lambda: canonical_bytes(forged), BenchmarkCanonicalizationError)
+    refuses(
+        lambda: __import__(
+            "ugence_benchmark_registry.contracts.canonical", fromlist=["canonical_digest"]
+        ).canonical_digest(forged),
+        BenchmarkCanonicalizationError,
+    )
 
 
 @probe("P-55 a semver with build metadata is unrepresentable (F-3)")

@@ -284,18 +284,29 @@ Every canonical byte sequence is framed as
 so the same body under two contract types can never produce the same bytes.
 
 **Only the exact registered BR-1 contract classes are canonicalizable.**
-Membership is decided by class *identity* (`type(contract) is SomeExactClass`)
-against a closed, sealed registry populated once at package import — never by
-`__name__` or `__module__`. A subclass, a same-named foreign dataclass defined
-anywhere else (even with its `__module__` forged to match this package), a
-duck type, or an arbitrary dataclass is refused outright: none of them reaches
-the encoder, and none of them produces bytes or a digest, "borrowed" or
-otherwise. No caller — including code inside this package — can register a
-new type into the closed mapping after import. Before producing bytes,
-`canonical_bytes` also revalidates the complete exact contract graph reachable
-from the root, so a frozen instance corrupted after construction via
-`object.__setattr__` into a state its public constructor would have refused is
-refused here too, rather than silently canonicalized.
+Membership is decided by class *identity* — compared with Python's `is`
+primitive, which no class or metaclass has a dunder method to override —
+against a closed registry populated once at package import — never by
+`__name__`, `__module__`, or the class object's own `__eq__`/`__hash__`. A
+subclass, a same-named foreign dataclass defined anywhere else (even with its
+`__module__` forged to match this package), a duck type, an arbitrary
+dataclass, or a foreign class whose **metaclass** forges the class object's own
+equality or hash to collide with a genuine registered class, is refused
+outright: none of them reaches the encoder, and none of them produces bytes or
+a digest, "borrowed" or otherwise. The registry itself lives entirely inside a
+closure — there is deliberately no module-level name bound to the mapping (a
+`MappingProxyType` stops the *mapping* from being mutated, but nothing stops a
+module attribute that *holds* one from being rebound wholesale by any caller
+who imported the module, underscore or not) — so no caller, including code
+inside this package, can widen it after import by any means short of reaching
+into the closure's cells directly, a fundamentally different and far deeper
+capability than mapping mutation or attribute replacement, equivalent to being
+able to rebind any other name in the process and not defended against here or
+anywhere else in the standard library. Before producing bytes, `canonical_bytes`
+also revalidates the complete exact contract graph reachable from the root, so
+a frozen instance corrupted after construction via `object.__setattr__` into a
+state its public constructor would have refused is refused here too, rather
+than silently canonicalized.
 
 **Exactly one domain is minted (DD-9).** BR-1 introduces exactly one artifact
 class — the benchmark-definition identity and the coordinates that make it up.
@@ -473,7 +484,7 @@ repository. For the avoidance of doubt, this package is **not**:
 packages/benchmark-registry/
 ├── pyproject.toml
 ├── public_api.json                                # machine-readable API snapshot
-├── adversarial_probes.py                          # 51 independent probes, curated API only
+├── adversarial_probes.py                          # 57 independent probes, curated API only
 ├── verify_benchmark_registry_distribution.py      # wheel + sdist + isolated --no-index install
 ├── src/ugence_benchmark_registry/
 │   ├── __init__.py            api.py    version.py    py.typed

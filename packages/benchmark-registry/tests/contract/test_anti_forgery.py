@@ -16,12 +16,17 @@ import pytest
 import ugence_benchmark_registry as pkg
 from ugence_benchmark_registry import api
 from ugence_benchmark_registry.api import (
+    BENCHMARK_DEFINITION_IDENTITY_DIGEST_DOMAIN,
+    BenchmarkCanonicalizationError,
     BenchmarkContractError,
+    BenchmarkCoordinate,
     BenchmarkLifecycleState,
     BenchmarkRefusalReason,
     BenchmarkScope,
     BenchmarkStructuralStatus,
     CanonicalBenchmarkDefinitionIdentity,
+    canonical_bytes,
+    canonical_digest,
 )
 
 import _builders as b
@@ -250,6 +255,107 @@ def test_a_registered_lifecycle_label_establishes_nothing():
     identity = b.identity(lifecycle_state=BenchmarkLifecycleState.REGISTERED)
     assert identity.trusted_resolution_performed is False
     assert identity.unresolved_reason is _R.BENCHMARK_RESOLUTION_NOT_PERFORMED
+
+
+def test_a_metaclass_forging_class_equality_cannot_borrow_the_genuine_bytes():
+    """The 'class identity' boundary, attacked at the level it actually needs
+    to hold: the class object's own equality and hash, not just its name.
+
+    ``canonical.py`` decides contract-type membership with ``cls is
+    SomeExactClass``. A dict-membership check (``in``/``[]``) would instead
+    dispatch to ``__hash__``/``__eq__`` — and a *type object*'s own equality
+    and hash are governed by its **metaclass**, not by the class itself (the
+    class's ``__eq__``/``__hash__`` govern its instances, not comparisons of
+    the class as an object). A foreign class built with a metaclass that
+    forges the type object's ``__eq__``/``__hash__`` to collide with
+    ``BenchmarkCoordinate`` would defeat a dict-membership check while being
+    a different object entirely, holding attacker-chosen field values
+    (including a floating ``benchmark_version``) and an attacker-authored
+    ``__post_init__`` that a dict-membership-driven "revalidation" step would
+    then call as if it belonged to the genuine type. ``is`` comparison has no
+    dunder for any metaclass to override, so this must still be refused.
+    """
+
+    genuine = BenchmarkCoordinate
+
+    class _SpoofMeta(type):
+        def __eq__(cls, other):
+            return other is genuine or other is cls
+
+        def __hash__(cls):
+            return hash(genuine)
+
+    @dataclasses.dataclass(frozen=True)
+    class _ForeignBase(metaclass=_SpoofMeta):
+        pass
+
+    @dataclasses.dataclass(frozen=True)
+    class _Foreign(_ForeignBase):
+        benchmark_id: str = "attacker-id"
+        benchmark_family: str = "attacker-family"
+        benchmark_version: str = "latest"
+        scope: object = None
+        geography: object = None
+        domain: object = None
+
+        def __post_init__(self) -> None:  # attacker-authored, always passes
+            pass
+
+    _Foreign.__name__ = "BenchmarkCoordinate"
+    _Foreign.__qualname__ = "BenchmarkCoordinate"
+    _Foreign.__module__ = genuine.__module__
+
+    # The forgery must actually work at the Python level, or this test would
+    # prove nothing about the canonicalization boundary specifically.
+    assert _Foreign is not genuine
+    assert _Foreign == genuine
+    assert hash(_Foreign) == hash(genuine)
+
+    forged = _Foreign()
+    with pytest.raises(BenchmarkCanonicalizationError):
+        canonical_bytes(forged)
+    with pytest.raises(BenchmarkCanonicalizationError):
+        canonical_digest(forged)
+
+
+def test_the_contract_type_registry_cannot_be_widened_by_rebinding_a_module_attribute():
+    """The registry-sealing boundary, attacked at the level it actually needs
+    to hold: whether the module attribute *holding* the registry can simply
+    be replaced, not whether the mapping object itself can be mutated.
+
+    A ``MappingProxyType`` stops ``__setitem__``, but nothing in Python stops
+    a module attribute that holds one from being reassigned wholesale by any
+    code that imported the module — leading underscores are a naming
+    convention, not access control. This package closes that hole by never
+    exposing the registry as a module attribute at all: it lives inside a
+    closure, and the only module-level names are the four functions the
+    closure returns. This test performs the exact attack — reassigning the
+    (guessed) module attribute — and confirms it lands nowhere.
+    """
+
+    from ugence_benchmark_registry.contracts import canonical as _canonical
+
+    assert not hasattr(_canonical, "_REGISTERED_CONTRACT_TYPES")
+
+    @dataclasses.dataclass(frozen=True)
+    class Evil:
+        benchmark_version: str = "latest"
+
+        def __post_init__(self) -> None:
+            pass
+
+    _canonical._REGISTERED_CONTRACT_TYPES = {
+        Evil: BENCHMARK_DEFINITION_IDENTITY_DIGEST_DOMAIN
+    }
+    try:
+        with pytest.raises(BenchmarkCanonicalizationError):
+            _canonical.canonical_bytes(Evil())
+    finally:
+        del _canonical._REGISTERED_CONTRACT_TYPES
+
+    # The genuine coordinate is unaffected throughout.
+    genuine = b.coordinate()
+    assert canonical_bytes(genuine) == canonical_bytes(b.coordinate())
 
 
 def test_the_role_separation_check_cannot_be_evaded_by_case_or_padding():
