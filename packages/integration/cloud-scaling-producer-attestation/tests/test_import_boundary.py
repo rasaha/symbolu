@@ -176,7 +176,14 @@ def test_phase_5a_is_reached_only_through_its_public_api():
 
 
 def test_no_private_symbol_of_any_dependency_is_imported():
-    """B-6: no ``_``-prefixed name is imported from any third-party or sibling module."""
+    """B-6: no ``_``-prefixed name is imported from another distribution.
+
+    Scoped to **absolute** imports on purpose. A relative import reaches inside this
+    package, where a private name is this package's own business — the verification routine
+    holds the artifact's construction token and provenance registry precisely so nothing
+    else can. What must never happen is reaching into a *dependency's* privates, which is
+    what an absolute ``from x import _y`` would be.
+    """
 
     offenders = []
     for path in SOURCES:

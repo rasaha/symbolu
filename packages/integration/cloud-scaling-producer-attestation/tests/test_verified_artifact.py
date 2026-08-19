@@ -267,3 +267,81 @@ def test_the_artifact_repr_states_that_it_grants_nothing(artifact):
     """V-19: the one-line rendering an operator reads says so plainly."""
 
     assert "grants_authority=False" in repr(artifact)
+
+
+# --------------------------------------------------------------------------------------- #
+# 5. Possession of a genuine artifact is not authority to mint one
+# --------------------------------------------------------------------------------------- #
+
+
+def test_a_borrowed_construction_token_does_not_mint_an_artifact(artifact):
+    """V-20: the escalation the provenance registry closes.
+
+    The construction token is a dataclass field, so anyone holding one genuine artifact can
+    read it off — and a forger who also recomputes ``artifact_digest`` produces something
+    the token check and the digest check both accept. Only the registry distinguishes it:
+    the authoritative routine is the only thing that records, and this object never went
+    through it.
+    """
+
+    from ugence_cloud_scaling_producer_attestation import canonical_digest
+
+    borrowed = artifact.construction_token
+    fields = {f.name: getattr(artifact, f.name) for f in dataclasses.fields(artifact)}
+    fields["tenant_id"] = "tenant-2"
+    fields["construction_token"] = borrowed
+    payload = {
+        **{k: v for k, v in fields.items()
+           if k not in ("artifact_digest", "construction_token")},
+        "outcome": "VERIFIED",
+        "grants_authority": False,
+    }
+    fields["artifact_digest"] = canonical_digest(payload)
+
+    forged = VerifiedProducerAttestation(**fields)
+    # It is internally consistent — token accepted, self-digest matches...
+    assert forged.construction_token is borrowed
+    assert forged.artifact_digest == forged.digest()
+    assert forged.tenant_id == "tenant-2"
+    # ...and it is still refused at every consumption boundary.
+    with pytest.raises(VerifiedArtifactIntegrityError) as exc:
+        require_verified_producer_attestation(forged)
+    assert "never reached" in str(exc.value)
+
+
+def test_a_faithful_copy_of_a_genuine_determination_still_revalidates(artifact):
+    """V-21: the registry keys on the determination, not on object identity.
+
+    A determination is its facts. An artifact carrying identical facts *is* the same
+    determination — copied, queued or rebuilt — so refusing a faithful copy would break
+    ordinary use while doing nothing extra against a forger, whose facts differ. V-20 is
+    the case that matters, and it is refused.
+    """
+
+    duplicate = copy.copy(artifact)
+    assert duplicate == artifact
+    assert duplicate.artifact_digest == artifact.artifact_digest
+    assert require_verified_producer_attestation(artifact) is artifact
+    assert require_verified_producer_attestation(duplicate) is duplicate
+
+
+def test_the_registry_is_not_reachable_from_the_curated_api():
+    """V-22: neither the token nor the registry is exported."""
+
+    import ugence_cloud_scaling_producer_attestation as pkg
+
+    for private in ("_VERIFICATION_TOKEN", "_MINTED_DIGESTS", "_record_minted"):
+        assert private not in pkg.__all__
+        assert not hasattr(pkg, private)
+
+
+def test_every_freshly_verified_artifact_is_in_the_registry(verifier, candidate, as_of):
+    """V-23: the positive control for the registry — minting records, every time."""
+
+    from _producer_fixtures import build_attestation
+
+    for _ in range(3):
+        minted = verifier.verify(
+            candidate=candidate, attestation=build_attestation(candidate), as_of=as_of
+        ).verified_attestation
+        assert require_verified_producer_attestation(minted) is minted

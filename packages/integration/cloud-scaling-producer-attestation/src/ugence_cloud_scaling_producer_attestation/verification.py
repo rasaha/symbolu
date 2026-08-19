@@ -80,7 +80,11 @@ from .trust import (
     producer_anchor_coordinate,
     require_production_resolver,
 )
-from .verified import VerifiedProducerAttestation, _VERIFICATION_TOKEN
+from .verified import (
+    _VERIFICATION_TOKEN,
+    VerifiedProducerAttestation,
+    _record_minted,
+)
 
 __all__ = [
     "ProducerSignatureVerifierPort",
@@ -589,8 +593,14 @@ def _mint_verified_artifact(
         "outcome": _Outcome.VERIFIED.value,
         "grants_authority": False,
     }
-    return VerifiedProducerAttestation(
-        **{k: v for k, v in payload.items() if k not in ("outcome", "grants_authority")},
-        artifact_digest=canonical_digest(payload),
-        construction_token=_VERIFICATION_TOKEN,
+    return _record_minted(
+        VerifiedProducerAttestation(
+            **{
+                key: value
+                for key, value in payload.items()
+                if key not in ("outcome", "grants_authority")
+            },
+            artifact_digest=canonical_digest(payload),
+            construction_token=_VERIFICATION_TOKEN,
+        )
     )

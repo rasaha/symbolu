@@ -35,10 +35,41 @@ So the boundary is made of three things instead:
    authoritative verification routine, which holds it. Direct construction raises.
 #. **A self-digest.** :attr:`artifact_digest` is recomputed at construction over every
    bound fact. A field rewritten afterwards no longer matches it.
+#. **A provenance registry.** Every determination the verification routine reaches is
+   recorded by its :attr:`artifact_digest` in a module-private set. Membership cannot be
+   obtained by assembling an object, only by going through the routine.
 #. **Revalidation at consumption.** :func:`require_verified_producer_attestation` re-checks
-   the exact type, the token provenance and the digest at every boundary that consumes one.
-   A consumer that skips it is trusting an object's shape, which is what this class exists
-   to say is not enough.
+   the exact type, field presence, the token, registry membership and the digest at every
+   boundary that consumes one. A consumer that skips it is trusting an object's shape,
+   which is what this class exists to say is not enough.
+
+Why the registry, given the token
+---------------------------------
+The token is the ratified construction guard, and it is kept. On its own, though, it makes
+*possession of one genuine artifact* equivalent to the capability to mint arbitrary ones:
+the token is a field, so ``getattr(genuine, "construction_token")`` hands it over, and a
+forger who also recomputes :attr:`artifact_digest` produces something the token and digest
+checks both accept. The registry closes that specific escalation: a determination this
+process never reached has a digest this process never recorded.
+
+It records **digests, not object identities**, and that is deliberate. A determination is
+its facts; an artifact carrying identical facts *is* the same determination, whether it was
+copied, passed through a queue or rebuilt. Keying on identity would refuse a faithful copy
+of a real determination while doing nothing extra against a forger, and a ``WeakSet`` keyed
+on value is worse still — ``add`` is a no-op for an equal member, so the recorded reference
+can die while an equal, live artifact goes unregistered.
+
+The set grows by one 71-byte digest per **distinct** determination reached, and never
+otherwise; repeat verifications of the same candidate add nothing. A process that verifies
+unboundedly many distinct recommendations should hold the boundary somewhere with its own
+lifecycle rather than relying on a library-local set, and this is said here so that choice
+is made deliberately.
+
+What it does **not** close, stated plainly rather than over-claimed: in-process code that
+reaches into a private module attribute can add to the registry, exactly as it can import
+the token. No Python-level mechanism prevents that, and the Trusted Evidence Authority
+documents the same residual for its own signing boundary. What is closed is every route
+that does not require reaching into this module's privates.
 
 There is deliberately **no** ``from_dict`` and no deserializer: a serialized verification
 artifact would be a forgeable verification artifact.
@@ -64,6 +95,19 @@ __all__ = [
 #: curated API. Holding it is what distinguishes an artifact the verifier minted from one a
 #: caller assembled.
 _VERIFICATION_TOKEN = object()
+
+#: Provenance registry: the ``artifact_digest`` of every determination the authoritative
+#: routine has reached in this process. Not exported and not reachable from the curated API.
+#: See this module's docstring for why it holds digests rather than object identities, and
+#: for its growth characteristic.
+_MINTED_DIGESTS: set = set()
+
+
+def _record_minted(artifact: "VerifiedProducerAttestation") -> "VerifiedProducerAttestation":
+    """Record a determination as reached. Called only by the authoritative routine."""
+
+    _MINTED_DIGESTS.add(artifact.artifact_digest)
+    return artifact
 
 
 @dataclass(frozen=True)
@@ -211,13 +255,15 @@ def require_verified_producer_attestation(
     """Revalidate a verification artifact at a consumption boundary. Refuse anything else.
 
     Call this **every** time one of these crosses a boundary, not once at the point of
-    minting. Four independent checks, each closing a different fabrication route:
+    minting. Five independent checks, each closing a different fabrication route:
 
     #. exact type — a subclass with a diverting property, and a duck-typed look-alike,
        both fail here;
     #. every declared field is actually present — an ``object.__new__`` fabrication has no
        instance state at all and fails here;
     #. the construction token — an artifact assembled without the verifier fails here;
+    #. registry membership — an artifact assembled *with* a borrowed token, read off a
+       genuine one, names a determination this process never reached and fails here;
     #. the self-digest, recomputed — a field rewritten with ``object.__setattr__`` after
        construction fails here.
     """
@@ -240,6 +286,13 @@ def require_verified_producer_attestation(
         raise _IntegrityError(
             f"{name} does not carry the package construction token; it was assembled "
             "outside the authoritative verification routine"
+        )
+    if value.artifact_digest not in _MINTED_DIGESTS:
+        raise _IntegrityError(
+            f"{name} names a determination this process never reached. It carries the "
+            "construction token, so it was assembled by something holding it — but the "
+            "authoritative verification routine never produced this determination. "
+            "Possession of a genuine artifact is not authority to mint another one."
         )
     if value.artifact_digest != value.digest():
         raise _IntegrityError(
