@@ -1,0 +1,206 @@
+name: benchmark-registry-ci
+
+# Scoped CI for the independent ugence-benchmark-registry leaf package — the one
+# shared, platform-wide Benchmark Registry (ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md,
+# B-1/§6.2), at milestone BR-1 (§30: "Benchmark Definition Contracts — benchmark
+# identity (§15), lifecycle state, structured references. Contracts only; no
+# registry.").
+#
+# Runs the package suite and the independent adversarial probes, builds a clean
+# wheel and sdist, verifies isolated --no-index installation with no dependency
+# at all and public-API parity across source/manifest/wheel/installed runtime,
+# re-asserts the dependency and reverse-dependency guards, the milestone
+# boundary and the no-clock/nondeterminism scans, reproduces the pinned canonical
+# byte vectors, checks the repository terminology validator, and runs the
+# platform-freeze verifier.
+#
+# The package declares NO runtime dependency — no Ugence package and no third
+# party — so the isolated install proof is exact: nothing may be resolved from
+# an index, from a wheelhouse or from the host, and the verifier fails if
+# anything is. Nothing here publishes, uses a secret, contacts a network service
+# or touches key material of any kind; BR-1 performs no cryptography beyond one
+# sha-256 digest path.
+
+on:
+  pull_request:
+    paths:
+      - "packages/benchmark-registry/**"
+      - "docs/architecture/ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md"
+      - ".github/workflows/benchmark-registry-ci.yml"
+  push:
+    # Feature branches AND the repository's actual default branch, so a merge
+    # touching the package (matching the path filter) gets a recorded CI run.
+    branches:
+      - "claude/setup-symbolu-monorepo-**"
+      - "claude/br1-**"
+      - "claude/br-1-**"
+      - "claude/benchmark-registry-**"
+    paths:
+      - "packages/benchmark-registry/**"
+      - "docs/architecture/ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md"
+      - ".github/workflows/benchmark-registry-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  package-suite:
+    name: Benchmark Registry package suite (source)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install test tooling only
+        # pytest and nothing else. The package itself has no dependency to
+        # install; if a runtime dependency ever appeared, the dependency-boundary
+        # job below would fail before this one could hide it.
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+      - name: Package suite (contracts, canonicalization, lifecycle, packaging)
+        run: python -m pytest packages/benchmark-registry/tests -q
+      - name: ADR §15 coordinate coverage — every coordinate is digest-bound
+        run: |
+          python -m pytest \
+            packages/benchmark-registry/tests/contract/test_digest_coverage.py \
+            packages/benchmark-registry/tests/contract/test_identity_contracts.py -q
+      - name: Exact-only coordinates — a floating reference is unrepresentable
+        run: |
+          python -m pytest \
+            packages/benchmark-registry/tests/contract/test_coordinate_exactness.py -q
+      - name: Canonicalization — pinned byte vectors and pinned digests
+        run: |
+          python -m pytest \
+            packages/benchmark-registry/tests/contract/test_canonicalization.py \
+            packages/benchmark-registry/tests/contract/test_nfc_construction_boundary.py -q
+      - name: Lifecycle relation — the full 4x4 matrix, every pair
+        run: |
+          python -m pytest \
+            packages/benchmark-registry/tests/contract/test_lifecycle.py -q
+      - name: Temporal and applicability matrices — half-open boundaries
+        run: |
+          python -m pytest \
+            packages/benchmark-registry/tests/contract/test_temporal.py \
+            packages/benchmark-registry/tests/contract/test_applicability.py -q
+      - name: Refusal vocabulary — every member a refusal, every producer shown
+        run: |
+          python -m pytest \
+            packages/benchmark-registry/tests/contract/test_reasons.py -q
+      - name: Anti-forgery — nothing constructible can claim trust
+        run: |
+          python -m pytest \
+            packages/benchmark-registry/tests/contract/test_anti_forgery.py -q
+      - name: Dependency and reverse-dependency guards
+        # Zero runtime dependencies, stdlib-only imports, no Ugence import in
+        # either direction, no competing contract definition.
+        run: |
+          python -m pytest \
+            packages/benchmark-registry/tests/packaging/test_dependency_boundary.py -q
+      - name: Milestone boundary — BR-1 stops where the ADR says it stops
+        # No registry, resolver, store, registration, signing, revocation or
+        # successor surface; no readiness, forecasting, attribution, valuation,
+        # ROI, policy or deployment surface.
+        run: |
+          python -m pytest \
+            packages/benchmark-registry/tests/packaging/test_milestone_boundary.py -q
+      - name: No-clock and nondeterminism scans
+        run: |
+          python -m pytest \
+            packages/benchmark-registry/tests/packaging/test_no_clock_or_environment.py -q
+
+  adversarial-probes:
+    name: Independent adversarial probes (source)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Independent probe harness (curated API + stdlib only)
+        # Imports no test module, no _builders helper, no conftest and no private
+        # submodule; reconstructs canonical bytes by hand.
+        env:
+          PYTHONPATH: packages/benchmark-registry/src
+        run: python packages/benchmark-registry/adversarial_probes.py
+
+  isolated-install:
+    name: Wheel and sdist build, isolated --no-index installation verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+      - name: Build wheel and sdist, install --no-index, prove the leaf
+        # Installs with --no-index and PIP_NO_INDEX=1 into a venv with no system
+        # site packages and no PYTHONPATH. It fails if any distribution beyond
+        # the package itself is installed, if PYTHONPATH leaks, if monorepo
+        # source shadows the wheel, if declared metadata names a dependency, if
+        # the wheel or sdist carries tests/probes/fixtures/build artifacts, or if
+        # a pinned digest moves.
+        run: python packages/benchmark-registry/verify_benchmark_registry_distribution.py
+
+  api-parity:
+    name: Public API parity (source vs committed manifest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install test tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+      - name: public_api.json equals the actual curated surface
+        run: |
+          python -m pytest \
+            packages/benchmark-registry/tests/packaging/test_public_api.py -q
+      - name: py.typed marker ships
+        run: |
+          test -f packages/benchmark-registry/src/ugence_benchmark_registry/py.typed
+
+  static-checks:
+    name: Static checks (pyflakes, terminology)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyflakes
+      - name: pyflakes over the whole package
+        run: python -m pyflakes packages/benchmark-registry
+      - name: Repository terminology validator
+        # Documentation-only guard over the canonical architecture documents.
+        # BR-1 adds no governed document, so this asserts non-regression.
+        run: python scripts/validate_terminology.py
+
+  freeze:
+    name: Platform-freeze verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pydantic
+      - name: Freeze verification (blocking — frozen artifacts must be unchanged)
+        run: python -m platform_freeze.verify --manifest platform/PLATFORM_FREEZE_V1.json
