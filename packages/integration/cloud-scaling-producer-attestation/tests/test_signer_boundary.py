@@ -20,6 +20,7 @@ from _producer_fixtures import (
     ISSUER_ID,
     PRODUCER_ID,
     PRODUCER_KEY_ID,
+    REC_TIME,
     TRUSTED_PRODUCER_SEED,
     UNTRUSTED_PRODUCER_SEED,
     build_attestation,
@@ -182,7 +183,7 @@ def test_a_signer_cannot_alter_any_recommendation_fact(candidate):
         subject_id=candidate.subject_id,
         recommendation_id=candidate.recommendation_id,
         recommendation_digest=candidate.recommendation_digest,
-        issued_at=__import__("_producer_fixtures").P5A.REC_TIME,
+        issued_at=REC_TIME,
     )
     assert minted.tenant_id == candidate.tenant_id
     assert minted.recommendation_digest == candidate.recommendation_digest
@@ -216,7 +217,7 @@ def test_a_signer_refuses_an_input_addressed_to_another_key():
             subject_id="checkout-api",
             recommendation_id="rec-phase5a-1",
             recommendation_digest="sha256:" + "a" * 64,
-            issued_at=__import__("_producer_fixtures").P5A.REC_TIME,
+            issued_at=REC_TIME,
         )
 
 
@@ -285,7 +286,7 @@ def test_a_signing_input_repr_never_renders_the_frame():
         subject_id="checkout-api",
         recommendation_id="rec-phase5a-1",
         recommendation_digest="sha256:" + "a" * 64,
-        issued_at=__import__("_producer_fixtures").P5A.REC_TIME,
+        issued_at=REC_TIME,
     )
     assert "recommendation_digest" not in captured["repr"]
     assert "bytes)" in captured["repr"]
@@ -339,7 +340,7 @@ def test_no_contract_in_this_package_ever_holds_a_signing_input():
         subject_id="checkout-api",
         recommendation_id="rec-phase5a-1",
         recommendation_digest="sha256:" + "a" * 64,
-        issued_at=__import__("_producer_fixtures").P5A.REC_TIME,
+        issued_at=REC_TIME,
     )
     # The canonical encoder base64s bytes rather than refusing, so the real guarantee is
     # that no contract in this package ever holds a signing input — it is not a field of
@@ -389,7 +390,7 @@ def test_a_reference_signer_is_refused_in_production_mode():
             subject_id="checkout-api",
             recommendation_id="rec-phase5a-1",
             recommendation_digest="sha256:" + "a" * 64,
-            issued_at=__import__("_producer_fixtures").P5A.REC_TIME,
+            issued_at=REC_TIME,
             production_mode=True,
         )
     assert "reference signer" in str(exc.value)
@@ -417,7 +418,7 @@ def test_a_production_signer_is_admitted():
         subject_id="checkout-api",
         recommendation_id="rec-phase5a-1",
         recommendation_digest="sha256:" + "a" * 64,
-        issued_at=__import__("_producer_fixtures").P5A.REC_TIME,
+        issued_at=REC_TIME,
         production_mode=True,
     )
     assert minted.producer_key_id == PRODUCER_KEY_ID

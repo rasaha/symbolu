@@ -81,6 +81,7 @@ MODULE_PROPERTY_CATEGORY = {
     "test_frozen_digests": "invariant",
     "test_phase5a_invariants": "invariant",
     "test_packaging": "invariant",
+    "test_sdist_payload": "invariant",
     "test_property_ledger": "invariant",
     "test_gate_isolation": "adversarial",
     "test_capability_domain_separation": "adversarial",

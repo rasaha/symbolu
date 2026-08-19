@@ -313,7 +313,14 @@ def test_a_genuine_attestation_replayed_against_another_candidate_is_refused(ver
     """A-19: replay. A genuine, correctly signed attestation for candidate A, presented
     beside candidate B, is refused — the binding is to a specific recommendation."""
 
-    import phase5a_fixtures as P5A
+    import _producer_fixtures as F
+
+    if not F.PHASE_5A_CHAIN_AVAILABLE:
+        pytest.skip(
+            "replay needs a SECOND, genuinely different candidate, which means varying the "
+            "Phase 5A chain — reachable only from a checkout, not from an extracted sdist"
+        )
+    P5A = F.P5A
 
     first = build_candidate()
     other_projection = P5A.build_projection(

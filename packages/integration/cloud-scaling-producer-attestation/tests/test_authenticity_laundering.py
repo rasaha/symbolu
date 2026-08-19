@@ -34,7 +34,7 @@ from __future__ import annotations
 
 import pytest
 
-import phase5a_fixtures as P5A
+import _producer_fixtures as _F
 from _producer_fixtures import (
     AS_OF,
     PRODUCER_KEY_ID,
@@ -56,6 +56,21 @@ from ugence_cloud_scaling_producer_attestation import ProducerAuthenticityOutcom
 #: ``@pytest.mark.<category>``, which wins. ``tests/test_property_ledger.py`` counts
 #: the resolved categories, so the adversarial-to-happy ratio is machine-checked
 #: rather than claimed.
+
+#: The laundering proof builds a forged recommendation through the controller's REAL
+#: Phase-3 pipeline, which lives in a repository test tree that no distribution ships. It is
+#: therefore shipped in the sdist but skipped there, visibly and with a reason, rather than
+#: omitted — a consumer should see that the property exists and why their build cannot run it.
+pytestmark = pytest.mark.skipif(
+    not _F.PHASE_5A_CHAIN_AVAILABLE,
+    reason=(
+        "the forgery-laundering traversal needs Phase 5A's genuine fixture chain "
+        "(controller Phase-3 pipeline -> Phase 4C projection -> Risk Authority decision), "
+        "which lives in repository test trees that no distribution ships; run from a checkout"
+    ),
+)
+
+P5A = _F.P5A
 
 O = ProducerAuthenticityOutcome
 

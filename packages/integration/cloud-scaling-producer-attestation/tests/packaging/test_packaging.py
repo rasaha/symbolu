@@ -191,6 +191,14 @@ def test_the_sdist_carries_the_suite_and_the_wheel_does_not():
     downstream consumer re-runs the adversarial properties against their own build. A wheel
     is an installation artifact: shipping test material in it would put fixtures, a
     reference signer's test seed and a ``conftest`` on the import path of every deployment.
+
+    This is a **shape** assertion and claims only shape. That some path matches ``/tests/``
+    does not mean the shipped payload collects, let alone runs — an earlier revision
+    satisfied this assertion while shipping a payload that failed at collection because no
+    ``conftest.py`` or fixture helper was in the archive at all. The claim in the sentence
+    above, that a consumer can re-run the properties, is established by
+    ``tests/packaging/test_sdist_payload.py``, which extracts the sdist outside the
+    repository and runs it against installed distributions in a fresh virtualenv.
     """
 
     import tarfile

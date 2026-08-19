@@ -37,6 +37,16 @@ the first time, and stops there.
   `producer_anchor_coordinate`, `anchor_coordinate_digest`, `anchor_record_digest`,
   `anchor_lifecycle_outcome` and `require_production_resolver`.
 
+### Packaging
+
+* The sdist ships a **runnable** suite, not merely a suite-shaped set of paths.
+  `MANIFEST.in` includes the package-root `conftest.py`, `tests/conftest.py`, the shared
+  fixture helper and a frozen Phase 5A candidate payload alongside the test modules, so an
+  extracted sdist collects and runs against the declared distributions alone. Properties
+  that are genuinely *about* the monorepo chain skip there, visibly and with a reason.
+  `tests/packaging/test_sdist_payload.py` proves it by extracting the archive outside the
+  repository and running it in a fresh virtualenv holding only non-editable wheels.
+
 ### Frozen
 
 Three new fixtures, with independently recomputed pinned digests: one verified attestation,

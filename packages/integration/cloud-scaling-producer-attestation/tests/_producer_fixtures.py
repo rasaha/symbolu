@@ -50,19 +50,16 @@ from ugence_cloud_scaling_producer_attestation import (
 # Phase 5A's own fixture module, imported rather than re-implemented.
 # --------------------------------------------------------------------------------------- #
 
-def repo_root() -> pathlib.Path:
-    """Locate the monorepo root without counting directory levels.
+def find_repo_root() -> "pathlib.Path | None":
+    """Locate the monorepo root without counting directory levels, or ``None``.
 
     Deliberately self-contained rather than imported from the package-root ``conftest``:
     ``tests/`` is on ``sys.path`` ahead of the package root, so ``import conftest`` here
     resolves to *this* directory's ``conftest``, which imports this module — a circular
-    import. Twelve duplicated lines are cheaper than that, and than a shared helper module
-    that would itself need to be importable before the path is set up.
+    import. A dozen duplicated lines are cheaper than that.
 
-    Counting ``parents[n]`` breaks the moment this tree is copied elsewhere — which the
-    guard sweep does on every mutation, into a disposable directory outside the repository.
-    ``UGENCE_REPO_ROOT`` is how the sweep tells a copy where the real checkout is;
-    otherwise the search walks upward for the marker directories.
+    ``None`` means there is no checkout, which is the ordinary case from an extracted
+    sdist. The suite then runs against the installed distributions.
     """
 
     injected = os.environ.get("UGENCE_REPO_ROOT")
@@ -74,27 +71,54 @@ def repo_root() -> pathlib.Path:
             candidate / "packages" / "trusted-evidence-authority"
         ).is_dir():
             return candidate
-    raise RuntimeError(
-        f"could not locate the monorepo root from {here}; set UGENCE_REPO_ROOT"
-    )
+    return None
 
 
-REPO = repo_root()
+def repo_root() -> pathlib.Path:
+    """The monorepo root, or a clear failure. For properties that genuinely require one."""
+
+    found = find_repo_root()
+    if found is None:
+        import pytest
+
+        pytest.skip(
+            "this property asserts a fact about the monorepo checkout, which an extracted "
+            "sdist does not contain"
+        )
+    return found
+
+
+REPO = find_repo_root()
 _PHASE_5A_TESTS = (
-    REPO / "packages" / "integration" / "cloud-scaling-authorization-contracts" / "tests"
+    (REPO / "packages" / "integration" / "cloud-scaling-authorization-contracts" / "tests")
+    if REPO is not None
+    else pathlib.Path("/nonexistent-phase-5a-test-tree")
 )
 
 
+#: Where the frozen candidate payload lives, for the sdist case. It is *this package's own*
+#: fixture data — a canonical serialization of the very candidate the genuine chain
+#: produces — not a borrowed copy of a neighbouring package's test tree.
+_FROZEN_CANDIDATE = pathlib.Path(__file__).resolve().parent / "data" / "phase5a_candidate.json"
+
+
 def _load_phase5a_fixtures():
-    """Load Phase 5A's ``tests/conftest.py`` under a distinct module name.
+    """Load Phase 5A's ``tests/conftest.py`` under a distinct module name, if it is here.
 
     Imported under ``phase5a_fixtures`` so it cannot collide with this suite's own
     ``conftest``. Everything the laundering proof needs — the genuine recommendation,
     projection, decision, target scope, policy binding and v1 attestation builders — comes
     from there, so the proof runs against Phase 5A's real frozen fixture and not a copy of
     it that could drift.
+
+    Returns ``None`` when that tree is absent, which is the ordinary case for a consumer
+    who extracted the sdist and has only the declared distributions installed. Test trees
+    are not shipped by any wheel, so the genuine chain simply is not reachable there — see
+    :func:`build_candidate` for what happens instead.
     """
 
+    if not (_PHASE_5A_TESTS / "conftest.py").is_file():
+        return None
     if str(_PHASE_5A_TESTS) not in sys.path:
         sys.path.insert(0, str(_PHASE_5A_TESTS))
     spec = importlib.util.spec_from_file_location(
@@ -107,6 +131,47 @@ def _load_phase5a_fixtures():
 
 
 P5A = _load_phase5a_fixtures()
+
+#: True in a repository checkout, False from an extracted sdist. Read by the shipped suite
+#: to skip the handful of properties that are *about* the monorepo chain rather than about
+#: this distribution.
+PHASE_5A_CHAIN_AVAILABLE = P5A is not None
+
+
+def _canonical_ts(value: str) -> datetime:
+    """Parse the canonical ``...Z`` spelling the packages themselves emit.
+
+    ``datetime.fromisoformat`` round-trips to ``+00:00``, which the Phase 5A deserializer
+    rightly refuses, so the frozen payload is written and read in the canonical spelling.
+    """
+
+    return datetime.strptime(value, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
+
+
+def frozen_payload() -> "dict[str, Any]":
+    """This package's frozen Phase 5A candidate payload, read once."""
+
+    global _FROZEN_PAYLOAD
+    if _FROZEN_PAYLOAD is None:
+        import json
+
+        _FROZEN_PAYLOAD = json.loads(_FROZEN_CANDIDATE.read_text(encoding="utf-8"))
+    return _FROZEN_PAYLOAD
+
+
+_FROZEN_PAYLOAD: "dict[str, Any] | None" = None
+
+#: The Phase 5A recommendation instant, and the default ``issued_at`` for v2 attestations.
+#:
+#: Taken from Phase 5A's own fixture module in a checkout, so the two cannot drift, and from
+#: the frozen payload otherwise — where it is the same instant by construction, because the
+#: frozen payload was generated from the genuine chain and carries it as the v1 attestation's
+#: ``issued_at``. ``test_frozen_digests`` asserts the two agree whenever both are reachable.
+REC_TIME = (
+    P5A.REC_TIME
+    if P5A is not None
+    else _canonical_ts(frozen_payload()["producer_attestation"]["issued_at"])
+)
 
 # --------------------------------------------------------------------------------------- #
 # Deterministic, non-secret test key material. No production key exists in this repository.
@@ -214,20 +279,83 @@ def build_verifier(
 _DEFAULT_CANDIDATE = None
 
 
+def _candidate_from_frozen_payload():
+    """Rebuild the Phase 5A candidate from this package's frozen payload.
+
+    Used when the monorepo test trees are absent — an extracted sdist, or any consumer with
+    only the declared distributions installed. It is a **reconstruction, not a stub**: every
+    value is fed through Phase 5A's own exact public types, which validate and re-derive
+    their digests exactly as they do for the genuine chain, and the result's
+    ``candidate_digest`` is asserted against the frozen constant. A reconstruction that
+    drifted from the chain would fail that assertion rather than quietly under-test.
+    """
+
+    from ugence_cloud_scaling_authorization_contracts import (
+        CapacityAuthorizationCandidate,
+        ExecutionTargetScope,
+        PolicyTargetBindingReference,
+        ProducerAttestationEvidence,
+    )
+
+    payload = frozen_payload()
+    _ts = _canonical_ts
+
+    candidate = CapacityAuthorizationCandidate(
+        **payload["scalars"],
+        **{key: _ts(value) for key, value in payload["datetimes"].items()},
+        evidence_references=tuple(payload["evidence_references"]),
+        target_scope=ExecutionTargetScope(**payload["target_scope"]),
+        policy_binding=PolicyTargetBindingReference(**payload["policy_binding"]),
+        producer_attestation=ProducerAttestationEvidence.from_dict(
+            payload["producer_attestation"]
+        ),
+    )
+    if candidate.candidate_digest != payload["expected_candidate_digest"]:
+        raise AssertionError(
+            "the reconstructed Phase 5A candidate does not reproduce the frozen digest "
+            f"{payload['expected_candidate_digest']}; the frozen payload has drifted from "
+            "the genuine chain and must be regenerated with "
+            "scripts/generate_frozen_candidate.py"
+        )
+    return candidate
+
+
 def build_candidate(**overrides: Any):
     """A genuine Phase 5A candidate, from Phase 5A's own public builder and fixtures.
 
-    The default (no-override) candidate is built once and shared. It is a frozen dataclass
-    over frozen dataclasses, so sharing it is safe, and building the real Phase-3 →
-    Phase 4C → Risk Authority → Phase 5A chain costs about a second each time. Any
-    override builds a fresh chain, so no test that varies an input ever sees the cache.
+    Two sources, and the second exists so the shipped suite is runnable rather than
+    decorative:
+
+    * **in a repository checkout** — the real Phase-3 → Phase 4C → Risk Authority → Phase 5A
+      chain, through Phase 5A's own fixture module. This is what the laundering proof and
+      the frozen-digest properties require, and it is what CI runs.
+    * **from an extracted sdist** — reconstructed from this package's frozen payload through
+      Phase 5A's exact public types, with its ``candidate_digest`` asserted against the
+      frozen constant. Test trees ship in no wheel, so the chain is genuinely unreachable
+      there; a reconstruction that had drifted would fail the digest assertion.
+
+    ``overrides`` require the genuine chain — they vary inputs *upstream* of the candidate,
+    which a serialized artifact cannot express — so they raise a skip when it is absent
+    rather than silently returning the default candidate, which would be a false pass.
+
+    The default candidate is built once and shared. It is a frozen dataclass over frozen
+    dataclasses, so sharing it is safe, and building the real chain costs about a second.
     """
 
     global _DEFAULT_CANDIDATE
     if overrides:
+        if P5A is None:
+            import pytest
+
+            pytest.skip(
+                "varying the Phase 5A chain requires the monorepo test trees, which no "
+                "distribution ships; run this property from a checkout"
+            )
         return P5A.build_candidate(**overrides)
     if _DEFAULT_CANDIDATE is None:
-        _DEFAULT_CANDIDATE = P5A.build_candidate()
+        _DEFAULT_CANDIDATE = (
+            P5A.build_candidate() if P5A is not None else _candidate_from_frozen_payload()
+        )
     return _DEFAULT_CANDIDATE
 
 
@@ -242,7 +370,7 @@ def build_attestation(
     subject_id: "str | None" = None,
     recommendation_id: "str | None" = None,
     recommendation_digest: "str | None" = None,
-    issued_at: datetime = P5A.REC_TIME,
+    issued_at: datetime = REC_TIME,
     signer=None,
 ) -> ProducerAttestationV2:
     """Mint a genuine v2 attestation bound to ``candidate``, through the one minting route."""

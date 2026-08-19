@@ -154,9 +154,19 @@ def run_suite(workdir: Path, timeout: int = 600) -> dict:
         capture_output=True,
         text=True,
         timeout=timeout,
-        # The copy lives outside the repository, so it cannot find the checkout by walking
-        # upward. Telling it explicitly is what keeps the copy out of every repo-wide scan.
-        env={**os.environ, "UGENCE_REPO_ROOT": str(REPO)},
+        env={
+            **os.environ,
+            # The copy lives outside the repository, so it cannot find the checkout by
+            # walking upward. Telling it explicitly keeps the copy out of every repo-wide
+            # scan.
+            "UGENCE_REPO_ROOT": str(REPO),
+            # Deselect the slow packaging-isolation properties. They build five wheels and a
+            # virtualenv per run — minutes each, times the whole inventory — and they assert
+            # facts about the sdist, not about any ``src/`` guard, so they can neither kill
+            # nor survive a mutation and contribute nothing to the score. The full suite and
+            # CI run them.
+            "UGENCE_SKIP_SLOW_PACKAGING": "1",
+        },
     )
     output = process.stdout + process.stderr
     if "error" in output.lower() and "during collection" in output.lower():

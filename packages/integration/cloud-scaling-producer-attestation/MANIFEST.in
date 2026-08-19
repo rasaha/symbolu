@@ -1,0 +1,57 @@
+# Source distribution contents — Cloud Scaling Phase 5B-0A.
+#
+# The sdist ships a RUNNABLE test payload, by policy: a downstream consumer must be able to
+# re-run this package's adversarial properties against their own build. That policy is only
+# worth something if the payload actually collects, so this file names the subset exactly
+# and ships every support file it imports. tests/test_sdist_payload.py extracts the built
+# sdist into a clean directory outside the repository and proves it collects and runs there.
+#
+# What is deliberately NOT shipped, and why: properties that assert facts about the
+# monorepo CHECKOUT (sibling package trees, git state) or that need Phase 5A's own test
+# fixture chain. No distribution ships a test tree, so those are unreachable by
+# construction rather than by omission — shipping them would guarantee collection errors.
+
+# --- support files the shipped tests import ---------------------------------------------
+include conftest.py
+include tests/conftest.py
+include tests/_producer_fixtures.py
+include tests/data/phase5a_candidate.json
+
+# --- the shipped, runnable property modules ----------------------------------------------
+include tests/test_happy_path.py
+include tests/test_adversarial.py
+include tests/test_authenticity_laundering.py
+include tests/test_capability_domain_separation.py
+include tests/test_gate_isolation.py
+include tests/test_no_placeholder_verifier.py
+include tests/test_signer_boundary.py
+include tests/test_time_authority.py
+include tests/test_trust_reuse.py
+include tests/test_typed_outcomes.py
+include tests/test_verified_artifact.py
+
+# --- documentation and manifests ----------------------------------------------------------
+include README.md
+include CHANGELOG.md
+include GUARD_SWEEP.md
+include guard_sweep.json
+include public_api.json
+
+# --- never shipped -------------------------------------------------------------------------
+# Checkout-only properties: these scan sibling package trees or Phase 5A's frozen fixture
+# chain, neither of which any distribution contains.
+exclude tests/test_import_boundary.py
+exclude tests/test_phase5a_invariants.py
+exclude tests/test_frozen_digests.py
+# The property ledger shells out to pytest over the full repository suite and asserts ratios
+# computed from it; from a subset it would report different numbers and assert the wrong thing.
+exclude tests/test_property_ledger.py
+# Packaging properties need built artifacts in a dist/ directory that an sdist does not carry.
+prune tests/packaging
+# Scratch, build and environment output.
+prune dist
+prune build
+prune .pytest_cache
+global-exclude *.pyc
+global-exclude __pycache__/*
+global-exclude .DS_Store
