@@ -3,6 +3,15 @@
 **Status:** Accepted (decomposition ratified by the owner). **Phase 5A implemented; 5B, 5C,
 5X, 5D and Phase 6 are not.**
 
+> **Amendment (Phase 5B-0A).** The first half of the deferred 5B row — **producer
+> authenticity** — is now implemented and recorded separately in
+> [ADR — Cloud Scaling Phase 5B-0A: Producer Authenticity](ADR_CLOUD_SCALING_PRODUCER_AUTHENTICITY_PHASE5B0A.md).
+> Nothing in *this* ADR changes: Phase 5A stays at 0.1.0 with its contract, its frozen
+> digests and its single `PRESENT_BUT_NOT_TRUST_VERIFIED` trust state untouched, and §3's
+> ratified rules are what 5B-0A discharges rather than revises. The v2 proof travels
+> alongside a candidate and is not bound inside it. **Policy authenticity (5B-0B) and
+> signed envelope issuance remain deferred.**
+
 Phase 4 ended at a non-executable `SubjectRiskDecision`. This ADR records the ratified
 decomposition of everything that follows, and specifies Phase 5A — the only part built.
 
