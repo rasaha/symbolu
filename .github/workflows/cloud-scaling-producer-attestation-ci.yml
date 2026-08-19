@@ -64,6 +64,17 @@ jobs:
       - name: Phase 5B-0A suite (happy path, adversarial, packaging)
         run: |
           python -m pytest packages/integration/cloud-scaling-producer-attestation/tests
+      - name: Sdist self-containment — the shipped payload collects and runs, extracted
+        # Named as its own step because the claim is easy to make and hard to keep: the
+        # sdist is documented to ship a suite a consumer can re-run, and for a while it
+        # shipped test modules with no conftest and no fixture helper, so none of them
+        # collected. This builds the sdist, installs the first-party wheels NON-editable
+        # into a fresh virtualenv, extracts the archive outside the checkout and runs the
+        # shipped suite there — with a negative control that deletes the fixture helper and
+        # requires the run to break. `-rs` prints every skip with its reason.
+        run: |
+          python -m pytest -rs \
+            packages/integration/cloud-scaling-producer-attestation/tests/packaging/test_sdist_payload.py
       - name: Authenticity gate — the forgery-laundering proof (explicit acceptance gate)
         run: |
           python -m pytest \
@@ -289,7 +300,7 @@ jobs:
           if-no-files-found: warn
 
   guard-sweep:
-    name: Gate-removal mutation sweep (every security gate is load-bearing)
+    name: Gate-removal mutation sweep (every security gate is scored, none unresolved)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -268,13 +268,75 @@ refuses("evidence-production key", attestation,
         directory(anchor(capability=tev.TrustAnchorCapability.EVIDENCE_PRODUCTION)),
         O.ANCHOR_UNKNOWN)
 
-# the reference resolver is refused in production, inside the wheel too
-try:
-    verifier(directory(), production_mode=True)
-except p5b.ProducerAttestationConfigurationError:
+# the reference resolver is refused in production, inside the wheel too — and so is every
+# SUBTYPE of it (closure-audit L-E). Exact-type matching used to let a subclass inherit the
+# reference implementation, fail the identity test, and then satisfy an opt-in it declared
+# for itself. These probes run the same cases against site-packages, not only against source.
+class _PlainSubclass(p5b.StaticTrustAnchorDirectory):
     pass
+
+class _OptedInSubclass(p5b.StaticTrustAnchorDirectory):
+    is_production_authoritative = True
+
+class _DeeperSubclass(_OptedInSubclass):
+    pass
+
+class _UnrelatedMixin:
+    pass
+
+class _MultipleInheritance(_UnrelatedMixin, p5b.StaticTrustAnchorDirectory):
+    is_production_authoritative = True
+
+for label, factory in (
+    ("exact reference directory", lambda: directory()),
+    ("plain subclass", lambda: _PlainSubclass(())),
+    ("subclass declaring is_production_authoritative", lambda: _OptedInSubclass(())),
+    ("deeper subclass", lambda: _DeeperSubclass(())),
+    ("multiple inheritance", lambda: _MultipleInheritance(())),
+):
+    try:
+        verifier(factory(), production_mode=True)
+    except p5b.ProducerAttestationConfigurationError:
+        pass
+    else:
+        raise AssertionError(
+            f"{label} was admitted in production inside the wheel — the reference-grade "
+            "denial is not subclass-aware in the installed distribution"
+        )
+
+# ...and the denial is not widened: an independently implemented resolver that opts in is
+# still admissible, and so is the ratified deny-all posture.
+class _IndependentProductionResolver:
+    is_production_authoritative = True
+
+    def resolve(self, coordinate):
+        return p5b.TrustAnchorResolution.refused(
+            coordinate,
+            tev.TrustedEvidenceRefusalReason.TRUSTED_EVIDENCE_TRUST_ANCHOR_MISSING,
+        )
+
+verifier(_IndependentProductionResolver(), production_mode=True)
+verifier(p5b.DenyAllTrustAnchorDirectory(), production_mode=True)
+
+# a wrapper that merely HOLDS a reference directory is refused for not opting in, which is a
+# different reason — proving the denial keys on what the object is, not what it contains.
+class _WrappingResolver:
+    def __init__(self):
+        self._inner = directory()
+
+    def resolve(self, coordinate):
+        return self._inner.resolve(coordinate)
+
+try:
+    verifier(_WrappingResolver(), production_mode=True)
+except p5b.ProducerAttestationConfigurationError as exc:
+    if "REFERENCE" in str(exc):
+        raise AssertionError(
+            "a non-subclass wrapper was refused as reference grade inside the wheel; the "
+            "denial has been widened beyond actual subtypes"
+        )
 else:
-    raise AssertionError("the reference resolver was admitted in production inside the wheel")
+    raise AssertionError("a resolver that declared nothing was admitted inside the wheel")
 
 # the reference signer is refused in production minting
 try:

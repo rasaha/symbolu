@@ -203,6 +203,22 @@ other resolver must **explicitly opt in** with `is_production_authoritative = Tr
 following the Risk Authority convention. Silence is refusal, so a resolver that has never
 considered the question cannot drift into production by default.
 
+The refusal covers **every subclass** of a reference-grade resolver, and it is evaluated
+**before** the opt-in. A subclass inherits the reference implementation whole — the same
+in-memory dict, populated by the same caller — so it is reference grade by construction,
+and setting `is_production_authoritative = True` on it declares something its inherited
+behaviour does not support. An earlier revision matched the exact type, which meant a
+three-line subclass carrying that attribute was admitted in production while the base class
+it was identical to was refused; an independent closure audit found it, and the ordering
+above is what closes it. The refusal is scoped to inheritance and nothing wider: an
+independently implemented resolver that opts in is admitted, and so is one that merely
+*holds* a reference directory as a delegate, because neither inherits the implementation.
+
+The `DenyAllTrustAnchorDirectory` exemption below stays matched on the **exact** type, and
+the asymmetry is the same rule applied consistently rather than an inconsistency: subclassing
+narrows nothing, so a subclass of the deny-all directory is not known to deny everything and
+does not inherit its exemption.
+
 `DenyAllTrustAnchorDirectory` is exempt from the opt-in and admitted in production, because
 it refuses every coordinate unconditionally: admitting it cannot widen anything, and
 refusing it would leave a composition root with no ratified deny-by-default posture at all.

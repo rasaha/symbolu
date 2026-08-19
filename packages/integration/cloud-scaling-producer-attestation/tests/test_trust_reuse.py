@@ -297,3 +297,193 @@ def test_the_reference_directory_is_still_usable_outside_production(candidate):
         candidate=candidate, attestation=build_attestation(candidate), as_of=AS_OF
     )
     assert result.refusal is None
+
+
+# --------------------------------------------------------------------------------------- #
+# 4. The reference-grade refusal is subclass-aware (closure-audit L-E)
+# --------------------------------------------------------------------------------------- #
+#
+# Exact-type matching was the hole rather than the guard. This package refuses subclasses
+# almost everywhere, because a subclass can divert a read through a property — but that
+# reasoning runs the other way for a *denial*: here the class is what is being refused, so
+# ``type(x) is T`` let a subclass inherit the reference implementation wholesale, fail the
+# identity test, and then satisfy an opt-in it declared for itself.
+
+
+class _PlainSubclass(StaticTrustAnchorDirectory):
+    """A direct subclass that changes nothing. Still the reference implementation."""
+
+
+class _OptedInSubclass(StaticTrustAnchorDirectory):
+    """The bypass itself: inherits the reference resolver, then declares itself production."""
+
+    is_production_authoritative = True
+
+
+class _DeeperSubclass(_OptedInSubclass):
+    """Two levels down. Depth is not a laundering mechanism."""
+
+
+class _UnrelatedMixin:
+    """No trust behaviour of its own."""
+
+
+class _MultipleInheritance(_UnrelatedMixin, StaticTrustAnchorDirectory):
+    """One base is the reference resolver, so the object *is* one."""
+
+    is_production_authoritative = True
+
+
+class _WrappingResolver:
+    """Holds a reference directory but is not one, and does not opt in.
+
+    Refused for the ordinary reason — silence is refusal — not because it wraps something.
+    Composition is judged on the wrapper's own declaration.
+    """
+
+    def __init__(self) -> None:
+        self._inner = build_directory()
+
+    def resolve(self, coordinate):  # pragma: no cover - refused before use
+        return self._inner.resolve(coordinate)
+
+
+class _IndependentProductionResolver:
+    """An independently implemented resolver that explicitly opts in. Must stay admissible."""
+
+    is_production_authoritative = True
+
+    def resolve(self, coordinate):
+        return TrustAnchorResolution.refused(
+            coordinate,
+            tev.TrustedEvidenceRefusalReason.TRUSTED_EVIDENCE_TRUST_ANCHOR_MISSING,
+        )
+
+
+@pytest.mark.parametrize(
+    "factory,label",
+    [
+        (lambda: StaticTrustAnchorDirectory(()), "exact StaticTrustAnchorDirectory"),
+        (lambda: _PlainSubclass(()), "direct subclass, no override"),
+        (lambda: _OptedInSubclass(()), "subclass declaring is_production_authoritative"),
+        (lambda: _DeeperSubclass(()), "deeper subclass"),
+        (lambda: _MultipleInheritance(()), "multiple inheritance, one base is reference"),
+    ],
+)
+def test_every_reference_grade_subtype_is_refused_in_production(factory, label):
+    """R-18: every actual subtype of the reference resolver is refused, opt-in or not.
+
+    The opt-in cannot lift this refusal, and it is checked *before* the opt-in is read, so
+    a subclass declaring itself production-authoritative never reaches the branch that
+    would have admitted it.
+    """
+
+    with pytest.raises(ProducerAttestationConfigurationError) as exc:
+        require_production_resolver(factory())
+    message = str(exc.value)
+    assert "REFERENCE" in message, label
+    assert type(factory()).__name__ in message, label
+
+
+@pytest.mark.parametrize(
+    "factory,label",
+    [
+        (lambda: _OptedInSubclass(()), "subclass declaring is_production_authoritative"),
+        (lambda: _MultipleInheritance(()), "multiple inheritance, one base is reference"),
+    ],
+)
+def test_a_reference_subclass_cannot_buy_its_way_in_with_the_opt_in(factory, label):
+    """R-19: the declaration is present and true, and it still does not help."""
+
+    resolver = factory()
+    assert resolver.is_production_authoritative is True
+    with pytest.raises(ProducerAttestationConfigurationError):
+        require_production_resolver(resolver)
+
+
+def test_a_reference_subclass_is_refused_at_verifier_construction_too():
+    """R-20: the refusal holds at the real entry point, not only in the helper."""
+
+    from ugence_cloud_scaling_producer_attestation import (
+        Ed25519ProducerSignatureVerifier,
+        ProducerAttestationVerifier,
+    )
+
+    with pytest.raises(ProducerAttestationConfigurationError):
+        ProducerAttestationVerifier(
+            trust_anchor_resolver=_OptedInSubclass(()),
+            signature_verifier=Ed25519ProducerSignatureVerifier(),
+            production_mode=True,
+        )
+
+
+def test_a_wrapper_that_is_not_a_subclass_is_refused_for_not_opting_in():
+    """R-21: composition is judged on the wrapper's own declaration, not its contents.
+
+    The denial is not widened to "anything that touches a reference directory". This one is
+    refused because it declared nothing — silence is refusal — which is a different reason,
+    and the message says so.
+    """
+
+    with pytest.raises(ProducerAttestationConfigurationError) as exc:
+        require_production_resolver(_WrappingResolver())
+    assert "production-authoritative" in str(exc.value)
+    assert "REFERENCE" not in str(exc.value)
+
+
+def test_an_independent_production_resolver_remains_admissible():
+    """R-22: the fix must not deny a genuine production resolver. The positive control."""
+
+    resolver = _IndependentProductionResolver()
+    assert require_production_resolver(resolver) is resolver
+    assert not isinstance(resolver, StaticTrustAnchorDirectory)
+
+
+def test_deny_all_remains_admissible_and_can_only_refuse(candidate):
+    """R-23: the ratified deny-by-default posture still composes, and still only denies."""
+
+    deny_all = DenyAllTrustAnchorDirectory()
+    assert require_production_resolver(deny_all) is deny_all
+
+    verifier = build_verifier(directory=deny_all, production_mode=True)
+    result = verifier.verify(
+        candidate=candidate, attestation=build_attestation(candidate), as_of=AS_OF
+    )
+    assert result.verified_attestation is None
+    assert result.refusal.outcome is O.ANCHOR_UNKNOWN
+
+
+def test_a_deny_all_subclass_does_not_inherit_the_exemption():
+    """R-24: the exact-typed exemption is deliberate and asymmetric.
+
+    ``DenyAllTrustAnchorDirectory`` is exempt from the opt-in because it can only refuse —
+    that is an *admission*, and a subclass could override ``resolve`` to return anchors, so
+    it must not inherit it. The same rule as R-18, applied to the other direction.
+    """
+
+    class _PermissiveDenyAll(DenyAllTrustAnchorDirectory):
+        def resolve(self, coordinate):  # pragma: no cover - refused before use
+            raise AssertionError("never reached")
+
+    with pytest.raises(ProducerAttestationConfigurationError) as exc:
+        require_production_resolver(_PermissiveDenyAll())
+    assert "production-authoritative" in str(exc.value)
+
+
+def test_the_reference_grade_denial_uses_subclass_aware_matching():
+    """R-25: asserted over the source, so a revert to exact-type matching fails here."""
+
+    import ast
+    import inspect
+
+    source = inspect.getsource(require_production_resolver)
+    tree = ast.parse(source.lstrip())
+    calls = {
+        node.func.id
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    }
+    assert "isinstance" in calls, (
+        "the reference-grade denial must be subclass-aware; exact-type matching lets a "
+        "subclass inherit the reference implementation and declare itself production"
+    )

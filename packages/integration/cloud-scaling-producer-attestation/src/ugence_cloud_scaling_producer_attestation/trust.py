@@ -81,7 +81,8 @@ __all__ = [
     "REFERENCE_GRADE_RESOLVERS",
 ]
 
-#: Resolver types this repository documents as reference grade. Refused in production.
+#: Resolver types this repository documents as reference grade. Refused in production,
+#: **including every subclass** — see :func:`require_production_resolver`.
 #: ``DenyAllTrustAnchorDirectory`` is deliberately absent: it can only refuse.
 REFERENCE_GRADE_RESOLVERS: tuple[type, ...] = (StaticTrustAnchorDirectory,)
 
@@ -168,16 +169,43 @@ def require_production_resolver(resolver: object) -> object:
 
     Two independent conditions, both fail-closed:
 
-    * a resolver whose exact type this repository classifies as reference grade is
-      refused outright — its own docstring says it is for tests and local use;
+    * a resolver that **is** a reference-grade resolver — that type or any subclass of it —
+      is refused outright, before the opt-in is even consulted. Its own docstring says it
+      is for tests and local use, and subclassing does not change what it is;
     * every other resolver must **explicitly opt in** with
       ``is_production_authoritative = True``, following the Risk Authority convention.
       Silence is refusal, so a resolver that has never considered the question cannot
       drift into production by default.
 
+    Why ``isinstance`` here, and exact type elsewhere
+    -------------------------------------------------
+    This package refuses subclasses almost everywhere: a subclass can divert a read through
+    a property, so admitting one is admitting arbitrary behaviour wearing a trusted name.
+    That reasoning runs the other way for a **denial**. Here the class is what is being
+    refused, so exact-type matching is the hole rather than the guard — it let
+
+    .. code-block:: python
+
+        class MyDirectory(StaticTrustAnchorDirectory):
+            is_production_authoritative = True
+
+    inherit the reference resolver's whole in-memory implementation, fail the exact-type
+    test because it is not *literally* ``StaticTrustAnchorDirectory``, and then satisfy the
+    opt-in it declared for itself. Subclass-aware matching closes it: the check asks what
+    the object **is**, and no subclass can answer differently.
+
+    The denial is not widened beyond that. An independently implemented resolver that
+    declares itself production-authoritative is admitted, because it inherits none of the
+    reference implementation — a wrapper *holding* a reference directory is a different
+    object with its own resolution behaviour, and is judged on its own opt-in.
+
     ``DenyAllTrustAnchorDirectory`` is exempt from the opt-in because it refuses every
     coordinate unconditionally: admitting it cannot widen anything, and refusing it would
-    leave a composition root with no ratified deny-by-default posture at all.
+    leave a composition root with no ratified deny-by-default posture at all. That
+    exemption stays **exact-typed** on purpose, and the asymmetry is the same rule applied
+    consistently: this one is an *admission*, and a subclass could override ``resolve`` to
+    return anchors, so it must not inherit the exemption. A deny-all subclass falls through
+    to the opt-in check like anything else.
     """
 
     if resolver is None:
@@ -187,16 +215,26 @@ def require_production_resolver(resolver: object) -> object:
         )
     if type(resolver) is DenyAllTrustAnchorDirectory:
         return resolver
-    for reference_type in REFERENCE_GRADE_RESOLVERS:
-        if type(resolver) is reference_type:
-            raise _ConfigError(
-                f"production_mode=True refuses {reference_type.__name__}: this repository "
-                "documents it as the deterministic REFERENCE resolver, 'suitable for "
-                "tests, for local use, and as the shape a production resolver should "
-                "present'. Inject a production-authoritative resolver "
-                "(is_production_authoritative=True) over a managed key service, or use "
-                "DenyAllTrustAnchorDirectory to deny by default."
-            )
+    if isinstance(resolver, REFERENCE_GRADE_RESOLVERS):
+        reference_type = next(
+            base for base in REFERENCE_GRADE_RESOLVERS if isinstance(resolver, base)
+        )
+        actual = type(resolver).__name__
+        via = (
+            f"{actual} is {reference_type.__name__}"
+            if actual == reference_type.__name__
+            else f"{actual} is a subclass of {reference_type.__name__}"
+        )
+        raise _ConfigError(
+            f"production_mode=True refuses {actual}: {via}, which this repository "
+            "documents as the deterministic REFERENCE resolver, 'suitable for tests, for "
+            "local use, and as the shape a production resolver should present'. A "
+            "subclass inherits that implementation, so declaring "
+            "is_production_authoritative=True on one does not make it production grade "
+            "and does not lift this refusal. Inject a production-authoritative resolver "
+            "over a managed key service, or use DenyAllTrustAnchorDirectory to deny by "
+            "default."
+        )
     if getattr(resolver, "is_production_authoritative", False) is not True:
         raise _ConfigError(
             "a production TrustAnchorResolverPort must be production-authoritative "

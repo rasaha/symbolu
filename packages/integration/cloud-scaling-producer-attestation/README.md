@@ -130,10 +130,19 @@ receive the capability is the composition root's decision.
 **Reference versus production grade.** The repository classifies
 `StaticTrustAnchorDirectory` as reference grade in its own words ("the deterministic
 *reference* resolver … suitable for tests, for local use"). `require_production_resolver`
-therefore **refuses it under `production_mode=True`**, following the Risk Authority's
-`is_production_authoritative` convention. `DenyAllTrustAnchorDirectory` is admitted, because
-it can only ever refuse — it is the ratified deny-by-default posture, and the only "no
-anchors" shape that ships.
+therefore **refuses it under `production_mode=True`** — and **every subclass of it**,
+before the opt-in is even read. A subclass inherits the reference implementation whole, so
+declaring `is_production_authoritative = True` on one does not make it production grade;
+matching the exact type instead, as an earlier revision did, let a three-line subclass
+through while refusing the base class it was identical to. The denial is scoped to
+inheritance only: an independently implemented resolver that opts in is admitted, and so is
+one that merely holds a reference directory as a delegate. Otherwise the Risk Authority's
+`is_production_authoritative` convention applies unchanged.
+
+`DenyAllTrustAnchorDirectory` is admitted, because it can only ever refuse — it is the
+ratified deny-by-default posture, and the only "no anchors" shape that ships. That exemption
+is matched on the **exact** type: subclassing narrows nothing, so a subclass of it is not
+known to deny everything and does not inherit the exemption.
 
 ## Key custody
 
