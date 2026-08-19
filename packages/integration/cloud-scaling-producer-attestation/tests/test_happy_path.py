@@ -78,7 +78,7 @@ def test_the_verified_artifact_binds_the_key_that_verified_it(
         candidate=candidate, attestation=attestation, as_of=as_of
     ).verified_attestation
 
-    assert artifact.verified_producer_id == PRODUCER_ID
+    assert artifact.attested_producer_id == PRODUCER_ID
     assert artifact.verified_issuer == ISSUER_ID
     assert artifact.verified_key_id == PRODUCER_KEY_ID
     assert artifact.trust_anchor_capability == PRODUCER_ATTESTATION_CAPABILITY.value

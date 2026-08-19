@@ -40,7 +40,7 @@ classifiers = [
 # Credential Broker, Cloud Scaling Operations, a cloud SDK or a Kubernetes client.
 dependencies = [
     "ugence-risk-authority>=0.4.0",
-    "ugence-trusted-evidence-authority>=0.2.0",
+    "ugence-trusted-evidence-authority>=0.3.0",
     "ugence-cloud-scaling-authorization-contracts>=0.1.0",
 ]
 

@@ -61,7 +61,7 @@
     },
     "PRODUCER_ATTESTATION_CAPABILITY": {
       "kind": "constant",
-      "value": "EVIDENCE_PRODUCTION"
+      "value": "CLOUD_SCALING_RECOMMENDATION_ATTESTATION"
     },
     "PRODUCER_ATTESTATION_SIGNATURE_ALGORITHM": {
       "kind": "constant",
@@ -282,7 +282,8 @@
       "kind": "enum",
       "values": [
         "EVIDENCE_PRODUCTION",
-        "RECEIPT_ISSUANCE"
+        "RECEIPT_ISSUANCE",
+        "CLOUD_SCALING_RECOMMENDATION_ATTESTATION"
       ]
     },
     "TrustAnchorCoordinate": {
@@ -348,7 +349,7 @@
         "subject_id",
         "subject_type",
         "attestation_digest",
-        "verified_producer_id",
+        "attested_producer_id",
         "verified_issuer",
         "verified_key_id",
         "trust_anchor_coordinate_digest",

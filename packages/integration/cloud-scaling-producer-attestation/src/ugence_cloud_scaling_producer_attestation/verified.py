@@ -3,9 +3,28 @@
 What it establishes
 -------------------
 Exactly one thing: that at the injected instant ``verified_as_of_fact``, a configured trust
-anchor at the exact coordinate ``(issuer, key_id, producer-attestation capability)`` was
-usable, and its public key verified a signature over a canonical payload this package
-**recomputed** from the Phase 5A candidate's own reconciled facts. Producer authenticity.
+anchor at the exact coordinate ``(issuer, key_id, Cloud Scaling recommendation-attestation
+capability)`` was usable, and its public key verified a signature over a canonical payload
+this package **recomputed** from the Phase 5A candidate's own reconciled facts.
+
+Issuer versus producer, stated precisely
+----------------------------------------
+The anchor is resolved by **issuer**. What the signature establishes is therefore:
+
+    a trusted issuer/key signed an assertion naming this producer.
+
+It does **not** establish that the producer controls the key, and it does not resolve the
+producer against a trust anchor of its own — ``producer_id`` is a signed *claim by the
+issuer*, not an independently verified identity. The field is named
+:attr:`attested_producer_id` so the name says exactly that much and no more. It was
+called ``verified_producer_id`` in an earlier revision of this unmerged package; an
+independent closure audit found the name asserted more than the check performs, and the
+name was corrected rather than kept as an alias.
+
+A trusted issuer may legitimately attest a producer other than itself — Phase 5 ADR §3
+ratifies the controller signing its own output, and does not require the two identifiers
+to differ. The trust question that answers is "which issuer vouched", not "which producer
+proved possession of a key".
 
 What it does not establish
 --------------------------
@@ -53,11 +72,26 @@ checks both accept. The registry closes that specific escalation: a determinatio
 process never reached has a digest this process never recorded.
 
 It records **digests, not object identities**, and that is deliberate. A determination is
-its facts; an artifact carrying identical facts *is* the same determination, whether it was
-copied, passed through a queue or rebuilt. Keying on identity would refuse a faithful copy
-of a real determination while doing nothing extra against a forger, and a ``WeakSet`` keyed
-on value is worse still — ``add`` is a no-op for an equal member, so the recorded reference
-can die while an equal, live artifact goes unregistered.
+its facts; an artifact carrying identical facts *is* the same determination. Keying on
+identity would refuse a faithful in-process copy of a real determination while doing
+nothing extra against a forger, and a ``WeakSet`` keyed on value is worse still — ``add``
+is a no-op for an equal member, so the recorded reference can die while an equal, live
+artifact goes unregistered.
+
+What "a faithful copy still revalidates" does and does not mean
+--------------------------------------------------------------
+It means an **in-process** copy that preserves object state: ``copy.copy``,
+``dataclasses.replace`` with no substitution, or any equal-but-identity-distinct instance
+carrying the same fields. Those revalidate, because they carry the same digest *and* the
+same construction token object.
+
+It does **not** extend to ``copy.deepcopy`` or to ``pickle``. Both rebuild the token — a
+bare ``object()`` sentinel whose whole meaning is its identity — so the copy carries a
+*different* token and :func:`require_verified_producer_attestation` refuses it. That is
+the correct direction to fail, and it is stated here rather than discovered: an artifact
+that has crossed a process boundary is not a determination *this* process reached, and
+there is deliberately no deserializer that would let it claim to be one. A consumer that
+needs a determination in another process must re-verify there, not ship the artifact.
 
 The set grows by one 71-byte digest per **distinct** determination reached, and never
 otherwise; repeat verifications of the same candidate add nothing. A process that verifies
@@ -123,7 +157,7 @@ class VerifiedProducerAttestation:
     subject_type: str
     # --- what verified it ---------------------------------------------------------------
     attestation_digest: str
-    verified_producer_id: str
+    attested_producer_id: str
     verified_issuer: str
     verified_key_id: str
     trust_anchor_coordinate_digest: str
@@ -216,7 +250,7 @@ class VerifiedProducerAttestation:
             "subject_id": self.subject_id,
             "subject_type": self.subject_type,
             "attestation_digest": self.attestation_digest,
-            "verified_producer_id": self.verified_producer_id,
+            "attested_producer_id": self.attested_producer_id,
             "verified_issuer": self.verified_issuer,
             "verified_key_id": self.verified_key_id,
             "trust_anchor_coordinate_digest": self.trust_anchor_coordinate_digest,

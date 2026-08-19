@@ -36,18 +36,37 @@ refused, not a narrowing: adding a spelling can only reject more.
 
 Trust-anchor capability, and the ruling behind it
 -------------------------------------------------
-:data:`PRODUCER_ATTESTATION_CAPABILITY` is TEV's
-``TrustAnchorCapability.EVIDENCE_PRODUCTION``. TEV ratifies exactly two capabilities and
-exactly one per anchor: ``EVIDENCE_PRODUCTION`` ("the anchor's key signs on behalf of a
-**producer**") and ``RECEIPT_ISSUANCE`` ("the anchor's key signs on behalf of the
-**verifying authority**"). A Cloud Scaling producer attestation is a producer signing a
-claim about its own output, so it is the producer role, and choosing it inherits ADR E-3's
-producer/verifier separation for free: a receipt-issuance key physically cannot verify a
-producer attestation here, and a producer key physically cannot issue a receipt there.
+:data:`PRODUCER_ATTESTATION_CAPABILITY` is
+``TrustAnchorCapability.CLOUD_SCALING_RECOMMENDATION_ATTESTATION`` — a **dedicated**
+capability, added to TEV's trust-anchor contract for this domain and used by nothing else.
 
-This reuses TEV's **capability vocabulary**, which is payload-neutral. It does not reuse,
-and does not imply, TEV's evidence *verifier* — this package verifies a different payload
-under its own routine (:mod:`.verification`).
+An earlier revision of this package borrowed ``EVIDENCE_PRODUCTION`` on the reasoning that
+"a producer attestation is the producer role". An independent closure audit showed what
+that reasoning missed. The repository deliberately keeps **one** trust-anchor store, so
+the capability is not a label on a role — it is the part of the coordinate an anchor is
+resolved by. Sharing it made a key provisioned purely to sign Trusted Evidence equally
+entitled to attest a capacity recommendation, and the coordinate had no way to tell the
+two apart. The audit demonstrated it end to end with a telemetry-agent key that held no
+Cloud Scaling grant of any kind.
+
+Domain separation inside the signed bytes does not close that. The schema tag and the
+signing purpose stop a *signature* from being replayed across domains; they say nothing
+about which *keys* a domain trusts. Neither does ``trust_anchor_set_id``, a naming
+convention or deployment documentation: none of them is what the anchor is resolved by.
+
+So the entitlement is now named in the coordinate. The three capabilities are mutually
+disjoint and exactly compared, in both directions: a receipt-issuance key cannot verify a
+producer attestation here, an evidence-production key cannot either, and the dedicated
+capability grants nothing back inside TEV — it produces no evidence and issues no receipt.
+One key may hold several of these grants, but each is a separate, explicitly configured
+anchor record; nothing derives one from another.
+
+This reuses TEV's **capability vocabulary**, which is payload-neutral, and now extends it
+by one member. It does not reuse, and does not imply, TEV's evidence *verifier* — this
+package verifies a different payload under its own routine (:mod:`.verification`). TEV
+defines the coordinate and verifies nothing under it; it neither admits nor approves a
+Cloud Scaling recommendation. Which keys receive the capability is the composition root's
+decision, not this package's and not TEV's.
 """
 
 from __future__ import annotations
@@ -130,8 +149,25 @@ PRODUCER_ATTESTATION_SIGNATURE_PROFILE: Final[str] = _TEV_PROFILE_V1
 PRODUCER_ATTESTATION_SIGNATURE_ENCODING: Final[str] = _TEV_ENCODING_V1
 
 #: The capability an anchor must hold to verify a Cloud Scaling producer attestation.
+#:
+#: A **dedicated** capability, not a reused evidence one. An earlier revision of this
+#: package resolved anchors under ``EVIDENCE_PRODUCTION``, and an independent closure
+#: audit proved the consequence: because the repository deliberately keeps **one**
+#: trust-anchor store, a key provisioned purely to sign Trusted Evidence — a telemetry
+#: agent, say — was thereby entitled to attest a capacity recommendation. The coordinate
+#: could not tell the two signing domains apart, so the entitlement was shared.
+#:
+#: Domain separation inside the signed bytes does not fix that. The schema tag and the
+#: signing purpose stop a *signature* from being replayed across domains; they say
+#: nothing about which *keys* a domain trusts. Only the coordinate can carry that, and
+#: the capability is the part of the coordinate that names the role.
+#:
+#: Deliberately **not** substituted for by ``trust_anchor_set_id``, by a naming
+#: convention, by the signing purpose alone or by deployment documentation. Those may add
+#: separation; none of them is the authority control, because none of them is what the
+#: anchor is resolved by.
 PRODUCER_ATTESTATION_CAPABILITY: Final[TrustAnchorCapability] = (
-    TrustAnchorCapability.EVIDENCE_PRODUCTION
+    TrustAnchorCapability.CLOUD_SCALING_RECOMMENDATION_ATTESTATION
 )
 
 #: The D-4 ratified subject type, re-anchored from Phase 5A. A v2 attestation must name it.
@@ -195,6 +231,22 @@ def _assert_domain_separation() -> None:
         raise ImportError(
             "a producer attestation must never be verified under the receipt-issuance "
             "capability; that would collapse ADR E-3's producer/verifier separation"
+        )
+    if PRODUCER_ATTESTATION_CAPABILITY is TrustAnchorCapability.EVIDENCE_PRODUCTION:
+        raise ImportError(
+            "a Cloud Scaling recommendation attestation must never be verified under the "
+            "evidence-production capability. The repository keeps one trust-anchor store, "
+            "so sharing that capability makes a key entitled to sign Trusted Evidence "
+            "equally entitled to attest a capacity recommendation — the exact cross-domain "
+            "privilege reuse the dedicated capability exists to refuse"
+        )
+    if PRODUCER_ATTESTATION_CAPABILITY is not (
+        TrustAnchorCapability.CLOUD_SCALING_RECOMMENDATION_ATTESTATION
+    ):
+        raise ImportError(
+            "the producer-attestation capability drifted from the one dedicated Cloud "
+            "Scaling capability; this package fails closed rather than resolving anchors "
+            "under a capability that names another domain"
         )
     if PRODUCER_ATTESTATION_SIGNATURE_PROFILE != _TEV_PROFILE_V1:
         raise ImportError(

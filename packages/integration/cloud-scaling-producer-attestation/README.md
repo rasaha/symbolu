@@ -102,12 +102,30 @@ domain tags stay TEV's too: this package signs Risk Authority's canonical bytes,
 separation is carried inside them by the schema tag and the signing purpose.
 
 **Trust-anchor capability.** `PRODUCER_ATTESTATION_CAPABILITY` is
-`TrustAnchorCapability.EVIDENCE_PRODUCTION`. TEV ratifies exactly two capabilities and
-exactly one per anchor: production ("signs on behalf of a **producer**") and receipt
-issuance ("signs on behalf of the **verifying authority**"). A producer attestation is a
-producer signing a claim about its own output, so it is the producer role — and choosing it
-inherits ADR E-3's separation for free: a receipt-issuance key physically cannot verify a
-producer attestation here.
+`TrustAnchorCapability.CLOUD_SCALING_RECOMMENDATION_ATTESTATION` — a **dedicated**
+capability for this signing domain, not a borrowed evidence one.
+
+An earlier revision used `EVIDENCE_PRODUCTION`, reasoning that a producer attestation is
+"the producer role". Because the repository keeps **one** trust-anchor store, that made a
+key provisioned purely to sign Trusted Evidence equally entitled to attest a capacity
+recommendation — an independent closure audit demonstrated it with a telemetry-agent key
+holding no Cloud Scaling grant. The capability is not a label on a role; it is the part of
+the coordinate the anchor is resolved by, so it is where the entitlement has to be named.
+Domain separation inside the signed bytes prevents signature *replay* across domains; it
+does not decide which *keys* a domain trusts, and neither does an anchor-set id, a naming
+convention or deployment documentation.
+
+The three capabilities are mutually disjoint and exactly compared: a receipt-issuance key
+cannot verify a producer attestation here, an evidence-production key cannot either, and
+the dedicated capability produces no TEV evidence and issues no TEV receipt. One key may
+hold several grants, but each is a separate, explicitly configured anchor record.
+
+What a verified attestation establishes is bounded and worth stating plainly: the
+publisher's signature is authentic, and the recommendation's content and context are
+cryptographically bound to it. No risk decision, authorization, envelope, ActionGate
+grant, credential or execution permission is created. TEV does not approve or admit the
+recommendation — it defines the coordinate and verifies nothing under it. Which keys
+receive the capability is the composition root's decision.
 
 **Reference versus production grade.** The repository classifies
 `StaticTrustAnchorDirectory` as reference grade in its own words ("the deterministic

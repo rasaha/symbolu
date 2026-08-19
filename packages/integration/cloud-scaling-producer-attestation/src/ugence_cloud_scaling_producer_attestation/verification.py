@@ -576,7 +576,7 @@ def _mint_verified_artifact(
         "subject_id": candidate.subject_id,
         "subject_type": candidate.subject_type,
         "attestation_digest": attestation.digest(),
-        "verified_producer_id": attestation.producer_id,
+        "attested_producer_id": attestation.producer_id,
         "verified_issuer": attestation.issuer,
         "verified_key_id": attestation.producer_key_id,
         "trust_anchor_coordinate_digest": coordinate_digest,

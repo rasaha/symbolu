@@ -34,6 +34,8 @@ from _producer_fixtures import (
     build_verifier,
 )
 
+from ugence_trusted_evidence_authority import TrustAnchorCapability
+
 from ugence_cloud_scaling_producer_attestation import (
     ProducerAuthenticityOutcome,
     anchor_coordinate_digest,
@@ -67,15 +69,15 @@ FROZEN_V2_SIGNATURE = (
     "dea1287ba58bc12b4e0a3cadd097f545f6baea671ad8bd0352a1386dfd4d4707"
 )
 FROZEN_VERIFIED_ARTIFACT_DIGEST = (
-    "sha256:39f1b3dd2ebe8b313aa7c2c59037ead226308a14a42580f3d2e44363ade7081d"
+    "sha256:519983d832ac08e9914b69cbe8894f241e0e118fd5596d37e903325f171a385d"
 )
 
 #: Fixture 2 — the resolved trust anchor the verification above ran under.
 FROZEN_ANCHOR_COORDINATE_DIGEST = (
-    "sha256:a122f5323fb05c73b961ddd463b54959e5b2ee8ddde6ee4897d2775dca0a31b8"
+    "sha256:2f2e303dbb951971369ad7a98ad5f4140c5aa01977640a55aefed79e22c88054"
 )
 FROZEN_ANCHOR_RECORD_DIGEST = (
-    "sha256:5af3bf6d088c2bd2660e41e85ccd6f7942190177c42facb90c99635931d1e523"
+    "sha256:0617ebc49db218fc0f0be405b39cf4da2df456dadbf5cf2ae13970af0d1e2fa9"
 )
 
 #: Fixture 3 — a refused attestation, and the exact refusal it pins.
@@ -93,6 +95,38 @@ PHASE_5A_CANDIDATE_DIGEST = (
 )
 PHASE_5A_FROZEN_PRODUCER_SIGNING_PAYLOAD_DIGEST = (
     "sha256:1035d2fc2ab8f4b443f815562f9f6ad8e4ce0032633f03a12e04e691c24cf2d0"
+)
+
+# ======================================================================================= #
+# Superseded Phase 5B-0A digests, kept as NEGATIVE anchors.
+#
+# Three of this package's own fixtures moved during remediation, and only these three.
+# Both causes are deliberate corrections to an unmerged package, not drift:
+#
+#   * the two trust-anchor digests moved because the capability inside the coordinate
+#     changed from the borrowed ``EVIDENCE_PRODUCTION`` to the dedicated
+#     ``CLOUD_SCALING_RECOMMENDATION_ATTESTATION``. That the coordinate digest moves is
+#     the point: it is the machine-checkable proof that the two signing domains are not
+#     the same coordinate, and therefore not the same entitlement.
+#   * the verified-artifact digest moved because its canonical field
+#     ``verified_producer_id`` was renamed to ``attested_producer_id``, so the bytes
+#     now name what the signature actually establishes.
+#
+# They are pinned as values that must **never** be produced again. A recurrence would
+# mean the borrowed capability or the overstated field name had come back.
+#
+# Nothing upstream moved: the v2 signing payload, the v2 attestation, every Phase 5A
+# digest and the platform freeze are asserted unchanged elsewhere in this module.
+# ======================================================================================= #
+
+SUPERSEDED_VERIFIED_ARTIFACT_DIGEST = (
+    "sha256:39f1b3dd2ebe8b313aa7c2c59037ead226308a14a42580f3d2e44363ade7081d"
+)
+SUPERSEDED_ANCHOR_COORDINATE_DIGEST = (
+    "sha256:a122f5323fb05c73b961ddd463b54959e5b2ee8ddde6ee4897d2775dca0a31b8"
+)
+SUPERSEDED_ANCHOR_RECORD_DIGEST = (
+    "sha256:5af3bf6d088c2bd2660e41e85ccd6f7942190177c42facb90c99635931d1e523"
 )
 
 
@@ -306,3 +340,70 @@ def test_every_frozen_digest_is_in_the_one_canonical_format():
         PHASE_5A_FROZEN_PRODUCER_SIGNING_PAYLOAD_DIGEST,
     ):
         assert is_canonical_digest(value), value
+
+
+# ======================================================================================= #
+# The superseded Phase 5B-0A digests are NEGATIVE anchors.
+# ======================================================================================= #
+
+
+def test_the_superseded_verified_artifact_digest_is_never_produced_again():
+    """F-N1: the artifact no longer names a producer as independently verified.
+
+    The superseded digest covered a canonical field called ``verified_producer_id``.
+    Producing it again would mean that name — and the claim it makes — had come back.
+    """
+
+    candidate = build_candidate()
+    result = build_verifier().verify(
+        candidate=candidate,
+        attestation=build_attestation(candidate),
+        as_of=AS_OF,
+    )
+    artifact = result.verified_attestation
+    assert artifact is not None
+    assert artifact.artifact_digest != SUPERSEDED_VERIFIED_ARTIFACT_DIGEST
+    assert artifact.artifact_digest == FROZEN_VERIFIED_ARTIFACT_DIGEST
+    assert "attested_producer_id" in artifact.digest_payload()
+    assert "verified_producer_id" not in artifact.digest_payload()
+
+
+def test_the_superseded_anchor_digests_are_never_produced_again():
+    """F-N2: the coordinate no longer names the borrowed evidence capability.
+
+    These two digests are the machine-checkable form of the cross-domain finding: they
+    are what the coordinate and record hashed to while this package resolved anchors
+    under ``EVIDENCE_PRODUCTION``. Reproducing either would mean the borrowed capability
+    had returned.
+    """
+
+    coordinate = producer_anchor_coordinate(
+        issuer=ISSUER_ID, producer_key_id=PRODUCER_KEY_ID
+    )
+    assert anchor_coordinate_digest(coordinate) != SUPERSEDED_ANCHOR_COORDINATE_DIGEST
+    assert anchor_coordinate_digest(coordinate) == FROZEN_ANCHOR_COORDINATE_DIGEST
+    assert anchor_record_digest(build_anchor()) != SUPERSEDED_ANCHOR_RECORD_DIGEST
+    assert anchor_record_digest(build_anchor()) == FROZEN_ANCHOR_RECORD_DIGEST
+    assert coordinate.capability is (
+        TrustAnchorCapability.CLOUD_SCALING_RECOMMENDATION_ATTESTATION
+    )
+
+
+def test_only_these_three_phase_5b_0a_digests_moved():
+    """F-N3: the remediation moved exactly what it had to, and nothing upstream.
+
+    The v2 signing payload and the v2 attestation are unchanged, because neither the
+    capability nor the artifact field name is inside the signed bytes. If either had
+    moved, the signing contract itself would have changed and every issued attestation
+    would have been invalidated.
+    """
+
+    candidate = build_candidate()
+    attestation = build_attestation(candidate)
+    assert _independent_digest(attestation.signing_payload()) == (
+        FROZEN_V2_SIGNING_PAYLOAD_DIGEST
+    )
+    assert _independent_digest(attestation.to_canonical_dict()) == (
+        FROZEN_V2_ATTESTATION_DIGEST
+    )
+    assert candidate.candidate_digest == PHASE_5A_CANDIDATE_DIGEST

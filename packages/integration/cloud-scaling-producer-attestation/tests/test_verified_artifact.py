@@ -345,3 +345,82 @@ def test_every_freshly_verified_artifact_is_in_the_registry(verifier, candidate,
             candidate=candidate, attestation=build_attestation(candidate), as_of=as_of
         ).verified_attestation
         assert require_verified_producer_attestation(minted) is minted
+
+
+# ======================================================================================= #
+# Issuer versus producer: the artifact names what the signature actually established.
+# ======================================================================================= #
+
+
+def test_a_trusted_issuer_may_attest_a_producer_other_than_itself():
+    """V-A1: the attested producer is the issuer's claim, and it need not be the issuer.
+
+    The anchor is resolved by **issuer**. ``producer_id`` is a signed field, but nothing
+    resolves it against a trust anchor of its own, so a trusted issuer/key can name any
+    producer it likes. That is legitimate — Phase 5 ADR §3 ratifies the controller signing
+    its own output and does not require the identifiers to differ — and it is exactly why
+    the artifact field is called :attr:`attested_producer_id` rather than
+    ``verified_producer_id``.
+    """
+
+    from _producer_fixtures import ISSUER_ID, build_candidate
+
+    candidate = build_candidate()
+    attestation = build_attestation(candidate, producer_id="some-other-producer-service")
+    result = build_verifier().verify(
+        candidate=candidate, attestation=attestation, as_of=AS_OF
+    )
+
+    artifact = result.verified_attestation
+    assert artifact is not None
+    assert artifact.attested_producer_id == "some-other-producer-service"
+    assert artifact.verified_issuer == ISSUER_ID
+    assert artifact.attested_producer_id != artifact.verified_issuer
+
+
+def test_the_artifact_never_claims_the_producer_was_independently_verified():
+    """V-A2: the misleading name is gone, and is not retained as an alias.
+
+    A compatibility alias would keep the false claim readable, which is the whole problem.
+    The package is unmerged, so the name is corrected rather than deprecated.
+    """
+
+    from _producer_fixtures import build_candidate
+
+    candidate = build_candidate()
+    result = build_verifier().verify(
+        candidate=candidate, attestation=build_attestation(candidate), as_of=AS_OF
+    )
+    artifact = result.verified_attestation
+
+    assert not hasattr(artifact, "verified_producer_id")
+    assert "verified_producer_id" not in artifact.digest_payload()
+    assert "attested_producer_id" in artifact.digest_payload()
+    field_names = {f.name for f in dataclasses.fields(artifact)}
+    assert "attested_producer_id" in field_names
+    assert "verified_producer_id" not in field_names
+
+
+def test_the_issuer_and_key_are_verified_while_the_producer_is_attested():
+    """V-A3: the naming distinction tracks a real difference in what was checked.
+
+    ``verified_issuer`` and ``verified_key_id`` name the coordinate an anchor was actually
+    resolved and lifecycle-checked at, and whose public key verified the signature.
+    ``attested_producer_id`` names a value that was only ever inside the signed bytes.
+    """
+
+    from _producer_fixtures import ISSUER_ID, PRODUCER_KEY_ID, build_candidate
+
+    candidate = build_candidate()
+    result = build_verifier().verify(
+        candidate=candidate,
+        attestation=build_attestation(candidate, producer_id="claimed-producer"),
+        as_of=AS_OF,
+    )
+    artifact = result.verified_attestation
+
+    # Resolved, and therefore verified.
+    assert artifact.verified_issuer == ISSUER_ID
+    assert artifact.verified_key_id == PRODUCER_KEY_ID
+    # Signed, and therefore only attested.
+    assert artifact.attested_producer_id == "claimed-producer"

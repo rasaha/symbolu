@@ -203,12 +203,21 @@ def test_the_signed_bytes_are_canonical_json_not_a_length_prefixed_frame(candida
 
 
 @pytest.mark.invariant
-def test_the_producer_capability_is_never_receipt_issuance():
-    """R-10: ADR E-3's producer/verifier separation, inherited and asserted."""
+def test_the_producer_capability_is_the_dedicated_cloud_scaling_one():
+    """R-10: a dedicated capability, disjoint from both TEV evidence roles.
 
-    assert PRODUCER_ATTESTATION_CAPABILITY is TrustAnchorCapability.EVIDENCE_PRODUCTION
+    ADR E-3's producer/verifier separation is inherited, and a second separation is
+    added on top of it: this package resolves anchors under a capability that names
+    *this* signing domain, so a key trusted to sign Trusted Evidence is not thereby
+    trusted to attest a capacity recommendation.
+    """
+
+    assert PRODUCER_ATTESTATION_CAPABILITY is (
+        TrustAnchorCapability.CLOUD_SCALING_RECOMMENDATION_ATTESTATION
+    )
+    assert PRODUCER_ATTESTATION_CAPABILITY is not TrustAnchorCapability.EVIDENCE_PRODUCTION
     assert PRODUCER_ATTESTATION_CAPABILITY is not TrustAnchorCapability.RECEIPT_ISSUANCE
-    assert len(list(TrustAnchorCapability)) == 2
+    assert len(list(TrustAnchorCapability)) == 3
 
 
 # --------------------------------------------------------------------------------------- #
