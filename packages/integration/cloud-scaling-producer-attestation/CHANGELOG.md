@@ -26,7 +26,11 @@ the first time, and stops there.
   Trusted Evidence Authority's maintained Ed25519 backends.
 * `VerifiedProducerAttestation` and `require_verified_producer_attestation` — the
   exact-typed, immutable, non-authoritative verification artifact and its consumption-time
-  revalidator.
+  revalidator. The boundary is four independent parts: a package-private construction
+  token, a self-digest over every bound fact, a provenance registry of the determinations
+  this process actually reached, and revalidation at every consumption boundary. The
+  registry exists because the token alone made *possession* of one genuine artifact
+  equivalent to the capability to mint arbitrary ones.
 * `ProducerAuthenticityOutcome` — a closed 27-member typed outcome vocabulary with exactly
   one success member.
 * Re-exports of the Trusted Evidence Authority's trust-anchor contracts, unchanged, plus
@@ -47,6 +51,17 @@ pre-existing digest is re-pinned.
 * The Cloud Scaling Controller stays at **0.4.0**, key-free and advisory.
 * Risk Authority and the Trusted Evidence Authority take no version change; only their
   public APIs are consumed.
+
+### Residual, stated rather than left to be found
+
+In-process code that reaches into a private module attribute can import the construction
+token or add to the provenance registry, and no Python-level mechanism prevents that. This
+is the same residual the Trusted Evidence Authority documents for its own signing boundary.
+What is closed is every route that does not require reaching into the module's privates.
+
+The provenance registry grows by one 71-byte digest per **distinct** determination reached;
+repeat verifications of the same candidate add nothing. A process verifying unboundedly many
+distinct recommendations should hold the boundary somewhere with its own lifecycle.
 
 ### Known limitation
 
