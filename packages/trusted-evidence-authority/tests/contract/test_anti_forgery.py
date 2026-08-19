@@ -44,15 +44,47 @@ from ugence_trusted_evidence_authority.api import (
 # 1. There is nothing to forge — no verified state exists
 # --------------------------------------------------------------------------- #
 
-def test_no_verified_state_exists_anywhere_in_the_public_api():
+def test_no_verified_state_an_artifact_can_carry_exists():
+    """No artifact carries a VERIFIED state. Only a *finding* may say VERIFIED.
+
+    ``EvidenceStructuralStatus`` still has exactly one member, and TEV-2 did not
+    add one: an envelope does not raise its payload's status, it wraps the
+    payload and lets a verifier answer the trust question on demand.
+
+    Exactly one enum in the package has a ``VERIFIED`` member —
+    ``ReceiptVerificationOutcome`` — and it is the outcome of an act, not a
+    state on an artifact. Its only ``VERIFIED`` value is produced by the code
+    paths that reach a real signature check; a caller cannot construct either
+    verification result type at all, which the direct-construction test proves.
+    """
+
     assert list(EvidenceStructuralStatus) == [
         EvidenceStructuralStatus.STRUCTURAL_UNVERIFIED
     ]
+    carriers = []
     for name in api.__all__:
         obj = getattr(api, name)
         if isinstance(obj, type) and issubclass(obj, enum.Enum):
-            for member in obj:
-                assert member.name != "VERIFIED", (name, member)
+            if any(m.name == "VERIFIED" for m in obj):
+                carriers.append(name)
+    assert carriers == ["ReceiptVerificationOutcome"], carriers
+
+    # And no dataclass field is typed as that outcome except the verification
+    # result itself, so no artifact can carry a VERIFIED value.
+    from ugence_trusted_evidence_authority.api import (
+        ScopeBoundVerificationResult,
+        SignatureOnlyVerificationResult,
+    )
+
+    results = (SignatureOnlyVerificationResult, ScopeBoundVerificationResult)
+    for name in api.__all__:
+        obj = getattr(api, name)
+        if not (isinstance(obj, type) and dataclasses.is_dataclass(obj)):
+            continue
+        if obj in results:
+            continue
+        for field in dataclasses.fields(obj):
+            assert "ReceiptVerificationOutcome" not in str(field.type), (name, field.name)
 
 
 def test_the_receipt_type_is_a_payload_and_is_named_as_one():
@@ -65,19 +97,67 @@ def test_the_receipt_type_is_a_payload_and_is_named_as_one():
 
     receipt_symbols = [n for n in api.__all__ if "receipt" in n.lower()]
     assert "EvidenceVerificationReceiptPayload" in receipt_symbols
+
+    # The unsigned TEV-1 shape is still named ``…ReceiptPayload``, never
+    # ``…Receipt``. TEV-2's artifact is named ``Signed…Receipt`` because it *is*
+    # signed, which is precisely the condition §13.3 attaches to the word: "a
+    # receipt that is unsigned … is **not** a receipt".
+    assert not hasattr(api, "EvidenceVerificationReceipt")
+    assert "EvidenceVerificationReceipt" not in api.__all__
+
     for name in receipt_symbols:
-        if not name.isupper():  # constants may name the domain they separate
-            assert name.endswith("Payload") or "PAYLOAD" in name, name
-        assert not name.endswith("Receipt"), name
+        if name.isupper() or "_" in name:
+            continue  # constants and functions name the domain they separate
+        if name.endswith("Receipt"):
+            assert name.startswith("Signed"), (
+                f"{name} claims to be a receipt without being signed; §13.3 "
+                "admits no 'trusted but unsigned' state"
+            )
+        else:
+            assert (
+                name.endswith("Payload")
+                or name.endswith("Verification")
+                or name.endswith("Outcome")
+                or name.endswith("Verifier")
+                or name.endswith("Issuer")
+                or name.endswith("Signer")
+                or name.endswith("Input")
+                or name.endswith("Kind")
+                or name.endswith("Expectation")
+                or name.endswith("Result")
+                or name.endswith("Port")
+            ), name
 
 
-def test_no_signed_receipt_verifier_or_result_type_is_exported():
+def test_the_tev2_surface_is_exactly_the_ratified_verification_layer():
+    """TEV-2 ships a verifier, anchors, a signer and an envelope — and no more.
+
+    The inverse of TEV-1's guard. What must stay absent is anything belonging to
+    a *later* milestone: Benchmark Registry types (BR-1/BR-2), Readiness
+    integration (UVI-EV-1 / M-3R.4), ROI (GV-F → GV-V), an ActionGate or
+    deployment authorizer, credential issuance, a KMS client (DD-10), and a
+    certificate authority.
+    """
+
+    present = set(api.__all__)
+    for required in (
+        "EvidenceVerificationAuthority",
+        "SignedEvidenceVerificationReceipt",
+        "SignedReceiptVerifier",
+        "TrustAnchorRecord",
+        "ReceiptIssuer",
+    ):
+        assert required in present, required
+
+    forbidden_fragments = (
+        "benchmark", "readiness", "roi", "forecast", "attribution", "valuation",
+        "actiongate", "deployment", "credential", "kms", "hsm", "certificate",
+        "policyapplicability", "riskauthority", "cloudscaling", "governedvalue",
+    )
     for name in api.__all__:
         flattened = name.lower().replace("_", "")
-        for forbidden in ("verificationresult", "signedreceipt", "verifier",
-                          "trustanchor", "keyring", "signer", "signature"):
-            assert forbidden not in flattened, name
-        assert not name.lower().startswith("verify"), name
+        for forbidden in forbidden_fragments:
+            assert forbidden not in flattened, (name, forbidden)
 
 
 def test_no_public_field_anywhere_is_named_like_a_trust_flag():
@@ -91,15 +171,43 @@ def test_no_public_field_anywhere_is_named_like_a_trust_flag():
 
     forbidden = {
         "verified", "is_verified", "authentic", "is_authentic", "trusted",
-        "is_trusted", "signature", "signed", "trust_anchor",
-        "verification_status", "attested", "admitted", "approved",
-        "authorized", "authorizes_deployment",
+        "is_trusted", "signed", "verification_status", "attested", "admitted",
+        "approved", "authorized", "authorizes_deployment", "valid", "is_valid",
     }
     for name in api.__all__:
         obj = getattr(api, name)
         if isinstance(obj, type) and dataclasses.is_dataclass(obj):
             fields = {f.name for f in dataclasses.fields(obj)}
             assert not (fields & forbidden), (name, sorted(fields & forbidden))
+
+
+def test_the_only_signature_field_is_opaque_material_never_a_trust_claim():
+    """``signature`` is now a field — of the two signed artifacts, and only them.
+
+    TEV-1 banned the name outright because nothing signed anything. TEV-2 signs,
+    so the name exists; what must remain true is that it holds *material* and
+    never a verdict. A ``signature`` field is therefore permitted only on the
+    two signed-artifact types, must be a ``str`` in the one canonical encoding,
+    and is never accompanied by a boolean saying whether it verified.
+    """
+
+    from ugence_trusted_evidence_authority.api import (
+        SignedEvidenceSubmission,
+        SignedEvidenceVerificationReceipt,
+    )
+
+    allowed = {SignedEvidenceSubmission, SignedEvidenceVerificationReceipt}
+    for name in api.__all__:
+        obj = getattr(api, name)
+        if not (isinstance(obj, type) and dataclasses.is_dataclass(obj)):
+            continue
+        fields = {f.name: f for f in dataclasses.fields(obj)}
+        if "signature" in fields:
+            assert obj in allowed, name
+            assert "str" in str(fields["signature"].type), name
+        # Never a stored answer about the signature.
+        for banned in ("signature_valid", "signature_verified", "verified"):
+            assert banned not in fields, (name, banned)
 
 
 def test_the_refusal_vocabulary_offers_no_success_member_to_return():
@@ -431,10 +539,21 @@ def test_copying_a_valid_contract_across_a_scope_is_detectable_not_silent(replay
 # --------------------------------------------------------------------------- #
 
 def test_no_public_object_exposes_an_authorization_surface():
+    """TEV-2 verifies, signs and resolves. It still authorizes nothing.
+
+    ``verify``, ``sign_receipt``, ``issue`` and ``resolve`` are TEV-2's ratified
+    verbs (§30) and are expected on the types that own them. What must remain
+    absent everywhere is the *authorization* vocabulary: E-14 keeps TAP off the
+    runtime path, §13.2 and E-12 keep a receipt from authorizing anything, and
+    §7.1 leaves runtime action authorization with Risk Authority / ActionGate.
+    """
+
     forbidden_members = {
-        "authorize", "authorizes_deployment", "authorize_deployment", "allow",
-        "admit", "approve", "grant", "issue", "sign", "verify", "revoke",
-        "resolve", "register",
+        "authorize", "authorizes_deployment", "authorize_deployment",
+        "authorize_action", "allow", "permit", "approve", "grant", "deploy",
+        "enact", "execute", "admit_and_authorize", "authorization",
+        "mint_envelope", "issue_authorization", "evaluate_policy",
+        "compute_readiness", "compute_roi",
     }
     for name in api.__all__:
         obj = getattr(api, name)
@@ -444,12 +563,89 @@ def test_no_public_object_exposes_an_authorization_surface():
             assert member not in forbidden_members, (name, member)
 
 
-def test_the_package_exposes_no_verifier_trust_anchor_or_key_type():
+def test_the_ratified_verbs_live_only_on_the_types_that_own_them():
+    """Role separation (§8) asserted on the actual method surface.
+
+    The verifier cannot sign, the signer cannot verify evidence, and the
+    re-verifier can do neither. Checked as method presence rather than as prose.
+    """
+
+    from ugence_trusted_evidence_authority.api import (
+        Ed25519ReceiptSigner,
+        EvidenceVerificationAuthority,
+        ReceiptIssuer,
+        SignedReceiptVerifier,
+    )
+
+    # The verification authority holds no signing or issuing capability.
+    for absent in ("sign", "sign_receipt", "issue", "signing_key"):
+        assert not hasattr(EvidenceVerificationAuthority, absent), absent
+
+    # The issuer performs no verification and resolves no trust anchor.
+    for absent in ("verify", "resolve", "trust_anchors"):
+        assert not hasattr(ReceiptIssuer, absent), absent
+
+    # The independent re-verifier holds no key and issues nothing.
+    for absent in ("sign", "sign_receipt", "issue", "signing_key"):
+        assert not hasattr(SignedReceiptVerifier, absent), absent
+
+    # The signer verifies nothing and admits nothing.
+    for absent in ("verify", "issue", "admit", "resolve"):
+        assert not hasattr(Ed25519ReceiptSigner, absent), absent
+
+
+def test_no_private_key_material_is_reachable_from_any_public_artifact():
+    """TEV-2 has key types — and none of them leaks a seed.
+
+    TEV-1's guard was "no key type exists". TEV-2 has two, so the guard becomes
+    the property that actually matters: private material enters only through
+    ``TrustedEvidenceSigningKey``, and no contract, digest, canonical byte
+    sequence, ``repr`` or verification result can carry it back out.
+    """
+
+    from ugence_trusted_evidence_authority.api import (
+        TrustedEvidenceSigningKey,
+        TrustedEvidenceVerificationKey,
+    )
+
+    seed = bytes(range(32))
+    signing_key = TrustedEvidenceSigningKey(seed)
+
+    # Never in a repr, in either direction.
+    assert "%s" % (signing_key,) == "TrustedEvidenceSigningKey(<redacted>)"
+    assert seed.hex() not in "%r" % (signing_key,)
+    assert seed.hex() not in "%s" % (signing_key,)
+
+    # No dataclass on the public surface can hold key material: the canonical
+    # encoder rejects bytes, and no public contract declares a bytes field.
+    from ugence_trusted_evidence_authority.api import ReceiptSigningInput
+
+    # ``ReceiptSigningInput`` is the one non-contract carrier of bytes: it is
+    # never canonicalized, never digested, never stored in an artifact, and
+    # holds the *public* frame about to be signed — never key material. It is
+    # exempted by identity, not by a name pattern, so a second bytes-carrying
+    # type could not slip in behind it.
+    exempt = {
+        TrustedEvidenceSigningKey,
+        TrustedEvidenceVerificationKey,
+        ReceiptSigningInput,
+    }
     for name in api.__all__:
-        lowered = name.lower()
-        for forbidden in ("verifier", "trustanchor", "trust_anchor", "keyring",
-                          "signer", "signature", "publickey", "privatekey"):
-            assert forbidden not in lowered.replace("_", ""), name
+        obj = getattr(api, name)
+        if not (isinstance(obj, type) and dataclasses.is_dataclass(obj)):
+            continue
+        if obj in exempt:
+            continue
+        for field in dataclasses.fields(obj):
+            assert "bytes" not in str(field.type).lower(), (name, field.name)
+            assert "seed" not in field.name.lower(), (name, field.name)
+            assert "private" not in field.name.lower(), (name, field.name)
+
+    # The public half is derivable; the private half is not recoverable from it.
+    public = signing_key.verification_key
+    assert isinstance(public, TrustedEvidenceVerificationKey)
+    assert not hasattr(public, "seed")
+    assert seed not in public.public_key_bytes
 
 
 def test_every_constructible_object_reports_at_least_one_unestablished_stage():
