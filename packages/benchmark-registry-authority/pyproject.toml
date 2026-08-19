@@ -65,7 +65,13 @@ dependencies = ["ugence-benchmark-registry==0.1.*"]
 test = ["pytest>=7.0"]
 
 [tool.setuptools.dynamic]
-version = { attr = "ugence_benchmark_registry_authority.__version__" }
+# Points at the version MODULE, not at the package's __init__. setuptools reads
+# a literal assignment out of the module's AST without importing it; pointing at
+# __init__.__version__ would force an import of the whole package inside the
+# isolated build environment, where the one runtime dependency is deliberately
+# not installed — so the build would fail for a reason that has nothing to do
+# with the version.
+version = { attr = "ugence_benchmark_registry_authority.version.__version__" }
 
 # Exactly one top-level namespace ships. Tests, probes, fixtures, the
 # distribution verifier and the mutation sweep are all excluded.

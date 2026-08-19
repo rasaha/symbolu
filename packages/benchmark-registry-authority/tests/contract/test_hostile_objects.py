@@ -9,6 +9,7 @@ recorder proves the hostile object's own validator was never given control.
 from __future__ import annotations
 
 import dataclasses
+import pathlib
 
 import pytest
 
@@ -173,3 +174,37 @@ def test_every_nested_site_in_the_graph_was_actually_covered():
     assert len(edges) >= 12
     assert len({path for path, _ in edges}) == len(edges)
     assert dataclasses.is_dataclass(DEEPEST_ROOT())
+
+
+def test_revalidation_calls_the_trusted_exact_class_never_the_instance():
+    """§07's step 3 spelling, asserted on the source itself.
+
+    ``expected_class.__post_init__(node)`` and ``node.__post_init__()`` are
+    *behaviourally* identical here, because step 2 has already proved
+    ``type(node) is expected_class`` — which is exactly why a behavioural test
+    cannot distinguish them, and why the ratification states the spelling as a
+    requirement in its own right rather than leaving it to be inferred.
+
+    The requirement is defence in depth: it means the ordering guarantee does
+    not silently become load-bearing for the invocation. If the exact-type proof
+    were ever weakened or reordered, the instance-resolved spelling would hand
+    control to an attacker's method while the trusted-class spelling still would
+    not. Asserting the spelling keeps that property from depending on a
+    neighbouring check staying where it is.
+    """
+
+    canonical = (
+        pathlib.Path(__file__).resolve().parents[2]
+        / "src"
+        / "ugence_benchmark_registry_authority"
+        / "contracts"
+        / "canonical.py"
+    )
+    source = canonical.read_text()
+    code = "\n".join(
+        line for line in source.splitlines() if not line.strip().startswith("#")
+    )
+    body = code.split('"""', 2)[-1]
+    assert "cls.__post_init__(contract)" in body
+    assert "contract.__post_init__()" not in body
+    assert ".__post_init__()" not in body

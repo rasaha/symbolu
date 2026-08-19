@@ -10,8 +10,37 @@ import pytest
 
 PKG = pathlib.Path(__file__).resolve().parents[2]
 SRC = PKG / "src" / "ugence_benchmark_registry_authority"
-REPO = PKG.parents[1]
 PYPROJECT = (PKG / "pyproject.toml").read_text()
+
+
+def _monorepo_root():
+    """Walk up to the monorepo root, or return ``None`` if there is not one.
+
+    Two properties in this module are about the **repository**, not about the
+    package: that no other package imports this one, and that no other workflow
+    references it. They are meaningful only when the package is sitting inside
+    the monorepo. The gate-deletion mutation sweep deliberately runs the suite
+    against a detached copy of the package tree, where neither question has an
+    answer — so they skip there, with a stated reason, rather than failing for a
+    reason that has nothing to do with the mutant under test.
+    """
+
+    for candidate in PKG.parents:
+        if (candidate / ".github" / "workflows").is_dir() and (
+            candidate / "packages"
+        ).is_dir():
+            return candidate
+    return None
+
+
+REPO = _monorepo_root()
+_DETACHED = pytest.mark.skipif(
+    REPO is None,
+    reason=(
+        "the package tree is detached from the monorepo (as it is under the "
+        "mutation sweep); repository-scope properties have no answer here"
+    ),
+)
 
 FORBIDDEN_PACKAGES = (
     "ugence_trusted_evidence_authority",
@@ -92,6 +121,7 @@ def test_the_only_non_stdlib_import_is_the_frozen_br1_layer():
     assert offenders == [], offenders
 
 
+@_DETACHED
 def test_no_package_in_the_monorepo_imports_this_one():
     """The BR-2A **terminal state**, not a permanent invariant.
 
@@ -116,6 +146,7 @@ def test_no_package_in_the_monorepo_imports_this_one():
     assert offenders == [], offenders
 
 
+@_DETACHED
 def test_no_workflow_other_than_this_packages_own_references_it():
     workflows = REPO / ".github" / "workflows"
     referencing = sorted(

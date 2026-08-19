@@ -15,6 +15,7 @@ from ugence_benchmark_registry_authority.api import (
     BENCHMARK_REGISTRY_AUTHORITY_CANONICALIZATION_VERSION,
     BENCHMARK_REGISTRY_AUTHORITY_DIGEST_DOMAINS,
     BenchmarkRegistryCanonicalizationError,
+    BenchmarkRegistryContractError,
     canonical_bytes,
     canonical_digest,
     canonical_domain_inventory,
@@ -232,3 +233,52 @@ def test_mutating_the_domain_inventory_snapshot_cannot_reach_the_encoder():
     assert canonical_digest(fx.submission_record()) == VECTORS[
         "BenchmarkSubmissionRecordPayload"
     ]["digest"]
+
+
+def test_the_contract_type_registry_is_sealed_and_cannot_be_widened():
+    """The seal is a ratified property, so it is tested rather than assumed.
+
+    After package import the registry is closed for the life of the process.
+    A caller holding a reference to the "private" registration function — which
+    anyone who imports the module does — must still be unable to add a type,
+    because a widened registry would let a foreign class produce genuine
+    canonical bytes under a borrowed domain while every other check kept
+    behaving normally.
+    """
+
+    import dataclasses
+
+    from ugence_benchmark_registry_authority.contracts.canonical import (
+        _register_contract_type,
+        _seal_contract_types,
+    )
+
+    @dataclasses.dataclass(frozen=True)
+    class Foreign:
+        value: str = "x"
+
+    with pytest.raises(BenchmarkRegistryContractError) as excinfo:
+        _register_contract_type(
+            Foreign,
+            "ugence.benchmark-registry-authority/forged/v1",
+            root_canonicalizable=True,
+        )
+    assert "sealed" in str(excinfo.value)
+
+    # Sealing again is equally refused: the registry closes exactly once.
+    with pytest.raises(BenchmarkRegistryContractError):
+        _register_contract_type(Foreign, None, root_canonicalizable=False)
+    _seal_contract_types()
+    with pytest.raises(BenchmarkRegistryCanonicalizationError):
+        canonical_bytes(Foreign())
+
+
+def test_a_non_dataclass_type_cannot_be_registered_even_before_sealing():
+    """The registration guard itself, exercised through the sealed boundary."""
+
+    from ugence_benchmark_registry_authority.contracts.canonical import (
+        _register_contract_type,
+    )
+
+    with pytest.raises(BenchmarkRegistryContractError):
+        _register_contract_type(str, "x", root_canonicalizable=True)

@@ -1,0 +1,29 @@
+# The sdist ships the package source, the committed machine-readable manifests
+# and the documentation — and nothing else.
+#
+# Tests, fixtures, the conftest, the probe harness, the distribution verifier,
+# the freeze-matrix verifier, the mutation sweep and the manifest generator are
+# all excluded from BOTH artifacts. The distribution verifier asserts their
+# absence in the wheel and in the sdist as a negative control: a consumer who
+# installs this package must not receive its test scaffolding, and a probe that
+# shipped inside the artifact it probes would be checking itself.
+include README.md
+include CHANGELOG.md
+include LICENSE
+include public_api.json
+include public_contract_inventory.json
+include canonical_domain_inventory.json
+include pinned_canonical_vectors.json
+include gate_inventory.json
+include src/ugence_benchmark_registry_authority/py.typed
+
+prune tests
+prune tools
+exclude conftest.py
+exclude adversarial_probes.py
+exclude verify_benchmark_registry_authority_distribution.py
+exclude verify_br1_freeze_matrix.py
+exclude gate_mutation_sweep.py
+
+global-exclude __pycache__/*
+global-exclude *.py[cod]
