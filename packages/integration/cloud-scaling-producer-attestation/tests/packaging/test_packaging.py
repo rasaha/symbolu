@@ -140,3 +140,69 @@ def test_the_built_wheel_contains_no_tests_and_carries_py_typed():
         assert not base.startswith("test_"), name
         assert "/tests/" not in name, name
     assert any(n.endswith("py.typed") for n in names)
+
+
+@pytest.mark.skipif(
+    not (PROJECT / "dist").exists(), reason="no wheel built in this working tree"
+)
+def test_the_built_wheel_exports_exactly_the_manifest_api():
+    """K-12: source/wheel public-API parity, read out of the wheel itself.
+
+    Parses ``__all__`` from the wheel's own ``__init__.py`` rather than importing it, so
+    the comparison is against the bytes that ship. The isolated-install verifier proves the
+    same for a genuinely offline *installed* runtime, and additionally proves digest parity;
+    this is the cheap check that runs on every suite invocation.
+    """
+
+    import ast
+
+    wheels = sorted((PROJECT / "dist").glob("*.whl"))
+    if not wheels:
+        pytest.skip("no wheel built")
+    with zipfile.ZipFile(wheels[-1]) as archive:
+        source = archive.read(
+            "ugence_cloud_scaling_producer_attestation/__init__.py"
+        ).decode("utf-8")
+    tree = ast.parse(source)
+    exported = None
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and any(
+            getattr(target, "id", None) == "__all__" for target in node.targets
+        ):
+            exported = [element.value for element in node.value.elts]
+    assert exported is not None, "the wheel's __init__ declares no __all__"
+
+    manifest = json.loads(PUBLIC_API.read_text(encoding="utf-8"))
+    assert sorted(exported) == sorted(manifest["symbols"]), (
+        "the built wheel's public API differs from public_api.json"
+    )
+    assert sorted(exported) == sorted(pkg.__all__), (
+        "the built wheel's public API differs from the source tree's"
+    )
+
+
+@pytest.mark.skipif(
+    not (PROJECT / "dist").exists(), reason="no sdist built in this working tree"
+)
+def test_the_sdist_carries_the_suite_and_the_wheel_does_not():
+    """K-13: the two artifacts differ deliberately, and each in the right direction.
+
+    An sdist is a source distribution: shipping the suite in it is correct, and is how a
+    downstream consumer re-runs the adversarial properties against their own build. A wheel
+    is an installation artifact: shipping test material in it would put fixtures, a
+    reference signer's test seed and a ``conftest`` on the import path of every deployment.
+    """
+
+    import tarfile
+
+    sdists = sorted((PROJECT / "dist").glob("*.tar.gz"))
+    wheels = sorted((PROJECT / "dist").glob("*.whl"))
+    if not sdists or not wheels:
+        pytest.skip("no distribution artifacts built")
+
+    sdist_names = tarfile.open(sdists[-1]).getnames()
+    assert any("/tests/" in name for name in sdist_names), (
+        "the sdist omits the suite; a consumer cannot re-run the adversarial properties"
+    )
+    wheel_names = zipfile.ZipFile(wheels[-1]).namelist()
+    assert not any("/tests/" in name for name in wheel_names)
