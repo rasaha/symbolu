@@ -1,0 +1,29 @@
+{
+  "distribution": "ugence-benchmark-registry-authority",
+  "namespace": "ugence_benchmark_registry_authority",
+  "package_version": "0.1.0",
+  "canonicalization_version": "ugence.benchmark-registry-authority/canonicalization/v1",
+  "note": "One domain-separation tag per artifact class this subphase actually ships, and no tag for an artifact that does not exist. Nested-admissible-only classes are the exact frozen BR-1 contracts a BR-2A graph may contain; they own NO BR-2A domain, because BR-2 never re-digests a BR-1 artifact under a BR-2 domain \u2014 a BR-1 identity must keep exactly one digest, the one BR-1 computes. Derived from the sealed contract-type registry itself, so it cannot drift from the boundary the encoder enforces.",
+  "root_canonicalizable": {
+    "BenchmarkPublisherSubmissionEnvelope": "ugence.benchmark-registry-authority/publisher-submission-envelope/v1",
+    "BenchmarkApprovalEnvelope": "ugence.benchmark-registry-authority/approval-envelope/v1",
+    "BenchmarkRevocationEnvelope": "ugence.benchmark-registry-authority/revocation-envelope/v1",
+    "BenchmarkSubmissionRecordPayload": "ugence.benchmark-registry-authority/submission-record-payload/v1",
+    "BenchmarkAdmissionDecisionPayload": "ugence.benchmark-registry-authority/admission-decision-payload/v1",
+    "BenchmarkPostAdmissionRejectionEventPayload": "ugence.benchmark-registry-authority/post-admission-rejection-event-payload/v1",
+    "BenchmarkRegistrationEventPayload": "ugence.benchmark-registry-authority/registration-event-payload/v1",
+    "BenchmarkRevocationEventPayload": "ugence.benchmark-registry-authority/revocation-event-payload/v1",
+    "BenchmarkConflictRecordPayload": "ugence.benchmark-registry-authority/conflict-record-payload/v1",
+    "BenchmarkResolutionRecordPayload": "ugence.benchmark-registry-authority/resolution-record-payload/v1",
+    "BenchmarkHistoricalRecordPayload": "ugence.benchmark-registry-authority/historical-record-payload/v1",
+    "PlatformRegistryScopeExpectation": "ugence.benchmark-registry-authority/platform-registry-scope-expectation/v1",
+    "TenantRegistryScopeExpectation": "ugence.benchmark-registry-authority/tenant-registry-scope-expectation/v1",
+    "BenchmarkExactResolutionRequest": "ugence.benchmark-registry-authority/exact-resolution-request/v1",
+    "BenchmarkHistoricalInspectionRequest": "ugence.benchmark-registry-authority/historical-inspection-request/v1"
+  },
+  "nested_admissible_only": [
+    "BenchmarkApplicabilityCoordinate",
+    "BenchmarkCoordinate",
+    "BenchmarkScope"
+  ]
+}

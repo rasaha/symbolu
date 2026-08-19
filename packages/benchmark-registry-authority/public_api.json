@@ -1,0 +1,699 @@
+{
+  "distribution": "ugence-benchmark-registry-authority",
+  "namespace": "ugence_benchmark_registry_authority",
+  "package_version": "0.1.0",
+  "curated_api_module": "ugence_benchmark_registry_authority.api",
+  "note": "Machine-readable snapshot of the curated public API (ugence_benchmark_registry_authority.api.__all__). __version__ is carried separately as package_version and is NOT a member of 'symbols', so symbols is exactly one shorter than api.__all__ — both counts are asserted, and neither is 'corrected' to match the other. tests/packaging/test_public_api.py asserts this file equals the actual package surface, and verify_benchmark_registry_authority_distribution.py asserts the same for the built wheel, the built sdist and the isolated installed runtime.",
+  "symbols": {
+    "BENCHMARK_ADMISSION_DECISION_PAYLOAD_DIGEST_DOMAIN": {
+      "kind": "constant",
+      "value": "ugence.benchmark-registry-authority/admission-decision-payload/v1"
+    },
+    "BENCHMARK_APPROVAL_ENVELOPE_DIGEST_DOMAIN": {
+      "kind": "constant",
+      "value": "ugence.benchmark-registry-authority/approval-envelope/v1"
+    },
+    "BENCHMARK_APPROVAL_SIGNING_FRAME_DOMAIN": {
+      "kind": "constant",
+      "value": "ugence.benchmark-registry-authority/approval-signing-frame/v1"
+    },
+    "BENCHMARK_BANNED_REGISTRATION_STATE_NAMES": {
+      "kind": "constant",
+      "value": [
+        "ACTIVE",
+        "CURRENT",
+        "DEFAULT",
+        "DEPRECATED",
+        "PUBLISHED",
+        "SUSPENDED"
+      ]
+    },
+    "BENCHMARK_CONFLICT_RECORD_PAYLOAD_DIGEST_DOMAIN": {
+      "kind": "constant",
+      "value": "ugence.benchmark-registry-authority/conflict-record-payload/v1"
+    },
+    "BENCHMARK_CONFUSABLE_COMPARED_ELEMENTS": {
+      "kind": "constant",
+      "value": [
+        "benchmark_id",
+        "benchmark_family",
+        "benchmark_version",
+        "scope.kind",
+        "scope.tenant_id",
+        "geography.declaration",
+        "geography.value",
+        "domain.declaration",
+        "domain.value"
+      ]
+    },
+    "BENCHMARK_CONFUSABLE_COMPARISON_CONTRACT": {
+      "kind": "constant",
+      "value": {
+        "compared_elements": [
+          "benchmark_id",
+          "benchmark_family",
+          "benchmark_version",
+          "scope.kind",
+          "scope.tenant_id",
+          "geography.declaration",
+          "geography.value",
+          "domain.declaration",
+          "domain.value"
+        ],
+        "compared_against": "the exact locators the registry already holds; the submitted locator is never compared against a normalized form of itself or of any stored locator",
+        "comparison_basis_at_this_version": "exact Unicode code-point equality over the nine-element identity tuple",
+        "normalization_posture": "EXPLICITLY_PROHIBITED",
+        "rewrite_permitted": false,
+        "outcome": "rejection only — the submitted locator is refused; neither it nor any stored locator is ever rewritten, merged or aliased",
+        "refusal_reason": "CONFUSABLE_COORDINATE",
+        "algorithm_identifier": null,
+        "unicode_version": null,
+        "completeness_claim": "NONE. No complete Unicode-confusable algorithm is claimed at this version. The deterministic algorithm and its version are not yet specified or tested, so the slot is explicitly empty rather than partially filled — a partial implementation presented as complete would leave a consumer believing this class of attack is handled.",
+        "implemented_by": "no code in BR-2A. BR-2A holds no registry and no set of occupied locators; the comparison belongs to BR-2B's admission path, which must implement this contract."
+      }
+    },
+    "BENCHMARK_EXACT_RESOLUTION_REQUEST_DIGEST_DOMAIN": {
+      "kind": "constant",
+      "value": "ugence.benchmark-registry-authority/exact-resolution-request/v1"
+    },
+    "BENCHMARK_HISTORICAL_INSPECTION_REQUEST_DIGEST_DOMAIN": {
+      "kind": "constant",
+      "value": "ugence.benchmark-registry-authority/historical-inspection-request/v1"
+    },
+    "BENCHMARK_HISTORICAL_RECORD_PAYLOAD_DIGEST_DOMAIN": {
+      "kind": "constant",
+      "value": "ugence.benchmark-registry-authority/historical-record-payload/v1"
+    },
+    "BENCHMARK_PLATFORM_REGISTRY_SCOPE_EXPECTATION_DIGEST_DOMAIN": {
+      "kind": "constant",
+      "value": "ugence.benchmark-registry-authority/platform-registry-scope-expectation/v1"
+    },
+    "BENCHMARK_POST_ADMISSION_REJECTION_EVENT_PAYLOAD_DIGEST_DOMAIN": {
+      "kind": "constant",
+      "value": "ugence.benchmark-registry-authority/post-admission-rejection-event-payload/v1"
+    },
+    "BENCHMARK_PRODUCTION_ADAPTER_ADMISSION_REQUIREMENT": {
+      "kind": "constant",
+      "value": "The production composition root admits only an allow-listed set of adapter classes, checked by interpreter identity (`cls is AllowedAdapter`) — the sealed-registry pattern no subclass, same-named lookalike or metaclass can defeat — and raises BenchmarkRegistryCompositionError for anything else. There is no settable flag, because D-15 retires the flag: an unavailable consistency guarantee must never be a Boolean one assignment away from a production deployment on an in-memory store. This requirement is stated here and implemented nowhere in this distribution; BR-2B and BR-2D own the composition root that enforces it."
+    },
+    "BENCHMARK_PUBLISHER_SUBMISSION_ENVELOPE_DIGEST_DOMAIN": {
+      "kind": "constant",
+      "value": "ugence.benchmark-registry-authority/publisher-submission-envelope/v1"
+    },
+    "BENCHMARK_PUBLISHER_SUBMISSION_SIGNING_FRAME_DOMAIN": {
+      "kind": "constant",
+      "value": "ugence.benchmark-registry-authority/publisher-submission-signing-frame/v1"
+    },
+    "BENCHMARK_REGISTRATION_EVENT_PAYLOAD_DIGEST_DOMAIN": {
+      "kind": "constant",
+      "value": "ugence.benchmark-registry-authority/registration-event-payload/v1"
+    },
+    "BENCHMARK_REGISTRATION_STATE_ORDER": {
+      "kind": "constant",
+      "value": [
+        "SUBMITTED",
+        "ADMITTED",
+        "REGISTERED",
+        "REVOKED",
+        "REJECTED"
+      ]
+    },
+    "BENCHMARK_REGISTRATION_TRANSITIONS": {
+      "kind": "constant",
+      "value": {
+        "SUBMITTED": [
+          "ADMITTED",
+          "REJECTED"
+        ],
+        "ADMITTED": [
+          "REGISTERED",
+          "REJECTED"
+        ],
+        "REGISTERED": [
+          "REVOKED"
+        ],
+        "REVOKED": [],
+        "REJECTED": []
+      }
+    },
+    "BENCHMARK_REGISTRY_ALL_REFUSAL_REASONS": {
+      "kind": "constant",
+      "value": [
+        "BENCHMARK_DEFINITION_MISSING",
+        "BENCHMARK_MALFORMED_CONTRACT",
+        "BENCHMARK_CANONICALIZATION_FAILED",
+        "BENCHMARK_IDENTITY_COORDINATE_MISSING",
+        "BENCHMARK_COORDINATE_NOT_EXACT",
+        "BENCHMARK_APPLICABILITY_INCONSISTENT",
+        "BENCHMARK_MEASUREMENT_SEMANTICS_INCOMPLETE",
+        "BENCHMARK_SOURCE_REQUIREMENTS_INVALID",
+        "BENCHMARK_APPROVAL_REFERENCE_INVALID",
+        "BENCHMARK_ROLE_SEPARATION_VIOLATED",
+        "BENCHMARK_EFFECTIVE_PERIOD_INVALID",
+        "BENCHMARK_NOT_YET_EFFECTIVE",
+        "BENCHMARK_EXPIRED",
+        "BENCHMARK_INVALID_LIFECYCLE_TRANSITION",
+        "BENCHMARK_REVOKED",
+        "BENCHMARK_SUPERSESSION_DECLARATION_INVALID",
+        "BENCHMARK_RESOLUTION_NOT_PERFORMED",
+        "IDEMPOTENT_DUPLICATE",
+        "COORDINATE_SLOT_CONFLICT",
+        "DIGEST_ALREADY_BOUND",
+        "CONFUSABLE_COORDINATE",
+        "LIFECYCLE_CONFLICT",
+        "UNAUTHORIZED_TRANSITION",
+        "UNSUPPORTED_SUPERSESSION",
+        "STALE_REGISTRY_SNAPSHOT",
+        "STORE_INTEGRITY_INVALID",
+        "STORE_UNAVAILABLE",
+        "NO_TRUST_ANCHOR_CONFIGURED",
+        "PUBLISHER_UNTRUSTED",
+        "SIGNATURE_INVALID",
+        "APPROVAL_UNVERIFIED",
+        "NOT_FOUND",
+        "NOT_ADMITTED",
+        "INDETERMINATE"
+      ]
+    },
+    "BENCHMARK_REGISTRY_AUTHORITY_CANONICALIZATION_VERSION": {
+      "kind": "constant",
+      "value": "ugence.benchmark-registry-authority/canonicalization/v1"
+    },
+    "BENCHMARK_REGISTRY_AUTHORITY_DIGEST_DOMAINS": {
+      "kind": "constant",
+      "value": [
+        "ugence.benchmark-registry-authority/publisher-submission-envelope/v1",
+        "ugence.benchmark-registry-authority/approval-envelope/v1",
+        "ugence.benchmark-registry-authority/revocation-envelope/v1",
+        "ugence.benchmark-registry-authority/submission-record-payload/v1",
+        "ugence.benchmark-registry-authority/admission-decision-payload/v1",
+        "ugence.benchmark-registry-authority/post-admission-rejection-event-payload/v1",
+        "ugence.benchmark-registry-authority/registration-event-payload/v1",
+        "ugence.benchmark-registry-authority/revocation-event-payload/v1",
+        "ugence.benchmark-registry-authority/conflict-record-payload/v1",
+        "ugence.benchmark-registry-authority/resolution-record-payload/v1",
+        "ugence.benchmark-registry-authority/historical-record-payload/v1",
+        "ugence.benchmark-registry-authority/exact-resolution-request/v1",
+        "ugence.benchmark-registry-authority/historical-inspection-request/v1",
+        "ugence.benchmark-registry-authority/platform-registry-scope-expectation/v1",
+        "ugence.benchmark-registry-authority/tenant-registry-scope-expectation/v1"
+      ]
+    },
+    "BENCHMARK_REGISTRY_DECLARED_CONSISTENCY": {
+      "kind": "frozen_instance",
+      "type": "BenchmarkRegistryStoreConsistencyDescriptor"
+    },
+    "BENCHMARK_REGISTRY_DISCLAIMED_GUARANTEES": {
+      "kind": "constant",
+      "value": [
+        "durability",
+        "multi_process_coordination",
+        "distributed_strong_consistency",
+        "eventual_consistency_safety",
+        "cross_process_atomic_revocation"
+      ]
+    },
+    "BENCHMARK_REGISTRY_REFUSAL_FAULT_CLASSES": {
+      "kind": "constant",
+      "value": {
+        "IDEMPOTENT_DUPLICATE": "IDEMPOTENCE",
+        "COORDINATE_SLOT_CONFLICT": "COORDINATE_CONFLICT",
+        "DIGEST_ALREADY_BOUND": "COORDINATE_CONFLICT",
+        "CONFUSABLE_COORDINATE": "COORDINATE_CONFLICT",
+        "LIFECYCLE_CONFLICT": "LIFECYCLE_INTEGRITY",
+        "UNAUTHORIZED_TRANSITION": "LIFECYCLE_INTEGRITY",
+        "UNSUPPORTED_SUPERSESSION": "LIFECYCLE_INTEGRITY",
+        "STALE_REGISTRY_SNAPSHOT": "STORE_INTEGRITY",
+        "STORE_INTEGRITY_INVALID": "STORE_INTEGRITY",
+        "STORE_UNAVAILABLE": "STORE_INTEGRITY",
+        "NO_TRUST_ANCHOR_CONFIGURED": "TRUST_AND_AUTHENTICITY",
+        "PUBLISHER_UNTRUSTED": "TRUST_AND_AUTHENTICITY",
+        "SIGNATURE_INVALID": "TRUST_AND_AUTHENTICITY",
+        "APPROVAL_UNVERIFIED": "TRUST_AND_AUTHENTICITY",
+        "NOT_FOUND": "READ_NON_DISCLOSURE",
+        "NOT_ADMITTED": "READ_NON_DISCLOSURE",
+        "INDETERMINATE": "INDETERMINATE"
+      }
+    },
+    "BENCHMARK_REGISTRY_REFUSAL_REASONS": {
+      "kind": "constant",
+      "value": [
+        "APPROVAL_UNVERIFIED",
+        "CONFUSABLE_COORDINATE",
+        "COORDINATE_SLOT_CONFLICT",
+        "DIGEST_ALREADY_BOUND",
+        "IDEMPOTENT_DUPLICATE",
+        "INDETERMINATE",
+        "LIFECYCLE_CONFLICT",
+        "NOT_ADMITTED",
+        "NOT_FOUND",
+        "NO_TRUST_ANCHOR_CONFIGURED",
+        "PUBLISHER_UNTRUSTED",
+        "SIGNATURE_INVALID",
+        "STALE_REGISTRY_SNAPSHOT",
+        "STORE_INTEGRITY_INVALID",
+        "STORE_UNAVAILABLE",
+        "UNAUTHORIZED_TRANSITION",
+        "UNSUPPORTED_SUPERSESSION"
+      ]
+    },
+    "BENCHMARK_RESERVED_AUTHORITY_ISSUED_TYPE_NAMES": {
+      "kind": "constant",
+      "value": [
+        "BenchmarkAdmissionDecision",
+        "BenchmarkRegistrationEvent",
+        "BenchmarkResolution"
+      ]
+    },
+    "BENCHMARK_RESOLUTION_RECORD_PAYLOAD_DIGEST_DOMAIN": {
+      "kind": "constant",
+      "value": "ugence.benchmark-registry-authority/resolution-record-payload/v1"
+    },
+    "BENCHMARK_REVOCATION_ENVELOPE_DIGEST_DOMAIN": {
+      "kind": "constant",
+      "value": "ugence.benchmark-registry-authority/revocation-envelope/v1"
+    },
+    "BENCHMARK_REVOCATION_EVENT_PAYLOAD_DIGEST_DOMAIN": {
+      "kind": "constant",
+      "value": "ugence.benchmark-registry-authority/revocation-event-payload/v1"
+    },
+    "BENCHMARK_REVOCATION_SIGNING_FRAME_DOMAIN": {
+      "kind": "constant",
+      "value": "ugence.benchmark-registry-authority/revocation-signing-frame/v1"
+    },
+    "BENCHMARK_SIGNING_FRAME_SPECIFICATION": {
+      "kind": "constant",
+      "value": {
+        "length_prefix": "uint32_be(len(utf8_bytes)) before every element, framing elements included, so no two distinct field tuples can concatenate to one byte string",
+        "element_encoding": "UTF-8 bytes of the canonical NFC string form of the field; enum fields contribute their .value; datetimes contribute the canonicalization v1 rendering %Y-%m-%dT%H:%M:%S.%fZ after normalization to UTC",
+        "version": "v1",
+        "excluded": "detached_signature (a signature cannot cover itself); every derived read-only property (each is a function of fields already covered)",
+        "profiles": {
+          "ED25519_SHA512_V1": "Ed25519 (RFC 8032); detached signature carried as exactly 128 lowercase hex characters"
+        },
+        "frames": {
+          "BenchmarkPublisherSubmissionEnvelope": {
+            "domain": "ugence.benchmark-registry-authority/publisher-submission-signing-frame/v1",
+            "element_order": [
+              "signing_frame_domain",
+              "signing_frame_version",
+              "coordinate.benchmark_id",
+              "coordinate.benchmark_family",
+              "coordinate.benchmark_version",
+              "coordinate.scope.kind",
+              "coordinate.scope.tenant_id",
+              "coordinate.geography.declaration",
+              "coordinate.geography.value",
+              "coordinate.domain.declaration",
+              "coordinate.domain.value",
+              "benchmark_identity_digest",
+              "benchmark_content_digest",
+              "publisher_identity",
+              "publisher_key_id",
+              "signature_profile"
+            ]
+          },
+          "BenchmarkApprovalEnvelope": {
+            "domain": "ugence.benchmark-registry-authority/approval-signing-frame/v1",
+            "element_order": [
+              "signing_frame_domain",
+              "signing_frame_version",
+              "publisher_submission_envelope_digest",
+              "approval_authority_identity",
+              "approval_authority_key_id",
+              "signature_profile",
+              "declared_outcome",
+              "applicable_policy_ref",
+              "validity_from",
+              "validity_to"
+            ],
+            "note": "publisher_submission_envelope_digest is the independently recomputed canonical digest of the exact nested envelope, never a caller-supplied field"
+          },
+          "BenchmarkRevocationEnvelope": {
+            "domain": "ugence.benchmark-registry-authority/revocation-signing-frame/v1",
+            "element_order": [
+              "signing_frame_domain",
+              "signing_frame_version",
+              "coordinate.benchmark_id",
+              "coordinate.benchmark_family",
+              "coordinate.benchmark_version",
+              "coordinate.scope.kind",
+              "coordinate.scope.tenant_id",
+              "coordinate.geography.declaration",
+              "coordinate.geography.value",
+              "coordinate.domain.declaration",
+              "coordinate.domain.value",
+              "admitted_digest",
+              "revoker_identity",
+              "revoker_key_id",
+              "signature_profile",
+              "declared_revocation_reason",
+              "effective_at"
+            ]
+          }
+        }
+      }
+    },
+    "BENCHMARK_SIGNING_FRAME_VERSION": {
+      "kind": "constant",
+      "value": "v1"
+    },
+    "BENCHMARK_SUBMISSION_RECORD_PAYLOAD_DIGEST_DOMAIN": {
+      "kind": "constant",
+      "value": "ugence.benchmark-registry-authority/submission-record-payload/v1"
+    },
+    "BENCHMARK_TENANT_REGISTRY_SCOPE_EXPECTATION_DIGEST_DOMAIN": {
+      "kind": "constant",
+      "value": "ugence.benchmark-registry-authority/tenant-registry-scope-expectation/v1"
+    },
+    "BENCHMARK_TERMINAL_REGISTRATION_STATES": {
+      "kind": "constant",
+      "value": [
+        "REJECTED",
+        "REVOKED"
+      ]
+    },
+    "BENCHMARK_TRANSITION_PAYLOAD_BINDING": {
+      "kind": "constant",
+      "value": {
+        "None|SUBMITTED": [
+          "BenchmarkSubmissionRecordPayload",
+          null
+        ],
+        "SUBMITTED|ADMITTED": [
+          "BenchmarkAdmissionDecisionPayload",
+          "ADMITTED"
+        ],
+        "SUBMITTED|REJECTED": [
+          "BenchmarkAdmissionDecisionPayload",
+          "REJECTED"
+        ],
+        "ADMITTED|REJECTED": [
+          "BenchmarkPostAdmissionRejectionEventPayload",
+          null
+        ],
+        "ADMITTED|REGISTERED": [
+          "BenchmarkRegistrationEventPayload",
+          null
+        ],
+        "REGISTERED|REVOKED": [
+          "BenchmarkRevocationEventPayload",
+          null
+        ]
+      }
+    },
+    "BENCHMARK_UNBOUND_PAYLOAD_TYPES": {
+      "kind": "constant",
+      "value": [
+        "BenchmarkConflictRecordPayload"
+      ]
+    },
+    "BENCHMARK_UNVERIFIED_AUTHORITY_PROPERTIES": {
+      "kind": "constant",
+      "value": [
+        "authority_verified",
+        "publisher_authenticity_established",
+        "approval_authenticity_established",
+        "registry_admission_established",
+        "trusted_resolution_established"
+      ]
+    },
+    "BenchmarkAdmissionDecisionPayload": {
+      "kind": "contract",
+      "fields": [
+        "submission_record",
+        "approval_envelope",
+        "declared_outcome",
+        "declared_recorded_at",
+        "declared_refusal_reason"
+      ]
+    },
+    "BenchmarkAdmissionOutcome": {
+      "kind": "enum",
+      "members": [
+        "ADMITTED",
+        "REJECTED"
+      ]
+    },
+    "BenchmarkApprovalEnvelope": {
+      "kind": "contract",
+      "fields": [
+        "publisher_submission_envelope",
+        "approval_authority_identity",
+        "approval_authority_key_id",
+        "signature_profile",
+        "signing_frame_domain",
+        "signing_frame_version",
+        "declared_outcome",
+        "applicable_policy_ref",
+        "validity_from",
+        "validity_to",
+        "detached_signature"
+      ]
+    },
+    "BenchmarkApprovalVerifierPort": {
+      "kind": "protocol"
+    },
+    "BenchmarkClockPort": {
+      "kind": "protocol"
+    },
+    "BenchmarkConflictRecordPayload": {
+      "kind": "contract",
+      "fields": [
+        "submission_record",
+        "declared_refusal_reason",
+        "declared_recorded_at"
+      ]
+    },
+    "BenchmarkConfusableNormalizationPosture": {
+      "kind": "enum",
+      "members": [
+        "EXPLICITLY_PROHIBITED"
+      ]
+    },
+    "BenchmarkExactResolutionRequest": {
+      "kind": "contract",
+      "fields": [
+        "coordinate"
+      ]
+    },
+    "BenchmarkHistoricalInspectionRequest": {
+      "kind": "contract",
+      "fields": [
+        "coordinate",
+        "as_of"
+      ]
+    },
+    "BenchmarkHistoricalRecordPayload": {
+      "kind": "contract",
+      "fields": [
+        "coordinate",
+        "declared_registration_state",
+        "declared_admitted_digest",
+        "declared_registry_authority_identity",
+        "as_of"
+      ]
+    },
+    "BenchmarkPostAdmissionRejectionEventPayload": {
+      "kind": "contract",
+      "fields": [
+        "admission_decision",
+        "declared_refusal_reason",
+        "declared_recorded_at"
+      ]
+    },
+    "BenchmarkPublisherSubmissionEnvelope": {
+      "kind": "contract",
+      "fields": [
+        "coordinate",
+        "benchmark_identity_digest",
+        "benchmark_content_digest",
+        "publisher_identity",
+        "publisher_key_id",
+        "signature_profile",
+        "signing_frame_domain",
+        "signing_frame_version",
+        "detached_signature"
+      ]
+    },
+    "BenchmarkPublisherTrustDirectoryPort": {
+      "kind": "protocol"
+    },
+    "BenchmarkRegistrationEventPayload": {
+      "kind": "contract",
+      "fields": [
+        "admission_decision",
+        "declared_recorded_at"
+      ]
+    },
+    "BenchmarkRegistrationState": {
+      "kind": "enum",
+      "members": [
+        "SUBMITTED",
+        "ADMITTED",
+        "REGISTERED",
+        "REVOKED",
+        "REJECTED"
+      ]
+    },
+    "BenchmarkRegistryCanonicalizationError": {
+      "kind": "error"
+    },
+    "BenchmarkRegistryCompositionError": {
+      "kind": "error"
+    },
+    "BenchmarkRegistryConsistencyClaim": {
+      "kind": "enum",
+      "members": [
+        "CLAIMED_WITHIN_DECLARED_SCOPE",
+        "EXPLICITLY_DISCLAIMED"
+      ]
+    },
+    "BenchmarkRegistryConsistencyScope": {
+      "kind": "enum",
+      "members": [
+        "PROCESS_LOCAL_ONLY"
+      ]
+    },
+    "BenchmarkRegistryContractError": {
+      "kind": "error"
+    },
+    "BenchmarkRegistryFaultClass": {
+      "kind": "enum",
+      "members": [
+        "IDEMPOTENCE",
+        "COORDINATE_CONFLICT",
+        "LIFECYCLE_INTEGRITY",
+        "STORE_INTEGRITY",
+        "TRUST_AND_AUTHENTICITY",
+        "READ_NON_DISCLOSURE",
+        "INDETERMINATE"
+      ]
+    },
+    "BenchmarkRegistryLifecycleError": {
+      "kind": "error"
+    },
+    "BenchmarkRegistryRefusalReason": {
+      "kind": "enum",
+      "members": [
+        "IDEMPOTENT_DUPLICATE",
+        "COORDINATE_SLOT_CONFLICT",
+        "DIGEST_ALREADY_BOUND",
+        "CONFUSABLE_COORDINATE",
+        "LIFECYCLE_CONFLICT",
+        "UNAUTHORIZED_TRANSITION",
+        "UNSUPPORTED_SUPERSESSION",
+        "STALE_REGISTRY_SNAPSHOT",
+        "STORE_INTEGRITY_INVALID",
+        "STORE_UNAVAILABLE",
+        "NO_TRUST_ANCHOR_CONFIGURED",
+        "PUBLISHER_UNTRUSTED",
+        "SIGNATURE_INVALID",
+        "APPROVAL_UNVERIFIED",
+        "NOT_FOUND",
+        "NOT_ADMITTED",
+        "INDETERMINATE"
+      ]
+    },
+    "BenchmarkRegistryScopeExpectation": {
+      "kind": "function"
+    },
+    "BenchmarkRegistryStoreConsistencyDescriptor": {
+      "kind": "contract",
+      "fields": [
+        "scope"
+      ]
+    },
+    "BenchmarkRegistryStorePort": {
+      "kind": "protocol"
+    },
+    "BenchmarkResolutionRecordPayload": {
+      "kind": "contract",
+      "fields": [
+        "coordinate",
+        "declared_registration_state",
+        "declared_admitted_digest",
+        "declared_registry_authority_identity"
+      ]
+    },
+    "BenchmarkRevocationEnvelope": {
+      "kind": "contract",
+      "fields": [
+        "coordinate",
+        "admitted_digest",
+        "revoker_identity",
+        "revoker_key_id",
+        "signature_profile",
+        "signing_frame_domain",
+        "signing_frame_version",
+        "declared_revocation_reason",
+        "effective_at",
+        "detached_signature"
+      ]
+    },
+    "BenchmarkRevocationEventPayload": {
+      "kind": "contract",
+      "fields": [
+        "registration_event",
+        "revocation_envelope",
+        "declared_recorded_at"
+      ]
+    },
+    "BenchmarkSignatureProfile": {
+      "kind": "enum",
+      "members": [
+        "ED25519_SHA512_V1"
+      ]
+    },
+    "BenchmarkSubmissionRecordPayload": {
+      "kind": "contract",
+      "fields": [
+        "publisher_submission_envelope",
+        "declared_registry_authority_identity",
+        "declared_recorded_at"
+      ]
+    },
+    "PlatformRegistryScopeExpectation": {
+      "kind": "contract",
+      "fields": [
+        "scope"
+      ]
+    },
+    "TenantRegistryScopeExpectation": {
+      "kind": "contract",
+      "fields": [
+        "scope"
+      ]
+    },
+    "bound_payload_for_transition": {
+      "kind": "function"
+    },
+    "canonical_bytes": {
+      "kind": "function"
+    },
+    "canonical_digest": {
+      "kind": "function"
+    },
+    "canonical_domain_inventory": {
+      "kind": "function"
+    },
+    "fault_class_for": {
+      "kind": "function"
+    },
+    "is_valid_registration_transition": {
+      "kind": "function"
+    },
+    "require_bound_payload_for_transition": {
+      "kind": "function"
+    },
+    "require_exact_historical_record_payload": {
+      "kind": "function"
+    },
+    "require_exact_resolution_record_payload": {
+      "kind": "function"
+    },
+    "require_valid_registration_transition": {
+      "kind": "function"
+    }
+  }
+}

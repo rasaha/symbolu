@@ -1,0 +1,269 @@
+name: benchmark-registry-authority-ci
+
+# Scoped, ADDITIVE CI for the independent ugence-benchmark-registry-authority
+# package — the authority/registry layer of the shared, platform-wide Benchmark
+# Registry (ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md, B-1/§6.2 as
+# amended), at milestone BR-2A: "Registry and exact-resolution CONTRACTS."
+#
+# This workflow is NEW and path-scoped. It modifies nothing: benchmark-registry-ci.yml
+# and every other existing workflow are untouched. The BR-1 jobs below run BR-1's
+# OWN suite, probes and distribution verifier UNMODIFIED, so a BR-1 regression
+# fails here as well as there.
+#
+# The package declares exactly one runtime dependency — ugence-benchmark-registry
+# ==0.1.* — and the standard library. The isolated install proof is therefore
+# exact: only that one distribution may be resolved, from a local wheelhouse
+# containing it, and the verifier fails if anything else is present, if
+# PYTHONPATH leaks, if monorepo source shadows the wheel, if either artifact
+# carries tests/probes/fixtures, or if a pinned digest moves.
+#
+# Nothing here publishes, uses a secret, contacts a network service or touches
+# key material of any kind. BR-2A performs no cryptography at all: it ships no
+# cryptographic dependency, no verifier, no signer and no key parser, and its
+# only hash is one sha-256 digest path over canonical bytes.
+
+on:
+  pull_request:
+    paths:
+      - "packages/benchmark-registry-authority/**"
+      - "docs/architecture/ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md"
+      - ".github/workflows/benchmark-registry-authority-ci.yml"
+  push:
+    branches:
+      - "claude/setup-symbolu-monorepo-**"
+      - "claude/br-2a-**"
+      - "claude/br2a-**"
+      - "claude/benchmark-registry-authority-**"
+    paths:
+      - "packages/benchmark-registry-authority/**"
+      - "docs/architecture/ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md"
+      - ".github/workflows/benchmark-registry-authority-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  package-suite:
+    name: BR-2A package suite (source)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install test tooling only
+        # pytest and nothing else. The package's one runtime dependency resolves
+        # from the sibling BR-1 source tree via conftest, so nothing is
+        # installed that the dependency-boundary job could then hide.
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+      - name: Full package suite
+        run: python -m pytest packages/benchmark-registry-authority/tests -q
+      - name: Canonicalization — pinned byte vectors and pinned digests
+        run: |
+          python -m pytest \
+            packages/benchmark-registry-authority/tests/contract/test_canonicalization.py -q
+      - name: Hostile objects — no attacker code runs, at any depth
+        # Asserts on a side-effect recorder, not merely on a raised error.
+        run: |
+          python -m pytest \
+            packages/benchmark-registry-authority/tests/contract/test_hostile_objects.py -q
+      - name: Constructor bypass — object.__setattr__ at every node, every depth
+        run: |
+          python -m pytest \
+            packages/benchmark-registry-authority/tests/contract/test_constructor_bypass.py -q
+      - name: Universal no-authority rule across every clone route
+        run: |
+          python -m pytest \
+            packages/benchmark-registry-authority/tests/contract/test_no_authority.py -q
+      - name: State machine — the nine ratified properties
+        run: |
+          python -m pytest \
+            packages/benchmark-registry-authority/tests/contract/test_chain_state_machine.py \
+            packages/benchmark-registry-authority/tests/contract/test_transition_binding.py -q
+      - name: Chain integrity and the substitution matrix
+        run: |
+          python -m pytest \
+            packages/benchmark-registry-authority/tests/contract/test_chain_integrity.py \
+            packages/benchmark-registry-authority/tests/contract/test_chain_substitution.py -q
+      - name: Timestamps, and the no-clock source scan
+        run: |
+          python -m pytest \
+            packages/benchmark-registry-authority/tests/contract/test_timestamps.py -q
+      - name: Two lifecycle authorities, the name ban, and supersession fail-closed
+        run: |
+          python -m pytest \
+            packages/benchmark-registry-authority/tests/contract/test_two_lifecycle_authorities.py \
+            packages/benchmark-registry-authority/tests/contract/test_supersession.py -q
+      - name: Separate refusal vocabularies, provably disjoint
+        run: |
+          python -m pytest \
+            packages/benchmark-registry-authority/tests/contract/test_refusal_vocabulary.py -q
+      - name: Tenancy, requests, scope expectations and the two read payloads
+        run: |
+          python -m pytest \
+            packages/benchmark-registry-authority/tests/contract/test_tenancy.py \
+            packages/benchmark-registry-authority/tests/contract/test_requests.py \
+            packages/benchmark-registry-authority/tests/contract/test_scope_expectations.py \
+            packages/benchmark-registry-authority/tests/contract/test_read_payloads.py -q
+      - name: Inert ports, inert descriptor, confusable comparison contract
+        run: |
+          python -m pytest \
+            packages/benchmark-registry-authority/tests/contract/test_confusable_and_ports.py -q
+      - name: Dependency and reverse-dependency guards
+        run: |
+          python -m pytest \
+            packages/benchmark-registry-authority/tests/packaging/test_dependency_boundary.py -q
+      - name: Milestone boundary — BR-2A stops where the ratification says it stops
+        run: |
+          python -m pytest \
+            packages/benchmark-registry-authority/tests/packaging/test_milestone_boundary.py -q
+      - name: Adversarial-to-happy property ratio (at least 2:1)
+        run: |
+          python -m pytest \
+            packages/benchmark-registry-authority/tests/test_adversarial_ratio.py -q
+
+  adversarial-probes:
+    name: Independent adversarial probes (source)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Independent probe harness (curated API + stdlib only)
+        # Imports no test module, no _builders helper, no conftest and no
+        # private submodule; reconstructs canonical bytes by hand.
+        env:
+          PYTHONPATH: packages/benchmark-registry-authority/src:packages/benchmark-registry/src
+        run: python packages/benchmark-registry-authority/adversarial_probes.py
+
+  gate-mutation-sweep:
+    name: Measured gate-deletion mutation sweep
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install test tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+      - name: Neutralize each load-bearing gate in turn; every mutant must be KILLED
+        # Operates on a copy of the tree, restores from a pristine snapshot after
+        # each mutant, and fails if any mutant survives unclassified.
+        run: python packages/benchmark-registry-authority/gate_mutation_sweep.py
+
+  isolated-install:
+    name: Wheel and sdist build, isolated --no-index installation verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+      - name: Build both distributions, install --no-index, run every negative control
+        # Installs with --no-index and PIP_NO_INDEX=1 into a venv with no system
+        # site packages and no PYTHONPATH, from a wheelhouse containing only the
+        # frozen BR-1 layer. Fails on an injected extra distribution, a leaked
+        # PYTHONPATH, monorepo source shadowing the wheel, a declared dependency
+        # beyond the allowed one, a test/conftest/probe/fixture inside either
+        # artifact, or a moved pinned digest.
+        run: python packages/benchmark-registry-authority/verify_benchmark_registry_authority_distribution.py
+
+  api-and-inventory-parity:
+    name: Public API and both inventories (source vs committed manifests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install test tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+      - name: public_api.json equals the actual curated surface
+        run: |
+          python -m pytest \
+            packages/benchmark-registry-authority/tests/packaging/test_public_api.py -q
+      - name: Both inventories re-derived from the live surface and compared
+        run: |
+          python -m pytest \
+            packages/benchmark-registry-authority/tests/packaging/test_inventories.py -q
+      - name: py.typed marker ships
+        run: |
+          test -f packages/benchmark-registry-authority/src/ugence_benchmark_registry_authority/py.typed
+
+  br1-freeze-matrix:
+    name: BR-1 freeze matrix (frozen identity layer must be unchanged)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install test tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest build
+      - name: BR-1 suite, unmodified — 593 tests
+        run: python -m pytest packages/benchmark-registry/tests -q
+      - name: BR-1 probes, unmodified — 57 probes
+        env:
+          PYTHONPATH: packages/benchmark-registry/src
+        run: python packages/benchmark-registry/adversarial_probes.py
+      - name: BR-1 distribution verifier, unmodified
+        run: python packages/benchmark-registry/verify_benchmark_registry_distribution.py
+      - name: Independent freeze assertions (digests, API counts, version, deps)
+        # Recomputes BR-1's pinned digests from raw canonical bytes with plain
+        # json and hashlib, importing nothing from the package, and asserts both
+        # API counts (api.__all__ = 32, public_api.json symbols = 31).
+        run: python packages/benchmark-registry-authority/verify_br1_freeze_matrix.py
+
+  static-checks:
+    name: Static checks (pyflakes, terminology, documentation links)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyflakes
+      - name: pyflakes over the whole package
+        run: python -m pyflakes packages/benchmark-registry-authority
+      - name: Repository terminology validator (non-regression)
+        run: python scripts/validate_terminology.py
+      - name: Documentation link checker (non-regression)
+        run: python scripts/check_doc_links.py
+
+  freeze:
+    name: Platform-freeze verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pydantic
+      - name: Freeze verification (blocking — frozen artifacts must be unchanged)
+        run: python -m platform_freeze.verify --manifest platform/PLATFORM_FREEZE_V1.json
