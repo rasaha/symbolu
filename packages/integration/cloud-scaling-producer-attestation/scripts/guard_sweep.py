@@ -258,6 +258,16 @@ SURVIVOR_CLASSIFICATION = {
         "specifies, and it would be the only survivor if a future edit made the digest "
         "check cover a different projection of the payload"
     ),
+    "value.construction_token is not _VERIFICATION_TOKEN": (
+        "sibling-backed — the provenance-registry check on the next line refuses everything "
+        "this one does. An artifact assembled outside the authoritative routine also names "
+        "a determination that routine never reached, unless it is a faithful copy of a real "
+        "one, which IS that determination and should pass (V-21). The token check is kept "
+        "as the ratified construction guard and as the check that would still stand if a "
+        "deployment ever scoped the registry differently — for example per-request rather "
+        "than per-process. Its construction-time twin in __post_init__ IS killed, by V-1 "
+        "and V-2"
+    ),
     "type(anchor) is not TrustAnchorRecord": (
         "unreachable through the public API — TrustAnchorResolution refuses at construction "
         "to carry anything but a TrustAnchorRecord, and the resolution's own exact-type "

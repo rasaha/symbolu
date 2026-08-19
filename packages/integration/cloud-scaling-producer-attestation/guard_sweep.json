@@ -1,0 +1,1120 @@
+[
+  {
+    "index": 1,
+    "module": "canonical.py",
+    "lineno": 85,
+    "condition": "not is_canonical_digest(value)",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_adversarial.py::test_a_bare_hex_recommendation_digest_is_refused"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 2,
+    "module": "canonical.py",
+    "lineno": 102,
+    "condition": "type(value) is not str",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_gate_isolation.py::test_require_nfc_text_refuses_a_non_string_with_a_typed_error[42]",
+      "tests/test_gate_isolation.py::test_require_nfc_text_refuses_a_non_string_with_a_typed_error[None]",
+      "tests/test_gate_isolation.py::test_require_nfc_text_refuses_a_non_string_with_a_typed_error[bytes]",
+      "tests/test_gate_isolation.py::test_require_nfc_text_refuses_a_non_string_with_a_typed_error[3.5]",
+      "tests/test_gate_isolation.py::test_require_nfc_text_refuses_a_non_string_with_a_typed_error[value4]"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 3,
+    "module": "canonical.py",
+    "lineno": 107,
+    "condition": "not allow_empty and value == ''",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_adversarial.py::test_an_empty_identifier_is_refused[producer_id]",
+      "tests/test_adversarial.py::test_an_empty_identifier_is_refused[issuer]",
+      "tests/test_adversarial.py::test_an_empty_identifier_is_refused[producer_key_id]",
+      "tests/test_adversarial.py::test_an_empty_identifier_is_refused[tenant_id]",
+      "tests/test_adversarial.py::test_an_empty_identifier_is_refused[subject_id]"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 4,
+    "module": "canonical.py",
+    "lineno": 109,
+    "condition": "unicodedata.normalize('NFC', value) != value",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_adversarial.py::test_a_non_nfc_identifier_is_refused_rather_than_normalized[producer_id]",
+      "tests/test_adversarial.py::test_a_non_nfc_identifier_is_refused_rather_than_normalized[issuer]",
+      "tests/test_adversarial.py::test_a_non_nfc_identifier_is_refused_rather_than_normalized[producer_key_id]",
+      "tests/test_adversarial.py::test_a_non_nfc_identifier_is_refused_rather_than_normalized[tenant_id]",
+      "tests/test_adversarial.py::test_a_non_nfc_identifier_is_refused_rather_than_normalized[subject_id]"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 5,
+    "module": "canonical.py",
+    "lineno": 121,
+    "condition": "text != text.strip()",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_adversarial.py::test_a_whitespace_padded_identifier_is_refused"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 6,
+    "module": "canonical.py",
+    "lineno": 123,
+    "condition": "any((ch.isspace() and ch != ' ' for ch in text))",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_gate_isolation.py::test_require_canonical_identifier_refuses_control_whitespace[\\t]",
+      "tests/test_gate_isolation.py::test_require_canonical_identifier_refuses_control_whitespace[\\n]",
+      "tests/test_gate_isolation.py::test_require_canonical_identifier_refuses_control_whitespace[\\r]",
+      "tests/test_gate_isolation.py::test_require_canonical_identifier_refuses_control_whitespace[\\x0b]"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 7,
+    "module": "canonical.py",
+    "lineno": 136,
+    "condition": "type(value) is not datetime",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_gate_isolation.py::test_require_aware_utc_refuses_a_non_datetime_with_a_typed_error[42]",
+      "tests/test_gate_isolation.py::test_require_aware_utc_refuses_a_non_datetime_with_a_typed_error[None]",
+      "tests/test_gate_isolation.py::test_require_aware_utc_refuses_a_non_datetime_with_a_typed_error[2026-01-01]",
+      "tests/test_gate_isolation.py::test_require_aware_utc_refuses_a_non_datetime_with_a_typed_error[1735689600.0]"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 8,
+    "module": "canonical.py",
+    "lineno": 140,
+    "condition": "value.tzinfo is None or value.utcoffset() is None",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_adversarial.py::test_a_naive_issued_at_is_refused_rather_than_assumed_utc",
+      "tests/test_time_authority.py::test_a_naive_instant_is_refused_at_every_entry_point[naive0]",
+      "tests/test_time_authority.py::test_a_naive_instant_is_refused_at_every_entry_point[naive1]",
+      "tests/test_time_authority.py::test_the_lifecycle_helper_requires_an_aware_instant"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 9,
+    "module": "canonical.py",
+    "lineno": 156,
+    "condition": "type(value) is not expected",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_gate_isolation.py::test_require_exact_type_refuses_a_subclass_and_admits_the_exact_type"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 10,
+    "module": "identifiers.py",
+    "lineno": 166,
+    "condition": "PRODUCER_ATTESTATION_V2_SCHEMA_VERSION == PHASE_5A_V1_SCHEMA_VERSION",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_gate_isolation.py::test_a_drifted_identifier_fails_the_import_time_separation[PRODUCER_ATTESTATION_V2_SCHEMA_VERSION-cloud-scaling-producer-attestation-evidence-1-frozen"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 11,
+    "module": "identifiers.py",
+    "lineno": 173,
+    "condition": "PRODUCER_ATTESTATION_V2_SIGNING_PURPOSE == _D4_ROUTING_PURPOSE",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_gate_isolation.py::test_a_drifted_identifier_fails_the_import_time_separation[PRODUCER_ATTESTATION_V2_SIGNING_PURPOSE-cloud_scaling.capacity_action-D-4"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 12,
+    "module": "identifiers.py",
+    "lineno": 179,
+    "condition": "PRODUCER_ATTESTATION_V2_SIGNING_PURPOSE in KNOWN_POLICY_SIGNING_PURPOSES",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_gate_isolation.py::test_a_drifted_identifier_fails_the_import_time_separation[PRODUCER_ATTESTATION_V2_SIGNING_PURPOSE-ugence.policy_authority.policy_signing-policy-signing"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 13,
+    "module": "identifiers.py",
+    "lineno": 185,
+    "condition": "SUPPORTED_V2_SIGNING_PURPOSES & KNOWN_POLICY_SIGNING_PURPOSES",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_gate_isolation.py::test_a_drifted_admitted_purpose_set_fails_the_separation"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 14,
+    "module": "identifiers.py",
+    "lineno": 189,
+    "condition": "_PHASE_5A_V1_SIGNING_PURPOSE in SUPPORTED_V2_SIGNING_PURPOSES",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_gate_isolation.py::test_admitting_the_v1_purpose_fails_the_separation"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 15,
+    "module": "identifiers.py",
+    "lineno": 194,
+    "condition": "PRODUCER_ATTESTATION_CAPABILITY is TrustAnchorCapability.RECEIPT_ISSUANCE",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_gate_isolation.py::test_the_receipt_issuance_capability_fails_the_separation"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 16,
+    "module": "identifiers.py",
+    "lineno": 199,
+    "condition": "PRODUCER_ATTESTATION_SIGNATURE_PROFILE != _TEV_PROFILE_V1",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_gate_isolation.py::test_a_drifted_identifier_fails_the_import_time_separation[PRODUCER_ATTESTATION_SIGNATURE_PROFILE-some.other/profile/v1-profile]"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 17,
+    "module": "identifiers.py",
+    "lineno": 204,
+    "condition": "PRODUCER_ATTESTATION_SIGNATURE_ENCODING != _TEV_ENCODING_V1",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_gate_isolation.py::test_a_drifted_identifier_fails_the_import_time_separation[PRODUCER_ATTESTATION_SIGNATURE_ENCODING-some.other/encoding/v1-encoding]"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 18,
+    "module": "identifiers.py",
+    "lineno": 206,
+    "condition": "SUBJECT_TYPE_CAPACITY_SUBJECT != _D4_SUBJECT_TYPE",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_gate_isolation.py::test_a_drifted_identifier_fails_the_import_time_separation[SUBJECT_TYPE_CAPACITY_SUBJECT-cloud_scaling.other_subject-D-4]"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 19,
+    "module": "attestation.py",
+    "lineno": 153,
+    "condition": "self.schema_version != PRODUCER_ATTESTATION_V2_SCHEMA_VERSION",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_adversarial.py::test_phase_5a_v1_schema_tag_is_refused"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 20,
+    "module": "attestation.py",
+    "lineno": 172,
+    "condition": "self.subject_type != SUBJECT_TYPE_CAPACITY_SUBJECT",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_adversarial.py::test_a_subject_type_substitution_is_refused_at_construction"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 21,
+    "module": "attestation.py",
+    "lineno": 179,
+    "condition": "purpose not in SUPPORTED_V2_SIGNING_PURPOSES",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_adversarial.py::test_a_policy_signing_purpose_is_refused[cloud_scaling.policy_signing]",
+      "tests/test_adversarial.py::test_a_policy_signing_purpose_is_refused[cloud_scaling.policy_target_binding]",
+      "tests/test_adversarial.py::test_a_policy_signing_purpose_is_refused[policy_authority.policy_signing]",
+      "tests/test_adversarial.py::test_a_policy_signing_purpose_is_refused[ugence.policy-authority.policy-signing]",
+      "tests/test_adversarial.py::test_a_policy_signing_purpose_is_refused[ugence.policy_authority.policy_signing]"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 22,
+    "module": "attestation.py",
+    "lineno": 190,
+    "condition": "algorithm not in SUPPORTED_V2_SIGNATURE_ALGORITHMS",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_adversarial.py::test_an_unratified_algorithm_profile_or_encoding_is_refused[signature_algorithm-ed448-UNSUPPORTED_ALGORITHM]",
+      "tests/test_adversarial.py::test_an_unratified_algorithm_profile_or_encoding_is_refused[signature_algorithm-none-UNSUPPORTED_ALGORITHM]"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 23,
+    "module": "attestation.py",
+    "lineno": 197,
+    "condition": "self.signature_profile != PRODUCER_ATTESTATION_SIGNATURE_PROFILE",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_adversarial.py::test_an_unratified_algorithm_profile_or_encoding_is_refused[signature_profile-some.other/profile/v1-UNSUPPORTED_PROFILE]"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 24,
+    "module": "attestation.py",
+    "lineno": 203,
+    "condition": "self.signature_encoding != PRODUCER_ATTESTATION_SIGNATURE_ENCODING",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_adversarial.py::test_an_unratified_algorithm_profile_or_encoding_is_refused[signature_encoding-some.other/encoding/v1-UNSUPPORTED_ENCODING]"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 25,
+    "module": "attestation.py",
+    "lineno": 214,
+    "condition": "type(self.signature) is not str",
+    "scored": true,
+    "killed": false,
+    "failed": [],
+    "classification": "sibling-backed \u2014 decode_signature refuses a non-str on the next line and yields the same MALFORMED_SIGNATURE outcome; this guard only makes the refusal typed one call earlier"
+  },
+  {
+    "index": 26,
+    "module": "attestation.py",
+    "lineno": 234,
+    "condition": "self.signing_payload_digest != expected",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_adversarial.py::test_a_reserialized_attestation_with_a_stale_payload_digest_is_refused"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 27,
+    "module": "attestation.py",
+    "lineno": 323,
+    "condition": "not isinstance(data, Mapping)",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_adversarial.py::test_malformed_canonical_input_is_refused[42]",
+      "tests/test_adversarial.py::test_malformed_canonical_input_is_refused[None]"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 28,
+    "module": "attestation.py",
+    "lineno": 330,
+    "condition": "unknown",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_adversarial.py::test_a_mapping_offering_a_trust_field_is_refused[mutation0]",
+      "tests/test_adversarial.py::test_a_mapping_offering_a_trust_field_is_refused[mutation1]",
+      "tests/test_adversarial.py::test_a_mapping_offering_a_trust_field_is_refused[mutation2]",
+      "tests/test_adversarial.py::test_a_mapping_offering_a_trust_field_is_refused[mutation3]"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 29,
+    "module": "attestation.py",
+    "lineno": 337,
+    "condition": "missing",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_adversarial.py::test_a_mapping_missing_a_required_field_is_refused[signature]",
+      "tests/test_adversarial.py::test_a_mapping_missing_a_required_field_is_refused[issuer]",
+      "tests/test_adversarial.py::test_a_mapping_missing_a_required_field_is_refused[tenant_id]",
+      "tests/test_adversarial.py::test_a_mapping_missing_a_required_field_is_refused[subject_id]"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 30,
+    "module": "signing.py",
+    "lineno": 120,
+    "condition": "self.issuance_token is not _SIGNING_INPUT_TOKEN",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_signer_boundary.py::test_a_signing_input_cannot_be_constructed_by_a_caller[None]",
+      "tests/test_signer_boundary.py::test_a_signing_input_cannot_be_constructed_by_a_caller[True]",
+      "tests/test_signer_boundary.py::test_a_signing_input_cannot_be_constructed_by_a_caller[token2]",
+      "tests/test_signer_boundary.py::test_a_signing_input_cannot_be_constructed_by_a_caller[token]",
+      "tests/test_signer_boundary.py::test_a_signing_input_cannot_be_constructed_by_a_caller[0]"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 31,
+    "module": "signing.py",
+    "lineno": 128,
+    "condition": "type(self.signed_input) is not bytes",
+    "scored": true,
+    "killed": false,
+    "failed": [],
+    "classification": "unreachable through the public API \u2014 mint_producer_attestation is the only route to a signing input and always passes canonical_bytes(); a caller cannot construct one at all, because the token guard above rejects it first"
+  },
+  {
+    "index": 32,
+    "module": "signing.py",
+    "lineno": 133,
+    "condition": "len(self.signed_input) == 0",
+    "scored": true,
+    "killed": false,
+    "failed": [],
+    "classification": "unreachable through the public API \u2014 the minted payload is never empty, and the token guard rejects a caller-assembled input before any content check"
+  },
+  {
+    "index": 33,
+    "module": "signing.py",
+    "lineno": 147,
+    "condition": "self.signature_profile != PRODUCER_ATTESTATION_SIGNATURE_PROFILE",
+    "scored": true,
+    "killed": false,
+    "failed": [],
+    "classification": "unreachable through the public API \u2014 the minting routine passes the pinned constant, not a parameter; there is no caller-supplied profile to get wrong"
+  },
+  {
+    "index": 34,
+    "module": "signing.py",
+    "lineno": 295,
+    "condition": "signing_input.issuer != self._issuer",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_gate_isolation.py::test_a_signer_refuses_an_input_addressed_to_other_coordinates[issuer-attacker.rogue-authority]"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 35,
+    "module": "signing.py",
+    "lineno": 300,
+    "condition": "signing_input.producer_key_id != self._producer_key_id",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_signer_boundary.py::test_a_signer_refuses_an_input_addressed_to_another_key"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 36,
+    "module": "signing.py",
+    "lineno": 305,
+    "condition": "signing_input.producer_id != self._producer_id",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_gate_isolation.py::test_a_signer_refuses_an_input_addressed_to_other_coordinates[producer_id-attacker.impersonator]"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 37,
+    "module": "signing.py",
+    "lineno": 333,
+    "condition": "PRODUCER_ATTESTATION_CAPABILITY is TrustAnchorCapability.RECEIPT_ISSUANCE",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_gate_isolation.py::test_the_reference_signer_refuses_to_publish_a_receipt_issuance_anchor"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 38,
+    "module": "signing.py",
+    "lineno": 385,
+    "condition": "signer is None",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_gate_isolation.py::test_minting_without_a_signer_is_refused"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 39,
+    "module": "signing.py",
+    "lineno": 387,
+    "condition": "production_mode and getattr(type(signer), 'is_reference_signer', False) is True",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_signer_boundary.py::test_a_reference_signer_is_refused_in_production_mode"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 40,
+    "module": "signing.py",
+    "lineno": 400,
+    "condition": "signer.signature_profile != PRODUCER_ATTESTATION_SIGNATURE_PROFILE",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_gate_isolation.py::test_a_signer_advertising_another_profile_is_refused"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 41,
+    "module": "signing.py",
+    "lineno": 435,
+    "condition": "type(signature) is not str",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_gate_isolation.py::test_a_signer_returning_a_non_string_signature_is_refused"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 42,
+    "module": "trust.py",
+    "lineno": 183,
+    "condition": "resolver is None",
+    "scored": true,
+    "killed": false,
+    "failed": [],
+    "classification": "sibling-backed \u2014 a None resolver fails the is_production_authoritative check below, which refuses it with the same typed configuration error"
+  },
+  {
+    "index": 43,
+    "module": "trust.py",
+    "lineno": 191,
+    "condition": "type(resolver) is reference_type",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_no_placeholder_verifier.py::test_the_reference_resolver_is_refused_in_production"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 44,
+    "module": "trust.py",
+    "lineno": 200,
+    "condition": "getattr(resolver, 'is_production_authoritative', False) is not True",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_gate_isolation.py::test_a_production_resolver_declaring_nothing_is_refused_by_the_helper",
+      "tests/test_no_placeholder_verifier.py::test_an_unattested_resolver_is_refused_in_production",
+      "tests/test_trust_reuse.py::test_a_truthy_non_true_production_declaration_is_refused"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 45,
+    "module": "verified.py",
+    "lineno": 147,
+    "condition": "self.construction_token is not _VERIFICATION_TOKEN",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_verified_artifact.py::test_direct_construction_is_refused",
+      "tests/test_verified_artifact.py::test_no_caller_held_token_is_accepted[None]",
+      "tests/test_verified_artifact.py::test_no_caller_held_token_is_accepted[True]",
+      "tests/test_verified_artifact.py::test_no_caller_held_token_is_accepted[token2]",
+      "tests/test_verified_artifact.py::test_no_caller_held_token_is_accepted[token]"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 46,
+    "module": "verified.py",
+    "lineno": 154,
+    "condition": "self.verification_profile != VERIFICATION_PROFILE",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_gate_isolation.py::test_a_verified_artifact_cannot_be_minted_under_another_verification_profile"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 47,
+    "module": "verified.py",
+    "lineno": 158,
+    "condition": "self.verification_profile_version != VERIFICATION_PROFILE_VERSION",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_gate_isolation.py::test_a_verified_artifact_cannot_be_minted_under_another_profile_version"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 48,
+    "module": "verified.py",
+    "lineno": 173,
+    "condition": "self.artifact_digest != expected",
+    "scored": true,
+    "killed": false,
+    "failed": [],
+    "classification": "sibling-backed \u2014 require_verified_producer_attestation recomputes the same digest at every consumption boundary, and that check IS killed; this one is unreachable at construction because the minting routine computes the digest it passes"
+  },
+  {
+    "index": 49,
+    "module": "verified.py",
+    "lineno": 271,
+    "condition": "type(value) is not VerifiedProducerAttestation",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_verified_artifact.py::test_a_duck_typed_look_alike_is_refused_at_consumption"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 50,
+    "module": "verified.py",
+    "lineno": 285,
+    "condition": "value.construction_token is not _VERIFICATION_TOKEN",
+    "scored": true,
+    "killed": false,
+    "failed": [],
+    "classification": "UNRESOLVED \u2014 no reviewed classification; investigate"
+  },
+  {
+    "index": 51,
+    "module": "verified.py",
+    "lineno": 290,
+    "condition": "value.artifact_digest not in _MINTED_DIGESTS",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_verified_artifact.py::test_a_borrowed_construction_token_does_not_mint_an_artifact"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 52,
+    "module": "verified.py",
+    "lineno": 297,
+    "condition": "value.artifact_digest != value.digest()",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_verified_artifact.py::test_a_mutated_field_fails_revalidation[tenant_id]",
+      "tests/test_verified_artifact.py::test_a_mutated_field_fails_revalidation[subject_id]",
+      "tests/test_verified_artifact.py::test_a_mutated_field_fails_revalidation[recommendation_digest]",
+      "tests/test_verified_artifact.py::test_a_mutated_field_fails_revalidation[verified_issuer]",
+      "tests/test_verified_artifact.py::test_a_mutated_field_fails_revalidation[verified_key_id]"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 53,
+    "module": "verification.py",
+    "lineno": 167,
+    "condition": "type(self.outcome) is not _Outcome",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_typed_outcomes.py::test_a_refusal_outcome_is_exact_typed"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 54,
+    "module": "verification.py",
+    "lineno": 172,
+    "condition": "self.outcome is _Outcome.VERIFIED",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_typed_outcomes.py::test_a_refusal_cannot_carry_the_success_member"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 55,
+    "module": "verification.py",
+    "lineno": 194,
+    "condition": "(self.verified_attestation is None) == (self.refusal is None)",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_typed_outcomes.py::test_a_result_cannot_carry_both_or_neither_branch"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 56,
+    "module": "verification.py",
+    "lineno": 199,
+    "condition": "self.verified_attestation is not None and type(self.verified_attestation) is not VerifiedProducerAttestation",
+    "scored": true,
+    "killed": false,
+    "failed": [],
+    "classification": "internal invariant \u2014 only this module constructs a result, and only ever with an artifact its own minting routine produced; not reachable from attacker input"
+  },
+  {
+    "index": 57,
+    "module": "verification.py",
+    "lineno": 206,
+    "condition": "self.refusal is not None and type(self.refusal) is not ProducerAttestationRefusal",
+    "scored": true,
+    "killed": false,
+    "failed": [],
+    "classification": "internal invariant \u2014 every refusal in this module is built by the single _refuse helper; not reachable from attacker input"
+  },
+  {
+    "index": 58,
+    "module": "verification.py",
+    "lineno": 242,
+    "condition": "trust_anchor_resolver is None",
+    "scored": true,
+    "killed": false,
+    "failed": [],
+    "classification": "sibling-backed \u2014 the hasattr(resolver, 'resolve') check below refuses None with the same typed configuration error"
+  },
+  {
+    "index": 59,
+    "module": "verification.py",
+    "lineno": 247,
+    "condition": "signature_verifier is None",
+    "scored": true,
+    "killed": false,
+    "failed": [],
+    "classification": "sibling-backed \u2014 the hasattr(verifier, 'verify_producer_signature') check below refuses None with the same typed configuration error"
+  },
+  {
+    "index": 60,
+    "module": "verification.py",
+    "lineno": 252,
+    "condition": "not hasattr(trust_anchor_resolver, 'resolve')",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_gate_isolation.py::test_a_resolver_without_a_resolve_method_is_refused_at_construction"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 61,
+    "module": "verification.py",
+    "lineno": 257,
+    "condition": "not hasattr(signature_verifier, 'verify_producer_signature')",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_gate_isolation.py::test_a_signature_verifier_without_its_method_is_refused_at_construction"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 62,
+    "module": "verification.py",
+    "lineno": 261,
+    "condition": "production_mode",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_no_placeholder_verifier.py::test_the_reference_resolver_is_refused_in_production",
+      "tests/test_no_placeholder_verifier.py::test_an_unattested_resolver_is_refused_in_production",
+      "tests/test_no_placeholder_verifier.py::test_a_non_production_signature_verifier_is_refused_in_production"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 63,
+    "module": "verification.py",
+    "lineno": 263,
+    "condition": "getattr(signature_verifier, 'is_production_authoritative', False) is not True",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_no_placeholder_verifier.py::test_a_non_production_signature_verifier_is_refused_in_production"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 64,
+    "module": "verification.py",
+    "lineno": 328,
+    "condition": "attestation is None",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_adversarial.py::test_an_absent_attestation_is_refused",
+      "tests/test_authenticity_laundering.py::test_step_6a_the_absent_arm_is_refused",
+      "tests/test_typed_outcomes.py::test_distinct_failures_produce_distinct_members"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 65,
+    "module": "verification.py",
+    "lineno": 333,
+    "condition": "type(attestation) is not ProducerAttestationV2",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_adversarial.py::test_a_phase_5a_v1_attestation_object_is_refused_by_exact_type",
+      "tests/test_adversarial.py::test_a_subclass_attestation_is_refused",
+      "tests/test_adversarial.py::test_a_duck_typed_attestation_look_alike_is_refused",
+      "tests/test_adversarial.py::test_a_metaclass_equality_attack_does_not_pass_the_exact_type_gate",
+      "tests/test_authenticity_laundering.py::test_a_downstream_valid_signature_never_compensates_for_invalid_provenance"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 66,
+    "module": "verification.py",
+    "lineno": 338,
+    "condition": "type(candidate) is not CapacityAuthorizationCandidate",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_adversarial.py::test_a_subclass_candidate_is_refused"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 67,
+    "module": "verification.py",
+    "lineno": 343,
+    "condition": "type(as_of) is not datetime or as_of.tzinfo is None or as_of.utcoffset() is None",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_adversarial.py::test_a_naive_as_of_is_refused",
+      "tests/test_time_authority.py::test_a_naive_instant_is_refused_at_every_entry_point[naive0]",
+      "tests/test_time_authority.py::test_a_naive_instant_is_refused_at_every_entry_point[naive1]"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 68,
+    "module": "verification.py",
+    "lineno": 352,
+    "condition": "attestation.schema_version != PRODUCER_ATTESTATION_V2_SCHEMA_VERSION",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_gate_isolation.py::test_the_verifier_re_checks_every_contract_fact_against_a_fabrication[schema_version-cloud-scaling-producer-attestation-evidence-1-UNSUPPORTED_SCHEMA_VERSION]"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 69,
+    "module": "verification.py",
+    "lineno": 357,
+    "condition": "attestation.signing_purpose not in SUPPORTED_V2_SIGNING_PURPOSES",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_gate_isolation.py::test_the_verifier_re_checks_every_contract_fact_against_a_fabrication[signing_purpose-ugence.policy_authority.policy_signing-UNSUPPORTED_SIGNING_PURPOSE]"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 70,
+    "module": "verification.py",
+    "lineno": 362,
+    "condition": "attestation.signature_algorithm not in SUPPORTED_V2_SIGNATURE_ALGORITHMS",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_gate_isolation.py::test_the_verifier_re_checks_every_contract_fact_against_a_fabrication[signature_algorithm-ed448-UNSUPPORTED_ALGORITHM]"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 71,
+    "module": "verification.py",
+    "lineno": 367,
+    "condition": "attestation.signature_profile != PRODUCER_ATTESTATION_SIGNATURE_PROFILE",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_gate_isolation.py::test_the_verifier_re_checks_every_contract_fact_against_a_fabrication[signature_profile-some.other/profile/v1-UNSUPPORTED_PROFILE]"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 72,
+    "module": "verification.py",
+    "lineno": 372,
+    "condition": "attestation.signature_encoding != PRODUCER_ATTESTATION_SIGNATURE_ENCODING",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_gate_isolation.py::test_the_verifier_re_checks_every_contract_fact_against_a_fabrication[signature_encoding-some.other/encoding/v1-UNSUPPORTED_ENCODING]"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 73,
+    "module": "verification.py",
+    "lineno": 381,
+    "condition": "attestation.recommendation_id != candidate.recommendation_id",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_adversarial.py::test_an_attestation_naming_another_recommendation_id_is_refused",
+      "tests/test_typed_outcomes.py::test_distinct_failures_produce_distinct_members"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 74,
+    "module": "verification.py",
+    "lineno": 386,
+    "condition": "attestation.recommendation_digest != candidate.recommendation_digest",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_adversarial.py::test_an_attestation_binding_another_recommendation_digest_is_refused",
+      "tests/test_adversarial.py::test_a_genuine_attestation_replayed_against_another_candidate_is_refused",
+      "tests/test_typed_outcomes.py::test_distinct_failures_produce_distinct_members"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 75,
+    "module": "verification.py",
+    "lineno": 392,
+    "condition": "attestation.tenant_id != candidate.tenant_id",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_adversarial.py::test_a_cross_tenant_attestation_is_refused",
+      "tests/test_adversarial.py::test_an_object_new_fabricated_attestation_is_refused",
+      "tests/test_typed_outcomes.py::test_distinct_failures_produce_distinct_members"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 76,
+    "module": "verification.py",
+    "lineno": 397,
+    "condition": "attestation.subject_id != candidate.subject_id",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_adversarial.py::test_a_cross_subject_attestation_is_refused",
+      "tests/test_typed_outcomes.py::test_distinct_failures_produce_distinct_members"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 77,
+    "module": "verification.py",
+    "lineno": 402,
+    "condition": "attestation.subject_type != candidate.subject_type",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_gate_isolation.py::test_the_verifier_re_checks_every_contract_fact_against_a_fabrication[subject_type-cloud_scaling.other_subject-WRONG_SUBJECT]"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 78,
+    "module": "verification.py",
+    "lineno": 429,
+    "condition": "recomputed_bytes != attestation.signed_bytes()",
+    "scored": true,
+    "killed": false,
+    "failed": [],
+    "classification": "sibling-backed \u2014 the payload-digest comparison on the following line is a digest over the same two byte strings and refuses the identical inputs (killed by GI-20). Both are additionally fronted by the reconciliation group, which refuses a divergent tenant, subject, subject type, recommendation id or digest before either runs. Deliberately kept: it is the direct byte comparison the design specifies, and it would be the only survivor if a future edit made the digest check cover a different projection of the payload"
+  },
+  {
+    "index": 79,
+    "module": "verification.py",
+    "lineno": 435,
+    "condition": "canonical_digest(recomputed) != attestation.signing_payload_digest",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_adversarial.py::test_a_mutated_attestation_fails_the_payload_recomputation",
+      "tests/test_gate_isolation.py::test_a_stale_payload_digest_fails_the_recomputation_gate"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 80,
+    "module": "verification.py",
+    "lineno": 452,
+    "condition": "type(resolution) is not TrustAnchorResolution",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_adversarial.py::test_a_resolver_returning_a_wrong_typed_resolution_is_refused"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 81,
+    "module": "verification.py",
+    "lineno": 458,
+    "condition": "anchor is None",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_adversarial.py::test_an_untrusted_producer_key_is_refused",
+      "tests/test_adversarial.py::test_a_foreign_issuer_is_refused",
+      "tests/test_adversarial.py::test_a_key_registered_only_for_receipt_issuance_is_not_found",
+      "tests/test_adversarial.py::test_the_deny_all_resolver_refuses_everything",
+      "tests/test_adversarial.py::test_an_empty_directory_refuses"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 82,
+    "module": "verification.py",
+    "lineno": 464,
+    "condition": "type(anchor) is not TrustAnchorRecord",
+    "scored": true,
+    "killed": false,
+    "failed": [],
+    "classification": "unreachable through the public API \u2014 TrustAnchorResolution refuses at construction to carry anything but a TrustAnchorRecord, and the resolution's own exact-type check above (killed by A-54) rejects a non-resolution; this guard covers a resolver that returns a genuine resolution subverted after construction"
+  },
+  {
+    "index": 83,
+    "module": "verification.py",
+    "lineno": 471,
+    "condition": "anchor.authority_id != attestation.issuer",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_adversarial.py::test_a_resolver_answering_for_another_authority_is_refused"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 84,
+    "module": "verification.py",
+    "lineno": 477,
+    "condition": "anchor.key_id != attestation.producer_key_id",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_adversarial.py::test_a_resolver_answering_with_another_key_id_is_refused"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 85,
+    "module": "verification.py",
+    "lineno": 482,
+    "condition": "anchor.capability is not PRODUCER_ATTESTATION_CAPABILITY",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_adversarial.py::test_a_resolver_answering_with_a_wrong_capability_anchor_is_refused"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 86,
+    "module": "verification.py",
+    "lineno": 491,
+    "condition": "lifecycle is not None",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_adversarial.py::test_a_key_revoked_before_the_instant_is_refused",
+      "tests/test_adversarial.py::test_a_disabled_key_is_refused",
+      "tests/test_adversarial.py::test_a_key_not_yet_valid_is_refused",
+      "tests/test_adversarial.py::test_an_expired_key_is_refused",
+      "tests/test_adversarial.py::test_an_unrecognised_lifecycle_refusal_falls_closed_to_not_in_window"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 87,
+    "module": "verification.py",
+    "lineno": 495,
+    "condition": "anchor.signature_profile != attestation.signature_profile",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_adversarial.py::test_an_anchor_profile_disagreement_is_refused"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 88,
+    "module": "verification.py",
+    "lineno": 500,
+    "condition": "anchor.signature_encoding != attestation.signature_encoding",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_adversarial.py::test_an_anchor_encoding_disagreement_is_refused"
+    ],
+    "classification": ""
+  },
+  {
+    "index": 89,
+    "module": "verification.py",
+    "lineno": 528,
+    "condition": "accepted is not True",
+    "scored": true,
+    "killed": true,
+    "failed": [
+      "tests/test_adversarial.py::test_a_signature_made_by_another_key_under_a_trusted_key_id_is_refused",
+      "tests/test_adversarial.py::test_a_substituted_producer_identity_invalidates_the_signature",
+      "tests/test_adversarial.py::test_a_signature_of_the_right_shape_but_wrong_bytes_is_refused",
+      "tests/test_adversarial.py::test_a_truthy_non_true_verifier_result_is_refused",
+      "tests/test_adversarial.py::test_every_invalid_case_mints_no_artifact_and_calls_no_signer"
+    ],
+    "classification": ""
+  }
+]
