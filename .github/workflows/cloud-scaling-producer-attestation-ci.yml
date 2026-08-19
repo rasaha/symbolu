@@ -151,13 +151,30 @@ jobs:
           python -m pytest packages/governance-contracts
           python -m pytest actiongate_provider
       - name: Cloud Scaling Operations (ships no suite; assert that, do not claim green)
-        # ``--co -q`` collects without running. The tree carries no tests, so reporting it
-        # as "passed" would be a claim nobody made. This step asserts the *absence* is what
-        # it is, and fails if a suite appears without this workflow noticing.
+        # ``--co`` collects without running. The tree carries no tests, so reporting it as
+        # "passed" would be a claim nobody made. This step asserts the *absence* is what it
+        # is, and fails if a suite appears without this workflow noticing.
+        #
+        # pytest exits 5 for "no tests collected", and the step shell runs with -e -o
+        # pipefail, so the exit code must be captured rather than allowed to abort the step.
+        # Asserting on the documented exit code AND the message is stronger than either
+        # alone: a future suite that collects makes the code 0 or 1, and both fail here.
         run: |
-          python -m pytest cloud_scaling_operations --co -q 2>&1 | tee /tmp/cso.txt
-          grep -q "no tests ran\|collected 0 items" /tmp/cso.txt \
-            || { echo "cloud_scaling_operations now ships tests; run them here"; exit 1; }
+          set +e
+          python -m pytest cloud_scaling_operations --co -q > /tmp/cso.txt 2>&1
+          status=$?
+          set -e
+          cat /tmp/cso.txt
+          if [ "$status" -ne 5 ]; then
+            echo "::error::cloud_scaling_operations pytest exited $status, not 5 (no tests"\
+                 "collected). It may now ship a suite — add it to this matrix and run it."
+            exit 1
+          fi
+          grep -qE "no tests (collected|ran)|collected 0 items" /tmp/cso.txt || {
+            echo "::error::unexpected collection output for cloud_scaling_operations"
+            exit 1
+          }
+          echo "cloud_scaling_operations ships no test suite (pytest exit 5) — asserted, not claimed green"
       - name: Risk Authority distribution verifier
         run: python packages/risk_authority/verify_risk_authority_distribution.py
       - name: Trusted Evidence Authority distribution verifier
