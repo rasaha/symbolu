@@ -150,12 +150,20 @@ def test_admitting_the_v1_purpose_fails_the_separation(monkeypatch):
         identifiers._assert_domain_separation()
 
 
-#: The three import-time capability separations, each with the phrase that only *that*
-#: check emits. The phrase is what makes each gate individually load-bearing: the final
-#: check refuses every wrong value, so a test that only asserted ``ImportError`` would
-#: still pass with either specific check disabled and would silently stop scoring them.
-#: Matching the message means disabling a specific check changes which refusal is
-#: reached, and the parametrised case for that check fails.
+#: The two explicitly named borrowed capabilities, each with the phrase that only *that*
+#: check emits.
+#:
+#: Matching the phrase is what keeps each branch **scored**: the catch-all below refuses
+#: every wrong value, so a test that only asserted ``ImportError`` would still pass with
+#: either specific branch disabled and would silently stop exercising it. Matching the
+#: message means disabling a specific branch changes which refusal is reached, and the
+#: parametrised case for that branch fails.
+#:
+#: Scored is not the same as load-bearing, and the distinction is deliberate here — see
+#: :func:`test_the_catch_all_is_the_load_bearing_capability_separation`. Removing either
+#: explicit branch alone does **not** open the attack, because the catch-all refuses the
+#: same value. The explicit branches buy typed attribution and a diagnostic that names the
+#: cross-domain reuse; the catch-all is what actually fails closed.
 CAPABILITY_SEPARATIONS = [
     (
         TrustAnchorCapability.RECEIPT_ISSUANCE,
@@ -186,8 +194,11 @@ def test_a_borrowed_capability_fails_the_separation_with_its_own_refusal(
     capability made a key trusted to sign Trusted Evidence equally entitled to attest a
     capacity recommendation.
 
-    Each is asserted by the phrase only its own check emits, so each check is scored on
-    its own rather than on the catch-all below it.
+    Each is asserted by the phrase only its own check emits, so each branch is **scored**
+    on its own rather than on the catch-all below it. That is an attribution property, not
+    a claim that either branch is individually load-bearing — the catch-all would refuse
+    both of these values too, which
+    :func:`test_the_catch_all_is_the_load_bearing_capability_separation` asserts.
     """
 
     from ugence_cloud_scaling_producer_attestation import identifiers
@@ -205,7 +216,8 @@ def test_any_other_capability_fails_the_separation_as_drift(monkeypatch):
 
     A capability that is neither of the two named ones and is not the dedicated member —
     a member added to the enum later, say — must still fail closed. Nothing above this
-    check refuses it, so this case scores the final assertion and only it.
+    check refuses it, so this case scores the final assertion and only it, and it is the
+    case that would fail if the catch-all were removed.
     """
 
     from ugence_cloud_scaling_producer_attestation import identifiers
@@ -221,6 +233,57 @@ def test_any_other_capability_fails_the_separation_as_drift(monkeypatch):
     with pytest.raises(ImportError) as excinfo:
         identifiers._assert_domain_separation()
     assert "drifted from the one dedicated Cloud Scaling capability" in str(excinfo.value)
+
+
+def test_the_catch_all_is_the_load_bearing_capability_separation():
+    """GI-4c: which of the three separations actually fails closed, stated as a property.
+
+    The mutation sweep kills all three, and it is easy to read three kills as three
+    independently load-bearing gates. They are not, and over-claiming here would misdescribe
+    the design. The order in ``_assert_domain_separation`` is: ``RECEIPT_ISSUANCE``, then
+    ``EVIDENCE_PRODUCTION``, then ``is not _DEDICATED``. The third one's condition is
+    satisfied by **every** value the first two catch, because neither borrowed capability is
+    the dedicated one — so it alone is what closes the hole, and the two explicit branches
+    exist for the message they emit.
+
+    Asserted against the live enum rather than restated in a comment, so a future edit that
+    made a borrowed capability the dedicated one — or that reordered the checks so an
+    explicit branch became the only refusal for some value — would break this and force the
+    wording in ``GUARD_SWEEP.md`` to be revisited.
+    """
+
+    from ugence_cloud_scaling_producer_attestation import identifiers
+
+    dedicated = TrustAnchorCapability.CLOUD_SCALING_RECOMMENDATION_ATTESTATION
+    assert identifiers.PRODUCER_ATTESTATION_CAPABILITY is dedicated
+
+    # The claim, in one line: the catch-all's condition already refuses both values the
+    # explicit branches name. Removing either explicit branch therefore changes only the
+    # message, not the verdict.
+    for borrowed, _label, _phrase in CAPABILITY_SEPARATIONS:
+        assert borrowed is not dedicated
+
+    # And the converse: the catch-all refuses values nothing above it names, which is why
+    # removing *it* would open the attack rather than merely blur a diagnostic.
+    #
+    # TEV declares exactly three capabilities today, and the two explicit branches name both
+    # non-dedicated members, so the value the catch-all uniquely refuses right now is one
+    # that is not a member at all — the drift GI-4b scores. Pinning the roster means adding
+    # a fourth member forces this property, and the wording it backs, to be revisited.
+    named = {borrowed for borrowed, _label, _phrase in CAPABILITY_SEPARATIONS}
+    assert set(TrustAnchorCapability) == named | {dedicated}, (
+        "TEV's capability roster changed; a member outside the dedicated one and the two "
+        "named borrowed ones is refused by the catch-all alone, so GUARD_SWEEP.md's "
+        "scored-vs-load-bearing note must be re-checked against the new member"
+    )
+
+    class _UnratifiedCapability:
+        name = "SOME_FUTURE_CAPABILITY"
+
+    drifted = _UnratifiedCapability()
+    for borrowed, _label, _phrase in CAPABILITY_SEPARATIONS:
+        assert drifted is not borrowed
+    assert drifted is not dedicated
 
 
 def test_the_reference_signer_refuses_to_publish_a_receipt_issuance_anchor(monkeypatch):

@@ -101,16 +101,32 @@ PHASE_5A_FROZEN_PRODUCER_SIGNING_PAYLOAD_DIGEST = (
 # Superseded Phase 5B-0A digests, kept as NEGATIVE anchors.
 #
 # Three of this package's own fixtures moved during remediation, and only these three.
-# Both causes are deliberate corrections to an unmerged package, not drift:
+# Every cause is a deliberate correction to an unmerged package, not drift.
 #
-#   * the two trust-anchor digests moved because the capability inside the coordinate
-#     changed from the borrowed ``EVIDENCE_PRODUCTION`` to the dedicated
-#     ``CLOUD_SCALING_RECOMMENDATION_ATTESTATION``. That the coordinate digest moves is
-#     the point: it is the machine-checkable proof that the two signing domains are not
-#     the same coordinate, and therefore not the same entitlement.
-#   * the verified-artifact digest moved because its canonical field
-#     ``verified_producer_id`` was renamed to ``attested_producer_id``, so the bytes
-#     now name what the signature actually establishes.
+# The two **trust-anchor** digests moved for one reason: the capability inside the
+# coordinate changed from the borrowed ``EVIDENCE_PRODUCTION`` to the dedicated
+# ``CLOUD_SCALING_RECOMMENDATION_ATTESTATION``. That the coordinate digest moves is the
+# point — it is the machine-checkable proof that the two signing domains are not the same
+# coordinate, and therefore not the same entitlement. The record digest moves with it
+# because a record carries its coordinate's capability.
+#
+# The **verified-artifact** digest moved for **four** canonical reasons, not one. Its
+# ``digest_payload()`` covers all four of these fields, so each is independently part of
+# the hashed bytes:
+#
+#   1. ``verified_producer_id`` was renamed to ``attested_producer_id``, so the bytes now
+#      name what the signature actually establishes;
+#   2. ``trust_anchor_capability`` changed value, from ``EVIDENCE_PRODUCTION`` to
+#      ``CLOUD_SCALING_RECOMMENDATION_ATTESTATION``;
+#   3. ``trust_anchor_coordinate_digest`` changed, because the coordinate it digests now
+#      carries the dedicated capability;
+#   4. ``trust_anchor_record_digest`` changed, for the same reason.
+#
+# Causes 2-4 all follow from the dedicated capability replacing the borrowed one; cause 1
+# is independent of them. The field rename **alone** does not account for the movement,
+# and :func:`test_the_verified_artifact_digest_moved_for_all_four_reasons` proves it by
+# reconstructing the superseded bytes: all four reversions together reproduce
+# ``39f1b3dd...`` exactly, and reverting any three of the four does not.
 #
 # They are pinned as values that must **never** be produced again. A recurrence would
 # mean the borrowed capability or the overstated field name had come back.
@@ -352,6 +368,10 @@ def test_the_superseded_verified_artifact_digest_is_never_produced_again():
 
     The superseded digest covered a canonical field called ``verified_producer_id``.
     Producing it again would mean that name — and the claim it makes — had come back.
+
+    This property pins the *outcome*. It deliberately does not attribute the movement to
+    the rename, which is only one of its four canonical causes;
+    :func:`test_the_verified_artifact_digest_moved_for_all_four_reasons` attributes it.
     """
 
     candidate = build_candidate()
@@ -366,6 +386,87 @@ def test_the_superseded_verified_artifact_digest_is_never_produced_again():
     assert artifact.artifact_digest == FROZEN_VERIFIED_ARTIFACT_DIGEST
     assert "attested_producer_id" in artifact.digest_payload()
     assert "verified_producer_id" not in artifact.digest_payload()
+
+
+#: The four canonical fields of ``VerifiedProducerAttestation.digest_payload()`` that the
+#: remediation changed, each mapped to the value it carried before. Reverting all four
+#: reconstructs the superseded bytes exactly; that is the attribution claim, in data.
+_SUPERSEDED_ARTIFACT_FIELDS = {
+    # (1) the rename. Independent of the capability correction.
+    "attested_producer_id": ("verified_producer_id", None),
+    # (2)-(4) all three follow from the dedicated capability replacing EVIDENCE_PRODUCTION.
+    "trust_anchor_capability": (None, "EVIDENCE_PRODUCTION"),
+    "trust_anchor_coordinate_digest": (None, SUPERSEDED_ANCHOR_COORDINATE_DIGEST),
+    "trust_anchor_record_digest": (None, SUPERSEDED_ANCHOR_RECORD_DIGEST),
+}
+
+
+def _revert(payload: dict, fields) -> dict:
+    """Rebuild the superseded canonical payload by undoing exactly ``fields``."""
+
+    reverted = dict(payload)
+    for field in fields:
+        old_name, old_value = _SUPERSEDED_ARTIFACT_FIELDS[field]
+        if old_name is not None:
+            reverted[old_name] = reverted.pop(field)
+        else:
+            reverted[field] = old_value
+    return reverted
+
+
+def test_the_verified_artifact_digest_moved_for_all_four_reasons():
+    """F-N1b: attribution, not just detection — the rename alone did not move the digest.
+
+    It is tempting to describe the verified-artifact movement as "the field rename", because
+    the rename is the visible edit. That is wrong, and wrong in the direction that matters:
+    it would let someone conclude the dedicated capability never reached the artifact's
+    canonical bytes, when in fact three of the four changed fields are exactly that.
+
+    The proof is a reconstruction rather than an assertion. Undoing all four changes to the
+    live payload reproduces the superseded digest ``39f1b3dd...`` **exactly** — which is only
+    possible if those four fields are the complete set of differences — and undoing any three
+    of the four does not. Both halves are necessary: the first shows the attribution is
+    complete, the second shows every one of the four is required.
+
+    Recomputed through ``canonical_digest`` on a plain dict, so nothing here can be satisfied
+    by an artifact object carrying a stale digest.
+    """
+
+    candidate = build_candidate()
+    result = build_verifier().verify(
+        candidate=candidate,
+        attestation=build_attestation(candidate),
+        as_of=AS_OF,
+    )
+    artifact = result.verified_attestation
+    assert artifact is not None
+    payload = artifact.digest_payload()
+
+    all_four = tuple(_SUPERSEDED_ARTIFACT_FIELDS)
+    assert len(all_four) == 4
+    # Sanity: the live payload really does carry all four fields, under their new names
+    # and values, so the reversion below is undoing something real.
+    for field in all_four:
+        assert field in payload
+    assert payload["trust_anchor_capability"] == (
+        TrustAnchorCapability.CLOUD_SCALING_RECOMMENDATION_ATTESTATION.value
+    )
+
+    # Complete: all four together reproduce the superseded bytes.
+    assert canonical_digest(_revert(payload, all_four)) == (
+        SUPERSEDED_VERIFIED_ARTIFACT_DIGEST
+    )
+    # Necessary: each one is load-bearing. Reverting the other three is not enough.
+    for omitted in all_four:
+        partial = tuple(f for f in all_four if f != omitted)
+        assert canonical_digest(_revert(payload, partial)) != (
+            SUPERSEDED_VERIFIED_ARTIFACT_DIGEST
+        ), f"reverting everything except {omitted} still reproduced the superseded digest"
+
+    # And in particular, the claim the audit corrected: the rename on its own does not.
+    assert canonical_digest(_revert(payload, ("attested_producer_id",))) != (
+        SUPERSEDED_VERIFIED_ARTIFACT_DIGEST
+    )
 
 
 def test_the_superseded_anchor_digests_are_never_produced_again():
@@ -407,3 +508,32 @@ def test_only_these_three_phase_5b_0a_digests_moved():
         FROZEN_V2_ATTESTATION_DIGEST
     )
     assert candidate.candidate_digest == PHASE_5A_CANDIDATE_DIGEST
+
+
+def test_the_frozen_candidate_payload_reproduces_the_genuine_chain_exactly():
+    """F-N4: the sdist's fallback candidate is the chain's candidate, not a lookalike.
+
+    An extracted sdist has no monorepo test trees, so the shipped suite rebuilds the Phase
+    5A candidate from this package's frozen payload. That reconstruction is only worth
+    anything if it is the *same artifact* the genuine chain produces, and only a checkout —
+    where both are reachable at once — can prove it. So this property lives here, and it
+    compares the whole dataclass rather than only the digest: a digest match over a subset
+    of fields would leave the unhashed remainder free to drift.
+
+    ``REC_TIME`` is compared explicitly because it is the one fixture constant the shipped
+    suite reads from the payload instead of from Phase 5A, as the default ``issued_at`` for
+    every v2 attestation it mints.
+    """
+
+    import _producer_fixtures as F
+
+    assert F.PHASE_5A_CHAIN_AVAILABLE, "this property requires the monorepo test trees"
+    genuine = P5A.build_candidate()
+    reconstructed = F._candidate_from_frozen_payload()
+    assert reconstructed == genuine
+    assert reconstructed.candidate_digest == genuine.candidate_digest
+    assert reconstructed.candidate_digest == PHASE_5A_CANDIDATE_DIGEST
+    assert F.REC_TIME == P5A.REC_TIME
+    assert F._canonical_ts(
+        F.frozen_payload()["producer_attestation"]["issued_at"]
+    ) == P5A.REC_TIME

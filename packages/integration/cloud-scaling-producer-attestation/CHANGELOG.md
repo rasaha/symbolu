@@ -59,8 +59,14 @@ pre-existing digest is re-pinned.
   242-test suite, its 37 exports, its ten frozen digests and its documented v1 limitation
   all untouched.
 * The Cloud Scaling Controller stays at **0.4.0**, key-free and advisory.
-* Risk Authority and the Trusted Evidence Authority take no version change; only their
-  public APIs are consumed.
+* Risk Authority takes no version change; only its public API is consumed.
+* The Trusted Evidence Authority takes **no behaviour change**, and moves **0.2.0 → 0.3.0**
+  for one additive `TrustAnchorCapability` member,
+  `CLOUD_SCALING_RECOMMENDATION_ATTESTATION`, lent to this package under the ADR §30
+  amendment. TEV verifies nothing under it and admits it on no evidence or receipt path;
+  the member is vocabulary, not authority. (An earlier revision of this entry said TEV took
+  no version change, which was true only before the borrowed `EVIDENCE_PRODUCTION`
+  capability was replaced by the dedicated one.)
 
 ### Residual, stated rather than left to be found
 

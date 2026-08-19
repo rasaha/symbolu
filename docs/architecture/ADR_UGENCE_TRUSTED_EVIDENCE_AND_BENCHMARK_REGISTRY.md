@@ -1120,6 +1120,10 @@ approved for implementation by this ADR.**
 | 3 | **BR-1** | **Benchmark Definition Contracts** — benchmark identity (§15), lifecycle state, structured references. Contracts only; no registry. | — | **DEFERRED** |
 | 4 | **BR-2** | **Benchmark Registry and trusted resolver** — admission ordering (§16.2), append-only registration, exact resolution, revocation (§17). | BR-1 | **DEFERRED** |
 | 5 | **UVI-EV-1** | **Readiness evidence/benchmark integration** — readiness consumes receipts and resolved definitions per §20. | TEV-2, BR-2 | **DEFERRED** |
+| 6 | **GV-F** | **Forecast ROI** | UVI-EV-1 | **DEFERRED** |
+| 7 | **GV-O** | **Observed ROI** | GV-F, TEV-2 | **DEFERRED** |
+| 8 | **GV-A** | **Attributed ROI** | GV-O | **DEFERRED** |
+| 9 | **GV-V** | **Verified ROI** | GV-A | **DEFERRED** |
 
 > **Amendment — the sole consumer exception (Cloud Scaling Phase 5B-0A).**
 > UVI-EV-1 above remains **DEFERRED**, and the blanket "no consumer imports the
@@ -1153,10 +1157,6 @@ approved for implementation by this ADR.**
 > `packages/trusted-evidence-authority/tests/authority/test_lent_capability_disjointness.py`
 > pins the capability disjointness. TEV moves to **0.3.0** for the additive
 > capability member.
-| 6 | **GV-F** | **Forecast ROI** | UVI-EV-1 | **DEFERRED** |
-| 7 | **GV-O** | **Observed ROI** | GV-F, TEV-2 | **DEFERRED** |
-| 8 | **GV-A** | **Attributed ROI** | GV-O | **DEFERRED** |
-| 9 | **GV-V** | **Verified ROI** | GV-A | **DEFERRED** |
 
 ### 30.1 Label reconciliation with repository convention
 
