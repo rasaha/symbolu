@@ -261,12 +261,30 @@ loses to it. There is no `from_dict`: a serialized verification artifact would b
 one.
 
 **A frozen dataclass is not a security boundary** — following Phase 4C's
-`AuthenticatedRecommendation`. The boundary is three independent parts: a package-private
-construction token, a self-digest recomputed over every bound fact, and
+`AuthenticatedRecommendation`. The boundary is **four** independent parts: a package-private
+construction token, a self-digest recomputed over every bound fact, a **provenance registry**
+of the determinations this process actually reached, and
 `require_verified_producer_attestation`, which re-checks the exact type, field presence, the
-token and the digest at every consumption boundary. Constructor bypass, `object.__new__`
-fabrication, `object.__setattr__` mutation, subclasses with diverting properties, duck-typed
-look-alikes and metaclass equality attacks are each covered by a named property in the suite.
+token, registry membership and the digest at every consumption boundary. Constructor bypass,
+`object.__new__` fabrication, `object.__setattr__` mutation, subclasses with diverting
+properties, duck-typed look-alikes and metaclass equality attacks are each covered by a named
+property in the suite.
+
+**Why the registry, given the token.** The token alone makes *possession of one genuine
+artifact* equivalent to the capability to mint arbitrary ones: it is a dataclass field, so it
+can be read off a real artifact, and a forger who also recomputes `artifact_digest` produces
+something the token and digest checks both accept. A determination this process never reached
+has a digest it never recorded. The registry keys on the **determination**, not on object
+identity — a determination is its facts, so a faithful copy is the same determination and
+still revalidates, while a forger's differing facts do not. A `weakref.WeakSet` keyed on
+value would be wrong here, and was the first attempt: `add` is a no-op for an equal member,
+so the recorded reference can die while an equal, live artifact goes unregistered.
+
+Stated plainly rather than over-claimed: in-process code that reaches into a private module
+attribute can add to the registry exactly as it can import the token, and no Python-level
+mechanism prevents that — the same residual the Trusted Evidence Authority documents for its
+own signing boundary. What is closed is every route that does not require reaching into this
+module's privates.
 
 ## §13. What remains open
 

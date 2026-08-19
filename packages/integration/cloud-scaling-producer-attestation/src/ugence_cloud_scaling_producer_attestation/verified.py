@@ -29,7 +29,7 @@ mutation and stops nothing deliberate. ``object.__new__`` fabricates one with no
 ``__post_init__``, ``object.__setattr__`` rewrites a frozen field, a subclass diverts every
 read through a property, and a duck-typed look-alike never touches this class at all.
 
-So the boundary is made of three things instead:
+So the boundary is made of four things instead:
 
 #. **A package-private construction token.** The only route to an instance is the
    authoritative verification routine, which holds it. Direct construction raises.
