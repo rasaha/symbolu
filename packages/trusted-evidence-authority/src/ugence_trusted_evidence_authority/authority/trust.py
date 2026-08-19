@@ -148,6 +148,14 @@ class TrustAnchorCapability(str, Enum):
     "no row may absorb". Holding the capability as a single-valued field rather
     than a set makes the separation unrepresentable to violate: there is no way
     to spell an anchor that both produces evidence and issues receipts.
+
+    The same single-valued rule is what makes this enum safely extensible for a
+    *different* signing domain. A member added here is a new, disjoint
+    entitlement: because an anchor carries exactly one capability and every
+    consumer compares it by exact identity, adding a member grants nothing to
+    any existing member and takes nothing from one. It is a vocabulary this
+    package owns and lends; it is **not** a claim that this package verifies,
+    admits or authorizes whatever the new domain signs.
     """
 
     #: The anchor's key signs **evidence** on behalf of a producer. Verifying
@@ -158,6 +166,24 @@ class TrustAnchorCapability(str, Enum):
     #: The anchor's key signs **receipts** on behalf of the verifying authority
     #: (ADR §8 role 4, E-11). It may never sign evidence.
     RECEIPT_ISSUANCE = "RECEIPT_ISSUANCE"
+    #: The anchor's key signs a **Cloud Scaling recommendation producer
+    #: attestation** on behalf of an issuing authority. It is a distinct signing
+    #: domain with a distinct payload, and it is deliberately **not**
+    #: :attr:`EVIDENCE_PRODUCTION`: a key entitled to sign Trusted Evidence
+    #: must not thereby be entitled to attest a capacity recommendation, and a
+    #: key entitled to attest a capacity recommendation must not thereby be
+    #: entitled to sign evidence or issue a receipt.
+    #:
+    #: This package defines the coordinate and **verifies nothing** under it.
+    #: The Cloud Scaling producer-attestation package owns that verification;
+    #: the Trusted Evidence Authority neither admits, approves nor authorizes a
+    #: Cloud Scaling recommendation, and holding this capability confers no
+    #: evidence-production or receipt-issuance entitlement here.
+    #:
+    #: One key may hold separate anchor records under separate capabilities, but
+    #: each such grant is an explicit, independently configured record; nothing
+    #: derives one from another.
+    CLOUD_SCALING_RECOMMENDATION_ATTESTATION = "CLOUD_SCALING_RECOMMENDATION_ATTESTATION"
 
 
 @dataclass(frozen=True)

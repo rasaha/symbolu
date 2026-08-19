@@ -25,16 +25,24 @@ def _sources():
 
 
 def test_the_package_version_is_the_expected_additive_minor_bump():
-    """0.1.0 -> 0.2.0: additive, backward-compatible (ADR §30 TEV-2 on TEV-1).
+    """0.2.0 -> 0.3.0: additive, backward-compatible.
 
-    A minor bump, not a major one, because every TEV-1 symbol remains present
-    with the same shape, the same field order, the same enum member order and
+    Same rule as 0.1.0 -> 0.2.0, applied again. A minor bump, not a major one,
+    because every existing symbol remains present with the same shape, the same
+    field order, the same enum member order, the same serialized spellings and
     the same digests. A patch bump would be wrong in the other direction: the
-    public surface grew.
+    public trust-anchor surface grew by exactly one
+    :class:`TrustAnchorCapability` member,
+    ``CLOUD_SCALING_RECOMMENDATION_ATTESTATION``, lent to the Cloud Scaling
+    producer-attestation consumer.
+
+    The growth is a *vocabulary* growth and not an authority growth: this
+    package verifies nothing under the new member, and no evidence or receipt
+    path admits it (see the disjointness tests below).
     """
 
-    assert ugence_trusted_evidence_authority.__version__ == "0.2.0"
-    assert api.__version__ == "0.2.0"
+    assert ugence_trusted_evidence_authority.__version__ == "0.3.0"
+    assert api.__version__ == "0.3.0"
 
 
 def test_no_separate_contract_version_constant_is_minted():
