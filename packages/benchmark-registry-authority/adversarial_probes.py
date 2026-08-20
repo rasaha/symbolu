@@ -66,7 +66,6 @@ from ugence_benchmark_registry_authority.api import (
     BenchmarkTransitionPlan,
     BenchmarkTransitionRefusal,
     BenchmarkPlanningOutcome,
-    BENCHMARK_REGISTRATION_TRANSITIONS,
     is_byte_identical_resubmission,
     plan_submission_outcome,
     plan_transition,
