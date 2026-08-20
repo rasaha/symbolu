@@ -389,14 +389,26 @@ def mint_producer_attestation(
     caller cannot present one identity and sign under another.
 
     ``production_mode=True`` refuses a reference signer, and refuses **every subclass of
-    one** — the :data:`REFERENCE_GRADE_SIGNERS` match is by ``isinstance`` and is evaluated
-    *before* the :attr:`is_reference_signer` flag, so a subclass that sets the flag to
-    ``False`` never reaches the branch that would have admitted it. This mirrors
-    :func:`~ugence_cloud_scaling_producer_attestation.trust.require_production_resolver`
-    exactly, and for the same reason: a denial matched by exact type is a hole, because the
-    subclass inherits the implementation the denial exists to refuse. A custodian that
-    *composes* a reference signer rather than inheriting from one is admitted — it never
-    declared itself reference grade, and it can hold its key wherever it likes.
+    one**, by ``isinstance`` against :data:`REFERENCE_GRADE_SIGNERS`. That match is what
+    closes the hole: matching by exact type let a subclass inherit the reference key
+    custodian whole, set ``is_reference_signer = False``, and mint in production. This
+    mirrors :func:`~ugence_cloud_scaling_producer_attestation.trust.require_production_resolver`,
+    and for the same reason — a denial matched by exact type is the hole rather than the
+    guard, because the subclass inherits the implementation the denial exists to refuse.
+
+    **The two refusals are independent, and neither depends on running first.** Both raise;
+    neither admits, so there is no fall-through for the other to pre-empt. Stated precisely
+    because an earlier revision of this docstring claimed the ``isinstance`` match had to be
+    evaluated first so a relabelled subclass "never reaches the branch that would have
+    admitted it" — there is no such branch, and swapping the two leaves every subclass
+    refused. What the order does buy is the **message**: a subclass is named as reference
+    grade rather than reported through the flag it set for itself. Each check earns its
+    place on its own: ``isinstance`` catches a subclass that lies about the flag, and the
+    flag catches a *non*-inheriting custodian that honestly declares itself reference grade.
+
+    A custodian that *composes* a reference signer rather than inheriting from one is
+    admitted — it never declared itself reference grade, and it can hold its key wherever it
+    likes.
 
     There is no production key in this repository and no route by which this function could
     supply one.

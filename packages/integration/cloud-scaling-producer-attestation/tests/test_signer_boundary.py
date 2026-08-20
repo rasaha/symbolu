@@ -566,9 +566,16 @@ def test_reference_grade_signers_names_exactly_the_shipped_reference_signer():
 def test_the_reference_grade_signer_denial_uses_subclass_aware_matching():
     """G-16d: asserted over the source, so a revert to exact-type matching fails here.
 
-    The AST counterpart of R-25. It also pins the ordering the finding turned on: the
-    ``isinstance`` match must appear before any read of ``is_reference_signer``, because a
-    denial evaluated after the opt-in is a denial a subclass can skip.
+    The AST counterpart of R-25, and the anti-regression that actually matters: the denial
+    must be ``isinstance``-based. Exact-type matching is what let a subclass inherit the
+    reference key custodian and relabel itself production.
+
+    It also pins the ordering — but for the honest reason, which is **diagnostic, not
+    security**. Both checks raise and neither admits, so swapping them leaves every subclass
+    refused; what changes is which message an operator gets. An earlier revision of the
+    docstring in ``signing.py`` claimed the order stopped a relabelled subclass reaching "the
+    branch that would have admitted it", and there is no such branch. The ordering assertion
+    is kept because the message is worth protecting, and it is described here as what it is.
     """
 
     source = inspect.getsource(mint_producer_attestation)
@@ -602,9 +609,41 @@ def test_the_reference_grade_signer_denial_uses_subclass_aware_matching():
     assert isinstance_lines, "the denial must match against REFERENCE_GRADE_SIGNERS"
     assert flag_lines, "the is_reference_signer flag check is expected to remain"
     assert min(isinstance_lines) < min(flag_lines), (
-        "the inheritance denial must be evaluated BEFORE the is_reference_signer flag; "
-        "a subclass setting the flag to False would otherwise reach the admitting branch"
+        "the inheritance denial should be evaluated before the is_reference_signer flag so "
+        "a subclass is NAMED as reference grade rather than reported through the flag it "
+        "set for itself. This is a diagnostic guarantee, not a security one: both checks "
+        "raise, so swapping them refuses the same signers with a worse message"
     )
+
+
+@pytest.mark.happy
+def test_the_is_reference_signer_flag_refuses_something_isinstance_cannot():
+    """G-16e: the second check is not redundant, and this is what it catches.
+
+    Stated as a property because the M-1 correction made the ``isinstance`` match carry the
+    security weight, and a reader could reasonably conclude the flag check is now dead code.
+    It is not: a custodian that does **not** inherit from the reference signer, but honestly
+    declares itself reference grade, is invisible to ``isinstance`` and refused by the flag.
+    """
+
+    inner = build_signer()
+
+    class HonestlyReferenceGrade:
+        is_reference_signer = True
+        producer_id = PRODUCER_ID
+        issuer = ISSUER_ID
+        producer_key_id = PRODUCER_KEY_ID
+        signature_profile = PRODUCER_ATTESTATION_SIGNATURE_PROFILE
+
+        def sign_producer_attestation(self, signing_input):
+            return inner.sign_producer_attestation(signing_input)
+
+    custodian = HonestlyReferenceGrade()
+    assert not isinstance(custodian, REFERENCE_GRADE_SIGNERS)
+
+    with pytest.raises(ProducerAttestationConfigurationError) as exc:
+        _mint(custodian)
+    assert "is_reference_signer is True" in str(exc.value)
 
 
 @pytest.mark.happy
