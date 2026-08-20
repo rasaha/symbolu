@@ -53,6 +53,47 @@ substituted component to unlock.
 - The distribution's own four-phase prose is corrected to the five-phase
   ratification (ADR §35 D-01, amended 2026-08-20).
 
+### Verification performed for this release
+
+Measured, not asserted. Every number below came from a run against this tree.
+
+- **Suite** 1710 tests, 449 distinct properties (418 adversarial : 31 happy,
+  13.48:1). The two monorepo-scope properties ran rather than skipping: no
+  package in the monorepo imports this one, and no workflow but its own
+  references it.
+- **Independent probes** 64/64, run twice — against the source tree, and again
+  from inside the installed wheel.
+- **Offline distribution verifier** PASSED, 41 checks. Both wheels are built in
+  the host environment; the isolated environment only ever *installs* a wheel,
+  never builds source. A fresh venv without system site packages, with
+  `--no-index`, `PIP_NO_INDEX=1`, an emptied `PYTHONPATH` and
+  `PYTHONNOUSERSITE=1`, resolving only from a wheelhouse holding exactly the
+  BR-2B wheel and the permitted BR-1 wheel. Source/wheel/sdist/installed-runtime
+  parity holds on all four manifests, all 18 pinned vectors and both counts.
+- **Negative controls** 8/8 caught: a smuggled test file, a smuggled conftest
+  and probe harness, an extra declared dependency, an injected distribution, a
+  moved pinned digest, monorepo source shadowing the installed wheel, a leaked
+  `PYTHONPATH`, and installing with the one dependency unavailable.
+- **BR-1 freeze matrix** VERIFIED, with BR-1's own suite (593 tests) and probes
+  (57) run unmodified. No BR-1 file is touched by this release.
+- **Mutation sweep** 53 gates inventoried, 48 killed, 5 survived, 0 errored.
+  Every restore is proven byte-identical to the proven-green baseline before
+  mutating, and every mutant is proven loaded — by the import system, not the
+  filesystem — before a KILL or SURVIVE is accepted. A harness control aborts
+  the run if that proof cannot itself fail.
+
+The five survivors are unchanged from BR-2A and none is a gap: **G-12** is
+shadowed by G-11 (identical bytes necessarily hash identically, so killing it in
+isolation would need a hash collision); **G-28**, **G-29** and **G-30** are the
+encoder's float, NFC and aware-datetime branches, each shadowed by construction-
+time validation and by graph revalidation (G-17), so the encoder's own branch is
+never the first refusal; **G-43** is equivalent while BR-1 is frozen, and the
+BR-1 freeze matrix is the independent gate that would catch that drift.
+
+**Not claimed.** This release has had no independent closure audit. The
+delivering session wrote, ran and reported all of the above, and an author-owned
+test, probe or mutation run is not an audit.
+
 ## [0.1.0] — BR-2A: registry and exact-resolution contracts
 
 First release. **Contracts and pure validation only.**
