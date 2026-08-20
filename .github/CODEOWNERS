@@ -96,6 +96,18 @@ docs/governance/PROTECTED_BRANCHES.md        @ontology-core @rasaha/ontology-ste
 # author of this work. A single owner reviewing their own change is not an
 # independent review, whatever branch protection is configured. Substituting a
 # distinct reviewer or team here is the step that makes this a real control.
+#
+# HOW BR-2B SATISFIED IT, AND WHY THAT DOES NOT CARRY FORWARD (ADR §35.2 D-21).
+# Independent GitHub approval is unavailable in a solo-maintainer model where the
+# sole maintainer is the author. For BR-2B the independent check was satisfied by
+# an independent technical closure audit at commit dfd6aa5e — which found no
+# shipped capability able to perform an authoritative or effectful operation —
+# rather than by an approving review.
+#
+# That substitution is SPECIFIC TO A PHASE THAT SHIPS NO CAPABILITY. An audit can
+# establish that nothing effectful exists; it cannot stand in for review of code
+# that does something. It does NOT carry forward to BR-2C or any later subphase,
+# each of which ships a capability and needs a distinct approving reviewer.
 
 # The shipped package: production source, its manifests, and its pinned digests.
 packages/benchmark-registry-authority/src/**                        @rasaha
