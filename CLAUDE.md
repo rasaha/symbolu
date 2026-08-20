@@ -1,40 +1,57 @@
 # Working agreement
 
-## Every response that executes a task
+## Prompts, specifications, plans, and briefs
 
-End with a "Next window" block: the next step, why it's next, and an exact
-pasteable prompt. Default sequence for design and architecture work is
-**audit → owner ratification → implementation**. Never jump from an analysis
-straight to an implementation prompt.
+- Open with the single load-bearing question and answer it first.
+- Default maximum: 400 words unless the user requests more.
+- Do not re-verify established facts unless later evidence contradicts them.
+- Use tables only when the cells contain meaningfully varying information.
+- Let the conclusion determine the structure, and do not fix a section count or
+  deliverable list before the analysis runs. If the result is blocked, stop
+  after explaining the blocker.
+- State each prohibition once and cap owner decisions at five.
+- Do not mirror the register of documents the user pastes. This repository's
+  house style is not a target to match or escalate.
+- If no document or implementation is warranted, say so directly.
 
-## Any prompt, spec, plan or brief you write
+## Task progression
 
-- Open with the single load-bearing question. Answer it first.
-- 400 words unless I name a higher number. Length is not rigor.
-- Never ask to re-verify established facts — merged PRs, green CI, git
-  ancestry, existing versions. Assume the record is true unless I flag doubt.
-- No table unless the cells vary. If one column would read the same for most
-  rows, write the sentence it collapses to instead.
-- Do not pre-commit to a section count or deliverable list. If the crux
-  resolves "blocked", stop there — do not design what you just said cannot
-  safely be built.
-- Cap owner decisions at 5.
-- If the honest answer is "this needs no document", say that.
+For substantial architecture work, normally proceed:
+audit → owner ratification → implementation.
 
-## Architecture and governance work in this repo
+Do not produce an implementation prompt while material owner decisions remain.
+When useful, end with the next recommended step and a pasteable prompt. Do not
+add this mechanically when the task is complete.
 
-- Label material claims `[V]` verified / `[I]` inferred / `[R]` needs
-  ratification / `[G]` gap. Cite `file:line` for every `[V]`.
-- Committed ADRs and code outrank any external prose, brief or artifact.
-- Do not mirror the register of documents I paste. This repo's house style is
-  not a target to match or escalate.
-- Design sessions are read-only: no tracked file changes, no branch, no commit,
-  no PR. Confirm a clean tree at the end.
+## Evidence and maturity
+
+For architecture, governance, and audit work, label material findings:
+`[V]` verified, `[I]` inferred, `[R]` requires ratification, `[G]` gap.
+
+Support `[V]` with the most stable available reference: file and symbol, test
+result, commit, PR, or `file:line` where appropriate. Never describe proposed,
+designed, or partially tested capability as implemented or production-ready.
+
+For claims about current repository behavior, code, tests, committed ADRs, and
+repository history outrank external explanatory documents. Legal requirements
+and owner-ratified product intent remain separate authorities.
 
 ## Verification
 
-Factual checks (does this gate scan `__all__` or the source tree, is it 82
-symbols or 81) are settled by the repository, so a fresh session is
-independent enough. Judgment calls — is this the right boundary, is the trust
-problem framed correctly — share blind spots across sessions of the same
-model; send those to a different model when getting them wrong is expensive.
+Factual checks — whether a gate scans a curated surface or the whole source
+tree, whether two inventories agree on a count — are settled by the repository,
+so a fresh session with no memory of the original reasoning is independent
+enough. Judgment calls — whether a boundary is drawn in the right place,
+whether a problem is framed correctly — share blind spots across sessions of
+the same model. Send those to a different model when getting them wrong is
+expensive; do not spend the extra round on facts the repository already
+settles.
+
+## Repository safety
+
+- Preserve pre-existing user changes and never clean or overwrite them.
+- Read-only/design tasks must not modify tracked files, create branches,
+  commit, or open PRs.
+- At completion, report whether this task changed the working tree; do not
+  require an initially dirty tree to become clean.
+- Do not expand task scope without explicit authorization.
