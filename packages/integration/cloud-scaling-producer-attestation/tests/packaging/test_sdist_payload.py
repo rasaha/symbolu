@@ -83,14 +83,31 @@ FORBIDDEN_FRAGMENTS = (
 #: rather than because of the mutation converts every survivor into a false kill and
 #: pollutes every guard's attribution. That is exactly what happened — the sweep job
 #: installs pytest but not ``build``, so the wheel property errored on all 91 runs, and two
-#: genuine survivors were reported killed by it. Nothing here can score a guard in ``src/``:
-#: a mutated package builds into a distribution exactly as an unmutated one does. So the
-#: sweep skips the module entirely, and the full suite and CI run it.
+#: genuine survivors were reported killed by it.
+#:
+#: **The deselection is for cost, and it is not free.** An earlier revision of this comment
+#: claimed "nothing here can score a guard in ``src/``: a mutated package builds into a
+#: distribution exactly as an unmutated one does". That is true of SD-1 … SD-5, and false of
+#: SD-6 … SD-9: those build the sdist **from the package under test** and run the *shipped*
+#: suite against it in a subprocess. Under a mutation, the sdist carries the mutated source
+#: and the shipped adversarial properties fail there exactly as they fail here — SD-7 would
+#: score, and deselecting it therefore removes real scoring capacity from the sweep rather
+#: than removing noise.
+#:
+#: What makes the deselection **safe** is a different fact, and a checkable one: every
+#: module the sdist ships is also run *directly and un-deselected* by the sweep. SD-7 can
+#: only fail for a mutation that already fails in the sweep's own run of the same property,
+#: so the sweep's score is unchanged — it just costs a minute per guard less to reach.
+#: ``tests/test_property_ledger.py::PL-6`` asserts that relationship, so a property added
+#: behind this switch that exercises ``src/`` behaviour the sweep does not otherwise run
+#: fails rather than silently shrinking the sweep.
 _SKIP_REASON = (
     "packaging-distribution properties (each builds an sdist or wheel, and the slow ones "
     "also create a virtualenv); deselected by the guard sweep via "
-    "UGENCE_SKIP_SLOW_PACKAGING because they score no src/ guard and a missing build "
-    "backend would otherwise register as a kill; run by the full suite and by CI"
+    "UGENCE_SKIP_SLOW_PACKAGING for COST, not because they score nothing — SD-6..SD-9 run "
+    "the shipped suite against a distribution built from the package under test and would "
+    "fail on a mutation. Safe only because every module the sdist ships is also run "
+    "directly by the sweep (PL-6). Run by the full suite and by CI"
 )
 pytestmark = pytest.mark.skipif(
     os.environ.get("UGENCE_SKIP_SLOW_PACKAGING") == "1", reason=_SKIP_REASON
@@ -200,10 +217,13 @@ def test_the_wheel_still_ships_no_tests_at_all(tmp_path_factory):
 # while proving nothing. These properties therefore build wheels, create a fresh virtualenv,
 # install into it, and run the extracted suite with that interpreter.
 #
-# That costs about a minute, which is why the guard sweep deselects them: they exercise
-# packaging, not any `if` in ``src/``, so they contribute nothing to mutation scoring and
-# would multiply the sweep's runtime by the number of guards. The full suite — locally and
-# in CI — runs them.
+# That costs about a minute each, which is why the guard sweep deselects them — for cost.
+# They do *not* contribute nothing to mutation scoring: SD-7 runs the shipped adversarial
+# suite against a distribution built from the package under test, so a mutated guard fails
+# there too. The sweep can afford to drop them only because every module the sdist ships is
+# also run directly, un-deselected, in the same sweep run — see the module-level note above
+# and ``tests/test_property_ledger.py::PL-6``. The full suite — locally and in CI — runs
+# them.
 
 #: Retained as an explicit marker on the four isolation properties. It is subsumed by the
 #: module-wide gate above and is kept because it documents, at the property itself, which
@@ -325,12 +345,21 @@ def test_the_extracted_sdist_runs_its_shipped_properties(isolated_consumer):
 
 
 @slow_packaging
-def test_the_extracted_sdist_imports_from_the_installed_distribution(isolated_consumer):
+def test_no_import_in_the_extracted_sdist_resolves_from_the_checkout(isolated_consumer):
     """SD-8: every import resolves to the extraction or the isolated environment.
 
     Not to the checkout. The environment is non-editable precisely so this assertion means
     something: against an editable development install, "site-packages" is the checkout and
     the check would pass vacuously.
+
+    Named for what it asserts. It was called
+    ``test_the_extracted_sdist_imports_from_the_installed_distribution``, which was wrong
+    about the package under test: the probe puts the extraction's own ``src/`` first on
+    ``sys.path``, so ``ugence_cloud_scaling_producer_attestation`` is imported **from the
+    extracted sdist**, not from site-packages. That is deliberate — the point is to run the
+    shipped payload against the shipped source — and only the four *neighbour*
+    distributions come from the isolated environment. The single property both cases share,
+    and the one actually asserted below, is that nothing resolves out of the checkout.
     """
 
     root = isolated_consumer["root"]

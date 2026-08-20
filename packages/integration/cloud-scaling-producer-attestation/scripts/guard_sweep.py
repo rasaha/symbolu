@@ -75,8 +75,11 @@ def _condition_text(source_lines: list[str], node: ast.If) -> str:
         return source_lines[node.lineno - 1].strip()
 
 
-def _reaches_refusal(node: ast.If) -> bool:
-    """Whether this ``if``'s own body can reach a raise or a typed refusal.
+def _reaches_refusal(node) -> bool:
+    """Whether this node's own body can reach a raise or a typed refusal.
+
+    Takes an ``ast.If`` for the inventory and an ``ast.ExceptHandler`` for the
+    excluded-count report; both carry a ``body``.
 
     Nested ``if`` bodies are excluded so an outer block does not inherit its children's
     relevance — each guard is scored for what *it* protects.
@@ -126,6 +129,37 @@ def inventory() -> list[Guard]:
     return guards
 
 
+def excluded_from_the_inventory() -> tuple[int, int]:
+    """What the ``if``-guard denominator leaves out, measured rather than claimed.
+
+    Two kinds of fail-closed logic exist in the source and are not scored as guards:
+
+    * ``except`` arms whose body raises or returns a typed refusal. The ``if False:``
+      rewrite cannot neutralise a handler, so they are out of scope for this mutation
+      operator rather than overlooked;
+    * the extra sub-terms of a boolean guard. ``if a and b:`` is neutralised and scored as
+      **one** guard; scoring each side independently is a different operator.
+
+    Reported in ``GUARD_SWEEP.md`` so the CI job's claim is bounded by a number this script
+    produced, not by a phrase somebody wrote once. (closure-audit L-3)
+    """
+
+    except_arms = 0
+    boolean_subterms = 0
+    for module in MODULE_ORDER:
+        tree = ast.parse((SRC / module).read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ExceptHandler) and _reaches_refusal(node):
+                except_arms += 1
+            elif (
+                isinstance(node, ast.If)
+                and _reaches_refusal(node)
+                and isinstance(node.test, ast.BoolOp)
+            ):
+                boolean_subterms += len(node.test.values) - 1
+    return except_arms, boolean_subterms
+
+
 def mutate(guard: Guard, workdir: Path) -> None:
     """Rewrite exactly this guard's ``if`` header to ``if False:`` in the copy."""
 
@@ -160,11 +194,17 @@ def run_suite(workdir: Path, timeout: int = 600) -> dict:
             # walking upward. Telling it explicitly keeps the copy out of every repo-wide
             # scan.
             "UGENCE_REPO_ROOT": str(REPO),
-            # Deselect the slow packaging-isolation properties. They build five wheels and a
-            # virtualenv per run — minutes each, times the whole inventory — and they assert
-            # facts about the sdist, not about any ``src/`` guard, so they can neither kill
-            # nor survive a mutation and contribute nothing to the score. The full suite and
-            # CI run them.
+            # Deselect the slow packaging-distribution properties. They build five wheels
+            # and a virtualenv per run — minutes each, times the whole inventory.
+            #
+            # This is a COST decision and it is not free. SD-6..SD-9 build the sdist from
+            # the package under test and run the *shipped* suite against it, so under a
+            # mutation they fail exactly as the same properties fail here: they would
+            # score. What makes dropping them sound is that every module the sdist ships
+            # is also run directly, un-deselected, in this same run — so the score is
+            # unchanged and only the wall-clock differs. tests/test_property_ledger.py
+            # PL-6 asserts that relationship, so a property added behind this switch that
+            # reaches src/ behaviour fails rather than silently shrinking the sweep.
             "UGENCE_SKIP_SLOW_PACKAGING": "1",
         },
     )
@@ -268,16 +308,23 @@ SURVIVOR_CLASSIFICATION = {
         "specifies, and it would be the only survivor if a future edit made the digest "
         "check cover a different projection of the payload"
     ),
-    "value.construction_token is not _VERIFICATION_TOKEN": (
-        "sibling-backed — the provenance-registry check on the next line refuses everything "
-        "this one does. An artifact assembled outside the authoritative routine also names "
-        "a determination that routine never reached, unless it is a faithful copy of a real "
-        "one, which IS that determination and should pass (V-21). The token check is kept "
-        "as the ratified construction guard and as the check that would still stand if a "
-        "deployment ever scoped the registry differently — for example per-request rather "
-        "than per-process. Its construction-time twin in __post_init__ IS killed, by V-1 "
-        "and V-2"
-    ),
+    # ``value.construction_token is not _VERIFICATION_TOKEN`` (verified.py, the
+    # consumption-boundary check) was classified here as "sibling-backed — the
+    # provenance-registry check on the next line refuses everything this one does".
+    # That was wrong, and wrong in the direction that matters: it described the only
+    # guard standing between a rebuilt artifact and admission as redundant.
+    #
+    # A ``copy.deepcopy``d or unpickled artifact bypasses ``__init__``, so it carries a
+    # freshly rebuilt token — but ``artifact_digest`` is a string, copied verbatim, so it
+    # names a determination this process really did reach. The registry admits it, the
+    # exact-type check admits it, the field-presence check admits it and the recomputed
+    # self-digest admits it. Only this guard refuses it. Reproduced by neutralising this
+    # guard alone in a disposable copy: both rebuilds were ADMITTED.
+    #
+    # It is no longer a survivor. ``tests/test_verified_artifact.py`` V-24 (deepcopy and
+    # pickle, asserting the other four checks pass first) and V-25 score it, and it is
+    # reported as **killed** by the table below. The entry is left here as a comment
+    # rather than deleted so the correction is visible to the next reader.
     "type(anchor) is not TrustAnchorRecord": (
         "unreachable through the public API — TrustAnchorResolution refuses at construction "
         "to carry anything but a TrustAnchorRecord, and the resolution's own exact-type "
@@ -427,6 +474,7 @@ def main() -> int:
 
 
 def write_report(results) -> None:
+    _EXCLUDED_EXCEPT_ARMS, _EXCLUDED_BOOLEAN_SUBTERMS = excluded_from_the_inventory()
     killed = [g for g, r in results if r.get("killed")]
     survived = [(g, r) for g, r in results if r["scored"] and not r.get("killed")]
     classes: dict[str, int] = {}
@@ -455,10 +503,22 @@ def write_report(results) -> None:
         "claim to be wrong in. This is not hypothetical: the packaging-distribution",
         "properties invoke `python -m build`, the sweep job installs pytest but not `build`,",
         "and one of them therefore errored on all 91 runs, converting two real survivors into",
-        "kills. Those properties are now deselected in sweep runs — a mutated package builds",
-        "into a distribution exactly as an unmutated one does, so they can score no guard —",
-        "and this precondition is what stops the next instance of that class from being",
+        "kills. This precondition is what stops the next instance of that class from being",
         "published as a result.",
+        "",
+        "**Why the packaging module is deselected, stated accurately.** For **cost**, and",
+        "not because it scores nothing. An earlier revision of this document and of the",
+        "module's own comment claimed \"nothing there can score a guard in `src/`: a mutated",
+        "package builds into a distribution exactly as an unmutated one does\". That is true",
+        "of SD-1 … SD-5 and **false** of SD-6 … SD-9, which build the sdist *from the package",
+        "under test* and run the shipped suite against it — under a mutation the shipped",
+        "adversarial properties fail there exactly as they fail here, so SD-7 would score.",
+        "Dropping them is sound for a different reason, and a checkable one: **every module",
+        "the sdist ships is also run directly, un-deselected, in this same sweep run**, so",
+        "the score is identical and only the wall-clock differs.",
+        "`tests/test_property_ledger.py::PL-6` asserts that relationship in both directions,",
+        "so a property added behind the switch that reaches `src/` behaviour the sweep does",
+        "not otherwise run fails rather than quietly shrinking the sweep.",
         "",
         f"| Result | **{len(killed)} killed / {len(survived)} survived** |",
         "|---|---|",
@@ -508,6 +568,23 @@ def write_report(results) -> None:
         "the payload-digest comparison, anchor resolution, anchor identity, anchor lifecycle,",
         "profile and encoding agreement, signature decoding and signature verification — are",
         "all killed by a property that names that gate.",
+        "",
+        "### What the inventory counts, and what it leaves out",
+        "",
+        "The denominator is every `if` in the shipped source whose own body can reach a",
+        "`raise` or a typed refusal. Two kinds of fail-closed logic are **not** in it, and",
+        "the count should not be read as \"every security gate in the package\":",
+        "",
+        f"* **{_EXCLUDED_EXCEPT_ARMS} fail-closed `except` arms.** An `except` cannot be",
+        "  neutralised by the `if False:` rewrite this sweep is built on, so it is out of",
+        "  scope for this mutation operator rather than overlooked;",
+        f"* **{_EXCLUDED_BOOLEAN_SUBTERMS} boolean sub-terms.** A two-term `and` guard is",
+        "  neutralised and scored as **one** guard. Scoring each side independently is a",
+        "  different operator, and this sweep does not claim it.",
+        "",
+        "The CI job used to be called *\"every security gate is scored\"*, which overstated",
+        "exactly this; it now says *\"every inventoried `if` guard scored\"*. The two counts",
+        "above are measured by `scripts/guard_sweep.py` at report time, not asserted.",
         "",
         "### What \"killed\" does and does not claim",
         "",

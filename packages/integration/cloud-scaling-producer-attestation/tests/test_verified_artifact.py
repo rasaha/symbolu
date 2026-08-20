@@ -325,6 +325,74 @@ def test_a_faithful_copy_of_a_genuine_determination_still_revalidates(artifact):
     assert require_verified_producer_attestation(duplicate) is duplicate
 
 
+@pytest.mark.parametrize(
+    "rebuild",
+    [
+        pytest.param(copy.deepcopy, id="deepcopy"),
+        pytest.param(lambda a: pickle.loads(pickle.dumps(a)), id="pickle"),
+    ],
+)
+def test_a_rebuilt_artifact_is_refused_by_the_token_check_alone(artifact, rebuild):
+    """V-24: the case that makes the token check load-bearing rather than sibling-backed.
+
+    ``copy.deepcopy`` and ``pickle`` both bypass ``__init__``, so ``__post_init__`` and its
+    construction-time token twin never run. Both rebuild the token — a bare ``object()``
+    whose whole meaning is its identity — while copying ``artifact_digest`` as the string it
+    is. The result therefore carries:
+
+    * the **same** ``artifact_digest``, so the provenance registry admits it;
+    * a self-digest that still recomputes, so the mutation check admits it;
+    * the exact type and every declared field, so those two checks admit it;
+    * a **different** construction token.
+
+    Exactly one of the five checks in :func:`require_verified_producer_attestation` refuses
+    it, and this is that check. The sweep classified it "sibling-backed" until this property
+    existed; the registry is not a sibling here, because a rebuilt artifact names a
+    determination this process genuinely did reach.
+    """
+
+    from ugence_cloud_scaling_producer_attestation.verified import _MINTED_DIGESTS
+
+    rebuilt = rebuild(artifact)
+
+    # The four checks that do NOT refuse it, asserted rather than assumed — this is what
+    # distinguishes the property from "something, somewhere, said no".
+    assert type(rebuilt) is VerifiedProducerAttestation
+    assert all(
+        hasattr(rebuilt, f.name) for f in dataclasses.fields(VerifiedProducerAttestation)
+    )
+    assert rebuilt.artifact_digest == artifact.artifact_digest
+    assert rebuilt.artifact_digest in _MINTED_DIGESTS
+    assert rebuilt.artifact_digest == rebuilt.digest()
+
+    # The one that does.
+    assert rebuilt.construction_token is not artifact.construction_token
+    with pytest.raises(VerifiedArtifactIntegrityError) as exc:
+        require_verified_producer_attestation(rebuilt)
+    assert "construction token" in str(exc.value)
+
+
+def test_no_deserializer_admits_an_artifact_from_another_process(artifact):
+    """V-25: the stated consequence — a determination does not travel between processes.
+
+    V-24 fixes the mechanism inside one interpreter. The claim the module docstring makes
+    is broader: there is deliberately no deserializer, so an artifact that has crossed a
+    process boundary cannot be re-admitted at all. Pickling is the only serialization the
+    class supports at all, and its output is refused on the way back in; the package
+    exposes no ``from_dict``, ``from_json``, ``parse`` or ``loads`` route that would offer
+    a second one.
+    """
+
+    import ugence_cloud_scaling_producer_attestation as pkg
+
+    for constructor in ("from_dict", "from_json", "parse", "parse_obj", "loads"):
+        assert not hasattr(VerifiedProducerAttestation, constructor)
+        assert constructor not in pkg.__all__
+
+    with pytest.raises(VerifiedArtifactIntegrityError):
+        require_verified_producer_attestation(pickle.loads(pickle.dumps(artifact)))
+
+
 def test_the_registry_is_not_reachable_from_the_curated_api():
     """V-22: neither the token nor the registry is exported."""
 
