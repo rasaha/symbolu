@@ -1,0 +1,71 @@
+# Ugence Cloud Scaling Producer Attestation — Cloud Scaling Phase 5B-0A.
+#
+# A one-way LEAF package. It imports Risk Authority (public canonicalization only), the
+# Trusted Evidence Authority (trust-anchor types and the Ed25519 backend only) and the
+# Phase 5A authorization contracts (the candidate, read-only). None of the three imports
+# this package, and neither does the Cloud Scaling Controller.
+#
+# It owns NO authority. It holds no policy, no policy verification, no evidence source, no
+# credentials, no clock and no execution surface. It does not reconstruct a Risk Decision,
+# repair a scope, mint a nonce, construct or sign an envelope, lift containment, invoke
+# ActionGate, broker a credential, call a cloud provider, scale anything, verify an effect
+# or learn from an outcome. Phase 5B-0B and every later phase are excluded, and no
+# capability toward any of them is introduced here.
+#
+# Build:   python -m build packages/integration/cloud-scaling-producer-attestation
+# Verify:  python packages/integration/cloud-scaling-producer-attestation/scripts/verify_isolated_install.py
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-cloud-scaling-producer-attestation"
+dynamic = ["version"]
+description = "Ugence Cloud Scaling Producer Attestation — Phase 5B-0A producer authenticity. A verified attestation grants nothing."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Ugence Labs" }]
+keywords = ["cloud-scaling", "producer-attestation", "authenticity", "non-authoritative", "contracts", "ugence"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Typing :: Typed",
+]
+# Exactly three first-party dependencies, all already merged on the default branch, and no
+# new third-party runtime dependency: the Ed25519 backends arrive transitively as the
+# Trusted Evidence Authority's own declared requirements, and the canonicalization surface
+# is reached only through Risk Authority's public API. There is deliberately NO dependency
+# on the Cloud Scaling Controller, Policy Authority, Decision Authority, ActionGate, a
+# Credential Broker, Cloud Scaling Operations, a cloud SDK or a Kubernetes client.
+dependencies = [
+    "ugence-risk-authority>=0.4.0",
+    "ugence-trusted-evidence-authority>=0.3.0",
+    "ugence-cloud-scaling-authorization-contracts>=0.1.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+dev = ["pytest>=7.0", "build>=1.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_cloud_scaling_producer_attestation.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_cloud_scaling_producer_attestation*"]
+
+[tool.setuptools.package-data]
+ugence_cloud_scaling_producer_attestation = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+# Every test carries exactly one property category, so the adversarial-to-happy ratio the
+# ratified design requires is machine-counted rather than claimed. See
+# tests/test_property_ledger.py, which asserts both the coverage and the ratio.
+markers = [
+    "happy: a positive-control property — something the boundary must ADMIT",
+    "adversarial: an attack that must be REFUSED, or a dangerous capability that must be ABSENT",
+    "invariant: a structural, packaging or frozen-value regression anchor — neither attack nor success",
+]

@@ -17,8 +17,12 @@ two named cryptographic distributions, one importing module, and every §23
 arrow still unbroken.
 
 The reverse direction is asserted too: no package in the monorepo imports this
-one. TEV-1/TEV-2 authorize no consumer integration (ADR §30 — UVI-EV-1 is
-DEFERRED), so an import from a consumer would be scope expansion.
+one, apart from the single consumer named in :data:`AUTHORIZED_CONSUMERS`. ADR
+§30's UVI-EV-1 — *readiness* consuming receipts and resolved definitions — is
+still DEFERRED, and an import driven by that milestone would still be scope
+expansion. What the allowlist records is a different, separately ratified
+integration; see :data:`AUTHORIZED_CONSUMERS` for exactly which, and why the
+blanket refusal is unchanged for everybody else.
 """
 
 from __future__ import annotations
@@ -26,6 +30,8 @@ from __future__ import annotations
 import ast
 import pathlib
 import sys
+
+import pytest
 
 import ugence_trusted_evidence_authority
 
@@ -344,17 +350,233 @@ def _imports_self(tree) -> bool:
     return False
 
 
-def test_no_consumer_imports_this_package():
-    repo = _repo_root()
-    if repo is None:
-        return  # running outside the monorepo (installed wheel); nothing to scan
+#: The **only** consumer authorized to import this package, and the **exact** symbols it
+#: may import. A path-only exemption is not a boundary: it would let the one authorized
+#: consumer reach every name in this package's ``__all__`` — evidence payloads,
+#: observations, receipts, trust stages, admission outcomes and the evidence verification
+#: engine included — while this file still reported "no unauthorized consumers". An
+#: independent closure audit demonstrated exactly that, so the grant is now stated symbol
+#: by symbol and anything outside it fails here.
+#:
+#: ``packages/integration/cloud-scaling-producer-attestation`` — **Cloud Scaling Phase
+#: 5B-0A, producer authenticity.** Authorized by the ratified Phase 5B architecture brief
+#: (Revision 3 §20.7 §3 and §10), which fixes that package's dependency topology as Risk
+#: Authority + this package + the Phase 5A authorization contracts, and requires it to
+#: reuse this package's trust-anchor contracts and resolver port, creating no second
+#: trust-anchor store and no local key map.
+#:
+#: This is **not** ADR §30's UVI-EV-1, which remains DEFERRED. UVI-EV-1 is readiness
+#: consuming *receipts and resolved definitions*. The grant below consumes the
+#: *trust-anchor contracts*, which are payload-neutral — they import no evidence contract
+#: and presume nothing about what the signed bytes contain — plus the Ed25519 key and
+#: codec types the anchor contract is expressed in. It consumes no receipt, admits no
+#: evidence and reuses no evidence verifier, and the enforcement below is what keeps that
+#: true rather than the sentence you are reading.
+#:
+#: The lent ``TrustAnchorCapability`` member ``CLOUD_SCALING_RECOMMENDATION_ATTESTATION``
+#: is a vocabulary this package owns and the consumer resolves its own anchors under. It
+#: grants nothing here: no evidence path and no receipt path admits it (see
+#: ``tests/authority/test_lent_capability_disjointness.py``).
+
+#: Symbols the consumer's **production source** imports. Derived from that source, not
+#: guessed: every entry is reachable from ``src/``, and every TEV import in ``src/`` is
+#: here.
+AUTHORIZED_PRODUCTION_SYMBOLS = frozenset(
+    {
+        # the trust-anchor contract and its resolver port
+        "TrustAnchorCoordinate",
+        "TrustAnchorRecord",
+        "TrustAnchorCapability",
+        "TrustAnchorResolution",
+        "TrustAnchorResolverPort",
+        "KeyRevocation",
+        "DenyAllTrustAnchorDirectory",
+        # the Ed25519 key types and codecs the anchor contract is expressed in
+        "TrustedEvidenceSigningKey",
+        "TrustedEvidenceVerificationKey",
+        "encode_public_key",
+        "encode_signature",
+        "decode_signature",
+        # the two ratified signature identifiers an anchor carries and a verifier compares
+        "TRUSTED_EVIDENCE_SIGNATURE_PROFILE_V1",
+        "TRUSTED_EVIDENCE_SIGNATURE_ENCODING_V1",
+        # the refusal vocabulary a resolver answers with
+        "TrustedEvidenceRefusalReason",
+    }
+)
+
+#: Reference-grade symbols. Imported by production source **only so that production can
+#: refuse them**: the consumer lists ``StaticTrustAnchorDirectory`` in its
+#: ``REFERENCE_GRADE_RESOLVERS`` and its ``require_production_resolver`` rejects it under
+#: ``production_mode=True``. Listed apart from the production grant so that "this is a
+#: reference-grade store" stays visible here and cannot quietly become a production
+#: dependency.
+AUTHORIZED_REFERENCE_GRADE_SYMBOLS = frozenset({"StaticTrustAnchorDirectory"})
+
+#: Symbols the consumer's **tests** may additionally import. Tests are not exempt from the
+#: boundary — they are enumerated by it. This one is the contract-error type the consumer
+#: asserts this package raises.
+AUTHORIZED_TEST_ONLY_SYMBOLS = frozenset({"TrustedEvidenceContractError"})
+
+#: The consumer test modules that may bind this package as a **module object**. Production
+#: source may never do so: a module binding permits arbitrary attribute access and would
+#: silently defeat every symbol rule above. These modules need the module object precisely
+#: in order to police the boundary — asserting that re-exported contracts are the
+#: *identical* object, and walking this package's own AST — so the capability is granted to
+#: them by name and to nothing else.
+AUTHORIZED_MODULE_BINDING_TEST_MODULES = frozenset(
+    {
+        "test_trust_reuse.py",
+        "test_import_boundary.py",
+        "test_capability_domain_separation.py",
+    }
+)
+
+AUTHORIZED_CONSUMERS = ("packages/integration/cloud-scaling-producer-attestation",)
+
+
+def _authorized_prefixes(repo):
+    """Allowlisted consumer paths as resolved path-component tuples.
+
+    Compared as path components, never as a string prefix. A bare ``startswith`` would
+    also exempt a sibling directory whose name merely begins with an authorized one —
+    ``…/cloud-scaling-producer-attestation-evil`` — which is a hole in the boundary the
+    allowlist exists to keep narrow.
+    """
+
+    return tuple((repo / prefix).resolve().parts for prefix in AUTHORIZED_CONSUMERS)
+
+
+def _is_authorized_path(resolved, authorized):
+    return any(resolved.parts[: len(prefix)] == prefix for prefix in authorized)
+
+
+def _permitted_symbols(path) -> frozenset:
+    """Which symbols this particular file inside the authorized consumer may import."""
+
+    allowed = AUTHORIZED_PRODUCTION_SYMBOLS | AUTHORIZED_REFERENCE_GRADE_SYMBOLS
+    if _is_test_file(path):
+        allowed = allowed | AUTHORIZED_TEST_ONLY_SYMBOLS
+    return allowed
+
+
+def _is_test_file(path) -> bool:
+    return (
+        "tests" in path.parts
+        or path.name == "conftest.py"
+        or path.name.startswith("test_")
+    )
+
+
+def authorized_consumer_symbol_violations(repo):
+    """Every way the authorized consumer could reach past its exact symbol grant.
+
+    Returns a sorted list of human-readable violations; empty means the grant is exactly
+    honoured. Semantic AST analysis throughout — never a raw-text scan — so a comment, a
+    docstring, a ``# noqa`` or a filename can neither create nor excuse a violation.
+    """
+
+    violations = []
+    authorized = _authorized_prefixes(repo)
+    for path in repo.glob("packages/**/*.py"):
+        resolved = path.resolve()
+        if "__pycache__" in resolved.parts or "build" in resolved.parts:
+            continue
+        if not _is_authorized_path(resolved, authorized):
+            continue
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, SyntaxError, ValueError):
+            continue
+        rel = path.relative_to(repo).as_posix()
+        permitted = _permitted_symbols(path)
+        is_test = _is_test_file(path)
+        dynamic = _dynamic_import_callables(tree)
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    if not _names_an_import_of_self(alias.name):
+                        continue
+                    if alias.name != SELF:
+                        violations.append(
+                            rel
+                            + ": binds the internal module "
+                            + repr(alias.name)
+                            + "; only the curated top-level API may be reached"
+                        )
+                    elif not (
+                        is_test and path.name in AUTHORIZED_MODULE_BINDING_TEST_MODULES
+                    ):
+                        why = (
+                            " (permitted only in the named boundary-policing test modules)"
+                            if is_test
+                            else "; production source may not — a module binding permits"
+                            " arbitrary attribute access"
+                        )
+                        violations.append(
+                            rel + ": binds " + repr(SELF) + " as a module object" + why
+                        )
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                if not _names_an_import_of_self(node.module):
+                    continue
+                if node.module != SELF:
+                    violations.append(
+                        rel
+                        + ": imports from the internal module "
+                        + repr(node.module)
+                        + "; only the curated top-level API may be reached"
+                    )
+                    continue
+                for alias in node.names:
+                    if alias.name == "*":
+                        violations.append(rel + ": star-imports " + repr(SELF))
+                    elif alias.name not in permitted:
+                        violations.append(
+                            rel
+                            + ": imports "
+                            + repr(alias.name)
+                            + ", which is outside the exact authorized trust-anchor grant"
+                        )
+            elif isinstance(node, ast.Call):
+                # Same dispatch as ``_imports_self``: an attribute call matches by the
+                # ``import_module`` attribute name (covering ``importlib`` under any
+                # alias), and a bare-name call matches an alias resolved from this file's
+                # own import statements.
+                func = node.func
+                if isinstance(func, ast.Attribute):
+                    is_dynamic = func.attr == _IMPORTLIB_CALLABLE
+                elif isinstance(func, ast.Name):
+                    is_dynamic = func.id in dynamic
+                else:
+                    is_dynamic = False
+                if is_dynamic:
+                    for arg in node.args[:1]:
+                        if isinstance(arg, ast.Constant) and _names_an_import_of_self(
+                            arg.value
+                        ):
+                            violations.append(
+                                rel
+                                + ": dynamically imports "
+                                + repr(arg.value)
+                                + "; the grant is explicit static imports only"
+                            )
+    return sorted(set(violations))
+
+
+def _consumer_importers(repo):
+    """Every module outside this package that imports it, minus the authorized consumers."""
+
     own_tree = (repo / "packages" / "trusted-evidence-authority").resolve()
+    authorized = _authorized_prefixes(repo)
     importers = []
     for path in repo.glob("packages/**/*.py"):
         resolved = path.resolve()
         if str(resolved).startswith(str(own_tree)):
             continue
         if "__pycache__" in resolved.parts or "build" in resolved.parts:
+            continue
+        if _is_authorized_path(resolved, authorized):
             continue
         try:
             text = path.read_text(encoding="utf-8")
@@ -366,10 +588,281 @@ def test_no_consumer_imports_this_package():
             continue  # not importable Python for this interpreter; nothing to import
         if _imports_self(tree):
             importers.append(str(path.relative_to(repo)))
+    return importers
+
+
+def test_no_unauthorized_consumer_imports_this_package():
+    repo = _repo_root()
+    if repo is None:
+        return  # running outside the monorepo (installed wheel); nothing to scan
+    importers = _consumer_importers(repo)
     assert not importers, (
-        "TEV-1 authorizes no consumer integration (ADR §30: UVI-EV-1 DEFERRED); "
-        f"unexpected imports: {importers}"
+        "TEV authorizes consumer integration only for the packages named in "
+        f"AUTHORIZED_CONSUMERS ({list(AUTHORIZED_CONSUMERS)}); ADR §30's UVI-EV-1 remains "
+        f"DEFERRED. Unexpected imports: {importers}"
     )
+
+
+def test_the_consumer_allowlist_is_exactly_the_ratified_set():
+    """The allowlist is a closed list, not a pattern, and it has not grown unnoticed.
+
+    A boundary whose exception list can be widened silently is not a boundary. Growing it
+    must fail here first, so the widening is reviewed against a ratified authorization
+    rather than noticed later.
+    """
+
+    assert AUTHORIZED_CONSUMERS == (
+        "packages/integration/cloud-scaling-producer-attestation",
+    )
+
+
+def test_the_symbol_grant_is_exactly_the_ratified_set():
+    """The grant is per-symbol, and it has not grown unnoticed either.
+
+    Naming one consumer package is only half the boundary. Without a symbol rule, the one
+    authorized consumer could import every name this package exports — evidence payloads,
+    observations, receipts, trust stages, admission outcomes and the evidence verification
+    engine — and the reverse-dependency scan would still report nothing at all.
+    """
+
+    assert AUTHORIZED_PRODUCTION_SYMBOLS == frozenset(
+        {
+            "TrustAnchorCoordinate",
+            "TrustAnchorRecord",
+            "TrustAnchorCapability",
+            "TrustAnchorResolution",
+            "TrustAnchorResolverPort",
+            "KeyRevocation",
+            "DenyAllTrustAnchorDirectory",
+            "TrustedEvidenceSigningKey",
+            "TrustedEvidenceVerificationKey",
+            "encode_public_key",
+            "encode_signature",
+            "decode_signature",
+            "TRUSTED_EVIDENCE_SIGNATURE_PROFILE_V1",
+            "TRUSTED_EVIDENCE_SIGNATURE_ENCODING_V1",
+            "TrustedEvidenceRefusalReason",
+        }
+    )
+    assert AUTHORIZED_REFERENCE_GRADE_SYMBOLS == frozenset({"StaticTrustAnchorDirectory"})
+    assert AUTHORIZED_TEST_ONLY_SYMBOLS == frozenset({"TrustedEvidenceContractError"})
+
+
+def test_the_grant_admits_no_evidence_receipt_or_verification_surface():
+    """Whatever the grant contains, it may never contain the evidence domain.
+
+    Stated as a property of the grant rather than as a list of today's imports, so a
+    future edit that widens the grant itself fails here too — not only an edit that
+    widens what the consumer imports.
+    """
+
+    granted = (
+        AUTHORIZED_PRODUCTION_SYMBOLS
+        | AUTHORIZED_REFERENCE_GRADE_SYMBOLS
+        | AUTHORIZED_TEST_ONLY_SYMBOLS
+    )
+    evidence_domain = {
+        name
+        for name in ugence_trusted_evidence_authority.__all__
+        if any(
+            fragment in name
+            for fragment in (
+                "Evidence",
+                "evidence",
+                "Receipt",
+                "receipt",
+                "Observation",
+                "Admission",
+                "Submission",
+                "Stage",
+            )
+        )
+    }
+    # The key, codec and error types the anchor contract is spelled in carry the package
+    # name as a prefix; they are not evidence-domain surfaces. Everything else is.
+    anchor_contract_spellings = {
+        "TrustedEvidenceSigningKey",
+        "TrustedEvidenceVerificationKey",
+        "TrustedEvidenceRefusalReason",
+        "TrustedEvidenceContractError",
+        "TRUSTED_EVIDENCE_SIGNATURE_PROFILE_V1",
+        "TRUSTED_EVIDENCE_SIGNATURE_ENCODING_V1",
+    }
+    leaked = (granted & evidence_domain) - anchor_contract_spellings
+    assert leaked == set(), leaked
+
+
+def test_the_authorized_consumer_honours_its_exact_symbol_grant():
+    """The live consumer imports exactly what it is granted, and nothing more."""
+
+    repo = _repo_root()
+    if repo is None:
+        return  # running outside the monorepo (installed wheel); nothing to scan
+    assert authorized_consumer_symbol_violations(repo) == []
+
+
+FORBIDDEN_INJECTIONS = [
+    ("from {} import EvidenceObservation", "outside the exact authorized"),
+    ("from {} import EvidenceTrustStage", "outside the exact authorized"),
+    ("from {} import EvidenceAdmissionOutcome", "outside the exact authorized"),
+    ("from {} import SignedEvidenceSubmission", "outside the exact authorized"),
+    ("from {} import SignedEvidenceVerificationReceipt", "outside the exact authorized"),
+    ("from {} import Ed25519EvidenceAuthenticityProtocol", "outside the exact authorized"),
+    ("from {} import EvidenceVerificationProtocolPort", "outside the exact authorized"),
+    ("from {} import EvidenceVerificationRequest", "outside the exact authorized"),
+    ("from {} import signed_evidence_input_bytes", "outside the exact authorized"),
+    ("from {} import EvidenceObservation as _Innocuous", "outside the exact authorized"),
+    ("from {}.authority.trust import TrustAnchorRecord", "internal module"),
+    ("import {}.authority.verification", "internal module"),
+    ("import {}", "module object"),
+    ("import {} as tev", "module object"),
+    ("from {} import *", "star-imports"),
+    ("import importlib" + chr(10) + "importlib.import_module({!r})", "dynamically imports"),
+    ("__import__({!r})", "dynamically imports"),
+]
+
+
+@pytest.mark.parametrize("template, expected_fragment", FORBIDDEN_INJECTIONS)
+def test_an_injected_forbidden_import_fails_the_symbol_boundary(
+    tmp_path, template, expected_fragment
+):
+    """Every documented bypass is reported. A boundary that cannot fail is not a boundary.
+
+    Each case is planted inside the **authorized** consumer path — the one place a
+    path-only allowlist waved everything through — and must still be reported.
+    """
+
+    body = template.format(SELF)
+    planted = tmp_path / AUTHORIZED_CONSUMERS[0] / "src" / "injected.py"
+    planted.parent.mkdir(parents=True)
+    planted.write_text(body + chr(10), encoding="utf-8")
+    (tmp_path / "packages" / "trusted-evidence-authority").mkdir(parents=True)
+
+    violations = authorized_consumer_symbol_violations(tmp_path)
+    assert violations, "not reported: " + repr(body)
+    assert any(expected_fragment in v for v in violations), violations
+
+
+@pytest.mark.parametrize("symbol", sorted(AUTHORIZED_PRODUCTION_SYMBOLS))
+def test_every_granted_production_symbol_remains_importable(tmp_path, symbol):
+    """Positive control: the grant is a narrowing, not a break.
+
+    Each genuinely required trust-anchor symbol must still pass, or the boundary would be
+    refusing the very integration it exists to authorize.
+    """
+
+    planted = tmp_path / AUTHORIZED_CONSUMERS[0] / "src" / "ok.py"
+    planted.parent.mkdir(parents=True)
+    planted.write_text("from " + SELF + " import " + symbol + chr(10), encoding="utf-8")
+    (tmp_path / "packages" / "trusted-evidence-authority").mkdir(parents=True)
+
+    assert authorized_consumer_symbol_violations(tmp_path) == []
+
+
+def test_a_test_only_symbol_is_refused_in_production_source(tmp_path):
+    """The test-only grant does not leak into ``src/``, and does apply in ``tests/``."""
+
+    (tmp_path / "packages" / "trusted-evidence-authority").mkdir(parents=True)
+    line = "from " + SELF + " import TrustedEvidenceContractError" + chr(10)
+
+    src = tmp_path / AUTHORIZED_CONSUMERS[0] / "src" / "mod.py"
+    src.parent.mkdir(parents=True)
+    src.write_text(line, encoding="utf-8")
+    assert authorized_consumer_symbol_violations(tmp_path) != []
+
+    src.unlink()
+    test = tmp_path / AUTHORIZED_CONSUMERS[0] / "tests" / "test_ok.py"
+    test.parent.mkdir(parents=True)
+    test.write_text(line, encoding="utf-8")
+    assert authorized_consumer_symbol_violations(tmp_path) == []
+
+
+def test_a_module_binding_is_refused_outside_the_named_boundary_test_modules(tmp_path):
+    """Only the modules that police the boundary may hold the module object."""
+
+    (tmp_path / "packages" / "trusted-evidence-authority").mkdir(parents=True)
+    line = "import " + SELF + " as tev" + chr(10)
+
+    ok = tmp_path / AUTHORIZED_CONSUMERS[0] / "tests" / "test_trust_reuse.py"
+    ok.parent.mkdir(parents=True)
+    ok.write_text(line, encoding="utf-8")
+    assert authorized_consumer_symbol_violations(tmp_path) == []
+
+    sneaky = ok.parent / "test_other.py"
+    sneaky.write_text(line, encoding="utf-8")
+    assert authorized_consumer_symbol_violations(tmp_path) != []
+
+
+def test_a_comment_or_noqa_creates_no_exception(tmp_path):
+    """Semantic AST analysis: prose neither causes nor excuses a violation."""
+
+    (tmp_path / "packages" / "trusted-evidence-authority").mkdir(parents=True)
+    planted = tmp_path / AUTHORIZED_CONSUMERS[0] / "src" / "mod.py"
+    planted.parent.mkdir(parents=True)
+
+    # A comment or docstring naming a forbidden symbol is not an import.
+    planted.write_text(
+        "# we deliberately never import EvidenceObservation from " + SELF + chr(10)
+        + chr(34) * 3 + "Nor SignedEvidenceSubmission." + chr(34) * 3 + chr(10)
+        + "from " + SELF + " import TrustAnchorRecord" + chr(10),
+        encoding="utf-8",
+    )
+    assert authorized_consumer_symbol_violations(tmp_path) == []
+
+    # ...and a ``# noqa`` does not excuse a real one.
+    planted.write_text(
+        "from " + SELF + " import EvidenceObservation  # noqa: F401 - allowed, honest"
+        + chr(10),
+        encoding="utf-8",
+    )
+    assert authorized_consumer_symbol_violations(tmp_path) != []
+
+
+def test_the_reverse_dependency_detector_still_fires_on_an_unauthorized_consumer(tmp_path):
+    """A boundary test that cannot fail is not a boundary test.
+
+    Plants an importing module at a path that is **not** on the allowlist and asserts the
+    scan reports it — so the allowlist above narrows the assertion to one reviewed
+    consumer, and does not disable it.
+    """
+
+    planted = tmp_path / "packages" / "some-other-consumer" / "mod.py"
+    planted.parent.mkdir(parents=True)
+    planted.write_text(f"import {SELF}\n", encoding="utf-8")
+    (tmp_path / "packages" / "trusted-evidence-authority").mkdir(parents=True)
+
+    found = _consumer_importers(tmp_path)
+    assert found == ["packages/some-other-consumer/mod.py"], found
+
+
+def test_a_sibling_whose_name_merely_starts_with_an_authorized_one_is_not_exempt(tmp_path):
+    """The allowlist matches path components, never a string prefix.
+
+    ``…/cloud-scaling-producer-attestation-evil`` starts with the authorized path as a
+    string. It is a different directory, it is not authorized, and it must still be
+    reported.
+    """
+
+    planted = tmp_path / (AUTHORIZED_CONSUMERS[0] + "-evil") / "mod.py"
+    planted.parent.mkdir(parents=True)
+    planted.write_text(f"import {SELF}\n", encoding="utf-8")
+    (tmp_path / "packages" / "trusted-evidence-authority").mkdir(parents=True)
+
+    found = _consumer_importers(tmp_path)
+    assert found == [
+        f"{AUTHORIZED_CONSUMERS[0]}-evil/mod.py"
+    ], found
+
+
+def test_the_authorized_consumer_is_exempt_from_the_same_scan(tmp_path):
+    """...and the exemption is real: the identical module on the allowlisted path passes."""
+
+    allowed = tmp_path / AUTHORIZED_CONSUMERS[0] / "mod.py"
+    allowed.parent.mkdir(parents=True)
+    allowed.write_text(f"import {SELF}\n", encoding="utf-8")
+    (tmp_path / "packages" / "trusted-evidence-authority").mkdir(parents=True)
+
+    assert _consumer_importers(tmp_path) == []
 
 
 # --- the detector itself is tested, because a boundary test that cannot fail is not a

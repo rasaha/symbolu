@@ -101,7 +101,7 @@ assert not any("/symbolu" in p for p in sys.path), sys.path
 assert not any(p in ("", ".") for p in sys.path[1:]), sys.path
 
 import ugence_trusted_evidence_authority as u
-assert u.__version__ == "0.2.0", u.__version__
+assert u.__version__ == "0.3.0", u.__version__
 assert "site-packages" in u.__file__, u.__file__
 assert not any("/symbolu" in p for p in sys.path), sys.path
 assert (pathlib.Path(u.__file__).resolve().parent / "py.typed").is_file(), "py.typed not installed"

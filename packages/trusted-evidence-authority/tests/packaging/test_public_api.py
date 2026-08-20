@@ -123,7 +123,7 @@ def test_py_typed_marker_present():
 
 def test_the_manifest_records_the_package_version():
     documented = json.loads(_PUBLIC_API_JSON.read_text(encoding="utf-8"))
-    assert documented["package_version"] == pkg.__version__ == "0.2.0"
+    assert documented["package_version"] == pkg.__version__ == "0.3.0"
 
 
 def test_pinned_constants_are_snapshotted_with_their_values():

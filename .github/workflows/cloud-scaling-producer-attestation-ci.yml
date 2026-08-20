@@ -1,0 +1,408 @@
+name: cloud-scaling-producer-attestation-ci
+
+# Scoped CI for Cloud Scaling Phase 5B-0A — producer authenticity
+# (ugence-cloud-scaling-producer-attestation): minting and verifying a producer
+# attestation that binds issuer, tenant and subject, and refusing everything else.
+# A verified attestation grants nothing.
+#
+# This workflow is ADDITIVE and PATH-SCOPED. It does not touch, weaken or modify
+# cloud-scaling-authorization-contracts-ci, cloud-scaling-risk-integration-ci,
+# cloud-scaling-controller-package-ci, the Trusted Evidence Authority workflows or any
+# Risk Authority workflow. It runs the Phase 5B-0A suite (including the forgery-laundering
+# proof and the no-placeholder-verifier, import-boundary and time-authority probes),
+# proves the eleven neighbouring baselines remain green and unchanged, re-verifies every
+# frozen digest, and builds and installs the wheel offline to prove installed behaviour
+# matches source behaviour digest for digest.
+
+on:
+  pull_request:
+    paths:
+      - "packages/integration/cloud-scaling-producer-attestation/**"
+      - "packages/integration/cloud-scaling-authorization-contracts/**"
+      - "packages/trusted-evidence-authority/**"
+      - "packages/risk_authority/**"
+      - "docs/architecture/ADR_CLOUD_SCALING_PRODUCER_AUTHENTICITY_PHASE5B0A.md"
+      - ".github/workflows/cloud-scaling-producer-attestation-ci.yml"
+  push:
+    branches:
+      - "claude/phase-5b-0a-**"
+      - "claude/setup-symbolu-monorepo-**"
+    paths:
+      - "packages/integration/cloud-scaling-producer-attestation/**"
+      - ".github/workflows/cloud-scaling-producer-attestation-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  producer-attestation-suite:
+    name: Phase 5B-0A producer-authenticity suite (source)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install tooling + first-party packages (editable)
+        run: |
+          python -m pip install --upgrade pip
+          # cryptography + PyNaCl are the Trusted Evidence Authority's declared runtime
+          # dependencies, and TEV deliberately has no pure-Python cryptographic fallback.
+          # numpy is the Cloud Scaling Controller's; the Phase 5A fixture chain this suite
+          # consumes builds a genuine recommendation through the real Phase-3 pipeline.
+          pip install pytest build numpy \
+                      "cryptography>=41.0.7,<47.0.0" "PyNaCl>=1.5.0,<2.0.0"
+          pip install -e packages/risk_authority
+          pip install -e packages/trusted-evidence-authority
+          pip install -e packages/capabilities/cloud-scaling-controller
+          pip install -e packages/integration/cloud-scaling-risk-integration
+          pip install -e packages/integration/cloud-scaling-authorization-contracts
+          pip install -e packages/integration/cloud-scaling-producer-attestation
+      - name: Phase 5B-0A suite (happy path, adversarial, packaging)
+        run: |
+          python -m pytest packages/integration/cloud-scaling-producer-attestation/tests
+      - name: Sdist self-containment — the shipped payload collects and runs, extracted
+        # Named as its own step because the claim is easy to make and hard to keep: the
+        # sdist is documented to ship a suite a consumer can re-run, and for a while it
+        # shipped test modules with no conftest and no fixture helper, so none of them
+        # collected. This builds the sdist, installs the first-party wheels NON-editable
+        # into a fresh virtualenv, extracts the archive outside the checkout and runs the
+        # shipped suite there — with a negative control that deletes the fixture helper and
+        # requires the run to break. `-rs` prints every skip with its reason.
+        run: |
+          python -m pytest -rs \
+            packages/integration/cloud-scaling-producer-attestation/tests/packaging/test_sdist_payload.py
+      - name: Authenticity gate — the forgery-laundering proof (explicit acceptance gate)
+        # This step used to exit 0 with all ten laundering properties SKIPPED. They skip
+        # when Phase 5A's genuine fixture chain is unresolvable — it lives in repository
+        # test trees, and the helper degrades to a skip rather than an error so the shipped
+        # sdist stays runnable. A gate that passes when the thing it gates did not run is
+        # not a gate: point UGENCE_REPO_ROOT at an empty directory and the old step was
+        # green with zero properties executed. So the count is now asserted, not the exit
+        # code alone.
+        run: |
+          set -euo pipefail
+          # Written outside the checkout so the report never shows up as an untracked file
+          # in a later step's git comparison.
+          REPORT="${RUNNER_TEMP:-/tmp}/laundering-junit.xml"
+          python -m pytest \
+            packages/integration/cloud-scaling-producer-attestation/tests/test_authenticity_laundering.py \
+            --junitxml="$REPORT" -rs
+          REPORT="$REPORT" python - <<'PY'
+          import os
+          import sys
+          import xml.etree.ElementTree as ET
+
+          #: The ten ratified laundering-traversal properties. A floor, not an equality:
+          #: adding an eleventh must not fail the gate, and losing the fixture chain must.
+          EXPECTED_MINIMUM = 10
+
+          root = ET.parse(os.environ["REPORT"]).getroot()
+          suites = [root] if root.tag == "testsuite" else list(root)
+          total = sum(int(s.get("tests", 0)) for s in suites)
+          skipped = sum(int(s.get("skipped", 0)) for s in suites)
+          failures = sum(int(s.get("failures", 0)) + int(s.get("errors", 0)) for s in suites)
+          executed = total - skipped - failures
+
+          print(f"laundering properties: {total} collected, {executed} passed, "
+                f"{skipped} skipped, {failures} failed/errored")
+          if failures:
+              sys.exit(f"FAIL: {failures} laundering properties failed or errored")
+          if executed < EXPECTED_MINIMUM:
+              sys.exit(
+                  f"FAIL: only {executed} laundering properties actually ran "
+                  f"(expected at least {EXPECTED_MINIMUM}, {skipped} skipped). The "
+                  "forgery-laundering proof is the acceptance gate for this phase; a run "
+                  "in which it was skipped is not evidence that laundering is refused. "
+                  "This almost always means Phase 5A's fixture chain did not resolve — "
+                  "check that every first-party package is installed and that the "
+                  "checkout is complete."
+              )
+          # A bare floor proves "ten things in this file ran", not "the laundering
+          # traversal ran": ten newly added trivial properties would satisfy it while
+          # every real traversal skipped. Nothing here is expected to skip on a complete
+          # checkout, so require that too — it is the assertion that actually pins the
+          # traversal, and it costs nothing while the file has no conditional properties.
+          if skipped:
+              names = [
+                  case.get("name", "?")
+                  for suite in suites
+                  for case in suite.iter("testcase")
+                  if case.find("skipped") is not None
+              ]
+              sys.exit(
+                  f"FAIL: {skipped} laundering properties skipped: {names}. On a complete "
+                  "checkout every property in this file must run. A skip here means the "
+                  "Phase 5A fixture chain is partly unresolvable, and the gate would be "
+                  "reporting on whichever properties happened to survive."
+              )
+          PY
+          python -m pytest \
+            packages/integration/cloud-scaling-producer-attestation/tests/test_adversarial.py
+      - name: Security gates — no placeholder verifier, boundaries, clock, typed outcomes
+        run: |
+          python -m pytest \
+            packages/integration/cloud-scaling-producer-attestation/tests/test_no_placeholder_verifier.py \
+            packages/integration/cloud-scaling-producer-attestation/tests/test_import_boundary.py \
+            packages/integration/cloud-scaling-producer-attestation/tests/test_time_authority.py \
+            packages/integration/cloud-scaling-producer-attestation/tests/test_typed_outcomes.py \
+            packages/integration/cloud-scaling-producer-attestation/tests/test_signer_boundary.py \
+            packages/integration/cloud-scaling-producer-attestation/tests/test_trust_reuse.py \
+            packages/integration/cloud-scaling-producer-attestation/tests/test_verified_artifact.py
+      - name: Frozen-digest regression + Phase 5A invariants (0.1.0, 37 exports, untouched)
+        run: |
+          python -m pytest \
+            packages/integration/cloud-scaling-producer-attestation/tests/test_frozen_digests.py \
+            packages/integration/cloud-scaling-producer-attestation/tests/test_phase5a_invariants.py
+      - name: Public-API manifest is regenerable and unchanged
+        run: |
+          python packages/integration/cloud-scaling-producer-attestation/scripts/generate_public_api.py
+          git diff --exit-code -- packages/integration/cloud-scaling-producer-attestation/public_api.json
+
+  neighbouring-baselines:
+    name: Eleven neighbouring package baselines remain green & unchanged
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install tooling
+        run: |
+          python -m pip install --upgrade pip
+          # `pydantic` is required by the platform-freeze verifier: it snapshots
+          # `decision_governance`, which imports `ugence_decision_authority`, which is built
+          # on pydantic. Without it the verifier fails on an import, not on a violation.
+          # ``requests`` is the Cloud Scaling Controller's declared optional dependency,
+          # behind its read-only ``prometheus`` / ``shadow`` extras. The Cloud Scaling
+          # Operations suite constructs a ProductionOrchestrator, which builds the
+          # controller's signal pipeline, which builds a PrometheusClient — so without it
+          # one boundary test fails on an ImportError rather than on a violation. This is
+          # the same environment-completeness problem as suites 7 and 8 below, and it is
+          # fixed the same way: install what the suite needs and let the suite be scored
+          # on its own behaviour.
+          pip install pytest numpy build pydantic "requests>=2.28.0" \
+                      "cryptography>=41.0.7,<47.0.0" "PyNaCl>=1.5.0,<2.0.0"
+          # --no-deps throughout: the monorepo's first-party distributions are not on any
+          # index, so resolving their declared inter-dependencies would fail. Installing
+          # them all explicitly gives the same import graph without a network resolve.
+          # Suites 7 and 8 do NOT collect without the last four — they fail on
+          # ModuleNotFoundError before any test body runs, which would be reported as a
+          # collection error rather than as a result.
+          pip install --no-deps \
+            -e packages/risk_authority \
+            -e packages/trusted-evidence-authority \
+            -e packages/capabilities/cloud-scaling-controller \
+            -e packages/integration/cloud-scaling-risk-integration \
+            -e packages/integration/cloud-scaling-authorization-contracts \
+            -e packages/governance-contracts \
+            -e packages/governance-provider-framework \
+            -e packages/providers/tap \
+            -e packages/runtime/agent-runtime \
+            -e packages/integration/risk-authority-evidence-runtime \
+            -e packages/integration/risk-authority-status-runtime \
+            -e packages/providers/actiongate \
+            -e packages/capabilities/cloud-scaling-operations \
+            -e packages/integration/cloud-scaling-producer-attestation
+      - name: 1 · Risk Authority conformance suite
+        run: python -m pytest packages/risk_authority/tests
+      - name: 2 · Policy Authority suite
+        run: python -m pytest packages/policy-authority
+      - name: 3 · Trusted Evidence Authority suite
+        run: python -m pytest packages/trusted-evidence-authority
+      - name: 4 · Cloud Scaling Controller suite (must stay 0.4.0 and key-free)
+        run: python -m pytest packages/capabilities/cloud-scaling-controller/tests
+      - name: 5 · Cloud Scaling risk integration (Phase 4C adapter)
+        run: python -m pytest packages/integration/cloud-scaling-risk-integration/tests
+      - name: 6 · Cloud Scaling authorization contracts (Phase 5A — expected 242 passed)
+        run: |
+          python -m pytest packages/integration/cloud-scaling-authorization-contracts/tests
+      - name: 7 · Risk Authority evidence runtime
+        run: python -m pytest packages/integration/risk-authority-evidence-runtime
+      - name: 8 · Risk Authority status runtime
+        run: python -m pytest packages/integration/risk-authority-status-runtime
+      - name: 9 · Risk Authority runtime
+        run: python -m pytest packages/integration/risk-authority-runtime
+      - name: 10 · Risk Authority runtime assurance
+        run: python -m pytest packages/integration/risk-authority-runtime-assurance
+      - name: 11 · Risk Authority execution assurance
+        run: python -m pytest packages/integration/risk-authority-execution-assurance
+      - name: Governance contracts and ActionGate (real package trees)
+        # Filesystem paths, never the repo-root compatibility shims. ``actiongate_provider``
+        # and ``cloud_scaling_operations`` are one-file facade packages at the repo root;
+        # pointing pytest at them collected the facade and reported it as the package's
+        # suite. An independent closure audit measured the gap: the shim collects 37 tests
+        # while the real ActionGate package collects 62, and the shim collects none at all
+        # while the real Cloud Scaling Operations package collects 132. Both real suites
+        # pass; neither was being run here.
+        run: |
+          python -m pytest packages/governance-contracts/tests
+          python -m pytest packages/providers/actiongate/tests
+      - name: Cloud Scaling Operations (real package tree)
+        # Runs the suite rather than asserting its absence. The previous step asserted
+        # "ships no tests" against the repo-root shim, which is empty by construction, so
+        # the assertion could never fail and never noticed the 132 tests the real package
+        # does ship.
+        run: python -m pytest packages/capabilities/cloud-scaling-operations/tests
+      - name: Every regression target actually collected tests
+        # Zero collected is a failure, not a pass. pytest exits 5 for "no tests collected",
+        # and a step that treats 5 as success reports a green suite that never ran. This
+        # asserts each target collects a non-zero count, so a path that silently stops
+        # matching — a rename, a move, a shim reappearing — fails here instead of quietly
+        # shrinking the matrix.
+        run: |
+          for target in \
+            packages/risk_authority/tests \
+            packages/policy-authority \
+            packages/trusted-evidence-authority/tests \
+            packages/capabilities/cloud-scaling-controller/tests \
+            packages/integration/cloud-scaling-risk-integration/tests \
+            packages/integration/cloud-scaling-authorization-contracts/tests \
+            packages/integration/risk-authority-evidence-runtime \
+            packages/integration/risk-authority-status-runtime \
+            packages/integration/risk-authority-runtime \
+            packages/integration/risk-authority-runtime-assurance \
+            packages/integration/risk-authority-execution-assurance \
+            packages/governance-contracts/tests \
+            packages/providers/actiongate/tests \
+            packages/capabilities/cloud-scaling-operations/tests \
+            packages/integration/cloud-scaling-producer-attestation/tests
+          do
+            set +e
+            # No ``-q``: the terse collect format suppresses the "N tests collected"
+            # summary line this gate reads.
+            python -m pytest "$target" --co > /tmp/collect.txt 2>&1
+            status=$?
+            set -e
+            if [ "$status" -ne 0 ]; then
+              echo "::error::$target failed collection (pytest exit $status)"
+              tail -30 /tmp/collect.txt
+              exit 1
+            fi
+            count=$(grep -oE '[0-9]+ tests? collected' /tmp/collect.txt | tail -1 | grep -oE '^[0-9]+')
+            if [ -z "$count" ] || [ "$count" -eq 0 ]; then
+              echo "::error::$target collected zero tests; a target that collects nothing"\
+                   "is a failure, not a green suite"
+              tail -30 /tmp/collect.txt
+              exit 1
+            fi
+            echo "$target: $count tests collected"
+          done
+      - name: Risk Authority distribution verifier
+        run: python packages/risk_authority/verify_risk_authority_distribution.py
+      - name: Trusted Evidence Authority distribution verifier
+        run: |
+          python packages/trusted-evidence-authority/verify_trusted_evidence_authority_distribution.py
+      - name: Platform freeze verifier (substantive digest must not move)
+        run: python -m platform_freeze.verify
+
+  isolated-install:
+    name: Wheel + sdist build, offline isolated install, source-vs-installed parity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      # Host-side tooling only. This is the RUNNER environment, not the isolated
+      # installation under test: the verifier builds its own throwaway virtualenv and
+      # installs into it with the index structurally disabled (--no-index, PIP_NO_INDEX,
+      # an unroutable sentinel index, no cache, no pip upgrade, no editable install).
+      - name: Install build tooling (host environment)
+        run: |
+          python -m pip install --upgrade pip
+          # numpy + the TEV backends are needed by the HOST step that computes the
+          # source-side expected digests: it imports the controller and TEV from the source
+          # tree. They are unrelated to the isolated environment, which gets its own copies
+          # from the local wheelhouse with no index reachable.
+          pip install build wheel pytest numpy \
+                      "cryptography>=41.0.7,<47.0.0" "PyNaCl>=1.5.0,<2.0.0"
+      - name: Genuinely offline isolated install + negative controls + source-vs-installed
+        # Phase A (online) builds first-party wheels and downloads the full dependency
+        # closure into a local wheelhouse. Phase B installs from that wheelhouse alone with
+        # no index reachable — that is the guarantee, and the closing banner names exactly
+        # it. Phase C proves it by negative control. Phase D probes installed behaviour
+        # against the source digests.
+        run: |
+          python packages/integration/cloud-scaling-producer-attestation/scripts/verify_isolated_install.py
+      - name: Build sdist + wheel (distribution artifacts)
+        run: python -m build packages/integration/cloud-scaling-producer-attestation
+      - name: Wheel contents — no test, fixture or conftest leakage
+        run: |
+          python - <<'PY'
+          import pathlib, zipfile
+          dist = pathlib.Path("packages/integration/cloud-scaling-producer-attestation/dist")
+          wheels = sorted(dist.glob("*.whl"))
+          sdists = sorted(dist.glob("*.tar.gz"))
+          assert wheels, "no wheel was built"
+          assert sdists, "no sdist was built"
+          names = zipfile.ZipFile(wheels[-1]).namelist()
+          top = {n.split("/")[0] for n in names}
+          assert top <= {
+              "ugence_cloud_scaling_producer_attestation",
+              "ugence_cloud_scaling_producer_attestation-0.1.0.dist-info",
+          }, f"unexpected top-level entries in the wheel: {sorted(top)}"
+          for n in names:
+              base = n.split("/")[-1]
+              assert base != "conftest.py", f"conftest leaked: {n}"
+              assert not base.startswith("test_"), f"test module leaked: {n}"
+              assert "/tests/" not in n, f"test package leaked: {n}"
+              assert base != "_producer_fixtures.py", f"fixtures leaked: {n}"
+          assert any(n.endswith("py.typed") for n in names), "py.typed missing from the wheel"
+          print(f"wheel contents OK ({len(names)} entries): {wheels[-1].name}")
+          print(f"sdist built: {sdists[-1].name}")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cloud-scaling-producer-attestation-dist
+          path: packages/integration/cloud-scaling-producer-attestation/dist/*
+          if-no-files-found: warn
+
+  guard-sweep:
+    name: Gate-removal mutation sweep (every inventoried `if` guard scored, none unresolved)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install tooling + first-party packages (editable)
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest numpy "cryptography>=41.0.7,<47.0.0" "PyNaCl>=1.5.0,<2.0.0"
+          pip install -e packages/risk_authority
+          pip install -e packages/trusted-evidence-authority
+          pip install -e packages/capabilities/cloud-scaling-controller
+          pip install -e packages/integration/cloud-scaling-risk-integration
+          pip install -e packages/integration/cloud-scaling-authorization-contracts
+          pip install -e packages/integration/cloud-scaling-producer-attestation
+      - name: Regenerate the guard sweep and prove it is unchanged
+        # The sweep refuses to report if `git status` over `src/` differs before and after,
+        # so a run that mutated the tracked tree fails here rather than being published.
+        run: |
+          python packages/integration/cloud-scaling-producer-attestation/scripts/guard_sweep.py
+          git diff --exit-code -- \
+            packages/integration/cloud-scaling-producer-attestation/GUARD_SWEEP.md \
+            packages/integration/cloud-scaling-producer-attestation/guard_sweep.json
+      - name: The tracked worktree is clean after the sweep
+        run: git diff --exit-code
+
+  documentation:
+    name: Terminology + documentation-link validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+      - name: Terminology validation
+        run: python scripts/validate_terminology.py
+      - name: Documentation-link validation
+        run: python scripts/check_doc_links.py

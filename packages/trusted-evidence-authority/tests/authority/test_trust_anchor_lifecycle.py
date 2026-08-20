@@ -185,11 +185,20 @@ def test_a_resolver_may_not_answer_a_question_it_was_not_asked():
 # --------------------------------------------------------------------------- #
 
 def test_an_anchor_holds_exactly_one_capability():
-    """One key, one role — unrepresentable to violate."""
+    """One key, one role — unrepresentable to violate.
+
+    The role vocabulary now carries a third member,
+    ``CLOUD_SCALING_RECOMMENDATION_ATTESTATION``, lent to the Cloud Scaling
+    producer-attestation consumer. It changes nothing here: an anchor still holds
+    exactly one capability, the two evidence roles keep their spelling and order, and
+    no path in this package resolves the lent member (see
+    ``test_lent_capability_disjointness.py``).
+    """
 
     assert [m.name for m in TrustAnchorCapability] == [
         "EVIDENCE_PRODUCTION",
         "RECEIPT_ISSUANCE",
+        "CLOUD_SCALING_RECOMMENDATION_ATTESTATION",
     ]
     anchor = authority_anchor()
     assert isinstance(anchor.capability, TrustAnchorCapability)

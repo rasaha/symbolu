@@ -435,8 +435,51 @@ falls back to an index.
 
 Tests enforce both directions: nothing outside the standard library and the two
 declared backends is imported, the backends are imported from exactly one
-module, and **no package in the monorepo imports this one** — TEV-1/TEV-2
-authorize no consumer integration (UVI-EV-1 is DEFERRED).
+module, and **exactly one consumer package imports this one**, under an exact,
+reviewed symbol grant.
+
+**The sole consumer exception.**
+`packages/integration/cloud-scaling-producer-attestation` — Cloud Scaling Phase
+5B-0A, producer authenticity — is authorized to import this package's **public
+trust-anchor contracts and resolver port**, and nothing else. The grant exists so
+the repository has one trust-anchor model and one store rather than a second one
+grown alongside it.
+
+It is deliberately narrow, and enforced rather than described
+(`tests/packaging/test_dependency_boundary.py`):
+
+* **One consumer.** A second consumer package fails the boundary test, including
+  a sibling directory whose name merely begins with the authorized path — the
+  match is on resolved path components, never a string prefix.
+* **Exact symbols.** Fifteen production symbols (the trust-anchor contract, the
+  resolver port, the Ed25519 key and codec types the contract is spelled in, the
+  two ratified signature identifiers and the resolver refusal vocabulary), plus
+  `StaticTrustAnchorDirectory` listed separately as reference grade, plus one
+  test-only contract-error type. Any other symbol fails, including every evidence,
+  observation, measurement, claim, receipt, trust-stage, admission and
+  verification-engine surface.
+* **Exact import forms.** Binding this package as a module object is refused in
+  the consumer's production source (a module binding permits arbitrary attribute
+  access); internal submodule imports, star imports, dynamic imports and aliased
+  forbidden symbols are refused everywhere. Tests are enumerated by the boundary,
+  not exempted from it, and no exception exists for `conftest.py`, docs paths,
+  comments or `# noqa`.
+
+**The dependency is one-way, and confers no authority.** Nothing in this package
+imports Cloud Scaling, and this package neither verifies, admits nor approves a
+Cloud Scaling recommendation. It lends the `TrustAnchorCapability` member
+`CLOUD_SCALING_RECOMMENDATION_ATTESTATION` as a *vocabulary*: no evidence path and
+no receipt path here admits it, and holding it grants no evidence-production or
+receipt-issuance entitlement
+(`tests/authority/test_lent_capability_disjointness.py`). Verification of a
+recommendation attestation belongs entirely to the consumer.
+
+`StaticTrustAnchorDirectory` remains reference grade: the consumer refuses it
+under `production_mode=True`, and every other resolver must opt in explicitly.
+
+This is **not** ADR §30's UVI-EV-1, which remains **DEFERRED**. UVI-EV-1 is
+readiness consuming *receipts and resolved definitions*; the grant above consumes
+payload-neutral trust-anchor contracts, no receipt and no evidence.
 
 ### Versioning judgement
 
@@ -786,6 +829,12 @@ fail-closed outcomes, deterministic audit records, and dedicated package CI.
 
 Also absent by design: network trust-anchor retrieval, certificate-authority
 infrastructure, credential issuance, receipt persistence or distribution
-services, ActionGate or deployment authorization, Cloud Scaling integration, and
-generic multi-algorithm cryptographic agility. **No consumer imports this
-package**, and a test enforces that.
+services, ActionGate or deployment authorization, Cloud Scaling **verification or
+authorization**, and generic multi-algorithm cryptographic agility.
+
+**Exactly one consumer imports this package**, under the exact symbol grant
+described above: Cloud Scaling Phase 5B-0A, for the public trust-anchor contracts
+and resolver port. That package resolves its own anchors and runs its own
+verification; this package supplies the anchor contract and the lent capability
+coordinate, and decides nothing about a Cloud Scaling recommendation. A test
+enforces both the single-consumer rule and the symbol grant.
