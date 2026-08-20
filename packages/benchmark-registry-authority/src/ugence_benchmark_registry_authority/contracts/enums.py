@@ -69,7 +69,7 @@ class BenchmarkRegistrationState(str, Enum):
 
     At BR-2A no member is ever *established* — every payload carrying one
     permanently derives that registry admission and trusted resolution are not
-    established. The vocabulary exists so that BR-2B's admission engine has a
+    established. The vocabulary exists so that BR-2D's admission path has a
     ratified relation to move through, not so that a caller can assert a
     position in it.
     """
@@ -171,7 +171,7 @@ class BenchmarkRegistryFaultClass(str, Enum):
     STORE_INTEGRITY = "STORE_INTEGRITY"
 
     #: A publisher, key, signature or approval could not be trusted. This is the
-    #: class that BR-2B's deny-all verifier returns for everything until BR-2C
+    #: class BR-2C's verifier will attach once real verification exists; until
     #: supplies an audited verifier.
     TRUST_AND_AUTHENTICITY = "TRUST_AND_AUTHENTICITY"
 

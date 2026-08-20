@@ -2,7 +2,8 @@
 
 All notable changes to this distribution. The format follows Keep a Changelog;
 versioning is Semantic Versioning, and the version ladder is the ratified
-subphase ladder: BR-2A `0.1.0`, BR-2B `0.2.0`, BR-2C `0.3.0`, BR-2D `0.4.0`.
+subphase ladder: BR-2A `0.1.0`, BR-2B `0.2.0`, BR-2C `0.3.0`, BR-2D `0.4.0`,
+BR-2E `0.5.0` (ADR §35 D-01, amended 2026-08-20).
 
 ## [0.1.0] — BR-2A: registry and exact-resolution contracts
 

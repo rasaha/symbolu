@@ -69,7 +69,7 @@
         "algorithm_identifier": null,
         "unicode_version": null,
         "completeness_claim": "NONE. No complete Unicode-confusable algorithm is claimed at this version. The deterministic algorithm and its version are not yet specified or tested, so the slot is explicitly empty rather than partially filled — a partial implementation presented as complete would leave a consumer believing this class of attack is handled.",
-        "implemented_by": "no code in BR-2A. BR-2A holds no registry and no set of occupied locators; the comparison belongs to BR-2B's admission path, which must implement this contract."
+        "implemented_by": "no code in BR-2A. BR-2A holds no registry and no set of occupied locators; the comparison belongs to BR-2B's conflict calculation, which must implement this contract."
       }
     },
     "BENCHMARK_EXACT_RESOLUTION_REQUEST_DIGEST_DOMAIN": {
@@ -94,7 +94,7 @@
     },
     "BENCHMARK_PRODUCTION_ADAPTER_ADMISSION_REQUIREMENT": {
       "kind": "constant",
-      "value": "The production composition root admits only an allow-listed set of adapter classes, checked by interpreter identity (`cls is AllowedAdapter`) — the sealed-registry pattern no subclass, same-named lookalike or metaclass can defeat — and raises BenchmarkRegistryCompositionError for anything else. There is no settable flag, because D-15 retires the flag: an unavailable consistency guarantee must never be a Boolean one assignment away from a production deployment on an in-memory store. This requirement is stated here and implemented nowhere in this distribution; BR-2B and BR-2D own the composition root that enforces it."
+      "value": "The production composition root admits only an allow-listed set of adapter classes, checked by interpreter identity (`cls is AllowedAdapter`) — the sealed-registry pattern no subclass, same-named lookalike or metaclass can defeat — and raises BenchmarkRegistryCompositionError for anything else. There is no settable flag, because D-15 retires the flag: an unavailable consistency guarantee must never be a Boolean one assignment away from a production deployment on an in-memory store. This requirement is stated here and implemented nowhere in this distribution; BR-2D owns the composition root that enforces it."
     },
     "BENCHMARK_PUBLISHER_SUBMISSION_ENVELOPE_DIGEST_DOMAIN": {
       "kind": "constant",

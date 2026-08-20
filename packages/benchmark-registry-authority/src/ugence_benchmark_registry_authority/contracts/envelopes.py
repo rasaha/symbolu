@@ -29,8 +29,8 @@ None of that verifies anything. Every envelope permanently derives
 ``signature_verified is False`` and ``admission_established is False`` on top of
 §09's five, and **BR-2A implements no signing, no verification and no key
 parsing**, and ships no cryptographic dependency. D-03 makes a verified
-publisher signature mandatory *before admission*; BR-2B's injected verifier
-defaults to exact deny-all, and BR-2C supplies the audited one. Until then
+publisher signature mandatory *before admission*; BR-2C injects the verifier,
+whose default is exact deny-all, and supplies the audited one. Until then
 nothing can be admitted, which is the intended state and not a limitation to be
 worked around.
 

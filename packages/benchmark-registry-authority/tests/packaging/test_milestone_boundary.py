@@ -9,44 +9,169 @@ import re
 
 import pytest
 
+from _milestones import (
+    SUBPHASE_LADDER,
+    VERSION_SUBPHASE,
+    banned_capability_tokens,
+)
+
 import ugence_benchmark_registry_authority as pkg
 from ugence_benchmark_registry_authority import api
 
 PKG = pathlib.Path(__file__).resolve().parents[2]
 SRC = PKG / "src" / "ugence_benchmark_registry_authority"
 
-#: Every capability §05 forbids, as the name a class or function would carry.
-FORBIDDEN_CAPABILITY_TOKENS = (
-    "admissionengine",
-    "admission_engine",
-    "registryengine",
-    "storage",
-    "store_impl",
-    "signatureverifier",
-    "signature_verifier",
-    "keyparser",
-    "key_parser",
-    "trustanchorstore",
-    "trust_anchor_store",
-    "approvalverifier",
-    "approval_verifier",
-    "resolverimpl",
-    "resolver_impl",
-    "convenienceresolver",
-    "selectionapi",
-    "selection_api",
-    "supersessionengine",
-    "adapterregistry",
-    "adapter_registry",
-    "identityallowlist",
-    "identity_allow_list",
-    "productioncompositionroot",
-    "production_composition_root",
+#: Every capability §05 forbids, as the name a class or function would carry,
+#: mapped to the subphase that may **first** ship it — D-19's milestone-
+#: conditional form.
+#:
+#: ``None`` means **permanently banned, at every subphase**, and those entries
+#: are not deferrals: D-07 rules that no convenience resolver or selection API
+#: exists *ever*, and D-10 puts supersession out of BR-2 scope entirely. Folding
+#: those into "not yet" would quietly convert a permanent prohibition into a
+#: schedule, which is the exact weakening this restructuring must not perform.
+FORBIDDEN_CAPABILITY_UNLOCK = {
+    "admissionengine": "BR-2D",
+    "admission_engine": "BR-2D",
+    "registryengine": "BR-2D",
+    "storage": "BR-2D",
+    "store_impl": "BR-2D",
+    "signatureverifier": "BR-2C",
+    "signature_verifier": "BR-2C",
+    "keyparser": "BR-2C",
+    "key_parser": "BR-2C",
+    "trustanchorstore": "BR-2C",
+    "trust_anchor_store": "BR-2C",
+    "approvalverifier": "BR-2C",
+    "approval_verifier": "BR-2C",
+    "resolverimpl": "BR-2D",
+    "resolver_impl": "BR-2D",
+    "convenienceresolver": None,
+    "selectionapi": None,
+    "selection_api": None,
+    "supersessionengine": None,
+    "adapterregistry": "BR-2D",
+    "adapter_registry": "BR-2D",
+    "identityallowlist": "BR-2D",
+    "identity_allow_list": "BR-2D",
+    "productioncompositionroot": "BR-2D",
+    "production_composition_root": "BR-2D",
+}
+
+#: The exact token set BR-2A froze. Pinned separately from the map above so a
+#: restructuring cannot drop an entry unnoticed: a token that vanished from the
+#: map would simply stop being checked, and nothing else would fail.
+BR2A_FROZEN_CAPABILITY_TOKENS = frozenset(
+    {
+        "admissionengine",
+        "admission_engine",
+        "registryengine",
+        "storage",
+        "store_impl",
+        "signatureverifier",
+        "signature_verifier",
+        "keyparser",
+        "key_parser",
+        "trustanchorstore",
+        "trust_anchor_store",
+        "approvalverifier",
+        "approval_verifier",
+        "resolverimpl",
+        "resolver_impl",
+        "convenienceresolver",
+        "selectionapi",
+        "selection_api",
+        "supersessionengine",
+        "adapterregistry",
+        "adapter_registry",
+        "identityallowlist",
+        "identity_allow_list",
+        "productioncompositionroot",
+        "production_composition_root",
+    }
+)
+
+
+#: The tokens banned at the subphase this distribution currently is.
+FORBIDDEN_CAPABILITY_TOKENS = tuple(
+    sorted(
+        banned_capability_tokens(
+            VERSION_SUBPHASE[api.__version__], FORBIDDEN_CAPABILITY_UNLOCK
+        )
+    )
 )
 
 
 def test_happy_the_package_version_is_the_br2b_version():
     assert api.__version__ == "0.2.0"
+
+
+# --------------------------------------------------------------------------- #
+# D-19: the bans became milestone-conditional. They did not become weaker.
+# --------------------------------------------------------------------------- #
+def test_the_effective_ban_set_is_exactly_what_br2a_froze():
+    """The whole point of the restructuring: nothing unlocks at BR-2B.
+
+    D-19 makes the capability bans milestone-conditional. This asserts the
+    change is structural rather than permissive — at this version the effective
+    ban set must equal BR-2A's frozen set **exactly**, in both directions. A
+    token that quietly acquired an already-reached unlock phase would show up
+    here as a missing element, not as a silently passing suite.
+    """
+
+    assert FORBIDDEN_CAPABILITY_TOKENS != ()
+    assert set(FORBIDDEN_CAPABILITY_TOKENS) == BR2A_FROZEN_CAPABILITY_TOKENS
+
+
+def test_every_frozen_token_still_carries_an_unlock_ruling():
+    """A token dropped from the map would simply stop being checked."""
+
+    assert set(FORBIDDEN_CAPABILITY_UNLOCK) == BR2A_FROZEN_CAPABILITY_TOKENS
+
+
+def test_no_capability_unlocks_at_br2b_at_all():
+    assert banned_capability_tokens("BR-2B", FORBIDDEN_CAPABILITY_UNLOCK) == (
+        BR2A_FROZEN_CAPABILITY_TOKENS
+    )
+
+
+def test_the_permanent_bans_never_unlock_at_any_subphase():
+    """D-07 and D-10 are prohibitions, not deferrals.
+
+    No convenience resolver and no selection API exists ever (D-07); supersession
+    is out of BR-2 scope entirely (D-10). Folding those into "not yet" would
+    convert a permanent ruling into a schedule.
+    """
+
+    permanent = {
+        token
+        for token, unlock in FORBIDDEN_CAPABILITY_UNLOCK.items()
+        if unlock is None
+    }
+    assert permanent == {
+        "convenienceresolver",
+        "selectionapi",
+        "selection_api",
+        "supersessionengine",
+    }
+    for subphase in SUBPHASE_LADDER:
+        still = banned_capability_tokens(subphase, FORBIDDEN_CAPABILITY_UNLOCK)
+        assert permanent <= still, subphase
+
+
+def test_every_unlock_phase_named_is_a_real_subphase():
+    for token, unlock in FORBIDDEN_CAPABILITY_UNLOCK.items():
+        assert unlock is None or unlock in SUBPHASE_LADDER, token
+
+
+def test_no_capability_is_scheduled_to_unlock_at_or_before_this_version():
+    """An unlock in the past would be a ban this release already lifted."""
+
+    reached = SUBPHASE_LADDER.index(VERSION_SUBPHASE[api.__version__])
+    for token, unlock in FORBIDDEN_CAPABILITY_UNLOCK.items():
+        if unlock is None:
+            continue
+        assert SUBPHASE_LADDER.index(unlock) > reached, token
 
 
 def _is_port_declaration(name: str, value) -> bool:

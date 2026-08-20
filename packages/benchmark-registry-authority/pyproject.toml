@@ -6,31 +6,44 @@
 # (ugence-benchmark-registry, 0.1.0) and this separate authority/registry layer.
 # BR-2 behaviour never enters BR-1.
 #
-# BR-2A (this release, 0.1.0) — "Registry and exact-resolution CONTRACTS."
+# BR-2A (0.1.0) — "Registry and exact-resolution CONTRACTS."
 # Record, event, envelope and request shapes; the registry lifecycle vocabulary
 # and its closed relation; exactly one structural representation bound to each
-# transition; typed refusals; ports as Protocols; fifteen new digest domains;
-# pure validation. Contracts only.
+# transition; typed refusals; ports as Protocols; fifteen digest domains; pure
+# validation. Contracts only.
+#
+# BR-2B (this release, 0.2.0) — "NON-AUTHORITATIVE LIFECYCLE KERNEL."
+# Transition validation, predecessor checks, terminality, and conflict and
+# idempotency calculation, all over CALLER-ASSERTED state. Three further digest
+# domains. It determines what transition WOULD BE valid; nothing here makes one
+# occur.
 #
 # NOT in this distribution and not started:
-#   BR-2B (0.2.0) admission engine, six-stage ordering, hash-chained event log,
-#                 process-local in-memory adapter, CAS slot claim, byte
-#                 idempotence, typed conflict, exact resolution. Its verifier is
-#                 injected and defaults to exact deny-all.
-#   BR-2C (0.3.0) audited Ed25519 verifier, composition-root trust-resolver
-#                 adapter, key entitlements and revocation. Blocked on a secure
-#                 cryptographic verifier and trust-resolver design, specified
-#                 and independently audited.
-#   BR-2D (0.4.0) durable adapter, production composition root, registry-event
-#                 signing. Blocked on ADR DD-10.
+#   BR-2C (0.3.0) cryptographic trust authority: audited Ed25519 verifier,
+#                 signing-frame verification, composition-root trust-resolver
+#                 adapter, key entitlements and revocation. The injected
+#                 verifier arrives here, defaulting to exact deny-all. Blocked
+#                 on a secure cryptographic verifier and trust-resolver design,
+#                 specified and independently audited.
+#   BR-2D (0.4.0) durable registry authority: persistence, the trusted clock,
+#                 compare-and-set transitions, immutable event history, the
+#                 process-local in-memory adapter, registry-event signing, and
+#                 the first authoritative admission, registration, revocation
+#                 and exact resolution. Closes with the identity-locked
+#                 composition root. Blocked on ADR DD-10.
+#   BR-2E (0.5.0) production composition and operations: tenant authorization,
+#                 service APIs, deployment controls, migrations,
+#                 backup/recovery, observability, audit export.
 #
-# This package ships NO admission engine, storage implementation, signature
-# verifier, key parser, trust-anchor store, approval verifier, clock read,
-# resolver, convenience resolver, selection API, supersession implementation,
-# adapter registry, identity allow-list, production composition root, or
-# cryptographic dependency. A capability that does not exist is unrepresentable
-# in the type surface, not merely unimplemented. Automated tests enforce every
-# one of those facts.
+# This package ships NO store of any kind, signature verifier, key parser,
+# trust-anchor store, approval verifier, clock read, append path,
+# authority-issued result, resolver, convenience resolver, selection API,
+# supersession implementation, adapter registry, identity allow-list,
+# production composition root, or cryptographic dependency. BR-2B is
+# non-authoritative BY CONSTRUCTION, not by an injected default: there is
+# nothing here for a substituted component to unlock. A capability that does
+# not exist is unrepresentable in the type surface, not merely unimplemented.
+# Automated tests enforce every one of those facts.
 #
 # EXACTLY ONE runtime dependency: the frozen BR-1 identity layer, pinned to its
 # 0.1 line. Nothing else, Ugence or third party. The isolated --no-index install

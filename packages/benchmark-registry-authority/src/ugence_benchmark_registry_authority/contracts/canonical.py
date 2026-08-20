@@ -49,8 +49,8 @@ The encoder consults **no** wall clock, locale, timezone database, environment
 variable, filesystem or network. ``astimezone`` is always called with an
 explicit ``timezone.utc`` target, never the zero-argument form that would infer
 the local zone. ``tests/contract/test_timestamps.py`` asserts this
-structurally over the whole source tree, not merely for one code path — **BR-2A
-reads no clock anywhere**, which is D-11 as ratified.
+structurally over the whole source tree, not merely for one code path —
+**neither BR-2A nor BR-2B reads a clock anywhere**, which is D-11 as amended.
 
 Derived digests never enter the body
 ------------------------------------
@@ -70,10 +70,11 @@ Domain separation and versioning
 --------------------------------
 ADR §22.1 requires every digest to bind a canonicalization version and a
 domain-separation tag. BR-1 minted exactly one domain because it introduced
-exactly one artifact class. **BR-2A introduces fifteen distinct artifact
-classes, and mints exactly fifteen domains** — one per class this subphase
-actually ships, and **no tag for an artifact that does not exist**. The
-authority-issued result types reserved for BR-2B and BR-2C
+exactly one artifact class. **BR-2A introduced fifteen distinct
+artifact classes and minted exactly fifteen domains; BR-2B appends three more**
+— one per class each subphase actually ships, and **no tag for an artifact that
+does not exist**. The
+authority-issued result types reserved for BR-2D
 (``BenchmarkAdmissionDecision``, ``BenchmarkRegistrationEvent``,
 ``BenchmarkResolution``) have no domain here, because they have no definition
 here: a tag without an artifact is an unused constant a later milestone would
@@ -123,8 +124,9 @@ BR-2A payloads nest **frozen BR-1 contracts** — the exact
 :class:`~ugence_benchmark_registry.BenchmarkApplicabilityCoordinate` inside it.
 The registry therefore records two capabilities per class:
 
-* **root-canonicalizable** — the class owns a BR-2A domain and may be handed to
-  :func:`canonical_bytes` directly. The fifteen BR-2A contract classes.
+* **root-canonicalizable** — the class owns a domain minted here and may be
+  handed to :func:`canonical_bytes` directly. Eighteen contract classes: BR-2A's
+  fifteen and BR-2B's three.
 * **nested-admissible only** — the class may appear *inside* a BR-2A graph and
   is encoded and revalidated there, but owns no BR-2A domain and is refused as a
   root. The three BR-1 classes that actually nest.

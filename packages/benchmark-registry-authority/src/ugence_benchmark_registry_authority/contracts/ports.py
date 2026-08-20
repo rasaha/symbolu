@@ -11,8 +11,9 @@ and **nothing in this package satisfies any of them**:
 What is deliberately absent
 ---------------------------
 No port implementation. **No deny-all implementation** — not even that one: a
-deny-all verifier is BR-2B's, where an injected verifier and a test proving
-nothing can reach ``ADMITTED`` belong together. No in-memory store, no adapter
+deny-all verifier is BR-2C's, where an injected verifier and a test proving
+nothing can reach ``ADMITTED`` belong together. BR-2B has no verifier to default,
+because it performs no authoritative act for one to gate. No in-memory store, no adapter
 registry, no identity allow-list executing adapter admission, and no production
 composition root.
 
@@ -95,7 +96,7 @@ __all__ = [
 class BenchmarkRegistryStorePort(Protocol):
     """The append-only registry store seam. **Declared here, implemented nowhere.**
 
-    D-14: BR-2A defines the port; BR-2B ships a clearly named *process-local*
+    D-14 as amended: BR-2A defines the port; **BR-2D** ships the clearly named *process-local*
     in-memory adapter; production composition raises a typed startup error when
     handed the non-production adapter — a warning or a docstring is
     insufficient. No Postgres, no reuse of Risk Authority persistence, and no
@@ -168,8 +169,8 @@ class BenchmarkApprovalVerifierPort(Protocol):
     BR-2A may define this contract and **must not implement or simulate
     signature verification** — including a permissive placeholder, a
     "development" verifier, or a :class:`NotImplementedError` body pretending to
-    be an implementation. BR-2B injects a verifier whose default is exact
-    deny-all; BR-2C supplies the audited one, reusing neither the Policy
+    be an implementation. **BR-2B ships no verifier at all**; BR-2C injects one
+    whose default is exact deny-all and supplies the audited one, reusing neither the Policy
     Authority nor the Risk Authority Ed25519 implementation.
     """
 
@@ -322,6 +323,6 @@ BENCHMARK_PRODUCTION_ADAPTER_ADMISSION_REQUIREMENT = (
     "There is no settable flag, because D-15 retires the flag: an unavailable "
     "consistency guarantee must never be a Boolean one assignment away from a "
     "production deployment on an in-memory store. This requirement is stated "
-    "here and implemented nowhere in this distribution; BR-2B and BR-2D own the "
+    "here and implemented nowhere in this distribution; BR-2D owns the "
     "composition root that enforces it."
 )

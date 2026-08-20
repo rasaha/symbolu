@@ -11,7 +11,7 @@ records a refused attempt outside it.
 Every one of them is a **structural counterpart**, never an authority-issued
 result. The authority-bearing names ``BenchmarkAdmissionDecision``,
 ``BenchmarkRegistrationEvent`` and ``BenchmarkResolution`` are reserved for
-types producible only through a ratified authority boundary at BR-2B and later,
+types producible only through a ratified authority boundary at BR-2D and later,
 and **BR-2A does not define them**. Everything here is suffixed ``Payload`` and
 permanently derives §09's five ``False`` properties.
 
@@ -448,8 +448,10 @@ class BenchmarkPostAdmissionRejectionEventPayload:
     ``declared_outcome`` to be exactly ``ADMITTED``**, refusing any other value.
 
     Permitted only while no registration record has been appended. BR-2A holds no
-    registry state, so it cannot check that here — the check belongs to BR-2B's
-    append path, which does hold the log. What BR-2A *can* and does make
+    registry state, so it cannot check that here. BR-2B's
+    :class:`~.kernel.BenchmarkTransitionPlan` checks it against the *asserted*
+    record presence a caller supplies; BR-2D's append path, which holds the log,
+    checks it against the observed one. What BR-2A *can* and does make
     structural is that the predecessor was admitted, and that this event is
     terminal.
 
@@ -732,8 +734,8 @@ class BenchmarkRevocationEventPayload:
 
         Never the registry's observed time, never a substitute for
         :attr:`declared_recorded_at`, and never validated here: D-11's
-        validation against registry-observed time belongs to BR-2B, which has a
-        clock. BR-2A has none.
+        validation against registry-observed time belongs to BR-2D, which has
+        the authoritative clock. Neither BR-2A nor BR-2B reads one.
         """
 
         return self.revocation_envelope.effective_at

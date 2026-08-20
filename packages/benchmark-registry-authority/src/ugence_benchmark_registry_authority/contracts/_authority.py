@@ -106,7 +106,7 @@ _AUTHORITY_DOC = {
     "registry_admission_established": (
         "Permanently ``False``. Nothing in this package can admit anything. "
         "The six-stage admission ordering, the append-only log and the slot "
-        "claim are BR-2B; a caller-constructed payload declaring ``ADMITTED`` "
+        "claim are BR-2D; a caller-constructed payload declaring ``ADMITTED`` "
         "records a declaration and nothing else."
     ),
     "trusted_resolution_established": (
