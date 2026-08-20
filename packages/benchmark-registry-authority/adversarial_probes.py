@@ -65,6 +65,7 @@ from ugence_benchmark_registry_authority.api import (
     BenchmarkRegistrySnapshotAssertion,
     BenchmarkTransitionPlan,
     BenchmarkTransitionRefusal,
+    BenchmarkPlanningOutcome,
     BENCHMARK_REGISTRATION_TRANSITIONS,
     is_byte_identical_resubmission,
     plan_submission_outcome,
@@ -1195,18 +1196,129 @@ def _q61():
         )
 
 
-@probe("Q-62 no planning function accepts a transition plan as input")
+@probe("Q-62 no callable in contracts/ accepts a plan, by resolved type identity")
 def _q62():
+    """Resolved, not matched. This harness derives it independently.
+
+    A substring rule reading the annotation text is walked past by an alias, by
+    a Union member, or by omitting the annotation entirely — which is how the
+    suite's version of this check came to pass a plan-consuming callable. Here
+    the hints are resolved through typing.get_type_hints, every Union and
+    generic is walked to its leaves, and membership is decided by ``is``.
+    """
+
+    import importlib
     import inspect
+    import pathlib as _pl
+    import typing
 
-    from ugence_benchmark_registry_authority.contracts import planning
+    plan = BenchmarkTransitionPlan
 
-    for name in planning.__all__:
-        value = getattr(planning, name)
-        if not inspect.isfunction(value):
+    def leaves(annotation):
+        found, pending, seen = set(), [annotation], []
+        while pending:
+            current = pending.pop()
+            if any(current is s for s in seen):
+                continue
+            seen.append(current)
+            if isinstance(current, type):
+                found.add(current)
+            origin = typing.get_origin(current)
+            if isinstance(origin, type):
+                found.add(origin)
+            pending.extend(typing.get_args(current))
+        return found
+
+    root = _pl.Path(
+        importlib.import_module(
+            "ugence_benchmark_registry_authority.contracts"
+        ).__file__
+    ).parent
+    ns = "ugence_benchmark_registry_authority"
+    offenders, unannotated, checked = [], [], 0
+
+    for path in sorted(root.glob("*.py")):
+        if path.name == "__init__.py":
             continue
-        for parameter in inspect.signature(value).parameters.values():
-            assert "BenchmarkTransitionPlan" not in str(parameter.annotation), name
+        module = importlib.import_module(f"{ns}.contracts.{path.stem}")
+        functions = []
+        for value in vars(module).values():
+            if inspect.isfunction(value):
+                functions.append(value)
+            elif inspect.isclass(value) and str(
+                getattr(value, "__module__", "")
+            ).startswith(ns):
+                for member in vars(value).values():
+                    if inspect.isfunction(member):
+                        functions.append(member)
+                    elif isinstance(member, property) and member.fget:
+                        functions.append(member.fget)
+        for func in functions:
+            code = getattr(func, "__code__", None)
+            if code is None or not str(code.co_filename).startswith(str(root)):
+                continue  # imported or compiler-generated, not written here
+            checked += 1
+            try:
+                hints = typing.get_type_hints(func)
+            except Exception:
+                unannotated.append(func.__qualname__)
+                continue
+            for name in inspect.signature(func).parameters:
+                if name in ("self", "cls"):
+                    continue
+                if name not in hints:
+                    unannotated.append(f"{func.__qualname__}({name})")
+                elif plan in leaves(hints[name]):
+                    offenders.append(f"{func.__qualname__}({name})")
+
+    assert checked > 50, checked
+    assert offenders == [], offenders
+    assert unannotated == [], unannotated
+
+    # The check must be able to fail. Plant the three shapes that walked past
+    # the substring rule and require the leaf-walker to see each one. The
+    # annotation object is attached directly rather than written as a local
+    # alias in a source annotation, because get_type_hints resolves a PEP 563
+    # string against the function's globals and would never see a local name.
+    aliased = plan
+    optional_alias = typing.Optional[aliased]
+    nested = typing.Dict[str, typing.List[aliased]]
+
+    def _commit(candidate):
+        return None
+
+    _commit.__annotations__ = {"candidate": optional_alias}
+
+    assert plan in leaves(aliased), "a bare alias is invisible"
+    assert plan in leaves(optional_alias), "an Optional alias is invisible"
+    assert plan in leaves(nested), "a nested alias is invisible"
+    assert plan in leaves(_commit.__annotations__["candidate"])
+    assert "BenchmarkTransitionPlan" not in "optional_alias"
+
+
+@probe("Q-64 no planner returns a lifecycle payload, through a resolved Union")
+def _q64():
+    import typing
+
+    forbidden = {
+        BenchmarkSubmissionRecordPayload,
+        BenchmarkAdmissionDecisionPayload,
+        BenchmarkPostAdmissionRejectionEventPayload,
+        BenchmarkRegistrationEventPayload,
+        BenchmarkRevocationEventPayload,
+        BenchmarkConflictRecordPayload,
+    }
+    for func in (plan_transition, plan_submission_outcome):
+        returned = set(typing.get_args(typing.get_type_hints(func)["return"]))
+        assert returned == {
+            BenchmarkTransitionPlan,
+            BenchmarkTransitionRefusal,
+        }, (func.__name__, returned)
+        assert not (returned & forbidden), func.__name__
+
+    # And the alias itself is exactly two members, so widening it is visible.
+    members = set(typing.get_args(BenchmarkPlanningOutcome))
+    assert members == {BenchmarkTransitionPlan, BenchmarkTransitionRefusal}, members
 
 
 @probe("Q-63 a self-inconsistent snapshot fails closed rather than being repaired")

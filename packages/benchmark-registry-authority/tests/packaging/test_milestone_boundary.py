@@ -9,6 +9,12 @@ import re
 
 import pytest
 
+from _boundary import (
+    names_resolving_to,
+    resolved_parameter_types,
+    resolved_return_types,
+    unannotated_parameters,
+)
 from _milestones import (
     SUBPHASE_LADDER,
     VERSION_SUBPHASE,
@@ -487,13 +493,93 @@ def test_br2b_added_exactly_one_verb_and_it_implies_no_authoritative_act():
 # --------------------------------------------------------------------------- #
 # BR-2B plans. It does not apply plans.
 # --------------------------------------------------------------------------- #
-def _annotation_names(annotation) -> set:
-    """Every identifier appearing in a parameter annotation, however spelled."""
+CONTRACTS = SRC / "contracts"
 
-    if annotation is inspect.Parameter.empty:
-        return set()
-    text = annotation if isinstance(annotation, str) else repr(annotation)
-    return set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", text))
+#: Every lifecycle payload a planner must never return.
+LIFECYCLE_PAYLOAD_TYPES = frozenset(
+    {
+        api.BenchmarkSubmissionRecordPayload,
+        api.BenchmarkAdmissionDecisionPayload,
+        api.BenchmarkPostAdmissionRejectionEventPayload,
+        api.BenchmarkRegistrationEventPayload,
+        api.BenchmarkRevocationEventPayload,
+        api.BenchmarkConflictRecordPayload,
+        api.BenchmarkResolutionRecordPayload,
+        api.BenchmarkHistoricalRecordPayload,
+    }
+)
+
+
+def _contract_modules():
+    """Every module under ``contracts/``, imported, for runtime resolution."""
+
+    import importlib
+
+    modules = []
+    for path in sorted(CONTRACTS.rglob("*.py")):
+        if path.name == "__init__.py":
+            continue
+        modules.append(
+            importlib.import_module(
+                "ugence_benchmark_registry_authority.contracts." + path.stem
+            )
+        )
+    return modules
+
+
+NAMESPACE = "ugence_benchmark_registry_authority"
+
+
+def _is_ours(value) -> bool:
+    """Whether ``value`` is defined by this package rather than merely imported.
+
+    ``vars(module)`` includes everything the module imported — ``Enum``,
+    ``datetime``, the BR-1 contracts — and walking their methods would drown the
+    scan in hundreds of stdlib signatures this package neither wrote nor
+    controls. Ownership is decided by ``__module__``, so the scan covers exactly
+    the code this package is answerable for.
+    """
+
+    if not str(getattr(value, "__module__", "")).startswith(NAMESPACE):
+        return False
+    code = getattr(value, "__code__", None)
+    if code is None:
+        return True
+    # Written here, or generated? ``@dataclass`` synthesizes ``__init__``,
+    # ``__eq__`` and ``__repr__`` by ``exec``-ing source with a placeholder
+    # filename, and stamps them with the defining module. They are the
+    # compiler's code, not this package's — nobody can annotate ``__eq__``'s
+    # ``other`` — so the scan covers only functions whose code lives in a file
+    # this package actually contains.
+    try:
+        return CONTRACTS in pathlib.Path(code.co_filename).resolve().parents
+    except (OSError, ValueError):  # pragma: no cover - synthesized filenames
+        return False
+
+
+def _functions_in(module):
+    """Functions and methods **this package defines** in ``module``."""
+
+    seen = []
+    for value in vars(module).values():
+        if inspect.isfunction(value) and _is_ours(value):
+            seen.append(value)
+        elif inspect.isclass(value) and _is_ours(value):
+            for member in vars(value).values():
+                # Members are ownership-checked too, not just their class.
+                # ``EnumType`` copies stdlib functions such as
+                # ``_generate_next_value_`` into every Enum subclass's own
+                # ``__dict__``, so a class this package defines still carries
+                # methods it did not write and cannot annotate.
+                if inspect.isfunction(member) and _is_ours(member):
+                    seen.append(member)
+                elif (
+                    isinstance(member, property)
+                    and member.fget is not None
+                    and _is_ours(member.fget)
+                ):
+                    seen.append(member.fget)
+    return seen
 
 
 def test_no_exported_callable_accepts_a_transition_plan_as_input():
@@ -503,8 +589,11 @@ def test_no_exported_callable_accepts_a_transition_plan_as_input():
     valid; BR-2D is the first phase permitted to assert that one occurred". A
     function that consumed a plan would be the seam through which applying,
     committing, appending, admitting, registering, revoking or resolving one
-    could later arrive — so no exported callable takes it as a parameter at all,
-    and no consumer can be handed a signature that invites it.
+    could later arrive.
+
+    Decided by **class identity** on resolved annotations, never by matching the
+    name in text: an alias, a ``Union`` member or a nested ``Optional`` spells
+    the same type without spelling its name.
     """
 
     offenders = []
@@ -512,20 +601,56 @@ def test_no_exported_callable_accepts_a_transition_plan_as_input():
         value = getattr(pkg, symbol)
         if not callable(value) or inspect.isclass(value):
             continue
-        try:
-            signature = inspect.signature(value)
-        except (TypeError, ValueError):  # pragma: no cover - builtins
-            continue
-        for name, parameter in signature.parameters.items():
-            if "BenchmarkTransitionPlan" in _annotation_names(
-                parameter.annotation
-            ):
+        for name, types in resolved_parameter_types(value).items():
+            if api.BenchmarkTransitionPlan in types:
                 offenders.append(f"{symbol}({name})")
     assert offenders == [], offenders
 
 
+def test_no_callable_under_contracts_accepts_a_plan_however_spelled():
+    """The same identity check over every function and method in ``contracts/``.
+
+    Reaches private helpers and methods that ``pkg.__all__`` never exposes.
+    """
+
+    offenders = []
+    for module in _contract_modules():
+        for func in _functions_in(module):
+            for name, types in resolved_parameter_types(func).items():
+                if api.BenchmarkTransitionPlan in types:
+                    offenders.append(f"{module.__name__}.{func.__qualname__}({name})")
+    assert offenders == [], offenders
+
+
+def test_every_parameter_under_contracts_is_annotated():
+    """An unannotated parameter is the cheapest place to hide a plan.
+
+    The identity checks above can only speak about annotations that exist, so an
+    unannotated parameter inside ``contracts/`` is a **failure**, never a skip.
+    ``self`` and ``cls`` are exempt; nothing else is.
+    """
+
+    offenders = []
+    for module in _contract_modules():
+        for func in _functions_in(module):
+            for name in unannotated_parameters(func):
+                offenders.append(f"{module.__name__}.{func.__qualname__}({name})")
+    assert offenders == [], offenders
+
+
 def test_no_function_anywhere_in_the_source_tree_takes_a_plan_parameter():
-    """The signature check again, over the tree, so a private helper cannot either."""
+    """The source-tree scan, now alias-aware and refusing bare parameters.
+
+    AST cannot resolve an alias, so the names that resolve to the plan type are
+    computed at runtime and the scan matches against that set. This keeps the
+    scan's one advantage over a runtime attribute walk — it sees closures and
+    nested functions, which no module attribute exposes — without keeping its
+    blind spot.
+    """
+
+    alias_names = {api.BenchmarkTransitionPlan.__name__}
+    for module in _contract_modules():
+        alias_names |= names_resolving_to(module, api.BenchmarkTransitionPlan)
 
     offenders = []
     for path in sorted(SRC.rglob("*.py")):
@@ -541,9 +666,20 @@ def test_no_function_anywhere_in_the_source_tree_takes_a_plan_parameter():
                 + [a for a in (args.vararg, args.kwarg) if a is not None]
             )
             for argument in every:
-                if argument.annotation is None:
+                if argument.arg in ("self", "cls"):
                     continue
-                if "BenchmarkTransitionPlan" in ast.unparse(argument.annotation):
+                if argument.annotation is None:
+                    if CONTRACTS in path.parents or path.parent == CONTRACTS:
+                        offenders.append(
+                            f"{path.name}: {node.name}({argument.arg}) unannotated"
+                        )
+                    continue
+                spelled = set(
+                    re.findall(
+                        r"[A-Za-z_][A-Za-z0-9_]*", ast.unparse(argument.annotation)
+                    )
+                )
+                if spelled & alias_names:
                     offenders.append(f"{path.name}: {node.name}({argument.arg})")
     assert offenders == [], offenders
 
@@ -551,27 +687,34 @@ def test_no_function_anywhere_in_the_source_tree_takes_a_plan_parameter():
 def test_no_exported_planner_can_return_a_lifecycle_payload():
     """Planning returns a plan or a refusal. It never returns a chain payload.
 
-    Checked on the live return annotation rather than on names, so a function
-    that quietly started producing a registry event would fail here even if it
-    kept a planning name.
+    Resolved, not read. Every module here uses PEP 563, so the raw return
+    annotation is the *string* ``"BenchmarkPlanningOutcome"`` — one opaque name
+    whose members the previous version never inspected, which made widening the
+    alias to include a registry event completely invisible. The hints are now
+    resolved and every ``Union`` member walked to its class object.
     """
 
-    payload_types = {
-        "BenchmarkSubmissionRecordPayload",
-        "BenchmarkAdmissionDecisionPayload",
-        "BenchmarkPostAdmissionRejectionEventPayload",
-        "BenchmarkRegistrationEventPayload",
-        "BenchmarkRevocationEventPayload",
-        "BenchmarkConflictRecordPayload",
-        "BenchmarkResolutionRecordPayload",
-        "BenchmarkHistoricalRecordPayload",
-    }
     for symbol in pkg.__all__:
         value = getattr(pkg, symbol)
         if not (inspect.isfunction(value) and symbol.startswith("plan_")):
             continue
-        returned = _annotation_names(
-            inspect.signature(value).return_annotation
-        )
+        returned = resolved_return_types(value)
         assert returned, symbol
-        assert not (returned & payload_types), f"{symbol} -> {returned}"
+        leaked = returned & LIFECYCLE_PAYLOAD_TYPES
+        assert not leaked, f"{symbol} -> {sorted(c.__name__ for c in leaked)}"
+        assert returned <= {
+            api.BenchmarkTransitionPlan,
+            api.BenchmarkTransitionRefusal,
+        }, f"{symbol} -> {sorted(c.__name__ for c in returned)}"
+
+
+def test_the_planning_outcome_alias_has_exactly_two_frozen_members():
+    """Widening the alias must fail a gate, not merely move a symbol count."""
+
+    import typing
+
+    members = set(typing.get_args(api.BenchmarkPlanningOutcome))
+    assert members == {
+        api.BenchmarkTransitionPlan,
+        api.BenchmarkTransitionRefusal,
+    }, sorted(getattr(m, "__name__", str(m)) for m in members)

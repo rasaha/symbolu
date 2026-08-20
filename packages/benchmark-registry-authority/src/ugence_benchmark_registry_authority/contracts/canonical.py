@@ -199,7 +199,7 @@ from dataclasses import fields, is_dataclass
 from datetime import datetime, timezone
 from enum import Enum
 from types import MappingProxyType
-from typing import Any
+from typing import Any, Optional
 
 from ugence_benchmark_registry import (
     BenchmarkApplicabilityCoordinate,
@@ -418,7 +418,9 @@ def _build_exact_type_boundary():
     types_: dict = {}
     sealed = False
 
-    def record(cls: type, domain, *, root_canonicalizable: bool) -> None:
+    def record(
+        cls: type, domain: Optional[str], *, root_canonicalizable: bool
+    ) -> None:
         """Register ``cls`` as an exact BR-2A-admissible contract type.
 
         Private to this package's own module-initialization path. Refuses to run

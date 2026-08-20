@@ -53,15 +53,53 @@ substituted component to unlock.
 - The distribution's own four-phase prose is corrected to the five-phase
   ratification (ADR §35 D-01, amended 2026-08-20).
 
+### Closure-audit remediation
+
+The first closure audit confirmed the property — *no callable consumes a
+`BenchmarkTransitionPlan`* — and **refuted the gates asserting it**. Three plan-
+consumption gates matched the literal substring `"BenchmarkTransitionPlan"` and
+skipped parameters annotated `None`; the return-type gate claimed to read a live
+annotation but, under PEP 563, read the *string* `"BenchmarkPlanningOutcome"`
+without ever inspecting the Union's members. A plan-consuming, event-returning
+exported callable would have passed all four.
+
+- Annotations are now resolved to **class objects** via `typing.get_type_hints`,
+  with every `Union`/`Optional`/generic walked to its leaves, and membership
+  decided by identity. An alias, a nested `Optional` and a PEP 563 string are
+  each seen.
+- An unannotated parameter under `contracts/` is a **failure**, not a skip.
+  `self`/`cls` remain exempt; dataclass- and Enum-synthesized methods are
+  excluded by checking that a function's code lives in a file this package
+  contains.
+- The return gate resolves hints and walks `typing.get_args`, so widening the
+  outcome alias is visible.
+- `BenchmarkPlanningOutcome` was recorded as `"kind": "pure_validation_function"`
+  — a `Union` described as a function, because a `Union` is callable in CPython.
+  It is now `"closed_type_alias"` with its **member set pinned**, so widening it
+  fails a gate rather than only moving a symbol count.
+- Thirteen new properties plant each attack — aliased parameter, nested
+  `Optional`, PEP 563 string, unannotated parameter, private helper,
+  keyword-only parameter, widened return Union — and require the checking logic
+  to report it. Three new mutation gates (G-54, G-55, G-56) plant the same
+  attacks in the shipped source; all three are killed.
+- D-06 gains a **behavioural** discriminator alongside the source assertion: two
+  submissions whose asserted identity *and* content digests are identical but
+  whose canonical bytes differ. A digest-only rule returns
+  `IDEMPOTENT_DUPLICATE`; comparing bytes returns `COORDINATE_SLOT_CONFLICT`.
+  Only one of those is D-06's answer, and no source string is consulted.
+
 ### Verification performed for this release
 
 Measured, not asserted. Every number below came from a run against this tree.
 
-- **Suite** 1710 tests, 449 distinct properties (418 adversarial : 31 happy,
-  13.48:1). The two monorepo-scope properties ran rather than skipping: no
+- **Suite** 1730 tests, 469 distinct properties (437 adversarial : 32 happy,
+  13.66:1). The movement from 1710 is +20 test functions and no removals:
+  +13 `test_boundary_gates_detect.py`, +3 `test_milestone_boundary.py`,
+  +2 `test_planning.py`, +2 `test_inventories.py`. The two monorepo-scope properties ran rather than skipping: no
   package in the monorepo imports this one, and no workflow but its own
   references it.
-- **Independent probes** 64/64, run twice — against the source tree, and again
+- **Independent probes** 65/65, run twice — Q-62 rewritten to resolve types
+  independently of the suite's helper, Q-64 added for the return boundary — against the source tree, and again
   from inside the installed wheel.
 - **Offline distribution verifier** PASSED, 41 checks. Both wheels are built in
   the host environment; the isolated environment only ever *installs* a wheel,
@@ -76,7 +114,11 @@ Measured, not asserted. Every number below came from a run against this tree.
   `PYTHONPATH`, and installing with the one dependency unavailable.
 - **BR-1 freeze matrix** VERIFIED, with BR-1's own suite (593 tests) and probes
   (57) run unmodified. No BR-1 file is touched by this release.
-- **Mutation sweep** 53 gates inventoried, 48 killed, 5 survived, 0 errored.
+- **Mutation sweep** 56 gates inventoried, 51 killed, 5 survived, 0 errored —
+  +3 boundary gates over the previous 53/48, all killed. The sweep also gained
+  correct handling of *additive* mutations, whose replacement text contains the
+  original: demanding the original's absence had reported a correctly applied
+  insertion as an unprovable mutant.
   Every restore is proven byte-identical to the proven-green baseline before
   mutating, and every mutant is proven loaded — by the import system, not the
   filesystem — before a KILL or SURVIVE is accepted. A harness control aborts

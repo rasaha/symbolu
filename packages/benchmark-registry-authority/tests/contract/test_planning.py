@@ -173,6 +173,70 @@ def test_the_comparison_is_over_bytes_and_not_over_digests():
     assert "canonical_digest" not in body
 
 
+def test_equal_asserted_digests_with_different_bytes_still_conflict():
+    """D-06, decided behaviourally rather than only by reading the source.
+
+    The structural assertion above says the source compares bytes. This says the
+    *outcome* depends on bytes, by constructing the case where the two rules
+    disagree: two submissions whose declared identity **and** content digests are
+    identical — the digests a caller asserts — but whose canonical bytes differ.
+
+    An implementation comparing the asserted digests would call these the same
+    submission and return IDEMPOTENT_DUPLICATE, silently discarding a genuinely
+    different record. Comparing canonical bytes returns the typed conflict. Only
+    one of those answers is D-06's, and no source-string rule is consulted here.
+    """
+
+    occupant = fx.submission_record()
+    proposed = fx.submission_record(
+        declared_registry_authority_identity="registry-authority-delta"
+    )
+
+    envelopes = (
+        proposed.publisher_submission_envelope,
+        occupant.publisher_submission_envelope,
+    )
+    # The asserted digests agree, exactly as a digest-only rule would require.
+    assert (
+        envelopes[0].benchmark_identity_digest
+        == envelopes[1].benchmark_identity_digest
+    )
+    assert (
+        envelopes[0].benchmark_content_digest
+        == envelopes[1].benchmark_content_digest
+    )
+    assert envelopes[0].coordinate == envelopes[1].coordinate
+
+    # The canonical bytes do not.
+    assert canonical_bytes(proposed) != canonical_bytes(occupant)
+    assert not is_byte_identical_resubmission(proposed, occupant)
+
+    outcome = plan_submission_outcome(_occupied(), proposed, occupant)
+    assert isinstance(outcome, BenchmarkTransitionRefusal)
+    assert outcome.declared_refusal_reason is _R.COORDINATE_SLOT_CONFLICT
+    assert outcome.declared_refusal_reason is not _R.IDEMPOTENT_DUPLICATE
+
+
+def test_a_digest_only_rule_would_have_given_the_other_answer():
+    """Names the wrong answer explicitly, so the test cannot pass vacuously.
+
+    If the two records ever stopped disagreeing in bytes while agreeing in
+    digests, the case above would still pass while proving nothing. This pins
+    the discriminator itself.
+    """
+
+    occupant = fx.submission_record()
+    proposed = fx.submission_record(
+        declared_registry_authority_identity="registry-authority-delta"
+    )
+    digests_agree = (
+        proposed.publisher_submission_envelope.benchmark_identity_digest
+        == occupant.publisher_submission_envelope.benchmark_identity_digest
+    )
+    bytes_agree = canonical_bytes(proposed) == canonical_bytes(occupant)
+    assert digests_agree and not bytes_agree, (digests_agree, bytes_agree)
+
+
 def test_the_functions_are_pure_and_mutate_no_argument():
     snapshot = _occupied()
     proposed, occupant = fx.submission_record(), fx.submission_record()

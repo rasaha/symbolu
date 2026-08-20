@@ -2,8 +2,8 @@
   "distribution": "ugence-benchmark-registry-authority",
   "milestone": "BR-2A",
   "note": "Complete inventory of every load-bearing gate, and the measured result of neutralizing each one in turn against the full suite and the author-owned adversarial probes. Production behaviour was not changed to chase a zero-survivor number; any survivor is classified as equivalent, shadowed (naming the shadowing gate), or a real gap. Regenerate by running gate_mutation_sweep.py.",
-  "gates_inventoried": 53,
-  "killed": 48,
+  "gates_inventoried": 56,
+  "killed": 51,
   "survived": 5,
   "errored": 0,
   "categories": {
@@ -91,6 +91,13 @@
     ],
     "planning-totality": [
       "G-53"
+    ],
+    "boundary-plan-consumption": [
+      "G-54",
+      "G-55"
+    ],
+    "boundary-return-widening": [
+      "G-56"
     ]
   },
   "ledger": [
@@ -517,6 +524,30 @@
       "description": "the ADMITTED -> REJECTED record-presence gate, through the total layer",
       "result": "KILLED",
       "first_failure": "test:tests/contract/test_lifecycle_kernel.py::test_post_admission_rejection_is_planned_only_while_nothing_is_registered"
+    },
+    {
+      "gate": "G-54",
+      "category": "boundary-plan-consumption",
+      "module": "planning.py",
+      "description": "the plan-consumption boundary, attacked with an aliased parameter on a private helper \u2014 the exact shape the substring rule walked past",
+      "result": "KILLED",
+      "first_failure": "test:tests/packaging/test_milestone_boundary.py::test_no_callable_under_contracts_accepts_a_plan_however_spelled"
+    },
+    {
+      "gate": "G-55",
+      "category": "boundary-plan-consumption",
+      "module": "planning.py",
+      "description": "the same boundary, attacked with an unannotated parameter \u2014 skipped rather than failed by the previous gate",
+      "result": "KILLED",
+      "first_failure": "test:tests/packaging/test_milestone_boundary.py::test_every_parameter_under_contracts_is_annotated"
+    },
+    {
+      "gate": "G-56",
+      "category": "boundary-return-widening",
+      "module": "planning.py",
+      "description": "the planning-outcome alias, widened to admit a registry event \u2014 invisible to a gate that read the alias name as a string",
+      "result": "KILLED",
+      "first_failure": "test:tests/packaging/test_boundary_gates_detect.py::test_happy_the_real_planning_functions_pass_every_boundary_check"
     }
   ],
   "survivor_classifications": {

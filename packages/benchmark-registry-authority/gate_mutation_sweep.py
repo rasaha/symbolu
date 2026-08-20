@@ -629,6 +629,58 @@ GATES = [
             is not _P.NO_RECORD_APPENDED""",
         """            and False""",
     ),
+    Gate(
+        "G-54",
+        "boundary-plan-consumption",
+        "planning.py",
+        "the plan-consumption boundary, attacked with an aliased parameter on a "
+        "private helper — the exact shape the substring rule walked past",
+        """def _refuse(
+    snapshot: BenchmarkRegistrySnapshotAssertion,
+    to_state: BenchmarkRegistrationState,
+    reason: BenchmarkRegistryRefusalReason,
+) -> BenchmarkTransitionRefusal:""",
+        """_PlanAlias = BenchmarkTransitionPlan
+
+
+def _apply(plan: Optional[_PlanAlias]) -> None:
+    return None
+
+
+def _refuse(
+    snapshot: BenchmarkRegistrySnapshotAssertion,
+    to_state: BenchmarkRegistrationState,
+    reason: BenchmarkRegistryRefusalReason,
+) -> BenchmarkTransitionRefusal:""",
+    ),
+    Gate(
+        "G-55",
+        "boundary-plan-consumption",
+        "planning.py",
+        "the same boundary, attacked with an unannotated parameter — skipped "
+        "rather than failed by the previous gate",
+        """def is_byte_identical_resubmission(""",
+        """def _apply(plan) -> None:
+    return None
+
+
+def is_byte_identical_resubmission(""",
+    ),
+    Gate(
+        "G-56",
+        "boundary-return-widening",
+        "planning.py",
+        "the planning-outcome alias, widened to admit a registry event — "
+        "invisible to a gate that read the alias name as a string",
+        """BenchmarkPlanningOutcome = Union[
+    BenchmarkTransitionPlan, BenchmarkTransitionRefusal
+]""",
+        """from .chain import BenchmarkRegistrationEventPayload as _Event
+
+BenchmarkPlanningOutcome = Union[
+    BenchmarkTransitionPlan, BenchmarkTransitionRefusal, _Event
+]""",
+    ),
 ]
 
 
@@ -736,8 +788,16 @@ def _assert_mutant_loaded(working: pathlib.Path, gate) -> str:
         "    assert here in f.parents, f'loaded {f}, outside the working copy'\n"
         "    src = inspect.getsource(m)\n"
         f"    assert {gate.new!r} in src, 'mutated text absent from the loaded module'\n"
-        f"    assert {gate.old!r} not in src, 'original text still present'\n"
-        "    print('MUTANT-LOADED')\n"
+        # Only for a genuine replacement. An additive mutation's new text
+        # contains the original, so the original legitimately remains and
+        # demanding its absence would report a correctly applied insertion as an
+        # unprovable mutant.
+        + (
+            f"    assert {gate.old!r} not in src, 'original text still present'\n"
+            if gate.old not in gate.new
+            else ""
+        )
+        + "    print('MUTANT-LOADED')\n"
     )
     env = dict(os.environ)
     env["PYTHONPATH"] = os.pathsep.join(

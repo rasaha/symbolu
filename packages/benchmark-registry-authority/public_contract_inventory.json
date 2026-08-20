@@ -839,9 +839,13 @@
     },
     {
       "symbol": "BenchmarkRegistryScopeExpectation",
-      "kind": "pure_validation_function",
+      "kind": "closed_type_alias",
       "caller_constructible": false,
-      "canonicalizable": false
+      "canonicalizable": false,
+      "members": [
+        "PlatformRegistryScopeExpectation",
+        "TenantRegistryScopeExpectation"
+      ]
     },
     {
       "symbol": "canonical_bytes",
@@ -1157,9 +1161,13 @@
     },
     {
       "symbol": "BenchmarkPlanningOutcome",
-      "kind": "pure_validation_function",
+      "kind": "closed_type_alias",
       "caller_constructible": false,
-      "canonicalizable": false
+      "canonicalizable": false,
+      "members": [
+        "BenchmarkTransitionPlan",
+        "BenchmarkTransitionRefusal"
+      ]
     },
     {
       "symbol": "is_byte_identical_resubmission",

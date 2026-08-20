@@ -227,6 +227,7 @@ def test_every_other_public_symbol_is_marked_with_its_kind_and_not_canonicalizab
     for row in others:
         assert row["canonicalizable"] is False
         assert row["kind"] in {
+            "closed_type_alias",
             "closed_vocabulary_enum",
             "typed_error",
             "protocol_port",
@@ -256,6 +257,39 @@ def test_the_four_ports_are_marked_as_protocol_ports_not_data_contracts():
         "BenchmarkClockPort",
     ):
         assert kinds[port] == "protocol_port"
+
+
+def test_the_planning_outcome_alias_is_typed_as_an_alias_with_frozen_members():
+    """A Union recorded as a function is a manifest that describes nothing.
+
+    ``BenchmarkPlanningOutcome`` is ``Union[BenchmarkTransitionPlan,
+    BenchmarkTransitionRefusal]``, and a Union is *callable* in CPython, so the
+    generator classified it as a pure validation function. Its members are now
+    pinned in the manifest and re-derived here, which is what makes widening the
+    alias fail a gate rather than only move a symbol count.
+    """
+
+    import typing
+
+    rows = {row["symbol"]: row for row in CONTRACTS["other_public_symbols"]}
+    row = rows["BenchmarkPlanningOutcome"]
+    assert row["kind"] == "closed_type_alias"
+    assert row["caller_constructible"] is False
+    assert row["canonicalizable"] is False
+    assert row["members"] == [
+        "BenchmarkTransitionPlan",
+        "BenchmarkTransitionRefusal",
+    ]
+    live = sorted(
+        arg.__name__ for arg in typing.get_args(api.BenchmarkPlanningOutcome)
+    )
+    assert live == row["members"]
+
+
+def test_every_closed_type_alias_row_pins_its_members():
+    for row in CONTRACTS["other_public_symbols"]:
+        if row["kind"] == "closed_type_alias":
+            assert row.get("members"), row["symbol"]
 
 
 def test_the_consistency_descriptor_is_marked_a_frozen_descriptor():

@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import typing
 import pathlib
 from enum import EnumMeta
 
@@ -404,19 +405,30 @@ def classify_non_contract_symbols():
             kind = "frozen_descriptor"
         elif isinstance(value, type):
             kind = "abstract_type_declaration"
+        elif typing.get_origin(value) is not None and typing.get_args(value):
+            # A typing alias such as ``Union[Plan, Refusal]``. It is *callable*
+            # in CPython, so without this branch it was recorded as a
+            # "pure_validation_function" — a Union described as a function.
+            # Its members are pinned so widening the alias moves the manifest
+            # and fails a gate, rather than only shifting a symbol count.
+            kind = "closed_type_alias"
         elif callable(value):
             kind = "pure_validation_function"
         else:
             kind = "pinned_constant"
-        rows.append(
-            {
-                "symbol": symbol,
-                "kind": kind,
-                "caller_constructible": kind
-                in {"frozen_descriptor", "closed_vocabulary_enum", "typed_error"},
-                "canonicalizable": False,
-            }
-        )
+        row = {
+            "symbol": symbol,
+            "kind": kind,
+            "caller_constructible": kind
+            in {"frozen_descriptor", "closed_vocabulary_enum", "typed_error"},
+            "canonicalizable": False,
+        }
+        if kind == "closed_type_alias":
+            row["members"] = sorted(
+                getattr(arg, "__name__", str(arg))
+                for arg in typing.get_args(value)
+            )
+        rows.append(row)
     return rows
 
 
