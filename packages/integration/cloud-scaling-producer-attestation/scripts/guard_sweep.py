@@ -7,9 +7,14 @@ Method, following the Phase 5A convention exactly:
   reach a ``raise`` or a typed refusal — in a fixed module order and then source order;
 * neutralise each one **independently** by rewriting its ``if`` header to ``if False:``;
 * do it in a **disposable untracked copy**; the tracked worktree is never mutated;
-* run the **full suite** against the mutated copy and record killed/survived;
-* a run is scored only if it **collected** the full suite — a collection error, a syntax
-  error, an import error or a timeout is not a valid kill;
+* run the suite against the mutated copy and record killed/survived. Not quite the *full*
+  suite: the packaging-distribution module is skipped via ``UGENCE_SKIP_SLOW_PACKAGING``, for
+  cost, under the safety condition PL-6 asserts. Every property the sdist ships is still run
+  directly here;
+* a run is scored only if it **collected the same number of tests as the unmutated baseline**
+  — a collection error, a syntax error, an import error, a timeout, or a collection count that
+  moved is not a valid kill. The count comparison is enforced against the baseline recorded
+  before the sweep starts, not merely asserted in this docstring;
 * classify every survivor.
 
 Writes ``GUARD_SWEEP.md``. Run:
@@ -190,12 +195,20 @@ def mutate(guard: Guard, workdir: Path) -> None:
     path.write_text("".join(lines), encoding="utf-8")
 
 
-def run_suite(workdir: Path, timeout: int = 600) -> dict:
+def run_suite(
+    workdir: Path, timeout: int = 600, expected_collected: "int | None" = None
+) -> dict:
     """Run the suite in the copy. Returns a scored result, honestly labelled.
 
-    Not quite the *full* suite: ``UGENCE_SKIP_SLOW_PACKAGING=1`` deselects the packaging
-    module below, so this collects fewer properties than a plain ``pytest tests`` in the
-    tracked tree. The deselection is a cost decision whose safety condition is asserted by
+    Not quite the *full* suite: ``UGENCE_SKIP_SLOW_PACKAGING=1`` makes the packaging module
+    skip. Stated precisely, because a previous revision of this docstring said it "deselects"
+    the module and therefore "collects fewer properties", and it does neither — the mechanism
+    is ``pytest.mark.skipif``, so collection is **identical** and only the number of properties
+    that *run* changes (26 fewer). That distinction is not pedantic here: the scorer below
+    compares collection counts against the baseline, and it would be comparing a moving number
+    if the flag changed collection.
+
+    The skip is a cost decision whose safety condition is asserted by
     ``tests/test_property_ledger.py`` PL-6; see the comment on the environment below.
     """
 
@@ -235,6 +248,39 @@ def run_suite(workdir: Path, timeout: int = 600) -> dict:
         return {"scored": False, "why": "syntax error", "failed": []}
     if re.search(r"^ERROR ", output, re.M) and " passed" not in output:
         return {"scored": False, "why": "import or collection error", "failed": []}
+    # The package's own pyproject sets ``addopts = "-q"``, so pytest never prints a
+    # "collected N items" line here. The summary line is what exists, and summing its
+    # outcome counts is exactly the number of tests that were collected and then either
+    # ran or were skipped. Deselected tests are excluded deliberately: they were never
+    # part of this run's population, and the packaging module is skipped rather than
+    # deselected, so this number is stable across mutations unless collection itself moves.
+    counted = {
+        outcome: int(value)
+        for value, outcome in re.findall(
+            r"(\d+) (passed|failed|skipped|errors?|xfailed|xpassed)\b", output
+        )
+    }
+    collected = sum(counted.values()) if counted else None
+    if expected_collected is not None:
+        if collected is None:
+            return {
+                "scored": False,
+                "why": "no collection count reported",
+                "failed": [],
+            }
+        if collected != expected_collected:
+            # The claim "a run is scored only if it collected the same suite" is enforced
+            # here rather than asserted in a docstring. A mutation that made part of the
+            # suite un-collectable while the remainder passed would otherwise be scored as
+            # a valid run, and a guard nothing exercised would be published as a survivor.
+            return {
+                "scored": False,
+                "why": (
+                    f"collected {collected}, baseline collected {expected_collected}; "
+                    "the mutation changed what could be collected"
+                ),
+                "failed": [],
+            }
     match = re.search(r"(\d+) passed", output)
     if match is None:
         tail = " | ".join(line for line in output.strip().splitlines()[-3:])
@@ -247,6 +293,7 @@ def run_suite(workdir: Path, timeout: int = 600) -> dict:
     return {
         "scored": True,
         "why": "",
+        "collected": collected,
         "failed": failed,
         "passed": int(match.group(1)),
         "killed": bool(failed),
@@ -440,7 +487,11 @@ def main() -> int:
         shutil.rmtree(WORKROOT)
 
     baseline = _baseline_run()
-    print(f"baseline (unmutated): {baseline['passed']} passed, no failures")
+    expected_collected = baseline["collected"]
+    print(
+        f"baseline (unmutated): {baseline['passed']} passed, no failures, "
+        f"{expected_collected} collected"
+    )
 
     results = []
     try:
@@ -456,7 +507,7 @@ def main() -> int:
             )
             mutate(guard, WORKDIR)
             try:
-                result = run_suite(WORKDIR)
+                result = run_suite(WORKDIR, expected_collected=expected_collected)
             except subprocess.TimeoutExpired:
                 result = {"scored": False, "why": "timeout", "failed": []}
             results.append((guard, result))
@@ -528,7 +579,14 @@ def write_report(results) -> None:
         "error or a timeout is not a valid kill.",
         "",
         "**Baseline precondition.** Before any mutation, the sweep runs the suite *unmutated*",
-        "and refuses to proceed unless it is green. A test that fails for a reason unrelated",
+        "and refuses to proceed unless it is green. It also records the baseline's",
+        "**collection count**, and every mutated run must match it: a run that collected a",
+        "different number of tests is reported NOT SCORED rather than counted, so a mutation",
+        "that made part of the suite un-collectable while the remainder passed cannot publish",
+        "an unexercised guard as a survivor. That check is enforced in the scorer, not merely",
+        "described here.",
+        "",
+        "A test that fails for a reason unrelated",
         "to the mutation fails on every run, so every guard looks killed and a genuinely",
         "surviving guard is published as load-bearing — the wrong direction for a security",
         "claim to be wrong in. This is not hypothetical: the packaging-distribution",
