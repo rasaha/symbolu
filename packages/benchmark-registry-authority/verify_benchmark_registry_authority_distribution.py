@@ -334,8 +334,8 @@ def main() -> int:  # noqa: C901 - a verifier is a long list of assertions
         )
         check(
             "installed api.__all__ count and manifest symbol count both hold",
-            installed_facts["api_all_count"] == 89
-            and len(source_manifest["symbols"]) == 88,
+            installed_facts["api_all_count"] == 93
+            and len(source_manifest["symbols"]) == 92,
             f"{installed_facts['api_all_count']} / {len(source_manifest['symbols'])}",
         )
         check(

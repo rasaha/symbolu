@@ -509,6 +509,9 @@
         "as_of"
       ]
     },
+    "BenchmarkPlanningOutcome": {
+      "kind": "function"
+    },
     "BenchmarkPostAdmissionRejectionEventPayload": {
       "kind": "contract",
       "fields": [
@@ -725,7 +728,16 @@
     "fault_class_for": {
       "kind": "function"
     },
+    "is_byte_identical_resubmission": {
+      "kind": "function"
+    },
     "is_valid_registration_transition": {
+      "kind": "function"
+    },
+    "plan_submission_outcome": {
+      "kind": "function"
+    },
+    "plan_transition": {
       "kind": "function"
     },
     "require_bound_payload_for_transition": {

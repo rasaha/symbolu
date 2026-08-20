@@ -583,6 +583,52 @@ GATES = [
         "        if not self.validity_from < self.validity_to:",
         "        if False:",
     ),
+    # ---------------- BR-2B planning (kernel + planning) ------------------ #
+    Gate(
+        "G-49",
+        "planning-fail-closed",
+        "planning.py",
+        "the fail-closed refusal when an unoccupied slot is handed an occupant",
+        """        if occupant_record is not None:
+            return _refuse(snapshot, _S.SUBMITTED, _R.STALE_REGISTRY_SNAPSHOT)
+        return plan_transition(snapshot, _S.SUBMITTED)""",
+        """        return plan_transition(snapshot, _S.SUBMITTED)""",
+    ),
+    Gate(
+        "G-50",
+        "planning-fail-closed",
+        "planning.py",
+        "the fail-closed refusal when the asserted occupant sits at another locator",
+        """    if occupant_envelope.coordinate != snapshot.coordinate:
+        return _refuse(snapshot, _S.SUBMITTED, _R.STALE_REGISTRY_SNAPSHOT)""",
+        """    if False:
+        return _refuse(snapshot, _S.SUBMITTED, _R.STALE_REGISTRY_SNAPSHOT)""",
+    ),
+    Gate(
+        "G-51",
+        "planning-idempotence",
+        "planning.py",
+        "the canonical-byte comparison D-06 requires for idempotence",
+        "    return canonical_bytes(proposed_record) == canonical_bytes(occupant_record)",
+        "    return True",
+    ),
+    Gate(
+        "G-52",
+        "planning-rejection-only",
+        "planning.py",
+        "the unequal-locator branch that keeps confusable handling rejection-only",
+        """        return _refuse(snapshot, _S.SUBMITTED, _R.CONFUSABLE_COORDINATE)""",
+        """        return plan_transition(snapshot, _S.SUBMITTED)""",
+    ),
+    Gate(
+        "G-53",
+        "planning-totality",
+        "kernel.py",
+        "the ADMITTED -> REJECTED record-presence gate, through the total layer",
+        """            and self.snapshot.asserted_registration_record_presence
+            is not _P.NO_RECORD_APPENDED""",
+        """            and False""",
+    ),
 ]
 
 

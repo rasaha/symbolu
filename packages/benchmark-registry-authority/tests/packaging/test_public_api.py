@@ -37,8 +37,8 @@ def test_both_counts_hold_and_neither_is_corrected_to_match_the_other():
     numbers are asserted so a future regeneration cannot quietly "fix" one.
     """
 
-    assert len(api.__all__) == 89
-    assert len(MANIFEST["symbols"]) == 88
+    assert len(api.__all__) == 93
+    assert len(MANIFEST["symbols"]) == 92
     assert len(MANIFEST["symbols"]) == len(api.__all__) - 1
     assert "__version__" not in MANIFEST["symbols"]
 

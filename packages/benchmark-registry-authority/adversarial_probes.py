@@ -65,6 +65,10 @@ from ugence_benchmark_registry_authority.api import (
     BenchmarkRegistrySnapshotAssertion,
     BenchmarkTransitionPlan,
     BenchmarkTransitionRefusal,
+    BENCHMARK_REGISTRATION_TRANSITIONS,
+    is_byte_identical_resubmission,
+    plan_submission_outcome,
+    plan_transition,
     BenchmarkRegistrationState,
     BenchmarkRegistryCanonicalizationError,
     BenchmarkRegistryConsistencyClaim,
@@ -1162,6 +1166,55 @@ def _q59():
             ),
         ),
         BenchmarkRegistryLifecycleError,
+    )
+
+
+@probe("Q-60 planning is total: every state pair yields a plan or a refusal")
+def _q60():
+    for a in BenchmarkRegistrationState:
+        for b in BenchmarkRegistrationState:
+            outcome = plan_transition(snapshot_assertion(asserted_current_state=a), b)
+            assert isinstance(
+                outcome, (BenchmarkTransitionPlan, BenchmarkTransitionRefusal)
+            ), (a, b)
+            if b not in BENCHMARK_REGISTRATION_TRANSITIONS[a]:
+                assert isinstance(outcome, BenchmarkTransitionRefusal), (a, b)
+
+
+@probe("Q-61 idempotence is decided on canonical bytes, recomputed from records")
+def _q61():
+    assert is_byte_identical_resubmission(record(), record())
+    assert not is_byte_identical_resubmission(
+        record(), record(declared_registry_authority_identity="someone-else")
+    )
+    # A caller may not substitute bytes or a digest for either record.
+    for impostor in (canonical_bytes(record()), canonical_digest(record()), None):
+        refuses(
+            lambda i=impostor: is_byte_identical_resubmission(record(), i),
+            BenchmarkRegistryContractError,
+        )
+
+
+@probe("Q-62 no planning function accepts a transition plan as input")
+def _q62():
+    import inspect
+
+    from ugence_benchmark_registry_authority.contracts import planning
+
+    for name in planning.__all__:
+        value = getattr(planning, name)
+        if not inspect.isfunction(value):
+            continue
+        for parameter in inspect.signature(value).parameters.values():
+            assert "BenchmarkTransitionPlan" not in str(parameter.annotation), name
+
+
+@probe("Q-63 a self-inconsistent snapshot fails closed rather than being repaired")
+def _q63():
+    stale = plan_submission_outcome(snapshot_assertion(), record())
+    assert isinstance(stale, BenchmarkTransitionRefusal)
+    assert stale.declared_refusal_reason is (
+        BenchmarkRegistryRefusalReason.STALE_REGISTRY_SNAPSHOT
     )
 
 

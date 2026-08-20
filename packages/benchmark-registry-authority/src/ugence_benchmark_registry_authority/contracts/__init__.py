@@ -95,6 +95,12 @@ from .kernel import (
     BenchmarkTransitionPlan,
     BenchmarkTransitionRefusal,
 )
+from .planning import (
+    BenchmarkPlanningOutcome,
+    is_byte_identical_resubmission,
+    plan_submission_outcome,
+    plan_transition,
+)
 from .lifecycle import (
     BENCHMARK_REGISTRATION_TRANSITIONS,
     is_valid_registration_transition,
@@ -239,6 +245,10 @@ __all__ = [
     "BenchmarkRegistrySnapshotAssertion",
     "BenchmarkTransitionPlan",
     "BenchmarkTransitionRefusal",
+    "BenchmarkPlanningOutcome",
+    "is_byte_identical_resubmission",
+    "plan_transition",
+    "plan_submission_outcome",
     "BENCHMARK_REGISTRY_SNAPSHOT_ASSERTION_DIGEST_DOMAIN",
     "BENCHMARK_TRANSITION_PLAN_DIGEST_DOMAIN",
     "BENCHMARK_TRANSITION_REFUSAL_DIGEST_DOMAIN",

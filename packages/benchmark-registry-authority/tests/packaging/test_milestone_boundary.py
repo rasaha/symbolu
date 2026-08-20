@@ -441,9 +441,137 @@ def test_no_module_level_function_performs_a_registry_operation(capability):
     assert offenders == [], offenders
 
 
-def test_every_exported_function_is_a_validator_or_a_pure_reader():
-    allowed_prefixes = ("require_", "is_", "canonical_", "bound_", "fault_")
+#: Exported-function prefixes, mapped to the subphase that introduced each —
+#: D-19's milestone-scoped allow-list. BR-2B adds ``plan_`` and nothing else,
+#: chosen so no verb implies an authoritative act: a plan states what *would be*
+#: admissible. The registry-operation ban below is untouched by this.
+EXPORTED_FUNCTION_PREFIX_ORIGIN = {
+    "require_": "BR-2A",
+    "is_": "BR-2A",
+    "canonical_": "BR-2A",
+    "bound_": "BR-2A",
+    "fault_": "BR-2A",
+    "plan_": "BR-2B",
+}
+
+
+def test_every_exported_function_is_a_validator_a_reader_or_a_planner():
+    allowed_prefixes = tuple(EXPORTED_FUNCTION_PREFIX_ORIGIN)
     for symbol in pkg.__all__:
         value = getattr(pkg, symbol)
         if inspect.isfunction(value):
             assert symbol.startswith(allowed_prefixes), symbol
+
+
+def test_no_exported_function_prefix_arrives_before_its_subphase():
+    """A prefix may not be introduced by a subphase this release has not reached."""
+
+    reached = SUBPHASE_LADDER.index(VERSION_SUBPHASE[api.__version__])
+    for prefix, origin in EXPORTED_FUNCTION_PREFIX_ORIGIN.items():
+        assert SUBPHASE_LADDER.index(origin) <= reached, prefix
+
+
+def test_br2b_added_exactly_one_verb_and_it_implies_no_authoritative_act():
+    added = {
+        prefix
+        for prefix, origin in EXPORTED_FUNCTION_PREFIX_ORIGIN.items()
+        if origin == "BR-2B"
+    }
+    assert added == {"plan_"}
+    # The registry-operation ban is what keeps the new verb honest: a function
+    # named plan_register would still be refused by the parametrized ban above.
+    for banned in ("register", "admit", "resolve", "revoke", "append", "verify"):
+        assert not any(prefix.startswith(banned) for prefix in added)
+
+
+# --------------------------------------------------------------------------- #
+# BR-2B plans. It does not apply plans.
+# --------------------------------------------------------------------------- #
+def _annotation_names(annotation) -> set:
+    """Every identifier appearing in a parameter annotation, however spelled."""
+
+    if annotation is inspect.Parameter.empty:
+        return set()
+    text = annotation if isinstance(annotation, str) else repr(annotation)
+    return set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", text))
+
+
+def test_no_exported_callable_accepts_a_transition_plan_as_input():
+    """A plan is an output of this package and an input to nothing in it.
+
+    This is the structural half of "BR-2B may determine what transition would be
+    valid; BR-2D is the first phase permitted to assert that one occurred". A
+    function that consumed a plan would be the seam through which applying,
+    committing, appending, admitting, registering, revoking or resolving one
+    could later arrive — so no exported callable takes it as a parameter at all,
+    and no consumer can be handed a signature that invites it.
+    """
+
+    offenders = []
+    for symbol in pkg.__all__:
+        value = getattr(pkg, symbol)
+        if not callable(value) or inspect.isclass(value):
+            continue
+        try:
+            signature = inspect.signature(value)
+        except (TypeError, ValueError):  # pragma: no cover - builtins
+            continue
+        for name, parameter in signature.parameters.items():
+            if "BenchmarkTransitionPlan" in _annotation_names(
+                parameter.annotation
+            ):
+                offenders.append(f"{symbol}({name})")
+    assert offenders == [], offenders
+
+
+def test_no_function_anywhere_in_the_source_tree_takes_a_plan_parameter():
+    """The signature check again, over the tree, so a private helper cannot either."""
+
+    offenders = []
+    for path in sorted(SRC.rglob("*.py")):
+        tree = ast.parse(path.read_text())
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            args = node.args
+            every = (
+                list(args.posonlyargs)
+                + list(args.args)
+                + list(args.kwonlyargs)
+                + [a for a in (args.vararg, args.kwarg) if a is not None]
+            )
+            for argument in every:
+                if argument.annotation is None:
+                    continue
+                if "BenchmarkTransitionPlan" in ast.unparse(argument.annotation):
+                    offenders.append(f"{path.name}: {node.name}({argument.arg})")
+    assert offenders == [], offenders
+
+
+def test_no_exported_planner_can_return_a_lifecycle_payload():
+    """Planning returns a plan or a refusal. It never returns a chain payload.
+
+    Checked on the live return annotation rather than on names, so a function
+    that quietly started producing a registry event would fail here even if it
+    kept a planning name.
+    """
+
+    payload_types = {
+        "BenchmarkSubmissionRecordPayload",
+        "BenchmarkAdmissionDecisionPayload",
+        "BenchmarkPostAdmissionRejectionEventPayload",
+        "BenchmarkRegistrationEventPayload",
+        "BenchmarkRevocationEventPayload",
+        "BenchmarkConflictRecordPayload",
+        "BenchmarkResolutionRecordPayload",
+        "BenchmarkHistoricalRecordPayload",
+    }
+    for symbol in pkg.__all__:
+        value = getattr(pkg, symbol)
+        if not (inspect.isfunction(value) and symbol.startswith("plan_")):
+            continue
+        returned = _annotation_names(
+            inspect.signature(value).return_annotation
+        )
+        assert returned, symbol
+        assert not (returned & payload_types), f"{symbol} -> {returned}"

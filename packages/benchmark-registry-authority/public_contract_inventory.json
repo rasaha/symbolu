@@ -1156,6 +1156,30 @@
       "canonicalizable": false
     },
     {
+      "symbol": "BenchmarkPlanningOutcome",
+      "kind": "pure_validation_function",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "is_byte_identical_resubmission",
+      "kind": "pure_validation_function",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "plan_transition",
+      "kind": "pure_validation_function",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "plan_submission_outcome",
+      "kind": "pure_validation_function",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
       "symbol": "BENCHMARK_REGISTRY_SNAPSHOT_ASSERTION_DIGEST_DOMAIN",
       "kind": "pinned_constant",
       "caller_constructible": false,
