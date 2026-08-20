@@ -251,9 +251,13 @@ def run_suite(
     # The package's own pyproject sets ``addopts = "-q"``, so pytest never prints a
     # "collected N items" line here. The summary line is what exists, and summing its
     # outcome counts is exactly the number of tests that were collected and then either
-    # ran or were skipped. Skipped tests are excluded deliberately: they were never
-    # part of this run's population, and the packaging module is skipped rather than
-    # skipped, so this number is stable across mutations unless collection itself moves.
+    # ran or were skipped — skipped tests ARE counted, which is the point: the packaging
+    # module is skipped rather than deselected, so the total stays 440 whether or not
+    # UGENCE_SKIP_SLOW_PACKAGING is set, and the comparison below is against a fixed
+    # number. pytest's *deselected* tally is deliberately not summed: a deselected test
+    # was never part of this run's population. (The two words are not interchangeable, and
+    # a blanket deselect->skip rename briefly collapsed them here into "skipped rather
+    # than skipped", which said the opposite of what the regex below does.)
     counted = {
         outcome: int(value)
         for value, outcome in re.findall(

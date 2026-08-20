@@ -1165,20 +1165,29 @@ def test_the_verifier_reconciles_exactly_five_candidate_facts_and_no_others():
     fires on edits A-59's sample might miss, and pins the reconciliation set so a widening
     shows up as a test failure rather than as a quietly broadened guarantee.
 
-    It is **not** a proof that no sixth candidate fact can ever be read. It checks three
-    things over the reconciliation section only:
+    It is **not** a proof that no sixth candidate fact can ever be read, and the list below
+    is **not exhaustive**. It checks three things over the reconciliation section only:
 
-    #. every direct ``candidate.<attribute>`` load in that section names one of the five;
-    #. no dynamic access — ``getattr(candidate, ...)``, ``vars``, ``__dict__`` — appears
-       there, since an attribute named at runtime is invisible to this walk;
+    #. every direct ``candidate.<attribute>`` load in that section names one of the five —
+       including loads through a local alias bound to ``candidate`` in the same section;
+    #. no dynamic access — ``getattr``/``vars`` applied to the candidate or to such an
+       alias, however the callable is spelled, and no ``__dict__`` — appears there, since
+       an attribute named at runtime is invisible to this walk;
     #. across the whole module, every ``attestation.X``/``candidate.Y`` inequality names one
        of the five, in either operand order.
 
-    What it does not cover, stated so the limit is not discovered later: a candidate fact
-    read *outside* the marked reconciliation section and acted on elsewhere; a fact reached
-    through a helper that takes the candidate as an argument; and anything a future refactor
-    moves out of the section. Those are A-59's job, and the documents cite A-59 first for
-    exactly this reason.
+    **Known gaps, because a syntactic check has them by nature.** A candidate fact read
+    outside the marked section and acted on elsewhere; a fact reached through a helper that
+    takes the candidate as an argument; an alias bound outside the section and used inside
+    it; a fact reached through a container, a closure, or any indirection this walk does not
+    model; and anything a future refactor moves out of the section. Two of these were found
+    by verification rather than by reasoning — a local alias, and ``builtins.getattr`` whose
+    callable is an attribute rather than a bare name — and both are now caught; the point of
+    recording that is that the *next* such shape is likely to exist too.
+
+    So treat a pass here as "no obvious widening", never as "no widening". A-59 is the
+    evidence that the guarantee holds, because it varies real candidates and observes the
+    outcome; it caught both of the shapes that slipped past this property.
     """
 
     import ast
@@ -1211,13 +1220,30 @@ def test_the_verifier_reconciles_exactly_five_candidate_facts_and_no_others():
     def in_section(node):
         return section_start <= getattr(node, "lineno", -1) < section_end
 
+    # --- names that refer to the candidate inside the section, aliases included -------- #
+    # `_c = candidate` then `_c.policy_binding_digest` reads a sixth fact exactly as
+    # `candidate.policy_binding_digest` does. Keying only on the name "candidate" let that
+    # through until verification found it.
+    candidate_names = {"candidate"}
+    for _ in range(3):  # transitive: _a = candidate; _b = _a
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Assign)
+                and in_section(node)
+                and isinstance(node.value, ast.Name)
+                and node.value.id in candidate_names
+            ):
+                candidate_names |= {
+                    target.id for target in node.targets if isinstance(target, ast.Name)
+                }
+
     # --- (1) every direct candidate.<attr> load in the section names one of the five ---- #
     read_in_section = {
         node.attr
         for node in ast.walk(tree)
         if isinstance(node, ast.Attribute)
         and isinstance(node.value, ast.Name)
-        and node.value.id == "candidate"
+        and node.value.id in candidate_names
         and in_section(node)
     }
     assert read_in_section, "no candidate attribute is read in the reconciliation section"
@@ -1232,12 +1258,16 @@ def test_the_verifier_reconciles_exactly_five_candidate_facts_and_no_others():
     for node in ast.walk(tree):
         if not in_section(node):
             continue
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
-            if node.func.id in {"getattr", "vars"} and any(
-                isinstance(a, ast.Name) and a.id == "candidate" for a in node.args
+        if isinstance(node, ast.Call):
+            # `builtins.getattr(candidate, ...)` is an ast.Attribute callable, not a Name.
+            # Keying on Name alone let that through until verification found it, so match
+            # on the trailing identifier however the callable is spelled.
+            called = getattr(node.func, "id", None) or getattr(node.func, "attr", None)
+            if called in {"getattr", "vars"} and any(
+                isinstance(a, ast.Name) and a.id in candidate_names for a in node.args
             ):
                 raise AssertionError(
-                    f"{node.func.id}(candidate, ...) at line {node.lineno} of the "
+                    f"{called}(<candidate>, ...) at line {node.lineno} of the "
                     "reconciliation section: an attribute named at runtime is invisible to "
                     "this walk, so the reconciliation set could widen without failing here"
                 )
@@ -1245,10 +1275,10 @@ def test_the_verifier_reconciles_exactly_five_candidate_facts_and_no_others():
             isinstance(node, ast.Attribute)
             and node.attr == "__dict__"
             and isinstance(node.value, ast.Name)
-            and node.value.id == "candidate"
+            and node.value.id in candidate_names
         ):
             raise AssertionError(
-                f"candidate.__dict__ at line {node.lineno} of the reconciliation section"
+                f"<candidate>.__dict__ at line {node.lineno} of the reconciliation section"
             )
 
     # --- (3) module-wide: every attestation/candidate inequality names one of the five -- #

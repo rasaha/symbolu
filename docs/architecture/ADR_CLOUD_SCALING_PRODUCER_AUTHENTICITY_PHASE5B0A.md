@@ -353,7 +353,7 @@ attestation yields two artifacts with the same `attestation_digest`, different
 
 **Which differences that actually admits.** The rule first, because an enumeration of
 dimensions is what two revisions of this section got wrong: **the verifier reconciles exactly
-five candidate facts and **directly reconciles no other candidate facts****. Stated as the claim it
+five candidate facts and directly reconciles no other candidate facts**. Stated as the claim it
 supports: For two independently valid objects of exact type
 `CapacityAuthorizationCandidate`, the producer-attestation layer does not independently
 compare facts outside those five when the five reconciled values remain equal.
