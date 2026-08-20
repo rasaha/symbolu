@@ -85,6 +85,7 @@ from .identifiers import (
 __all__ = [
     "ProducerAttestationSigningInput",
     "ProducerAttestationSignerPort",
+    "REFERENCE_GRADE_SIGNERS",
     "ReferenceEd25519ProducerAttestationSigner",
     "mint_producer_attestation",
 ]
@@ -355,6 +356,15 @@ class ReferenceEd25519ProducerAttestationSigner:
         )
 
 
+#: Signer types this repository documents as reference grade. Refused in production,
+#: **including every subclass** — see :func:`mint_producer_attestation`. The exact
+#: counterpart of :data:`~ugence_cloud_scaling_producer_attestation.trust.
+#: REFERENCE_GRADE_RESOLVERS`, and deliberately spelled the same way, so the two denials
+#: cannot drift apart. Composition is not inheritance: a custodian that *holds* one of
+#: these is not matched, because it never declared itself reference grade.
+REFERENCE_GRADE_SIGNERS: tuple[type, ...] = (ReferenceEd25519ProducerAttestationSigner,)
+
+
 def mint_producer_attestation(
     *,
     signer: ProducerAttestationSignerPort,
@@ -378,12 +388,54 @@ def mint_producer_attestation(
     key that is actually about to be used and are bound into the bytes before signing. A
     caller cannot present one identity and sign under another.
 
-    ``production_mode=True`` refuses a reference signer. There is no production key in this
-    repository and no route by which this function could supply one.
+    ``production_mode=True`` refuses a reference signer, and refuses **every subclass of
+    one**, by ``isinstance`` against :data:`REFERENCE_GRADE_SIGNERS`. That match is what
+    closes the hole: matching by exact type let a subclass inherit the reference key
+    custodian whole, set ``is_reference_signer = False``, and mint in production. This
+    mirrors :func:`~ugence_cloud_scaling_producer_attestation.trust.require_production_resolver`,
+    and for the same reason — a denial matched by exact type is the hole rather than the
+    guard, because the subclass inherits the implementation the denial exists to refuse.
+
+    **The two refusals are independent, and neither depends on running first.** Both raise;
+    neither admits, so there is no fall-through for the other to pre-empt. Stated precisely
+    because an earlier revision of this docstring claimed the ``isinstance`` match had to be
+    evaluated first so a relabelled subclass "never reaches the branch that would have
+    admitted it" — there is no such branch, and swapping the two leaves every subclass
+    refused. What the order does buy is the **message**: a subclass is named as reference
+    grade rather than reported through the flag it set for itself. Each check earns its
+    place on its own: ``isinstance`` catches a subclass that lies about the flag, and the
+    flag catches a *non*-inheriting custodian that honestly declares itself reference grade.
+
+    A custodian that *composes* a reference signer rather than inheriting from one is
+    admitted — it never declared itself reference grade, and it can hold its key wherever it
+    likes.
+
+    There is no production key in this repository and no route by which this function could
+    supply one.
     """
 
     if signer is None:
         raise _ConfigError("a signer is required; there is no default and no fallback")
+    if production_mode and isinstance(signer, REFERENCE_GRADE_SIGNERS):
+        reference_type = next(
+            base for base in REFERENCE_GRADE_SIGNERS if isinstance(signer, base)
+        )
+        actual = type(signer).__name__
+        via = (
+            f"{actual} is {reference_type.__name__}"
+            if actual == reference_type.__name__
+            else f"{actual} is a subclass of {reference_type.__name__}"
+        )
+        raise _ConfigError(
+            f"production_mode=True refuses {actual}: {via}, which this repository "
+            "documents as the REFERENCE signer, for tests and local use only. A subclass "
+            "inherits that signer's whole implementation — the same in-memory "
+            "TrustedEvidenceSigningKey, built from the same caller-supplied seed — so "
+            "setting is_reference_signer=False on one relabels it without changing what "
+            "holds the key, and does not lift this refusal. Inject a production key "
+            "custodian implementing ProducerAttestationSignerPort over a managed key "
+            "service; this repository ships no production key."
+        )
     if production_mode and getattr(type(signer), "is_reference_signer", False) is True:
         raise _ConfigError(
             "production_mode=True refuses a reference signer "

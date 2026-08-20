@@ -338,17 +338,72 @@ except p5b.ProducerAttestationConfigurationError as exc:
 else:
     raise AssertionError("a resolver that declared nothing was admitted inside the wheel")
 
-# the reference signer is refused in production minting
-try:
-    mint()  # a reference signer...
-    p5b.mint_producer_attestation(
-        signer=signer(), tenant_id="t", subject_id="s", recommendation_id="r",
+# the reference signer is refused in production minting — and so is every SUBTYPE of it
+# (post-merge audit M-1). The exact counterpart of the resolver matrix above, and open for
+# the same reason: a subclass inherits the reference signer's whole implementation — the
+# same in-memory TrustedEvidenceSigningKey, built from the same caller-supplied seed — so
+# matching the denial by exact type let a one-line relabelling walk straight through.
+class _PlainSignerSubclass(p5b.ReferenceEd25519ProducerAttestationSigner):
+    pass
+
+class _RelabelledSigner(p5b.ReferenceEd25519ProducerAttestationSigner):
+    is_reference_signer = False
+
+class _TwoLevelSigner(_RelabelledSigner):
+    pass
+
+class _MultipleInheritanceSigner(_UnrelatedMixin,
+                                 p5b.ReferenceEd25519ProducerAttestationSigner):
+    is_reference_signer = False
+
+def _sub_signer(cls):
+    return cls(producer_id=PRODUCER, issuer=ISSUER, producer_key_id=KEY_ID,
+               signing_key=tev.TrustedEvidenceSigningKey(TRUSTED_SEED))
+
+def _mint_in_production(s):
+    return p5b.mint_producer_attestation(
+        signer=s, tenant_id="t", subject_id="s", recommendation_id="r",
         recommendation_digest="sha256:" + "a" * 64, issued_at=ISSUED_AT,
         production_mode=True)
-except p5b.ProducerAttestationConfigurationError:
-    pass
-else:
-    raise AssertionError("the reference signer was admitted in production inside the wheel")
+
+for label, factory in (
+    ("the reference signer", lambda: signer()),
+    ("plain signer subclass", lambda: _sub_signer(_PlainSignerSubclass)),
+    ("subclass with is_reference_signer = False", lambda: _sub_signer(_RelabelledSigner)),
+    ("two-level signer subclass", lambda: _sub_signer(_TwoLevelSigner)),
+    ("multiple inheritance", lambda: _sub_signer(_MultipleInheritanceSigner)),
+):
+    try:
+        _mint_in_production(factory())
+    except p5b.ProducerAttestationConfigurationError as exc:
+        if "REFERENCE" not in str(exc):
+            raise AssertionError(
+                f"{label} was refused inside the wheel, but not as reference grade: {exc}")
+    else:
+        raise AssertionError(
+            f"{label} was admitted in production minting inside the wheel — the "
+            "reference-grade signer denial is not subclass-aware in the installed "
+            "distribution")
+
+# ...and the denial is not widened: a custodian that COMPOSES a reference signer rather
+# than inheriting from one is still admissible.
+class _ComposingCustodian:
+    is_reference_signer = False
+    producer_id = PRODUCER
+    issuer = ISSUER
+    producer_key_id = KEY_ID
+    signature_profile = p5b.PRODUCER_ATTESTATION_SIGNATURE_PROFILE
+
+    def __init__(self):
+        self._inner = signer()
+
+    def sign_producer_attestation(self, signing_input):
+        return self._inner.sign_producer_attestation(signing_input)
+
+if _mint_in_production(_ComposingCustodian()).producer_key_id != KEY_ID:
+    raise AssertionError(
+        "a composing production custodian was refused inside the wheel; the reference-grade "
+        "signer denial has been widened beyond actual subtypes")
 
 # a fabricated verified artifact is refused at consumption
 try:

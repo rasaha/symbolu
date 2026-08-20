@@ -55,7 +55,9 @@ Phase 5A's producer-signing payload is **frozen**, at
 not widen it, reinterpret it, or re-verify it.
 
 `ProducerAttestationV2` is a separate contract at
-`ugence.cloud-scaling/producer-attestation/v2`. Its signing payload binds, at minimum:
+`ugence.cloud-scaling/producer-attestation/v2`. Its signing payload binds exactly these
+fourteen keys — not "at least" these; the set is closed, and `tests/test_adversarial.py`
+A-58 asserts it against the payload builder itself:
 
 ```
 schema_version, signing_purpose, producer_id, issuer, producer_key_id,
@@ -74,9 +76,15 @@ one workload would be equally valid alongside a candidate reconciled for another
 those fields to v1 would move a frozen digest, and reusing v1's tag for the wider payload
 would let a v1 signature be presented as a v2 proof.
 
-**Consequence, accepted:** the v2 proof travels **alongside** a Phase 5A candidate and is
-independently bound to it, rather than inside it. Binding one inside a candidate requires a
-Phase 5A 0.2.0, which is 5B-0B's work.
+**Consequence, accepted:** the v2 proof travels **alongside** a Phase 5A candidate rather
+than inside it. Binding one inside a candidate requires a Phase 5A 0.2.0, which is 5B-0B's
+work.
+
+It is bound to the **recommendation** — by `recommendation_id` and `recommendation_digest`,
+both signature-covered — and **not** to the candidate. An earlier revision of this paragraph
+said the proof "is independently bound to it", meaning the candidate; that is false and it
+contradicted §12.1. `candidate_digest` is not in the signed payload, so one genuine
+attestation verifies against more than one candidate. §12.1 states exactly what follows.
 
 ## §4. Decision — `issuer` and `producer_id` are separate fields, not required to differ
 
@@ -309,6 +317,98 @@ attestation digest, the verified producer, issuer and key id, the anchor coordin
 digests, the anchor capability, the profile and encoding, the issuance and verification
 instants, the anchor window bounds, the verification profile and version, and its own digest.
 
+### §12.1. What the signature covers, and what merely records the determination's scope
+
+"Bound into the artifact" and "covered by the producer's signature" are two different
+statements, and conflating them over-reads the guarantee. The artifact's own
+`artifact_digest` covers every field listed above — that is an integrity digest this package
+computes, and it is what stops a field being rewritten after construction. It is **not** the
+producer's signature.
+
+The producer's signature covers exactly the fourteen keys
+`producer_attestation_signing_payload` emits, and nothing else:
+
+| Covered by the v2 producer signature | |
+|---|---|
+| identity of the signing statement | `schema_version`, `signing_purpose` |
+| who signed, under which key | `producer_id`, `issuer`, `producer_key_id` |
+| how it was signed | `signature_algorithm`, `signature_profile`, `signature_encoding` |
+| **what it is about** | `tenant_id`, `subject_id`, `subject_type`, `recommendation_id`, `recommendation_digest` |
+| when it was issued | `issued_at` |
+
+Everything else on the artifact **records the scope of this determination**: which candidate
+it was reached against (`candidate_digest`), which anchor answered
+(`trust_anchor_coordinate_digest`, `trust_anchor_record_digest`, `trust_anchor_capability`),
+when it was reached (`verified_as_of_fact`, the anchor window bounds) and under which routine
+(`verification_profile`, `verification_profile_version`). Those are facts about the check,
+recorded honestly and digest-protected against later rewriting. They are not assertions the
+producer made.
+
+**`candidate_digest` in particular is not signature-covered.** The consequence, stated here
+rather than left to be discovered: *one genuine attestation verifies against **any** candidate
+that agrees on the five reconciled facts* — `(recommendation_id, recommendation_digest,
+tenant_id, subject_id, subject_type)`. Verified against two such candidates, the same
+attestation yields two artifacts with the same `attestation_digest`, different
+`candidate_digest`s and therefore different `artifact_digest`s, and both read `VERIFIED`.
+
+**Which differences that actually admits.** The rule first, because an enumeration of
+dimensions is what two revisions of this section got wrong: **the verifier reconciles exactly
+five candidate facts and directly reconciles no other candidate facts**. Stated as the claim it
+supports: For two independently valid objects of exact type
+`CapacityAuthorizationCandidate`, the producer-attestation layer does not independently
+compare facts outside those five when the five reconciled values remain equal.
+
+`candidate_digest` is read **after** verification succeeds, to bind the resulting artifact to
+the candidate the determination was reached against. It is neither producer-signature-covered
+nor independently reconciled: the verifier never compares it against anything.
+
+`tests/test_adversarial.py` A-59 is the load-bearing evidence — it varies real candidates
+through the genuine chain and observes the outcome. A-60 is a syntactic tripwire over the
+reconciliation section, and its coverage limits are stated with it.
+
+Measured instances, each executed against the genuine Phase 5A chain:
+
+| Candidate differs in | Same attestation still verifies? | Why |
+|---|---|---|
+| policy binding (`policy_id`, `policy_version`) | **yes** | outside the reconciled five |
+| execution target scope (e.g. `account_id`) | **yes** | outside the reconciled five |
+| permitted magnitude bounds | **yes** | outside the reconciled five — but scope and binding must be varied *together*, since Phase 5A refuses a binding whose bounds contradict its scope |
+| `disposition` and `risk_outcome` (`RISK_PASSED`/`ALLOW` → `RISK_PASSED_WITH_CONDITIONS`/`ALLOW_WITH_CONDITIONS`) | **yes** | outside the reconciled five |
+| the risk decision itself — a different `decision_snapshot`, so both `decision_digest` and `decision_snapshot_digest` move | **yes** | outside the reconciled five |
+| the recommendation's own magnitudes (`magnitude_after`, `requested_delta`) | **no** — `RECOMMENDATION_DIGEST_MISMATCH` | functionally determined by the recommendation, so they move `recommendation_digest`, which **is** one of the five |
+
+Two corrections are recorded here rather than quietly applied, because each was wrong in a
+different direction. The first revision claimed the attestation tolerates differences in
+"decision, disposition, risk outcome, magnitudes" — **magnitudes is false**, for the reason in
+the last row. The second revision over-corrected and claimed `disposition`, `risk_outcome` and
+the decision are "not independently variable at all", justified by Phase 5A refusing candidates
+outside the ALLOW disposition family — **also false**: that family has *two* members, so a
+candidate can vary within it and still be genuine, and the claim said nothing about the
+decision at all. Worse, it described a limit of the test fixture as a property of the system.
+
+So the uncovered surface is the **authorization envelope built around a recommendation** — the
+policy bound to it, the scope it would execute in, the bounds that policy sets, and the risk
+decision that admitted it — and not the recommendation's own content, which is pinned. That is
+the residual, and it is the one the closing paragraph of this section has always named.
+
+This is a **deliberate consequence of the ratified scope**, not a defect to be silently
+tolerated. A producer attestation asserts *who produced this recommendation*. The
+recommendation is pinned, by id and by content digest, and a forged recommendation therefore
+still cannot launder — that is the property §1 exists for. What is **not** pinned is the
+downstream authorization envelope the recommendation was later placed into, because binding
+that would require the signature to cover the Phase 5A candidate, which would require the
+attestation to be minted *after* the candidate rather than at the Controller's output
+boundary, and would make the v2 payload depend on Phase 5A. Both were considered and
+rejected; the attestation is minted where the producer is, and the candidate is assembled
+later by something else.
+
+The residual is therefore real and named: **a genuine producer attestation does not certify
+the policy binding, the decision or the scope its recommendation was subsequently bound
+into.** Establishing those is Phase 5B-0B's (policy authenticity) and the authorization
+subphases' work, and a consumer must not read `VERIFIED` as saying anything about them.
+`tests/test_adversarial.py` pins the behaviour with a property, so a future edit that changes
+the signed payload's coverage changes a test rather than quietly changing this guarantee.
+
 It carries **no** field named authorized, executable, envelope, ActionGate, admitted,
 credential or execution-permitted, because those concepts do not exist in this package.
 `outcome` and `grants_authority` are read-only **properties**, not fields, so
@@ -354,6 +454,45 @@ Also still open, and unchanged by this ADR: the binding Risk Decision cannot mon
 authorize a Cloud Scaling action (`tools_allow` is empty and `Scope` carries none of the
 operational dimensions), which is the second ratified blocker and belongs to a later subphase.
 
+### §13.1. Recorded and not fixed — low findings from the post-merge remediation audit
+
+Disclosed here so they are on the record rather than in a pull-request body. None is a
+verified-artifact bypass; each is a limit on what the surrounding *evidence* proves.
+
+**L-1 — the reference-grade denial lists are public, rebindable names.**
+`REFERENCE_GRADE_RESOLVERS` and `REFERENCE_GRADE_SIGNERS` are both exported. They are the
+tuples `require_production_resolver` and `mint_producer_attestation` match against, so
+in-process code that rebinds either module attribute to `()` lifts the production denial for
+everything it named. This is the **same residual** §12 already records for the construction
+token and the provenance registry — code that reaches into a module's attributes is not
+defended against, and no Python-level mechanism defends against it. They are exported
+deliberately: a composition root needs to be able to *ask* whether a component it is about to
+inject is reference grade, and a denial list nobody can read is a denial list nobody can
+audit. Not fixed; the trade is stated.
+
+**L-2 — the reverse-dependency scan has a blind spot outside `packages/`.** The Trusted
+Evidence Authority's importer scan walks `packages/**/*.py` only, so a consumer at the
+repository root or under `scripts/` would not be seen by it. Pre-existing, owned by TEV, and
+untouched here. It bounds what "nothing else imports this" is evidence *for*: it is evidence
+about `packages/`, not about the whole tree.
+
+**L-3 — "every security gate is scored" overstated the denominator.** The sweep's inventory
+is every `if` in the shipped source whose own body can reach a `raise` or a typed refusal. It
+does **not** independently score fail-closed `except` arms, and it does not score the
+individual sub-terms of a boolean guard — a two-term `and` is neutralised and scored as one
+guard, not two. The CI job name claimed more than the method delivers and now says
+*"every inventoried `if` guard scored"*. `GUARD_SWEEP.md` carries the measured excluded
+counts. Not fixed by widening the inventory: an `except` arm cannot be neutralised by the
+`if False:` rewrite this sweep is built on, and scoring sub-terms independently is a
+different mutation operator, not a bug in this one.
+
+**L-4 — a misnamed packaging property.** `SD-8` was called
+`test_the_extracted_sdist_imports_from_the_installed_distribution`, which was wrong about the
+package under test: the probe puts the extraction's own `src/` first on `sys.path`, so this
+package is imported **from the extracted sdist** and only the four neighbours come from
+site-packages. Renamed to `test_no_import_in_the_extracted_sdist_resolves_from_the_checkout`,
+which is what it asserts. Trivial, so fixed rather than merely recorded.
+
 ## §14. Package topology
 
 ```
@@ -362,9 +501,16 @@ packages/integration/cloud-scaling-producer-attestation
   namespace     ugence_cloud_scaling_producer_attestation
   version       0.1.0
   depends on    ugence-risk-authority>=0.4.0                      (public canonicalization only)
-                ugence-trusted-evidence-authority>=0.2.0          (trust-anchor types + Ed25519 backend)
+                ugence-trusted-evidence-authority>=0.3.0          (trust-anchor types + Ed25519 backend)
                 ugence-cloud-scaling-authorization-contracts>=0.1.0 (the candidate, read-only)
 ```
+
+The Trusted Evidence Authority floor is **0.3.0**, not 0.2.0. 0.3.0 is the release that adds
+`TrustAnchorCapability.CLOUD_SCALING_RECOMMENDATION_ATTESTATION`, which is the dedicated
+capability every anchor coordinate in this package is resolved under (§12); against 0.2.0 the
+member does not exist and this package fails at import. An earlier revision of this table said
+`>=0.2.0` while `pyproject.toml` correctly declared `>=0.3.0` — the ADR was the wrong one, and
+is corrected here rather than the floor being relaxed to match it.
 
 No third-party runtime dependency is added: the Ed25519 backends arrive transitively as the
 Trusted Evidence Authority's own declared requirements. Nothing upstream depends on this

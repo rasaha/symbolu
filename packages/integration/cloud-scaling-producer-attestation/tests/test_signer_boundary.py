@@ -35,6 +35,7 @@ from ugence_cloud_scaling_producer_attestation import (
     ProducerAttestationSignerPort,
     ProducerAttestationSigningBoundaryError,
     ProducerAttestationSigningInput,
+    REFERENCE_GRADE_SIGNERS,
     ReferenceEd25519ProducerAttestationSigner,
     mint_producer_attestation,
 )
@@ -381,7 +382,12 @@ def test_the_shipped_signer_is_structurally_marked_as_reference():
 
 
 def test_a_reference_signer_is_refused_in_production_mode():
-    """G-16: production minting refuses the reference signer, at the call, fail-closed."""
+    """G-16: production minting refuses the reference signer, at the call, fail-closed.
+
+    The message names the grade in the same words the resolver-side denial uses
+    (``REFERENCE``), because the two refusals are now the same mechanism and an operator
+    reading one should recognise the other.
+    """
 
     with pytest.raises(ProducerAttestationConfigurationError) as exc:
         mint_producer_attestation(
@@ -393,7 +399,7 @@ def test_a_reference_signer_is_refused_in_production_mode():
             issued_at=REC_TIME,
             production_mode=True,
         )
-    assert "reference signer" in str(exc.value)
+    assert "REFERENCE signer" in str(exc.value)
 
 
 @pytest.mark.happy
@@ -422,6 +428,222 @@ def test_a_production_signer_is_admitted():
         production_mode=True,
     )
     assert minted.producer_key_id == PRODUCER_KEY_ID
+
+
+# --- the reference-grade signer denial is subclass-aware (mirrors R-18 … R-25) --------- #
+
+
+def _mint(signer):
+    return mint_producer_attestation(
+        signer=signer,
+        tenant_id="tenant-1",
+        subject_id="checkout-api",
+        recommendation_id="rec-phase5a-1",
+        recommendation_digest="sha256:" + "a" * 64,
+        issued_at=REC_TIME,
+        production_mode=True,
+    )
+
+
+class _PlainSubclass(ReferenceEd25519ProducerAttestationSigner):
+    """A subclass that changes nothing. Still the reference key custodian."""
+
+
+class _RelabelledSubclass(ReferenceEd25519ProducerAttestationSigner):
+    """The attack: inherit the whole reference implementation, then deny being it."""
+
+    is_reference_signer = False
+
+
+class _TwoLevelSubclass(_RelabelledSubclass):
+    """Distance from the base does not launder the inheritance."""
+
+
+class _Unrelated:
+    """A mixin with no signing behaviour of its own."""
+
+
+class _MultipleInheritance(_Unrelated, ReferenceEd25519ProducerAttestationSigner):
+    """One base is reference grade, which is enough."""
+
+    is_reference_signer = False
+
+
+def _sub(cls):
+    return cls(
+        producer_id=PRODUCER_ID,
+        issuer=ISSUER_ID,
+        producer_key_id=PRODUCER_KEY_ID,
+        signing_key=signing_key(),
+    )
+
+
+@pytest.mark.parametrize(
+    "factory, label",
+    [
+        (lambda: build_signer(), "the reference signer itself"),
+        (lambda: _sub(_PlainSubclass), "direct subclass, no override"),
+        (lambda: _sub(_RelabelledSubclass), "subclass with is_reference_signer = False"),
+        (lambda: _sub(_TwoLevelSubclass), "two-level subclass"),
+        (lambda: _sub(_MultipleInheritance), "multiple inheritance, one base is reference"),
+    ],
+)
+def test_every_reference_grade_signer_subtype_is_refused_in_production(factory, label):
+    """G-16a: every actual subtype of the reference signer is refused in production.
+
+    The exact counterpart of R-18 on the resolver side, and open for the same reason: a
+    subclass inherits the reference signer's whole implementation — the same in-memory
+    ``TrustedEvidenceSigningKey``, built from the same caller-supplied seed — so matching
+    the denial by exact type let a one-line relabelling walk straight through it.
+
+    ``_RelabelledSubclass`` is the case that was admitted before this fix. It is not a
+    contrived shape: it is what someone writes when they want the reference signer's
+    behaviour and have been told production mode wants ``is_reference_signer = False``.
+    """
+
+    with pytest.raises(ProducerAttestationConfigurationError) as exc:
+        _mint(factory())
+    assert "REFERENCE" in str(exc.value), label
+
+
+def test_a_reference_signer_subclass_cannot_relabel_its_way_in():
+    """G-16b: the flag is present, false, and read — and it still does not help.
+
+    Stated separately from G-16a because it is the whole finding: the declaration the
+    subclass makes about itself is genuine, the old guard read it, and the old guard
+    admitted it. The ``isinstance`` match is evaluated *first*, so the flag is never
+    reached.
+    """
+
+    signer = _sub(_RelabelledSubclass)
+    assert signer.is_reference_signer is False
+    assert type(signer).is_reference_signer is False
+    assert isinstance(signer, ReferenceEd25519ProducerAttestationSigner)
+
+    with pytest.raises(ProducerAttestationConfigurationError) as exc:
+        _mint(signer)
+    message = str(exc.value)
+    assert "_RelabelledSubclass" in message
+    assert "subclass of ReferenceEd25519ProducerAttestationSigner" in message
+
+
+@pytest.mark.happy
+def test_a_custodian_that_composes_a_reference_signer_is_still_admitted():
+    """G-17a: the positive control the denial must not swallow.
+
+    ``test_a_production_signer_is_admitted`` (G-17) covers an independently implemented
+    custodian. This one is the harder case: a custodian that *holds* a reference signer and
+    delegates to it. It is admitted, because composition is a decision about where the key
+    lives, and this custodian never declared itself reference grade — exactly the
+    resolver-side ruling in R-21/R-22, applied here.
+    """
+
+    inner = build_signer()
+
+    class ComposingCustodian:
+        is_reference_signer = False
+        producer_id = PRODUCER_ID
+        issuer = ISSUER_ID
+        producer_key_id = PRODUCER_KEY_ID
+        signature_profile = PRODUCER_ATTESTATION_SIGNATURE_PROFILE
+
+        def sign_producer_attestation(self, signing_input):
+            return inner.sign_producer_attestation(signing_input)
+
+    custodian = ComposingCustodian()
+    assert not isinstance(custodian, REFERENCE_GRADE_SIGNERS)
+    assert _mint(custodian).producer_key_id == PRODUCER_KEY_ID
+
+
+@pytest.mark.happy
+def test_reference_grade_signers_names_exactly_the_shipped_reference_signer():
+    """G-16c: the tuple is the inventory, and it is neither empty nor over-broad."""
+
+    assert REFERENCE_GRADE_SIGNERS == (ReferenceEd25519ProducerAttestationSigner,)
+    assert "REFERENCE_GRADE_SIGNERS" in pkg.__all__
+
+
+def test_the_reference_grade_signer_denial_uses_subclass_aware_matching():
+    """G-16d: asserted over the source, so a revert to exact-type matching fails here.
+
+    The AST counterpart of R-25, and the anti-regression that actually matters: the denial
+    must be ``isinstance``-based. Exact-type matching is what let a subclass inherit the
+    reference key custodian and relabel itself production.
+
+    It also pins the ordering — but for the honest reason, which is **diagnostic, not
+    security**. Both checks raise and neither admits, so swapping them leaves every subclass
+    refused; what changes is which message an operator gets. An earlier revision of the
+    docstring in ``signing.py`` claimed the order stopped a relabelled subclass reaching "the
+    branch that would have admitted it", and there is no such branch. The ordering assertion
+    is kept because the message is worth protecting, and it is described here as what it is.
+    """
+
+    source = inspect.getsource(mint_producer_attestation)
+    tree = ast.parse(source.lstrip())
+    calls = {
+        node.func.id
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    }
+    assert "isinstance" in calls, (
+        "the reference-grade signer denial must be subclass-aware; exact-type matching "
+        "lets a subclass inherit the reference key custodian and relabel itself production"
+    )
+
+    isinstance_lines = [
+        node.lineno
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "isinstance"
+        and any(
+            isinstance(arg, ast.Name) and arg.id == "REFERENCE_GRADE_SIGNERS"
+            for arg in node.args
+        )
+    ]
+    flag_lines = [
+        node.lineno
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant) and node.value == "is_reference_signer"
+    ]
+    assert isinstance_lines, "the denial must match against REFERENCE_GRADE_SIGNERS"
+    assert flag_lines, "the is_reference_signer flag check is expected to remain"
+    assert min(isinstance_lines) < min(flag_lines), (
+        "the inheritance denial should be evaluated before the is_reference_signer flag so "
+        "a subclass is NAMED as reference grade rather than reported through the flag it "
+        "set for itself. This is a diagnostic guarantee, not a security one: both checks "
+        "raise, so swapping them refuses the same signers with a worse message"
+    )
+
+
+@pytest.mark.happy
+def test_the_is_reference_signer_flag_refuses_something_isinstance_cannot():
+    """G-16e: the second check is not redundant, and this is what it catches.
+
+    Stated as a property because the M-1 correction made the ``isinstance`` match carry the
+    security weight, and a reader could reasonably conclude the flag check is now dead code.
+    It is not: a custodian that does **not** inherit from the reference signer, but honestly
+    declares itself reference grade, is invisible to ``isinstance`` and refused by the flag.
+    """
+
+    inner = build_signer()
+
+    class HonestlyReferenceGrade:
+        is_reference_signer = True
+        producer_id = PRODUCER_ID
+        issuer = ISSUER_ID
+        producer_key_id = PRODUCER_KEY_ID
+        signature_profile = PRODUCER_ATTESTATION_SIGNATURE_PROFILE
+
+        def sign_producer_attestation(self, signing_input):
+            return inner.sign_producer_attestation(signing_input)
+
+    custodian = HonestlyReferenceGrade()
+    assert not isinstance(custodian, REFERENCE_GRADE_SIGNERS)
+
+    with pytest.raises(ProducerAttestationConfigurationError) as exc:
+        _mint(custodian)
+    assert "is_reference_signer is True" in str(exc.value)
 
 
 @pytest.mark.happy

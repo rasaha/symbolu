@@ -7,9 +7,14 @@ Method, following the Phase 5A convention exactly:
   reach a ``raise`` or a typed refusal — in a fixed module order and then source order;
 * neutralise each one **independently** by rewriting its ``if`` header to ``if False:``;
 * do it in a **disposable untracked copy**; the tracked worktree is never mutated;
-* run the **full suite** against the mutated copy and record killed/survived;
-* a run is scored only if it **collected** the full suite — a collection error, a syntax
-  error, an import error or a timeout is not a valid kill;
+* run the suite against the mutated copy and record killed/survived. Not quite the *full*
+  suite: the packaging-distribution module is skipped via ``UGENCE_SKIP_SLOW_PACKAGING``, for
+  cost, under the safety condition PL-6 asserts. Every property the sdist ships is still run
+  directly here;
+* a run is scored only if it **collected the same number of tests as the unmutated baseline**
+  — a collection error, a syntax error, an import error, a timeout, or a collection count that
+  moved is not a valid kill. The count comparison is enforced against the baseline recorded
+  before the sweep starts, not merely asserted in this docstring;
 * classify every survivor.
 
 Writes ``GUARD_SWEEP.md``. Run:
@@ -75,11 +80,28 @@ def _condition_text(source_lines: list[str], node: ast.If) -> str:
         return source_lines[node.lineno - 1].strip()
 
 
-def _reaches_refusal(node: ast.If) -> bool:
-    """Whether this ``if``'s own body can reach a raise or a typed refusal.
+def _reaches_refusal(node) -> bool:
+    """Whether this node's body can reach a raise or a typed refusal, **nested bodies
+    included**.
 
-    Nested ``if`` bodies are excluded so an outer block does not inherit its children's
-    relevance — each guard is scored for what *it* protects.
+    Takes an ``ast.If`` for the inventory and an ``ast.ExceptHandler`` for the
+    excluded-count report; both carry a ``body``.
+
+    Stated precisely, because an earlier revision of this docstring claimed the opposite —
+    "nested ``if`` bodies are excluded so an outer block does not inherit its children's
+    relevance" — while the code below has always used ``ast.walk``, which descends into
+    them. The code is right and the claim was wrong: an outer ``if`` that contains nothing
+    but a guarded block is itself a guard, because neutralising it disables everything
+    inside. ``verification.py``'s ``if production_mode:`` is the case in point — remove it
+    and the entire production-mode enforcement block stops running.
+
+    The consequence for the headline number is disclosed rather than left implicit: under
+    the stricter reading the inventory would be **one smaller**, and ``GUARD_SWEEP.md`` says
+    so and names the guard.
+
+    The typed-refusal arm below is also looser than "``return _Outcome.SOMETHING``": any
+    ``return X.y`` counts. That admits no false guard in this source — every match is a real
+    refusal — but it is a heuristic, not a proof, and is recorded as one.
     """
 
     for statement in node.body:
@@ -126,6 +148,37 @@ def inventory() -> list[Guard]:
     return guards
 
 
+def excluded_from_the_inventory() -> tuple[int, int]:
+    """What the ``if``-guard denominator leaves out, measured rather than claimed.
+
+    Two kinds of fail-closed logic exist in the source and are not scored as guards:
+
+    * ``except`` arms whose body raises or returns a typed refusal. The ``if False:``
+      rewrite cannot neutralise a handler, so they are out of scope for this mutation
+      operator rather than overlooked;
+    * the extra sub-terms of a boolean guard. ``if a and b:`` is neutralised and scored as
+      **one** guard; scoring each side independently is a different operator.
+
+    Reported in ``GUARD_SWEEP.md`` so the CI job's claim is bounded by a number this script
+    produced, not by a phrase somebody wrote once. (closure-audit L-3)
+    """
+
+    except_arms = 0
+    boolean_subterms = 0
+    for module in MODULE_ORDER:
+        tree = ast.parse((SRC / module).read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ExceptHandler) and _reaches_refusal(node):
+                except_arms += 1
+            elif (
+                isinstance(node, ast.If)
+                and _reaches_refusal(node)
+                and isinstance(node.test, ast.BoolOp)
+            ):
+                boolean_subterms += len(node.test.values) - 1
+    return except_arms, boolean_subterms
+
+
 def mutate(guard: Guard, workdir: Path) -> None:
     """Rewrite exactly this guard's ``if`` header to ``if False:`` in the copy."""
 
@@ -142,8 +195,22 @@ def mutate(guard: Guard, workdir: Path) -> None:
     path.write_text("".join(lines), encoding="utf-8")
 
 
-def run_suite(workdir: Path, timeout: int = 600) -> dict:
-    """Run the full suite in the copy. Returns a scored result, honestly labelled."""
+def run_suite(
+    workdir: Path, timeout: int = 600, expected_collected: "int | None" = None
+) -> dict:
+    """Run the suite in the copy. Returns a scored result, honestly labelled.
+
+    Not quite the *full* suite: ``UGENCE_SKIP_SLOW_PACKAGING=1`` makes the packaging module
+    skip. Stated precisely, because a previous revision of this docstring said it
+    "deselects" the module and therefore "collects fewer properties", and it does neither —
+    the mechanism is ``pytest.mark.skipif``, so collection is **identical** at 440 and only
+    the number of properties that *run* changes (26 fewer). That distinction is not pedantic here: the scorer below
+    compares collection counts against the baseline, and it would be comparing a moving number
+    if the flag changed collection.
+
+    The skip is a cost decision whose safety condition is asserted by
+    ``tests/test_property_ledger.py`` PL-6; see the comment on the environment below.
+    """
 
     process = subprocess.run(
         # NB: no ``-q`` here. The package's own pyproject already sets ``addopts = "-q"``,
@@ -160,11 +227,17 @@ def run_suite(workdir: Path, timeout: int = 600) -> dict:
             # walking upward. Telling it explicitly keeps the copy out of every repo-wide
             # scan.
             "UGENCE_REPO_ROOT": str(REPO),
-            # Deselect the slow packaging-isolation properties. They build five wheels and a
-            # virtualenv per run — minutes each, times the whole inventory — and they assert
-            # facts about the sdist, not about any ``src/`` guard, so they can neither kill
-            # nor survive a mutation and contribute nothing to the score. The full suite and
-            # CI run them.
+            # Skip the slow packaging-distribution properties. They build five wheels
+            # and a virtualenv per run — minutes each, times the whole inventory.
+            #
+            # This is a COST decision and it is not free. SD-6..SD-9 build the sdist from
+            # the package under test and run the *shipped* suite against it, so under a
+            # mutation they fail exactly as the same properties fail here: they would
+            # score. What makes dropping them sound is that every module the sdist ships
+            # is also run directly, un-skipped, in this same run — so the score is
+            # unchanged and only the wall-clock differs. tests/test_property_ledger.py
+            # PL-6 asserts that relationship, so a property added behind this switch that
+            # reaches src/ behaviour fails rather than silently shrinking the sweep.
             "UGENCE_SKIP_SLOW_PACKAGING": "1",
         },
     )
@@ -175,6 +248,43 @@ def run_suite(workdir: Path, timeout: int = 600) -> dict:
         return {"scored": False, "why": "syntax error", "failed": []}
     if re.search(r"^ERROR ", output, re.M) and " passed" not in output:
         return {"scored": False, "why": "import or collection error", "failed": []}
+    # The package's own pyproject sets ``addopts = "-q"``, so pytest never prints a
+    # "collected N items" line here. The summary line is what exists, and summing its
+    # outcome counts is exactly the number of tests that were collected and then either
+    # ran or were skipped — skipped tests ARE counted, which is the point: the packaging
+    # module is skipped rather than deselected, so the total stays 440 whether or not
+    # UGENCE_SKIP_SLOW_PACKAGING is set, and the comparison below is against a fixed
+    # number. pytest's *deselected* tally is deliberately not summed: a deselected test
+    # was never part of this run's population. (The two words are not interchangeable, and
+    # a blanket deselect->skip rename briefly collapsed them here into "skipped rather
+    # than skipped", which said the opposite of what the regex below does.)
+    counted = {
+        outcome: int(value)
+        for value, outcome in re.findall(
+            r"(\d+) (passed|failed|skipped|errors?|xfailed|xpassed)\b", output
+        )
+    }
+    collected = sum(counted.values()) if counted else None
+    if expected_collected is not None:
+        if collected is None:
+            return {
+                "scored": False,
+                "why": "no collection count reported",
+                "failed": [],
+            }
+        if collected != expected_collected:
+            # The claim "a run is scored only if it collected the same suite" is enforced
+            # here rather than asserted in a docstring. A mutation that made part of the
+            # suite un-collectable while the remainder passed would otherwise be scored as
+            # a valid run, and a guard nothing exercised would be published as a survivor.
+            return {
+                "scored": False,
+                "why": (
+                    f"collected {collected}, baseline collected {expected_collected}; "
+                    "the mutation changed what could be collected"
+                ),
+                "failed": [],
+            }
     match = re.search(r"(\d+) passed", output)
     if match is None:
         tail = " | ".join(line for line in output.strip().splitlines()[-3:])
@@ -187,6 +297,7 @@ def run_suite(workdir: Path, timeout: int = 600) -> dict:
     return {
         "scored": True,
         "why": "",
+        "collected": collected,
         "failed": failed,
         "passed": int(match.group(1)),
         "killed": bool(failed),
@@ -268,16 +379,23 @@ SURVIVOR_CLASSIFICATION = {
         "specifies, and it would be the only survivor if a future edit made the digest "
         "check cover a different projection of the payload"
     ),
-    "value.construction_token is not _VERIFICATION_TOKEN": (
-        "sibling-backed — the provenance-registry check on the next line refuses everything "
-        "this one does. An artifact assembled outside the authoritative routine also names "
-        "a determination that routine never reached, unless it is a faithful copy of a real "
-        "one, which IS that determination and should pass (V-21). The token check is kept "
-        "as the ratified construction guard and as the check that would still stand if a "
-        "deployment ever scoped the registry differently — for example per-request rather "
-        "than per-process. Its construction-time twin in __post_init__ IS killed, by V-1 "
-        "and V-2"
-    ),
+    # ``value.construction_token is not _VERIFICATION_TOKEN`` (verified.py, the
+    # consumption-boundary check) was classified here as "sibling-backed — the
+    # provenance-registry check on the next line refuses everything this one does".
+    # That was wrong, and wrong in the direction that matters: it described the only
+    # guard standing between a rebuilt artifact and admission as redundant.
+    #
+    # A ``copy.deepcopy``d or unpickled artifact bypasses ``__init__``, so it carries a
+    # freshly rebuilt token — but ``artifact_digest`` is a string, copied verbatim, so it
+    # names a determination this process really did reach. The registry admits it, the
+    # exact-type check admits it, the field-presence check admits it and the recomputed
+    # self-digest admits it. Only this guard refuses it. Reproduced by neutralising this
+    # guard alone in a disposable copy: both rebuilds were ADMITTED.
+    #
+    # It is no longer a survivor. ``tests/test_verified_artifact.py`` V-24 (deepcopy and
+    # pickle, asserting the other four checks pass first) and V-25 score it, and it is
+    # reported as **killed** by the table below. The entry is left here as a comment
+    # rather than deleted so the correction is visible to the next reader.
     "type(anchor) is not TrustAnchorRecord": (
         "unreachable through the public API — TrustAnchorResolution refuses at construction "
         "to carry anything but a TrustAnchorRecord, and the resolution's own exact-type "
@@ -331,7 +449,7 @@ def _baseline_run() -> dict:
     This happened. The packaging-distribution properties invoke ``python -m build``, the
     sweep job installs pytest but not ``build``, and one property therefore errored on all
     91 runs — converting two genuine survivors into kills and appearing in every guard's
-    attribution list. The module is now deselected in sweep runs; this check is what makes
+    attribution list. The module is now skipped in sweep runs; this check is what makes
     the next instance of the same class impossible to publish.
     """
 
@@ -373,7 +491,11 @@ def main() -> int:
         shutil.rmtree(WORKROOT)
 
     baseline = _baseline_run()
-    print(f"baseline (unmutated): {baseline['passed']} passed, no failures")
+    expected_collected = baseline["collected"]
+    print(
+        f"baseline (unmutated): {baseline['passed']} passed, no failures, "
+        f"{expected_collected} collected"
+    )
 
     results = []
     try:
@@ -389,7 +511,7 @@ def main() -> int:
             )
             mutate(guard, WORKDIR)
             try:
-                result = run_suite(WORKDIR)
+                result = run_suite(WORKDIR, expected_collected=expected_collected)
             except subprocess.TimeoutExpired:
                 result = {"scored": False, "why": "timeout", "failed": []}
             results.append((guard, result))
@@ -427,6 +549,18 @@ def main() -> int:
 
 
 def write_report(results) -> None:
+    _EXCLUDED_EXCEPT_ARMS, _EXCLUDED_BOOLEAN_SUBTERMS = excluded_from_the_inventory()
+    #: The outer scaffolding guard named in the disclosure below. Located rather than
+    #: hard-coded, so the line number cannot rot.
+    _SCAFFOLDING_LINENO = next(
+        (
+            guard.lineno
+            for guard, _ in results
+            if guard.module == "verification.py"
+            and " ".join(guard.condition.split()) == "production_mode"
+        ),
+        "(none)",
+    )
     killed = [g for g, r in results if r.get("killed")]
     survived = [(g, r) for g, r in results if r["scored"] and not r.get("killed")]
     classes: dict[str, int] = {}
@@ -445,20 +579,40 @@ def write_report(results) -> None:
         "package; the tracked worktree is never mutated, and the sweep refuses to report if",
         "the content hash of every shipped source file differs before and after. A run is",
         "scored **only** if it",
-        "collected and ran the full suite — a collection error, a syntax error, an import",
+        "collected the full 440-test suite while intentionally skipping 26 packaging",
+        "properties during mutation runs — a collection error, a syntax error, an import",
         "error or a timeout is not a valid kill.",
         "",
         "**Baseline precondition.** Before any mutation, the sweep runs the suite *unmutated*",
-        "and refuses to proceed unless it is green. A test that fails for a reason unrelated",
+        "and refuses to proceed unless it is green. It also records the baseline's",
+        "**collection count**, and every mutated run must match it: a run that collected a",
+        "different number of tests is reported NOT SCORED rather than counted, so a mutation",
+        "that made part of the suite un-collectable while the remainder passed cannot publish",
+        "an unexercised guard as a survivor. That check is enforced in the scorer, not merely",
+        "described here.",
+        "",
+        "A test that fails for a reason unrelated",
         "to the mutation fails on every run, so every guard looks killed and a genuinely",
         "surviving guard is published as load-bearing — the wrong direction for a security",
         "claim to be wrong in. This is not hypothetical: the packaging-distribution",
         "properties invoke `python -m build`, the sweep job installs pytest but not `build`,",
         "and one of them therefore errored on all 91 runs, converting two real survivors into",
-        "kills. Those properties are now deselected in sweep runs — a mutated package builds",
-        "into a distribution exactly as an unmutated one does, so they can score no guard —",
-        "and this precondition is what stops the next instance of that class from being",
+        "kills. This precondition is what stops the next instance of that class from being",
         "published as a result.",
+        "",
+        "**Why the packaging module is skipped, stated accurately.** For **cost**, and",
+        "not because it scores nothing. An earlier revision of this document and of the",
+        "module's own comment claimed \"nothing there can score a guard in `src/`: a mutated",
+        "package builds into a distribution exactly as an unmutated one does\". That is true",
+        "of SD-1 … SD-5 and **false** of SD-6 … SD-9, which build the sdist *from the package",
+        "under test* and run the shipped suite against it — under a mutation the shipped",
+        "adversarial properties fail there exactly as they fail here, so SD-7 would score.",
+        "Dropping them is sound for a different reason, and a checkable one: **every module",
+        "the sdist ships is also run directly, un-skipped, in this same sweep run**, so",
+        "the score is identical and only the wall-clock differs.",
+        "`tests/test_property_ledger.py::PL-6` asserts that relationship in both directions,",
+        "so a property added behind the switch that reaches `src/` behaviour the sweep does",
+        "not otherwise run fails rather than quietly shrinking the sweep.",
         "",
         f"| Result | **{len(killed)} killed / {len(survived)} survived** |",
         "|---|---|",
@@ -508,6 +662,42 @@ def write_report(results) -> None:
         "the payload-digest comparison, anchor resolution, anchor identity, anchor lifecycle,",
         "profile and encoding agreement, signature decoding and signature verification — are",
         "all killed by a property that names that gate.",
+        "",
+        "### What the inventory counts, and what it leaves out",
+        "",
+        "The denominator is every `if` in the shipped source whose own body can reach a",
+        "`raise` or a typed refusal. Two kinds of fail-closed logic are **not** in it, and",
+        "the count should not be read as \"every security gate in the package\":",
+        "",
+        f"* **{_EXCLUDED_EXCEPT_ARMS} fail-closed `except` arms.** An `except` cannot be",
+        "  neutralised by the `if False:` rewrite this sweep is built on, so it is out of",
+        "  scope for this mutation operator rather than overlooked;",
+        f"* **{_EXCLUDED_BOOLEAN_SUBTERMS} boolean sub-terms.** A two-term `and` guard is",
+        "  neutralised and scored as **one** guard. Scoring each side independently is a",
+        "  different operator, and this sweep does not claim it.",
+        "",
+        "Two further facts about the denominator, disclosed because a reader could otherwise",
+        "infer them wrongly from the count alone:",
+        "",
+        "* **An outer `if` that only wraps a guarded block is itself inventoried.**",
+        "  Relevance is computed over the whole nested body, so",
+        f"  `verification.py:{_SCAFFOLDING_LINENO}` (`if production_mode:`) is scored as a",
+        "  guard even though it reaches a `raise` only through its nested child. That is",
+        "  deliberate — neutralise it and the entire production-mode enforcement block stops",
+        "  running — but it means a stricter reading that excluded nested bodies would report",
+        f"  **{len(results) - 1}** guards rather than {len(results)}. Both numbers describe",
+        "  the same source; this one is the count the published table is built from.",
+        "* **One of the five checks in `require_verified_producer_attestation` is an `except`",
+        "  arm**, and is therefore among the excluded arms above rather than among the scored",
+        "  guards. It is the field-presence check, and it is the one that refuses an",
+        "  `object.__new__` fabrication. It is covered by properties",
+        "  (`test_verified_artifact.py` V-3, `test_typed_outcomes.py` O-13) but not by this",
+        "  sweep, so \"four of that function's five checks are mutation-scored\" is the exact",
+        "  claim, not five.",
+        "",
+        "The CI job used to be called *\"every security gate is scored\"*, which overstated",
+        "exactly this; it now says *\"every inventoried `if` guard scored\"*. The two counts",
+        "above are measured by `scripts/guard_sweep.py` at report time, not asserted.",
         "",
         "### What \"killed\" does and does not claim",
         "",

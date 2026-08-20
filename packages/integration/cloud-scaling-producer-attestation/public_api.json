@@ -217,6 +217,9 @@
     "REFERENCE_GRADE_RESOLVERS": {
       "kind": "tuple"
     },
+    "REFERENCE_GRADE_SIGNERS": {
+      "kind": "tuple"
+    },
     "REFUSAL_OUTCOMES": {
       "kind": "frozenset",
       "values": [

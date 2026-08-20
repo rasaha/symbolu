@@ -32,8 +32,11 @@ What it deliberately does not do
 Phase 5A stays at **0.1.0, unmodified**: this package does not change its canonical
 dictionaries, its candidate digest, or the documented limitation of its v1 attestation, and
 it does not reinterpret that unverified field as verified. The v2 proof travels *alongside*
-a candidate and is independently bound to it; binding one *inside* a candidate is Phase
-5B-0B's work. The Cloud Scaling Controller stays at 0.4.0, key-free and advisory.
+a candidate; binding one *inside* a candidate is Phase 5B-0B's work. It is bound to the
+**recommendation** — by id and content digest — and **not** to the candidate: ``candidate_digest``
+is not signature-covered. See :mod:`ugence_cloud_scaling_producer_attestation.verified` and
+ADR §12.1 before reading a ``VERIFIED`` outcome as saying anything about the policy binding
+or the execution scope the recommendation was later bound into. The Cloud Scaling Controller stays at 0.4.0, key-free and advisory.
 
 **Policy authenticity remains unresolved.** Nothing here establishes that the policy binding
 a candidate carries is genuine or in force. That blocker is Phase 5B-0B's and is open.
@@ -83,6 +86,7 @@ from .outcomes import (
     ProducerAuthenticityOutcome,
 )
 from .signing import (
+    REFERENCE_GRADE_SIGNERS,
     ProducerAttestationSignerPort,
     ProducerAttestationSigningInput,
     ReferenceEd25519ProducerAttestationSigner,
@@ -153,6 +157,7 @@ __all__ = [
     "anchor_lifecycle_outcome",
     "require_production_resolver",
     "REFERENCE_GRADE_RESOLVERS",
+    "REFERENCE_GRADE_SIGNERS",
     # --- the authoritative verification routine ---
     "ProducerAttestationVerifier",
     "ProducerSignatureVerifierPort",

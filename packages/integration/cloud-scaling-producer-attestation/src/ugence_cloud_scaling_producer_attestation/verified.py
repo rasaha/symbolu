@@ -41,6 +41,63 @@ attestation says who produced the recommendation. It says nothing about whether 
 binding the candidate carries is genuine, in force, or issued by an authority anyone
 trusts. That is Phase 5B-0B's, and it is not implemented here.
 
+What the signature covers, and what records the determination's scope
+--------------------------------------------------------------------
+Two different statements, and reading the first for the second over-claims the guarantee.
+:attr:`artifact_digest` covers every field on this class — but that is an *integrity*
+digest this package computes, and its job is to stop a field being rewritten after
+construction. It is not the producer's signature.
+
+The producer's signature covers exactly the fourteen keys
+:func:`~ugence_cloud_scaling_producer_attestation.attestation.
+producer_attestation_signing_payload` emits: the schema version and signing purpose, the
+producer, issuer and key id, the algorithm, profile and encoding, the issuance instant, and
+the five facts the determination is *about* — ``tenant_id``, ``subject_id``,
+``subject_type``, ``recommendation_id`` and ``recommendation_digest``.
+
+Every remaining field on this artifact records **the scope of this determination**, not
+something the producer asserted: :attr:`candidate_digest` (which candidate it was reached
+against), the trust-anchor coordinate, record and capability (which anchor answered),
+:attr:`verified_as_of_fact` and the anchor window bounds (when), and the verification
+profile and version (under which routine).
+
+:attr:`candidate_digest` is therefore **not signature-covered**, and the consequence is
+stated here rather than left to be found: *one genuine attestation verifies against any
+candidate that agrees on those five reconciled facts*. Verified against two such candidates
+the same attestation yields two artifacts with the same :attr:`attestation_digest`,
+different :attr:`candidate_digest` values and different :attr:`artifact_digest` values, and
+both read ``VERIFIED``.
+
+What that admits, stated as a rule rather than as a list — an enumeration of dimensions is
+what two revisions of this docstring got wrong. The verifier reconciles **exactly those five
+facts and directly reconciles no other candidate facts**. Stated as the claim it supports: for
+two independently valid objects of exact type ``CapacityAuthorizationCandidate``, the
+producer-attestation layer does not independently compare facts outside those five when the
+five reconciled values remain equal.
+
+:attr:`candidate_digest` is read **after** verification succeeds, to bind the resulting
+artifact to the candidate the determination was reached against. It is neither
+producer-signature-covered nor independently reconciled — the verifier never compares it
+against anything. ``tests/test_adversarial.py`` A-59 is the load-bearing evidence; A-60 is a
+syntactic tripwire whose coverage limits are stated with it. Measured
+instances: a different policy binding, a different execution target scope, different permitted
+magnitude bounds, a different ``disposition``/``risk_outcome`` within the ALLOW family, and a
+different risk decision — all still ``VERIFIED``.
+
+The one thing it does **not** admit is a candidate whose own recommendation differs:
+``magnitude_after`` and ``requested_delta`` are functionally determined by the recommendation,
+so changing them moves ``recommendation_digest``, which *is* one of the five, and the
+verification refuses with ``RECOMMENDATION_DIGEST_MISMATCH``.
+
+That is the ratified scope, not an oversight. The recommendation itself *is* pinned, by id
+and by content digest, which is what stops a forged recommendation laundering. What is not
+pinned is the authorization envelope the recommendation was later placed into — binding
+that would mean signing the Phase 5A candidate, which would mean minting the attestation
+after the candidate rather than at the Controller's output boundary, and would make the v2
+payload depend on Phase 5A. So a consumer must not read ``VERIFIED`` as saying anything
+about the policy binding, the decision or the scope the recommendation was bound into.
+ADR §12.1 records the ruling; ``tests/test_adversarial.py`` pins the behaviour.
+
 Why a frozen dataclass is not the boundary
 ------------------------------------------
 Following Phase 4C's ``AuthenticatedRecommendation``: a frozen dataclass stops *accidental*

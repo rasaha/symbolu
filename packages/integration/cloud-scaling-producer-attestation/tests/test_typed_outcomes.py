@@ -36,6 +36,8 @@ from ugence_cloud_scaling_producer_attestation import (
     ProducerAuthenticityOutcome,
     ProducerAuthenticityResult,
     TrustAnchorCapability,
+    VerifiedArtifactIntegrityError,
+    VerifiedProducerAttestation,
 )
 
 #: Property category: this module's default is declared in ``tests/conftest.py``
@@ -303,3 +305,86 @@ def test_every_typed_error_carries_an_outcome_member():
         error = cls("message")
         assert type(error.outcome) is O, cls.__name__
         assert error.outcome is not O.VERIFIED, cls.__name__
+
+
+# --------------------------------------------------------------------------------------- #
+# 5. The result decides the presence of an artifact; a caller does not supply one
+# --------------------------------------------------------------------------------------- #
+
+
+def test_a_fabricated_artifact_cannot_be_wrapped_in_a_result():
+    """O-13: the docstring claim, made executable.
+
+    ``ProducerAuthenticityResult`` is exported, so a caller can construct one. Its only
+    artifact gate was an exact-type check — and ``object.__new__`` produces exactly the
+    right type with no instance state at all, so the check saw nothing wrong with it. The
+    result constructed, and ``result.outcome`` then read ``VERIFIED``: a caller-assembled
+    object reporting a determination that never happened, at the exact boundary a consumer
+    branches on.
+
+    Construction now routes the artifact through the same revalidation every other
+    consumption boundary performs, so the fabrication is refused where it is made.
+    """
+
+    fabricated = object.__new__(VerifiedProducerAttestation)
+    assert type(fabricated) is VerifiedProducerAttestation  # the old gate was satisfied
+
+    with pytest.raises(VerifiedArtifactIntegrityError) as exc:
+        ProducerAuthenticityResult(verified_attestation=fabricated)
+    assert "fabricated without running the verification routine" in str(exc.value)
+
+
+def test_a_token_bearing_forgery_cannot_be_wrapped_in_a_result(
+    verifier, candidate, attestation, as_of
+):
+    """O-14: the harder fabrication — borrow the token, recompute the digest, still refused.
+
+    O-13 covers the empty shell. This is V-20's forgery, which is internally consistent:
+    exact type, every field present, a genuine construction token read off a real artifact,
+    and a self-digest that recomputes. Only provenance-registry membership distinguishes it,
+    and the result boundary now checks that too.
+    """
+
+    import dataclasses
+
+    from ugence_cloud_scaling_producer_attestation import canonical_digest
+
+    genuine = verifier.verify(
+        candidate=candidate, attestation=attestation, as_of=as_of
+    ).verified_attestation
+    fields = {f.name: getattr(genuine, f.name) for f in dataclasses.fields(genuine)}
+    fields["tenant_id"] = "tenant-forged"
+    payload = {
+        **{
+            k: v
+            for k, v in fields.items()
+            if k not in ("artifact_digest", "construction_token")
+        },
+        "outcome": "VERIFIED",
+        "grants_authority": False,
+    }
+    fields["artifact_digest"] = canonical_digest(payload)
+    forged = VerifiedProducerAttestation(**fields)
+
+    with pytest.raises(VerifiedArtifactIntegrityError) as exc:
+        ProducerAuthenticityResult(verified_attestation=forged)
+    assert "never reached" in str(exc.value)
+
+
+@pytest.mark.happy
+def test_a_genuine_determination_still_builds_a_result(
+    verifier, candidate, attestation, as_of
+):
+    """O-15: the positive control. The revalidation must not refuse the real thing.
+
+    Including a result rebuilt by hand around a genuine artifact — the revalidation is
+    about the artifact's provenance, not about who assembled the wrapper.
+    """
+
+    genuine = verifier.verify(
+        candidate=candidate, attestation=attestation, as_of=as_of
+    ).verified_attestation
+    rebuilt = ProducerAuthenticityResult(verified_attestation=genuine)
+    assert rebuilt.outcome is O.VERIFIED
+    assert rebuilt.verified_attestation is genuine
+    assert rebuilt.refusal is None
