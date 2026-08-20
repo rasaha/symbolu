@@ -121,6 +121,24 @@ jobs:
                   "check that every first-party package is installed and that the "
                   "checkout is complete."
               )
+          # A bare floor proves "ten things in this file ran", not "the laundering
+          # traversal ran": ten newly added trivial properties would satisfy it while
+          # every real traversal skipped. Nothing here is expected to skip on a complete
+          # checkout, so require that too — it is the assertion that actually pins the
+          # traversal, and it costs nothing while the file has no conditional properties.
+          if skipped:
+              names = [
+                  case.get("name", "?")
+                  for suite in suites
+                  for case in suite.iter("testcase")
+                  if case.find("skipped") is not None
+              ]
+              sys.exit(
+                  f"FAIL: {skipped} laundering properties skipped: {names}. On a complete "
+                  "checkout every property in this file must run. A skip here means the "
+                  "Phase 5A fixture chain is partly unresolvable, and the gate would be "
+                  "reporting on whichever properties happened to survive."
+              )
           PY
           python -m pytest \
             packages/integration/cloud-scaling-producer-attestation/tests/test_adversarial.py

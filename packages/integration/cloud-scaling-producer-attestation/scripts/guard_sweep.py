@@ -76,13 +76,27 @@ def _condition_text(source_lines: list[str], node: ast.If) -> str:
 
 
 def _reaches_refusal(node) -> bool:
-    """Whether this node's own body can reach a raise or a typed refusal.
+    """Whether this node's body can reach a raise or a typed refusal, **nested bodies
+    included**.
 
     Takes an ``ast.If`` for the inventory and an ``ast.ExceptHandler`` for the
     excluded-count report; both carry a ``body``.
 
-    Nested ``if`` bodies are excluded so an outer block does not inherit its children's
-    relevance — each guard is scored for what *it* protects.
+    Stated precisely, because an earlier revision of this docstring claimed the opposite —
+    "nested ``if`` bodies are excluded so an outer block does not inherit its children's
+    relevance" — while the code below has always used ``ast.walk``, which descends into
+    them. The code is right and the claim was wrong: an outer ``if`` that contains nothing
+    but a guarded block is itself a guard, because neutralising it disables everything
+    inside. ``verification.py``'s ``if production_mode:`` is the case in point — remove it
+    and the entire production-mode enforcement block stops running.
+
+    The consequence for the headline number is disclosed rather than left implicit: under
+    the stricter reading the inventory would be **one smaller**, and ``GUARD_SWEEP.md`` says
+    so and names the guard.
+
+    The typed-refusal arm below is also looser than "``return _Outcome.SOMETHING``": any
+    ``return X.y`` counts. That admits no false guard in this source — every match is a real
+    refusal — but it is a heuristic, not a proof, and is recorded as one.
     """
 
     for statement in node.body:
@@ -177,7 +191,13 @@ def mutate(guard: Guard, workdir: Path) -> None:
 
 
 def run_suite(workdir: Path, timeout: int = 600) -> dict:
-    """Run the full suite in the copy. Returns a scored result, honestly labelled."""
+    """Run the suite in the copy. Returns a scored result, honestly labelled.
+
+    Not quite the *full* suite: ``UGENCE_SKIP_SLOW_PACKAGING=1`` deselects the packaging
+    module below, so this collects fewer properties than a plain ``pytest tests`` in the
+    tracked tree. The deselection is a cost decision whose safety condition is asserted by
+    ``tests/test_property_ledger.py`` PL-6; see the comment on the environment below.
+    """
 
     process = subprocess.run(
         # NB: no ``-q`` here. The package's own pyproject already sets ``addopts = "-q"``,
@@ -475,6 +495,17 @@ def main() -> int:
 
 def write_report(results) -> None:
     _EXCLUDED_EXCEPT_ARMS, _EXCLUDED_BOOLEAN_SUBTERMS = excluded_from_the_inventory()
+    #: The outer scaffolding guard named in the disclosure below. Located rather than
+    #: hard-coded, so the line number cannot rot.
+    _SCAFFOLDING_LINENO = next(
+        (
+            guard.lineno
+            for guard, _ in results
+            if guard.module == "verification.py"
+            and " ".join(guard.condition.split()) == "production_mode"
+        ),
+        "(none)",
+    )
     killed = [g for g, r in results if r.get("killed")]
     survived = [(g, r) for g, r in results if r["scored"] and not r.get("killed")]
     classes: dict[str, int] = {}
@@ -581,6 +612,25 @@ def write_report(results) -> None:
         f"* **{_EXCLUDED_BOOLEAN_SUBTERMS} boolean sub-terms.** A two-term `and` guard is",
         "  neutralised and scored as **one** guard. Scoring each side independently is a",
         "  different operator, and this sweep does not claim it.",
+        "",
+        "Two further facts about the denominator, disclosed because a reader could otherwise",
+        "infer them wrongly from the count alone:",
+        "",
+        "* **An outer `if` that only wraps a guarded block is itself inventoried.**",
+        "  Relevance is computed over the whole nested body, so",
+        f"  `verification.py:{_SCAFFOLDING_LINENO}` (`if production_mode:`) is scored as a",
+        "  guard even though it reaches a `raise` only through its nested child. That is",
+        "  deliberate — neutralise it and the entire production-mode enforcement block stops",
+        "  running — but it means a stricter reading that excluded nested bodies would report",
+        f"  **{len(results) - 1}** guards rather than {len(results)}. Both numbers describe",
+        "  the same source; this one is the count the published table is built from.",
+        "* **One of the five checks in `require_verified_producer_attestation` is an `except`",
+        "  arm**, and is therefore among the excluded arms above rather than among the scored",
+        "  guards. It is the field-presence check, and it is the one that refuses an",
+        "  `object.__new__` fabrication. It is covered by properties",
+        "  (`test_verified_artifact.py` V-3, `test_typed_outcomes.py` O-13) but not by this",
+        "  sweep, so \"four of that function's five checks are mutation-scored\" is the exact",
+        "  claim, not five.",
         "",
         "The CI job used to be called *\"every security gate is scored\"*, which overstated",
         "exactly this; it now says *\"every inventoried `if` guard scored\"*. The two counts",
