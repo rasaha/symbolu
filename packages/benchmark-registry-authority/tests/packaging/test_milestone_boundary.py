@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import inspect
 import pathlib
+import re
 
 import pytest
 
@@ -48,7 +49,7 @@ def test_happy_the_package_version_is_the_br2a_version():
     assert api.__version__ == "0.1.0"
 
 
-def _is_port_declaration(name: str, value=None) -> bool:
+def _is_port_declaration(name: str, value) -> bool:
     """A ``...Port`` Protocol declares a seam; it does not implement one.
 
     ``BenchmarkApprovalVerifierPort`` names the shape a verifier must fit, and
@@ -56,13 +57,61 @@ def _is_port_declaration(name: str, value=None) -> bool:
     capability ban is on implementations, so port declarations are exempt — and
     the exemption is narrow: the name must end in ``Port`` *and* the object must
     actually be a Protocol.
+
+    ``value`` has no default. A default let the source-tree caller — which holds
+    an AST node rather than an object — exempt **any** name ending in ``Port``
+    without ever checking Protocol-ness, so a concrete, instantiable class
+    called ``...Port`` passed the tree-wide capability ban. That caller now uses
+    :func:`_is_inert_port_protocol_node`, which establishes the same fact
+    structurally, and this signature makes the unchecked call unwritable.
     """
 
-    if not name.endswith("Port"):
+    return name.endswith("Port") and bool(getattr(value, "_is_protocol", False))
+
+
+def _is_inert_port_protocol_node(node) -> bool:
+    """The AST equivalent of :func:`_is_port_declaration` — verified, not assumed.
+
+    A live object can be asked ``_is_protocol``; a source-tree scan walks ``ast``
+    nodes and has nothing to ask, so it establishes the same three facts
+    structurally: the node is a **class** whose name ends in ``Port``,
+    ``Protocol`` is among its bases, and every method body is ``...``.
+
+    A function is never exempt, whatever it is called, and neither is a class
+    that merely ends in ``Port`` while carrying a real body — which is exactly
+    what a concrete in-memory store or approval verifier would be.
+    """
+
+    if not isinstance(node, ast.ClassDef) or not node.name.endswith("Port"):
         return False
-    if value is None:
-        return True
-    return bool(getattr(value, "_is_protocol", False))
+    bases = {
+        base.id if isinstance(base, ast.Name) else getattr(base, "attr", "")
+        for base in node.bases
+    }
+    if "Protocol" not in bases:
+        return False
+    for child in node.body:
+        if not isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        body = [
+            stmt
+            for stmt in child.body
+            if not (
+                isinstance(stmt, ast.Expr)
+                and isinstance(stmt.value, ast.Constant)
+                and isinstance(stmt.value.value, str)
+            )
+        ]
+        if len(body) != 1:
+            return False
+        only = body[0]
+        if not (
+            isinstance(only, ast.Expr)
+            and isinstance(only.value, ast.Constant)
+            and only.value.value is Ellipsis
+        ):
+            return False
+    return True
 
 
 def test_no_forbidden_capability_is_exported():
@@ -91,7 +140,7 @@ def test_no_class_or_function_anywhere_carries_a_forbidden_capability_name():
         tree = ast.parse(path.read_text())
         for node in ast.walk(tree):
             if isinstance(node, (ast.ClassDef, ast.FunctionDef)):
-                if _is_port_declaration(node.name):
+                if _is_inert_port_protocol_node(node):
                     continue
                 lowered = node.name.lower().replace("_", "")
                 for token in FORBIDDEN_CAPABILITY_TOKENS:
@@ -126,6 +175,24 @@ def test_no_executable_stub_or_todo_backed_runtime_path_exists():
         assert "TODO" not in code, path.name
         assert "FIXME" not in code, path.name
         assert "XXX" not in code, path.name
+
+
+def test_every_test_file_cited_in_the_source_tree_actually_exists():
+    """A docstring citing a gate that does not exist is an unverifiable claim.
+
+    These citations ship inside both artifacts, so a consumer reads them as this
+    package's own evidence for what is enforced. Four of them named modules that
+    a suite reorganization had merged away, and nothing noticed — because
+    nothing checked. A claim about a gate is worth exactly what the gate is
+    worth, and a missing file is worth nothing.
+    """
+
+    missing = []
+    for path in sorted(SRC.rglob("*.py")):
+        for cited in re.findall(r"tests/[A-Za-z0-9_/]+\.py", path.read_text()):
+            if not (PKG / cited).exists():
+                missing.append(f"{path.name}: {cited}")
+    assert missing == [], missing
 
 
 def test_no_notimplementederror_pretends_to_be_a_port_implementation():

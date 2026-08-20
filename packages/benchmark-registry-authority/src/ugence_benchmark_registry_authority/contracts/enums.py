@@ -248,7 +248,8 @@ BENCHMARK_TERMINAL_REGISTRATION_STATES: frozenset = frozenset(
 )
 
 #: The state names D-08 permanently bans, pinned so the ban is machine-checkable
-#: rather than a comment. ``tests/contract/test_name_ban.py`` asserts that no
+#: rather than a comment. ``tests/contract/test_two_lifecycle_authorities.py``
+#: asserts that no
 #: enum member, no class, and no exported symbol in this package carries any of
 #: them.
 BENCHMARK_BANNED_REGISTRATION_STATE_NAMES: frozenset = frozenset(

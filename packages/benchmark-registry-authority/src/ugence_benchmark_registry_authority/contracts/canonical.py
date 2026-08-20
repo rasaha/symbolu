@@ -48,7 +48,7 @@ Determinism inputs
 The encoder consults **no** wall clock, locale, timezone database, environment
 variable, filesystem or network. ``astimezone`` is always called with an
 explicit ``timezone.utc`` target, never the zero-argument form that would infer
-the local zone. ``tests/packaging/test_no_clock_or_environment.py`` asserts this
+the local zone. ``tests/contract/test_timestamps.py`` asserts this
 structurally over the whole source tree, not merely for one code path — **BR-2A
 reads no clock anywhere**, which is D-11 as ratified.
 

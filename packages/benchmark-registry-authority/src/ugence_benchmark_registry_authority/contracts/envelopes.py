@@ -86,7 +86,7 @@ approval evidence; the artifact's author wrote that enum, and its only effect is
 to participate in BR-1's identity digest. D-05 requires the embedded state to be
 exactly ``APPROVED`` at admission precisely so the identity digest is a *stable
 content address* — that is a digest-stability rule, not an approval one.
-``tests/contract/test_approval_envelope.py`` asserts the non-substitution.
+``tests/contract/test_envelopes.py`` asserts the non-substitution.
 """
 
 from __future__ import annotations

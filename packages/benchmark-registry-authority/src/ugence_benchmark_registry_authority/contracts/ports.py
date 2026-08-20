@@ -16,7 +16,7 @@ nothing can reach ``ADMITTED`` belong together. No in-memory store, no adapter
 registry, no identity allow-list executing adapter admission, and no production
 composition root.
 
-``tests/packaging/test_ports_are_inert.py`` asserts that **no concrete class in
+``tests/contract/test_confusable_and_ports.py`` asserts that **no concrete class in
 this package satisfies any port** — structurally, by method-name coverage, so a
 class cannot satisfy a port by accident either.
 
