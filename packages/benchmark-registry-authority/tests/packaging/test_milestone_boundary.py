@@ -4,16 +4,15 @@ from __future__ import annotations
 
 import ast
 import inspect
+import json
 import pathlib
 import re
 
 import pytest
 
 from _boundary import (
-    names_resolving_to,
     resolved_parameter_types,
     resolved_return_types,
-    unannotated_parameters,
 )
 from _milestones import (
     SUBPHASE_LADDER,
@@ -286,13 +285,58 @@ def test_the_three_reserved_authority_issued_types_are_undefined():
         assert not hasattr(api, reserved), reserved
 
 
-def test_the_reserved_names_appear_nowhere_as_a_class_definition():
+def test_the_reserved_names_are_bound_by_nothing_anywhere_under_src():
+    """Any binding form, every file — not ``class`` statements in two modules.
+
+    The previous version matched ``ast.ClassDef`` only, and checked ``pkg`` and
+    ``api`` for attributes. The third audit bound ``BenchmarkRegistrationEvent``
+    with ``NewType`` in a contracts module and it was invisible to both: a
+    reserved authority-issued name existed, and nothing said so.
+
+    Every way a name can come to exist is collected here — class and function
+    definitions, plain and annotated assignment, augmented assignment, walrus,
+    ``import``/``from`` aliases, ``for`` targets, ``with ... as``,
+    ``except ... as``, ``global``/``nonlocal`` declarations and match captures —
+    and none of them may be a reserved name.
+    """
+
     reserved = set(api.BENCHMARK_RESERVED_AUTHORITY_ISSUED_TYPE_NAMES)
+    offenders = []
     for path in sorted(SRC.rglob("*.py")):
         tree = ast.parse(path.read_text())
         for node in ast.walk(tree):
-            if isinstance(node, ast.ClassDef):
-                assert node.name not in reserved, f"{path.name}: {node.name}"
+            bound = set()
+            if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+                bound.add(node.name)
+            elif isinstance(node, ast.Name) and isinstance(
+                node.ctx, (ast.Store, ast.Del)
+            ):
+                bound.add(node.id)
+            elif isinstance(node, (ast.Import, ast.ImportFrom)):
+                for entry in node.names:
+                    bound.add(entry.asname or entry.name.split(".")[0])
+            elif isinstance(node, (ast.Global, ast.Nonlocal)):
+                bound.update(node.names)
+            elif isinstance(node, ast.ExceptHandler) and node.name:
+                bound.add(node.name)
+            elif isinstance(node, getattr(ast, "MatchAs", ())) and node.name:
+                bound.add(node.name)
+            elif isinstance(node, getattr(ast, "MatchStar", ())) and node.name:
+                bound.add(node.name)
+            for name in bound & reserved:
+                offenders.append(f"{path.name}: {name}")
+    assert offenders == [], offenders
+
+
+def test_the_reserved_names_resolve_to_nothing_at_runtime():
+    """Attribute access on every module, not only ``pkg`` and ``api``."""
+
+    offenders = []
+    for module in _package_modules():
+        for name in api.BENCHMARK_RESERVED_AUTHORITY_ISSUED_TYPE_NAMES:
+            if hasattr(module, name):
+                offenders.append(f"{module.__name__}.{name}")
+    assert offenders == [], offenders
 
 
 def test_no_executable_stub_or_todo_backed_runtime_path_exists():
@@ -539,319 +583,239 @@ def _package_modules():
     return modules
 
 
-def _defined_here(value) -> bool:
-    return str(getattr(value, "__module__", "")).startswith(NAMESPACE)
+CALLABLE_INVENTORY = json.loads(
+    (PKG / "public_callable_inventory.json").read_text()
+)
+UNRESOLVED = "<unresolved>"
 
 
-def _is_generated(owner, name: str, member) -> bool:
-    """Whether ``owner.name`` was synthesized rather than written here.
+def _render(types) -> list:
+    return sorted(f"{cls.__module__}.{cls.__qualname__}" for cls in types)
 
-    Decided by **identity against a base class**, or by the dataclass machinery's
-    own fixed method set — never by a filename the code object carries.
 
-    ``EnumType`` copies functions such as ``_generate_next_value_`` into every
-    subclass's own ``__dict__``, and ``@dataclass`` synthesizes ``__init__``,
-    ``__eq__`` and ``__repr__`` by exec. Nobody can annotate the ``other`` of a
-    generated ``__eq__``, so these are exempt from the *annotation* requirement
-    only. They are **not** exempt from the plan-consumption check, which needs no
-    exemption at all: a synthesized method has no annotation naming a plan.
+def _unwrap(member):
+    """The underlying function of a classmethod, staticmethod or property."""
+
+    if isinstance(member, (classmethod, staticmethod)):
+        return getattr(member, "__func__", None)
+    if isinstance(member, property):
+        return member.fget
+    return member
+
+
+def _live_callables() -> dict:
+    """``{label: signature}`` for every callable reachable under ``src/``.
+
+    **No classification, no exemption, no ownership test.** The label is built
+    from the module being walked and the attribute path, never from the
+    callable's own ``__module__`` or ``__qualname__`` — both are writable, and
+    the third audit reassigned ``__module__`` to ``"builtins"`` to move a method
+    out of scope. Where a thing is bound is a fact about this package; what it
+    says about itself is not.
+
+    Imported, synthesized and injected callables are included. They are entries
+    in the frozen inventory, not exclusions, because every exclusion previously
+    written here became the next bypass.
     """
 
-    import dataclasses as _dc
-
-    for base in getattr(owner, "__mro__", ())[1:]:
-        if _defined_here(base):
-            continue
-        if getattr(base, name, None) is member:
-            return True
-    if _dc.is_dataclass(owner) and name in {
-        "__init__",
-        "__eq__",
-        "__repr__",
-        "__hash__",
-        "__setattr__",
-        "__delattr__",
-    }:
-        return True
-    return False
-
-
-def _names_defined_in_source(module) -> set:
-    """Every name that appears as a ``def`` in this module's own source text.
-
-    The scanned text is the authority for what this package wrote. A member
-    bound in a module but absent from its source was injected or generated —
-    ``typing.Protocol`` installs ``__init__`` and ``__subclasshook__`` on every
-    Protocol class, and neither can be annotated by anyone here.
-
-    This is deliberately *not* ``co_filename``: the filename travels with the
-    code object and can be chosen by whoever compiled it, while this comes from
-    reading the file the scan already walks.
-    """
-
-    tree = ast.parse(pathlib.Path(module.__file__).read_text())
-    return {
-        node.name
-        for node in ast.walk(tree)
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-    }
-
-
-def _callables_in(module):
-    """``(label, function, generated?, attribute name)`` for every callable here.
-
-    No filter on where the code claims to come from. A function bound in a module
-    under ``src/`` is this package's regardless of how it was compiled — which is
-    the whole point: ``exec``-created and ``__code__``-rewritten functions are
-    exactly the ones the previous ownership test let through.
-    """
-
-    found = []
-    for name, value in vars(module).items():
-        if inspect.isfunction(value):
-            found.append((f"{module.__name__}.{name}", value, False, name))
-        elif inspect.isclass(value) and _defined_here(value):
-            for attribute, member in vars(value).items():
-                label = f"{module.__name__}.{value.__name__}.{attribute}"
-                if inspect.isfunction(member):
-                    found.append(
-                        (
-                            label,
-                            member,
-                            _is_generated(value, attribute, member),
-                            attribute,
+    entries = {}
+    for module in _package_modules():
+        for name, value in vars(module).items():
+            func = _unwrap(value)
+            if inspect.isfunction(func):
+                entries[f"{module.__name__}::{name}"] = _signature(func)
+            elif inspect.isclass(value):
+                for attribute, member in vars(value).items():
+                    inner = _unwrap(member)
+                    if inspect.isfunction(inner):
+                        entries[f"{module.__name__}::{name}.{attribute}"] = (
+                            _signature(inner)
                         )
-                    )
-                elif isinstance(member, property) and member.fget is not None:
-                    found.append(
-                        (
-                            label,
-                            member.fget,
-                            _is_generated(value, attribute, member.fget),
-                            attribute,
-                        )
-                    )
-    return found
+    return entries
 
 
-def test_no_exported_callable_accepts_a_transition_plan_as_input():
-    """A plan is an output of this package and an input to nothing in it.
+def _signature(func) -> dict:
+    try:
+        parameters = {
+            name: _render(types)
+            for name, types in resolved_parameter_types(func).items()
+        }
+    except Exception:  # pragma: no cover - recorded, never skipped
+        parameters = {UNRESOLVED: []}
+    try:
+        returns = _render(resolved_return_types(func))
+    except Exception:  # pragma: no cover - recorded, never skipped
+        returns = [UNRESOLVED]
+    return {"parameters": parameters, "returns": returns}
 
-    Decided by **class identity** on resolved annotations, never by matching the
-    name in text: an alias, a ``Union`` member or a nested ``Optional`` spells
-    the same type without spelling its name.
+
+# --------------------------------------------------------------------------- #
+# The boundary, as a closed set rather than a rule
+# --------------------------------------------------------------------------- #
+def test_the_live_callable_set_equals_the_frozen_inventory_exactly():
+    """Every callable under ``src/``, compared — not classified.
+
+    Three audits found seven defects in the rules that used to assert BR-2B's
+    boundary, and none in the boundary itself. Every one was a classification
+    defect: a substring an alias walked past, a skipped ``None`` annotation, a
+    PEP 563 string read as one opaque name, an ownership test keyed on
+    attacker-supplied ``co_filename``, a walk scoped to ``contracts/``, then a
+    dunder-named lambda, a reassigned ``__module__``, and a base class whose
+    ``__module__`` was reassigned to make a method look generated.
+
+    There is nothing here to walk past because nothing is decided. A callable
+    the inventory does not list fails, whatever it is called, however it was
+    compiled and wherever it was bound. A listed callable whose resolved
+    signature moved fails too.
     """
 
-    offenders = []
-    for symbol in pkg.__all__:
-        value = getattr(pkg, symbol)
-        if not callable(value) or inspect.isclass(value):
-            continue
-        for name, types in resolved_parameter_types(value).items():
-            if api.BenchmarkTransitionPlan in types:
-                offenders.append(f"{symbol}({name})")
-    assert offenders == [], offenders
+    live = _live_callables()
+    frozen = CALLABLE_INVENTORY["callables"]
+
+    added = sorted(set(live) - set(frozen))
+    removed = sorted(set(frozen) - set(live))
+    assert added == [], f"callables not in the frozen inventory: {added[:6]}"
+    assert removed == [], f"inventoried callables now absent: {removed[:6]}"
+
+    moved = [
+        label for label in sorted(live) if live[label] != frozen[label]
+    ]
+    assert moved == [], (
+        f"resolved signature moved for: "
+        f"{[(m, frozen[m], live[m]) for m in moved[:3]]}"
+    )
 
 
-def test_no_callable_anywhere_under_src_accepts_a_plan_however_spelled():
-    """Every module whose source lives under ``src/``, not just ``contracts/``.
+def test_every_parameter_written_under_src_is_annotated_and_no_lambda_exists():
+    """The annotation requirement, restored with nothing to exempt.
 
-    This check has **no exemptions**. A synthesized method carries no annotation
-    naming a plan, so excluding one would buy nothing and cost the guarantee — and
-    the exclusions are precisely what the second audit walked through: a function
-    ``exec``-compiled with a chosen ``co_filename``, the same trick via one
-    ``__code__.replace``, and a plain ``def`` in ``api.py`` that the
-    ``contracts/``-scoped walk never visited.
+    Its previous form asked each *runtime* callable where it came from, and
+    carried exemptions for ``EnumType``-copied methods, the dataclass method
+    set and ``typing.Protocol``'s injected ``__init__`` — exemptions the third
+    audit walked through twice. This form never meets those callables: it reads
+    the source files under ``src/`` and checks the parameters written **in
+    them**. A stdlib function imported into a module was not written here, so
+    there is nothing to classify and nothing to exempt.
+
+    Lambdas are refused outright rather than checked. A lambda cannot annotate
+    its parameters, and the third audit's first plant was a dunder-named lambda
+    consuming a plan. There is no lambda in this package and none may appear.
     """
-
-    offenders = []
-    for module in _package_modules():
-        for label, func, _generated, _attribute in _callables_in(module):
-            for name, types in resolved_parameter_types(func).items():
-                if api.BenchmarkTransitionPlan in types:
-                    offenders.append(f"{label}({name})")
-    assert offenders == [], offenders
-
-
-def test_no_planner_anywhere_under_src_returns_a_lifecycle_payload():
-    """The return half, over every module rather than the exported surface.
-
-    Scoped to planners, because that is what the ruling constrains: BR-2A's
-    ``require_exact_resolution_record_payload`` legitimately returns a resolution
-    record, and ``BenchmarkRegistryStorePort.read_historical`` legitimately
-    declares one — a store port is a *shape*, and BR-2D will implement it. What
-    must never return a lifecycle payload is something that plans.
-
-    A callable that consumed a plan and returned an event is caught by the
-    parameter check above, which has no exemptions at all, so nothing rests on
-    this test recognising the name.
-    """
-
-    offenders = []
-    for module in _package_modules():
-        for label, func, _generated, _attribute in _callables_in(module):
-            if not func.__name__.startswith("plan_"):
-                continue
-            returned = resolved_return_types(func)
-            assert returned, label
-            leaked = returned & LIFECYCLE_PAYLOAD_TYPES
-            if leaked or not returned <= {
-                api.BenchmarkTransitionPlan,
-                api.BenchmarkTransitionRefusal,
-            }:
-                offenders.append(
-                    f"{label} -> {sorted(c.__name__ for c in returned)}"
-                )
-    assert offenders == [], offenders
-
-
-def test_every_parameter_under_src_is_annotated():
-    """An unannotated parameter is the cheapest place to hide a plan.
-
-    The identity checks can only speak about annotations that exist, so a bare
-    parameter is a **failure**, never a skip. ``self`` and ``cls`` are exempt.
-    Synthesized methods are exempt too — nobody can annotate the ``other`` of a
-    generated ``__eq__`` — but that exemption is decided by identity against a
-    base class or by the dataclass machinery's fixed method set, never by a
-    filename the code object carries.
-    """
-
-    offenders = []
-    for module in _package_modules():
-        defined = _names_defined_in_source(module)
-        for label, func, generated, attribute in _callables_in(module):
-            if generated:
-                continue
-            # Keyed on the ATTRIBUTE, not the function's own __name__:
-            # typing.Protocol installs __subclasshook__ and __init__ whose
-            # underlying functions are named _proto_hook and
-            # _no_init_or_replace_init, so a __name__-based test sees neither
-            # as a dunder and demands annotations nobody here can add.
-            if attribute.startswith("__") and func.__name__ not in defined:
-                continue  # injected dunder, e.g. Protocol's __init__
-            if func.__name__ not in defined and not _defined_here(func):
-                # Imported, not written: ``from dataclasses import fields``
-                # binds a stdlib function into this module's namespace, and
-                # nobody here can annotate it.
-                #
-                # A function exec-compiled into this module's own globals keeps
-                # this package's ``__module__`` and therefore stays in scope —
-                # which is the case that matters. And the plan-consumption check
-                # above carries no exemption of any kind, so even a function that
-                # lied about its origin could not use this to hide an annotated
-                # plan parameter.
-                continue
-            for name in unannotated_parameters(func):
-                offenders.append(f"{label}({name})")
-    assert offenders == [], offenders
-
-
-def test_no_function_in_any_source_file_takes_a_plan_parameter():
-    """The textual scan, alias-aware across **every** module the walk imports.
-
-    AST cannot resolve an alias, so the names that resolve to the plan type are
-    computed at runtime and the scan matches that set. The earlier version built
-    that set from ``contracts/`` alone, so a module-level alias declared in
-    ``api.py`` was a name the scan had never heard of.
-
-    The scan keeps its one advantage over a runtime attribute walk — it sees
-    closures and nested functions that no module attribute exposes — and now
-    covers the same files.
-    """
-
-    alias_names = {api.BenchmarkTransitionPlan.__name__}
-    for module in _package_modules():
-        alias_names |= names_resolving_to(module, api.BenchmarkTransitionPlan)
 
     offenders = []
     for path in sorted(SRC.rglob("*.py")):
-        tree = ast.parse(path.read_text())
+        tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
+            if isinstance(node, ast.Lambda):
+                offenders.append(f"{path.name}:{node.lineno} lambda")
+                continue
             if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
-            args = node.args
-            every = (
-                list(args.posonlyargs)
-                + list(args.args)
-                + list(args.kwonlyargs)
-                + [a for a in (args.vararg, args.kwarg) if a is not None]
-            )
-            for argument in every:
-                if argument.arg in ("self", "cls") or argument.annotation is None:
+            arguments = node.args
+            written = [
+                *arguments.posonlyargs,
+                *arguments.args,
+                *arguments.kwonlyargs,
+                arguments.vararg,
+                arguments.kwarg,
+            ]
+            for argument in written:
+                if argument is None or argument.arg in ("self", "cls"):
                     continue
-                spelled = set(
-                    re.findall(
-                        r"[A-Za-z_][A-Za-z0-9_]*", ast.unparse(argument.annotation)
+                if argument.annotation is None:
+                    offenders.append(
+                        f"{path.name}:{node.lineno} "
+                        f"{node.name}({argument.arg})"
                     )
-                )
-                if spelled & alias_names:
-                    offenders.append(f"{path.name}: {node.name}({argument.arg})")
     assert offenders == [], offenders
 
 
-def test_the_alias_set_is_gathered_from_every_scanned_module():
-    """A module the alias walk skips is a module whose aliases are invisible."""
-
-    walked = {
-        pathlib.Path(module.__file__).resolve() for module in _package_modules()
-    }
-    assert walked == {path.resolve() for path in SRC.rglob("*.py")}
-    # api.py is the module the contracts/-scoped walk never visited.
-    assert any(path.name == "api.py" for path in walked)
+def test_the_inventory_records_the_count_it_holds():
+    assert CALLABLE_INVENTORY["callables_inventoried"] == len(
+        CALLABLE_INVENTORY["callables"]
+    )
+    assert CALLABLE_INVENTORY["callables_inventoried"] > 0
 
 
-def test_the_ownership_test_cannot_be_granted_by_the_code_object():
-    """``co_filename`` is attacker-supplied; the scanned path is not.
+def test_no_inventoried_callable_accepts_a_transition_plan():
+    """Read off the frozen set, so it is a fact about a closed list.
 
-    Both shapes the second audit used are constructed here and required to stay
-    in scope. If ownership ever consults the code object again, this fails.
+    The set-equality property above is what makes this exhaustive: a plan
+    consumer that never reached the inventory has already failed there.
     """
 
-    planted = {}
-    exec(  # noqa: S102 - a synthetic variant, defined and discarded here
-        compile(
-            "def smuggled(plan):\n    return None\n",
-            "/tmp/not_under_contracts.py",
-            "exec",
-        ),
-        planted,
+    plan = (
+        f"{api.BenchmarkTransitionPlan.__module__}."
+        f"{api.BenchmarkTransitionPlan.__qualname__}"
     )
-    smuggled = planted["smuggled"]
-    assert smuggled.__code__.co_filename == "/tmp/not_under_contracts.py"
-    assert unannotated_parameters(smuggled) == ["plan"]
-
-    def rewritten(plan) -> None: ...
-
-    rewritten.__code__ = rewritten.__code__.replace(
-        co_filename="/tmp/not_under_contracts.py"
-    )
-    assert rewritten.__code__.co_filename == "/tmp/not_under_contracts.py"
-    assert unannotated_parameters(rewritten) == ["plan"]
-
-    # Neither is excluded by _is_generated: it consults base-class identity and
-    # the dataclass method set, and knows nothing about filenames.
-    class Holder:
-        pass
-
-    assert not _is_generated(Holder, "smuggled", smuggled)
-    assert not _is_generated(Holder, "rewritten", rewritten)
+    offenders = [
+        f"{label}({name})"
+        for label, entry in CALLABLE_INVENTORY["callables"].items()
+        for name, types in entry["parameters"].items()
+        if plan in types
+    ]
+    assert offenders == [], offenders
 
 
-def test_the_module_walk_covers_every_file_the_ast_scan_reads():
-    """The runtime view and the textual view must cover the same files.
+#: The only callables that may declare a lifecycle payload return, named
+#: individually rather than matched by a name pattern. BR-2A's two exact-type
+#: validators return the payload they validate, and the store port *declares*
+#: one because a port is a shape BR-2D will implement. Every other callable
+#: returning a lifecycle payload would be fabricating a registry event.
+#:
+#: A frozen list of three, not a rule: the previous version scoped the check to
+#: ``plan_*`` names, and the third audit fabricated an event from a callable
+#: that was not named ``plan_`` anything and consumed no plan.
+PERMITTED_PAYLOAD_RETURNS = frozenset(
+    {
+        "::BenchmarkRegistryStorePort.read_historical",
+        "::require_exact_historical_record_payload",
+        "::require_exact_resolution_record_payload",
+        "api::BenchmarkRegistryStorePort.read_historical",
+        "api::require_exact_historical_record_payload",
+        "api::require_exact_resolution_record_payload",
+        "contracts.ports::BenchmarkRegistryStorePort.read_historical",
+        "contracts.read_payloads::require_exact_historical_record_payload",
+        "contracts.read_payloads::require_exact_resolution_record_payload",
+        "contracts::BenchmarkRegistryStorePort.read_historical",
+        "contracts::require_exact_historical_record_payload",
+        "contracts::require_exact_resolution_record_payload",
+    }
+)
 
-    A module the walk skips is a module whose aliases the AST scan never learns
-    and whose functions the resolver never sees — which is how a plain ``def`` in
-    ``api.py`` stayed invisible.
+
+def test_no_inventoried_callable_returns_a_reserved_or_lifecycle_payload():
+    """The return half, over the closed list and every callable in it.
+
+    Not scoped to ``plan_*``. That narrowing was itself an audit finding: a
+    callable consuming no plan and carrying no planning name fabricated a
+    registry event, and no gate spoke about it. The three legitimate exceptions
+    are enumerated above; everything else is refused.
     """
 
-    walked = {
-        pathlib.Path(module.__file__).resolve() for module in _package_modules()
+    payloads = {
+        f"{cls.__module__}.{cls.__qualname__}" for cls in LIFECYCLE_PAYLOAD_TYPES
     }
-    scanned = {path.resolve() for path in SRC.rglob("*.py")}
-    assert walked == scanned, sorted(
-        str(p) for p in scanned.symmetric_difference(walked)
-    )
+    offenders = []
+    for label, entry in CALLABLE_INVENTORY["callables"].items():
+        suffix = label[len(NAMESPACE):]
+        if suffix.lstrip(".") in PERMITTED_PAYLOAD_RETURNS:
+            continue
+        leaked = set(entry["returns"]) & payloads
+        if leaked:
+            offenders.append(f"{label} -> {sorted(leaked)}")
+    assert offenders == [], offenders
+
+
+def test_the_permitted_payload_returns_are_all_present_and_used():
+    """A stale exception is an exception nobody notices has stopped applying."""
+
+    suffixes = {
+        label[len(NAMESPACE):].lstrip(".")
+        for label in CALLABLE_INVENTORY["callables"]
+    }
+    unused = sorted(PERMITTED_PAYLOAD_RETURNS - suffixes)
+    assert unused == [], unused
 
 
 def test_no_exported_planner_can_return_a_lifecycle_payload():

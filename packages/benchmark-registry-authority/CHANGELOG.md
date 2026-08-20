@@ -128,19 +128,94 @@ AST scan reads, and the alias set is gathered from every one of them.
   The sweep gained explicit support for gates outside `contracts/`, since a
   sweep confined to `contracts/` could not have planted F.
 
+### Third closure-audit remediation: the boundary became a closed set
+
+The third audit found four more bypasses — a dunder-named lambda consuming a
+plan, a class whose `__module__` was reassigned to `"builtins"`, a base class
+given the same treatment so a derived method looked generated, and a reserved
+authority name bound by `NewType` rather than `class`, beside a callable
+fabricating a registry event without being named `plan_` anything.
+
+That is seven defects across three audits, **none of them in the boundary** and
+every one of them in a rule asserting it. Each was a *classification* failure,
+and each fix added machinery whose exemptions became the next attack. That is
+what proving a negative over an open-ended surface costs: the rule must
+anticipate every spelling, and the attacker needs one it did not.
+
+So the property was inverted rather than patched again.
+
+- **`public_callable_inventory.json`** freezes every callable reachable under
+  `src/` — 2207 of them — with the classes its parameter and return
+  annotations resolve to. `test_the_live_callable_set_equals_the_frozen_inventory_exactly`
+  asserts the live set equals the frozen set: an unlisted callable fails
+  whatever it is called, however it was compiled and wherever it was bound, and
+  a listed one whose resolved signature moved fails too.
+- **The exemptions were deleted, not repaired.** `_is_generated`, the
+  attribute-dunder exemption and the `_defined_here` ownership test are gone.
+  Imported stdlib functions, `@dataclass`-synthesized `__eq__`,
+  `EnumType`-copied `_generate_next_value_` and `typing.Protocol`'s injected
+  `__init__` are **entries, not exclusions**. That ties the file to the
+  interpreter version by design: "the set of callables reachable here changed"
+  is exactly what this must notice.
+- **Labels come from the module being walked and the attribute path**, never
+  from a callable's own `__module__` or `__qualname__`. Both are writable, and
+  the audit wrote to them. Where a thing is bound is a fact about this package;
+  what it claims about itself is not.
+- **The return check no longer scopes to `plan_*`.** That narrowing was itself
+  the finding. It now reads every inventoried callable against
+  `PERMITTED_PAYLOAD_RETURNS` — twelve labels naming BR-2A's two exact-type
+  validators and the store port across the four modules that re-export them —
+  and a companion test fails if any of the twelve stops existing, so a stale
+  exception cannot go unnoticed.
+- **The reserved-name check binds on any binding form**: `class`, `def`,
+  assignment, `import`/`from ... import ... as`, `global`/`nonlocal`,
+  `except ... as` and match captures, across every module under `src/`, plus a
+  runtime attribute check. `NewType` is a call bound by assignment, which the
+  class-definition-only version never saw.
+- **The annotation requirement returns without exemptions.** Its previous form
+  asked runtime callables where they came from and carried exemptions for
+  `EnumType`, the dataclass method set and `Protocol`. It now reads the source
+  files under `src/` and checks the parameters written *in them* — a stdlib
+  function imported into a module was not written here, so there is nothing to
+  classify. Lambdas are refused outright: a lambda cannot annotate anything, and
+  the audit's first plant was one.
+- **G-60 to G-65** plant all four replanted attacks plus an unannotated
+  parameter and a lambda in shipped source. All six are killed. The annotation
+  property was additionally proven non-vacuous *against a regenerated
+  inventory*: with the plant inventoried, set-equality passes and
+  `test_every_parameter_written_under_src_is_annotated_and_no_lambda_exists` is
+  the only failure — the residual the closed set alone cannot catch.
+
+Nine boundary tests were deleted with the machinery they exercised and eight
+positive ones added, so the suite falls by one test. Nothing the deleted tests
+asserted is unasserted: plan consumption and payload return are now read off a
+closed list, and the annotation and reserved-name properties are checked over
+source text.
+
 ### Verification performed for this release
 
-Measured, not asserted. Every number below came from a run against this tree.
+Measured, not asserted. Every number below came from a run against this tree,
+after purging every `__pycache__` and `*.pyc`, with `PYTHONDONTWRITEBYTECODE=1`
+and `pytest -p no:cacheprovider`.
 
-- **Suite** 1734 tests, 473 distinct properties (441 adversarial : 32 happy,
-  13.78:1). Movement from 1730 is +4: seven properties added and three renamed
-  away in `test_milestone_boundary.py` as the three `contracts/`-scoped gates
-  became `src/`-wide ones. The two monorepo-scope properties ran rather than skipping: no
-  package in the monorepo imports this one, and no workflow but its own
-  references it.
-- **Independent probes** 65/65, run twice — Q-62 rewritten to resolve types
-  independently of the suite's helper, Q-64 added for the return boundary — against the source tree, and again
-  from inside the installed wheel.
+- **Suite** 1733 tests, 472 distinct properties (440 adversarial : 32 happy,
+  13.75:1). Movement from 1734/473 is **−1**, entirely in
+  `test_milestone_boundary.py`: nine tests were deleted with the exemption
+  machinery they exercised and eight added over the closed inventory and the
+  source-text scans. Net −1 test function, net −1 collected test.
+- **Frozen callable inventory** 2207 entries, regenerated from this tree and
+  byte-compared by the suite. New artifact this round; there is no prior figure
+  to move from.
+- **Independent probes** 65/65 against the source tree and 65/65 again from
+  inside the installed wheel. Unchanged from the previous round — Q-62 and Q-64
+  already resolved types independently of the suite's helper, and the closed-set
+  work did not add a probe.
+- **Mutation sweep** 65 gates inventoried, 60 killed, 5 survived, 0 errored.
+  Movement from 59/54 is **+6, all killed**: G-60 to G-63 plant the third
+  audit's four attacks in shipped source, and G-64 and G-65 plant an unannotated
+  parameter and a lambda. Every restore is proven byte-identical to the
+  proven-green baseline before mutating, and every mutant is proven loaded — by
+  the import system, not the filesystem — before a KILL or SURVIVE is accepted.
 - **Offline distribution verifier** PASSED, 41 checks. Both wheels are built in
   the host environment; the isolated environment only ever *installs* a wheel,
   never builds source. A fresh venv without system site packages, with
@@ -154,15 +229,14 @@ Measured, not asserted. Every number below came from a run against this tree.
   `PYTHONPATH`, and installing with the one dependency unavailable.
 - **BR-1 freeze matrix** VERIFIED, with BR-1's own suite (593 tests) and probes
   (57) run unmodified. No BR-1 file is touched by this release.
-- **Mutation sweep** 59 gates inventoried, 54 killed, 5 survived, 0 errored —
-  +3 scope gates over the previous 56/51, all killed. The sweep also gained
-  correct handling of *additive* mutations, whose replacement text contains the
-  original: demanding the original's absence had reported a correctly applied
-  insertion as an unprovable mutant.
-  Every restore is proven byte-identical to the proven-green baseline before
-  mutating, and every mutant is proven loaded — by the import system, not the
-  filesystem — before a KILL or SURVIVE is accepted. A harness control aborts
-  the run if that proof cannot itself fail.
+- **`pyflakes`** clean over both packages. It was absent from an earlier
+  container, which made a local "green" narrower than CI's; it is now run here.
+- **Public surface unmoved.** `api.__all__` 93, `public_api.json` 92 symbols,
+  18 pinned canonical vectors, 18 root-canonicalizable digest domains (plus the
+  3 nested-admissible-only BR-1 classes, which own no BR-2 domain), 18 public
+  data contracts and 74 other public symbols. No figure in this round widened
+  the surface; the callable inventory is a test artifact over what is already
+  reachable, not an export.
 
 The five survivors are unchanged from BR-2A and none is a gap: **G-12** is
 shadowed by G-11 (identical bytes necessarily hash identically, so killing it in
@@ -172,9 +246,11 @@ time validation and by graph revalidation (G-17), so the encoder's own branch is
 never the first refusal; **G-43** is equivalent while BR-1 is frozen, and the
 BR-1 freeze matrix is the independent gate that would catch that drift.
 
-**Not claimed.** This release has had no independent closure audit. The
-delivering session wrote, ran and reported all of the above, and an author-owned
-test, probe or mutation run is not an audit.
+**Not claimed.** This release has had no independent closure audit of the
+closed-inventory work. The three completed audits were of the *previous*
+designs, and every defect they found is remediated above; the delivering session
+wrote, ran and reported everything in this section, and an author-owned test,
+probe or mutation run is not an audit.
 
 ## [0.1.0] — BR-2A: registry and exact-resolution contracts
 
