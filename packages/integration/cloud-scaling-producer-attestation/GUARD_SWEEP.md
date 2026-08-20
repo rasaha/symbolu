@@ -13,7 +13,14 @@ collected and ran the full suite — a collection error, a syntax error, an impo
 error or a timeout is not a valid kill.
 
 **Baseline precondition.** Before any mutation, the sweep runs the suite *unmutated*
-and refuses to proceed unless it is green. A test that fails for a reason unrelated
+and refuses to proceed unless it is green. It also records the baseline's
+**collection count**, and every mutated run must match it: a run that collected a
+different number of tests is reported NOT SCORED rather than counted, so a mutation
+that made part of the suite un-collectable while the remainder passed cannot publish
+an unexercised guard as a survivor. That check is enforced in the scorer, not merely
+described here.
+
+A test that fails for a reason unrelated
 to the mutation fails on every run, so every guard looks killed and a genuinely
 surviving guard is published as load-bearing — the wrong direction for a security
 claim to be wrong in. This is not hypothetical: the packaging-distribution
@@ -88,14 +95,14 @@ not otherwise run fails rather than quietly shrinking the sweep.
 | 45 | `trust.py:211` | `resolver is None` | survived | — | sibling-backed — a None resolver fails the is_production_authoritative check below, which refuses it with the same typed configuration error |
 | 46 | `trust.py:218` | `isinstance(resolver, REFERENCE_GRADE_RESOLVERS)` | **killed** | test_the_reference_resolver_is_refused_in_production; test_every_reference_grade_subtype_is_refused_in_production[<lambda>-exact (+7 more) | — |
 | 47 | `trust.py:238` | `getattr(resolver, 'is_production_authoritative', False) is not True` | **killed** | test_a_production_resolver_declaring_nothing_is_refused_by_the_helper; test_an_unattested_resolver_is_refused_in_production (+3 more) | — |
-| 48 | `verified.py:228` | `self.construction_token is not _VERIFICATION_TOKEN` | **killed** | test_direct_construction_is_refused; test_no_caller_held_token_is_accepted[None] (+4 more) | — |
-| 49 | `verified.py:235` | `self.verification_profile != VERIFICATION_PROFILE` | **killed** | test_a_verified_artifact_cannot_be_minted_under_another_verification_profile | — |
-| 50 | `verified.py:239` | `self.verification_profile_version != VERIFICATION_PROFILE_VERSION` | **killed** | test_a_verified_artifact_cannot_be_minted_under_another_profile_version | — |
-| 51 | `verified.py:254` | `self.artifact_digest != expected` | survived | — | sibling-backed — require_verified_producer_attestation recomputes the same digest at every consumption boundary, and that check IS killed; this one is unreachable at construction because the minting routine computes the digest it passes |
-| 52 | `verified.py:352` | `type(value) is not VerifiedProducerAttestation` | **killed** | test_a_duck_typed_look_alike_is_refused_at_consumption | — |
-| 53 | `verified.py:366` | `value.construction_token is not _VERIFICATION_TOKEN` | **killed** | test_a_rebuilt_artifact_is_refused_by_the_token_check_alone[deepcopy]; test_a_rebuilt_artifact_is_refused_by_the_token_check_alone[pickle] (+1 more) | — |
-| 54 | `verified.py:371` | `value.artifact_digest not in _MINTED_DIGESTS` | **killed** | test_a_token_bearing_forgery_cannot_be_wrapped_in_a_result; test_a_borrowed_construction_token_does_not_mint_an_artifact | — |
-| 55 | `verified.py:378` | `value.artifact_digest != value.digest()` | **killed** | test_a_mutated_field_fails_revalidation[tenant_id]; test_a_mutated_field_fails_revalidation[subject_id] (+5 more) | — |
+| 48 | `verified.py:230` | `self.construction_token is not _VERIFICATION_TOKEN` | **killed** | test_direct_construction_is_refused; test_no_caller_held_token_is_accepted[None] (+4 more) | — |
+| 49 | `verified.py:237` | `self.verification_profile != VERIFICATION_PROFILE` | **killed** | test_a_verified_artifact_cannot_be_minted_under_another_verification_profile | — |
+| 50 | `verified.py:241` | `self.verification_profile_version != VERIFICATION_PROFILE_VERSION` | **killed** | test_a_verified_artifact_cannot_be_minted_under_another_profile_version | — |
+| 51 | `verified.py:256` | `self.artifact_digest != expected` | survived | — | sibling-backed — require_verified_producer_attestation recomputes the same digest at every consumption boundary, and that check IS killed; this one is unreachable at construction because the minting routine computes the digest it passes |
+| 52 | `verified.py:354` | `type(value) is not VerifiedProducerAttestation` | **killed** | test_a_duck_typed_look_alike_is_refused_at_consumption | — |
+| 53 | `verified.py:368` | `value.construction_token is not _VERIFICATION_TOKEN` | **killed** | test_a_rebuilt_artifact_is_refused_by_the_token_check_alone[deepcopy]; test_a_rebuilt_artifact_is_refused_by_the_token_check_alone[pickle] (+1 more) | — |
+| 54 | `verified.py:373` | `value.artifact_digest not in _MINTED_DIGESTS` | **killed** | test_a_token_bearing_forgery_cannot_be_wrapped_in_a_result; test_a_borrowed_construction_token_does_not_mint_an_artifact | — |
+| 55 | `verified.py:380` | `value.artifact_digest != value.digest()` | **killed** | test_a_mutated_field_fails_revalidation[tenant_id]; test_a_mutated_field_fails_revalidation[subject_id] (+5 more) | — |
 | 56 | `verification.py:168` | `type(self.outcome) is not _Outcome` | **killed** | test_a_refusal_outcome_is_exact_typed | — |
 | 57 | `verification.py:173` | `self.outcome is _Outcome.VERIFIED` | **killed** | test_a_refusal_cannot_carry_the_success_member | — |
 | 58 | `verification.py:208` | `(self.verified_attestation is None) == (self.refusal is None)` | **killed** | test_a_result_cannot_carry_both_or_neither_branch | — |
