@@ -1196,7 +1196,7 @@ def _q61():
         )
 
 
-@probe("Q-62 no callable in contracts/ accepts a plan, by resolved type identity")
+@probe("Q-62 no callable anywhere under src/ accepts a plan, by resolved type identity")
 def _q62():
     """Resolved, not matched. This harness derives it independently.
 
@@ -1229,19 +1229,28 @@ def _q62():
             pending.extend(typing.get_args(current))
         return found
 
-    root = _pl.Path(
-        importlib.import_module(
-            "ugence_benchmark_registry_authority.contracts"
-        ).__file__
-    ).parent
     ns = "ugence_benchmark_registry_authority"
+    root = _pl.Path(importlib.import_module(ns).__file__).parent
     offenders, unannotated, checked = [], [], 0
 
-    for path in sorted(root.glob("*.py")):
-        if path.name == "__init__.py":
-            continue
-        module = importlib.import_module(f"{ns}.contracts.{path.stem}")
+    # Every file under the package root, not contracts/ alone. A walk scoped to
+    # contracts/ never visits api.py, where a plain plan-consuming def once sat
+    # unseen by this probe and by the suite alike.
+    for path in sorted(root.rglob("*.py")):
+        relative = path.relative_to(root).with_suffix("")
+        parts = [part for part in relative.parts if part != "__init__"]
+        module = importlib.import_module(".".join([ns, *parts]))
         functions = []
+        source_defs = {
+            node.name
+            for node in __import__("ast").walk(
+                __import__("ast").parse(path.read_text())
+            )
+            if isinstance(
+                node,
+                (__import__("ast").FunctionDef, __import__("ast").AsyncFunctionDef),
+            )
+        }
         for value in vars(module).values():
             if inspect.isfunction(value):
                 functions.append(value)
@@ -1254,20 +1263,28 @@ def _q62():
                     elif isinstance(member, property) and member.fget:
                         functions.append(member.fget)
         for func in functions:
-            code = getattr(func, "__code__", None)
-            if code is None or not str(code.co_filename).startswith(str(root)):
-                continue  # imported or compiler-generated, not written here
+            # Ownership follows the scanned path and the module's own source
+            # text — never code.co_filename, which whoever compiled the function
+            # chooses, and which one __code__.replace() rewrites.
+            written_here = func.__name__ in source_defs
+            imported = not str(
+                getattr(func, "__module__", "")
+            ).startswith(ns)
+            if imported and not written_here:
+                continue
             checked += 1
             try:
                 hints = typing.get_type_hints(func)
             except Exception:
-                unannotated.append(func.__qualname__)
+                if written_here:
+                    unannotated.append(func.__qualname__)
                 continue
             for name in inspect.signature(func).parameters:
                 if name in ("self", "cls"):
                     continue
                 if name not in hints:
-                    unannotated.append(f"{func.__qualname__}({name})")
+                    if written_here:
+                        unannotated.append(f"{func.__qualname__}({name})")
                 elif plan in leaves(hints[name]):
                     offenders.append(f"{func.__qualname__}({name})")
 

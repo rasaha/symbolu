@@ -55,16 +55,44 @@ SRC_REL = pathlib.Path("src") / "ugence_benchmark_registry_authority"
 class Gate:
     """One load-bearing gate, and the edit that neutralizes it."""
 
-    def __init__(self, gate_id, category, module, description, old, new):
+    def __init__(
+        self, gate_id, category, module, description, old, new,
+        *, at_package_root=False,
+    ):
         self.gate_id = gate_id
         self.category = category
         self.module = module
         self.description = description
         self.old = old
         self.new = new
+        #: ``True`` for a file directly under the package root rather than
+        #: ``contracts/``. Stated explicitly rather than inferred from the
+        #: filename: the BR-2B boundary is not confined to ``contracts/``, and a
+        #: sweep that could only mutate ``contracts/`` could not plant the
+        #: bypass that hid in ``api.py``.
+        self.at_package_root = at_package_root
+
+    def target(self, root: pathlib.Path) -> pathlib.Path:
+        """The file this gate lives in.
+
+        ``contracts/`` by default — the shape every BR-2A gate uses — or the
+        package root when the gate declares itself there.
+        """
+
+        if self.at_package_root:
+            return root / SRC_REL / self.module
+        return root / SRC_REL / "contracts" / self.module
+
+    def dotted(self) -> str:
+        """The importable module name for this gate's file."""
+
+        stem = self.module[:-3]
+        if self.at_package_root:
+            return f"ugence_benchmark_registry_authority.{stem}"
+        return f"ugence_benchmark_registry_authority.contracts.{stem}"
 
     def apply(self, root: pathlib.Path) -> None:
-        path = root / SRC_REL / "contracts" / self.module
+        path = self.target(root)
         text = path.read_text()
         if self.old not in text:
             raise LookupError(
@@ -681,6 +709,66 @@ BenchmarkPlanningOutcome = Union[
     BenchmarkTransitionPlan, BenchmarkTransitionRefusal, _Event
 ]""",
     ),
+    # -------- BR-2B boundary scope: the second audit's three bypasses ----- #
+    Gate(
+        "G-57",
+        "boundary-ownership",
+        "planning.py",
+        "the boundary against a function exec-compiled with a chosen "
+        "co_filename outside contracts/ — bypass D",
+        """def plan_transition(""",
+        """_PlanAliasD = BenchmarkTransitionPlan
+_smuggled_globals = {"_PlanAliasD": _PlanAliasD}
+_smuggled_source = chr(10).join(
+    ["def smuggled(plan: _PlanAliasD):", "    return None", ""]
+)
+exec(  # noqa: S102
+    compile(_smuggled_source, "/tmp/not_under_contracts.py", "exec"),
+    _smuggled_globals,
+)
+smuggled = _smuggled_globals["smuggled"]
+
+
+def plan_transition(""",
+    ),
+    Gate(
+        "G-58",
+        "boundary-ownership",
+        "planning.py",
+        "the same exemption reached by one __code__.replace(co_filename=...) on "
+        "an ordinary def, with no exec at all — bypass E",
+        """def plan_submission_outcome(""",
+        """_PlanAliasE = BenchmarkTransitionPlan
+
+
+def rewritten(plan: _PlanAliasE) -> None:
+    return None
+
+
+rewritten.__code__ = rewritten.__code__.replace(
+    co_filename="/tmp/not_under_contracts.py"
+)
+
+
+def plan_submission_outcome(""",
+    ),
+    Gate(
+        "G-59",
+        "boundary-scope",
+        "api.py",
+        "the boundary outside contracts/: a module-level alias and a plain "
+        "plan-consuming def in api.py — bypass F",
+        """__all__ = [""",
+        """_PlanAliasF = BenchmarkTransitionPlan
+
+
+def apply_plan(plan: _PlanAliasF) -> BenchmarkRegistrationEventPayload:
+    raise SystemExit("planted")
+
+
+__all__ = [""",
+        at_package_root=True,
+    ),
 ]
 
 
@@ -769,8 +857,8 @@ def _assert_mutant_loaded(working: pathlib.Path, gate) -> str:
     established.
     """
 
-    module = f"ugence_benchmark_registry_authority.contracts.{gate.module[:-3]}"
-    target = working / SRC_REL / "contracts" / gate.module
+    module = gate.dotted()
+    target = gate.target(working)
     probe = (
         "import inspect,pathlib,traceback\n"
         f"here = pathlib.Path({str(working)!r}).resolve()\n"

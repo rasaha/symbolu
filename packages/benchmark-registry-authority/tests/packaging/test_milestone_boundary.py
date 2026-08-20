@@ -494,6 +494,7 @@ def test_br2b_added_exactly_one_verb_and_it_implies_no_authoritative_act():
 # BR-2B plans. It does not apply plans.
 # --------------------------------------------------------------------------- #
 CONTRACTS = SRC / "contracts"
+NAMESPACE = "ugence_benchmark_registry_authority"
 
 #: Every lifecycle payload a planner must never return.
 LIFECYCLE_PAYLOAD_TYPES = frozenset(
@@ -510,86 +511,131 @@ LIFECYCLE_PAYLOAD_TYPES = frozenset(
 )
 
 
-def _contract_modules():
-    """Every module under ``contracts/``, imported, for runtime resolution."""
+def _package_modules():
+    """Every module whose source text lives under ``src/``, imported.
+
+    **The scanned path decides membership, not the code object.** An earlier
+    version asked each function where its code came from — ``__code__
+    .co_filename`` — and exempted anything outside ``contracts/``. That value is
+    supplied by whoever compiled the function: ``exec`` with a chosen filename,
+    or one ``__code__.replace(co_filename=...)`` on an ordinary ``def``, moved a
+    plan-consuming callable out of scope without moving a single line of source.
+    An earlier version also walked ``contracts/`` alone, so a plain ``def`` in
+    ``api.py`` was never looked at.
+
+    Both are the same mistake: letting something other than the filesystem decide
+    what this package contains. The AST scan already walks every ``*.py`` under
+    ``src/``; this walks exactly that set and imports it, so the runtime view and
+    the textual view cover the same files by construction.
+    """
 
     import importlib
 
     modules = []
-    for path in sorted(CONTRACTS.rglob("*.py")):
-        if path.name == "__init__.py":
-            continue
-        modules.append(
-            importlib.import_module(
-                "ugence_benchmark_registry_authority.contracts." + path.stem
-            )
-        )
+    for path in sorted(SRC.rglob("*.py")):
+        relative = path.relative_to(SRC).with_suffix("")
+        parts = [part for part in relative.parts if part != "__init__"]
+        modules.append(importlib.import_module(".".join([NAMESPACE, *parts])))
     return modules
 
 
-NAMESPACE = "ugence_benchmark_registry_authority"
+def _defined_here(value) -> bool:
+    return str(getattr(value, "__module__", "")).startswith(NAMESPACE)
 
 
-def _is_ours(value) -> bool:
-    """Whether ``value`` is defined by this package rather than merely imported.
+def _is_generated(owner, name: str, member) -> bool:
+    """Whether ``owner.name`` was synthesized rather than written here.
 
-    ``vars(module)`` includes everything the module imported — ``Enum``,
-    ``datetime``, the BR-1 contracts — and walking their methods would drown the
-    scan in hundreds of stdlib signatures this package neither wrote nor
-    controls. Ownership is decided by ``__module__``, so the scan covers exactly
-    the code this package is answerable for.
+    Decided by **identity against a base class**, or by the dataclass machinery's
+    own fixed method set — never by a filename the code object carries.
+
+    ``EnumType`` copies functions such as ``_generate_next_value_`` into every
+    subclass's own ``__dict__``, and ``@dataclass`` synthesizes ``__init__``,
+    ``__eq__`` and ``__repr__`` by exec. Nobody can annotate the ``other`` of a
+    generated ``__eq__``, so these are exempt from the *annotation* requirement
+    only. They are **not** exempt from the plan-consumption check, which needs no
+    exemption at all: a synthesized method has no annotation naming a plan.
     """
 
-    if not str(getattr(value, "__module__", "")).startswith(NAMESPACE):
-        return False
-    code = getattr(value, "__code__", None)
-    if code is None:
+    import dataclasses as _dc
+
+    for base in getattr(owner, "__mro__", ())[1:]:
+        if _defined_here(base):
+            continue
+        if getattr(base, name, None) is member:
+            return True
+    if _dc.is_dataclass(owner) and name in {
+        "__init__",
+        "__eq__",
+        "__repr__",
+        "__hash__",
+        "__setattr__",
+        "__delattr__",
+    }:
         return True
-    # Written here, or generated? ``@dataclass`` synthesizes ``__init__``,
-    # ``__eq__`` and ``__repr__`` by ``exec``-ing source with a placeholder
-    # filename, and stamps them with the defining module. They are the
-    # compiler's code, not this package's — nobody can annotate ``__eq__``'s
-    # ``other`` — so the scan covers only functions whose code lives in a file
-    # this package actually contains.
-    try:
-        return CONTRACTS in pathlib.Path(code.co_filename).resolve().parents
-    except (OSError, ValueError):  # pragma: no cover - synthesized filenames
-        return False
+    return False
 
 
-def _functions_in(module):
-    """Functions and methods **this package defines** in ``module``."""
+def _names_defined_in_source(module) -> set:
+    """Every name that appears as a ``def`` in this module's own source text.
 
-    seen = []
-    for value in vars(module).values():
-        if inspect.isfunction(value) and _is_ours(value):
-            seen.append(value)
-        elif inspect.isclass(value) and _is_ours(value):
-            for member in vars(value).values():
-                # Members are ownership-checked too, not just their class.
-                # ``EnumType`` copies stdlib functions such as
-                # ``_generate_next_value_`` into every Enum subclass's own
-                # ``__dict__``, so a class this package defines still carries
-                # methods it did not write and cannot annotate.
-                if inspect.isfunction(member) and _is_ours(member):
-                    seen.append(member)
-                elif (
-                    isinstance(member, property)
-                    and member.fget is not None
-                    and _is_ours(member.fget)
-                ):
-                    seen.append(member.fget)
-    return seen
+    The scanned text is the authority for what this package wrote. A member
+    bound in a module but absent from its source was injected or generated —
+    ``typing.Protocol`` installs ``__init__`` and ``__subclasshook__`` on every
+    Protocol class, and neither can be annotated by anyone here.
+
+    This is deliberately *not* ``co_filename``: the filename travels with the
+    code object and can be chosen by whoever compiled it, while this comes from
+    reading the file the scan already walks.
+    """
+
+    tree = ast.parse(pathlib.Path(module.__file__).read_text())
+    return {
+        node.name
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+
+
+def _callables_in(module):
+    """``(label, function, generated?, attribute name)`` for every callable here.
+
+    No filter on where the code claims to come from. A function bound in a module
+    under ``src/`` is this package's regardless of how it was compiled — which is
+    the whole point: ``exec``-created and ``__code__``-rewritten functions are
+    exactly the ones the previous ownership test let through.
+    """
+
+    found = []
+    for name, value in vars(module).items():
+        if inspect.isfunction(value):
+            found.append((f"{module.__name__}.{name}", value, False, name))
+        elif inspect.isclass(value) and _defined_here(value):
+            for attribute, member in vars(value).items():
+                label = f"{module.__name__}.{value.__name__}.{attribute}"
+                if inspect.isfunction(member):
+                    found.append(
+                        (
+                            label,
+                            member,
+                            _is_generated(value, attribute, member),
+                            attribute,
+                        )
+                    )
+                elif isinstance(member, property) and member.fget is not None:
+                    found.append(
+                        (
+                            label,
+                            member.fget,
+                            _is_generated(value, attribute, member.fget),
+                            attribute,
+                        )
+                    )
+    return found
 
 
 def test_no_exported_callable_accepts_a_transition_plan_as_input():
     """A plan is an output of this package and an input to nothing in it.
-
-    This is the structural half of "BR-2B may determine what transition would be
-    valid; BR-2D is the first phase permitted to assert that one occurred". A
-    function that consumed a plan would be the seam through which applying,
-    committing, appending, admitting, registering, revoking or resolving one
-    could later arrive.
 
     Decided by **class identity** on resolved annotations, never by matching the
     name in text: an alias, a ``Union`` member or a nested ``Optional`` spells
@@ -607,49 +653,114 @@ def test_no_exported_callable_accepts_a_transition_plan_as_input():
     assert offenders == [], offenders
 
 
-def test_no_callable_under_contracts_accepts_a_plan_however_spelled():
-    """The same identity check over every function and method in ``contracts/``.
+def test_no_callable_anywhere_under_src_accepts_a_plan_however_spelled():
+    """Every module whose source lives under ``src/``, not just ``contracts/``.
 
-    Reaches private helpers and methods that ``pkg.__all__`` never exposes.
+    This check has **no exemptions**. A synthesized method carries no annotation
+    naming a plan, so excluding one would buy nothing and cost the guarantee — and
+    the exclusions are precisely what the second audit walked through: a function
+    ``exec``-compiled with a chosen ``co_filename``, the same trick via one
+    ``__code__.replace``, and a plain ``def`` in ``api.py`` that the
+    ``contracts/``-scoped walk never visited.
     """
 
     offenders = []
-    for module in _contract_modules():
-        for func in _functions_in(module):
+    for module in _package_modules():
+        for label, func, _generated, _attribute in _callables_in(module):
             for name, types in resolved_parameter_types(func).items():
                 if api.BenchmarkTransitionPlan in types:
-                    offenders.append(f"{module.__name__}.{func.__qualname__}({name})")
+                    offenders.append(f"{label}({name})")
     assert offenders == [], offenders
 
 
-def test_every_parameter_under_contracts_is_annotated():
-    """An unannotated parameter is the cheapest place to hide a plan.
+def test_no_planner_anywhere_under_src_returns_a_lifecycle_payload():
+    """The return half, over every module rather than the exported surface.
 
-    The identity checks above can only speak about annotations that exist, so an
-    unannotated parameter inside ``contracts/`` is a **failure**, never a skip.
-    ``self`` and ``cls`` are exempt; nothing else is.
+    Scoped to planners, because that is what the ruling constrains: BR-2A's
+    ``require_exact_resolution_record_payload`` legitimately returns a resolution
+    record, and ``BenchmarkRegistryStorePort.read_historical`` legitimately
+    declares one — a store port is a *shape*, and BR-2D will implement it. What
+    must never return a lifecycle payload is something that plans.
+
+    A callable that consumed a plan and returned an event is caught by the
+    parameter check above, which has no exemptions at all, so nothing rests on
+    this test recognising the name.
     """
 
     offenders = []
-    for module in _contract_modules():
-        for func in _functions_in(module):
-            for name in unannotated_parameters(func):
-                offenders.append(f"{module.__name__}.{func.__qualname__}({name})")
+    for module in _package_modules():
+        for label, func, _generated, _attribute in _callables_in(module):
+            if not func.__name__.startswith("plan_"):
+                continue
+            returned = resolved_return_types(func)
+            assert returned, label
+            leaked = returned & LIFECYCLE_PAYLOAD_TYPES
+            if leaked or not returned <= {
+                api.BenchmarkTransitionPlan,
+                api.BenchmarkTransitionRefusal,
+            }:
+                offenders.append(
+                    f"{label} -> {sorted(c.__name__ for c in returned)}"
+                )
     assert offenders == [], offenders
 
 
-def test_no_function_anywhere_in_the_source_tree_takes_a_plan_parameter():
-    """The source-tree scan, now alias-aware and refusing bare parameters.
+def test_every_parameter_under_src_is_annotated():
+    """An unannotated parameter is the cheapest place to hide a plan.
+
+    The identity checks can only speak about annotations that exist, so a bare
+    parameter is a **failure**, never a skip. ``self`` and ``cls`` are exempt.
+    Synthesized methods are exempt too — nobody can annotate the ``other`` of a
+    generated ``__eq__`` — but that exemption is decided by identity against a
+    base class or by the dataclass machinery's fixed method set, never by a
+    filename the code object carries.
+    """
+
+    offenders = []
+    for module in _package_modules():
+        defined = _names_defined_in_source(module)
+        for label, func, generated, attribute in _callables_in(module):
+            if generated:
+                continue
+            # Keyed on the ATTRIBUTE, not the function's own __name__:
+            # typing.Protocol installs __subclasshook__ and __init__ whose
+            # underlying functions are named _proto_hook and
+            # _no_init_or_replace_init, so a __name__-based test sees neither
+            # as a dunder and demands annotations nobody here can add.
+            if attribute.startswith("__") and func.__name__ not in defined:
+                continue  # injected dunder, e.g. Protocol's __init__
+            if func.__name__ not in defined and not _defined_here(func):
+                # Imported, not written: ``from dataclasses import fields``
+                # binds a stdlib function into this module's namespace, and
+                # nobody here can annotate it.
+                #
+                # A function exec-compiled into this module's own globals keeps
+                # this package's ``__module__`` and therefore stays in scope —
+                # which is the case that matters. And the plan-consumption check
+                # above carries no exemption of any kind, so even a function that
+                # lied about its origin could not use this to hide an annotated
+                # plan parameter.
+                continue
+            for name in unannotated_parameters(func):
+                offenders.append(f"{label}({name})")
+    assert offenders == [], offenders
+
+
+def test_no_function_in_any_source_file_takes_a_plan_parameter():
+    """The textual scan, alias-aware across **every** module the walk imports.
 
     AST cannot resolve an alias, so the names that resolve to the plan type are
-    computed at runtime and the scan matches against that set. This keeps the
-    scan's one advantage over a runtime attribute walk — it sees closures and
-    nested functions, which no module attribute exposes — without keeping its
-    blind spot.
+    computed at runtime and the scan matches that set. The earlier version built
+    that set from ``contracts/`` alone, so a module-level alias declared in
+    ``api.py`` was a name the scan had never heard of.
+
+    The scan keeps its one advantage over a runtime attribute walk — it sees
+    closures and nested functions that no module attribute exposes — and now
+    covers the same files.
     """
 
     alias_names = {api.BenchmarkTransitionPlan.__name__}
-    for module in _contract_modules():
+    for module in _package_modules():
         alias_names |= names_resolving_to(module, api.BenchmarkTransitionPlan)
 
     offenders = []
@@ -666,13 +777,7 @@ def test_no_function_anywhere_in_the_source_tree_takes_a_plan_parameter():
                 + [a for a in (args.vararg, args.kwarg) if a is not None]
             )
             for argument in every:
-                if argument.arg in ("self", "cls"):
-                    continue
-                if argument.annotation is None:
-                    if CONTRACTS in path.parents or path.parent == CONTRACTS:
-                        offenders.append(
-                            f"{path.name}: {node.name}({argument.arg}) unannotated"
-                        )
+                if argument.arg in ("self", "cls") or argument.annotation is None:
                     continue
                 spelled = set(
                     re.findall(
@@ -682,6 +787,71 @@ def test_no_function_anywhere_in_the_source_tree_takes_a_plan_parameter():
                 if spelled & alias_names:
                     offenders.append(f"{path.name}: {node.name}({argument.arg})")
     assert offenders == [], offenders
+
+
+def test_the_alias_set_is_gathered_from_every_scanned_module():
+    """A module the alias walk skips is a module whose aliases are invisible."""
+
+    walked = {
+        pathlib.Path(module.__file__).resolve() for module in _package_modules()
+    }
+    assert walked == {path.resolve() for path in SRC.rglob("*.py")}
+    # api.py is the module the contracts/-scoped walk never visited.
+    assert any(path.name == "api.py" for path in walked)
+
+
+def test_the_ownership_test_cannot_be_granted_by_the_code_object():
+    """``co_filename`` is attacker-supplied; the scanned path is not.
+
+    Both shapes the second audit used are constructed here and required to stay
+    in scope. If ownership ever consults the code object again, this fails.
+    """
+
+    planted = {}
+    exec(  # noqa: S102 - a synthetic variant, defined and discarded here
+        compile(
+            "def smuggled(plan):\n    return None\n",
+            "/tmp/not_under_contracts.py",
+            "exec",
+        ),
+        planted,
+    )
+    smuggled = planted["smuggled"]
+    assert smuggled.__code__.co_filename == "/tmp/not_under_contracts.py"
+    assert unannotated_parameters(smuggled) == ["plan"]
+
+    def rewritten(plan) -> None: ...
+
+    rewritten.__code__ = rewritten.__code__.replace(
+        co_filename="/tmp/not_under_contracts.py"
+    )
+    assert rewritten.__code__.co_filename == "/tmp/not_under_contracts.py"
+    assert unannotated_parameters(rewritten) == ["plan"]
+
+    # Neither is excluded by _is_generated: it consults base-class identity and
+    # the dataclass method set, and knows nothing about filenames.
+    class Holder:
+        pass
+
+    assert not _is_generated(Holder, "smuggled", smuggled)
+    assert not _is_generated(Holder, "rewritten", rewritten)
+
+
+def test_the_module_walk_covers_every_file_the_ast_scan_reads():
+    """The runtime view and the textual view must cover the same files.
+
+    A module the walk skips is a module whose aliases the AST scan never learns
+    and whose functions the resolver never sees — which is how a plain ``def`` in
+    ``api.py`` stayed invisible.
+    """
+
+    walked = {
+        pathlib.Path(module.__file__).resolve() for module in _package_modules()
+    }
+    scanned = {path.resolve() for path in SRC.rglob("*.py")}
+    assert walked == scanned, sorted(
+        str(p) for p in scanned.symmetric_difference(walked)
+    )
 
 
 def test_no_exported_planner_can_return_a_lifecycle_payload():

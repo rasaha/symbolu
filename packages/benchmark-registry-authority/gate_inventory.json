@@ -2,8 +2,8 @@
   "distribution": "ugence-benchmark-registry-authority",
   "milestone": "BR-2A",
   "note": "Complete inventory of every load-bearing gate, and the measured result of neutralizing each one in turn against the full suite and the author-owned adversarial probes. Production behaviour was not changed to chase a zero-survivor number; any survivor is classified as equivalent, shadowed (naming the shadowing gate), or a real gap. Regenerate by running gate_mutation_sweep.py.",
-  "gates_inventoried": 56,
-  "killed": 51,
+  "gates_inventoried": 59,
+  "killed": 54,
   "survived": 5,
   "errored": 0,
   "categories": {
@@ -98,6 +98,13 @@
     ],
     "boundary-return-widening": [
       "G-56"
+    ],
+    "boundary-ownership": [
+      "G-57",
+      "G-58"
+    ],
+    "boundary-scope": [
+      "G-59"
     ]
   },
   "ledger": [
@@ -531,7 +538,7 @@
       "module": "planning.py",
       "description": "the plan-consumption boundary, attacked with an aliased parameter on a private helper \u2014 the exact shape the substring rule walked past",
       "result": "KILLED",
-      "first_failure": "test:tests/packaging/test_milestone_boundary.py::test_no_callable_under_contracts_accepts_a_plan_however_spelled"
+      "first_failure": "test:tests/packaging/test_milestone_boundary.py::test_no_callable_anywhere_under_src_accepts_a_plan_however_spelled"
     },
     {
       "gate": "G-55",
@@ -539,7 +546,7 @@
       "module": "planning.py",
       "description": "the same boundary, attacked with an unannotated parameter \u2014 skipped rather than failed by the previous gate",
       "result": "KILLED",
-      "first_failure": "test:tests/packaging/test_milestone_boundary.py::test_every_parameter_under_contracts_is_annotated"
+      "first_failure": "test:tests/packaging/test_milestone_boundary.py::test_every_parameter_under_src_is_annotated"
     },
     {
       "gate": "G-56",
@@ -548,6 +555,30 @@
       "description": "the planning-outcome alias, widened to admit a registry event \u2014 invisible to a gate that read the alias name as a string",
       "result": "KILLED",
       "first_failure": "test:tests/packaging/test_boundary_gates_detect.py::test_happy_the_real_planning_functions_pass_every_boundary_check"
+    },
+    {
+      "gate": "G-57",
+      "category": "boundary-ownership",
+      "module": "planning.py",
+      "description": "the boundary against a function exec-compiled with a chosen co_filename outside contracts/ \u2014 bypass D",
+      "result": "KILLED",
+      "first_failure": "test:tests/packaging/test_milestone_boundary.py::test_no_callable_anywhere_under_src_accepts_a_plan_however_spelled"
+    },
+    {
+      "gate": "G-58",
+      "category": "boundary-ownership",
+      "module": "planning.py",
+      "description": "the same exemption reached by one __code__.replace(co_filename=...) on an ordinary def, with no exec at all \u2014 bypass E",
+      "result": "KILLED",
+      "first_failure": "test:tests/packaging/test_milestone_boundary.py::test_no_callable_anywhere_under_src_accepts_a_plan_however_spelled"
+    },
+    {
+      "gate": "G-59",
+      "category": "boundary-scope",
+      "module": "api.py",
+      "description": "the boundary outside contracts/: a module-level alias and a plain plan-consuming def in api.py \u2014 bypass F",
+      "result": "KILLED",
+      "first_failure": "test:tests/packaging/test_milestone_boundary.py::test_no_callable_anywhere_under_src_accepts_a_plan_however_spelled"
     }
   ],
   "survivor_classifications": {

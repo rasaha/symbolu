@@ -88,14 +88,54 @@ exported callable would have passed all four.
   `IDEMPOTENT_DUPLICATE`; comparing bytes returns `COORDINATE_SLOT_CONFLICT`.
   Only one of those is D-06's answer, and no source string is consulted.
 
+### Second closure-audit remediation
+
+The second audit confirmed `tests/_boundary.py` resolves correctly and found the
+gates **consuming** it were scoped to `contracts/` and asked each function where
+its code came from. Three planted callables kept the suite and probes green:
+
+- **D** — a function `exec`-compiled inside `planning.py` with
+  `co_filename="/tmp/not_under_contracts.py"`.
+- **E** — the same exemption via one `__code__.replace(co_filename=...)` on an
+  ordinary `def`, no `exec` at all.
+- **F** — a module-level alias and a plain plan-consuming `def` in `api.py`,
+  which the `contracts/`-scoped module walk and alias walk never visited.
+
+D and E are the same mistake as the substring rule they replaced: letting
+something the attacker supplies decide what this package contains. `co_filename`
+travels with the code object and is chosen by whoever compiled it. **Ownership
+now follows the scanned path** — the module walk imports exactly the files the
+AST scan reads, and the alias set is gathered from every one of them.
+
+- The plan-consumption check carries **no exemption of any kind**. A synthesized
+  method has no annotation naming a plan, so excluding one would buy nothing and
+  cost the guarantee.
+- The annotation requirement keeps a narrow exemption, decided by **identity
+  against a base class** (`EnumType` copies `_generate_next_value_` into every
+  subclass), by the dataclass machinery's fixed method set, or by the module's
+  **own source text** (`typing.Protocol` installs `__init__` and
+  `__subclasshook__`; `from dataclasses import fields` binds a stdlib function).
+  Never by a filename.
+- The return check is scoped to planners, since BR-2A's
+  `require_exact_resolution_record_payload` legitimately returns a resolution
+  record and `BenchmarkRegistryStorePort.read_historical` legitimately declares
+  one. Nothing rests on it: a callable consuming a plan and returning an event
+  is caught by the parameter check.
+- Probe Q-62 had the identical `contracts/` blind spot and is widened the same
+  way, verified to catch F independently of the suite.
+- G-57, G-58 and G-59 plant exactly D, E and F in shipped source; all three are
+  killed by `test_no_callable_anywhere_under_src_accepts_a_plan_however_spelled`.
+  The sweep gained explicit support for gates outside `contracts/`, since a
+  sweep confined to `contracts/` could not have planted F.
+
 ### Verification performed for this release
 
 Measured, not asserted. Every number below came from a run against this tree.
 
-- **Suite** 1730 tests, 469 distinct properties (437 adversarial : 32 happy,
-  13.66:1). The movement from 1710 is +20 test functions and no removals:
-  +13 `test_boundary_gates_detect.py`, +3 `test_milestone_boundary.py`,
-  +2 `test_planning.py`, +2 `test_inventories.py`. The two monorepo-scope properties ran rather than skipping: no
+- **Suite** 1734 tests, 473 distinct properties (441 adversarial : 32 happy,
+  13.78:1). Movement from 1730 is +4: seven properties added and three renamed
+  away in `test_milestone_boundary.py` as the three `contracts/`-scoped gates
+  became `src/`-wide ones. The two monorepo-scope properties ran rather than skipping: no
   package in the monorepo imports this one, and no workflow but its own
   references it.
 - **Independent probes** 65/65, run twice — Q-62 rewritten to resolve types
@@ -114,8 +154,8 @@ Measured, not asserted. Every number below came from a run against this tree.
   `PYTHONPATH`, and installing with the one dependency unavailable.
 - **BR-1 freeze matrix** VERIFIED, with BR-1's own suite (593 tests) and probes
   (57) run unmodified. No BR-1 file is touched by this release.
-- **Mutation sweep** 56 gates inventoried, 51 killed, 5 survived, 0 errored —
-  +3 boundary gates over the previous 53/48, all killed. The sweep also gained
+- **Mutation sweep** 59 gates inventoried, 54 killed, 5 survived, 0 errored —
+  +3 scope gates over the previous 56/51, all killed. The sweep also gained
   correct handling of *additive* mutations, whose replacement text contains the
   original: demanding the original's absence had reported a correctly applied
   insertion as an unprovable mutant.
