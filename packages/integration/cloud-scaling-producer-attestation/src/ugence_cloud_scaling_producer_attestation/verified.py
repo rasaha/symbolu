@@ -70,8 +70,16 @@ both read ``VERIFIED``.
 
 What that admits, stated as a rule rather than as a list — an enumeration of dimensions is
 what two revisions of this docstring got wrong. The verifier reconciles **exactly those five
-facts and reads no others**, so *any* candidate difference outside them is admitted, by
-construction; ``tests/test_adversarial.py`` A-60 asserts that set over the source. Measured
+facts and directly reconciles no other candidate facts**. Stated as the claim it supports: for
+two independently valid objects of exact type ``CapacityAuthorizationCandidate``, the
+producer-attestation layer does not independently compare facts outside those five when the
+five reconciled values remain equal.
+
+:attr:`candidate_digest` is read **after** verification succeeds, to bind the resulting
+artifact to the candidate the determination was reached against. It is neither
+producer-signature-covered nor independently reconciled — the verifier never compares it
+against anything. ``tests/test_adversarial.py`` A-59 is the load-bearing evidence; A-60 is a
+syntactic tripwire whose coverage limits are stated with it. Measured
 instances: a different policy binding, a different execution target scope, different permitted
 magnitude bounds, a different ``disposition``/``risk_outcome`` within the ALLOW family, and a
 different risk decision — all still ``VERIFIED``.

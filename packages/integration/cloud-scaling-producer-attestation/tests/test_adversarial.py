@@ -1084,6 +1084,23 @@ def test_one_attestation_verifies_against_any_candidate_agreeing_on_the_five_fac
         # The ALLOW family has two members, so a candidate can carry the other one and still
         # be a genuine Phase 5A candidate. disposition and risk_outcome move together —
         # the seam contract refuses them apart — and neither is reconciled.
+        # The risk decision ITSELF, not merely its disposition: a different decision
+        # snapshot, with decision_digest cleared so the seam contract re-derives it. Both
+        # decision_digest and decision_snapshot_digest move. This row was labelled
+        # "measured" before anything measured it.
+        "the risk decision itself": (
+            lambda proj, decision: build_candidate(
+                projection=proj,
+                decision=dataclasses.replace(
+                    decision,
+                    decision_snapshot={
+                        **decision.decision_snapshot,
+                        "second_evaluation_marker": "a-59",
+                    },
+                    decision_digest=None,
+                ),
+            )
+        )(*(lambda pr: (pr, p5a.build_decision(pr)))(p5a.build_projection())),
         "disposition and risk_outcome": (
             lambda proj, decision: build_candidate(
                 projection=proj,
@@ -1095,6 +1112,12 @@ def test_one_attestation_verifies_against_any_candidate_agreeing_on_the_five_fac
             )
         )(*(lambda pr: (pr, p5a.build_decision(pr)))(p5a.build_projection())),
     }
+    # The decision row must genuinely differ in the decision, not merely in something
+    # downstream of it — otherwise "the risk decision itself" is a label, not a measurement.
+    decision_row = admitted["the risk decision itself"]
+    assert decision_row.decision_digest != first.decision_digest
+    assert decision_row.decision_snapshot_digest != first.decision_snapshot_digest
+
     for label, other in admitted.items():
         assert agrees_on_the_five(other), label
         assert other.candidate_digest != first.candidate_digest, label
@@ -1134,19 +1157,28 @@ def test_one_attestation_verifies_against_any_candidate_agreeing_on_the_five_fac
 
 
 def test_the_verifier_reconciles_exactly_five_candidate_facts_and_no_others():
-    """A-60: the invariant every row of the documented coverage table follows from.
+    """A-60: a syntactic tripwire over the reconciliation section. Not a proof.
 
-    A-59 measures particular dimensions. This pins the general rule they are instances of:
-    the verification routine compares exactly five facts between the attestation and the
-    candidate. Everything else about a candidate — its policy binding, its execution scope,
-    the bounds that policy sets — is never read for reconciliation, which is *why* a single
-    attestation admits candidates differing in them.
+    **What this is and is not.** A-59 is the load-bearing evidence for the documented
+    coverage: it varies real candidates through the genuine Phase 5A chain and observes what
+    the verifier does. This property is a *tripwire* over the source — cheaper than A-59,
+    fires on edits A-59's sample might miss, and pins the reconciliation set so a widening
+    shows up as a test failure rather than as a quietly broadened guarantee.
 
-    Asserted over the source rather than by enumerating candidates, because the enumeration
-    can only ever sample. An earlier revision of the documents drew the enumeration from
-    reasoning instead of from tests and got three of six dimensions wrong; this property is
-    the one that would have caught that, because widening or narrowing the reconciliation
-    set fails here immediately.
+    It is **not** a proof that no sixth candidate fact can ever be read. It checks three
+    things over the reconciliation section only:
+
+    #. every direct ``candidate.<attribute>`` load in that section names one of the five;
+    #. no dynamic access — ``getattr(candidate, ...)``, ``vars``, ``__dict__`` — appears
+       there, since an attribute named at runtime is invisible to this walk;
+    #. across the whole module, every ``attestation.X``/``candidate.Y`` inequality names one
+       of the five, in either operand order.
+
+    What it does not cover, stated so the limit is not discovered later: a candidate fact
+    read *outside* the marked reconciliation section and acted on elsewhere; a fact reached
+    through a helper that takes the candidate as an argument; and anything a future refactor
+    moves out of the section. Those are A-59's job, and the documents cite A-59 first for
+    exactly this reason.
     """
 
     import ast
@@ -1154,7 +1186,72 @@ def test_the_verifier_reconciles_exactly_five_candidate_facts_and_no_others():
 
     from ugence_cloud_scaling_producer_attestation import verification
 
-    tree = ast.parse(inspect.getsource(verification))
+    FIVE = {
+        "recommendation_id",
+        "recommendation_digest",
+        "tenant_id",
+        "subject_id",
+        "subject_type",
+    }
+
+    source = inspect.getsource(verification)
+    lines = source.splitlines()
+    tree = ast.parse(source)
+
+    # --- locate the reconciliation section by its own numbered markers ------------------ #
+    def marker(fragment):
+        hits = [i for i, line in enumerate(lines, 1) if fragment in line]
+        assert len(hits) == 1, f"expected exactly one {fragment!r} marker, got {hits}"
+        return hits[0]
+
+    section_start = marker("=== 3. reconciliation")
+    section_end = marker("=== 4. payload recomputation")
+    assert section_start < section_end
+
+    def in_section(node):
+        return section_start <= getattr(node, "lineno", -1) < section_end
+
+    # --- (1) every direct candidate.<attr> load in the section names one of the five ---- #
+    read_in_section = {
+        node.attr
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Attribute)
+        and isinstance(node.value, ast.Name)
+        and node.value.id == "candidate"
+        and in_section(node)
+    }
+    assert read_in_section, "no candidate attribute is read in the reconciliation section"
+    assert read_in_section <= FIVE, (
+        f"the reconciliation section reads {sorted(read_in_section - FIVE)} from the "
+        "candidate, which is outside the five reconciled facts. ADR §12.1, the verified.py "
+        "docstring and the README section 'What the signature covers' all describe that set "
+        "and must be updated with it"
+    )
+
+    # --- (2) no dynamic candidate access in the section, which would hide a sixth fact -- #
+    for node in ast.walk(tree):
+        if not in_section(node):
+            continue
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+            if node.func.id in {"getattr", "vars"} and any(
+                isinstance(a, ast.Name) and a.id == "candidate" for a in node.args
+            ):
+                raise AssertionError(
+                    f"{node.func.id}(candidate, ...) at line {node.lineno} of the "
+                    "reconciliation section: an attribute named at runtime is invisible to "
+                    "this walk, so the reconciliation set could widen without failing here"
+                )
+        if (
+            isinstance(node, ast.Attribute)
+            and node.attr == "__dict__"
+            and isinstance(node.value, ast.Name)
+            and node.value.id == "candidate"
+        ):
+            raise AssertionError(
+                f"candidate.__dict__ at line {node.lineno} of the reconciliation section"
+            )
+
+    # --- (3) module-wide: every attestation/candidate inequality names one of the five -- #
     reconciled = set()
     for node in ast.walk(tree):
         if not isinstance(node, ast.Compare):
@@ -1164,8 +1261,8 @@ def test_the_verifier_reconciles_exactly_five_candidate_facts_and_no_others():
             continue
         right = comparators[0]
         # Operand order carries no meaning to Python, so it must carry none here either.
-        # `candidate.X != attestation.Y` reads a sixth candidate fact exactly as
-        # `attestation.Y != candidate.X` does, and keying on "attestation is on the left"
+        # ``candidate.X != attestation.Y`` reads a sixth candidate fact exactly as
+        # ``attestation.Y != candidate.X`` does, and keying on "attestation is on the left"
         # let that shape through until this normalisation was added.
         if (
             isinstance(left, ast.Attribute)
@@ -1176,11 +1273,6 @@ def test_the_verifier_reconciles_exactly_five_candidate_facts_and_no_others():
             and right.value.id == "attestation"
         ):
             left, right = right, left
-        # Keyed on the CANDIDATE-side attribute, and deliberately not requiring the two
-        # sides to name the same field. A reconciliation written as
-        # ``attestation.recommendation_id != candidate.policy_binding_digest`` still reads a
-        # sixth candidate fact, and a check that only matched same-named pairs would miss
-        # it — which it did, until this property was falsified against exactly that shape.
         if (
             isinstance(left, ast.Attribute)
             and isinstance(left.value, ast.Name)
@@ -1191,22 +1283,14 @@ def test_the_verifier_reconciles_exactly_five_candidate_facts_and_no_others():
         ):
             reconciled.add(right.attr)
 
-    assert reconciled == {
-        "recommendation_id",
-        "recommendation_digest",
-        "tenant_id",
-        "subject_id",
-        "subject_type",
-    }, (
-        f"the reconciliation set is now {sorted(reconciled)}. It defines exactly which "
-        "candidate differences a single genuine attestation tolerates, so ADR §12.1, the "
-        "verified.py docstring and the README section 'What the signature covers' all "
-        "describe this set and must be updated with it"
+    assert reconciled == FIVE, (
+        f"the reconciliation set is now {sorted(reconciled)}. It defines which candidate "
+        "differences a single genuine attestation tolerates, so the documents describing it "
+        "must be updated with it"
     )
 
-    # And it is the same set the signature covers, minus the attestation's own metadata —
-    # which is what makes the reconciliation an independent recomputation rather than a
-    # comparison of the attestation against itself.
+    # And it is a subset of what the signature covers — which is what makes reconciliation an
+    # independent recomputation rather than a comparison of the attestation against itself.
     from ugence_cloud_scaling_producer_attestation import (
         producer_attestation_signing_payload,
     )

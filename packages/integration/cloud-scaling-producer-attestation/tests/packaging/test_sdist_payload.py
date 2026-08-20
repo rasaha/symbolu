@@ -85,17 +85,17 @@ FORBIDDEN_FRAGMENTS = (
 #: installs pytest but not ``build``, so the wheel property errored on all 91 runs, and two
 #: genuine survivors were reported killed by it.
 #:
-#: **The deselection is for cost, and it is not free.** An earlier revision of this comment
+#: **The skip is for cost, and it is not free.** An earlier revision of this comment
 #: claimed "nothing here can score a guard in ``src/``: a mutated package builds into a
 #: distribution exactly as an unmutated one does". That is true of SD-1 … SD-5, and false of
 #: SD-6 … SD-9: those build the sdist **from the package under test** and run the *shipped*
 #: suite against it in a subprocess. Under a mutation, the sdist carries the mutated source
 #: and the shipped adversarial properties fail there exactly as they fail here — SD-7 would
-#: score, and deselecting it therefore removes real scoring capacity from the sweep rather
+#: score, and skipping it therefore removes real scoring capacity from the sweep rather
 #: than removing noise.
 #:
-#: What makes the deselection **safe** is a different fact, and a checkable one: every
-#: module the sdist ships is also run *directly and un-deselected* by the sweep. SD-7 can
+#: What makes the skip **safe** is a different fact, and a checkable one: every
+#: module the sdist ships is also run *directly and un-skipped* by the sweep. SD-7 can
 #: only fail for a mutation that already fails in the sweep's own run of the same property,
 #: so the sweep's score is unchanged — it just costs a minute per guard less to reach.
 #: ``tests/test_property_ledger.py::PL-6`` asserts that relationship, so a property added
@@ -103,7 +103,7 @@ FORBIDDEN_FRAGMENTS = (
 #: fails rather than silently shrinking the sweep.
 _SKIP_REASON = (
     "packaging-distribution properties (each builds an sdist or wheel, and the slow ones "
-    "also create a virtualenv); deselected by the guard sweep via "
+    "also create a virtualenv); skipped during guard-sweep runs via "
     "UGENCE_SKIP_SLOW_PACKAGING for COST, not because they score nothing — SD-6..SD-9 run "
     "the shipped suite against a distribution built from the package under test and would "
     "fail on a mutation. Safe only because every module the sdist ships is also run "
@@ -217,11 +217,11 @@ def test_the_wheel_still_ships_no_tests_at_all(tmp_path_factory):
 # while proving nothing. These properties therefore build wheels, create a fresh virtualenv,
 # install into it, and run the extracted suite with that interpreter.
 #
-# That costs about a minute each, which is why the guard sweep deselects them — for cost.
+# That costs about a minute each, which is why the guard sweep makes them skip — for cost.
 # They do *not* contribute nothing to mutation scoring: SD-7 runs the shipped adversarial
 # suite against a distribution built from the package under test, so a mutated guard fails
 # there too. The sweep can afford to drop them only because every module the sdist ships is
-# also run directly, un-deselected, in the same sweep run — see the module-level note above
+# also run directly, un-skipped, in the same sweep run — see the module-level note above
 # and ``tests/test_property_ledger.py::PL-6``. The full suite — locally and in CI — runs
 # them.
 

@@ -55,7 +55,9 @@ Phase 5A's producer-signing payload is **frozen**, at
 not widen it, reinterpret it, or re-verify it.
 
 `ProducerAttestationV2` is a separate contract at
-`ugence.cloud-scaling/producer-attestation/v2`. Its signing payload binds, at minimum:
+`ugence.cloud-scaling/producer-attestation/v2`. Its signing payload binds exactly these
+fourteen keys — not "at least" these; the set is closed, and `tests/test_adversarial.py`
+A-58 asserts it against the payload builder itself:
 
 ```
 schema_version, signing_purpose, producer_id, issuer, producer_key_id,
@@ -351,9 +353,18 @@ attestation yields two artifacts with the same `attestation_digest`, different
 
 **Which differences that actually admits.** The rule first, because an enumeration of
 dimensions is what two revisions of this section got wrong: **the verifier reconciles exactly
-five candidate facts and reads no others**, so *any* candidate difference outside those five is
-admitted, by construction. `tests/test_adversarial.py` A-60 asserts that set over the source,
-so it cannot drift silently.
+five candidate facts and **directly reconciles no other candidate facts****. Stated as the claim it
+supports: For two independently valid objects of exact type
+`CapacityAuthorizationCandidate`, the producer-attestation layer does not independently
+compare facts outside those five when the five reconciled values remain equal.
+
+`candidate_digest` is read **after** verification succeeds, to bind the resulting artifact to
+the candidate the determination was reached against. It is neither producer-signature-covered
+nor independently reconciled: the verifier never compares it against anything.
+
+`tests/test_adversarial.py` A-59 is the load-bearing evidence — it varies real candidates
+through the genuine chain and observes the outcome. A-60 is a syntactic tripwire over the
+reconciliation section, and its coverage limits are stated with it.
 
 Measured instances, each executed against the genuine Phase 5A chain:
 
@@ -363,7 +374,7 @@ Measured instances, each executed against the genuine Phase 5A chain:
 | execution target scope (e.g. `account_id`) | **yes** | outside the reconciled five |
 | permitted magnitude bounds | **yes** | outside the reconciled five — but scope and binding must be varied *together*, since Phase 5A refuses a binding whose bounds contradict its scope |
 | `disposition` and `risk_outcome` (`RISK_PASSED`/`ALLOW` → `RISK_PASSED_WITH_CONDITIONS`/`ALLOW_WITH_CONDITIONS`) | **yes** | outside the reconciled five |
-| the risk decision itself | **yes** | outside the reconciled five |
+| the risk decision itself — a different `decision_snapshot`, so both `decision_digest` and `decision_snapshot_digest` move | **yes** | outside the reconciled five |
 | the recommendation's own magnitudes (`magnitude_after`, `requested_delta`) | **no** — `RECOMMENDATION_DIGEST_MISMATCH` | functionally determined by the recommendation, so they move `recommendation_digest`, which **is** one of the five |
 
 Two corrections are recorded here rather than quietly applied, because each was wrong in a

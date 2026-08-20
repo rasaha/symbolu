@@ -189,10 +189,20 @@ assertions the producer made.
 > subject_id, subject_type)`. Both verifications return `VERIFIED`, with the same
 > `attestation_digest` and different `candidate_digest`s.
 
-**The rule, not a list.** The verifier reconciles **exactly those five facts and reads no
-others**, so any candidate difference outside them is admitted by construction — `A-60` asserts
-that set over the source. Two earlier revisions of this section tried to enumerate the
-dimensions instead, and each got it wrong in a different direction.
+**The rule, not a list.** The verifier reconciles **exactly those five facts and directly
+reconciles no other candidate facts**. Stated as the claim it supports: for two independently
+valid objects of exact type `CapacityAuthorizationCandidate`, the producer-attestation layer
+does not independently compare facts outside those five when the five reconciled values remain
+equal. Two earlier revisions of this section tried to enumerate the dimensions instead, and
+each got it wrong in a different direction.
+
+`candidate_digest` is read **after** verification succeeds, to bind the resulting artifact to
+the candidate the determination was reached against. It is neither producer-signature-covered
+nor independently reconciled — the verifier never compares it against anything.
+
+`A-59` is the load-bearing evidence: it varies real candidates through the genuine chain and
+observes the outcome. `A-60` is a syntactic tripwire over the reconciliation section, useful
+but not a proof that no sixth fact can ever be read; its limits are stated with it.
 
 Measured instances:
 
@@ -202,7 +212,7 @@ Measured instances:
 | execution target scope | **yes** | outside the reconciled five |
 | permitted magnitude bounds | **yes** | scope and binding must vary *together* — Phase 5A refuses a binding contradicting its scope |
 | `disposition` / `risk_outcome`, within the ALLOW family | **yes** | outside the reconciled five |
-| the risk decision itself | **yes** | outside the reconciled five |
+| the risk decision itself (`decision_digest` and `decision_snapshot_digest` both move) | **yes** | outside the reconciled five |
 | the recommendation's own magnitudes | **no** — `RECOMMENDATION_DIGEST_MISMATCH` | they move `recommendation_digest`, which **is** one of the five |
 
 So the uncovered surface is the **authorization envelope built around a recommendation** —

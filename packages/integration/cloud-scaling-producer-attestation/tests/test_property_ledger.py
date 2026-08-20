@@ -175,43 +175,43 @@ def test_the_invariant_bucket_is_not_counted_as_adversarial(ledger):
 
 
 # --------------------------------------------------------------------------------------- #
-# The deselection the guard sweep applies must not shrink what the guard sweep scores
+# The skip the guard sweep applies must not shrink what the guard sweep scores
 # --------------------------------------------------------------------------------------- #
 
-#: The environment switch the sweep sets to deselect the expensive packaging properties.
-DESELECTION_SWITCH = "UGENCE_SKIP_SLOW_PACKAGING"
+#: The environment switch the sweep sets to skip the expensive packaging properties.
+SKIP_SWITCH = "UGENCE_SKIP_SLOW_PACKAGING"
 
-#: Attributes of this package a deselected module may touch in-process. All metadata: a
+#: Attributes of this package a skipped module may touch in-process. All metadata: a
 #: mutated ``if`` in ``src/`` cannot change any of them, so reading one scores no guard.
 METADATA_ONLY = frozenset({"__file__", "__version__", "__all__", "__name__", "__doc__"})
 
 
-def _deselected_modules() -> list[pathlib.Path]:
+def _skipped_modules() -> list[pathlib.Path]:
     root = pathlib.Path(__file__).resolve().parents[1]
     return sorted(
         path
         for path in root.rglob("tests/**/test_*.py")
-        if DESELECTION_SWITCH in path.read_text(encoding="utf-8")
+        if SKIP_SWITCH in path.read_text(encoding="utf-8")
     )
 
 
-def test_nothing_behind_the_sweep_deselection_scores_a_guard_the_sweep_does_not_run():
-    """PL-6: the condition that makes the guard sweep's deselection honest.
+def test_nothing_behind_the_sweep_skip_scores_a_guard_the_sweep_does_not_run():
+    """PL-6: the condition that makes the guard sweep's skip honest.
 
-    The sweep runs the whole suite once per guard, and deselects
+    The sweep runs the whole suite once per guard, and skips
     ``tests/packaging/test_sdist_payload.py`` to avoid building a distribution ninety-one
     times. That module was documented as scoring nothing — "a mutated package builds into a
     distribution exactly as an unmutated one does" — and that justification is false. SD-6 …
     SD-9 build the sdist **from the package under test** and run the shipped suite against
     it, so a mutated guard fails there as surely as it fails in the sweep's own run.
 
-    So the deselection is a **cost** decision, and it is sound for one reason only: what the
+    So the skip is a **cost** decision, and it is sound for one reason only: what the
     extracted sdist runs, the sweep already runs directly. This property asserts both halves
     of that, mechanically:
 
-    #. every ``test_*.py`` module the sdist ships is itself free of the deselection switch,
-       so the sweep runs it un-deselected — nothing the sdist would catch is dropped;
-    #. no deselected module reaches ``src/`` behaviour in-process. Its only permitted use of
+    #. every ``test_*.py`` module the sdist ships is itself free of the skip switch,
+       so the sweep runs it un-skipped — nothing the sdist would catch is dropped;
+    #. no skipped module reaches ``src/`` behaviour in-process. Its only permitted use of
        this package is metadata a mutation cannot move.
 
     Add a property behind the switch that calls the verifier, the minting routine or the
@@ -223,7 +223,7 @@ def test_nothing_behind_the_sweep_deselection_scores_a_guard_the_sweep_does_not_
 
     root = pathlib.Path(__file__).resolve().parents[1]
     # Read the shipped-payload manifest out of its own source rather than importing the
-    # module: importing a deselected module to check the deselection would be circular,
+    # module: importing a skipped module to check the skip would be circular,
     # and this property must hold whether or not that module can be imported at all.
     payload_source = (root / "tests/packaging/test_sdist_payload.py").read_text(
         encoding="utf-8"
@@ -238,27 +238,27 @@ def test_nothing_behind_the_sweep_deselection_scores_a_guard_the_sweep_does_not_
         )
     )
 
-    deselected = _deselected_modules()
-    assert deselected, (
-        f"no module carries {DESELECTION_SWITCH}; if the sweep no longer deselects "
+    skipped = _skipped_modules()
+    assert skipped, (
+        f"no module carries {SKIP_SWITCH}; if the sweep no longer skips "
         "anything, delete this property rather than letting it pass vacuously"
     )
 
-    # (1) Nothing the sdist ships is deselected.
-    deselected_relative = {str(path.relative_to(root)) for path in deselected}
+    # (1) Nothing the sdist ships is skipped.
+    skipped_relative = {str(path.relative_to(root)) for path in skipped}
     shipped_tests = {
         name for name in REQUIRED_SDIST_PAYLOAD if name.rsplit("/", 1)[-1].startswith("test_")
     }
     assert shipped_tests, "the shipped payload lists no test modules"
-    overlap = shipped_tests & deselected_relative
+    overlap = shipped_tests & skipped_relative
     assert not overlap, (
-        f"{sorted(overlap)} are shipped in the sdist AND deselected by the sweep. SD-7 "
-        "runs them against the mutated package, so deselecting them removes scoring the "
+        f"{sorted(overlap)} are shipped in the sdist AND skipped by the sweep. SD-7 "
+        "runs them against the mutated package, so skipping them removes scoring the "
         "sweep does not recover elsewhere"
     )
 
-    # (2) No deselected module exercises src/ behaviour in-process.
-    for path in deselected:
+    # (2) No skipped module exercises src/ behaviour in-process.
+    for path in skipped:
         tree = ast.parse(path.read_text(encoding="utf-8"))
         aliases = set()
         imported_names = set()
@@ -274,10 +274,10 @@ def test_nothing_behind_the_sweep_deselection_scores_a_guard_the_sweep_does_not_
 
         offending = imported_names - METADATA_ONLY
         assert not offending, (
-            f"{path.relative_to(root)} is deselected by {DESELECTION_SWITCH} and imports "
+            f"{path.relative_to(root)} is skipped by {SKIP_SWITCH} and imports "
             f"{sorted(offending)} from the package. A property behind the switch that "
             "exercises src/ behaviour is scoring the sweep silently loses — either drop "
-            "the deselection or move the property to a module the sweep runs"
+            "the skip or move the property to a module the sweep runs"
         )
         for node in ast.walk(tree):
             if (
@@ -288,6 +288,6 @@ def test_nothing_behind_the_sweep_deselection_scores_a_guard_the_sweep_does_not_
             ):
                 raise AssertionError(
                     f"{path.relative_to(root)}:{node.lineno} reads "
-                    f"{node.value.id}.{node.attr} while deselected by "
-                    f"{DESELECTION_SWITCH}; only {sorted(METADATA_ONLY)} are mutation-inert"
+                    f"{node.value.id}.{node.attr} while skipped by "
+                    f"{SKIP_SWITCH}; only {sorted(METADATA_ONLY)} are mutation-inert"
                 )

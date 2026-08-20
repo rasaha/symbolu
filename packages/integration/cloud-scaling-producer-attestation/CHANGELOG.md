@@ -108,7 +108,12 @@ digest are byte-identical, so no issued attestation is invalidated.
   signature: one genuine attestation verifies against any candidate agreeing on
   `(recommendation_id, recommendation_digest, tenant_id, subject_id, subject_type)` —
   and the rule behind that is the one to read: the verifier reconciles **exactly those five
-  facts and no others**, so any candidate difference outside them is admitted by construction.
+  facts and directly reconciles no other candidate facts** — for two independently valid
+  objects of exact type `CapacityAuthorizationCandidate`, the layer does not independently
+  compare facts outside those five when the five reconciled values remain equal.
+  `candidate_digest` is read after verification succeeds, to bind the artifact to the
+  candidate the determination was reached against; it is neither signature-covered nor
+  reconciled.
   Measured: policy binding, execution target scope, permitted magnitude bounds,
   `disposition`/`risk_outcome` within the ALLOW family, and the risk decision itself. The one
   exception is the recommendation's own magnitudes, which move `recommendation_digest` — one of

@@ -201,10 +201,10 @@ def run_suite(
     """Run the suite in the copy. Returns a scored result, honestly labelled.
 
     Not quite the *full* suite: ``UGENCE_SKIP_SLOW_PACKAGING=1`` makes the packaging module
-    skip. Stated precisely, because a previous revision of this docstring said it "deselects"
-    the module and therefore "collects fewer properties", and it does neither — the mechanism
-    is ``pytest.mark.skipif``, so collection is **identical** and only the number of properties
-    that *run* changes (26 fewer). That distinction is not pedantic here: the scorer below
+    skip. Stated precisely, because a previous revision of this docstring said it
+    "deselects" the module and therefore "collects fewer properties", and it does neither —
+    the mechanism is ``pytest.mark.skipif``, so collection is **identical** at 440 and only
+    the number of properties that *run* changes (26 fewer). That distinction is not pedantic here: the scorer below
     compares collection counts against the baseline, and it would be comparing a moving number
     if the flag changed collection.
 
@@ -227,14 +227,14 @@ def run_suite(
             # walking upward. Telling it explicitly keeps the copy out of every repo-wide
             # scan.
             "UGENCE_REPO_ROOT": str(REPO),
-            # Deselect the slow packaging-distribution properties. They build five wheels
+            # Skip the slow packaging-distribution properties. They build five wheels
             # and a virtualenv per run — minutes each, times the whole inventory.
             #
             # This is a COST decision and it is not free. SD-6..SD-9 build the sdist from
             # the package under test and run the *shipped* suite against it, so under a
             # mutation they fail exactly as the same properties fail here: they would
             # score. What makes dropping them sound is that every module the sdist ships
-            # is also run directly, un-deselected, in this same run — so the score is
+            # is also run directly, un-skipped, in this same run — so the score is
             # unchanged and only the wall-clock differs. tests/test_property_ledger.py
             # PL-6 asserts that relationship, so a property added behind this switch that
             # reaches src/ behaviour fails rather than silently shrinking the sweep.
@@ -251,9 +251,9 @@ def run_suite(
     # The package's own pyproject sets ``addopts = "-q"``, so pytest never prints a
     # "collected N items" line here. The summary line is what exists, and summing its
     # outcome counts is exactly the number of tests that were collected and then either
-    # ran or were skipped. Deselected tests are excluded deliberately: they were never
+    # ran or were skipped. Skipped tests are excluded deliberately: they were never
     # part of this run's population, and the packaging module is skipped rather than
-    # deselected, so this number is stable across mutations unless collection itself moves.
+    # skipped, so this number is stable across mutations unless collection itself moves.
     counted = {
         outcome: int(value)
         for value, outcome in re.findall(
@@ -445,7 +445,7 @@ def _baseline_run() -> dict:
     This happened. The packaging-distribution properties invoke ``python -m build``, the
     sweep job installs pytest but not ``build``, and one property therefore errored on all
     91 runs — converting two genuine survivors into kills and appearing in every guard's
-    attribution list. The module is now deselected in sweep runs; this check is what makes
+    attribution list. The module is now skipped in sweep runs; this check is what makes
     the next instance of the same class impossible to publish.
     """
 
@@ -575,7 +575,8 @@ def write_report(results) -> None:
         "package; the tracked worktree is never mutated, and the sweep refuses to report if",
         "the content hash of every shipped source file differs before and after. A run is",
         "scored **only** if it",
-        "collected and ran the full suite — a collection error, a syntax error, an import",
+        "collected the full 440-test suite while intentionally skipping 26 packaging",
+        "properties during mutation runs — a collection error, a syntax error, an import",
         "error or a timeout is not a valid kill.",
         "",
         "**Baseline precondition.** Before any mutation, the sweep runs the suite *unmutated*",
@@ -595,7 +596,7 @@ def write_report(results) -> None:
         "kills. This precondition is what stops the next instance of that class from being",
         "published as a result.",
         "",
-        "**Why the packaging module is deselected, stated accurately.** For **cost**, and",
+        "**Why the packaging module is skipped, stated accurately.** For **cost**, and",
         "not because it scores nothing. An earlier revision of this document and of the",
         "module's own comment claimed \"nothing there can score a guard in `src/`: a mutated",
         "package builds into a distribution exactly as an unmutated one does\". That is true",
@@ -603,7 +604,7 @@ def write_report(results) -> None:
         "under test* and run the shipped suite against it — under a mutation the shipped",
         "adversarial properties fail there exactly as they fail here, so SD-7 would score.",
         "Dropping them is sound for a different reason, and a checkable one: **every module",
-        "the sdist ships is also run directly, un-deselected, in this same sweep run**, so",
+        "the sdist ships is also run directly, un-skipped, in this same sweep run**, so",
         "the score is identical and only the wall-clock differs.",
         "`tests/test_property_ledger.py::PL-6` asserts that relationship in both directions,",
         "so a property added behind the switch that reaches `src/` behaviour the sweep does",

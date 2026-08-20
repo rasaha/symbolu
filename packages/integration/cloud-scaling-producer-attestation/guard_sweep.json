@@ -606,7 +606,7 @@
   {
     "index": 48,
     "module": "verified.py",
-    "lineno": 230,
+    "lineno": 238,
     "condition": "self.construction_token is not _VERIFICATION_TOKEN",
     "scored": true,
     "killed": true,
@@ -622,7 +622,7 @@
   {
     "index": 49,
     "module": "verified.py",
-    "lineno": 237,
+    "lineno": 245,
     "condition": "self.verification_profile != VERIFICATION_PROFILE",
     "scored": true,
     "killed": true,
@@ -634,7 +634,7 @@
   {
     "index": 50,
     "module": "verified.py",
-    "lineno": 241,
+    "lineno": 249,
     "condition": "self.verification_profile_version != VERIFICATION_PROFILE_VERSION",
     "scored": true,
     "killed": true,
@@ -646,7 +646,7 @@
   {
     "index": 51,
     "module": "verified.py",
-    "lineno": 256,
+    "lineno": 264,
     "condition": "self.artifact_digest != expected",
     "scored": true,
     "killed": false,
@@ -656,7 +656,7 @@
   {
     "index": 52,
     "module": "verified.py",
-    "lineno": 354,
+    "lineno": 362,
     "condition": "type(value) is not VerifiedProducerAttestation",
     "scored": true,
     "killed": true,
@@ -668,7 +668,7 @@
   {
     "index": 53,
     "module": "verified.py",
-    "lineno": 368,
+    "lineno": 376,
     "condition": "value.construction_token is not _VERIFICATION_TOKEN",
     "scored": true,
     "killed": true,
@@ -682,7 +682,7 @@
   {
     "index": 54,
     "module": "verified.py",
-    "lineno": 373,
+    "lineno": 381,
     "condition": "value.artifact_digest not in _MINTED_DIGESTS",
     "scored": true,
     "killed": true,
@@ -695,7 +695,7 @@
   {
     "index": 55,
     "module": "verified.py",
-    "lineno": 380,
+    "lineno": 388,
     "condition": "value.artifact_digest != value.digest()",
     "scored": true,
     "killed": true,
