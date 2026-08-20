@@ -20,8 +20,10 @@ For substantial architecture work, normally proceed:
 audit → owner ratification → implementation.
 
 Do not produce an implementation prompt while material owner decisions remain.
-When useful, end with the next recommended step and a pasteable prompt. Do not
-add this mechanically when the task is complete.
+End with the next recommended step and a prompt that can be pasted as-is,
+restating it in full rather than referring back to one given earlier in the
+session. Omit the block only when the work is genuinely finished and there is
+no next step; do not append one mechanically to a completed task.
 
 ## Evidence and maturity
 
