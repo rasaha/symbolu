@@ -1410,12 +1410,34 @@ a repository artifact, and is not authority here.
 **Gating.** BR-2A is ratified and implemented. BR-2B may follow with **no
 verifier, no store and no clock**: it is non-authoritative *by construction*, not
 by an injected default, so nothing at that phase depends on a deny-all default
-holding. BR-2C is blocked on **audited cryptographic engineering** — a secure
+holding.
+
+BR-2C is blocked on **audited cryptographic engineering *and* unratified
+governance** — both, not one. The engineering half is unchanged: a secure
 verifier and a composition-root trust-resolver design, specified and
 independently audited, reusing neither the Policy Authority nor the Risk
-Authority Ed25519 implementation. That blocker is engineering, not governance:
-**no owner decision is outstanding for it.** BR-2D awaits DD-10 and BR-2C.
-BR-2E awaits BR-2D.
+Authority Ed25519 implementation. The governance half is that **BR-2C cannot be
+built as ratified without amending a ratified contract surface.** This row
+requires a verified result to bind *exact artifact digest, role, key, profile and
+anchor revision*; the frozen verifier port returns a bare `bool`
+(`packages/benchmark-registry-authority/src/ugence_benchmark_registry_authority/contracts/ports.py:177-185`),
+and the entitlement port returns a bare `bool` alongside it (`:154-158`), so a
+verified result has nowhere to carry role, key, profile or anchor revision. That
+is the same shape as the BR-2D contract change **D-22** ratified deliberately
+rather than leaving to implementation pressure (§35.8), and it is recorded here
+for the same reason. A second owner action is outstanding **on the register's own
+terms**: D-21 rules that naming a distinct reviewer stays an *open owner action
+for any later subphase that ships a capability*, and BR-2C is the first subphase
+that ships one — so "independently audited" in this paragraph names an
+unresolved governance question, not a settled process.
+
+The previous text of this paragraph — *"That blocker is engineering, not
+governance: no owner decision is outstanding for it"* — is **withdrawn**. It was
+explanatory prose, was never ratified in §35.2, and is contradicted by the
+contract evidence recorded in §35.8 and by D-21. **D-23 ratifies the
+classification and nothing else**: the five substantive questions are stated in
+§35.9 and every one of them is **OPEN**. BR-2D awaits DD-10 and BR-2C. BR-2E
+awaits BR-2D.
 
 ### 35.2 Decision register — final dispositions
 
@@ -1443,6 +1465,7 @@ BR-2E awaits BR-2D.
 | **D-20** | What boundary claim does BR-2B actually make, and how is it enforced? | **RATIFIED 2026-08-20.** The universal claim — *no callable anywhere under `src/` accepts a `BenchmarkTransitionPlan`* — is **withdrawn as unprovable and is not to be re-attempted**. Python permits closures, callables held in containers, dynamic attributes, `exec`, `type()`, `__getattr__`, `functools.partial` and runtime rebinding, so no enumeration decides it; three closure audits found seven bypasses, each on the seam between what a design counted as discoverable and what Python allows. The last design, a frozen inventory of every reachable callable, additionally failed against its own adversary: a contributor who can modify production source can regenerate the inventory in the same commit. **The enforceable claim is capability absence**, in four decidable parts: (1) no exported callable and no declared Protocol port method accepts a transition plan, by resolved type identity, with full annotation of that surface required so the check cannot be vacuous; (2) no authority-issued result type exists; (3) no store, verifier, clock, append or apply operation, composition root or prohibited dependency exists; (4) planning returns only a structural plan or a typed refusal. **Private-source expansion is a governance matter, not a gate**: it is covered by `.github/CODEOWNERS` plus branch protection requiring an approving review from someone other than the author, and it is inert without capability — a private plan consumer computes a value and has no store, clock, authority result or effectful operation to spend it on. **CODEOWNERS alone is not enforcement**, and a single owner approving their own change is not an independent review; naming a distinct reviewer is an open owner action. |
 | **D-21** | Has BR-2B's capability-absence claim been independently audited, and what constitutes independent review in a solo-maintainer model? | **RATIFIED 2026-08-20.** An independent technical closure audit of BR-2B was performed at commit `dfd6aa5e` against D-20's four-part capability-absence claim and found **no shipped capability able to perform an authoritative or effectful operation**. Specifically: **no class satisfies any of the four ports** structurally, including partial method coverage and subclasses; **no code path appends, applies, admits, registers, revokes or resolves**; there is **no clock read, filesystem access, socket, subprocess or cryptographic verification**, with `hashlib` confined to canonical digesting; there are **no caches, memoized results or singletons**, and the prohibition on memoizing a verification result **holds regardless of return width** — a bare `bool` is the worst case, not an exemption, because a cached answer is indistinguishable from a fresh one; the **three reserved authority-issued names bind to nothing** under any binding form and resolve to nothing at runtime; and injecting a permissive always-true verifier, a working clock and a working store, monkey-patching all four ports, subclassing shipped contracts and handing a transition plan into every position of all 102 exported callables — **148,070 calls under an audit hook** — **invoked no injected port** and produced no filesystem, network, subprocess or `exec` effect. One non-effectful finding is recorded rather than omitted: `BENCHMARK_SIGNING_FRAME_SPECIFICATION` (`contracts/envelopes.py:164`) is an exported module-level **mutable** dict; tampering with it changes no digest and no behaviour, and **no code path reads it**. The wheel and sdist ship only the **21 `src/` modules with no entry points**, so the probes, verifiers and mutation harnesses are not part of the shipped surface. **On governance:** independent GitHub approval is unavailable in a solo-maintainer model where the sole maintainer is the author, so the independent check for BR-2B is **this technical audit rather than a second approving reviewer**. Branch protection and CODEOWNERS remain **routing, not enforcement**, and naming a distinct reviewer stays an **open owner action** for any later subphase that ships a capability. |
 | **D-22** | What production persistence and concurrency posture does BR-2D build, and is HSM/KMS the same decision? | **RATIFIED 2026-08-20**, closing **DD-10a** and separating **DD-10b** (§31). Five rulings. **(1) DD-10 is split.** DD-10a is decidable from repository evidence and gates BR-2D; DD-10b has no seam to attach to, since BR-2 declares four ports and no signer and registry-event signing arrives at BR-2D. **(2) Posture B — single-node durable persistence on stdlib `sqlite3`.** It is the only posture satisfying BR-2D's §35.1 row without a new dependency, without Postgres and without reusing Risk Authority persistence — which forecloses nothing in any case, because `risk_authority/persistence/postgres.py` is a 67-line placeholder whose five factory methods all raise `PostgresNotConfiguredError`, with no driver and an empty dependency list. Posture A (reference-grade only) is rejected: it leaves BR-2E's ratified "migrations, backup/recovery" with nothing to operate on. Posture C (distributed) is rejected as disproportionate. **(3) The consistency descriptor is a contract change, ratified now rather than discovered during implementation.** `durability`, `multi_process_coordination` and `cross_process_atomic_revocation` move from `EXPLICITLY_DISCLAIMED` to claimed within the declared scope; `distributed_strong_consistency` and `eventual_consistency_safety` **stay disclaimed**. Note that the guarantee properties are **hard-coded, not derived from the scope enum** despite the docstring's wording, so adding a scope member alone changes no answer: **both** a new `BenchmarkRegistryConsistencyScope` member **and** rewritten property bodies are required. **(4) BR-2 re-implements the durable-audit pattern; it does not import it.** `packages/capabilities/storygraph/.../durable_audit.py` is the one working durable store in this monorepo — SQLite, append-only, hash-linked, tenant-partitioned, schema-versioned, WAL, recoverable — and `ugence_storygraph` is on BR-2's forbidden-import list; §23 restricts BR-2 to `governance-contracts` only. The **shape** is copied, never the code, and §23 stands unamended. **(5) Divergence from Policy Authority §15.7 is accepted.** DD-10 was recorded as mirroring §15.7, but PA has shipped only `InMemoryPolicyRegistry` behind a `threading.RLock` (`core/registry.py:92`) and its §15.7 remains deferred. BR-2 goes first; PA is not bound by this ruling and BR-2D is not held for it. |
+| **D-23** | Is BR-2C's blocker engineering only, as §35.1 previously stated? | **RATIFIED 2026-08-20 — CLASSIFICATION ONLY.** No. BR-2C is blocked by **unresolved governance blockers and unresolved engineering blockers**, and the prior §35.1 sentence asserting that no owner decision is outstanding is withdrawn. Two independent grounds: the §35.1 BR-2C row requires a verified result to bind digest, role, key, profile and anchor revision while the ratified ports return `bool` (§35.8), which is a contract change of exactly the kind D-22 ruled must be ratified deliberately; and D-21 leaves naming a distinct reviewer an **open owner action for any later subphase that ships a capability**, which BR-2C is the first to do. **This ruling decides the classification and no substantive question.** The five questions in §35.9 are recorded as **OPEN**; none is ratified, narrowed, ranked or recommended here, and none may be treated as settled by inference from this row. Nothing outside this ADR is amended: no port, no refusal vocabulary, no test, no `CODEOWNERS` entry and no package file changes under this decision. |
 
 ### 35.3 BR-1 freeze guarantees
 
@@ -1580,10 +1603,129 @@ member, because the guarantee answers are hard-coded rather than derived from
 the scope despite the descriptor docstring's wording.
 
 
+**The BR-2C row already implies a contract change; §35.9 opens it and D-23
+declines to rule it.** §35.1 commits BR-2C to a verified result binding "exact
+artifact digest, role, key, profile and anchor revision", to
+"publisher/approver/revoker anchor resolution", and to "key rotation and
+revocation". The ratified contract answers each of those with a Boolean or with
+nothing at all. `BenchmarkApprovalVerifierPort.verify_publisher_submission` and
+`.verify_approval` both return `bool`
+(`packages/benchmark-registry-authority/src/ugence_benchmark_registry_authority/contracts/ports.py:177-185`),
+and `BenchmarkPublisherTrustDirectoryPort.is_entitled` returns `bool` (`:154-158`),
+so a verified result has nowhere to carry role, key, profile or anchor revision.
+There is **no revoker verification method on any port**, though
+`BenchmarkRevocationEnvelope` (`contracts/envelopes.py:488-524`) declares
+`revoker_identity` and `revoker_key_id`, D-12 requires revocation assertions to
+carry revoker signatures, and §17's role table (`:431`) and rule 10 (`:735`)
+require the revoking authority to be entitled for the exact benchmark scope with
+the publisher never substituted for it — while D-02's four-party separation names
+no revoker at all and `is_entitled` is **publisher-scoped in its own signature**.
+And the refusal vocabulary cannot separate two conditions D-03 names separately:
+an **unknown key** and a **revoked key** both land on `PUBLISHER_UNTRUSTED`
+(`contracts/reasons.py:157`) or `SIGNATURE_INVALID` (`:162`).
+`NO_TRUST_ANCHOR_CONFIGURED` (`:153`) covers D-04's startup-time absent resolver,
+not a trust directory that becomes unreachable in flight; that falls to
+`INDETERMINATE` (`:188`), which **refuses**, so this one is not a safety gap —
+but it is also not the ruling `STORE_UNAVAILABLE` (`:145`) makes for the store,
+which forbids falling back to a cached or default answer, and D-21 records that
+the prohibition on memoizing a verification result **holds regardless of return
+width**. Those statements cannot all hold at once, so the contract was always
+going to move the moment BR-2C was built as ratified — precisely the situation
+D-22 met for BR-2D.
+
+**The difference from D-22 is deliberate.** DD-10a was decidable from repository
+evidence, so D-22 ruled it. BR-2C's questions are not: each allocates authority,
+decides what a relying party may learn, or moves a pinned surface, and the
+repository settles none of them. §35.9 therefore states them as **OPEN owner
+questions** and D-23 ratifies only the classification. Whichever way they are
+ruled, the moves are surface-affecting and must be re-pinned rather than
+discovered: BR-2's refusal enum is pinned at seventeen members and the composite
+vocabulary at thirty-four
+(`packages/benchmark-registry-authority/tests/contract/test_refusal_vocabulary.py:137-138`),
+the ports are curated under D-18's single `api.__all__`, and every assertion site
+D-18 enumerates moves with the version bump. **No BR-2A source, test, manifest or
+`CODEOWNERS` entry is changed by this amendment**; the port, vocabulary and
+reviewer changes belong to the subphase and the ruling that ships them.
+
 **Distribution text not corrected here.** Seventy-seven statements in
 `packages/benchmark-registry-authority` assert the four-phase subdivision, 30 of
 them inside `src/` and therefore shipped in both the wheel and the sdist. They
 are corrected **with BR-2B**, so the text is corrected once rather than twice.
+
+### 35.9 BR-2C — outstanding owner questions (all OPEN)
+
+**Status: OPEN.** None of the five below is ratified, narrowed, ranked or
+recommended. D-23 rules the classification only. Each enters §35.2 as its own
+decision when — and only when — the owner rules it; until then a BR-2C
+implementation that answers any of them by choosing a signature has taken an
+unratified owner decision.
+
+**Q-2C-1 — What does a verified result return, and does the BR-2A verifier port
+change shape? (OPEN)**
+*Options.* (a) Widen both port methods to return a frozen verified-result type
+binding digest, role, key, profile and anchor revision. (b) Keep `bool` on the
+port and carry the binding on a separate BR-2C-owned result type outside the
+port. (c) Narrow §35.1's BR-2C row to require a smaller binding.
+*Consequences.* (a) amends a ratified BR-2A surface and re-pins every D-18
+assertion site. (b) leaves the ratified binding inexpressible at the seam the
+composition root injects, so the audited verifier's answer reaches callers
+through a path no decision covers. (c) reduces what BR-2D can rely on at the
+moment it first becomes authoritative.
+
+**Q-2C-2 — Is the publisher trust directory a Boolean predicate or an
+anchor-resolution seam? (OPEN)**
+*Options.* (a) `is_entitled -> bool` stands; anchor identity and revision are
+resolved inside the verifier. (b) The directory returns the resolved anchor
+identity and revision.
+*Consequences.* (a) keeps the port minimal but means no registry-side seam can
+name **which** anchor answered, so an anchor revision cannot be bound into a
+result or an audit trail. (b) enlarges a ratified port and requires D-04's
+"no second hidden trust store inside the registry" constraint to be restated
+against a richer return, since a resolved-anchor type is the shape a hidden
+store would also have.
+
+**Q-2C-3 — Where is revoker entitlement verified, and does one anchor set serve
+three roles? (OPEN)**
+*Context.* D-02 allocates four parties and does not name the revoker; §17 (`:431`,
+`:735`) requires the revoking authority to be entitled for the exact benchmark
+scope and forbids substituting the publisher's identity.
+*Options.* (a) A third port method plus role-scoped directory lookups. (b) One
+role-parameterised verification method over a single anchor set. (c) Revoker
+verification deferred to BR-2D, arriving with revocation itself.
+*Consequences.* (a) makes the three roles separately entitled and separately
+auditable, at the cost of a wider port. (b) permits one anchor set to satisfy
+publisher, approver and revoker, which is an authority-allocation ruling, not a
+signature choice. (c) leaves BR-2C shipping "revoker anchor resolution" per
+§35.1 with no seam that verifies a revoker, and moves a trust decision into the
+phase that first asserts an event occurred.
+
+**Q-2C-4 — May a refusal distinguish a revoked key from an unknown key? (OPEN)**
+*Context.* D-03 names both conditions separately; the vocabulary collapses them
+today. §17.6 and §27.2 already rule the opposite way for reads, collapsing a
+genuine miss and a cross-tenant denial into one `NOT_FOUND`.
+*Options.* (a) Distinguish them with new refusal members. (b) Keep them
+collapsed, by the §17.6 precedent.
+*Consequences.* (a) tells an operator whether a rotation failed or an impostor
+signed, and tells an unauthenticated submitter the state of a key — an
+enumeration oracle over key status. (b) preserves non-disclosure and leaves the
+operator unable to separate the two. Either ruling that adds a member moves the
+pinned seventeen/thirty-four counts and their assertion sites.
+
+**Q-2C-5 — What is the trust directory's runtime availability and staleness
+posture? (OPEN)**
+*Context.* D-04's seventh constraint covers a resolver **absent at startup**, not
+one that becomes unreachable in flight; that condition currently refuses through
+`INDETERMINATE`, so it fails closed and no member is required for safety.
+*Options.* (a) Extend `STORE_UNAVAILABLE`'s no-cache-no-default rule to anchors,
+with its own typed outcome. (b) Leave `INDETERMINATE` carrying it and rule
+nothing anchor-specific. (c) Permit bounded reliance on a last-known anchor set
+while the directory is unreachable.
+*Consequences.* (a) adds a member and moves the pinned counts, and states the
+caching prohibition where a verifier can read it. (b) is safe and silent: the
+caching question stays unruled, so an implementation may answer it by default.
+(c) reintroduces a cached trust answer, which D-21 records as indistinguishable
+from a fresh one, and is the only option under which an unreachable directory can
+be survived rather than refused.
 
 ---
 
