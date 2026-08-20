@@ -83,6 +83,7 @@ from .outcomes import (
     ProducerAuthenticityOutcome,
 )
 from .signing import (
+    REFERENCE_GRADE_SIGNERS,
     ProducerAttestationSignerPort,
     ProducerAttestationSigningInput,
     ReferenceEd25519ProducerAttestationSigner,
@@ -153,6 +154,7 @@ __all__ = [
     "anchor_lifecycle_outcome",
     "require_production_resolver",
     "REFERENCE_GRADE_RESOLVERS",
+    "REFERENCE_GRADE_SIGNERS",
     # --- the authoritative verification routine ---
     "ProducerAttestationVerifier",
     "ProducerSignatureVerifierPort",
