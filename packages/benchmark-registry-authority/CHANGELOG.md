@@ -128,129 +128,123 @@ AST scan reads, and the alias set is gathered from every one of them.
   The sweep gained explicit support for gates outside `contracts/`, since a
   sweep confined to `contracts/` could not have planted F.
 
-### Third closure-audit remediation: the boundary became a closed set
+### Owner ruling: the universal callable claim is withdrawn
 
-The third audit found four more bypasses — a dunder-named lambda consuming a
-plan, a class whose `__module__` was reassigned to `"builtins"`, a base class
-given the same treatment so a derived method looked generated, and a reserved
-authority name bound by `NewType` rather than `class`, beside a callable
-fabricating a registry event without being named `plan_` anything.
+A third audit found four more bypasses — a dunder-named plan-consuming lambda,
+a class whose `__module__` was reassigned to `"builtins"`, a base class given
+the same treatment so a derived method looked generated, and a reserved
+authority name bound by `NewType` rather than `class`.
 
-That is seven defects across three audits, **none of them in the boundary** and
-every one of them in a rule asserting it. Each was a *classification* failure,
-and each fix added machinery whose exemptions became the next attack. That is
-what proving a negative over an open-ended surface costs: the rule must
-anticipate every spelling, and the attacker needs one it did not.
+That made **seven defects across three audits, none of them in the boundary**
+and every one in a rule asserting it. The delivering session's answer was a
+frozen 2207-entry inventory of every callable reachable under `src/`, compared
+for exact equality. **The owner ruled that design out on 2026-08-20 (ADR §35
+D-20), and the claim behind it with it.**
 
-So the property was inverted rather than patched again.
+The claim was never provable. Python permits closures, callables held in
+containers, dynamic attributes, `exec`, `type()`, `__getattr__`,
+`functools.partial` and runtime rebinding; every design only changed *what
+counted as discoverable*, which is why each fix produced the next bypass. The
+inventory additionally failed against its own adversary: a contributor who can
+modify production source can regenerate the inventory in the same commit, and
+a 2207-entry JSON diff dominated by stdlib imports and synthesized methods is
+not something a reviewer reads closely. It was also Python-version-dependent —
+it failed on 3.10, 3.12 and 3.13, three of the four versions this distribution
+declares.
 
-- **`public_callable_inventory.json`** freezes every callable reachable under
-  `src/` — 2207 of them — with the classes its parameter and return
-  annotations resolve to. `test_the_live_callable_set_equals_the_frozen_inventory_exactly`
-  asserts the live set equals the frozen set: an unlisted callable fails
-  whatever it is called, however it was compiled and wherever it was bound, and
-  a listed one whose resolved signature moved fails too.
-- **The exemptions were deleted, not repaired.** `_is_generated`, the
-  attribute-dunder exemption and the `_defined_here` ownership test are gone.
-  Imported stdlib functions, `@dataclass`-synthesized `__eq__`,
-  `EnumType`-copied `_generate_next_value_` and `typing.Protocol`'s injected
-  `__init__` are **entries, not exclusions**. That ties the file to the
-  interpreter version by design: "the set of callables reachable here changed"
-  is exactly what this must notice.
-- **Labels come from the module being walked and the attribute path**, never
-  from a callable's own `__module__` or `__qualname__`. Both are writable, and
-  the audit wrote to them. Where a thing is bound is a fact about this package;
-  what it claims about itself is not.
-- **The return check no longer scopes to `plan_*`.** That narrowing was itself
-  the finding. It now reads every inventoried callable against
-  `PERMITTED_PAYLOAD_RETURNS` — twelve labels naming BR-2A's two exact-type
-  validators and the store port across the four modules that re-export them —
-  and a companion test fails if any of the twelve stops existing, so a stale
-  exception cannot go unnoticed.
-- **The reserved-name check binds on any binding form**: `class`, `def`,
-  assignment, `import`/`from ... import ... as`, `global`/`nonlocal`,
-  `except ... as` and match captures, across every module under `src/`, plus a
-  runtime attribute check. `NewType` is a call bound by assignment, which the
-  class-definition-only version never saw.
-- **The annotation requirement returns without exemptions.** Its previous form
-  asked runtime callables where they came from and carried exemptions for
-  `EnumType`, the dataclass method set and `Protocol`. It now reads the source
-  files under `src/` and checks the parameters written *in them* — a stdlib
-  function imported into a module was not written here, so there is nothing to
-  classify. Lambdas are refused outright: a lambda cannot annotate anything, and
-  the audit's first plant was one.
-- **G-60 to G-65** plant all four replanted attacks plus an unannotated
-  parameter and a lambda in shipped source. All six are killed. The annotation
-  property was additionally proven non-vacuous *against a regenerated
-  inventory*: with the plant inventoried, set-equality passes and
-  `test_every_parameter_written_under_src_is_annotated_and_no_lambda_exists` is
-  the only failure — the residual the closed set alone cannot catch.
+**Removed:** `public_callable_inventory.json`, `tools/generate_callable_inventory.py`,
+the five tests that compared against it, and mutation gates G-57, G-58, G-60,
+G-61 and G-62, which planted plan consumers in *private* source and asserted
+the package could discover them. The removals are recorded in
+`gate_mutation_sweep.py` beside the gates that remain, not dropped silently.
 
-Nine boundary tests were deleted with the machinery they exercised and eight
-positive ones added, so the suite falls by one test. Nothing the deleted tests
-asserted is unasserted: plan consumption and payload return are now read off a
-closed list, and the annotation and reserved-name properties are checked over
-source text.
+**The enforceable claim, in four decidable parts.** BR-2B asserts:
+
+1. **No exported callable and no declared Protocol port method accepts a
+   transition plan** — 22 callables, by resolved type identity through
+   `typing.get_type_hints` with every `Union`, `Optional` and generic walked to
+   its leaves, so an alias or a nested plan is as visible as a bare one. That
+   surface must be fully annotated, or the check would pass vacuously on an
+   unannotated parameter, and its size is pinned so it cannot shrink quietly.
+2. **No authority-issued result type exists** — the reserved names bind to
+   nothing, under any binding form, anywhere under `src/`.
+3. **No store, verifier, clock, append or apply operation, composition root or
+   prohibited dependency exists** — the capability, dependency and clock gates,
+   unchanged.
+4. **Planning returns only a structural plan or a typed refusal.**
+
+**Why that is enough.** A private helper taking a plan computes a value and can
+do nothing with it: there is no store to append to, no clock to read, no
+authority-issued result to return and no effectful operation to call. That is
+what "non-authoritative by construction" means, and it survives the introduction
+of a private helper or a verifier — which the universal claim was never needed
+to prevent.
+
+**Private-source expansion is governed, not gated.** `.github/CODEOWNERS` now
+covers this package's source, its manifests, its boundary tests, its probe and
+mutation harnesses, its distribution verifiers, the frozen BR-1 layer and the
+ADR. **CODEOWNERS is not enforcement** — it routes review requests. It becomes a
+control only with branch protection requiring a pull request, review from code
+owners, and an approval from someone other than the author. **A single owner
+approving their own change is not an independent review**; naming a distinct
+reviewer is an open owner action, recorded in the file itself.
+
+**Python versions.** `requires-python = ">=3.10"` declares four interpreters and
+CI now runs the suite on all four. Two test-harness defects blocked 3.10 and were
+fixed: the metaclass forgery in `tests/_hostile.py` and in probe Q-14 let
+`@dataclass` synthesize `__doc__`, and CPython 3.10 builds a missing `__doc__`
+from `str(inspect.signature(cls))`, which raises on a class whose metaclass
+forges `__eq__`. Supplying `__doc__` avoids the call and changes nothing about
+the forgery. **Open item, BR-1:** the frozen layer declares the same range but
+its dependency-boundary test imports `tomllib` (3.11+), so BR-1's suite cannot
+run on 3.10. Its shipped source is unaffected — 592 of 593 tests and all 57
+probes pass there. Resolving it is a BR-1 decision; BR-2 changes no BR-1 file.
 
 ### Verification performed for this release
 
-Measured, not asserted. Every number below came from a run against this tree,
-after purging every `__pycache__` and `*.pyc`, with `PYTHONDONTWRITEBYTECODE=1`
-and `pytest -p no:cacheprovider`.
+Measured, not asserted. Every number came from a run against this tree, after
+purging every `__pycache__` and `*.pyc`, with `PYTHONDONTWRITEBYTECODE=1` and
+`pytest -p no:cacheprovider`.
 
-- **Suite** 1733 tests, 472 distinct properties (440 adversarial : 32 happy,
-  13.75:1). Movement from 1734/473 is **−1**, entirely in
-  `test_milestone_boundary.py`: nine tests were deleted with the exemption
-  machinery they exercised and eight added over the closed inventory and the
-  source-text scans. Net −1 test function, net −1 collected test.
-- **Frozen callable inventory** 2207 entries, regenerated from this tree and
-  byte-compared by the suite. New artifact this round; there is no prior figure
-  to move from.
-- **Independent probes** 65/65 against the source tree and 65/65 again from
-  inside the installed wheel. Unchanged from the previous round — Q-62 and Q-64
-  already resolved types independently of the suite's helper, and the closed-set
-  work did not add a probe.
-- **Mutation sweep** 65 gates inventoried, 60 killed, 5 survived, 0 errored.
-  Movement from 59/54 is **+6, all killed**: G-60 to G-63 plant the third
-  audit's four attacks in shipped source, and G-64 and G-65 plant an unannotated
-  parameter and a lambda. Every restore is proven byte-identical to the
-  proven-green baseline before mutating, and every mutant is proven loaded — by
-  the import system, not the filesystem — before a KILL or SURVIVE is accepted.
-- **Offline distribution verifier** PASSED, 41 checks. Both wheels are built in
-  the host environment; the isolated environment only ever *installs* a wheel,
-  never builds source. A fresh venv without system site packages, with
-  `--no-index`, `PIP_NO_INDEX=1`, an emptied `PYTHONPATH` and
-  `PYTHONNOUSERSITE=1`, resolving only from a wheelhouse holding exactly the
-  BR-2B wheel and the permitted BR-1 wheel. Source/wheel/sdist/installed-runtime
-  parity holds on all four manifests, all 18 pinned vectors and both counts.
-- **Negative controls** 8/8 caught: a smuggled test file, a smuggled conftest
-  and probe harness, an extra declared dependency, an injected distribution, a
-  moved pinned digest, monorepo source shadowing the installed wheel, a leaked
-  `PYTHONPATH`, and installing with the one dependency unavailable.
-- **BR-1 freeze matrix** VERIFIED, with BR-1's own suite (593 tests) and probes
-  (57) run unmodified. No BR-1 file is touched by this release.
-- **`pyflakes`** clean over both packages. It was absent from an earlier
-  container, which made a local "green" narrower than CI's; it is now run here.
-- **Public surface unmoved.** `api.__all__` 93, `public_api.json` 92 symbols,
-  18 pinned canonical vectors, 18 root-canonicalizable digest domains (plus the
-  3 nested-admissible-only BR-1 classes, which own no BR-2 domain), 18 public
-  data contracts and 74 other public symbols. No figure in this round widened
-  the surface; the callable inventory is a test artifact over what is already
-  reachable, not an export.
+- **Suite** 1731 tests on **each of Python 3.10, 3.11, 3.12 and 3.13**. 470
+  distinct properties, 438 adversarial : 32 happy, 13.69:1. Movement from
+  1733/472 is **−2**: eight inventory-dependent tests removed, six narrowed-claim
+  tests added.
+- **Independent probes** 65/65 on each of the four interpreters, and 65/65 again
+  from inside the installed wheel. Q-62 was rewritten from the withdrawn
+  universal claim to the exported-plus-port surface, and now walks **both**
+  curated surfaces rather than trusting the gate that pins them equal. It was
+  proven non-vacuous against a planted exported plan consumer, and its assertion
+  order was corrected so an offender is reported as an offender rather than as a
+  surface-size change.
+- **Mutation sweep** 60 inventoried, 55 killed, 5 survived, 0 errored. Movement
+  from 65/60 is **−5**, all of them gates asserting the withdrawn claim. G-54 and
+  G-55 were re-aimed from private helpers at the exported surface, G-59 from a
+  `contracts/`-scope bypass at a declared port method; each is killed by the
+  named narrowed-claim test, not by an import failure.
+- **Offline distribution verifier** PASSED, 41 checks, 8/8 negative controls.
+  Wheels built in the host environment; the isolated environment only ever
+  installs a wheel — fresh venv, no system site packages, `--no-index`,
+  `PIP_NO_INDEX=1`, emptied `PYTHONPATH`, `PYTHONNOUSERSITE=1`, wheelhouse of
+  exactly two wheels.
+- **BR-1 freeze matrix** VERIFIED; BR-1 suite 593 and probes 57 on 3.11, probes
+  57 on all four. No BR-1 file is touched.
+- **`pyflakes`** clean over both packages.
+- **Public surface unmoved**: `api.__all__` 93, `public_api.json` 92, 18 pinned
+  vectors, 18 root-canonicalizable domains, 18 public data contracts.
 
-The five survivors are unchanged from BR-2A and none is a gap: **G-12** is
-shadowed by G-11 (identical bytes necessarily hash identically, so killing it in
-isolation would need a hash collision); **G-28**, **G-29** and **G-30** are the
-encoder's float, NFC and aware-datetime branches, each shadowed by construction-
-time validation and by graph revalidation (G-17), so the encoder's own branch is
-never the first refusal; **G-43** is equivalent while BR-1 is frozen, and the
-BR-1 freeze matrix is the independent gate that would catch that drift.
+The five mutation survivors are unchanged and none is a gap: **G-12** is shadowed
+by G-11 (identical bytes necessarily hash identically); **G-28**, **G-29** and
+**G-30** are the encoder's float, NFC and aware-datetime branches, each shadowed
+by construction-time validation and graph revalidation (G-17); **G-43** is
+equivalent while BR-1 is frozen, and the freeze matrix would catch that drift.
 
-**Not claimed.** This release has had no independent closure audit of the
-closed-inventory work. The three completed audits were of the *previous*
-designs, and every defect they found is remediated above; the delivering session
-wrote, ran and reported everything in this section, and an author-owned test,
-probe or mutation run is not an audit.
+**Not claimed.** The narrowed design has had no independent audit. Three audits
+examined the *previous* designs, and what they found is why the claim was
+narrowed rather than patched again. The delivering session wrote, ran and
+reported everything above, and an author-owned test, probe or mutation run is not
+an audit. **Nor is the governance control live**: CODEOWNERS ships in this
+change, branch protection and an independent reviewer do not.
 
 ## [0.1.0] — BR-2A: registry and exact-resolution contracts
 

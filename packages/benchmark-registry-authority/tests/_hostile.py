@@ -119,6 +119,14 @@ def metaclass_forged(genuine, tag="metaclass_forged"):
         },
         "__post_init__": __post_init__,
         "__module__": target.__module__,
+        # Supplied so ``@dataclass`` does not synthesize one. On CPython 3.10
+        # ``dataclasses._process_class`` builds a missing ``__doc__`` from
+        # ``str(inspect.signature(cls))``, and ``inspect`` takes a wrong branch
+        # on a class whose metaclass forges ``__eq__`` — raising ValueError
+        # before the forgery is ever handed to the code under test. That is a
+        # limitation of the forgery builder on one interpreter, not of the
+        # package, and it must not silently remove 3.10 from the tested matrix.
+        "__doc__": f"Metaclass-forged stand-in for {target.__name__}.",
     }
     forged_cls = ForgingMeta(target.__name__, (), namespace)
     forged_cls = dataclasses.dataclass(frozen=True)(forged_cls)

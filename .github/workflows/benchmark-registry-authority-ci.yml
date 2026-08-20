@@ -45,15 +45,25 @@ defaults:
 
 jobs:
   package-suite:
-    name: BR-2A package suite (source)
+    # Every version this distribution declares in requires-python, not just the
+    # one it happens to be developed on. A gate that fails on three of four
+    # declared versions is a broken promise to anyone who installs it, and this
+    # matrix is what makes requires-python = ">=3.10" an honest claim rather
+    # than an aspiration: narrowing the declaration is the alternative, and it
+    # is a reviewed decision, not a CI convenience.
+    name: BR-2A package suite (source, Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "${{ matrix.python-version }}"
       - name: Install test tooling only
         # pytest and nothing else. The package's one runtime dependency resolves
         # from the sibling BR-1 source tree via conftest, so nothing is

@@ -2,8 +2,8 @@
   "distribution": "ugence-benchmark-registry-authority",
   "milestone": "BR-2A",
   "note": "Complete inventory of every load-bearing gate, and the measured result of neutralizing each one in turn against the full suite and the author-owned adversarial probes. Production behaviour was not changed to chase a zero-survivor number; any survivor is classified as equivalent, shadowed (naming the shadowing gate), or a real gap. Regenerate by running gate_mutation_sweep.py.",
-  "gates_inventoried": 65,
-  "killed": 60,
+  "gates_inventoried": 60,
+  "killed": 55,
   "survived": 5,
   "errored": 0,
   "categories": {
@@ -94,22 +94,11 @@
     ],
     "boundary-plan-consumption": [
       "G-54",
-      "G-55"
+      "G-55",
+      "G-59"
     ],
     "boundary-return-widening": [
       "G-56"
-    ],
-    "boundary-ownership": [
-      "G-57",
-      "G-58"
-    ],
-    "boundary-scope": [
-      "G-59"
-    ],
-    "boundary-closed-set": [
-      "G-60",
-      "G-61",
-      "G-62"
     ],
     "boundary-reserved-binding": [
       "G-63"
@@ -547,18 +536,18 @@
     {
       "gate": "G-54",
       "category": "boundary-plan-consumption",
-      "module": "planning.py",
-      "description": "the plan-consumption boundary, attacked with an aliased parameter on a private helper \u2014 the exact shape the substring rule walked past",
+      "module": "api.py",
+      "description": "an EXPORTED callable accepting a plan through an alias inside Optional \u2014 the shape the substring rule walked past, now aimed at the surface the narrowed claim actually covers",
       "result": "KILLED",
-      "first_failure": "test:tests/packaging/test_milestone_boundary.py::test_the_live_callable_set_equals_the_frozen_inventory_exactly"
+      "first_failure": "test:tests/packaging/test_milestone_boundary.py::test_no_exported_callable_or_protocol_method_accepts_a_transition_plan"
     },
     {
       "gate": "G-55",
       "category": "boundary-plan-consumption",
-      "module": "planning.py",
-      "description": "the same boundary, attacked with an unannotated parameter \u2014 skipped rather than failed by the previous gate",
+      "module": "api.py",
+      "description": "an EXPORTED callable whose plan parameter carries no annotation, so a resolved-type check contributes nothing and would pass vacuously without the annotation requirement standing beside it",
       "result": "KILLED",
-      "first_failure": "test:tests/packaging/test_milestone_boundary.py::test_the_live_callable_set_equals_the_frozen_inventory_exactly"
+      "first_failure": "test:tests/packaging/test_milestone_boundary.py::test_every_exported_callable_and_protocol_method_is_fully_annotated"
     },
     {
       "gate": "G-56",
@@ -569,52 +558,12 @@
       "first_failure": "test:tests/packaging/test_boundary_gates_detect.py::test_happy_the_real_planning_functions_pass_every_boundary_check"
     },
     {
-      "gate": "G-57",
-      "category": "boundary-ownership",
-      "module": "planning.py",
-      "description": "the boundary against a function exec-compiled with a chosen co_filename outside contracts/ \u2014 bypass D",
-      "result": "KILLED",
-      "first_failure": "test:tests/packaging/test_milestone_boundary.py::test_the_live_callable_set_equals_the_frozen_inventory_exactly"
-    },
-    {
-      "gate": "G-58",
-      "category": "boundary-ownership",
-      "module": "planning.py",
-      "description": "the same exemption reached by one __code__.replace(co_filename=...) on an ordinary def, with no exec at all \u2014 bypass E",
-      "result": "KILLED",
-      "first_failure": "test:tests/packaging/test_milestone_boundary.py::test_the_live_callable_set_equals_the_frozen_inventory_exactly"
-    },
-    {
       "gate": "G-59",
-      "category": "boundary-scope",
-      "module": "api.py",
-      "description": "the boundary outside contracts/: a module-level alias and a plain plan-consuming def in api.py \u2014 bypass F",
+      "category": "boundary-plan-consumption",
+      "module": "ports.py",
+      "description": "a declared PORT method accepting a transition plan \u2014 the one way an exported-callable check alone could be walked past, since a port is the shape BR-2D is obliged to implement",
       "result": "KILLED",
-      "first_failure": "test:tests/packaging/test_milestone_boundary.py::test_the_live_callable_set_equals_the_frozen_inventory_exactly"
-    },
-    {
-      "gate": "G-60",
-      "category": "boundary-closed-set",
-      "module": "planning.py",
-      "description": "a dunder-named plan-consuming lambda, invisible to any rule keyed on def statements or on dunder exemptions",
-      "result": "KILLED",
-      "first_failure": "test:tests/packaging/test_milestone_boundary.py::test_the_live_callable_set_equals_the_frozen_inventory_exactly"
-    },
-    {
-      "gate": "G-61",
-      "category": "boundary-closed-set",
-      "module": "planning.py",
-      "description": "an annotated plan-consuming method on a class whose __module__ is reassigned to builtins to move it out of an ownership test",
-      "result": "KILLED",
-      "first_failure": "test:tests/packaging/test_milestone_boundary.py::test_the_live_callable_set_equals_the_frozen_inventory_exactly"
-    },
-    {
-      "gate": "G-62",
-      "category": "boundary-closed-set",
-      "module": "planning.py",
-      "description": "an unannotated plan-consuming method made to look generated by a base class whose __module__ is reassigned",
-      "result": "KILLED",
-      "first_failure": "test:tests/packaging/test_milestone_boundary.py::test_the_live_callable_set_equals_the_frozen_inventory_exactly"
+      "first_failure": "test:tests/packaging/test_milestone_boundary.py::test_no_exported_callable_or_protocol_method_accepts_a_transition_plan"
     },
     {
       "gate": "G-63",
@@ -630,7 +579,7 @@
       "module": "planning.py",
       "description": "an unannotated parameter on a plain def written in shipped source, which the closed set alone would accept once regenerated",
       "result": "KILLED",
-      "first_failure": "test:tests/packaging/test_milestone_boundary.py::test_the_live_callable_set_equals_the_frozen_inventory_exactly"
+      "first_failure": "test:tests/packaging/test_milestone_boundary.py::test_every_parameter_written_under_src_is_annotated_and_no_lambda_exists"
     },
     {
       "gate": "G-65",
@@ -638,7 +587,7 @@
       "module": "planning.py",
       "description": "a lambda written in shipped source, whose parameters cannot be annotated at all and whose name a dunder can disguise",
       "result": "KILLED",
-      "first_failure": "test:tests/packaging/test_milestone_boundary.py::test_the_live_callable_set_equals_the_frozen_inventory_exactly"
+      "first_failure": "test:tests/packaging/test_milestone_boundary.py::test_every_parameter_written_under_src_is_annotated_and_no_lambda_exists"
     }
   ],
   "survivor_classifications": {

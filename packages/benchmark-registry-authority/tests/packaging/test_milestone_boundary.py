@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import ast
 import inspect
-import json
 import pathlib
 import re
 
@@ -13,6 +12,7 @@ import pytest
 from _boundary import (
     resolved_parameter_types,
     resolved_return_types,
+    unannotated_parameters,
 )
 from _milestones import (
     SUBPHASE_LADDER,
@@ -583,111 +583,145 @@ def _package_modules():
     return modules
 
 
-CALLABLE_INVENTORY = json.loads(
-    (PKG / "public_callable_inventory.json").read_text()
-)
-UNRESOLVED = "<unresolved>"
+# --------------------------------------------------------------------------- #
+# The enforceable boundary: what is *exported*, and what capability exists
+# --------------------------------------------------------------------------- #
+# Ratified 2026-08-20. The previous design tried to prove that **no callable
+# anywhere under src/** consumes a transition plan. That claim is not provable
+# in Python and was abandoned, not merely re-implemented:
+#
+#   Python permits closures, callables held in containers, dynamic attributes,
+#   ``exec``, ``type()``, ``__getattr__``, ``functools.partial`` and runtime
+#   rebinding. Every design that "discovered" callables only changed *what
+#   counts as discoverable*, and three audits found seven bypasses on exactly
+#   that seam. The last design — a frozen 2207-entry inventory — could be
+#   defeated by regenerating it in the same commit as the plant, so it did not
+#   even hold against the adversary it was written for.
+#
+# The enforceable claim is capability absence, and it is what actually keeps
+# BR-2B safe: **even if a private helper or a verifier were introduced, there is
+# no store, no clock, no authority-issued result and no effectful operation for
+# it to unlock.** A private plan-consuming helper computes a value and can do
+# nothing with it. That is "non-authoritative by construction".
+#
+# Private-source expansion is therefore governed, not gated: see CODEOWNERS and
+# docs/governance/PROTECTED_BRANCHES.md. A contributor who can modify production
+# code *and* its tests in one commit is stopped by an independent approving
+# review, not by a generated artifact they can regenerate.
+#
+# Four properties, each decidable, are asserted below and above:
+#   1. No exported callable or Protocol method accepts a transition plan.
+#   2. No authority-issued result type exists (the reserved-name gates).
+#   3. No store, verifier, clock, append/apply operation, composition root or
+#      prohibited dependency exists (capability, dependency and clock gates).
+#   4. Planning returns only a structural plan or a typed refusal.
+# --------------------------------------------------------------------------- #
 
 
-def _render(types) -> list:
-    return sorted(f"{cls.__module__}.{cls.__qualname__}" for cls in types)
+def _exported_callables() -> dict:
+    """``{name: function}`` for every callable on the curated public surface.
 
-
-def _unwrap(member):
-    """The underlying function of a classmethod, staticmethod or property."""
-
-    if isinstance(member, (classmethod, staticmethod)):
-        return getattr(member, "__func__", None)
-    if isinstance(member, property):
-        return member.fget
-    return member
-
-
-def _live_callables() -> dict:
-    """``{label: signature}`` for every callable reachable under ``src/``.
-
-    **No classification, no exemption, no ownership test.** The label is built
-    from the module being walked and the attribute path, never from the
-    callable's own ``__module__`` or ``__qualname__`` — both are writable, and
-    the third audit reassigned ``__module__`` to ``"builtins"`` to move a method
-    out of scope. Where a thing is bound is a fact about this package; what it
-    says about itself is not.
-
-    Imported, synthesized and injected callables are included. They are entries
-    in the frozen inventory, not exclusions, because every exclusion previously
-    written here became the next bypass.
+    The curated surface is the thing this package promises and the thing a
+    caller can reach. It is enumerated by ``api.__all__``, which is pinned
+    against ``public_api.json`` by a separate gate, so it cannot be widened
+    quietly to make this check smaller.
     """
 
-    entries = {}
-    for module in _package_modules():
-        for name, value in vars(module).items():
-            func = _unwrap(value)
-            if inspect.isfunction(func):
-                entries[f"{module.__name__}::{name}"] = _signature(func)
-            elif inspect.isclass(value):
-                for attribute, member in vars(value).items():
-                    inner = _unwrap(member)
-                    if inspect.isfunction(inner):
-                        entries[f"{module.__name__}::{name}.{attribute}"] = (
-                            _signature(inner)
-                        )
-    return entries
+    found = {}
+    for symbol in api.__all__:
+        value = getattr(api, symbol)
+        if inspect.isfunction(value):
+            found[symbol] = value
+    return found
 
 
-def _signature(func) -> dict:
-    try:
-        parameters = {
-            name: _render(types)
-            for name, types in resolved_parameter_types(func).items()
-        }
-    except Exception:  # pragma: no cover - recorded, never skipped
-        parameters = {UNRESOLVED: []}
-    try:
-        returns = _render(resolved_return_types(func))
-    except Exception:  # pragma: no cover - recorded, never skipped
-        returns = [UNRESOLVED]
-    return {"parameters": parameters, "returns": returns}
+def _protocol_methods() -> dict:
+    """``{Protocol.method: function}`` for every method a declared port exposes.
 
-
-# --------------------------------------------------------------------------- #
-# The boundary, as a closed set rather than a rule
-# --------------------------------------------------------------------------- #
-def test_the_live_callable_set_equals_the_frozen_inventory_exactly():
-    """Every callable under ``src/``, compared — not classified.
-
-    Three audits found seven defects in the rules that used to assert BR-2B's
-    boundary, and none in the boundary itself. Every one was a classification
-    defect: a substring an alias walked past, a skipped ``None`` annotation, a
-    PEP 563 string read as one opaque name, an ownership test keyed on
-    attacker-supplied ``co_filename``, a walk scoped to ``contracts/``, then a
-    dunder-named lambda, a reassigned ``__module__``, and a base class whose
-    ``__module__`` was reassigned to make a method look generated.
-
-    There is nothing here to walk past because nothing is decided. A callable
-    the inventory does not list fails, whatever it is called, however it was
-    compiled and wherever it was bound. A listed callable whose resolved
-    signature moved fails too.
+    Ports are the shapes BR-2D will implement. A plan parameter *declared* here
+    would be a plan parameter BR-2D is obliged to accept, which is the one way
+    an exported-surface check alone could be walked past.
     """
 
-    live = _live_callables()
-    frozen = CALLABLE_INVENTORY["callables"]
+    found = {}
+    for symbol in api.__all__:
+        value = getattr(api, symbol)
+        if not inspect.isclass(value) or not _is_port_declaration(symbol, value):
+            continue
+        for attribute, member in vars(value).items():
+            if inspect.isfunction(member) and not attribute.startswith("_"):
+                found[f"{symbol}.{attribute}"] = member
+    return found
 
-    added = sorted(set(live) - set(frozen))
-    removed = sorted(set(frozen) - set(live))
-    assert added == [], f"callables not in the frozen inventory: {added[:6]}"
-    assert removed == [], f"inventoried callables now absent: {removed[:6]}"
 
-    moved = [
-        label for label in sorted(live) if live[label] != frozen[label]
+def test_no_exported_callable_or_protocol_method_accepts_a_transition_plan():
+    """Property 1, by resolved type identity — the claim BR-2B actually makes.
+
+    Resolved, never matched as text: ``typing.get_type_hints`` evaluates the
+    PEP 563 strings and every ``Union``/``Optional``/generic is walked to its
+    leaves, so an alias, a nested ``Optional`` or a container-nested plan is as
+    visible as a bare one. Membership is decided by ``is`` against the real
+    class, the same discipline the sealed contract-type registry uses.
+
+    This does **not** claim no private helper takes a plan. It claims no caller
+    can hand one to this package, and no port obliges BR-2D to accept one.
+    """
+
+    offenders = []
+    for label, func in {**_exported_callables(), **_protocol_methods()}.items():
+        for name, types in resolved_parameter_types(func).items():
+            if api.BenchmarkTransitionPlan in types:
+                offenders.append(f"{label}({name})")
+    assert offenders == [], offenders
+
+
+def test_every_exported_callable_and_protocol_method_is_fully_annotated():
+    """Otherwise property 1 is silently vacuous for an unannotated parameter.
+
+    An unannotated parameter resolves to no types, so a plan hidden behind one
+    would pass the check above by contributing nothing to it. On the curated
+    surface an unannotated parameter is a failure, not a skip — this package
+    ships ``py.typed`` and annotates everything it exports.
+    """
+
+    offenders = [
+        f"{label}({name})"
+        for label, func in {
+            **_exported_callables(),
+            **_protocol_methods(),
+        }.items()
+        for name in unannotated_parameters(func)
     ]
-    assert moved == [], (
-        f"resolved signature moved for: "
-        f"{[(m, frozen[m], live[m]) for m in moved[:3]]}"
+    assert offenders == [], offenders
+
+
+#: Exactly what property 1 walks. Pinned, not floored: a surface that *shrinks*
+#: makes the check smaller without failing anything, and a gate that quietly
+#: covers less is the failure mode all three audits found. Moving this number is
+#: a reviewed change, the same as moving ``public_api.json``.
+EXPORTED_CALLABLES_WALKED = 13
+PROTOCOL_METHODS_WALKED = 9
+
+
+def test_the_surface_property_one_walks_is_exactly_what_is_pinned():
+    """A gate over an empty — or quietly shrunken — set passes for the wrong reason."""
+
+    assert len(_exported_callables()) == EXPORTED_CALLABLES_WALKED, sorted(
+        _exported_callables()
+    )
+    assert len(_protocol_methods()) == PROTOCOL_METHODS_WALKED, sorted(
+        _protocol_methods()
     )
 
 
 def test_every_parameter_written_under_src_is_annotated_and_no_lambda_exists():
-    """The annotation requirement, restored with nothing to exempt.
+    """A legibility requirement on shipped source. **Not** a boundary control.
+
+    This does not prove anything about hidden callables and is not relied on to
+    — property 1 is asserted on the exported surface above. What it buys is that
+    every parameter written in this package is annotated and no lambda appears,
+    so a reviewer reading a diff can see what a function accepts. Reviewability
+    is the control that governs private source; this keeps it cheap.
 
     Its previous form asked each *runtime* callable where it came from, and
     carried exemptions for ``EnumType``-copied methods, the dataclass method
@@ -728,94 +762,6 @@ def test_every_parameter_written_under_src_is_annotated_and_no_lambda_exists():
                         f"{node.name}({argument.arg})"
                     )
     assert offenders == [], offenders
-
-
-def test_the_inventory_records_the_count_it_holds():
-    assert CALLABLE_INVENTORY["callables_inventoried"] == len(
-        CALLABLE_INVENTORY["callables"]
-    )
-    assert CALLABLE_INVENTORY["callables_inventoried"] > 0
-
-
-def test_no_inventoried_callable_accepts_a_transition_plan():
-    """Read off the frozen set, so it is a fact about a closed list.
-
-    The set-equality property above is what makes this exhaustive: a plan
-    consumer that never reached the inventory has already failed there.
-    """
-
-    plan = (
-        f"{api.BenchmarkTransitionPlan.__module__}."
-        f"{api.BenchmarkTransitionPlan.__qualname__}"
-    )
-    offenders = [
-        f"{label}({name})"
-        for label, entry in CALLABLE_INVENTORY["callables"].items()
-        for name, types in entry["parameters"].items()
-        if plan in types
-    ]
-    assert offenders == [], offenders
-
-
-#: The only callables that may declare a lifecycle payload return, named
-#: individually rather than matched by a name pattern. BR-2A's two exact-type
-#: validators return the payload they validate, and the store port *declares*
-#: one because a port is a shape BR-2D will implement. Every other callable
-#: returning a lifecycle payload would be fabricating a registry event.
-#:
-#: A frozen list of three, not a rule: the previous version scoped the check to
-#: ``plan_*`` names, and the third audit fabricated an event from a callable
-#: that was not named ``plan_`` anything and consumed no plan.
-PERMITTED_PAYLOAD_RETURNS = frozenset(
-    {
-        "::BenchmarkRegistryStorePort.read_historical",
-        "::require_exact_historical_record_payload",
-        "::require_exact_resolution_record_payload",
-        "api::BenchmarkRegistryStorePort.read_historical",
-        "api::require_exact_historical_record_payload",
-        "api::require_exact_resolution_record_payload",
-        "contracts.ports::BenchmarkRegistryStorePort.read_historical",
-        "contracts.read_payloads::require_exact_historical_record_payload",
-        "contracts.read_payloads::require_exact_resolution_record_payload",
-        "contracts::BenchmarkRegistryStorePort.read_historical",
-        "contracts::require_exact_historical_record_payload",
-        "contracts::require_exact_resolution_record_payload",
-    }
-)
-
-
-def test_no_inventoried_callable_returns_a_reserved_or_lifecycle_payload():
-    """The return half, over the closed list and every callable in it.
-
-    Not scoped to ``plan_*``. That narrowing was itself an audit finding: a
-    callable consuming no plan and carrying no planning name fabricated a
-    registry event, and no gate spoke about it. The three legitimate exceptions
-    are enumerated above; everything else is refused.
-    """
-
-    payloads = {
-        f"{cls.__module__}.{cls.__qualname__}" for cls in LIFECYCLE_PAYLOAD_TYPES
-    }
-    offenders = []
-    for label, entry in CALLABLE_INVENTORY["callables"].items():
-        suffix = label[len(NAMESPACE):]
-        if suffix.lstrip(".") in PERMITTED_PAYLOAD_RETURNS:
-            continue
-        leaked = set(entry["returns"]) & payloads
-        if leaked:
-            offenders.append(f"{label} -> {sorted(leaked)}")
-    assert offenders == [], offenders
-
-
-def test_the_permitted_payload_returns_are_all_present_and_used():
-    """A stale exception is an exception nobody notices has stopped applying."""
-
-    suffixes = {
-        label[len(NAMESPACE):].lstrip(".")
-        for label in CALLABLE_INVENTORY["callables"]
-    }
-    unused = sorted(PERMITTED_PAYLOAD_RETURNS - suffixes)
-    assert unused == [], unused
 
 
 def test_no_exported_planner_can_return_a_lifecycle_payload():

@@ -504,6 +504,11 @@ def _q14():
     namespace = {
         "__annotations__": {f.name: object for f in dataclasses.fields(genuine)},
         "__module__": target.__module__,
+        # Supplied so @dataclass does not synthesize one. On CPython 3.10
+        # dataclasses builds a missing __doc__ from str(inspect.signature(cls)),
+        # and inspect takes a wrong branch on a class whose metaclass forges
+        # __eq__ — raising before the forgery reaches the code under test.
+        "__doc__": f"Metaclass-forged stand-in for {target.__name__}.",
     }
     forged_cls = dataclasses.dataclass(frozen=True)(
         ForgingMeta(target.__name__, (), namespace)
@@ -1195,21 +1200,43 @@ def _q61():
         )
 
 
-@probe("Q-62 no callable anywhere under src/ accepts a plan, by resolved type identity")
-def _q62():
-    """Resolved, not matched. This harness derives it independently.
+def _is_declared_port(value) -> bool:
+    """A declared ``typing.Protocol`` port, decided structurally.
 
-    A substring rule reading the annotation text is walked past by an alias, by
-    a Union member, or by omitting the annotation entirely — which is how the
-    suite's version of this check came to pass a plan-consuming callable. Here
-    the hints are resolved through typing.get_type_hints, every Union and
-    generic is walked to its leaves, and membership is decided by ``is``.
+    ``_is_protocol`` is set by ``typing.Protocol`` itself on the class object.
+    A concrete class cannot acquire it by naming itself ``...Port``.
     """
 
-    import importlib
+    return bool(getattr(value, "_is_protocol", False))
+
+
+@probe("Q-62 no exported callable or port method accepts a plan, by resolved identity")
+def _q62():
+    """Resolved, not matched — and scoped to the claim BR-2B actually makes.
+
+    An earlier version of this probe asserted that *no callable anywhere under
+    src/* consumes a plan. That claim was withdrawn by owner ruling (ADR §35
+    D-20): Python permits closures, containers, dynamic attributes, exec and
+    runtime rebinding, so no walk can enumerate every callable, and this probe's
+    own ownership test — a function's ``__module__`` — is writable by whoever
+    plants the function. It was asserting something it could not decide.
+
+    What it checks now is decidable and is the property that holds: no callable
+    a caller can reach, and no port method BR-2D would be obliged to implement,
+    accepts a transition plan. Hints are resolved through get_type_hints, every
+    Union and generic is walked to its leaves, and membership is decided by
+    ``is`` — so an alias, an Optional or a container-nested plan is visible.
+
+    A private helper taking a plan is *not* covered, deliberately. It is
+    governed by review, and it is inert: there is no store, clock, authority
+    result or effectful operation in this package for it to spend a plan on.
+    Q-24, Q-25 and Q-46 are the probes that keep that true.
+    """
+
     import inspect
-    import pathlib as _pl
     import typing
+
+    import ugence_benchmark_registry_authority as pkg
 
     plan = BenchmarkTransitionPlan
 
@@ -1228,74 +1255,50 @@ def _q62():
             pending.extend(typing.get_args(current))
         return found
 
-    ns = "ugence_benchmark_registry_authority"
-    root = _pl.Path(importlib.import_module(ns).__file__).parent
-    offenders, unannotated, checked = [], [], 0
-
-    # Every file under the package root, not contracts/ alone. A walk scoped to
-    # contracts/ never visits api.py, where a plain plan-consuming def once sat
-    # unseen by this probe and by the suite alike.
-    for path in sorted(root.rglob("*.py")):
-        relative = path.relative_to(root).with_suffix("")
-        parts = [part for part in relative.parts if part != "__init__"]
-        module = importlib.import_module(".".join([ns, *parts]))
-        functions = []
-        source_defs = {
-            node.name
-            for node in __import__("ast").walk(
-                __import__("ast").parse(path.read_text())
-            )
-            if isinstance(
-                node,
-                (__import__("ast").FunctionDef, __import__("ast").AsyncFunctionDef),
-            )
-        }
-        for value in vars(module).values():
+    # Both curated surfaces, unioned. A separate gate pins them equal, but this
+    # harness must not depend on that gate holding: walking only the root
+    # re-export would miss a callable added to ``api.__all__`` alone, and
+    # walking only ``api`` would miss the reverse. Neither may host a plan
+    # consumer, so both are walked here.
+    surface = {}
+    for module in (pkg, pkg.api):
+        for symbol in module.__all__:
+            value = getattr(module, symbol)
             if inspect.isfunction(value):
-                functions.append(value)
-            elif inspect.isclass(value) and str(
-                getattr(value, "__module__", "")
-            ).startswith(ns):
-                for member in vars(value).values():
-                    if inspect.isfunction(member):
-                        functions.append(member)
-                    elif isinstance(member, property) and member.fget:
-                        functions.append(member.fget)
-        for func in functions:
-            # Ownership follows the scanned path and the module's own source
-            # text — never code.co_filename, which whoever compiled the function
-            # chooses, and which one __code__.replace() rewrites.
-            written_here = func.__name__ in source_defs
-            imported = not str(
-                getattr(func, "__module__", "")
-            ).startswith(ns)
-            if imported and not written_here:
-                continue
-            checked += 1
-            try:
-                hints = typing.get_type_hints(func)
-            except Exception:
-                if written_here:
-                    unannotated.append(func.__qualname__)
-                continue
-            for name in inspect.signature(func).parameters:
-                if name in ("self", "cls"):
-                    continue
-                if name not in hints:
-                    if written_here:
-                        unannotated.append(f"{func.__qualname__}({name})")
-                elif plan in leaves(hints[name]):
-                    offenders.append(f"{func.__qualname__}({name})")
+                surface[symbol] = value
+            elif inspect.isclass(value) and _is_declared_port(value):
+                for attribute, member in vars(value).items():
+                    if inspect.isfunction(member) and not attribute.startswith("_"):
+                        surface[f"{symbol}.{attribute}"] = member
 
-    assert checked > 50, checked
+    offenders, unannotated = [], []
+    for label, func in surface.items():
+        try:
+            hints = typing.get_type_hints(func)
+        except Exception:
+            unannotated.append(label)
+            continue
+        for name in inspect.signature(func).parameters:
+            if name in ("self", "cls"):
+                continue
+            if name not in hints:
+                unannotated.append(f"{label}({name})")
+            elif plan in leaves(hints[name]):
+                offenders.append(f"{label}({name})")
+
+    # Offenders first. The size assertion below exists so a *shrunken* surface
+    # cannot make this probe vacuous, but it must never be what reports a plan
+    # consumer: a plant that replaced an existing callable would leave the size
+    # unchanged, and a size failure says nothing about what was found.
     assert offenders == [], offenders
     assert unannotated == [], unannotated
+    assert len(surface) == 22, sorted(surface)
 
-    # The check must be able to fail. Plant the three shapes that walked past
-    # the substring rule and require the leaf-walker to see each one. The
-    # annotation object is attached directly rather than written as a local
-    # alias in a source annotation, because get_type_hints resolves a PEP 563
-    # string against the function's globals and would never see a local name.
+    # The check must be able to fail. Plant the shapes that walked past the
+    # substring rule and require the leaf-walker to see each one. The annotation
+    # object is attached directly rather than written as a source annotation,
+    # because get_type_hints resolves a PEP 563 string against the function's
+    # globals and would never see a local name.
     aliased = plan
     optional_alias = typing.Optional[aliased]
     nested = typing.Dict[str, typing.List[aliased]]

@@ -660,39 +660,39 @@ GATES = [
     Gate(
         "G-54",
         "boundary-plan-consumption",
-        "planning.py",
-        "the plan-consumption boundary, attacked with an aliased parameter on a "
-        "private helper — the exact shape the substring rule walked past",
-        """def _refuse(
-    snapshot: BenchmarkRegistrySnapshotAssertion,
-    to_state: BenchmarkRegistrationState,
-    reason: BenchmarkRegistryRefusalReason,
-) -> BenchmarkTransitionRefusal:""",
-        """_PlanAlias = BenchmarkTransitionPlan
+        "api.py",
+        "an EXPORTED callable accepting a plan through an alias inside "
+        "Optional — the shape the substring rule walked past, now aimed at the "
+        "surface the narrowed claim actually covers",
+        """__all__ = [""",
+        """from typing import Optional as _Optional
+
+_PlanAlias = BenchmarkTransitionPlan
 
 
-def _apply(plan: Optional[_PlanAlias]) -> None:
+def apply_plan(plan: _Optional[_PlanAlias]) -> None:
     return None
 
 
-def _refuse(
-    snapshot: BenchmarkRegistrySnapshotAssertion,
-    to_state: BenchmarkRegistrationState,
-    reason: BenchmarkRegistryRefusalReason,
-) -> BenchmarkTransitionRefusal:""",
+__all__ = [
+    "apply_plan",""",
+        at_package_root=True,
     ),
     Gate(
         "G-55",
         "boundary-plan-consumption",
-        "planning.py",
-        "the same boundary, attacked with an unannotated parameter — skipped "
-        "rather than failed by the previous gate",
-        """def is_byte_identical_resubmission(""",
-        """def _apply(plan) -> None:
+        "api.py",
+        "an EXPORTED callable whose plan parameter carries no annotation, so a "
+        "resolved-type check contributes nothing and would pass vacuously "
+        "without the annotation requirement standing beside it",
+        """__all__ = [""",
+        """def apply_plan(plan) -> None:
     return None
 
 
-def is_byte_identical_resubmission(""",
+__all__ = [
+    "apply_plan",""",
+        at_package_root=True,
     ),
     Gate(
         "G-56",
@@ -711,115 +711,22 @@ BenchmarkPlanningOutcome = Union[
     ),
     # -------- BR-2B boundary scope: the second audit's three bypasses ----- #
     Gate(
-        "G-57",
-        "boundary-ownership",
-        "planning.py",
-        "the boundary against a function exec-compiled with a chosen "
-        "co_filename outside contracts/ — bypass D",
-        """def plan_transition(""",
-        """_PlanAliasD = BenchmarkTransitionPlan
-_smuggled_globals = {"_PlanAliasD": _PlanAliasD}
-_smuggled_source = chr(10).join(
-    ["def smuggled(plan: _PlanAliasD):", "    return None", ""]
-)
-exec(  # noqa: S102
-    compile(_smuggled_source, "/tmp/not_under_contracts.py", "exec"),
-    _smuggled_globals,
-)
-smuggled = _smuggled_globals["smuggled"]
-
-
-def plan_transition(""",
-    ),
-    Gate(
-        "G-58",
-        "boundary-ownership",
-        "planning.py",
-        "the same exemption reached by one __code__.replace(co_filename=...) on "
-        "an ordinary def, with no exec at all — bypass E",
-        """def plan_submission_outcome(""",
-        """_PlanAliasE = BenchmarkTransitionPlan
-
-
-def rewritten(plan: _PlanAliasE) -> None:
-    return None
-
-
-rewritten.__code__ = rewritten.__code__.replace(
-    co_filename="/tmp/not_under_contracts.py"
-)
-
-
-def plan_submission_outcome(""",
-    ),
-    Gate(
         "G-59",
-        "boundary-scope",
-        "api.py",
-        "the boundary outside contracts/: a module-level alias and a plain "
-        "plan-consuming def in api.py — bypass F",
-        """__all__ = [""",
-        """_PlanAliasF = BenchmarkTransitionPlan
+        "boundary-plan-consumption",
+        "ports.py",
+        "a declared PORT method accepting a transition plan — the one way an "
+        "exported-callable check alone could be walked past, since a port is "
+        "the shape BR-2D is obliged to implement",
+        """@runtime_checkable
+class BenchmarkRegistryStorePort(Protocol):""",
+        """from .kernel import BenchmarkTransitionPlan as _Plan
 
 
-def apply_plan(plan: _PlanAliasF) -> BenchmarkRegistrationEventPayload:
-    raise SystemExit("planted")
-
-
-__all__ = [""",
-        at_package_root=True,
-    ),
-    # ---- third audit: attacks that defeat classification, not the boundary -- #
-    Gate(
-        "G-60",
-        "boundary-closed-set",
-        "planning.py",
-        "a dunder-named plan-consuming lambda, invisible to any rule keyed on "
-        "def statements or on dunder exemptions",
-        """def plan_transition(""",
-        """__apply__ = lambda plan: None
-
-
-def plan_transition(""",
-    ),
-    Gate(
-        "G-61",
-        "boundary-closed-set",
-        "planning.py",
-        "an annotated plan-consuming method on a class whose __module__ is "
-        "reassigned to builtins to move it out of an ownership test",
-        """def plan_submission_outcome(""",
-        """class _Applier:
-    def apply(self, plan: BenchmarkTransitionPlan) -> None:
-        return None
-
-
-_Applier.__module__ = "builtins"
-
-
-def plan_submission_outcome(""",
-    ),
-    Gate(
-        "G-62",
-        "boundary-closed-set",
-        "planning.py",
-        "an unannotated plan-consuming method made to look generated by a base "
-        "class whose __module__ is reassigned",
-        """def is_byte_identical_resubmission(""",
-        """class _FakeBase:
-    def apply(self, plan):
-        return None
-
-
-_FakeBase.__module__ = "builtins"
-
-
-class _Derived(_FakeBase):
-    def apply(self, plan):
-        return None
-
-
-def is_byte_identical_resubmission(""",
+@runtime_checkable
+class BenchmarkRegistryStorePort(Protocol):
+    def apply_plan(self, plan: _Plan) -> None:
+        ...
+""",
     ),
     Gate(
         "G-63",
@@ -866,6 +773,24 @@ def is_byte_identical_resubmission(""",
 
 def is_byte_identical_resubmission(""",
     ),
+    # ---- withdrawn by owner ruling, 2026-08-20 (ADR §35 D-20) ------------- #
+    # G-57, G-58, G-60, G-61 and G-62 planted plan-consuming callables in
+    # PRIVATE source and asserted this package could discover them: an
+    # exec-forged co_filename, a __code__.replace, a dunder-named lambda, a
+    # reassigned __module__, and a base class made to look generated.
+    #
+    # They are removed — not renumbered, and recorded here rather than dropped
+    # silently. The claim they tested, that no callable anywhere under src/
+    # consumes a plan, is not provable in Python: closures, containers, dynamic
+    # attributes, exec and runtime rebinding mean each design only changed what
+    # counted as discoverable, and the last one could be defeated by
+    # regenerating its inventory in the same commit as the plant.
+    #
+    # Nothing gates private source in its place, deliberately. Expansion there
+    # is governed by CODEOWNERS plus an independent approving review, and it is
+    # harmless without capability: a private plan consumer computes a value and
+    # has no store, clock, authority result or effectful operation to spend it
+    # on. G-33..G-47 are the gates that keep that true, and they are untouched.
 ]
 
 
