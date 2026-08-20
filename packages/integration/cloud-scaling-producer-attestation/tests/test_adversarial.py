@@ -940,3 +940,135 @@ def test_every_invalid_case_produces_a_distinct_typed_outcome_not_a_message(cand
             candidate=candidate, attestation=attestation, as_of=AS_OF
         )
         assert type(result.refusal.outcome) is ProducerAuthenticityOutcome, label
+
+
+# --------------------------------------------------------------------------------------- #
+# What the signature covers, pinned — so the boundary of the guarantee is stated, not found
+# --------------------------------------------------------------------------------------- #
+
+
+def test_the_signed_payload_covers_the_recommendation_and_not_the_candidate():
+    """A-58: the exact key set the producer's signature covers.
+
+    Asserted against the payload builder itself rather than against a sentence in a
+    document, so widening or narrowing the coverage changes this test. ``candidate_digest``
+    is deliberately absent: the attestation is minted at the Controller's *output boundary*,
+    before any Phase 5A candidate exists to digest.
+    """
+
+    from ugence_cloud_scaling_producer_attestation import (
+        producer_attestation_signing_payload,
+    )
+
+    payload = producer_attestation_signing_payload(
+        producer_id=PRODUCER_ID,
+        issuer=ISSUER_ID,
+        producer_key_id=PRODUCER_KEY_ID,
+        tenant_id="tenant-1",
+        subject_id="checkout-api",
+        subject_type="cloud_scaling.capacity_subject",
+        recommendation_id="rec-phase5a-1",
+        recommendation_digest="sha256:" + "a" * 64,
+        issued_at=AS_OF,
+        signing_purpose="p",
+        signature_algorithm="ed25519",
+        signature_profile="pr",
+        signature_encoding="e",
+    )
+
+    assert set(payload) == {
+        "schema_version",
+        "signing_purpose",
+        "producer_id",
+        "issuer",
+        "producer_key_id",
+        "signature_algorithm",
+        "signature_profile",
+        "signature_encoding",
+        "tenant_id",
+        "subject_id",
+        "subject_type",
+        "recommendation_id",
+        "recommendation_digest",
+        "issued_at",
+    }
+    for uncovered in (
+        "candidate_digest",
+        "policy_binding_digest",
+        "decision_digest",
+        "target_scope_digest",
+        "disposition",
+        "risk_outcome",
+        "magnitude_after",
+        "requested_delta",
+    ):
+        assert uncovered not in payload, (
+            f"{uncovered} is now signature-covered. That is a widening of the v2 "
+            "guarantee, and ADR §12.1, the verified.py docstring and the README section "
+            "'What the signature covers' all state that it is not covered — update them "
+            "deliberately rather than letting the documents drift"
+        )
+
+
+def test_one_attestation_verifies_against_any_candidate_agreeing_on_the_five_facts():
+    """A-59: the stated consequence of A-58, demonstrated end to end.
+
+    ``candidate_digest`` is not signed, so a genuine attestation is not bound to one
+    candidate — it is bound to a *recommendation*. Two candidates that agree on
+    ``(recommendation_id, recommendation_digest, tenant_id, subject_id, subject_type)`` and
+    differ in **policy binding** both verify under the same attestation.
+
+    This is the ratified scope, and the point of pinning it is that a reader of ``VERIFIED``
+    must not infer anything about the policy binding, the decision or the scope. If a later
+    phase binds the candidate, this test fails and the documents get revisited.
+    """
+
+    import _producer_fixtures as fixtures
+
+    if fixtures.P5A is None:
+        pytest.skip(
+            "varying the Phase 5A chain requires the monorepo test trees, which no "
+            "distribution ships; run this property from a checkout"
+        )
+
+    first = build_candidate()
+    attestation = build_attestation(first)
+    verifier = build_verifier(directory=build_directory(build_anchor()))
+
+    scope = fixtures.P5A.build_target_scope(fixtures.P5A.build_projection())
+    second = build_candidate(
+        policy_binding=fixtures.P5A.build_policy_binding(
+            scope, policy_id="cloud-scaling.unbounded", policy_version="9.9.9"
+        )
+    )
+
+    five = (
+        "recommendation_id",
+        "recommendation_digest",
+        "tenant_id",
+        "subject_id",
+        "subject_type",
+    )
+    assert all(getattr(first, name) == getattr(second, name) for name in five)
+    assert second.policy_binding != first.policy_binding
+    assert second.candidate_digest != first.candidate_digest
+
+    one = verifier.verify(candidate=first, attestation=attestation, as_of=AS_OF)
+    two = verifier.verify(candidate=second, attestation=attestation, as_of=AS_OF)
+
+    assert one.outcome is O.VERIFIED
+    assert two.outcome is O.VERIFIED, (
+        "the second candidate was refused. If the signature now covers the candidate, "
+        "this is a deliberate widening — update ADR §12.1, the verified.py docstring and "
+        "the README section 'What the signature covers' to match"
+    )
+
+    # Same signed statement; different determination scope, honestly recorded.
+    assert one.verified_attestation.attestation_digest == (
+        two.verified_attestation.attestation_digest
+    )
+    assert one.verified_attestation.candidate_digest == first.candidate_digest
+    assert two.verified_attestation.candidate_digest == second.candidate_digest
+    assert one.verified_attestation.artifact_digest != (
+        two.verified_attestation.artifact_digest
+    )

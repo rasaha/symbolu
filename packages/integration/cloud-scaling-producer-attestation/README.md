@@ -70,8 +70,10 @@ fails before a key is even resolved.
 * **Phase 5A stays at 0.1.0, unmodified.** This package does not change its canonical
   dictionaries, its candidate digest, or the documented limitation of its v1 attestation,
   and it does not reinterpret that unverified field as verified. The v2 proof travels
-  **alongside** a candidate and is independently bound to it; binding one *inside* a
-  candidate would need a Phase 5A 0.2.0, which is Phase 5B-0B's work.
+  **alongside** a candidate; binding one *inside* a candidate would need a Phase 5A 0.2.0,
+  which is Phase 5B-0B's work. What it is bound to is stated precisely below — the
+  *recommendation*, by id and content digest, and **not** the candidate: see
+  [What the signature covers](#what-the-signature-covers).
 * **The Cloud Scaling Controller stays at 0.4.0**, key-free and advisory. It gains no
   private key, no signer, no crypto dependency and no new export. Its own statement stands:
   its recommendation digest is not a signature, not an authorization and not a proof of
@@ -139,10 +141,59 @@ inheritance only: an independently implemented resolver that opts in is admitted
 one that merely holds a reference directory as a delegate. Otherwise the Risk Authority's
 `is_production_authoritative` convention applies unchanged.
 
+The **signer** side is the same mechanism, spelled the same way.
+`mint_producer_attestation(production_mode=True)` refuses
+`ReferenceEd25519ProducerAttestationSigner` and every subclass of it, matched by
+`isinstance` against `REFERENCE_GRADE_SIGNERS` and evaluated **before** the
+`is_reference_signer` flag — so a subclass that sets `is_reference_signer = False` never
+reaches the branch that would have admitted it. A custodian that *composes* a signer rather
+than inheriting from one is admitted, because composition is a decision about where the key
+lives and such a custodian never declared itself reference grade.
+
 `DenyAllTrustAnchorDirectory` is admitted, because it can only ever refuse — it is the
 ratified deny-by-default posture, and the only "no anchors" shape that ships. That exemption
 is matched on the **exact** type: subclassing narrows nothing, so a subclass of it is not
 known to deny everything and does not inherit the exemption.
+
+## What the signature covers
+
+The producer's signature and the artifact's own integrity digest are **not** the same
+coverage, and reading one for the other over-claims the guarantee.
+
+`artifact_digest` covers every field on `VerifiedProducerAttestation`. That is an integrity
+digest this package computes; its job is to stop a field being rewritten after construction.
+
+The **producer's signature** covers exactly the fourteen keys of the v2 signing payload:
+
+| | |
+|---|---|
+| identity of the statement | `schema_version`, `signing_purpose` |
+| who signed, under which key | `producer_id`, `issuer`, `producer_key_id` |
+| how | `signature_algorithm`, `signature_profile`, `signature_encoding` |
+| **what it is about** | `tenant_id`, `subject_id`, `subject_type`, `recommendation_id`, `recommendation_digest` |
+| when | `issued_at` |
+
+Every other field on the artifact **records the scope of the determination** — which
+candidate it was reached against (`candidate_digest`), which anchor answered, when, and
+under which verification profile. Honest, digest-protected facts about the check; not
+assertions the producer made.
+
+> **`candidate_digest` is not signature-covered.** One genuine attestation verifies against
+> **any** candidate agreeing on `(recommendation_id, recommendation_digest, tenant_id,
+> subject_id, subject_type)` — **including a candidate carrying a different policy binding,
+> decision, disposition, risk outcome, magnitude or execution scope**. Both verifications
+> return `VERIFIED`, with the same `attestation_digest` and different `candidate_digest`s.
+
+This is the ratified scope, not a defect. The *recommendation* is pinned by id and content
+digest, which is what stops a forged recommendation laundering. The authorization envelope
+it was later placed into is not pinned, because binding that would mean signing the Phase 5A
+candidate — minting the attestation after the candidate instead of at the Controller's output
+boundary, and making the v2 payload depend on Phase 5A. Both were rejected.
+
+So **do not read `VERIFIED` as saying anything about the policy binding, the decision or the
+scope** the recommendation was bound into. Establishing those is Phase 5B-0B's work and the
+authorization subphases'. ADR §12.1 records the ruling and `tests/test_adversarial.py` pins
+the behaviour with a property.
 
 ## Key custody
 
@@ -156,6 +207,120 @@ port and drops in without any caller change.
 Stated plainly rather than over-claimed: in-process code that reaches into a private module
 attribute is not defended against, and no Python-level mechanism defends against it. What
 is closed is the **public API** route. The load-bearing secret remains the signing key.
+
+## Standing this up in production
+
+**`production_mode` defaults to `False`, everywhere it appears.** That default is right for
+tests and for a local composition root, and it is wrong for a deployment: with it left alone,
+this package will accept the shipped reference resolver, the shipped reference signer and a
+non-production signature verifier, and the artifacts it mints will look exactly like
+production ones. Nothing warns you. Passing `production_mode=True` is what turns the
+reference components into refusals, so a production composition root must set it explicitly
+at **both** boundaries — minting and verifying.
+
+A composition root that stands this up correctly does three things: it sets
+`production_mode=True`, it injects a non-reference resolver and a non-reference signer, and
+it calls `require_verified_producer_attestation` at every point a verified artifact is
+consumed rather than trusting the object it was handed.
+
+```python
+from ugence_cloud_scaling_producer_attestation import (
+    PRODUCER_ATTESTATION_SIGNATURE_PROFILE,
+    Ed25519ProducerSignatureVerifier,
+    ProducerAttestationVerifier,
+    mint_producer_attestation,
+    require_verified_producer_attestation,
+)
+
+# --- 1. the signer: a key custodian over your managed key service ----------------------
+# Implements ProducerAttestationSignerPort. It must NOT subclass
+# ReferenceEd25519ProducerAttestationSigner — subclasses are refused in production, and
+# relabelling one with is_reference_signer = False does not lift that.
+class KmsProducerSigner:
+    is_reference_signer = False
+
+    def __init__(self, kms, *, producer_id, issuer, producer_key_id):
+        self._kms = kms
+        self.producer_id = producer_id
+        self.issuer = issuer
+        self.producer_key_id = producer_key_id
+
+    @property
+    def signature_profile(self) -> str:
+        # The one ratified profile. There is no second value to return.
+        return PRODUCER_ATTESTATION_SIGNATURE_PROFILE
+
+    def sign_producer_attestation(self, signing_input) -> str:
+        # The port has no "sign arbitrary bytes" method by design: the package builds the
+        # bytes, and the custodian signs what it is handed. Return canonical lowercase
+        # base16 of the raw Ed25519 signature.
+        return self._kms.sign_ed25519(
+            key_id=self.producer_key_id, message=signing_input.signed_bytes()
+        ).hex()
+
+
+# --- 2. the resolver: your trust-anchor store, not the shipped reference directory ------
+# Implements TrustAnchorResolverPort. Again: not a subclass of StaticTrustAnchorDirectory.
+class ManagedTrustAnchorDirectory:
+    is_production_authoritative = True
+
+    def __init__(self, store):
+        self._store = store
+
+    def resolve(self, coordinate):
+        # Return a TrustAnchorResolution for exactly this (issuer, key_id, capability).
+        return self._store.resolve(coordinate)
+
+
+# --- 3. minting, at the Controller's output boundary ------------------------------------
+attestation = mint_producer_attestation(
+    signer=KmsProducerSigner(kms, producer_id=..., issuer=..., producer_key_id=...),
+    tenant_id=recommendation.tenant_id,
+    subject_id=recommendation.subject_id,
+    recommendation_id=recommendation.recommendation_id,
+    recommendation_digest=recommendation.recommendation_digest,
+    issued_at=clock.now(),          # injected; this package never reads a clock
+    production_mode=True,           # <-- not the default
+)
+
+# --- 4. verifying ------------------------------------------------------------------------
+verifier = ProducerAttestationVerifier(
+    trust_anchor_resolver=ManagedTrustAnchorDirectory(store),
+    # The shipped Ed25519 verifier already declares is_production_authoritative = True;
+    # it holds no key material and does its own strict public-key validation.
+    signature_verifier=Ed25519ProducerSignatureVerifier(),
+    production_mode=True,           # <-- not the default
+)
+result = verifier.verify(
+    candidate=candidate, attestation=attestation, as_of=clock.now()
+)
+
+# --- 5. every consumption boundary ------------------------------------------------------
+if result.refusal is not None:
+    # Branch on result.refusal.outcome — a closed typed vocabulary, never on a message.
+    return deny(result.refusal.outcome)
+
+artifact = require_verified_producer_attestation(result.verified_attestation)
+```
+
+**Step 5 is not ceremony.** `require_verified_producer_attestation` re-checks the exact type,
+field presence, the construction token, provenance-registry membership and the recomputed
+self-digest. Call it every time an artifact crosses a boundary — a queue, a cache, a function
+that received one as an argument, a service layer — not once at the point of minting. A
+consumer that skips it is trusting an object's *shape*, which is the thing
+`VerifiedProducerAttestation` exists to say is not enough. Note in particular that it refuses
+a `copy.deepcopy`d or unpickled artifact: a determination reached in another process is not a
+determination reached in this one, and there is deliberately no deserializer. Re-verify there
+instead of shipping the artifact.
+
+Three things this checklist does **not** buy you, and they are the ones that matter:
+
+* a verified artifact still **grants nothing** — `grants_authority` hard-returns `False`;
+* the producer is not independently resolved: `attested_producer_id` is a signed *claim by
+  the issuer*, and the anchor was resolved by **issuer**, not by producer;
+* the signature does not cover the candidate — see
+  [What the signature covers](#what-the-signature-covers) before treating `VERIFIED` as
+  saying anything about the policy binding, the decision or the scope.
 
 ## No clock
 
