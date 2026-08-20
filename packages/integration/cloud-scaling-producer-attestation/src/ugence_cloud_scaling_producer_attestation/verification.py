@@ -84,6 +84,7 @@ from .verified import (
     _VERIFICATION_TOKEN,
     VerifiedProducerAttestation,
     _record_minted,
+    require_verified_producer_attestation,
 )
 
 __all__ = [
@@ -181,10 +182,23 @@ class ProducerAuthenticityResult:
     """The typed outcome of one verification. Exactly one of the two branches is present.
 
     There is **no boolean success flag**. A caller must branch on which of
-    :attr:`verified_attestation` and :attr:`refusal` is present, and the presence of an
-    artifact is decided by this module, never supplied by a caller. Carrying both would be
-    a verified refusal, and carrying neither would be an untyped silence; both are refused
-    at construction, so neither state exists to read optimistically.
+    :attr:`verified_attestation` and :attr:`refusal` is present. Carrying both would be a
+    verified refusal, and carrying neither would be an untyped silence; both are refused at
+    construction, so neither state exists to read optimistically.
+
+    **The presence of an artifact is decided by this module, never supplied by a caller**,
+    and that is enforced here rather than asserted. This class is exported, so a caller can
+    construct one — and while an exact-type check was the only gate, constructing this
+    class around ``object.__new__(VerifiedProducerAttestation)`` was accepted, and
+    :attr:`outcome` then read ``VERIFIED``. Such a fabrication is exactly the right type
+    and has no instance state at all, so exact-type matching cannot see it.
+
+    Construction therefore routes the artifact through
+    :func:`require_verified_producer_attestation`, the same revalidation every other
+    consumption boundary performs: exact type, field presence, the construction token,
+    provenance-registry membership and the recomputed self-digest. A result carrying a
+    verified artifact is now one this process genuinely reached, whoever assembled the
+    result.
     """
 
     verified_attestation: Optional[VerifiedProducerAttestation] = None
@@ -202,6 +216,15 @@ class ProducerAuthenticityResult:
             raise TypeError(
                 "ProducerAuthenticityResult.verified_attestation must be exactly a "
                 "VerifiedProducerAttestation"
+            )
+        if self.verified_attestation is not None:
+            # Kept deliberately AFTER the exact-type check above, so a wrong type still
+            # gets the typed TypeError a caller can act on, and the revalidation below
+            # answers the question the type cannot: did this process reach this
+            # determination? See this class's docstring.
+            require_verified_producer_attestation(
+                self.verified_attestation,
+                "ProducerAuthenticityResult.verified_attestation",
             )
         if self.refusal is not None and (
             type(self.refusal) is not ProducerAttestationRefusal
