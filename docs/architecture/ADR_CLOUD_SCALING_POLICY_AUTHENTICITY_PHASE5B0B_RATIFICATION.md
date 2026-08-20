@@ -40,3 +40,36 @@ artifact's own documentation, so a consumer cannot read a determination as a cla
 `packages/integration/cloud-scaling-policy-authenticity`, at `0.1.0`. Phase 5A stays at
 `0.1.0` with all ten frozen digests unmoved, re-measured by
 `tests/test_phase5a_untouched.py`.
+
+---
+
+## D-5B0B-7 `[R]` — should the verified artifact's digest payload be partitioned?
+
+**Open. One owner decision, brought with a recommendation. Not implemented.**
+
+`VerifiedPolicyAuthenticity.digest_payload()` is today one flat map. Two of its entries are
+not attested facts: `candidate_digest_fact` is recorded and never reconciled (R-4), and
+`resolved_as_of_fact` is injected and unvalidated (R-2). Everything else was checked. The
+question is whether the payload should partition into two separately framed maps — a
+`verified` map and a `recorded` map — so both remain digest-covered while the structure says
+which is which.
+
+**Recommendation: yes, and decide it now.** The `_fact` suffix and a docstring are the only
+things currently separating "this policy was signed by an entitled key" from "someone handed
+us this instant". A reader who trusts the artifact's shape rather than its prose gets no
+signal, and these two fields are precisely the ones the two open residuals are about.
+Partitioning also gives 5B-1 and 5B-2 the right move when they close R-4 and R-2: promote a
+field from `recorded` to `verified`, which visibly moves the artifact digest.
+
+**Why now rather than later.** The partition changes the artifact digest's shape. Nothing
+downstream pins that digest yet, because 5B-0B is unmerged — so today it costs nothing, and
+after the first consumer pins one it is a breaking change.
+
+**The one thing that makes it non-obvious.** A partition is a taxonomy commitment about every
+future field, not a one-time relabelling. `expected_reference_tenant_id` shows the edge: it is
+genuinely checked (against the coordinate's own tenant component) and genuinely establishes
+nothing about the caller's right to that tenant. It belongs in `verified` on the letter of
+what was checked, and a reader may take more from that than the check supports.
+
+**If ratified:** implement in 5B-0B before merge, at `0.1.0`, with no gate-count change.
+**If refused:** the flat payload stands and the distinction stays documentary.

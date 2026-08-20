@@ -426,3 +426,74 @@ def test_the_boundary_exposes_no_signer_no_key_and_no_registry():
     # And nothing exported is callable under a signing name.
     for symbol in exported:
         assert symbol not in {"sign", "mint", "issue", "revoke"}
+
+
+# --------------------------------------------------------------------------- #
+# Both fail-closed terminals are reachable through the public routine
+# --------------------------------------------------------------------------- #
+@pytest.mark.adversarial
+def test_a_tampered_candidate_digest_reaches_coordinate_malformed_through_verify():
+    """A frozen dataclass stops accidental mutation only. The digest shape is re-checked."""
+
+    from _policy_fixtures import genuine_candidate, phase5a_builders
+
+    if phase5a_builders() is None:  # pragma: no cover - only outside a checkout
+        pytest.skip("the Phase 5A test tree is unavailable outside a source checkout")
+    candidate = genuine_candidate()
+    # A bare Policy Authority digest where a Phase 5A one belongs: the exact namespace
+    # confusion D-5B0B-2 measured, arriving as tampering rather than as a conversion.
+    object.__setattr__(candidate, "candidate_digest", "a" * 64)
+
+    authority, record = issued()
+    result = verifier_for(authority).verify(
+        coordinate=record.coordinate,
+        expected_reference_tenant_id=record.coordinate.tenant_id,
+        as_of=T_MID,
+        candidate=candidate,
+    )
+    assert result.outcome is O.COORDINATE_MALFORMED
+
+
+@pytest.mark.adversarial
+def test_a_routine_that_violates_its_own_invariant_refuses_as_invariant_violation(monkeypatch):
+    """The backstop, exercised by making the routine itself wrong.
+
+    Every mint-time integrity check is pre-empted by an earlier gate, which is the design —
+    so this terminal is unreachable with correct code, and the only honest way to test it is
+    to inject the programming failure it exists to catch. Here the routine stamps a
+    verification profile the artifact type does not accept. It must refuse, and the refusal
+    must say *invariant violated* rather than *verification unavailable*.
+    """
+
+    from ugence_cloud_scaling_policy_authenticity import verification as module
+
+    monkeypatch.setattr(
+        module, "VERIFICATION_PROFILE", "ugence.cloud-scaling/policy-authenticity/wrong"
+    )
+    authority, record = issued()
+    result = verifier_for(authority).verify(
+        coordinate=record.coordinate,
+        expected_reference_tenant_id=record.coordinate.tenant_id,
+        as_of=T_MID,
+    )
+    assert result.outcome is O.INVARIANT_VIOLATION
+    assert result.verified_policy is None
+
+
+@pytest.mark.adversarial
+def test_the_terminal_handler_still_refuses_a_foreign_failure_as_unavailable(monkeypatch):
+    """Classification must not become a route to a softer answer for an unknown failure."""
+
+    from ugence_cloud_scaling_policy_authenticity import verification as module
+
+    def explode(**_kwargs):
+        raise RuntimeError("something nobody modelled")
+
+    monkeypatch.setattr(module, "_mint_verified_artifact", explode)
+    authority, record = issued()
+    result = verifier_for(authority).verify(
+        coordinate=record.coordinate,
+        expected_reference_tenant_id=record.coordinate.tenant_id,
+        as_of=T_MID,
+    )
+    assert result.outcome is O.VERIFICATION_UNAVAILABLE

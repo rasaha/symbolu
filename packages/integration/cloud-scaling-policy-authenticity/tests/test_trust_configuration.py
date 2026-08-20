@@ -144,3 +144,83 @@ def test_no_public_key_material_enters_the_trust_configuration_digest():
     source = inspect.getsource(module.policy_trust_configuration_digest)
     for forbidden in ("verify_key", "public_bytes", "seed", "encode()"):
         assert forbidden not in source
+
+
+# --------------------------------------------------------------------------- #
+# The port reports; the verifier snapshots
+# --------------------------------------------------------------------------- #
+class DriftingPort:
+    """A port whose reported trust identity changes on every read.
+
+    Not a hypothetical: ``trust_configuration_digest`` is a property on an injected
+    collaborator, so a port backed by a mutable key store recomputes it, and one that
+    rebuilds its ring in the background genuinely answers differently over time. A verifier
+    that read it at mint time would stamp an identity it never admitted.
+    """
+
+    def __init__(self, inner):
+        self._inner = inner
+        self.reads = 0
+
+    @property
+    def trust_configuration_digest(self) -> str:
+        self.reads += 1
+        return f"{self.reads:064x}"
+
+    @property
+    def is_production_authoritative(self) -> bool:
+        return self._inner.is_production_authoritative
+
+    def resolve_policy_version(self, **kwargs):
+        return self._inner.resolve_policy_version(**kwargs)
+
+
+@pytest.mark.adversarial
+def test_the_verifier_snapshots_the_trust_identity_and_mints_from_the_snapshot():
+    authority, record = issued()
+    port = DriftingPort(port_for(authority))
+    verifier = PolicyAuthenticityVerifier(resolution_port=port)
+    admitted = verifier.trust_configuration_digest
+    assert port.reads == 1  # read once, at construction
+
+    verified = verifier.verify(
+        coordinate=record.coordinate,
+        expected_reference_tenant_id=record.coordinate.tenant_id,
+        as_of=T_MID,
+    ).verified_policy
+
+    # The port has drifted; the determination names what was admitted, not what it now says.
+    assert verified.trust_configuration_digest == admitted
+    assert verified.trust_configuration_digest != port.trust_configuration_digest
+
+
+@pytest.mark.adversarial
+def test_the_snapshot_is_stable_across_repeated_reads_and_repeated_verifications():
+    authority, record = issued()
+    verifier = PolicyAuthenticityVerifier(resolution_port=DriftingPort(port_for(authority)))
+    seen = {verifier.trust_configuration_digest for _ in range(5)}
+    for _ in range(3):
+        seen.add(
+            verifier.verify(
+                coordinate=record.coordinate,
+                expected_reference_tenant_id=record.coordinate.tenant_id,
+                as_of=T_MID,
+            ).verified_policy.trust_configuration_digest
+        )
+    assert len(seen) == 1
+
+
+@pytest.mark.adversarial
+def test_the_snapshot_cannot_be_rebound_after_construction():
+    authority = make_authority()
+    verifier = PolicyAuthenticityVerifier(resolution_port=port_for(authority))
+    with pytest.raises(AttributeError):
+        verifier._trust_configuration_digest = "d" * 64
+
+
+@pytest.mark.happy
+def test_two_verifiers_over_the_same_configuration_snapshot_the_same_identity():
+    authority = make_authority()
+    first = PolicyAuthenticityVerifier(resolution_port=port_for(authority))
+    second = PolicyAuthenticityVerifier(resolution_port=port_for(authority))
+    assert first.trust_configuration_digest == second.trust_configuration_digest

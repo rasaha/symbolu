@@ -51,6 +51,13 @@ earlier failure:
 
 Only after all ten does a :class:`~.verified.VerifiedPolicyAuthenticity` exist.
 
+Three checks deliberately sit **outside** that list, and the count stays ten because none of
+them is a gate on an input. The trust identity is snapshotted once, at *construction*, and
+every determination is minted from the snapshot. The verified/resolution **pair** is
+cross-checked by :class:`PolicyAuthenticityResult` itself, at *result construction*, because
+it is a property of the pair rather than of anything the routine was handed. And the terminal
+handler *classifies* an escaping exception rather than deciding anything about an input.
+
 No placeholder, no optionality
 -------------------------------
 The resolution port is a **required** constructor argument with no default. There is no port
@@ -88,7 +95,9 @@ from .canonical import (
     is_policy_digest,
     require_aware_utc,
 )
+from .errors import CloudScalingPolicyAuthenticityError as _PackageError
 from .errors import PolicyAuthenticityConfigurationError as _ConfigError
+from .errors import VerifiedPolicyArtifactIntegrityError as _IntegrityError
 from .identifiers import (
     POLICY_AUTHENTICITY_DIGEST_DOMAIN,
     POLICY_AUTHORITY_CANONICALIZATION_VERSION,
@@ -146,6 +155,14 @@ class PolicyAuthenticityResult:
     The verified branch is **revalidated** on construction. Assembling a result around a
     fabricated artifact therefore fails here, which means every verified artifact a caller
     can reach through a result is one this process genuinely reached.
+
+    The **pair** is bound as well as each half. Both halves are individually genuine even
+    when they are about different policies — a real determination for policy A and a real
+    resolution for policy B are each valid objects — and a consumer that reads the body out
+    of ``resolution`` while trusting the coordinate on ``verified_policy`` would then be
+    reading a body the proof does not cover. So the two are cross-checked on the coordinate
+    and on ``policy_body_digest``, which is the binding D-5B0B-2 makes load-bearing. The
+    verifier cannot produce a mismatched pair; this refuses one that was assembled.
     """
 
     verified_policy: Optional[VerifiedPolicyAuthenticity] = None
@@ -176,9 +193,42 @@ class PolicyAuthenticityResult:
                     "was reached from; the policy body reaches a consumer through the "
                     "authority's own type, not through this package"
                 )
+            self._require_agreeing_pair()
         if self.refusal is not None and type(self.refusal) is not PolicyAuthenticityRefusal:
             raise TypeError(
                 "PolicyAuthenticityResult.refusal must be exactly a PolicyAuthenticityRefusal"
+            )
+
+    def _require_agreeing_pair(self) -> None:
+        """Refuse a verified branch whose resolution is about a different policy.
+
+        Three comparisons, each closing a way the two halves could disagree: the resolution
+        must be *about* the coordinate the artifact names, it must have *found* a record
+        under that coordinate, and that record's signed body digest must be the one the
+        artifact binds.
+        """
+
+        artifact = self.verified_policy
+        resolution = self.resolution
+        coordinate = artifact.policy_coordinate
+        if resolution.requested_coordinate != coordinate:
+            raise _IntegrityError(
+                "PolicyAuthenticityResult pairs a verified policy with a resolution about a "
+                "different coordinate; both halves may be genuine and the pair is still a "
+                "misstatement"
+            )
+        record = resolution.record
+        if type(record) is not IssuedPolicyRecord or record.coordinate != coordinate:
+            raise _IntegrityError(
+                "PolicyAuthenticityResult pairs a verified policy with a resolution that "
+                "carries no record for that coordinate"
+            )
+        if record.policy_body_digest != artifact.policy_body_digest:
+            raise _IntegrityError(
+                "PolicyAuthenticityResult pairs a verified policy with a resolution whose "
+                "record binds a different policy body; policy_body_digest is the content "
+                "binding, so a consumer reading the body out of the resolution would be "
+                "reading a body the proof does not cover"
             )
 
     @property
@@ -201,9 +251,17 @@ class PolicyAuthenticityVerifier:
     posture in which this class verifies against something it was not given. Under
     ``production_mode=True`` the port must be production-authoritative; that is checked at
     construction, so a reference component cannot reach a determination.
+
+    The port's ``trust_configuration_digest`` is **snapshotted at construction** and every
+    determination is minted from the snapshot. A port is an injected collaborator, so its
+    attribute is something this class reads rather than something it controls: reading it
+    again at mint time would let a port report one trust identity when it was admitted and
+    another when the artifact is stamped, which is the one fact the artifact exists to pin.
+    A verifier is therefore bound to one trust configuration for its whole life; a changed
+    configuration means a new port and a new verifier.
     """
 
-    __slots__ = ("_port", "_production_mode")
+    __slots__ = ("_port", "_production_mode", "_trust_configuration_digest")
 
     def __init__(self, *, resolution_port, production_mode: bool = False) -> None:
         if resolution_port is None:
@@ -227,6 +285,11 @@ class PolicyAuthenticityVerifier:
             require_production_resolution_port(resolution_port)
         object.__setattr__(self, "_port", resolution_port)
         object.__setattr__(self, "_production_mode", bool(production_mode))
+        # Snapshotted, deliberately: see this class's docstring. ``str()`` is not a
+        # normalization — ``is_policy_digest`` above already refused anything but an exact
+        # ``str`` of the right shape — it detaches the value from a property that could
+        # answer differently next time.
+        object.__setattr__(self, "_trust_configuration_digest", str(digest))
 
     def __setattr__(self, name: str, value: object) -> None:
         raise AttributeError(
@@ -246,9 +309,13 @@ class PolicyAuthenticityVerifier:
 
     @property
     def trust_configuration_digest(self) -> str:
-        """The identity of the trust configuration every determination here is reached under."""
+        """The identity of the trust configuration every determination here is reached under.
 
-        return self._port.trust_configuration_digest
+        The value read from the port at construction, not a fresh read. See the class
+        docstring for why that difference is load-bearing.
+        """
+
+        return self._trust_configuration_digest
 
     # -- the authoritative routine ------------------------------------------------------ #
 
@@ -282,8 +349,9 @@ class PolicyAuthenticityVerifier:
                 candidate=candidate,
             )
         except Exception as exc:  # noqa: BLE001 - deliberate fail-closed terminal
+            outcome = _terminal_outcome(exc)
             return _refuse(
-                _Outcome.VERIFICATION_UNAVAILABLE,
+                outcome,
                 f"verification could not reach a determination: {type(exc).__name__}",
             )
 
@@ -437,7 +505,7 @@ class PolicyAuthenticityVerifier:
             coordinate=coordinate,
             expected_reference_tenant_id=expected_reference_tenant_id,
             resolved_as_of=instant,
-            trust_configuration_digest=self._port.trust_configuration_digest,
+            trust_configuration_digest=self._trust_configuration_digest,
             candidate_digest_fact=None if candidate is None else candidate.candidate_digest,
         )
         return PolicyAuthenticityResult(verified_policy=artifact, resolution=resolution)
@@ -447,6 +515,27 @@ class PolicyAuthenticityVerifier:
             f"PolicyAuthenticityVerifier(port={type(self._port).__name__}, "
             f"production_mode={self._production_mode})"
         )
+
+
+def _terminal_outcome(exc: BaseException) -> _Outcome:
+    """Classify an exception that escaped the routine. Every answer is a refusal.
+
+    This package's own errors already carry the member they mean — a malformed field is
+    ``COORDINATE_MALFORMED``, a failed artifact integrity check is ``INVARIANT_VIOLATION`` —
+    and flattening all of them to ``VERIFICATION_UNAVAILABLE`` would tell a caller "the
+    check could not run" when what happened is "the check ran and the artifact is bad".
+    Those are different facts and a caller may reasonably act on them differently.
+
+    Anything else is genuinely unavailable: a collaborator's exception, a stdlib error, a
+    programming failure. ``VERIFIED`` can never be returned, whatever an exception claims to
+    carry — an exception is not a success, and an attacker-influenced ``outcome`` attribute
+    must not become one.
+    """
+
+    outcome = getattr(exc, "outcome", None) if isinstance(exc, _PackageError) else None
+    if type(outcome) is not _Outcome or outcome is _Outcome.VERIFIED:
+        return _Outcome.VERIFICATION_UNAVAILABLE
+    return outcome
 
 
 def _refuse(outcome: _Outcome, detail: str) -> PolicyAuthenticityResult:

@@ -164,3 +164,69 @@ def test_there_is_no_deserializer_on_the_public_surface():
     for forbidden in ("from_dict", "from_json", "loads", "deserialize", "parse"):
         assert not hasattr(VerifiedPolicyAuthenticity, forbidden)
         assert forbidden not in pkg.__all__
+
+
+# --------------------------------------------------------------------------- #
+# The pair, not only each half
+# --------------------------------------------------------------------------- #
+def _genuine_pair(policy_id: str):
+    """One genuine determination and the genuine resolution it was reached from."""
+
+    from _policy_fixtures import make_authority, make_policy, verifier_for
+
+    authority = make_authority()
+    record = authority.issue(make_policy(policy_id=policy_id))
+    result = verifier_for(authority).verify(
+        coordinate=record.coordinate,
+        expected_reference_tenant_id=record.coordinate.tenant_id,
+        as_of=T_MID,
+    )
+    assert result.verified is True
+    return result.verified_policy, result.resolution
+
+
+@pytest.mark.adversarial
+def test_a_genuine_artifact_cannot_be_paired_with_a_genuine_resolution_for_another_policy():
+    """Both halves are real. The pair is a misstatement, and is refused as one.
+
+    A consumer reads the coordinate off the artifact and the body out of the resolution.
+    Pair them across two policies and that consumer reads a body the proof does not cover —
+    which is exactly what ``policy_body_digest`` exists to prevent.
+    """
+
+    artifact_a, _resolution_a = _genuine_pair("policy-a")
+    _artifact_b, resolution_b = _genuine_pair("policy-b")
+
+    assert artifact_a.policy_id != resolution_b.record.coordinate.policy_id
+    with pytest.raises(VerifiedPolicyArtifactIntegrityError):
+        PolicyAuthenticityResult(verified_policy=artifact_a, resolution=resolution_b)
+
+
+@pytest.mark.adversarial
+def test_a_pair_agreeing_on_the_coordinate_but_not_the_body_digest_is_refused():
+    """Same coordinate, different signed body. The coordinate check alone would admit it."""
+
+    artifact, resolution = _genuine_pair("policy-c")
+    object.__setattr__(resolution.record, "policy_body_digest", "c" * 64)
+    with pytest.raises(VerifiedPolicyArtifactIntegrityError):
+        PolicyAuthenticityResult(verified_policy=artifact, resolution=resolution)
+
+
+@pytest.mark.adversarial
+def test_a_verified_branch_without_a_record_bearing_resolution_is_refused():
+    from ugence_policy_authority.api import PolicyResolution, PolicyResolutionReason
+
+    artifact, resolution = _genuine_pair("policy-d")
+    empty = PolicyResolution.unresolved(
+        PolicyResolutionReason.NOT_FOUND,
+        requested_coordinate=resolution.requested_coordinate,
+        as_of=resolution.as_of,
+    )
+    with pytest.raises(VerifiedPolicyArtifactIntegrityError):
+        PolicyAuthenticityResult(verified_policy=artifact, resolution=empty)
+
+
+@pytest.mark.happy
+def test_the_pair_the_verifier_produces_agrees_with_itself():
+    artifact, resolution = _genuine_pair("policy-e")
+    assert PolicyAuthenticityResult(verified_policy=artifact, resolution=resolution) is not None

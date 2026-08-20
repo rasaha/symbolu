@@ -37,6 +37,25 @@ First release. Adds a distribution; changes none.
 - **D-5B0B-6** — the proof travels alongside the candidate. Phase 5A stays at `0.1.0`; this
   suite re-runs its frozen-digest tests to prove all ten are unmoved.
 
+### Audit remediation (pre-merge, same version)
+
+Three findings from the independent audit of this package, addressed without adding or
+removing a verification gate and without touching Phase 5A.
+
+- **The result pair is bound.** `PolicyAuthenticityResult` now cross-checks the verified
+  artifact against the `PolicyResolution` it carries, on the coordinate and on
+  `policy_body_digest`. Two individually genuine halves about different policies are a
+  misstatement — a consumer reading the body out of the resolution would read a body the
+  proof does not cover — and the pair is refused as one.
+- **The trust identity is snapshotted at verifier construction** and every determination is
+  minted from the snapshot, so a port cannot report one identity when it is admitted and
+  another when the artifact is stamped.
+- **Typed outcomes survive the terminal handler.** An escaping error of this package's own
+  types keeps the member it carries (`COORDINATE_MALFORMED`, `INVARIANT_VIOLATION`, …);
+  anything else is `VERIFICATION_UNAVAILABLE`. "The check could not run" and "the check ran
+  and the artifact is bad" are different facts. An exception claiming `VERIFIED` never
+  becomes one.
+
 ### Residual closed at this boundary
 
 - **R-3** — `resolve_policy` does not re-enforce `coordinate.content_digest ==

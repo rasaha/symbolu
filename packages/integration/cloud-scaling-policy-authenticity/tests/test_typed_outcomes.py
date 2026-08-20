@@ -65,3 +65,68 @@ def test_there_is_no_member_meaning_probably_fine():
     for member in O:
         for word in forbidden:
             assert word not in member.value
+
+
+# --------------------------------------------------------------------------- #
+# The terminal handler classifies rather than flattens
+# --------------------------------------------------------------------------- #
+@pytest.mark.invariant
+def test_every_typed_error_keeps_its_member_through_the_terminal_handler():
+    """"could not run" and "ran, and the artifact is bad" are different facts.
+
+    Flattening every escaping exception to ``VERIFICATION_UNAVAILABLE`` would tell a caller
+    the first when what happened was the second. Each of this package's errors already
+    carries the member it means, so the terminal consults it.
+    """
+
+    from ugence_cloud_scaling_policy_authenticity import (
+        PolicyAuthenticityConfigurationError,
+        PolicyAuthenticityExactTypeError,
+        PolicyAuthenticityFieldError,
+        VerifiedPolicyArtifactIntegrityError,
+    )
+    from ugence_cloud_scaling_policy_authenticity.verification import _terminal_outcome
+
+    expected = {
+        PolicyAuthenticityFieldError("f"): O.COORDINATE_MALFORMED,
+        PolicyAuthenticityExactTypeError("t"): O.UNSUPPORTED_EXACT_TYPE,
+        VerifiedPolicyArtifactIntegrityError("i"): O.INVARIANT_VIOLATION,
+        PolicyAuthenticityConfigurationError("c"): O.VERIFICATION_UNAVAILABLE,
+    }
+    for error, member in expected.items():
+        assert _terminal_outcome(error) is member
+
+
+@pytest.mark.adversarial
+@pytest.mark.parametrize(
+    "exc",
+    [
+        RuntimeError("a collaborator failed"),
+        ValueError("a stdlib error"),
+        KeyError("a programming failure"),
+    ],
+)
+def test_a_foreign_exception_is_unavailable_not_classified(exc):
+    from ugence_cloud_scaling_policy_authenticity.verification import _terminal_outcome
+
+    assert _terminal_outcome(exc) is O.VERIFICATION_UNAVAILABLE
+
+
+@pytest.mark.adversarial
+def test_an_exception_claiming_the_success_member_never_becomes_a_success():
+    """An ``outcome`` attribute is attacker-influenceable in principle. It cannot say VERIFIED."""
+
+    from ugence_cloud_scaling_policy_authenticity import (
+        CloudScalingPolicyAuthenticityError,
+    )
+    from ugence_cloud_scaling_policy_authenticity.verification import _terminal_outcome
+
+    claiming = CloudScalingPolicyAuthenticityError("mine", O.VERIFIED)
+    assert _terminal_outcome(claiming) is O.VERIFICATION_UNAVAILABLE
+
+    class Impostor(CloudScalingPolicyAuthenticityError):
+        pass
+
+    impostor = Impostor("mine")
+    impostor.outcome = "VERIFIED"  # a bare string, not a member
+    assert _terminal_outcome(impostor) is O.VERIFICATION_UNAVAILABLE
