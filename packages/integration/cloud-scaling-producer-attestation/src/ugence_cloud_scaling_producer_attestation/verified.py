@@ -63,11 +63,21 @@ profile and version (under which routine).
 
 :attr:`candidate_digest` is therefore **not signature-covered**, and the consequence is
 stated here rather than left to be found: *one genuine attestation verifies against any
-candidate that agrees on those five reconciled facts*, including candidates carrying a
-different policy binding, decision, disposition, risk outcome, magnitude or execution
-scope. Verified against two such candidates the same attestation yields two artifacts with
-the same :attr:`attestation_digest`, different :attr:`candidate_digest` values and
-different :attr:`artifact_digest` values, and both read ``VERIFIED``.
+candidate that agrees on those five reconciled facts*. Verified against two such candidates
+the same attestation yields two artifacts with the same :attr:`attestation_digest`,
+different :attr:`candidate_digest` values and different :attr:`artifact_digest` values, and
+both read ``VERIFIED``.
+
+What that admits, taken from executed tests rather than from reasoning: candidates differing
+in their **policy binding**, in their **execution target scope**, or in the **permitted
+magnitude bounds** the policy imposes. It does **not** admit a candidate whose own
+recommendation differs — ``magnitude_after`` and ``requested_delta`` are functionally
+determined by the recommendation, so changing them moves ``recommendation_digest``, which
+*is* signed, and the verification refuses with ``RECOMMENDATION_DIGEST_MISMATCH``. Nor are
+``disposition``, ``risk_outcome`` or the decision independently variable: Phase 5A refuses a
+candidate outside the ALLOW disposition family at construction. The uncovered surface is
+therefore the **authorization envelope built around a recommendation**, not the
+recommendation itself.
 
 That is the ratified scope, not an oversight. The recommendation itself *is* pinned, by id
 and by content digest, which is what stops a forged recommendation laundering. What is not

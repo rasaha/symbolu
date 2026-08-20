@@ -1011,16 +1011,27 @@ def test_the_signed_payload_covers_the_recommendation_and_not_the_candidate():
 
 
 def test_one_attestation_verifies_against_any_candidate_agreeing_on_the_five_facts():
-    """A-59: the stated consequence of A-58, demonstrated end to end.
+    """A-59: the stated consequence of A-58, measured across every claimed dimension.
 
     ``candidate_digest`` is not signed, so a genuine attestation is not bound to one
-    candidate — it is bound to a *recommendation*. Two candidates that agree on
-    ``(recommendation_id, recommendation_digest, tenant_id, subject_id, subject_type)`` and
-    differ in **policy binding** both verify under the same attestation.
+    candidate — it is bound to a *recommendation*. This property pins the boundary in
+    **both** directions, because an earlier revision of the documents got the permissive
+    side too wide: it claimed the attestation also admits candidates differing in
+    "decision, disposition, risk outcome, magnitudes". Three of those six were wrong.
 
-    This is the ratified scope, and the point of pinning it is that a reader of ``VERIFIED``
-    must not infer anything about the policy binding, the decision or the scope. If a later
-    phase binds the candidate, this test fails and the documents get revisited.
+    Admitted (not reconciled, not signed): a different **policy binding**, a different
+    **execution target scope**, different **permitted magnitude bounds**.
+
+    Refused: the recommendation's **own** magnitudes. ``magnitude_after`` and
+    ``requested_delta`` are functionally determined by the recommendation, so varying them
+    moves ``recommendation_digest`` — which *is* signed — and the verification refuses.
+    That negative case is the one that keeps the documented residual honest, so it is
+    asserted here rather than described.
+
+    (``disposition``, ``risk_outcome`` and the decision are not independently variable at
+    all: Phase 5A refuses a candidate outside the ALLOW disposition family at construction,
+    so there is no such candidate to present. ``test_the_documented_uncovered_dimensions_are_
+    the_measured_ones`` records that.)
     """
 
     import _producer_fixtures as fixtures
@@ -1030,17 +1041,11 @@ def test_one_attestation_verifies_against_any_candidate_agreeing_on_the_five_fac
             "varying the Phase 5A chain requires the monorepo test trees, which no "
             "distribution ships; run this property from a checkout"
         )
+    p5a = fixtures.P5A
 
     first = build_candidate()
     attestation = build_attestation(first)
     verifier = build_verifier(directory=build_directory(build_anchor()))
-
-    scope = fixtures.P5A.build_target_scope(fixtures.P5A.build_projection())
-    second = build_candidate(
-        policy_binding=fixtures.P5A.build_policy_binding(
-            scope, policy_id="cloud-scaling.unbounded", policy_version="9.9.9"
-        )
-    )
 
     five = (
         "recommendation_id",
@@ -1049,26 +1054,151 @@ def test_one_attestation_verifies_against_any_candidate_agreeing_on_the_five_fac
         "subject_id",
         "subject_type",
     )
-    assert all(getattr(first, name) == getattr(second, name) for name in five)
-    assert second.policy_binding != first.policy_binding
-    assert second.candidate_digest != first.candidate_digest
 
-    one = verifier.verify(candidate=first, attestation=attestation, as_of=AS_OF)
-    two = verifier.verify(candidate=second, attestation=attestation, as_of=AS_OF)
+    def agrees_on_the_five(other):
+        return all(getattr(first, name) == getattr(other, name) for name in five)
 
-    assert one.outcome is O.VERIFIED
-    assert two.outcome is O.VERIFIED, (
-        "the second candidate was refused. If the signature now covers the candidate, "
-        "this is a deliberate widening — update ADR §12.1, the verified.py docstring and "
-        "the README section 'What the signature covers' to match"
+    scope = p5a.build_target_scope(p5a.build_projection())
+
+    # --- admitted: three dimensions of the authorization envelope --------------------- #
+    admitted = {
+        "policy binding": build_candidate(
+            policy_binding=p5a.build_policy_binding(
+                scope, policy_id="cloud-scaling.unbounded", policy_version="9.9.9"
+            )
+        ),
+        "execution target scope": build_candidate(
+            target_scope=p5a.build_target_scope(
+                p5a.build_projection(), account_id="acct-999888777666"
+            )
+        ),
+        # Varied on the scope AND the binding together: Phase 5A requires the two to
+        # agree, so a binding whose bounds contradict its scope is not a candidate at all.
+        "permitted magnitude bounds": (
+            lambda wider: build_candidate(
+                target_scope=wider, policy_binding=p5a.build_policy_binding(wider)
+            )
+        )(p5a.build_target_scope(p5a.build_projection(), max_magnitude=40, max_delta=9)),
+    }
+    for label, other in admitted.items():
+        assert agrees_on_the_five(other), label
+        assert other.candidate_digest != first.candidate_digest, label
+        result = verifier.verify(
+            candidate=other, attestation=attestation, as_of=AS_OF
+        )
+        assert result.outcome is O.VERIFIED, (
+            f"a candidate differing only in {label} was refused. If the signature now "
+            "covers it, that is a deliberate narrowing — update ADR §12.1, the verified.py "
+            "docstring and the README section 'What the signature covers' to match"
+        )
+        # Same signed statement; different determination scope, honestly recorded.
+        assert result.verified_attestation.candidate_digest == other.candidate_digest
+        assert result.verified_attestation.attestation_digest == (
+            verifier.verify(candidate=first, attestation=attestation, as_of=AS_OF)
+            .verified_attestation.attestation_digest
+        )
+
+    # --- refused: the recommendation's own content is pinned -------------------------- #
+    different_recommendation = build_candidate(
+        projection=p5a.build_projection(
+            recommendation=p5a.build_recommendation(predicted=10)
+        )
+    )
+    assert different_recommendation.magnitude_after != first.magnitude_after
+    assert different_recommendation.recommendation_digest != first.recommendation_digest
+    assert not agrees_on_the_five(different_recommendation)
+    refused = verifier.verify(
+        candidate=different_recommendation, attestation=attestation, as_of=AS_OF
+    )
+    assert refused.outcome is O.RECOMMENDATION_DIGEST_MISMATCH, (
+        "a candidate whose recommendation magnitudes differ was ADMITTED. The signature "
+        "covers recommendation_digest, so this must be refused — the documented residual "
+        "is about the authorization envelope, not the recommendation's own content"
+    )
+    assert refused.verified_attestation is None
+
+
+def test_the_verifier_reconciles_exactly_five_candidate_facts_and_no_others():
+    """A-60: the invariant every row of the documented coverage table follows from.
+
+    A-59 measures particular dimensions. This pins the general rule they are instances of:
+    the verification routine compares exactly five facts between the attestation and the
+    candidate. Everything else about a candidate — its policy binding, its execution scope,
+    the bounds that policy sets — is never read for reconciliation, which is *why* a single
+    attestation admits candidates differing in them.
+
+    Asserted over the source rather than by enumerating candidates, because the enumeration
+    can only ever sample. An earlier revision of the documents drew the enumeration from
+    reasoning instead of from tests and got three of six dimensions wrong; this property is
+    the one that would have caught that, because widening or narrowing the reconciliation
+    set fails here immediately.
+    """
+
+    import ast
+    import inspect
+
+    from ugence_cloud_scaling_producer_attestation import verification
+
+    tree = ast.parse(inspect.getsource(verification))
+    reconciled = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Compare):
+            continue
+        left, comparators = node.left, node.comparators
+        if not comparators or not isinstance(node.ops[0], ast.NotEq):
+            continue
+        right = comparators[0]
+        # Keyed on the CANDIDATE-side attribute, and deliberately not requiring the two
+        # sides to name the same field. A reconciliation written as
+        # ``attestation.recommendation_id != candidate.policy_binding_digest`` still reads a
+        # sixth candidate fact, and a check that only matched same-named pairs would miss
+        # it — which it did, until this property was falsified against exactly that shape.
+        if (
+            isinstance(left, ast.Attribute)
+            and isinstance(left.value, ast.Name)
+            and left.value.id == "attestation"
+            and isinstance(right, ast.Attribute)
+            and isinstance(right.value, ast.Name)
+            and right.value.id == "candidate"
+        ):
+            reconciled.add(right.attr)
+
+    assert reconciled == {
+        "recommendation_id",
+        "recommendation_digest",
+        "tenant_id",
+        "subject_id",
+        "subject_type",
+    }, (
+        f"the reconciliation set is now {sorted(reconciled)}. It defines exactly which "
+        "candidate differences a single genuine attestation tolerates, so ADR §12.1, the "
+        "verified.py docstring and the README section 'What the signature covers' all "
+        "describe this set and must be updated with it"
     )
 
-    # Same signed statement; different determination scope, honestly recorded.
-    assert one.verified_attestation.attestation_digest == (
-        two.verified_attestation.attestation_digest
+    # And it is the same set the signature covers, minus the attestation's own metadata —
+    # which is what makes the reconciliation an independent recomputation rather than a
+    # comparison of the attestation against itself.
+    from ugence_cloud_scaling_producer_attestation import (
+        producer_attestation_signing_payload,
     )
-    assert one.verified_attestation.candidate_digest == first.candidate_digest
-    assert two.verified_attestation.candidate_digest == second.candidate_digest
-    assert one.verified_attestation.artifact_digest != (
-        two.verified_attestation.artifact_digest
+
+    signed = producer_attestation_signing_payload(
+        producer_id=PRODUCER_ID,
+        issuer=ISSUER_ID,
+        producer_key_id=PRODUCER_KEY_ID,
+        tenant_id="t",
+        subject_id="s",
+        subject_type="st",
+        recommendation_id="r",
+        recommendation_digest="sha256:" + "a" * 64,
+        issued_at=AS_OF,
+        signing_purpose="p",
+        signature_algorithm="ed25519",
+        signature_profile="pr",
+        signature_encoding="e",
+    )
+    assert reconciled <= set(signed), (
+        "a fact is reconciled against the candidate but not covered by the signature; "
+        "reconciling it proves nothing about what the producer asserted"
     )

@@ -143,12 +143,18 @@ one that merely holds a reference directory as a delegate. Otherwise the Risk Au
 
 The **signer** side is the same mechanism, spelled the same way.
 `mint_producer_attestation(production_mode=True)` refuses
-`ReferenceEd25519ProducerAttestationSigner` and every subclass of it, matched by
-`isinstance` against `REFERENCE_GRADE_SIGNERS` and evaluated **before** the
-`is_reference_signer` flag — so a subclass that sets `is_reference_signer = False` never
-reaches the branch that would have admitted it. A custodian that *composes* a signer rather
-than inheriting from one is admitted, because composition is a decision about where the key
-lives and such a custodian never declared itself reference grade.
+`ReferenceEd25519ProducerAttestationSigner` and every subclass of it, matched by `isinstance`
+against `REFERENCE_GRADE_SIGNERS`. That match is what closes the hole — a subclass inherits
+the reference key custodian whole, so setting `is_reference_signer = False` on one relabels
+it without changing what holds the key.
+
+The `is_reference_signer` check remains alongside it and earns its place independently: it
+catches a *non*-inheriting custodian that honestly declares itself reference grade. Both
+raise, so neither depends on running first; the `isinstance` match is placed first for the
+**message**, so a subclass is named as reference grade rather than reported through the flag
+it set for itself. A custodian that *composes* a signer rather than inheriting from one is
+admitted, because composition is a decision about where the key lives and such a custodian
+never declared itself reference grade.
 
 `DenyAllTrustAnchorDirectory` is admitted, because it can only ever refuse — it is the
 ratified deny-by-default posture, and the only "no anchors" shape that ships. That exemption
@@ -180,9 +186,22 @@ assertions the producer made.
 
 > **`candidate_digest` is not signature-covered.** One genuine attestation verifies against
 > **any** candidate agreeing on `(recommendation_id, recommendation_digest, tenant_id,
-> subject_id, subject_type)` — **including a candidate carrying a different policy binding,
-> decision, disposition, risk outcome, magnitude or execution scope**. Both verifications
-> return `VERIFIED`, with the same `attestation_digest` and different `candidate_digest`s.
+> subject_id, subject_type)`. Both verifications return `VERIFIED`, with the same
+> `attestation_digest` and different `candidate_digest`s.
+
+What that admits in practice, measured rather than reasoned:
+
+| Candidate differs in | Still verifies? | |
+|---|---|---|
+| policy binding | **yes** | not reconciled, not signed |
+| execution target scope | **yes** | not reconciled, not signed |
+| permitted magnitude bounds | **yes** | not reconciled, not signed |
+| the recommendation's own magnitudes | **no** — `RECOMMENDATION_DIGEST_MISMATCH` | they move `recommendation_digest`, which **is** signed |
+| `disposition`, `risk_outcome`, decision | not variable at all | Phase 5A refuses a candidate outside the ALLOW family at construction |
+
+So the uncovered surface is the **authorization envelope built around a recommendation** —
+the policy bound to it, the scope it would execute in, the bounds that policy sets — and not
+the recommendation's own content, which is pinned.
 
 This is the ratified scope, not a defect. The *recommendation* is pinned by id and content
 digest, which is what stops a forged recommendation laundering. The authorization envelope

@@ -74,9 +74,15 @@ one workload would be equally valid alongside a candidate reconciled for another
 those fields to v1 would move a frozen digest, and reusing v1's tag for the wider payload
 would let a v1 signature be presented as a v2 proof.
 
-**Consequence, accepted:** the v2 proof travels **alongside** a Phase 5A candidate and is
-independently bound to it, rather than inside it. Binding one inside a candidate requires a
-Phase 5A 0.2.0, which is 5B-0B's work.
+**Consequence, accepted:** the v2 proof travels **alongside** a Phase 5A candidate rather
+than inside it. Binding one inside a candidate requires a Phase 5A 0.2.0, which is 5B-0B's
+work.
+
+It is bound to the **recommendation** — by `recommendation_id` and `recommendation_digest`,
+both signature-covered — and **not** to the candidate. An earlier revision of this paragraph
+said the proof "is independently bound to it", meaning the candidate; that is false and it
+contradicted §12.1. `candidate_digest` is not in the signed payload, so one genuine
+attestation verifies against more than one candidate. §12.1 states exactly what follows.
 
 ## §4. Decision — `issuer` and `producer_id` are separate fields, not required to differ
 
@@ -339,11 +345,27 @@ producer made.
 **`candidate_digest` in particular is not signature-covered.** The consequence, stated here
 rather than left to be discovered: *one genuine attestation verifies against **any** candidate
 that agrees on the five reconciled facts* — `(recommendation_id, recommendation_digest,
-tenant_id, subject_id, subject_type)` — **including candidates that differ in policy binding,
-decision, disposition, risk outcome, magnitudes or execution scope**. Verified against two
-such candidates, the same attestation yields two artifacts with the same
-`attestation_digest`, different `candidate_digest`s and therefore different
-`artifact_digest`s, and both read `VERIFIED`.
+tenant_id, subject_id, subject_type)`. Verified against two such candidates, the same
+attestation yields two artifacts with the same `attestation_digest`, different
+`candidate_digest`s and therefore different `artifact_digest`s, and both read `VERIFIED`.
+
+**Which differences that actually admits, enumerated from executed tests and not from
+reasoning.** An earlier revision of this section listed "policy binding, decision,
+disposition, risk outcome, magnitudes or execution scope". Three of those six are wrong, and
+the correction matters because the over-broad list made the residual sound larger than it is:
+
+| Candidate differs in | Same attestation still verifies? | Why |
+|---|---|---|
+| policy binding (`policy_id`, `policy_version`) | **yes** | not reconciled, not signed |
+| execution target scope (e.g. `account_id`) | **yes** | not reconciled, not signed |
+| permitted magnitude bounds (`max_permitted_magnitude`, `max_permitted_delta`) | **yes** | not reconciled, not signed |
+| the recommendation's own magnitudes (`magnitude_after`, `requested_delta`) | **no** — `RECOMMENDATION_DIGEST_MISMATCH` | functionally determined by the recommendation, so they move `recommendation_digest`, which **is** signed |
+| `disposition`, `risk_outcome`, `decision_id` | **not independently variable at all** | Phase 5A refuses a candidate outside the ALLOW disposition family at construction, so no such candidate exists to present |
+
+So the uncovered surface is the **authorization envelope** built around a recommendation —
+the policy bound to it, the scope it would execute in, the bounds that policy sets — and not
+the recommendation's own content, which is pinned. That is the accurate statement of the
+residual, and it is narrower than the earlier list implied.
 
 This is a **deliberate consequence of the ratified scope**, not a defect to be silently
 tolerated. A producer attestation asserts *who produced this recommendation*. The

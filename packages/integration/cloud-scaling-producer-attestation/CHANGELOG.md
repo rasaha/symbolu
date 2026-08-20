@@ -106,13 +106,18 @@ digest are byte-identical, so no issued attestation is invalidated.
 
 * **What the signature covers.** `candidate_digest` is **not** covered by the producer's
   signature: one genuine attestation verifies against any candidate agreeing on
-  `(recommendation_id, recommendation_digest, tenant_id, subject_id, subject_type)`,
-  including candidates carrying a different policy binding, decision or scope. This is the
-  ratified scope — the attestation is minted at the Controller's output boundary, before a
-  candidate exists — and it is now stated in ADR §12.1, in the `verified.py` docstring and
-  in a README section, and pinned by two properties rather than left to be discovered. The
-  README's earlier claim that the v2 proof is "independently bound to" a candidate is
-  corrected: it is bound to the *recommendation*.
+  `(recommendation_id, recommendation_digest, tenant_id, subject_id, subject_type)` —
+  measurably, candidates differing in policy binding, execution target scope or permitted
+  magnitude bounds. It does **not** extend to the recommendation's own magnitudes, which
+  move `recommendation_digest` and are refused, nor to `disposition`/`risk_outcome`/the
+  decision, which Phase 5A will not let a candidate vary at all. This is the ratified scope
+  — the attestation is minted at the Controller's output boundary, before a candidate exists
+  — and it is now stated in ADR §12.1, in the `verified.py` docstring and in a README
+  section, and pinned by properties rather than left to be discovered.
+* The claim that the v2 proof is "independently bound to" a candidate is retracted in all
+  three places that made it — the README, the package's top-level docstring and ADR §3,
+  which had come to contradict ADR §12.1. The proof is bound to the *recommendation*, by id
+  and content digest.
 * **A production composition root.** The README gains a worked example: `production_mode=True`
   at both boundaries (it defaults to `False`), a non-reference resolver and signer, and
   `require_verified_producer_attestation` at every consumption boundary.
