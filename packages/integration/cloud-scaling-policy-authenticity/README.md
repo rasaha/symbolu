@@ -16,7 +16,7 @@ asks the Policy Authority anything: its one trust state is `PRESENT_BUT_NOT_TRUS
 
 ## What a `VERIFIED` outcome means, exactly
 
-At the injected `as_of`, under the trust configuration the artifact names, the complete
+At the injected `as_of`, through the resolution port the composition root wired, the complete
 six-component coordinate resolved to a **non-historical** `RESOLVED` answer. That answer
 means the Policy Authority found a record under that exact coordinate, the stored artifact
 still re-derived it and still canonicalized, the declared and signed body digests both
@@ -90,9 +90,16 @@ answer questions with different owners and different rotation authority. This pa
 canonical field:
 
 * **`verified`** — the facts a gate actually checked: the six coordinate components, the body
-  digest, the issuing authority and key, the trust-configuration identity, the profile.
-* **`recorded`** — carried and digest-covered, but **never attested**. Exactly two members
-  today, one per open residual: `resolved_as_of_fact` (R-2) and `candidate_digest_fact` (R-4).
+  digest, the issuing authority and key, the record and adapter ids, the profile.
+* **`recorded`** — carried and digest-covered, but **never attested**. Four members, three
+  reasons:
+
+  | Fact | Why nothing established it |
+  |---|---|
+  | `resolved_as_of_fact` | R-2 — the instant is injected and unvalidated |
+  | `candidate_digest_fact` | R-4 — recorded, never reconciled |
+  | `policy_type` | absent from the 21 signed issuance keys, and `resolve_policy` never compares the record's value to the adapter descriptor's. Transitively committed inside `policy_body_digest`, but a hash is one-way and this package holds no adapter registry |
+  | `trust_configuration_digest` | reported by the resolution port about itself. The port is the seam to the authority, so any check here would be the port vouching for itself |
 
 Being recorded does not mean unprotected — both halves are inside the artifact digest, so
 neither can be rewritten after the fact. It means nobody checked it. Read a fact through

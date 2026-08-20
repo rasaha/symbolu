@@ -59,8 +59,21 @@ def test_the_partition_is_total_and_disjoint_over_the_artifact_s_own_fields():
 
 
 @pytest.mark.invariant
-def test_the_recorded_half_holds_exactly_the_two_facts_the_open_residuals_name():
-    assert RECORDED_FACT_NAMES == {"resolved_as_of_fact", "candidate_digest_fact"}
+def test_the_recorded_half_holds_exactly_the_facts_nothing_established():
+    """Four members, three reasons. Each is pinned by its own test elsewhere in the suite.
+
+    * ``resolved_as_of_fact`` — R-2, injected and unvalidated;
+    * ``candidate_digest_fact`` — R-4, recorded and never reconciled;
+    * ``policy_type`` — not signature-covered and never compared at resolution;
+    * ``trust_configuration_digest`` — reported by the resolution port about itself.
+    """
+
+    assert RECORDED_FACT_NAMES == {
+        "resolved_as_of_fact",
+        "candidate_digest_fact",
+        "policy_type",
+        "trust_configuration_digest",
+    }
 
 
 @pytest.mark.invariant

@@ -85,3 +85,32 @@ No gate was added or removed — the verification routine still runs ten — the
 at `0.1.0`, and no Phase 5A frozen digest moved. Promotion is the ratified route for closing
 the two residuals: 5B-1 moves `candidate_digest_fact` and 5B-2 moves `resolved_as_of_fact` into
 the verified half, and each promotion visibly moves the artifact digest.
+
+
+---
+
+## D-5B0B-7 addendum — what the recorded half turned out to hold
+
+Ratifying the partition made a second question answerable that the flat payload had hidden:
+*which facts does this boundary actually establish?* Auditing the verified half against the
+code moved two more members into `recorded`, neither of which can be repaired with a gate.
+
+* **`policy_type`** is not among the 21 keys of `IssuedPolicyRecord.signing_payload()`, and
+  `resolve_policy` recomputes the body digest from the adapter descriptor's value rather than
+  the record's. It is transitively committed inside `policy_body_digest`, whose frame includes
+  it, but a hash is one-way and this package holds no adapter registry with which to re-derive
+  the descriptor. Nothing to check it against; it is recorded.
+* **`trust_configuration_digest`** is reported by the resolution port about itself. The port is
+  the seam to the authority, so a check would be the port vouching for itself. Making it
+  verifiable would mean this package holding the trust configuration and comparing — which is
+  precisely the second trust store D-5B0B-4 refuses. It is recorded.
+
+**The route to promoting the trust identity, if the owner later wants it verified `[R]`:**
+restrict `production_mode=True` to the exact port types this distribution ships, so the digest
+is computed by code in this package from the wired components rather than reported by a
+caller's object. Not taken now — it would refuse a legitimate custom production port, and the
+artifact would then mean different things in the two modes. Recorded here so the option is not
+rediscovered.
+
+Neither change adds or removes a verification gate; the routine still runs ten and
+`VERIFICATION_PROFILE_VERSION` stays `v1`.

@@ -2,15 +2,18 @@
 
 What it establishes
 -------------------
-Exactly one thing: that at the injected instant :attr:`resolved_as_of_fact`, under the
-policy trust configuration identified by :attr:`trust_configuration_digest`, the complete
-policy coordinate this artifact names resolved to a **non-historical** ``RESOLVED``
-answer — meaning the Policy Authority found a record under that exact coordinate, the
+Exactly one thing: that at the injected instant :attr:`resolved_as_of_fact`, through the
+resolution port the composition root wired, the complete policy coordinate this artifact
+names resolved to a **non-historical** ``RESOLVED`` answer — meaning the Policy Authority found a record under that exact coordinate, the
 stored artifact still re-derived it and still canonicalized, the declared and signed body
 digests both equalled the recomputed one, the issuance signature verified under a key of the
 named authority that was un-revoked, in-window, tenant-permitted and entitled to
 ``ISSUE_POLICY``, external approval evidence held, the lifecycle was active, the instant fell
 inside the effective period, and no verified revocation applied.
+
+Note what that sentence does **not** say. It does not say *which* trust configuration the
+resolution ran under: :attr:`trust_configuration_digest` is what the port reported about
+itself, which is why it sits in the recorded half. See :meth:`recorded_facts`.
 
 "Is valid now", not "was validly issued"
 -----------------------------------------
@@ -148,9 +151,7 @@ VERIFIED_FACT_NAMES: "frozenset[str]" = frozenset(
         "signature_alg",
         "record_id",
         "adapter_id",
-        "policy_type",
         "expected_reference_tenant_id",
-        "trust_configuration_digest",
         "policy_trust_anchor_owner",
         "authority_protocol_id",
         "authority_canonicalization_version",
@@ -160,12 +161,32 @@ VERIFIED_FACT_NAMES: "frozenset[str]" = frozenset(
     }
 )
 
-#: The facts carried and digest-covered but **never attested** (D-5B0B-7). One member per
-#: open residual: ``resolved_as_of_fact`` (R-2) and ``candidate_digest_fact`` (R-4). A member
-#: leaves this set only when the residual it names is closed, and doing so moves the artifact
-#: digest — which is the point.
+#: The facts carried and digest-covered but **never attested** (D-5B0B-7). A member leaves
+#: this set only when something starts actually checking it, and doing so moves the artifact
+#: digest — which is the point. Four members, for three distinct reasons:
+#:
+#: * ``resolved_as_of_fact`` — open residual **R-2**: the instant is injected and unvalidated.
+#: * ``candidate_digest_fact`` — open residual **R-4**: recorded, never reconciled.
+#: * ``policy_type`` — **not signature-covered and never compared.** It is absent from the 21
+#:   keys of ``IssuedPolicyRecord.signing_payload()`` (``adapter_id`` is present; this is not),
+#:   and ``resolve_policy`` never compares the record's ``policy_type`` against the adapter
+#:   descriptor's. A record differing only in this field resolves ``RESOLVED`` and would mint a
+#:   ``VERIFIED`` artifact carrying the substituted value. It is transitively committed inside
+#:   ``policy_body_digest``, whose frame includes it — but a hash is one-way, and this package
+#:   holds no adapter registry with which to re-derive the descriptor, so there is nothing here
+#:   to check it against.
+#: * ``trust_configuration_digest`` — **self-reported by the resolution port.** The port is the
+#:   seam to the authority, so any check this package could make would be the port vouching for
+#:   itself: a wrapper delegating to a genuine ``PolicyAuthorityResolutionPort`` while reporting
+#:   an arbitrary well-formed digest is indistinguishable from the genuine port at this
+#:   boundary. Only the composition root knows which trust configuration it wired.
 RECORDED_FACT_NAMES: "frozenset[str]" = frozenset(
-    {"resolved_as_of_fact", "candidate_digest_fact"}
+    {
+        "resolved_as_of_fact",
+        "candidate_digest_fact",
+        "policy_type",
+        "trust_configuration_digest",
+    }
 )
 
 #: The private construction token. Not exported, not in ``__all__``, not reachable from the
@@ -391,9 +412,7 @@ class VerifiedPolicyAuthenticity:
             "signature_alg": self.signature_alg,
             "record_id": self.record_id,
             "adapter_id": self.adapter_id,
-            "policy_type": self.policy_type,
             "expected_reference_tenant_id": self.expected_reference_tenant_id,
-            "trust_configuration_digest": self.trust_configuration_digest,
             "policy_trust_anchor_owner": self.policy_trust_anchor_owner,
             "authority_protocol_id": self.authority_protocol_id,
             "authority_canonicalization_version": self.authority_canonicalization_version,
@@ -410,21 +429,22 @@ class VerifiedPolicyAuthenticity:
     def recorded_facts(self) -> dict:
         """Facts carried and digest-covered, but **never attested** (D-5B0B-7).
 
-        Both members name an open residual, and that is the whole reason they are separated:
-
-        * ``resolved_as_of_fact`` — the instant the determination was reached at. Injected by
-          the caller and unvalidated (**R-2**). It is not a verified statement about time.
-        * ``candidate_digest_fact`` — which candidate the proof accompanied, if one was
-          supplied. Recorded and never reconciled (**R-4**); a Phase 5A binding cannot name a
-          coordinate, so there is nothing here that was compared.
+        Four members, and each is here because nothing established it — see
+        :data:`RECORDED_FACT_NAMES` for the reason attached to each. Two name open residuals
+        (``resolved_as_of_fact``/R-2, ``candidate_digest_fact``/R-4); ``policy_type`` is
+        neither signature-covered nor compared at resolution; ``trust_configuration_digest``
+        is reported by the resolution port about itself.
 
         Being in this map does **not** mean the value is unprotected: it is inside the
         artifact digest, so it cannot be rewritten after the fact. It means nobody checked it.
+        A consumer that needs any of these to be *true* must establish it somewhere else.
         """
 
         return {
             "resolved_as_of_fact": self.resolved_as_of_fact,
             "candidate_digest_fact": self.candidate_digest_fact,
+            "policy_type": self.policy_type,
+            "trust_configuration_digest": self.trust_configuration_digest,
         }
 
     def digest_payload(self) -> dict:

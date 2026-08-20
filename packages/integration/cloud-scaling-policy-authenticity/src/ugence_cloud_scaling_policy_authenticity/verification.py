@@ -201,12 +201,21 @@ class PolicyAuthenticityResult:
             )
 
     def _require_agreeing_pair(self) -> None:
-        """Refuse a verified branch whose resolution is about a different policy.
+        """Refuse a verified branch whose resolution is not the one the artifact reports.
 
-        Three comparisons, each closing a way the two halves could disagree: the resolution
-        must be *about* the coordinate the artifact names, it must have *found* a record
-        under that coordinate, and that record's signed body digest must be the one the
-        artifact binds.
+        Two questions, and binding only the first leaves the pair a misstatement.
+
+        **Which policy** — the resolution must be *about* the coordinate the artifact names,
+        it must have *found* a record under that coordinate, and that record's signed body
+        digest must be the one the artifact binds.
+
+        **Which answer** — a genuine artifact of policy X pairs cleanly with a genuine
+        resolution of policy X that says something else entirely. A historical resolution is
+        the sharp case: it is ``RESOLVED``, it is about the same coordinate, it carries the
+        same body digest, and ``implies_current_validity`` is ``False`` — while every artifact
+        this package mints reports ``historical=False``. A resolution reached at a different
+        ``as_of`` is the same failure in the other dimension, and D-5B0B-5 measured that the
+        instant is exactly what changes the answer. So both are bound.
         """
 
         artifact = self.verified_policy
@@ -230,6 +239,20 @@ class PolicyAuthenticityResult:
                 "record binds a different policy body; policy_body_digest is the content "
                 "binding, so a consumer reading the body out of the resolution would be "
                 "reading a body the proof does not cover"
+            )
+        if resolution.as_of != artifact.resolved_as_of_fact:
+            raise _IntegrityError(
+                "PolicyAuthenticityResult pairs a verified policy with a resolution reached "
+                "at a different instant than the artifact reports; the same record yields "
+                "different answers at different instants, so the pair asserts a validity the "
+                "resolution never established"
+            )
+        if resolution.historical or resolution.implies_current_validity is not True:
+            raise _IntegrityError(
+                "PolicyAuthenticityResult pairs a verified policy with a historical "
+                "resolution. Every artifact this package mints reports historical=False, so "
+                "the pair would present a statement about the past as one about now — the "
+                "distinction D-5B0B-1 refuses to let downstream consumers carry"
             )
 
     @property
@@ -257,9 +280,12 @@ class PolicyAuthenticityVerifier:
     determination is minted from the snapshot. A port is an injected collaborator, so its
     attribute is something this class reads rather than something it controls: reading it
     again at mint time would let a port report one trust identity when it was admitted and
-    another when the artifact is stamped, which is the one fact the artifact exists to pin.
-    A verifier is therefore bound to one trust configuration for its whole life; a changed
-    configuration means a new port and a new verifier.
+    another when the artifact is stamped. A verifier is therefore bound to one reported trust
+    identity for its whole life; a changed configuration means a new port and a new verifier.
+
+    The snapshot stops *drift*; it does not make the value true. A port reports its own trust
+    identity, and this boundary cannot cross-check it — that is why the fact sits in the
+    artifact's **recorded** half. See :data:`~.verified.RECORDED_FACT_NAMES`.
     """
 
     __slots__ = ("_port", "_production_mode", "_trust_configuration_digest")
@@ -575,9 +601,7 @@ def _mint_verified_artifact(
         "signature_alg": record.signature_alg,
         "record_id": record.record_id,
         "adapter_id": record.adapter_id,
-        "policy_type": record.policy_type,
         "expected_reference_tenant_id": expected_reference_tenant_id,
-        "trust_configuration_digest": trust_configuration_digest,
         "policy_trust_anchor_owner": POLICY_TRUST_ANCHOR_OWNER,
         "authority_protocol_id": POLICY_AUTHORITY_PROTOCOL_ID,
         "authority_canonicalization_version": POLICY_AUTHORITY_CANONICALIZATION_VERSION,
@@ -591,9 +615,13 @@ def _mint_verified_artifact(
         "historical": False,
     }
     recorded_map = {
-        # R-2: injected, unvalidated. R-4: recorded, never reconciled.
+        # R-2: injected, unvalidated. R-4: recorded, never reconciled. policy_type: absent
+        # from the signed payload and never compared at resolution. trust_configuration_digest:
+        # reported by the port about itself. See RECORDED_FACT_NAMES for each reason in full.
         "resolved_as_of_fact": resolved_as_of,
         "candidate_digest_fact": candidate_digest_fact,
+        "policy_type": record.policy_type,
+        "trust_configuration_digest": trust_configuration_digest,
     }
     derived = ("outcome", "grants_authority", "historical")
     return _record_minted(

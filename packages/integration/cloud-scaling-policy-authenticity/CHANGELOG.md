@@ -78,6 +78,33 @@ value cannot be read through a call that reads as attested. `VERIFIED_FACT_NAMES
 No gate was added or removed (still ten), the distribution stays at `0.1.0`, and no Phase 5A
 frozen digest moved.
 
+### Second audit round (pre-merge, same version)
+
+Three further findings. **No verification gate was added or removed — the routine still runs
+ten — so `VERIFICATION_PROFILE_VERSION` stays `v1`.** Two facts moved from the verified half
+to the recorded half, which does move every artifact digest; that is safe only because nothing
+downstream pins one yet and no verification artifact crosses a process boundary.
+
+- **`policy_type` moves to `recorded`.** It is absent from the 21 keys of
+  `IssuedPolicyRecord.signing_payload()` (`adapter_id` is present; this is not), and
+  `resolve_policy` recomputes the body digest from the *descriptor's* `policy_type`, never the
+  record's — so a record differing only in that field resolves `RESOLVED` and minted a
+  `VERIFIED` artifact carrying the substituted value. No gate is available: the fact is
+  transitively committed inside `policy_body_digest`, whose frame includes it, but a hash is
+  one-way and this package holds no adapter registry with which to re-derive the descriptor.
+- **`trust_configuration_digest` moves to `recorded`.** It was port-self-reported and checked
+  only for shape, so a wrapper delegating to a genuine `PolicyAuthorityResolutionPort` while
+  reporting an arbitrary well-formed digest minted an artifact carrying that value. No gate is
+  available either: the port *is* the seam to the authority, so any check would be the port
+  vouching for itself. The construction-time snapshot is kept — it stops drift between
+  admission and minting — but it does not make the value true, and the docstrings now say so.
+- **The result pair binds which answer, not only which policy.**
+  `PolicyAuthenticityResult` now also requires the carried resolution to be non-historical and
+  to have been reached at the instant the artifact reports. A genuine artifact previously
+  paired cleanly with a genuine `historical=True` resolution of the same policy — same
+  coordinate, same body digest, `implies_current_validity=False` — and with one reached at a
+  different `as_of`.
+
 ### Residual closed at this boundary
 
 - **R-3** — `resolve_policy` does not re-enforce `coordinate.content_digest ==

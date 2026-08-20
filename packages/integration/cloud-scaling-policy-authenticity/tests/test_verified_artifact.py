@@ -243,3 +243,68 @@ def test_a_verified_branch_without_a_record_bearing_resolution_is_refused():
 def test_the_pair_the_verifier_produces_agrees_with_itself():
     artifact, resolution = _genuine_pair("policy-e")
     assert PolicyAuthenticityResult(verified_policy=artifact, resolution=resolution) is not None
+
+
+@pytest.mark.adversarial
+def test_a_genuine_artifact_cannot_be_paired_with_a_historical_resolution_of_the_same_policy():
+    """Same policy, same instant, same body digest — and a different *answer*.
+
+    A historical resolution is ``RESOLVED``, about the same coordinate, carrying the same
+    record, with ``implies_current_validity`` ``False``. Every artifact this package mints
+    reports ``historical=False``. Binding only which-policy would let the pair present a
+    statement about the past as one about now.
+    """
+
+    from ugence_policy_authority.api import HistoricalResolutionRule, resolve_policy
+
+    from _policy_fixtures import ONE_SECOND, T_TO, issued, revoke, verifier_for
+
+    authority, record = issued()
+    artifact = verifier_for(authority).verify(
+        coordinate=record.coordinate,
+        expected_reference_tenant_id=record.coordinate.tenant_id,
+        as_of=T_MID,
+    ).verified_policy
+
+    revoke(authority, record, revoked_at=T_TO - ONE_SECOND)
+    historical = resolve_policy(
+        reference=record.coordinate,
+        expected_reference_tenant_id=record.coordinate.tenant_id,
+        as_of=T_MID,
+        registry=authority.registry,
+        signature_verifier=authority.key_ring,
+        adapters=authority.adapters,
+        historical_resolution=HistoricalResolutionRule.ALLOW_BEFORE_REVOCATION,
+    )
+    assert historical.resolved and historical.historical
+    assert historical.record.policy_body_digest == artifact.policy_body_digest
+
+    with pytest.raises(VerifiedPolicyArtifactIntegrityError):
+        PolicyAuthenticityResult(verified_policy=artifact, resolution=historical)
+
+
+@pytest.mark.adversarial
+def test_a_genuine_artifact_cannot_be_paired_with_a_resolution_reached_at_another_instant():
+    """D-5B0B-5 measured that the instant is what changes the answer, so the instant is bound."""
+
+    from datetime import timedelta
+
+    from _policy_fixtures import issued, port_for, verifier_for
+
+    authority, record = issued()
+    artifact = verifier_for(authority).verify(
+        coordinate=record.coordinate,
+        expected_reference_tenant_id=record.coordinate.tenant_id,
+        as_of=T_MID,
+    ).verified_policy
+
+    elsewhen = port_for(authority).resolve_policy_version(
+        coordinate=record.coordinate,
+        expected_reference_tenant_id=record.coordinate.tenant_id,
+        as_of=T_MID + timedelta(days=1),
+    )
+    assert elsewhen.resolved and not elsewhen.historical
+    assert elsewhen.as_of != artifact.resolved_as_of_fact
+
+    with pytest.raises(VerifiedPolicyArtifactIntegrityError):
+        PolicyAuthenticityResult(verified_policy=artifact, resolution=elsewhen)
