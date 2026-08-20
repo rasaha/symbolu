@@ -1,0 +1,74 @@
+# Ugence Cloud Scaling Policy Authenticity — Cloud Scaling Phase 5B-0B.
+#
+# A one-way LEAF package. It imports the Ugence Policy Authority (its public API only)
+# and the Phase 5A authorization contracts (the candidate, read-only). Neither imports
+# this package, and neither does the Cloud Scaling Controller.
+#
+# It owns NO authority. It holds no key, no key ring, no policy registry, no trust anchor
+# record, no credentials, no clock and no execution surface. It authors no policy, approves
+# nothing, issues nothing, revokes nothing, mints no envelope, repairs no scope, extracts no
+# bounds, invokes no ActionGate and scales nothing. Phase 5B-1 and every later phase are
+# excluded, and no capability toward any of them is introduced here.
+#
+# Build:   python -m build packages/integration/cloud-scaling-policy-authenticity
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-cloud-scaling-policy-authenticity"
+dynamic = ["version"]
+description = "Ugence Cloud Scaling Policy Authenticity — Phase 5B-0B. A verified policy proof grants nothing."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Ugence Labs" }]
+keywords = ["cloud-scaling", "policy-authenticity", "non-authoritative", "contracts", "ugence"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Typing :: Typed",
+]
+# Exactly two first-party dependencies, both already merged on the default branch, and no
+# third-party runtime dependency at all: the Policy Authority's signing backend is its own
+# stdlib-only RFC 8032 implementation, and every byte this package digests flows through the
+# authority's public canonicalization.
+#
+# D-5B0B-4 option (a) is what puts ugence-policy-authority here. Its measured transitive
+# cost, recorded rather than discovered: that distribution declares
+# ``ugence-uvi-policy-contracts>=0.1.0`` and its ``api`` module imports ``.adapters.uvi``, so
+# the UVI contracts arrive transitively even though Cloud Scaling would register its own
+# capacity-bounds adapter. The authority's generic core imports no UVI symbol.
+#
+# There is deliberately NO dependency on the Trusted Evidence Authority (D-5B0B-4 rejects
+# lending a TEV trust anchor), the Cloud Scaling Controller, Risk Authority, ActionGate, a
+# Credential Broker, Cloud Scaling Operations, a cloud SDK or a Kubernetes client.
+dependencies = [
+    "ugence-policy-authority>=0.1.0",
+    "ugence-cloud-scaling-authorization-contracts>=0.1.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+dev = ["pytest>=7.0", "build>=1.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_cloud_scaling_policy_authenticity.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_cloud_scaling_policy_authenticity*"]
+
+[tool.setuptools.package-data]
+ugence_cloud_scaling_policy_authenticity = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+# Every test carries exactly one property category, so the adversarial-to-happy ratio is
+# machine-counted rather than claimed. See tests/test_property_ledger.py.
+markers = [
+    "happy: a positive-control property — something the boundary must ADMIT",
+    "adversarial: an attack that must be REFUSED, or a dangerous capability that must be ABSENT",
+    "invariant: a structural, packaging or frozen-value regression anchor — neither attack nor success",
+]

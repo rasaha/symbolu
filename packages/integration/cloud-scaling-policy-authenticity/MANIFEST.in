@@ -1,0 +1,5 @@
+include README.md
+include CHANGELOG.md
+include py.typed
+recursive-include src/ugence_cloud_scaling_policy_authenticity *.py py.typed
+recursive-include tests *.py
