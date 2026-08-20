@@ -108,8 +108,22 @@ def _members(archive: pathlib.Path):
 
 
 def _clean_env():
+    """The isolated target environment: offline, and reachable by nothing.
+
+    ``PYTHONPATH`` is emptied rather than merely unset so an inherited value
+    cannot reappear; ``PYTHONNOUSERSITE`` closes the per-user site directory,
+    which is otherwise on the path of any interpreter and would let a
+    ``pip install --user`` package satisfy an import this proof says is
+    unsatisfiable. The venv is created without ``--system-site-packages``, so
+    the system directory is already out of reach.
+
+    ``PIP_NO_INDEX`` is belt to the explicit ``--no-index`` brace: the flag
+    covers the command, the variable covers anything the command shells out to.
+    """
+
     env = dict(os.environ)
-    env.pop("PYTHONPATH", None)
+    env["PYTHONPATH"] = ""
+    env["PYTHONNOUSERSITE"] = "1"
     env["PIP_NO_INDEX"] = "1"
     env["PIP_DISABLE_PIP_VERSION_CHECK"] = "1"
     return env
@@ -140,8 +154,8 @@ def main() -> int:  # noqa: C901 - a verifier is a long list of assertions
         sdist = _latest(findlinks, f"{NAMESPACE}-*.tar.gz")
         br1_wheel = _latest(findlinks, "ugence_benchmark_registry-*.whl")
         print(f"      built {wheel.name}, {sdist.name}, {br1_wheel.name}")
-        check("the wheel carries the BR-2A version", "0.1.0" in wheel.name, wheel.name)
-        check("the sdist carries the BR-2A version", "0.1.0" in sdist.name, sdist.name)
+        check("the wheel carries the BR-2B version", "0.2.0" in wheel.name, wheel.name)
+        check("the sdist carries the BR-2B version", "0.2.0" in sdist.name, sdist.name)
 
         # ------------------------------------------------------------- #
         # 2. Artifact hygiene — both artifacts, negative-controlled
@@ -334,8 +348,8 @@ def main() -> int:  # noqa: C901 - a verifier is a long list of assertions
         )
         check(
             "installed api.__all__ count and manifest symbol count both hold",
-            installed_facts["api_all_count"] == 82
-            and len(source_manifest["symbols"]) == 81,
+            installed_facts["api_all_count"] == 93
+            and len(source_manifest["symbols"]) == 92,
             f"{installed_facts['api_all_count']} / {len(source_manifest['symbols'])}",
         )
         check(
@@ -356,9 +370,9 @@ def main() -> int:  # noqa: C901 - a verifier is a long list of assertions
             },
         )
         check(
-            "all fifteen pinned vectors were reproduced, including the "
+            "all eighteen pinned vectors were reproduced, including the "
             "post-admission rejection event and the revocation event",
-            len(installed_facts["vectors"]) == 15
+            len(installed_facts["vectors"]) == 18
             and "BenchmarkPostAdmissionRejectionEventPayload"
             in installed_facts["vectors"]
             and "BenchmarkRevocationEventPayload" in installed_facts["vectors"],
@@ -633,6 +647,18 @@ req = A.BenchmarkExactResolutionRequest(coordinate=coord())
 hreq = A.BenchmarkHistoricalInspectionRequest(coordinate=coord(), as_of=AO)
 pse = A.PlatformRegistryScopeExpectation(scope=BenchmarkScope.platform_wide())
 tse = A.TenantRegistryScopeExpectation(scope=BenchmarkScope.for_tenant("t1"))
+snap = A.BenchmarkRegistrySnapshotAssertion(
+    coordinate=coord(),
+    asserted_current_state=A.BenchmarkRegistrationState.ADMITTED,
+    asserted_registration_record_presence=(
+        A.BenchmarkRegistrationRecordPresence.NO_RECORD_APPENDED))
+plan = A.BenchmarkTransitionPlan(
+    snapshot=snap, planned_to_state=A.BenchmarkRegistrationState.REGISTERED)
+tref = A.BenchmarkTransitionRefusal(
+    snapshot=snap,
+    refused_to_state=A.BenchmarkRegistrationState.REVOKED,
+    declared_refusal_reason=(
+        A.BenchmarkRegistryRefusalReason.UNAUTHORIZED_TRANSITION))
 
 objects = {
     "BenchmarkPublisherSubmissionEnvelope": pub,
@@ -650,6 +676,9 @@ objects = {
     "BenchmarkHistoricalInspectionRequest": hreq,
     "PlatformRegistryScopeExpectation": pse,
     "TenantRegistryScopeExpectation": tse,
+    "BenchmarkRegistrySnapshotAssertion": snap,
+    "BenchmarkTransitionPlan": plan,
+    "BenchmarkTransitionRefusal": tref,
 }
 snapshot = _contract_type_registry_snapshot()
 print(json.dumps({

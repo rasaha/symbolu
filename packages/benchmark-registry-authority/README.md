@@ -32,6 +32,7 @@ ugence-benchmark-registry-authority
   0.2.0  (BR-2B)  deps: unchanged
   0.3.0  (BR-2C)  deps: + an audited cryptographic verifier
   0.4.0  (BR-2D)  deps: + a durable backend named only after ADR DD-10
+  0.5.0  (BR-2E)  deps: + whatever operations require, and nothing sooner
 ```
 
 The frozen layer stays frozen. This package adds no BR-1 field, changes no BR-1
@@ -42,10 +43,11 @@ stored BR-1 canonical artifact or its identity digest.
 
 | Subphase | Version | Ships | Status |
 | --- | --- | --- | --- |
-| **BR-2A** | `0.1.0` | Registry and exact-resolution **contracts** | **this release** |
-| BR-2B | `0.2.0` | Admission engine, hash-chained event log, process-local in-memory adapter, CAS slot claim, exact resolution. Its verifier is *injected* and defaults to **exact deny-all** | not started |
-| BR-2C | `0.3.0` | Audited Ed25519 verifier, composition-root trust-resolver adapter, key entitlements and revocation | blocked on a secure cryptographic verifier and trust-resolver design, specified and independently audited |
-| BR-2D | `0.4.0` | Durable adapter, production composition root, registry-event signing | blocked on ADR DD-10 |
+| BR-2A | `0.1.0` | Registry and exact-resolution **contracts** | shipped |
+| **BR-2B** | `0.2.0` | **Non-authoritative lifecycle kernel**: transition validation, predecessor checks, terminality, conflict and idempotency calculation over *caller-asserted* state. **No store, no verifier, no clock, no append path, no authority-issued result** — it cannot admit, register, revoke or resolve | **this release** |
+| BR-2C | `0.3.0` | Cryptographic trust authority: audited Ed25519 verifier, signing-frame verification, composition-root trust-resolver adapter, key entitlements and revocation. The injected verifier arrives here, defaulting to **exact deny-all** | blocked on a secure cryptographic verifier and trust-resolver design, specified and independently audited |
+| BR-2D | `0.4.0` | Durable registry authority: persistence, the trusted clock, compare-and-set transitions, immutable event history, the process-local in-memory adapter, registry-event signing, and the **first authoritative** admission, registration, revocation and exact resolution. Closes with the identity-locked composition root | blocked on ADR DD-10 |
+| BR-2E | `0.5.0` | Production composition and operations: tenant authorization, service APIs, deployment controls, migrations, backup/recovery, observability, audit export | blocked on BR-2D |
 
 ## The two lifecycles, never merged
 
@@ -54,7 +56,7 @@ stored BR-1 canonical artifact or its identity digest.
 | Type | `BenchmarkLifecycleState` | `BenchmarkRegistrationState` |
 | Owner | the artifact's author — a self-declaration | the registry — an observed, appended fact |
 | Members | `AUTHORED · APPROVED · REGISTERED · REVOKED` | `SUBMITTED · ADMITTED · REGISTERED · REVOKED · REJECTED` |
-| Evidential weight | **none** — a lifecycle enum on the artifact is not approval evidence | authoritative for resolvability, from BR-2B onward |
+| Evidential weight | **none** — a lifecycle enum on the artifact is not approval evidence | authoritative for resolvability, from BR-2D onward |
 | Mutability | frozen and digest-bound | append-only events; no record is ever edited |
 
 The two share the spellings `REGISTERED` and `REVOKED`, and because both are

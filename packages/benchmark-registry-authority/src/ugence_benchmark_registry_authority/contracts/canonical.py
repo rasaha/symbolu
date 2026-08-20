@@ -48,9 +48,9 @@ Determinism inputs
 The encoder consults **no** wall clock, locale, timezone database, environment
 variable, filesystem or network. ``astimezone`` is always called with an
 explicit ``timezone.utc`` target, never the zero-argument form that would infer
-the local zone. ``tests/packaging/test_no_clock_or_environment.py`` asserts this
-structurally over the whole source tree, not merely for one code path — **BR-2A
-reads no clock anywhere**, which is D-11 as ratified.
+the local zone. ``tests/contract/test_timestamps.py`` asserts this
+structurally over the whole source tree, not merely for one code path —
+**neither BR-2A nor BR-2B reads a clock anywhere**, which is D-11 as amended.
 
 Derived digests never enter the body
 ------------------------------------
@@ -70,10 +70,11 @@ Domain separation and versioning
 --------------------------------
 ADR §22.1 requires every digest to bind a canonicalization version and a
 domain-separation tag. BR-1 minted exactly one domain because it introduced
-exactly one artifact class. **BR-2A introduces fifteen distinct artifact
-classes, and mints exactly fifteen domains** — one per class this subphase
-actually ships, and **no tag for an artifact that does not exist**. The
-authority-issued result types reserved for BR-2B and BR-2C
+exactly one artifact class. **BR-2A introduced fifteen distinct
+artifact classes and minted exactly fifteen domains; BR-2B appends three more**
+— one per class each subphase actually ships, and **no tag for an artifact that
+does not exist**. The
+authority-issued result types reserved for BR-2D
 (``BenchmarkAdmissionDecision``, ``BenchmarkRegistrationEvent``,
 ``BenchmarkResolution``) have no domain here, because they have no definition
 here: a tag without an artifact is an unused constant a later milestone would
@@ -123,8 +124,9 @@ BR-2A payloads nest **frozen BR-1 contracts** — the exact
 :class:`~ugence_benchmark_registry.BenchmarkApplicabilityCoordinate` inside it.
 The registry therefore records two capabilities per class:
 
-* **root-canonicalizable** — the class owns a BR-2A domain and may be handed to
-  :func:`canonical_bytes` directly. The fifteen BR-2A contract classes.
+* **root-canonicalizable** — the class owns a domain minted here and may be
+  handed to :func:`canonical_bytes` directly. Eighteen contract classes: BR-2A's
+  fifteen and BR-2B's three.
 * **nested-admissible only** — the class may appear *inside* a BR-2A graph and
   is encoded and revalidated there, but owns no BR-2A domain and is refused as a
   root. The three BR-1 classes that actually nest.
@@ -197,7 +199,7 @@ from dataclasses import fields, is_dataclass
 from datetime import datetime, timezone
 from enum import Enum
 from types import MappingProxyType
-from typing import Any
+from typing import Any, Optional
 
 from ugence_benchmark_registry import (
     BenchmarkApplicabilityCoordinate,
@@ -228,6 +230,9 @@ __all__ = [
     "BENCHMARK_HISTORICAL_INSPECTION_REQUEST_DIGEST_DOMAIN",
     "BENCHMARK_PLATFORM_REGISTRY_SCOPE_EXPECTATION_DIGEST_DOMAIN",
     "BENCHMARK_TENANT_REGISTRY_SCOPE_EXPECTATION_DIGEST_DOMAIN",
+    "BENCHMARK_REGISTRY_SNAPSHOT_ASSERTION_DIGEST_DOMAIN",
+    "BENCHMARK_TRANSITION_PLAN_DIGEST_DOMAIN",
+    "BENCHMARK_TRANSITION_REFUSAL_DIGEST_DOMAIN",
     "BENCHMARK_REGISTRY_AUTHORITY_DIGEST_DOMAINS",
     "canonical_bytes",
     "canonical_digest",
@@ -338,8 +343,27 @@ BENCHMARK_TENANT_REGISTRY_SCOPE_EXPECTATION_DIGEST_DOMAIN = (
     _DOMAIN_PREFIX + "tenant-registry-scope-expectation/v1"
 )
 
-#: Every BR-2A domain, pinned as an immutable tuple in declaration order. Used
-#: by the canonical-domain inventory and by the uniqueness assertion below.
+#: Domain for :class:`~.kernel.BenchmarkRegistrySnapshotAssertion`. BR-2B.
+BENCHMARK_REGISTRY_SNAPSHOT_ASSERTION_DIGEST_DOMAIN = (
+    _DOMAIN_PREFIX + "registry-snapshot-assertion/v1"
+)
+
+#: Domain for :class:`~.kernel.BenchmarkTransitionPlan`. BR-2B.
+BENCHMARK_TRANSITION_PLAN_DIGEST_DOMAIN = (
+    _DOMAIN_PREFIX + "transition-plan/v1"
+)
+
+#: Domain for :class:`~.kernel.BenchmarkTransitionRefusal`. BR-2B.
+BENCHMARK_TRANSITION_REFUSAL_DIGEST_DOMAIN = (
+    _DOMAIN_PREFIX + "transition-refusal/v1"
+)
+
+#: Every domain this distribution mints, pinned as an immutable tuple in
+#: declaration order — BR-2A's fifteen, then BR-2B's three. Used by the
+#: canonical-domain inventory and by the uniqueness assertion below. Append-only:
+#: a later subphase adds at the end and never inserts or re-orders, because a
+#: moved domain re-digests an artifact that was already addressed under the old
+#: one.
 BENCHMARK_REGISTRY_AUTHORITY_DIGEST_DOMAINS: tuple = (
     BENCHMARK_PUBLISHER_SUBMISSION_ENVELOPE_DIGEST_DOMAIN,
     BENCHMARK_APPROVAL_ENVELOPE_DIGEST_DOMAIN,
@@ -356,6 +380,9 @@ BENCHMARK_REGISTRY_AUTHORITY_DIGEST_DOMAINS: tuple = (
     BENCHMARK_HISTORICAL_INSPECTION_REQUEST_DIGEST_DOMAIN,
     BENCHMARK_PLATFORM_REGISTRY_SCOPE_EXPECTATION_DIGEST_DOMAIN,
     BENCHMARK_TENANT_REGISTRY_SCOPE_EXPECTATION_DIGEST_DOMAIN,
+    BENCHMARK_REGISTRY_SNAPSHOT_ASSERTION_DIGEST_DOMAIN,
+    BENCHMARK_TRANSITION_PLAN_DIGEST_DOMAIN,
+    BENCHMARK_TRANSITION_REFUSAL_DIGEST_DOMAIN,
 )
 
 # Two artifact classes sharing a domain would collapse two byte spaces into one.
@@ -391,7 +418,9 @@ def _build_exact_type_boundary():
     types_: dict = {}
     sealed = False
 
-    def record(cls: type, domain, *, root_canonicalizable: bool) -> None:
+    def record(
+        cls: type, domain: Optional[str], *, root_canonicalizable: bool
+    ) -> None:
         """Register ``cls`` as an exact BR-2A-admissible contract type.
 
         Private to this package's own module-initialization path. Refuses to run

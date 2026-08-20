@@ -2,8 +2,8 @@
   "distribution": "ugence-benchmark-registry-authority",
   "milestone": "BR-2A",
   "note": "Complete inventory of every load-bearing gate, and the measured result of neutralizing each one in turn against the full suite and the author-owned adversarial probes. Production behaviour was not changed to chase a zero-survivor number; any survivor is classified as equivalent, shadowed (naming the shadowing gate), or a real gap. Regenerate by running gate_mutation_sweep.py.",
-  "gates_inventoried": 48,
-  "killed": 43,
+  "gates_inventoried": 60,
+  "killed": 55,
   "survived": 5,
   "errored": 0,
   "categories": {
@@ -78,6 +78,34 @@
     "no-authority": [
       "G-46",
       "G-47"
+    ],
+    "planning-fail-closed": [
+      "G-49",
+      "G-50"
+    ],
+    "planning-idempotence": [
+      "G-51"
+    ],
+    "planning-rejection-only": [
+      "G-52"
+    ],
+    "planning-totality": [
+      "G-53"
+    ],
+    "boundary-plan-consumption": [
+      "G-54",
+      "G-55",
+      "G-59"
+    ],
+    "boundary-return-widening": [
+      "G-56"
+    ],
+    "boundary-reserved-binding": [
+      "G-63"
+    ],
+    "boundary-annotation": [
+      "G-64",
+      "G-65"
     ]
   },
   "ledger": [
@@ -151,7 +179,7 @@
       "module": "lifecycle.py",
       "description": "the empty admissible-successor set for REVOKED \u2014 the terminal state's own relation entry",
       "result": "KILLED",
-      "first_failure": "test:tests/contract/test_canonicalization.py - ugence_benchmark_registry_aut..."
+      "first_failure": "import:BenchmarkRegistryLifecycleError REVOKED is terminal but admits successors"
     },
     {
       "gate": "G-10",
@@ -159,7 +187,7 @@
       "module": "lifecycle.py",
       "description": "the empty admissible-successor set for REJECTED",
       "result": "KILLED",
-      "first_failure": "test:tests/contract/test_canonicalization.py - ugence_benchmark_registry_aut..."
+      "first_failure": "import:BenchmarkRegistryLifecycleError REJECTED is terminal but admits successors"
     },
     {
       "gate": "G-11",
@@ -464,6 +492,102 @@
       "description": "the approval envelope's strictly-ordered validity interval gate",
       "result": "KILLED",
       "first_failure": "test:tests/contract/test_envelopes.py::test_the_approval_validity_interval_is_half_open_and_strictly_ordered"
+    },
+    {
+      "gate": "G-49",
+      "category": "planning-fail-closed",
+      "module": "planning.py",
+      "description": "the fail-closed refusal when an unoccupied slot is handed an occupant",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_planning.py::test_an_unoccupied_slot_handed_an_occupant_fails_closed"
+    },
+    {
+      "gate": "G-50",
+      "category": "planning-fail-closed",
+      "module": "planning.py",
+      "description": "the fail-closed refusal when the asserted occupant sits at another locator",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_planning.py::test_an_occupant_at_another_locator_fails_closed"
+    },
+    {
+      "gate": "G-51",
+      "category": "planning-idempotence",
+      "module": "planning.py",
+      "description": "the canonical-byte comparison D-06 requires for idempotence",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_planning.py::test_one_changed_field_makes_them_not_byte_identical"
+    },
+    {
+      "gate": "G-52",
+      "category": "planning-rejection-only",
+      "module": "planning.py",
+      "description": "the unequal-locator branch that keeps confusable handling rejection-only",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_planning.py::test_an_unequal_locator_routed_as_a_collision_is_rejection_only"
+    },
+    {
+      "gate": "G-53",
+      "category": "planning-totality",
+      "module": "kernel.py",
+      "description": "the ADMITTED -> REJECTED record-presence gate, through the total layer",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_lifecycle_kernel.py::test_post_admission_rejection_is_planned_only_while_nothing_is_registered"
+    },
+    {
+      "gate": "G-54",
+      "category": "boundary-plan-consumption",
+      "module": "api.py",
+      "description": "an EXPORTED callable accepting a plan through an alias inside Optional \u2014 the shape the substring rule walked past, now aimed at the surface the narrowed claim actually covers",
+      "result": "KILLED",
+      "first_failure": "test:tests/packaging/test_milestone_boundary.py::test_no_exported_callable_or_protocol_method_accepts_a_transition_plan"
+    },
+    {
+      "gate": "G-55",
+      "category": "boundary-plan-consumption",
+      "module": "api.py",
+      "description": "an EXPORTED callable whose plan parameter carries no annotation, so a resolved-type check contributes nothing and would pass vacuously without the annotation requirement standing beside it",
+      "result": "KILLED",
+      "first_failure": "test:tests/packaging/test_milestone_boundary.py::test_every_exported_callable_and_protocol_method_is_fully_annotated"
+    },
+    {
+      "gate": "G-56",
+      "category": "boundary-return-widening",
+      "module": "planning.py",
+      "description": "the planning-outcome alias, widened to admit a registry event \u2014 invisible to a gate that read the alias name as a string",
+      "result": "KILLED",
+      "first_failure": "test:tests/packaging/test_boundary_gates_detect.py::test_happy_the_real_planning_functions_pass_every_boundary_check"
+    },
+    {
+      "gate": "G-59",
+      "category": "boundary-plan-consumption",
+      "module": "ports.py",
+      "description": "a declared PORT method accepting a transition plan \u2014 the one way an exported-callable check alone could be walked past, since a port is the shape BR-2D is obliged to implement",
+      "result": "KILLED",
+      "first_failure": "test:tests/packaging/test_milestone_boundary.py::test_no_exported_callable_or_protocol_method_accepts_a_transition_plan"
+    },
+    {
+      "gate": "G-63",
+      "category": "boundary-reserved-binding",
+      "module": "planning.py",
+      "description": "a reserved authority-issued name bound by NewType rather than class, beside a non-plan_* callable fabricating a registry event",
+      "result": "KILLED",
+      "first_failure": "test:tests/packaging/test_milestone_boundary.py::test_the_reserved_names_are_bound_by_nothing_anywhere_under_src"
+    },
+    {
+      "gate": "G-64",
+      "category": "boundary-annotation",
+      "module": "planning.py",
+      "description": "an unannotated parameter on a plain def written in shipped source, which the closed set alone would accept once regenerated",
+      "result": "KILLED",
+      "first_failure": "test:tests/packaging/test_milestone_boundary.py::test_every_parameter_written_under_src_is_annotated_and_no_lambda_exists"
+    },
+    {
+      "gate": "G-65",
+      "category": "boundary-annotation",
+      "module": "planning.py",
+      "description": "a lambda written in shipped source, whose parameters cannot be annotated at all and whose name a dunder can disguise",
+      "result": "KILLED",
+      "first_failure": "test:tests/packaging/test_milestone_boundary.py::test_every_parameter_written_under_src_is_annotated_and_no_lambda_exists"
     }
   ],
   "survivor_classifications": {

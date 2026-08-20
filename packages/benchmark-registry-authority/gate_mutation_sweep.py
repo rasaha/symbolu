@@ -37,6 +37,7 @@ Run:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import pathlib
@@ -54,16 +55,44 @@ SRC_REL = pathlib.Path("src") / "ugence_benchmark_registry_authority"
 class Gate:
     """One load-bearing gate, and the edit that neutralizes it."""
 
-    def __init__(self, gate_id, category, module, description, old, new):
+    def __init__(
+        self, gate_id, category, module, description, old, new,
+        *, at_package_root=False,
+    ):
         self.gate_id = gate_id
         self.category = category
         self.module = module
         self.description = description
         self.old = old
         self.new = new
+        #: ``True`` for a file directly under the package root rather than
+        #: ``contracts/``. Stated explicitly rather than inferred from the
+        #: filename: the BR-2B boundary is not confined to ``contracts/``, and a
+        #: sweep that could only mutate ``contracts/`` could not plant the
+        #: bypass that hid in ``api.py``.
+        self.at_package_root = at_package_root
+
+    def target(self, root: pathlib.Path) -> pathlib.Path:
+        """The file this gate lives in.
+
+        ``contracts/`` by default — the shape every BR-2A gate uses — or the
+        package root when the gate declares itself there.
+        """
+
+        if self.at_package_root:
+            return root / SRC_REL / self.module
+        return root / SRC_REL / "contracts" / self.module
+
+    def dotted(self) -> str:
+        """The importable module name for this gate's file."""
+
+        stem = self.module[:-3]
+        if self.at_package_root:
+            return f"ugence_benchmark_registry_authority.{stem}"
+        return f"ugence_benchmark_registry_authority.contracts.{stem}"
 
     def apply(self, root: pathlib.Path) -> None:
-        path = root / SRC_REL / "contracts" / self.module
+        path = self.target(root)
         text = path.read_text()
         if self.old not in text:
             raise LookupError(
@@ -582,6 +611,186 @@ GATES = [
         "        if not self.validity_from < self.validity_to:",
         "        if False:",
     ),
+    # ---------------- BR-2B planning (kernel + planning) ------------------ #
+    Gate(
+        "G-49",
+        "planning-fail-closed",
+        "planning.py",
+        "the fail-closed refusal when an unoccupied slot is handed an occupant",
+        """        if occupant_record is not None:
+            return _refuse(snapshot, _S.SUBMITTED, _R.STALE_REGISTRY_SNAPSHOT)
+        return plan_transition(snapshot, _S.SUBMITTED)""",
+        """        return plan_transition(snapshot, _S.SUBMITTED)""",
+    ),
+    Gate(
+        "G-50",
+        "planning-fail-closed",
+        "planning.py",
+        "the fail-closed refusal when the asserted occupant sits at another locator",
+        """    if occupant_envelope.coordinate != snapshot.coordinate:
+        return _refuse(snapshot, _S.SUBMITTED, _R.STALE_REGISTRY_SNAPSHOT)""",
+        """    if False:
+        return _refuse(snapshot, _S.SUBMITTED, _R.STALE_REGISTRY_SNAPSHOT)""",
+    ),
+    Gate(
+        "G-51",
+        "planning-idempotence",
+        "planning.py",
+        "the canonical-byte comparison D-06 requires for idempotence",
+        "    return canonical_bytes(proposed_record) == canonical_bytes(occupant_record)",
+        "    return True",
+    ),
+    Gate(
+        "G-52",
+        "planning-rejection-only",
+        "planning.py",
+        "the unequal-locator branch that keeps confusable handling rejection-only",
+        """        return _refuse(snapshot, _S.SUBMITTED, _R.CONFUSABLE_COORDINATE)""",
+        """        return plan_transition(snapshot, _S.SUBMITTED)""",
+    ),
+    Gate(
+        "G-53",
+        "planning-totality",
+        "kernel.py",
+        "the ADMITTED -> REJECTED record-presence gate, through the total layer",
+        """            and self.snapshot.asserted_registration_record_presence
+            is not _P.NO_RECORD_APPENDED""",
+        """            and False""",
+    ),
+    Gate(
+        "G-54",
+        "boundary-plan-consumption",
+        "api.py",
+        "an EXPORTED callable accepting a plan through an alias inside "
+        "Optional — the shape the substring rule walked past, now aimed at the "
+        "surface the narrowed claim actually covers",
+        """__all__ = [""",
+        """from typing import Optional as _Optional
+
+_PlanAlias = BenchmarkTransitionPlan
+
+
+def apply_plan(plan: _Optional[_PlanAlias]) -> None:
+    return None
+
+
+__all__ = [
+    "apply_plan",""",
+        at_package_root=True,
+    ),
+    Gate(
+        "G-55",
+        "boundary-plan-consumption",
+        "api.py",
+        "an EXPORTED callable whose plan parameter carries no annotation, so a "
+        "resolved-type check contributes nothing and would pass vacuously "
+        "without the annotation requirement standing beside it",
+        """__all__ = [""",
+        """def apply_plan(plan) -> None:
+    return None
+
+
+__all__ = [
+    "apply_plan",""",
+        at_package_root=True,
+    ),
+    Gate(
+        "G-56",
+        "boundary-return-widening",
+        "planning.py",
+        "the planning-outcome alias, widened to admit a registry event — "
+        "invisible to a gate that read the alias name as a string",
+        """BenchmarkPlanningOutcome = Union[
+    BenchmarkTransitionPlan, BenchmarkTransitionRefusal
+]""",
+        """from .chain import BenchmarkRegistrationEventPayload as _Event
+
+BenchmarkPlanningOutcome = Union[
+    BenchmarkTransitionPlan, BenchmarkTransitionRefusal, _Event
+]""",
+    ),
+    # -------- BR-2B boundary scope: the second audit's three bypasses ----- #
+    Gate(
+        "G-59",
+        "boundary-plan-consumption",
+        "ports.py",
+        "a declared PORT method accepting a transition plan — the one way an "
+        "exported-callable check alone could be walked past, since a port is "
+        "the shape BR-2D is obliged to implement",
+        """@runtime_checkable
+class BenchmarkRegistryStorePort(Protocol):""",
+        """from .kernel import BenchmarkTransitionPlan as _Plan
+
+
+@runtime_checkable
+class BenchmarkRegistryStorePort(Protocol):
+    def apply_plan(self, plan: _Plan) -> None:
+        ...
+""",
+    ),
+    Gate(
+        "G-63",
+        "boundary-reserved-binding",
+        "planning.py",
+        "a reserved authority-issued name bound by NewType rather than class, "
+        "beside a non-plan_* callable fabricating a registry event",
+        """_S = BenchmarkRegistrationState""",
+        """from typing import NewType as _NewType
+
+from .chain import BenchmarkRegistrationEventPayload as _Evt
+
+BenchmarkRegistrationEvent = _NewType("BenchmarkRegistrationEvent", _Evt)
+
+
+def fabricate(anything: object) -> _Evt:
+    raise SystemExit("planted")
+
+
+_S = BenchmarkRegistrationState""",
+    ),
+    Gate(
+        "G-64",
+        "boundary-annotation",
+        "planning.py",
+        "an unannotated parameter on a plain def written in shipped source, "
+        "which the closed set alone would accept once regenerated",
+        """def is_byte_identical_resubmission(""",
+        """def _reconcile(candidate, previous) -> None:
+    return None
+
+
+def is_byte_identical_resubmission(""",
+    ),
+    Gate(
+        "G-65",
+        "boundary-annotation",
+        "planning.py",
+        "a lambda written in shipped source, whose parameters cannot be "
+        "annotated at all and whose name a dunder can disguise",
+        """def is_byte_identical_resubmission(""",
+        """_reconcile = lambda candidate, previous: None
+
+
+def is_byte_identical_resubmission(""",
+    ),
+    # ---- withdrawn by owner ruling, 2026-08-20 (ADR §35 D-20) ------------- #
+    # G-57, G-58, G-60, G-61 and G-62 planted plan-consuming callables in
+    # PRIVATE source and asserted this package could discover them: an
+    # exec-forged co_filename, a __code__.replace, a dunder-named lambda, a
+    # reassigned __module__, and a base class made to look generated.
+    #
+    # They are removed — not renumbered, and recorded here rather than dropped
+    # silently. The claim they tested, that no callable anywhere under src/
+    # consumes a plan, is not provable in Python: closures, containers, dynamic
+    # attributes, exec and runtime rebinding mean each design only changed what
+    # counted as discoverable, and the last one could be defeated by
+    # regenerating its inventory in the same commit as the plant.
+    #
+    # Nothing gates private source in its place, deliberately. Expansion there
+    # is governed by CODEOWNERS plus an independent approving review, and it is
+    # harmless without capability: a private plan consumer computes a value and
+    # has no store, clock, authority result or effectful operation to spend it
+    # on. G-33..G-47 are the gates that keep that true, and they are untouched.
 ]
 
 
@@ -598,6 +807,131 @@ def _snapshot(destination: pathlib.Path) -> None:
 def _restore(pristine: pathlib.Path, working: pathlib.Path) -> None:
     shutil.rmtree(working, ignore_errors=True)
     shutil.copytree(pristine, working)
+
+
+def _tree_manifest(root: pathlib.Path) -> dict:
+    """``{relative path: sha256}`` for every file under ``root``.
+
+    Bytecode is excluded from the snapshot, so a ``.pyc`` appearing here at all
+    would mean something wrote one despite ``PYTHONDONTWRITEBYTECODE`` — which
+    is exactly the condition that can mask a mutation, so it is surfaced rather
+    than filtered out.
+    """
+
+    manifest = {}
+    for path in sorted(root.rglob("*")):
+        if path.is_file():
+            manifest[str(path.relative_to(root))] = hashlib.sha256(
+                path.read_bytes()
+            ).hexdigest()
+    return manifest
+
+
+def _assert_pristine(working: pathlib.Path, expected: dict, gate_id: str) -> None:
+    """Prove the working tree is byte-identical to the proven-green baseline.
+
+    The baseline suite runs once, on a tree whose hashes are recorded here.
+    Asserting that each restore reproduces those exact bytes is what makes that
+    single run stand for "the baseline passes before this mutation" — a restore
+    that silently left a previous mutant behind, or dropped a stray ``.pyc``,
+    would otherwise turn every later result into a measurement of the wrong
+    tree.
+    """
+
+    actual = _tree_manifest(working)
+    if actual != expected:
+        added = sorted(set(actual) - set(expected))
+        removed = sorted(set(expected) - set(actual))
+        changed = sorted(
+            p for p in set(actual) & set(expected) if actual[p] != expected[p]
+        )
+        raise RuntimeError(
+            f"{gate_id}: the restored tree is not the pristine baseline "
+            f"(added={added[:3]} removed={removed[:3]} changed={changed[:3]}); "
+            "a sweep run against a drifted tree measures nothing"
+        )
+
+
+def _assert_mutant_loaded(working: pathlib.Path, gate) -> str:
+    """Prove the interpreter actually imports the mutated source.
+
+    Editing a file on disk is not evidence that the run under measurement used
+    it. A stale ``__pycache__`` entry, a shadowing entry earlier on
+    ``sys.path``, or a package resolved from the real repository instead of the
+    working copy would all produce a green suite against **unmutated** code —
+    reported as SURVIVED, and read as a missing gate that is in fact present.
+
+    So the check is made from inside a subprocess with the same environment the
+    suite gets, and it asks the import system rather than the filesystem:
+    :func:`inspect.getsource` reads through the module's own loader, so it
+    reflects what Python imported. The module's ``__file__`` must also resolve
+    inside the working copy.
+
+    A mutation that makes the module **refuse to import** is the strongest kill
+    there is — several gates in this package are import-time structural
+    invariants — so that case is reported as a kill, not as an unprovable
+    result. It is still proven rather than assumed: the traceback must name the
+    mutated file inside the working copy, which only happens if the interpreter
+    executed it.
+
+    Returns a short status used as the ledger's ``first_failure`` when the
+    mutant is refused at import; raises only when neither outcome can be
+    established.
+    """
+
+    module = gate.dotted()
+    target = gate.target(working)
+    probe = (
+        "import inspect,pathlib,traceback\n"
+        f"here = pathlib.Path({str(working)!r}).resolve()\n"
+        f"target = pathlib.Path({str(target)!r}).resolve()\n"
+        "disk = target.read_text()\n"
+        f"assert {gate.new!r} in disk, 'mutated text absent from the file on disk'\n"
+        "try:\n"
+        f"    import {module} as m\n"
+        "except Exception as exc:\n"
+        "    tb = ''.join(traceback.format_exc())\n"
+        "    assert str(target) in tb, 'import failed without executing the mutant'\n"
+        "    print('MUTANT-REFUSED-AT-IMPORT', type(exc).__name__, str(exc)[:90])\n"
+        "else:\n"
+        "    f = pathlib.Path(m.__file__).resolve()\n"
+        "    assert here in f.parents, f'loaded {f}, outside the working copy'\n"
+        "    src = inspect.getsource(m)\n"
+        f"    assert {gate.new!r} in src, 'mutated text absent from the loaded module'\n"
+        # Only for a genuine replacement. An additive mutation's new text
+        # contains the original, so the original legitimately remains and
+        # demanding its absence would report a correctly applied insertion as an
+        # unprovable mutant.
+        + (
+            f"    assert {gate.old!r} not in src, 'original text still present'\n"
+            if gate.old not in gate.new
+            else ""
+        )
+        + "    print('MUTANT-LOADED')\n"
+    )
+    env = dict(os.environ)
+    env["PYTHONPATH"] = os.pathsep.join(
+        [str(working / "src"), str(BR1_SRC), str(working / "tests")]
+    )
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    result = subprocess.run(
+        [sys.executable, "-c", probe],
+        capture_output=True,
+        text=True,
+        env=env,
+        cwd=str(working),
+    )
+    if "MUTANT-LOADED" in result.stdout:
+        return ""
+    if "MUTANT-REFUSED-AT-IMPORT" in result.stdout:
+        return "import:" + result.stdout.split("MUTANT-REFUSED-AT-IMPORT", 1)[
+            1
+        ].strip()
+    raise RuntimeError(
+        f"{gate.gate_id}: could not prove the mutant was loaded — "
+        f"{(result.stderr or result.stdout).strip().splitlines()[-1:]}"
+    )
+
 
 
 def _first_failure(output: str) -> str:
@@ -714,14 +1048,43 @@ def main() -> int:
         if not passed:
             print(f"BASELINE FAILED on the pristine tree: {detail}")
             return 1
+        baseline_manifest = _tree_manifest(working)
+
+        # HARNESS CONTROL — a check that cannot fail proves nothing. Apply a
+        # real mutation, revert the file underneath it, and require
+        # _assert_mutant_loaded to object. If it stays silent, every
+        # "MUTANT-LOADED" below is worthless and the sweep must not proceed.
+        control_gate = GATES[0]
+        control_path = working / SRC_REL / "contracts" / control_gate.module
+        control_gate.apply(working)
+        control_path.write_text(
+            control_path.read_text().replace(control_gate.new, control_gate.old)
+        )
+        try:
+            _assert_mutant_loaded(working, control_gate)
+        except RuntimeError:
+            print("harness control: a reverted mutant is correctly detected as "
+                  "not loaded")
+        else:
+            print("HARNESS CONTROL FAILED: _assert_mutant_loaded accepted a tree "
+                  "whose mutation had been reverted; every result below would be "
+                  "unfounded")
+            return 1
+        _restore(pristine, working)
+        _assert_pristine(working, baseline_manifest, "harness-control")
+
         print("baseline: the pristine tree passes the suite and the probes")
+        print(f"baseline: {len(baseline_manifest)} files hashed; every restore "
+              "below is proven byte-identical to this tree before mutating")
         print("-" * 78)
 
         for gate in GATES:
             _restore(pristine, working)
             try:
+                _assert_pristine(working, baseline_manifest, gate.gate_id)
                 gate.apply(working)
-            except LookupError as exc:
+                import_refusal = _assert_mutant_loaded(working, gate)
+            except (LookupError, RuntimeError) as exc:
                 print(f"ERROR {gate.gate_id}: {exc}")
                 ledger.append(
                     {
@@ -734,7 +1097,12 @@ def main() -> int:
                     }
                 )
                 continue
-            passed, detail = _run_suite(working)
+            if import_refusal:
+                # The mutated module refuses to import at all. Proven executed,
+                # and killed by the package's own import-time invariant.
+                passed, detail = False, import_refusal
+            else:
+                passed, detail = _run_suite(working)
             result = "SURVIVED" if passed else "KILLED"
             ledger.append(
                 {

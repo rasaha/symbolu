@@ -78,7 +78,7 @@ class BenchmarkRegistryCompositionError(BenchmarkRegistryContractError):
     **Defined at BR-2A, raised by nothing at BR-2A.** BR-2A ships no composition
     root, no adapter registry and no identity allow-list — §17 forbids all
     three — so no code path in this package can raise this. The type exists so
-    that BR-2B and BR-2D, which do own those paths, raise an error the ratified
+    that BR-2D and BR-2E, which do own those paths, raise an error the ratified
     contract already names, rather than minting one after the fact.
 
     Defining a typed error is not shipping the capability that raises it: this

@@ -7,18 +7,30 @@ never inside it.
 
 Milestone boundary
 ------------------
-* **BR-2A (this release, 0.1.0)** — registry and exact-resolution *contracts*:
-  record, event, envelope and request shapes; the registry lifecycle vocabulary
-  and its closed relation; one structural representation bound to each
-  transition; typed refusals; ports as Protocols; new digest domains; pure
-  validation. **No engine, no store, no verifier, no clock read, no resolver.**
-* **BR-2B (0.2.0)** — admission and the append-only process-local registry. Its
-  verifier is *injected* and defaults to exact deny-all, with a test proving
-  nothing can reach ``ADMITTED``.
-* **BR-2C (0.3.0)** — publisher trust and signature verification. Blocked on an
-  audited cryptographic verifier and a composition-root trust-resolver design.
-* **BR-2D (0.4.0)** — durable store and production composition. Blocked on ADR
-  DD-10.
+* **BR-2A (0.1.0)** — registry and exact-resolution *contracts*: record, event,
+  envelope and request shapes; the registry lifecycle vocabulary and its closed
+  relation; one structural representation bound to each transition; typed
+  refusals; ports as Protocols; new digest domains; pure validation.
+  **No engine, no store, no verifier, no clock read, no resolver.**
+* **BR-2B (this release, 0.2.0)** — the **non-authoritative lifecycle kernel**:
+  transition validation, predecessor checks, terminality, and conflict and
+  idempotency calculation over *caller-asserted* state. It ships **no store, no
+  verifier, no clock, no append path and no authority-issued result**, and it
+  **cannot admit, register, revoke or resolve**. It determines what transition
+  *would be* valid; nothing here makes one occur.
+* **BR-2C (0.3.0)** — the cryptographic trust authority: audited verifier,
+  signing-frame verification, anchor resolution, key rotation and revocation.
+  The injected verifier arrives here, defaulting to exact deny-all. Blocked on
+  an audited cryptographic verifier and a composition-root trust-resolver
+  design.
+* **BR-2D (0.4.0)** — the durable registry authority: persistence, the trusted
+  clock, compare-and-set transitions, immutable event history, the process-local
+  in-memory adapter, and the **first authoritative** admission, registration,
+  revocation and exact resolution. Closes with the identity-locked composition
+  root. Blocked on ADR DD-10.
+* **BR-2E (0.5.0)** — production composition and operations: tenant
+  authorization, service APIs, deployment controls, migrations,
+  backup/recovery, observability, audit export.
 
 Dependencies
 ------------
@@ -26,7 +38,7 @@ Exactly one runtime dependency: ``ugence-benchmark-registry==0.1.*``, plus the
 standard library. Nothing else, in either direction — a dependency-boundary test
 proves this package imports no other Ugence package, and that at BR-2A delivery
 no package in the monorepo imports *this* one. That reverse fact is the **BR-2A
-terminal state, not a permanent invariant**: BR-2B and later explicitly may
+terminal state, not a permanent invariant**: BR-2C and later explicitly may
 depend on BR-2A after their own ratification.
 
 The frozen layer stays frozen
@@ -122,6 +134,17 @@ from .api import (
     BENCHMARK_PRODUCTION_ADAPTER_ADMISSION_REQUIREMENT,
     BENCHMARK_UNVERIFIED_AUTHORITY_PROPERTIES,
     BENCHMARK_RESERVED_AUTHORITY_ISSUED_TYPE_NAMES,
+    BenchmarkRegistrationRecordPresence,
+    BenchmarkRegistrySnapshotAssertion,
+    BenchmarkTransitionPlan,
+    BenchmarkTransitionRefusal,
+    BenchmarkPlanningOutcome,
+    is_byte_identical_resubmission,
+    plan_transition,
+    plan_submission_outcome,
+    BENCHMARK_REGISTRY_SNAPSHOT_ASSERTION_DIGEST_DOMAIN,
+    BENCHMARK_TRANSITION_PLAN_DIGEST_DOMAIN,
+    BENCHMARK_TRANSITION_REFUSAL_DIGEST_DOMAIN,
 )
 from .version import __version__
 
@@ -208,5 +231,16 @@ __all__ = [
     "BENCHMARK_PRODUCTION_ADAPTER_ADMISSION_REQUIREMENT",
     "BENCHMARK_UNVERIFIED_AUTHORITY_PROPERTIES",
     "BENCHMARK_RESERVED_AUTHORITY_ISSUED_TYPE_NAMES",
+    "BenchmarkRegistrationRecordPresence",
+    "BenchmarkRegistrySnapshotAssertion",
+    "BenchmarkTransitionPlan",
+    "BenchmarkTransitionRefusal",
+    "BenchmarkPlanningOutcome",
+    "is_byte_identical_resubmission",
+    "plan_transition",
+    "plan_submission_outcome",
+    "BENCHMARK_REGISTRY_SNAPSHOT_ASSERTION_DIGEST_DOMAIN",
+    "BENCHMARK_TRANSITION_PLAN_DIGEST_DOMAIN",
+    "BENCHMARK_TRANSITION_REFUSAL_DIGEST_DOMAIN",
     "api",
 ]

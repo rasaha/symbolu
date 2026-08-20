@@ -112,7 +112,7 @@ BENCHMARK_CONFUSABLE_COMPARISON_CONTRACT: MappingProxyType = MappingProxyType(
         ),
         "implemented_by": (
             "no code in BR-2A. BR-2A holds no registry and no set of occupied "
-            "locators; the comparison belongs to BR-2B's admission path, which "
+            "locators; the comparison belongs to BR-2B's conflict calculation, which "
             "must implement this contract."
         ),
     }

@@ -71,6 +71,72 @@ docs/ontology/**                             @ontology-core @rasaha/ontology-ste
 docs/governance/PROTECTED_BRANCHES.md        @ontology-core @rasaha/ontology-stewards
 
 # =============================================================================
+# BENCHMARK REGISTRY AUTHORITY (BR-2) — GOVERNED SURFACE
+# =============================================================================
+#
+# Ratified 2026-08-20 (ADR §35 D-20). BR-2B's safety property is capability
+# absence, not the absence of every conceivable private callable. The latter is
+# not provable in Python — closures, containers, dynamic attributes, exec and
+# runtime rebinding put it out of reach — and three audits found seven bypasses
+# on exactly that seam before the claim was withdrawn.
+#
+# Private-source expansion is therefore governed here rather than gated in CI.
+# A contributor who can modify production code AND its tests in one commit is
+# stopped by an independent approving review, not by a generated artifact they
+# can regenerate in the same commit.
+#
+# CODEOWNERS IS NOT ENFORCEMENT. It routes review requests and nothing more.
+# It becomes a control only with branch protection configured per
+# docs/governance/PROTECTED_BRANCHES.md: require a pull request, require review
+# from Code Owners, require at least one approval from someone other than the
+# author, and dismiss stale approvals on push. Without those settings every line
+# below is advisory.
+#
+# INDEPENDENCE IS AN OPEN OWNER DECISION. The owner named below is also the
+# author of this work. A single owner reviewing their own change is not an
+# independent review, whatever branch protection is configured. Substituting a
+# distinct reviewer or team here is the step that makes this a real control.
+#
+# HOW BR-2B SATISFIED IT, AND WHY THAT DOES NOT CARRY FORWARD (ADR §35.2 D-21).
+# Independent GitHub approval is unavailable in a solo-maintainer model where the
+# sole maintainer is the author. For BR-2B the independent check was satisfied by
+# an independent technical closure audit at commit dfd6aa5e — which found no
+# shipped capability able to perform an authoritative or effectful operation —
+# rather than by an approving review.
+#
+# That substitution is SPECIFIC TO A PHASE THAT SHIPS NO CAPABILITY. An audit can
+# establish that nothing effectful exists; it cannot stand in for review of code
+# that does something. It does NOT carry forward to BR-2C or any later subphase,
+# each of which ships a capability and needs a distinct approving reviewer.
+
+# The shipped package: production source, its manifests, and its pinned digests.
+packages/benchmark-registry-authority/src/**                        @rasaha
+packages/benchmark-registry-authority/public_api.json               @rasaha
+packages/benchmark-registry-authority/public_contract_inventory.json @rasaha
+packages/benchmark-registry-authority/canonical_domain_inventory.json @rasaha
+packages/benchmark-registry-authority/pinned_canonical_vectors.json  @rasaha
+packages/benchmark-registry-authority/pyproject.toml                @rasaha
+
+# The gates themselves. A change that weakens a boundary test is the change this
+# entry exists to put in front of a reviewer.
+packages/benchmark-registry-authority/tests/packaging/**            @rasaha
+packages/benchmark-registry-authority/adversarial_probes.py         @rasaha
+packages/benchmark-registry-authority/gate_mutation_sweep.py        @rasaha
+packages/benchmark-registry-authority/gate_inventory.json           @rasaha
+packages/benchmark-registry-authority/verify_benchmark_registry_authority_distribution.py @rasaha
+packages/benchmark-registry-authority/verify_br1_freeze_matrix.py   @rasaha
+
+# The frozen BR-1 identity layer. BR-2 pins its exact digests; a change here
+# invalidates the freeze matrix.
+packages/benchmark-registry/src/**                                  @rasaha
+packages/benchmark-registry/public_api.json                         @rasaha
+
+# The ratified decisions and the workflows that enforce them.
+docs/architecture/ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md @rasaha
+.github/workflows/benchmark-registry-authority-ci.yml               @rasaha
+.github/workflows/benchmark-registry-ci.yml                         @rasaha
+
+# =============================================================================
 # CODEOWNERS FILE ITSELF
 # =============================================================================
 #

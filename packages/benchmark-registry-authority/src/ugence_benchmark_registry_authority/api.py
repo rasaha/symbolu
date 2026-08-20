@@ -143,6 +143,17 @@ from .contracts import (
     BENCHMARK_PRODUCTION_ADAPTER_ADMISSION_REQUIREMENT,
     BENCHMARK_UNVERIFIED_AUTHORITY_PROPERTIES,
     BENCHMARK_RESERVED_AUTHORITY_ISSUED_TYPE_NAMES,
+    BenchmarkRegistrationRecordPresence,
+    BenchmarkRegistrySnapshotAssertion,
+    BenchmarkTransitionPlan,
+    BenchmarkTransitionRefusal,
+    BenchmarkPlanningOutcome,
+    is_byte_identical_resubmission,
+    plan_transition,
+    plan_submission_outcome,
+    BENCHMARK_REGISTRY_SNAPSHOT_ASSERTION_DIGEST_DOMAIN,
+    BENCHMARK_TRANSITION_PLAN_DIGEST_DOMAIN,
+    BENCHMARK_TRANSITION_REFUSAL_DIGEST_DOMAIN,
 )
 from .version import __version__
 
@@ -229,4 +240,15 @@ __all__ = [
     "BENCHMARK_PRODUCTION_ADAPTER_ADMISSION_REQUIREMENT",
     "BENCHMARK_UNVERIFIED_AUTHORITY_PROPERTIES",
     "BENCHMARK_RESERVED_AUTHORITY_ISSUED_TYPE_NAMES",
+    "BenchmarkRegistrationRecordPresence",
+    "BenchmarkRegistrySnapshotAssertion",
+    "BenchmarkTransitionPlan",
+    "BenchmarkTransitionRefusal",
+    "BenchmarkPlanningOutcome",
+    "is_byte_identical_resubmission",
+    "plan_transition",
+    "plan_submission_outcome",
+    "BENCHMARK_REGISTRY_SNAPSHOT_ASSERTION_DIGEST_DOMAIN",
+    "BENCHMARK_TRANSITION_PLAN_DIGEST_DOMAIN",
+    "BENCHMARK_TRANSITION_REFUSAL_DIGEST_DOMAIN",
 ]

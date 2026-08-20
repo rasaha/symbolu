@@ -61,6 +61,14 @@ from ugence_benchmark_registry_authority.api import (
     BenchmarkPostAdmissionRejectionEventPayload,
     BenchmarkPublisherSubmissionEnvelope,
     BenchmarkRegistrationEventPayload,
+    BenchmarkRegistrationRecordPresence,
+    BenchmarkRegistrySnapshotAssertion,
+    BenchmarkTransitionPlan,
+    BenchmarkTransitionRefusal,
+    BenchmarkPlanningOutcome,
+    is_byte_identical_resubmission,
+    plan_submission_outcome,
+    plan_transition,
     BenchmarkRegistrationState,
     BenchmarkRegistryCanonicalizationError,
     BenchmarkRegistryConsistencyClaim,
@@ -255,6 +263,20 @@ def post_admission_rejection(**kw):
     return BenchmarkPostAdmissionRejectionEventPayload(**base)
 
 
+def snapshot_assertion(**overrides):
+    """Independently built here, not shared with the suite's fixtures."""
+
+    base = dict(
+        coordinate=coordinate(),
+        asserted_current_state=BenchmarkRegistrationState.ADMITTED,
+        asserted_registration_record_presence=(
+            BenchmarkRegistrationRecordPresence.NO_RECORD_APPENDED
+        ),
+    )
+    base.update(overrides)
+    return BenchmarkRegistrySnapshotAssertion(**base)
+
+
 ALL_BUILDERS = (
     publisher,
     approval,
@@ -264,6 +286,18 @@ ALL_BUILDERS = (
     post_admission_rejection,
     registration,
     revocation,
+    snapshot_assertion,
+    lambda: BenchmarkTransitionPlan(
+        snapshot=snapshot_assertion(),
+        planned_to_state=BenchmarkRegistrationState.REGISTERED,
+    ),
+    lambda: BenchmarkTransitionRefusal(
+        snapshot=snapshot_assertion(),
+        refused_to_state=BenchmarkRegistrationState.REVOKED,
+        declared_refusal_reason=(
+            BenchmarkRegistryRefusalReason.UNAUTHORIZED_TRANSITION
+        ),
+    ),
     lambda: BenchmarkConflictRecordPayload(
         submission_record=record(),
         declared_refusal_reason=(
@@ -301,13 +335,13 @@ def _q00():
     assert event.declared_state is BenchmarkRegistrationState.REVOKED
 
 
-@probe("Q-01 all fifteen shipped artifacts canonicalize into fifteen byte spaces")
+@probe("Q-01 all eighteen shipped artifacts canonicalize into eighteen byte spaces")
 def _q01():
     domains = set()
     for builder in ALL_BUILDERS:
         framed = json.loads(canonical_bytes(builder()).decode("utf-8"))
         domains.add(framed["domain"])
-    assert len(domains) == 15, len(domains)
+    assert len(domains) == 18, len(domains)
     assert domains == set(BENCHMARK_REGISTRY_AUTHORITY_DIGEST_DOMAINS)
 
 
@@ -470,6 +504,11 @@ def _q14():
     namespace = {
         "__annotations__": {f.name: object for f in dataclasses.fields(genuine)},
         "__module__": target.__module__,
+        # Supplied so @dataclass does not synthesize one. On CPython 3.10
+        # dataclasses builds a missing __doc__ from str(inspect.signature(cls)),
+        # and inspect takes a wrong branch on a class whose metaclass forges
+        # __eq__ — raising before the forgery reaches the code under test.
+        "__doc__": f"Metaclass-forged stand-in for {target.__name__}.",
     }
     forged_cls = dataclasses.dataclass(frozen=True)(
         ForgingMeta(target.__name__, (), namespace)
@@ -1132,6 +1171,181 @@ def _q59():
             ),
         ),
         BenchmarkRegistryLifecycleError,
+    )
+
+
+@probe("Q-60 planning is total: every state pair yields a plan or a refusal")
+def _q60():
+    for a in BenchmarkRegistrationState:
+        for b in BenchmarkRegistrationState:
+            outcome = plan_transition(snapshot_assertion(asserted_current_state=a), b)
+            assert isinstance(
+                outcome, (BenchmarkTransitionPlan, BenchmarkTransitionRefusal)
+            ), (a, b)
+            if b not in BENCHMARK_REGISTRATION_TRANSITIONS[a]:
+                assert isinstance(outcome, BenchmarkTransitionRefusal), (a, b)
+
+
+@probe("Q-61 idempotence is decided on canonical bytes, recomputed from records")
+def _q61():
+    assert is_byte_identical_resubmission(record(), record())
+    assert not is_byte_identical_resubmission(
+        record(), record(declared_registry_authority_identity="someone-else")
+    )
+    # A caller may not substitute bytes or a digest for either record.
+    for impostor in (canonical_bytes(record()), canonical_digest(record()), None):
+        refuses(
+            lambda i=impostor: is_byte_identical_resubmission(record(), i),
+            BenchmarkRegistryContractError,
+        )
+
+
+def _is_declared_port(value) -> bool:
+    """A declared ``typing.Protocol`` port, decided structurally.
+
+    ``_is_protocol`` is set by ``typing.Protocol`` itself on the class object.
+    A concrete class cannot acquire it by naming itself ``...Port``.
+    """
+
+    return bool(getattr(value, "_is_protocol", False))
+
+
+@probe("Q-62 no exported callable or port method accepts a plan, by resolved identity")
+def _q62():
+    """Resolved, not matched — and scoped to the claim BR-2B actually makes.
+
+    An earlier version of this probe asserted that *no callable anywhere under
+    src/* consumes a plan. That claim was withdrawn by owner ruling (ADR §35
+    D-20): Python permits closures, containers, dynamic attributes, exec and
+    runtime rebinding, so no walk can enumerate every callable, and this probe's
+    own ownership test — a function's ``__module__`` — is writable by whoever
+    plants the function. It was asserting something it could not decide.
+
+    What it checks now is decidable and is the property that holds: no callable
+    a caller can reach, and no port method BR-2D would be obliged to implement,
+    accepts a transition plan. Hints are resolved through get_type_hints, every
+    Union and generic is walked to its leaves, and membership is decided by
+    ``is`` — so an alias, an Optional or a container-nested plan is visible.
+
+    A private helper taking a plan is *not* covered, deliberately. It is
+    governed by review, and it is inert: there is no store, clock, authority
+    result or effectful operation in this package for it to spend a plan on.
+    Q-24, Q-25 and Q-46 are the probes that keep that true.
+    """
+
+    import inspect
+    import typing
+
+    import ugence_benchmark_registry_authority as pkg
+
+    plan = BenchmarkTransitionPlan
+
+    def leaves(annotation):
+        found, pending, seen = set(), [annotation], []
+        while pending:
+            current = pending.pop()
+            if any(current is s for s in seen):
+                continue
+            seen.append(current)
+            if isinstance(current, type):
+                found.add(current)
+            origin = typing.get_origin(current)
+            if isinstance(origin, type):
+                found.add(origin)
+            pending.extend(typing.get_args(current))
+        return found
+
+    # Both curated surfaces, unioned. A separate gate pins them equal, but this
+    # harness must not depend on that gate holding: walking only the root
+    # re-export would miss a callable added to ``api.__all__`` alone, and
+    # walking only ``api`` would miss the reverse. Neither may host a plan
+    # consumer, so both are walked here.
+    surface = {}
+    for module in (pkg, pkg.api):
+        for symbol in module.__all__:
+            value = getattr(module, symbol)
+            if inspect.isfunction(value):
+                surface[symbol] = value
+            elif inspect.isclass(value) and _is_declared_port(value):
+                for attribute, member in vars(value).items():
+                    if inspect.isfunction(member) and not attribute.startswith("_"):
+                        surface[f"{symbol}.{attribute}"] = member
+
+    offenders, unannotated = [], []
+    for label, func in surface.items():
+        try:
+            hints = typing.get_type_hints(func)
+        except Exception:
+            unannotated.append(label)
+            continue
+        for name in inspect.signature(func).parameters:
+            if name in ("self", "cls"):
+                continue
+            if name not in hints:
+                unannotated.append(f"{label}({name})")
+            elif plan in leaves(hints[name]):
+                offenders.append(f"{label}({name})")
+
+    # Offenders first. The size assertion below exists so a *shrunken* surface
+    # cannot make this probe vacuous, but it must never be what reports a plan
+    # consumer: a plant that replaced an existing callable would leave the size
+    # unchanged, and a size failure says nothing about what was found.
+    assert offenders == [], offenders
+    assert unannotated == [], unannotated
+    assert len(surface) == 22, sorted(surface)
+
+    # The check must be able to fail. Plant the shapes that walked past the
+    # substring rule and require the leaf-walker to see each one. The annotation
+    # object is attached directly rather than written as a source annotation,
+    # because get_type_hints resolves a PEP 563 string against the function's
+    # globals and would never see a local name.
+    aliased = plan
+    optional_alias = typing.Optional[aliased]
+    nested = typing.Dict[str, typing.List[aliased]]
+
+    def _commit(candidate):
+        return None
+
+    _commit.__annotations__ = {"candidate": optional_alias}
+
+    assert plan in leaves(aliased), "a bare alias is invisible"
+    assert plan in leaves(optional_alias), "an Optional alias is invisible"
+    assert plan in leaves(nested), "a nested alias is invisible"
+    assert plan in leaves(_commit.__annotations__["candidate"])
+    assert "BenchmarkTransitionPlan" not in "optional_alias"
+
+
+@probe("Q-64 no planner returns a lifecycle payload, through a resolved Union")
+def _q64():
+    import typing
+
+    forbidden = {
+        BenchmarkSubmissionRecordPayload,
+        BenchmarkAdmissionDecisionPayload,
+        BenchmarkPostAdmissionRejectionEventPayload,
+        BenchmarkRegistrationEventPayload,
+        BenchmarkRevocationEventPayload,
+        BenchmarkConflictRecordPayload,
+    }
+    for func in (plan_transition, plan_submission_outcome):
+        returned = set(typing.get_args(typing.get_type_hints(func)["return"]))
+        assert returned == {
+            BenchmarkTransitionPlan,
+            BenchmarkTransitionRefusal,
+        }, (func.__name__, returned)
+        assert not (returned & forbidden), func.__name__
+
+    # And the alias itself is exactly two members, so widening it is visible.
+    members = set(typing.get_args(BenchmarkPlanningOutcome))
+    assert members == {BenchmarkTransitionPlan, BenchmarkTransitionRefusal}, members
+
+
+@probe("Q-63 a self-inconsistent snapshot fails closed rather than being repaired")
+def _q63():
+    stale = plan_submission_outcome(snapshot_assertion(), record())
+    assert isinstance(stale, BenchmarkTransitionRefusal)
+    assert stale.declared_refusal_reason is (
+        BenchmarkRegistryRefusalReason.STALE_REGISTRY_SNAPSHOT
     )
 
 

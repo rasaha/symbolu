@@ -223,7 +223,7 @@ def require_aware_datetime(value: object, name: str) -> datetime:
 
     Requiring a caller to supply this value is not granting it authority. D-11
     ratifies one injected authoritative clock for recorded time, owned by the
-    registry from BR-2B onward; **BR-2A reads no clock at all**, so every
+    registry from BR-2D onward; **neither BR-2A nor BR-2B reads a clock**, so every
     timestamp in this package is a *declaration* by whoever constructed the
     object, permanently covered by ``authority_verified is False``.
     """

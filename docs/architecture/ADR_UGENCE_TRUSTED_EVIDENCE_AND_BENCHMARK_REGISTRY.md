@@ -1137,7 +1137,7 @@ approved for implementation by this ADR.**
 | 1 | **TEV-1** | **Trusted Evidence Verification Contracts** — the verification-result coordinate set (§9), the six-stage model (§12), receipt shape (§13), reason-code namespace (§11). Contracts only; no verifier. | — | **DEFERRED** |
 | 2 | **TEV-2** | **TAP Verification Service and signed receipts** — the verification authority, trust anchors, key trust/revocation, signing, independent verification. | TEV-1 | **DEFERRED** |
 | 3 | **BR-1** | **Benchmark Definition Contracts** — benchmark identity (§15), lifecycle state, structured references. Contracts only; no registry. | — | **DEFERRED** |
-| 4 | **BR-2** | **Benchmark Registry and trusted resolver** — admission ordering (§16.2), append-only registration, exact resolution, revocation (§17). **Subdivided by §35 (D-01) into four independently auditable subphases:** BR-2A contracts, BR-2B admission and process-local registry, BR-2C publisher trust and signature verification, BR-2D durable store and production composition. | BR-1 | **BR-2A ratified and implemented; BR-2B–BR-2D DEFERRED** |
+| 4 | **BR-2** | **Benchmark Registry and trusted resolver** — admission ordering (§16.2), append-only registration, exact resolution, revocation (§17). **Subdivided by §35 (D-01, amended 2026-08-20) into five independently auditable subphases:** BR-2A contracts, BR-2B non-authoritative lifecycle kernel, BR-2C cryptographic trust authority, BR-2D durable registry authority, BR-2E production composition and operations. | BR-1 | **BR-2A ratified and implemented; BR-2B–BR-2E DEFERRED** |
 | 5 | **UVI-EV-1** | **Readiness evidence/benchmark integration** — readiness consumes receipts and resolved definitions per §20. | TEV-2, BR-2 | **DEFERRED** |
 | 6 | **GV-F** | **Forecast ROI** | UVI-EV-1 | **DEFERRED** |
 | 7 | **GV-O** | **Observed ROI** | GV-F, TEV-2 | **DEFERRED** |
@@ -1348,31 +1348,46 @@ or verdict is changed.**
 ## 35. BR-2 ratification ledger
 
 The repository's permanent record of the BR-2 admission-boundary ratification.
-Seventeen owner decisions, **D-01 through D-17**, all ratified. This section is
+Nineteen owner decisions, **D-01 through D-19**, all ratified. This section is
 governance; the supporting architecture brief that produced it is evidence, not
 a repository artifact, and is not authority here.
+
+> **Amendment, 2026-08-20 — four subphases become five.** This supersedes
+> D-01's original four-subphase ruling. Cryptographic trust, durable state and
+> production composition carry **different threat models** and warrant separate
+> delivery and closure audits, so they no longer share one closure. The
+> consequential half of the change is BR-2B: it becomes **non-authoritative by
+> construction** rather than by an injected default, which removes the need for
+> a deny-all default to be load-bearing at a phase that ships no verifier at
+> all. Two new decisions, **D-18** and **D-19**, record the surface and naming
+> rulings that follow from it. §35.8 records which decisions are deliberately
+> unchanged, so they are not re-opened.
 
 ### 35.1 Subphase allocation
 
 | Subphase | Version | Ships | Must not ship |
 |---|---|---|---|
 | **BR-2A** | `0.1.0` | Registry and exact-resolution **contracts**: record, event, envelope and request shapes; the registry lifecycle vocabulary and its closed relation; one structural representation bound to each transition; typed outcomes; ports as Protocols; new digest domains; pure validation | Any engine, any store, any verifier, any clock read, any convenience resolver |
-| BR-2B | `0.2.0` | Admission and the append-only **process-local** registry: six-stage admission ordering, hash-chained event log, in-memory adapter, CAS slot claim, byte idempotence, typed conflict, exact resolution | Any real verifier — the injected verifier is **exact deny-all**, and a test proves nothing can be admitted |
-| BR-2C | `0.3.0` | Publisher trust and signature verification: audited Ed25519 verifier, composition-root trust-resolver adapter, key entitlements and revocation, approval-verification boundary | Any durable store |
-| BR-2D | `0.4.0` | Durable store and production composition: durable adapter, production composition root, registry-event signing | A backend chosen before DD-10 is ratified |
+| BR-2B | `0.2.0` | **Non-authoritative lifecycle kernel**: deterministic transition validation, predecessor-digest checks, terminality, conflict and idempotency calculation; produces transition **plans** and typed refusals | Any store, any verifier, any clock, any append path, any authority-issued result — and any authoritative act: it **cannot admit, register, revoke or resolve** |
+| BR-2C | `0.3.0` | **Cryptographic trust authority**: audited verifier, signing-frame verification, publisher/approver/revoker anchor resolution, key rotation and revocation. A verified result **binds exact artifact digest, role, key, profile and anchor revision** | Any storage, and any registry state whatsoever |
+| BR-2D | `0.4.0` | **Durable registry authority**: transactional persistence, the trusted clock, compare-and-set transitions, concurrency protection, immutable event history, the process-local in-memory adapter, registry-event signing, and the **first authoritative** admission, registration, revocation and exact resolution. Closes with the **identity-locked composition root** | A backend chosen before DD-10 is ratified; any authoritative operation exposed before the composition root locks |
+| BR-2E | `0.5.0` | **Production composition and operations**: tenant authorization, service APIs, deployment controls, migrations, backup/recovery, observability, operational audit export | Any new authority — BR-2E composes and operates what BR-2D made authoritative, and mints nothing of its own |
 
-**Gating.** BR-2A is ratified and implemented. BR-2B may follow, deny-all.
-BR-2C is blocked on **audited cryptographic engineering** — a secure verifier and
-a composition-root trust-resolver design, specified and independently audited,
-reusing neither the Policy Authority nor the Risk Authority Ed25519
-implementation. That blocker is engineering, not governance: **no owner decision
-is outstanding for it.** BR-2D awaits DD-10.
+**Gating.** BR-2A is ratified and implemented. BR-2B may follow with **no
+verifier, no store and no clock**: it is non-authoritative *by construction*, not
+by an injected default, so nothing at that phase depends on a deny-all default
+holding. BR-2C is blocked on **audited cryptographic engineering** — a secure
+verifier and a composition-root trust-resolver design, specified and
+independently audited, reusing neither the Policy Authority nor the Risk
+Authority Ed25519 implementation. That blocker is engineering, not governance:
+**no owner decision is outstanding for it.** BR-2D awaits DD-10 and BR-2C.
+BR-2E awaits BR-2D.
 
 ### 35.2 Decision register — final dispositions
 
 | ID | Question | Ruling as ratified |
 |---|---|---|
-| **D-01** | Is BR-2 subdivided, and along which boundaries? | **RATIFIED WITH PRECISION.** Four separately auditable subphases (§35.1). BR-2B's verifier is *injected* with an exact deny-all default; any reference or test verifier is **structurally refused in production**, not warned about. |
+| **D-01** | Is BR-2 subdivided, and along which boundaries? | **RATIFIED WITH PRECISION; AMENDED 2026-08-20 TO FIVE SUBPHASES.** Five separately auditable subphases (§35.1). The governing rule: **BR-2B may determine what transition *would be* valid; BR-2D is the first phase permitted to assert that a transition *occurred*.** **BR-2B is non-authoritative by construction**: it ships no store, no verifier, no clock, no append path and no authority-issued result, so there is nothing at that phase for a substituted component to unlock. Trust verification is **BR-2C**; authoritative registry composition is **BR-2D**; operations are **BR-2E**. BR-2B ships no verifier, so the injected deny-all default is a **BR-2C/BR-2D constraint**, not a BR-2B one: from BR-2C the injected verifier carries an exact deny-all default, and any reference or test verifier is **structurally refused in production** by the identity-locked composition root that closes BR-2D — not warned about. |
 | **D-02** | Who is the admission authority? | **RATIFIED.** Four-party separation: publisher submits and signs; an independent approver supplies an authenticated approval; the registry validates prerequisites and appends records; the composition root supplies trust anchors, clock and production adapters. The registry never manufactures publisher authenticity or approval, and publisher approval of its own artifact is insufficient. |
 | **D-03** | Must an admitted artifact carry a verified publisher signature? | **RATIFIED.** Mandatory before admission. An unsigned, malformed, unknown-key, revoked-key or invalidly signed artifact cannot become `ADMITTED` or `REGISTERED`. BR-2A may define the signed-submission contract and **must not implement or simulate signature verification**. |
 | **D-04** | Who owns the benchmark trust anchors? | **RATIFIED WITH MODIFICATION.** The **composition root** owns and configures them, under seven binding constraints: exact deny-all default; no registry-minted anchors; no Policy Authority ownership; no import of the trusted-evidence trust-anchor directory; no exception to §23; **no second hidden trust store inside the registry**; production startup fails closed when a production trust resolver is absent. DD-3 is narrowed accordingly (§31). |
@@ -1382,13 +1397,17 @@ is outstanding for it.** BR-2D awaits DD-10.
 | **D-08** | Which registration lifecycle states exist, and is any reversible? | **RATIFIED WITH PRECISION.** Five states: `SUBMITTED`, `ADMITTED`, `REGISTERED`, `REVOKED`, `REJECTED`, distinct from the artifact's embedded lifecycle state. Permitted forward transitions only; **no reverse transition and no self-transition**. `ADMITTED → REJECTED` only while no registration record has been appended. **No state named `ACTIVE`, `PUBLISHED`, `CURRENT`, `DEFAULT`, `SUSPENDED` or `DEPRECATED` may be introduced.** |
 | **D-09** | Is revocation retroactive? | **RATIFIED WITH MODIFICATION.** `DENY_ALWAYS` for trusted resolution: a revoked version never resolves as admissible, regardless of any caller-supplied `as_of`. Historical inspection remains possible through a **separately named read-only API returning a distinct record type** that cannot be passed where a resolved registered artifact is required. `ALLOW_BEFORE_REVOCATION` may exist only as an explicit future composition-root policy, must never make a revoked artifact *currently* admissible, and is not part of BR-2A. |
 | **D-10** | What are BR-2's supersession rules? | **RATIFIED.** Out of scope. Every supersession request, inference or version-order guess **fails closed** with a typed unsupported-operation result. **BR-2 must not infer authority from SemVer ordering** — a guessed supersession is an unsigned authority decision (§17.12). Blocks UVI-EV-1's supersession-aware paths; blocks nothing in BR-2. |
-| **D-11** | Who owns the authoritative clock? | **RATIFIED WITH MODIFICATION.** One injected authoritative clock owns `recorded_at`. Publisher-supplied time is evidence, never registry time. Caller-supplied `as_of` is permitted **only** on explicitly historical inspection APIs and never bypasses `DENY_ALWAYS` or influences trusted exact resolution. **Zero clock skew** — no non-zero tolerance precedent exists in this repository and none is invented. No future-dated registration. A revocation's `effective_at` is validated against registry-observed time and its own signed record and can never reopen or reverse a revocation. **BR-2A reads no clock.** |
-| **D-12** | Are registry records signed? | **RATIFIED.** For BR-2A and BR-2B, registry registration records and events are **unsigned**. Publisher submissions require publisher signatures; approval assertions require their independent authority; revocation assertions require revoker signatures. Registry-generated artifacts are called **records or events, never verification receipts** — "receipt" is the trusted-evidence layer's word under §6.4, and no component issues the independent verification receipt validating its own action. Registry-event signing is deferred to BR-2D. |
+| **D-11** | Who owns the authoritative clock? | **RATIFIED WITH MODIFICATION.** One injected authoritative clock owns `recorded_at`. Publisher-supplied time is evidence, never registry time. Caller-supplied `as_of` is permitted **only** on explicitly historical inspection APIs and never bypasses `DENY_ALWAYS` or influences trusted exact resolution. **Zero clock skew** — no non-zero tolerance precedent exists in this repository and none is invented. No future-dated registration. A revocation's `effective_at` is validated against registry-observed time and its own signed record and can never reopen or reverse a revocation. **BR-2A and BR-2B read no clock; the authoritative clock arrives at BR-2D.** |
+| **D-12** | Are registry records signed? | **RATIFIED; AMENDED 2026-08-20.** Through BR-2C, registry registration records and events are **unsigned** — no registry event exists at all before BR-2D. Publisher submissions require publisher signatures; approval assertions require their independent authority; revocation assertions require revoker signatures. Registry-generated artifacts are called **records or events, never verification receipts** — "receipt" is the trusted-evidence layer's word under §6.4, and no component issues the independent verification receipt validating its own action. Registry-event signing lands with BR-2D's event history, which is the first place an event exists to sign. |
 | **D-13** | What is the tenant and visibility model? | **RATIFIED.** BR-1's model preserved exactly: tenant-scoped or explicitly platform-wide, declared and digest-bound, never inferred. Reads make not-found and not-permitted **externally indistinguishable**. No publisher-private or shared-by-policy visibility is added. Cross-tenant and platform-wide access is enforced by exact types and tested through constructor bypass, forged records and resolution attacks. |
-| **D-14** | Who owns the durable store, and when? | **RATIFIED.** BR-2A defines the durable-store port. BR-2B ships a clearly named **process-local** in-memory adapter. Production composition raises a **typed startup error** when given the non-production adapter — a warning or docstring is insufficient. No Postgres, no reuse of Risk Authority persistence, no durable backend chosen before DD-10. Enforced by an allow-list of adapter classes checked by **interpreter identity**, not by a settable flag. |
-| **D-15** | What consistency model does BR-2 claim? | **RATIFIED.** Process-local atomicity and read-after-write behaviour, and nothing more. The port contract **explicitly disclaims** durability, multi-process coordination, distributed strong consistency, eventual-consistency safety, and cross-process atomic revocation. An unavailable guarantee **must not be represented as a Boolean capability that can be flipped**: a frozen typed descriptor plus an identity-checked adapter allow-list replaces any such flag. |
+| **D-14** | Who owns the durable store, and when? | **RATIFIED; AMENDED 2026-08-20.** BR-2A defines the durable-store port. **BR-2D** ships the clearly named **process-local** in-memory adapter, alongside durable persistence; **BR-2B ships no store of any kind**. Production composition raises a **typed startup error** when given the non-production adapter — a warning or docstring is insufficient. No Postgres, no reuse of Risk Authority persistence, no durable backend chosen before DD-10. Enforced by an allow-list of adapter classes checked by **interpreter identity**, not by a settable flag, in the identity-locked composition root that **closes BR-2D**. |
+| **D-15** | What consistency model does BR-2 claim? | **RATIFIED.** Process-local atomicity and read-after-write behaviour, and nothing more. The port contract **explicitly disclaims** durability, multi-process coordination, distributed strong consistency, eventual-consistency safety, and cross-process atomic revocation. An unavailable guarantee **must not be represented as a Boolean capability that can be flipped**: a frozen typed descriptor plus an identity-checked adapter allow-list replaces any such flag. **Anchored 2026-08-20:** the text is phase-neutral and unchanged, but the claim now *arrives* at **BR-2D** with the first store. BR-2A declares the descriptor; **BR-2B claims no consistency at all, because it holds nothing to be consistent about**; BR-2D's process-local adapter is the first thing the claim describes. Recorded here so the arrival point is not left to inference from D-14. |
 | **D-16** | Where does BR-2 live, and what does §6.2 become? | **RATIFIED.** New distribution `ugence-benchmark-registry-authority` at `packages/benchmark-registry-authority/`, namespace `ugence_benchmark_registry_authority`, initial version `0.1.0`. `ugence-benchmark-registry` stays at `0.1.0` with its zero-dependency proof intact. §6.2 amended to record the two layers. **BR-2 behaviour never goes inside BR-1.** |
 | **D-17** | What exactly is guaranteed unchanged in BR-1? | **RATIFIED.** BR-2 CI preserves and independently reverifies: the pinned identity digests; the canonicalization version; the single BR-1 domain string; the curated public API; `BR1_BENCHMARK_REFUSAL_REASONS` including declaration order; the package suite and probe counts; package version `0.1.0`; the empty dependency list; and the platform-freeze substantive digest. BR-1's suite, probes and verifier run **unmodified**, and the pinned digests are recomputed independently from raw canonical bytes and again from the installed wheel. **Note:** the curated `api.__all__` and the `public_api.json` symbol map differ by exactly one, because `__version__` is carried separately as `package_version`. **Both counts are asserted and the manifest is not "corrected" to match.** Gates every subphase. |
+| **D-18** | Does BR-2 curate one public surface or more than one? | **RATIFIED 2026-08-20.** **One** curated surface, `api.__all__`, at every subphase; no second curated surface and no second symbol manifest is introduced. The pinned surface counts are **milestone-scoped snapshots, not invariants**: they move deliberately at each version bump, and every assertion site moves with them — `packages/benchmark-registry-authority/public_api.json`, `tests/packaging/test_public_api.py:40-41`, and `verify_benchmark_registry_authority_distribution.py:337,361`. Two mechanisms make this the only coherent choice. `tests/packaging/test_public_api.py:118-125` derives from the **sealed contract-type registry** and requires every root-canonicalizable class to appear in `api.__all__`, so BR-2B's transition-plan and refusal types enter that surface by force. And `MANIFEST.in` enumerates its JSON manifests **by name** while `pyproject.toml`'s `packages.find` glob ships every module **automatically**, so a second manifest would ship in neither artifact while the code it describes shipped in both. |
+| **D-19** | May a later subphase extend the exported-function naming allow-list? | **RATIFIED 2026-08-20.** The exported-function prefix allow-list at `tests/packaging/test_milestone_boundary.py:252-257` — `require_`, `is_`, `canonical_`, `bound_`, `fault_` — is **milestone-scoped, not permanent**. BR-2B extends it with the verbs its kernel needs, each chosen so that **no verb implies an authoritative act**. The registry-operation ban at `:225-249` — `register`, `admit`, `resolve`, `lookup`, `revoke`, `append`, `claim_slot`, `verify`, `sign`, `now`, `read`, `write`, `persist` — **stands unchanged at BR-2B**, and is what keeps the kernel non-authoritative in name as well as in fact. The two capability-token lists at `tests/contract/test_confusable_and_ports.py:158-176` and `tests/packaging/test_milestone_boundary.py:18-45` likewise become **milestone-conditional**: each token carries its unlock phase and the exact classes permitted to carry it then. **BR-2B requires none of them to unlock** — a non-authoritative kernel needs no engine, verifier, adapter, store, resolver or composition root. |
+| **D-20** | What boundary claim does BR-2B actually make, and how is it enforced? | **RATIFIED 2026-08-20.** The universal claim — *no callable anywhere under `src/` accepts a `BenchmarkTransitionPlan`* — is **withdrawn as unprovable and is not to be re-attempted**. Python permits closures, callables held in containers, dynamic attributes, `exec`, `type()`, `__getattr__`, `functools.partial` and runtime rebinding, so no enumeration decides it; three closure audits found seven bypasses, each on the seam between what a design counted as discoverable and what Python allows. The last design, a frozen inventory of every reachable callable, additionally failed against its own adversary: a contributor who can modify production source can regenerate the inventory in the same commit. **The enforceable claim is capability absence**, in four decidable parts: (1) no exported callable and no declared Protocol port method accepts a transition plan, by resolved type identity, with full annotation of that surface required so the check cannot be vacuous; (2) no authority-issued result type exists; (3) no store, verifier, clock, append or apply operation, composition root or prohibited dependency exists; (4) planning returns only a structural plan or a typed refusal. **Private-source expansion is a governance matter, not a gate**: it is covered by `.github/CODEOWNERS` plus branch protection requiring an approving review from someone other than the author, and it is inert without capability — a private plan consumer computes a value and has no store, clock, authority result or effectful operation to spend it on. **CODEOWNERS alone is not enforcement**, and a single owner approving their own change is not an independent review; naming a distinct reviewer is an open owner action. |
+| **D-21** | Has BR-2B's capability-absence claim been independently audited, and what constitutes independent review in a solo-maintainer model? | **RATIFIED 2026-08-20.** An independent technical closure audit of BR-2B was performed at commit `dfd6aa5e` against D-20's four-part capability-absence claim and found **no shipped capability able to perform an authoritative or effectful operation**. Specifically: **no class satisfies any of the four ports** structurally, including partial method coverage and subclasses; **no code path appends, applies, admits, registers, revokes or resolves**; there is **no clock read, filesystem access, socket, subprocess or cryptographic verification**, with `hashlib` confined to canonical digesting; there are **no caches, memoized results or singletons**, and the prohibition on memoizing a verification result **holds regardless of return width** — a bare `bool` is the worst case, not an exemption, because a cached answer is indistinguishable from a fresh one; the **three reserved authority-issued names bind to nothing** under any binding form and resolve to nothing at runtime; and injecting a permissive always-true verifier, a working clock and a working store, monkey-patching all four ports, subclassing shipped contracts and handing a transition plan into every position of all 102 exported callables — **148,070 calls under an audit hook** — **invoked no injected port** and produced no filesystem, network, subprocess or `exec` effect. One non-effectful finding is recorded rather than omitted: `BENCHMARK_SIGNING_FRAME_SPECIFICATION` (`contracts/envelopes.py:164`) is an exported module-level **mutable** dict; tampering with it changes no digest and no behaviour, and **no code path reads it**. The wheel and sdist ship only the **21 `src/` modules with no entry points**, so the probes, verifiers and mutation harnesses are not part of the shipped surface. **On governance:** independent GitHub approval is unavailable in a solo-maintainer model where the sole maintainer is the author, so the independent check for BR-2B is **this technical audit rather than a second approving reviewer**. Branch protection and CODEOWNERS remain **routing, not enforcement**, and naming a distinct reviewer stays an **open owner action** for any later subphase that ships a capability. |
 
 ### 35.3 BR-1 freeze guarantees
 
@@ -1469,9 +1488,56 @@ chain-integrity and chain-substitution results, and the
 no-caller-constructible-authority properties — and only that session may
 recommend merge.
 
+### 35.8 Five-phase amendment — what is deliberately unchanged
+
+Recorded so that a later reader does not re-open a decision this amendment
+already considered and left alone.
+
+| Decision | Disposition under five phases |
+|---|---|
+| **D-03** (§35.2) | **Unchanged, and strictly stronger.** It rules that an unsigned, malformed, unknown-key, revoked-key or invalidly signed artifact cannot become `ADMITTED` or `REGISTERED`. Under five phases BR-2B cannot reach those states *at all*, by construction rather than by refusal. |
+| **D-05** (§35.2) | **Unchanged text; closure splits.** Its ruling now spans two phases — idempotency-by-canonical-bytes is BR-2B *calculation*, admission-requires-`APPROVED` is BR-2D *assertion*. D-05 cannot be closed in a single audit; record which half closes where. |
+| **D-06** (§35.2) | **Unchanged text; owner assigned.** It forbids claiming a complete Unicode confusable implementation until the deterministic algorithm and its version are specified and tested, but named no owner for completing it. That work is **BR-2B** conflict calculation. |
+| **D-15** (§35.2) | **Text unchanged; arrival point anchored.** D-15 carries no subphase letter and none was added: it rules on what *BR-2* claims, not on which subphase ships the store, so nothing in it was false. What it lacked was a statement of *when* the claim starts applying, which is now recorded in the ruling itself — BR-2D — rather than left to be inferred from D-14. |
+| **D-09** (§35.2) | **Unchanged.** `ALLOW_BEFORE_REVOCATION` remains a possible future composition-root policy, which now lands at **BR-2E**. |
+
+**Reserved authority-issued type names.** The three names reserved at
+`packages/benchmark-registry-authority/src/ugence_benchmark_registry_authority/contracts/_authority.py:74-82`
+— `BenchmarkAdmissionDecision`, `BenchmarkRegistrationEvent`,
+`BenchmarkResolution` — have **BR-2D as their named unlock point**. All three
+assert that something *occurred*, which is precisely what BR-2D is the first
+phase permitted to say. Until then the gates at
+`tests/packaging/test_milestone_boundary.py:103` and `:109` continue to enforce
+their absence.
+
+**Consequence, not a ruling.** BR-2B's new canonicalizable types must be
+registered in `contracts/_seal.py`'s `REGISTERING_MODULES` **before the seal
+closes**, or `canonical_bytes` refuses them as unregistered. This follows
+mechanically from the sealed registry and requires no owner decision; it is
+recorded here so it is not discovered late.
+
+**Python versions are a promise, not a preference.** `requires-python = ">=3.10"`
+declares four interpreters. BR-2B's CI runs its suite on all four
+(`.github/workflows/benchmark-registry-authority-ci.yml`, `package-suite`
+matrix); a gate that fails on three of four declared versions is a broken
+promise to anyone who installs the distribution, and narrowing the declaration
+is the only honest alternative. **Open item, BR-1:** the frozen layer declares
+the same range but its own
+`tests/packaging/test_dependency_boundary.py::test_the_distribution_declares_no_runtime_dependency`
+imports `tomllib`, which is 3.11+, so BR-1's suite cannot run on 3.10. BR-1's
+shipped source is unaffected — 592 of its 593 tests and all 57 probes pass on
+3.10. Resolving it means either a test-only `tomli` backport in a frozen package
+or narrowing BR-1's `requires-python`; both are BR-1 decisions and neither is
+taken here, because BR-2 changes no BR-1 file (D-17).
+
+**Distribution text not corrected here.** Seventy-seven statements in
+`packages/benchmark-registry-authority` assert the four-phase subdivision, 30 of
+them inside `src/` and therefore shipped in both the wheel and the sdist. They
+are corrected **with BR-2B**, so the text is corrected once rather than twice.
+
 ---
 
 *Design-only ADR for every milestone except BR-1 and BR-2A. No authority is
 minted here. Trusted evidence verification and benchmark **resolution** remain
-**NOT implemented**; BR-2B, BR-2C and BR-2D in §30 remain DEFERRED and each
+**NOT implemented**; BR-2B, BR-2C, BR-2D and BR-2E in §30 remain DEFERRED and each
 requires a separate reviewed phase.*

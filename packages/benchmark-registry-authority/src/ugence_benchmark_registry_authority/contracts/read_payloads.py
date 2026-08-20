@@ -34,7 +34,7 @@ permanently ``False``. B-9: possession is not validity, retrieval is not
 resolution. Holding either object — or any digest of it — authorizes no
 execution and establishes no active eligibility.
 
-**The authoritative result type does not exist here.** It belongs to BR-2B/BR-2C,
+**The authoritative result type does not exist here.** It belongs to BR-2D,
 after real verification exists, and its name (``BenchmarkResolution``) is
 reserved and undefined at BR-2A. A caller can construct a
 :class:`BenchmarkResolutionRecordPayload` all day and never construct a

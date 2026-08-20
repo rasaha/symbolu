@@ -1,7 +1,7 @@
 {
   "distribution": "ugence-benchmark-registry-authority",
   "namespace": "ugence_benchmark_registry_authority",
-  "package_version": "0.1.0",
+  "package_version": "0.2.0",
   "milestone": "BR-2A",
   "note": "Machine-readable public-contract inventory. 'Every type is constructible and canonicalizable' applies to PUBLIC DATA CONTRACTS ONLY \u2014 the fifteen rows under 'public_data_contracts'. It does NOT apply to Protocols, enums, errors, constants, pure validation functions, frozen descriptors or abstract type declarations, each of which is listed under 'other_public_symbols' and marked with its own kind and with canonicalizable=false. No row anywhere carries a caller-supplied upstream digest field: every upstream digest in this package is a derived read-only property recomputed from the exact nested object. The 'caller_supplied_digest_fields' column lists digests of artifacts OUTSIDE this package's graph (the BR-1 identity digest, the benchmark content digest, the immutable admitted digest), which cannot be recomputed here because the objects are not held. Regenerate with tools/generate_manifests.py; tests/packaging/test_inventories.py re-derives every column from the live surface and asserts this file equals it.",
   "public_data_contracts": [
@@ -167,7 +167,7 @@
         "registry_admission_established",
         "trusted_resolution_established"
       ],
-      "later_milestone_authority_issued_result": "BR-2B \u2014 the authority-issued submission record appended by the admission engine's append-only log.",
+      "later_milestone_authority_issued_result": "BR-2D \u2014 the authority-issued submission record appended by the durable registry authority's append-only log.",
       "fields": [
         "publisher_submission_envelope",
         "declared_registry_authority_identity",
@@ -211,7 +211,7 @@
         "registry_admission_established",
         "trusted_resolution_established"
       ],
-      "later_milestone_authority_issued_result": "BR-2B \u2014 BenchmarkAdmissionDecision, the authority-issued result. Reserved and undefined at BR-2A.",
+      "later_milestone_authority_issued_result": "BR-2D \u2014 BenchmarkAdmissionDecision, the authority-issued result. Reserved and undefined until BR-2D.",
       "fields": [
         "submission_record",
         "approval_envelope",
@@ -260,7 +260,7 @@
         "registry_admission_established",
         "trusted_resolution_established"
       ],
-      "later_milestone_authority_issued_result": "BR-2B \u2014 the authority-issued post-admission rejection event.",
+      "later_milestone_authority_issued_result": "BR-2D \u2014 the authority-issued post-admission rejection event.",
       "fields": [
         "admission_decision",
         "declared_refusal_reason",
@@ -303,7 +303,7 @@
         "registry_admission_established",
         "trusted_resolution_established"
       ],
-      "later_milestone_authority_issued_result": "BR-2B \u2014 BenchmarkRegistrationEvent, the authority-issued result. Reserved and undefined at BR-2A.",
+      "later_milestone_authority_issued_result": "BR-2D \u2014 BenchmarkRegistrationEvent, the authority-issued result. Reserved and undefined until BR-2D.",
       "fields": [
         "admission_decision",
         "declared_recorded_at"
@@ -346,7 +346,7 @@
         "registry_admission_established",
         "trusted_resolution_established"
       ],
-      "later_milestone_authority_issued_result": "BR-2B/BR-2C \u2014 the authority-issued revocation event, appended only after the revoker's signature verifies under an entitled anchor.",
+      "later_milestone_authority_issued_result": "BR-2D \u2014 the authority-issued revocation event, appended only after the revoker's signature verifies under an entitled anchor.",
       "fields": [
         "registration_event",
         "revocation_envelope",
@@ -394,7 +394,7 @@
         "registry_admission_established",
         "trusted_resolution_established"
       ],
-      "later_milestone_authority_issued_result": "BR-2B \u2014 the authority-issued conflict record produced by the admission engine's slot claim.",
+      "later_milestone_authority_issued_result": "BR-2D \u2014 the authority-issued conflict record produced by the durable registry authority's compare-and-set slot claim.",
       "fields": [
         "submission_record",
         "declared_refusal_reason",
@@ -422,6 +422,110 @@
       "terminal": true
     },
     {
+      "class_name": "BenchmarkRegistrySnapshotAssertion",
+      "kind": "public_data_contract",
+      "caller_constructible": true,
+      "canonicalizable": true,
+      "digest_domain": "ugence.benchmark-registry-authority/registry-snapshot-assertion/v1",
+      "carries_declared_authority_information": false,
+      "permanently_false_trust_properties": [
+        "approval_authenticity_established",
+        "authority_verified",
+        "publisher_authenticity_established",
+        "registry_admission_established",
+        "trusted_resolution_established"
+      ],
+      "later_milestone_authority_issued_result": "BR-2D \u2014 the durable registry authority that can observe the state this contract only asserts. BR-2B holds no store and reads none.",
+      "fields": [
+        "coordinate",
+        "asserted_current_state",
+        "asserted_registration_record_presence"
+      ],
+      "nested_source_of_truth_contracts": [
+        "coordinate"
+      ],
+      "derived_digest_properties": [],
+      "caller_supplied_digest_fields": [],
+      "caller_supplied_upstream_digest_fields": [],
+      "mechanically_reachable_actor_identities": [],
+      "equality_and_separation_checks": [],
+      "carries_declared_recorded_at": false,
+      "prev_event_digest_rule": "not applicable \u2014 carries no chain position",
+      "transition_represented": "none \u2014 a caller's assertion about current state, not a move",
+      "required_predecessor_state": null,
+      "required_predecessor_declared_outcome": null,
+      "terminal": false
+    },
+    {
+      "class_name": "BenchmarkTransitionPlan",
+      "kind": "public_data_contract",
+      "caller_constructible": true,
+      "canonicalizable": true,
+      "digest_domain": "ugence.benchmark-registry-authority/transition-plan/v1",
+      "carries_declared_authority_information": false,
+      "permanently_false_trust_properties": [
+        "approval_authenticity_established",
+        "authority_verified",
+        "publisher_authenticity_established",
+        "registry_admission_established",
+        "trusted_resolution_established"
+      ],
+      "later_milestone_authority_issued_result": "BR-2D \u2014 the first phase permitted to assert that the planned transition occurred. A plan says only that it would be admissible.",
+      "fields": [
+        "snapshot",
+        "planned_to_state"
+      ],
+      "nested_source_of_truth_contracts": [],
+      "derived_digest_properties": [
+        "snapshot_digest"
+      ],
+      "caller_supplied_digest_fields": [],
+      "caller_supplied_upstream_digest_fields": [],
+      "mechanically_reachable_actor_identities": [],
+      "equality_and_separation_checks": [],
+      "carries_declared_recorded_at": false,
+      "prev_event_digest_rule": "not applicable \u2014 carries no chain position",
+      "transition_represented": "any transition the closed relation admits, as a plan only \u2014 a plan is not the transition, and BR-2B cannot perform one",
+      "required_predecessor_state": null,
+      "required_predecessor_declared_outcome": null,
+      "terminal": false
+    },
+    {
+      "class_name": "BenchmarkTransitionRefusal",
+      "kind": "public_data_contract",
+      "caller_constructible": true,
+      "canonicalizable": true,
+      "digest_domain": "ugence.benchmark-registry-authority/transition-refusal/v1",
+      "carries_declared_authority_information": true,
+      "permanently_false_trust_properties": [
+        "approval_authenticity_established",
+        "authority_verified",
+        "publisher_authenticity_established",
+        "registry_admission_established",
+        "trusted_resolution_established"
+      ],
+      "later_milestone_authority_issued_result": "BR-2D \u2014 the authority-issued refusal appended when the move is actually attempted against observed rather than asserted state.",
+      "fields": [
+        "snapshot",
+        "refused_to_state",
+        "declared_refusal_reason"
+      ],
+      "nested_source_of_truth_contracts": [],
+      "derived_digest_properties": [
+        "snapshot_digest"
+      ],
+      "caller_supplied_digest_fields": [],
+      "caller_supplied_upstream_digest_fields": [],
+      "mechanically_reachable_actor_identities": [],
+      "equality_and_separation_checks": [],
+      "carries_declared_recorded_at": false,
+      "prev_event_digest_rule": "not applicable \u2014 carries no chain position",
+      "transition_represented": "none \u2014 records a move that would not be admissible against the nested assertion",
+      "required_predecessor_state": null,
+      "required_predecessor_declared_outcome": null,
+      "terminal": true
+    },
+    {
       "class_name": "BenchmarkResolutionRecordPayload",
       "kind": "public_data_contract",
       "caller_constructible": true,
@@ -437,7 +541,7 @@
         "registry_admission_established",
         "trusted_resolution_established"
       ],
-      "later_milestone_authority_issued_result": "BR-2B/BR-2C \u2014 BenchmarkResolution, the authority-issued result and its issuance boundary, after real verification exists. Reserved and undefined at BR-2A.",
+      "later_milestone_authority_issued_result": "BR-2D \u2014 BenchmarkResolution, the authority-issued result and its issuance boundary, after real verification exists. Reserved and undefined at BR-2A.",
       "fields": [
         "coordinate",
         "declared_registration_state",
@@ -479,7 +583,7 @@
         "registry_admission_established",
         "trusted_resolution_established"
       ],
-      "later_milestone_authority_issued_result": "BR-2B \u2014 the authority-issued historical record returned by the read-only inspection API.",
+      "later_milestone_authority_issued_result": "BR-2D \u2014 the authority-issued historical record returned by the read-only inspection API.",
       "fields": [
         "coordinate",
         "declared_registration_state",
@@ -521,7 +625,7 @@
         "registry_admission_established",
         "trusted_resolution_established"
       ],
-      "later_milestone_authority_issued_result": "BR-2B \u2014 the authorization check that consumes it, applied before any temporal or lifecycle check.",
+      "later_milestone_authority_issued_result": "BR-2D \u2014 the authorization check that consumes it, applied before any temporal or lifecycle check.",
       "fields": [
         "scope"
       ],
@@ -557,7 +661,7 @@
         "registry_admission_established",
         "trusted_resolution_established"
       ],
-      "later_milestone_authority_issued_result": "BR-2B \u2014 the cross-tenant non-disclosure check that consumes it.",
+      "later_milestone_authority_issued_result": "BR-2D \u2014 the cross-tenant non-disclosure check that consumes it.",
       "fields": [
         "scope"
       ],
@@ -594,7 +698,7 @@
         "registry_admission_established",
         "trusted_resolution_established"
       ],
-      "later_milestone_authority_issued_result": "BR-2B/BR-2C \u2014 the trusted exact-resolution API that consumes it.",
+      "later_milestone_authority_issued_result": "BR-2D \u2014 the trusted exact-resolution API that consumes it.",
       "fields": [
         "coordinate"
       ],
@@ -627,7 +731,7 @@
         "registry_admission_established",
         "trusted_resolution_established"
       ],
-      "later_milestone_authority_issued_result": "BR-2B \u2014 the separately named read-only historical inspection API.",
+      "later_milestone_authority_issued_result": "BR-2D \u2014 the separately named read-only historical inspection API.",
       "fields": [
         "coordinate",
         "as_of"
@@ -735,9 +839,13 @@
     },
     {
       "symbol": "BenchmarkRegistryScopeExpectation",
-      "kind": "pure_validation_function",
+      "kind": "closed_type_alias",
       "caller_constructible": false,
-      "canonicalizable": false
+      "canonicalizable": false,
+      "members": [
+        "PlatformRegistryScopeExpectation",
+        "TenantRegistryScopeExpectation"
+      ]
     },
     {
       "symbol": "canonical_bytes",
@@ -1041,6 +1149,58 @@
     },
     {
       "symbol": "BENCHMARK_RESERVED_AUTHORITY_ISSUED_TYPE_NAMES",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BenchmarkRegistrationRecordPresence",
+      "kind": "closed_vocabulary_enum",
+      "caller_constructible": true,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BenchmarkPlanningOutcome",
+      "kind": "closed_type_alias",
+      "caller_constructible": false,
+      "canonicalizable": false,
+      "members": [
+        "BenchmarkTransitionPlan",
+        "BenchmarkTransitionRefusal"
+      ]
+    },
+    {
+      "symbol": "is_byte_identical_resubmission",
+      "kind": "pure_validation_function",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "plan_transition",
+      "kind": "pure_validation_function",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "plan_submission_outcome",
+      "kind": "pure_validation_function",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_REGISTRY_SNAPSHOT_ASSERTION_DIGEST_DOMAIN",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_TRANSITION_PLAN_DIGEST_DOMAIN",
+      "kind": "pinned_constant",
+      "caller_constructible": false,
+      "canonicalizable": false
+    },
+    {
+      "symbol": "BENCHMARK_TRANSITION_REFUSAL_DIGEST_DOMAIN",
       "kind": "pinned_constant",
       "caller_constructible": false,
       "canonicalizable": false

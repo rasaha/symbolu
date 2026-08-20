@@ -53,6 +53,7 @@ __all__ = [
     "BenchmarkRegistryConsistencyScope",
     "BenchmarkRegistryConsistencyClaim",
     "BenchmarkConfusableNormalizationPosture",
+    "BenchmarkRegistrationRecordPresence",
     "BENCHMARK_REGISTRATION_STATE_ORDER",
     "BENCHMARK_TERMINAL_REGISTRATION_STATES",
     "BENCHMARK_BANNED_REGISTRATION_STATE_NAMES",
@@ -68,7 +69,7 @@ class BenchmarkRegistrationState(str, Enum):
 
     At BR-2A no member is ever *established* — every payload carrying one
     permanently derives that registry admission and trusted resolution are not
-    established. The vocabulary exists so that BR-2B's admission engine has a
+    established. The vocabulary exists so that BR-2D's admission path has a
     ratified relation to move through, not so that a caller can assert a
     position in it.
     """
@@ -170,7 +171,7 @@ class BenchmarkRegistryFaultClass(str, Enum):
     STORE_INTEGRITY = "STORE_INTEGRITY"
 
     #: A publisher, key, signature or approval could not be trusted. This is the
-    #: class that BR-2B's deny-all verifier returns for everything until BR-2C
+    #: class BR-2C's verifier will attach once real verification exists; until
     #: supplies an audited verifier.
     TRUST_AND_AUTHENTICITY = "TRUST_AND_AUTHENTICITY"
 
@@ -248,7 +249,8 @@ BENCHMARK_TERMINAL_REGISTRATION_STATES: frozenset = frozenset(
 )
 
 #: The state names D-08 permanently bans, pinned so the ban is machine-checkable
-#: rather than a comment. ``tests/contract/test_name_ban.py`` asserts that no
+#: rather than a comment. ``tests/contract/test_two_lifecycle_authorities.py``
+#: asserts that no
 #: enum member, no class, and no exported symbol in this package carries any of
 #: them.
 BENCHMARK_BANNED_REGISTRATION_STATE_NAMES: frozenset = frozenset(
@@ -261,3 +263,27 @@ BENCHMARK_BANNED_REGISTRATION_STATE_NAMES: frozenset = frozenset(
         "DEPRECATED",
     }
 )
+
+
+class BenchmarkRegistrationRecordPresence(str, Enum):
+    """Whether a registration record has been appended, as a caller asserts it.
+
+    Two members and no third. This gates the one arrow the closed transition
+    relation cannot express on its own: ``ADMITTED → REJECTED`` is permitted
+    **only while no registration record has been appended**, which is a fact
+    about the log rather than about the state pair.
+
+    A closed enum rather than a Boolean, for D-15's reason. An
+    ``is_registered`` flag would be one assignment away from turning a refused
+    rejection into a permitted one, and the point of the gate is that it cannot
+    be flipped. It is also an *assertion* in both members: BR-2B holds no log,
+    so ``NO_RECORD_APPENDED`` is what a caller claims, never what BR-2B
+    observed.
+    """
+
+    #: The caller asserts no registration record exists for this locator.
+    NO_RECORD_APPENDED = "NO_RECORD_APPENDED"
+
+    #: The caller asserts a registration record has been appended. This closes
+    #: the ``ADMITTED → REJECTED`` arrow permanently for that locator.
+    RECORD_APPENDED = "RECORD_APPENDED"

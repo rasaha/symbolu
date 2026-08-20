@@ -6,6 +6,13 @@ import dataclasses
 
 import pytest
 
+from _milestones import (
+    SUBPHASE_LADDER,
+    VERSION_SUBPHASE,
+    banned_capability_tokens,
+)
+
+from ugence_benchmark_registry_authority import api
 from ugence_benchmark_registry_authority.api import (
     BENCHMARK_CONFUSABLE_COMPARED_ELEMENTS,
     BENCHMARK_CONFUSABLE_COMPARISON_CONTRACT,
@@ -31,6 +38,88 @@ PORTS = (
     BenchmarkApprovalVerifierPort,
     BenchmarkClockPort,
 )
+
+#: Implementation-shaped names no exported symbol may carry, mapped to the
+#: subphase that may first ship one — D-19's milestone-conditional form, the
+#: same discipline ``test_milestone_boundary.py`` applies to the tree-wide list.
+#:
+#: ``None`` is a permanent ban rather than a deferral. A stub, fake, dummy,
+#: no-op or null implementation is never correct at *any* subphase: §17 forbids
+#: shipping an executable placeholder, and that ruling has no expiry date.
+EXPORTED_IMPLEMENTATION_UNLOCK = {
+    "denyall": "BR-2C",
+    "deny_all": "BR-2C",
+    "verifier": "BR-2C",
+    "trust_store": "BR-2C",
+    "inmemory": "BR-2D",
+    "in_memory": "BR-2D",
+    "adapter": "BR-2D",
+    "compositionroot": "BR-2D",
+    "composition_root": "BR-2D",
+    "registry_impl": "BR-2D",
+    "engine": "BR-2D",
+    "resolver": "BR-2D",
+    "signer": "BR-2D",
+    "stub": None,
+    "fake": None,
+    "dummy": None,
+    "noop": None,
+    "null_": None,
+}
+
+#: The exact token set BR-2A froze, pinned independently so a restructuring
+#: cannot drop one unnoticed.
+BR2A_FROZEN_EXPORT_TOKENS = frozenset(
+    {
+        "denyall",
+        "deny_all",
+        "inmemory",
+        "in_memory",
+        "stub",
+        "fake",
+        "dummy",
+        "noop",
+        "null_",
+        "adapter",
+        "compositionroot",
+        "composition_root",
+        "registry_impl",
+        "engine",
+        "resolver",
+        "verifier",
+        "signer",
+        "trust_store",
+    }
+)
+
+EXPORTED_IMPLEMENTATION_TOKENS = tuple(
+    sorted(
+        banned_capability_tokens(
+            VERSION_SUBPHASE[api.__version__], EXPORTED_IMPLEMENTATION_UNLOCK
+        )
+    )
+)
+
+
+def test_the_exported_implementation_ban_is_not_weaker_than_br2a_froze():
+    """Milestone-conditional, and at this version identical to BR-2A's set."""
+
+    assert set(EXPORTED_IMPLEMENTATION_TOKENS) == BR2A_FROZEN_EXPORT_TOKENS
+    assert set(EXPORTED_IMPLEMENTATION_UNLOCK) == BR2A_FROZEN_EXPORT_TOKENS
+
+
+def test_a_placeholder_implementation_name_is_banned_at_every_subphase():
+    """§17's ban on executable placeholders has no expiry date."""
+
+    permanent = {
+        token
+        for token, unlock in EXPORTED_IMPLEMENTATION_UNLOCK.items()
+        if unlock is None
+    }
+    assert permanent == {"stub", "fake", "dummy", "noop", "null_"}
+    for subphase in SUBPHASE_LADDER:
+        still = banned_capability_tokens(subphase, EXPORTED_IMPLEMENTATION_UNLOCK)
+        assert permanent <= still, subphase
 
 
 # --------------------------------------------------------------------------- #
@@ -155,26 +244,7 @@ def test_no_deny_all_or_placeholder_implementation_ships():
 
     import ugence_benchmark_registry_authority as pkg
 
-    banned = (
-        "denyall",
-        "deny_all",
-        "inmemory",
-        "in_memory",
-        "stub",
-        "fake",
-        "dummy",
-        "noop",
-        "null_",
-        "adapter",
-        "compositionroot",
-        "composition_root",
-        "registry_impl",
-        "engine",
-        "resolver",
-        "verifier",
-        "signer",
-        "trust_store",
-    )
+    banned = EXPORTED_IMPLEMENTATION_TOKENS
     for symbol in pkg.__all__:
         value = getattr(pkg, symbol)
         if not (inspect.isclass(value) or inspect.isfunction(value)):
