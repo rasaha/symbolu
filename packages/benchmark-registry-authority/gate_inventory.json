@@ -151,7 +151,7 @@
       "module": "lifecycle.py",
       "description": "the empty admissible-successor set for REVOKED \u2014 the terminal state's own relation entry",
       "result": "KILLED",
-      "first_failure": "test:tests/contract/test_canonicalization.py - ugence_benchmark_registry_aut..."
+      "first_failure": "import:BenchmarkRegistryLifecycleError REVOKED is terminal but admits successors"
     },
     {
       "gate": "G-10",
@@ -159,7 +159,7 @@
       "module": "lifecycle.py",
       "description": "the empty admissible-successor set for REJECTED",
       "result": "KILLED",
-      "first_failure": "test:tests/contract/test_canonicalization.py - ugence_benchmark_registry_aut..."
+      "first_failure": "import:BenchmarkRegistryLifecycleError REJECTED is terminal but admits successors"
     },
     {
       "gate": "G-11",

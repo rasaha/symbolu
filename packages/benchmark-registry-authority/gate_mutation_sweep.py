@@ -37,6 +37,7 @@ Run:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import pathlib
@@ -600,6 +601,123 @@ def _restore(pristine: pathlib.Path, working: pathlib.Path) -> None:
     shutil.copytree(pristine, working)
 
 
+def _tree_manifest(root: pathlib.Path) -> dict:
+    """``{relative path: sha256}`` for every file under ``root``.
+
+    Bytecode is excluded from the snapshot, so a ``.pyc`` appearing here at all
+    would mean something wrote one despite ``PYTHONDONTWRITEBYTECODE`` — which
+    is exactly the condition that can mask a mutation, so it is surfaced rather
+    than filtered out.
+    """
+
+    manifest = {}
+    for path in sorted(root.rglob("*")):
+        if path.is_file():
+            manifest[str(path.relative_to(root))] = hashlib.sha256(
+                path.read_bytes()
+            ).hexdigest()
+    return manifest
+
+
+def _assert_pristine(working: pathlib.Path, expected: dict, gate_id: str) -> None:
+    """Prove the working tree is byte-identical to the proven-green baseline.
+
+    The baseline suite runs once, on a tree whose hashes are recorded here.
+    Asserting that each restore reproduces those exact bytes is what makes that
+    single run stand for "the baseline passes before this mutation" — a restore
+    that silently left a previous mutant behind, or dropped a stray ``.pyc``,
+    would otherwise turn every later result into a measurement of the wrong
+    tree.
+    """
+
+    actual = _tree_manifest(working)
+    if actual != expected:
+        added = sorted(set(actual) - set(expected))
+        removed = sorted(set(expected) - set(actual))
+        changed = sorted(
+            p for p in set(actual) & set(expected) if actual[p] != expected[p]
+        )
+        raise RuntimeError(
+            f"{gate_id}: the restored tree is not the pristine baseline "
+            f"(added={added[:3]} removed={removed[:3]} changed={changed[:3]}); "
+            "a sweep run against a drifted tree measures nothing"
+        )
+
+
+def _assert_mutant_loaded(working: pathlib.Path, gate) -> str:
+    """Prove the interpreter actually imports the mutated source.
+
+    Editing a file on disk is not evidence that the run under measurement used
+    it. A stale ``__pycache__`` entry, a shadowing entry earlier on
+    ``sys.path``, or a package resolved from the real repository instead of the
+    working copy would all produce a green suite against **unmutated** code —
+    reported as SURVIVED, and read as a missing gate that is in fact present.
+
+    So the check is made from inside a subprocess with the same environment the
+    suite gets, and it asks the import system rather than the filesystem:
+    :func:`inspect.getsource` reads through the module's own loader, so it
+    reflects what Python imported. The module's ``__file__`` must also resolve
+    inside the working copy.
+
+    A mutation that makes the module **refuse to import** is the strongest kill
+    there is — several gates in this package are import-time structural
+    invariants — so that case is reported as a kill, not as an unprovable
+    result. It is still proven rather than assumed: the traceback must name the
+    mutated file inside the working copy, which only happens if the interpreter
+    executed it.
+
+    Returns a short status used as the ledger's ``first_failure`` when the
+    mutant is refused at import; raises only when neither outcome can be
+    established.
+    """
+
+    module = f"ugence_benchmark_registry_authority.contracts.{gate.module[:-3]}"
+    target = working / SRC_REL / "contracts" / gate.module
+    probe = (
+        "import inspect,pathlib,traceback\n"
+        f"here = pathlib.Path({str(working)!r}).resolve()\n"
+        f"target = pathlib.Path({str(target)!r}).resolve()\n"
+        "disk = target.read_text()\n"
+        f"assert {gate.new!r} in disk, 'mutated text absent from the file on disk'\n"
+        "try:\n"
+        f"    import {module} as m\n"
+        "except Exception as exc:\n"
+        "    tb = ''.join(traceback.format_exc())\n"
+        "    assert str(target) in tb, 'import failed without executing the mutant'\n"
+        "    print('MUTANT-REFUSED-AT-IMPORT', type(exc).__name__, str(exc)[:90])\n"
+        "else:\n"
+        "    f = pathlib.Path(m.__file__).resolve()\n"
+        "    assert here in f.parents, f'loaded {f}, outside the working copy'\n"
+        "    src = inspect.getsource(m)\n"
+        f"    assert {gate.new!r} in src, 'mutated text absent from the loaded module'\n"
+        f"    assert {gate.old!r} not in src, 'original text still present'\n"
+        "    print('MUTANT-LOADED')\n"
+    )
+    env = dict(os.environ)
+    env["PYTHONPATH"] = os.pathsep.join(
+        [str(working / "src"), str(BR1_SRC), str(working / "tests")]
+    )
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    result = subprocess.run(
+        [sys.executable, "-c", probe],
+        capture_output=True,
+        text=True,
+        env=env,
+        cwd=str(working),
+    )
+    if "MUTANT-LOADED" in result.stdout:
+        return ""
+    if "MUTANT-REFUSED-AT-IMPORT" in result.stdout:
+        return "import:" + result.stdout.split("MUTANT-REFUSED-AT-IMPORT", 1)[
+            1
+        ].strip()
+    raise RuntimeError(
+        f"{gate.gate_id}: could not prove the mutant was loaded — "
+        f"{(result.stderr or result.stdout).strip().splitlines()[-1:]}"
+    )
+
+
+
 def _first_failure(output: str) -> str:
     for line in output.splitlines():
         if line.startswith("FAILED "):
@@ -714,14 +832,43 @@ def main() -> int:
         if not passed:
             print(f"BASELINE FAILED on the pristine tree: {detail}")
             return 1
+        baseline_manifest = _tree_manifest(working)
+
+        # HARNESS CONTROL — a check that cannot fail proves nothing. Apply a
+        # real mutation, revert the file underneath it, and require
+        # _assert_mutant_loaded to object. If it stays silent, every
+        # "MUTANT-LOADED" below is worthless and the sweep must not proceed.
+        control_gate = GATES[0]
+        control_path = working / SRC_REL / "contracts" / control_gate.module
+        control_gate.apply(working)
+        control_path.write_text(
+            control_path.read_text().replace(control_gate.new, control_gate.old)
+        )
+        try:
+            _assert_mutant_loaded(working, control_gate)
+        except RuntimeError:
+            print("harness control: a reverted mutant is correctly detected as "
+                  "not loaded")
+        else:
+            print("HARNESS CONTROL FAILED: _assert_mutant_loaded accepted a tree "
+                  "whose mutation had been reverted; every result below would be "
+                  "unfounded")
+            return 1
+        _restore(pristine, working)
+        _assert_pristine(working, baseline_manifest, "harness-control")
+
         print("baseline: the pristine tree passes the suite and the probes")
+        print(f"baseline: {len(baseline_manifest)} files hashed; every restore "
+              "below is proven byte-identical to this tree before mutating")
         print("-" * 78)
 
         for gate in GATES:
             _restore(pristine, working)
             try:
+                _assert_pristine(working, baseline_manifest, gate.gate_id)
                 gate.apply(working)
-            except LookupError as exc:
+                import_refusal = _assert_mutant_loaded(working, gate)
+            except (LookupError, RuntimeError) as exc:
                 print(f"ERROR {gate.gate_id}: {exc}")
                 ledger.append(
                     {
@@ -734,7 +881,12 @@ def main() -> int:
                     }
                 )
                 continue
-            passed, detail = _run_suite(working)
+            if import_refusal:
+                # The mutated module refuses to import at all. Proven executed,
+                # and killed by the package's own import-time invariant.
+                passed, detail = False, import_refusal
+            else:
+                passed, detail = _run_suite(working)
             result = "SURVIVED" if passed else "KILLED"
             ledger.append(
                 {
