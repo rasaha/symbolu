@@ -189,15 +189,21 @@ assertions the producer made.
 > subject_id, subject_type)`. Both verifications return `VERIFIED`, with the same
 > `attestation_digest` and different `candidate_digest`s.
 
-What that admits in practice, measured rather than reasoned:
+**The rule, not a list.** The verifier reconciles **exactly those five facts and reads no
+others**, so any candidate difference outside them is admitted by construction — `A-60` asserts
+that set over the source. Two earlier revisions of this section tried to enumerate the
+dimensions instead, and each got it wrong in a different direction.
+
+Measured instances:
 
 | Candidate differs in | Still verifies? | |
 |---|---|---|
-| policy binding | **yes** | not reconciled, not signed |
-| execution target scope | **yes** | not reconciled, not signed |
-| permitted magnitude bounds | **yes** | not reconciled, not signed |
-| the recommendation's own magnitudes | **no** — `RECOMMENDATION_DIGEST_MISMATCH` | they move `recommendation_digest`, which **is** signed |
-| `disposition`, `risk_outcome`, decision | not variable at all | Phase 5A refuses a candidate outside the ALLOW family at construction |
+| policy binding | **yes** | outside the reconciled five |
+| execution target scope | **yes** | outside the reconciled five |
+| permitted magnitude bounds | **yes** | scope and binding must vary *together* — Phase 5A refuses a binding contradicting its scope |
+| `disposition` / `risk_outcome`, within the ALLOW family | **yes** | outside the reconciled five |
+| the risk decision itself | **yes** | outside the reconciled five |
+| the recommendation's own magnitudes | **no** — `RECOMMENDATION_DIGEST_MISMATCH` | they move `recommendation_digest`, which **is** one of the five |
 
 So the uncovered surface is the **authorization envelope built around a recommendation** —
 the policy bound to it, the scope it would execute in, the bounds that policy sets — and not

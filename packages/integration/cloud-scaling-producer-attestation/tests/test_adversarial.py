@@ -1028,10 +1028,12 @@ def test_one_attestation_verifies_against_any_candidate_agreeing_on_the_five_fac
     That negative case is the one that keeps the documented residual honest, so it is
     asserted here rather than described.
 
-    (``disposition``, ``risk_outcome`` and the decision are not independently variable at
-    all: Phase 5A refuses a candidate outside the ALLOW disposition family at construction,
-    so there is no such candidate to present. ``test_the_documented_uncovered_dimensions_are_
-    the_measured_ones`` records that.)
+    ``disposition`` and ``risk_outcome`` are covered here too, and they are the reason this
+    docstring no longer enumerates from reasoning. A previous revision claimed they were "not
+    independently variable at all" because Phase 5A refuses candidates outside the ALLOW
+    disposition family — but that family has **two** members, so a candidate can vary within
+    it and remain genuine, and it still verifies. The claim was a limit of the test fixture
+    described as a property of the system, and it cited a property name that did not exist.
     """
 
     import _producer_fixtures as fixtures
@@ -1079,6 +1081,19 @@ def test_one_attestation_verifies_against_any_candidate_agreeing_on_the_five_fac
                 target_scope=wider, policy_binding=p5a.build_policy_binding(wider)
             )
         )(p5a.build_target_scope(p5a.build_projection(), max_magnitude=40, max_delta=9)),
+        # The ALLOW family has two members, so a candidate can carry the other one and still
+        # be a genuine Phase 5A candidate. disposition and risk_outcome move together —
+        # the seam contract refuses them apart — and neither is reconciled.
+        "disposition and risk_outcome": (
+            lambda proj, decision: build_candidate(
+                projection=proj,
+                decision=dataclasses.replace(
+                    decision,
+                    disposition=type(decision.disposition).RISK_PASSED_WITH_CONDITIONS,
+                    risk_outcome=type(decision.risk_outcome).ALLOW_WITH_CONDITIONS,
+                ),
+            )
+        )(*(lambda pr: (pr, p5a.build_decision(pr)))(p5a.build_projection())),
     }
     for label, other in admitted.items():
         assert agrees_on_the_five(other), label
@@ -1148,6 +1163,19 @@ def test_the_verifier_reconciles_exactly_five_candidate_facts_and_no_others():
         if not comparators or not isinstance(node.ops[0], ast.NotEq):
             continue
         right = comparators[0]
+        # Operand order carries no meaning to Python, so it must carry none here either.
+        # `candidate.X != attestation.Y` reads a sixth candidate fact exactly as
+        # `attestation.Y != candidate.X` does, and keying on "attestation is on the left"
+        # let that shape through until this normalisation was added.
+        if (
+            isinstance(left, ast.Attribute)
+            and isinstance(left.value, ast.Name)
+            and left.value.id == "candidate"
+            and isinstance(right, ast.Attribute)
+            and isinstance(right.value, ast.Name)
+            and right.value.id == "attestation"
+        ):
+            left, right = right, left
         # Keyed on the CANDIDATE-side attribute, and deliberately not requiring the two
         # sides to name the same field. A reconciliation written as
         # ``attestation.recommendation_id != candidate.policy_binding_digest`` still reads a

@@ -349,23 +349,36 @@ tenant_id, subject_id, subject_type)`. Verified against two such candidates, the
 attestation yields two artifacts with the same `attestation_digest`, different
 `candidate_digest`s and therefore different `artifact_digest`s, and both read `VERIFIED`.
 
-**Which differences that actually admits, enumerated from executed tests and not from
-reasoning.** An earlier revision of this section listed "policy binding, decision,
-disposition, risk outcome, magnitudes or execution scope". Three of those six are wrong, and
-the correction matters because the over-broad list made the residual sound larger than it is:
+**Which differences that actually admits.** The rule first, because an enumeration of
+dimensions is what two revisions of this section got wrong: **the verifier reconciles exactly
+five candidate facts and reads no others**, so *any* candidate difference outside those five is
+admitted, by construction. `tests/test_adversarial.py` A-60 asserts that set over the source,
+so it cannot drift silently.
+
+Measured instances, each executed against the genuine Phase 5A chain:
 
 | Candidate differs in | Same attestation still verifies? | Why |
 |---|---|---|
-| policy binding (`policy_id`, `policy_version`) | **yes** | not reconciled, not signed |
-| execution target scope (e.g. `account_id`) | **yes** | not reconciled, not signed |
-| permitted magnitude bounds (`max_permitted_magnitude`, `max_permitted_delta`) | **yes** | not reconciled, not signed |
-| the recommendation's own magnitudes (`magnitude_after`, `requested_delta`) | **no** — `RECOMMENDATION_DIGEST_MISMATCH` | functionally determined by the recommendation, so they move `recommendation_digest`, which **is** signed |
-| `disposition`, `risk_outcome`, `decision_id` | **not independently variable at all** | Phase 5A refuses a candidate outside the ALLOW disposition family at construction, so no such candidate exists to present |
+| policy binding (`policy_id`, `policy_version`) | **yes** | outside the reconciled five |
+| execution target scope (e.g. `account_id`) | **yes** | outside the reconciled five |
+| permitted magnitude bounds | **yes** | outside the reconciled five — but scope and binding must be varied *together*, since Phase 5A refuses a binding whose bounds contradict its scope |
+| `disposition` and `risk_outcome` (`RISK_PASSED`/`ALLOW` → `RISK_PASSED_WITH_CONDITIONS`/`ALLOW_WITH_CONDITIONS`) | **yes** | outside the reconciled five |
+| the risk decision itself | **yes** | outside the reconciled five |
+| the recommendation's own magnitudes (`magnitude_after`, `requested_delta`) | **no** — `RECOMMENDATION_DIGEST_MISMATCH` | functionally determined by the recommendation, so they move `recommendation_digest`, which **is** one of the five |
 
-So the uncovered surface is the **authorization envelope** built around a recommendation —
-the policy bound to it, the scope it would execute in, the bounds that policy sets — and not
-the recommendation's own content, which is pinned. That is the accurate statement of the
-residual, and it is narrower than the earlier list implied.
+Two corrections are recorded here rather than quietly applied, because each was wrong in a
+different direction. The first revision claimed the attestation tolerates differences in
+"decision, disposition, risk outcome, magnitudes" — **magnitudes is false**, for the reason in
+the last row. The second revision over-corrected and claimed `disposition`, `risk_outcome` and
+the decision are "not independently variable at all", justified by Phase 5A refusing candidates
+outside the ALLOW disposition family — **also false**: that family has *two* members, so a
+candidate can vary within it and still be genuine, and the claim said nothing about the
+decision at all. Worse, it described a limit of the test fixture as a property of the system.
+
+So the uncovered surface is the **authorization envelope built around a recommendation** — the
+policy bound to it, the scope it would execute in, the bounds that policy sets, and the risk
+decision that admitted it — and not the recommendation's own content, which is pinned. That is
+the residual, and it is the one the closing paragraph of this section has always named.
 
 This is a **deliberate consequence of the ratified scope**, not a defect to be silently
 tolerated. A producer attestation asserts *who produced this recommendation*. The

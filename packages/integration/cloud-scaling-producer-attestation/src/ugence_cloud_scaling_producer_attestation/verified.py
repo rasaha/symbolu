@@ -68,16 +68,18 @@ the same attestation yields two artifacts with the same :attr:`attestation_diges
 different :attr:`candidate_digest` values and different :attr:`artifact_digest` values, and
 both read ``VERIFIED``.
 
-What that admits, taken from executed tests rather than from reasoning: candidates differing
-in their **policy binding**, in their **execution target scope**, or in the **permitted
-magnitude bounds** the policy imposes. It does **not** admit a candidate whose own
-recommendation differs — ``magnitude_after`` and ``requested_delta`` are functionally
-determined by the recommendation, so changing them moves ``recommendation_digest``, which
-*is* signed, and the verification refuses with ``RECOMMENDATION_DIGEST_MISMATCH``. Nor are
-``disposition``, ``risk_outcome`` or the decision independently variable: Phase 5A refuses a
-candidate outside the ALLOW disposition family at construction. The uncovered surface is
-therefore the **authorization envelope built around a recommendation**, not the
-recommendation itself.
+What that admits, stated as a rule rather than as a list — an enumeration of dimensions is
+what two revisions of this docstring got wrong. The verifier reconciles **exactly those five
+facts and reads no others**, so *any* candidate difference outside them is admitted, by
+construction; ``tests/test_adversarial.py`` A-60 asserts that set over the source. Measured
+instances: a different policy binding, a different execution target scope, different permitted
+magnitude bounds, a different ``disposition``/``risk_outcome`` within the ALLOW family, and a
+different risk decision — all still ``VERIFIED``.
+
+The one thing it does **not** admit is a candidate whose own recommendation differs:
+``magnitude_after`` and ``requested_delta`` are functionally determined by the recommendation,
+so changing them moves ``recommendation_digest``, which *is* one of the five, and the
+verification refuses with ``RECOMMENDATION_DIGEST_MISMATCH``.
 
 That is the ratified scope, not an oversight. The recommendation itself *is* pinned, by id
 and by content digest, which is what stops a forged recommendation laundering. What is not

@@ -107,10 +107,12 @@ digest are byte-identical, so no issued attestation is invalidated.
 * **What the signature covers.** `candidate_digest` is **not** covered by the producer's
   signature: one genuine attestation verifies against any candidate agreeing on
   `(recommendation_id, recommendation_digest, tenant_id, subject_id, subject_type)` —
-  measurably, candidates differing in policy binding, execution target scope or permitted
-  magnitude bounds. It does **not** extend to the recommendation's own magnitudes, which
-  move `recommendation_digest` and are refused, nor to `disposition`/`risk_outcome`/the
-  decision, which Phase 5A will not let a candidate vary at all. This is the ratified scope
+  and the rule behind that is the one to read: the verifier reconciles **exactly those five
+  facts and no others**, so any candidate difference outside them is admitted by construction.
+  Measured: policy binding, execution target scope, permitted magnitude bounds,
+  `disposition`/`risk_outcome` within the ALLOW family, and the risk decision itself. The one
+  exception is the recommendation's own magnitudes, which move `recommendation_digest` — one of
+  the five — and are refused. This is the ratified scope
   — the attestation is minted at the Controller's output boundary, before a candidate exists
   — and it is now stated in ADR §12.1, in the `verified.py` docstring and in a README
   section, and pinned by properties rather than left to be discovered.
