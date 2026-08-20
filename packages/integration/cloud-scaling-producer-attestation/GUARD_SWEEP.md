@@ -80,22 +80,22 @@ not otherwise run fails rather than quietly shrinking the sweep.
 | 37 | `signing.py:301` | `signing_input.producer_key_id != self._producer_key_id` | **killed** | test_a_signer_refuses_an_input_addressed_to_another_key | — |
 | 38 | `signing.py:306` | `signing_input.producer_id != self._producer_id` | **killed** | test_a_signer_refuses_an_input_addressed_to_other_coordinates[producer_id-attacker.impersonator] | — |
 | 39 | `signing.py:334` | `PRODUCER_ATTESTATION_CAPABILITY is TrustAnchorCapability.RECEIPT_ISSUANCE` | **killed** | test_the_reference_signer_refuses_to_publish_a_receipt_issuance_anchor | — |
-| 40 | `signing.py:405` | `signer is None` | **killed** | test_minting_without_a_signer_is_refused | — |
-| 41 | `signing.py:407` | `production_mode and isinstance(signer, REFERENCE_GRADE_SIGNERS)` | **killed** | test_a_reference_signer_is_refused_in_production_mode; test_every_reference_grade_signer_subtype_is_refused_in_production[<lambda>-the (+6 more) | — |
-| 42 | `signing.py:427` | `production_mode and getattr(type(signer), 'is_reference_signer', False) is True` | **killed** | test_the_reference_grade_signer_denial_uses_subclass_aware_matching | — |
-| 43 | `signing.py:440` | `signer.signature_profile != PRODUCER_ATTESTATION_SIGNATURE_PROFILE` | **killed** | test_a_signer_advertising_another_profile_is_refused | — |
-| 44 | `signing.py:475` | `type(signature) is not str` | **killed** | test_a_signer_returning_a_non_string_signature_is_refused | — |
+| 40 | `signing.py:417` | `signer is None` | **killed** | test_minting_without_a_signer_is_refused | — |
+| 41 | `signing.py:419` | `production_mode and isinstance(signer, REFERENCE_GRADE_SIGNERS)` | **killed** | test_a_reference_signer_is_refused_in_production_mode; test_every_reference_grade_signer_subtype_is_refused_in_production[<lambda>-the (+6 more) | — |
+| 42 | `signing.py:439` | `production_mode and getattr(type(signer), 'is_reference_signer', False) is True` | **killed** | test_the_reference_grade_signer_denial_uses_subclass_aware_matching; test_the_is_reference_signer_flag_refuses_something_isinstance_cannot | — |
+| 43 | `signing.py:452` | `signer.signature_profile != PRODUCER_ATTESTATION_SIGNATURE_PROFILE` | **killed** | test_a_signer_advertising_another_profile_is_refused | — |
+| 44 | `signing.py:487` | `type(signature) is not str` | **killed** | test_a_signer_returning_a_non_string_signature_is_refused | — |
 | 45 | `trust.py:211` | `resolver is None` | survived | — | sibling-backed — a None resolver fails the is_production_authoritative check below, which refuses it with the same typed configuration error |
 | 46 | `trust.py:218` | `isinstance(resolver, REFERENCE_GRADE_RESOLVERS)` | **killed** | test_the_reference_resolver_is_refused_in_production; test_every_reference_grade_subtype_is_refused_in_production[<lambda>-exact (+7 more) | — |
 | 47 | `trust.py:238` | `getattr(resolver, 'is_production_authoritative', False) is not True` | **killed** | test_a_production_resolver_declaring_nothing_is_refused_by_the_helper; test_an_unattested_resolver_is_refused_in_production (+3 more) | — |
-| 48 | `verified.py:218` | `self.construction_token is not _VERIFICATION_TOKEN` | **killed** | test_direct_construction_is_refused; test_no_caller_held_token_is_accepted[None] (+4 more) | — |
-| 49 | `verified.py:225` | `self.verification_profile != VERIFICATION_PROFILE` | **killed** | test_a_verified_artifact_cannot_be_minted_under_another_verification_profile | — |
-| 50 | `verified.py:229` | `self.verification_profile_version != VERIFICATION_PROFILE_VERSION` | **killed** | test_a_verified_artifact_cannot_be_minted_under_another_profile_version | — |
-| 51 | `verified.py:244` | `self.artifact_digest != expected` | survived | — | sibling-backed — require_verified_producer_attestation recomputes the same digest at every consumption boundary, and that check IS killed; this one is unreachable at construction because the minting routine computes the digest it passes |
-| 52 | `verified.py:342` | `type(value) is not VerifiedProducerAttestation` | **killed** | test_a_duck_typed_look_alike_is_refused_at_consumption | — |
-| 53 | `verified.py:356` | `value.construction_token is not _VERIFICATION_TOKEN` | **killed** | test_a_rebuilt_artifact_is_refused_by_the_token_check_alone[deepcopy]; test_a_rebuilt_artifact_is_refused_by_the_token_check_alone[pickle] (+1 more) | — |
-| 54 | `verified.py:361` | `value.artifact_digest not in _MINTED_DIGESTS` | **killed** | test_a_token_bearing_forgery_cannot_be_wrapped_in_a_result; test_a_borrowed_construction_token_does_not_mint_an_artifact | — |
-| 55 | `verified.py:368` | `value.artifact_digest != value.digest()` | **killed** | test_a_mutated_field_fails_revalidation[tenant_id]; test_a_mutated_field_fails_revalidation[subject_id] (+5 more) | — |
+| 48 | `verified.py:228` | `self.construction_token is not _VERIFICATION_TOKEN` | **killed** | test_direct_construction_is_refused; test_no_caller_held_token_is_accepted[None] (+4 more) | — |
+| 49 | `verified.py:235` | `self.verification_profile != VERIFICATION_PROFILE` | **killed** | test_a_verified_artifact_cannot_be_minted_under_another_verification_profile | — |
+| 50 | `verified.py:239` | `self.verification_profile_version != VERIFICATION_PROFILE_VERSION` | **killed** | test_a_verified_artifact_cannot_be_minted_under_another_profile_version | — |
+| 51 | `verified.py:254` | `self.artifact_digest != expected` | survived | — | sibling-backed — require_verified_producer_attestation recomputes the same digest at every consumption boundary, and that check IS killed; this one is unreachable at construction because the minting routine computes the digest it passes |
+| 52 | `verified.py:352` | `type(value) is not VerifiedProducerAttestation` | **killed** | test_a_duck_typed_look_alike_is_refused_at_consumption | — |
+| 53 | `verified.py:366` | `value.construction_token is not _VERIFICATION_TOKEN` | **killed** | test_a_rebuilt_artifact_is_refused_by_the_token_check_alone[deepcopy]; test_a_rebuilt_artifact_is_refused_by_the_token_check_alone[pickle] (+1 more) | — |
+| 54 | `verified.py:371` | `value.artifact_digest not in _MINTED_DIGESTS` | **killed** | test_a_token_bearing_forgery_cannot_be_wrapped_in_a_result; test_a_borrowed_construction_token_does_not_mint_an_artifact | — |
+| 55 | `verified.py:378` | `value.artifact_digest != value.digest()` | **killed** | test_a_mutated_field_fails_revalidation[tenant_id]; test_a_mutated_field_fails_revalidation[subject_id] (+5 more) | — |
 | 56 | `verification.py:168` | `type(self.outcome) is not _Outcome` | **killed** | test_a_refusal_outcome_is_exact_typed | — |
 | 57 | `verification.py:173` | `self.outcome is _Outcome.VERIFIED` | **killed** | test_a_refusal_cannot_carry_the_success_member | — |
 | 58 | `verification.py:208` | `(self.verified_attestation is None) == (self.refusal is None)` | **killed** | test_a_result_cannot_carry_both_or_neither_branch | — |
@@ -116,11 +116,11 @@ not otherwise run fails rather than quietly shrinking the sweep.
 | 73 | `verification.py:385` | `attestation.signature_algorithm not in SUPPORTED_V2_SIGNATURE_ALGORITHMS` | **killed** | test_the_verifier_re_checks_every_contract_fact_against_a_fabrication[signature_algorithm-ed448-UNSUPPORTED_ALGORITHM] | — |
 | 74 | `verification.py:390` | `attestation.signature_profile != PRODUCER_ATTESTATION_SIGNATURE_PROFILE` | **killed** | test_the_verifier_re_checks_every_contract_fact_against_a_fabrication[signature_profile-some.other/profile/v1-UNSUPPORTED_PROFILE] | — |
 | 75 | `verification.py:395` | `attestation.signature_encoding != PRODUCER_ATTESTATION_SIGNATURE_ENCODING` | **killed** | test_the_verifier_re_checks_every_contract_fact_against_a_fabrication[signature_encoding-some.other/encoding/v1-UNSUPPORTED_ENCODING] | — |
-| 76 | `verification.py:404` | `attestation.recommendation_id != candidate.recommendation_id` | **killed** | test_an_attestation_naming_another_recommendation_id_is_refused; test_distinct_failures_produce_distinct_members | — |
-| 77 | `verification.py:409` | `attestation.recommendation_digest != candidate.recommendation_digest` | **killed** | test_an_attestation_binding_another_recommendation_digest_is_refused; test_a_genuine_attestation_replayed_against_another_candidate_is_refused (+1 more) | — |
-| 78 | `verification.py:415` | `attestation.tenant_id != candidate.tenant_id` | **killed** | test_a_cross_tenant_attestation_is_refused; test_an_object_new_fabricated_attestation_is_refused (+1 more) | — |
-| 79 | `verification.py:420` | `attestation.subject_id != candidate.subject_id` | **killed** | test_a_cross_subject_attestation_is_refused; test_distinct_failures_produce_distinct_members | — |
-| 80 | `verification.py:425` | `attestation.subject_type != candidate.subject_type` | **killed** | test_the_verifier_re_checks_every_contract_fact_against_a_fabrication[subject_type-cloud_scaling.other_subject-WRONG_SUBJECT] | — |
+| 76 | `verification.py:404` | `attestation.recommendation_id != candidate.recommendation_id` | **killed** | test_an_attestation_naming_another_recommendation_id_is_refused; test_the_verifier_reconciles_exactly_five_candidate_facts_and_no_others (+1 more) | — |
+| 77 | `verification.py:409` | `attestation.recommendation_digest != candidate.recommendation_digest` | **killed** | test_an_attestation_binding_another_recommendation_digest_is_refused; test_a_genuine_attestation_replayed_against_another_candidate_is_refused (+3 more) | — |
+| 78 | `verification.py:415` | `attestation.tenant_id != candidate.tenant_id` | **killed** | test_a_cross_tenant_attestation_is_refused; test_an_object_new_fabricated_attestation_is_refused (+2 more) | — |
+| 79 | `verification.py:420` | `attestation.subject_id != candidate.subject_id` | **killed** | test_a_cross_subject_attestation_is_refused; test_the_verifier_reconciles_exactly_five_candidate_facts_and_no_others (+1 more) | — |
+| 80 | `verification.py:425` | `attestation.subject_type != candidate.subject_type` | **killed** | test_the_verifier_reconciles_exactly_five_candidate_facts_and_no_others; test_the_verifier_re_checks_every_contract_fact_against_a_fabrication[subject_type-cloud_scaling.other_subject-WRONG_SUBJECT] | — |
 | 81 | `verification.py:452` | `recomputed_bytes != attestation.signed_bytes()` | survived | — | sibling-backed — the payload-digest comparison on the following line is a digest over the same two byte strings and refuses the identical inputs (killed by GI-20). Both are additionally fronted by the reconciliation group, which refuses a divergent tenant, subject, subject type, recommendation id or digest before either runs. Deliberately kept: it is the direct byte comparison the design specifies, and it would be the only survivor if a future edit made the digest check cover a different projection of the payload |
 | 82 | `verification.py:458` | `canonical_digest(recomputed) != attestation.signing_payload_digest` | **killed** | test_a_mutated_attestation_fails_the_payload_recomputation; test_a_stale_payload_digest_fails_the_recomputation_gate | — |
 | 83 | `verification.py:475` | `type(resolution) is not TrustAnchorResolution` | **killed** | test_a_resolver_returning_a_wrong_typed_resolution_is_refused | — |
@@ -176,6 +176,25 @@ the count should not be read as "every security gate in the package":
 * **8 boolean sub-terms.** A two-term `and` guard is
   neutralised and scored as **one** guard. Scoring each side independently is a
   different operator, and this sweep does not claim it.
+
+Two further facts about the denominator, disclosed because a reader could otherwise
+infer them wrongly from the count alone:
+
+* **An outer `if` that only wraps a guarded block is itself inventoried.**
+  Relevance is computed over the whole nested body, so
+  `verification.py:284` (`if production_mode:`) is scored as a
+  guard even though it reaches a `raise` only through its nested child. That is
+  deliberate — neutralise it and the entire production-mode enforcement block stops
+  running — but it means a stricter reading that excluded nested bodies would report
+  **91** guards rather than 92. Both numbers describe
+  the same source; this one is the count the published table is built from.
+* **One of the five checks in `require_verified_producer_attestation` is an `except`
+  arm**, and is therefore among the excluded arms above rather than among the scored
+  guards. It is the field-presence check, and it is the one that refuses an
+  `object.__new__` fabrication. It is covered by properties
+  (`test_verified_artifact.py` V-3, `test_typed_outcomes.py` O-13) but not by this
+  sweep, so "four of that function's five checks are mutation-scored" is the exact
+  claim, not five.
 
 The CI job used to be called *"every security gate is scored"*, which overstated
 exactly this; it now says *"every inventoried `if` guard scored"*. The two counts

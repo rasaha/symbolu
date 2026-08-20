@@ -499,7 +499,7 @@
   {
     "index": 40,
     "module": "signing.py",
-    "lineno": 405,
+    "lineno": 417,
     "condition": "signer is None",
     "scored": true,
     "killed": true,
@@ -511,7 +511,7 @@
   {
     "index": 41,
     "module": "signing.py",
-    "lineno": 407,
+    "lineno": 419,
     "condition": "production_mode and isinstance(signer, REFERENCE_GRADE_SIGNERS)",
     "scored": true,
     "killed": true,
@@ -527,19 +527,20 @@
   {
     "index": 42,
     "module": "signing.py",
-    "lineno": 427,
+    "lineno": 439,
     "condition": "production_mode and getattr(type(signer), 'is_reference_signer', False) is True",
     "scored": true,
     "killed": true,
     "failed": [
-      "tests/test_signer_boundary.py::test_the_reference_grade_signer_denial_uses_subclass_aware_matching"
+      "tests/test_signer_boundary.py::test_the_reference_grade_signer_denial_uses_subclass_aware_matching",
+      "tests/test_signer_boundary.py::test_the_is_reference_signer_flag_refuses_something_isinstance_cannot"
     ],
     "classification": ""
   },
   {
     "index": 43,
     "module": "signing.py",
-    "lineno": 440,
+    "lineno": 452,
     "condition": "signer.signature_profile != PRODUCER_ATTESTATION_SIGNATURE_PROFILE",
     "scored": true,
     "killed": true,
@@ -551,7 +552,7 @@
   {
     "index": 44,
     "module": "signing.py",
-    "lineno": 475,
+    "lineno": 487,
     "condition": "type(signature) is not str",
     "scored": true,
     "killed": true,
@@ -605,7 +606,7 @@
   {
     "index": 48,
     "module": "verified.py",
-    "lineno": 218,
+    "lineno": 228,
     "condition": "self.construction_token is not _VERIFICATION_TOKEN",
     "scored": true,
     "killed": true,
@@ -621,7 +622,7 @@
   {
     "index": 49,
     "module": "verified.py",
-    "lineno": 225,
+    "lineno": 235,
     "condition": "self.verification_profile != VERIFICATION_PROFILE",
     "scored": true,
     "killed": true,
@@ -633,7 +634,7 @@
   {
     "index": 50,
     "module": "verified.py",
-    "lineno": 229,
+    "lineno": 239,
     "condition": "self.verification_profile_version != VERIFICATION_PROFILE_VERSION",
     "scored": true,
     "killed": true,
@@ -645,7 +646,7 @@
   {
     "index": 51,
     "module": "verified.py",
-    "lineno": 244,
+    "lineno": 254,
     "condition": "self.artifact_digest != expected",
     "scored": true,
     "killed": false,
@@ -655,7 +656,7 @@
   {
     "index": 52,
     "module": "verified.py",
-    "lineno": 342,
+    "lineno": 352,
     "condition": "type(value) is not VerifiedProducerAttestation",
     "scored": true,
     "killed": true,
@@ -667,7 +668,7 @@
   {
     "index": 53,
     "module": "verified.py",
-    "lineno": 356,
+    "lineno": 366,
     "condition": "value.construction_token is not _VERIFICATION_TOKEN",
     "scored": true,
     "killed": true,
@@ -681,7 +682,7 @@
   {
     "index": 54,
     "module": "verified.py",
-    "lineno": 361,
+    "lineno": 371,
     "condition": "value.artifact_digest not in _MINTED_DIGESTS",
     "scored": true,
     "killed": true,
@@ -694,7 +695,7 @@
   {
     "index": 55,
     "module": "verified.py",
-    "lineno": 368,
+    "lineno": 378,
     "condition": "value.artifact_digest != value.digest()",
     "scored": true,
     "killed": true,
@@ -959,6 +960,7 @@
     "killed": true,
     "failed": [
       "tests/test_adversarial.py::test_an_attestation_naming_another_recommendation_id_is_refused",
+      "tests/test_adversarial.py::test_the_verifier_reconciles_exactly_five_candidate_facts_and_no_others",
       "tests/test_typed_outcomes.py::test_distinct_failures_produce_distinct_members"
     ],
     "classification": ""
@@ -973,6 +975,8 @@
     "failed": [
       "tests/test_adversarial.py::test_an_attestation_binding_another_recommendation_digest_is_refused",
       "tests/test_adversarial.py::test_a_genuine_attestation_replayed_against_another_candidate_is_refused",
+      "tests/test_adversarial.py::test_one_attestation_verifies_against_any_candidate_agreeing_on_the_five_facts",
+      "tests/test_adversarial.py::test_the_verifier_reconciles_exactly_five_candidate_facts_and_no_others",
       "tests/test_typed_outcomes.py::test_distinct_failures_produce_distinct_members"
     ],
     "classification": ""
@@ -987,6 +991,7 @@
     "failed": [
       "tests/test_adversarial.py::test_a_cross_tenant_attestation_is_refused",
       "tests/test_adversarial.py::test_an_object_new_fabricated_attestation_is_refused",
+      "tests/test_adversarial.py::test_the_verifier_reconciles_exactly_five_candidate_facts_and_no_others",
       "tests/test_typed_outcomes.py::test_distinct_failures_produce_distinct_members"
     ],
     "classification": ""
@@ -1000,6 +1005,7 @@
     "killed": true,
     "failed": [
       "tests/test_adversarial.py::test_a_cross_subject_attestation_is_refused",
+      "tests/test_adversarial.py::test_the_verifier_reconciles_exactly_five_candidate_facts_and_no_others",
       "tests/test_typed_outcomes.py::test_distinct_failures_produce_distinct_members"
     ],
     "classification": ""
@@ -1012,6 +1018,7 @@
     "scored": true,
     "killed": true,
     "failed": [
+      "tests/test_adversarial.py::test_the_verifier_reconciles_exactly_five_candidate_facts_and_no_others",
       "tests/test_gate_isolation.py::test_the_verifier_re_checks_every_contract_fact_against_a_fabrication[subject_type-cloud_scaling.other_subject-WRONG_SUBJECT]"
     ],
     "classification": ""
