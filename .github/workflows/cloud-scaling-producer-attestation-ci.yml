@@ -76,9 +76,53 @@ jobs:
           python -m pytest -rs \
             packages/integration/cloud-scaling-producer-attestation/tests/packaging/test_sdist_payload.py
       - name: Authenticity gate — the forgery-laundering proof (explicit acceptance gate)
+        # This step used to exit 0 with all ten laundering properties SKIPPED. They skip
+        # when Phase 5A's genuine fixture chain is unresolvable — it lives in repository
+        # test trees, and the helper degrades to a skip rather than an error so the shipped
+        # sdist stays runnable. A gate that passes when the thing it gates did not run is
+        # not a gate: point UGENCE_REPO_ROOT at an empty directory and the old step was
+        # green with zero properties executed. So the count is now asserted, not the exit
+        # code alone.
         run: |
+          set -euo pipefail
+          # Written outside the checkout so the report never shows up as an untracked file
+          # in a later step's git comparison.
+          REPORT="${RUNNER_TEMP:-/tmp}/laundering-junit.xml"
           python -m pytest \
             packages/integration/cloud-scaling-producer-attestation/tests/test_authenticity_laundering.py \
+            --junitxml="$REPORT" -rs
+          REPORT="$REPORT" python - <<'PY'
+          import os
+          import sys
+          import xml.etree.ElementTree as ET
+
+          #: The ten ratified laundering-traversal properties. A floor, not an equality:
+          #: adding an eleventh must not fail the gate, and losing the fixture chain must.
+          EXPECTED_MINIMUM = 10
+
+          root = ET.parse(os.environ["REPORT"]).getroot()
+          suites = [root] if root.tag == "testsuite" else list(root)
+          total = sum(int(s.get("tests", 0)) for s in suites)
+          skipped = sum(int(s.get("skipped", 0)) for s in suites)
+          failures = sum(int(s.get("failures", 0)) + int(s.get("errors", 0)) for s in suites)
+          executed = total - skipped - failures
+
+          print(f"laundering properties: {total} collected, {executed} passed, "
+                f"{skipped} skipped, {failures} failed/errored")
+          if failures:
+              sys.exit(f"FAIL: {failures} laundering properties failed or errored")
+          if executed < EXPECTED_MINIMUM:
+              sys.exit(
+                  f"FAIL: only {executed} laundering properties actually ran "
+                  f"(expected at least {EXPECTED_MINIMUM}, {skipped} skipped). The "
+                  "forgery-laundering proof is the acceptance gate for this phase; a run "
+                  "in which it was skipped is not evidence that laundering is refused. "
+                  "This almost always means Phase 5A's fixture chain did not resolve — "
+                  "check that every first-party package is installed and that the "
+                  "checkout is complete."
+              )
+          PY
+          python -m pytest \
             packages/integration/cloud-scaling-producer-attestation/tests/test_adversarial.py
       - name: Security gates — no placeholder verifier, boundaries, clock, typed outcomes
         run: |
@@ -300,7 +344,7 @@ jobs:
           if-no-files-found: warn
 
   guard-sweep:
-    name: Gate-removal mutation sweep (every security gate is scored, none unresolved)
+    name: Gate-removal mutation sweep (every inventoried `if` guard scored, none unresolved)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
