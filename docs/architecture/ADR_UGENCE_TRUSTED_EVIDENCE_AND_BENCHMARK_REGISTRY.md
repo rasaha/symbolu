@@ -1144,6 +1144,39 @@ approved for implementation by this ADR.**
 | 8 | **GV-A** | **Attributed ROI** | GV-O | **DEFERRED** |
 | 9 | **GV-V** | **Verified ROI** | GV-A | **DEFERRED** |
 
+> **Amendment — the sole consumer exception (Cloud Scaling Phase 5B-0A).**
+> UVI-EV-1 above remains **DEFERRED**, and the blanket "no consumer imports the
+> Trusted Evidence Authority" rule that accompanied it is **no longer accurate**.
+> Exactly one consumer exception is ratified, and it is a different integration
+> from UVI-EV-1.
+>
+> `packages/integration/cloud-scaling-producer-attestation` may import TEV's
+> **public trust-anchor contracts and resolver port**, so that the repository has
+> one trust-anchor model and one store rather than a second grown beside it. The
+> exception authorizes nothing else — in particular no evidence payload,
+> observation, measurement, receipt, trust stage, evidence verification engine or
+> admission behaviour; no use of TEV as the authority that approves a Cloud
+> Scaling recommendation; no reverse import from TEV into Cloud Scaling; no
+> production use of `StaticTrustAnchorDirectory`; no local key map or shadow
+> trust-anchor registry; no change to TEV production behaviour; and no generic
+> exception for future packages.
+>
+> TEV additionally **lends** one `TrustAnchorCapability` member,
+> `CLOUD_SCALING_RECOMMENDATION_ATTESTATION`, which the consumer resolves its own
+> anchors under. It is a vocabulary, not an authority: TEV verifies nothing under
+> it, no TEV evidence or receipt path admits it, and holding it grants no
+> evidence-production or receipt-issuance entitlement. A key entitled to sign
+> Trusted Evidence is therefore **not** entitled to attest a capacity
+> recommendation, which an earlier revision of the consumer wrongly permitted.
+>
+> Enforced, not described:
+> `packages/trusted-evidence-authority/tests/packaging/test_dependency_boundary.py`
+> pins the one consumer path and the exact symbol grant and refuses every other
+> consumer, symbol and import form; and
+> `packages/trusted-evidence-authority/tests/authority/test_lent_capability_disjointness.py`
+> pins the capability disjointness. TEV moves to **0.3.0** for the additive
+> capability member.
+
 ### 30.1 Label reconciliation with repository convention
 
 The labels above are **retained** as primary identifiers, and mapped to existing repository
