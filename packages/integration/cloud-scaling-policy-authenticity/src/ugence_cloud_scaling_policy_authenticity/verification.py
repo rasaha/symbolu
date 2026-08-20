@@ -113,6 +113,7 @@ from .resolution_port import require_production_resolution_port
 from .verified import (
     _VERIFICATION_TOKEN,
     VerifiedPolicyAuthenticity,
+    _partitioned_digest,
     _record_minted,
     require_verified_policy_authenticity,
 )
@@ -557,7 +558,11 @@ def _mint_verified_artifact(
 ) -> VerifiedPolicyAuthenticity:
     """Assemble the verified artifact. Reached only after every gate above has succeeded."""
 
-    payload = {
+    # The two halves are assembled separately here, in the same partition the artifact's own
+    # digest_payload() reports (D-5B0B-7). Nothing lands in `recorded` by omission: a fact is
+    # there because nothing checked it, and an import-time guard in .verified refuses a field
+    # that is in neither half.
+    verified_map = {
         "policy_family": coordinate.policy_family,
         "policy_id": coordinate.policy_id,
         "policy_version": coordinate.version,
@@ -577,20 +582,26 @@ def _mint_verified_artifact(
         "authority_protocol_id": POLICY_AUTHORITY_PROTOCOL_ID,
         "authority_canonicalization_version": POLICY_AUTHORITY_CANONICALIZATION_VERSION,
         "policy_issued_at_fact": record.issued_at,
-        "resolved_as_of_fact": resolved_as_of,
-        "candidate_digest_fact": candidate_digest_fact,
         "verification_profile": VERIFICATION_PROFILE,
         "verification_profile_version": VERIFICATION_PROFILE_VERSION,
+        # Framed into the verified half deliberately: that this artifact establishes policy
+        # authenticity, grants nothing and is not historical are all gate outcomes.
         "outcome": _Outcome.VERIFIED.value,
         "grants_authority": False,
         "historical": False,
     }
+    recorded_map = {
+        # R-2: injected, unvalidated. R-4: recorded, never reconciled.
+        "resolved_as_of_fact": resolved_as_of,
+        "candidate_digest_fact": candidate_digest_fact,
+    }
     derived = ("outcome", "grants_authority", "historical")
     return _record_minted(
         VerifiedPolicyAuthenticity(
-            **{key: value for key, value in payload.items() if key not in derived},
-            artifact_digest=framed_digest(
-                domain=POLICY_AUTHENTICITY_DIGEST_DOMAIN, body=payload
+            **{key: value for key, value in verified_map.items() if key not in derived},
+            **recorded_map,
+            artifact_digest=_partitioned_digest(
+                verified_map=verified_map, recorded_map=recorded_map
             ),
             construction_token=_VERIFICATION_TOKEN,
         )

@@ -43,9 +43,9 @@ artifact's own documentation, so a consumer cannot read a determination as a cla
 
 ---
 
-## D-5B0B-7 `[R]` — should the verified artifact's digest payload be partitioned?
+## D-5B0B-7 — should the verified artifact's digest payload be partitioned?
 
-**Open. One owner decision, brought with a recommendation. Not implemented.**
+**Ratified: yes, as recommended. Implemented in 5B-0B at `0.1.0`, before merge.**
 
 `VerifiedPolicyAuthenticity.digest_payload()` is today one flat map. Two of its entries are
 not attested facts: `candidate_digest_fact` is recorded and never reconciled (R-4), and
@@ -54,7 +54,7 @@ question is whether the payload should partition into two separately framed maps
 `verified` map and a `recorded` map — so both remain digest-covered while the structure says
 which is which.
 
-**Recommendation: yes, and decide it now.** The `_fact` suffix and a docstring are the only
+**The recommendation, as ruled.** The `_fact` suffix and a docstring are the only
 things currently separating "this policy was signed by an entitled key" from "someone handed
 us this instant". A reader who trusts the artifact's shape rather than its prose gets no
 signal, and these two fields are precisely the ones the two open residuals are about.
@@ -71,5 +71,17 @@ genuinely checked (against the coordinate's own tenant component) and genuinely 
 nothing about the caller's right to that tenant. It belongs in `verified` on the letter of
 what was checked, and a reader may take more from that than the check supports.
 
-**If ratified:** implement in 5B-0B before merge, at `0.1.0`, with no gate-count change.
-**If refused:** the flat payload stands and the distinction stays documentary.
+**As implemented.** `digest_payload()` returns two maps, `verified` and `recorded`, each
+carrying its own domain tag as a canonical field, and the artifact digest covers both frames.
+`RECORDED_FACT_NAMES` is exactly `{resolved_as_of_fact, candidate_digest_fact}`; everything
+else, `expected_reference_tenant_id` included, is verified on the letter of what was checked —
+the edge above is answered that way and the field's own documentation continues to say that a
+checked reference tenant is not a checked caller entitlement. The partition is total and
+disjoint over the artifact's fields, enforced at import, so a new field cannot be added without
+classifying it. `verified_fact(name)` and `recorded_fact(name)` each refuse the other's half,
+so an unattested value cannot be read through a call that reads as attested.
+
+No gate was added or removed — the verification routine still runs ten — the distribution stays
+at `0.1.0`, and no Phase 5A frozen digest moved. Promotion is the ratified route for closing
+the two residuals: 5B-1 moves `candidate_digest_fact` and 5B-2 moves `resolved_as_of_fact` into
+the verified half, and each promotion visibly moves the artifact digest.

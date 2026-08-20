@@ -74,6 +74,8 @@ __all__ = [
     "VERIFICATION_PROFILE",
     "VERIFICATION_PROFILE_VERSION",
     "POLICY_AUTHENTICITY_DIGEST_DOMAIN",
+    "POLICY_AUTHENTICITY_VERIFIED_FACTS_DOMAIN",
+    "POLICY_AUTHENTICITY_RECORDED_FACTS_DOMAIN",
     "POLICY_TRUST_CONFIGURATION_DIGEST_DOMAIN",
     "REQUIRED_KEY_ENTITLEMENT",
     "FORBIDDEN_KEY_ENTITLEMENT",
@@ -96,6 +98,19 @@ VERIFICATION_PROFILE_VERSION: Final[str] = "v1"
 #: Domain tag bound into this package's verification-artifact digest.
 POLICY_AUTHENTICITY_DIGEST_DOMAIN: Final[str] = (
     "ugence.cloud-scaling/policy-authenticity/artifact/v1"
+)
+
+#: Domain tag of the **verified** half of a verification artifact's digest payload: the facts
+#: a gate actually checked (D-5B0B-7).
+POLICY_AUTHENTICITY_VERIFIED_FACTS_DOMAIN: Final[str] = (
+    "ugence.cloud-scaling/policy-authenticity/artifact/verified/v1"
+)
+
+#: Domain tag of the **recorded** half: facts carried and digest-covered, but never attested.
+#: Two members today, one per open residual — ``resolved_as_of_fact`` (R-2: the instant is
+#: injected and unvalidated) and ``candidate_digest_fact`` (R-4: recorded, never reconciled).
+POLICY_AUTHENTICITY_RECORDED_FACTS_DOMAIN: Final[str] = (
+    "ugence.cloud-scaling/policy-authenticity/artifact/recorded/v1"
 )
 
 #: Domain tag bound into the trust-configuration digest a resolution port reports.
@@ -145,6 +160,20 @@ if POLICY_AUTHENTICITY_DIGEST_DOMAIN == POLICY_BODY_DIGEST_DOMAIN:  # pragma: no
     raise AssertionError(
         "the verification-artifact digest domain must not equal the Policy Authority's "
         "policy-body digest domain: a verification artifact is not a policy body"
+    )
+if (  # pragma: no cover - import guard
+    len(
+        {
+            POLICY_AUTHENTICITY_DIGEST_DOMAIN,
+            POLICY_AUTHENTICITY_VERIFIED_FACTS_DOMAIN,
+            POLICY_AUTHENTICITY_RECORDED_FACTS_DOMAIN,
+        }
+    )
+    != 3
+):
+    raise AssertionError(
+        "the artifact, verified-facts and recorded-facts domains must be three distinct "
+        "tags: collapsing any two would let a recorded fact occupy an attested frame"
     )
 if REQUIRED_KEY_ENTITLEMENT is FORBIDDEN_KEY_ENTITLEMENT:  # pragma: no cover - import guard
     raise AssertionError(

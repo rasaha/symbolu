@@ -34,13 +34,10 @@ def _genuine():
 @pytest.mark.adversarial
 def test_direct_construction_is_refused():
     genuine = _genuine()
-    fields = {
-        name: getattr(genuine, name)
-        for name in genuine.digest_payload()
-        if name not in ("outcome", "grants_authority", "historical")
-    }
     with pytest.raises(VerifiedPolicyArtifactIntegrityError):
-        VerifiedPolicyAuthenticity(**fields, artifact_digest=genuine.artifact_digest)
+        VerifiedPolicyAuthenticity(
+            **_field_values(genuine), artifact_digest=genuine.artifact_digest
+        )
 
 
 @pytest.mark.adversarial
@@ -56,11 +53,7 @@ def test_a_borrowed_construction_token_does_not_mint_a_second_determination():
 
     genuine = _genuine()
     token = genuine.construction_token  # readable off any genuine artifact
-    fields = {
-        name: getattr(genuine, name)
-        for name in genuine.digest_payload()
-        if name not in ("outcome", "grants_authority", "historical")
-    }
+    fields = _field_values(genuine)
     fields["record_id"] = "a-determination-this-process-never-reached"
     forged = VerifiedPolicyAuthenticity(
         **fields,
@@ -73,15 +66,35 @@ def test_a_borrowed_construction_token_does_not_mint_a_second_determination():
         require_verified_policy_authenticity(forged)
 
 
-def _recompute(fields: dict) -> str:
-    from ugence_cloud_scaling_policy_authenticity import (
-        POLICY_AUTHENTICITY_DIGEST_DOMAIN,
-        framed_digest,
+def _field_values(artifact) -> dict:
+    """Every constructor field of a genuine artifact, read back off it."""
+
+    from ugence_cloud_scaling_policy_authenticity.verified import (
+        RECORDED_FACT_NAMES,
+        VERIFIED_FACT_NAMES,
     )
 
-    payload = dict(fields)
-    payload.update({"outcome": "VERIFIED", "grants_authority": False, "historical": False})
-    return framed_digest(domain=POLICY_AUTHENTICITY_DIGEST_DOMAIN, body=payload)
+    return {
+        name: getattr(artifact, name)
+        for name in VERIFIED_FACT_NAMES | RECORDED_FACT_NAMES
+    }
+
+
+def _recompute(fields: dict) -> str:
+    """The artifact digest a forger would have to produce, over the ratified partition."""
+
+    from ugence_cloud_scaling_policy_authenticity.verified import (
+        RECORDED_FACT_NAMES,
+        VERIFIED_FACT_NAMES,
+        _partitioned_digest,
+    )
+
+    verified_map = {k: v for k, v in fields.items() if k in VERIFIED_FACT_NAMES}
+    verified_map.update(
+        {"outcome": "VERIFIED", "grants_authority": False, "historical": False}
+    )
+    recorded_map = {k: v for k, v in fields.items() if k in RECORDED_FACT_NAMES}
+    return _partitioned_digest(verified_map=verified_map, recorded_map=recorded_map)
 
 
 @pytest.mark.adversarial

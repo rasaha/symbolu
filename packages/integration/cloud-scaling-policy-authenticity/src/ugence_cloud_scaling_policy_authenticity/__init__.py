@@ -84,6 +84,8 @@ from .identifiers import (
     FORBIDDEN_KEY_ENTITLEMENT,
     PHASE_5A_BINDING_SCHEMA_VERSION,
     POLICY_AUTHENTICITY_DIGEST_DOMAIN,
+    POLICY_AUTHENTICITY_RECORDED_FACTS_DOMAIN,
+    POLICY_AUTHENTICITY_VERIFIED_FACTS_DOMAIN,
     POLICY_AUTHORITY_CANONICALIZATION_VERSION,
     POLICY_AUTHORITY_PROTOCOL_ID,
     POLICY_TRUST_ANCHOR_OWNER,
@@ -116,6 +118,8 @@ from .verification import (
     PolicyAuthenticityVerifier,
 )
 from .verified import (
+    RECORDED_FACT_NAMES,
+    VERIFIED_FACT_NAMES,
     VerifiedPolicyAuthenticity,
     require_verified_policy_authenticity,
 )
@@ -140,6 +144,11 @@ __all__ = [
     # --- the verified artifact (non-authoritative; revalidated at consumption) ---
     "VerifiedPolicyAuthenticity",
     "require_verified_policy_authenticity",
+    # --- the ratified verified/recorded partition (D-5B0B-7) ---
+    "VERIFIED_FACT_NAMES",
+    "RECORDED_FACT_NAMES",
+    "POLICY_AUTHENTICITY_VERIFIED_FACTS_DOMAIN",
+    "POLICY_AUTHENTICITY_RECORDED_FACTS_DOMAIN",
     # --- typed outcomes ---
     "PolicyAuthenticityOutcome",
     "REFUSAL_OUTCOMES",

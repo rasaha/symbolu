@@ -56,6 +56,28 @@ removing a verification gate and without touching Phase 5A.
   and the artifact is bad" are different facts. An exception claiming `VERIFIED` never
   becomes one.
 
+### D-5B0B-7 — the digest payload partitions (ratified, implemented at the same version)
+
+`VerifiedPolicyAuthenticity.digest_payload()` is now two separately framed maps, each carrying
+its own domain tag as a canonical field:
+
+- **`verified`** — the facts a gate checked;
+- **`recorded`** — carried and digest-covered but never attested. Exactly
+  `resolved_as_of_fact` (R-2: injected, unvalidated) and `candidate_digest_fact` (R-4:
+  recorded, never reconciled).
+
+Both halves remain inside the artifact digest, so neither can be rewritten; what the partition
+adds is that the frame a fact sits in is part of what the digest commits to. Promoting a fact
+into the verified half — what 5B-1 and 5B-2 do when they close R-4 and R-2 — therefore moves
+the artifact digest instead of silently relabelling it.
+
+`verified_fact(name)` and `recorded_fact(name)` each refuse the other's half, so an unattested
+value cannot be read through a call that reads as attested. `VERIFIED_FACT_NAMES` and
+`RECORDED_FACT_NAMES` are exported, and an import-time guard refuses a field in neither set.
+
+No gate was added or removed (still ten), the distribution stays at `0.1.0`, and no Phase 5A
+frozen digest moved.
+
 ### Residual closed at this boundary
 
 - **R-3** — `resolve_policy` does not re-enforce `coordinate.content_digest ==

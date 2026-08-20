@@ -114,6 +114,8 @@ from .canonical import (
 from .errors import VerifiedPolicyArtifactIntegrityError as _IntegrityError
 from .identifiers import (
     POLICY_AUTHENTICITY_DIGEST_DOMAIN,
+    POLICY_AUTHENTICITY_RECORDED_FACTS_DOMAIN,
+    POLICY_AUTHENTICITY_VERIFIED_FACTS_DOMAIN,
     POLICY_AUTHORITY_CANONICALIZATION_VERSION,
     POLICY_AUTHORITY_PROTOCOL_ID,
     POLICY_TRUST_ANCHOR_OWNER,
@@ -126,7 +128,45 @@ from .outcomes import PolicyAuthenticityOutcome
 __all__ = [
     "VerifiedPolicyAuthenticity",
     "require_verified_policy_authenticity",
+    "VERIFIED_FACT_NAMES",
+    "RECORDED_FACT_NAMES",
 ]
+
+#: The facts a gate actually checked. Ordered as a frozenset because membership, not order,
+#: is what the partition asserts; the payload orders them by construction.
+VERIFIED_FACT_NAMES: "frozenset[str]" = frozenset(
+    {
+        "policy_family",
+        "policy_id",
+        "policy_version",
+        "policy_content_digest",
+        "policy_scope",
+        "policy_tenant_id",
+        "policy_body_digest",
+        "issuing_authority_id",
+        "key_id",
+        "signature_alg",
+        "record_id",
+        "adapter_id",
+        "policy_type",
+        "expected_reference_tenant_id",
+        "trust_configuration_digest",
+        "policy_trust_anchor_owner",
+        "authority_protocol_id",
+        "authority_canonicalization_version",
+        "policy_issued_at_fact",
+        "verification_profile",
+        "verification_profile_version",
+    }
+)
+
+#: The facts carried and digest-covered but **never attested** (D-5B0B-7). One member per
+#: open residual: ``resolved_as_of_fact`` (R-2) and ``candidate_digest_fact`` (R-4). A member
+#: leaves this set only when the residual it names is closed, and doing so moves the artifact
+#: digest — which is the point.
+RECORDED_FACT_NAMES: "frozenset[str]" = frozenset(
+    {"resolved_as_of_fact", "candidate_digest_fact"}
+)
 
 #: The private construction token. Not exported, not in ``__all__``, not reachable from the
 #: curated API. Holding it is what distinguishes an artifact the verifier minted from one a
@@ -136,6 +176,35 @@ _VERIFICATION_TOKEN = object()
 #: Provenance registry: the ``artifact_digest`` of every determination the authoritative
 #: routine has reached in this process. See this module's docstring.
 _MINTED_DIGESTS: set = set()
+
+
+def _framed_partition(*, verified_map: dict, recorded_map: dict) -> dict:
+    """The two separately framed maps, in the one shape the artifact digest covers.
+
+    Module-level and shared by :meth:`VerifiedPolicyAuthenticity.digest_payload` and the
+    minting routine, so the shape cannot drift between the digest that is stamped and the
+    digest that is recomputed to check it.
+    """
+
+    return {
+        "verified": {
+            "domain": POLICY_AUTHENTICITY_VERIFIED_FACTS_DOMAIN,
+            "facts": verified_map,
+        },
+        "recorded": {
+            "domain": POLICY_AUTHENTICITY_RECORDED_FACTS_DOMAIN,
+            "facts": recorded_map,
+        },
+    }
+
+
+def _partitioned_digest(*, verified_map: dict, recorded_map: dict) -> str:
+    """The artifact digest over both frames. The only routine that stamps one."""
+
+    return framed_digest(
+        domain=POLICY_AUTHENTICITY_DIGEST_DOMAIN,
+        body=_framed_partition(verified_map=verified_map, recorded_map=recorded_map),
+    )
 
 
 def _record_minted(artifact: "VerifiedPolicyAuthenticity") -> "VerifiedPolicyAuthenticity":
@@ -301,12 +370,12 @@ class VerifiedPolicyAuthenticity:
 
     # -- canonical form --------------------------------------------------------------------- #
 
-    def digest_payload(self) -> dict:
-        """Every bound fact, and nothing derived except the two framed refusals.
+    def verified_facts(self) -> dict:
+        """The facts a gate actually checked. Every entry was established, not merely carried.
 
-        ``artifact_digest`` and ``construction_token`` are excluded — a digest cannot cover
-        itself, and a process-local sentinel is not canonicalizable. Every other field is
-        present, so a field rewritten after construction moves the digest.
+        ``artifact_digest`` and ``construction_token`` are absent — a digest cannot cover
+        itself, and a process-local sentinel is not canonicalizable. The two recorded facts
+        are absent because they were never attested; see :meth:`recorded_facts`.
         """
 
         return {
@@ -329,8 +398,6 @@ class VerifiedPolicyAuthenticity:
             "authority_protocol_id": self.authority_protocol_id,
             "authority_canonicalization_version": self.authority_canonicalization_version,
             "policy_issued_at_fact": self.policy_issued_at_fact,
-            "resolved_as_of_fact": self.resolved_as_of_fact,
-            "candidate_digest_fact": self.candidate_digest_fact,
             "verification_profile": self.verification_profile,
             "verification_profile_version": self.verification_profile_version,
             # Framed in deliberately: the digest commits to the facts that this artifact
@@ -339,6 +406,76 @@ class VerifiedPolicyAuthenticity:
             "grants_authority": self.grants_authority,
             "historical": self.historical,
         }
+
+    def recorded_facts(self) -> dict:
+        """Facts carried and digest-covered, but **never attested** (D-5B0B-7).
+
+        Both members name an open residual, and that is the whole reason they are separated:
+
+        * ``resolved_as_of_fact`` — the instant the determination was reached at. Injected by
+          the caller and unvalidated (**R-2**). It is not a verified statement about time.
+        * ``candidate_digest_fact`` — which candidate the proof accompanied, if one was
+          supplied. Recorded and never reconciled (**R-4**); a Phase 5A binding cannot name a
+          coordinate, so there is nothing here that was compared.
+
+        Being in this map does **not** mean the value is unprotected: it is inside the
+        artifact digest, so it cannot be rewritten after the fact. It means nobody checked it.
+        """
+
+        return {
+            "resolved_as_of_fact": self.resolved_as_of_fact,
+            "candidate_digest_fact": self.candidate_digest_fact,
+        }
+
+    def digest_payload(self) -> dict:
+        """The two separately framed maps the artifact digest covers.
+
+        Each half carries its own domain tag as an ordinary canonical field, so the frame a
+        fact sits in is part of what the digest commits to. Promoting a fact from ``recorded``
+        to ``verified`` — which is what 5B-1 and 5B-2 do when they close R-4 and R-2 — is
+        therefore a visible change to the artifact digest, not a silent relabelling.
+        """
+
+        return _framed_partition(
+            verified_map=self.verified_facts(), recorded_map=self.recorded_facts()
+        )
+
+    def verified_fact(self, name: str):
+        """Read one **attested** fact by name. Refuses a recorded one.
+
+        The accessor a consumer reaches for when it wants to act on something this package
+        established. Asking it for ``resolved_as_of_fact`` or ``candidate_digest_fact`` is a
+        category error and is refused rather than answered, because the answer would read as
+        attested. Plain attribute access still reaches those fields — this is the surface that
+        says which is which, not a lock.
+        """
+
+        if name in RECORDED_FACT_NAMES:
+            raise _IntegrityError(
+                f"{name!r} is a recorded fact, not a verified one: it is carried and "
+                "digest-covered but nothing checked it. Read it through recorded_fact(), "
+                "which says so at the call site"
+            )
+        if name not in VERIFIED_FACT_NAMES:
+            raise _IntegrityError(
+                f"{name!r} is not a fact of a verification artifact"
+            )
+        return getattr(self, name)
+
+    def recorded_fact(self, name: str):
+        """Read one **unverified** recorded fact by name. Refuses a verified one.
+
+        Symmetric on purpose: an attested fact read through this accessor would understate
+        what is known, and a caller reading everything through one accessor would learn
+        nothing from either.
+        """
+
+        if name not in RECORDED_FACT_NAMES:
+            raise _IntegrityError(
+                f"{name!r} is not a recorded fact; recorded_fact() answers only for "
+                f"{sorted(RECORDED_FACT_NAMES)}"
+            )
+        return getattr(self, name)
 
     def digest(self) -> str:
         """Recompute this artifact's canonical digest from its current field values."""
@@ -407,3 +544,21 @@ def require_verified_policy_authenticity(
             "the digest bound at verification time"
         )
     return value
+
+
+# --- the partition is total and disjoint, checked at import ------------------------------- #
+_PARTITIONED = VERIFIED_FACT_NAMES | RECORDED_FACT_NAMES
+_UNPARTITIONABLE = {"artifact_digest", "construction_token"}
+_DECLARED = {f.name for f in fields(VerifiedPolicyAuthenticity)} - _UNPARTITIONABLE
+if VERIFIED_FACT_NAMES & RECORDED_FACT_NAMES:  # pragma: no cover - import guard
+    raise AssertionError(
+        "a fact cannot be both verified and recorded: "
+        f"{sorted(VERIFIED_FACT_NAMES & RECORDED_FACT_NAMES)}"
+    )
+if _PARTITIONED != _DECLARED:  # pragma: no cover - import guard
+    raise AssertionError(
+        "every field of a verification artifact must be classified as verified or recorded; "
+        f"unclassified: {sorted(_DECLARED - _PARTITIONED)}; "
+        f"named but not declared: {sorted(_PARTITIONED - _DECLARED)}. Adding a field means "
+        "deciding whether a gate checked it, which is the decision D-5B0B-7 ratified."
+    )

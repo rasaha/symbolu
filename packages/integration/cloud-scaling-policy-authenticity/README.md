@@ -61,6 +61,7 @@ consumer:
 | D-5B0B-4 | **option (a)** — verify through the Policy Authority's own `PolicyKeyRing`, not a lent Trusted Evidence Authority trust anchor |
 | D-5B0B-5 | authenticity means "is valid now", judged at an **injected** `as_of`; no clock |
 | D-5B0B-6 | the proof travels **alongside** the candidate; Phase 5A stays at `0.1.0` with all ten frozen digests unmoved |
+| D-5B0B-7 | the digest payload partitions into a **verified** half and a **recorded** half, so an unattested fact is digest-covered without reading as attested |
 
 ### Why option (a), and what it costs
 
@@ -83,6 +84,28 @@ the Policy Authority's for policy. That is separation of concerns, not duplicati
 answer questions with different owners and different rotation authority. This package holds
 **no keys, no key ring, no registry and no anchor records**; it delegates.
 
+## Verified facts and recorded facts
+
+`digest_payload()` is two separately framed maps, each carrying its own domain tag as a
+canonical field:
+
+* **`verified`** — the facts a gate actually checked: the six coordinate components, the body
+  digest, the issuing authority and key, the trust-configuration identity, the profile.
+* **`recorded`** — carried and digest-covered, but **never attested**. Exactly two members
+  today, one per open residual: `resolved_as_of_fact` (R-2) and `candidate_digest_fact` (R-4).
+
+Being recorded does not mean unprotected — both halves are inside the artifact digest, so
+neither can be rewritten after the fact. It means nobody checked it. Read a fact through
+`verified_fact(name)` when you intend to act on something this package established;
+`recorded_fact(name)` answers for the other two and each accessor refuses the other's half, so
+an unattested value cannot arrive through a call that reads as attested. The partition is
+total and disjoint over the artifact's fields, enforced at import: adding a field means
+deciding which half it belongs to.
+
+When 5B-1 closes R-4 and 5B-2 closes R-2, the corresponding fact is **promoted** into the
+verified half — which moves the artifact digest, because the frame a fact sits in is part of
+what that digest commits to.
+
 ## The open residual you must read before deploying
 
 **R-2 — whose clock supplies `as_of` is unsettled, and this implementation proceeds with
@@ -90,7 +113,11 @@ answer questions with different owners and different rotation authority. This pa
 resolution depend on it, so a determination reached at an attacker-chosen instant can resolve
 a policy that is revoked, expired or not yet effective *now*. Binding `as_of` to a trusted
 time source is 5B-2's envelope-issuance work. `TEMPORAL_OUTCOMES` names the members that
-instant can move.
+instant can move, and `resolved_as_of_fact` sits in the artifact's **recorded** half so the
+artifact itself says the instant was not verified.
+
+**R-4** is likewise visible in the artifact's shape rather than only in its prose:
+`candidate_digest_fact` is in the recorded half because nothing reconciled it.
 
 ## Wiring it
 
