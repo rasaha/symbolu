@@ -45,8 +45,8 @@ FORBIDDEN_CAPABILITY_TOKENS = (
 )
 
 
-def test_happy_the_package_version_is_the_br2a_version():
-    assert api.__version__ == "0.1.0"
+def test_happy_the_package_version_is_the_br2b_version():
+    assert api.__version__ == "0.2.0"
 
 
 def _is_port_declaration(name: str, value) -> bool:

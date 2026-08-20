@@ -334,8 +334,8 @@ def main() -> int:  # noqa: C901 - a verifier is a long list of assertions
         )
         check(
             "installed api.__all__ count and manifest symbol count both hold",
-            installed_facts["api_all_count"] == 82
-            and len(source_manifest["symbols"]) == 81,
+            installed_facts["api_all_count"] == 89
+            and len(source_manifest["symbols"]) == 88,
             f"{installed_facts['api_all_count']} / {len(source_manifest['symbols'])}",
         )
         check(
@@ -356,9 +356,9 @@ def main() -> int:  # noqa: C901 - a verifier is a long list of assertions
             },
         )
         check(
-            "all fifteen pinned vectors were reproduced, including the "
+            "all eighteen pinned vectors were reproduced, including the "
             "post-admission rejection event and the revocation event",
-            len(installed_facts["vectors"]) == 15
+            len(installed_facts["vectors"]) == 18
             and "BenchmarkPostAdmissionRejectionEventPayload"
             in installed_facts["vectors"]
             and "BenchmarkRevocationEventPayload" in installed_facts["vectors"],

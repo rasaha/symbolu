@@ -1,7 +1,7 @@
 {
   "distribution": "ugence-benchmark-registry-authority",
   "namespace": "ugence_benchmark_registry_authority",
-  "package_version": "0.1.0",
+  "package_version": "0.2.0",
   "canonicalization_version": "ugence.benchmark-registry-authority/canonicalization/v1",
   "note": "One pinned canonical byte vector and digest per shipped artifact class. 'canonical_bytes' is the exact UTF-8 JSON the encoder produces for the pinned fixture; 'digest' is its sha-256. Both are reproducible from the literals in tests/_builders.py, and the digest is independently recomputable with plain hashlib over the byte string alone, importing nothing from the package.",
   "vectors": {
@@ -40,6 +40,18 @@
     "BenchmarkConflictRecordPayload": {
       "canonical_bytes": "{\"body\":{\"declared_recorded_at\":\"2026-03-01T12:00:00.000000Z\",\"declared_refusal_reason\":\"COORDINATE_SLOT_CONFLICT\",\"submission_record\":{\"declared_recorded_at\":\"2026-03-01T12:00:00.000000Z\",\"declared_registry_authority_identity\":\"registry-authority-gamma\",\"publisher_submission_envelope\":{\"benchmark_content_digest\":\"b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2\",\"benchmark_identity_digest\":\"a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1\",\"coordinate\":{\"benchmark_family\":\"fam\",\"benchmark_id\":\"bmk\",\"benchmark_version\":\"1.2.3\",\"domain\":{\"declaration\":\"NOT_APPLICABLE\",\"value\":\"\"},\"geography\":{\"declaration\":\"APPLICABLE\",\"value\":\"eu\"},\"scope\":{\"kind\":\"TENANT\",\"tenant_id\":\"t1\"}},\"detached_signature\":\"01010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101\",\"publisher_identity\":\"publisher-alpha\",\"publisher_key_id\":\"publisher-key-1\",\"signature_profile\":\"ED25519_SHA512_V1\",\"signing_frame_domain\":\"ugence.benchmark-registry-authority/publisher-submission-signing-frame/v1\",\"signing_frame_version\":\"v1\"}}},\"canonicalization\":\"ugence.benchmark-registry-authority/canonicalization/v1\",\"domain\":\"ugence.benchmark-registry-authority/conflict-record-payload/v1\",\"type\":\"BenchmarkConflictRecordPayload\"}",
       "digest": "3676266f22fbabbc15c795535a982279eee625fb6b55f1b9a455697ab6b0b598"
+    },
+    "BenchmarkRegistrySnapshotAssertion": {
+      "canonical_bytes": "{\"body\":{\"asserted_current_state\":\"ADMITTED\",\"asserted_registration_record_presence\":\"NO_RECORD_APPENDED\",\"coordinate\":{\"benchmark_family\":\"fam\",\"benchmark_id\":\"bmk\",\"benchmark_version\":\"1.2.3\",\"domain\":{\"declaration\":\"NOT_APPLICABLE\",\"value\":\"\"},\"geography\":{\"declaration\":\"APPLICABLE\",\"value\":\"eu\"},\"scope\":{\"kind\":\"TENANT\",\"tenant_id\":\"t1\"}}},\"canonicalization\":\"ugence.benchmark-registry-authority/canonicalization/v1\",\"domain\":\"ugence.benchmark-registry-authority/registry-snapshot-assertion/v1\",\"type\":\"BenchmarkRegistrySnapshotAssertion\"}",
+      "digest": "1d60f269a1e745304fb392f97039b307a5d29076cc39de2337ae4c49aee7554e"
+    },
+    "BenchmarkTransitionPlan": {
+      "canonical_bytes": "{\"body\":{\"planned_to_state\":\"REGISTERED\",\"snapshot\":{\"asserted_current_state\":\"ADMITTED\",\"asserted_registration_record_presence\":\"NO_RECORD_APPENDED\",\"coordinate\":{\"benchmark_family\":\"fam\",\"benchmark_id\":\"bmk\",\"benchmark_version\":\"1.2.3\",\"domain\":{\"declaration\":\"NOT_APPLICABLE\",\"value\":\"\"},\"geography\":{\"declaration\":\"APPLICABLE\",\"value\":\"eu\"},\"scope\":{\"kind\":\"TENANT\",\"tenant_id\":\"t1\"}}}},\"canonicalization\":\"ugence.benchmark-registry-authority/canonicalization/v1\",\"domain\":\"ugence.benchmark-registry-authority/transition-plan/v1\",\"type\":\"BenchmarkTransitionPlan\"}",
+      "digest": "83b342bec31fb04c24d7214038e5c257c5ee22c6e5d332fba40978be877c96fd"
+    },
+    "BenchmarkTransitionRefusal": {
+      "canonical_bytes": "{\"body\":{\"declared_refusal_reason\":\"UNAUTHORIZED_TRANSITION\",\"refused_to_state\":\"REVOKED\",\"snapshot\":{\"asserted_current_state\":\"ADMITTED\",\"asserted_registration_record_presence\":\"NO_RECORD_APPENDED\",\"coordinate\":{\"benchmark_family\":\"fam\",\"benchmark_id\":\"bmk\",\"benchmark_version\":\"1.2.3\",\"domain\":{\"declaration\":\"NOT_APPLICABLE\",\"value\":\"\"},\"geography\":{\"declaration\":\"APPLICABLE\",\"value\":\"eu\"},\"scope\":{\"kind\":\"TENANT\",\"tenant_id\":\"t1\"}}}},\"canonicalization\":\"ugence.benchmark-registry-authority/canonicalization/v1\",\"domain\":\"ugence.benchmark-registry-authority/transition-refusal/v1\",\"type\":\"BenchmarkTransitionRefusal\"}",
+      "digest": "efa9a8e8d79e06e6099126878e0bf78ecaf3a9193a54e71d3de23817cab8ea70"
     },
     "BenchmarkResolutionRecordPayload": {
       "canonical_bytes": "{\"body\":{\"coordinate\":{\"benchmark_family\":\"fam\",\"benchmark_id\":\"bmk\",\"benchmark_version\":\"1.2.3\",\"domain\":{\"declaration\":\"NOT_APPLICABLE\",\"value\":\"\"},\"geography\":{\"declaration\":\"APPLICABLE\",\"value\":\"eu\"},\"scope\":{\"kind\":\"TENANT\",\"tenant_id\":\"t1\"}},\"declared_admitted_digest\":\"a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1\",\"declared_registration_state\":\"REGISTERED\",\"declared_registry_authority_identity\":\"registry-authority-gamma\"},\"canonicalization\":\"ugence.benchmark-registry-authority/canonicalization/v1\",\"domain\":\"ugence.benchmark-registry-authority/resolution-record-payload/v1\",\"type\":\"BenchmarkResolutionRecordPayload\"}",

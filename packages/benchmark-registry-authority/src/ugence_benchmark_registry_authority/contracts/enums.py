@@ -53,6 +53,7 @@ __all__ = [
     "BenchmarkRegistryConsistencyScope",
     "BenchmarkRegistryConsistencyClaim",
     "BenchmarkConfusableNormalizationPosture",
+    "BenchmarkRegistrationRecordPresence",
     "BENCHMARK_REGISTRATION_STATE_ORDER",
     "BENCHMARK_TERMINAL_REGISTRATION_STATES",
     "BENCHMARK_BANNED_REGISTRATION_STATE_NAMES",
@@ -262,3 +263,27 @@ BENCHMARK_BANNED_REGISTRATION_STATE_NAMES: frozenset = frozenset(
         "DEPRECATED",
     }
 )
+
+
+class BenchmarkRegistrationRecordPresence(str, Enum):
+    """Whether a registration record has been appended, as a caller asserts it.
+
+    Two members and no third. This gates the one arrow the closed transition
+    relation cannot express on its own: ``ADMITTED → REJECTED`` is permitted
+    **only while no registration record has been appended**, which is a fact
+    about the log rather than about the state pair.
+
+    A closed enum rather than a Boolean, for D-15's reason. An
+    ``is_registered`` flag would be one assignment away from turning a refused
+    rejection into a permitted one, and the point of the gate is that it cannot
+    be flipped. It is also an *assertion* in both members: BR-2B holds no log,
+    so ``NO_RECORD_APPENDED`` is what a caller claims, never what BR-2B
+    observed.
+    """
+
+    #: The caller asserts no registration record exists for this locator.
+    NO_RECORD_APPENDED = "NO_RECORD_APPENDED"
+
+    #: The caller asserts a registration record has been appended. This closes
+    #: the ``ADMITTED → REJECTED`` arrow permanently for that locator.
+    RECORD_APPENDED = "RECORD_APPENDED"

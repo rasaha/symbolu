@@ -23,7 +23,7 @@ def test_happy_the_manifest_names_the_right_distribution_and_namespace():
 
 
 def test_the_manifest_version_equals_the_package_version():
-    assert MANIFEST["package_version"] == api.__version__ == "0.1.0"
+    assert MANIFEST["package_version"] == api.__version__ == "0.2.0"
 
 
 def test_the_manifest_symbols_equal_the_curated_surface_minus_version():
@@ -37,8 +37,8 @@ def test_both_counts_hold_and_neither_is_corrected_to_match_the_other():
     numbers are asserted so a future regeneration cannot quietly "fix" one.
     """
 
-    assert len(api.__all__) == 82
-    assert len(MANIFEST["symbols"]) == 81
+    assert len(api.__all__) == 89
+    assert len(MANIFEST["symbols"]) == 88
     assert len(MANIFEST["symbols"]) == len(api.__all__) - 1
     assert "__version__" not in MANIFEST["symbols"]
 

@@ -1,7 +1,7 @@
 {
   "distribution": "ugence-benchmark-registry-authority",
   "namespace": "ugence_benchmark_registry_authority",
-  "package_version": "0.1.0",
+  "package_version": "0.2.0",
   "curated_api_module": "ugence_benchmark_registry_authority.api",
   "note": "Machine-readable snapshot of the curated public API (ugence_benchmark_registry_authority.api.__all__). __version__ is carried separately as package_version and is NOT a member of 'symbols', so symbols is exactly one shorter than api.__all__ — both counts are asserted, and neither is 'corrected' to match the other. tests/packaging/test_public_api.py asserts this file equals the actual package surface, and verify_benchmark_registry_authority_distribution.py asserts the same for the built wheel, the built sdist and the isolated installed runtime.",
   "symbols": {
@@ -196,7 +196,10 @@
         "ugence.benchmark-registry-authority/exact-resolution-request/v1",
         "ugence.benchmark-registry-authority/historical-inspection-request/v1",
         "ugence.benchmark-registry-authority/platform-registry-scope-expectation/v1",
-        "ugence.benchmark-registry-authority/tenant-registry-scope-expectation/v1"
+        "ugence.benchmark-registry-authority/tenant-registry-scope-expectation/v1",
+        "ugence.benchmark-registry-authority/registry-snapshot-assertion/v1",
+        "ugence.benchmark-registry-authority/transition-plan/v1",
+        "ugence.benchmark-registry-authority/transition-refusal/v1"
       ]
     },
     "BENCHMARK_REGISTRY_DECLARED_CONSISTENCY": {
@@ -256,6 +259,10 @@
         "UNAUTHORIZED_TRANSITION",
         "UNSUPPORTED_SUPERSESSION"
       ]
+    },
+    "BENCHMARK_REGISTRY_SNAPSHOT_ASSERTION_DIGEST_DOMAIN": {
+      "kind": "constant",
+      "value": "ugence.benchmark-registry-authority/registry-snapshot-assertion/v1"
     },
     "BENCHMARK_RESERVED_AUTHORITY_ISSUED_TYPE_NAMES": {
       "kind": "constant",
@@ -402,6 +409,14 @@
         ]
       }
     },
+    "BENCHMARK_TRANSITION_PLAN_DIGEST_DOMAIN": {
+      "kind": "constant",
+      "value": "ugence.benchmark-registry-authority/transition-plan/v1"
+    },
+    "BENCHMARK_TRANSITION_REFUSAL_DIGEST_DOMAIN": {
+      "kind": "constant",
+      "value": "ugence.benchmark-registry-authority/transition-refusal/v1"
+    },
     "BENCHMARK_UNBOUND_PAYLOAD_TYPES": {
       "kind": "constant",
       "value": [
@@ -526,6 +541,13 @@
         "declared_recorded_at"
       ]
     },
+    "BenchmarkRegistrationRecordPresence": {
+      "kind": "enum",
+      "members": [
+        "NO_RECORD_APPENDED",
+        "RECORD_APPENDED"
+      ]
+    },
     "BenchmarkRegistrationState": {
       "kind": "enum",
       "members": [
@@ -598,6 +620,14 @@
     "BenchmarkRegistryScopeExpectation": {
       "kind": "function"
     },
+    "BenchmarkRegistrySnapshotAssertion": {
+      "kind": "contract",
+      "fields": [
+        "coordinate",
+        "asserted_current_state",
+        "asserted_registration_record_presence"
+      ]
+    },
     "BenchmarkRegistryStoreConsistencyDescriptor": {
       "kind": "contract",
       "fields": [
@@ -651,6 +681,21 @@
         "publisher_submission_envelope",
         "declared_registry_authority_identity",
         "declared_recorded_at"
+      ]
+    },
+    "BenchmarkTransitionPlan": {
+      "kind": "contract",
+      "fields": [
+        "snapshot",
+        "planned_to_state"
+      ]
+    },
+    "BenchmarkTransitionRefusal": {
+      "kind": "contract",
+      "fields": [
+        "snapshot",
+        "refused_to_state",
+        "declared_refusal_reason"
       ]
     },
     "PlatformRegistryScopeExpectation": {

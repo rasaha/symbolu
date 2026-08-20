@@ -37,6 +37,10 @@ from ugence_benchmark_registry_authority.api import (
     BenchmarkHistoricalInspectionRequest,
     BenchmarkHistoricalRecordPayload,
     BenchmarkPostAdmissionRejectionEventPayload,
+    BenchmarkRegistrationRecordPresence,
+    BenchmarkRegistrySnapshotAssertion,
+    BenchmarkTransitionPlan,
+    BenchmarkTransitionRefusal,
     BenchmarkPublisherSubmissionEnvelope,
     BenchmarkRegistrationEventPayload,
     BenchmarkRegistrationState,
@@ -297,6 +301,53 @@ def tenant_expectation(**overrides) -> TenantRegistryScopeExpectation:
 #: them appears in ``pinned_canonical_vectors.json``, in the canonical-domain
 #: inventory, in the public-contract inventory, and in the source/wheel/sdist
 #: parity checks.
+def snapshot_assertion(**overrides) -> BenchmarkRegistrySnapshotAssertion:
+    kwargs = dict(
+        coordinate=coordinate(),
+        asserted_current_state=BenchmarkRegistrationState.ADMITTED,
+        asserted_registration_record_presence=(
+            BenchmarkRegistrationRecordPresence.NO_RECORD_APPENDED
+        ),
+    )
+    kwargs.update(overrides)
+    return BenchmarkRegistrySnapshotAssertion(**kwargs)
+
+
+def unoccupied_assertion(**overrides) -> BenchmarkRegistrySnapshotAssertion:
+    """The only assertion from which the initial move is admissible."""
+
+    kwargs = dict(
+        coordinate=coordinate(),
+        asserted_current_state=None,
+        asserted_registration_record_presence=(
+            BenchmarkRegistrationRecordPresence.NO_RECORD_APPENDED
+        ),
+    )
+    kwargs.update(overrides)
+    return BenchmarkRegistrySnapshotAssertion(**kwargs)
+
+
+def transition_plan(**overrides) -> BenchmarkTransitionPlan:
+    kwargs = dict(
+        snapshot=snapshot_assertion(),
+        planned_to_state=BenchmarkRegistrationState.REGISTERED,
+    )
+    kwargs.update(overrides)
+    return BenchmarkTransitionPlan(**kwargs)
+
+
+def transition_refusal(**overrides) -> BenchmarkTransitionRefusal:
+    kwargs = dict(
+        snapshot=snapshot_assertion(),
+        refused_to_state=BenchmarkRegistrationState.REVOKED,
+        declared_refusal_reason=(
+            BenchmarkRegistryRefusalReason.UNAUTHORIZED_TRANSITION
+        ),
+    )
+    kwargs.update(overrides)
+    return BenchmarkTransitionRefusal(**kwargs)
+
+
 PINNED_VECTOR_BUILDERS = (
     ("BenchmarkPublisherSubmissionEnvelope", publisher_envelope),
     ("BenchmarkApprovalEnvelope", approval_envelope),
@@ -313,4 +364,7 @@ PINNED_VECTOR_BUILDERS = (
     ("BenchmarkHistoricalInspectionRequest", historical_inspection_request),
     ("PlatformRegistryScopeExpectation", platform_expectation),
     ("TenantRegistryScopeExpectation", tenant_expectation),
+    ("BenchmarkRegistrySnapshotAssertion", snapshot_assertion),
+    ("BenchmarkTransitionPlan", transition_plan),
+    ("BenchmarkTransitionRefusal", transition_refusal),
 )

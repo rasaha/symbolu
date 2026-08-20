@@ -41,7 +41,10 @@ from .canonical import (
     BENCHMARK_REVOCATION_ENVELOPE_DIGEST_DOMAIN,
     BENCHMARK_REVOCATION_EVENT_PAYLOAD_DIGEST_DOMAIN,
     BENCHMARK_SUBMISSION_RECORD_PAYLOAD_DIGEST_DOMAIN,
+    BENCHMARK_REGISTRY_SNAPSHOT_ASSERTION_DIGEST_DOMAIN,
     BENCHMARK_TENANT_REGISTRY_SCOPE_EXPECTATION_DIGEST_DOMAIN,
+    BENCHMARK_TRANSITION_PLAN_DIGEST_DOMAIN,
+    BENCHMARK_TRANSITION_REFUSAL_DIGEST_DOMAIN,
     canonical_bytes,
     canonical_digest,
     canonical_domain_inventory,
@@ -64,6 +67,7 @@ from .enums import (
     BENCHMARK_TERMINAL_REGISTRATION_STATES,
     BenchmarkAdmissionOutcome,
     BenchmarkConfusableNormalizationPosture,
+    BenchmarkRegistrationRecordPresence,
     BenchmarkRegistrationState,
     BenchmarkRegistryConsistencyClaim,
     BenchmarkRegistryConsistencyScope,
@@ -85,6 +89,11 @@ from .errors import (
     BenchmarkRegistryCompositionError,
     BenchmarkRegistryContractError,
     BenchmarkRegistryLifecycleError,
+)
+from .kernel import (
+    BenchmarkRegistrySnapshotAssertion,
+    BenchmarkTransitionPlan,
+    BenchmarkTransitionRefusal,
 )
 from .lifecycle import (
     BENCHMARK_REGISTRATION_TRANSITIONS,
@@ -226,4 +235,11 @@ __all__ = [
     "BENCHMARK_PRODUCTION_ADAPTER_ADMISSION_REQUIREMENT",
     "BENCHMARK_UNVERIFIED_AUTHORITY_PROPERTIES",
     "BENCHMARK_RESERVED_AUTHORITY_ISSUED_TYPE_NAMES",
+    "BenchmarkRegistrationRecordPresence",
+    "BenchmarkRegistrySnapshotAssertion",
+    "BenchmarkTransitionPlan",
+    "BenchmarkTransitionRefusal",
+    "BENCHMARK_REGISTRY_SNAPSHOT_ASSERTION_DIGEST_DOMAIN",
+    "BENCHMARK_TRANSITION_PLAN_DIGEST_DOMAIN",
+    "BENCHMARK_TRANSITION_REFUSAL_DIGEST_DOMAIN",
 ]

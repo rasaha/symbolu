@@ -228,6 +228,9 @@ __all__ = [
     "BENCHMARK_HISTORICAL_INSPECTION_REQUEST_DIGEST_DOMAIN",
     "BENCHMARK_PLATFORM_REGISTRY_SCOPE_EXPECTATION_DIGEST_DOMAIN",
     "BENCHMARK_TENANT_REGISTRY_SCOPE_EXPECTATION_DIGEST_DOMAIN",
+    "BENCHMARK_REGISTRY_SNAPSHOT_ASSERTION_DIGEST_DOMAIN",
+    "BENCHMARK_TRANSITION_PLAN_DIGEST_DOMAIN",
+    "BENCHMARK_TRANSITION_REFUSAL_DIGEST_DOMAIN",
     "BENCHMARK_REGISTRY_AUTHORITY_DIGEST_DOMAINS",
     "canonical_bytes",
     "canonical_digest",
@@ -338,8 +341,27 @@ BENCHMARK_TENANT_REGISTRY_SCOPE_EXPECTATION_DIGEST_DOMAIN = (
     _DOMAIN_PREFIX + "tenant-registry-scope-expectation/v1"
 )
 
-#: Every BR-2A domain, pinned as an immutable tuple in declaration order. Used
-#: by the canonical-domain inventory and by the uniqueness assertion below.
+#: Domain for :class:`~.kernel.BenchmarkRegistrySnapshotAssertion`. BR-2B.
+BENCHMARK_REGISTRY_SNAPSHOT_ASSERTION_DIGEST_DOMAIN = (
+    _DOMAIN_PREFIX + "registry-snapshot-assertion/v1"
+)
+
+#: Domain for :class:`~.kernel.BenchmarkTransitionPlan`. BR-2B.
+BENCHMARK_TRANSITION_PLAN_DIGEST_DOMAIN = (
+    _DOMAIN_PREFIX + "transition-plan/v1"
+)
+
+#: Domain for :class:`~.kernel.BenchmarkTransitionRefusal`. BR-2B.
+BENCHMARK_TRANSITION_REFUSAL_DIGEST_DOMAIN = (
+    _DOMAIN_PREFIX + "transition-refusal/v1"
+)
+
+#: Every domain this distribution mints, pinned as an immutable tuple in
+#: declaration order — BR-2A's fifteen, then BR-2B's three. Used by the
+#: canonical-domain inventory and by the uniqueness assertion below. Append-only:
+#: a later subphase adds at the end and never inserts or re-orders, because a
+#: moved domain re-digests an artifact that was already addressed under the old
+#: one.
 BENCHMARK_REGISTRY_AUTHORITY_DIGEST_DOMAINS: tuple = (
     BENCHMARK_PUBLISHER_SUBMISSION_ENVELOPE_DIGEST_DOMAIN,
     BENCHMARK_APPROVAL_ENVELOPE_DIGEST_DOMAIN,
@@ -356,6 +378,9 @@ BENCHMARK_REGISTRY_AUTHORITY_DIGEST_DOMAINS: tuple = (
     BENCHMARK_HISTORICAL_INSPECTION_REQUEST_DIGEST_DOMAIN,
     BENCHMARK_PLATFORM_REGISTRY_SCOPE_EXPECTATION_DIGEST_DOMAIN,
     BENCHMARK_TENANT_REGISTRY_SCOPE_EXPECTATION_DIGEST_DOMAIN,
+    BENCHMARK_REGISTRY_SNAPSHOT_ASSERTION_DIGEST_DOMAIN,
+    BENCHMARK_TRANSITION_PLAN_DIGEST_DOMAIN,
+    BENCHMARK_TRANSITION_REFUSAL_DIGEST_DOMAIN,
 )
 
 # Two artifact classes sharing a domain would collapse two byte spaces into one.

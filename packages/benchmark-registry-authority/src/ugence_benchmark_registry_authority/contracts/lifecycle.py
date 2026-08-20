@@ -24,8 +24,11 @@ The ``ADMITTED → REJECTED`` precondition
 That arrow is permitted **only while no registration record has been appended**.
 The relation cannot express that condition, because it is a fact about the
 *log*, not about the state pair — and BR-2A holds no log. The relation therefore
-admits the arrow, and BR-2B's append path, which does hold the log, enforces the
-precondition. What BR-2A makes structural instead is that
+admits the arrow, and the condition is enforced elsewhere. BR-2B's
+:class:`~.kernel.BenchmarkTransitionPlan` enforces it against the **asserted**
+:class:`~.enums.BenchmarkRegistrationRecordPresence` a caller supplies, because
+BR-2B holds no log either; BR-2D, which does hold one, enforces it against the
+observed log. What BR-2A makes structural instead is that
 :class:`~.chain.BenchmarkPostAdmissionRejectionEventPayload` requires its nested
 predecessor's ``declared_outcome`` to be exactly ``ADMITTED``.
 

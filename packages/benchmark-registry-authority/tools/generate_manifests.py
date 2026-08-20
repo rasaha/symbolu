@@ -78,6 +78,29 @@ TRANSITION_METADATA = {
         "required_predecessor_state": None,
         "required_predecessor_declared_outcome": None,
     },
+    "BenchmarkRegistrySnapshotAssertion": {
+        "transition_represented": (
+            "none — a caller's assertion about current state, not a move"
+        ),
+        "required_predecessor_state": None,
+        "required_predecessor_declared_outcome": None,
+    },
+    "BenchmarkTransitionPlan": {
+        "transition_represented": (
+            "any transition the closed relation admits, as a plan only — a "
+            "plan is not the transition, and BR-2B cannot perform one"
+        ),
+        "required_predecessor_state": None,
+        "required_predecessor_declared_outcome": None,
+    },
+    "BenchmarkTransitionRefusal": {
+        "transition_represented": (
+            "none — records a move that would not be admissible against the "
+            "nested assertion"
+        ),
+        "required_predecessor_state": None,
+        "required_predecessor_declared_outcome": None,
+    },
 }
 
 LATER_MILESTONE = {
@@ -93,49 +116,61 @@ LATER_MILESTONE = {
         "BR-2C — revocation signature verification under an entitled anchor."
     ),
     "BenchmarkSubmissionRecordPayload": (
-        "BR-2B — the authority-issued submission record appended by the "
-        "admission engine's append-only log."
+        "BR-2D — the authority-issued submission record appended by the "
+        "durable registry authority's append-only log."
     ),
     "BenchmarkAdmissionDecisionPayload": (
-        "BR-2B — BenchmarkAdmissionDecision, the authority-issued result. "
-        "Reserved and undefined at BR-2A."
+        "BR-2D — BenchmarkAdmissionDecision, the authority-issued result. "
+        "Reserved and undefined until BR-2D."
     ),
     "BenchmarkPostAdmissionRejectionEventPayload": (
-        "BR-2B — the authority-issued post-admission rejection event."
+        "BR-2D — the authority-issued post-admission rejection event."
     ),
     "BenchmarkRegistrationEventPayload": (
-        "BR-2B — BenchmarkRegistrationEvent, the authority-issued result. "
-        "Reserved and undefined at BR-2A."
+        "BR-2D — BenchmarkRegistrationEvent, the authority-issued result. "
+        "Reserved and undefined until BR-2D."
     ),
     "BenchmarkRevocationEventPayload": (
-        "BR-2B/BR-2C — the authority-issued revocation event, appended only "
+        "BR-2D — the authority-issued revocation event, appended only "
         "after the revoker's signature verifies under an entitled anchor."
     ),
     "BenchmarkConflictRecordPayload": (
-        "BR-2B — the authority-issued conflict record produced by the "
-        "admission engine's slot claim."
+        "BR-2D — the authority-issued conflict record produced by the "
+        "durable registry authority's compare-and-set slot claim."
     ),
     "BenchmarkResolutionRecordPayload": (
-        "BR-2B/BR-2C — BenchmarkResolution, the authority-issued result and "
+        "BR-2D — BenchmarkResolution, the authority-issued result and "
         "its issuance boundary, after real verification exists. Reserved and "
         "undefined at BR-2A."
     ),
     "BenchmarkHistoricalRecordPayload": (
-        "BR-2B — the authority-issued historical record returned by the "
+        "BR-2D — the authority-issued historical record returned by the "
         "read-only inspection API."
     ),
     "BenchmarkExactResolutionRequest": (
-        "BR-2B/BR-2C — the trusted exact-resolution API that consumes it."
+        "BR-2D — the trusted exact-resolution API that consumes it."
     ),
     "BenchmarkHistoricalInspectionRequest": (
-        "BR-2B — the separately named read-only historical inspection API."
+        "BR-2D — the separately named read-only historical inspection API."
     ),
     "PlatformRegistryScopeExpectation": (
-        "BR-2B — the authorization check that consumes it, applied before any "
+        "BR-2D — the authorization check that consumes it, applied before any "
         "temporal or lifecycle check."
     ),
     "TenantRegistryScopeExpectation": (
-        "BR-2B — the cross-tenant non-disclosure check that consumes it."
+        "BR-2D — the cross-tenant non-disclosure check that consumes it."
+    ),
+    "BenchmarkRegistrySnapshotAssertion": (
+        "BR-2D — the durable registry authority that can observe the state "
+        "this contract only asserts. BR-2B holds no store and reads none."
+    ),
+    "BenchmarkTransitionPlan": (
+        "BR-2D — the first phase permitted to assert that the planned "
+        "transition occurred. A plan says only that it would be admissible."
+    ),
+    "BenchmarkTransitionRefusal": (
+        "BR-2D — the authority-issued refusal appended when the move is "
+        "actually attempted against observed rather than asserted state."
     ),
 }
 

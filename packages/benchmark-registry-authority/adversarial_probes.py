@@ -61,6 +61,10 @@ from ugence_benchmark_registry_authority.api import (
     BenchmarkPostAdmissionRejectionEventPayload,
     BenchmarkPublisherSubmissionEnvelope,
     BenchmarkRegistrationEventPayload,
+    BenchmarkRegistrationRecordPresence,
+    BenchmarkRegistrySnapshotAssertion,
+    BenchmarkTransitionPlan,
+    BenchmarkTransitionRefusal,
     BenchmarkRegistrationState,
     BenchmarkRegistryCanonicalizationError,
     BenchmarkRegistryConsistencyClaim,
@@ -255,6 +259,20 @@ def post_admission_rejection(**kw):
     return BenchmarkPostAdmissionRejectionEventPayload(**base)
 
 
+def snapshot_assertion(**overrides):
+    """Independently built here, not shared with the suite's fixtures."""
+
+    base = dict(
+        coordinate=coordinate(),
+        asserted_current_state=BenchmarkRegistrationState.ADMITTED,
+        asserted_registration_record_presence=(
+            BenchmarkRegistrationRecordPresence.NO_RECORD_APPENDED
+        ),
+    )
+    base.update(overrides)
+    return BenchmarkRegistrySnapshotAssertion(**base)
+
+
 ALL_BUILDERS = (
     publisher,
     approval,
@@ -264,6 +282,18 @@ ALL_BUILDERS = (
     post_admission_rejection,
     registration,
     revocation,
+    snapshot_assertion,
+    lambda: BenchmarkTransitionPlan(
+        snapshot=snapshot_assertion(),
+        planned_to_state=BenchmarkRegistrationState.REGISTERED,
+    ),
+    lambda: BenchmarkTransitionRefusal(
+        snapshot=snapshot_assertion(),
+        refused_to_state=BenchmarkRegistrationState.REVOKED,
+        declared_refusal_reason=(
+            BenchmarkRegistryRefusalReason.UNAUTHORIZED_TRANSITION
+        ),
+    ),
     lambda: BenchmarkConflictRecordPayload(
         submission_record=record(),
         declared_refusal_reason=(
@@ -301,13 +331,13 @@ def _q00():
     assert event.declared_state is BenchmarkRegistrationState.REVOKED
 
 
-@probe("Q-01 all fifteen shipped artifacts canonicalize into fifteen byte spaces")
+@probe("Q-01 all eighteen shipped artifacts canonicalize into eighteen byte spaces")
 def _q01():
     domains = set()
     for builder in ALL_BUILDERS:
         framed = json.loads(canonical_bytes(builder()).decode("utf-8"))
         domains.add(framed["domain"])
-    assert len(domains) == 15, len(domains)
+    assert len(domains) == 18, len(domains)
     assert domains == set(BENCHMARK_REGISTRY_AUTHORITY_DIGEST_DOMAINS)
 
 
