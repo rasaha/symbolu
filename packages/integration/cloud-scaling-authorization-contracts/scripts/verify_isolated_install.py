@@ -45,7 +45,6 @@ Exit code 0 on success; non-zero on the first failed step.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import shutil
@@ -84,7 +83,7 @@ CONTROLLER_HELPERS = (
 )
 
 _PROBE = r'''
-import dataclasses, importlib, json, pathlib, sys
+import dataclasses, hashlib, importlib, json, pathlib, sys
 from datetime import datetime, timezone
 
 EXPECTED = json.loads(sys.argv[1])

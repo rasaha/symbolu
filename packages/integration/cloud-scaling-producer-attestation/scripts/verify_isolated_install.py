@@ -210,6 +210,8 @@ candidate = p5a.CapacityAuthorizationCandidate(**{
     **{k: v for k, v in EXPECTED["candidate_fields"].items()},
     "target_scope": p5a.ExecutionTargetScope(**EXPECTED["target_scope_fields"]),
     "policy_binding": p5a.PolicyTargetBindingReference(**EXPECTED["policy_fields"]),
+    "policy_coordinate_binding": p5a.PolicyTargetBindingReferenceV2(
+        **EXPECTED["policy_coordinate_fields"]),
     "producer_attestation": p5a.ProducerAttestationEvidence.from_dict(
         EXPECTED["v1_attestation"]),
     **{k: _ts(v) for k, v in EXPECTED["candidate_datetimes"].items()},
@@ -518,7 +520,12 @@ def source_expectations() -> dict:
     scalar_fields, datetime_fields = {}, {}
     for field in dataclasses.fields(candidate):
         value = getattr(candidate, field.name)
-        if field.name in ("target_scope", "policy_binding", "producer_attestation"):
+        if field.name in (
+            "target_scope",
+            "policy_binding",
+            "policy_coordinate_binding",
+            "producer_attestation",
+        ):
             continue
         if hasattr(value, "isoformat"):
             datetime_fields[field.name] = _canonical_ts(value)
@@ -552,6 +559,13 @@ def source_expectations() -> dict:
         "policy_fields": {
             f.name: getattr(candidate.policy_binding, f.name)
             for f in dataclasses.fields(candidate.policy_binding)
+        },
+        # 5B-1: the candidate carries a second policy reference, the complete Policy
+        # Authority coordinate. Like the other carried artifacts it is rebuilt in the probe
+        # through Phase 5A's own exact type rather than serialized as an object.
+        "policy_coordinate_fields": {
+            f.name: getattr(candidate.policy_coordinate_binding, f.name)
+            for f in dataclasses.fields(candidate.policy_coordinate_binding)
         },
         "v1_attestation": {
             key: (_canonical_ts(value) if hasattr(value, "isoformat") else value)

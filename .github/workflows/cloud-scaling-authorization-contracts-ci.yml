@@ -155,16 +155,27 @@ jobs:
       - name: Wheel contents — no test, fixture or conftest leakage
         run: |
           python - <<'PY'
-          import pathlib, zipfile
+          import pathlib, re, zipfile
           dist = pathlib.Path("packages/integration/cloud-scaling-authorization-contracts/dist")
           wheels = sorted(dist.glob("*.whl"))
           assert wheels, "no wheel was built"
           names = zipfile.ZipFile(wheels[-1]).namelist()
           top = {n.split("/")[0] for n in names}
+          # The version is read from the source rather than written here, so a deliberate
+          # version bump does not fail this assertion for the wrong reason. What is asserted
+          # stays the same: the wheel's dist-info is the version the source declares, and the
+          # wheel's top level holds nothing else.
+          version = re.search(
+              r'^__version__\s*(?::[^=]*)?=\s*"([^"]+)"',
+              pathlib.Path(
+                  "packages/integration/cloud-scaling-authorization-contracts/src/ugence_cloud_scaling_authorization_contracts/version.py"
+              ).read_text(),
+              re.M,
+          ).group(1)
           assert top <= {
               "ugence_cloud_scaling_authorization_contracts",
-              "ugence_cloud_scaling_authorization_contracts-0.1.0.dist-info",
-          }, f"unexpected top-level entries in the wheel: {sorted(top)}"
+              f"ugence_cloud_scaling_authorization_contracts-{version}.dist-info",
+          }, f"unexpected top-level entries in the wheel (source version {version}): {sorted(top)}"
           for n in names:
               base = n.split("/")[-1]
               assert base != "conftest.py", f"conftest leaked: {n}"

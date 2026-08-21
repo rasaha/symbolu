@@ -170,7 +170,7 @@ jobs:
             packages/integration/cloud-scaling-policy-authenticity/tests/test_production_posture.py \
             packages/integration/cloud-scaling-policy-authenticity/tests/test_typed_outcomes.py \
             packages/integration/cloud-scaling-policy-authenticity/tests/test_verified_artifact.py
-      - name: Phase 5A stays untouched at 0.1.0 with its ten frozen digests unmoved
+      - name: Phase 5A is at the version 5B-1 moved it to, with its eleven digests pinned
         run: |
           python -m pytest \
             packages/integration/cloud-scaling-policy-authenticity/tests/test_phase5a_untouched.py
@@ -229,7 +229,7 @@ jobs:
       - name: Wheel contents — no test, fixture or conftest leakage
         run: |
           python - <<'PY'
-          import pathlib, zipfile
+          import pathlib, re, zipfile
           dist = pathlib.Path("packages/integration/cloud-scaling-policy-authenticity/dist")
           wheels = sorted(dist.glob("*.whl"))
           sdists = sorted(dist.glob("*.tar.gz"))
@@ -237,10 +237,21 @@ jobs:
           assert sdists, "no sdist was built"
           names = zipfile.ZipFile(wheels[-1]).namelist()
           top = {n.split("/")[0] for n in names}
+          # The version is read from the source rather than written here, so a deliberate
+          # version bump does not fail this assertion for the wrong reason. What is asserted
+          # stays the same: the wheel's dist-info is the version the source declares, and the
+          # wheel's top level holds nothing else.
+          version = re.search(
+              r'^__version__\s*(?::[^=]*)?=\s*"([^"]+)"',
+              pathlib.Path(
+                  "packages/integration/cloud-scaling-policy-authenticity/src/ugence_cloud_scaling_policy_authenticity/version.py"
+              ).read_text(),
+              re.M,
+          ).group(1)
           assert top <= {
               "ugence_cloud_scaling_policy_authenticity",
-              "ugence_cloud_scaling_policy_authenticity-0.1.0.dist-info",
-          }, f"unexpected top-level entries in the wheel: {sorted(top)}"
+              f"ugence_cloud_scaling_policy_authenticity-{version}.dist-info",
+          }, f"unexpected top-level entries in the wheel (source version {version}): {sorted(top)}"
           for n in names:
               base = n.split("/")[-1]
               assert base != "conftest.py", f"conftest leaked: {n}"
