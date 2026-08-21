@@ -104,7 +104,8 @@ canonical field:
 Being recorded does not mean unprotected — both halves are inside the artifact digest, so
 neither can be rewritten after the fact. It means nobody checked it. Read a fact through
 `verified_fact(name)` when you intend to act on something this package established;
-`recorded_fact(name)` answers for the other two and each accessor refuses the other's half, so
+`recorded_fact(name)` answers for the four that nothing did, and each accessor refuses the
+other's half, so
 an unattested value cannot arrive through a call that reads as attested. The partition is
 total and disjoint over the artifact's fields, enforced at import: adding a field means
 deciding which half it belongs to.
@@ -163,6 +164,27 @@ because it can only refuse.
 Revalidate a verified artifact with `require_verified_policy_authenticity(...)` at **every**
 consumption boundary, not once at minting. A frozen dataclass is not a security boundary.
 
+## Changing the artifact digest
+
+The artifact digest has a merged definition now, so it is something a consumer can pin.
+Anything that changes what `digest_payload()` covers — adding a fact, or **promoting one from
+the recorded half to the verified half**, which is what 5B-1 does when R-4 closes and 5B-2
+does when R-2 does — moves it.
+
+When that happens, three things change in **one commit**:
+
+1. the constants in `tests/test_frozen_digests.py`;
+2. `VERIFICATION_PROFILE_VERSION` in `identifiers.py`;
+3. a CHANGELOG entry naming which digest moved and why.
+
+`FROZEN_PARTITION_FINGERPRINT` makes this mechanical rather than remembered: it covers the
+profile version *together with* both halves' exact membership, so moving a fact without
+bumping fails, and bumping without re-recording the fingerprint fails too. Neither edit
+lands alone.
+
+Pre-merge this was free — three remediation rounds reshaped the payload at `0.1.0` while
+nothing pinned a digest. That window is closed.
+
 ## Running the suite
 
 ```
@@ -171,3 +193,8 @@ python -m pytest packages/integration/cloud-scaling-policy-authenticity -q
 
 No editable install is required in a checkout. Outside one, the suite runs against the
 installed distributions and the candidate-dependent tests skip.
+
+CI runs it on every pull request touching this package, the Policy Authority, Phase 5A or the
+UVI contracts — see `.github/workflows/cloud-scaling-policy-authenticity-ci.yml`, which also
+re-runs the two authorities this package stands on and asserts the suite actually collected
+its properties rather than silently collecting none.
