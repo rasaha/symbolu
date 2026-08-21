@@ -25,7 +25,7 @@ ugence-governance-contracts 0.3.1        leaf — depends on nothing
         ▲
 ugence-benchmark-registry 0.1.0          FROZEN — zero runtime dependencies,
         ▲                                contracts only, BR-1 identity layer
-        │  BR-2A depends on this and nothing else
+        │  BR-2 depends on this and nothing else
         │
 ugence-benchmark-registry-authority
   0.1.0  (BR-2A)  deps: ugence-benchmark-registry ==0.1.*   + stdlib
@@ -183,8 +183,8 @@ is independently recomputable with plain `hashlib` over the byte string alone,
 importing nothing from the package.
 
 The three **nested-admissible-only** classes — `BenchmarkCoordinate`,
-`BenchmarkScope`, `BenchmarkApplicabilityCoordinate` — may appear inside a BR-2A
-graph but own **no** BR-2A domain and are refused as canonicalization roots. A
+`BenchmarkScope`, `BenchmarkApplicabilityCoordinate` — may appear inside a BR-2
+graph but own **no** BR-2 domain and are refused as canonicalization roots. A
 BR-1 identity must keep exactly one digest: the one BR-1 computes.
 
 ## Four-party separation

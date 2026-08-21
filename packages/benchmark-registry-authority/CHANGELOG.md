@@ -292,6 +292,27 @@ correct-now, and are corrected in this release rather than deferred:
   survived, 0 errored** — so the only byte that moved in the ledger is the
   label. The label is **not** derived from `tests/_milestones.py`.
 
+**A second, independent audit found further shipped-text residue, corrected
+here.** Three of the sites reach a consumer of the built artifacts:
+
+- `pyproject.toml` — the distribution `description`, which ships as the
+  wheel and sdist `Summary`, still announced BR-2A "contracts only, no
+  registry". It now names the BR-2B kernel and what `0.2.0` actually ships.
+- `src/ugence_benchmark_registry_authority/__init__.py:1` — the top-level
+  package docstring title, moved on D-30's ground for `api.py:1`.
+- `canonical_domain_inventory.json`'s `note` — said "a BR-2A graph" and
+  "NO BR-2A domain" in a shipped machine-readable manifest. The generator
+  literal at `tools/generate_manifests.py:482` moved to **BR-2**, the span the
+  sentence actually describes, and the file was regenerated.
+
+`api.py:11-12` attributed BR-2A's ratified title *and* D-01–D-17 to BR-2B; it
+now names the `0.2.0` surface as BR-2A's ratified contracts plus the kernel
+BR-2B adds, and the bullet list gained the three lifecycle-kernel contracts it
+had omitted. Corrected alongside, none of them shipped: the `README.md`
+dependency-diagram and nested-admissible prose, the `tests/_builders.py` module
+title, the probe-harness title, the sweep banner, and the distribution
+verifier's title, comment and failure line.
+
 **Verification for this correction.** Measured against this tree on Python 3.11,
 with every `__pycache__` purged, `PYTHONDONTWRITEBYTECODE=1` and
 `pytest -p no:cacheprovider`.

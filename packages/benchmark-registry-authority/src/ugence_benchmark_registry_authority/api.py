@@ -8,8 +8,9 @@ in the built wheel, in the built sdist, and in an isolated installed runtime.
 
 What this surface contains
 --------------------------
-The structural contract layer of **BR-2B**: "Registry and exact-resolution
-*contracts*." Ratified as D-01 through D-17.
+The structural contract layer at **0.2.0**. It carries BR-2A's ratified
+"Registry and exact-resolution *contracts*" — D-01 through D-17 — and the
+**non-authoritative lifecycle kernel** BR-2B adds on top of them.
 
 * the three inbound assertion **envelopes** — publisher submission, independent
   approval, revocation — carrying *declared* signature material;
@@ -25,7 +26,10 @@ The structural contract layer of **BR-2B**: "Registry and exact-resolution
   relation, and the immutable transition-to-payload binding;
 * the seventeen-member BR-2 **refusal vocabulary**, disjoint from BR-1's frozen
   seventeen, and its total classification into seven fault classes;
-* four **inert Protocol ports** and one frozen consistency descriptor.
+* four **inert Protocol ports** and one frozen consistency descriptor;
+* the three **lifecycle-kernel contracts** BR-2B adds — the caller-asserted
+  registry snapshot, the admissible transition plan and its typed refusal —
+  and the total planning functions over them.
 
 What this surface does **not** contain
 --------------------------------------

@@ -1023,7 +1023,7 @@ SURVIVOR_CLASSIFICATIONS: dict = {
 
 def main() -> int:
     print("=" * 78)
-    print("BR-2A GATE INVENTORY AND MEASURED GATE-DELETION MUTATION SWEEP")
+    print("BR-2B GATE INVENTORY AND MEASURED GATE-DELETION MUTATION SWEEP")
     print("=" * 78)
     by_category: dict = {}
     for gate in GATES:

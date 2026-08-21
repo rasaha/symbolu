@@ -479,7 +479,7 @@ def main() -> int:
             "One domain-separation tag per artifact class this subphase "
             "actually ships, and no tag for an artifact that does not exist. "
             "Nested-admissible-only classes are the exact frozen BR-1 contracts "
-            "a BR-2A graph may contain; they own NO BR-2A domain, because BR-2 "
+            "a BR-2 graph may contain; they own NO BR-2 domain, because BR-2 "
             "never re-digests a BR-1 artifact under a BR-2 domain — a BR-1 "
             "identity must keep exactly one digest, the one BR-1 computes. "
             "Derived from the sealed contract-type registry itself, so it "

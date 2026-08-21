@@ -1,4 +1,4 @@
-"""Pinned fixture builders for the BR-2A suite.
+"""Pinned fixture builders for the BR-2 suite.
 
 Every value here is a **fixed literal**. Nothing reads a clock, an environment
 variable, a random source or the filesystem, so the canonical bytes these

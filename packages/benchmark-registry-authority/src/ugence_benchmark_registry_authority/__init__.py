@@ -1,4 +1,4 @@
-"""Ugence Benchmark Registry Authority — BR-2A registry and resolution contracts.
+"""Ugence Benchmark Registry Authority — BR-2B non-authoritative lifecycle kernel.
 
 Independent distribution ``ugence-benchmark-registry-authority``. The
 **authority/registry layer** of the shared, platform-wide Benchmark Registry,
