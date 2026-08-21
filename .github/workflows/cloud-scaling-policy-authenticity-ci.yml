@@ -7,7 +7,7 @@ name: cloud-scaling-policy-authenticity-ci
 #
 # Why this workflow exists. Phase 5B-0B merged with its suite running nowhere automated: the
 # repository's per-package workflows are path-scoped, and no existing one matches this
-# package's paths, so its 253 properties were measured only by hand. Every guarantee the
+# package's paths, so its properties were measured only by hand. Every guarantee the
 # package documents — the fail-closed gates, the verified/recorded partition, the frozen
 # artifact digest — is a claim that nothing checked between commits. This closes that.
 #
@@ -111,7 +111,7 @@ jobs:
           import sys
           import xml.etree.ElementTree as ET
 
-          MINIMUM = 250
+          MINIMUM = 275
 
           root = ET.parse("/tmp/junit.xml").getroot()
           suites = [root] if root.tag == "testsuite" else list(root)
@@ -163,6 +163,7 @@ jobs:
         run: |
           python -m pytest \
             packages/integration/cloud-scaling-policy-authenticity/tests/test_adversarial.py \
+            packages/integration/cloud-scaling-policy-authenticity/tests/test_candidate_reconciliation.py \
             packages/integration/cloud-scaling-policy-authenticity/tests/test_coordinate_gap.py \
             packages/integration/cloud-scaling-policy-authenticity/tests/test_historical_refusal.py \
             packages/integration/cloud-scaling-policy-authenticity/tests/test_import_boundary.py \

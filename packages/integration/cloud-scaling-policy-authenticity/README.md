@@ -60,8 +60,23 @@ consumer:
 | D-5B0B-3 | the issuance signature covers all six coordinate components; a Phase 5A binding cannot name a coordinate |
 | D-5B0B-4 | **option (a)** — verify through the Policy Authority's own `PolicyKeyRing`, not a lent Trusted Evidence Authority trust anchor |
 | D-5B0B-5 | authenticity means "is valid now", judged at an **injected** `as_of`; no clock |
-| D-5B0B-6 | the proof travels **alongside** the candidate; Phase 5A stays at `0.1.0` with all ten frozen digests unmoved |
+| D-5B0B-6 | the proof travels **alongside** the candidate; Phase 5A stays at `0.1.0` with all ten frozen digests unmoved — **superseded by D-5B1-1** (see below) |
 | D-5B0B-7 | the digest payload partitions into a **verified** half and a **recorded** half, so an unattested fact is digest-covered without reading as attested |
+| D-5B1-1 | the policy coordinate travels **inside** the candidate, so a determination can be reconciled against it; Phase 5A moves to `0.2.0` and one of its (now eleven) frozen digests moves |
+| D-5B1-3 | the partition guard becomes a **ratchet** driven by repository history, so a promotion cannot ship without a profile-version bump |
+
+### What 5B-1 changed here
+
+Gate 11 reconciles a supplied candidate's `PolicyTargetBindingReferenceV2` against the
+resolved policy — all six coordinate components, `policy_body_digest`, and the issuing
+identity — and refuses a disagreement with `CANDIDATE_COORDINATE_MISMATCH`. That closes ADR
+residual **R-4**: before it, one genuine policy proof verified alongside any candidate
+whatsoever, including one whose policy binding named a different policy entirely.
+
+`candidate_digest_fact` moved from the **recorded** half to the **verified** half as a result,
+which moved the reference artifact digest and took `VERIFICATION_PROFILE_VERSION` to `v2` and
+this distribution to `0.2.0`. `None` on that fact means no candidate accompanied the
+determination — never that one was carried unchecked.
 
 ### Why option (a), and what it costs
 
@@ -177,10 +192,18 @@ When that happens, three things change in **one commit**:
 2. `VERIFICATION_PROFILE_VERSION` in `identifiers.py`;
 3. a CHANGELOG entry naming which digest moved and why.
 
-`FROZEN_PARTITION_FINGERPRINT` makes this mechanical rather than remembered: it covers the
-profile version *together with* both halves' exact membership, so moving a fact without
-bumping fails, and bumping without re-recording the fingerprint fails too. Neither edit
-lands alone.
+`FROZEN_PARTITION_FINGERPRINT` catches an *accidental* move: it covers the profile version
+together with both halves' exact membership, so a change that did not intend to move a fact
+fails there. It does not catch a deliberate one — the 5B-1 audit measured that promoting a
+fact, updating both pinned constants and leaving the profile version alone passes that file at
+5 passed, because the pin and the change land in the same commit.
+
+`tests/test_partition_ratchet.py` is what enforces the rule (D-5B1-3). It takes its "before"
+from **repository history** — the membership at the merge base, parsed out of the historical
+source rather than imported — and fails when the partition moved without a bump, or when the
+version moved with no changelog line naming it. CI resolves the baseline from the event's own
+default branch and sets `UGENCE_RATCHET_REQUIRED=1`, so a baseline it cannot resolve fails the
+workflow instead of skipping.
 
 Pre-merge this was free — three remediation rounds reshaped the payload at `0.1.0` while
 nothing pinned a digest. That window is closed.

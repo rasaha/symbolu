@@ -45,7 +45,14 @@ SIGNATURE_COVERED = {
 }
 
 #: Verified facts established by a gate rather than by the signature.
-GATE_ESTABLISHED = {"expected_reference_tenant_id"}
+#:
+#: ``candidate_digest_fact`` joined this set in 5B-1, when gate 11 began reconciling a
+#: supplied candidate's policy coordinate against the resolved one. It is the one member whose
+#: verified status is **conditional on presence**: ``None`` means no candidate accompanied the
+#: determination, and every non-``None`` value went through the gate. The property below
+#: measures both halves of that, because "verified when present" is a weaker statement than
+#: the rest of this set makes and a reader is owed the difference.
+GATE_ESTABLISHED = {"expected_reference_tenant_id", "candidate_digest_fact"}
 
 #: Verified facts that are this package's own constants, pinned at construction.
 PACKAGE_CONSTANTS = {
@@ -147,6 +154,38 @@ def test_the_record_s_coordinate_cannot_diverge_from_the_presented_one(component
         as_of=T_MID,
     )
     assert result.verified_policy is None
+
+
+@pytest.mark.invariant
+def test_a_candidate_digest_is_verified_when_present_and_absent_otherwise():
+    """Gate 11's exact statement, measured from both sides.
+
+    With no candidate the fact is ``None`` — the determination says nothing about any
+    candidate, rather than saying something unchecked about one. With a candidate that
+    reconciles, the digest is bound. With one that does not, no artifact exists at all, so
+    there is no third state in which the fact is present but unverified.
+    """
+
+    from _policy_fixtures import genuine_candidate, phase5a_builders
+
+    assert _verified().candidate_digest_fact is None
+
+    if phase5a_builders() is None:
+        pytest.skip("the Phase 5A test tree is unavailable outside a source checkout")
+
+    authority, record = issued()
+    candidate = genuine_candidate(record)
+    result = verifier_for(authority).verify(
+        coordinate=record.coordinate,
+        expected_reference_tenant_id=record.coordinate.tenant_id,
+        as_of=T_MID,
+        candidate=candidate,
+    )
+    assert result.verified_policy.candidate_digest_fact == candidate.candidate_digest
+    assert (
+        result.verified_policy.verified_fact("candidate_digest_fact")
+        == candidate.candidate_digest
+    )
 
 
 @pytest.mark.invariant

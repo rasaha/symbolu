@@ -50,10 +50,16 @@ def test_the_policy_authority_stays_at_0_1_0():
 
 
 @pytest.mark.invariant
-def test_this_package_ships_at_0_1_0_and_adds_a_distribution_rather_than_changing_one():
-    from ugence_cloud_scaling_policy_authenticity import __version__
+def test_this_package_ships_at_the_version_its_profile_change_requires():
+    """``0.2.0`` since 5B-1: a gate was added and a fact was promoted, so the profile moved."""
 
-    assert __version__ == "0.1.0"
+    from ugence_cloud_scaling_policy_authenticity import (
+        VERIFICATION_PROFILE_VERSION,
+        __version__,
+    )
+
+    assert __version__ == "0.2.0"
+    assert VERIFICATION_PROFILE_VERSION == "v2"
 
 
 @pytest.mark.invariant

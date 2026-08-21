@@ -39,7 +39,9 @@ The four rulings this implementation is built on
   per anchor while the Policy Authority splits ``ISSUE_POLICY`` from ``REVOKE_POLICY`` on one
   key. This package therefore imports the Policy Authority and does **not** import TEV.
 * **D-5B0B-6** — the proof travels **alongside** the candidate. Phase 5A stays at ``0.1.0``,
-  unmodified, with all ten frozen digests unmoved.
+  unmodified, with all ten frozen digests unmoved. **Superseded by 5B-1**: the policy
+  coordinate now travels *inside* the candidate, Phase 5A is at ``0.2.0``, and one of
+  its (now eleven) frozen digests moved.
 
 What it deliberately does not do
 --------------------------------

@@ -47,16 +47,17 @@ Everything else.
   permission here, and no field for a later commit to flip. The Policy Authority performs no
   caller authorization at all: :attr:`expected_reference_tenant_id` records the tenant the
   *reference* declared, never the caller's right to it.
-* **Not bound to a recommendation, a scope or a candidate.** This is the direct successor to
-  5B-0A's A-59 residual, and ADR residual R-4. :attr:`candidate_digest_fact` records *which
-  candidate the determination accompanied*, if the caller supplied one. It is **never
-  reconciled against anything** — the verifier does not compare it, and cannot: D-5B0B-3
-  measured that Phase 5A's ``PolicyTargetBindingReference`` carries three of the coordinate's
-  six components and that its fourth, ``policy_artifact_digest``, is format-incompatible with
-  every Policy Authority digest, so a Phase 5A binding **cannot name a coordinate**. The
-  consequence, stated as a rule: *one genuine policy proof verifies alongside any candidate
-  whatsoever*, including one whose policy binding names a different policy entirely. Binding
-  the two is 5B-1's decision-scope repair. ``tests/test_adversarial.py`` pins this.
+* **Not bound to a recommendation.** :attr:`candidate_digest_fact` records which candidate
+  the determination accompanied, and since 5B-1 that candidate is **reconciled**: gate 11
+  compares its policy coordinate — all six components, the signed body digest and the issuing
+  identity — against the resolved policy, and refuses the pair with
+  ``CANDIDATE_COORDINATE_MISMATCH`` when they disagree. ``None`` means no candidate
+  accompanied the determination; it never means one was carried unchecked.
+
+  What remains open is narrower and is 5B-0A's A-59 residual, not this one: the *producer
+  attestation* is bound to the recommendation rather than to the candidate, and this package
+  establishes nothing about that binding. Reading a ``VERIFIED`` here as "the recommendation
+  this candidate carries is the one a trusted producer signed" is still wrong.
 * **Not the bounds the candidate carries.** Whether ``max_permitted_magnitude`` and
   ``max_permitted_delta`` on a candidate are the bounds this policy states is bound-extraction
   work, not authenticity work, and is out of scope. What this artifact gives a consumer who
@@ -158,15 +159,21 @@ VERIFIED_FACT_NAMES: "frozenset[str]" = frozenset(
         "policy_issued_at_fact",
         "verification_profile",
         "verification_profile_version",
+        #: Promoted from the recorded half by 5B-1, when gate 11 began reconciling it against
+        #: the resolved coordinate. ``None`` means no candidate accompanied the determination;
+        #: it never means a candidate was carried unchecked.
+        "candidate_digest_fact",
     }
 )
 
 #: The facts carried and digest-covered but **never attested** (D-5B0B-7). A member leaves
 #: this set only when something starts actually checking it, and doing so moves the artifact
-#: digest — which is the point. Four members, for three distinct reasons:
+#: digest — which is the point. **Three** members since 5B-1, for three distinct reasons —
+#: ``candidate_digest_fact`` left this half when gate 11 began reconciling it, and the artifact
+#: digest and the profile version both moved with it, which is exactly what a promotion is
+#: supposed to look like:
 #:
 #: * ``resolved_as_of_fact`` — open residual **R-2**: the instant is injected and unvalidated.
-#: * ``candidate_digest_fact`` — open residual **R-4**: recorded, never reconciled.
 #: * ``policy_type`` — **not signature-covered and never compared.** It is absent from the 21
 #:   keys of ``IssuedPolicyRecord.signing_payload()`` (``adapter_id`` is present; this is not),
 #:   and ``resolve_policy`` never compares the record's ``policy_type`` against the adapter
@@ -183,7 +190,6 @@ VERIFIED_FACT_NAMES: "frozenset[str]" = frozenset(
 RECORDED_FACT_NAMES: "frozenset[str]" = frozenset(
     {
         "resolved_as_of_fact",
-        "candidate_digest_fact",
         "policy_type",
         "trust_configuration_digest",
     }
@@ -419,6 +425,7 @@ class VerifiedPolicyAuthenticity:
             "policy_issued_at_fact": self.policy_issued_at_fact,
             "verification_profile": self.verification_profile,
             "verification_profile_version": self.verification_profile_version,
+            "candidate_digest_fact": self.candidate_digest_fact,
             # Framed in deliberately: the digest commits to the facts that this artifact
             # establishes policy authenticity, grants nothing, and is not historical.
             "outcome": self.outcome.value,
@@ -429,11 +436,11 @@ class VerifiedPolicyAuthenticity:
     def recorded_facts(self) -> dict:
         """Facts carried and digest-covered, but **never attested** (D-5B0B-7).
 
-        Four members, and each is here because nothing established it — see
-        :data:`RECORDED_FACT_NAMES` for the reason attached to each. Two name open residuals
-        (``resolved_as_of_fact``/R-2, ``candidate_digest_fact``/R-4); ``policy_type`` is
-        neither signature-covered nor compared at resolution; ``trust_configuration_digest``
-        is reported by the resolution port about itself.
+        Three members since 5B-1, and each is here because nothing established it — see
+        :data:`RECORDED_FACT_NAMES` for the reason attached to each. One names an open residual
+        (``resolved_as_of_fact``/R-2); ``policy_type`` is neither signature-covered nor
+        compared at resolution; ``trust_configuration_digest`` is reported by the resolution
+        port about itself. ``candidate_digest_fact`` was the fourth until R-4 closed.
 
         Being in this map does **not** mean the value is unprotected: it is inside the
         artifact digest, so it cannot be rewritten after the fact. It means nobody checked it.
@@ -442,7 +449,6 @@ class VerifiedPolicyAuthenticity:
 
         return {
             "resolved_as_of_fact": self.resolved_as_of_fact,
-            "candidate_digest_fact": self.candidate_digest_fact,
             "policy_type": self.policy_type,
             "trust_configuration_digest": self.trust_configuration_digest,
         }
@@ -464,9 +470,8 @@ class VerifiedPolicyAuthenticity:
         """Read one **attested** fact by name. Refuses a recorded one.
 
         The accessor a consumer reaches for when it wants to act on something this package
-        established. Asking it for ``resolved_as_of_fact`` or ``candidate_digest_fact`` is a
-        category error and is refused rather than answered, because the answer would read as
-        attested. Plain attribute access still reaches those fields — this is the surface that
+        established. Asking it for ``resolved_as_of_fact`` is a category error and is refused
+        rather than answered, because the answer would read as attested. Plain attribute access still reaches those fields — this is the surface that
         says which is which, not a lock.
         """
 

@@ -1,8 +1,52 @@
 # Changelog — ugence-cloud-scaling-policy-authenticity
 
-## 0.2.0 — Cloud Scaling Phase 5B-1: decision-scope repair (in progress)
+## 0.2.0 — Cloud Scaling Phase 5B-1: decision-scope repair
 
 Ratified in `docs/architecture/ADR_CLOUD_SCALING_DECISION_SCOPE_PHASE5B1_RATIFICATION.md`.
+
+### Added — gate 11, candidate reconciliation (D-5B1-1, closing ADR residual R-4)
+
+- A supplied candidate's `PolicyTargetBindingReferenceV2` is reconciled against the resolved
+  policy: all six coordinate components, `policy_body_digest`, and the issuing identity
+  (`issuing_authority_id`, `key_id`, `signature_alg`). A disagreement is the new
+  `CANDIDATE_COORDINATE_MISMATCH` — a refusal, because the proof and the candidate are handed
+  to a consumer together and a proof about policy A beside a candidate about policy B is a
+  misstatement however genuine each half is.
+- The verification routine now runs **eleven** ordered gates, not ten. The candidate stays
+  optional; omitting one is not a refusal.
+- Before Phase 5A `0.2.0` this comparison could not be made at all: a Phase 5A binding carried
+  three of the coordinate's six components and its fourth was in the wrong digest namespace,
+  so one genuine policy proof verified alongside any candidate whatsoever. That was R-4.
+
+### Changed — the promotion, and what it cost
+
+- `candidate_digest_fact` moved from the **recorded** half to the **verified** half.
+  `VERIFICATION_PROFILE_VERSION` moves to `v2` in the same commit, as the ratchet requires,
+  and the reference artifact digest moved with it:
+  `8b0ea25f…` → `f245511d…`. The partition fingerprint moved `86d39d25…` → `242ac003…`.
+  Both superseded values are pinned as negative anchors.
+- `RECORDED_FACT_NAMES` is now three members: `resolved_as_of_fact` (R-2, still open),
+  `policy_type` and `trust_configuration_digest`. The recorded half's domain tag does not
+  move — the frame is unchanged, only its membership.
+- `None` on `candidate_digest_fact` means **no candidate accompanied the determination**. It
+  never means one was carried unchecked: a candidate that does not reconcile mints no artifact.
+- The distribution moves to `0.2.0`. Phase 5A moves to `0.2.0` independently, and one of its
+  frozen digests moved; `tests/test_phase5a_untouched.py` is amended rather than deleted,
+  because its purpose — a change to Phase 5A surfaces in a package that depends on it —
+  survives the superseded premise it was written for.
+- `tests/test_candidate_not_bound.py` is replaced by `tests/test_candidate_reconciliation.py`.
+  The old module measured the residual and asserted `VERIFIED` for a candidate naming another
+  policy; the new one asserts the refusal.
+
+### Still open
+
+- **R-2** — `resolved_as_of_fact` stays in the recorded half. Whose clock supplies `as_of` is
+  5B-2's work, and a determination reached at an attacker-chosen instant can still resolve a
+  policy that is revoked, expired or not yet effective *now*.
+- **A-59 (5B-0A)** — the producer attestation binds the recommendation, not the candidate.
+  Reconciling the policy does not reconcile the producer's signature to this candidate.
+- Bound extraction — that the candidate's `max_permitted_*` are the bounds the verified policy
+  body states — remains 5B-2's.
 
 ### Added — the partition ratchet (D-5B1-3)
 

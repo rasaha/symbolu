@@ -116,6 +116,11 @@ class PolicyAuthenticityOutcome(str, Enum):
     #: Policy Authority enforces this equality at issuance but does **not** re-enforce it
     #: at resolution (ADR residual R-3), so this boundary enforces it itself.
     COORDINATE_DIGEST_UNBOUND = "COORDINATE_DIGEST_UNBOUND"
+    #: The candidate this determination accompanies names a **different policy** than the one
+    #: that resolved (5B-1). A refusal, not a warning: the two artifacts are handed to a
+    #: consumer together, and a proof about policy A beside a candidate about policy B is a
+    #: misstatement however genuine each half is on its own.
+    CANDIDATE_COORDINATE_MISMATCH = "CANDIDATE_COORDINATE_MISMATCH"
 
     # --- fail-closed terminals ------------------------------------------------------------
     #: The resolution port could not be used — it raised, or returned a foreign type.
