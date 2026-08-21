@@ -54,6 +54,7 @@ from ugence_benchmark_registry_authority.api import (
     BenchmarkPublisherVerifiedResult,
     BenchmarkRevocationVerifiedResult,
     BenchmarkTrustAnchorRecord,
+    BenchmarkTrustAnchorResolution,
     BenchmarkTrustAnchorStatus,
     BenchmarkTrustRole,
     BenchmarkVerificationOutcome,
@@ -387,6 +388,41 @@ def revoker_trust_anchor_record(**overrides) -> BenchmarkTrustAnchorRecord:
     )
     kwargs.update(overrides)
     return trust_anchor_record(**kwargs)
+
+
+def trust_anchor_resolution(**overrides) -> BenchmarkTrustAnchorResolution:
+    """A resolution carrying the ENABLED publisher anchor (D-34).
+
+    The triple is taken from the record so the default fixture always satisfies
+    the constructor's asked-versus-answered check; a test that wants the
+    mismatch overrides one half deliberately.
+    """
+
+    record = overrides.pop("anchor", trust_anchor_record())
+    kwargs = dict(
+        role=record.role if record is not None else BenchmarkTrustRole.PUBLISHER,
+        identity=record.identity if record is not None else PUBLISHER_IDENTITY,
+        key_id=record.key_id if record is not None else PUBLISHER_KEY_ID,
+        anchor=record,
+        refusal_reason=None,
+    )
+    kwargs.update(overrides)
+    return BenchmarkTrustAnchorResolution(**kwargs)
+
+
+def refused_trust_anchor_resolution(**overrides) -> BenchmarkTrustAnchorResolution:
+    """A resolution carrying a refusal instead of a record.
+
+    A second fixture for the same class, like ``revoked_trust_anchor_record``:
+    the refusal branch of the XOR is unreachable from the resolved fixture.
+    """
+
+    kwargs = dict(
+        anchor=None,
+        refusal_reason=BenchmarkRegistryRefusalReason.TRUST_ANCHOR_NOT_FOUND,
+    )
+    kwargs.update(overrides)
+    return trust_anchor_resolution(**kwargs)
 
 
 def publisher_verified_result(**overrides) -> BenchmarkPublisherVerifiedResult:

@@ -858,6 +858,38 @@ def is_byte_identical_resubmission(""",
         """    if not _ED25519_PUBLIC_KEY_HEX_RE.match(text):""",
         """    if False:""",
     ),
+    # ---- D-34: the anchor-resolution outcome --------------------------- #
+    Gate(
+        "G-74",
+        "resolution-record-xor-refusal",
+        "trust.py",
+        "the exclusive-or at the heart of D-34; without it a resolution can "
+        "carry both a record and a refusal, or neither, and a caller branching "
+        "on whichever field it read first gets two answers from one object",
+        """        if (self.anchor is None) == (self.refusal_reason is None):""",
+        """        if False:""",
+    ),
+    Gate(
+        "G-75",
+        "resolution-admissible-refusals",
+        "trust.py",
+        "the membership gate keeping a resolution to the two conditions in "
+        "which no record exists; without it the seam can refuse "
+        "TRUST_ANCHOR_EXPIRED, which is a lifecycle evaluation D-25 rules it "
+        "never performs and D-27 requires the verification seam to make",
+        """                not in _TRUST_ANCHOR_RESOLUTION_REFUSAL_REASONS""",
+        """                in ()""",
+    ),
+    Gate(
+        "G-76",
+        "resolution-asked-versus-answered",
+        "trust.py",
+        "the triple-match gate; without it a resolver may answer a question it "
+        "was not asked, and an anchor from one role namespace can be returned "
+        "for a lookup in another — the cross-role substitution D-26 forbids",
+        """        if mismatched:""",
+        """        if False:""",
+    ),
     # ---- withdrawn by owner ruling, 2026-08-20 (ADR §35 D-20) ------------- #
     # G-57, G-58, G-60, G-61 and G-62 planted plan-consuming callables in
     # PRIVATE source and asserted this package could discover them: an

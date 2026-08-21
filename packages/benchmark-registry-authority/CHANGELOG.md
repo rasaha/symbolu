@@ -2,9 +2,146 @@
 
 All notable changes to this distribution. The format follows Keep a Changelog;
 versioning is Semantic Versioning, and the version ladder is the ratified one:
-BR-2A `0.1.0`, BR-2B `0.2.0`, **BR-2C-0 `0.2.1`**, BR-2C `0.3.0`, BR-2D `0.4.0`,
-BR-2E `0.5.0` (ADR §35 D-01, amended 2026-08-20, and D-33). Five of the six
+BR-2A `0.1.0`, BR-2B `0.2.0`, **BR-2C-0 `0.2.1` and `0.2.2`**, BR-2C `0.3.0`,
+BR-2D `0.4.0`, BR-2E `0.5.0` (ADR §35 D-01, amended 2026-08-20, and D-33). Five of the six
 rungs are subphases; `BR-2C-0` is a **version rung** and mints no closure audit.
+
+## [0.2.2] — the anchor-resolution outcome (D-34)
+
+**Contracts only, again. No verifier ships, and the verifier these contracts
+describe has not been audited and is not production-ready.** D-32 requires that
+statement to stand until an external cryptographic audit of the BR-2C verifier is
+obtained and recorded, and makes that audit a **hard precondition to any
+production use**. D-32 waives the *distinct in-repo reviewer* for BR-2C only; the
+**engineering half** of §35.1's blocker is untouched here, so the audited
+verifier, the composition-root trust-resolver design and the key parser are
+**not begun**.
+
+`0.2.1` recorded, under "left open here, since ruled", that `resolve_anchor`
+returned `Optional[BenchmarkTrustAnchorRecord]` and that a `None` could not
+distinguish `TRUST_ANCHOR_NOT_FOUND` from `TRUST_DIRECTORY_UNAVAILABLE`. **D-34
+rules the remedy and this release is that remedy and nothing beyond it.**
+
+### Changed — the seam returns a resolution, not an optional record
+
+- **`BenchmarkPublisherTrustDirectoryPort.resolve_anchor`** (`contracts/ports.py`)
+  returns `BenchmarkTrustAnchorResolution` instead of
+  `Optional[BenchmarkTrustAnchorRecord]`. It still performs **no lifecycle
+  evaluation** and still takes **no trusted instant**: revoked, disabled,
+  not-yet-valid and expired remain the verification seam's to decide against
+  D-28's published order, and a resolver that filtered on the instant would
+  collapse all four into the one indistinguishable absence D-27 requires stay
+  distinguishable. The port remains an inert `Protocol` that nothing in this
+  package satisfies, asserted structurally.
+
+### Added — one contract type, and no manifest that carries a digest
+
+- **`BenchmarkTrustAnchorResolution`** — frozen, binding the exact
+  `(role, identity, key_id)` triple the lookup asked and carrying **exactly one**
+  of an anchor record or a typed refusal reason. Both the "resolved and refused"
+  and the "neither" states are **unconstructible**, enforced in `__post_init__`,
+  and there is **no Boolean success flag**: a caller branches on which half is
+  present. A record answered at a different role, identity or key than the one
+  asked is refused — a resolver may not answer a question it was not asked, and
+  D-26 makes the role part of the question rather than something a shared
+  physical directory may infer.
+- **The only two admissible refusals are `TRUST_ANCHOR_NOT_FOUND` and
+  `TRUST_DIRECTORY_UNAVAILABLE`** — the two conditions in which no record exists
+  to return. D-28 rules the second fails closed with **never** a fallback to a
+  cached, default or previously successful answer, and an unreachable directory
+  reading as *no such anchor* is exactly such a substituted default. Every other
+  member of the 24 is refused at construction, the four lifecycle refusals
+  included. A third member would be a ratification, not an implementation choice.
+
+### Not added, deliberately
+
+- **No digest domain, no pinned vector and no contract-inventory row.** The type
+  is exported but **not registered as root-canonicalizable** in
+  `contracts/_seal.py`, so the encoder refuses to render it. §05 forbids byte
+  space an artifact does not need, and D-25 rules the anchor record's own
+  canonical digest **is** the anchor revision — a second digest over the
+  resolution carrying that record would be a competing identity for one fact, the
+  parallel revision D-25 refuses. Asserted in all four registers rather than
+  assumed, since "it is absent" is what a later regeneration could quietly
+  falsify.
+- **No second exported symbol.** The admissible-refusal tuple stays
+  module-private: D-34's *Surfaces moved* clause ratifies one new type and no
+  second symbol, and D-18 keeps the curated surface a thing that moves by
+  ratification. The constructor enforces the membership and its refusal names
+  both members.
+- **No `resolved()` / `refused()` classmethod factories**, unlike the
+  trusted-evidence precedent this shape is copied from: §17 forbids a convenience
+  resolver, and a classmethod named `resolved` on an exported type in a package
+  whose exported-function ban lists `resolve` is a name no contract needs.
+- **No field defaults on either half of the exclusive-or**, so the unset half is
+  written at every call site rather than defaulted into silence — the rule
+  `BenchmarkTrustAnchorRecord.revoked_at` already follows.
+
+### Copied, never imported
+
+The record-XOR-refusal shape is the trusted-evidence layer's
+`TrustAnchorResolution`. It is **copied and not imported**:
+`ugence_trusted_evidence_authority` is the first entry on this package's
+forbidden-import list, §23 restricts BR-2 to `governance-contracts`, D-04's
+fourth constraint forbids importing that layer's trust-anchor directory, and
+**D-22(4) is the ratified precedent for copying a shape and not the code**. The
+dependency list is unchanged and no cryptographic library is linked.
+
+### Measured surface movement
+
+| Manifest | Before | After |
+| --- | --- | --- |
+| `api.__all__` | 106 | **107** |
+| `public_api.json` symbols | 105 | **106** |
+| public-contract inventory rows | 22 | **22** |
+| canonical domains / pinned vectors | 22 | **22** |
+| BR-2 refusal vocabulary | 24 | **24** |
+| combined BR-1/BR-2 list | 41 | **41** |
+
+Regenerated with `tools/generate_manifests.py`, never hand-edited. **No refusal
+member is added, removed, renamed, re-valued or re-ordered** — both reasons this
+release admits already existed under D-27 and D-28 — so §35.6's append-only
+guarantee is untouched.
+
+### `package_version` moves to `0.2.2`, on the rung D-33 already minted
+
+Same rung, second version. `VERSION_SUBPHASE` maps **both** `0.2.1` and `0.2.2`
+to `BR-2C-0`, because the rung names what a version ships rather than how many
+times it shipped: both are BR-2C's contract surface with no BR-2C capability, so
+both must ban the same twelve tokens. A second rung would be a second claim about
+capability, and D-34 makes none. `0.3.0` stays the audited verifier.
+
+Every milestone-label site D-33's amended row enumerates moved with the version:
+`version.py`, `tests/_milestones.py`, the two version literals, the two pins at
+`verify_benchmark_registry_authority_distribution.py:157-158`, the `milestone`
+literals written into `public_contract_inventory.json` and `gate_inventory.json`
+by their generators, `pyproject.toml`, `README.md`, `api.py` and the package
+docstring's own milestone-boundary list.
+
+### Measured verification
+
+| Check | Result |
+| --- | --- |
+| Package suite | **2013 passed** |
+| Independent adversarial probes | **79 passed** (also inside the installed wheel) |
+| Gate mutation sweep | **71 inventoried, 66 KILLED, 5 SURVIVED, 0 errored** |
+| Offline distribution verifier | **VERIFIED**, 8 negative controls run, 8 caught |
+| pyflakes | clean |
+| BR-1 freeze matrix | **VERIFIED** |
+
+The sweep grew by three: **G-74** (the record-XOR-refusal gate), **G-75** (the
+admissible-refusal membership gate) and **G-76** (the asked-versus-answered
+triple gate) are inventoried rather than left uncounted, and all three are
+KILLED. All five survivors are the pre-existing classified ones; this release
+introduced none. **This is author-owned assurance**, on the base rate D-32(5) records and
+accepts for BR-2C.
+
+### Still left open here, since ruled
+
+- **Which refusal members a verified result may carry.** **Ruled by D-35**: the
+  eleven-member `TRUST_AND_AUTHENTICITY` fault class plus `INDETERMINATE`, twelve
+  of the twenty-four. `contracts/trust.py`'s biconditional still admits all 24.
+  **Not implemented here.**
 
 ## [0.2.1] — BR-2C contract surface (D-24, D-25, D-32, D-33)
 
@@ -190,7 +327,7 @@ and the rulings land in a later release.
   type is minted here", and both D-27 and D-28 locate the distinctions in the
   verified result — but D-28's fail-closed posture needs the two separable.
   **Ruled by D-34**: the seam returns a resolution type carrying an anchor
-  record **XOR** a typed refusal. Not implemented here.
+  record **XOR** a typed refusal. Not implemented here; shipped in `0.2.2`.
 - **Which refusal members a verified result may carry** is unconstrained beyond
   membership of the BR-2 vocabulary. **Ruled by D-35**: the eleven-member
   `TRUST_AND_AUTHENTICITY` fault class plus `INDETERMINATE`, twelve of the

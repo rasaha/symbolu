@@ -18,7 +18,8 @@ Milestone boundary
   verifier, no clock, no append path and no authority-issued result**, and it
   **cannot admit, register, revoke or resolve**. It determines what transition
   *would be* valid; nothing here makes one occur.
-* **BR-2C-0 (this release, 0.2.1)** — BR-2C's ratified **contract surface**, and
+* **BR-2C-0 (this release, 0.2.1 and 0.2.2)** — BR-2C's ratified **contract
+  surface**, and
   no BR-2C capability. A **version rung, not a subphase** (D-33): D-01's five
   subphases are unamended and it mints no closure audit. It exists because the
   curated surface moved — ``api.__all__`` 93 → 106 — while ``0.3.0`` stays
@@ -29,7 +30,8 @@ Milestone boundary
   blocked** on an audited cryptographic verifier and a composition-root
   trust-resolver design. Its ratified *contract surface* — the trust-anchor
   record, the three distinct verified-result types and the reshaped ports
-  (D-24, D-25, D-26) — ships at ``0.2.1``, because D-23 classifies the
+  (D-24, D-25, D-26), with D-34's anchor-resolution outcome — ship at ``0.2.1``
+  and ``0.2.2``, because D-23 classifies the
   governance and engineering blockers as independent and only the governance
   half is cleared. **No verifier ships, and
   none has been audited** (D-32).
@@ -168,6 +170,7 @@ from .api import (
     BENCHMARK_PUBLISHER_VERIFIED_RESULT_DIGEST_DOMAIN,
     BENCHMARK_APPROVAL_VERIFIED_RESULT_DIGEST_DOMAIN,
     BENCHMARK_REVOCATION_VERIFIED_RESULT_DIGEST_DOMAIN,
+    BenchmarkTrustAnchorResolution,
 )
 from .version import __version__
 
@@ -278,5 +281,7 @@ __all__ = [
     "BENCHMARK_PUBLISHER_VERIFIED_RESULT_DIGEST_DOMAIN",
     "BENCHMARK_APPROVAL_VERIFIED_RESULT_DIGEST_DOMAIN",
     "BENCHMARK_REVOCATION_VERIFIED_RESULT_DIGEST_DOMAIN",
+    # D-34: the anchor-resolution outcome. Appended, never inserted.
+    "BenchmarkTrustAnchorResolution",
     "api",
 ]

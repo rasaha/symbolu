@@ -37,10 +37,18 @@ SUBPHASE_LADDER = ("BR-2A", "BR-2B", "BR-2C-0", "BR-2C", "BR-2D", "BR-2E")
 #: deliberately at each version bump" untrue of the distribution. ``0.3.0`` was
 #: not available: §35.1 defines it as the *audited verifier*, and taking it would
 #: unlock twelve BR-2C capability tokens the slice does not ship.
+#:
+#: ``0.2.2`` is D-34's surface move — the anchor-resolution outcome replacing
+#: ``Optional[BenchmarkTrustAnchorRecord]`` at the seam — and maps to the **same**
+#: rung. The rung names what a version ships, not how many times it shipped: both
+#: are BR-2C's contract surface with no BR-2C capability, so both must ban the
+#: same twelve tokens. A second rung would be a second claim about capability,
+#: and D-34 makes none.
 VERSION_SUBPHASE = {
     "0.1.0": "BR-2A",
     "0.2.0": "BR-2B",
     "0.2.1": "BR-2C-0",
+    "0.2.2": "BR-2C-0",
     "0.3.0": "BR-2C",
     "0.4.0": "BR-2D",
     "0.5.0": "BR-2E",

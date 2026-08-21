@@ -22,9 +22,15 @@ from ugence_benchmark_registry_authority.api import (
     BenchmarkRegistryRefusalReason,
     BenchmarkRevocationVerifiedResult,
     BenchmarkSignatureProfile,
+    BENCHMARK_UNVERIFIED_AUTHORITY_PROPERTIES,
+    BenchmarkPublisherTrustDirectoryPort,
+    BenchmarkRegistryCanonicalizationError,
+    BenchmarkTrustAnchorRecord,
+    BenchmarkTrustAnchorResolution,
     BenchmarkTrustAnchorStatus,
     BenchmarkTrustRole,
     BenchmarkVerificationOutcome,
+    canonical_bytes,
     canonical_digest,
     fault_class_for,
 )
@@ -414,3 +420,216 @@ def test_no_verifier_or_resolver_ships_and_no_crypto_is_imported():
 
     for module in ("cryptography", "nacl", "ed25519", "Crypto", "OpenSSL"):
         assert module not in sys.modules
+
+
+# --------------------------------------------------------------------------- #
+# D-34: the anchor-resolution outcome — record XOR typed refusal
+# --------------------------------------------------------------------------- #
+def test_the_seam_returns_a_resolution_and_not_an_optional_record():
+    """D-34: the annotation itself is the ruling's surface."""
+
+    import typing
+
+    hints = typing.get_type_hints(
+        BenchmarkPublisherTrustDirectoryPort.resolve_anchor
+    )
+    assert hints["return"] is BenchmarkTrustAnchorResolution
+    assert typing.get_origin(hints["return"]) is None
+
+
+def test_happy_a_resolution_carries_the_record_it_resolved():
+    resolution = fx.trust_anchor_resolution()
+    record = fx.trust_anchor_record()
+    assert resolution.anchor == record
+    assert resolution.refusal_reason is None
+    assert (resolution.role, resolution.identity, resolution.key_id) == (
+        record.role,
+        record.identity,
+        record.key_id,
+    )
+
+
+def test_happy_a_resolution_carries_a_refusal_instead_of_a_record():
+    resolution = fx.refused_trust_anchor_resolution()
+    assert resolution.anchor is None
+    assert (
+        resolution.refusal_reason
+        is BenchmarkRegistryRefusalReason.TRUST_ANCHOR_NOT_FOUND
+    )
+
+
+def test_a_resolution_carrying_both_a_record_and_a_refusal_is_unconstructible():
+    """A resolved refusal. Neither field alone would answer the caller."""
+
+    with pytest.raises(BenchmarkRegistryContractError) as raised:
+        fx.trust_anchor_resolution(
+            refusal_reason=BenchmarkRegistryRefusalReason.TRUST_ANCHOR_NOT_FOUND
+        )
+    assert "exactly one of an anchor record" in str(raised.value)
+
+
+def test_a_resolution_carrying_neither_is_unconstructible():
+    """The other direction: the untyped silence D-34 removed."""
+
+    with pytest.raises(BenchmarkRegistryContractError) as raised:
+        fx.trust_anchor_resolution(anchor=None, refusal_reason=None)
+    assert "exactly one of an anchor record" in str(raised.value)
+
+
+def test_there_is_no_boolean_success_flag_on_a_resolution():
+    """D-24 removed Booleans from these seams; none returns through this one."""
+
+    fields = [f.name for f in dataclasses.fields(BenchmarkTrustAnchorResolution)]
+    assert fields == ["role", "identity", "key_id", "anchor", "refusal_reason"]
+    for name in fields:
+        value = getattr(fx.trust_anchor_resolution(), name)
+        assert not isinstance(value, bool), name
+
+
+def test_neither_half_of_the_exclusive_or_carries_a_default():
+    """The unset half is written at every call site, never defaulted."""
+
+    for name in ("anchor", "refusal_reason"):
+        field = next(
+            f
+            for f in dataclasses.fields(BenchmarkTrustAnchorResolution)
+            if f.name == name
+        )
+        assert field.default is dataclasses.MISSING, name
+        assert field.default_factory is dataclasses.MISSING, name
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("role", BenchmarkTrustRole.REVOKER),
+        ("identity", "some-other-identity"),
+        ("key_id", "some-other-key-id"),
+    ],
+)
+def test_a_resolver_may_not_answer_a_question_it_was_not_asked(field, value):
+    """The asked triple and the answered record must agree in all three parts."""
+
+    with pytest.raises(BenchmarkRegistryContractError) as raised:
+        fx.trust_anchor_resolution(**{field: value})
+    assert "a different" in str(raised.value)
+    assert field in str(raised.value)
+
+
+def test_the_role_is_part_of_the_question_not_inferred_from_the_record():
+    """D-26: a shared physical directory never infers the namespace."""
+
+    with pytest.raises(BenchmarkRegistryContractError):
+        fx.trust_anchor_resolution(
+            anchor=fx.approver_trust_anchor_record(),
+            role=BenchmarkTrustRole.PUBLISHER,
+        )
+
+
+@pytest.mark.parametrize(
+    "reason",
+    [
+        BenchmarkRegistryRefusalReason.TRUST_ANCHOR_NOT_FOUND,
+        BenchmarkRegistryRefusalReason.TRUST_DIRECTORY_UNAVAILABLE,
+    ],
+)
+def test_the_two_admissible_refusals_are_exactly_the_no_record_conditions(reason):
+    """D-28 needs these two separable; a bare None could not tell them apart."""
+
+    assert fx.refused_trust_anchor_resolution(refusal_reason=reason).anchor is None
+
+
+@pytest.mark.parametrize(
+    "reason",
+    [
+        r
+        for r in BenchmarkRegistryRefusalReason
+        if r
+        not in (
+            BenchmarkRegistryRefusalReason.TRUST_ANCHOR_NOT_FOUND,
+            BenchmarkRegistryRefusalReason.TRUST_DIRECTORY_UNAVAILABLE,
+        )
+    ],
+)
+def test_every_other_refusal_member_is_refused_by_a_resolution(reason):
+    """Including all four lifecycle refusals: this seam evaluates nothing."""
+
+    with pytest.raises(BenchmarkRegistryContractError) as raised:
+        fx.refused_trust_anchor_resolution(refusal_reason=reason)
+    assert "is not one a resolution may carry" in str(raised.value)
+
+
+def test_the_four_lifecycle_refusals_belong_to_the_verification_seam():
+    """D-27's distinctions survive because the resolver never evaluates them."""
+
+    for reason in BENCHMARK_TRUST_ANCHOR_EVALUATION_ORDER:
+        with pytest.raises(BenchmarkRegistryContractError):
+            fx.refused_trust_anchor_resolution(refusal_reason=reason)
+
+
+def test_a_resolution_returns_a_revoked_anchor_as_it_stands():
+    """It filters nothing: the record arrives with its own status intact."""
+
+    revoked = fx.revoked_trust_anchor_record()
+    resolution = fx.trust_anchor_resolution(anchor=revoked)
+    assert resolution.anchor.status is BenchmarkTrustAnchorStatus.REVOKED
+    assert resolution.refusal_reason is None
+
+
+def test_a_resolution_takes_no_trusted_instant():
+    """D-25 and D-27: an instant here would collapse the four distinctions."""
+
+    names = [f.name for f in dataclasses.fields(BenchmarkTrustAnchorResolution)]
+    for banned in ("at", "instant", "time", "now"):
+        assert not any(banned in n for n in names), banned
+
+
+def test_only_an_exact_anchor_record_may_be_carried():
+    """Not a subclass, and not something that merely looks like one.
+
+    Built directly rather than through the fixture: the fixture reads the triple
+    off the record, so it cannot reach the constructor with a non-record.
+    """
+
+    record = fx.trust_anchor_record()
+
+    class Subclassed(BenchmarkTrustAnchorRecord):
+        pass
+
+    for impostor in (
+        object(),
+        Subclassed(**dataclasses.asdict(record)),
+        dataclasses.asdict(record),
+    ):
+        with pytest.raises(BenchmarkRegistryContractError):
+            BenchmarkTrustAnchorResolution(
+                role=record.role,
+                identity=record.identity,
+                key_id=record.key_id,
+                anchor=impostor,
+                refusal_reason=None,
+            )
+
+
+def test_a_resolution_establishes_no_authority_even_carrying_a_record():
+    """§09's five derivations, on a resolution that did resolve something."""
+
+    resolution = fx.trust_anchor_resolution()
+    for prop in BENCHMARK_UNVERIFIED_AUTHORITY_PROPERTIES:
+        assert getattr(resolution, prop) is False, prop
+
+
+def test_a_resolution_is_not_canonicalizable_and_mints_no_domain():
+    """D-34's least obvious clause, asserted rather than assumed.
+
+    Deliberately unsealed: §05 forbids byte space an artifact does not need, and
+    D-25 makes the anchor record's own digest the sole anchor revision, so a
+    second digest over the resolution carrying it would be a competing identity
+    for one fact. The encoder refuses it, which is the enforcement.
+    """
+
+    with pytest.raises(BenchmarkRegistryCanonicalizationError):
+        canonical_bytes(fx.trust_anchor_resolution())
+    with pytest.raises(BenchmarkRegistryCanonicalizationError):
+        canonical_digest(fx.trust_anchor_resolution())
+    assert not hasattr(fx.trust_anchor_resolution(), "anchor_record_digest")

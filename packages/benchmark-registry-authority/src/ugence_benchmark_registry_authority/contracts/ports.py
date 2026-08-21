@@ -88,7 +88,7 @@ from .trust import (
     BenchmarkApprovalVerifiedResult,
     BenchmarkPublisherVerifiedResult,
     BenchmarkRevocationVerifiedResult,
-    BenchmarkTrustAnchorRecord,
+    BenchmarkTrustAnchorResolution,
 )
 
 __all__ = [
@@ -182,7 +182,7 @@ class BenchmarkPublisherTrustDirectoryPort(Protocol):
         role: BenchmarkTrustRole,
         identity: str,
         key_id: str,
-    ) -> Optional[BenchmarkTrustAnchorRecord]:
+    ) -> BenchmarkTrustAnchorResolution:
         """Resolve the anchor record for an exact (role, identity, key) triple.
 
         Returns the record **as it stands**, with its own status and validity
@@ -193,6 +193,17 @@ class BenchmarkPublisherTrustDirectoryPort(Protocol):
         evaluation belongs to the verification seam, which binds its outcome and
         its reason into the verified result where D-27 requires the distinctions
         to be preserved.
+
+        **The return is a resolution, not an optional record** (D-34). This seam
+        returned ``Optional[BenchmarkTrustAnchorRecord]`` when D-25 and D-26
+        reshaped it, which followed both rulings literally and left a ``None``
+        standing for two conditions D-27 and D-28 had ratified as separate
+        refusal members: the directory answered and held no anchor, and the
+        directory could not be consulted. D-28's fail-closed posture needs those
+        two separable — an unreachable directory reading as *no such anchor* is a
+        default answer substituted for an unavailable one, which D-28 forbids —
+        so the outcome carries a record **XOR** a typed refusal instead, and a
+        caller branches on which is present.
 
         Never called here.
         """

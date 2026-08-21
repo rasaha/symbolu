@@ -1,7 +1,7 @@
 {
   "distribution": "ugence-benchmark-registry-authority",
   "namespace": "ugence_benchmark_registry_authority",
-  "package_version": "0.2.1",
+  "package_version": "0.2.2",
   "canonicalization_version": "ugence.benchmark-registry-authority/canonicalization/v1",
   "note": "One pinned canonical byte vector and digest per shipped artifact class. 'canonical_bytes' is the exact UTF-8 JSON the encoder produces for the pinned fixture; 'digest' is its sha-256. Both are reproducible from the literals in tests/_builders.py, and the digest is independently recomputable with plain hashlib over the byte string alone, importing nothing from the package.",
   "vectors": {

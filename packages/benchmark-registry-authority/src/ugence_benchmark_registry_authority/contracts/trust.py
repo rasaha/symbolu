@@ -120,6 +120,7 @@ from ._validation import (
     require_canonical_str,
     require_digest,
     require_enum_member,
+    require_exact_type,
     require_identifier,
     require_public_key_material,
 )
@@ -144,6 +145,7 @@ __all__ = [
     "BENCHMARK_TRUST_ANCHOR_EVALUATION_ORDER",
     "BENCHMARK_VERIFIED_RESULT_BOUND_FACTS",
     "BenchmarkTrustAnchorRecord",
+    "BenchmarkTrustAnchorResolution",
     "BenchmarkPublisherVerifiedResult",
     "BenchmarkApprovalVerifiedResult",
     "BenchmarkRevocationVerifiedResult",
@@ -163,6 +165,38 @@ BENCHMARK_TRUST_ANCHOR_EVALUATION_ORDER: tuple = (
     BenchmarkRegistryRefusalReason.TRUST_ANCHOR_DISABLED,
     BenchmarkRegistryRefusalReason.TRUST_ANCHOR_NOT_YET_VALID,
     BenchmarkRegistryRefusalReason.TRUST_ANCHOR_EXPIRED,
+)
+
+#: The **only** two refusals an anchor-resolution outcome may carry (D-34).
+#:
+#: **Module-private deliberately.** D-34's *Surfaces moved* clause ratifies one
+#: new exported type and no second symbol, and D-18 keeps the curated surface a
+#: thing that moves by ratification rather than by an author's judgement that a
+#: constant would be useful. The constructor enforces the membership and its
+#: refusal names both members, so nothing a caller needs is unavailable; a later
+#: row may export it, and until one does this stays inside the module.
+#:
+#: Both name conditions in which **no anchor record exists to return**: the
+#: directory answered and held no anchor at the triple, or the directory could
+#: not be consulted at all. D-28 rules the second fails closed with **never** a
+#: fallback to a cached, default or previously successful answer, and an
+#: unreachable directory reading as *no such anchor* is exactly such a
+#: substituted default — which is why the two are separate members here rather
+#: than one absent value.
+#:
+#: The four **lifecycle** refusals are deliberately absent. D-27 requires
+#: revoked, disabled, not-yet-valid and expired to stay distinguishable, and
+#: D-25's seam performs **no lifecycle evaluation**: it returns the record as it
+#: stands, with its own status and interval intact, and the verification seam
+#: decides those four against the trusted instant on
+#: :data:`BENCHMARK_TRUST_ANCHOR_EVALUATION_ORDER`. A resolution that could
+#: refuse ``TRUST_ANCHOR_EXPIRED`` would be a resolver that had already
+#: evaluated, which is the collapse D-25's docstring refuses.
+#:
+#: Adding a third member is a ratification, not an implementation choice (D-34).
+_TRUST_ANCHOR_RESOLUTION_REFUSAL_REASONS: tuple = (
+    BenchmarkRegistryRefusalReason.TRUST_ANCHOR_NOT_FOUND,
+    BenchmarkRegistryRefusalReason.TRUST_DIRECTORY_UNAVAILABLE,
 )
 
 #: The nine facts D-24 requires every verified result to bind, as the field
@@ -432,6 +466,145 @@ class BenchmarkTrustAnchorRecord:
         """
 
         return canonical_digest(self)
+
+
+@permanently_unverified_authority
+@dataclass(frozen=True)
+class BenchmarkTrustAnchorResolution:
+    """The typed outcome of one exact-triple anchor lookup. **Resolves nothing.**
+
+    D-25 replaced Boolean entitlement with anchor *resolution*, and the seam that
+    landed with it returned ``Optional[BenchmarkTrustAnchorRecord]``. That
+    followed D-25 and D-28 literally — D-25 enumerates exactly one new type and
+    D-28 says no further type is minted there — but it left a one-bit answer
+    wearing a type: a ``None`` could not say whether the directory **answered and
+    held no anchor** or **could not be consulted at all**. D-34 rules the seam
+    returns this instead.
+
+    Exactly one of :attr:`anchor` and :attr:`refusal_reason` is set, enforced in
+    :meth:`__post_init__`. There is no "resolved but also refused" state, no
+    "neither" state to read optimistically, and **no Boolean success flag**: a
+    caller must branch on which of the two is present. A flag would be a third
+    spelling of the same fact, free to disagree with the other two, and D-24
+    removed Booleans from these seams for that reason.
+
+    Why the two conditions must stay separate
+    ------------------------------------------
+    D-28 rules fail-closed on unavailable trust state, with **never** a fallback
+    to a cached, default or previously successful verification. An unreachable
+    directory that reads as *no such anchor* is a default answer substituted for
+    an unavailable one — the precise substitution D-28 forbids — and a verifier
+    handed a bare ``None`` could not tell which it had. D-27 requires the anchor
+    distinctions preserved in verification and audit results, and locates any
+    deliberate collapse at a later **external read boundary**, not at this seam.
+
+    What it does not evaluate
+    --------------------------
+    Nothing. This carries the record **as it stands**, with its own status and
+    validity interval intact, exactly as
+    :meth:`~.ports.BenchmarkPublisherTrustDirectoryPort.resolve_anchor`
+    describes. It takes **no trusted instant** and performs no lifecycle
+    evaluation: were it to filter on the instant, revoked, disabled, not-yet-valid
+    and expired would collapse into one indistinguishable absence, which is what
+    D-27 requires stay distinguishable. Those four belong to the verification
+    seam, which binds its outcome and reason into the verified result.
+
+    Shape copied, code never imported
+    ----------------------------------
+    ``TrustAnchorResolution`` in the trusted-evidence layer is the ratified
+    precedent for a record-XOR-refusal outcome, and this is deliberately the same
+    shape. It is **copied and not imported**: ``ugence_trusted_evidence_authority``
+    is on this package's forbidden-import list, §23 restricts BR-2 to
+    ``governance-contracts``, D-04's fourth constraint forbids importing the
+    trusted-evidence layer's trust-anchor directory, and D-22(4) is the ratified
+    precedent for copying a shape and not the code.
+
+    Two things are deliberately *not* copied. The precedent's ``resolved()`` and
+    ``refused()`` classmethod factories are omitted: §17 forbids a convenience
+    resolver, and a classmethod named ``resolved`` on an exported type in a
+    package whose exported-function ban lists ``resolve`` is a name no contract
+    needs. And neither field carries a default, so the unset half of the XOR is
+    written at every call site rather than defaulted into silence — the same rule
+    :class:`BenchmarkTrustAnchorRecord`'s ``revoked_at`` follows.
+
+    Not a resolution. Naming the shape of an answer is not answering: this
+    package holds no anchors, mints none, resolves none and parses no key
+    material (D-04), and no implementation of the seam exists to build one of
+    these. It carries §09's five permanently-``False`` authority derivations like
+    every other contract here, so a resolution carrying an anchor still reports
+    ``trusted_resolution_established is False``.
+    """
+
+    #: The role namespace the lookup was made in. Bound because D-26 keeps the
+    #: three namespaces logically separate: an anchor authorized for one role
+    #: never authorizes another automatically.
+    role: BenchmarkTrustRole
+
+    #: The identity the lookup asked for.
+    identity: str
+
+    #: The key identifier the lookup asked for.
+    key_id: str
+
+    #: The resolved record, or :data:`None` on a refusal. Present **exactly**
+    #: when :attr:`refusal_reason` is absent.
+    anchor: Optional[BenchmarkTrustAnchorRecord]
+
+    #: Why no usable record was returned, or :data:`None` when one was. Present
+    #: **exactly** when :attr:`anchor` is absent, and drawn only from
+    #: ``TRUST_ANCHOR_NOT_FOUND`` and ``TRUST_DIRECTORY_UNAVAILABLE``.
+    refusal_reason: Optional[BenchmarkRegistryRefusalReason]
+
+    def __post_init__(self) -> None:
+        require_enum_member(self.role, BenchmarkTrustRole, "role")
+        require_identifier(self.identity, "identity")
+        require_identifier(self.key_id, "key_id")
+        if (self.anchor is None) == (self.refusal_reason is None):
+            raise BenchmarkRegistryContractError(
+                "a trust-anchor resolution carries exactly one of an anchor "
+                "record or a typed refusal reason; carrying both would be a "
+                "resolved refusal, and carrying neither would be the untyped "
+                "silence D-34 replaced Optional[BenchmarkTrustAnchorRecord] to "
+                "eliminate"
+            )
+        if self.refusal_reason is not None:
+            require_enum_member(
+                self.refusal_reason,
+                BenchmarkRegistryRefusalReason,
+                "refusal_reason",
+            )
+            if (
+                self.refusal_reason
+                not in _TRUST_ANCHOR_RESOLUTION_REFUSAL_REASONS
+            ):
+                raise BenchmarkRegistryContractError(
+                    f"refusal_reason {self.refusal_reason.value} is not one a "
+                    "resolution may carry; D-34 admits exactly "
+                    "TRUST_ANCHOR_NOT_FOUND and TRUST_DIRECTORY_UNAVAILABLE, "
+                    "the two conditions in which no anchor record exists to "
+                    "return, and the seam performs no lifecycle evaluation, so "
+                    "revoked, disabled, not-yet-valid and expired belong to the "
+                    "verification seam and never to this one"
+                )
+            return
+        require_exact_type(self.anchor, BenchmarkTrustAnchorRecord, "anchor")
+        mismatched = [
+            name
+            for name, asked, answered in (
+                ("role", self.role, self.anchor.role),
+                ("identity", self.identity, self.anchor.identity),
+                ("key_id", self.key_id, self.anchor.key_id),
+            )
+            if asked != answered
+        ]
+        if mismatched:
+            raise BenchmarkRegistryContractError(
+                "the resolved anchor answers a different "
+                f"{', '.join(mismatched)} than the lookup asked for; a resolver "
+                "may not answer a question it was not asked, and D-26 makes the "
+                "role part of the question rather than something a shared "
+                "physical directory may infer"
+            )
 
 
 @permanently_unverified_authority

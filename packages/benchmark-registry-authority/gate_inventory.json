@@ -2,8 +2,8 @@
   "distribution": "ugence-benchmark-registry-authority",
   "milestone": "BR-2C-0",
   "note": "Complete inventory of every load-bearing gate, and the measured result of neutralizing each one in turn against the full suite and the author-owned adversarial probes. Production behaviour was not changed to chase a zero-survivor number; any survivor is classified as equivalent, shadowed (naming the shadowing gate), or a real gap. Regenerate by running gate_mutation_sweep.py.",
-  "gates_inventoried": 68,
-  "killed": 63,
+  "gates_inventoried": 71,
+  "killed": 66,
   "survived": 5,
   "errored": 0,
   "categories": {
@@ -126,6 +126,15 @@
     ],
     "trust-key-material-encoding": [
       "G-73"
+    ],
+    "resolution-record-xor-refusal": [
+      "G-74"
+    ],
+    "resolution-admissible-refusals": [
+      "G-75"
+    ],
+    "resolution-asked-versus-answered": [
+      "G-76"
     ]
   },
   "ledger": [
@@ -672,6 +681,30 @@
       "description": "the Ed25519 public-key-material encoding check; without it an anchor carries arbitrary text where 32 bytes of key material must be, and two spellings of one anchor become two revisions of it",
       "result": "KILLED",
       "first_failure": "test:tests/contract/test_envelopes.py::test_the_anchor_record_key_material_is_never_parsed"
+    },
+    {
+      "gate": "G-74",
+      "category": "resolution-record-xor-refusal",
+      "module": "trust.py",
+      "description": "the exclusive-or at the heart of D-34; without it a resolution can carry both a record and a refusal, or neither, and a caller branching on whichever field it read first gets two answers from one object",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_trust_contracts.py::test_a_resolution_carrying_both_a_record_and_a_refusal_is_unconstructible"
+    },
+    {
+      "gate": "G-75",
+      "category": "resolution-admissible-refusals",
+      "module": "trust.py",
+      "description": "the membership gate keeping a resolution to the two conditions in which no record exists; without it the seam can refuse TRUST_ANCHOR_EXPIRED, which is a lifecycle evaluation D-25 rules it never performs and D-27 requires the verification seam to make",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_trust_contracts.py::test_every_other_refusal_member_is_refused_by_a_resolution[IDEMPOTENT_DUPLICATE]"
+    },
+    {
+      "gate": "G-76",
+      "category": "resolution-asked-versus-answered",
+      "module": "trust.py",
+      "description": "the triple-match gate; without it a resolver may answer a question it was not asked, and an anchor from one role namespace can be returned for a lookup in another \u2014 the cross-role substitution D-26 forbids",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_trust_contracts.py::test_a_resolver_may_not_answer_a_question_it_was_not_asked[role-REVOKER]"
     }
   ],
   "survivor_classifications": {

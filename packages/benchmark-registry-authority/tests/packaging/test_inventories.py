@@ -299,3 +299,36 @@ def test_the_consistency_descriptor_is_marked_a_frozen_descriptor():
     assert kinds["BenchmarkRegistryStoreConsistencyDescriptor"] == (
         "frozen_descriptor"
     )
+
+
+# --------------------------------------------------------------------------- #
+# D-34: an exported contract that is deliberately not root-canonicalizable
+# --------------------------------------------------------------------------- #
+def test_the_anchor_resolution_is_exported_and_seals_nothing():
+    """D-34's least obvious clause: the surface moves, the manifests do not.
+
+    An exported contract type normally brings a digest domain, a pinned vector
+    and an inventory row with it. This one deliberately brings none. §05 forbids
+    byte space an artifact does not need, and D-25 rules the anchor record's own
+    canonical digest **is** the anchor revision, so a second digest over the
+    resolution carrying that record would be a competing identity for one fact —
+    the parallel revision D-25 refuses.
+
+    Asserted in all four registers at once, because "it is absent" is the kind of
+    claim a later regeneration could quietly falsify.
+    """
+
+    assert "BenchmarkTrustAnchorResolution" in api.__all__
+    assert "BenchmarkTrustAnchorResolution" not in _root_classes()
+    assert "BenchmarkTrustAnchorResolution" not in DOMAINS["root_canonicalizable"]
+    assert "BenchmarkTrustAnchorResolution" not in DOMAINS["nested_admissible_only"]
+    assert "BenchmarkTrustAnchorResolution" not in VECTORS["vectors"]
+    assert "BenchmarkTrustAnchorResolution" not in ROWS
+
+
+def test_the_three_sealed_manifests_stay_at_twenty_two_across_d34():
+    """The counts D-24 through D-28 moved to 22; D-34 moves none of them."""
+
+    assert len(DOMAINS["root_canonicalizable"]) == 22
+    assert len(VECTORS["vectors"]) == 22
+    assert len(ROWS) == 22

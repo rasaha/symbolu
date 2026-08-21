@@ -130,6 +130,7 @@ from .trust import (
     BenchmarkPublisherVerifiedResult,
     BenchmarkRevocationVerifiedResult,
     BenchmarkTrustAnchorRecord,
+    BenchmarkTrustAnchorResolution,
 )
 from .read_payloads import (
     BenchmarkHistoricalRecordPayload,
@@ -281,4 +282,6 @@ __all__ = [
     "BENCHMARK_PUBLISHER_VERIFIED_RESULT_DIGEST_DOMAIN",
     "BENCHMARK_APPROVAL_VERIFIED_RESULT_DIGEST_DOMAIN",
     "BENCHMARK_REVOCATION_VERIFIED_RESULT_DIGEST_DOMAIN",
+    # D-34: the anchor-resolution outcome. Appended, never inserted.
+    "BenchmarkTrustAnchorResolution",
 ]
