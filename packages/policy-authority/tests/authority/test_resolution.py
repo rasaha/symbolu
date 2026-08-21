@@ -247,6 +247,39 @@ def test_a_record_pairing_a_coordinate_with_a_different_artifact_is_detected():
     )
 
 
+def test_a_record_whose_policy_type_diverges_from_its_descriptor_is_detected():
+    """A divergent ``policy_type`` is caught even though every other check passes.
+
+    ``policy_type`` is absent from the issuance signing payload, so the signature
+    still verifies over a record that names a different type. The coordinate
+    re-derives and both digests match, which is what makes this its own reason
+    rather than an ``ARTIFACT_REFERENCE_MISMATCH``.
+    """
+
+    authority = make_authority()
+    policy = make_policy()
+    record = authority.issue(policy)
+    genuine_payload = record.signing_payload()
+
+    object.__setattr__(record, "policy_type", "not-the-adapters-type")
+
+    # The signature is unaffected: policy_type is not among the signed fields.
+    assert record.signing_payload() == genuine_payload
+
+    resolution = authority.resolve(policy.reference)
+    assert resolution.status is PolicyResolutionStatus.UNRESOLVED
+    assert resolution.reason is PolicyResolutionReason.ARTIFACT_TYPE_MISMATCH
+    assert resolution.policy is None
+
+
+def test_the_policy_type_gate_does_not_fire_for_a_genuine_record():
+    authority = make_authority()
+    policy = make_policy()
+    record = authority.issue(policy)
+    assert record.policy_type == authority.adapters.describe(policy).policy_type
+    assert authority.resolve(policy.reference).status is PolicyResolutionStatus.RESOLVED
+
+
 def test_a_body_digest_disagreeing_with_the_signed_one_is_detected():
     authority = make_authority()
     policy = make_policy()

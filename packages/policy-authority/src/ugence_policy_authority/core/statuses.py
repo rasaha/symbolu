@@ -106,6 +106,15 @@ class PolicyResolutionReason(str, Enum):
     NOT_FOUND = "NOT_FOUND"
     REFERENCE_MISMATCH = "REFERENCE_MISMATCH"
     ARTIFACT_REFERENCE_MISMATCH = "ARTIFACT_REFERENCE_MISMATCH"
+    #: The stored record's ``policy_type`` is not the type its own adapter
+    #: derives from the stored artifact. Distinct from
+    #: ``ARTIFACT_REFERENCE_MISMATCH``, where the *coordinate* fails to
+    #: re-derive: here the coordinate re-derives correctly and only the record's
+    #: type label contradicts the artifact it carries. ``policy_type`` is set
+    #: from the descriptor at issuance and is **not** covered by the issuance
+    #: signature, so a record differing only in this field verifies; nothing
+    #: else in this order catches it.
+    ARTIFACT_TYPE_MISMATCH = "ARTIFACT_TYPE_MISMATCH"
     NO_ADAPTER_REGISTERED = "NO_ADAPTER_REGISTERED"
     ARTIFACT_NOT_CANONICALIZABLE = "ARTIFACT_NOT_CANONICALIZABLE"
     CONTENT_DIGEST_MISMATCH = "CONTENT_DIGEST_MISMATCH"

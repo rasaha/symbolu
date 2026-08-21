@@ -16,6 +16,7 @@ a record exists under the exact coordinate     ``NOT_FOUND``
 the stored record carries that coordinate      ``REFERENCE_MISMATCH``
 a registered adapter still claims the artifact ``NO_ADAPTER_REGISTERED``
 the artifact re-derives the same coordinate    ``ARTIFACT_REFERENCE_MISMATCH``
+the record's ``policy_type`` is the artifact's ``ARTIFACT_TYPE_MISMATCH``
 the artifact still canonicalizes               ``ARTIFACT_NOT_CANONICALIZABLE``
 declared digest == recomputed body digest      ``CONTENT_DIGEST_MISMATCH``
 signed body digest == recomputed body digest   ``BODY_DIGEST_MISMATCH``
@@ -171,6 +172,18 @@ def resolve_policy(
         return deny(
             PolicyResolutionReason.ARTIFACT_REFERENCE_MISMATCH,
             "the stored artifact does not re-derive the stored coordinate",
+        )
+
+    # ``policy_type`` is written from the descriptor at issuance but is not part
+    # of the coordinate and is not covered by the issuance signature, so a record
+    # differing only in this field re-derives its coordinate, matches both
+    # digests and verifies. Nothing later in this order compares it, so it is
+    # compared here: a record must describe the artifact it actually carries.
+    if descriptor.policy_type != record.policy_type:
+        return deny(
+            PolicyResolutionReason.ARTIFACT_TYPE_MISMATCH,
+            "the stored record names a policy_type its adapter does not derive "
+            "from the stored artifact",
         )
 
     # -- digest binding ----------------------------------------------------
