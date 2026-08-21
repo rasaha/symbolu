@@ -1,4 +1,4 @@
-"""Canonical public API for the Ugence Benchmark Registry Authority (BR-2B).
+"""Canonical public API for the Ugence Benchmark Registry Authority (BR-2C-0).
 
 The deliberately curated, supported public surface. Import from here (or the
 equivalently-exported top-level :mod:`ugence_benchmark_registry_authority`).
@@ -33,7 +33,16 @@ The structural contract layer at **0.2.3**. It carries BR-2A's ratified
 * the four **BR-2C trust and verification contracts** ratified by D-24, D-25 and
   D-26 — the immutable role-scoped trust-anchor record and the three distinct
   exact verified-result types that replaced the ``bool``-returning approval-
-  verifier and publisher-trust-directory seams.
+  verifier and publisher-trust-directory seams;
+* :class:`BenchmarkTrustAnchorResolution` (D-34) — the anchor-resolution
+  outcome that replaced ``Optional[BenchmarkTrustAnchorRecord]`` at the
+  trust-directory seam, binding the exact ``(role, identity, key_id)`` triple it
+  was asked and carrying an anchor record **XOR** one of the seam's two typed
+  refusals, so absence and unavailability can never collapse into one answer;
+* :data:`BENCHMARK_VERIFICATION_REFUSAL_REASONS` (D-35) — the twelve of the
+  twenty-four a ``REFUSED`` verified result may carry, **derived from the
+  fault-class map and never written out**, so an appended member classifies
+  itself in or out rather than waiting for a hand-edited list to catch up.
 
 Why the BR-2C contracts are here at ``0.2.3``
 ----------------------------------------------

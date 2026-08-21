@@ -102,7 +102,7 @@ def test_the_adversarial_to_happy_ratio_is_at_least_two_to_one():
 def test_the_ratio_is_reported_for_the_delivery_record():
     happy, adversarial = _properties()
     print(
-        f"\nBR-2B distinct properties: {len(adversarial)} adversarial, "
+        f"\nBR-2C-0 distinct properties: {len(adversarial)} adversarial, "
         f"{len(happy)} happy, "
         f"ratio {len(adversarial) / len(happy):.2f}:1, "
         f"total {len(adversarial) + len(happy)}"

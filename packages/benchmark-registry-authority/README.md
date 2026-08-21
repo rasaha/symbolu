@@ -228,9 +228,9 @@ never represented as an issuer or a signer in any payload.
 
 BR-1's seventeen refusal reasons are frozen; BR-2 **appends and never inserts,
 renames, re-values, re-orders or removes**. `BenchmarkRegistryRefusalReason`
-holds seventeen BR-2 reasons, disjoint from BR-1's by member *and* by value.
+holds twenty-four BR-2 reasons, disjoint from BR-1's by member *and* by value.
 
-`BENCHMARK_REGISTRY_ALL_REFUSAL_REASONS` is the ordered composite (34 members).
+`BENCHMARK_REGISTRY_ALL_REFUSAL_REASONS` is the ordered composite (41 members).
 Its BR-1 prefix is taken from `tuple(BenchmarkRefusalReason)` — iterating the
 *enum*, which yields declaration order — and explicitly **not** from
 `BR1_BENCHMARK_REFUSAL_REASONS`, which is a `frozenset` whose iteration order is
@@ -261,19 +261,19 @@ python packages/benchmark-registry-authority/gate_mutation_sweep.py
 ### Measured results at this revision
 
 **Re-measured, not edited.** ADR §35.2 D-31(a) deferred this table's
-re-statement to "a fresh sweep and verifier run in a README pass at BR-2C", and
-that run is the one the BR-2C contract slice performed: every number below was
-produced by executing the named check against this tree, not by adjusting the
-BR-2A-era figures that stood here. The BR-2A-era marking is therefore withdrawn
-along with the numbers it guarded.
+re-statement to "a fresh sweep and verifier run in a README pass at BR-2C". Every
+number below was produced by executing the named check against this tree at
+`0.2.3`, in the closure pass that corrected the prose around it — never by
+adjusting the figures that stood here. The numbers a rung moves are re-run, not
+carried forward, so a stale figure fails a check rather than surviving an edit.
 
 | Check | Result |
 | --- | --- |
-| Package suite | **1970 tests passed** |
-| Independent adversarial probes | **74 passed** (also inside the installed wheel) |
-| Distinct properties | **471 adversarial : 35 happy = 13.46 : 1** (required ≥ 2:1) |
-| Gate inventory | **68 gates** |
-| Mutation sweep | **63 KILLED, 5 SURVIVED, 0 errored** — every survivor classified |
+| Package suite | **2108 tests passed** |
+| Independent adversarial probes | **83 passed** (also inside the installed wheel) |
+| Distinct properties | **503 adversarial : 38 happy = 13.24 : 1** (required ≥ 2:1) |
+| Gate inventory | **72 gates** |
+| Mutation sweep | **67 KILLED, 5 SURVIVED, 0 errored** — every survivor classified |
 | Distribution | wheel + sdist built; offline `--no-index` install verified |
 | Negative controls | **8 run, 8 caught** |
 | pyflakes | clean |

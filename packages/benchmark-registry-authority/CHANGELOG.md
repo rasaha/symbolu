@@ -4,8 +4,89 @@ All notable changes to this distribution. The format follows Keep a Changelog;
 versioning is Semantic Versioning, and the version ladder is the ratified one:
 BR-2A `0.1.0`, BR-2B `0.2.0`, **BR-2C-0 `0.2.1`, `0.2.2` and `0.2.3`**, BR-2C
 `0.3.0`, BR-2D `0.4.0`, BR-2E `0.5.0` (ADR §35 D-01, amended 2026-08-20, and
-D-33). Five of the six rungs are subphases; `BR-2C-0` is a **version rung** and
-mints no closure audit.
+D-33 and D-36). Five of the six rungs are subphases; `BR-2C-0` is a **version
+rung**, carries three versions, and mints no closure audit.
+
+## [Unreleased] — BR-2C-0 closure: shipped-text corrections, and D-36
+
+**No version bump.** `package_version` stays `0.2.3`. This entry moves no count,
+no digest domain, no pinned canonical vector, no refusal member, no capability
+token and no contract type. It is prose correction under D-30 and D-31's
+standing precedent, plus one ratification.
+
+### Ratified — D-36: the `BR-2C-0` rung carries all three versions
+
+`tests/_milestones.py`'s `VERSION_SUBPHASE` maps `0.2.1`, `0.2.2` and `0.2.3` to
+`BR-2C-0`, but D-33 ruled only `"0.2.1"` and neither D-34's nor D-35's *Surfaces
+moved* clause named a version bump. **D-36 rules the map that was already there**:
+one rung, three versions. D-18 requires a version bump at each surface-count move
+and both later rows moved `api.__all__` by one, so each needed a version of its
+own; the rung names *what* a version ships, not how many times it shipped, and
+all three ship BR-2C's contract surface and no BR-2C capability, so all three
+ban the same twelve tokens. A rung per version would be an index that rules
+nothing; folding the three back onto `0.2.1` would restore the
+two-surfaces-one-version defect D-33 exists to end.
+
+The gap was a **missing ratification, not a wrong mapping**, and it was never a
+silent one: every consumer reads `VERSION_SUBPHASE[api.__version__]` by exact
+string, so an unmapped version raises `KeyError` and fails closed rather than
+widening a ban set. The `0.2.3` entry below states that nothing is left open by
+it; that was true of D-33, D-34 and D-35's rulings and **not** of the rung's
+version mapping, which this entry closes.
+
+### Fixed — five shipped-text defects an independent closure audit found
+
+- **`README.md` refusal counts.** `BenchmarkRegistryRefusalReason` holds
+  **twenty-four** BR-2 reasons, not seventeen, and
+  `BENCHMARK_REGISTRY_ALL_REFUSAL_REASONS` is **41** members, not 34 — the
+  counts D-27 and D-28 moved and whose gates already pinned. BR-1's own frozen
+  seventeen is unchanged and stays where it stood.
+- **`README.md` measured-results table, re-run and re-stated, never edited.**
+  Every figure below was produced by executing the named check against this tree.
+- **Three headline milestone labels, BR-2B → BR-2C-0**, on D-30's precedent for
+  a label that was true at the previous rung: the module docstring titles at
+  `src/ugence_benchmark_registry_authority/api.py:1` and
+  `src/ugence_benchmark_registry_authority/__init__.py:1`, and `pyproject.toml`'s
+  `description`, which ships as the distribution **Summary**.
+- **Those same three curated-surface descriptions now name what `0.2.2` and
+  `0.2.3` added**: `BenchmarkTrustAnchorResolution` (D-34) and
+  `BENCHMARK_VERIFICATION_REFUSAL_REASONS` (D-35). The surface moved two
+  releases ago; the descriptions of it had not.
+- **Two stale labels.** `__init__.py`'s `0.2.3` bullet read `api.__all__` 93 →
+  **106**, which is `0.2.1`'s figure; across the rung's three versions it is 93 →
+  **108**. `tests/test_adversarial_ratio.py` printed its ratio under a **BR-2B**
+  heading. `version.py`'s per-version breakdown — 93 → 106 → 107 → 108 — was
+  already correct and is unchanged.
+
+**No generator literal moved**, so no manifest was regenerated, and none was
+hand-edited. `tools/generate_manifests.py` and `gate_mutation_sweep.py` already
+write `"milestone": "BR-2C-0"`.
+
+### Measured verification
+
+Re-run against this tree after the corrections, not carried forward:
+
+| Check | Result |
+| --- | --- |
+| Package suite | **2108 passed** |
+| Independent adversarial probes | **83 passed** (also inside the installed wheel) |
+| Distinct properties | **503 adversarial : 38 happy = 13.24 : 1** (required ≥ 2:1) |
+| Gate mutation sweep | **72 inventoried, 67 KILLED, 5 SURVIVED, 0 errored** |
+| Offline distribution verifier | **VERIFIED**, 8 negative controls run, 8 caught |
+| pyflakes | clean |
+| BR-1 freeze matrix | **VERIFIED** |
+
+All five survivors are the pre-existing classified ones — four **shadowed**, one
+**equivalent** while BR-1 is frozen. This pass introduced none, and changed no
+production behaviour to reduce the number. **This is author-owned assurance**, on
+the base rate D-32(5) records and accepts for BR-2C.
+
+### What this entry does not do
+
+**No BR-2C verifier engineering has begun**, and D-32(3) leaves the engineering
+half of §35.1's blocker standing in full. Until an external cryptographic audit
+is obtained and recorded, no artifact of this distribution may describe the
+verifier as audited, independently reviewed or production-ready — and none does.
 
 ## [0.2.3] — which refusals a verified result may carry (D-35)
 
