@@ -1,8 +1,8 @@
 # Ratification record — Cloud Scaling Phase 5B-0B, D-5B0B-4
 
-**Status:** ratified. Closes the one blocker on
-`ADR_CLOUD_SCALING_POLICY_AUTHENTICITY_PHASE5B0B.md` (branch
-`claude/phase-5b-0b-policy-authenticity-670bl1`, commit `1dd110f1`).
+**Status:** ratified. Closes the one blocker on the closure document,
+`ADR_CLOUD_SCALING_POLICY_AUTHENTICITY_PHASE5B0B.md`, which is alongside this file in the
+tree (merged as PR #1460, authored at commit `1dd110f1`).
 
 ## D-5B0B-4 — who owns the policy trust anchor
 
