@@ -59,7 +59,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ugence-benchmark-registry-authority"
 dynamic = ["version"]
-description = "Ugence Benchmark Registry Authority — BR-2A registry and exact-resolution contracts: the administrative lifecycle, its closed transition relation, nested-binding record and event shapes, typed refusals and inert ports (internal platform infrastructure; contracts only, no registry)."
+description = "Ugence Benchmark Registry Authority — BR-2B non-authoritative lifecycle kernel over BR-2A's registry and exact-resolution contracts: the administrative lifecycle, its closed transition relation, nested-binding record and event shapes, typed refusals, inert ports, and transition planning over caller-asserted state (internal platform infrastructure; no store, no verifier, no clock, no append path, no authority-issued result)."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Proprietary" }

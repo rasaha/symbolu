@@ -187,7 +187,7 @@ DIGEST_PROPERTY_SUFFIX = "_digest"
 
 
 def _root_canonicalizable_classes():
-    """The fifteen root-canonicalizable classes, in registry insertion order."""
+    """The eighteen root-canonicalizable classes, in registry insertion order."""
 
     return [
         (cls, domain)
@@ -440,11 +440,11 @@ def main() -> int:
         "distribution": DISTRIBUTION,
         "namespace": NAMESPACE,
         "package_version": api.__version__,
-        "milestone": "BR-2A",
+        "milestone": "BR-2B",
         "note": (
             "Machine-readable public-contract inventory. "
             "'Every type is constructible and canonicalizable' applies to "
-            "PUBLIC DATA CONTRACTS ONLY — the fifteen rows under "
+            "PUBLIC DATA CONTRACTS ONLY — the eighteen rows under "
             "'public_data_contracts'. It does NOT apply to Protocols, enums, "
             "errors, constants, pure validation functions, frozen descriptors "
             "or abstract type declarations, each of which is listed under "
@@ -479,7 +479,7 @@ def main() -> int:
             "One domain-separation tag per artifact class this subphase "
             "actually ships, and no tag for an artifact that does not exist. "
             "Nested-admissible-only classes are the exact frozen BR-1 contracts "
-            "a BR-2A graph may contain; they own NO BR-2A domain, because BR-2 "
+            "a BR-2 graph may contain; they own NO BR-2 domain, because BR-2 "
             "never re-digests a BR-1 artifact under a BR-2 domain — a BR-1 "
             "identity must keep exactly one digest, the one BR-1 computes. "
             "Derived from the sealed contract-type registry itself, so it "

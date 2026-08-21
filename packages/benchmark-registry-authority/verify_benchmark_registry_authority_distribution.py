@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build, install offline, and verify the BR-2A distribution — with negative controls.
+"""Build, install offline, and verify the BR-2B distribution — with negative controls.
 
 Builds a wheel and an sdist from a clean tree, installs the wheel **genuinely
 offline** into a throwaway virtual environment, and asserts that the installed
@@ -518,7 +518,7 @@ def main() -> int:  # noqa: C901 - a verifier is a long list of assertions
         bare = work / "bare"
         _run([sys.executable, "-m", "venv", str(bare)])
         bare_python = bare / bin_dir / ("python.exe" if os.name == "nt" else "python")
-        # Install ONLY the BR-2A wheel with no dependency available at all.
+        # Install ONLY this distribution's wheel with no dependency available at all.
         empty = work / "empty-wheelhouse"
         empty.mkdir()
         shutil.copy(wheel, empty)
@@ -550,7 +550,10 @@ def main() -> int:  # noqa: C901 - a verifier is a long list of assertions
     for label, caught in _CONTROLS:
         print(f"  {'caught ' if caught else 'MISSED '} {label}")
     if _FAILURES:
-        print(f"ISOLATED BR-2A DISTRIBUTION VERIFICATION FAILED — {len(_FAILURES)}")
+        print(
+            "ISOLATED BENCHMARK-REGISTRY-AUTHORITY DISTRIBUTION VERIFICATION "
+            f"FAILED — {len(_FAILURES)}"
+        )
         for failure in _FAILURES:
             print(f"  - {failure}")
         return 1

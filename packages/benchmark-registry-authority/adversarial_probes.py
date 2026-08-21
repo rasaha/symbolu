@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Independent adversarial probes for the Benchmark Registry Authority (BR-2A).
+"""Independent adversarial probes for the Benchmark Registry Authority (BR-2B).
 
 Deliberately **independent** of the package's own test suite: this file imports
 no test module, no ``_builders`` helper, no ``conftest`` and no private

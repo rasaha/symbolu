@@ -3,7 +3,7 @@
   "namespace": "ugence_benchmark_registry_authority",
   "package_version": "0.2.0",
   "canonicalization_version": "ugence.benchmark-registry-authority/canonicalization/v1",
-  "note": "One domain-separation tag per artifact class this subphase actually ships, and no tag for an artifact that does not exist. Nested-admissible-only classes are the exact frozen BR-1 contracts a BR-2A graph may contain; they own NO BR-2A domain, because BR-2 never re-digests a BR-1 artifact under a BR-2 domain \u2014 a BR-1 identity must keep exactly one digest, the one BR-1 computes. Derived from the sealed contract-type registry itself, so it cannot drift from the boundary the encoder enforces.",
+  "note": "One domain-separation tag per artifact class this subphase actually ships, and no tag for an artifact that does not exist. Nested-admissible-only classes are the exact frozen BR-1 contracts a BR-2 graph may contain; they own NO BR-2 domain, because BR-2 never re-digests a BR-1 artifact under a BR-2 domain \u2014 a BR-1 identity must keep exactly one digest, the one BR-1 computes. Derived from the sealed contract-type registry itself, so it cannot drift from the boundary the encoder enforces.",
   "root_canonicalizable": {
     "BenchmarkPublisherSubmissionEnvelope": "ugence.benchmark-registry-authority/publisher-submission-envelope/v1",
     "BenchmarkApprovalEnvelope": "ugence.benchmark-registry-authority/approval-envelope/v1",

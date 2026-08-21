@@ -1,4 +1,4 @@
-"""Pinned fixture builders for the BR-2A suite.
+"""Pinned fixture builders for the BR-2 suite.
 
 Every value here is a **fixed literal**. Nothing reads a clock, an environment
 variable, a random source or the filesystem, so the canonical bytes these
@@ -296,11 +296,15 @@ def tenant_expectation(**overrides) -> TenantRegistryScopeExpectation:
     return TenantRegistryScopeExpectation(**kwargs)
 
 
-#: One pinned fixture per shipped root-canonicalizable artifact class, in the
-#: ratified domain order. Fifteen builders for fifteen classes — every one of
-#: them appears in ``pinned_canonical_vectors.json``, in the canonical-domain
-#: inventory, in the public-contract inventory, and in the source/wheel/sdist
-#: parity checks.
+#: Pinned fixtures for the shipped root-canonicalizable artifact classes, in
+#: the ratified domain order. **Eighteen classes** — BR-2A's fifteen and
+#: BR-2B's three. The builder count is deliberately **not** one-to-one with
+#: them: ``rejected_admission_decision`` is a second fixture for
+#: ``BenchmarkAdmissionDecisionPayload`` and ``unoccupied_assertion`` a second
+#: for ``BenchmarkRegistrySnapshotAssertion``, so twenty builders cover the
+#: eighteen classes. Every one of the eighteen appears in
+#: ``pinned_canonical_vectors.json``, in the canonical-domain inventory, in the
+#: public-contract inventory, and in the source/wheel/sdist parity checks.
 def snapshot_assertion(**overrides) -> BenchmarkRegistrySnapshotAssertion:
     kwargs = dict(
         coordinate=coordinate(),
