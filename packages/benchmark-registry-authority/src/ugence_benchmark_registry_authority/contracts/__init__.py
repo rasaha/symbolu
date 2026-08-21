@@ -125,6 +125,7 @@ from .ports import (
 )
 from .trust import (
     BENCHMARK_TRUST_ANCHOR_EVALUATION_ORDER,
+    BENCHMARK_VERIFICATION_REFUSAL_REASONS,
     BENCHMARK_VERIFIED_RESULT_BOUND_FACTS,
     BenchmarkApprovalVerifiedResult,
     BenchmarkPublisherVerifiedResult,
@@ -284,4 +285,6 @@ __all__ = [
     "BENCHMARK_REVOCATION_VERIFIED_RESULT_DIGEST_DOMAIN",
     # D-34: the anchor-resolution outcome. Appended, never inserted.
     "BenchmarkTrustAnchorResolution",
+    # D-35: the refusal subset a verified result may carry.
+    "BENCHMARK_VERIFICATION_REFUSAL_REASONS",
 ]

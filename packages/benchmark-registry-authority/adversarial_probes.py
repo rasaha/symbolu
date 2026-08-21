@@ -69,6 +69,7 @@ from ugence_benchmark_registry_authority.api import (
     BenchmarkPublisherVerifiedResult,
     BenchmarkRevocationVerifiedResult,
     BENCHMARK_TRUST_ANCHOR_EVALUATION_ORDER,
+    BENCHMARK_VERIFICATION_REFUSAL_REASONS,
     BenchmarkTrustAnchorRecord,
     BenchmarkTrustAnchorResolution,
     BenchmarkTrustAnchorStatus,
@@ -1805,6 +1806,122 @@ def _q78():
     assert getattr(
         pkg.BenchmarkPublisherTrustDirectoryPort, "_is_protocol", False
     )
+
+
+@probe("Q-79 a verified result may carry twelve of the twenty-four refusals")
+def _q79():
+    assert len(BenchmarkRegistryRefusalReason) == 24
+    assert len(BENCHMARK_VERIFICATION_REFUSAL_REASONS) == 12
+    assert len(set(BENCHMARK_VERIFICATION_REFUSAL_REASONS)) == 12
+    # Every admissible member constructs on all three result types.
+    for builder in (publisher_verified, approval_verified, revocation_verified):
+        for reason in BENCHMARK_VERIFICATION_REFUSAL_REASONS:
+            built = builder(
+                outcome=BenchmarkVerificationOutcome.REFUSED,
+                refusal_reason=reason,
+                anchor_record_digest=None,
+            )
+            assert built.refusal_reason is reason, reason.name
+    # Declaration order survives: §22.13 sorts this vocabulary by index.
+    members = list(BenchmarkRegistryRefusalReason)
+    positions = [members.index(r) for r in BENCHMARK_VERIFICATION_REFUSAL_REASONS]
+    assert positions == sorted(positions), positions
+
+
+@probe("Q-80 the excluded twelve cannot reach any verified-result type")
+def _q80():
+    excluded = [
+        r
+        for r in BenchmarkRegistryRefusalReason
+        if r not in BENCHMARK_VERIFICATION_REFUSAL_REASONS
+    ]
+    assert len(excluded) == 12
+    # The nine registry-state facts, named rather than derived: a phase that
+    # ships no registry state cannot establish any of them (§35.1's BR-2C row).
+    assert {r.name for r in excluded} == {
+        "IDEMPOTENT_DUPLICATE",
+        "COORDINATE_SLOT_CONFLICT",
+        "DIGEST_ALREADY_BOUND",
+        "CONFUSABLE_COORDINATE",
+        "LIFECYCLE_CONFLICT",
+        "UNAUTHORIZED_TRANSITION",
+        "STALE_REGISTRY_SNAPSHOT",
+        "STORE_INTEGRITY_INVALID",
+        "STORE_UNAVAILABLE",
+        # D-10 puts supersession out of BR-2's scope entirely.
+        "UNSUPPORTED_SUPERSESSION",
+        # D-27 places the non-disclosure collapse at an external read boundary.
+        "NOT_FOUND",
+        "NOT_ADMITTED",
+    }
+    for builder in (publisher_verified, approval_verified, revocation_verified):
+        for reason in excluded:
+            exc = refuses(
+                lambda b=builder, r=reason: b(
+                    outcome=BenchmarkVerificationOutcome.REFUSED,
+                    refusal_reason=r,
+                    anchor_record_digest=None,
+                ),
+                BenchmarkRegistryContractError,
+            )
+            assert "not one a verified result may carry" in str(exc), reason.name
+
+
+@probe("Q-81 the subset is derived from the total fault-class map, not written out")
+def _q81():
+    # Recomputed here from the map, so a literal that had drifted would fail.
+    derived = tuple(
+        reason
+        for reason in BenchmarkRegistryRefusalReason
+        if fault_class_for(reason)
+        in (
+            BenchmarkRegistryFaultClass.TRUST_AND_AUTHENTICITY,
+            BenchmarkRegistryFaultClass.INDETERMINATE,
+        )
+    )
+    assert BENCHMARK_VERIFICATION_REFUSAL_REASONS == derived
+    # Total classification is what makes deriving safe where a literal is not.
+    for reason in BenchmarkRegistryRefusalReason:
+        assert fault_class_for(reason) is not None, reason.name
+    trust = [
+        r
+        for r in BenchmarkRegistryRefusalReason
+        if fault_class_for(r) is BenchmarkRegistryFaultClass.TRUST_AND_AUTHENTICITY
+    ]
+    assert len(trust) == 11, len(trust)
+    # INDETERMINATE joins without being in the trust class: D-35 rules it in.
+    indeterminate = BenchmarkRegistryRefusalReason.INDETERMINATE
+    assert (
+        fault_class_for(indeterminate)
+        is BenchmarkRegistryFaultClass.INDETERMINATE
+    )
+    assert indeterminate in BENCHMARK_VERIFICATION_REFUSAL_REASONS
+    assert set(BENCHMARK_VERIFICATION_REFUSAL_REASONS) == set(trust) | {
+        indeterminate
+    }
+
+
+@probe("Q-82 narrowing the subset added no member and moved no refusal count")
+def _q82():
+    assert len(BenchmarkRegistryRefusalReason) == 24
+    assert len(BENCHMARK_REGISTRY_ALL_REFUSAL_REASONS) == 41
+    # The four lifecycle refusals land on the verification seam, which is the
+    # one that evaluates them; the resolution seam's two survive the handoff.
+    for reason in BENCHMARK_TRUST_ANCHOR_EVALUATION_ORDER:
+        assert reason in BENCHMARK_VERIFICATION_REFUSAL_REASONS, reason.name
+    for name in ("TRUST_ANCHOR_NOT_FOUND", "TRUST_DIRECTORY_UNAVAILABLE"):
+        assert (
+            BenchmarkRegistryRefusalReason[name]
+            in BENCHMARK_VERIFICATION_REFUSAL_REASONS
+        )
+    # The other half of the biconditional is untouched by the narrowing.
+    for reason in BENCHMARK_VERIFICATION_REFUSAL_REASONS:
+        refuses(
+            lambda r=reason: publisher_verified(
+                outcome=BenchmarkVerificationOutcome.VERIFIED, refusal_reason=r
+            ),
+            BenchmarkRegistryContractError,
+        )
 
 
 def main() -> int:

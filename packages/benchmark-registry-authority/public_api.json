@@ -1,7 +1,7 @@
 {
   "distribution": "ugence-benchmark-registry-authority",
   "namespace": "ugence_benchmark_registry_authority",
-  "package_version": "0.2.2",
+  "package_version": "0.2.3",
   "curated_api_module": "ugence_benchmark_registry_authority.api",
   "note": "Machine-readable snapshot of the curated public API (ugence_benchmark_registry_authority.api.__all__). __version__ is carried separately as package_version and is NOT a member of 'symbols', so symbols is exactly one shorter than api.__all__ — both counts are asserted, and neither is 'corrected' to match the other. tests/packaging/test_public_api.py asserts this file equals the actual package surface, and verify_benchmark_registry_authority_distribution.py asserts the same for the built wheel, the built sdist and the isolated installed runtime.",
   "symbols": {
@@ -481,6 +481,23 @@
         "approval_authenticity_established",
         "registry_admission_established",
         "trusted_resolution_established"
+      ]
+    },
+    "BENCHMARK_VERIFICATION_REFUSAL_REASONS": {
+      "kind": "constant",
+      "value": [
+        "NO_TRUST_ANCHOR_CONFIGURED",
+        "PUBLISHER_UNTRUSTED",
+        "SIGNATURE_INVALID",
+        "APPROVAL_UNVERIFIED",
+        "INDETERMINATE",
+        "TRUST_ANCHOR_NOT_FOUND",
+        "TRUST_ANCHOR_REVOKED",
+        "TRUST_ANCHOR_DISABLED",
+        "TRUST_ANCHOR_NOT_YET_VALID",
+        "TRUST_ANCHOR_EXPIRED",
+        "TRUST_DIRECTORY_UNAVAILABLE",
+        "STALE_TRUST_SNAPSHOT"
       ]
     },
     "BENCHMARK_VERIFIED_RESULT_BOUND_FACTS": {

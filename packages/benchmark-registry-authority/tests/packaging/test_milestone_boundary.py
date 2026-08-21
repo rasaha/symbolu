@@ -110,7 +110,7 @@ FORBIDDEN_CAPABILITY_TOKENS = tuple(
 def test_happy_the_package_version_is_the_br2c_0_rung():
     """D-33's rung: BR-2C's contracts landed, no BR-2C capability did."""
 
-    assert api.__version__ == "0.2.2"
+    assert api.__version__ == "0.2.3"
     assert VERSION_SUBPHASE[api.__version__] == "BR-2C-0"
 
 

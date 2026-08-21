@@ -133,16 +133,21 @@ from .canonical import (
     canonical_digest,
 )
 from .enums import (
+    BenchmarkRegistryFaultClass,
     BenchmarkSignatureProfile,
     BenchmarkTrustAnchorStatus,
     BenchmarkTrustRole,
     BenchmarkVerificationOutcome,
 )
 from .errors import BenchmarkRegistryContractError
-from .reasons import BenchmarkRegistryRefusalReason
+from .reasons import (
+    BENCHMARK_REGISTRY_REFUSAL_FAULT_CLASSES,
+    BenchmarkRegistryRefusalReason,
+)
 
 __all__ = [
     "BENCHMARK_TRUST_ANCHOR_EVALUATION_ORDER",
+    "BENCHMARK_VERIFICATION_REFUSAL_REASONS",
     "BENCHMARK_VERIFIED_RESULT_BOUND_FACTS",
     "BenchmarkTrustAnchorRecord",
     "BenchmarkTrustAnchorResolution",
@@ -197,6 +202,49 @@ BENCHMARK_TRUST_ANCHOR_EVALUATION_ORDER: tuple = (
 _TRUST_ANCHOR_RESOLUTION_REFUSAL_REASONS: tuple = (
     BenchmarkRegistryRefusalReason.TRUST_ANCHOR_NOT_FOUND,
     BenchmarkRegistryRefusalReason.TRUST_DIRECTORY_UNAVAILABLE,
+)
+
+#: The **only** refusal reasons a ``REFUSED`` verified result may carry (D-35):
+#: the eleven members classified ``TRUST_AND_AUTHENTICITY``, plus
+#: ``INDETERMINATE``. Twelve of the twenty-four; twelve excluded.
+#:
+#: **Derived from the fault-class map, never written out.** §35.6 makes the
+#: vocabulary append-only, and a hand-copied list of twelve would have to be
+#: re-edited by hand every time a member is appended — the drift D-35 closed the
+#: subtractive option to avoid. Deriving it means the next appended member
+#: classifies itself in or out, and D-27 and D-28 already require the
+#: classification to be **total**, so there is no member the derivation can miss.
+#:
+#: Why ``INDETERMINATE`` joins a class it is not in. It is its own fault class
+#: (:attr:`~.enums.BenchmarkRegistryFaultClass.INDETERMINATE`), so the trust
+#: class alone would exclude it, and D-35 rules it in explicitly rather than
+#: leaving it to be read off the map: §35.9's Q-2C-5 records that a resolver
+#: becoming unreachable in flight refuses through ``INDETERMINATE`` and so fails
+#: closed, which makes it a live verification-time answer. A subset with no
+#: fail-closed catch-all would force an undeterminable condition into a specific
+#: trust claim, or into no representable answer at all.
+#:
+#: What is excluded, and why it is not a judgement call. §35.1's BR-2C row
+#: forbids the subphase to ship "any storage, and any registry state whatsoever",
+#: and nine of the excluded twelve are registry-state facts a phase with no
+#: registry state cannot know. ``UNSUPPORTED_SUPERSESSION`` is D-10's
+#: out-of-scope refusal, and BR-2 infers no supersession at any phase.
+#: ``NOT_FOUND`` and ``NOT_ADMITTED`` are ``READ_NON_DISCLOSURE``, and D-27
+#: deliberately places the non-disclosure collapse at a later **external read
+#: boundary** rather than in the verification result, so admitting the read
+#: vocabulary here would invert D-27.
+#:
+#: Declaration order is preserved — the enum is iterated, not a set — so a
+#: consumer sorting by index under §22.13 reads the same order this vocabulary
+#: has everywhere else.
+BENCHMARK_VERIFICATION_REFUSAL_REASONS: tuple = tuple(
+    reason
+    for reason in BenchmarkRegistryRefusalReason
+    if BENCHMARK_REGISTRY_REFUSAL_FAULT_CLASSES[reason]
+    in (
+        BenchmarkRegistryFaultClass.TRUST_AND_AUTHENTICITY,
+        BenchmarkRegistryFaultClass.INDETERMINATE,
+    )
 )
 
 #: The nine facts D-24 requires every verified result to bind, as the field
@@ -257,6 +305,15 @@ def _require_outcome_and_reason_agree(
       consumer branching on whichever field it happened to read would get two
       different answers from one object.
 
+    D-35 narrows *which* reason. A ``REFUSED`` result carries one of the twelve
+    in :data:`BENCHMARK_VERIFICATION_REFUSAL_REASONS` and not merely any member
+    of the BR-2 vocabulary. Before that ruling this accepted all twenty-four, so
+    a verified result could refuse with ``COORDINATE_SLOT_CONFLICT`` or
+    ``STORE_UNAVAILABLE`` — registry-state facts a subphase §35.1 forbids to ship
+    "any registry state whatsoever" cannot know — or with ``NOT_FOUND``, whose
+    non-disclosure collapse D-27 places at a later external read boundary rather
+    than in this result.
+
     Enforced in the constructor rather than documented for a caller to honour,
     on the same ground the actor-separation check lives in the approval
     envelope's constructor: any later and the inconsistent artifact already
@@ -283,6 +340,16 @@ def _require_outcome_and_reason_agree(
     require_enum_member(
         refusal_reason, BenchmarkRegistryRefusalReason, "refusal_reason"
     )
+    if refusal_reason not in BENCHMARK_VERIFICATION_REFUSAL_REASONS:
+        raise BenchmarkRegistryContractError(
+            f"refusal_reason {refusal_reason.value} is not one a verified "
+            "result may carry; D-35 admits the eleven members classified "
+            "TRUST_AND_AUTHENTICITY and INDETERMINATE, and nothing else — "
+            f"{refusal_reason.value} is classified "
+            f"{BENCHMARK_REGISTRY_REFUSAL_FAULT_CLASSES[refusal_reason].value},"
+            " which is a fact about registry state, registry scope or a read "
+            "boundary that a phase shipping no registry state cannot establish"
+        )
 
 
 def _require_anchor_digest_binding(

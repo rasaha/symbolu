@@ -13,7 +13,10 @@ import pytest
 
 import _builders as fx
 from ugence_benchmark_registry_authority.api import (
+    BENCHMARK_REGISTRY_ALL_REFUSAL_REASONS,
+    BENCHMARK_REGISTRY_REFUSAL_FAULT_CLASSES,
     BENCHMARK_TRUST_ANCHOR_EVALUATION_ORDER,
+    BENCHMARK_VERIFICATION_REFUSAL_REASONS,
     BENCHMARK_VERIFIED_RESULT_BOUND_FACTS,
     BenchmarkApprovalVerifiedResult,
     BenchmarkPublisherVerifiedResult,
@@ -633,3 +636,240 @@ def test_a_resolution_is_not_canonicalizable_and_mints_no_domain():
     with pytest.raises(BenchmarkRegistryCanonicalizationError):
         canonical_digest(fx.trust_anchor_resolution())
     assert not hasattr(fx.trust_anchor_resolution(), "anchor_record_digest")
+
+
+# --------------------------------------------------------------------------- #
+# D-35: which refusals a verified result may carry — twelve of the twenty-four
+# --------------------------------------------------------------------------- #
+#: The nine excluded members that are **registry-state facts**. Named here, not
+#: derived, because the point of the list is that a phase §35.1 forbids to ship
+#: "any registry state whatsoever" cannot establish any of them, and that claim
+#: should be readable rather than computed.
+REGISTRY_STATE_REFUSALS = (
+    "IDEMPOTENT_DUPLICATE",
+    "COORDINATE_SLOT_CONFLICT",
+    "DIGEST_ALREADY_BOUND",
+    "CONFUSABLE_COORDINATE",
+    "LIFECYCLE_CONFLICT",
+    "UNAUTHORIZED_TRANSITION",
+    "STALE_REGISTRY_SNAPSHOT",
+    "STORE_INTEGRITY_INVALID",
+    "STORE_UNAVAILABLE",
+)
+
+#: The other three exclusions, each on its own ground rather than on registry
+#: state: D-10 puts supersession out of BR-2's scope entirely, and D-27 places
+#: the non-disclosure collapse at a later external read boundary.
+SCOPE_AND_READ_REFUSALS = (
+    "UNSUPPORTED_SUPERSESSION",
+    "NOT_FOUND",
+    "NOT_ADMITTED",
+)
+
+
+def test_happy_the_subset_is_twelve_of_the_twenty_four():
+    assert len(BenchmarkRegistryRefusalReason) == 24
+    assert len(BENCHMARK_VERIFICATION_REFUSAL_REASONS) == 12
+    assert len(set(BENCHMARK_VERIFICATION_REFUSAL_REASONS)) == 12
+
+
+def test_the_subset_is_derived_from_the_fault_class_map_not_written_out():
+    """D-35's load-bearing mechanic, asserted rather than trusted.
+
+    A hand-copied list of twelve is the subtractive option D-35 closed: it must
+    be re-edited by hand every time §35.6 appends a member, and an author who
+    forgets leaves a ratified member silently inadmissible. Recomputing the
+    derivation here from the map means this test fails if someone replaces the
+    comprehension with a literal that has since drifted.
+    """
+
+    derived = tuple(
+        reason
+        for reason in BenchmarkRegistryRefusalReason
+        if BENCHMARK_REGISTRY_REFUSAL_FAULT_CLASSES[reason]
+        in (
+            BenchmarkRegistryFaultClass.TRUST_AND_AUTHENTICITY,
+            BenchmarkRegistryFaultClass.INDETERMINATE,
+        )
+    )
+    assert BENCHMARK_VERIFICATION_REFUSAL_REASONS == derived
+
+
+def test_the_next_appended_member_classifies_itself_in_or_out():
+    """Every member has a class, so the derivation can miss none of them.
+
+    D-27 and D-28 require the classification to be total; that totality is what
+    makes deriving safe where a literal would not be.
+    """
+
+    for reason in BenchmarkRegistryRefusalReason:
+        assert reason in BENCHMARK_REGISTRY_REFUSAL_FAULT_CLASSES, reason.name
+        assert (
+            reason in BENCHMARK_VERIFICATION_REFUSAL_REASONS
+        ) is (
+            fault_class_for(reason)
+            in (
+                BenchmarkRegistryFaultClass.TRUST_AND_AUTHENTICITY,
+                BenchmarkRegistryFaultClass.INDETERMINATE,
+            )
+        ), reason.name
+
+
+def test_the_subset_preserves_declaration_order():
+    """§22.13 sorts refusals by declaration index; a set would lose that."""
+
+    members = list(BenchmarkRegistryRefusalReason)
+    positions = [members.index(r) for r in BENCHMARK_VERIFICATION_REFUSAL_REASONS]
+    assert positions == sorted(positions)
+
+
+def test_the_eleven_trust_members_and_indeterminate_are_exactly_the_subset():
+    trust = [
+        r
+        for r in BenchmarkRegistryRefusalReason
+        if fault_class_for(r) is BenchmarkRegistryFaultClass.TRUST_AND_AUTHENTICITY
+    ]
+    assert len(trust) == 11
+    assert set(BENCHMARK_VERIFICATION_REFUSAL_REASONS) == set(trust) | {
+        BenchmarkRegistryRefusalReason.INDETERMINATE
+    }
+
+
+def test_indeterminate_is_in_the_subset_without_being_in_the_trust_class():
+    """D-35 rules it in explicitly; the class alone would have excluded it."""
+
+    indeterminate = BenchmarkRegistryRefusalReason.INDETERMINATE
+    assert (
+        fault_class_for(indeterminate)
+        is BenchmarkRegistryFaultClass.INDETERMINATE
+    )
+    assert (
+        fault_class_for(indeterminate)
+        is not BenchmarkRegistryFaultClass.TRUST_AND_AUTHENTICITY
+    )
+    assert indeterminate in BENCHMARK_VERIFICATION_REFUSAL_REASONS
+
+
+@pytest.mark.parametrize("name,builder", RESULT_BUILDERS)
+@pytest.mark.parametrize(
+    "reason", BENCHMARK_VERIFICATION_REFUSAL_REASONS, ids=lambda r: r.name
+)
+def test_every_admissible_reason_constructs_on_every_result_type(
+    name, builder, reason
+):
+    result = builder(
+        outcome=BenchmarkVerificationOutcome.REFUSED,
+        refusal_reason=reason,
+        anchor_record_digest=None,
+    )
+    assert result.refusal_reason is reason
+    assert result.outcome is BenchmarkVerificationOutcome.REFUSED
+
+
+@pytest.mark.parametrize("name,builder", RESULT_BUILDERS)
+@pytest.mark.parametrize(
+    "reason",
+    [
+        r
+        for r in BenchmarkRegistryRefusalReason
+        if r not in BENCHMARK_VERIFICATION_REFUSAL_REASONS
+    ],
+    ids=lambda r: r.name,
+)
+def test_every_excluded_reason_is_refused_on_every_result_type(
+    name, builder, reason
+):
+    with pytest.raises(BenchmarkRegistryContractError) as raised:
+        builder(
+            outcome=BenchmarkVerificationOutcome.REFUSED,
+            refusal_reason=reason,
+            anchor_record_digest=None,
+        )
+    assert "is not one a verified result may carry" in str(raised.value)
+    assert reason.value in str(raised.value)
+
+
+def test_the_twelve_excluded_are_exactly_the_nine_plus_three_and_no_others():
+    """Both exclusion grounds enumerated, so neither can quietly grow."""
+
+    excluded = {
+        r.name
+        for r in BenchmarkRegistryRefusalReason
+        if r not in BENCHMARK_VERIFICATION_REFUSAL_REASONS
+    }
+    assert excluded == set(REGISTRY_STATE_REFUSALS) | set(SCOPE_AND_READ_REFUSALS)
+    assert len(excluded) == 12
+
+
+@pytest.mark.parametrize("name", REGISTRY_STATE_REFUSALS)
+def test_a_registry_state_refusal_cannot_reach_a_verified_result(name):
+    """§35.1: BR-2C ships no storage and no registry state whatsoever."""
+
+    reason = BenchmarkRegistryRefusalReason[name]
+    assert fault_class_for(reason) in (
+        BenchmarkRegistryFaultClass.IDEMPOTENCE,
+        BenchmarkRegistryFaultClass.COORDINATE_CONFLICT,
+        BenchmarkRegistryFaultClass.LIFECYCLE_INTEGRITY,
+        BenchmarkRegistryFaultClass.STORE_INTEGRITY,
+    )
+    with pytest.raises(BenchmarkRegistryContractError):
+        fx.refused_publisher_verified_result(refusal_reason=reason)
+
+
+def test_supersession_is_excluded_on_d10_scope_and_not_on_registry_state():
+    reason = BenchmarkRegistryRefusalReason.UNSUPPORTED_SUPERSESSION
+    assert (
+        fault_class_for(reason) is BenchmarkRegistryFaultClass.LIFECYCLE_INTEGRITY
+    )
+    with pytest.raises(BenchmarkRegistryContractError):
+        fx.refused_publisher_verified_result(refusal_reason=reason)
+
+
+@pytest.mark.parametrize("name", ["NOT_FOUND", "NOT_ADMITTED"])
+def test_the_read_vocabulary_never_enters_a_verification_result(name):
+    """D-27 puts the non-disclosure collapse at an external read boundary."""
+
+    reason = BenchmarkRegistryRefusalReason[name]
+    assert (
+        fault_class_for(reason) is BenchmarkRegistryFaultClass.READ_NON_DISCLOSURE
+    )
+    with pytest.raises(BenchmarkRegistryContractError):
+        fx.refused_publisher_verified_result(refusal_reason=reason)
+
+
+def test_the_four_lifecycle_refusals_stay_admissible_on_a_verified_result():
+    """D-27's distinctions land here — this is the seam that evaluates them."""
+
+    for reason in BENCHMARK_TRUST_ANCHOR_EVALUATION_ORDER:
+        assert reason in BENCHMARK_VERIFICATION_REFUSAL_REASONS
+        result = fx.refused_publisher_verified_result(refusal_reason=reason)
+        assert result.refusal_reason is reason
+
+
+def test_the_resolution_seams_two_refusals_are_a_subset_of_the_verification_twelve():
+    """D-34's two are among D-35's twelve, so a refusal survives the handoff."""
+
+    for name in ("TRUST_ANCHOR_NOT_FOUND", "TRUST_DIRECTORY_UNAVAILABLE"):
+        assert (
+            BenchmarkRegistryRefusalReason[name]
+            in BENCHMARK_VERIFICATION_REFUSAL_REASONS
+        )
+
+
+def test_this_row_adds_no_member_and_moves_no_refusal_count():
+    """D-35 narrows a constructor; §35.6's append-only guarantee is untouched."""
+
+    assert len(BenchmarkRegistryRefusalReason) == 24
+    assert len(BENCHMARK_REGISTRY_ALL_REFUSAL_REASONS) == 41
+    assert len(BENCHMARK_REGISTRY_REFUSAL_FAULT_CLASSES) == 24
+
+
+def test_a_verified_outcome_still_carries_no_reason_at_all():
+    """The biconditional's other half is unchanged by the narrowing."""
+
+    for reason in BENCHMARK_VERIFICATION_REFUSAL_REASONS:
+        with pytest.raises(BenchmarkRegistryContractError):
+            fx.publisher_verified_result(
+                outcome=BenchmarkVerificationOutcome.VERIFIED,
+                refusal_reason=reason,
+            )

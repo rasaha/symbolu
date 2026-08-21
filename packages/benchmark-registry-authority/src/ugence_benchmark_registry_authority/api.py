@@ -8,7 +8,7 @@ in the built wheel, in the built sdist, and in an isolated installed runtime.
 
 What this surface contains
 --------------------------
-The structural contract layer at **0.2.2**. It carries BR-2A's ratified
+The structural contract layer at **0.2.3**. It carries BR-2A's ratified
 "Registry and exact-resolution *contracts*" — D-01 through D-17 — and the
 **non-authoritative lifecycle kernel** BR-2B adds on top of them.
 
@@ -35,7 +35,7 @@ The structural contract layer at **0.2.2**. It carries BR-2A's ratified
   exact verified-result types that replaced the ``bool``-returning approval-
   verifier and publisher-trust-directory seams.
 
-Why the BR-2C contracts are here at ``0.2.2``
+Why the BR-2C contracts are here at ``0.2.3``
 ----------------------------------------------
 D-23 classifies BR-2C as blocked on **both** unratified governance and audited
 cryptographic engineering. D-24, D-25 and D-26 clear the governance half by
@@ -43,7 +43,7 @@ ruling the contract change; D-32 waives the distinct in-repo reviewer for BR-2C
 only. **The engineering half stands**, so this release carries BR-2C's ratified
 *contract surface* and none of its capability.
 
-D-33 mints the rung that says exactly that. ``package_version`` is ``0.2.2`` and
+D-33 mints the rung that says exactly that. ``package_version`` is ``0.2.3`` and
 the milestone label is ``BR-2C-0`` — *BR-2C's contracts landed; no BR-2C
 capability did* — which sits between ``BR-2B`` and ``BR-2C`` in
 ``tests/_milestones.py``'s ladder. It is a **version rung, not a subphase**:
@@ -212,6 +212,7 @@ from .contracts import (
     BenchmarkApprovalVerifiedResult,
     BenchmarkRevocationVerifiedResult,
     BENCHMARK_TRUST_ANCHOR_EVALUATION_ORDER,
+    BENCHMARK_VERIFICATION_REFUSAL_REASONS,
     BENCHMARK_VERIFIED_RESULT_BOUND_FACTS,
     BENCHMARK_TRUST_ANCHOR_RECORD_DIGEST_DOMAIN,
     BENCHMARK_PUBLISHER_VERIFIED_RESULT_DIGEST_DOMAIN,
@@ -332,4 +333,7 @@ __all__ = [
     # D-34: the anchor-resolution outcome the trust-directory seam returns.
     # Appended, never inserted.
     "BenchmarkTrustAnchorResolution",
+    # D-35: the refusal subset a verified result may carry. Appended,
+    # never inserted.
+    "BENCHMARK_VERIFICATION_REFUSAL_REASONS",
 ]

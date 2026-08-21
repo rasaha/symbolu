@@ -18,7 +18,8 @@
 # domains. It determines what transition WOULD BE valid; nothing here makes one
 # occur.
 #
-# BR-2C-0 (this release, 0.2.2; the rung also carries 0.2.1) — BR-2C's ratified
+# BR-2C-0 (this release, 0.2.3; the rung also carries 0.2.1 and 0.2.2) —
+# BR-2C's ratified
 # CONTRACT SURFACE, and no
 # BR-2C capability (ADR §35.2 D-33 mints the rung; D-24, D-25 and D-26 rule the
 # surface):

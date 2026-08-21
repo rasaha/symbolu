@@ -890,6 +890,19 @@ def is_byte_identical_resubmission(""",
         """        if mismatched:""",
         """        if False:""",
     ),
+    # ---- D-35: the refusal subset a verified result may carry ------------ #
+    Gate(
+        "G-77",
+        "verified-result-refusal-subset",
+        "trust.py",
+        "the membership gate keeping a REFUSED verified result to D-35's twelve; "
+        "without it a result can refuse with COORDINATE_SLOT_CONFLICT or "
+        "STORE_UNAVAILABLE, which are registry-state facts a subphase that "
+        "ships no registry state cannot establish, or with NOT_FOUND, whose "
+        "collapse D-27 places at a later external read boundary",
+        """    if refusal_reason not in BENCHMARK_VERIFICATION_REFUSAL_REASONS:""",
+        """    if False:""",
+    ),
     # ---- withdrawn by owner ruling, 2026-08-20 (ADR §35 D-20) ------------- #
     # G-57, G-58, G-60, G-61 and G-62 planted plan-consuming callables in
     # PRIVATE source and asserted this package could discover them: an

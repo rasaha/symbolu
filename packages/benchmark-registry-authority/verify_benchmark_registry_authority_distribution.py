@@ -154,8 +154,8 @@ def main() -> int:  # noqa: C901 - a verifier is a long list of assertions
         sdist = _latest(findlinks, f"{NAMESPACE}-*.tar.gz")
         br1_wheel = _latest(findlinks, "ugence_benchmark_registry-*.whl")
         print(f"      built {wheel.name}, {sdist.name}, {br1_wheel.name}")
-        check("the wheel carries the BR-2C-0 version", "0.2.2" in wheel.name, wheel.name)
-        check("the sdist carries the BR-2C-0 version", "0.2.2" in sdist.name, sdist.name)
+        check("the wheel carries the BR-2C-0 version", "0.2.3" in wheel.name, wheel.name)
+        check("the sdist carries the BR-2C-0 version", "0.2.3" in sdist.name, sdist.name)
 
         # ------------------------------------------------------------- #
         # 2. Artifact hygiene — both artifacts, negative-controlled
@@ -348,8 +348,8 @@ def main() -> int:  # noqa: C901 - a verifier is a long list of assertions
         )
         check(
             "installed api.__all__ count and manifest symbol count both hold",
-            installed_facts["api_all_count"] == 107
-            and len(source_manifest["symbols"]) == 106,
+            installed_facts["api_all_count"] == 108
+            and len(source_manifest["symbols"]) == 107,
             f"{installed_facts['api_all_count']} / {len(source_manifest['symbols'])}",
         )
         check(

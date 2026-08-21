@@ -2,8 +2,8 @@
   "distribution": "ugence-benchmark-registry-authority",
   "milestone": "BR-2C-0",
   "note": "Complete inventory of every load-bearing gate, and the measured result of neutralizing each one in turn against the full suite and the author-owned adversarial probes. Production behaviour was not changed to chase a zero-survivor number; any survivor is classified as equivalent, shadowed (naming the shadowing gate), or a real gap. Regenerate by running gate_mutation_sweep.py.",
-  "gates_inventoried": 71,
-  "killed": 66,
+  "gates_inventoried": 72,
+  "killed": 67,
   "survived": 5,
   "errored": 0,
   "categories": {
@@ -135,6 +135,9 @@
     ],
     "resolution-asked-versus-answered": [
       "G-76"
+    ],
+    "verified-result-refusal-subset": [
+      "G-77"
     ]
   },
   "ledger": [
@@ -705,6 +708,14 @@
       "description": "the triple-match gate; without it a resolver may answer a question it was not asked, and an anchor from one role namespace can be returned for a lookup in another \u2014 the cross-role substitution D-26 forbids",
       "result": "KILLED",
       "first_failure": "test:tests/contract/test_trust_contracts.py::test_a_resolver_may_not_answer_a_question_it_was_not_asked[role-REVOKER]"
+    },
+    {
+      "gate": "G-77",
+      "category": "verified-result-refusal-subset",
+      "module": "trust.py",
+      "description": "the membership gate keeping a REFUSED verified result to D-35's twelve; without it a result can refuse with COORDINATE_SLOT_CONFLICT or STORE_UNAVAILABLE, which are registry-state facts a subphase that ships no registry state cannot establish, or with NOT_FOUND, whose collapse D-27 places at a later external read boundary",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_trust_contracts.py::test_every_excluded_reason_is_refused_on_every_result_type[IDEMPOTENT_DUPLICATE-BenchmarkPublisherVerifiedResult-publisher_verified_result]"
     }
   ],
   "survivor_classifications": {

@@ -2,9 +2,139 @@
 
 All notable changes to this distribution. The format follows Keep a Changelog;
 versioning is Semantic Versioning, and the version ladder is the ratified one:
-BR-2A `0.1.0`, BR-2B `0.2.0`, **BR-2C-0 `0.2.1` and `0.2.2`**, BR-2C `0.3.0`,
-BR-2D `0.4.0`, BR-2E `0.5.0` (ADR §35 D-01, amended 2026-08-20, and D-33). Five of the six
-rungs are subphases; `BR-2C-0` is a **version rung** and mints no closure audit.
+BR-2A `0.1.0`, BR-2B `0.2.0`, **BR-2C-0 `0.2.1`, `0.2.2` and `0.2.3`**, BR-2C
+`0.3.0`, BR-2D `0.4.0`, BR-2E `0.5.0` (ADR §35 D-01, amended 2026-08-20, and
+D-33). Five of the six rungs are subphases; `BR-2C-0` is a **version rung** and
+mints no closure audit.
+
+## [0.2.3] — which refusals a verified result may carry (D-35)
+
+**Contracts only. No verifier ships, and the verifier these contracts describe
+has not been audited and is not production-ready.** D-32 requires that statement
+to stand until an external cryptographic audit of the BR-2C verifier is obtained
+and recorded, and makes that audit a **hard precondition to any production use**.
+It waives the *distinct in-repo reviewer* for BR-2C only; the **engineering half**
+of §35.1's blocker is untouched, so the audited verifier, the composition-root
+trust-resolver design and the key parser are **not begun**.
+
+`0.2.1` recorded, and `0.2.2` carried forward, that which refusal members a
+verified result may carry was "unconstrained beyond membership of the BR-2
+vocabulary". **D-35 rules the subset. This is the last of the three items the
+BR-2C contract slice left open.**
+
+### Changed — a REFUSED result carries twelve of the twenty-four
+
+- **`_require_outcome_and_reason_agree`** (`contracts/trust.py`) narrows from
+  membership of `BenchmarkRegistryRefusalReason` to membership of
+  `BENCHMARK_VERIFICATION_REFUSAL_REASONS`. Before this, a verified result could
+  refuse with `COORDINATE_SLOT_CONFLICT`, `STORE_UNAVAILABLE` or `NOT_FOUND`.
+  The biconditional's other half is unchanged: `VERIFIED` still carries no
+  reason, `REFUSED` still carries exactly one, and both other combinations stay
+  unconstructible.
+
+### Added — one specification constant, derived and not written out
+
+- **`BENCHMARK_VERIFICATION_REFUSAL_REASONS`** — the eleven members classified
+  `TRUST_AND_AUTHENTICITY`, **plus `INDETERMINATE`**. Twelve admissible; twelve
+  excluded. Published on the model of `BENCHMARK_TRUST_ANCHOR_EVALUATION_ORDER`,
+  for the same reason: the contract published today is the contract verified
+  later, and a verifier that had to reinterpret it could reinterpret it
+  differently.
+- **Derived from the fault-class map, never enumerated.** §35.6 makes the
+  vocabulary append-only, and a hand-copied list of twelve would need re-editing
+  by hand on every appended member — the drift D-35 closed the subtractive
+  option to avoid. Deriving means the next member classifies itself in or out,
+  and D-27 and D-28 already require the classification to be **total**, so the
+  derivation can miss none. A test and a probe both recompute it from the map,
+  so a literal that had since drifted would fail rather than pass quietly.
+- **Declaration order is preserved** — the enum is iterated, not a set — so a
+  consumer sorting by index under §22.13 reads the order this vocabulary has
+  everywhere else.
+
+### `INDETERMINATE` joins, ruled explicitly rather than read off the map
+
+It is its **own** fault class, not a trust one, so the class alone would have
+excluded it. §35.9's Q-2C-5 records that a resolver becoming unreachable in
+flight refuses through `INDETERMINATE` and so fails closed, which makes it a live
+verification-time answer. A subset with no fail-closed catch-all would force an
+undeterminable condition into a specific trust claim, or into no representable
+answer at all.
+
+### What is excluded, and on which ground
+
+**Nine are registry-state facts** a subphase §35.1 forbids to ship "any storage,
+and any registry state whatsoever" cannot establish: `IDEMPOTENT_DUPLICATE`,
+`COORDINATE_SLOT_CONFLICT`, `DIGEST_ALREADY_BOUND`, `CONFUSABLE_COORDINATE`,
+`LIFECYCLE_CONFLICT`, `UNAUTHORIZED_TRANSITION`, `STALE_REGISTRY_SNAPSHOT`,
+`STORE_INTEGRITY_INVALID` and `STORE_UNAVAILABLE`.
+
+**`UNSUPPORTED_SUPERSESSION`** is D-10's out-of-scope refusal; BR-2 infers no
+supersession at any phase.
+
+**`NOT_FOUND` and `NOT_ADMITTED`** are `READ_NON_DISCLOSURE`, and D-27
+deliberately places the non-disclosure collapse at a later **external read
+boundary** rather than in the verification result — admitting the read
+vocabulary here would invert D-27.
+
+The four anchor-lifecycle refusals **stay admissible**: this is the seam that
+evaluates them, on D-28's published order. D-34's two resolution refusals are
+among the twelve, so a refusal survives the handoff from the resolution seam to
+the verification seam intact.
+
+### Measured surface movement
+
+| Manifest | Before | After |
+| --- | --- | --- |
+| `api.__all__` | 107 | **108** |
+| `public_api.json` symbols | 106 | **107** |
+| public-contract inventory rows | 22 | **22** |
+| canonical domains / pinned vectors | 22 | **22** |
+| BR-2 refusal vocabulary | 24 | **24** |
+| combined BR-1/BR-2 list | 41 | **41** |
+
+Regenerated with `tools/generate_manifests.py`, never hand-edited. A constant is
+not a contract type, so nothing is sealed and the three sealed manifests do not
+move. **No refusal member is added, removed, renamed, re-valued or re-ordered** —
+this row narrows a constructor — so §35.6's append-only guarantee is untouched
+and the composite indices stay 17..40.
+
+### `package_version` moves to `0.2.3`, on the rung D-33 minted
+
+Same rung, third version. `VERSION_SUBPHASE` maps `0.2.1`, `0.2.2` **and**
+`0.2.3` to `BR-2C-0`: the rung names what a version ships rather than how many
+times it shipped, so all three ban the same twelve capability tokens. `0.3.0`
+stays the audited verifier.
+
+Every milestone-label site D-33's amended row enumerates moved with the version,
+including the two version pins **and** the independent `api.__all__` count the
+offline distribution verifier re-derives — a site the row did not name until
+this release added it.
+
+### Measured verification
+
+| Check | Result |
+| --- | --- |
+| Package suite | **2108 passed** |
+| Independent adversarial probes | **83 passed** (also inside the installed wheel) |
+| Gate mutation sweep | **72 inventoried, 67 KILLED, 5 SURVIVED, 0 errored** |
+| Offline distribution verifier | **VERIFIED**, 8 negative controls run, 8 caught |
+| pyflakes | clean |
+| BR-1 freeze matrix | **VERIFIED** |
+
+**G-77**, the narrowed membership gate, is inventoried rather than left uncounted,
+and is KILLED. All five survivors are the pre-existing classified ones; this
+release introduced none. **This is author-owned assurance**, on the base rate
+D-32(5) records and accepts for BR-2C.
+
+### Nothing is left open by this entry
+
+D-33, D-34 and D-35 are all implemented. What stands is the **engineering half**
+of §35.1's BR-2C blocker, untouched by any of them: a secure verifier and a
+composition-root trust-resolver design, externally audited, reusing neither the
+Policy Authority nor the Risk Authority Ed25519 implementation. **No BR-2C
+verifier engineering has begun**, and until that external audit is obtained and
+recorded, no artifact of this distribution may describe the verifier as audited,
+independently reviewed or production-ready.
 
 ## [0.2.2] — the anchor-resolution outcome (D-34)
 
@@ -141,7 +271,7 @@ accepts for BR-2C.
 - **Which refusal members a verified result may carry.** **Ruled by D-35**: the
   eleven-member `TRUST_AND_AUTHENTICITY` fault class plus `INDETERMINATE`, twelve
   of the twenty-four. `contracts/trust.py`'s biconditional still admits all 24.
-  **Not implemented here.**
+  **Not implemented here; shipped in `0.2.3`.**
 
 ## [0.2.1] — BR-2C contract surface (D-24, D-25, D-32, D-33)
 
