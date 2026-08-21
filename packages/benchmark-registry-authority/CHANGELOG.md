@@ -246,6 +246,48 @@ reported everything above, and an author-owned test, probe or mutation run is no
 an audit. **Nor is the governance control live**: CODEOWNERS ships in this
 change, branch protection and an independent reviewer do not.
 
+### Residue remediation (ADR §35.2 D-30)
+
+Prose-only correction of BR-2A-era statements that survived the `0.2.0` surface
+move. **No behaviour, no surface and no version changed**: `api.__all__` stays
+at 93, `public_api.json` at 92, the BR-2 refusal vocabulary at 17 and the
+combined BR-1/BR-2 list at 34, and `package_version` stays `0.2.0`. No
+capability token was unlocked and no BR-2C work is begun.
+
+- **Four stale counts corrected from fifteen to eighteen**, the number of
+  root-canonicalizable classes `canonical_domain_inventory.json` registers at
+  `package_version` `0.2.0` — `api.py:23`, the domain-block comment at
+  `contracts/canonical.py:254-255`, and the `canonical_bytes` docstring at
+  `contracts/canonical.py:684`. Each now follows the phrasing already correct at
+  `contracts/canonical.py:73-74`, `:129` and `:362`: BR-2A's fifteen and BR-2B's
+  three.
+- **Three milestone labels corrected from BR-2A to BR-2B** — the `api.py` module
+  docstring's title and layer sentence, and the `milestone` field of
+  `public_contract_inventory.json`, whose source moved with it in
+  `tools/generate_manifests.py` so regeneration no longer reverts the label.
+- **Three stale counts corrected outside `src/`** — the canonicalization heading
+  in `README.md`, and the two generator strings in `tools/generate_manifests.py`
+  (the `_root_canonicalizable_classes` docstring and the public-contract
+  inventory note).
+
+Manifests were regenerated with `tools/generate_manifests.py` rather than
+hand-edited; the only bytes that moved in a committed manifest are the
+`milestone` field and the note's count word.
+
+**Verification for this correction.** Suite **1731 passed** on Python 3.11.
+Offline distribution verifier **PASSED**, 8/8 negative controls caught,
+including "all eighteen pinned vectors were reproduced". Manifest regeneration
+reports 18 data contracts, 74 other symbols, 18 domains, 3 nested-only, 18
+vectors, 92 symbols against `api.__all__` = 93.
+
+**Not corrected — remaining residue outside D-30's enumeration.** The
+`README.md` table under the corrected heading still lists fifteen rows; BR-2B's
+three classes are absent from it, as they are from the README's `BR-2A` title.
+Two further fifteen-counts sit outside `src/` and outside the enumeration:
+`tests/_builders.py:300` and the `"milestone": "BR-2A"` literal that
+`gate_mutation_sweep.py:1147` writes into `gate_inventory.json`. Each needs an
+owner ruling of its own.
+
 ## [0.1.0] — BR-2A: registry and exact-resolution contracts
 
 First release. **Contracts and pure validation only.**

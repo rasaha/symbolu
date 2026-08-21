@@ -154,7 +154,7 @@ full depth, **post-order**: every nested node is proved to be an exact registere
 class and revalidated before its parent's validator — or any derived property
 that validator reads — touches a single one of its fields.
 
-### Fifteen artifact classes, fifteen domains, fifteen pinned vectors
+### Eighteen artifact classes, eighteen domains, eighteen pinned vectors
 
 | Contract | Digest domain | Pinned digest |
 | --- | --- | --- |

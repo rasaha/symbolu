@@ -1,4 +1,4 @@
-"""Canonical public API for the Ugence Benchmark Registry Authority (BR-2A).
+"""Canonical public API for the Ugence Benchmark Registry Authority (BR-2B).
 
 The deliberately curated, supported public surface. Import from here (or the
 equivalently-exported top-level :mod:`ugence_benchmark_registry_authority`).
@@ -8,7 +8,7 @@ in the built wheel, in the built sdist, and in an isolated installed runtime.
 
 What this surface contains
 --------------------------
-The structural contract layer of **BR-2A**: "Registry and exact-resolution
+The structural contract layer of **BR-2B**: "Registry and exact-resolution
 *contracts*." Ratified as D-01 through D-17.
 
 * the three inbound assertion **envelopes** — publisher submission, independent
@@ -20,7 +20,7 @@ The structural contract layer of **BR-2A**: "Registry and exact-resolution
   never be consumed as a current one;
 * the two **request shapes** and the two **registry scope expectations**;
 * one deterministic canonicalization path and one digest path, versioned and
-  domain-separated across fifteen minted domains;
+  domain-separated across eighteen minted domains;
 * the five-member BR-2 **registration lifecycle**, its closed transition
   relation, and the immutable transition-to-payload binding;
 * the seventeen-member BR-2 **refusal vocabulary**, disjoint from BR-1's frozen

@@ -251,8 +251,9 @@ BENCHMARK_REGISTRY_AUTHORITY_CANONICALIZATION_VERSION = (
 _DOMAIN_PREFIX = "ugence.benchmark-registry-authority/"
 
 # --------------------------------------------------------------------------- #
-# One domain per artifact class this subphase actually ships. Fifteen classes,
-# fifteen domains, and no tag for an artifact that does not exist.
+# One domain per artifact class this subphase actually ships. Eighteen classes
+# and eighteen domains — BR-2A's fifteen and BR-2B's three — and no tag for
+# an artifact that does not exist.
 # --------------------------------------------------------------------------- #
 
 #: Domain for :class:`~.envelopes.BenchmarkPublisherSubmissionEnvelope` — the
@@ -681,10 +682,11 @@ def _revalidate_value(value: Any, path: str) -> None:
 def canonical_bytes(contract: Any) -> bytes:
     """Return the exact UTF-8 bytes :func:`canonical_digest` is computed over.
 
-    ``contract`` must be an exact instance of one of the fifteen registered
-    **root-canonicalizable** BR-2A contract classes — never a subclass, never a
-    same-named foreign dataclass, never a duck type, and never a frozen BR-1
-    contract, which owns its own digest path and must keep exactly one digest.
+    ``contract`` must be an exact instance of one of the eighteen registered
+    **root-canonicalizable** contract classes — BR-2A's fifteen and BR-2B's
+    three — never a subclass, never a same-named foreign dataclass, never a
+    duck type, and never a frozen BR-1 contract, which owns its own digest
+    path and must keep exactly one digest.
     Membership is decided by class identity against the sealed registry, never
     by name.
 

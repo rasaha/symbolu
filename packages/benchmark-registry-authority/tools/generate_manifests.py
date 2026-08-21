@@ -187,7 +187,7 @@ DIGEST_PROPERTY_SUFFIX = "_digest"
 
 
 def _root_canonicalizable_classes():
-    """The fifteen root-canonicalizable classes, in registry insertion order."""
+    """The eighteen root-canonicalizable classes, in registry insertion order."""
 
     return [
         (cls, domain)
@@ -440,11 +440,11 @@ def main() -> int:
         "distribution": DISTRIBUTION,
         "namespace": NAMESPACE,
         "package_version": api.__version__,
-        "milestone": "BR-2A",
+        "milestone": "BR-2B",
         "note": (
             "Machine-readable public-contract inventory. "
             "'Every type is constructible and canonicalizable' applies to "
-            "PUBLIC DATA CONTRACTS ONLY — the fifteen rows under "
+            "PUBLIC DATA CONTRACTS ONLY — the eighteen rows under "
             "'public_data_contracts'. It does NOT apply to Protocols, enums, "
             "errors, constants, pure validation functions, frozen descriptors "
             "or abstract type declarations, each of which is listed under "
