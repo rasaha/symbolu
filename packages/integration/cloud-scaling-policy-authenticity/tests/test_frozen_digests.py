@@ -9,10 +9,16 @@ is now something a consumer can pin, and 5B-1 and 5B-2 will each want to move on
 **The rule this file enforces.** A change that moves a pinned digest is a change to what this
 package's verification profile produces. When one of these constants must be updated, update
 :data:`~ugence_cloud_scaling_policy_authenticity.VERIFICATION_PROFILE_VERSION` in the same
-commit, and say in the changelog which digest moved and why. The partition fingerprint below
-makes that mechanical rather than remembered: it covers the profile version *and* the exact
-membership of both halves, so moving a fact without bumping fails here, and bumping without
-recording the new fingerprint fails here too. Both edits land together or neither does.
+commit, and say in the changelog which digest moved and why.
+
+**What this file cannot enforce, corrected (5B-1 D-5B1-3).** These constants are pins. An
+earlier version of this docstring claimed the partition fingerprint below made the profile
+bump "mechanical rather than remembered"; the 5B-1 audit measured otherwise — promoting
+``candidate_digest_fact``, updating the two constants and leaving the profile version at
+``"v1"`` passes this file at 5 passed. A pin catches an *accidental* move, because a change
+that did not intend to move a digest does not carry an updated pin. It cannot catch a
+deliberate one, because the pin and the change land in the same commit. The rule is enforced
+by ``tests/test_partition_ratchet.py``, which takes its "before" from repository history.
 
 **What is deliberately not frozen.** Nothing that depends on wall-clock time, machine state or
 key generation. Every value below is reproducible from the repository alone: the fixtures sign
@@ -97,10 +103,11 @@ def test_the_reference_trust_configuration_digest_has_not_moved():
 
 @pytest.mark.invariant
 def test_the_partition_fingerprint_ties_membership_to_the_profile_version():
-    """Moving a fact between halves without bumping the profile version fails here.
+    """The fingerprint still covers the profile version and both halves' exact membership.
 
-    So does bumping without re-recording the fingerprint. The two edits are forced into one
-    commit, which is what makes "promotion requires a bump" a rule rather than a note.
+    What it establishes is that an *unintended* move surfaces here rather than silently. What
+    it does not establish is the discipline itself: a deliberate promotion can update this
+    constant in the same commit. ``tests/test_partition_ratchet.py`` is what refuses that.
     """
 
     assert _partition_fingerprint() == FROZEN_PARTITION_FINGERPRINT

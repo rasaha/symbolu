@@ -61,10 +61,26 @@ jobs:
   policy-authenticity-suite:
     name: Phase 5B-0B policy-authenticity suite (source)
     runs-on: ubuntu-latest
+    env:
+      # The partition ratchet reads the repository's history for its "before". A baseline it
+      # cannot resolve is a skip locally and a FAILURE here: a gate that quietly skips where
+      # it is supposed to run is not a gate. Set at job level so the full-suite run enforces
+      # it too, not only the dedicated step.
+      UGENCE_RATCHET_REQUIRED: "1"
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Resolve the partition ratchet's baseline
+        # The merge base with the repository's default branch — named by the event rather
+        # than hardcoded, because this repository's default branch is not called "main".
+        run: |
+          set -euo pipefail
+          default='${{ github.event.repository.default_branch }}'
+          git fetch --no-tags origin "+refs/heads/${default}:refs/remotes/origin/ratchet-base"
+          base=$(git merge-base HEAD refs/remotes/origin/ratchet-base)
+          echo "UGENCE_RATCHET_BASE=${base}" >> "$GITHUB_ENV"
+          echo "ratchet baseline: ${base} (merge base with ${default})"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -122,13 +138,20 @@ jobs:
               )
           PY
       - name: Digest stability — frozen digests and the partition fingerprint
-        # The gate that makes "promoting a fact requires a profile bump" mechanical. The
-        # fingerprint covers VERIFICATION_PROFILE_VERSION together with both halves' exact
-        # membership, so 5B-1 and 5B-2 cannot move a fact between halves without bumping.
+        # The pinned side: the reference artifact digest, the trust-configuration digest and
+        # the partition fingerprint all still reproduce. A pin catches an *accidental* move;
+        # it cannot catch a deliberate one, because updating the pin is as cheap as the change
+        # — which is what the ratchet step below exists for (5B-1 D-5B1-3).
         run: |
           python -m pytest \
             packages/integration/cloud-scaling-policy-authenticity/tests/test_frozen_digests.py \
             packages/integration/cloud-scaling-policy-authenticity/tests/test_digest_partition.py
+      - name: Partition ratchet — a promotion cannot ship without a profile bump
+        # Takes its "before" from the merge base resolved above, so the constants in this
+        # commit cannot answer for the commit that came before it.
+        run: |
+          python -m pytest \
+            packages/integration/cloud-scaling-policy-authenticity/tests/test_partition_ratchet.py
       - name: Derivation gate — every verified fact is signed, gated or a pinned constant
         # Two remediation rounds each found a verified fact that nothing established. This is
         # the enumeration that replaced spot-checking; a new unclassified fact fails here.

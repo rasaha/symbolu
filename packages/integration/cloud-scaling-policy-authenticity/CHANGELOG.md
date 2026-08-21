@@ -1,5 +1,28 @@
 # Changelog — ugence-cloud-scaling-policy-authenticity
 
+## 0.2.0 — Cloud Scaling Phase 5B-1: decision-scope repair (in progress)
+
+Ratified in `docs/architecture/ADR_CLOUD_SCALING_DECISION_SCOPE_PHASE5B1_RATIFICATION.md`.
+
+### Added — the partition ratchet (D-5B1-3)
+
+- `tests/test_partition_ratchet.py` and `tests/_partition_ratchet.py`. The partition
+  fingerprint pinned in `tests/test_frozen_digests.py` was a **pin, not a ratchet**: the 5B-1
+  audit measured that promoting `candidate_digest_fact`, updating the two pinned constants and
+  leaving `VERIFICATION_PROFILE_VERSION` at `"v1"` passes that file at 5 passed. Updating a pin
+  is exactly as cheap as the change it gates, because both land in the same commit.
+- The ratchet takes its "before" from **repository history** — the membership recorded at the
+  merge base, parsed out of the historical source rather than imported — and fails when the
+  verified/recorded partition moved without a `VERIFICATION_PROFILE_VERSION` bump, or when the
+  version moved with no changelog line naming it.
+- It lands **before** the promotion it exists to catch, with negative controls that drive a
+  promotion-without-a-bump and a bump-with-a-silent-changelog through the gate and observe it
+  fail. A guard built after the first promotion would have missed the one event it is for.
+- CI resolves the baseline from the event's own default branch and sets
+  `UGENCE_RATCHET_REQUIRED=1`, so a baseline that cannot be resolved fails the workflow
+  instead of skipping quietly. Outside a checkout the gate skips, as the suite's other
+  repository-dependent properties do.
+
 ## 0.1.0 — Cloud Scaling Phase 5B-0B: policy authenticity
 
 First release. Adds a distribution; changes none.
