@@ -1144,7 +1144,7 @@ def main() -> int:
         json.dumps(
             {
                 "distribution": "ugence-benchmark-registry-authority",
-                "milestone": "BR-2A",
+                "milestone": "BR-2B",
                 "note": (
                     "Complete inventory of every load-bearing gate, and the "
                     "measured result of neutralizing each one in turn against "

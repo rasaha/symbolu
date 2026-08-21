@@ -1,4 +1,4 @@
-# ugence-benchmark-registry-authority — BR-2A
+# ugence-benchmark-registry-authority — BR-2B
 
 **Registry and exact-resolution contracts.** The authority/registry layer of the
 shared, platform-wide Benchmark Registry, sitting **above** the frozen identity
@@ -173,6 +173,9 @@ that validator reads — touches a single one of its fields.
 | `BenchmarkHistoricalInspectionRequest` | `…/historical-inspection-request/v1` | `0b1d2dfd8fda95d8c7234a8dc0063b788d753f97e23c2b14a5919ef2c758284f` |
 | `PlatformRegistryScopeExpectation` | `…/platform-registry-scope-expectation/v1` | `c1d80cf0f2e83d0086f62bb0214d5386c16dd2083726506b0421233052d9dadc` |
 | `TenantRegistryScopeExpectation` | `…/tenant-registry-scope-expectation/v1` | `fa12f4dfdb94e0fe76206196d9b880d6a1d11c56c8e7ba7de9aabe475714a543` |
+| `BenchmarkRegistrySnapshotAssertion` | `…/registry-snapshot-assertion/v1` | `1d60f269a1e745304fb392f97039b307a5d29076cc39de2337ae4c49aee7554e` |
+| `BenchmarkTransitionPlan` | `…/transition-plan/v1` | `83b342bec31fb04c24d7214038e5c257c5ee22c6e5d332fba40978be877c96fd` |
+| `BenchmarkTransitionRefusal` | `…/transition-refusal/v1` | `efa9a8e8d79e06e6099126878e0bf78ecaf3a9193a54e71d3de23817cab8ea70` |
 
 Each vector's exact canonical bytes are committed in
 [`pinned_canonical_vectors.json`](pinned_canonical_vectors.json) and every digest
@@ -235,7 +238,15 @@ python packages/benchmark-registry-authority/verify_br1_freeze_matrix.py
 python packages/benchmark-registry-authority/gate_mutation_sweep.py
 ```
 
-### Measured results at this revision
+### Measured results — BR-2A-era, not re-measured at this revision
+
+**These numbers were measured against `0.1.0` (BR-2A) and have not been
+re-stated for `0.2.0`.** They are measurements, not counts of a fixed set, so
+restating them requires a run rather than an edit; the committed ledger in
+[`gate_inventory.json`](gate_inventory.json) and the `0.2.0` section of
+[`CHANGELOG.md`](CHANGELOG.md) carry the current figures. This table is
+re-stated from a fresh sweep and verifier run in a README pass at BR-2C
+(ADR §35.2 D-31). No number below is edited here.
 
 | Check | Result |
 | --- | --- |
