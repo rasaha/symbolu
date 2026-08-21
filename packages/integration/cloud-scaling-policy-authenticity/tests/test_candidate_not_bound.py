@@ -65,6 +65,11 @@ def _candidate_naming_another_policy():
         decision=decision,
         producer_attestation=attestation,
         policy_binding=binding,
+        # Both references name the other policy: since 5B-1 a candidate cannot carry two
+        # policy identities, so "a candidate about a different policy" means both halves.
+        policy_coordinate_binding=builders.build_policy_coordinate_binding(
+            scope, policy_id="something.else-entirely", policy_version="99.0.0"
+        ),
         target_scope=scope,
     )
 

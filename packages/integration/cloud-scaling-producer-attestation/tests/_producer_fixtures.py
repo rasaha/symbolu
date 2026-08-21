@@ -294,6 +294,7 @@ def _candidate_from_frozen_payload():
         CapacityAuthorizationCandidate,
         ExecutionTargetScope,
         PolicyTargetBindingReference,
+        PolicyTargetBindingReferenceV2,
         ProducerAttestationEvidence,
     )
 
@@ -306,6 +307,9 @@ def _candidate_from_frozen_payload():
         evidence_references=tuple(payload["evidence_references"]),
         target_scope=ExecutionTargetScope(**payload["target_scope"]),
         policy_binding=PolicyTargetBindingReference(**payload["policy_binding"]),
+        policy_coordinate_binding=PolicyTargetBindingReferenceV2(
+            **payload["policy_coordinate_binding"]
+        ),
         producer_attestation=ProducerAttestationEvidence.from_dict(
             payload["producer_attestation"]
         ),

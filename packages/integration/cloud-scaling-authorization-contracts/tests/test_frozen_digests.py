@@ -25,6 +25,7 @@ from conftest import (
     build_policy_binding,
     build_projection,
     build_target_scope,
+    coordinate_for,
 )
 from ugence_cloud_scaling_authorization_contracts import (
     build_capacity_authorization_candidate,
@@ -59,8 +60,18 @@ FROZEN_TARGET_SCOPE_DIGEST = (
 FROZEN_POLICY_BINDING_DIGEST = (
     "sha256:8961f6b2b78e811d556b7e43af99807eb368e65ca3b0fa7c6109aa952b5b9808"
 )
+#: The complete Policy Authority coordinate the candidate now carries (5B-1). Pinned as its
+#: own anchor: it is a new artifact in the chain, exactly as the policy binding above is.
+FROZEN_POLICY_COORDINATE_BINDING_DIGEST = (
+    "sha256:ad1d1ad9d3fa574a071e98a8638c283e19d21d744c91b6848baaa0eca6670ed8"
+)
+#: **Moved by 5B-1.** The candidate gained the required ``policy_coordinate_binding`` field,
+#: and every field of a candidate enters its digest payload — so this is the one Phase 5A
+#: constant an in-candidate policy coordinate can move, and the floor for any option that
+#: binds the coordinate inside the candidate at all (D-5B1-1). The superseded value is pinned
+#: below.
 FROZEN_CANDIDATE_DIGEST = (
-    "sha256:db72ffffc5bf4ecfe8a5f9fe187efb5e8439355e559fcc34b391cc4c9282a313"
+    "sha256:be06c65385d73f66c52dd51024c30ed7939a836369db654f381d52270f2aa906"
 )
 #: Superseded by the F-2 audit remediation. The pre-remediation candidate digest bound
 #: ``policy_binding``/``producer_attestation`` only through derived scalars while still
@@ -70,6 +81,19 @@ FROZEN_CANDIDATE_DIGEST = (
 #: here so a silent revert to the weaker payload is caught rather than re-baselined.
 SUPERSEDED_PRE_F2_CANDIDATE_DIGEST = (
     "sha256:61718405a6affa83e96184a6c7259666fb266766db0fb09bc7502141625d2ed5"
+)
+
+#: Superseded by 5B-1. The pre-repair candidate carried a policy *binding* that could not
+#: name a coordinate, so a verified policy proof could not be reconciled against it: one
+#: genuine proof verified alongside any candidate whatsoever. Pinned as a negative anchor so
+#: dropping the coordinate back out of the payload is a failure rather than a re-baseline.
+#:
+#: Two other packages pin this same value for the same fixture chain, and both moved with it:
+#: ``cloud-scaling-producer-attestation`` (tests/test_frozen_digests.py,
+#: tests/test_phase5a_invariants.py) and, transitively, its own
+#: ``FROZEN_VERIFIED_ARTIFACT_DIGEST``, which binds the candidate digest.
+SUPERSEDED_PRE_5B1_CANDIDATE_DIGEST = (
+    "sha256:db72ffffc5bf4ecfe8a5f9fe187efb5e8439355e559fcc34b391cc4c9282a313"
 )
 
 #: The RA illustrative canonicalization fixture. Documented here so it is never mistaken
@@ -89,7 +113,9 @@ def frozen_chain():
     binding = build_policy_binding(scope)
     candidate = build_capacity_authorization_candidate(
         projection=projection, decision=decision, producer_attestation=attestation,
-        policy_binding=binding, target_scope=scope,
+        policy_binding=binding,
+        policy_coordinate_binding=coordinate_for(binding),
+        target_scope=scope,
     )
     return projection, decision, attestation, scope, binding, candidate
 
@@ -115,6 +141,39 @@ def test_phase5_binding_digests_are_frozen(frozen_chain):
     assert binding.digest() == FROZEN_POLICY_BINDING_DIGEST
 
 
+def test_the_policy_coordinate_binding_digest_is_frozen(frozen_chain):
+    """5B-1's new artifact, pinned like every other stage of the chain."""
+
+    candidate = frozen_chain[-1]
+    coordinate = candidate.policy_coordinate_binding
+    assert coordinate.digest() == FROZEN_POLICY_COORDINATE_BINDING_DIGEST
+    assert (
+        candidate.policy_coordinate_binding_digest
+        == FROZEN_POLICY_COORDINATE_BINDING_DIGEST
+    )
+
+
+def test_only_the_candidate_digest_moved_in_the_5b1_repair(frozen_chain):
+    """The measurement D-5B1-1 rests on, re-asserted from the built chain.
+
+    Widening the existing binding in place would have moved ``FROZEN_POLICY_BINDING_DIGEST``
+    as well. Carrying the coordinate as its own field moves exactly one of the ten, which is
+    the floor: no in-candidate binding can move none.
+    """
+
+    projection, decision, attestation, scope, binding, candidate = frozen_chain
+    assert projection.recommendation_digest == FROZEN_RECOMMENDATION_DIGEST
+    assert projection.context_digest == FROZEN_CONTEXT_DIGEST
+    assert projection.subject_digest == FROZEN_SUBJECT_DIGEST
+    assert projection.request_digest == FROZEN_REQUEST_DIGEST
+    assert projection.idempotency_key == FROZEN_IDEMPOTENCY_KEY
+    assert decision.decision_digest == FROZEN_DECISION_DIGEST
+    assert attestation.signing_payload_digest == FROZEN_PRODUCER_SIGNING_PAYLOAD_DIGEST
+    assert scope.digest() == FROZEN_TARGET_SCOPE_DIGEST
+    assert binding.digest() == FROZEN_POLICY_BINDING_DIGEST
+    assert candidate.candidate_digest != SUPERSEDED_PRE_5B1_CANDIDATE_DIGEST
+
+
 def test_candidate_digest_is_frozen(frozen_chain):
     *_, candidate = frozen_chain
     assert candidate.candidate_digest == FROZEN_CANDIDATE_DIGEST
@@ -126,7 +185,8 @@ def test_every_frozen_digest_is_distinct_and_canonical():
         FROZEN_RECOMMENDATION_DIGEST, FROZEN_CONTEXT_DIGEST, FROZEN_SUBJECT_DIGEST,
         FROZEN_REQUEST_DIGEST, FROZEN_IDEMPOTENCY_KEY, FROZEN_DECISION_DIGEST,
         FROZEN_PRODUCER_SIGNING_PAYLOAD_DIGEST, FROZEN_TARGET_SCOPE_DIGEST,
-        FROZEN_POLICY_BINDING_DIGEST, FROZEN_CANDIDATE_DIGEST,
+        FROZEN_POLICY_BINDING_DIGEST, FROZEN_POLICY_COORDINATE_BINDING_DIGEST,
+        FROZEN_CANDIDATE_DIGEST,
     ]
     assert len(set(frozen)) == len(frozen), "two stages produced the same digest"
     assert all(is_canonical_digest(d) for d in frozen)
@@ -139,7 +199,8 @@ def test_the_ra_illustrative_fixture_is_not_a_phase5a_digest():
         FROZEN_RECOMMENDATION_DIGEST, FROZEN_CONTEXT_DIGEST, FROZEN_SUBJECT_DIGEST,
         FROZEN_REQUEST_DIGEST, FROZEN_IDEMPOTENCY_KEY, FROZEN_DECISION_DIGEST,
         FROZEN_PRODUCER_SIGNING_PAYLOAD_DIGEST, FROZEN_TARGET_SCOPE_DIGEST,
-        FROZEN_POLICY_BINDING_DIGEST, FROZEN_CANDIDATE_DIGEST,
+        FROZEN_POLICY_BINDING_DIGEST, FROZEN_POLICY_COORDINATE_BINDING_DIGEST,
+        FROZEN_CANDIDATE_DIGEST,
     }
     assert RA_ILLUSTRATIVE_FIXTURE not in frozen
 
@@ -155,6 +216,7 @@ def test_the_pre_f2_candidate_digest_is_not_reachable(frozen_chain):
 
     *_, candidate = frozen_chain
     assert candidate.candidate_digest != SUPERSEDED_PRE_F2_CANDIDATE_DIGEST
+    assert candidate.candidate_digest != SUPERSEDED_PRE_5B1_CANDIDATE_DIGEST
     assert candidate.candidate_digest == FROZEN_CANDIDATE_DIGEST
 
 

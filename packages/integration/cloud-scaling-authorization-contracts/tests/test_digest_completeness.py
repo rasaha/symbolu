@@ -35,6 +35,7 @@ from conftest import (
     build_policy_binding,
     build_projection,
     build_target_scope,
+    coordinate_for,
 )
 from ugence_cloud_scaling_authorization_contracts import (
     CandidateConstructionError,
@@ -152,6 +153,7 @@ def _rebuilt(projection, decision, *, attestation=None, scope=None, policy=None)
             else build_attestation(recommendation_digest=projection.recommendation_digest)
         ),
         policy_binding=policy if policy is not None else build_policy_binding(scope),
+        policy_coordinate_binding=coordinate_for(policy if policy is not None else build_policy_binding(scope)),
         target_scope=scope,
     )
 

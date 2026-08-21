@@ -68,8 +68,12 @@ FROZEN_V2_SIGNATURE = (
     "2d8ef3dd0cd9c81491159beedb0bf55ef65b3d3892366b06fb4ac85a3335b6a6"
     "dea1287ba58bc12b4e0a3cadd097f545f6baea671ad8bd0352a1386dfd4d4707"
 )
+#: **Moved by 5B-1**, and not by anything this package did: ``digest_payload()`` binds
+#: ``candidate_digest``, and the Phase 5A candidate gained the policy coordinate that closes
+#: R-4. This package's source did not change and its version does not move; the fixture it
+#: verifies did. The superseded value is pinned below.
 FROZEN_VERIFIED_ARTIFACT_DIGEST = (
-    "sha256:519983d832ac08e9914b69cbe8894f241e0e118fd5596d37e903325f171a385d"
+    "sha256:5a2a66489c00a5fef94c8fc5be231ee564786286315d6d60e75ecbc55f60d30e"
 )
 
 #: Fixture 2 — the resolved trust anchor the verification above ran under.
@@ -91,7 +95,16 @@ FROZEN_REFUSAL_OUTCOME = O.SIGNATURE_INVALID
 # ======================================================================================= #
 
 PHASE_5A_CANDIDATE_DIGEST = (
+    "sha256:be06c65385d73f66c52dd51024c30ed7939a836369db654f381d52270f2aa906"
+)
+#: What the Phase 5A candidate hashed to before 5B-1 bound the policy coordinate inside it.
+#: Pinned here, in the package that consumes it, so a revert surfaces on both sides.
+SUPERSEDED_PRE_5B1_PHASE_5A_CANDIDATE_DIGEST = (
     "sha256:db72ffffc5bf4ecfe8a5f9fe187efb5e8439355e559fcc34b391cc4c9282a313"
+)
+#: The verified artifact this package produced while the candidate carried no coordinate.
+SUPERSEDED_PRE_5B1_VERIFIED_ARTIFACT_DIGEST = (
+    "sha256:519983d832ac08e9914b69cbe8894f241e0e118fd5596d37e903325f171a385d"
 )
 PHASE_5A_FROZEN_PRODUCER_SIGNING_PAYLOAD_DIGEST = (
     "sha256:1035d2fc2ab8f4b443f815562f9f6ad8e4ce0032633f03a12e04e691c24cf2d0"
@@ -400,6 +413,14 @@ _SUPERSEDED_ARTIFACT_FIELDS = {
     "trust_anchor_record_digest": (None, SUPERSEDED_ANCHOR_RECORD_DIGEST),
 }
 
+#: A fifth difference, from a different cause and a different phase: 5B-1 moved the Phase 5A
+#: candidate digest, and this artifact binds it. Kept out of the map above so the four-way
+#: attribution keeps saying what it said — those four are the 5B-0A remediation's — and
+#: reverted alongside them wherever the superseded *bytes* must be reconstructed.
+_PRE_5B1_CANDIDATE_FIELD = {
+    "candidate_digest": SUPERSEDED_PRE_5B1_PHASE_5A_CANDIDATE_DIGEST
+}
+
 
 def _revert(payload: dict, fields) -> dict:
     """Rebuild the superseded canonical payload by undoing exactly ``fields``."""
@@ -411,6 +432,9 @@ def _revert(payload: dict, fields) -> dict:
             reverted[old_name] = reverted.pop(field)
         else:
             reverted[field] = old_value
+    # Always undone: the pre-5B-1 candidate digest. Reconstructing the superseded bytes means
+    # reconstructing the fixture chain they were computed over, and 5B-1 moved that chain.
+    reverted.update(_PRE_5B1_CANDIDATE_FIELD)
     return reverted
 
 
@@ -427,6 +451,11 @@ def test_the_verified_artifact_digest_moved_for_all_four_reasons():
     possible if those four fields are the complete set of differences — and undoing any three
     of the four does not. Both halves are necessary: the first shows the attribution is
     complete, the second shows every one of the four is required.
+
+    Since 5B-1 the reversion also undoes ``candidate_digest``, which that phase moved when it
+    bound the policy coordinate inside the Phase 5A candidate. That is a fifth difference from
+    a different phase, not a fifth cause of *this* movement, so it is applied by ``_revert``
+    unconditionally and the four-way attribution below still ranges over exactly four.
 
     Recomputed through ``canonical_digest`` on a plain dict, so nothing here can be satisfied
     by an artifact object carrying a stale digest.
@@ -508,6 +537,7 @@ def test_only_these_three_phase_5b_0a_digests_moved():
         FROZEN_V2_ATTESTATION_DIGEST
     )
     assert candidate.candidate_digest == PHASE_5A_CANDIDATE_DIGEST
+    assert candidate.candidate_digest != SUPERSEDED_PRE_5B1_PHASE_5A_CANDIDATE_DIGEST
 
 
 def test_the_frozen_candidate_payload_reproduces_the_genuine_chain_exactly():

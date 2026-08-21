@@ -23,9 +23,11 @@ from conftest import (
     build_candidate,
     build_decision,
     build_policy_binding,
+    build_policy_coordinate_binding,
     build_projection,
     build_recommendation,
     build_target_scope,
+    coordinate_for,
     production_subject,
 )
 from risk_authority.integrations import SubjectRiskDecision
@@ -103,7 +105,9 @@ def test_attestation_for_another_recommendation_is_refused(projection, decision,
     with pytest.raises(ProducerAttestationError) as exc:
         build_capacity_authorization_candidate(
             projection=projection, decision=decision, producer_attestation=foreign,
-            policy_binding=policy_binding, target_scope=target_scope,
+            policy_binding=policy_binding,
+            policy_coordinate_binding=coordinate_for(policy_binding),
+            target_scope=target_scope,
         )
     assert exc.value.reason is Reason.PRODUCER_ATTESTATION_CONTENT_MISMATCH
 
@@ -116,7 +120,9 @@ def test_action_substitution_is_refused(projection, decision, attestation):
     with pytest.raises(TargetScopeError) as exc:
         build_capacity_authorization_candidate(
             projection=projection, decision=decision, producer_attestation=attestation,
-            policy_binding=build_policy_binding(scope), target_scope=scope,
+            policy_binding=build_policy_binding(scope),
+            policy_coordinate_binding=coordinate_for(build_policy_binding(scope)),
+            target_scope=scope,
         )
     assert exc.value.reason is Reason.ACTION_SUBSTITUTION
 
@@ -138,7 +144,9 @@ def test_target_substitution_is_refused(projection, decision, attestation, field
     with pytest.raises(TargetScopeError) as exc:
         build_capacity_authorization_candidate(
             projection=projection, decision=decision, producer_attestation=attestation,
-            policy_binding=build_policy_binding(scope), target_scope=scope,
+            policy_binding=build_policy_binding(scope),
+            policy_coordinate_binding=coordinate_for(build_policy_binding(scope)),
+            target_scope=scope,
         )
     assert exc.value.reason is Reason.TARGET_SUBSTITUTION
 
@@ -159,7 +167,9 @@ def test_policy_binding_for_another_account_is_refused(projection, decision, att
     with pytest.raises(PolicyTargetBindingError) as exc:
         build_capacity_authorization_candidate(
             projection=projection, decision=decision, producer_attestation=attestation,
-            policy_binding=build_policy_binding(theirs), target_scope=ours,
+            policy_binding=build_policy_binding(theirs),
+            policy_coordinate_binding=coordinate_for(build_policy_binding(theirs)),
+            target_scope=ours,
         )
     assert exc.value.reason is Reason.POLICY_TARGET_CONTENT_MISMATCH
 
@@ -202,7 +212,9 @@ def test_scope_cannot_widen_bounds_beyond_the_policy(projection, decision, attes
     with pytest.raises(PolicyTargetBindingError) as exc:
         build_capacity_authorization_candidate(
             projection=projection, decision=decision, producer_attestation=attestation,
-            policy_binding=policy, target_scope=scope,
+            policy_binding=policy,
+            policy_coordinate_binding=coordinate_for(policy),
+            target_scope=scope,
         )
     assert exc.value.reason is Reason.POLICY_TARGET_CONTENT_MISMATCH
 
@@ -312,7 +324,9 @@ def test_missing_producer_attestation_is_refused(projection, decision, target_sc
     with pytest.raises(ExactTypeError) as exc:
         build_capacity_authorization_candidate(
             projection=projection, decision=decision, producer_attestation=None,
-            policy_binding=policy_binding, target_scope=target_scope,
+            policy_binding=policy_binding,
+            policy_coordinate_binding=coordinate_for(policy_binding),
+            target_scope=target_scope,
         )
     assert exc.value.reason is Reason.MISSING_PRODUCER_ATTESTATION
 
@@ -397,7 +411,9 @@ def test_missing_policy_binding_is_refused(projection, decision, attestation, ta
     with pytest.raises(ExactTypeError) as exc:
         build_capacity_authorization_candidate(
             projection=projection, decision=decision, producer_attestation=attestation,
-            policy_binding=None, target_scope=target_scope,
+            policy_binding=None,
+            policy_coordinate_binding=build_policy_coordinate_binding(target_scope),
+            target_scope=target_scope,
         )
     assert exc.value.reason is Reason.MISSING_POLICY_TARGET_BINDING
 
@@ -501,7 +517,9 @@ def test_duck_typed_lookalikes_are_refused(projection, decision, target_scope, p
         build_capacity_authorization_candidate(
             projection=projection, decision=decision,
             producer_attestation=QuacksLikeAttestation(),
-            policy_binding=policy_binding, target_scope=target_scope,
+            policy_binding=policy_binding,
+            policy_coordinate_binding=coordinate_for(policy_binding),
+            target_scope=target_scope,
         )
     assert exc.value.reason is Reason.UNSUPPORTED_EXACT_TYPE
 

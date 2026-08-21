@@ -12,7 +12,7 @@
     "sha256:998181d54842ac5e17e5d997dca8eb8c99fa8d451d593ac8087167350dd8dd09",
     "sha256:c5b669cd770b98de3f94878675e114ef92ad03e06b27571ca1a320ddcd1b19ef"
   ],
-  "expected_candidate_digest": "sha256:db72ffffc5bf4ecfe8a5f9fe187efb5e8439355e559fcc34b391cc4c9282a313",
+  "expected_candidate_digest": "sha256:be06c65385d73f66c52dd51024c30ed7939a836369db654f381d52270f2aa906",
   "note": "Frozen serialization of the genuine Phase 5A CapacityAuthorizationCandidate. Regenerate with scripts/generate_frozen_candidate.py. The shipped sdist suite reconstructs this through Phase 5A's exact public types and asserts the candidate digest below, so a drift from the chain fails rather than passes.",
   "policy_binding": {
     "binding_digest": "sha256:227e6a199579a65d07bb2c060202fa341f917cc65b8ea91d1038a44469746fac",
@@ -26,6 +26,21 @@
     "policy_signature_algorithm": "ed25519",
     "policy_version": "3.1.0",
     "schema_version": "cloud-scaling-policy-target-binding-1",
+    "target_scope_digest": "sha256:b97f41c98353aaafdb9aef4fa12309b459900ce002affc206b5c3239b82c3baa"
+  },
+  "policy_coordinate_binding": {
+    "binding_digest": "sha256:833110804678bbda1df9d481997326ebc8301849509ac3a4833c6c51d5ac247f",
+    "issuing_authority_id": "ugence.policy-authority",
+    "key_id": "policy-signing-key-7",
+    "policy_body_digest": "66fc54f7f78b3d4adddf0eb7df8acf84e52a3098a91e91d7230f3b0d672c77d0",
+    "policy_content_digest": "66fc54f7f78b3d4adddf0eb7df8acf84e52a3098a91e91d7230f3b0d672c77d0",
+    "policy_family": "capacity-bounds",
+    "policy_id": "cloud-scaling.capacity-bounds",
+    "policy_scope": "TENANT",
+    "policy_tenant_id": "tenant-1",
+    "policy_version": "3.1.0",
+    "schema_version": "cloud-scaling-policy-target-binding-2",
+    "signature_alg": "ed25519",
     "target_scope_digest": "sha256:b97f41c98353aaafdb9aef4fa12309b459900ce002affc206b5c3239b82c3baa"
   },
   "producer_attestation": {
@@ -42,7 +57,7 @@
   },
   "scalars": {
     "action_type": "scale_up",
-    "candidate_digest": "sha256:db72ffffc5bf4ecfe8a5f9fe187efb5e8439355e559fcc34b391cc4c9282a313",
+    "candidate_digest": "sha256:be06c65385d73f66c52dd51024c30ed7939a836369db654f381d52270f2aa906",
     "context_digest": "sha256:d0bd58ff75993e4451575315f99678e0ac22b84f36bf7223cd9928cf9aee5f6f",
     "decision_digest": "sha256:d08f94ba8ba174e3929da24efc151fa2cebb9743329a3a61c71f65e46aa23101",
     "decision_id": "risk_dec_000001",
@@ -54,6 +69,7 @@
     "magnitude_after": 9,
     "magnitude_before": 6,
     "policy_binding_digest": "sha256:8961f6b2b78e811d556b7e43af99807eb368e65ca3b0fa7c6109aa952b5b9808",
+    "policy_coordinate_binding_digest": "sha256:ad1d1ad9d3fa574a071e98a8638c283e19d21d744c91b6848baaa0eca6670ed8",
     "producer_id": "ugence.cloud-scaling-controller",
     "producer_key_id": "producer-attestation-key-1",
     "producer_signing_payload_digest": "sha256:1035d2fc2ab8f4b443f815562f9f6ad8e4ce0032633f03a12e04e691c24cf2d0",
@@ -63,7 +79,7 @@
     "request_digest": "sha256:06fb8dc06e693f843826a634685cbd6fc7b645cfc684d27d5fa4160a2311b568",
     "requested_delta": 3,
     "risk_outcome": "ALLOW",
-    "schema_version": "cloud-scaling-capacity-authorization-candidate-1",
+    "schema_version": "cloud-scaling-capacity-authorization-candidate-2",
     "subject_digest": "sha256:13a27fea8c625e3d8d9d1c163e645ce690441dcc4c677d23600ace148dc3ad25",
     "subject_id": "checkout-api",
     "subject_type": "cloud_scaling.capacity_subject",

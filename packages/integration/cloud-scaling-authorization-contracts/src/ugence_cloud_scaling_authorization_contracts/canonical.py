@@ -40,14 +40,30 @@ __all__ = [
     "canonical_digest",
     "digest_of_snapshot",
     "is_canonical_digest",
+    "is_policy_authority_digest",
     "require_canonical_digest",
     "require_canonical_identifier",
     "require_nfc_text",
+    "require_policy_authority_digest",
 ]
 
 #: ``sha256:`` followed by exactly 64 lowercase hexadecimal characters. Uppercase hex is
 #: refused rather than lowercased: two spellings of one digest would defeat equality.
 _DIGEST_RE: Final[re.Pattern[str]] = re.compile(r"^sha256:[0-9a-f]{64}$")
+
+#: **Bare** lowercase 64-hex, with no prefix: the Policy Authority's digest shape.
+#:
+#: A second shape in this package is a cost, and it is paid deliberately (5B-1 D-5B1-4).
+#: ``PolicyTargetBindingReferenceV2`` carries the authority's own ``policy_body_digest``, and
+#: the alternative was to re-encode it with a ``sha256:`` prefix so one predicate could serve
+#: both. That would mint a digest nobody signed, over a frame nobody hashed: the value would
+#: no longer be the string the issuance signature covers, and the 5B-0B verifier — which
+#: compares against the authority's bare value — would have to strip the prefix back off
+#: before making the one comparison the whole phase exists to make.
+#:
+#: So the two namespaces stay separate and are never converted. There is deliberately no
+#: function here that turns one into the other, in either direction.
+_POLICY_AUTHORITY_DIGEST_RE: Final[re.Pattern[str]] = re.compile(r"^[0-9a-f]{64}$")
 
 
 def canonical_digest(value: Any) -> str:
@@ -83,6 +99,30 @@ def require_canonical_digest(name: str, value: Any) -> str:
         raise CanonicalFieldError(
             f"{name} must be a canonical {DIGEST_PREFIX}<64 lowercase hex> digest "
             f"(got {value!r})",
+            _Reason.MALFORMED_CANONICAL_FIELD,
+        )
+    return value
+
+
+def is_policy_authority_digest(value: Any) -> bool:
+    """True only for a bare ``<64 lowercase hex>`` Policy Authority digest.
+
+    False for a ``sha256:``-prefixed Phase 5A digest, and :func:`is_canonical_digest` is
+    False for every value this accepts. The incompatibility is executable in both directions
+    on purpose: neither shape can be mistaken for the other, and neither is converted.
+    """
+
+    return isinstance(value, str) and _POLICY_AUTHORITY_DIGEST_RE.match(value) is not None
+
+
+def require_policy_authority_digest(name: str, value: Any) -> str:
+    """Return ``value`` if it is a bare Policy Authority digest; otherwise reject."""
+
+    if not is_policy_authority_digest(value):
+        raise CanonicalFieldError(
+            f"{name} must be a bare <64 lowercase hex> Policy Authority digest, carried in "
+            f"the authority's own namespace and never re-encoded with the {DIGEST_PREFIX} "
+            f"prefix Phase 5A digests use (got {value!r})",
             _Reason.MALFORMED_CANONICAL_FIELD,
         )
     return value

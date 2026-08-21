@@ -52,16 +52,27 @@ PHASE_5A_NEGATIVE_ANCHOR = (
 
 
 
-def test_phase_5a_is_still_at_version_0_1_0():
-    """P-1: Phase 5B-0A does not re-version Phase 5A."""
+def test_phase_5a_is_at_the_version_this_package_was_pinned_against():
+    """P-1: Phase 5B-0A does not re-version Phase 5A — and pins what it reads.
 
-    assert p5a.__version__ == "0.1.0"
+    ``0.2.0`` since 5B-1, which added the required policy coordinate to the candidate. This
+    package's source is unchanged by that and its own version does not move; what moves is
+    the fixture chain it verifies against. The assertion stays exact rather than becoming a
+    range: a version that drifted without this suite being re-measured is the thing worth
+    catching.
+    """
+
+    assert p5a.__version__ == "0.2.0"
 
 
-def test_phase_5a_still_exports_exactly_thirty_seven_symbols():
-    """P-2: the Phase 5A public API is unchanged."""
+def test_phase_5a_exports_exactly_the_symbols_this_package_was_measured_against():
+    """P-2: the Phase 5A public API is pinned; 5B-1 added four symbols to it.
 
-    assert len(p5a.__all__) == 37
+    ``PolicyTargetBindingReferenceV2``, ``POLICY_TARGET_BINDING_V2_SCHEMA_VERSION``,
+    ``POLICY_COORDINATE_COMPONENTS`` and ``is_policy_authority_digest``.
+    """
+
+    assert len(p5a.__all__) == 41
 
 
 def test_the_phase_5a_v1_signing_payload_digest_is_unchanged():
@@ -95,9 +106,10 @@ def test_the_phase_5a_negative_anchor_is_still_unreachable():
 def test_the_phase_5a_candidate_digest_is_unaffected_by_a_v2_attestation(candidate):
     """P-5: a v2 proof travels ALONGSIDE the candidate; it is not bound inside it.
 
-    Binding one inside a candidate would require a Phase 5A 0.2.0, which is Phase 5B-0B's
-    work. The candidate digest before and after verification is identical because the
-    candidate never learns the v2 attestation exists.
+    Still true after 5B-1. What that phase bound inside the candidate is the *policy*
+    coordinate, not this producer attestation: the candidate digest before and after a
+    successful v2 verification is identical, because the candidate never learns the v2
+    attestation exists. Binding the attestation inside the candidate remains unratified work.
     """
 
     before = candidate.candidate_digest
@@ -230,24 +242,31 @@ PHASE_5A_FROZEN_DIGESTS = {
     "policy_binding_digest": (
         "sha256:8961f6b2b78e811d556b7e43af99807eb368e65ca3b0fa7c6109aa952b5b9808"
     ),
+    "policy_coordinate_binding_digest": (
+        "sha256:ad1d1ad9d3fa574a071e98a8638c283e19d21d744c91b6848baaa0eca6670ed8"
+    ),
     "candidate_digest": (
-        "sha256:db72ffffc5bf4ecfe8a5f9fe187efb5e8439355e559fcc34b391cc4c9282a313"
+        "sha256:be06c65385d73f66c52dd51024c30ed7939a836369db654f381d52270f2aa906"
     ),
 }
 
 
-def test_all_ten_phase_5a_frozen_digests_still_reproduce():
-    """P-13: the complete frozen set, from the genuine chain, unchanged by this package."""
+def test_all_eleven_phase_5a_frozen_digests_still_reproduce():
+    """P-13: the complete frozen set, from the genuine chain, unchanged by this package.
+
+    Eleven since 5B-1: the candidate carries the policy coordinate binding, and its digest is
+    pinned like every other stage of the chain.
+    """
 
     candidate = P5A.build_candidate()
     produced = {
         name: getattr(candidate, name) for name in PHASE_5A_FROZEN_DIGESTS
     }
     assert produced == PHASE_5A_FROZEN_DIGESTS
-    assert len(PHASE_5A_FROZEN_DIGESTS) == 10
+    assert len(PHASE_5A_FROZEN_DIGESTS) == 11
 
 
-def test_the_ten_frozen_digests_are_independently_recomputable():
+def test_the_frozen_digests_are_independently_recomputable():
     """P-14: recomputed from raw canonical bytes via ``hashlib``, not read back.
 
     ``hashlib`` is banned inside both distributions precisely so each has one digest path.
@@ -262,6 +281,7 @@ def test_the_ten_frozen_digests_are_independently_recomputable():
     for name, artifact in (
         ("target_scope_digest", candidate.target_scope),
         ("policy_binding_digest", candidate.policy_binding),
+        ("policy_coordinate_binding_digest", candidate.policy_coordinate_binding),
     ):
         recomputed = "sha256:" + hashlib.sha256(
             canonical_bytes(artifact.to_canonical_dict())

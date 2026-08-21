@@ -23,6 +23,8 @@ import contextlib
 
 import pytest
 
+from conftest import coordinate_for
+
 from ugence_cloud_scaling_authorization_contracts import candidate as candidate_module
 from ugence_cloud_scaling_authorization_contracts import (
     build_capacity_authorization_candidate,
@@ -97,6 +99,7 @@ def test_no_post_validation_source_reread(
             decision=decision,
             producer_attestation=attestation,
             policy_binding=policy_binding,
+            policy_coordinate_binding=coordinate_for(policy_binding),
             target_scope=target_scope,
         )
 
@@ -151,7 +154,9 @@ def test_the_builder_consumes_the_returned_facts_not_the_sources(
     try:
         built = build_capacity_authorization_candidate(
             projection=projection, decision=decision, producer_attestation=attestation,
-            policy_binding=policy_binding, target_scope=target_scope,
+            policy_binding=policy_binding,
+            policy_coordinate_binding=coordinate_for(policy_binding),
+            target_scope=target_scope,
         )
     finally:
         candidate_module.reconcile_phase4 = original
