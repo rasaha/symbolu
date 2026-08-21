@@ -103,10 +103,18 @@ for name, mod in (("p5b", p5b), ("p5a", p5a), ("tev", tev), ("ra", ra)):
 
 if p5b.__version__ != EXPECTED["version"]:
     raise AssertionError(f"version {p5b.__version__} != {EXPECTED['version']}")
-if p5a.__version__ != "0.1.0":
-    raise AssertionError(f"Phase 5A moved off 0.1.0: {p5a.__version__}")
-if len(p5a.__all__) != 37:
-    raise AssertionError(f"Phase 5A export count moved: {len(p5a.__all__)}")
+# Compared against the SOURCE tree's values, passed in — not against literals. What matters
+# here is that the installed Phase 5A is the one this package was measured against; pinning
+# the numbers in this probe just re-breaks it on every deliberate neighbour bump (5B-1 moved
+# Phase 5A to 0.2.0 and added four exports).
+if p5a.__version__ != EXPECTED["phase5a_version"]:
+    raise AssertionError(
+        f"installed Phase 5A {p5a.__version__} != source {EXPECTED['phase5a_version']}"
+    )
+if sorted(p5a.__all__) != sorted(EXPECTED["phase5a_public_api"]):
+    missing = set(EXPECTED["phase5a_public_api"]) - set(p5a.__all__)
+    extra = set(p5a.__all__) - set(EXPECTED["phase5a_public_api"])
+    raise AssertionError(f"Phase 5A API drift: missing={sorted(missing)} extra={sorted(extra)}")
 
 # --- 2. exact public API parity with the source tree and with public_api.json -----------
 installed_api = sorted(p5b.__all__)
@@ -532,9 +540,13 @@ def source_expectations() -> dict:
         else:
             scalar_fields[field.name] = value
 
+    import ugence_cloud_scaling_authorization_contracts as p5a
+
     return {
         "version": p5b.__version__,
         "public_api": list(p5b.__all__),
+        "phase5a_version": p5a.__version__,
+        "phase5a_public_api": list(p5a.__all__),
         "schema_version": p5b.PRODUCER_ATTESTATION_V2_SCHEMA_VERSION,
         "signing_purpose": p5b.PRODUCER_ATTESTATION_V2_SIGNING_PURPOSE,
         "tenant_id": candidate.tenant_id,
