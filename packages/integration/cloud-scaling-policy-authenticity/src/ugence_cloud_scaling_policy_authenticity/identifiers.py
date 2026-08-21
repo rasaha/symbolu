@@ -107,8 +107,11 @@ POLICY_AUTHENTICITY_VERIFIED_FACTS_DOMAIN: Final[str] = (
 )
 
 #: Domain tag of the **recorded** half: facts carried and digest-covered, but never attested.
-#: Two members today, one per open residual — ``resolved_as_of_fact`` (R-2: the instant is
-#: injected and unvalidated) and ``candidate_digest_fact`` (R-4: recorded, never reconciled).
+#: Four members today, for three distinct reasons — ``resolved_as_of_fact`` (R-2: the instant
+#: is injected and unvalidated), ``candidate_digest_fact`` (R-4: recorded, never reconciled),
+#: ``policy_type`` (absent from the signed issuance payload and never compared at resolution)
+#: and ``trust_configuration_digest`` (reported by the resolution port about itself). See
+#: :data:`~.verified.RECORDED_FACT_NAMES`, which carries each reason in full.
 POLICY_AUTHENTICITY_RECORDED_FACTS_DOMAIN: Final[str] = (
     "ugence.cloud-scaling/policy-authenticity/artifact/recorded/v1"
 )
