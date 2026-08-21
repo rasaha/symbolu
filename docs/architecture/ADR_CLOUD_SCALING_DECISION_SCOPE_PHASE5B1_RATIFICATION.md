@@ -151,3 +151,86 @@ coordinate the authority cannot address, which is a reconciliation in name only.
 | R-3 `[G]` | `resolve_policy` does not re-enforce `coordinate.content_digest == policy_body_digest`; 5B-0B refuses the divergence at its own boundary, the authority still permits it | Policy Authority |
 | R-7 `[G]` | The verified/recorded maps are written twice, in `verified.py` and `_mint_verified_artifact`. The self-digest catches drift as a refusal, so this is a maintenance hazard rather than a correctness one — but the first promotion is when it bites | 5B-1 |
 | R-8 | Bound extraction — that the candidate's `max_permitted_*` are the bounds the verified policy body states — remains open after 5B-1. Binding the coordinate is not extracting the bounds | 5B-2 |
+
+---
+
+## As implemented
+
+The four ordered steps landed as four commits on `claude/cloud-scaling-5b1-ratification-olctwy`.
+Each leaves the whole repository green, so the mechanical consequences of a step (a neighbour's
+fixture, a moved pin) sit in the commit that caused them rather than in a later one.
+
+**1. The ratchet, before the promotion (D-5B1-3).** `tests/_partition_ratchet.py` and
+`tests/test_partition_ratchet.py` read the partition at the merge base — parsed out of the
+historical source with `ast`, never imported — and fail when the verified/recorded membership
+moved without a `VERIFICATION_PROFILE_VERSION` bump, or when the version moved with no
+changelog line naming it. A parser-fidelity property measures the AST reader against the
+imported truth first, so a silent miss cannot leave the gate green and vacuous, and negative
+controls drive a real promotion-without-a-bump and a bump-with-a-silent-changelog through the
+gate and observe it fail. `[V]` The gate was also exercised end to end: promoting
+`candidate_digest_fact` in the working tree without a bump fails it, naming the promoted fact.
+CI resolves the baseline from the event's own default branch and sets
+`UGENCE_RATCHET_REQUIRED=1`, so an unresolvable baseline fails the workflow instead of skipping.
+
+**2. `PolicyTargetBindingReferenceV2` (D-5B1-1, D-5B1-4, D-5B1-5).** Six required coordinate
+components, the bare-64-hex `policy_body_digest` under its own predicate with no converter in
+either direction, the target-scope binding, and a self-validating digest. Carried as a
+**required** candidate field beside the existing reference, which is unchanged. Two builder
+guards refuse a candidate whose two policy references disagree on `policy_id`/`policy_version`
+or whose coordinate binds another scope. Phase 5A → `0.2.0`, schema `…-candidate-2`.
+
+**3. Gate 11 and the promotion.** The verification routine reconciles a supplied candidate's
+coordinate against the resolved policy on all six components, the signed body digest and the
+issuing identity, refusing a disagreement with `CANDIDATE_COORDINATE_MISMATCH`.
+`candidate_digest_fact` moved to the verified half, `VERIFICATION_PROFILE_VERSION` → `v2`,
+distribution → `0.2.0`.
+
+**4. Neighbours.** `cloud-scaling-producer-attestation` re-pinned (fixtures and sdist payload
+only, staying at `0.1.0`); 5B-0B's `test_phase5a_untouched.py` amended rather than deleted.
+
+### Measured
+
+| Fact | Value |
+|---|---|
+| Phase 5A suite | 242 → **277 passed**, 0 failed, 0 skipped |
+| Producer-attestation suite | **440 passed**, 0 failed, 3 skipped (no built dist in the tree; pre-existing) |
+| Policy-authenticity suite | 259 → **282 passed**, 0 failed, 0 skipped |
+| Policy Authority suite | **331 passed**, 0 failed, 0 skipped |
+| Phase 5A digests moved | **1 of 10**: `FROZEN_CANDIDATE_DIGEST` `sha256:db72ffff…` → `sha256:be06c653…` |
+| New Phase 5A pin | `FROZEN_POLICY_COORDINATE_BINDING_DIGEST` `sha256:ad1d1ad9…` (ten pins → eleven) |
+| Producer-attestation digest moved | `FROZEN_VERIFIED_ARTIFACT_DIGEST` `sha256:519983d8…` → `sha256:5a2a6648…` |
+| Policy-authenticity digests moved | artifact `8b0ea25f…` → `f245511d…`; partition fingerprint `86d39d25…` → `242ac003…` |
+| Gates | ten → **eleven** |
+| Recorded facts | four → **three** |
+
+Every superseded value above is pinned as a negative anchor in the package that produces it.
+
+### Where the implementation is narrower than a reader might assume
+
+* **`candidate_digest_fact` is verified *when present*.** The candidate stays optional, so
+  `None` means no candidate accompanied the determination. It never means one was carried
+  unchecked — a candidate that does not reconcile mints no artifact — and both halves of that
+  are measured. This is the one member of the verified half whose status is conditional, and
+  it is documented as such on the artifact, in `RECORDED_FACT_NAMES`' neighbour and in the
+  derivation ledger.
+* **Three fields cross-checked between the two policy references, not five.** `policy_id`,
+  `policy_version` and `target_scope_digest`, exactly as ratified. The issuer and key are not:
+  Phase 5A's `policy_issuer`/`policy_key_id` have no ratified correspondence to the authority's
+  `issuing_authority_id`/`key_id`, and inventing one would be Phase 5A asserting something
+  about the Policy Authority no clause supports. Gate 11 does compare the issuing identity,
+  because there the determination knows the truth.
+* **The coordinate's tenant is not compared against the candidate's tenant.** The authority's
+  global tenant is the empty string, so a global-scope policy legitimately bounds a
+  tenant-scoped action. Recorded as R-9 below rather than decided silently.
+
+### Residuals after this change
+
+| # | Residual | Owner |
+|---|---|---|
+| R-2 `[R]` | `resolved_as_of_fact` stays recorded; whose clock supplies `as_of` is unsettled | 5B-2 |
+| R-3 `[G]` | The authority still does not re-enforce `coordinate.content_digest == policy_body_digest` at resolution. Three boundaries now refuse the divergence themselves | Policy Authority |
+| R-7 `[G]` | The verified/recorded maps are still written twice — in `verified.py` and in `_mint_verified_artifact`. The promotion required editing both; editing one is caught by the artifact's self-digest as a refusal, so this is a maintenance hazard, not a correctness one | 5B-2 |
+| R-8 | Bound extraction — that the candidate's `max_permitted_*` are the bounds the verified body states — is untouched | 5B-2 |
+| R-9 `[R]` | Whether a candidate's tenant must equal its policy coordinate's tenant component, given that a global-scope policy carries the empty tenant | Owner / 5B-2 |
+| R-10 `[G]` | Two Phase 5A suite weaknesses found while implementing, both pre-existing: `test_non_reachability.py` strips docstrings with `ast.get_docstring`, whose dedented result does not match the indented source, so an indented docstring naming a forbidden symbol trips the scan; and `test_phase5a_invariants.py::test_no_phase_5a_source_file_was_modified` reads `git status`, so it measures a clean working tree rather than an unmodified package | Phase 5A |
+| A-59 (5B-0A) | The producer attestation binds the recommendation, not the candidate. Reconciling the policy does not reconcile the producer's signature to this candidate | 5B-2 |
