@@ -1,0 +1,121 @@
+# Changelog — ugence-cloud-scaling-policy-authenticity
+
+## 0.1.0 — Cloud Scaling Phase 5B-0B: policy authenticity
+
+First release. Adds a distribution; changes none.
+
+### Added
+
+- `PolicyAuthenticityVerifier` — the authoritative routine. Ten ordered gates, stopping at the
+  first failure, deterministic, fail-closed. An unexpected exception becomes
+  `VERIFICATION_UNAVAILABLE`, which is a refusal.
+- `PolicyResolutionPort` with `PolicyAuthorityResolutionPort` (the one production-grade seam
+  to the Policy Authority's trusted-resolution path, pinning the fail-closed historical rule
+  and reporting its trust-configuration identity) and `DenyAllPolicyResolutionPort` (the
+  production-admissible "trust not configured" posture).
+- `VerifiedPolicyAuthenticity` — the exact-typed, immutable, non-authoritative result. Minted
+  only by the routine, guarded by a construction token, a self-digest, a provenance registry
+  and `require_verified_policy_authenticity` revalidation at every consumption boundary.
+- `PolicyAuthenticityOutcome` — a closed vocabulary with exactly one success. Every Policy
+  Authority refusal reason maps across one-for-one and injectively; an unrecognised reason
+  becomes `INDETERMINATE`, which is a refusal.
+- `policy_trust_configuration_digest` — the identity of one policy trust configuration,
+  computed from the anchors' governing attributes and never from key material.
+
+### Ratified decisions implemented
+
+- **D-5B0B-1** — the verified artifact is a `RESOLVED`, non-historical `PolicyResolution`.
+- **D-5B0B-2** — `policy_body_digest` is the content binding. The two digest namespaces (bare
+  64-hex for the Policy Authority, `sha256:`-prefixed for Phase 5A) are validated separately
+  and never converted.
+- **D-5B0B-3** — all six coordinate components are carried; a Phase 5A binding cannot name a
+  coordinate, so none is derived from one.
+- **D-5B0B-4, option (a)** — policy signatures are verified through the Policy Authority's own
+  `PolicyKeyRing`. No Trusted Evidence Authority dependency exists, and an import-boundary test
+  makes that unreachable rather than merely unused.
+- **D-5B0B-5** — "is valid now", at an injected `as_of`. No clock is read anywhere.
+- **D-5B0B-6** — the proof travels alongside the candidate. Phase 5A stays at `0.1.0`; this
+  suite re-runs its frozen-digest tests to prove all ten are unmoved.
+
+### Audit remediation (pre-merge, same version)
+
+Three findings from the independent audit of this package, addressed without adding or
+removing a verification gate and without touching Phase 5A.
+
+- **The result pair is bound.** `PolicyAuthenticityResult` now cross-checks the verified
+  artifact against the `PolicyResolution` it carries, on the coordinate and on
+  `policy_body_digest`. Two individually genuine halves about different policies are a
+  misstatement — a consumer reading the body out of the resolution would read a body the
+  proof does not cover — and the pair is refused as one.
+- **The trust identity is snapshotted at verifier construction** and every determination is
+  minted from the snapshot, so a port cannot report one identity when it is admitted and
+  another when the artifact is stamped.
+- **Typed outcomes survive the terminal handler.** An escaping error of this package's own
+  types keeps the member it carries (`COORDINATE_MALFORMED`, `INVARIANT_VIOLATION`, …);
+  anything else is `VERIFICATION_UNAVAILABLE`. "The check could not run" and "the check ran
+  and the artifact is bad" are different facts. An exception claiming `VERIFIED` never
+  becomes one.
+
+### D-5B0B-7 — the digest payload partitions (ratified, implemented at the same version)
+
+`VerifiedPolicyAuthenticity.digest_payload()` is now two separately framed maps, each carrying
+its own domain tag as a canonical field:
+
+- **`verified`** — the facts a gate checked;
+- **`recorded`** — carried and digest-covered but never attested. Exactly
+  `resolved_as_of_fact` (R-2: injected, unvalidated) and `candidate_digest_fact` (R-4:
+  recorded, never reconciled).
+
+Both halves remain inside the artifact digest, so neither can be rewritten; what the partition
+adds is that the frame a fact sits in is part of what the digest commits to. Promoting a fact
+into the verified half — what 5B-1 and 5B-2 do when they close R-4 and R-2 — therefore moves
+the artifact digest instead of silently relabelling it.
+
+`verified_fact(name)` and `recorded_fact(name)` each refuse the other's half, so an unattested
+value cannot be read through a call that reads as attested. `VERIFIED_FACT_NAMES` and
+`RECORDED_FACT_NAMES` are exported, and an import-time guard refuses a field in neither set.
+
+No gate was added or removed (still ten), the distribution stays at `0.1.0`, and no Phase 5A
+frozen digest moved.
+
+### Second audit round (pre-merge, same version)
+
+Three further findings. **No verification gate was added or removed — the routine still runs
+ten — so `VERIFICATION_PROFILE_VERSION` stays `v1`.** Two facts moved from the verified half
+to the recorded half, which does move every artifact digest; that is safe only because nothing
+downstream pins one yet and no verification artifact crosses a process boundary.
+
+- **`policy_type` moves to `recorded`.** It is absent from the 21 keys of
+  `IssuedPolicyRecord.signing_payload()` (`adapter_id` is present; this is not), and
+  `resolve_policy` recomputes the body digest from the *descriptor's* `policy_type`, never the
+  record's — so a record differing only in that field resolves `RESOLVED` and minted a
+  `VERIFIED` artifact carrying the substituted value. No gate is available: the fact is
+  transitively committed inside `policy_body_digest`, whose frame includes it, but a hash is
+  one-way and this package holds no adapter registry with which to re-derive the descriptor.
+- **`trust_configuration_digest` moves to `recorded`.** It was port-self-reported and checked
+  only for shape, so a wrapper delegating to a genuine `PolicyAuthorityResolutionPort` while
+  reporting an arbitrary well-formed digest minted an artifact carrying that value. No gate is
+  available either: the port *is* the seam to the authority, so any check would be the port
+  vouching for itself. The construction-time snapshot is kept — it stops drift between
+  admission and minting — but it does not make the value true, and the docstrings now say so.
+- **The result pair binds which answer, not only which policy.**
+  `PolicyAuthenticityResult` now also requires the carried resolution to be non-historical and
+  to have been reached at the instant the artifact reports. A genuine artifact previously
+  paired cleanly with a genuine `historical=True` resolution of the same policy — same
+  coordinate, same body digest, `implies_current_validity=False` — and with one reached at a
+  different `as_of`.
+
+### Residual closed at this boundary
+
+- **R-3** — `resolve_policy` does not re-enforce `coordinate.content_digest ==
+  policy_body_digest`. Reproduced with a synthetic decoupling adapter and refused here as
+  `COORDINATE_DIGEST_UNBOUND`. `tests/test_coordinate_gap.py` also pins the residual itself, so
+  a future Policy Authority fix surfaces as a failing test rather than as a silently redundant
+  gate.
+
+### Residuals carried, not closed
+
+- **R-2** — whose clock supplies `as_of`, and what makes it trustworthy. Open by ruling; this
+  implementation proceeds with `as_of` injected and unvalidated. 5B-2's work.
+- **R-4** — binding the verified policy proof to the recommendation and target scope. 5B-1's
+  decision-scope repair. `candidate_digest_fact` records scope, never a binding.
