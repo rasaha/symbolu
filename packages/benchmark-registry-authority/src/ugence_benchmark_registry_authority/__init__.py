@@ -20,9 +20,14 @@ Milestone boundary
   *would be* valid; nothing here makes one occur.
 * **BR-2C (0.3.0)** — the cryptographic trust authority: audited verifier,
   signing-frame verification, anchor resolution, key rotation and revocation.
-  The injected verifier arrives here, defaulting to exact deny-all. Blocked on
-  an audited cryptographic verifier and a composition-root trust-resolver
-  design.
+  The injected verifier arrives here, defaulting to exact deny-all. **Still
+  blocked** on an audited cryptographic verifier and a composition-root
+  trust-resolver design. Its ratified *contract surface* — the trust-anchor
+  record, the three distinct verified-result types and the reshaped ports
+  (D-24, D-25, D-26) — ships in this ``0.2.0`` release ahead of the version
+  rung, because D-23 classifies the governance and engineering blockers as
+  independent and only the governance half is cleared. **No verifier ships, and
+  none has been audited** (D-32).
 * **BR-2D (0.4.0)** — the durable registry authority: persistence, the trusted
   clock, compare-and-set transitions, immutable event history, the process-local
   in-memory adapter, and the **first authoritative** admission, registration,
@@ -145,6 +150,19 @@ from .api import (
     BENCHMARK_REGISTRY_SNAPSHOT_ASSERTION_DIGEST_DOMAIN,
     BENCHMARK_TRANSITION_PLAN_DIGEST_DOMAIN,
     BENCHMARK_TRANSITION_REFUSAL_DIGEST_DOMAIN,
+    BenchmarkTrustRole,
+    BenchmarkTrustAnchorStatus,
+    BenchmarkVerificationOutcome,
+    BenchmarkTrustAnchorRecord,
+    BenchmarkPublisherVerifiedResult,
+    BenchmarkApprovalVerifiedResult,
+    BenchmarkRevocationVerifiedResult,
+    BENCHMARK_TRUST_ANCHOR_EVALUATION_ORDER,
+    BENCHMARK_VERIFIED_RESULT_BOUND_FACTS,
+    BENCHMARK_TRUST_ANCHOR_RECORD_DIGEST_DOMAIN,
+    BENCHMARK_PUBLISHER_VERIFIED_RESULT_DIGEST_DOMAIN,
+    BENCHMARK_APPROVAL_VERIFIED_RESULT_DIGEST_DOMAIN,
+    BENCHMARK_REVOCATION_VERIFIED_RESULT_DIGEST_DOMAIN,
 )
 from .version import __version__
 
@@ -242,5 +260,18 @@ __all__ = [
     "BENCHMARK_REGISTRY_SNAPSHOT_ASSERTION_DIGEST_DOMAIN",
     "BENCHMARK_TRANSITION_PLAN_DIGEST_DOMAIN",
     "BENCHMARK_TRANSITION_REFUSAL_DIGEST_DOMAIN",
+    "BenchmarkTrustRole",
+    "BenchmarkTrustAnchorStatus",
+    "BenchmarkVerificationOutcome",
+    "BenchmarkTrustAnchorRecord",
+    "BenchmarkPublisherVerifiedResult",
+    "BenchmarkApprovalVerifiedResult",
+    "BenchmarkRevocationVerifiedResult",
+    "BENCHMARK_TRUST_ANCHOR_EVALUATION_ORDER",
+    "BENCHMARK_VERIFIED_RESULT_BOUND_FACTS",
+    "BENCHMARK_TRUST_ANCHOR_RECORD_DIGEST_DOMAIN",
+    "BENCHMARK_PUBLISHER_VERIFIED_RESULT_DIGEST_DOMAIN",
+    "BENCHMARK_APPROVAL_VERIFIED_RESULT_DIGEST_DOMAIN",
+    "BENCHMARK_REVOCATION_VERIFIED_RESULT_DIGEST_DOMAIN",
     "api",
 ]

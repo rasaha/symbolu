@@ -54,6 +54,9 @@ __all__ = [
     "BenchmarkRegistryConsistencyClaim",
     "BenchmarkConfusableNormalizationPosture",
     "BenchmarkRegistrationRecordPresence",
+    "BenchmarkTrustRole",
+    "BenchmarkTrustAnchorStatus",
+    "BenchmarkVerificationOutcome",
     "BENCHMARK_REGISTRATION_STATE_ORDER",
     "BENCHMARK_TERMINAL_REGISTRATION_STATES",
     "BENCHMARK_BANNED_REGISTRATION_STATE_NAMES",
@@ -287,3 +290,128 @@ class BenchmarkRegistrationRecordPresence(str, Enum):
     #: The caller asserts a registration record has been appended. This closes
     #: the ``ADMITTED → REJECTED`` arrow permanently for that locator.
     RECORD_APPENDED = "RECORD_APPENDED"
+
+
+class BenchmarkTrustRole(str, Enum):
+    """The three role-scoped anchor namespaces BR-2C's trust directory serves.
+
+    D-26 rules that publisher, approver and revoker occupy **logically separate
+    role-scoped anchor namespaces**. They may share one physical directory
+    implementation, but an anchor authorized for one role **never** authorizes
+    another automatically — which is why the role is a mandatory parameter of
+    the resolution seam and a bound field of every resolved record and every
+    verified result, rather than something a caller may leave implicit.
+
+    §8's role-separation matrix names the benchmark-version revoker as a role
+    distinct from the publisher, and §17's rule 10 requires the revoking
+    authority to be entitled for the exact benchmark scope with the publisher
+    never substituted for it. A single namespace would make that substitution
+    a configuration accident rather than an unrepresentable state.
+
+    Three members and no fourth. The composition root — D-02's fourth party —
+    supplies anchors; it is never a signer, so it has no anchor namespace of
+    its own to name here.
+
+    **Naming a role is not occupying one.** Nothing in this package resolves an
+    anchor, holds one, or checks that any identity is entitled under any role.
+    """
+
+    #: The publisher namespace. Entitles a key to sign a publisher submission
+    #: envelope and nothing else.
+    PUBLISHER = "PUBLISHER"
+
+    #: The independent approver namespace. D-02 forbids the publisher from
+    #: approving its own artifact; separate namespaces are that rule expressed
+    #: where the anchors live rather than only where the envelopes are checked.
+    APPROVER = "APPROVER"
+
+    #: The revoker namespace. D-26 allocates revoker entitlement to BR-2C
+    #: rather than leaving it to the implementer, because ``is_entitled`` was
+    #: publisher-scoped in its own signature and D-02's four-party separation
+    #: names no revoker.
+    REVOKER = "REVOKER"
+
+
+class BenchmarkTrustAnchorStatus(str, Enum):
+    """The lifecycle status a resolved trust-anchor record carries.
+
+    Three members, and deliberately **not** five. D-27 names five conditions a
+    refusal must distinguish — not found, revoked, disabled, not yet valid and
+    expired — and only two of them are statuses of a record that was found.
+    "Not found" is the absence of a record and can never be a field on one;
+    "not yet valid" and "expired" are **derived** by comparing the record's own
+    validity interval against the explicit trusted instant, so representing
+    them here as well would create a second spelling of a fact the interval
+    already carries, and the two spellings could disagree.
+
+    D-28 fixes the evaluation order — **revoked, disabled, not yet valid,
+    expired** — so a revoked anchor refuses as revoked even when its interval
+    has also elapsed. The first two terms of that order are read from this
+    enum; the last two from the interval.
+
+    A closed enum rather than a Boolean pair, for D-15's reason: a settable
+    ``is_active`` flag is one assignment away from re-enabling a revoked anchor.
+    There is no ``ENABLED_WITH_WARNING``, no ``PENDING`` and no ``UNKNOWN``: an
+    anchor whose status could not be determined is not an anchor, and D-28's
+    fail-closed posture refuses rather than defaulting.
+
+    The in-force member is ``ENABLED`` and deliberately **not** ``ACTIVE``.
+    ``ACTIVE`` is a member of
+    :data:`BENCHMARK_BANNED_REGISTRATION_STATE_NAMES` — one of the floating
+    lifecycle words B-9 keeps out of this package because "possession is not
+    validity" — and an anchor status spelling it would put a banned word back
+    into the vocabulary through a side door. ``ENABLED`` also pairs correctly
+    with :attr:`DISABLED`, which is the distinction the member actually draws.
+    """
+
+    #: The anchor is in force, subject to its validity interval being satisfied
+    #: at the trusted instant. **Not** a statement that verification succeeded,
+    #: and not a claim that anything is currently resolvable.
+    ENABLED = "ENABLED"
+
+    #: The anchor was revoked. D-28: revocation **invalidates prior signatures
+    #: retroactively**, unlike ordinary key rotation, so a revoked anchor
+    #: refuses at every trusted instant and not merely at instants after the
+    #: revocation.
+    REVOKED = "REVOKED"
+
+    #: The anchor was administratively disabled without being revoked. Distinct
+    #: from :attr:`REVOKED` because it carries no retroactive effect: a disabled
+    #: anchor stops authorizing new verification without invalidating what it
+    #: previously authorized.
+    DISABLED = "DISABLED"
+
+
+class BenchmarkVerificationOutcome(str, Enum):
+    """What a verified result reports about **cryptographic verification only**.
+
+    D-24: a verified result establishes cryptographic verification and nothing
+    else — **never admission, never registration, never trusted resolution**.
+    This enum is therefore deliberately *not*
+    :class:`BenchmarkAdmissionOutcome`: reusing ``ADMITTED``/``REJECTED`` would
+    spell a verification answer in the admission vocabulary, which is the exact
+    confusion D-24's "cryptographic verification ONLY" forbids, and D-01 keeps
+    BR-2D the first phase permitted to assert that anything occurred.
+
+    Two members and no third. There is no ``INDETERMINATE`` member here because
+    an undetermined verification is a refusal, not an outcome of its own: the
+    refusal vocabulary already carries
+    :attr:`~.reasons.BenchmarkRegistryRefusalReason.INDETERMINATE` and every
+    unknown condition maps there and refuses. A third outcome member would be a
+    way for a result to be neither verified nor refused, which fails open.
+
+    **Declaring an outcome is not producing one.** No verifier ships at this
+    contract slice, so every value of this enum in this package is one a caller
+    wrote down.
+    """
+
+    #: The signature verified under the bound profile against the bound anchor
+    #: record, evaluated at the bound trusted instant. Carries **no** refusal
+    #: reason, and establishes none of §09's five authority facts.
+    VERIFIED = "VERIFIED"
+
+    #: Verification refused. Always accompanied by exactly one stable typed
+    #: refusal reason from the BR-2 vocabulary saying why — the constructor of
+    #: every verified-result type enforces the biconditional, so a refusal with
+    #: no reason and a verification with a reason are both unconstructible.
+    REFUSED = "REFUSED"

@@ -50,6 +50,13 @@ from ugence_benchmark_registry_authority.api import (
     BenchmarkRevocationEventPayload,
     BenchmarkSignatureProfile,
     BenchmarkSubmissionRecordPayload,
+    BenchmarkApprovalVerifiedResult,
+    BenchmarkPublisherVerifiedResult,
+    BenchmarkRevocationVerifiedResult,
+    BenchmarkTrustAnchorRecord,
+    BenchmarkTrustAnchorStatus,
+    BenchmarkTrustRole,
+    BenchmarkVerificationOutcome,
     PlatformRegistryScopeExpectation,
     TenantRegistryScopeExpectation,
 )
@@ -93,6 +100,22 @@ EFFECTIVE_AT = datetime(2026, 6, 1, 0, 0, 0, tzinfo=timezone.utc)
 AS_OF = datetime(2026, 9, 1, 0, 0, 0, tzinfo=timezone.utc)
 
 PROFILE = BenchmarkSignatureProfile.ED25519_SHA512_V1
+
+# BR-2C contract fixtures. Public-key material is 64 lowercase hex characters
+# (32 bytes) and, like every other literal here, is a fixed string that is never
+# decoded: this package parses no key material and links no cryptographic
+# library, so these are encodings that look like keys and are not keys.
+PUBLISHER_PUBLIC_KEY = "d4" * 32
+APPROVER_PUBLIC_KEY = "e5" * 32
+REVOKER_PUBLIC_KEY = "f6" * 32
+
+# The explicit trusted instant D-28 makes an input to verification. Deliberately
+# inside [VALIDITY_FROM, VALIDITY_TO) so the pinned anchor fixture is one a
+# verifier would find valid — and deliberately a literal, because BR-2C ships no
+# clock and the authoritative clock arrives at BR-2D (D-11, unamended).
+TRUSTED_INSTANT = datetime(2026, 4, 1, 0, 0, 0, tzinfo=timezone.utc)
+ANCHOR_REVOKED_AT = datetime(2026, 7, 1, 0, 0, 0, tzinfo=timezone.utc)
+ANCHOR_REVOCATION_REASON = "key-compromise-reported"
 
 
 def tenant_scope(tenant_id: str = TENANT_ID) -> BenchmarkScope:
@@ -296,13 +319,149 @@ def tenant_expectation(**overrides) -> TenantRegistryScopeExpectation:
     return TenantRegistryScopeExpectation(**kwargs)
 
 
+# --------------------------------------------------------------------------- #
+# BR-2C trust and verification contracts (D-24, D-25, D-26).
+#
+# Fixtures for shapes, not for capability. Constructing a verified result here
+# verifies nothing: the objects carry §09's five permanently-False authority
+# derivations exactly as every other contract in this package does, and no
+# verifier exists to produce one.
+# --------------------------------------------------------------------------- #
+def trust_anchor_record(**overrides) -> BenchmarkTrustAnchorRecord:
+    """An ENABLED publisher anchor. The pinned fixture."""
+
+    kwargs = dict(
+        role=BenchmarkTrustRole.PUBLISHER,
+        identity=PUBLISHER_IDENTITY,
+        key_id=PUBLISHER_KEY_ID,
+        signature_profile=PROFILE,
+        public_key_material=PUBLISHER_PUBLIC_KEY,
+        validity_from=VALIDITY_FROM,
+        validity_to=VALIDITY_TO,
+        status=BenchmarkTrustAnchorStatus.ENABLED,
+        revoked_at=None,
+        revocation_reason=None,
+    )
+    kwargs.update(overrides)
+    return BenchmarkTrustAnchorRecord(**kwargs)
+
+
+def revoked_trust_anchor_record(**overrides) -> BenchmarkTrustAnchorRecord:
+    """A REVOKED anchor, carrying the revocation facts a REVOKED status requires.
+
+    A second fixture for the same class, like ``rejected_admission_decision``
+    and ``unoccupied_assertion``: the revoked branch of the constructor's
+    biconditional is unreachable from the ENABLED fixture.
+    """
+
+    kwargs = dict(
+        status=BenchmarkTrustAnchorStatus.REVOKED,
+        revoked_at=ANCHOR_REVOKED_AT,
+        revocation_reason=ANCHOR_REVOCATION_REASON,
+    )
+    kwargs.update(overrides)
+    return trust_anchor_record(**kwargs)
+
+
+def approver_trust_anchor_record(**overrides) -> BenchmarkTrustAnchorRecord:
+    """An anchor in the **approver** namespace. D-26 keeps the three separate."""
+
+    kwargs = dict(
+        role=BenchmarkTrustRole.APPROVER,
+        identity=APPROVAL_AUTHORITY_IDENTITY,
+        key_id=APPROVAL_AUTHORITY_KEY_ID,
+        public_key_material=APPROVER_PUBLIC_KEY,
+    )
+    kwargs.update(overrides)
+    return trust_anchor_record(**kwargs)
+
+
+def revoker_trust_anchor_record(**overrides) -> BenchmarkTrustAnchorRecord:
+    """An anchor in the **revoker** namespace."""
+
+    kwargs = dict(
+        role=BenchmarkTrustRole.REVOKER,
+        identity=REVOKER_IDENTITY,
+        key_id=REVOKER_KEY_ID,
+        public_key_material=REVOKER_PUBLIC_KEY,
+    )
+    kwargs.update(overrides)
+    return trust_anchor_record(**kwargs)
+
+
+def publisher_verified_result(**overrides) -> BenchmarkPublisherVerifiedResult:
+    kwargs = dict(
+        verified_digest=IDENTITY_DIGEST,
+        signer_role=BenchmarkTrustRole.PUBLISHER,
+        signer_identity=PUBLISHER_IDENTITY,
+        signer_key_id=PUBLISHER_KEY_ID,
+        signature_profile=PROFILE,
+        anchor_record_digest=OTHER_DIGEST,
+        evaluated_at=TRUSTED_INSTANT,
+        outcome=BenchmarkVerificationOutcome.VERIFIED,
+        refusal_reason=None,
+    )
+    kwargs.update(overrides)
+    return BenchmarkPublisherVerifiedResult(**kwargs)
+
+
+def refused_publisher_verified_result(
+    **overrides,
+) -> BenchmarkPublisherVerifiedResult:
+    """A refusal naming an anchor that was never found — so it binds no revision."""
+
+    kwargs = dict(
+        anchor_record_digest=None,
+        outcome=BenchmarkVerificationOutcome.REFUSED,
+        refusal_reason=BenchmarkRegistryRefusalReason.TRUST_ANCHOR_NOT_FOUND,
+    )
+    kwargs.update(overrides)
+    return publisher_verified_result(**kwargs)
+
+
+def approval_verified_result(**overrides) -> BenchmarkApprovalVerifiedResult:
+    kwargs = dict(
+        verified_digest=CONTENT_DIGEST,
+        signer_role=BenchmarkTrustRole.APPROVER,
+        signer_identity=APPROVAL_AUTHORITY_IDENTITY,
+        signer_key_id=APPROVAL_AUTHORITY_KEY_ID,
+        signature_profile=PROFILE,
+        anchor_record_digest=OTHER_DIGEST,
+        evaluated_at=TRUSTED_INSTANT,
+        outcome=BenchmarkVerificationOutcome.VERIFIED,
+        refusal_reason=None,
+    )
+    kwargs.update(overrides)
+    return BenchmarkApprovalVerifiedResult(**kwargs)
+
+
+def revocation_verified_result(**overrides) -> BenchmarkRevocationVerifiedResult:
+    kwargs = dict(
+        verified_digest=OTHER_DIGEST,
+        signer_role=BenchmarkTrustRole.REVOKER,
+        signer_identity=REVOKER_IDENTITY,
+        signer_key_id=REVOKER_KEY_ID,
+        signature_profile=PROFILE,
+        anchor_record_digest=IDENTITY_DIGEST,
+        evaluated_at=TRUSTED_INSTANT,
+        outcome=BenchmarkVerificationOutcome.VERIFIED,
+        refusal_reason=None,
+    )
+    kwargs.update(overrides)
+    return BenchmarkRevocationVerifiedResult(**kwargs)
+
+
 #: Pinned fixtures for the shipped root-canonicalizable artifact classes, in
-#: the ratified domain order. **Eighteen classes** — BR-2A's fifteen and
-#: BR-2B's three. The builder count is deliberately **not** one-to-one with
-#: them: ``rejected_admission_decision`` is a second fixture for
-#: ``BenchmarkAdmissionDecisionPayload`` and ``unoccupied_assertion`` a second
-#: for ``BenchmarkRegistrySnapshotAssertion``, so twenty builders cover the
-#: eighteen classes. Every one of the eighteen appears in
+#: the ratified domain order. **Twenty-two classes** — BR-2A's fifteen, BR-2B's
+#: three and BR-2C's four. The builder count is deliberately **not** one-to-one
+#: with them: ``rejected_admission_decision`` is a second fixture for
+#: ``BenchmarkAdmissionDecisionPayload``, ``unoccupied_assertion`` a second for
+#: ``BenchmarkRegistrySnapshotAssertion``, ``refused_publisher_verified_result``
+#: a second for ``BenchmarkPublisherVerifiedResult``, and
+#: ``revoked_trust_anchor_record``, ``approver_trust_anchor_record`` and
+#: ``revoker_trust_anchor_record`` three more for ``BenchmarkTrustAnchorRecord``
+#: — so the builders outnumber the classes and the count is not restated as a
+#: pair. Every one of the twenty-two appears in
 #: ``pinned_canonical_vectors.json``, in the canonical-domain inventory, in the
 #: public-contract inventory, and in the source/wheel/sdist parity checks.
 def snapshot_assertion(**overrides) -> BenchmarkRegistrySnapshotAssertion:
@@ -371,4 +530,8 @@ PINNED_VECTOR_BUILDERS = (
     ("BenchmarkRegistrySnapshotAssertion", snapshot_assertion),
     ("BenchmarkTransitionPlan", transition_plan),
     ("BenchmarkTransitionRefusal", transition_refusal),
+    ("BenchmarkTrustAnchorRecord", trust_anchor_record),
+    ("BenchmarkPublisherVerifiedResult", publisher_verified_result),
+    ("BenchmarkApprovalVerifiedResult", approval_verified_result),
+    ("BenchmarkRevocationVerifiedResult", revocation_verified_result),
 )

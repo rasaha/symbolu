@@ -76,6 +76,22 @@
     "BenchmarkHistoricalInspectionRequest": {
       "canonical_bytes": "{\"body\":{\"as_of\":\"2026-09-01T00:00:00.000000Z\",\"coordinate\":{\"benchmark_family\":\"fam\",\"benchmark_id\":\"bmk\",\"benchmark_version\":\"1.2.3\",\"domain\":{\"declaration\":\"NOT_APPLICABLE\",\"value\":\"\"},\"geography\":{\"declaration\":\"APPLICABLE\",\"value\":\"eu\"},\"scope\":{\"kind\":\"TENANT\",\"tenant_id\":\"t1\"}}},\"canonicalization\":\"ugence.benchmark-registry-authority/canonicalization/v1\",\"domain\":\"ugence.benchmark-registry-authority/historical-inspection-request/v1\",\"type\":\"BenchmarkHistoricalInspectionRequest\"}",
       "digest": "0b1d2dfd8fda95d8c7234a8dc0063b788d753f97e23c2b14a5919ef2c758284f"
+    },
+    "BenchmarkTrustAnchorRecord": {
+      "canonical_bytes": "{\"body\":{\"identity\":\"publisher-alpha\",\"key_id\":\"publisher-key-1\",\"public_key_material\":\"d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4\",\"revocation_reason\":null,\"revoked_at\":null,\"role\":\"PUBLISHER\",\"signature_profile\":\"ED25519_SHA512_V1\",\"status\":\"ENABLED\",\"validity_from\":\"2026-01-01T00:00:00.000000Z\",\"validity_to\":\"2027-01-01T00:00:00.000000Z\"},\"canonicalization\":\"ugence.benchmark-registry-authority/canonicalization/v1\",\"domain\":\"ugence.benchmark-registry-authority/trust-anchor-record/v1\",\"type\":\"BenchmarkTrustAnchorRecord\"}",
+      "digest": "86d2ff9b9edbc2a4acd4a0edb1e54ef221e276a8b55a22fb35009189aee885f4"
+    },
+    "BenchmarkPublisherVerifiedResult": {
+      "canonical_bytes": "{\"body\":{\"anchor_record_digest\":\"c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3\",\"evaluated_at\":\"2026-04-01T00:00:00.000000Z\",\"outcome\":\"VERIFIED\",\"refusal_reason\":null,\"signature_profile\":\"ED25519_SHA512_V1\",\"signer_identity\":\"publisher-alpha\",\"signer_key_id\":\"publisher-key-1\",\"signer_role\":\"PUBLISHER\",\"verified_digest\":\"a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1\"},\"canonicalization\":\"ugence.benchmark-registry-authority/canonicalization/v1\",\"domain\":\"ugence.benchmark-registry-authority/publisher-verified-result/v1\",\"type\":\"BenchmarkPublisherVerifiedResult\"}",
+      "digest": "7df2cff0f37e0544bebbcd977928fd2d91fd3c30490c053a3788eaf29eaebe0d"
+    },
+    "BenchmarkApprovalVerifiedResult": {
+      "canonical_bytes": "{\"body\":{\"anchor_record_digest\":\"c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3\",\"evaluated_at\":\"2026-04-01T00:00:00.000000Z\",\"outcome\":\"VERIFIED\",\"refusal_reason\":null,\"signature_profile\":\"ED25519_SHA512_V1\",\"signer_identity\":\"approval-authority-beta\",\"signer_key_id\":\"approval-key-1\",\"signer_role\":\"APPROVER\",\"verified_digest\":\"b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2\"},\"canonicalization\":\"ugence.benchmark-registry-authority/canonicalization/v1\",\"domain\":\"ugence.benchmark-registry-authority/approval-verified-result/v1\",\"type\":\"BenchmarkApprovalVerifiedResult\"}",
+      "digest": "7ee8fb68bbbdfbf9715f136ca750d3df1391244c860cf70c3d74074ef4dfabd4"
+    },
+    "BenchmarkRevocationVerifiedResult": {
+      "canonical_bytes": "{\"body\":{\"anchor_record_digest\":\"a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1\",\"evaluated_at\":\"2026-04-01T00:00:00.000000Z\",\"outcome\":\"VERIFIED\",\"refusal_reason\":null,\"signature_profile\":\"ED25519_SHA512_V1\",\"signer_identity\":\"revoker-delta\",\"signer_key_id\":\"revocation-key-1\",\"signer_role\":\"REVOKER\",\"verified_digest\":\"c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3\"},\"canonicalization\":\"ugence.benchmark-registry-authority/canonicalization/v1\",\"domain\":\"ugence.benchmark-registry-authority/revocation-verified-result/v1\",\"type\":\"BenchmarkRevocationVerifiedResult\"}",
+      "digest": "fb697a58598890cddaedf744236485885904260d79cc14c9f1500dc7921926fa"
     }
   }
 }

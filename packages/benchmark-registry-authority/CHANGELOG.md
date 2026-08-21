@@ -5,6 +5,162 @@ versioning is Semantic Versioning, and the version ladder is the ratified
 subphase ladder: BR-2A `0.1.0`, BR-2B `0.2.0`, BR-2C `0.3.0`, BR-2D `0.4.0`,
 BR-2E `0.5.0` (ADR §35 D-01, amended 2026-08-20).
 
+## [Unreleased] — BR-2C contract surface (D-24, D-25, D-32)
+
+**Contracts only. No verifier ships, and the verifier these contracts describe
+has not been audited and is not production-ready.**
+
+ADR §35.2 D-32 requires that statement to stand until an external cryptographic
+audit of the BR-2C verifier is obtained and recorded, and forbids any artifact
+of this distribution — this CHANGELOG included — from describing the verifier as
+audited, independently reviewed or production-ready before then. That audit is a
+**hard precondition to any production use** of it. D-32 waives the *distinct
+in-repo reviewer* for BR-2C only, and nothing else: the **engineering half** of
+§35.1's blocker stands untouched, so the audited verifier, the composition-root
+trust-resolver design and the key parser are **not begun here**.
+
+D-23 classifies BR-2C as blocked on unratified governance *and* audited
+engineering, independently. D-24, D-25 and D-26 clear the governance half by
+ruling the contract change; this entry is that change and nothing beyond it.
+
+### Changed — the two `bool` seams are replaced
+
+- **`BenchmarkApprovalVerifierPort`** (`contracts/ports.py`) — both methods
+  return exact types instead of `bool`, and D-26 adds a third seam,
+  `verify_revocation`. Each takes the **explicit trusted instant** as an
+  argument: D-28 records that BR-2C ships no clock, so the instant is an *input*
+  to verification and never a clock read. D-11 is unamended and the
+  authoritative clock still arrives at BR-2D.
+- **`BenchmarkPublisherTrustDirectoryPort.is_entitled` → `.resolve_anchor`** —
+  Boolean entitlement is replaced by exact anchor resolution (D-25), role-scoped
+  in its parameters (D-26). It performs **no lifecycle evaluation**: a resolver
+  that filtered on the trusted instant would collapse revoked, disabled,
+  not-yet-valid and expired into one indistinguishable absence, which is what
+  D-27 requires stay distinguishable.
+- Both ports remain **inert `Protocol` declarations exactly as BR-2A shipped
+  them**. Nothing in this package satisfies either, asserted structurally.
+
+### Added — four contract types, three enums, seven refusals
+
+- **`BenchmarkTrustAnchorRecord`** (D-25) — the immutable role-scoped anchor the
+  resolution seam returns, binding role, identity, key identifier, profile,
+  public-key material, validity interval, status and revocation facts. **The
+  anchor revision is this record's canonical digest**; no parallel revision
+  counter is minted. Key material is validated as a 64-hex-character *encoding*
+  and never decoded — this package still parses no key material and links no
+  cryptographic library.
+- **`BenchmarkPublisherVerifiedResult`, `BenchmarkApprovalVerifiedResult`,
+  `BenchmarkRevocationVerifiedResult`** (D-24, D-26) — three **distinct exact
+  types**, each pinning its own role and owning its own digest domain, each
+  binding D-24's nine facts. A result establishes **cryptographic verification
+  only — never admission, never registration, never trusted resolution**: all
+  five of §09's authority derivations stay permanently `False`, including on a
+  result reading `outcome=VERIFIED`.
+- **`BenchmarkTrustRole`, `BenchmarkTrustAnchorStatus`,
+  `BenchmarkVerificationOutcome`** — closed vocabularies. The verification
+  outcome is deliberately *not* `BenchmarkAdmissionOutcome`: spelling a
+  verification answer in the admission vocabulary is the confusion D-24 forbids.
+  The in-force anchor status is `ENABLED`, not `ACTIVE`, because `ACTIVE` is a
+  banned floating lifecycle name under D-08.
+- **Seven refusal members, appended and never inserted** (§35.6) —
+  `TRUST_ANCHOR_NOT_FOUND`, `TRUST_ANCHOR_REVOKED`, `TRUST_ANCHOR_DISABLED`,
+  `TRUST_ANCHOR_NOT_YET_VALID`, `TRUST_ANCHOR_EXPIRED` (D-27's five, role-neutral)
+  and `TRUST_DIRECTORY_UNAVAILABLE`, `STALE_TRUST_SNAPSHOT` (D-28's two).
+  Each is classified `TRUST_AND_AUTHENTICITY`; the classification is total.
+- `BENCHMARK_TRUST_ANCHOR_EVALUATION_ORDER` publishes D-28's ratified order —
+  revoked, disabled, not yet valid, expired — as a **specification constant**.
+  Nothing here evaluates it.
+
+### Measured surface movement
+
+Every number below was **measured after regenerating the manifests with
+`tools/generate_manifests.py`**, never predicted and never hand-edited.
+
+| Manifest | Before | After |
+| --- | --- | --- |
+| `api.__all__` | 93 | **106** |
+| `public_api.json` symbols | 92 | **105** |
+| public-contract inventory rows | 18 | **22** |
+| canonical domains / pinned vectors | 18 | **22** |
+| BR-2 refusal vocabulary | 17 | **24** |
+| combined BR-1/BR-2 list | 34 | **41** |
+
+BR-2's members now occupy composite indices 17..40; BR-1's frozen seventeen are
+untouched in value, order and index.
+
+### Measured verification
+
+| Check | Result |
+| --- | --- |
+| Package suite | **1970 passed** |
+| Independent adversarial probes | **74 passed** (also inside the installed wheel) |
+| Distinct properties | **471 adversarial : 35 happy = 13.46 : 1** |
+| Gate mutation sweep | **68 inventoried, 63 KILLED, 5 SURVIVED, 0 errored** |
+| Offline distribution verifier | **VERIFIED**, 8 negative controls run, 8 caught |
+| pyflakes | clean |
+| BR-1 freeze matrix | **VERIFIED** |
+
+All five survivors are the pre-existing classified ones; the slice introduced
+none. **This is author-owned assurance.** D-32(5) records the cost it accepts:
+three closure audits across BR-2B found seven defects, none in the boundary and
+every one in a rule asserting it, and that is the measured base rate this
+waiver accepts for BR-2C.
+
+### `package_version` deliberately stays `0.2.0`
+
+Not an oversight. Moving to `0.3.0` would map this distribution to **BR-2C** in
+`tests/_milestones.py`'s ratified ladder and unlock eight capability tokens —
+`signature_verifier`, `key_parser`, `trust_anchor_store`, `approval_verifier`
+and their unseparated spellings — whose bans are the only mechanical enforcement
+of the engineering blocker D-32 leaves standing. §35.1 defines `0.3.0` as the
+*audited verifier*, which this does not ship. D-24 through D-29 enumerate their
+moved surfaces down to individual docstring lines and name neither `version.py`
+nor `package_version`.
+
+**Recorded as open, not decided here:** the ratified ladder has exactly five
+rungs and no rung meaning *"BR-2C contracts landed, capability not"*, so a
+public surface moved at an unchanged version. Minting one is not available to an
+implementer — `VERSION_SUBPHASE` maps only the five, and any other string raises
+rather than resolving — so whether to mint an intermediate rung or accept the
+move at `0.2.0` is an **owner decision this entry does not take**.
+
+### Three BR-2A-era gates narrowed, each explicitly and with its citation
+
+None was weakened to a pattern; each names the exact class and field it excuses.
+
+- **The key-material ban** (`test_envelopes.py`) — D-25 ratifies that the anchor
+  record binds public-key material. The exemption is one field on one class, is
+  asserted in both directions so it cannot grow a second member, and licenses no
+  parsing.
+- **The visibility-dimension ban** (`test_tenancy.py`) — the `public_` token
+  collision is incidental: that ban is about *audience*, and "public key" is
+  cryptographic terminology. Every other token still applies to the field.
+- **The caller-supplied-digest ban** (`test_chain_integrity.py`, and
+  independently in `adversarial_probes.py`) — D-24 names both digests among the
+  nine bound facts. The rule exists because chain payloads *chain*; a verified
+  result chains nothing and is permanently `authority_verified is False`, so a
+  settable digest admits no forgery the type did not already admit. Nesting was
+  rejected because it would make `TRUST_ANCHOR_NOT_FOUND` and
+  `TRUST_DIRECTORY_UNAVAILABLE` — refusals in which no anchor exists to nest —
+  structurally unrepresentable.
+
+### Left open rather than decided
+
+- **`resolve_anchor` returns `Optional[BenchmarkTrustAnchorRecord]`**, so a
+  `None` cannot distinguish `TRUST_ANCHOR_NOT_FOUND` from
+  `TRUST_DIRECTORY_UNAVAILABLE` at the seam itself. This follows the rulings
+  literally — D-25 enumerates exactly one new type and D-28 says "no further
+  type is minted here", and both D-27 and D-28 locate the distinctions in the
+  verified result — but D-28's fail-closed posture needs the two separable, and
+  neither a resolution-result type nor a ratified exception is available without
+  a further owner decision.
+- **Which refusal members a verified result may carry** is unconstrained beyond
+  membership of the BR-2 vocabulary. No subset is ratified, and inventing one
+  would be a vocabulary ruling.
+- **D-31(a)'s deferred README obligation is discharged here**: the
+  measured-results table is re-stated from the fresh runs above rather than
+  edited, and its BR-2A-era marking withdrawn with it.
+
 ## [0.2.0] — BR-2B: the non-authoritative lifecycle kernel
 
 **Determines what a transition would be. Makes none occur.**

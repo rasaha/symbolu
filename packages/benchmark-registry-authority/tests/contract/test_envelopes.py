@@ -164,14 +164,76 @@ def test_a_blank_publisher_identity_or_key_is_refused():
             fx.publisher_envelope(**override)
 
 
+#: The **only** field in this package permitted to carry key material, and the
+#: only class permitted to declare it. D-25 ratifies that the resolved
+#: trust-anchor record binds "public-key material" among its eight bound facts,
+#: which is a deliberate change to BR-2A's blanket posture and not a drift from
+#: it — so the exception is named here, scoped to one class and one field name,
+#: rather than the ban being relaxed to a pattern that would let a second one in.
+#:
+#: What the exception does **not** license: parsing. The field is validated as
+#: an *encoding* by ``require_public_key_material`` — 64 lowercase hex
+#: characters — and its bytes are never decoded, no key object is constructed,
+#: and this package still links no cryptographic library. ``test_the_anchor_
+#: record_key_material_is_never_parsed`` asserts the encoding-only posture, and
+#: ``tests/packaging/test_dependency_boundary.py`` asserts the absent
+#: dependency.
+RATIFIED_KEY_MATERIAL_FIELD = ("BenchmarkTrustAnchorRecord", "public_key_material")
+
+
 def test_no_key_material_field_exists_anywhere():
-    """Naming a key is not possessing one; no public key is carried or parsed."""
+    """Naming a key is not possessing one; no public key is carried or parsed.
+
+    One ratified exception, named in :data:`RATIFIED_KEY_MATERIAL_FIELD` and
+    nowhere else: D-25's anchor record. Every other class in the package, and
+    every other field on that class, stays under the original ban.
+    """
 
     banned = ("public_key", "private_key", "key_material", "pem", "der", "jwk")
-    for _name, builder in fx.PINNED_VECTOR_BUILDERS:
+    exempt_class, exempt_field = RATIFIED_KEY_MATERIAL_FIELD
+    for name, builder in fx.PINNED_VECTOR_BUILDERS:
         for f in dataclasses.fields(builder()):
+            if (name, f.name) == (exempt_class, exempt_field):
+                continue
             for token in banned:
                 assert token not in f.name.lower(), f.name
+
+
+def test_the_one_key_material_exception_is_exactly_one_field_on_one_class():
+    """The exemption cannot quietly grow a second member.
+
+    Asserted in both directions: the named field exists on the named class, and
+    no *other* class carries any field the ban would have caught. A future type
+    that acquired key material would fail the test above; a future edit that
+    widened this constant would fail here.
+    """
+
+    exempt_class, exempt_field = RATIFIED_KEY_MATERIAL_FIELD
+    carriers = []
+    for name, builder in fx.PINNED_VECTOR_BUILDERS:
+        for f in dataclasses.fields(builder()):
+            if "key_material" in f.name or "public_key" in f.name:
+                carriers.append((name, f.name))
+    assert carriers == [(exempt_class, exempt_field)], carriers
+
+
+def test_the_anchor_record_key_material_is_never_parsed():
+    """An encoding is checked; no key is constructed and no curve is touched.
+
+    The record's own posture is asserted the same way every envelope's is: the
+    validator refuses anything that is not exactly 64 lowercase hex characters,
+    and the object it produces still reports every one of §09's five authority
+    facts as ``False``.
+    """
+
+    record = fx.trust_anchor_record()
+    assert len(record.public_key_material) == 64
+    assert record.public_key_material == record.public_key_material.lower()
+    for override in ("A" * 64, "d4" * 31, "", "0x" + "d4" * 32, "zz" * 32):
+        with pytest.raises(BenchmarkRegistryContractError):
+            fx.trust_anchor_record(public_key_material=override)
+    assert record.authority_verified is False
+    assert record.publisher_authenticity_established is False
 
 
 # --------------------------------------------------------------------------- #

@@ -49,8 +49,8 @@ def test_the_domain_inventory_lists_the_three_nested_only_br1_classes():
 
 def test_every_shipped_class_has_exactly_one_distinct_domain():
     domains = list(DOMAINS["root_canonicalizable"].values())
-    assert len(domains) == 18
-    assert len(set(domains)) == 18
+    assert len(domains) == 22
+    assert len(set(domains)) == 22
 
 
 def test_the_domain_inventory_matches_the_pinned_domain_tuple():

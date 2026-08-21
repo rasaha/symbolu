@@ -18,13 +18,22 @@
 # domains. It determines what transition WOULD BE valid; nothing here makes one
 # occur.
 #
+# BR-2C's ratified CONTRACT SURFACE ships here (ADR §35.2 D-24, D-25, D-26):
+# the role-scoped trust-anchor record, the three distinct exact verified-result
+# types, and the reshaped approval-verifier and trust-directory ports. Four
+# further digest domains. NO VERIFIER, no anchor resolution, no key parsing, no
+# clock read and no cryptographic dependency — and THE VERIFIER THOSE CONTRACTS
+# DESCRIBE DOES NOT EXIST AND HAS NOT BEEN AUDITED.
+#
 # NOT in this distribution and not started:
 #   BR-2C (0.3.0) cryptographic trust authority: audited Ed25519 verifier,
 #                 signing-frame verification, composition-root trust-resolver
 #                 adapter, key entitlements and revocation. The injected
-#                 verifier arrives here, defaulting to exact deny-all. Blocked
-#                 on a secure cryptographic verifier and trust-resolver design,
-#                 specified and independently audited.
+#                 verifier arrives here, defaulting to exact deny-all. Still
+#                 blocked on a secure cryptographic verifier and trust-resolver
+#                 design, specified and EXTERNALLY AUDITED — D-32 waives only
+#                 the distinct in-repo reviewer, and makes that external
+#                 cryptographic audit a hard precondition to any production use.
 #   BR-2D (0.4.0) durable registry authority: persistence, the trusted clock,
 #                 compare-and-set transitions, immutable event history, the
 #                 process-local in-memory adapter, registry-event signing, and

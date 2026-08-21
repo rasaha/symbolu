@@ -348,8 +348,8 @@ def main() -> int:  # noqa: C901 - a verifier is a long list of assertions
         )
         check(
             "installed api.__all__ count and manifest symbol count both hold",
-            installed_facts["api_all_count"] == 93
-            and len(source_manifest["symbols"]) == 92,
+            installed_facts["api_all_count"] == 106
+            and len(source_manifest["symbols"]) == 105,
             f"{installed_facts['api_all_count']} / {len(source_manifest['symbols'])}",
         )
         check(
@@ -370,12 +370,18 @@ def main() -> int:  # noqa: C901 - a verifier is a long list of assertions
             },
         )
         check(
-            "all eighteen pinned vectors were reproduced, including the "
-            "post-admission rejection event and the revocation event",
-            len(installed_facts["vectors"]) == 18
+            "all twenty-two pinned vectors were reproduced, including the "
+            "post-admission rejection event, the revocation event and the four "
+            "BR-2C trust and verification contracts",
+            len(installed_facts["vectors"]) == 22
             and "BenchmarkPostAdmissionRejectionEventPayload"
             in installed_facts["vectors"]
-            and "BenchmarkRevocationEventPayload" in installed_facts["vectors"],
+            and "BenchmarkRevocationEventPayload" in installed_facts["vectors"]
+            and "BenchmarkTrustAnchorRecord" in installed_facts["vectors"]
+            and "BenchmarkPublisherVerifiedResult" in installed_facts["vectors"]
+            and "BenchmarkApprovalVerifiedResult" in installed_facts["vectors"]
+            and "BenchmarkRevocationVerifiedResult"
+            in installed_facts["vectors"],
         )
         check(
             "installed contract inventory row set equals the committed one",
@@ -584,6 +590,9 @@ VT = datetime(2027, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
 EA = datetime(2026, 6, 1, 0, 0, 0, tzinfo=timezone.utc)
 AO = datetime(2026, 9, 1, 0, 0, 0, tzinfo=timezone.utc)
 P = A.BenchmarkSignatureProfile.ED25519_SHA512_V1
+PUB_K, APP_K, REV_K = "d4" * 32, "e5" * 32, "f6" * 32
+TI = datetime(2026, 4, 1, 0, 0, 0, tzinfo=timezone.utc)
+OT_D = "c3" * 32
 
 def coord(**kw):
     base = dict(benchmark_id="bmk", benchmark_family="fam",
@@ -663,6 +672,29 @@ tref = A.BenchmarkTransitionRefusal(
     declared_refusal_reason=(
         A.BenchmarkRegistryRefusalReason.UNAUTHORIZED_TRANSITION))
 
+anchor = A.BenchmarkTrustAnchorRecord(
+    role=A.BenchmarkTrustRole.PUBLISHER,
+    identity="publisher-alpha", key_id="publisher-key-1",
+    signature_profile=P, public_key_material=PUB_K,
+    validity_from=VF, validity_to=VT,
+    status=A.BenchmarkTrustAnchorStatus.ENABLED,
+    revoked_at=None, revocation_reason=None)
+pvr = A.BenchmarkPublisherVerifiedResult(
+    verified_digest=ID_D, signer_role=A.BenchmarkTrustRole.PUBLISHER,
+    signer_identity="publisher-alpha", signer_key_id="publisher-key-1",
+    signature_profile=P, anchor_record_digest=OT_D, evaluated_at=TI,
+    outcome=A.BenchmarkVerificationOutcome.VERIFIED, refusal_reason=None)
+avr = A.BenchmarkApprovalVerifiedResult(
+    verified_digest=CT_D, signer_role=A.BenchmarkTrustRole.APPROVER,
+    signer_identity="approval-authority-beta", signer_key_id="approval-key-1",
+    signature_profile=P, anchor_record_digest=OT_D, evaluated_at=TI,
+    outcome=A.BenchmarkVerificationOutcome.VERIFIED, refusal_reason=None)
+rvr = A.BenchmarkRevocationVerifiedResult(
+    verified_digest=OT_D, signer_role=A.BenchmarkTrustRole.REVOKER,
+    signer_identity="revoker-delta", signer_key_id="revocation-key-1",
+    signature_profile=P, anchor_record_digest=ID_D, evaluated_at=TI,
+    outcome=A.BenchmarkVerificationOutcome.VERIFIED, refusal_reason=None)
+
 objects = {
     "BenchmarkPublisherSubmissionEnvelope": pub,
     "BenchmarkApprovalEnvelope": app,
@@ -682,6 +714,10 @@ objects = {
     "BenchmarkRegistrySnapshotAssertion": snap,
     "BenchmarkTransitionPlan": plan,
     "BenchmarkTransitionRefusal": tref,
+    "BenchmarkTrustAnchorRecord": anchor,
+    "BenchmarkPublisherVerifiedResult": pvr,
+    "BenchmarkApprovalVerifiedResult": avr,
+    "BenchmarkRevocationVerifiedResult": rvr,
 }
 snapshot = _contract_type_registry_snapshot()
 print(json.dumps({

@@ -2,8 +2,8 @@
   "distribution": "ugence-benchmark-registry-authority",
   "milestone": "BR-2B",
   "note": "Complete inventory of every load-bearing gate, and the measured result of neutralizing each one in turn against the full suite and the author-owned adversarial probes. Production behaviour was not changed to chase a zero-survivor number; any survivor is classified as equivalent, shadowed (naming the shadowing gate), or a real gap. Regenerate by running gate_mutation_sweep.py.",
-  "gates_inventoried": 60,
-  "killed": 55,
+  "gates_inventoried": 68,
+  "killed": 63,
   "survived": 5,
   "errored": 0,
   "categories": {
@@ -106,6 +106,26 @@
     "boundary-annotation": [
       "G-64",
       "G-65"
+    ],
+    "trust-result-role-pin": [
+      "G-66"
+    ],
+    "trust-result-biconditional": [
+      "G-67",
+      "G-68"
+    ],
+    "trust-anchor-revision-binding": [
+      "G-69"
+    ],
+    "trust-anchor-lifecycle": [
+      "G-70",
+      "G-71"
+    ],
+    "trust-anchor-interval": [
+      "G-72"
+    ],
+    "trust-key-material-encoding": [
+      "G-73"
     ]
   },
   "ledger": [
@@ -475,7 +495,7 @@
       "module": "_authority.py",
       "description": "the permanently-False derivation itself",
       "result": "KILLED",
-      "first_failure": "test:tests/contract/test_envelopes.py::test_a_br1_approved_lifecycle_state_never_substitutes_for_this_envelope"
+      "first_failure": "test:tests/contract/test_envelopes.py::test_the_anchor_record_key_material_is_never_parsed"
     },
     {
       "gate": "G-47",
@@ -588,6 +608,70 @@
       "description": "a lambda written in shipped source, whose parameters cannot be annotated at all and whose name a dunder can disguise",
       "result": "KILLED",
       "first_failure": "test:tests/packaging/test_milestone_boundary.py::test_every_parameter_written_under_src_is_annotated_and_no_lambda_exists"
+    },
+    {
+      "gate": "G-66",
+      "category": "trust-result-role-pin",
+      "module": "trust.py",
+      "description": "the role pin that makes three verified-result types distinct rather than three aliases \u2014 without it a revoker result satisfies a publisher signature, the substitution D-26 and \u00a717 rule 10 forbid",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_trust_contracts.py::test_each_result_pins_its_own_role_and_refuses_every_other[publisher_verified_result-PUBLISHER]"
+    },
+    {
+      "gate": "G-67",
+      "category": "trust-result-biconditional",
+      "module": "trust.py",
+      "description": "the VERIFIED-carries-no-reason half of the outcome biconditional",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_trust_contracts.py::test_a_verified_result_carrying_a_refusal_reason_is_unconstructible[BenchmarkPublisherVerifiedResult-publisher_verified_result]"
+    },
+    {
+      "gate": "G-68",
+      "category": "trust-result-biconditional",
+      "module": "trust.py",
+      "description": "the REFUSED-must-say-why half \u2014 without it a refusal is the shapeless answer D-24 replaced the Boolean to eliminate",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_trust_contracts.py::test_a_reasonless_refusal_says_which_rule_it_broke[BenchmarkPublisherVerifiedResult-publisher_verified_result]"
+    },
+    {
+      "gate": "G-69",
+      "category": "trust-anchor-revision-binding",
+      "module": "trust.py",
+      "description": "the rule that a VERIFIED result binds the anchor revision it trusted; without it a verification cannot be re-checked against a revocation",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_trust_contracts.py::test_an_unbound_anchor_revision_says_which_rule_it_broke[BenchmarkPublisherVerifiedResult-publisher_verified_result]"
+    },
+    {
+      "gate": "G-70",
+      "category": "trust-anchor-lifecycle",
+      "module": "trust.py",
+      "description": "the REVOKED-must-carry-revoked_at gate; without it a revocation has no recorded time and the two spellings of 'was this revoked' disagree",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_trust_contracts.py::test_a_revoked_anchor_missing_its_time_says_which_rule_it_broke"
+    },
+    {
+      "gate": "G-71",
+      "category": "trust-anchor-lifecycle",
+      "module": "trust.py",
+      "description": "the gate refusing a revocation fact on an anchor that was not revoked",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_trust_contracts.py::test_a_revocation_fact_without_a_revocation_is_unconstructible[ENABLED]"
+    },
+    {
+      "gate": "G-72",
+      "category": "trust-anchor-interval",
+      "module": "trust.py",
+      "description": "the anchor's strictly-ordered validity interval gate; an interval containing no instant could never be valid at any trusted instant",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_trust_contracts.py::test_an_interval_containing_no_instant_is_refused_never_reordered"
+    },
+    {
+      "gate": "G-73",
+      "category": "trust-key-material-encoding",
+      "module": "_validation.py",
+      "description": "the Ed25519 public-key-material encoding check; without it an anchor carries arbitrary text where 32 bytes of key material must be, and two spellings of one anchor become two revisions of it",
+      "result": "KILLED",
+      "first_failure": "test:tests/contract/test_envelopes.py::test_the_anchor_record_key_material_is_never_parsed"
     }
   ],
   "survivor_classifications": {

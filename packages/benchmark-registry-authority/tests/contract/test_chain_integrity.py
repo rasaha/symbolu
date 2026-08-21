@@ -29,6 +29,41 @@ CHAIN = (
 
 ALL_CONTRACTS = fx.PINNED_VECTOR_BUILDERS
 
+#: The three BR-2C verified-result types (D-24, D-26). Named as a set so the
+#: exemption below cannot be widened by editing a predicate.
+VERIFIED_RESULT_CLASSES = frozenset(
+    {
+        "BenchmarkPublisherVerifiedResult",
+        "BenchmarkApprovalVerifiedResult",
+        "BenchmarkRevocationVerifiedResult",
+    }
+)
+
+#: The two digest **fields** D-24 ratifies on every verified result, exempt from
+#: the derived-property rule and from nothing else.
+#:
+#: **Why the rule does not reach here.** The derived-property rule exists
+#: because a chain payload *chains*: a caller-supplied ``prev_event_digest``
+#: would be an independent spelling of a link, and an artifact could then attest
+#: to a predecessor nobody could reproduce. A verified result chains nothing. It
+#: is a record of one evaluation, it is permanently ``authority_verified is
+#: False`` like every other caller-constructible type here, and a caller who
+#: wanted to fabricate one could already write ``outcome=VERIFIED`` into it — so
+#: a fabricated digest field adds no forgery the type did not already admit,
+#: and the type proves nothing either way.
+#:
+#: **Why nesting was not chosen instead.** D-24 rules that the result binds "the
+#: envelope or artifact digest" and "the anchor-record digest" — digests, named
+#: as such, among exactly nine bound facts. Nesting the envelope would add a
+#: tenth bound thing D-24 did not rule. It would also make the **refusal** cases
+#: unrepresentable: ``TRUST_ANCHOR_NOT_FOUND`` and
+#: ``TRUST_DIRECTORY_UNAVAILABLE`` are precisely the conditions in which no
+#: anchor record exists to nest, and D-27 requires those refusals to stay
+#: distinguishable.
+VERIFIED_RESULT_RATIFIED_DIGEST_FIELDS = frozenset(
+    {"verified_digest", "anchor_record_digest"}
+)
+
 
 def test_happy_the_chain_links_by_recomputed_digest_at_every_hop():
     event = fx.revocation_event()
@@ -60,6 +95,8 @@ def test_no_contract_declares_an_upstream_digest_field(name, builder):
         "admitted_digest",
         "declared_admitted_digest",
     }
+    if name in VERIFIED_RESULT_CLASSES:
+        allowed = allowed | VERIFIED_RESULT_RATIFIED_DIGEST_FIELDS
     for f in dataclasses.fields(builder()):
         if f.name.endswith("_digest"):
             assert f.name in allowed, f"{name}.{f.name} is a caller-supplied digest"

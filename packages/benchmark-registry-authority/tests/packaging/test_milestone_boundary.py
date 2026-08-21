@@ -700,7 +700,10 @@ def test_every_exported_callable_and_protocol_method_is_fully_annotated():
 #: covers less is the failure mode all three audits found. Moving this number is
 #: a reviewed change, the same as moving ``public_api.json``.
 EXPORTED_CALLABLES_WALKED = 13
-PROTOCOL_METHODS_WALKED = 9
+#: Ten, not nine, since D-26 added ``verify_revocation`` to
+#: ``BenchmarkApprovalVerifierPort``. The ports stay inert Protocols; the count
+#: moves because there is one more seam declared, not one more implemented.
+PROTOCOL_METHODS_WALKED = 10
 
 
 def test_the_surface_property_one_walks_is_exactly_what_is_pinned():

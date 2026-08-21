@@ -773,6 +773,91 @@ def is_byte_identical_resubmission(""",
 
 def is_byte_identical_resubmission(""",
     ),
+    # ---------------- BR-2C trust contracts (D-24 – D-28) ----------------- #
+    Gate(
+        "G-66",
+        "trust-result-role-pin",
+        "trust.py",
+        "the role pin that makes three verified-result types distinct rather "
+        "than three aliases — without it a revoker result satisfies a "
+        "publisher signature, the substitution D-26 and §17 rule 10 forbid",
+        """    if value is not expected:""",
+        """    if False:""",
+    ),
+    Gate(
+        "G-67",
+        "trust-result-biconditional",
+        "trust.py",
+        "the VERIFIED-carries-no-reason half of the outcome biconditional",
+        """        if refusal_reason is not None:
+            raise BenchmarkRegistryContractError(
+                "a VERIFIED result carries no refusal_reason;""",
+        """        if False:
+            raise BenchmarkRegistryContractError(
+                "a VERIFIED result carries no refusal_reason;""",
+    ),
+    Gate(
+        "G-68",
+        "trust-result-biconditional",
+        "trust.py",
+        "the REFUSED-must-say-why half — without it a refusal is the shapeless "
+        "answer D-24 replaced the Boolean to eliminate",
+        "    if refusal_reason is None:\n"
+        "        raise BenchmarkRegistryContractError(",
+        "    if False:\n"
+        "        raise BenchmarkRegistryContractError(",
+    ),
+    Gate(
+        "G-69",
+        "trust-anchor-revision-binding",
+        "trust.py",
+        "the rule that a VERIFIED result binds the anchor revision it trusted; "
+        "without it a verification cannot be re-checked against a revocation",
+        """        if anchor_record_digest is None:
+            raise BenchmarkRegistryContractError(""",
+        """        if False:
+            raise BenchmarkRegistryContractError(""",
+    ),
+    Gate(
+        "G-70",
+        "trust-anchor-lifecycle",
+        "trust.py",
+        "the REVOKED-must-carry-revoked_at gate; without it a revocation has "
+        "no recorded time and the two spellings of 'was this revoked' disagree",
+        """            if self.revoked_at is None:
+                raise BenchmarkRegistryContractError(""",
+        """            if False:
+                raise BenchmarkRegistryContractError(""",
+    ),
+    Gate(
+        "G-71",
+        "trust-anchor-lifecycle",
+        "trust.py",
+        "the gate refusing a revocation fact on an anchor that was not revoked",
+        """        if self.revoked_at is not None:
+            raise BenchmarkRegistryContractError(""",
+        """        if False:
+            raise BenchmarkRegistryContractError(""",
+    ),
+    Gate(
+        "G-72",
+        "trust-anchor-interval",
+        "trust.py",
+        "the anchor's strictly-ordered validity interval gate; an interval "
+        "containing no instant could never be valid at any trusted instant",
+        """        if not self.validity_from < self.validity_to:""",
+        """        if False:""",
+    ),
+    Gate(
+        "G-73",
+        "trust-key-material-encoding",
+        "_validation.py",
+        "the Ed25519 public-key-material encoding check; without it an anchor "
+        "carries arbitrary text where 32 bytes of key material must be, and "
+        "two spellings of one anchor become two revisions of it",
+        """    if not _ED25519_PUBLIC_KEY_HEX_RE.match(text):""",
+        """    if False:""",
+    ),
     # ---- withdrawn by owner ruling, 2026-08-20 (ADR §35 D-20) ------------- #
     # G-57, G-58, G-60, G-61 and G-62 planted plan-consuming callables in
     # PRIVATE source and asserted this package could discover them: an

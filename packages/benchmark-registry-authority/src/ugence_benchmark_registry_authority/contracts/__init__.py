@@ -45,6 +45,10 @@ from .canonical import (
     BENCHMARK_TENANT_REGISTRY_SCOPE_EXPECTATION_DIGEST_DOMAIN,
     BENCHMARK_TRANSITION_PLAN_DIGEST_DOMAIN,
     BENCHMARK_TRANSITION_REFUSAL_DIGEST_DOMAIN,
+    BENCHMARK_TRUST_ANCHOR_RECORD_DIGEST_DOMAIN,
+    BENCHMARK_PUBLISHER_VERIFIED_RESULT_DIGEST_DOMAIN,
+    BENCHMARK_APPROVAL_VERIFIED_RESULT_DIGEST_DOMAIN,
+    BENCHMARK_REVOCATION_VERIFIED_RESULT_DIGEST_DOMAIN,
     canonical_bytes,
     canonical_digest,
     canonical_domain_inventory,
@@ -73,6 +77,9 @@ from .enums import (
     BenchmarkRegistryConsistencyScope,
     BenchmarkRegistryFaultClass,
     BenchmarkSignatureProfile,
+    BenchmarkTrustAnchorStatus,
+    BenchmarkTrustRole,
+    BenchmarkVerificationOutcome,
 )
 from .envelopes import (
     BENCHMARK_APPROVAL_SIGNING_FRAME_DOMAIN,
@@ -115,6 +122,14 @@ from .ports import (
     BenchmarkPublisherTrustDirectoryPort,
     BenchmarkRegistryStoreConsistencyDescriptor,
     BenchmarkRegistryStorePort,
+)
+from .trust import (
+    BENCHMARK_TRUST_ANCHOR_EVALUATION_ORDER,
+    BENCHMARK_VERIFIED_RESULT_BOUND_FACTS,
+    BenchmarkApprovalVerifiedResult,
+    BenchmarkPublisherVerifiedResult,
+    BenchmarkRevocationVerifiedResult,
+    BenchmarkTrustAnchorRecord,
 )
 from .read_payloads import (
     BenchmarkHistoricalRecordPayload,
@@ -252,4 +267,18 @@ __all__ = [
     "BENCHMARK_REGISTRY_SNAPSHOT_ASSERTION_DIGEST_DOMAIN",
     "BENCHMARK_TRANSITION_PLAN_DIGEST_DOMAIN",
     "BENCHMARK_TRANSITION_REFUSAL_DIGEST_DOMAIN",
+    # BR-2C trust and verification contracts (D-24, D-25, D-26)
+    "BenchmarkTrustRole",
+    "BenchmarkTrustAnchorStatus",
+    "BenchmarkVerificationOutcome",
+    "BenchmarkTrustAnchorRecord",
+    "BenchmarkPublisherVerifiedResult",
+    "BenchmarkApprovalVerifiedResult",
+    "BenchmarkRevocationVerifiedResult",
+    "BENCHMARK_TRUST_ANCHOR_EVALUATION_ORDER",
+    "BENCHMARK_VERIFIED_RESULT_BOUND_FACTS",
+    "BENCHMARK_TRUST_ANCHOR_RECORD_DIGEST_DOMAIN",
+    "BENCHMARK_PUBLISHER_VERIFIED_RESULT_DIGEST_DOMAIN",
+    "BENCHMARK_APPROVAL_VERIFIED_RESULT_DIGEST_DOMAIN",
+    "BENCHMARK_REVOCATION_VERIFIED_RESULT_DIGEST_DOMAIN",
 ]
