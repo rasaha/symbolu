@@ -1,11 +1,12 @@
 # Changelog — ugence-benchmark-registry-authority
 
 All notable changes to this distribution. The format follows Keep a Changelog;
-versioning is Semantic Versioning, and the version ladder is the ratified
-subphase ladder: BR-2A `0.1.0`, BR-2B `0.2.0`, BR-2C `0.3.0`, BR-2D `0.4.0`,
-BR-2E `0.5.0` (ADR §35 D-01, amended 2026-08-20).
+versioning is Semantic Versioning, and the version ladder is the ratified one:
+BR-2A `0.1.0`, BR-2B `0.2.0`, **BR-2C-0 `0.2.1`**, BR-2C `0.3.0`, BR-2D `0.4.0`,
+BR-2E `0.5.0` (ADR §35 D-01, amended 2026-08-20, and D-33). Five of the six
+rungs are subphases; `BR-2C-0` is a **version rung** and mints no closure audit.
 
-## [Unreleased] — BR-2C contract surface (D-24, D-25, D-32)
+## [0.2.1] — BR-2C contract surface (D-24, D-25, D-32, D-33)
 
 **Contracts only. No verifier ships, and the verifier these contracts describe
 has not been audited and is not production-ready.**
@@ -101,28 +102,60 @@ untouched in value, order and index.
 | BR-1 freeze matrix | **VERIFIED** |
 
 All five survivors are the pre-existing classified ones; the slice introduced
-none. **This is author-owned assurance.** D-32(5) records the cost it accepts:
+none. **Every row above was re-run at the `0.2.1` rung and is unchanged**, with
+the offline distribution verifier re-pinned to the moved version and returning
+VERIFIED, and the gate ledger regenerated rather than hand-edited.
+**This is author-owned assurance.** D-32(5) records the cost it accepts:
 three closure audits across BR-2B found seven defects, none in the boundary and
 every one in a rule asserting it, and that is the measured base rate this
 waiver accepts for BR-2C.
 
-### `package_version` deliberately stays `0.2.0`
+### `package_version` moves to `0.2.1`, on a rung minted for the purpose (D-33)
 
-Not an oversight. Moving to `0.3.0` would map this distribution to **BR-2C** in
-`tests/_milestones.py`'s ratified ladder and unlock eight capability tokens —
-`signature_verifier`, `key_parser`, `trust_anchor_store`, `approval_verifier`
-and their unseparated spellings — whose bans are the only mechanical enforcement
-of the engineering blocker D-32 leaves standing. §35.1 defines `0.3.0` as the
-*audited verifier*, which this does not ship. D-24 through D-29 enumerate their
-moved surfaces down to individual docstring lines and name neither `version.py`
-nor `package_version`.
+The BR-2C contract slice moved this distribution's curated surface —
+`api.__all__` 93 → 106, `public_api.json` 92 → 105 — at an unchanged `0.2.0`.
+D-18 rules those counts are milestone-scoped snapshots that move **deliberately
+at each version bump**, so leaving the version alone left two different surfaces
+wearing one version. That was recorded here as an owner decision and is now
+taken: **D-33 mints `BR-2C-0` at `0.2.1`**, inserted at index 2 of
+`tests/_milestones.py`'s ladder between `BR-2B` and `BR-2C`, meaning *BR-2C's
+contract surface landed; no BR-2C capability did*.
 
-**Recorded as open, not decided here:** the ratified ladder has exactly five
-rungs and no rung meaning *"BR-2C contracts landed, capability not"*, so a
-public surface moved at an unchanged version. Minting one is not available to an
-implementer — `VERSION_SUBPHASE` maps only the five, and any other string raises
-rather than resolving — so whether to mint an intermediate rung or accept the
-move at `0.2.0` is an **owner decision this entry does not take**.
+It is a **version rung, not a subphase.** D-01's five separately auditable
+subphases are unamended, §35.1's five-row table is unamended, and the rung mints
+no closure audit: BR-2C still closes at `0.3.0`, on D-32's terms and its
+external cryptographic audit.
+
+**`0.3.0` was not available, and it unlocks twelve capability tokens, not
+eight.** §35.1 defines `0.3.0` as the *audited verifier*, which this release
+does not ship and D-32(4) forbids describing as audited. Mapping this
+distribution to **BR-2C** would unlock the eight at
+`tests/packaging/test_milestone_boundary.py:44-51` — `signature_verifier`,
+`key_parser`, `trust_anchor_store`, `approval_verifier` and their unseparated
+spellings — **and four more** from the exported-symbol table at
+`tests/contract/test_confusable_and_ports.py:50-53`: `denyall`, `deny_all`,
+`verifier` and `trust_store`. The earlier text of this section said eight; D-24
+and D-25 name all twelve between them, four of them in D-25's own *Surfaces
+moved* clause. Corrected here rather than carried forward.
+
+**The token bans were never the only mechanical enforcement**, and D-33 records
+that alongside the count. Five gates are unconditional at every rung and no
+version bump moves any of them: no cryptographic dependency may be declared
+(`tests/packaging/test_dependency_boundary.py:88`); no module may import a
+forbidden package, `ugence_trusted_evidence_authority` first among them
+(`:93-94`); nothing in the package performs cryptography
+(`tests/packaging/test_milestone_boundary.py:423`); no concrete class satisfies
+any port (`tests/contract/test_confusable_and_ports.py:205`); and no
+cryptographic module is imported at all
+(`tests/contract/test_trust_contracts.py:410`). The rung protects the twelve
+tokens. What no test here can assert is the external cryptographic audit itself,
+which stays a hard precondition to any production use.
+
+**Measured, on the ladder edit at `fd604dc4`:** minting the rung turns exactly
+two tests red — the two version literals — and unlocks nothing.
+`banned_capability_tokens` compares by ladder **index**, so inserting a rung
+shifts BR-2C, BR-2D and BR-2E without lifting a ban. Bare `0.3.0` turns five
+red, three of them the assertions that the bans did not weaken.
 
 ### Three BR-2A-era gates narrowed, each explicitly and with its citation
 
@@ -144,19 +177,25 @@ None was weakened to a pattern; each names the exact class and field it excuses.
   `TRUST_DIRECTORY_UNAVAILABLE` — refusals in which no anchor exists to nest —
   structurally unrepresentable.
 
-### Left open rather than decided
+### Left open here, since ruled — and not implemented in this release
+
+Both items this entry recorded as needing a further owner decision have one.
+Neither ruling is implemented at `0.2.1`: the shapes below are still what ships,
+and the rulings land in a later release.
 
 - **`resolve_anchor` returns `Optional[BenchmarkTrustAnchorRecord]`**, so a
   `None` cannot distinguish `TRUST_ANCHOR_NOT_FOUND` from
   `TRUST_DIRECTORY_UNAVAILABLE` at the seam itself. This follows the rulings
   literally — D-25 enumerates exactly one new type and D-28 says "no further
   type is minted here", and both D-27 and D-28 locate the distinctions in the
-  verified result — but D-28's fail-closed posture needs the two separable, and
-  neither a resolution-result type nor a ratified exception is available without
-  a further owner decision.
+  verified result — but D-28's fail-closed posture needs the two separable.
+  **Ruled by D-34**: the seam returns a resolution type carrying an anchor
+  record **XOR** a typed refusal. Not implemented here.
 - **Which refusal members a verified result may carry** is unconstrained beyond
-  membership of the BR-2 vocabulary. No subset is ratified, and inventing one
-  would be a vocabulary ruling.
+  membership of the BR-2 vocabulary. **Ruled by D-35**: the eleven-member
+  `TRUST_AND_AUTHENTICITY` fault class plus `INDETERMINATE`, twelve of the
+  twenty-four. No refusal member is added or re-ordered by that ruling. Not
+  implemented here.
 - **D-31(a)'s deferred README obligation is discharged here**: the
   measured-results table is re-stated from the fresh runs above rather than
   edited, and its BR-2A-era marking withdrawn with it.

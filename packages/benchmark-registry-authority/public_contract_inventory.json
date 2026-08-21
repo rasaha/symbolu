@@ -1,8 +1,8 @@
 {
   "distribution": "ugence-benchmark-registry-authority",
   "namespace": "ugence_benchmark_registry_authority",
-  "package_version": "0.2.0",
-  "milestone": "BR-2B",
+  "package_version": "0.2.1",
+  "milestone": "BR-2C-0",
   "note": "Machine-readable public-contract inventory. 'Every type is constructible and canonicalizable' applies to PUBLIC DATA CONTRACTS ONLY \u2014 the twenty-two rows under 'public_data_contracts'. It does NOT apply to Protocols, enums, errors, constants, pure validation functions, frozen descriptors or abstract type declarations, each of which is listed under 'other_public_symbols' and marked with its own kind and with canonicalizable=false. No row anywhere carries a caller-supplied upstream digest field: every upstream digest in this package is a derived read-only property recomputed from the exact nested object. The 'caller_supplied_digest_fields' column lists digests of artifacts OUTSIDE this package's graph (the BR-1 identity digest, the benchmark content digest, the immutable admitted digest), which cannot be recomputed here because the objects are not held. Regenerate with tools/generate_manifests.py; tests/packaging/test_inventories.py re-derives every column from the live surface and asserts this file equals it.",
   "public_data_contracts": [
     {

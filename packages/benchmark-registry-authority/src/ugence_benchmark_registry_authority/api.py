@@ -8,7 +8,7 @@ in the built wheel, in the built sdist, and in an isolated installed runtime.
 
 What this surface contains
 --------------------------
-The structural contract layer at **0.2.0**. It carries BR-2A's ratified
+The structural contract layer at **0.2.1**. It carries BR-2A's ratified
 "Registry and exact-resolution *contracts*" — D-01 through D-17 — and the
 **non-authoritative lifecycle kernel** BR-2B adds on top of them.
 
@@ -35,7 +35,7 @@ The structural contract layer at **0.2.0**. It carries BR-2A's ratified
   exact verified-result types that replaced the ``bool``-returning approval-
   verifier and publisher-trust-directory seams.
 
-Why the BR-2C contracts are here at ``0.2.0``
+Why the BR-2C contracts are here at ``0.2.1``
 ----------------------------------------------
 D-23 classifies BR-2C as blocked on **both** unratified governance and audited
 cryptographic engineering. D-24, D-25 and D-26 clear the governance half by
@@ -43,16 +43,30 @@ ruling the contract change; D-32 waives the distinct in-repo reviewer for BR-2C
 only. **The engineering half stands**, so this release carries BR-2C's ratified
 *contract surface* and none of its capability.
 
-``package_version`` therefore stays ``0.2.0`` and the milestone label stays
-``BR-2B``. Moving it to ``0.3.0`` would map this distribution to BR-2C in
-``tests/_milestones.py``'s ratified ladder and unlock eight capability tokens —
+D-33 mints the rung that says exactly that. ``package_version`` is ``0.2.1`` and
+the milestone label is ``BR-2C-0`` — *BR-2C's contracts landed; no BR-2C
+capability did* — which sits between ``BR-2B`` and ``BR-2C`` in
+``tests/_milestones.py``'s ladder. It is a **version rung, not a subphase**:
+D-01's five subphases are unamended and it mints no closure audit.
+
+``0.3.0`` was not available. §35.1 defines it as the *audited verifier*, which
+this release does not ship and D-32 forbids any artifact of this package from
+describing as audited, independently reviewed or production-ready until an
+external cryptographic audit is obtained and recorded. Taking it would also map
+this distribution to BR-2C in the ladder and unlock **twelve** capability
+tokens: the eight at ``tests/packaging/test_milestone_boundary.py`` —
 ``signature_verifier``, ``key_parser``, ``trust_anchor_store``,
-``approval_verifier`` and their unseparated spellings — whose bans are the only
-mechanical enforcement of the engineering blocker D-32 explicitly leaves
-untouched. §35.1 defines ``0.3.0`` as the *audited verifier*, and D-32 forbids
-any artifact of this package describing the verifier as audited, independently
-reviewed or production-ready until an external cryptographic audit is obtained
-and recorded.
+``approval_verifier`` and their unseparated spellings — and four more from the
+exported-symbol table at ``tests/contract/test_confusable_and_ports.py``:
+``denyall``, ``deny_all``, ``verifier`` and ``trust_store``.
+
+Those bans are not the only mechanical enforcement, and D-33 records that too:
+the ban on a declared cryptographic dependency, on importing another authority's
+package, on any cryptographic call in this tree, on any concrete class
+satisfying a port, and on any cryptographic module being imported at all are
+**unconditional at every rung**, and no version bump moves them. What no test in
+this repository can assert is the external cryptographic audit itself, which
+D-32(4) makes a hard precondition to any production use.
 
 What this surface does **not** contain
 --------------------------------------

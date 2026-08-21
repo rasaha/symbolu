@@ -12,21 +12,26 @@ Milestone boundary
   relation; one structural representation bound to each transition; typed
   refusals; ports as Protocols; new digest domains; pure validation.
   **No engine, no store, no verifier, no clock read, no resolver.**
-* **BR-2B (this release, 0.2.0)** — the **non-authoritative lifecycle kernel**:
+* **BR-2B (0.2.0)** — the **non-authoritative lifecycle kernel**:
   transition validation, predecessor checks, terminality, and conflict and
   idempotency calculation over *caller-asserted* state. It ships **no store, no
   verifier, no clock, no append path and no authority-issued result**, and it
   **cannot admit, register, revoke or resolve**. It determines what transition
   *would be* valid; nothing here makes one occur.
+* **BR-2C-0 (this release, 0.2.1)** — BR-2C's ratified **contract surface**, and
+  no BR-2C capability. A **version rung, not a subphase** (D-33): D-01's five
+  subphases are unamended and it mints no closure audit. It exists because the
+  curated surface moved — ``api.__all__`` 93 → 106 — while ``0.3.0`` stays
+  reserved for the audited verifier.
 * **BR-2C (0.3.0)** — the cryptographic trust authority: audited verifier,
   signing-frame verification, anchor resolution, key rotation and revocation.
   The injected verifier arrives here, defaulting to exact deny-all. **Still
   blocked** on an audited cryptographic verifier and a composition-root
   trust-resolver design. Its ratified *contract surface* — the trust-anchor
   record, the three distinct verified-result types and the reshaped ports
-  (D-24, D-25, D-26) — ships in this ``0.2.0`` release ahead of the version
-  rung, because D-23 classifies the governance and engineering blockers as
-  independent and only the governance half is cleared. **No verifier ships, and
+  (D-24, D-25, D-26) — ships at ``0.2.1``, because D-23 classifies the
+  governance and engineering blockers as independent and only the governance
+  half is cleared. **No verifier ships, and
   none has been audited** (D-32).
 * **BR-2D (0.4.0)** — the durable registry authority: persistence, the trusted
   clock, compare-and-set transitions, immutable event history, the process-local

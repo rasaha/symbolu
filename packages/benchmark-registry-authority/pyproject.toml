@@ -12,13 +12,15 @@
 # transition; typed refusals; ports as Protocols; fifteen digest domains; pure
 # validation. Contracts only.
 #
-# BR-2B (this release, 0.2.0) — "NON-AUTHORITATIVE LIFECYCLE KERNEL."
+# BR-2B (0.2.0) — "NON-AUTHORITATIVE LIFECYCLE KERNEL."
 # Transition validation, predecessor checks, terminality, and conflict and
 # idempotency calculation, all over CALLER-ASSERTED state. Three further digest
 # domains. It determines what transition WOULD BE valid; nothing here makes one
 # occur.
 #
-# BR-2C's ratified CONTRACT SURFACE ships here (ADR §35.2 D-24, D-25, D-26):
+# BR-2C-0 (this release, 0.2.1) — BR-2C's ratified CONTRACT SURFACE, and no
+# BR-2C capability (ADR §35.2 D-33 mints the rung; D-24, D-25 and D-26 rule the
+# surface):
 # the role-scoped trust-anchor record, the three distinct exact verified-result
 # types, and the reshaped approval-verifier and trust-directory ports. Four
 # further digest domains. NO VERIFIER, no anchor resolution, no key parsing, no

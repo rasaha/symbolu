@@ -1,4 +1,4 @@
-# ugence-benchmark-registry-authority — BR-2B
+# ugence-benchmark-registry-authority — BR-2C-0
 
 **Registry and exact-resolution contracts.** The authority/registry layer of the
 shared, platform-wide Benchmark Registry, sitting **above** the frozen identity
@@ -30,6 +30,7 @@ ugence-benchmark-registry 0.1.0          FROZEN — zero runtime dependencies,
 ugence-benchmark-registry-authority
   0.1.0  (BR-2A)  deps: ugence-benchmark-registry ==0.1.*   + stdlib
   0.2.0  (BR-2B)  deps: unchanged
+  0.2.1  (BR-2C-0) deps: unchanged — BR-2C's contracts, no BR-2C capability
   0.3.0  (BR-2C)  deps: + an audited cryptographic verifier
   0.4.0  (BR-2D)  deps: + a durable backend named only after ADR DD-10
   0.5.0  (BR-2E)  deps: + whatever operations require, and nothing sooner
@@ -44,8 +45,9 @@ stored BR-1 canonical artifact or its identity digest.
 | Subphase | Version | Ships | Status |
 | --- | --- | --- | --- |
 | BR-2A | `0.1.0` | Registry and exact-resolution **contracts** | shipped |
-| **BR-2B** | `0.2.0` | **Non-authoritative lifecycle kernel**: transition validation, predecessor checks, terminality, conflict and idempotency calculation over *caller-asserted* state. **No store, no verifier, no clock, no append path, no authority-issued result** — it cannot admit, register, revoke or resolve | **this release** |
-| BR-2C | `0.3.0` | Cryptographic trust authority: audited Ed25519 verifier, signing-frame verification, composition-root trust-resolver adapter, key entitlements and revocation. The injected verifier arrives here, defaulting to **exact deny-all** | **contract surface only, shipped in `0.2.0`** (ADR §35.2 D-24, D-25, D-26); the subphase itself is still blocked on a secure cryptographic verifier and trust-resolver design, **externally audited** |
+| BR-2B | `0.2.0` | **Non-authoritative lifecycle kernel**: transition validation, predecessor checks, terminality, conflict and idempotency calculation over *caller-asserted* state. **No store, no verifier, no clock, no append path, no authority-issued result** — it cannot admit, register, revoke or resolve | shipped |
+| **BR-2C-0** | `0.2.1` | **BR-2C's ratified contract surface, and no BR-2C capability.** A version rung, not a subphase (ADR §35.2 **D-33**): D-01's five subphases are unamended, it mints no closure audit, and it exists because the surface moved — `api.__all__` 93 → 106 — while `0.3.0` stays reserved for the audited verifier | **this release** |
+| BR-2C | `0.3.0` | Cryptographic trust authority: audited Ed25519 verifier, signing-frame verification, composition-root trust-resolver adapter, key entitlements and revocation. The injected verifier arrives here, defaulting to **exact deny-all** | **contract surface only, shipped in `0.2.1`** (ADR §35.2 D-24, D-25, D-26; rung minted by D-33); the subphase itself is still blocked on a secure cryptographic verifier and trust-resolver design, **externally audited** |
 | BR-2D | `0.4.0` | Durable registry authority: persistence, the trusted clock, compare-and-set transitions, immutable event history, the process-local in-memory adapter, registry-event signing, and the **first authoritative** admission, registration, revocation and exact resolution. Closes with the identity-locked composition root | blocked on ADR DD-10 |
 | BR-2E | `0.5.0` | Production composition and operations: tenant authorization, service APIs, deployment controls, migrations, backup/recovery, observability, audit export | blocked on BR-2D |
 
@@ -186,7 +188,7 @@ Each vector's exact canonical bytes are committed in
 is independently recomputable with plain `hashlib` over the byte string alone,
 importing nothing from the package.
 
-The last four rows are BR-2C's ratified **contract surface**, landed in `0.2.0`
+The last four rows are BR-2C's ratified **contract surface**, landed in `0.2.1`
 under ADR §35.2 D-24, D-25 and D-26. They are shapes: the immutable role-scoped
 trust-anchor record the resolution seam returns, and the three distinct exact
 verified-result types that replaced the `bool` returns on the approval-verifier

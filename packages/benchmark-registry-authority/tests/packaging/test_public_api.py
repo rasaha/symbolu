@@ -23,7 +23,7 @@ def test_happy_the_manifest_names_the_right_distribution_and_namespace():
 
 
 def test_the_manifest_version_equals_the_package_version():
-    assert MANIFEST["package_version"] == api.__version__ == "0.2.0"
+    assert MANIFEST["package_version"] == api.__version__ == "0.2.1"
 
 
 def test_the_manifest_symbols_equal_the_curated_surface_minus_version():

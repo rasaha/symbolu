@@ -462,7 +462,7 @@ def main() -> int:
         "distribution": DISTRIBUTION,
         "namespace": NAMESPACE,
         "package_version": api.__version__,
-        "milestone": "BR-2B",
+        "milestone": "BR-2C-0",
         "note": (
             "Machine-readable public-contract inventory. "
             "'Every type is constructible and canonicalizable' applies to "
