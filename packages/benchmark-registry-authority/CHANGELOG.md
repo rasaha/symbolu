@@ -115,10 +115,11 @@ tests in `tests/packaging/test_milestone_boundary.py` now pin it:
   guard, so the rejected ladder cannot quietly become the shipped one.
 
 **No ban set is weakened or restated.** The checks assert equality against the
-live ban set rather than a copied literal, so a ban that shrank would fail
-`test_the_effective_ban_set_is_exactly_what_br2a_froze` first. Both negative
-controls were exercised: injecting a token that unlocks at `BR-2C-0` into either
-map fails the precondition check by name.
+live ban set rather than a copied literal, so a **one-sided** shrink fails
+`test_the_effective_ban_set_is_exactly_what_br2a_froze` first. A two-sided edit
+does not — see the self-attestation note below, which is the honest limit of
+that guarantee. Both negative controls were exercised: injecting a token that
+unlocks at `BR-2C-0` into either map fails the precondition check by name.
 
 **This moves the suite count**, which every earlier commit in this closure had
 held fixed: 2108 → 2111 here, and → **2113** with the audit remediation below;
@@ -174,11 +175,62 @@ re-edit a version-tagged section, which is what `[Unreleased]` exists to prevent
 Both tables are now dated instead, so two different suite counts in one file read
 as scoped rather than contradictory.
 
+### Fixed — what a third audit found, including in the correction itself
+
+- **The replacement enforcement prose was still false**, in a second way the
+  first rewrite did not consider. It said *no* test, probe, verifier, sweep or
+  generator reads this file. `pyproject.toml` sets `readme = "README.md"`, so
+  setuptools embeds the **whole** README — that very paragraph, and the results
+  table — in the built distribution's `METADATA`, and the offline distribution
+  verifier substring-scans that blob for banned cryptographic dependency names.
+  Prose in the README can therefore turn a distribution check red. The narrow
+  claim survives — nothing checks these *figures* — and the broad one is
+  withdrawn.
+
+  **The first attempt at this correction broke the build check.** Naming the
+  banned strings in the README to explain the scan put them into `METADATA` and
+  failed the verifier. That is why the rewrite names none of them, and why it was
+  validated by building metadata and asserting each of the paragraph's own claims
+  against it rather than by reasoning about what the build would do.
+
+- **The capability vocabulary is self-attested, and the docstring said
+  otherwise.** `BR2A_FROZEN_CAPABILITY_TOKENS` claimed to be "pinned separately
+  from the map above so a restructuring cannot drop an entry unnoticed". True of
+  a one-sided edit only: both literals live in one file, so removing a token from
+  each leaves the suite green — measured, by deleting `"keyparser"` and
+  `"key_parser"` from both and shipping a live `class KeyParser` with a working
+  `parse()` under `src/`, which passed at 2113. A capability the ADR bans until
+  `0.3.0` would ship with nothing saying so. **No second authority for these
+  tokens exists in this repository**: the probe harness carries none, the gate
+  inventory carries none, and ADR §35.2 names them only in prose. Pinning them to
+  one needs its own ratification, so the docstring now states the limit instead of
+  overstating the guard. **No ban was weakened and no token added.**
+
+- **The D-33 citation fix was half-executed.** The ruling sentence was corrected
+  to `tests/_milestones.py:28` and `:49-58`; the *Surfaces moved* clause in the
+  same row still read `:16` and `:21-27`. It now names the symbols —
+  `SUBPHASE_LADDER` and `VERSION_SUBPHASE` — with the lines verified against the
+  file.
+
+- **§35.2 now records once that in-row line citations are frozen at
+  ratification** rather than correcting them one at a time. D-30's enumeration
+  alone carries six that no longer resolve, and three further citations went stale
+  *during* this closure, two moved by its own insertions. A governance record
+  cannot track line numbers it does not own, so the rule is stated for D-01
+  through D-36: file paths and symbol names are live and corrected when wrong,
+  line numbers are historical. D-33 and D-36 are named exceptions, re-verified.
+
+- **Both scope lines are re-worded to survive the next version bump.**
+  "As measured now, against this tree" and `[0.2.3]`'s pointer at `[Unreleased]`
+  both go false when that section is renamed at release. `[0.2.2]` and `[0.2.1]`
+  stay unlabelled: nothing invites reading them as live.
+
 ### Measured verification
 
-**As measured now**, against this tree after the corrections — not carried
-forward, and not the as-shipped figures of any released section below. Two
-different suite counts in this file are dated, not contradictory:
+**As measured after this entry's changes** — not carried forward, and not the
+as-shipped figures of any released section below. Where this file shows two
+different suite counts, they are scoped to different points in the history rather
+than contradicting each other:
 
 | Check | Result |
 | --- | --- |
@@ -309,8 +361,9 @@ this release added it.
 
 **As shipped at `0.2.3`.** These are the figures the release measured, and they
 stay put: a version-tagged section records what that version shipped, so later
-work is carried by `[Unreleased]` rather than by re-editing this table. The suite
-has since moved — see `[Unreleased]` above for the current figures.
+work is carried by the newer sections above rather than by re-editing this table.
+The suite has since moved — the newest section above carries the current
+figures.
 
 | Check | Result |
 | --- | --- |

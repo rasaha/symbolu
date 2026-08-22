@@ -266,13 +266,25 @@ number below was produced by executing the named check against this tree at
 `0.2.3`, in the closure pass that corrected the prose around it — never by
 adjusting the figures that stood here.
 
-**Nothing in this repository enforces this table.** No test, probe, verifier,
-sweep or generator reads this file — the only document any check parses is BR-1's
-own `README.md`, and it looks for pinned digests, not figures. What attests these
-numbers is the run recorded in the commit that states them, and the discipline of
-re-running rather than editing. That is weaker than a gate, and is said here
-rather than left to be assumed: a stale figure in this table would survive until
-someone re-ran the checks and noticed.
+**Nothing checks these figures.** No test, probe, verifier, sweep or generator
+compares a number in this table against a run. What attests them is the run
+recorded in the commit that states them, and the discipline of re-running rather
+than editing. That is weaker than a gate, and is said here rather than left to be
+assumed: a stale figure in this table would survive until someone re-ran the
+checks and noticed.
+
+**This file is not unread, though.** `pyproject.toml` sets
+`readme = "README.md"`, so setuptools embeds the **whole** of it — this paragraph
+and the table below included — in the built distribution's `METADATA`, and
+[`verify_benchmark_registry_authority_distribution.py`](verify_benchmark_registry_authority_distribution.py)
+substring-scans that blob for the banned cryptographic dependency names it lists
+in its own source. **Prose written here can turn a distribution check red**, and
+the margin is two letters: this README uses only the *adjective* for that
+discipline, never the library name it is derived from, and the scan matches the
+library name. That is why the banned strings are named nowhere in this document —
+writing one here would fail the very check it describes. The only place any check
+parses a document directly is BR-1's own `README.md`, where it looks for pinned
+digests.
 
 | Check | Result |
 | --- | --- |

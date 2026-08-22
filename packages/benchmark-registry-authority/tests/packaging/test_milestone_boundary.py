@@ -63,9 +63,23 @@ FORBIDDEN_CAPABILITY_UNLOCK = {
     "production_composition_root": "BR-2D",
 }
 
-#: The exact token set BR-2A froze. Pinned separately from the map above so a
-#: restructuring cannot drop an entry unnoticed: a token that vanished from the
-#: map would simply stop being checked, and nothing else would fail.
+#: The exact token set BR-2A froze, held separately from the map above so that a
+#: **one-sided** edit is caught: a token dropped from the map alone stops being
+#: checked, and the equality against this set fails.
+#:
+#: **This vocabulary is self-attested, and the guard is weaker than it reads.**
+#: Both literals live in this one file, so an edit that removes a token from the
+#: map *and* from this set moves both sides of the comparison together and the
+#: suite stays green — measured, not supposed: deleting ``"keyparser"`` and
+#: ``"key_parser"`` from both while shipping a live ``class KeyParser`` under
+#: ``src/`` leaves the suite passing, and a capability the ADR bans until
+#: ``0.3.0`` would ship with nothing saying so.
+#:
+#: No second authority for these tokens exists in this repository: the probe
+#: harness carries none, the gate inventory carries none, and ADR §35.2 names
+#: them only in prose. Pinning them to one is genuine engineering and needs its
+#: own ratification. Until then this comment is the warning, and the reviewer of
+#: any diff touching either literal is the check.
 BR2A_FROZEN_CAPABILITY_TOKENS = frozenset(
     {
         "admissionengine",
