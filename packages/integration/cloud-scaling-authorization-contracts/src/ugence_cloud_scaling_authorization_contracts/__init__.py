@@ -52,6 +52,7 @@ from .canonical import (
     canonical_digest,
     digest_of_snapshot,
     is_canonical_digest,
+    is_policy_authority_digest,
 )
 from .candidate import (
     AUTHORIZATION_CANDIDATE_SCHEMA_VERSION,
@@ -86,9 +87,12 @@ from .reconciliation import (
 )
 from .target import (
     EXECUTION_TARGET_SCOPE_SCHEMA_VERSION,
+    POLICY_COORDINATE_COMPONENTS,
     POLICY_TARGET_BINDING_SCHEMA_VERSION,
+    POLICY_TARGET_BINDING_V2_SCHEMA_VERSION,
     ExecutionTargetScope,
     PolicyTargetBindingReference,
+    PolicyTargetBindingReferenceV2,
 )
 from .trust import PHASE_5A_TRUST_STATE, EvidenceTrustState
 from .version import __version__
@@ -110,8 +114,11 @@ __all__ = [
     # --- policy / execution target binding (structural only) ---
     "ExecutionTargetScope",
     "PolicyTargetBindingReference",
+    "PolicyTargetBindingReferenceV2",
     "EXECUTION_TARGET_SCOPE_SCHEMA_VERSION",
+    "POLICY_COORDINATE_COMPONENTS",
     "POLICY_TARGET_BINDING_SCHEMA_VERSION",
+    "POLICY_TARGET_BINDING_V2_SCHEMA_VERSION",
     # --- the single unverified trust state ---
     "EvidenceTrustState",
     "PHASE_5A_TRUST_STATE",
@@ -126,6 +133,7 @@ __all__ = [
     "canonical_digest",
     "digest_of_snapshot",
     "is_canonical_digest",
+    "is_policy_authority_digest",
     "DIGEST_PREFIX",
     # --- typed errors and rejection reasons ---
     "CloudScalingAuthorizationContractError",

@@ -20,6 +20,7 @@ collaborator rather than merely producing no candidate.
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
@@ -41,9 +42,11 @@ from ugence_cloud_scaling_risk_integration import (
 )
 
 from ugence_cloud_scaling_authorization_contracts import (
+    POLICY_TARGET_BINDING_V2_SCHEMA_VERSION,
     PRODUCER_SIGNING_PURPOSE,
     ExecutionTargetScope,
     PolicyTargetBindingReference,
+    PolicyTargetBindingReferenceV2,
     ProducerAttestationEvidence,
     build_capacity_authorization_candidate,
     canonical_digest,
@@ -58,6 +61,10 @@ INSIDE_WINDOW = H.at(300.0)
 #: A fixed, non-secret test seed. Determinism is the point: the frozen digests must be
 #: reproducible from the repository alone, with no generated key material.
 PRODUCER_SEED = bytes(range(32, 64))
+
+#: The tenant every fixture in this suite is scoped to. Named here because the V2 policy
+#: coordinate carries a tenant component and is not always built from a target scope.
+FIXTURE_TENANT_ID = "tenant-1"
 PRODUCER_ID = "ugence.cloud-scaling-controller"
 PRODUCER_KEY_ID = "producer-attestation-key-1"
 
@@ -298,6 +305,92 @@ def build_policy_binding(
     )
 
 
+def build_policy_coordinate_binding(
+    target_scope: Optional[ExecutionTargetScope] = None,
+    *,
+    target_scope_digest: Optional[str] = None,
+    policy_family: str = "capacity-bounds",
+    policy_id: str = "cloud-scaling.capacity-bounds",
+    policy_version: str = "3.1.0",
+    policy_scope: str = "TENANT",
+    policy_tenant_id: Optional[str] = None,
+    policy_body_digest: Optional[str] = None,
+    issuing_authority_id: str = "ugence.policy-authority",
+    key_id: str = "policy-signing-key-7",
+    signature_alg: str = "ed25519",
+    **overrides: Any,
+) -> PolicyTargetBindingReferenceV2:
+    """A complete Policy Authority coordinate, bound to this exact scope (5B-1).
+
+    ``policy_body_digest`` here is **well-shaped, not genuine**: it is a bare 64-hex digest
+    over the fixture's own identity, because Phase 5A depends on neither the Policy Authority
+    nor the UVI contracts and so cannot issue a real policy to derive one from. That is a
+    property of this fixture and not of the contract — exactly as the existing
+    ``policy_artifact_digest`` placeholder is. The genuine article is built in the Phase 5B-0B
+    suite, which has the authority available and reconciles this coordinate against a real
+    issued record.
+    """
+
+    if (target_scope is None) == (target_scope_digest is None):
+        raise TypeError("pass exactly one of target_scope or target_scope_digest")
+    tenant = policy_tenant_id
+    if tenant is None:
+        tenant = target_scope.tenant_id if target_scope is not None else FIXTURE_TENANT_ID
+    body = dict(
+        policy_family=policy_family,
+        policy_id=policy_id,
+        policy_version=policy_version,
+        policy_scope=policy_scope,
+        policy_tenant_id=tenant,
+        issuing_authority_id=issuing_authority_id,
+        key_id=key_id,
+        signature_alg=signature_alg,
+        target_scope_digest=(
+            target_scope.digest() if target_scope is not None else target_scope_digest
+        ),
+    )
+    digest = policy_body_digest or hashlib.sha256(
+        canonical_bytes({"policy": policy_id, "v": policy_version, "body": "fixture"})
+    ).hexdigest()
+    body.update(policy_content_digest=digest, policy_body_digest=digest)
+    body.update(overrides)
+    payload = {
+        "schema_version": POLICY_TARGET_BINDING_V2_SCHEMA_VERSION,
+        "policy_family": body["policy_family"],
+        "policy_id": body["policy_id"],
+        "policy_version": body["policy_version"],
+        "policy_content_digest": body["policy_content_digest"],
+        "policy_scope": body["policy_scope"],
+        "policy_tenant_id": body["policy_tenant_id"],
+        "policy_body_digest": body["policy_body_digest"],
+        "issuing_authority_id": body["issuing_authority_id"],
+        "key_id": body["key_id"],
+        "signature_alg": body["signature_alg"],
+        "target_scope_digest": body["target_scope_digest"],
+    }
+    return PolicyTargetBindingReferenceV2(
+        binding_digest=canonical_digest(payload), **body
+    )
+
+
+def coordinate_for(policy_binding, **overrides) -> PolicyTargetBindingReferenceV2:
+    """The V2 coordinate that agrees with a given V1 binding.
+
+    Derived *from* the binding rather than built alongside it, so a test that varies the
+    binding does not have to remember to vary the coordinate too — the two stay in agreement
+    unless a test deliberately breaks it, which is what
+    ``tests/test_policy_coordinate_binding.py`` does on purpose.
+    """
+
+    derived = dict(
+        target_scope_digest=policy_binding.target_scope_digest,
+        policy_id=policy_binding.policy_id,
+        policy_version=policy_binding.policy_version,
+    )
+    derived.update(overrides)
+    return build_policy_coordinate_binding(**derived)
+
+
 def build_candidate(**overrides: Any):
     """The full genuine chain: recommendation → projection → decision → candidate."""
 
@@ -308,11 +401,19 @@ def build_candidate(**overrides: Any):
     )
     target_scope = overrides.pop("target_scope", None) or build_target_scope(projection)
     policy_binding = overrides.pop("policy_binding", None) or build_policy_binding(target_scope)
+    coordinate_binding = overrides.pop(
+        "policy_coordinate_binding", None
+    ) or build_policy_coordinate_binding(
+        target_scope,
+        policy_id=policy_binding.policy_id,
+        policy_version=policy_binding.policy_version,
+    )
     return build_capacity_authorization_candidate(
         projection=projection,
         decision=decision,
         producer_attestation=attestation,
         policy_binding=policy_binding,
+        policy_coordinate_binding=coordinate_binding,
         target_scope=target_scope,
     )
 
@@ -360,11 +461,19 @@ def policy_binding(target_scope) -> PolicyTargetBindingReference:
 
 
 @pytest.fixture
-def candidate(projection, decision, attestation, target_scope, policy_binding):
+def policy_coordinate_binding(target_scope) -> PolicyTargetBindingReferenceV2:
+    return build_policy_coordinate_binding(target_scope)
+
+
+@pytest.fixture
+def candidate(
+    projection, decision, attestation, target_scope, policy_binding, policy_coordinate_binding
+):
     return build_capacity_authorization_candidate(
         projection=projection,
         decision=decision,
         producer_attestation=attestation,
         policy_binding=policy_binding,
+        policy_coordinate_binding=policy_coordinate_binding,
         target_scope=target_scope,
     )

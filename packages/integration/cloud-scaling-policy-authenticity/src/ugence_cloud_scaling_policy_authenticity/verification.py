@@ -9,7 +9,7 @@ instant, whose record binds its own body digest into its own identity.
 
 Why that is more than "call ``resolve_policy`` and check the status"
 ---------------------------------------------------------------------
-Four gates exist here that the authority does not perform for a consumer:
+Five gates exist here that the authority does not perform for a consumer:
 
 #. **Historical refusal.** ``resolve_policy`` can legitimately return ``RESOLVED`` with
    ``historical=True`` under a configured rule. That answer describes the past and can never
@@ -29,6 +29,13 @@ Four gates exist here that the authority does not perform for a consumer:
    itself, and refuses with ``COORDINATE_DIGEST_UNBOUND``.
 #. **The closed algorithm set.** A record naming an algorithm this profile does not admit is
    refused even if the configured verifier accepted it.
+#. **The candidate is about this policy (5B-1).** When a candidate accompanies the question,
+   its policy coordinate is reconciled against the resolved one — all six components, the
+   signed body digest and the issuing identity — and a disagreement is
+   ``CANDIDATE_COORDINATE_MISMATCH``. The authority is never asked about the candidate: it has
+   no notion of one. This gate is only reachable since Phase 5A 0.2.0 gave a candidate a
+   coordinate to compare; before that, one genuine proof verified alongside any candidate
+   whatsoever (ADR residual R-4).
 
 Ordered, stop at the first failing group, deterministic
 --------------------------------------------------------
@@ -47,12 +54,13 @@ earlier failure:
    resolved coordinate;
 #. **coordinate/body-digest equality** — the R-3 gate above;
 #. **algorithm admission** — the closed set;
-#. **digest shape** — both digests are bare 64-hex Policy Authority digests.
+#. **digest shape** — both digests are bare 64-hex Policy Authority digests;
+#. **candidate reconciliation** — a supplied candidate names this exact policy.
 
-Only after all ten does a :class:`~.verified.VerifiedPolicyAuthenticity` exist.
+Only after all eleven does a :class:`~.verified.VerifiedPolicyAuthenticity` exist.
 
-Three checks deliberately sit **outside** that list, and the count stays ten because none of
-them is a gate on an input. The trust identity is snapshotted once, at *construction*, and
+Three checks deliberately sit **outside** that list, and the count stays eleven because none
+of them is a gate on an input. The trust identity is snapshotted once, at *construction*, and
 every determination is minted from the snapshot. The verified/resolution **pair** is
 cross-checked by :class:`PolicyAuthenticityResult` itself, at *result construction*, because
 it is a property of the pair rather than of anything the routine was handed. And the terminal
@@ -356,11 +364,13 @@ class PolicyAuthenticityVerifier:
     ) -> PolicyAuthenticityResult:
         """Verify one exact policy coordinate at ``as_of``. Returns a typed result.
 
-        ``candidate`` is **optional and never reconciled**. When supplied, its digest is
-        recorded on the verified artifact as the scope of the determination — which candidate
-        this proof accompanied — and nothing about it is compared against the policy. A Phase
-        5A binding cannot name a coordinate (D-5B0B-3), so there is nothing here to compare
-        it with; binding the two is 5B-1's work. See :mod:`.verified`.
+        ``candidate`` is **optional, and reconciled when supplied** (5B-1). Its policy
+        coordinate is compared against the resolved policy on all six components, the signed
+        body digest and the issuing identity; a disagreement refuses the pair with
+        ``CANDIDATE_COORDINATE_MISMATCH`` rather than minting a determination that says
+        nothing about the candidate it names. Omitting a candidate is not a refusal: the
+        artifact then carries ``candidate_digest_fact=None``, which means no candidate
+        accompanied the determination. See :mod:`.verified`.
 
         Never raises for an invalid input: an invalid input is an expected answer to the
         question, and raising would tempt a caller into treating a swallowed exception as a
@@ -526,6 +536,15 @@ class PolicyAuthenticityVerifier:
                 "the candidate's digest is not a canonical Phase 5A digest",
             )
 
+        # === 11. the candidate is about THIS policy (5B-1, ADR residual R-4) ============
+        # Only reachable since Phase 5A 0.2.0 gave the candidate a policy coordinate to
+        # reconcile against. Before that this comparison could not be made at all, and a
+        # genuine proof verified alongside any candidate whatsoever.
+        if candidate is not None:
+            mismatch = _coordinate_disagreement(candidate, coordinate, record)
+            if mismatch is not None:
+                return _refuse(_Outcome.CANDIDATE_COORDINATE_MISMATCH, mismatch)
+
         # === every gate succeeded — and only now does an artifact exist =================
         artifact = _mint_verified_artifact(
             record=record,
@@ -542,6 +561,59 @@ class PolicyAuthenticityVerifier:
             f"PolicyAuthenticityVerifier(port={type(self._port).__name__}, "
             f"production_mode={self._production_mode})"
         )
+
+
+#: What a candidate's policy coordinate must agree with, field by field: the six coordinate
+#: components that identify the policy version, the content binding its signature covers, and
+#: the issuing identity. Left is the candidate's field name; the pair beside it is where the
+#: determination reads the truth from.
+_RECONCILED_FIELDS: tuple = (
+    ("policy_family", "coordinate", "policy_family"),
+    ("policy_id", "coordinate", "policy_id"),
+    ("policy_version", "coordinate", "version"),
+    ("policy_content_digest", "coordinate", "content_digest"),
+    ("policy_scope", "coordinate", "scope"),
+    ("policy_tenant_id", "coordinate", "tenant_id"),
+    ("policy_body_digest", "record", "policy_body_digest"),
+    ("issuing_authority_id", "record", "issuing_authority_id"),
+    ("key_id", "record", "key_id"),
+    ("signature_alg", "record", "signature_alg"),
+)
+
+
+def _coordinate_disagreement(candidate, coordinate, record) -> Optional[str]:
+    """Return why the candidate is about a different policy, or ``None`` if it is not.
+
+    **Complete, not sampled.** All six coordinate components are compared, because exact-match
+    lookup is the only lookup the authority's registry performs and a subset comparison would
+    read as a binding while establishing less than one (D-5B1-5). ``policy_body_digest`` is
+    compared too: it is the content binding the issuance signature covers (D-5B0B-2). The
+    issuing identity is compared because the candidate asserts it and the determination knows
+    it; a candidate naming another authority or key is not a candidate about this policy.
+
+    The candidate's own ``binding_digest`` is not re-derived here. Phase 5A's type validates it
+    at construction and refuses a mutated one, and a candidate that reached this boundary is
+    one Phase 5A built — this package does not re-implement a neighbour's validation.
+    """
+
+    binding = getattr(candidate, "policy_coordinate_binding", None)
+    if binding is None:
+        return (
+            "the candidate carries no policy coordinate binding; a candidate built before "
+            "Phase 5A 0.2.0 cannot name a policy version, so this determination cannot be "
+            "reconciled against it"
+        )
+    sources = {"coordinate": coordinate, "record": record}
+    for field, source, attribute in _RECONCILED_FIELDS:
+        expected = getattr(sources[source], attribute)
+        actual = getattr(binding, field, None)
+        if actual != expected:
+            return (
+                f"the candidate's policy coordinate disagrees on {field}: the candidate "
+                f"names {actual!r} and the resolved policy is {expected!r}. Both artifacts "
+                "may be individually genuine and the pair is still a misstatement"
+            )
+    return None
 
 
 def _terminal_outcome(exc: BaseException) -> _Outcome:
@@ -608,6 +680,10 @@ def _mint_verified_artifact(
         "policy_issued_at_fact": record.issued_at,
         "verification_profile": VERIFICATION_PROFILE,
         "verification_profile_version": VERIFICATION_PROFILE_VERSION,
+        # Verified since 5B-1: a supplied candidate is reconciled against the resolved
+        # coordinate by gate 11, and ``None`` means no candidate accompanied this
+        # determination — never that one was carried unchecked.
+        "candidate_digest_fact": candidate_digest_fact,
         # Framed into the verified half deliberately: that this artifact establishes policy
         # authenticity, grants nothing and is not historical are all gate outcomes.
         "outcome": _Outcome.VERIFIED.value,
@@ -615,11 +691,11 @@ def _mint_verified_artifact(
         "historical": False,
     }
     recorded_map = {
-        # R-2: injected, unvalidated. R-4: recorded, never reconciled. policy_type: absent
-        # from the signed payload and never compared at resolution. trust_configuration_digest:
-        # reported by the port about itself. See RECORDED_FACT_NAMES for each reason in full.
+        # R-2: injected, unvalidated. policy_type: absent from the signed payload and never
+        # compared at resolution. trust_configuration_digest: reported by the port about
+        # itself. See RECORDED_FACT_NAMES for each reason in full. R-4's candidate_digest_fact
+        # left this half in 5B-1, when gate 11 began reconciling it.
         "resolved_as_of_fact": resolved_as_of,
-        "candidate_digest_fact": candidate_digest_fact,
         "policy_type": record.policy_type,
         "trust_configuration_digest": trust_configuration_digest,
     }

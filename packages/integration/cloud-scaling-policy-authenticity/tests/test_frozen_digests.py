@@ -9,10 +9,16 @@ is now something a consumer can pin, and 5B-1 and 5B-2 will each want to move on
 **The rule this file enforces.** A change that moves a pinned digest is a change to what this
 package's verification profile produces. When one of these constants must be updated, update
 :data:`~ugence_cloud_scaling_policy_authenticity.VERIFICATION_PROFILE_VERSION` in the same
-commit, and say in the changelog which digest moved and why. The partition fingerprint below
-makes that mechanical rather than remembered: it covers the profile version *and* the exact
-membership of both halves, so moving a fact without bumping fails here, and bumping without
-recording the new fingerprint fails here too. Both edits land together or neither does.
+commit, and say in the changelog which digest moved and why.
+
+**What this file cannot enforce, corrected (5B-1 D-5B1-3).** These constants are pins. An
+earlier version of this docstring claimed the partition fingerprint below made the profile
+bump "mechanical rather than remembered"; the 5B-1 audit measured otherwise — promoting
+``candidate_digest_fact``, updating the two constants and leaving the profile version at
+``"v1"`` passes this file at 5 passed. A pin catches an *accidental* move, because a change
+that did not intend to move a digest does not carry an updated pin. It cannot catch a
+deliberate one, because the pin and the change land in the same commit. The rule is enforced
+by ``tests/test_partition_ratchet.py``, which takes its "before" from repository history.
 
 **What is deliberately not frozen.** Nothing that depends on wall-clock time, machine state or
 key generation. Every value below is reproducible from the repository alone: the fixtures sign
@@ -41,6 +47,12 @@ from ugence_cloud_scaling_policy_authenticity.verified import (
 #: The digest of the reference determination: the authority's default fixture policy, resolved
 #: at ``T_MID`` with no candidate supplied, under the fixture key ring.
 FROZEN_ARTIFACT_DIGEST = (
+    "f245511d4efeaee342ae6fac65fe323cc187f7f39d0c09a0034bc7d05899335c"
+)
+#: What the reference determination hashed to under profile ``v1``, before 5B-1 promoted
+#: ``candidate_digest_fact`` into the verified half. Pinned as a negative anchor: reproducing
+#: it would mean the promotion had been reverted without the profile version following.
+SUPERSEDED_V1_ARTIFACT_DIGEST = (
     "8b0ea25f368287715657f1ff2293e137de1f810de7946e4fc27e52d8af473c7f"
 )
 
@@ -53,6 +65,10 @@ FROZEN_TRUST_CONFIGURATION_DIGEST = (
 #: Covers the profile version together with both halves' exact membership and their domain
 #: tags. This is the constant that ties a partition change to a profile bump.
 FROZEN_PARTITION_FINGERPRINT = (
+    "242ac003c259a63b60f8f55fa26b8b002b7498267e1f8151ae78bca8db7afccc"
+)
+#: The ``v1`` fingerprint: four recorded facts, nineteen verified ones.
+SUPERSEDED_V1_PARTITION_FINGERPRINT = (
     "86d39d254d0702ccc90df894ee44a8c5b51b4ebfedeaa7ef396e81ef33edda07"
 )
 
@@ -97,10 +113,11 @@ def test_the_reference_trust_configuration_digest_has_not_moved():
 
 @pytest.mark.invariant
 def test_the_partition_fingerprint_ties_membership_to_the_profile_version():
-    """Moving a fact between halves without bumping the profile version fails here.
+    """The fingerprint still covers the profile version and both halves' exact membership.
 
-    So does bumping without re-recording the fingerprint. The two edits are forced into one
-    commit, which is what makes "promotion requires a bump" a rule rather than a note.
+    What it establishes is that an *unintended* move surfaces here rather than silently. What
+    it does not establish is the discipline itself: a deliberate promotion can update this
+    constant in the same commit. ``tests/test_partition_ratchet.py`` is what refuses that.
     """
 
     assert _partition_fingerprint() == FROZEN_PARTITION_FINGERPRINT
@@ -108,7 +125,19 @@ def test_the_partition_fingerprint_ties_membership_to_the_profile_version():
 
 @pytest.mark.invariant
 def test_the_profile_version_is_the_one_these_digests_were_recorded_under():
-    assert VERIFICATION_PROFILE_VERSION == "v1"
+    """``v2`` since 5B-1: gate 11 was added and ``candidate_digest_fact`` was promoted."""
+
+    assert VERIFICATION_PROFILE_VERSION == "v2"
+
+
+@pytest.mark.invariant
+def test_the_v1_artifact_digest_and_fingerprint_are_never_produced_again():
+    """The promotion, pinned from the other side: reverting it must fail rather than pass."""
+
+    assert _reference_determination().artifact_digest != SUPERSEDED_V1_ARTIFACT_DIGEST
+    assert _partition_fingerprint() != SUPERSEDED_V1_PARTITION_FINGERPRINT
+    assert "candidate_digest_fact" in VERIFIED_FACT_NAMES
+    assert "candidate_digest_fact" not in RECORDED_FACT_NAMES
 
 
 @pytest.mark.invariant

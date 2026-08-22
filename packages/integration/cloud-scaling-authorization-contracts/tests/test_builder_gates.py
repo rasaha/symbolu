@@ -89,6 +89,7 @@ from conftest import (
     build_projection,
     build_recommendation,
     build_target_scope,
+    coordinate_for,
     production_subject,
 )
 from ugence_cloud_scaling_authorization_contracts import (
@@ -108,6 +109,7 @@ def _attempt(projection, decision, scope, *, policy=None, attestation=None):
             else build_attestation(recommendation_digest=projection.recommendation_digest)
         ),
         policy_binding=policy if policy is not None else build_policy_binding(scope),
+        policy_coordinate_binding=coordinate_for(policy if policy is not None else build_policy_binding(scope)),
         target_scope=scope,
     )
 
@@ -492,6 +494,7 @@ def test_a_fabricated_projection_yields_no_candidate(
             decision=decision,
             producer_attestation=attestation,
             policy_binding=policy_binding,
+            policy_coordinate_binding=coordinate_for(policy_binding),
             target_scope=target_scope,
         )
     assert built is None
@@ -573,6 +576,7 @@ def test_a_decision_issued_for_another_tenant_is_refused(
             decision=foreign,
             producer_attestation=attestation,
             policy_binding=policy_binding,
+            policy_coordinate_binding=coordinate_for(policy_binding),
             target_scope=target_scope,
         )
 
@@ -623,6 +627,7 @@ def test_a_decision_made_about_another_subject_is_refused(
             decision=foreign,
             producer_attestation=attestation,
             policy_binding=policy_binding,
+            policy_coordinate_binding=coordinate_for(policy_binding),
             target_scope=target_scope,
         )
 
@@ -655,11 +660,14 @@ def test_the_projection_decision_binding_reaches_no_later_authority(
     with pytest.raises(ReconciliationError):
         build_capacity_authorization_candidate(
             projection=projection, decision=foreign, producer_attestation=attestation,
-            policy_binding=policy_binding, target_scope=target_scope,
+            policy_binding=policy_binding,
+            policy_coordinate_binding=coordinate_for(policy_binding),
+            target_scope=target_scope,
         )
 
     assert set(inspect.signature(build_capacity_authorization_candidate).parameters) == {
-        "projection", "decision", "producer_attestation", "policy_binding", "target_scope",
+        "projection", "decision", "producer_attestation", "policy_binding",
+        "policy_coordinate_binding", "target_scope",
     }
 
 
@@ -739,6 +747,7 @@ def test_a_request_carrying_a_non_D4_identifier_is_refused(
             decision=aligned,
             producer_attestation=attestation,
             policy_binding=policy_binding,
+            policy_coordinate_binding=coordinate_for(policy_binding),
             target_scope=target_scope,
         )
 

@@ -166,6 +166,40 @@ class MutatedPackage:
             **body,
         )
 
+    def policy_coordinate_binding(self, target_scope: Any) -> Any:
+        """The V2 coordinate, built from the **mutated** module's own type.
+
+        Built here rather than imported from ``conftest``: the builder admits exact types
+        only, and a coordinate minted by the pristine package is a different class than the
+        mutated copy's.
+        """
+
+        import hashlib
+
+        from risk_authority.crypto import canonical_bytes
+
+        policy_id, policy_version = "cloud-scaling.capacity-bounds", "3.1.0"
+        digest = hashlib.sha256(
+            canonical_bytes({"policy": policy_id, "v": policy_version, "body": "fixture"})
+        ).hexdigest()
+        body = dict(
+            policy_family="capacity-bounds",
+            policy_id=policy_id,
+            policy_version=policy_version,
+            policy_content_digest=digest,
+            policy_scope="TENANT",
+            policy_tenant_id=target_scope.tenant_id,
+            policy_body_digest=digest,
+            issuing_authority_id="ugence.policy-authority",
+            key_id="policy-signing-key-7",
+            signature_alg="ed25519",
+            target_scope_digest=target_scope.digest(),
+        )
+        payload = {"schema_version": "cloud-scaling-policy-target-binding-2", **body}
+        return self.module.PolicyTargetBindingReferenceV2(
+            binding_digest=self.module.canonical_digest(payload), **body
+        )
+
     def build(self, projection: Any, decision: Any) -> Any:
         """Run the mutated package's REAL public builder on this projection/decision."""
 
@@ -177,6 +211,7 @@ class MutatedPackage:
                 recommendation_digest=projection.recommendation_digest
             ),
             policy_binding=self.policy_binding(scope),
+            policy_coordinate_binding=self.policy_coordinate_binding(scope),
             target_scope=scope,
         )
 
@@ -192,9 +227,13 @@ def mutated_package(tmp_path: pathlib.Path, guard_number: int) -> MutatedPackage
     dst.mkdir(parents=True, exist_ok=True)
     shutil.copytree(SRC, dst / PKG_NAME)
     guards = canonical_guards(dst / PKG_NAME)
-    if len(guards) != 49:
+    # 51 since 5B-1: the builder gained guards 43 and 44 — the two policy references must
+    # name one policy, and the coordinate must bind this scope. The count is asserted so a
+    # guard that disappears cannot go unnoticed; the numbered anchors the sweep aims at are
+    # checked separately, and both new guards sort after every anchor.
+    if len(guards) != 51:
         raise AssertionError(
-            f"canonical inventory drifted: {len(guards)} in-scope guards, expected 49"
+            f"canonical inventory drifted: {len(guards)} in-scope guards, expected 51"
         )
     _neutralise(dst / PKG_NAME, guards[guard_number - 1])
 

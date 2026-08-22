@@ -24,6 +24,7 @@ from conftest import (
     build_projection,
     build_recommendation,
     build_target_scope,
+    coordinate_for,
 )
 from ugence_cloud_scaling_authorization_contracts import (
     PHASE_5A_TRUST_STATE,
@@ -78,6 +79,7 @@ def test_a_stale_digest_paired_with_a_changed_id_fails():
             decision=decision,
             producer_attestation=stale,
             policy_binding=build_policy_binding(scope),
+            policy_coordinate_binding=coordinate_for(build_policy_binding(scope)),
             target_scope=scope,
         )
     assert exc.value.reason.value == "producer_attestation_content_mismatch"
@@ -114,6 +116,7 @@ def test_the_id_reaches_the_candidate_digest():
                 recommendation_id=recommendation_id,
             ),
             policy_binding=policy,
+            policy_coordinate_binding=coordinate_for(policy),
             target_scope=scope,
         )
 
@@ -143,6 +146,7 @@ def test_a_self_consistent_but_unverified_attestation_remains_non_authoritative(
         decision=decision,
         producer_attestation=rogue,
         policy_binding=build_policy_binding(scope),
+        policy_coordinate_binding=coordinate_for(build_policy_binding(scope)),
         target_scope=scope,
     )
     # Structurally admissible...

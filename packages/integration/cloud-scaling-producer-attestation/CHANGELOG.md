@@ -3,6 +3,24 @@
 All notable changes to this distribution. This package follows the Cloud Scaling phase
 numbering; each entry names the phase that produced it.
 
+## Unreleased — fixture re-pins for Cloud Scaling Phase 5B-1
+
+**No source change, and the version does not move.** Phase 5B-1 added the required policy
+coordinate to the Phase 5A candidate, which moved the candidate digest this package's fixtures
+build. Two pins moved with it:
+
+* `PHASE_5A_CANDIDATE_DIGEST` — `sha256:db72ffff…` → `sha256:be06c653…`, and the pre-5B-1
+  value is kept as `SUPERSEDED_PRE_5B1_PHASE_5A_CANDIDATE_DIGEST`, a negative anchor.
+* `FROZEN_VERIFIED_ARTIFACT_DIGEST` — `sha256:519983d8…` → `sha256:5a2a6648…`. This artifact
+  binds `candidate_digest`, so a moved candidate moves it. That is a property of the input,
+  not a change in what this package establishes: no gate was added, removed or reordered, and
+  the four-way attribution of the 5B-0A remediation still ranges over exactly its four fields,
+  with the pre-5B-1 candidate digest reverted alongside them.
+
+`tests/data/phase5a_candidate.json` was regenerated with `scripts/generate_frozen_candidate.py`
+so the shipped sdist reconstructs the current candidate, and the Phase 5A invariants this suite
+asserts were re-measured: version `0.2.0`, 41 exported symbols, eleven frozen digests.
+
 ## 0.1.0 — Cloud Scaling Phase 5B-0A: producer authenticity foundation
 
 First release. Makes a Cloud Scaling producer attestation **mintable and verifiable** for

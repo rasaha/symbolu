@@ -229,8 +229,15 @@ def phase5a_builders():
     return module
 
 
-def genuine_candidate():
-    """One genuine ``CapacityAuthorizationCandidate``, or ``None`` outside a checkout."""
+def genuine_candidate(record=None, **coordinate_overrides):
+    """One genuine ``CapacityAuthorizationCandidate``, or ``None`` outside a checkout.
+
+    With ``record``, the candidate's policy coordinate is the coordinate that record was
+    genuinely issued under — which is what makes reconciliation testable against a real
+    determination rather than against a coordinate invented to match. Without one, the Phase
+    5A fixture's own coordinate is used, and a determination about any other policy will not
+    reconcile against it.
+    """
 
     builders = phase5a_builders()
     if builders is None:
@@ -245,12 +252,31 @@ def genuine_candidate():
         recommendation_digest=projection.recommendation_digest
     )
     scope = builders.build_target_scope(projection)
-    binding = builders.build_policy_binding(scope)
+    coordinate_kwargs = dict(coordinate_overrides)
+    if record is not None:
+        coordinate = record.coordinate
+        coordinate_kwargs.setdefault("policy_family", coordinate.policy_family)
+        coordinate_kwargs.setdefault("policy_id", coordinate.policy_id)
+        coordinate_kwargs.setdefault("policy_version", coordinate.version)
+        coordinate_kwargs.setdefault("policy_scope", coordinate.scope)
+        coordinate_kwargs.setdefault("policy_tenant_id", coordinate.tenant_id)
+        coordinate_kwargs.setdefault("policy_body_digest", record.policy_body_digest)
+        coordinate_kwargs.setdefault("issuing_authority_id", record.issuing_authority_id)
+        coordinate_kwargs.setdefault("key_id", record.key_id)
+        coordinate_kwargs.setdefault("signature_alg", record.signature_alg)
+    binding = builders.build_policy_binding(
+        scope,
+        policy_id=coordinate_kwargs.get("policy_id", "cloud-scaling.capacity-bounds"),
+        policy_version=coordinate_kwargs.get("policy_version", "3.1.0"),
+    )
     return build_capacity_authorization_candidate(
         projection=projection,
         decision=decision,
         producer_attestation=attestation,
         policy_binding=binding,
+        policy_coordinate_binding=builders.build_policy_coordinate_binding(
+            scope, **coordinate_kwargs
+        ),
         target_scope=scope,
     )
 

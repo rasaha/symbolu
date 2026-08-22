@@ -14,8 +14,15 @@ PROJECT = SRC.parents[1]
 PYPROJECT = (PROJECT / "pyproject.toml").read_text(encoding="utf-8")
 
 
-def test_version_is_the_declared_initial_version():
-    assert pkg.__version__ == "0.1.0"
+def test_version_is_the_declared_version():
+    """``0.2.0`` since 5B-1: the candidate gained a required field and its digest moved.
+
+    Pre-1.0, that is a minor bump, and the digest is a value two merged packages pin — so a
+    version that stayed put would be telling a consumer nothing changed while the artifact
+    they pin changed shape.
+    """
+
+    assert pkg.__version__ == "0.2.0"
 
 
 def test_distribution_and_namespace_names():

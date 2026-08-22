@@ -103,10 +103,18 @@ for name, mod in (("p5b", p5b), ("p5a", p5a), ("tev", tev), ("ra", ra)):
 
 if p5b.__version__ != EXPECTED["version"]:
     raise AssertionError(f"version {p5b.__version__} != {EXPECTED['version']}")
-if p5a.__version__ != "0.1.0":
-    raise AssertionError(f"Phase 5A moved off 0.1.0: {p5a.__version__}")
-if len(p5a.__all__) != 37:
-    raise AssertionError(f"Phase 5A export count moved: {len(p5a.__all__)}")
+# Compared against the SOURCE tree's values, passed in — not against literals. What matters
+# here is that the installed Phase 5A is the one this package was measured against; pinning
+# the numbers in this probe just re-breaks it on every deliberate neighbour bump (5B-1 moved
+# Phase 5A to 0.2.0 and added four exports).
+if p5a.__version__ != EXPECTED["phase5a_version"]:
+    raise AssertionError(
+        f"installed Phase 5A {p5a.__version__} != source {EXPECTED['phase5a_version']}"
+    )
+if sorted(p5a.__all__) != sorted(EXPECTED["phase5a_public_api"]):
+    missing = set(EXPECTED["phase5a_public_api"]) - set(p5a.__all__)
+    extra = set(p5a.__all__) - set(EXPECTED["phase5a_public_api"])
+    raise AssertionError(f"Phase 5A API drift: missing={sorted(missing)} extra={sorted(extra)}")
 
 # --- 2. exact public API parity with the source tree and with public_api.json -----------
 installed_api = sorted(p5b.__all__)
@@ -210,6 +218,8 @@ candidate = p5a.CapacityAuthorizationCandidate(**{
     **{k: v for k, v in EXPECTED["candidate_fields"].items()},
     "target_scope": p5a.ExecutionTargetScope(**EXPECTED["target_scope_fields"]),
     "policy_binding": p5a.PolicyTargetBindingReference(**EXPECTED["policy_fields"]),
+    "policy_coordinate_binding": p5a.PolicyTargetBindingReferenceV2(
+        **EXPECTED["policy_coordinate_fields"]),
     "producer_attestation": p5a.ProducerAttestationEvidence.from_dict(
         EXPECTED["v1_attestation"]),
     **{k: _ts(v) for k, v in EXPECTED["candidate_datetimes"].items()},
@@ -518,16 +528,25 @@ def source_expectations() -> dict:
     scalar_fields, datetime_fields = {}, {}
     for field in dataclasses.fields(candidate):
         value = getattr(candidate, field.name)
-        if field.name in ("target_scope", "policy_binding", "producer_attestation"):
+        if field.name in (
+            "target_scope",
+            "policy_binding",
+            "policy_coordinate_binding",
+            "producer_attestation",
+        ):
             continue
         if hasattr(value, "isoformat"):
             datetime_fields[field.name] = _canonical_ts(value)
         else:
             scalar_fields[field.name] = value
 
+    import ugence_cloud_scaling_authorization_contracts as p5a
+
     return {
         "version": p5b.__version__,
         "public_api": list(p5b.__all__),
+        "phase5a_version": p5a.__version__,
+        "phase5a_public_api": list(p5a.__all__),
         "schema_version": p5b.PRODUCER_ATTESTATION_V2_SCHEMA_VERSION,
         "signing_purpose": p5b.PRODUCER_ATTESTATION_V2_SIGNING_PURPOSE,
         "tenant_id": candidate.tenant_id,
@@ -552,6 +571,13 @@ def source_expectations() -> dict:
         "policy_fields": {
             f.name: getattr(candidate.policy_binding, f.name)
             for f in dataclasses.fields(candidate.policy_binding)
+        },
+        # 5B-1: the candidate carries a second policy reference, the complete Policy
+        # Authority coordinate. Like the other carried artifacts it is rebuilt in the probe
+        # through Phase 5A's own exact type rather than serialized as an object.
+        "policy_coordinate_fields": {
+            f.name: getattr(candidate.policy_coordinate_binding, f.name)
+            for f in dataclasses.fields(candidate.policy_coordinate_binding)
         },
         "v1_attestation": {
             key: (_canonical_ts(value) if hasattr(value, "isoformat") else value)

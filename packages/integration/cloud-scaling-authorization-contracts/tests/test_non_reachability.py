@@ -28,6 +28,7 @@ from conftest import (
     build_projection,
     build_recommendation,
     build_target_scope,
+    coordinate_for,
     production_subject,
 )
 from risk_authority.integrations import SubjectRiskDecision, SubjectRiskDisposition
@@ -57,7 +58,9 @@ def invalid_cases(projection, decision, attestation, target_scope, policy_bindin
     )
     base = dict(
         projection=projection, decision=decision, producer_attestation=attestation,
-        policy_binding=policy_binding, target_scope=target_scope,
+        policy_binding=policy_binding,
+        policy_coordinate_binding=coordinate_for(policy_binding),
+        target_scope=target_scope,
     )
     wrong_action = "scale_down" if target_scope.action_type != "scale_down" else "scale_up"
     substituted_scope = build_target_scope(projection, action_type=wrong_action)
@@ -138,7 +141,8 @@ def test_the_builder_accepts_no_collaborator_parameter():
 
     params = set(inspect.signature(build_capacity_authorization_candidate).parameters)
     assert params == {
-        "projection", "decision", "producer_attestation", "policy_binding", "target_scope",
+        "projection", "decision", "producer_attestation", "policy_binding",
+        "policy_coordinate_binding", "target_scope",
     }
     for forbidden in (
         "policy_resolver", "evidence_resolver", "decision_authority", "envelope_issuer",

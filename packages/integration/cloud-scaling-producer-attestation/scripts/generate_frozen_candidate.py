@@ -63,6 +63,7 @@ def main() -> int:
         if field.name in (
             "target_scope",
             "policy_binding",
+            "policy_coordinate_binding",
             "producer_attestation",
             "evidence_references",
         ):
@@ -90,6 +91,10 @@ def main() -> int:
         "policy_binding": {
             f.name: getattr(candidate.policy_binding, f.name)
             for f in dataclasses.fields(candidate.policy_binding)
+        },
+        "policy_coordinate_binding": {
+            f.name: getattr(candidate.policy_coordinate_binding, f.name)
+            for f in dataclasses.fields(candidate.policy_coordinate_binding)
         },
         "producer_attestation": {
             key: (_canonical_ts(value) if hasattr(value, "isoformat") else value)

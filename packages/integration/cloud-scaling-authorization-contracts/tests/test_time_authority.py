@@ -13,6 +13,8 @@ import pathlib
 
 import pytest
 
+from conftest import coordinate_for
+
 import ugence_cloud_scaling_authorization_contracts as pkg
 from ugence_cloud_scaling_authorization_contracts import (
     CapacityAuthorizationCandidate,
@@ -120,7 +122,9 @@ def test_a_long_expired_decision_still_builds_a_candidate(projection, decision, 
     )
     candidate = build_capacity_authorization_candidate(
         projection=projection, decision=decision, producer_attestation=old,
-        policy_binding=policy_binding, target_scope=target_scope,
+        policy_binding=policy_binding,
+        policy_coordinate_binding=coordinate_for(policy_binding),
+        target_scope=target_scope,
     )
     assert candidate.attestation_issued_at_fact == ancient
     # And it still grants nothing — carrying an old fact is not endorsing it.

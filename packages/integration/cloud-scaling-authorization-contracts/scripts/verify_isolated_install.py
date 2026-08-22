@@ -83,7 +83,7 @@ CONTROLLER_HELPERS = (
 )
 
 _PROBE = r'''
-import dataclasses, importlib, json, pathlib, sys
+import dataclasses, hashlib, importlib, json, pathlib, sys
 from datetime import datetime, timezone
 
 EXPECTED = json.loads(sys.argv[1])
@@ -244,17 +244,52 @@ def make_policy(scope, **over):
     )
 
 
+def make_coordinate(scope, **over):
+    """The complete Policy Authority coordinate the candidate carries (5B-1).
+
+    The body digest is well-shaped rather than genuine, for the same reason the source
+    fixture's is: this distribution depends on neither the Policy Authority nor the UVI
+    contracts, so there is no real policy here to derive one from.
+    """
+
+    digest = hashlib.sha256(
+        canonical_bytes(
+            {"policy": "cloud-scaling.capacity-bounds", "v": "3.1.0", "body": "fixture"}
+        )
+    ).hexdigest()
+    body = dict(
+        policy_family="capacity-bounds",
+        policy_id="cloud-scaling.capacity-bounds",
+        policy_version="3.1.0",
+        policy_content_digest=digest,
+        policy_scope="TENANT",
+        policy_tenant_id=scope.tenant_id,
+        policy_body_digest=digest,
+        issuing_authority_id="ugence.policy-authority",
+        key_id="policy-signing-key-7",
+        signature_alg="ed25519",
+        target_scope_digest=scope.digest(),
+    )
+    body.update(over)
+    payload = {"schema_version": "cloud-scaling-policy-target-binding-2", **body}
+    return p5a.PolicyTargetBindingReferenceV2(
+        binding_digest=p5a.canonical_digest(payload), **body
+    )
+
+
 attestation = make_attestation(projection.recommendation_digest)
 scope = make_scope()
 policy = make_policy(scope)
+coordinate = make_coordinate(scope)
 candidate = p5a.build_capacity_authorization_candidate(
     projection=projection, decision=decision, producer_attestation=attestation,
-    policy_binding=policy, target_scope=scope,
+    policy_binding=policy, policy_coordinate_binding=coordinate, target_scope=scope,
 )
 for key, actual in (
     ("producer_signing_payload_digest", attestation.signing_payload_digest),
     ("target_scope_digest", scope.digest()),
     ("policy_binding_digest", policy.digest()),
+    ("policy_coordinate_binding_digest", coordinate.digest()),
     ("candidate_digest", candidate.candidate_digest),
 ):
     if actual != EXPECTED[key]:
@@ -294,7 +329,8 @@ def forged_decision(**over):
 
 def build(**over):
     kw = dict(projection=projection, decision=decision, producer_attestation=attestation,
-              policy_binding=policy, target_scope=scope)
+              policy_binding=policy, policy_coordinate_binding=coordinate,
+              target_scope=scope)
     kw.update(over)
     return p5a.build_capacity_authorization_candidate(**kw)
 
@@ -485,9 +521,12 @@ def source_expectations() -> dict:
     )
     scope = fixtures.build_target_scope(projection)
     policy = fixtures.build_policy_binding(scope)
+    coordinate = fixtures.build_policy_coordinate_binding(
+        scope, policy_id=policy.policy_id, policy_version=policy.policy_version
+    )
     candidate = p5a.build_capacity_authorization_candidate(
         projection=projection, decision=decision, producer_attestation=attestation,
-        policy_binding=policy, target_scope=scope,
+        policy_binding=policy, policy_coordinate_binding=coordinate, target_scope=scope,
     )
     return {
         "version": p5a.__version__,
@@ -501,6 +540,7 @@ def source_expectations() -> dict:
         "producer_signing_payload_digest": attestation.signing_payload_digest,
         "target_scope_digest": scope.digest(),
         "policy_binding_digest": policy.digest(),
+        "policy_coordinate_binding_digest": coordinate.digest(),
         "candidate_digest": candidate.candidate_digest,
     }
 

@@ -7,7 +7,7 @@ name: cloud-scaling-policy-authenticity-ci
 #
 # Why this workflow exists. Phase 5B-0B merged with its suite running nowhere automated: the
 # repository's per-package workflows are path-scoped, and no existing one matches this
-# package's paths, so its 253 properties were measured only by hand. Every guarantee the
+# package's paths, so its properties were measured only by hand. Every guarantee the
 # package documents — the fail-closed gates, the verified/recorded partition, the frozen
 # artifact digest — is a claim that nothing checked between commits. This closes that.
 #
@@ -61,10 +61,26 @@ jobs:
   policy-authenticity-suite:
     name: Phase 5B-0B policy-authenticity suite (source)
     runs-on: ubuntu-latest
+    env:
+      # The partition ratchet reads the repository's history for its "before". A baseline it
+      # cannot resolve is a skip locally and a FAILURE here: a gate that quietly skips where
+      # it is supposed to run is not a gate. Set at job level so the full-suite run enforces
+      # it too, not only the dedicated step.
+      UGENCE_RATCHET_REQUIRED: "1"
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Resolve the partition ratchet's baseline
+        # The merge base with the repository's default branch — named by the event rather
+        # than hardcoded, because this repository's default branch is not called "main".
+        run: |
+          set -euo pipefail
+          default='${{ github.event.repository.default_branch }}'
+          git fetch --no-tags origin "+refs/heads/${default}:refs/remotes/origin/ratchet-base"
+          base=$(git merge-base HEAD refs/remotes/origin/ratchet-base)
+          echo "UGENCE_RATCHET_BASE=${base}" >> "$GITHUB_ENV"
+          echo "ratchet baseline: ${base} (merge base with ${default})"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -95,7 +111,7 @@ jobs:
           import sys
           import xml.etree.ElementTree as ET
 
-          MINIMUM = 250
+          MINIMUM = 275
 
           root = ET.parse("/tmp/junit.xml").getroot()
           suites = [root] if root.tag == "testsuite" else list(root)
@@ -122,13 +138,20 @@ jobs:
               )
           PY
       - name: Digest stability — frozen digests and the partition fingerprint
-        # The gate that makes "promoting a fact requires a profile bump" mechanical. The
-        # fingerprint covers VERIFICATION_PROFILE_VERSION together with both halves' exact
-        # membership, so 5B-1 and 5B-2 cannot move a fact between halves without bumping.
+        # The pinned side: the reference artifact digest, the trust-configuration digest and
+        # the partition fingerprint all still reproduce. A pin catches an *accidental* move;
+        # it cannot catch a deliberate one, because updating the pin is as cheap as the change
+        # — which is what the ratchet step below exists for (5B-1 D-5B1-3).
         run: |
           python -m pytest \
             packages/integration/cloud-scaling-policy-authenticity/tests/test_frozen_digests.py \
             packages/integration/cloud-scaling-policy-authenticity/tests/test_digest_partition.py
+      - name: Partition ratchet — a promotion cannot ship without a profile bump
+        # Takes its "before" from the merge base resolved above, so the constants in this
+        # commit cannot answer for the commit that came before it.
+        run: |
+          python -m pytest \
+            packages/integration/cloud-scaling-policy-authenticity/tests/test_partition_ratchet.py
       - name: Derivation gate — every verified fact is signed, gated or a pinned constant
         # Two remediation rounds each found a verified fact that nothing established. This is
         # the enumeration that replaced spot-checking; a new unclassified fact fails here.
@@ -140,13 +163,14 @@ jobs:
         run: |
           python -m pytest \
             packages/integration/cloud-scaling-policy-authenticity/tests/test_adversarial.py \
+            packages/integration/cloud-scaling-policy-authenticity/tests/test_candidate_reconciliation.py \
             packages/integration/cloud-scaling-policy-authenticity/tests/test_coordinate_gap.py \
             packages/integration/cloud-scaling-policy-authenticity/tests/test_historical_refusal.py \
             packages/integration/cloud-scaling-policy-authenticity/tests/test_import_boundary.py \
             packages/integration/cloud-scaling-policy-authenticity/tests/test_production_posture.py \
             packages/integration/cloud-scaling-policy-authenticity/tests/test_typed_outcomes.py \
             packages/integration/cloud-scaling-policy-authenticity/tests/test_verified_artifact.py
-      - name: Phase 5A stays untouched at 0.1.0 with its ten frozen digests unmoved
+      - name: Phase 5A is at the version 5B-1 moved it to, with its eleven digests pinned
         run: |
           python -m pytest \
             packages/integration/cloud-scaling-policy-authenticity/tests/test_phase5a_untouched.py
@@ -205,7 +229,7 @@ jobs:
       - name: Wheel contents — no test, fixture or conftest leakage
         run: |
           python - <<'PY'
-          import pathlib, zipfile
+          import pathlib, re, zipfile
           dist = pathlib.Path("packages/integration/cloud-scaling-policy-authenticity/dist")
           wheels = sorted(dist.glob("*.whl"))
           sdists = sorted(dist.glob("*.tar.gz"))
@@ -213,10 +237,21 @@ jobs:
           assert sdists, "no sdist was built"
           names = zipfile.ZipFile(wheels[-1]).namelist()
           top = {n.split("/")[0] for n in names}
+          # The version is read from the source rather than written here, so a deliberate
+          # version bump does not fail this assertion for the wrong reason. What is asserted
+          # stays the same: the wheel's dist-info is the version the source declares, and the
+          # wheel's top level holds nothing else.
+          version = re.search(
+              r'^__version__\s*(?::[^=]*)?=\s*"([^"]+)"',
+              pathlib.Path(
+                  "packages/integration/cloud-scaling-policy-authenticity/src/ugence_cloud_scaling_policy_authenticity/version.py"
+              ).read_text(),
+              re.M,
+          ).group(1)
           assert top <= {
               "ugence_cloud_scaling_policy_authenticity",
-              "ugence_cloud_scaling_policy_authenticity-0.1.0.dist-info",
-          }, f"unexpected top-level entries in the wheel: {sorted(top)}"
+              f"ugence_cloud_scaling_policy_authenticity-{version}.dist-info",
+          }, f"unexpected top-level entries in the wheel (source version {version}): {sorted(top)}"
           for n in names:
               base = n.split("/")[-1]
               assert base != "conftest.py", f"conftest leaked: {n}"

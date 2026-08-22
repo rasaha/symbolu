@@ -92,8 +92,12 @@ __all__ = [
 #: one produced by this one.
 VERIFICATION_PROFILE: Final[str] = "ugence.cloud-scaling/policy-authenticity/v1"
 
-#: The profile's own version. Bumped when a gate is added, removed or reordered.
-VERIFICATION_PROFILE_VERSION: Final[str] = "v1"
+#: The profile's own version. Bumped when a gate is added, removed or reordered, and when a
+#: fact moves between the verified and recorded halves — both changed in 5B-1, which added
+#: gate 11 (candidate/coordinate reconciliation) and promoted ``candidate_digest_fact``.
+#: ``tests/test_partition_ratchet.py`` enforces the bump from repository history rather than
+#: from a constant in the same commit as the change.
+VERIFICATION_PROFILE_VERSION: Final[str] = "v2"
 
 #: Domain tag bound into this package's verification-artifact digest.
 POLICY_AUTHENTICITY_DIGEST_DOMAIN: Final[str] = (
@@ -107,10 +111,11 @@ POLICY_AUTHENTICITY_VERIFIED_FACTS_DOMAIN: Final[str] = (
 )
 
 #: Domain tag of the **recorded** half: facts carried and digest-covered, but never attested.
-#: Four members today, for three distinct reasons — ``resolved_as_of_fact`` (R-2: the instant
-#: is injected and unvalidated), ``candidate_digest_fact`` (R-4: recorded, never reconciled),
-#: ``policy_type`` (absent from the signed issuance payload and never compared at resolution)
-#: and ``trust_configuration_digest`` (reported by the resolution port about itself). See
+#: Three members since 5B-1, for three distinct reasons — ``resolved_as_of_fact`` (R-2: the
+#: instant is injected and unvalidated), ``policy_type`` (absent from the signed issuance
+#: payload and never compared at resolution) and ``trust_configuration_digest`` (reported by
+#: the resolution port about itself). ``candidate_digest_fact`` was the fourth until R-4
+#: closed; the domain tag itself does not move, because the frame is unchanged. See
 #: :data:`~.verified.RECORDED_FACT_NAMES`, which carries each reason in full.
 POLICY_AUTHENTICITY_RECORDED_FACTS_DOMAIN: Final[str] = (
     "ugence.cloud-scaling/policy-authenticity/artifact/recorded/v1"

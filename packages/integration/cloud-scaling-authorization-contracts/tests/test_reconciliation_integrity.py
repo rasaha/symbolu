@@ -57,7 +57,12 @@ import time
 import pytest
 
 from _mutation_support import guard_condition, mutated_package
-from conftest import build_projection, build_recommendation, production_subject
+from conftest import (
+    build_projection,
+    build_recommendation,
+    coordinate_for,
+    production_subject,
+)
 from ugence_cloud_scaling_authorization_contracts import (
     DOMAIN_CLOUD_SCALING,
     AuthorizationCandidateRejectionReason as Reason,
@@ -157,6 +162,7 @@ def _refuses(projection, decision, *, reason, diagnostic, not_diagnostic=None):
                 decision=decision,
                 producer_attestation=attestation,
                 policy_binding=policy,
+                policy_coordinate_binding=coordinate_for(policy),
                 target_scope=scope,
             )
 
@@ -172,7 +178,8 @@ def _refuses(projection, decision, *, reason, diagnostic, not_diagnostic=None):
         assert not_diagnostic not in str(exc.value), "a sibling gate produced this refusal"
     # 7. there is no collaborator parameter to reach
     assert set(inspect.signature(build_capacity_authorization_candidate).parameters) == {
-        "projection", "decision", "producer_attestation", "policy_binding", "target_scope",
+        "projection", "decision", "producer_attestation", "policy_binding",
+        "policy_coordinate_binding", "target_scope",
     }
     return exc.value
 

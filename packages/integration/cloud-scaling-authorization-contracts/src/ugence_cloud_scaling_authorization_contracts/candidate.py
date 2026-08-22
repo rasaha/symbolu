@@ -46,7 +46,11 @@ from .errors import (
     TargetScopeError,
 )
 from .reconciliation import ReconciledPhase4Facts, reconcile_phase4
-from .target import ExecutionTargetScope, PolicyTargetBindingReference
+from .target import (
+    ExecutionTargetScope,
+    PolicyTargetBindingReference,
+    PolicyTargetBindingReferenceV2,
+)
 from .trust import PHASE_5A_TRUST_STATE, EvidenceTrustState
 
 __all__ = [
@@ -57,8 +61,12 @@ __all__ = [
 
 #: The canonical schema identifier for this artifact. "candidate" is in the tag itself, so
 #: even a raw canonical dictionary read out of an audit log names what it is.
+#: Moved to ``-2`` by 5B-1: the candidate gained a required field, so the serialized shape
+#: a strict deserializer accepts changed. (The F-2 remediation moved the candidate *digest*
+#: without moving this identifier, and correctly so — it changed what the payload covered,
+#: not which fields the artifact carries.)
 AUTHORIZATION_CANDIDATE_SCHEMA_VERSION: Final[str] = (
-    "cloud-scaling-capacity-authorization-candidate-1"
+    "cloud-scaling-capacity-authorization-candidate-2"
 )
 
 
@@ -91,6 +99,8 @@ def _digest_payload(
     target_scope_digest: str,
     policy_binding: "PolicyTargetBindingReference",
     policy_binding_digest: str,
+    policy_coordinate_binding: "PolicyTargetBindingReferenceV2",
+    policy_coordinate_binding_digest: str,
     producer_attestation: "ProducerAttestationEvidence",
     producer_signing_payload_digest: str,
     producer_id: str,
@@ -142,12 +152,14 @@ def _digest_payload(
         # true rather than aspirational.
         "target_scope": target_scope.to_canonical_dict(),
         "policy_binding": policy_binding.to_canonical_dict(),
+        "policy_coordinate_binding": policy_coordinate_binding.to_canonical_dict(),
         "producer_attestation": producer_attestation.to_canonical_dict(),
         # The derived digests and signing identity stay bound as well. They are redundant
         # given the full forms above, and deliberately so: a reader auditing the payload
         # sees the identity it expects without having to descend into a nested object.
         "target_scope_digest": target_scope_digest,
         "policy_binding_digest": policy_binding_digest,
+        "policy_coordinate_binding_digest": policy_coordinate_binding_digest,
         "producer_signing_payload_digest": producer_signing_payload_digest,
         "producer_id": producer_id,
         "producer_key_id": producer_key_id,
@@ -204,6 +216,10 @@ class CapacityAuthorizationCandidate:
     target_scope_digest: str
     policy_binding: PolicyTargetBindingReference
     policy_binding_digest: str
+    #: The complete Policy Authority coordinate (5B-1). Required, and required *because* an
+    #: optional one would leave the residual it closes open by default.
+    policy_coordinate_binding: PolicyTargetBindingReferenceV2
+    policy_coordinate_binding_digest: str
     producer_attestation: ProducerAttestationEvidence
     producer_signing_payload_digest: str
     producer_id: str
@@ -230,12 +246,14 @@ class CapacityAuthorizationCandidate:
         for name in (
             "target_scope",
             "policy_binding",
+            "policy_coordinate_binding",
             "producer_attestation",
         ):
             value = getattr(self, name)
             expected = {
                 "target_scope": ExecutionTargetScope,
                 "policy_binding": PolicyTargetBindingReference,
+                "policy_coordinate_binding": PolicyTargetBindingReferenceV2,
                 "producer_attestation": ProducerAttestationEvidence,
             }[name]
             if type(value) is not expected:
@@ -315,6 +333,8 @@ class CapacityAuthorizationCandidate:
             target_scope_digest=self.target_scope_digest,
             policy_binding=self.policy_binding,
             policy_binding_digest=self.policy_binding_digest,
+            policy_coordinate_binding=self.policy_coordinate_binding,
+            policy_coordinate_binding_digest=self.policy_coordinate_binding_digest,
             producer_attestation=self.producer_attestation,
             producer_signing_payload_digest=self.producer_signing_payload_digest,
             producer_id=self.producer_id,
@@ -340,6 +360,7 @@ def build_capacity_authorization_candidate(
     decision: SubjectRiskDecision,
     producer_attestation: ProducerAttestationEvidence,
     policy_binding: PolicyTargetBindingReference,
+    policy_coordinate_binding: PolicyTargetBindingReferenceV2,
     target_scope: ExecutionTargetScope,
 ) -> CapacityAuthorizationCandidate:
     """Reconcile Phase 4 and the Phase 5 bindings, then build the candidate. Or refuse.
@@ -356,7 +377,8 @@ def build_capacity_authorization_candidate(
     :raises ExactTypeError: an argument is not the exact required type.
     :raises ReconciliationError: Phase 4 did not reconcile.
     :raises ProducerAttestationError: the attestation is missing, malformed or misbound.
-    :raises PolicyTargetBindingError: the policy binding is missing, malformed or misbound.
+    :raises PolicyTargetBindingError: either policy reference is missing, malformed or
+        misbound, or the two disagree about which policy they name.
     :raises TargetScopeError: the target scope contradicts the projected subject.
     :raises MagnitudeBoundError: the requested magnitude or delta exceeds its maximum.
     """
@@ -365,12 +387,18 @@ def build_capacity_authorization_candidate(
     for name, value, expected in (
         ("producer_attestation", producer_attestation, ProducerAttestationEvidence),
         ("policy_binding", policy_binding, PolicyTargetBindingReference),
+        (
+            "policy_coordinate_binding",
+            policy_coordinate_binding,
+            PolicyTargetBindingReferenceV2,
+        ),
         ("target_scope", target_scope, ExecutionTargetScope),
     ):
         if value is None:
             reason = {
                 "producer_attestation": _Reason.MISSING_PRODUCER_ATTESTATION,
                 "policy_binding": _Reason.MISSING_POLICY_TARGET_BINDING,
+                "policy_coordinate_binding": _Reason.MISSING_POLICY_COORDINATE_BINDING,
                 "target_scope": _Reason.TARGET_SUBSTITUTION,
             }[name]
             raise ExactTypeError(f"{name} is required", reason)
@@ -410,6 +438,13 @@ def build_capacity_authorization_candidate(
     b_max_magnitude = policy_binding.max_permitted_magnitude
     b_max_delta = policy_binding.max_permitted_delta
     b_digest = policy_binding.digest()
+    b_policy_id = policy_binding.policy_id
+    b_policy_version = policy_binding.policy_version
+
+    c_policy_id = policy_coordinate_binding.policy_id
+    c_policy_version = policy_coordinate_binding.policy_version
+    c_target_scope_digest = policy_coordinate_binding.target_scope_digest
+    c_digest = policy_coordinate_binding.digest()
 
     # --- the attestation must bind THIS recommendation ---------------------------------
     if a_recommendation_digest != facts.recommendation_digest:
@@ -474,6 +509,35 @@ def build_capacity_authorization_candidate(
             _Reason.POLICY_TARGET_CONTENT_MISMATCH,
         )
 
+    # --- the two policy references must name ONE policy, bound to THIS scope -----------
+    # A candidate that carries two policy references can state a contradiction: a V1 binding
+    # for policy A beside a coordinate for policy B. Both halves would be individually
+    # well-formed, and a consumer reading the bounds off one while reconciling a verified
+    # proof against the other would be reading bounds the proof does not cover. So the
+    # agreement is a construction-time refusal, not a downstream consumer's problem.
+    #
+    # Three fields, and deliberately only three (5B-1 D-5B1-1). The issuer and key are NOT
+    # cross-checked: ``policy_issuer``/``policy_key_id`` are Phase 5A identifiers with no
+    # ratified correspondence to the authority's ``issuing_authority_id``/``key_id``, and
+    # inventing one here would be this package asserting something about the Policy Authority
+    # that no ratified clause supports. The coordinate's tenant component is not compared
+    # against the candidate's tenant either: the authority's global tenant is the empty
+    # string, so a global-scope policy legitimately bounds a tenant-scoped action.
+    if c_policy_id != b_policy_id or c_policy_version != b_policy_version:
+        raise PolicyTargetBindingError(
+            f"the candidate's two policy references disagree: the binding names "
+            f"{b_policy_id!r}@{b_policy_version!r} and the coordinate names "
+            f"{c_policy_id!r}@{c_policy_version!r}. A candidate may carry one policy "
+            "identity, not two",
+            _Reason.POLICY_COORDINATE_CONTENT_MISMATCH,
+        )
+    if c_target_scope_digest != s_digest:
+        raise PolicyTargetBindingError(
+            "the policy coordinate binding references a different execution target scope; a "
+            "coordinate not bound to this scope could be transplanted onto another target",
+            _Reason.POLICY_COORDINATE_CONTENT_MISMATCH,
+        )
+
     # --- bounds, enforced against the policy-carried maxima ----------------------------
     if s_requested_magnitude > b_max_magnitude:
         raise MagnitudeBoundError(
@@ -516,6 +580,8 @@ def build_capacity_authorization_candidate(
         target_scope_digest=s_digest,
         policy_binding=policy_binding,
         policy_binding_digest=b_digest,
+        policy_coordinate_binding=policy_coordinate_binding,
+        policy_coordinate_binding_digest=c_digest,
         producer_attestation=producer_attestation,
         producer_signing_payload_digest=a_signing_payload_digest,
         producer_id=a_producer_id,

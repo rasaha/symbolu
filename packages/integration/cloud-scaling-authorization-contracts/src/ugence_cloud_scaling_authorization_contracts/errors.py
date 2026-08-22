@@ -121,6 +121,16 @@ class AuthorizationCandidateRejectionReason(str, Enum):
     MISSING_POLICY_TARGET_BINDING = "missing_policy_target_binding"
     MALFORMED_POLICY_TARGET_BINDING = "malformed_policy_target_binding"
     POLICY_TARGET_CONTENT_MISMATCH = "policy_target_content_mismatch"
+
+    # --- the policy coordinate carried inside the candidate (structural only) ---------
+    #: Still structural, and still nothing about authenticity: a coordinate is *named* here,
+    #: never resolved. Phase 5B-0B verifies it. These three members exist because "the
+    #: candidate carries no coordinate", "the coordinate is malformed" and "the two policy
+    #: references in one candidate name different policies" are three different refusals, and
+    #: the third is the one 5B-1 exists to make possible.
+    MISSING_POLICY_COORDINATE_BINDING = "missing_policy_coordinate_binding"
+    MALFORMED_POLICY_COORDINATE_BINDING = "malformed_policy_coordinate_binding"
+    POLICY_COORDINATE_CONTENT_MISMATCH = "policy_coordinate_content_mismatch"
     MISSING_ACCOUNT_BINDING = "missing_account_binding"
     ACTION_SUBSTITUTION = "action_substitution"
     TARGET_SUBSTITUTION = "target_substitution"
