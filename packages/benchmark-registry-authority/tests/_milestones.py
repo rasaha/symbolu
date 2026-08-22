@@ -40,11 +40,12 @@ SUBPHASE_LADDER = ("BR-2A", "BR-2B", "BR-2C-0", "BR-2C", "BR-2D", "BR-2E")
 #:
 #: ``0.2.2`` is D-34's surface move — the anchor-resolution outcome replacing
 #: ``Optional[BenchmarkTrustAnchorRecord]`` at the seam — and ``0.2.3`` is
-#: D-35's, narrowing which refusals a verified result may carry. Both map to the
-#: **same** rung. The rung names what a version ships, not how many times it shipped: both
-#: are BR-2C's contract surface with no BR-2C capability, so both must ban the
-#: same twelve tokens. A second rung would be a second claim about capability,
-#: and D-34 makes none.
+#: D-35's, narrowing which refusals a verified result may carry. **D-36 rules
+#: that all three map to the same rung**, so this map is ratified rather than
+#: inferred: the rung names what a version ships, not how many times it shipped,
+#: and all three are BR-2C's contract surface with no BR-2C capability, so all
+#: three must ban the same twelve tokens. A rung per version would add ladder
+#: indices whose ban sets are identical to ``BR-2C-0``'s, and so rule nothing.
 VERSION_SUBPHASE = {
     "0.1.0": "BR-2A",
     "0.2.0": "BR-2B",

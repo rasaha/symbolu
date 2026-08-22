@@ -62,6 +62,36 @@ version mapping, which this entry closes.
 hand-edited. `tools/generate_manifests.py` and `gate_mutation_sweep.py` already
 write `"milestone": "BR-2C-0"`.
 
+### Fixed — the closure remainder, found auditing the pass above
+
+- **`verify_benchmark_registry_authority_distribution.py:2`** still headlined
+  "the BR-2B distribution" while its sibling `adversarial_probes.py:1` already
+  read `BR-2C-0`. Corrected to match.
+- **The same file's "six controls §20 specifies"** is **withdrawn**. ADR §20 is
+  the *Readiness integration boundary (future posture, not implemented)* and
+  specifies no negative control at all, so the citation ruled nothing. The
+  six/eight relation is now stated outright instead: the script's own scheme
+  numbers **six** isolation properties, and runs and reports **eight** controls,
+  because control 6 splits into 6a (source shadowing) and 6b (a leaked
+  `PYTHONPATH`) and step 8's dependency-really-required control carries no
+  number. The summary counts runs, so it reads eight. No control was added,
+  removed or renumbered.
+- **D-36's *Surfaces moved* clause is discharged rather than left open** — the
+  defect D-33's own enumeration was faulted for. Its citation now appears at
+  `README.md`'s `BR-2C-0` milestone row, at `version.py`'s ladder docstring, and
+  at `tests/_milestones.py`'s `VERSION_SUBPHASE` docstring, where the inferred
+  "a second rung would be a second claim about capability, and D-34 makes none"
+  is replaced by D-36 as the ruling.
+
+### Fixed — one false clause struck from ADR §35.2 D-36
+
+D-36 closed the rung-per-version option partly on "D-01's five subphases would
+be outnumbered by rungs carrying no ruling". That is **false**: a rung per
+version leaves five subphases against three rungs. The clause is struck. The
+row's substantive ground is verified and stands alone — the extra ladder indices
+produce ban sets identical to `BR-2C-0`'s, so they rule nothing. **The ruling is
+unchanged**; only its reasoning is narrower.
+
 ### Measured verification
 
 Re-run against this tree after the corrections, not carried forward:

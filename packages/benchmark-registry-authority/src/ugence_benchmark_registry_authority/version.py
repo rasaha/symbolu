@@ -17,7 +17,10 @@ mints it as a version rung so that a surface which moved — ``api.__all__`` 93 
 106 at ``0.2.1``, 106 → 107 at ``0.2.2`` under D-34 and 107 → 108 at ``0.2.3``
 under D-35 — is recorded by a version that moved with it, without taking
 ``0.3.0``, which §35.1 defines as the **audited verifier** and which would unlock twelve
-BR-2C capability tokens this distribution does not ship. It mints no closure
+BR-2C capability tokens this distribution does not ship. **D-36 rules that all
+three versions sit on that one rung**, rather than each taking a rung of its
+own: the rung names what a version ships, not how many times it shipped, and all
+three ship BR-2C's contract surface and no BR-2C capability. It mints no closure
 audit; BR-2C still closes at ``0.3.0``, on D-32's terms and its external
 cryptographic audit.
 """

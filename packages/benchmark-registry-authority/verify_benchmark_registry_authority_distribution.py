@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build, install offline, and verify the BR-2B distribution — with negative controls.
+"""Build, install offline, and verify the BR-2C-0 distribution — with negative controls.
 
 Builds a wheel and an sdist from a clean tree, installs the wheel **genuinely
 offline** into a throwaway virtual environment, and asserts that the installed
@@ -19,8 +19,21 @@ runtime is byte-for-byte the contract this repository committed.
 A verifier that only asserts positives proves little: if the isolation were
 broken, every positive assertion would still pass. So each isolation property is
 also **negatively controlled** — deliberately violated, and the check that
-should catch it is confirmed to fail. The six controls §20 specifies are all
-here, and each one is run and reported.
+should catch it is confirmed to fail.
+
+**Six** isolation properties are controlled, numbered 1-6 in the steps below;
+**eight** controls are run and reported. The two are not in conflict: control 6
+splits into **6a** (monorepo source shadowing the wheel) and **6b** (a leaked
+``PYTHONPATH`` in the child environment), and step 8's proof that the one
+dependency is genuinely required rather than optional is an eighth, run and
+reported but carrying no number in this scheme. The closing summary counts
+**runs**, not numbers, so it reads eight, and every run must have been caught.
+
+The earlier citation of these as "the six controls §20 specifies" is
+**withdrawn**: ADR §20 is the *Readiness integration boundary (future posture,
+not implemented)* and specifies no negative control at all. The six are this
+script's own numbering, not a ratified list, and nothing in the ADR fixes their
+count.
 
 Run:
     python packages/benchmark-registry-authority/verify_benchmark_registry_authority_distribution.py
