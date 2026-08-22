@@ -47,6 +47,7 @@ from .errors import (
 )
 from .reconciliation import ReconciledPhase4Facts, reconcile_phase4
 from .target import (
+    POLICY_SCOPE_TENANT,
     ExecutionTargetScope,
     PolicyTargetBindingReference,
     PolicyTargetBindingReferenceV2,
@@ -444,6 +445,8 @@ def build_capacity_authorization_candidate(
     c_policy_id = policy_coordinate_binding.policy_id
     c_policy_version = policy_coordinate_binding.policy_version
     c_target_scope_digest = policy_coordinate_binding.target_scope_digest
+    c_policy_scope = policy_coordinate_binding.policy_scope
+    c_policy_tenant_id = policy_coordinate_binding.policy_tenant_id
     c_digest = policy_coordinate_binding.digest()
 
     # --- the attestation must bind THIS recommendation ---------------------------------
@@ -520,9 +523,14 @@ def build_capacity_authorization_candidate(
     # cross-checked: ``policy_issuer``/``policy_key_id`` are Phase 5A identifiers with no
     # ratified correspondence to the authority's ``issuing_authority_id``/``key_id``, and
     # inventing one here would be this package asserting something about the Policy Authority
-    # that no ratified clause supports. The coordinate's tenant component is not compared
-    # against the candidate's tenant either: the authority's global tenant is the empty
-    # string, so a global-scope policy legitimately bounds a tenant-scoped action.
+    # that no ratified clause supports.
+    #
+    # The coordinate's tenant *is* compared, since 5B-2 closed R-9 — but only when the policy
+    # is TENANT-scoped. The original note here said it was not compared at all, reasoning that
+    # the authority's global tenant is the empty string so a global policy legitimately bounds
+    # a tenant-scoped action. That is a correct reason not to compare *unconditionally*, and
+    # not a reason not to compare: it argues for the scope guard below, which is the shape
+    # ``uvi-policy-contracts`` already uses.
     if c_policy_id != b_policy_id or c_policy_version != b_policy_version:
         raise PolicyTargetBindingError(
             f"the candidate's two policy references disagree: the binding names "
@@ -536,6 +544,23 @@ def build_capacity_authorization_candidate(
             "the policy coordinate binding references a different execution target scope; a "
             "coordinate not bound to this scope could be transplanted onto another target",
             _Reason.POLICY_COORDINATE_CONTENT_MISMATCH,
+        )
+
+    # --- a TENANT-scoped policy may bound only its own tenant's action (R-9) -----------
+    # Both references can agree perfectly and the coordinate can be bound to this very scope
+    # while the policy belongs to somebody else. Keyed on the scope, never on a bare equality:
+    # a GLOBAL policy carries the empty tenant, so `!=` alone would refuse every global policy
+    # in the platform. Mirrors ``uvi-policy-contracts`` ``contracts/context.py``.
+    if (
+        c_policy_scope == POLICY_SCOPE_TENANT
+        and c_policy_tenant_id != facts.tenant_id
+    ):
+        raise PolicyTargetBindingError(
+            f"cross-tenant policy binding: the coordinate names a {POLICY_SCOPE_TENANT}-scoped "
+            f"policy belonging to tenant {c_policy_tenant_id!r}, but this candidate's action "
+            f"is for tenant {facts.tenant_id!r}. A tenant's policy does not bound another "
+            "tenant's action",
+            _Reason.CROSS_TENANT_POLICY_BINDING,
         )
 
     # --- bounds, enforced against the policy-carried maxima ----------------------------

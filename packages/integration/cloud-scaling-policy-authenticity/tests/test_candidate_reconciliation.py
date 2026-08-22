@@ -130,7 +130,12 @@ def test_a_candidate_naming_a_different_policy_is_refused():
         ({"policy_family": "OTHER_FAMILY"}, "policy_family"),
         ({"policy_id": "other-policy"}, "policy_id"),
         ({"policy_version": "9.9.9"}, "policy_version"),
-        ({"policy_scope": "TENANT"}, "policy_scope"),
+        # The tenant must ride along: the fixture policy is GLOBAL with the empty tenant, so
+        # claiming TENANT scope while keeping that empty tenant is a pairing Phase 5A's
+        # builder now refuses outright (R-9). Naming this candidate's own tenant keeps the
+        # candidate constructible so that *this* gate is the one measured; policy_scope is
+        # still the reported field, being earlier in the compared order.
+        ({"policy_scope": "TENANT", "policy_tenant_id": "tenant-1"}, "policy_scope"),
         ({"policy_tenant_id": "tenant-elsewhere"}, "policy_tenant_id"),
         # A substituted body digest surfaces as ``policy_content_digest``: Phase 5A's V2 type
         # refuses a coordinate whose content and body digests differ (the R-3 equality), so a
@@ -221,42 +226,143 @@ def test_a_reconciled_determination_still_grants_nothing():
 
 
 # ======================================================================================
-# R-9, stated as executable behaviour rather than as a caveat
+# R-9, closed: a TENANT-scoped policy bounds only its own tenant's action (gate 12, 5B-2)
+#
+# The rule is not invented here. ``uvi-policy-contracts`` already refuses cross-tenant policy
+# binding at ``contracts/context.py:118`` and ``:223``, ratified, keyed on the scope. 5B-2
+# carries it into the two places that held both tenants and did not compare them: Phase 5A's
+# builder, and this boundary.
+#
+# The two enforce the same rule and neither is redundant. Phase 5A refuses to *build* such a
+# candidate; this gate refuses one that arrived anyway. A candidate is shape- and
+# digest-validated by its type but carries no cross-field policy guard there, so an internally
+# consistent cross-tenant candidate can exist without the builder ever having produced one —
+# which is exactly what ``_forged_cross_tenant_candidate`` below constructs.
 # ======================================================================================
 
 
+def _forged_cross_tenant_candidate(record):
+    """A genuine-shaped candidate Phase 5A's builder would refuse to produce.
+
+    Every field is internally consistent and ``candidate_digest`` genuinely covers the payload,
+    so nothing earlier than gate 12 has grounds to refuse it. What makes it forged is only that
+    its action belongs to one tenant while its coordinate faithfully describes another tenant's
+    ``TENANT``-scoped policy — the pairing the builder now rejects at construction.
+    """
+
+    import dataclasses
+
+    from ugence_cloud_scaling_authorization_contracts import (
+        CapacityAuthorizationCandidate,
+        canonical_digest,
+    )
+
+    honest = genuine_candidate()
+    coordinate = _coordinate_matching(record, honest)
+
+    forged = object.__new__(CapacityAuthorizationCandidate)
+    for field in dataclasses.fields(honest):
+        object.__setattr__(forged, field.name, getattr(honest, field.name))
+    object.__setattr__(forged, "policy_coordinate_binding", coordinate)
+    object.__setattr__(forged, "candidate_digest", canonical_digest(forged.digest_payload()))
+    return forged
+
+
+def _coordinate_matching(record, honest):
+    """The coordinate that record was genuinely issued under, bound to the honest scope."""
+
+    builders = phase5a_builders()
+    return builders.build_policy_coordinate_binding(
+        target_scope_digest=honest.policy_coordinate_binding.target_scope_digest,
+        policy_family=record.coordinate.policy_family,
+        policy_id=record.coordinate.policy_id,
+        policy_version=record.coordinate.version,
+        policy_scope=record.coordinate.scope,
+        policy_tenant_id=record.coordinate.tenant_id,
+        policy_body_digest=record.policy_body_digest,
+        issuing_authority_id=record.issuing_authority_id,
+        key_id=record.key_id,
+        signature_alg=record.signature_alg,
+    )
+
+
 @pytest.mark.adversarial
-def test_a_candidate_reconciles_against_another_tenants_policy():
-    """**R-9, measured.** Nothing ties a candidate's *action* tenant to its policy's tenant.
+def test_another_tenants_policy_no_longer_bounds_this_action():
+    """**R-9, closed.** The property that measured the residual, inverted.
 
-    Gate 11 compares the candidate's coordinate against the *resolved* policy, and a
-    tenant-B policy resolved for tenant B matches a tenant-B coordinate exactly — even when
-    the action the candidate describes belongs to tenant A. Phase 5A does not compare them
-    either: the builder deliberately leaves `policy_tenant_id` uncompared against the
-    candidate's `tenant_id`.
-
-    This pins **today's permissive behaviour as a measurement, not an endorsement**, in the
-    idiom this suite used for R-4 before 5B-1 closed it: a residual is worth more as a
-    property that inverts when it is closed than as a sentence in a document.
-
-    The original framing of R-9 asked only about the empty-string global tenant, which made
-    it read like an edge case. It is not: a *different, non-empty* tenant reconciles too, and
-    that is what this measures. Whether it should — and whether a composition root is
-    obliged to connect the two at all — is the owner's to rule on before 5B-2 wires one.
+    Before 5B-2 this pair verified: gate 11 compares the candidate's coordinate against the
+    *resolved* policy, and a tenant-B coordinate for a tenant-B policy matches exactly — even
+    when the action described belongs to tenant A. Gate 12 is the comparison nothing made.
     """
 
     authority, record = issued(scope=PolicyScope.TENANT, tenant_id="tenant-elsewhere")
-    coordinate = record.coordinate
-    candidate = genuine_candidate(record)
+    candidate = _forged_cross_tenant_candidate(record)
 
-    assert coordinate.scope == "TENANT"
-    assert coordinate.tenant_id == "tenant-elsewhere"
-    assert candidate.tenant_id != coordinate.tenant_id, (
+    assert record.coordinate.scope == "TENANT"
+    assert candidate.tenant_id != record.coordinate.tenant_id, (
         "the fixture must describe an action for a different tenant than the policy's, or "
         "this property measures nothing"
     )
 
     result = _verify(candidate=candidate, authority=authority, record=record)
+    assert result.outcome is O.CANDIDATE_CROSS_TENANT_POLICY
+    assert result.verified_policy is None
+    assert "tenant-elsewhere" in result.refusal.detail
+
+
+@pytest.mark.adversarial
+def test_the_refusal_is_not_the_coordinate_mismatch_wearing_another_name():
+    """Gate 11 and gate 12 answer different questions, and the outcomes must not blur.
+
+    Here the two artifacts agree perfectly about *which* policy is in play. Reporting that as
+    ``CANDIDATE_COORDINATE_MISMATCH`` would tell a reader to go looking for a disagreement
+    that is not there.
+    """
+
+    authority, record = issued(scope=PolicyScope.TENANT, tenant_id="tenant-elsewhere")
+    candidate = _forged_cross_tenant_candidate(record)
+    binding = candidate.policy_coordinate_binding
+
+    assert binding.policy_id == record.coordinate.policy_id
+    assert binding.policy_version == record.coordinate.version
+    assert binding.policy_tenant_id == record.coordinate.tenant_id
+
+    result = _verify(candidate=candidate, authority=authority, record=record)
+    assert result.outcome is not O.CANDIDATE_COORDINATE_MISMATCH
+    assert result.outcome is O.CANDIDATE_CROSS_TENANT_POLICY
+
+
+@pytest.mark.happy
+def test_a_globally_scoped_policy_still_bounds_any_tenants_action():
+    """The carve-out, and the reason the guard reads the scope rather than the tenant.
+
+    A ``GLOBAL`` policy carries the empty tenant. A bare equality would refuse every global
+    policy in the platform — which is the whole of what the original R-9 framing worried
+    about, and why that framing read as an edge case rather than the hole it was.
+    """
+
+    authority, record = issued()
+    assert record.coordinate.scope == "GLOBAL"
+    assert record.coordinate.tenant_id == ""
+
+    candidate = genuine_candidate(record)
+    assert candidate.tenant_id not in ("", record.coordinate.tenant_id)
+
+    result = _verify(candidate=candidate, authority=authority, record=record)
     assert result.outcome is O.VERIFIED
-    assert result.verified_policy.policy_tenant_id == "tenant-elsewhere"
     assert result.verified_policy.candidate_digest_fact == candidate.candidate_digest
+
+
+@pytest.mark.happy
+def test_a_tenant_scoped_policy_bounds_its_own_tenants_action():
+    """The guard refuses a mismatch, not the ``TENANT`` scope itself."""
+
+    builders = phase5a_builders()
+    own_tenant = builders.build_target_scope(builders.build_projection()).tenant_id
+    authority, record = issued(scope=PolicyScope.TENANT, tenant_id=own_tenant)
+
+    candidate = genuine_candidate(record)
+    assert candidate.tenant_id == record.coordinate.tenant_id
+
+    result = _verify(candidate=candidate, authority=authority, record=record)
+    assert result.outcome is O.VERIFIED

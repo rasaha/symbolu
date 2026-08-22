@@ -131,6 +131,12 @@ class AuthorizationCandidateRejectionReason(str, Enum):
     MISSING_POLICY_COORDINATE_BINDING = "missing_policy_coordinate_binding"
     MALFORMED_POLICY_COORDINATE_BINDING = "malformed_policy_coordinate_binding"
     POLICY_COORDINATE_CONTENT_MISMATCH = "policy_coordinate_content_mismatch"
+    #: R-9 (5B-2). Its own member, deliberately not folded into the mismatch above: the
+    #: two references agree perfectly and the coordinate is bound to this very scope. What
+    #: is wrong is that the policy belongs to another tenant, which is a scope violation
+    #: rather than a content disagreement, and a reader triaging one should not be handed
+    #: the other. Named as ``uvi-policy-contracts`` names it.
+    CROSS_TENANT_POLICY_BINDING = "cross_tenant_policy_binding"
     MISSING_ACCOUNT_BINDING = "missing_account_binding"
     ACTION_SUBSTITUTION = "action_substitution"
     TARGET_SUBSTITUTION = "target_substitution"

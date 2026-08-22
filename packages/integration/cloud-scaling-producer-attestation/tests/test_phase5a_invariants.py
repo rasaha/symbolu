@@ -66,13 +66,16 @@ def test_phase_5a_is_at_the_version_this_package_was_pinned_against():
 
 
 def test_phase_5a_exports_exactly_the_symbols_this_package_was_measured_against():
-    """P-2: the Phase 5A public API is pinned; 5B-1 added four symbols to it.
+    """P-2: the Phase 5A public API is pinned; 5B-1 added four symbols and 5B-2 a fifth.
 
-    ``PolicyTargetBindingReferenceV2``, ``POLICY_TARGET_BINDING_V2_SCHEMA_VERSION``,
-    ``POLICY_COORDINATE_COMPONENTS`` and ``is_policy_authority_digest``.
+    5B-1: ``PolicyTargetBindingReferenceV2``, ``POLICY_TARGET_BINDING_V2_SCHEMA_VERSION``,
+    ``POLICY_COORDINATE_COMPONENTS`` and ``is_policy_authority_digest``. 5B-2 adds
+    ``POLICY_SCOPE_TENANT``, the one scope value that constrains which tenant a policy may
+    bound (R-9).
     """
 
-    assert len(p5a.__all__) == 41
+    assert len(p5a.__all__) == 42
+    assert "POLICY_SCOPE_TENANT" in p5a.__all__
 
 
 def test_the_phase_5a_v1_signing_payload_digest_is_unchanged():

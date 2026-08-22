@@ -346,3 +346,75 @@ def test_the_schema_version_is_the_second_binding_schema():
     with pytest.raises(PolicyTargetBindingError) as exc:
         dataclasses.replace(coordinate, schema_version="cloud-scaling-policy-target-binding-1")
     assert exc.value.reason is Reason.UNSUPPORTED_SCHEMA_VERSION
+
+
+# ======================================================================================
+# The coordinate's tenant must be able to bound this action's tenant — R-9 (5B-2)
+#
+# The rule is not invented here. ``uvi-policy-contracts`` already refuses cross-tenant policy
+# binding, ratified, at ``contracts/context.py:118`` and again in ``bind_policies`` at ``:223``,
+# in exactly this shape: guard on ``scope is TENANT``, never a bare equality. Guarding on the
+# scope is what lets the authority's *global* tenant — the empty string — pass untouched. Phase
+# 5A carries the rule now because it holds both tenants and did not compare them.
+# ======================================================================================
+
+
+def test_a_tenant_scoped_policy_for_another_tenant_cannot_bound_this_action():
+    """R-9. Two well-formed halves, and the policy belongs to somebody else.
+
+    Nothing before 5B-2 tied the *action's* tenant to the tenant of the policy bounding it, so
+    a candidate acting on ``tenant-1`` could carry a coordinate for ``tenant-elsewhere``'s
+    ``TENANT``-scoped policy and be built, and then verify.
+    """
+
+    projection = build_projection()
+    scope = build_target_scope(projection)
+    binding = build_policy_binding(scope)
+    with pytest.raises(PolicyTargetBindingError) as exc:
+        _build(
+            target_scope=scope,
+            policy_binding=binding,
+            policy_coordinate_binding=coordinate_for(
+                binding, policy_scope="TENANT", policy_tenant_id="tenant-elsewhere"
+            ),
+        )
+    assert exc.value.reason is Reason.CROSS_TENANT_POLICY_BINDING
+    assert scope.tenant_id != "tenant-elsewhere"
+
+
+def test_a_globally_scoped_policy_still_bounds_a_tenant_scoped_action():
+    """The carve-out the scope guard exists to preserve, and the reason equality is wrong.
+
+    A ``GLOBAL`` policy carries the empty tenant. A bare ``!=`` would refuse every global
+    policy in the platform; guarding on the scope refuses only the cross-tenant case.
+    """
+
+    projection = build_projection()
+    scope = build_target_scope(projection)
+    binding = build_policy_binding(scope)
+    candidate = _build(
+        target_scope=scope,
+        policy_binding=binding,
+        policy_coordinate_binding=coordinate_for(
+            binding, policy_scope="GLOBAL", policy_tenant_id=""
+        ),
+    )
+    assert candidate.policy_coordinate_binding.policy_scope == "GLOBAL"
+    assert candidate.policy_coordinate_binding.policy_tenant_id == ""
+    assert candidate.tenant_id == scope.tenant_id
+
+
+def test_a_tenant_scoped_policy_for_this_very_tenant_is_admitted():
+    """The guard refuses a mismatch, not the scope itself."""
+
+    projection = build_projection()
+    scope = build_target_scope(projection)
+    binding = build_policy_binding(scope)
+    candidate = _build(
+        target_scope=scope,
+        policy_binding=binding,
+        policy_coordinate_binding=coordinate_for(
+            binding, policy_scope="TENANT", policy_tenant_id=scope.tenant_id
+        ),
+    )
+    assert candidate.policy_coordinate_binding.policy_tenant_id == candidate.tenant_id

@@ -87,7 +87,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
+from typing import Final, Optional
 
 from ugence_cloud_scaling_authorization_contracts import CapacityAuthorizationCandidate
 from ugence_policy_authority.api import (
@@ -545,6 +545,21 @@ class PolicyAuthenticityVerifier:
             if mismatch is not None:
                 return _refuse(_Outcome.CANDIDATE_COORDINATE_MISMATCH, mismatch)
 
+        # === 12. the policy may bound THIS tenant's action (5B-2, ADR residual R-9) =====
+        # Gate 11 establishes the two artifacts are about one policy. It does not establish
+        # that the policy may bound this action: a TENANT-scoped policy belongs to exactly one
+        # tenant, and nothing before 5B-2 compared that tenant against the candidate's. Phase
+        # 5A refuses this at construction too, but this boundary accepts a candidate object it
+        # did not build and so cannot inherit that discipline.
+        #
+        # The resolved coordinate is the authority here, not the candidate's copy of it —
+        # gate 11 has already forced the two to agree, and reading the resolved side keeps the
+        # answer independent of what the candidate claims about itself.
+        if candidate is not None:
+            crossing = _cross_tenant_binding(candidate, coordinate)
+            if crossing is not None:
+                return _refuse(_Outcome.CANDIDATE_CROSS_TENANT_POLICY, crossing)
+
         # === every gate succeeded — and only now does an artifact exist =================
         artifact = _mint_verified_artifact(
             record=record,
@@ -614,6 +629,35 @@ def _coordinate_disagreement(candidate, coordinate, record) -> Optional[str]:
                 "may be individually genuine and the pair is still a misstatement"
             )
     return None
+
+
+#: The one policy scope whose artifacts belong to a single tenant (R-9). Compared as a string
+#: because the resolved coordinate reports it as one; the authoritative definition is
+#: ``PolicyScope.TENANT`` in ``uvi-policy-contracts``, whose ``contracts/context.py`` refuses
+#: cross-tenant binding in exactly this shape.
+_TENANT_SCOPE: Final = "TENANT"
+
+
+def _cross_tenant_binding(candidate, coordinate) -> Optional[str]:
+    """Return why this policy may not bound this action, or ``None`` if it may.
+
+    Keyed on the scope, never on a bare tenant equality: a ``GLOBAL`` policy carries the empty
+    tenant, so ``!=`` alone would refuse every global policy in the platform. That asymmetry is
+    the whole reason the guard reads the scope first.
+    """
+
+    scope = getattr(coordinate, "scope", None)
+    if str(getattr(scope, "value", scope)) != _TENANT_SCOPE:
+        return None
+    policy_tenant = coordinate.tenant_id
+    action_tenant = getattr(candidate, "tenant_id", None)
+    if policy_tenant == action_tenant:
+        return None
+    return (
+        f"cross-tenant policy binding: the resolved policy is {_TENANT_SCOPE}-scoped to "
+        f"tenant {policy_tenant!r}, and the candidate's action is for tenant "
+        f"{action_tenant!r}. A tenant's policy does not bound another tenant's action"
+    )
 
 
 def _terminal_outcome(exc: BaseException) -> _Outcome:

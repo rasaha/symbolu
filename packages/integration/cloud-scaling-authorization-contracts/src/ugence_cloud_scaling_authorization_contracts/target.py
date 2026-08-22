@@ -57,12 +57,21 @@ __all__ = [
     "POLICY_TARGET_BINDING_SCHEMA_VERSION",
     "POLICY_TARGET_BINDING_V2_SCHEMA_VERSION",
     "POLICY_COORDINATE_COMPONENTS",
+    "POLICY_SCOPE_TENANT",
     "ExecutionTargetScope",
     "PolicyTargetBindingReference",
     "PolicyTargetBindingReferenceV2",
 ]
 
 EXECUTION_TARGET_SCOPE_SCHEMA_VERSION: Final[str] = "cloud-scaling-execution-target-scope-1"
+
+#: The one ``policy_scope`` value that constrains which tenant a policy may bound (R-9).
+#: Duplicated as a literal rather than imported: this package deliberately depends on no
+#: Policy Authority and no UVI contracts, which is why the coordinate travels as strings at
+#: all. The authoritative definition is ``PolicyScope.TENANT`` in ``uvi-policy-contracts``,
+#: whose ``GLOBAL`` counterpart carries the empty tenant — which is exactly why the guard
+#: keys on the scope and never on a bare tenant equality.
+POLICY_SCOPE_TENANT: Final = "TENANT"
 POLICY_TARGET_BINDING_SCHEMA_VERSION: Final[str] = "cloud-scaling-policy-target-binding-1"
 POLICY_TARGET_BINDING_V2_SCHEMA_VERSION: Final[str] = "cloud-scaling-policy-target-binding-2"
 
