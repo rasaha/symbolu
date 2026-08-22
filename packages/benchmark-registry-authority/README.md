@@ -269,9 +269,9 @@ carried forward, so a stale figure fails a check rather than surviving an edit.
 
 | Check | Result |
 | --- | --- |
-| Package suite | **2108 tests passed** |
+| Package suite | **2111 tests passed** |
 | Independent adversarial probes | **83 passed** (also inside the installed wheel) |
-| Distinct properties | **503 adversarial : 38 happy = 13.24 : 1** (required ≥ 2:1) |
+| Distinct properties | **506 adversarial : 38 happy = 13.32 : 1** (required ≥ 2:1) |
 | Gate inventory | **72 gates** |
 | Mutation sweep | **67 KILLED, 5 SURVIVED, 0 errored** — every survivor classified |
 | Distribution | wheel + sdist built; offline `--no-index` install verified |

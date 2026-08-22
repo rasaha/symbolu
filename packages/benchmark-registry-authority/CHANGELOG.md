@@ -92,15 +92,47 @@ row's substantive ground is verified and stands alone — the extra ladder indic
 produce ban sets identical to `BR-2C-0`'s, so they rule nothing. **The ruling is
 unchanged**; only its reasoning is narrower.
 
+### Added — one check, pinning D-36's ground instead of asserting it
+
+D-36 closes the rung-per-version option because the extra ladder indices would
+produce ban sets identical to `BR-2C-0`'s. That was a **derivation** from
+`banned_capability_tokens` comparing by index — true, and enforced nowhere. Three
+tests in `tests/packaging/test_milestone_boundary.py` now pin it:
+
+- **`test_no_token_unlocks_at_the_br2c_0_rung_itself`** — the precondition the
+  ground rests on. Every unlock in both maps is `BR-2C`, `BR-2D` or permanent. A
+  token naming `BR-2C-0` would be shippable at one of the three versions and not
+  the others, the split rungs would stop being interchangeable, and D-36's ground
+  would be false with nothing saying so. This is the check that fails instead.
+- **`test_splitting_the_br2c_0_rung_per_version_changes_no_ban_set`** — builds
+  the ladder D-36 rejected and compares ban sets against the real one, at the
+  three split rungs and at `BR-2C`, `BR-2D` and `BR-2E`. Measured on **both**
+  unlock maps, since D-33 records that `0.3.0` unlocks twelve tokens across the
+  two, not eight across one.
+- **`test_the_hypothetical_ladder_is_never_the_real_one`** — a guard on the
+  guard, so the rejected ladder cannot quietly become the shipped one.
+
+**No ban set is weakened or restated.** The checks assert equality against the
+live ban set rather than a copied literal, so a ban that shrank would fail
+`test_the_effective_ban_set_is_exactly_what_br2a_froze` first. Both negative
+controls were exercised: injecting a token that unlocks at `BR-2C-0` into either
+map fails the precondition check by name.
+
+**This moves the suite count**, which every commit in this closure had held
+fixed: 2108 → **2111**, and distinct properties 503 : 38 → **506 : 38**. Both are
+re-stated below and in `README.md` from a fresh run, never by arithmetic. The
+`[0.2.3]` table below moves with them: `package_version` has not moved, so that
+table is a claim about the live distribution rather than a sealed one.
+
 ### Measured verification
 
 Re-run against this tree after the corrections, not carried forward:
 
 | Check | Result |
 | --- | --- |
-| Package suite | **2108 passed** |
+| Package suite | **2111 passed** |
 | Independent adversarial probes | **83 passed** (also inside the installed wheel) |
-| Distinct properties | **503 adversarial : 38 happy = 13.24 : 1** (required ≥ 2:1) |
+| Distinct properties | **506 adversarial : 38 happy = 13.32 : 1** (required ≥ 2:1) |
 | Gate mutation sweep | **72 inventoried, 67 KILLED, 5 SURVIVED, 0 errored** |
 | Offline distribution verifier | **VERIFIED**, 8 negative controls run, 8 caught |
 | pyflakes | clean |
@@ -223,9 +255,16 @@ this release added it.
 
 ### Measured verification
 
+Re-measured, not carried forward. `package_version` is still `0.2.3`, so this
+table is a claim about the **live** distribution rather than a sealed one, and it
+moves whenever a check on that distribution moves. The suite read **2108** when
+this entry was written; `[Unreleased]`'s D-36 ban-set-identity check has since
+added three tests, and the figure is re-stated from a fresh run rather than
+adjusted by arithmetic. Nothing else in this table moved.
+
 | Check | Result |
 | --- | --- |
-| Package suite | **2108 passed** |
+| Package suite | **2111 passed** |
 | Independent adversarial probes | **83 passed** (also inside the installed wheel) |
 | Gate mutation sweep | **72 inventoried, 67 KILLED, 5 SURVIVED, 0 errored** |
 | Offline distribution verifier | **VERIFIED**, 8 negative controls run, 8 caught |

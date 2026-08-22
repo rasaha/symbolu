@@ -182,6 +182,123 @@ def test_no_capability_is_scheduled_to_unlock_at_or_before_this_version():
         assert SUBPHASE_LADDER.index(unlock) > reached, token
 
 
+# --------------------------------------------------------------------------- #
+# D-36: splitting the BR-2C-0 rung per version would rule nothing.
+# --------------------------------------------------------------------------- #
+#: The ladder D-36 closed: one rung per version instead of one rung carrying
+#: ``0.2.1``, ``0.2.2`` and ``0.2.3``. It is never the real ladder — it exists
+#: only so the option D-36 rejected can be *measured* rather than asserted.
+_PER_VERSION_LADDER = (
+    "BR-2A",
+    "BR-2B",
+    "BR-2C-0/0.2.1",
+    "BR-2C-0/0.2.2",
+    "BR-2C-0/0.2.3",
+    "BR-2C",
+    "BR-2D",
+    "BR-2E",
+)
+
+_SPLIT_RUNGS = ("BR-2C-0/0.2.1", "BR-2C-0/0.2.2", "BR-2C-0/0.2.3")
+
+#: Both unlock maps, so the check covers the tree-wide capability scan *and*
+#: the exported-symbol scan. D-33 records that ``0.3.0`` unlocks twelve tokens
+#: across the two, not eight across one, so a check reading only one map would
+#: measure two thirds of the ground it claims to pin.
+def _both_unlock_maps():
+    import importlib.util
+
+    other = PKG / "tests" / "contract" / "test_confusable_and_ports.py"
+    spec = importlib.util.spec_from_file_location("_d36_exported_unlock", other)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return (
+        ("FORBIDDEN_CAPABILITY_UNLOCK", FORBIDDEN_CAPABILITY_UNLOCK),
+        ("EXPORTED_IMPLEMENTATION_UNLOCK", module.EXPORTED_IMPLEMENTATION_UNLOCK),
+    )
+
+
+def _banned_on(ladder: tuple, rung: str, unlock_map: dict) -> frozenset:
+    """:func:`banned_capability_tokens`, against a ladder given explicitly."""
+
+    reached = ladder.index(rung)
+    return frozenset(
+        token
+        for token, unlock in unlock_map.items()
+        if unlock is None or ladder.index(unlock) > reached
+    )
+
+
+def test_no_token_unlocks_at_the_br2c_0_rung_itself():
+    """The precondition D-36's ground rests on, asserted rather than assumed.
+
+    D-36 closes the rung-per-version option because the extra ladder indices
+    would produce ban sets identical to ``BR-2C-0``'s, and so rule nothing.
+    That holds **only** while no token names ``BR-2C-0`` as its unlock phase: a
+    token that did would be shippable at one of the three versions and not the
+    others, the split rungs would stop being interchangeable, and D-36's ground
+    would be false with nothing saying so. Every unlock is `BR-2C`, `BR-2D` or
+    permanent, and this is the check that keeps it that way.
+    """
+
+    for name, unlock_map in _both_unlock_maps():
+        offenders = sorted(
+            token for token, unlock in unlock_map.items() if unlock == "BR-2C-0"
+        )
+        assert offenders == [], (
+            f"{name}: {offenders} unlock at BR-2C-0 itself, which falsifies "
+            "ADR §35.2 D-36's ground. The rung carries three versions; a token "
+            "first shippable at one of them needs its own ratification."
+        )
+
+
+def test_splitting_the_br2c_0_rung_per_version_changes_no_ban_set():
+    """D-36's ground, measured on both surfaces rather than asserted.
+
+    Builds the ladder D-36 rejected — ``BR-2C-0`` split into one rung per
+    version — and compares ban sets against the real ladder. At each of the
+    three split rungs the ban set must equal the real ``BR-2C-0``'s, and at
+    ``BR-2C``, ``BR-2D`` and ``BR-2E`` it must be unchanged by the insertion,
+    because :func:`banned_capability_tokens` compares by ladder **index**.
+    Identical ban sets at every rung is the whole of why the extra rungs would
+    rule nothing.
+
+    This weakens no ban: it asserts equality against the live ban set rather
+    than against a copied literal, so a ban that shrank would fail
+    :func:`test_the_effective_ban_set_is_exactly_what_br2a_froze` first and this
+    check would still see the two ladders agree.
+    """
+
+    for name, unlock_map in _both_unlock_maps():
+        real = _banned_on(SUBPHASE_LADDER, "BR-2C-0", unlock_map)
+        assert real, name
+
+        for rung in _SPLIT_RUNGS:
+            assert _banned_on(_PER_VERSION_LADDER, rung, unlock_map) == real, (
+                f"{name}: splitting BR-2C-0 changed the ban set at {rung}"
+            )
+
+        for rung in ("BR-2C", "BR-2D", "BR-2E"):
+            assert _banned_on(_PER_VERSION_LADDER, rung, unlock_map) == (
+                _banned_on(SUBPHASE_LADDER, rung, unlock_map)
+            ), f"{name}: inserting rungs moved the ban set at {rung}"
+
+
+def test_the_hypothetical_ladder_is_never_the_real_one():
+    """A guard on the guard: the rejected ladder must not become the shipped one."""
+
+    assert SUBPHASE_LADDER == (
+        "BR-2A",
+        "BR-2B",
+        "BR-2C-0",
+        "BR-2C",
+        "BR-2D",
+        "BR-2E",
+    )
+    assert _PER_VERSION_LADDER != SUBPHASE_LADDER
+    assert set(VERSION_SUBPHASE.values()) <= set(SUBPHASE_LADDER)
+
+
 def _is_port_declaration(name: str, value) -> bool:
     """A ``...Port`` Protocol declares a seam; it does not implement one.
 
