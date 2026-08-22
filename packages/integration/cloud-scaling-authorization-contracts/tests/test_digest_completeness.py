@@ -56,16 +56,25 @@ FROZEN_PAYLOAD_PARAM_EXCLUSIONS: frozenset[str] = frozenset()
 #: qualifies: every other field is semantic and must be bound.
 FROZEN_FIELD_EXCLUSIONS: frozenset[str] = frozenset({"candidate_digest"})
 
-#: Public attributes that are **not** dataclass fields and are deliberately outside the
-#: digest payload (R-11, 5B-2). Both are constants that derive nothing from the instance, so
-#: there is nothing about *this* candidate for a digest to cover:
+#: **R-11.** The complete public non-field surface of ``CapacityAuthorizationCandidate``:
+#: every public name reachable on the class or through its MRO that is not a dataclass field.
+#: Three methods and two constant properties.
 #:
-#: * ``trust_state`` — always ``PRESENT_BUT_NOT_TRUST_VERIFIED``, the whole package's posture;
-#: * ``grants_authority`` — always ``False``, and no branch in this package returns ``True``.
+#: This is an allowlist over *names*, not a judgement about implementations. An earlier
+#: attempt decided whether an exempt attribute was instance-derived by reading its source for
+#: the name ``self``; that is source classification, and "derives from instance state" is a
+#: semantic property whose every syntactic approximation has a bypass class — a renamed
+#: receiver, a helper delegate, ``getattr``, a custom descriptor. Broadening the scan only
+#: moves the boundary, so the classifier is gone. Whatever a member is implemented as, it must
+#: be named here.
 #:
-#: Membership here is not taken on trust. ``test_an_exempt_attribute_may_not_read_the_instance``
-#: reads each exempt property's source and refuses one that touches ``self`` at all.
-FROZEN_NON_FIELD_EXCLUSIONS: frozenset[str] = frozenset({"trust_state", "grants_authority"})
+#: ``trust_state`` and ``grants_authority`` stay properties rather than becoming digest-covered
+#: fields on purpose: a read-only property cannot be forged by ``object.__setattr__`` on a
+#: frozen dataclass, and a field can. Making them fields would trade a completeness hole for a
+#: forgery one.
+FROZEN_NON_FIELD_SURFACE: frozenset[str] = frozenset(
+    {"digest", "digest_payload", "to_canonical_dict", "trust_state", "grants_authority"}
+)
 
 
 def _digest_payload_ast() -> ast.FunctionDef:
@@ -108,7 +117,9 @@ def test_the_exclusion_sets_stay_frozen():
 
     assert FROZEN_PAYLOAD_PARAM_EXCLUSIONS == frozenset()
     assert FROZEN_FIELD_EXCLUSIONS == frozenset({"candidate_digest"})
-    assert FROZEN_NON_FIELD_EXCLUSIONS == frozenset({"trust_state", "grants_authority"})
+    assert FROZEN_NON_FIELD_SURFACE == frozenset(
+        {"digest", "digest_payload", "to_canonical_dict", "trust_state", "grants_authority"}
+    )
 
 
 def test_every_candidate_field_is_digest_bound(candidate):
@@ -120,96 +131,148 @@ def test_every_candidate_field_is_digest_bound(candidate):
     assert not unbound, f"candidate fields carried but not digest-bound: {unbound}"
 
 
-def _public_non_field_attributes() -> dict:
-    """Public non-field attributes of the candidate class, name → descriptor.
+def public_non_field_members(cls) -> "set[str]":
+    """Every public name on ``cls`` or its MRO that is not a dataclass field.
 
-    Properties and ``cached_property`` alike. Read off the class rather than an instance so a
-    descriptor is seen as itself instead of as the value it computes, and across the MRO so an
-    attribute inherited from a base is not missed.
-    """
+    **Statically.** ``inspect.getmembers_static`` never invokes a descriptor, so a property, a
+    ``cached_property`` or a custom ``__get__`` is observed as the object it is rather than as
+    the value it would compute — and a member whose computation raised could not hide by
+    making enumeration fail. ``dir()`` plus ``inspect.getattr_static`` is the same guarantee
+    where ``getmembers_static`` is unavailable.
 
-    from functools import cached_property
-
-    fields = set(CapacityAuthorizationCandidate.__dataclass_fields__)
-    found = {}
-    for klass in CapacityAuthorizationCandidate.__mro__:
-        if klass is object:
-            continue
-        for name, attr in vars(klass).items():
-            if name.startswith("_") or name in fields or name in found:
-                continue
-            if isinstance(attr, (property, cached_property)):
-                found[name] = attr
-    return found
-
-
-def test_every_public_non_field_attribute_is_digest_bound_or_named_exempt(candidate):
-    """**R-11.** A digest-covered binding must not be able to arrive as a property.
-
-    ``test_every_candidate_field_is_digest_bound`` enumerates ``__dataclass_fields__``, and a
-    property is not a field. Measured before this test existed: adding one per-instance,
-    semantically load-bearing property outside ``digest_payload()`` left the whole suite green
-    with **zero test edits** — cheaper than the partition ratchet's free ride, which at least
-    cost six. So the completeness claim under D-5B1-1 held only for bindings that happen to be
-    fields, and nothing made a future one be a field.
-
-    What this refuses is the *silent* case. A derived attribute is still allowed; it has to be
-    named in ``FROZEN_NON_FIELD_EXCLUSIONS``, and the test below decides whether it may be.
-    """
-
-    payload_keys = set(candidate.digest_payload())
-    unbound = sorted(
-        set(_public_non_field_attributes()) - payload_keys - FROZEN_NON_FIELD_EXCLUSIONS
-    )
-    assert not unbound, (
-        f"the candidate carries public attributes its digest does not cover: {unbound}. "
-        "A property is not a dataclass field, so the field-completeness test above cannot "
-        "see it. Bind it in digest_payload(), or name it in FROZEN_NON_FIELD_EXCLUSIONS "
-        "with a written rationale."
-    )
-
-
-def test_an_exempt_attribute_may_not_read_the_instance():
-    """The exemption is earned structurally, not by being written down.
-
-    An earlier draft of this test compared two candidates and asserted the exempt attributes
-    agreed. That was vacuous in the way this repository has learned to distrust: it passed
-    against a deliberately planted property reading ``self.tenant_id``, because the two
-    fixtures happened to differ in another field. Whether the check fires should not depend
-    on which fixture varies.
-
-    So the claim is measured where it actually lives — in the source. An exempt property may
-    not touch ``self`` at all. That is strictly stronger than constancy across two samples,
-    and it cannot be satisfied by luck.
+    Enumeration is total over *names* and asks nothing about how a member is implemented. That
+    is the whole design: a renamed receiver, a helper delegate, ``getattr``, a custom
+    descriptor and an inherited attribute are all just names here, and all of them land in the
+    net. Methods are included deliberately — pinning the public surface is the point, and a
+    binding smuggled in as a zero-argument method would otherwise be exempt by category.
     """
 
     import inspect
-    import textwrap
 
-    for name in sorted(FROZEN_NON_FIELD_EXCLUSIONS):
-        descriptor = _public_non_field_attributes()[name]
-        func = getattr(descriptor, "fget", None) or getattr(descriptor, "func")
-        tree = ast.parse(textwrap.dedent(inspect.getsource(func)))
-        reads_self = [
-            node
-            for node in ast.walk(tree)
-            if isinstance(node, ast.Name) and node.id == "self" and isinstance(node.ctx, ast.Load)
-        ]
-        assert not reads_self, (
-            f"{name} is exempt from the candidate digest on the grounds that it derives "
-            "nothing from the instance, and it reads self. Either it is per-instance data, "
-            "which must be digest-bound, or the exemption is wrong."
-        )
+    fields = set(getattr(cls, "__dataclass_fields__", {}))
+    if hasattr(inspect, "getmembers_static"):
+        names = {name for name, _ in inspect.getmembers_static(cls)}
+    else:  # pragma: no cover - Python < 3.11
+        names = set(dir(cls))
+        for name in list(names):
+            try:
+                inspect.getattr_static(cls, name)
+            except AttributeError:
+                names.discard(name)
+    return {n for n in names if not n.startswith("_") and n not in fields}
 
 
-def test_the_exempt_attributes_are_the_two_that_exist():
-    """The exemption list is not allowed to name something that is not there.
+def test_every_public_non_field_member_is_digest_bound_or_named(candidate):
+    """**R-11.** A binding may not reach the candidate outside the digest and unnamed.
 
-    A stale entry would silently pre-authorise a future property that happened to reuse the
-    name, which is the same defeat as widening the set.
+    ``test_every_candidate_field_is_digest_bound`` enumerates ``__dataclass_fields__``, and a
+    property is not a field. Measured before this existed: one per-instance, semantically
+    load-bearing property outside ``digest_payload()`` left the whole suite green with **zero
+    test edits** — cheaper than the partition ratchet's free ride, which cost six.
+
+    The claim is precisely this and no wider: every public attribute *declared on the class or
+    inherited through its MRO* is either digest-covered or named. The class is a frozen
+    dataclass without ``__slots__``, so ``object.__setattr__`` can still staple an attribute
+    onto a live instance; no static check sees that and this one does not claim to.
     """
 
-    assert FROZEN_NON_FIELD_EXCLUSIONS <= set(_public_non_field_attributes())
+    payload_keys = set(candidate.digest_payload())
+    unnamed = sorted(
+        public_non_field_members(CapacityAuthorizationCandidate)
+        - payload_keys
+        - FROZEN_NON_FIELD_SURFACE
+    )
+    assert not unnamed, (
+        f"the candidate exposes public members its digest does not cover: {unnamed}. "
+        "A property, descriptor or method is not a dataclass field, so the field test above "
+        "cannot see it. Bind it in digest_payload(), or name it in FROZEN_NON_FIELD_SURFACE "
+        "and disclose it in the changelog as 'surface: <name> — <why>'."
+    )
+
+
+def test_the_allowlist_names_only_members_that_exist():
+    """A stale entry would pre-authorise a future member that reused the name."""
+
+    assert FROZEN_NON_FIELD_SURFACE <= public_non_field_members(CapacityAuthorizationCandidate)
+
+
+@pytest.mark.parametrize(
+    "construct",
+    ["renamed_receiver", "helper_delegate", "getattr_access", "custom_descriptor", "inherited"],
+)
+def test_the_enumerator_sees_every_way_an_attribute_can_arrive(construct):
+    """The five bypasses the source classifier could not survive, measured on the enumerator.
+
+    Each is a way a per-instance value could reach a reader without being a dataclass field.
+    Against a scan for the literal name ``self`` the first four walk straight through. Against
+    an enumeration over names none of them is even a distinguishable case — which is the
+    argument for the redesign, made as a measurement rather than as a claim.
+    """
+
+    from dataclasses import dataclass
+
+    class _Descriptor:
+        def __get__(self, obj, owner=None):
+            return "value" if obj is None else obj.tenant_id
+
+    def _helper(instance):
+        return instance.tenant_id
+
+    @dataclass(frozen=True)
+    class _Base:
+        tenant_id: str
+
+        @property
+        def inherited(self) -> str:
+            return self.tenant_id
+
+    @dataclass(frozen=True)
+    class _Candidate(_Base):
+        @property
+        def renamed_receiver(obj) -> str:  # noqa: N805 - the bypass under test
+            return obj.tenant_id
+
+        @property
+        def helper_delegate(self) -> str:
+            return _helper(self)
+
+        @property
+        def getattr_access(obj) -> str:  # noqa: N805 - the bypass under test
+            return getattr(obj, "tenant_id")
+
+        custom_descriptor = _Descriptor()
+
+    assert construct in public_non_field_members(_Candidate)
+
+
+def test_the_enumerator_sees_an_attribute_attached_after_class_creation():
+    """Attached to the class rather than written in its body, and still enumerated."""
+
+    from dataclasses import dataclass
+
+    @dataclass(frozen=True)
+    class _Candidate:
+        tenant_id: str
+
+    assert "stapled" not in public_non_field_members(_Candidate)
+    _Candidate.stapled = property(lambda obj: obj.tenant_id)
+    assert "stapled" in public_non_field_members(_Candidate)
+
+
+def test_enumeration_never_executes_a_member():
+    """A member that raised on access must not be able to hide by breaking enumeration."""
+
+    from dataclasses import dataclass
+
+    @dataclass(frozen=True)
+    class _Candidate:
+        tenant_id: str
+
+        @property
+        def explodes(self):
+            raise RuntimeError("a member that refuses to be read is still a member")
+
+    assert "explodes" in public_non_field_members(_Candidate)
 
 
 def test_the_carried_artifacts_are_bound_in_full_not_by_digest_alone(candidate):

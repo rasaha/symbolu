@@ -34,9 +34,37 @@ moves** — a refusal changes what is constructible, not what is hashed.
 - **R-11 closed.** The completeness test enumerated `__dataclass_fields__`, and a property is
   not a field, so a binding could arrive outside the digest while appearing to bind. Measured:
   one per-instance property outside `digest_payload()` left the suite green with zero test
-  edits. It now enumerates the public attribute surface — fields, properties,
-  `cached_property` — with `FROZEN_NON_FIELD_EXCLUSIONS` naming the two constant exemptions,
-  and an exemption is earned structurally: an exempt property may not read `self`.
+  edits.
+
+  R-11 is now stated precisely: *every public attribute declared on
+  `CapacityAuthorizationCandidate` or inherited through its MRO is either a dataclass field
+  covered by `digest_payload()` or an explicitly named non-field surface member, and the
+  allowlist cannot grow without a disclosed, reviewed change.* It does not claim coverage of
+  every attribute an instance could ever expose: the class is a frozen dataclass without
+  `__slots__`, so `object.__setattr__` can still staple an attribute onto a live instance, and
+  no static check sees that.
+
+  Enumeration is static — `inspect.getmembers_static`, falling back to `dir()` plus
+  `inspect.getattr_static` — so it never executes a descriptor, and total over *names*, so it
+  asks nothing about how a member is implemented. A first attempt classified instead, reading
+  an exempt property's source for the name `self`; that is source classification, and every
+  syntactic approximation of "derives from instance state" has a bypass class. The five that
+  defeated it — renamed receiver, helper delegate, `getattr`, custom descriptor, inherited or
+  class-attached — are now parametrised acceptance tests over the enumerator.
+
+  The allowlist is ratcheted against the merge base (`tests/_surface_ratchet.py`), so it
+  cannot grow silently. That closes accidental drift; it does not close a contributor editing
+  the class and the allowlist together, which no test in one trust domain can. What it buys is
+  that widening becomes disclosed rather than silent — the same residual D-5B1-3's third rule
+  carries, recorded rather than repaired.
+
+- The public non-field surface, disclosed in full because nothing was exempt before it existed:
+  - surface: digest — a method, computes the canonical digest and stores nothing.
+  - surface: digest_payload — a method, returns the payload the digest is taken over.
+  - surface: to_canonical_dict — a method, the canonical serialisation.
+  - surface: trust_state — constant `PRESENT_BUT_NOT_TRUST_VERIFIED`; a read-only property
+    rather than a field so `object.__setattr__` cannot forge it on a frozen dataclass.
+  - surface: grants_authority — constant `False`, and no branch in this package returns `True`.
 - Suite 277 → 283, 0 failed, 0 skipped.
 
 ## [0.2.0] — Cloud Scaling Phase 5B-1: decision-scope repair

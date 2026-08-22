@@ -427,15 +427,52 @@ the `GLOBAL` carve-out is pinned on both, because a bare equality would refuse e
 policy in the platform. No digest moves: a refusal changes what is constructible, not what is
 hashed `[V]`.
 
-**R-11's first repair was itself vacuous, and the check caught it.** The exemption for a
-non-field attribute rests on the attribute deriving nothing from the instance. A first draft
-measured that by comparing two candidates and asserting the exempt values agreed — and it
-**passed against a planted property reading `self.tenant_id`**, because the two fixtures
-happened to differ only in `account_id` `[V]`. Whether a guard fires must not depend on which
-fixture varies. The check now reads each exempt property's source and refuses one that touches
-`self` at all: strictly stronger than constancy across two samples, and not satisfiable by luck.
-Measured against the full attacker path — inject the property, exempt it, update the frozen pin
-to match, all cheap and all in one commit — and refused `[V]`.
+**R-11 took three attempts, and the first two were the same mistake.** The first compared two
+candidates and asserted the exempt values agreed — and passed against a planted property
+reading `self.tenant_id`, because the fixtures happened to differ only in `account_id` `[V]`.
+The second read each exempt property's source and refused one touching `self`. Both are
+*source classification*, and "derives from instance state" is a semantic property: every
+syntactic approximation has a bypass class. A renamed receiver, a helper delegate, `getattr`,
+a custom descriptor and a class-attached attribute all walk through a scan for the literal name
+`self`, and broadening the scan only moves the boundary.
+
+**The ruled correction abandons classification.** Enumeration became total over *names* —
+static, via `inspect.getmembers_static` (falling back to `dir()` plus
+`inspect.getattr_static`), so it never executes a descriptor and a member that raised on
+access cannot hide by breaking enumeration. Whatever a member is implemented as, it must be
+named. Methods are included: pinning the public surface is the point, and a binding smuggled
+in as a zero-argument method would otherwise be exempt by category.
+
+**R-11's claim, stated precisely.** *Every public attribute declared on
+`CapacityAuthorizationCandidate` or inherited through its MRO is either a dataclass field
+covered by `digest_payload()` or an explicitly named non-field surface member. The allowlist
+cannot grow without a disclosed, reviewed change.* It does **not** claim coverage of every
+attribute an instance could ever expose: the class is a frozen dataclass without `__slots__`,
+so `object.__setattr__` can staple an attribute onto a live instance, and no static check sees
+that `[G]`.
+
+`trust_state` and `grants_authority` stay properties rather than becoming digest-covered
+fields. A read-only property cannot be forged by `object.__setattr__` on a frozen dataclass and
+a field can, so converting them would trade a completeness hole for a forgery one — which is
+why "eliminate instance-derived exemptions entirely" was the wrong correction.
+
+**Two protections, measured separately, because they are not the same protection** `[V]`:
+
+| Attacker path | Outcome | Refused by |
+|---|---|---|
+| Plant the attribute only — *accidental drift* | **Refused** | `test_digest_completeness.py` |
+| Plant it and exempt it, silently | **Refused** | `test_surface_ratchet.py` |
+| Plant it, exempt it, **and disclose it** | **Bypassed** | nothing — by design |
+
+The third row is not a defect and is recorded rather than repaired. No test in this tree can
+close it: tests and production code share one trust domain, so a contributor editing both is
+indistinguishable from a contributor doing the right thing. What the ratchet buys is what it
+bought the partition — the baseline lives in history and cannot be edited by the commit that
+changes the current state, so widening becomes a **disclosed** event rather than a silent one.
+It cannot make the disclosure true. That is the identical `[G]` D-5B1-3's third rule carries.
+
+The five bypass constructs are now parametrised acceptance tests over the enumerator rather
+than a one-off audit, so the redesign's argument is a measurement that reruns.
 
 That is the second time in this ADR's history that a guard written to close a residual was
 itself hollow on the first attempt, and the second time an end-to-end negative control was what
