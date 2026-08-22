@@ -207,7 +207,7 @@ only, staying at `0.1.0`); 5B-0B's `test_phase5a_untouched.py` amended rather th
 |---|---|
 | Phase 5A suite | 242 → **277 passed**, 0 failed, 0 skipped |
 | Producer-attestation suite | **437 passed**, 0 failed, 3 skipped, 440 collected (the skips need a built dist in the tree; pre-existing) |
-| Policy-authenticity suite | 259 → **282 passed**, 0 failed, 0 skipped — *with a ratchet baseline supplied.* A bare clone with no `UGENCE_RATCHET_BASE` and no default-branch ref shows 281 passed, 1 skipped: the ratchet gate itself, skipping because it has no history to compare against. CI supplies the baseline and sets `UGENCE_RATCHET_REQUIRED=1`, which is why the runner reports 0 skipped |
+| Policy-authenticity suite | 259 → **286 passed**, 0 failed, 0 skipped — *with a ratchet baseline supplied.* A bare clone with no `UGENCE_RATCHET_BASE` and no default-branch ref skips one: the ratchet gate itself, for want of history to compare against. CI supplies the baseline and sets `UGENCE_RATCHET_REQUIRED=1`, which is why the runner reports 0 skipped |
 | Policy Authority suite | **331 passed**, 0 failed, 0 skipped |
 | Phase 5A digests moved | **1 of 10**: `FROZEN_CANDIDATE_DIGEST` `sha256:db72ffff…` → `sha256:be06c653…` |
 | New Phase 5A pin | `FROZEN_POLICY_COORDINATE_BINDING_DIGEST` `sha256:ad1d1ad9…` (ten pins → eleven) |
@@ -275,7 +275,8 @@ anywhere in the changelog, and testing it end to end showed that vacuous:
 rule now demands a **structured** line — `promoted: <fact> — …` or `demoted: <fact> — …` — with
 the direction matching. Three negative controls drive an undisclosed second promotion, a
 demotion riding alongside a disclosed promotion, and the disciplined multi-fact change through
-the gate and observe the first two fail and the third pass. Suite: **285 passed**.
+the gate and observe the first two fail and the third pass. Suite at the time of that
+measurement: **285 passed**; **286** at `a2884dae`, which added the R-9 property below.
 
 This is a strengthening beyond D-5B1-3's literal wording, which named two rules. It is offered
 as implementing that decision's intent — a promotion cannot ship without disclosure — rather
@@ -307,3 +308,88 @@ It pushed back on two things, and both are corrected above: R-9's framing was to
 | R-10 `[G]` | Two Phase 5A suite weaknesses found while implementing, both pre-existing: `test_non_reachability.py` strips docstrings with `ast.get_docstring`, whose dedented result does not match the indented source, so an indented docstring naming a forbidden symbol trips the scan; and `test_phase5a_invariants.py::test_no_phase_5a_source_file_was_modified` reads `git status`, so it measures a clean working tree rather than an unmodified package | Phase 5A |
 | R-11 `[G]` | The floor claim holds only for digest-covered bindings, and nothing enforces that a future in-candidate binding is digest-covered: the completeness test enumerates dataclass fields, so a coordinate added as a derived property or side table would escape it while appearing to bind | Phase 5A |
 | A-59 (5B-0A) | The producer attestation binds the recommendation, not the candidate. Reconciling the policy does not reconcile the producer's signature to this candidate | 5B-2 |
+
+## The residual ratification round, and what this session verified of it
+
+A third independent session ruled on the three residual decisions this record left open, and
+re-measured before ruling. Every load-bearing citation in that ruling was checked against the
+repository here rather than accepted; all of them hold. What follows separates what is now
+**measured** from what still **awaits the owner**, because the two are not the same and one of
+these rulings is not a model's to make.
+
+### R-9 — the rule the ruling found is not a new one `[V]`
+
+The ruling's decisive finding is that the scope-guarded comparison R-9 asks for **already
+exists in this repository, ratified, in exactly the shape that avoids the trap**:
+
+```python
+if ref.scope is PolicyScope.TENANT and ref.tenant_id != self.tenant_id:
+    raise PolicyContractError(f"cross-tenant policy binding: ...")
+```
+
+— `uvi-policy-contracts/.../contracts/context.py:118`, and again at `:223` inside
+`bind_policies` `[V]`. Guarding on `scope is TENANT` is what lets the authority's empty-string
+global tenant pass untouched, which is why a bare equality would have been wrong and this is
+not. So R-9 is not "invent a cross-tenant rule"; it is "**Phase 5A and 5B-0B do not carry a
+rule the rest of the tree already does**". That reframing is the round's real contribution.
+
+Two inputs the ruling says a repair would need are already present: V2 carries `policy_scope`
+and `policy_tenant_id` (`target.py:498`, `:501`) `[V]`, and the builder already reads
+`facts.tenant_id` a few lines above the existing cross-check `[V]`. A refusal changes what is
+constructible, not what is hashed, so no digest moves.
+
+The ruling's second half — that the obligation is **not** the composition root's, because
+nothing outside the package imports the verifier today `[V]`, so an obligation placed there
+would be unenforceable and untestable — follows from that measurement and is sound.
+
+**Still `[R]`.** Whether a `TENANT`-scoped policy may bound only its own tenant's action is
+product intent. A fresh session can establish, as this one did, that the rest of the tree
+already answers yes; it cannot rule that Cloud Scaling must. The owner's word closes R-9.
+
+### D-5B1-3 — the widening, measured against a stronger attack `[V]`
+
+The ruling reproduced the free ride the third rule closes, and chose a worse fact to move than
+this session did: reverting to the two-rule wording and promoting **`resolved_as_of_fact`** —
+R-2, the injected and unvalidated clock — with only `candidate_digest_fact` disclosed goes
+green at **282 passed** `[V]`. The changelog does not merely fail to mention it; it
+*affirmatively states* that the fact stays recorded, so a mention-anywhere narrowing is not
+available either. Rule 3 restored against that same tree fails as the sole guard.
+
+That measurement settles the factual question the `[R]` above turns on: the two-rule wording
+was underspecified, not a ceiling. **Still `[R]` for one reason only** — whether a gate may
+exceed its ratified wording is a governance call, and the session that widened it and the
+session that endorsed the widening are both models. The owner's word discharges it.
+
+One limit is recorded rather than repaired `[G]`: rule 3 forces a promotion to be *disclosed*;
+it cannot make the disclosure *true*. That is the correct ceiling for a changelog gate.
+
+### R-11 — settled on evidence, and cheaper to exploit than the ratchet was `[V]`
+
+Reproduced independently here at `a2884dae`, in a scratch worktree since removed. Adding one
+per-instance, semantically load-bearing property to `CapacityAuthorizationCandidate` outside
+`digest_payload()`:
+
+```
+tests=277  failures=0  errors=0  skipped=0     — one source file touched, zero test edits
+```
+
+The ratchet's free ride cost six edits; this costs none. The class already carries two
+non-field properties, `trust_state` and `grants_authority` (`candidate.py:275`, `:285`) `[V]`,
+both constants — so today's surface is benign, but benign by accident: adding a property is
+established practice here, and `test_digest_completeness.py:106` enumerates
+`__dataclass_fields__`, which a property is not `[V]`.
+
+This one is a fact about the repository, not a judgment call, so it needs no further
+ratification. **R-11 is settled: required, in 5B-2** — the completeness test enumerates the
+public attribute surface (fields, properties, `cached_property`) against `digest_payload()`,
+carrying a frozen allowlist naming exactly the two exempt properties and why, pinned the way
+`FROZEN_FIELD_EXCLUSIONS` is at `test_digest_completeness.py:57`. D-5B1-1's floor claim loses
+its "for a binding that is actually bound" qualifier once it lands.
+
+### Where the three now stand
+
+| Decision | Status |
+|---|---|
+| R-9 | Measured and reframed `[V]`; the rule exists elsewhere in the tree. Ruling awaits the owner `[R]` |
+| D-5B1-3 widening | Justification measured against a stronger attack `[V]`. Discharge awaits the owner `[R]` |
+| R-11 | Settled `[V]` — required in 5B-2, no further ratification needed |
