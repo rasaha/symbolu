@@ -34,9 +34,10 @@ from __future__ import annotations
 import ast
 import os
 import pathlib
+import re
 import subprocess
 from dataclasses import dataclass
-from typing import Optional
+from typing import Final, Optional
 
 __all__ = [
     "PartitionSnapshot",
@@ -150,11 +151,15 @@ def ratchet_problems(
 ) -> "list[str]":
     """The findings. Empty means the change is disciplined; anything else fails the gate.
 
-    Two rules, and they are the whole gate:
+    Three rules, and they are the whole gate:
 
     #. membership moved ⇒ the profile version must move in the same change;
     #. the profile version moved ⇒ the changelog must name it, on one line, beside
-       ``VERIFICATION_PROFILE_VERSION``.
+       ``VERIFICATION_PROFILE_VERSION``;
+    #. **every fact that changed halves must be disclosed on its own changelog line**, in the
+       form ``promoted: <fact> — …`` or ``demoted: <fact> — …``. A bump earned by one
+       promotion does not carry a second, undisclosed one along with it, and an incidental
+       mention of a fact name elsewhere in the changelog is not a disclosure.
 
     A version bump with no membership change is allowed and unremarked: a gate can be added,
     removed or reordered without the partition moving, and that bump is just as required.
@@ -163,10 +168,10 @@ def ratchet_problems(
     problems: "list[str]" = []
     membership_moved = baseline.membership != current.membership
     version_moved = baseline.profile_version != current.profile_version
+    promoted = sorted(current.verified & baseline.recorded)
+    demoted = sorted(current.recorded & baseline.verified)
 
     if membership_moved and not version_moved:
-        promoted = sorted(current.verified & baseline.recorded)
-        demoted = sorted(current.recorded & baseline.verified)
         problems.append(
             "the verified/recorded partition moved while VERIFICATION_PROFILE_VERSION "
             f"stayed at {current.profile_version!r} "
@@ -183,7 +188,57 @@ def ratchet_problems(
             "carrying both VERIFICATION_PROFILE_VERSION and the new value, saying which "
             "digest moved and why."
         )
+    # A bump is not a blanket permit. Without this, the FIRST disclosed promotion pays for
+    # every later one in the same change: `version_moved` is already True, so the rule above
+    # stays silent, and the changelog line the first promotion added already satisfies the
+    # rule beside it. An independent audit of 5B-1 found that hole, and measuring it showed
+    # it was worse than a misleading signal — a second, undisclosed promotion took the whole
+    # 282-property suite green, because every other guard that noticed was a pinned constant
+    # or a hardcoded fact name, and updating those is exactly the cheap edit this gate exists
+    # to render insufficient. So each fact that changed halves must be named in the changelog
+    # on its own account.
+    undisclosed = [
+        f"{fact} ({direction})"
+        for direction, facts in (("promoted", promoted), ("demoted", demoted))
+        for fact in facts
+        if not _changelog_discloses(changelog, direction, fact)
+    ]
+    if undisclosed:
+        problems.append(
+            f"the partition moved facts the changelog does not disclose: {undisclosed}. "
+            f"(promoted: {promoted or 'none'}; demoted: {demoted or 'none'}.) A profile "
+            "version bump is not a blanket permit for every fact that moves alongside the "
+            "one it was raised for. Disclose each on its own line, in the form "
+            "`promoted: <fact> — <what now establishes it>` or "
+            "`demoted: <fact> — <what stopped establishing it>`."
+        )
     return problems
+
+
+#: An explicit disclosure line: the direction, a colon, and the fact name.
+_DISCLOSURE_RE: Final = re.compile(
+    r"^\s*[-*]?\s*(?P<direction>promoted|demoted)\s*:\s*(?P<rest>.*)$", re.IGNORECASE
+)
+
+
+def _changelog_discloses(changelog: str, direction: str, fact: str) -> bool:
+    """True when a changelog line explicitly discloses this fact moving in this direction.
+
+    A **structured** line, not a mention. The first form of this rule asked only whether the
+    fact name appeared anywhere in the changelog, and testing it end to end showed that was
+    vacuous: ``resolved_as_of_fact`` already appears in this package's changelog in a sentence
+    saying it *stays* in the recorded half, which silently satisfied the check for a promotion
+    of that very fact. An incidental mention is not a disclosure, and a gate that accepts one
+    is the same kind of pin it was written to replace.
+    """
+
+    for line in changelog.splitlines():
+        match = _DISCLOSURE_RE.match(line)
+        if match is None or match.group("direction").lower() != direction:
+            continue
+        if re.search(rf"\b{re.escape(fact)}\b", match.group("rest")):
+            return True
+    return False
 
 
 def _changelog_names(changelog: str, version: str) -> bool:

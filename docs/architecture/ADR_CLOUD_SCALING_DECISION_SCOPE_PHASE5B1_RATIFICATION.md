@@ -245,6 +245,36 @@ namespaces; the two pins replaced by derivations were not weakened; and every di
 count, negative anchor and version pin in this record reproduces exactly. The attack on the
 ratchet itself had not reported when these corrections were made.
 
+### The audit's ratchet finding, and the repair `[V]`
+
+The attack on the ratchet found the gate's own logic hole, and re-measuring it showed it was
+worse than the audit reported. Rule 1 asked *whether the version moved*, not whether the
+disclosure accounted for what moved. So once one legitimate promotion had bumped the version
+and added its changelog line, a **second, undisclosed promotion in the same change was
+invisible**: `version_moved` was already true, so rule 1 stayed silent, and the line the first
+promotion added already satisfied rule 2.
+
+The audit judged this a misleading-signal risk, on the grounds that the wider suite still
+caught the extra fact. Measuring the harder case refutes that: with a second promotion applied
+and every pinned constant and hardcoded fact name updated alongside it — four cheap edits — the
+**entire 282-property suite went green and the ratchet passed 10/10** `[V]`. Every guard that
+noticed was itself a pin, and updating a pin is exactly the edit this gate exists to render
+insufficient.
+
+**Repaired, and the first repair was itself too weak.** A third rule now requires every fact
+that changed halves to be disclosed. The first form asked only whether the fact name appeared
+anywhere in the changelog, and testing it end to end showed that vacuous:
+`resolved_as_of_fact` already appears in this package's changelog in a sentence saying it
+*stays* recorded, which silently satisfied the check for a promotion of that very fact. The
+rule now demands a **structured** line — `promoted: <fact> — …` or `demoted: <fact> — …` — with
+the direction matching. Three negative controls drive an undisclosed second promotion, a
+demotion riding alongside a disclosed promotion, and the disciplined multi-fact change through
+the gate and observe the first two fail and the third pass. Suite: **285 passed**.
+
+This is a strengthening beyond D-5B1-3's literal wording, which named two rules. It is offered
+as implementing that decision's intent — a promotion cannot ship without disclosure — rather
+than as a new decision, and the owner should say so if the widening is unwelcome `[R]`.
+
 ### Residuals after this change
 
 | # | Residual | Owner |

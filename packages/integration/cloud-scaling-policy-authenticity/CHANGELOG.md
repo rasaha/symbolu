@@ -20,6 +20,12 @@ Ratified in `docs/architecture/ADR_CLOUD_SCALING_DECISION_SCOPE_PHASE5B1_RATIFIC
 
 ### Changed — the promotion, and what it cost
 
+- promoted: `candidate_digest_fact` — gate 11 reconciles a supplied candidate's policy
+  coordinate against the resolved policy, so the fact this artifact carries about which
+  candidate it accompanied is now checked rather than merely recorded. This line's shape is
+  load-bearing: the ratchet requires every fact that changes halves to be disclosed as
+  `promoted: <fact>` or `demoted: <fact>` on its own line, so that a version bump earned by
+  one promotion cannot carry a second, undisclosed one along with it.
 - `candidate_digest_fact` moved from the **recorded** half to the **verified** half.
   `VERIFICATION_PROFILE_VERSION` moves to `v2` in the same commit, as the ratchet requires,
   and the reference artifact digest moved with it:

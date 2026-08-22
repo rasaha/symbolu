@@ -188,8 +188,11 @@ def test_a_promotion_without_a_profile_bump_fails_the_gate():
     problems = ratchet_problems(
         baseline=current, current=promoted, changelog=_read("changelog")
     )
-    assert len(problems) == 1
+    # Two findings, because an undisclosed promotion without a bump breaks both rules: the
+    # version did not move, and no `promoted:` line discloses the fact.
+    assert len(problems) == 2, problems
     assert "VERIFICATION_PROFILE_VERSION" in problems[0] and fact in problems[0]
+    assert "does not disclose" in problems[1] and fact in problems[1]
 
 
 @pytest.mark.adversarial
@@ -263,12 +266,93 @@ def test_a_promotion_with_a_bump_and_a_changelog_line_passes():
         profile_version="v99",
     )
     changelog = (
-        f"- VERIFICATION_PROFILE_VERSION moves to v99: {fact} was promoted to the verified "
-        "half, and the artifact digest moved with it.\n"
+        f"- VERIFICATION_PROFILE_VERSION moves to v99.\n- promoted: {fact} — the artifact "
+        "digest moved with it.\n"
     )
     assert ratchet_problems(
         baseline=current, current=disciplined, changelog=changelog
     ) == []
+
+
+@pytest.mark.adversarial
+def test_a_bump_earned_by_one_promotion_does_not_carry_a_second_one():
+    """The free ride, refused. This is the hole an independent audit of 5B-1 found.
+
+    Rule 1 asks whether the version moved, not whether the disclosure accounts for what moved.
+    So once one legitimate promotion has bumped the version and added its changelog line, a
+    second promotion in the same change was invisible: the version had already moved, and the
+    line the first promotion added already satisfied the rule beside it.
+
+    Measuring it showed the consequence was not merely a misleading signal. With a second,
+    undisclosed promotion applied to the real tree and every pinned constant and hardcoded
+    fact name updated alongside it, the entire suite went green and this file passed 10/10 —
+    because every other guard that noticed was itself a pin, and updating a pin is the cheap
+    edit this gate exists to render insufficient.
+    """
+
+    current = _working_tree_snapshot()
+    disclosed, undisclosed = sorted(current.recorded)[:2]
+    both_promoted = PartitionSnapshot(
+        verified=current.verified | {disclosed, undisclosed},
+        recorded=current.recorded - {disclosed, undisclosed},
+        verified_domain=current.verified_domain,
+        recorded_domain=current.recorded_domain,
+        profile_version="v99",
+    )
+    changelog = (
+        f"- VERIFICATION_PROFILE_VERSION moves to v99.\n- promoted: {disclosed} — now "
+        "checked by its own gate.\n"
+    )
+    problems = ratchet_problems(
+        baseline=current, current=both_promoted, changelog=changelog
+    )
+    assert len(problems) == 1, problems
+    reported = problems[0].split("disclose: ")[1].split("]")[0]
+    assert undisclosed in reported and disclosed not in reported
+
+
+@pytest.mark.adversarial
+def test_a_demotion_riding_alongside_a_disclosed_promotion_is_refused():
+    """The direction that matters more: a checked fact quietly reclassified as unchecked."""
+
+    current = _working_tree_snapshot()
+    promoted = sorted(current.recorded)[0]
+    demoted = "policy_body_digest"
+    assert demoted in current.verified
+    mixed = PartitionSnapshot(
+        verified=(current.verified | {promoted}) - {demoted},
+        recorded=(current.recorded - {promoted}) | {demoted},
+        verified_domain=current.verified_domain,
+        recorded_domain=current.recorded_domain,
+        profile_version="v99",
+    )
+    changelog = (
+        f"- VERIFICATION_PROFILE_VERSION moves to v99.\n- promoted: {promoted} — now "
+        "checked by its own gate.\n"
+    )
+    problems = ratchet_problems(baseline=current, current=mixed, changelog=changelog)
+    assert len(problems) == 1 and demoted in problems[0]
+
+
+@pytest.mark.happy
+def test_naming_every_moved_fact_passes():
+    """The disciplined multi-fact change, which the gate must not obstruct."""
+
+    current = _working_tree_snapshot()
+    first, second = sorted(current.recorded)[:2]
+    both = PartitionSnapshot(
+        verified=current.verified | {first, second},
+        recorded=current.recorded - {first, second},
+        verified_domain=current.verified_domain,
+        recorded_domain=current.recorded_domain,
+        profile_version="v99",
+    )
+    changelog = (
+        "- VERIFICATION_PROFILE_VERSION moves to v99.\n"
+        f"- promoted: {first} — now checked by its own gate.\n"
+        f"- promoted: {second} — likewise.\n"
+    )
+    assert ratchet_problems(baseline=current, current=both, changelog=changelog) == []
 
 
 @pytest.mark.happy
