@@ -125,19 +125,72 @@ Measured at `6b805691` [V]:
    `test_no_capability_is_scheduled_to_unlock_at_or_before_this_version` nor
    `test_a_token_is_banned_below_its_unlock_rung_and_not_at_it` fails on it.
 
+### The comparison baseline, and why it cannot be read from the release head
+
+**D-33 inside the release head cannot authorize itself** [R]. A row that
+authorizes an unlock and travels in the same commit stream as the code it
+authorizes is not an independent baseline: an edit to the row and an edit to the
+map move together, in the same commit, reviewed by the same eyes. That is the
+one-file two-literal failure mode one directory up, and reading D-33 from the
+head reproduces it at document scale. The row's authority as a fixed point comes
+entirely from its being **older than, and separate from, the thing it is used to
+check**.
+
+**The baseline is the commit that ratified it:**
+
+```
+4920c87893328a94fa9cea407af3e9e8dd15dd8f
+ADR §35.2: ratify D-33, D-34 and D-35 — the three items BR-2C's
+contract slice left open        (2026-08-21)
+```
+
+The reviewer reads D-33's row **from that commit object**, pinned by its full
+hash — `git show 4920c878…:docs/architecture/ADR_UGENCE_TRUSTED_EVIDENCE_AND_BENCHMARK_REGISTRY.md`
+— and never from the release head's working tree or from the head's copy of the
+ADR. The comparison is then *historical baseline* against *exact `0.3.0` release
+head*, in that direction.
+
+**Two things about this baseline the reviewer must be told rather than discover.**
+
+**It has not moved, measured** [V]. Between `4920c878` and `c3fe8708` — this
+brief's own head — D-33's twelve-token clause is **byte-identical**, and the
+`FORBIDDEN_CAPABILITY_UNLOCK` and `EXPORTED_IMPLEMENTATION_UNLOCK` literals are
+**byte-identical** across the same span: no token added, none removed, and no
+unlock phase changed. The rest of D-33's row *did* move — refreshed line
+citations and an added *Five further sites* enumeration — which is why the
+comparison must be scoped to the twelve-token clause and the maps, not to the
+row's full text. This is the reconciliation performed once as a worked
+demonstration. It says nothing about a `0.3.0` head, which does not exist; the
+reviewer repeats it against the head they are given.
+
+**It is not yet merged, and that is a precondition still open** [G]. At the time
+of writing, `4920c878` is **not an ancestor of this repository's default
+branch**: it is reachable only from the BR-2C-0 line of work
+(`claude/symbolu-br2c-prose-fixes-lyhe5i` and the branches stacked on it), all
+published to the remote and immutable by hash, none merged. A baseline that lives
+only on the same unmerged line as the work it checks is weaker than one on the
+default branch, though pinning by full commit hash preserves what matters:
+immutability and independence from any later edit. **Landing the BR-2C-0 line on
+the default branch before the D-38 review is commissioned is an owner action, and
+it is outstanding.** If it is not closed, the reviewer should treat the baseline
+as hash-pinned rather than branch-anchored, and should say so in their findings
+rather than let the distinction pass silently.
+
 **So the reviewer's procedure for (ii) is a reconciliation, not an inspection**
 [R]:
 
 1. At the release head, recompute the unlock delta across **both** maps between
    the rung below and the release's own rung, using `banned_capability_tokens`
    from `tests/_milestones.py`.
-2. Reconcile that delta, **by name**, against the twelve D-33 pre-registers.
+2. Reconcile that delta, **by name**, against the twelve D-33 pre-registers —
+   read from the baseline commit above, never from the release head's copy.
 3. Treat **any** token in the delta that D-33 does not name as a self-authorized
    capability, whether it arrived by removal, by a changed unlock phase, or by a
    ladder edit — and whether or not the suite is green.
-4. Separately reconcile the **membership** of both frozen sets against the ADR's
-   record, since a token deleted from all four literals leaves no delta to
-   compute.
+4. Separately reconcile the **membership** of both frozen sets against the
+   baseline commit's copies of both unlock maps, since a token deleted from all
+   four literals leaves no delta to compute and the head's own literals cannot
+   witness their own deletion.
 5. Confirm that the gates which currently carry the boundary and **must** be
    relaxed for a verifier to ship at all — among them
    `test_nothing_in_the_package_performs_cryptography`,

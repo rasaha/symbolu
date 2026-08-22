@@ -1474,6 +1474,17 @@ half was recorded here at all.
    D-32(4) conditions production use, D-38 conditions shipping at all, and
    satisfying either leaves the other outstanding.
 
+*Non-authoritative starting material, recorded here for discoverability and for
+nothing else.* `docs/architecture/BR2C_D38_INDEPENDENT_REVIEW_BRIEF.md` drafts an
+inventory a D-38 reviewer might begin from, including the historical commit that
+ratified D-33's twelve-token set as a baseline independent of any release head.
+It is **not** a ratified artifact and this reference does not make it one; it is
+**not** evidence that any review has been commissioned, begun or obtained; and it
+is **not** a definition of audit sufficiency. D-38's terms above govern, the
+reviewer scopes their own review, and the brief shares an author with the rows it
+serves — which is the authorship D-38 exists to distrust. A reviewer who treats
+it as the scope of their review has not performed the review D-38 requires.
+
 D-21 rules that naming a distinct reviewer stays an *open owner action for any
 later subphase that ships a capability*, and BR-2C is the first subphase that
 ships one. **Ruled 2026-08-21 by D-32, for BR-2C only:** the distinct in-repo
