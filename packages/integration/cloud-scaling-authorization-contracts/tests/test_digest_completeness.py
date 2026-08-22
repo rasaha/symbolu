@@ -56,6 +56,17 @@ FROZEN_PAYLOAD_PARAM_EXCLUSIONS: frozenset[str] = frozenset()
 #: qualifies: every other field is semantic and must be bound.
 FROZEN_FIELD_EXCLUSIONS: frozenset[str] = frozenset({"candidate_digest"})
 
+#: Public attributes that are **not** dataclass fields and are deliberately outside the
+#: digest payload (R-11, 5B-2). Both are constants that derive nothing from the instance, so
+#: there is nothing about *this* candidate for a digest to cover:
+#:
+#: * ``trust_state`` — always ``PRESENT_BUT_NOT_TRUST_VERIFIED``, the whole package's posture;
+#: * ``grants_authority`` — always ``False``, and no branch in this package returns ``True``.
+#:
+#: Membership here is not taken on trust. ``test_an_exempt_attribute_may_not_read_the_instance``
+#: reads each exempt property's source and refuses one that touches ``self`` at all.
+FROZEN_NON_FIELD_EXCLUSIONS: frozenset[str] = frozenset({"trust_state", "grants_authority"})
+
 
 def _digest_payload_ast() -> ast.FunctionDef:
     tree = ast.parse(SRC.read_text(encoding="utf-8"), filename=str(SRC))
@@ -97,6 +108,7 @@ def test_the_exclusion_sets_stay_frozen():
 
     assert FROZEN_PAYLOAD_PARAM_EXCLUSIONS == frozenset()
     assert FROZEN_FIELD_EXCLUSIONS == frozenset({"candidate_digest"})
+    assert FROZEN_NON_FIELD_EXCLUSIONS == frozenset({"trust_state", "grants_authority"})
 
 
 def test_every_candidate_field_is_digest_bound(candidate):
@@ -106,6 +118,98 @@ def test_every_candidate_field_is_digest_bound(candidate):
     fields = set(CapacityAuthorizationCandidate.__dataclass_fields__)
     unbound = sorted(fields - payload_keys - FROZEN_FIELD_EXCLUSIONS)
     assert not unbound, f"candidate fields carried but not digest-bound: {unbound}"
+
+
+def _public_non_field_attributes() -> dict:
+    """Public non-field attributes of the candidate class, name → descriptor.
+
+    Properties and ``cached_property`` alike. Read off the class rather than an instance so a
+    descriptor is seen as itself instead of as the value it computes, and across the MRO so an
+    attribute inherited from a base is not missed.
+    """
+
+    from functools import cached_property
+
+    fields = set(CapacityAuthorizationCandidate.__dataclass_fields__)
+    found = {}
+    for klass in CapacityAuthorizationCandidate.__mro__:
+        if klass is object:
+            continue
+        for name, attr in vars(klass).items():
+            if name.startswith("_") or name in fields or name in found:
+                continue
+            if isinstance(attr, (property, cached_property)):
+                found[name] = attr
+    return found
+
+
+def test_every_public_non_field_attribute_is_digest_bound_or_named_exempt(candidate):
+    """**R-11.** A digest-covered binding must not be able to arrive as a property.
+
+    ``test_every_candidate_field_is_digest_bound`` enumerates ``__dataclass_fields__``, and a
+    property is not a field. Measured before this test existed: adding one per-instance,
+    semantically load-bearing property outside ``digest_payload()`` left the whole suite green
+    with **zero test edits** — cheaper than the partition ratchet's free ride, which at least
+    cost six. So the completeness claim under D-5B1-1 held only for bindings that happen to be
+    fields, and nothing made a future one be a field.
+
+    What this refuses is the *silent* case. A derived attribute is still allowed; it has to be
+    named in ``FROZEN_NON_FIELD_EXCLUSIONS``, and the test below decides whether it may be.
+    """
+
+    payload_keys = set(candidate.digest_payload())
+    unbound = sorted(
+        set(_public_non_field_attributes()) - payload_keys - FROZEN_NON_FIELD_EXCLUSIONS
+    )
+    assert not unbound, (
+        f"the candidate carries public attributes its digest does not cover: {unbound}. "
+        "A property is not a dataclass field, so the field-completeness test above cannot "
+        "see it. Bind it in digest_payload(), or name it in FROZEN_NON_FIELD_EXCLUSIONS "
+        "with a written rationale."
+    )
+
+
+def test_an_exempt_attribute_may_not_read_the_instance():
+    """The exemption is earned structurally, not by being written down.
+
+    An earlier draft of this test compared two candidates and asserted the exempt attributes
+    agreed. That was vacuous in the way this repository has learned to distrust: it passed
+    against a deliberately planted property reading ``self.tenant_id``, because the two
+    fixtures happened to differ in another field. Whether the check fires should not depend
+    on which fixture varies.
+
+    So the claim is measured where it actually lives — in the source. An exempt property may
+    not touch ``self`` at all. That is strictly stronger than constancy across two samples,
+    and it cannot be satisfied by luck.
+    """
+
+    import inspect
+    import textwrap
+
+    for name in sorted(FROZEN_NON_FIELD_EXCLUSIONS):
+        descriptor = _public_non_field_attributes()[name]
+        func = getattr(descriptor, "fget", None) or getattr(descriptor, "func")
+        tree = ast.parse(textwrap.dedent(inspect.getsource(func)))
+        reads_self = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Name) and node.id == "self" and isinstance(node.ctx, ast.Load)
+        ]
+        assert not reads_self, (
+            f"{name} is exempt from the candidate digest on the grounds that it derives "
+            "nothing from the instance, and it reads self. Either it is per-instance data, "
+            "which must be digest-bound, or the exemption is wrong."
+        )
+
+
+def test_the_exempt_attributes_are_the_two_that_exist():
+    """The exemption list is not allowed to name something that is not there.
+
+    A stale entry would silently pre-authorise a future property that happened to reuse the
+    name, which is the same defeat as widening the set.
+    """
+
+    assert FROZEN_NON_FIELD_EXCLUSIONS <= set(_public_non_field_attributes())
 
 
 def test_the_carried_artifacts_are_bound_in_full_not_by_digest_alone(candidate):
