@@ -105,10 +105,16 @@ working tree, and fail when membership changed and the profile version did not, 
 version changed without a changelog entry naming it. It runs in the package's CI and as a test
 that skips only where there is no checkout, matching the existing `_find_repo_root` convention.
 
-**Ordering, and it is load-bearing:** the ratchet lands and is proven — a negative control that
-performs the promotion without the bump and observes the failure — *before* `candidate_digest_fact`
-is promoted. Building the guard after the first promotion would leave the one event it exists to
-catch untested.
+**Ordering:** the ratchet lands and is proven — a negative control that performs the promotion
+without the bump and observes the failure — *before* `candidate_digest_fact` is promoted. Building
+the guard after the first promotion would leave the one event it exists to catch untested.
+
+**What that ordering is, precisely** `[I]`. The independent design review corrected an earlier
+overstatement here. GitHub Actions runs `pull_request` workflows at the branch tip, not per
+commit, so **nothing in CI re-verifies that the ordering held at each intermediate commit**, and
+a squash-merge erases the sequence entirely. The ordering is author discipline and reviewer
+legibility, not an enforced property. What the ratchet actually guarantees is narrower and still
+correct: *this change's net effect* is disciplined, measured against the merge base.
 
 ## D-5B1-4 — V2 carries the bare Policy Authority digest, under its own validator
 
@@ -275,6 +281,20 @@ This is a strengthening beyond D-5B1-3's literal wording, which named two rules.
 as implementing that decision's intent — a promotion cannot ship without disclosure — rather
 than as a new decision, and the owner should say so if the widening is unwelcome `[R]`.
 
+### The independent design review, and what it changed
+
+A second, independent review — a different model, deliberately, because these are judgment calls
+that a same-model session would share blind spots on — ruled on the five boundaries. It upheld
+four: `candidate_digest_fact`'s conditional verification (with the reasoning that "verified"
+means the routine correctly evaluated the input including its absence, which no other verified
+field claims more strongly), the three-field cross-check between the two Phase 5A references
+(forcing agreement on issuer and key, which have no ratified correspondence, would be false
+rigor), gate 11's ten-field set (the issuing identity establishes *who asserts this version under
+what key*, which the coordinate alone does not), and the ratchet's merge-base source of truth.
+
+It pushed back on two things, and both are corrected above: R-9's framing was too narrow, and the
+"load-bearing" label on the commit ordering claimed an enforcement CI does not perform.
+
 ### Residuals after this change
 
 | # | Residual | Owner |
@@ -283,7 +303,7 @@ than as a new decision, and the owner should say so if the widening is unwelcome
 | R-3 `[G]` | The authority still does not re-enforce `coordinate.content_digest == policy_body_digest` at resolution. Three boundaries now refuse the divergence themselves | Policy Authority |
 | R-7 `[G]` | The verified/recorded maps are still written twice — in `verified.py` and in `_mint_verified_artifact`. The promotion required editing both; editing one is caught by the artifact's self-digest as a refusal, so this is a maintenance hazard, not a correctness one | 5B-2 |
 | R-8 | Bound extraction — that the candidate's `max_permitted_*` are the bounds the verified body states — is untouched | 5B-2 |
-| R-9 `[R]` | Whether a candidate's tenant must equal its policy coordinate's tenant component, given that a global-scope policy carries the empty tenant | Owner / 5B-2 |
+| R-9 `[R]` | **Broadened by the independent design review, and measured.** The first framing asked only about the empty-string global tenant, which read as an edge case. It is not: **nothing anywhere in the tree ties a candidate's *action* tenant to the tenant of the policy it reconciles against.** A candidate describing an action for `tenant-1`, carrying a coordinate for a `TENANT`-scoped policy belonging to `tenant-elsewhere`, verifies `VERIFIED` `[V]` — gate 11 compares the candidate's coordinate against the *resolved* policy, and that policy is genuinely the other tenant's. Phase 5A does not compare them either. Inert today because no composition root calls `verify()`, which is exactly why it must be ruled on **before** 5B-2 wires one rather than discovered while wiring it. Pinned as executable behaviour by `test_a_candidate_reconciles_against_another_tenants_policy`, which measures today's permissive behaviour without endorsing it | Owner, before 5B-2 |
 | R-10 `[G]` | Two Phase 5A suite weaknesses found while implementing, both pre-existing: `test_non_reachability.py` strips docstrings with `ast.get_docstring`, whose dedented result does not match the indented source, so an indented docstring naming a forbidden symbol trips the scan; and `test_phase5a_invariants.py::test_no_phase_5a_source_file_was_modified` reads `git status`, so it measures a clean working tree rather than an unmodified package | Phase 5A |
 | R-11 `[G]` | The floor claim holds only for digest-covered bindings, and nothing enforces that a future in-candidate binding is digest-covered: the completeness test enumerates dataclass fields, so a coordinate added as a derived property or side table would escape it while appearing to bind | Phase 5A |
 | A-59 (5B-0A) | The producer attestation binds the recommendation, not the candidate. Reconciling the policy does not reconcile the producer's signature to this candidate | 5B-2 |

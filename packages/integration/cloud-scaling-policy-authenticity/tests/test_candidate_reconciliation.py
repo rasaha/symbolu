@@ -33,6 +33,7 @@ import pytest
 
 from _policy_fixtures import (
     T_MID,
+    PolicyScope,
     genuine_candidate,
     issued,
     phase5a_builders,
@@ -217,3 +218,45 @@ def test_a_reconciled_determination_still_grants_nothing():
     assert verified.grants_authority is False
     assert verified.historical is False
     assert verified.outcome is O.VERIFIED
+
+
+# ======================================================================================
+# R-9, stated as executable behaviour rather than as a caveat
+# ======================================================================================
+
+
+@pytest.mark.adversarial
+def test_a_candidate_reconciles_against_another_tenants_policy():
+    """**R-9, measured.** Nothing ties a candidate's *action* tenant to its policy's tenant.
+
+    Gate 11 compares the candidate's coordinate against the *resolved* policy, and a
+    tenant-B policy resolved for tenant B matches a tenant-B coordinate exactly — even when
+    the action the candidate describes belongs to tenant A. Phase 5A does not compare them
+    either: the builder deliberately leaves `policy_tenant_id` uncompared against the
+    candidate's `tenant_id`.
+
+    This pins **today's permissive behaviour as a measurement, not an endorsement**, in the
+    idiom this suite used for R-4 before 5B-1 closed it: a residual is worth more as a
+    property that inverts when it is closed than as a sentence in a document.
+
+    The original framing of R-9 asked only about the empty-string global tenant, which made
+    it read like an edge case. It is not: a *different, non-empty* tenant reconciles too, and
+    that is what this measures. Whether it should — and whether a composition root is
+    obliged to connect the two at all — is the owner's to rule on before 5B-2 wires one.
+    """
+
+    authority, record = issued(scope=PolicyScope.TENANT, tenant_id="tenant-elsewhere")
+    coordinate = record.coordinate
+    candidate = genuine_candidate(record)
+
+    assert coordinate.scope == "TENANT"
+    assert coordinate.tenant_id == "tenant-elsewhere"
+    assert candidate.tenant_id != coordinate.tenant_id, (
+        "the fixture must describe an action for a different tenant than the policy's, or "
+        "this property measures nothing"
+    )
+
+    result = _verify(candidate=candidate, authority=authority, record=record)
+    assert result.outcome is O.VERIFIED
+    assert result.verified_policy.policy_tenant_id == "tenant-elsewhere"
+    assert result.verified_policy.candidate_digest_fact == candidate.candidate_digest
