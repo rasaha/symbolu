@@ -1422,28 +1422,74 @@ verifier, no store and no clock**: it is non-authoritative *by construction*, no
 by an injected default, so nothing at that phase depends on a deny-all default
 holding.
 
-BR-2C is blocked on **audited cryptographic engineering *and* unratified
-governance** — both, not one. The engineering half is unchanged: a secure
-verifier and a composition-root trust-resolver design, specified and
-independently audited, reusing neither the Policy Authority nor the Risk
-Authority Ed25519 implementation. The governance half is that **BR-2C cannot be
-built as ratified without amending a ratified contract surface.** This row
-requires a verified result to bind *exact artifact digest, role, key, profile and
-anchor revision*; the frozen verifier port returns a bare `bool`
-(`packages/benchmark-registry-authority/src/ugence_benchmark_registry_authority/contracts/ports.py:177-185`),
-and the entitlement port returns a bare `bool` alongside it (`:154-158`), so a
-verified result has nowhere to carry role, key, profile or anchor revision. That
-is the same shape as the BR-2D contract change **D-22** ratified deliberately
-rather than leaving to implementation pressure (§35.8), and it is recorded here
-for the same reason. A second owner action is outstanding **on the register's own
-terms**: D-21 rules that naming a distinct reviewer stays an *open owner action
-for any later subphase that ships a capability*, and BR-2C is the first subphase
-that ships one. **Ruled 2026-08-21 by D-32, for BR-2C only:** the distinct
-in-repo reviewer is **waived**, and "independently audited" in this paragraph is
-**redefined for BR-2C** to mean an **external cryptographic audit, which remains
-a hard precondition to any production use of the BR-2C verifier** — not to
-BR-2C development or merge. The engineering half of the blocker is untouched by
-that waiver. BR-2D and BR-2E re-raise D-21's question on their own terms.
+**Corrected in place 2026-08-22 under D-30 and D-31's standing precedent for
+shipped-text defects. This ratifies nothing and amends no ruling** — it records
+that one half of the blocker described below was discharged by rulings already
+taken, and restates what is left. The superseded text is struck at the end of
+this paragraph so the change is visible rather than silent.
+
+BR-2C was blocked on **audited cryptographic engineering *and* unratified
+governance** — both, not one. **The governance half is now discharged** [V]. It
+was that *BR-2C cannot be built as ratified without amending a ratified contract
+surface*: this row requires a verified result to bind exact artifact digest,
+role, key, profile and anchor revision, and the frozen BR-2A ports returned a
+bare `bool` on both seams, which has nowhere to carry any of them. **D-24, D-25
+and D-26 ratified that amendment and `BR-2C-0` shipped it.** At this head
+`BenchmarkPublisherTrustDirectoryPort` declares one method, `resolve_anchor`,
+returning `BenchmarkTrustAnchorResolution` — D-25 replacing Boolean entitlement
+with exact anchor resolution, D-26 making the seam role-scoped in its
+parameters, and D-34 replacing the `Optional[BenchmarkTrustAnchorRecord]` that
+D-25 and D-26 left behind. `BenchmarkApprovalVerifierPort` declares
+`verify_publisher_submission`, `verify_approval` and `verify_revocation`,
+returning `BenchmarkPublisherVerifiedResult`, `BenchmarkApprovalVerifiedResult`
+and `BenchmarkRevocationVerifiedResult` — D-24 replacing the Boolean results,
+D-26 adding the third seam under role separation. **No seam in
+`contracts/ports.py` returns `bool`**; the word survives there only in prose
+recording what was replaced, and `is_entitled` survives nowhere as a symbol —
+only in `contracts/trust.py` and `contracts/enums.py` docstrings explaining why
+D-26 allocated revoker entitlement rather than leaving it to an implementer [V].
+The parallel to the BR-2D contract change **D-22** ratified deliberately rather
+than leaving to implementation pressure (§35.8) held, and was the reason this
+half was recorded here at all.
+
+**What remains blocking, and it is three things, not one.**
+
+1. **The engineering half, unchanged and not begun.** A secure verifier and a
+   composition-root trust-resolver design, specified and independently audited,
+   reusing neither the Policy Authority nor the Risk Authority Ed25519
+   implementation. D-32(3) leaves this standing in full, and no BR-2C verifier
+   engineering has begun.
+2. **D-32(4) — an external cryptographic audit of the verifier**, which is what
+   "independently audited" in this paragraph means for BR-2C. It is a hard
+   precondition to **any production use** of that verifier, not to BR-2C
+   development or merge. Until it is obtained and recorded, no artifact of this
+   distribution may describe any verifier as audited, independently reviewed or
+   production-ready.
+3. **D-38 — a distinct independent authority** must review and adversarially
+   audit the **exact release head** before any capability-bearing BR-2C release,
+   `0.3.0` included, confirming that only ratified parsing, verification and
+   trust-resolution capabilities ship and that changing the prohibition list
+   cannot self-authorize a new capability. **If that review is unavailable,
+   `0.3.0` remains blocked.** This is **not** the same gate as D-32(4):
+   D-32(4) conditions production use, D-38 conditions shipping at all, and
+   satisfying either leaves the other outstanding.
+
+D-21 rules that naming a distinct reviewer stays an *open owner action for any
+later subphase that ships a capability*, and BR-2C is the first subphase that
+ships one. **Ruled 2026-08-21 by D-32, for BR-2C only:** the distinct in-repo
+reviewer was **waived**. **Amended 2026-08-22 by D-38:** that waiver is
+withdrawn for any capability-bearing BR-2C release and survives only for the
+contract-only rung `BR-2C-0`. **D-32(6)'s lapse also still stands**: the waiver
+lapses immediately if a second maintainer with write access to this repository
+exists before BR-2C completes, in which case D-21's requirement applies
+unchanged. BR-2D and BR-2E re-raise D-21's question on their own terms.
+
+*Struck by this correction:* "BR-2C is blocked on audited cryptographic
+engineering **and** unratified governance — both, not one", together with the
+sentences asserting that the verifier port returns a bare `bool` and the
+entitlement port a bare `bool` alongside it. Both were true when written and are
+false at this head. Their in-row line citations are covered by §35.2's frozen
+rule and are not chased.
 
 The previous text of this paragraph — *"That blocker is engineering, not
 governance: no owner decision is outstanding for it"* — is **withdrawn**. It was
