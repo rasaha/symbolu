@@ -36,15 +36,17 @@ answer `[V]`.
 additional, **required** field of `CapacityAuthorizationCandidate`. The existing
 `PolicyTargetBindingReference` is neither widened nor removed.
 
-One pinned Phase 5A digest moves rather than two, and one is the floor **for a binding that is
-actually bound**: every *field* of the candidate enters `digest_payload()`, so no digest-covered
-in-candidate binding can move zero `[V]`. The qualifier is load-bearing and was missing from the
-first statement of this claim: a coordinate carried as a derived property or in a side table
-would move zero digests, because it would not be inside the candidate digest at all — and would
+One pinned Phase 5A digest moves rather than two, and one is the floor: every field of the
+candidate enters `digest_payload()`, so no in-candidate binding can move zero `[V]`.
+
+That claim first carried the qualifier *"for a binding that is actually bound"*, because
+nothing made a future binding be a field: a coordinate carried as a derived property or in a
+side table would move zero digests, not being inside the candidate digest at all — and would
 therefore bind nothing, since the candidate could then carry a different coordinate under an
-unchanged digest. Nothing structurally prevents a future change from doing that and calling it a
-binding: `test_every_candidate_field_is_digest_bound` enumerates `dataclasses.fields()`, and a
-property is not a field `[G]` — recorded as R-11. Removing
+unchanged digest. **5B-2 closed that hole (R-11)**, so the qualifier is retired: completeness
+now enumerates the public attribute surface rather than `dataclasses.fields()`, and a
+non-field attribute must either be digest-bound or named exempt under a rule that reads its
+source. Removing
 V1 instead would move `FROZEN_POLICY_BINDING_DIGEST` as well and would discard the
 bounds-agreement and scope-digest checks Phase 5A already performs against the target scope.
 
@@ -101,8 +103,20 @@ inherits the same weakness `[G]`.
 A ratchet cannot be built from a constant that lives in the file being edited — updating the pin
 is exactly as cheap as the change it is supposed to gate. The enforcement must derive the
 "before" from repository history: compare the partition membership at the merge base against the
-working tree, and fail when membership changed and the profile version did not, or when the
-version changed without a changelog entry naming it. It runs in the package's CI and as a test
+working tree, and fail on any of **three** conditions — when membership changed and the profile
+version did not; when the version changed without a changelog entry naming it; and when a moved
+fact is not disclosed in the changelog by name and direction.
+
+**The third rule, ratified on the owner's ruling of 5B-2.** The decision as first written named
+two rules, and two rules leave a free ride: a bump *earned* by one disclosed promotion carries a
+second, undisclosed one for nothing. Measured twice, and the second measurement is the one that
+settles it — reverting to the two-rule wording and promoting `resolved_as_of_fact`, the injected
+and unvalidated clock, with only `candidate_digest_fact` disclosed goes green at **282 passed**,
+while the changelog *affirmatively states* that the fact stays recorded `[V]`. A gate that lets
+the code contradict the changelog it just checked is not enforcing disclosure. The two-rule
+wording was underspecified rather than a ceiling, and the widening implements the decision's own
+intent. Disclosure must be **structured** — `promoted: <fact> — …` / `demoted: <fact> — …` — because
+a mention-anywhere check is satisfied by the very sentences that state the opposite. It runs in the package's CI and as a test
 that skips only where there is no checkout, matching the existing `_find_repo_root` convention.
 
 **Ordering:** the ratchet lands and is proven — a negative control that performs the promotion
@@ -278,9 +292,12 @@ demotion riding alongside a disclosed promotion, and the disciplined multi-fact 
 the gate and observe the first two fail and the third pass. Suite at the time of that
 measurement: **285 passed**; **286** at `a2884dae`, which added the R-9 property below.
 
-This is a strengthening beyond D-5B1-3's literal wording, which named two rules. It is offered
-as implementing that decision's intent — a promotion cannot ship without disclosure — rather
-than as a new decision, and the owner should say so if the widening is unwelcome `[R]`.
+This was a strengthening beyond D-5B1-3's literal wording, which named two rules. It was offered
+as implementing that decision's intent — a promotion cannot ship without disclosure — rather than
+as a new decision. **The owner ratified it as-is in 5B-2**, on the measurement above; D-5B1-3 is
+restated as three rules and the `[R]` is discharged. One limit is recorded rather than repaired
+`[G]`: rule 3 forces a promotion to be *disclosed*, and cannot make the disclosure *true*. That
+is the right ceiling for a changelog gate.
 
 ### The independent design review, and what it changed
 
@@ -384,12 +401,48 @@ ratification. **R-11 is settled: required, in 5B-2** — the completeness test e
 public attribute surface (fields, properties, `cached_property`) against `digest_payload()`,
 carrying a frozen allowlist naming exactly the two exempt properties and why, pinned the way
 `FROZEN_FIELD_EXCLUSIONS` is at `test_digest_completeness.py:57`. D-5B1-1's floor claim loses
-its "for a binding that is actually bound" qualifier once it lands.
+its "for a binding that is actually bound" qualifier once it lands — which it now has.
 
 ### Where the three now stand
 
 | Decision | Status |
 |---|---|
-| R-9 | Measured and reframed `[V]`; the rule exists elsewhere in the tree. Ruling awaits the owner `[R]` |
-| D-5B1-3 widening | Justification measured against a stronger attack `[V]`. Discharge awaits the owner `[R]` |
-| R-11 | Settled `[V]` — required in 5B-2, no further ratification needed |
+| R-9 | **Ruled and closed in 5B-2** `[V]` — a `TENANT`-scoped policy bounds only its own tenant's action; `GLOBAL` bounds any |
+| D-5B1-3 widening | **Ratified as-is** `[V]` — restated above as three rules, `[R]` discharged |
+| R-11 | **Closed in 5B-2** `[V]` — completeness enumerates the public attribute surface |
+
+## Phase 5B-2 part 1 — what closing them actually took
+
+The owner ruled all three, and the two that were `[R]` were ruled on grounds no session could
+supply: that Cloud Scaling has no managed-service-provider or parent/child tenancy case, and
+that a gate may exceed its ratified wording when it implements that wording's intent.
+
+**R-9 needed two sites, not one.** Phase 5A's builder refuses to construct the pairing; gate 12
+refuses one that arrived anyway. The second is not belt-and-braces: a candidate is shape- and
+digest-validated by its type but carries **no cross-field policy guard there**, so an internally
+consistent cross-tenant candidate can exist without the builder ever having produced one. The
+suite constructs exactly that, and with gate 12 neutralised it verifies `VERIFIED` `[V]` — the
+residual reproduced at the boundary rather than argued about. Both sites key on the scope, and
+the `GLOBAL` carve-out is pinned on both, because a bare equality would refuse every global
+policy in the platform. No digest moves: a refusal changes what is constructible, not what is
+hashed `[V]`.
+
+**R-11's first repair was itself vacuous, and the check caught it.** The exemption for a
+non-field attribute rests on the attribute deriving nothing from the instance. A first draft
+measured that by comparing two candidates and asserting the exempt values agreed — and it
+**passed against a planted property reading `self.tenant_id`**, because the two fixtures
+happened to differ only in `account_id` `[V]`. Whether a guard fires must not depend on which
+fixture varies. The check now reads each exempt property's source and refuses one that touches
+`self` at all: strictly stronger than constancy across two samples, and not satisfiable by luck.
+Measured against the full attacker path — inject the property, exempt it, update the frozen pin
+to match, all cheap and all in one commit — and refused `[V]`.
+
+That is the second time in this ADR's history that a guard written to close a residual was
+itself hollow on the first attempt, and the second time an end-to-end negative control was what
+exposed it. The pattern is worth naming: a guard is not evidence until something has been driven
+through it and observed to fail.
+
+### Residuals after 5B-2 part 1
+
+R-9 and R-11 are closed. **R-2** (whose clock supplies `as_of`), **R-3**, **R-7**, **R-8**,
+**R-10** and **A-59** are untouched and out of scope for part 1.

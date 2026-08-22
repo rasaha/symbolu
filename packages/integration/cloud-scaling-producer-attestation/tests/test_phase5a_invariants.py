@@ -62,7 +62,7 @@ def test_phase_5a_is_at_the_version_this_package_was_pinned_against():
     catching.
     """
 
-    assert p5a.__version__ == "0.2.0"
+    assert p5a.__version__ == "0.3.0"
 
 
 def test_phase_5a_exports_exactly_the_symbols_this_package_was_measured_against():

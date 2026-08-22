@@ -1,5 +1,44 @@
 # Changelog — ugence-cloud-scaling-authorization-contracts
 
+## [0.3.0] — Cloud Scaling Phase 5B-2 part 1: R-9
+
+Ratified in `docs/architecture/ADR_CLOUD_SCALING_DECISION_SCOPE_PHASE5B1_RATIFICATION.md`,
+owner ruling on the three residual decisions. **Breaking**, pre-1.0: a candidate that was
+constructible at `0.2.0` may be refused at `0.3.0`. No schema identifier moves and **no digest
+moves** — a refusal changes what is constructible, not what is hashed.
+
+### Added
+
+- `POLICY_SCOPE_TENANT` — the one `policy_scope` value that constrains which tenant a policy
+  may bound. A literal rather than an import: this package depends on neither the Policy
+  Authority nor the UVI contracts, which is why the coordinate travels as strings at all.
+- Rejection reason `CROSS_TENANT_POLICY_BINDING`. Its own member, deliberately not folded into
+  `POLICY_COORDINATE_CONTENT_MISMATCH`: the two references agree perfectly and the coordinate
+  is bound to this very scope. What is wrong is whose action the policy may bound, which is a
+  scope violation rather than a content disagreement.
+- A third builder guard in that family (inventory 51 → 52), closing **R-9**: a `TENANT`-scoped
+  policy may bound only its own tenant's action. Keyed on the scope, never on a bare tenant
+  equality — a `GLOBAL` policy carries the empty tenant, so `!=` alone would refuse every
+  global policy in the platform. Mirrors the ratified shape at
+  `uvi-policy-contracts/.../contracts/context.py:118` and `:223`.
+
+### Changed
+
+- The commentary at the two-reference cross-check said the coordinate's tenant was not
+  compared at all, reasoning from the empty global tenant. That is a correct reason not to
+  compare *unconditionally* and not a reason not to compare; it is corrected in place rather
+  than deleted, because the reasoning it records is what shaped the guard.
+
+### Tests
+
+- **R-11 closed.** The completeness test enumerated `__dataclass_fields__`, and a property is
+  not a field, so a binding could arrive outside the digest while appearing to bind. Measured:
+  one per-instance property outside `digest_payload()` left the suite green with zero test
+  edits. It now enumerates the public attribute surface — fields, properties,
+  `cached_property` — with `FROZEN_NON_FIELD_EXCLUSIONS` naming the two constant exemptions,
+  and an exemption is earned structurally: an exempt property may not read `self`.
+- Suite 277 → 283, 0 failed, 0 skipped.
+
 ## [0.2.0] — Cloud Scaling Phase 5B-1: decision-scope repair
 
 Ratified in `docs/architecture/ADR_CLOUD_SCALING_DECISION_SCOPE_PHASE5B1_RATIFICATION.md`.
