@@ -36,8 +36,15 @@ answer `[V]`.
 additional, **required** field of `CapacityAuthorizationCandidate`. The existing
 `PolicyTargetBindingReference` is neither widened nor removed.
 
-One pinned Phase 5A digest moves rather than two, and one is the floor: every field of the
-candidate enters `digest_payload()`, so no in-candidate binding can move zero `[V]`. Removing
+One pinned Phase 5A digest moves rather than two, and one is the floor **for a binding that is
+actually bound**: every *field* of the candidate enters `digest_payload()`, so no digest-covered
+in-candidate binding can move zero `[V]`. The qualifier is load-bearing and was missing from the
+first statement of this claim: a coordinate carried as a derived property or in a side table
+would move zero digests, because it would not be inside the candidate digest at all — and would
+therefore bind nothing, since the candidate could then carry a different coordinate under an
+unchanged digest. Nothing structurally prevents a future change from doing that and calling it a
+binding: `test_every_candidate_field_is_digest_bound` enumerates `dataclasses.fields()`, and a
+property is not a field `[G]` — recorded as R-11. Removing
 V1 instead would move `FROZEN_POLICY_BINDING_DIGEST` as well and would discard the
 bounds-agreement and scope-digest checks Phase 5A already performs against the target scope.
 
@@ -193,8 +200,8 @@ only, staying at `0.1.0`); 5B-0B's `test_phase5a_untouched.py` amended rather th
 | Fact | Value |
 |---|---|
 | Phase 5A suite | 242 → **277 passed**, 0 failed, 0 skipped |
-| Producer-attestation suite | **440 passed**, 0 failed, 3 skipped (no built dist in the tree; pre-existing) |
-| Policy-authenticity suite | 259 → **282 passed**, 0 failed, 0 skipped |
+| Producer-attestation suite | **437 passed**, 0 failed, 3 skipped, 440 collected (the skips need a built dist in the tree; pre-existing) |
+| Policy-authenticity suite | 259 → **282 passed**, 0 failed, 0 skipped — *with a ratchet baseline supplied.* A bare clone with no `UGENCE_RATCHET_BASE` and no default-branch ref shows 281 passed, 1 skipped: the ratchet gate itself, skipping because it has no history to compare against. CI supplies the baseline and sets `UGENCE_RATCHET_REQUIRED=1`, which is why the runner reports 0 skipped |
 | Policy Authority suite | **331 passed**, 0 failed, 0 skipped |
 | Phase 5A digests moved | **1 of 10**: `FROZEN_CANDIDATE_DIGEST` `sha256:db72ffff…` → `sha256:be06c653…` |
 | New Phase 5A pin | `FROZEN_POLICY_COORDINATE_BINDING_DIGEST` `sha256:ad1d1ad9…` (ten pins → eleven) |
@@ -223,6 +230,21 @@ Every superseded value above is pinned as a negative anchor in the package that 
   global tenant is the empty string, so a global-scope policy legitimately bounds a
   tenant-scoped action. Recorded as R-9 below rather than decided silently.
 
+### Corrections from the independent audit of `ed611fd2`
+
+An independent audit re-measured the claims in this record. Two were overstated and are
+corrected above: the producer-attestation suite reports **437 passed of 440 collected**, not
+440 passed — the original figure read the junit `tests` attribute, which counts the 3 skips
+inside the total; and the policy-authenticity **0 skipped** holds only where a ratchet baseline
+is supplied, which CI does and a bare clone does not. The audit also refuted the unqualified
+form of the floor claim, now restated under D-5B1-1 and carried as R-11.
+
+Confirmed unchanged by that audit: no gate 11 bypass across five sub-checks; nothing in the diff
+grants authority, resolves a policy inside Phase 5A, reads a clock or converts between the digest
+namespaces; the two pins replaced by derivations were not weakened; and every digest count, gate
+count, negative anchor and version pin in this record reproduces exactly. The attack on the
+ratchet itself had not reported when these corrections were made.
+
 ### Residuals after this change
 
 | # | Residual | Owner |
@@ -233,4 +255,5 @@ Every superseded value above is pinned as a negative anchor in the package that 
 | R-8 | Bound extraction — that the candidate's `max_permitted_*` are the bounds the verified body states — is untouched | 5B-2 |
 | R-9 `[R]` | Whether a candidate's tenant must equal its policy coordinate's tenant component, given that a global-scope policy carries the empty tenant | Owner / 5B-2 |
 | R-10 `[G]` | Two Phase 5A suite weaknesses found while implementing, both pre-existing: `test_non_reachability.py` strips docstrings with `ast.get_docstring`, whose dedented result does not match the indented source, so an indented docstring naming a forbidden symbol trips the scan; and `test_phase5a_invariants.py::test_no_phase_5a_source_file_was_modified` reads `git status`, so it measures a clean working tree rather than an unmodified package | Phase 5A |
+| R-11 `[G]` | The floor claim holds only for digest-covered bindings, and nothing enforces that a future in-candidate binding is digest-covered: the completeness test enumerates dataclass fields, so a coordinate added as a derived property or side table would escape it while appearing to bind | Phase 5A |
 | A-59 (5B-0A) | The producer attestation binds the recommendation, not the candidate. Reconciling the policy does not reconcile the producer's signature to this candidate | 5B-2 |
