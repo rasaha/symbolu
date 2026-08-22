@@ -7,7 +7,7 @@ BR-2A `0.1.0`, BR-2B `0.2.0`, **BR-2C-0 `0.2.1`, `0.2.2` and `0.2.3`**, BR-2C
 D-33 and D-36). Five of the six rungs are subphases; `BR-2C-0` is a **version
 rung**, carries three versions, and mints no closure audit.
 
-## [Unreleased] — BR-2C-0 closure: shipped-text corrections, and D-36
+## [Unreleased] — BR-2C-0 closure: shipped-text corrections, D-36, D-37 and D-38
 
 **No version bump.** `package_version` stays `0.2.3`. This entry moves no
 **pinned surface count**, no digest domain, no pinned canonical vector, no
@@ -214,11 +214,17 @@ as scoped rather than contradictory.
 
 - **§35.2 now records once that in-row line citations are frozen at
   ratification** rather than correcting them one at a time. D-30's enumeration
-  alone carries six that no longer resolve, and three further citations went stale
-  *during* this closure, two moved by its own insertions. A governance record
-  cannot track line numbers it does not own, so the rule is stated for D-01
-  through D-36: file paths and symbol names are live and corrected when wrong,
-  line numbers are historical. D-33 and D-36 are named exceptions, re-verified.
+  alone carries six that no longer resolve. A governance record cannot track line
+  numbers it does not own, so the rule is stated for D-01 through D-38: file
+  paths and symbol names are live and corrected when wrong, line numbers are
+  historical. **Corrected 2026-08-22 by D-38:** this entry first put the
+  closure's own staleness at three and named D-33, D-36 and D-37 as re-verified
+  exceptions. The measured figure is **fifteen** stale citations at this head —
+  eleven of D-33's and four of D-36's, seven of them in
+  `test_milestone_boundary.py`, which the closure's final two commits rewrote —
+  so **the exception is withdrawn** and the frozen rule now covers all thirty-eight
+  rows without exception. D-37 carries no line citations at all and should never
+  have been listed.
 
 - **Both scope lines are re-worded to survive the next version bump.**
   "As measured now, against this tree" and `[0.2.3]`'s pointer at `[Unreleased]`
@@ -234,28 +240,92 @@ one-file two-literal pairs — `FORBIDDEN_CAPABILITY_UNLOCK` and
 built and no shape scan is added.** No ban is weakened, no token added, no test
 added: the suite stays at 2113.
 
-**The escape is stub-sized, and that is the ground.** Measured on the same tree
-with both spellings removed: a `KeyParser` that digests its input fails
-`test_no_module_outside_canonical_computes_a_digest`; one that merely
-base64-decodes fails the curated stdlib allow-list twice. Only a parser importing
-nothing outside that allow-list and computing nothing survives — a placeholder,
-which §17 already bans. The list-free gates carry the load the token list is
-credited with.
+**The escape is not stub-sized, and that ground is withdrawn.** A fourth
+independent audit falsified it, and ADR §35.2 D-38 replaces it; the measured
+position, reproduced against a scratch copy of this package with both spellings
+removed, is this. A `KeyParser` that digests its input fails
+`test_no_module_outside_canonical_computes_a_digest` — because of **where the
+module sits**, not because it digests, since that same digesting parser written
+into `contracts/canonical.py` instead ships **green at 2113**. One that calls
+`base64.b64decode` fails the curated stdlib allow-list twice. But one whose
+`parse()` validates `"<key-id>:<base64>"` with `re` and decodes the base64 in
+pure Python — a bit accumulator, no import beyond `re` — **ships green at
+2113**, and it is no placeholder: it round-trips `base64.b64encode` at every
+length 1 through 39 and raises on malformed input. Restore the two spellings and
+**exactly one** gate catches it,
+`test_no_class_or_function_anywhere_carries_a_forbidden_capability_name`. The
+token list is therefore the **sole** control preventing a working key parser from
+entering this package, not a naming guard over list-free gates that carry the
+load. **And §17 bans no placeholder**: §17 is *Registry and resolution semantics*
+— fourteen rules on lookup, registration, revocation and supersession, plus
+§17.1 on historical resolution — and the word appears nowhere else in the ADR.
+The real enforcement is `EXPORTED_IMPLEMENTATION_UNLOCK`'s permanent
+`{stub, fake, dummy, noop, null_}`, a **name** ban in the same self-attested
+one-file two-literal pattern, which stops none of the four variants above.
 
-**No generated artifact can hold a prohibition.** Every manifest here is derived
-from what exists, so a ban set derived from the tree passes by construction; a
-hand-written block inside a generated file is dropped on regeneration; a new
-manifest reproduces the failure mode one directory away.
+**No generated artifact in this tree holds a prohibition.** Every manifest here
+is derived from what exists, so a ban set derived from the tree passes by
+construction; a hand-written block inside a generated file is dropped on
+regeneration; a new manifest reproduces the failure mode one directory away.
+**Narrowed 2026-08-22 by D-38:** this is a fact about the five committed JSONs,
+verified against them, and not a modal truth about generators — one emitting a
+hand-authored list would carry a prohibition.
 
 Two corrections to the assessment behind the ruling, both measured and both
 recorded in the row so a later reconsideration starts from the real position:
 **the ADR does name tokens** — D-33 names four plus their unseparated spellings,
-eight of twenty-seven, and exactly the BR-2C-unlocking eight — which makes the
+eight of twenty-five, and exactly the BR-2C-unlocking eight — which makes the
 ADR-row option stronger than it was credited for; and the residual escape is
-narrower than the raw demonstration reads. Neither changes the ruling.
+narrower than the raw demonstration reads — **the second of the two is struck by
+D-38 as falsified**, the escape being exactly as wide as the demonstration reads.
+Neither changes the ruling.
 
 **It rules for this rung only.** At `0.3.0` a verifier makes the tokens
 load-bearing and BR-2C re-decides, alongside D-32(4)'s external audit.
+
+### Ratified — D-38: D-37 stands for `BR-2C-0` only, on a replaced ground
+
+A fourth independent audit falsified the ground D-37 rests on. **ADR §35.2 D-38
+withdraws that ground and replaces it; the ruling itself stands, for `BR-2C-0`
+only.** The rung ships **no cryptographic capability**, and that inertness — not
+the size of the escape — is why self-attestation is survivable here. A token
+naming a capability the rung cannot ship is inert, and a guard over inert tokens
+can be self-attested without anything being at risk. That ground does not survive
+the arrival of a capability.
+
+**The naming-token guard is currently the sole control preventing a working key
+parser from entering this package.** The four variants measured above establish
+it: the digest gate is scoped to *location*, the stdlib allow-list catches only
+an import, and a `parse()` written in pure Python trips neither — it ships green
+at 2113 and really parses. With the two spellings intact, exactly one gate
+catches it.
+
+**No shape scan is accepted as a substitute.** A classifier recognising a parser
+by shape — imports, arithmetic density, string handling — would be another
+gameable one, and the pure-Python variant is the demonstration: it was written to
+pass exactly the gates that exist. Adding one buys a second literal to edit and a
+false sense that the boundary is mechanical. **This is why this pass adds no
+test, and that is a ruling rather than an omission.**
+
+**Before any capability-bearing BR-2C release, `0.3.0` included:** a **distinct
+independent authority** must review and adversarially audit the **exact release
+head**, confirming both that only ratified parsing, verification and
+trust-resolution capabilities ship, and that changing the prohibition list cannot
+self-authorize a new capability. **If that review is unavailable, `0.3.0` remains
+blocked.** This amends **D-32(1)** and **(2)**, whose distinct-reviewer waiver is
+withdrawn for any capability-bearing BR-2C release and survives only for
+`BR-2C-0`; D-32(3), (5) and (6) are unamended. **Two distinct preconditions now
+stand, and they are not the same gate:** D-32(4) is an *external cryptographic
+audit of the verifier*, a precondition to **production use**; D-38 is a *distinct
+independent reviewer of the exact release head*, a precondition to **shipping
+`0.3.0` at all**. Satisfying either leaves the other outstanding.
+
+**D-38 adds no executable capability to `BR-2C-0`.** No ban is weakened, no token
+added or removed — the **twenty-five** capability tokens and the eighteen
+exported-implementation tokens are untouched — no count, digest domain, pinned
+vector, refusal member or `package_version` moves, and no test is added, so the
+suite stays at **2113** and the property ratio at **508 : 38 = 13.37 : 1**, both
+re-stated from a fresh run and never edited.
 
 ### Measured verification
 
@@ -282,7 +352,9 @@ the base rate D-32(5) records and accepts for BR-2C.
 ### What this entry does not do
 
 **No BR-2C verifier engineering has begun**, and D-32(3) leaves the engineering
-half of §35.1's blocker standing in full. Until an external cryptographic audit
+half of §35.1's blocker standing in full. D-38 adds a second precondition beside
+it rather than any capability: a distinct independent reviewer of the exact
+release head, without which `0.3.0` stays blocked. Until an external cryptographic audit
 is obtained and recorded, no artifact of this distribution may describe the
 verifier as audited, independently reviewed or production-ready — and none does.
 

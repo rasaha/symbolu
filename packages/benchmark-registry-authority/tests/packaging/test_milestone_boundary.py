@@ -82,21 +82,38 @@ FORBIDDEN_CAPABILITY_UNLOCK = {
 #: BR-2C re-decides the posture at ``0.3.0`` when a verifier makes them
 #: load-bearing.
 #:
-#: The escape is stub-sized, which is what makes the posture survivable. With
-#: both spellings removed, a ``KeyParser`` that digests its input fails
-#: ``test_no_module_outside_canonical_computes_a_digest``; one that merely
-#: base64-decodes fails the curated stdlib allow-list twice. Only a parser that
-#: imports nothing outside that allow-list and computes nothing survives — a
-#: placeholder, which §17 bans anyway. The list-free gates carry the load: no
-#: concrete class satisfies a port, nothing performs cryptography, no module
-#: outside ``canonical`` computes a digest. This list is a **naming** guard
-#: layered over those, not the only thing standing between this rung and a
-#: shipped capability.
+#: **The escape is not stub-sized.** A fourth independent audit falsified that
+#: ground, and the corrected measurement stands here in its place. With both
+#: spellings removed: a ``KeyParser`` that digests its input fails
+#: ``test_no_module_outside_canonical_computes_a_digest`` — because of **where
+#: the module sits**, not because it digests, since the same digesting parser
+#: written into ``contracts/canonical.py`` instead leaves the suite green; one
+#: that calls ``base64.b64decode`` fails the curated stdlib allow-list twice.
+#: But a ``KeyParser`` whose ``parse()`` validates ``"<key-id>:<base64>"`` with
+#: ``re`` and decodes the base64 in pure Python — a bit accumulator, no import
+#: beyond ``re`` — **ships green**, and it really parses: it round-trips
+#: ``base64.b64encode`` at every length 1..39 and raises on malformed input.
+#: Restore the two spellings and **exactly one** gate catches it,
+#: ``test_no_class_or_function_anywhere_carries_a_forbidden_capability_name``.
+#: This list is therefore the **sole** control preventing a working key parser
+#: from entering the package — not a naming guard layered over list-free gates
+#: that carry the load.
 #:
-#: No generated artifact can carry a prohibition — every manifest here is
-#: derived from what exists, so a ban set derived from the tree would pass by
-#: construction. The reviewer of any diff touching either literal is the check,
-#: and that is weaker than a gate.
+#: **ADR §35.2 D-38 (2026-08-22) rules on that measurement.** D-37 stands for
+#: ``BR-2C-0`` on a **replaced** ground: the rung ships no cryptographic
+#: capability at all, and that inertness — not the size of the escape — is why
+#: self-attestation is survivable here. No shape scan is accepted as a
+#: substitute, because a new classifier would be another gameable one; that is
+#: a ruling, not an omission. Before any capability-bearing BR-2C release,
+#: including ``0.3.0``, a distinct independent authority must review and
+#: adversarially audit the exact release head.
+#:
+#: **No generated artifact in this tree carries a prohibition** — every manifest
+#: here is derived from what exists, so a ban set derived from the tree would
+#: pass by construction. That is a fact about the five committed JSONs, not a
+#: property of generators in general: a generator emitting a hand-authored list
+#: would carry one. The reviewer of any diff touching either literal is the
+#: check, and that is weaker than a gate.
 BR2A_FROZEN_CAPABILITY_TOKENS = frozenset(
     {
         "admissionengine",

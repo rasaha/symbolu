@@ -66,9 +66,13 @@ def banned_capability_tokens(
     A token stays banned unless its unlock phase has been **reached**. An unlock
     of :data:`None` means *permanently banned* and never lifts — D-07's ban on a
     convenience resolver or selection API, D-10's exclusion of supersession, and
-    §17's ban on executable placeholders are prohibitions, not deferrals, and
+    the permanent ``{stub, fake, dummy, noop, null_}`` entries of
+    ``EXPORTED_IMPLEMENTATION_UNLOCK`` are prohibitions, not deferrals, and
     folding them into "not yet" would convert a permanent ruling into a
-    schedule.
+    schedule. Note what that last one is and is not: §17 is *Registry and
+    resolution semantics* and bans no placeholder; the placeholder prohibition
+    is a **name** ban carried by that unlock map alone, in the same self-attested
+    one-file two-literal pattern D-37 and D-38 rule.
 
     Comparison is by ladder **index**, never by string ordering, so a renamed or
     misspelled subphase raises rather than sorting itself quietly into scope.
