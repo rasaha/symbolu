@@ -218,17 +218,6 @@ def _both_unlock_maps():
     )
 
 
-def _banned_on(ladder: tuple, rung: str, unlock_map: dict) -> frozenset:
-    """:func:`banned_capability_tokens`, against a ladder given explicitly."""
-
-    reached = ladder.index(rung)
-    return frozenset(
-        token
-        for token, unlock in unlock_map.items()
-        if unlock is None or ladder.index(unlock) > reached
-    )
-
-
 def test_no_token_unlocks_at_the_br2c_0_rung_itself():
     """The precondition D-36's ground rests on, asserted rather than assumed.
 
@@ -270,18 +259,80 @@ def test_splitting_the_br2c_0_rung_per_version_changes_no_ban_set():
     """
 
     for name, unlock_map in _both_unlock_maps():
-        real = _banned_on(SUBPHASE_LADDER, "BR-2C-0", unlock_map)
+        real = banned_capability_tokens("BR-2C-0", unlock_map)
         assert real, name
 
         for rung in _SPLIT_RUNGS:
-            assert _banned_on(_PER_VERSION_LADDER, rung, unlock_map) == real, (
+            assert banned_capability_tokens(
+                rung, unlock_map, _PER_VERSION_LADDER
+            ) == real, (
                 f"{name}: splitting BR-2C-0 changed the ban set at {rung}"
             )
 
         for rung in ("BR-2C", "BR-2D", "BR-2E"):
-            assert _banned_on(_PER_VERSION_LADDER, rung, unlock_map) == (
-                _banned_on(SUBPHASE_LADDER, rung, unlock_map)
-            ), f"{name}: inserting rungs moved the ban set at {rung}"
+            assert banned_capability_tokens(
+                rung, unlock_map, _PER_VERSION_LADDER
+            ) == banned_capability_tokens(rung, unlock_map), (
+                f"{name}: inserting rungs moved the ban set at {rung}"
+            )
+
+
+def test_a_token_is_banned_below_its_unlock_rung_and_not_at_it():
+    """The ``reached`` boundary itself, which nothing pinned before.
+
+    :func:`banned_capability_tokens` bans a token whose unlock index is strictly
+    **greater** than the rung reached. Nothing exercised that boundary: every
+    check ran at rungs where no token unlocks, so drifting ``>`` to ``>=`` — a
+    one-character change that would keep every capability banned one rung too
+    long — left the suite green. Found by an independent audit of the D-36
+    check; the gap is older than that check.
+
+    This asserts the semantics directly, on both surfaces: at a token's own
+    unlock rung it is **not** banned, and one rung below it **is**.
+    """
+
+    for name, unlock_map in _both_unlock_maps():
+        checked = 0
+        for token, unlock in unlock_map.items():
+            if unlock is None:
+                continue
+            at = SUBPHASE_LADDER.index(unlock)
+            assert token not in banned_capability_tokens(unlock, unlock_map), (
+                f"{name}: {token} is still banned at its own unlock rung {unlock}"
+            )
+            below = SUBPHASE_LADDER[at - 1]
+            assert token in banned_capability_tokens(below, unlock_map), (
+                f"{name}: {token} is not banned at {below}, one rung below "
+                f"its unlock {unlock}"
+            )
+            checked += 1
+        assert checked, f"{name}: no token carries a real unlock phase"
+
+
+def test_the_rung_carries_exactly_the_three_versions_d36_ruled():
+    """D-36's **ruling**, not merely its ground.
+
+    D-36 rules that ``0.2.1``, ``0.2.2`` and ``0.2.3`` all sit on ``BR-2C-0``:
+    the rung names what a version ships, not how many times it shipped, and all
+    three ship BR-2C's contract surface and no BR-2C capability.
+
+    The ground — that splitting the rung would change no ban set — was pinned
+    first, and an independent audit found the ruling itself still unpinned:
+    re-mapping ``0.2.2`` to ``BR-2B`` left the suite green, because the
+    fail-closed ``KeyError`` every consumer relies on catches an **unmapped**
+    version, never a **mis**-mapped one, and only once that version is live.
+    """
+
+    assert {v: VERSION_SUBPHASE[v] for v in ("0.2.1", "0.2.2", "0.2.3")} == {
+        "0.2.1": "BR-2C-0",
+        "0.2.2": "BR-2C-0",
+        "0.2.3": "BR-2C-0",
+    }
+    assert [v for v, rung in VERSION_SUBPHASE.items() if rung == "BR-2C-0"] == [
+        "0.2.1",
+        "0.2.2",
+        "0.2.3",
+    ]
 
 
 def test_the_hypothetical_ladder_is_never_the_real_one():

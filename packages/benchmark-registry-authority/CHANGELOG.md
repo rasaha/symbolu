@@ -9,10 +9,12 @@ rung**, carries three versions, and mints no closure audit.
 
 ## [Unreleased] — BR-2C-0 closure: shipped-text corrections, and D-36
 
-**No version bump.** `package_version` stays `0.2.3`. This entry moves no count,
-no digest domain, no pinned canonical vector, no refusal member, no capability
-token and no contract type. It is prose correction under D-30 and D-31's
-standing precedent, plus one ratification.
+**No version bump.** `package_version` stays `0.2.3`. This entry moves no
+**pinned surface count**, no digest domain, no pinned canonical vector, no
+refusal member, no capability token and no contract type. It is prose correction
+under D-30 and D-31's standing precedent, plus one ratification and the tests
+that pin it. The **suite count and the property ratio do move** — five tests were
+added — and both are re-stated from fresh runs below.
 
 ### Ratified — D-36: the `BR-2C-0` rung carries all three versions
 
@@ -118,21 +120,71 @@ live ban set rather than a copied literal, so a ban that shrank would fail
 controls were exercised: injecting a token that unlocks at `BR-2C-0` into either
 map fails the precondition check by name.
 
-**This moves the suite count**, which every commit in this closure had held
-fixed: 2108 → **2111**, and distinct properties 503 : 38 → **506 : 38**. Both are
-re-stated below and in `README.md` from a fresh run, never by arithmetic. The
-`[0.2.3]` table below moves with them: `package_version` has not moved, so that
-table is a claim about the live distribution rather than a sealed one.
+**This moves the suite count**, which every earlier commit in this closure had
+held fixed: 2108 → 2111 here, and → **2113** with the audit remediation below;
+distinct properties 503 : 38 → **508 : 38**. Every figure is re-stated below and
+in `README.md` from a fresh run, never by arithmetic. The `[0.2.3]` table further
+down does **not** move with them: it records what that release shipped, and later
+work is carried here.
+
+### Fixed — what two independent audits found in the check above
+
+The pinning check was audited by two independent sessions. Both reproduced every
+figure; between them they found four defects, three of them introduced by this
+closure.
+
+- **`README.md` claimed an enforcement that does not exist.** It read "a stale
+  figure fails a check rather than surviving an edit". **Nothing in this
+  repository reads `README.md` or `CHANGELOG.md`** — the only document any check
+  parses is BR-1's own README, for pinned digests. The sentence was false, and it
+  was written by the closure pass whose whole purpose is correcting shipped text.
+  Replaced with what is actually true: the figures are attested by the run
+  recorded in the commit that states them, and by the discipline of re-running
+  rather than editing, which is weaker than a gate.
+- **The check measured a copy of the predicate, not the predicate.** The local
+  `_banned_on` helper duplicated `banned_capability_tokens` with the ladder
+  parameterised, so both sides of the comparison came from the copy and it could
+  drift — `>` to `>=` — with the suite green. `banned_capability_tokens` now
+  takes an explicit `ladder` argument and `_banned_on` is **deleted**, so the
+  fork cannot reappear.
+- **D-36's *ruling* was unpinned, only its ground was.** Re-mapping `0.2.2` to
+  `BR-2B` left the suite green: the fail-closed `KeyError` the row relies on
+  catches an *unmapped* version, never a *mis*-mapped one, and only once that
+  version is live. `test_the_rung_carries_exactly_the_three_versions_d36_ruled`
+  asserts the mapping itself.
+- **The `reached` boundary the whole ladder turns on was never exercised.** Every
+  check ran at rungs where no token unlocks, so drifting `>` to `>=` — keeping
+  every capability banned one rung too long — stayed invisible even after the
+  fork was removed. `test_a_token_is_banned_below_its_unlock_rung_and_not_at_it`
+  pins it on both surfaces. **This gap is older than the D-36 check.**
+
+Every one of these is mutation-proved: mis-mapping `0.2.1` or `0.2.2`, drifting
+the predicate to `>=`, and injecting a token that unlocks at `BR-2C-0` into
+either map were each green before and are each red now.
+
+Two stale ADR citations are corrected, both verified against the files rather
+than trusted: D-36's fourth `VERSION_SUBPHASE[api.__version__]` site is
+`tests/packaging/test_milestone_boundary.py:690` — it was cited as `:522`, which
+this closure's own insertions moved twice — and D-33's `tests/_milestones.py:16`
+and `:21-27` are `:28` and `:49-58`, stale since `ab199013`.
+
+**The `[0.2.3]` table is reverted** to its release-time `2108`. The argument for
+tracking it live proved too much: it would oblige every future no-bump commit to
+re-edit a version-tagged section, which is what `[Unreleased]` exists to prevent.
+Both tables are now dated instead, so two different suite counts in one file read
+as scoped rather than contradictory.
 
 ### Measured verification
 
-Re-run against this tree after the corrections, not carried forward:
+**As measured now**, against this tree after the corrections — not carried
+forward, and not the as-shipped figures of any released section below. Two
+different suite counts in this file are dated, not contradictory:
 
 | Check | Result |
 | --- | --- |
-| Package suite | **2111 passed** |
+| Package suite | **2113 passed** |
 | Independent adversarial probes | **83 passed** (also inside the installed wheel) |
-| Distinct properties | **506 adversarial : 38 happy = 13.32 : 1** (required ≥ 2:1) |
+| Distinct properties | **508 adversarial : 38 happy = 13.37 : 1** (required ≥ 2:1) |
 | Gate mutation sweep | **72 inventoried, 67 KILLED, 5 SURVIVED, 0 errored** |
 | Offline distribution verifier | **VERIFIED**, 8 negative controls run, 8 caught |
 | pyflakes | clean |
@@ -255,16 +307,14 @@ this release added it.
 
 ### Measured verification
 
-Re-measured, not carried forward. `package_version` is still `0.2.3`, so this
-table is a claim about the **live** distribution rather than a sealed one, and it
-moves whenever a check on that distribution moves. The suite read **2108** when
-this entry was written; `[Unreleased]`'s D-36 ban-set-identity check has since
-added three tests, and the figure is re-stated from a fresh run rather than
-adjusted by arithmetic. Nothing else in this table moved.
+**As shipped at `0.2.3`.** These are the figures the release measured, and they
+stay put: a version-tagged section records what that version shipped, so later
+work is carried by `[Unreleased]` rather than by re-editing this table. The suite
+has since moved — see `[Unreleased]` above for the current figures.
 
 | Check | Result |
 | --- | --- |
-| Package suite | **2111 passed** |
+| Package suite | **2108 passed** |
 | Independent adversarial probes | **83 passed** (also inside the installed wheel) |
 | Gate mutation sweep | **72 inventoried, 67 KILLED, 5 SURVIVED, 0 errored** |
 | Offline distribution verifier | **VERIFIED**, 8 negative controls run, 8 caught |

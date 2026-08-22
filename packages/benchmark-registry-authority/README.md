@@ -264,14 +264,21 @@ python packages/benchmark-registry-authority/gate_mutation_sweep.py
 re-statement to "a fresh sweep and verifier run in a README pass at BR-2C". Every
 number below was produced by executing the named check against this tree at
 `0.2.3`, in the closure pass that corrected the prose around it — never by
-adjusting the figures that stood here. The numbers a rung moves are re-run, not
-carried forward, so a stale figure fails a check rather than surviving an edit.
+adjusting the figures that stood here.
+
+**Nothing in this repository enforces this table.** No test, probe, verifier,
+sweep or generator reads this file — the only document any check parses is BR-1's
+own `README.md`, and it looks for pinned digests, not figures. What attests these
+numbers is the run recorded in the commit that states them, and the discipline of
+re-running rather than editing. That is weaker than a gate, and is said here
+rather than left to be assumed: a stale figure in this table would survive until
+someone re-ran the checks and noticed.
 
 | Check | Result |
 | --- | --- |
-| Package suite | **2111 tests passed** |
+| Package suite | **2113 tests passed** |
 | Independent adversarial probes | **83 passed** (also inside the installed wheel) |
-| Distinct properties | **506 adversarial : 38 happy = 13.32 : 1** (required ≥ 2:1) |
+| Distinct properties | **508 adversarial : 38 happy = 13.37 : 1** (required ≥ 2:1) |
 | Gate inventory | **72 gates** |
 | Mutation sweep | **67 KILLED, 5 SURVIVED, 0 errored** — every survivor classified |
 | Distribution | wheel + sdist built; offline `--no-index` install verified |

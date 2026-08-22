@@ -58,7 +58,9 @@ VERSION_SUBPHASE = {
 }
 
 
-def banned_capability_tokens(subphase: str, unlock_map: dict) -> frozenset:
+def banned_capability_tokens(
+    subphase: str, unlock_map: dict, ladder: tuple = SUBPHASE_LADDER
+) -> frozenset:
     """The tokens from ``unlock_map`` still banned at ``subphase``.
 
     A token stays banned unless its unlock phase has been **reached**. An unlock
@@ -70,11 +72,17 @@ def banned_capability_tokens(subphase: str, unlock_map: dict) -> frozenset:
 
     Comparison is by ladder **index**, never by string ordering, so a renamed or
     misspelled subphase raises rather than sorting itself quietly into scope.
+
+    ``ladder`` defaults to the real :data:`SUBPHASE_LADDER` and is a parameter
+    only so D-36's check can measure a *hypothetical* ladder with **this**
+    predicate rather than a copy of it. An independent audit showed the copy it
+    replaced could drift — ``>`` to ``>=`` — with the suite still green, because
+    both sides of that comparison came from the same copy.
     """
 
-    reached = SUBPHASE_LADDER.index(subphase)
+    reached = ladder.index(subphase)
     return frozenset(
         token
         for token, unlock in unlock_map.items()
-        if unlock is None or SUBPHASE_LADDER.index(unlock) > reached
+        if unlock is None or ladder.index(unlock) > reached
     )
