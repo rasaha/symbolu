@@ -225,6 +225,38 @@ as scoped rather than contradictory.
   both go false when that section is renamed at release. `[0.2.2]` and `[0.2.1]`
   stay unlabelled: nothing invites reading them as live.
 
+### Ratified — D-37: the capability-ban vocabulary is self-attested, and stays so
+
+The self-attestation recorded above is now **ruled** rather than merely noted.
+ADR §35.2 D-37 accepts it as the standing posture at `BR-2C-0`, covering both
+one-file two-literal pairs — `FORBIDDEN_CAPABILITY_UNLOCK` and
+`EXPORTED_IMPLEMENTATION_UNLOCK` with their frozen sets. **No second authority is
+built and no shape scan is added.** No ban is weakened, no token added, no test
+added: the suite stays at 2113.
+
+**The escape is stub-sized, and that is the ground.** Measured on the same tree
+with both spellings removed: a `KeyParser` that digests its input fails
+`test_no_module_outside_canonical_computes_a_digest`; one that merely
+base64-decodes fails the curated stdlib allow-list twice. Only a parser importing
+nothing outside that allow-list and computing nothing survives — a placeholder,
+which §17 already bans. The list-free gates carry the load the token list is
+credited with.
+
+**No generated artifact can hold a prohibition.** Every manifest here is derived
+from what exists, so a ban set derived from the tree passes by construction; a
+hand-written block inside a generated file is dropped on regeneration; a new
+manifest reproduces the failure mode one directory away.
+
+Two corrections to the assessment behind the ruling, both measured and both
+recorded in the row so a later reconsideration starts from the real position:
+**the ADR does name tokens** — D-33 names four plus their unseparated spellings,
+eight of twenty-seven, and exactly the BR-2C-unlocking eight — which makes the
+ADR-row option stronger than it was credited for; and the residual escape is
+narrower than the raw demonstration reads. Neither changes the ruling.
+
+**It rules for this rung only.** At `0.3.0` a verifier makes the tokens
+load-bearing and BR-2C re-decides, alongside D-32(4)'s external audit.
+
 ### Measured verification
 
 **As measured after this entry's changes** — not carried forward, and not the

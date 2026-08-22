@@ -75,11 +75,28 @@ FORBIDDEN_CAPABILITY_UNLOCK = {
 #: ``src/`` leaves the suite passing, and a capability the ADR bans until
 #: ``0.3.0`` would ship with nothing saying so.
 #:
-#: No second authority for these tokens exists in this repository: the probe
-#: harness carries none, the gate inventory carries none, and ADR §35.2 names
-#: them only in prose. Pinning them to one is genuine engineering and needs its
-#: own ratification. Until then this comment is the warning, and the reviewer of
-#: any diff touching either literal is the check.
+#: **ADR §35.2 D-37 ratifies this self-attestation as the standing posture at
+#: ``BR-2C-0``, for this list and for ``EXPORTED_IMPLEMENTATION_UNLOCK``'s twin
+#: in ``tests/contract/test_confusable_and_ports.py``.** It rules for this rung
+#: only: the tokens are inert here because no capability exists to name, and
+#: BR-2C re-decides the posture at ``0.3.0`` when a verifier makes them
+#: load-bearing.
+#:
+#: The escape is stub-sized, which is what makes the posture survivable. With
+#: both spellings removed, a ``KeyParser`` that digests its input fails
+#: ``test_no_module_outside_canonical_computes_a_digest``; one that merely
+#: base64-decodes fails the curated stdlib allow-list twice. Only a parser that
+#: imports nothing outside that allow-list and computes nothing survives — a
+#: placeholder, which §17 bans anyway. The list-free gates carry the load: no
+#: concrete class satisfies a port, nothing performs cryptography, no module
+#: outside ``canonical`` computes a digest. This list is a **naming** guard
+#: layered over those, not the only thing standing between this rung and a
+#: shipped capability.
+#:
+#: No generated artifact can carry a prohibition — every manifest here is
+#: derived from what exists, so a ban set derived from the tree would pass by
+#: construction. The reviewer of any diff touching either literal is the check,
+#: and that is weaker than a gate.
 BR2A_FROZEN_CAPABILITY_TOKENS = frozenset(
     {
         "admissionengine",
