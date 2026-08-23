@@ -324,7 +324,7 @@ It pushed back on two things, and both are corrected above: R-9's framing was to
 | R-9 **CLOSED (5B-2 pt 1)** `[V]` | **Broadened by the independent design review, then closed.** Enforced at Phase 5A's builder (`CROSS_TENANT_POLICY_BINDING`) and gate 12 (`CANDIDATE_CROSS_TENANT_POLICY`), both keyed on the scope so the `GLOBAL` carve-out survives. Original framing kept below for the record:  The first framing asked only about the empty-string global tenant, which read as an edge case. It is not: **nothing anywhere in the tree ties a candidate's *action* tenant to the tenant of the policy it reconciles against.** A candidate describing an action for `tenant-1`, carrying a coordinate for a `TENANT`-scoped policy belonging to `tenant-elsewhere`, verifies `VERIFIED` `[V]` — gate 11 compares the candidate's coordinate against the *resolved* policy, and that policy is genuinely the other tenant's. Phase 5A does not compare them either. Inert today because no composition root calls `verify()`, which is exactly why it must be ruled on **before** 5B-2 wires one rather than discovered while wiring it. Pinned as executable behaviour by `test_a_candidate_reconciles_against_another_tenants_policy`, which measures today's permissive behaviour without endorsing it | Owner, before 5B-2 |
 | R-10 `[G]` | Two Phase 5A suite weaknesses found while implementing, both pre-existing: `test_non_reachability.py` strips docstrings with `ast.get_docstring`, whose dedented result does not match the indented source, so an indented docstring naming a forbidden symbol trips the scan; and `test_phase5a_invariants.py::test_no_phase_5a_source_file_was_modified` reads `git status`, so it measures a clean working tree rather than an unmodified package | Phase 5A |
 | R-11 **CLOSED (5B-2 pt 1)** `[V]` | Completeness now enumerates the public attribute surface statically and totally over names (`inspect.getmembers_static`), never executing a descriptor, with a five-member allowlist ratcheted against the merge base. Eleven distinct bypass constructs were planted and refused. The declared trust boundary — a contributor editing class, allowlist and disclosure together — is recorded, not claimed closed | Phase 5A |
-| R-12 `[G]` | **Found by the 5B-2 part 2 independent review.** Gate 13 compares each of the candidate's six timestamps against `as_of` and **never against each other**, so a candidate whose attestation predates its subject assertion by a year verifies `[V]`. That is internal *incoherence* rather than staleness — the pair is consistent with the instant and inconsistent with itself — and it belongs upstream at construction, where the builder holds all six. Out of scope for R-2, which is about reconciling the instant | Phase 5A |
+| R-12 **PARTLY CLOSED** `[V]` | Ruled and implemented in Phase 5A as temporal coherence — three construction-time refusals reading no clock. Two are load-bearing: the decision window (`evaluated_at <= expires_at`, a **newly ratified candidate-coherence invariant**, grounded on the sibling principle at `controls.py:64` rather than falsely claimed as upstream-enforced) and the attestation window (`asserted_at <= issued_at <= valid_until`). The third, the subject ordering, is **unreachable** — four protections stand in front of it, decisively `validate_subject_binding` re-deriving the context digest from the *request* `[V]` — so it is defence in depth, and whether to keep it is open. Original finding:  Gate 13 compares each of the candidate's six timestamps against `as_of` and **never against each other**, so a candidate whose attestation predates its subject assertion by a year verifies `[V]`. That is internal *incoherence* rather than staleness — the pair is consistent with the instant and inconsistent with itself — and it belongs upstream at construction, where the builder holds all six. Out of scope for R-2, which is about reconciling the instant | Phase 5A |
 | A-59 (5B-0A) **INTENTIONAL BOUNDARY — not a defect** `[R]` | Measured: the attestation module never mentions `candidate_digest`, and two candidates with different digests were built from one attestation object `[V]`. **Owner ruling: this is not to be "closed" by adding `candidate_digest` to the producer signature.** The producer owns the recommendation, not the downstream policy, risk decision or authorization candidate. The producer signature authenticates the recommendation; the verified artifact binds that authenticated recommendation to the candidate examined; authorizing the complete candidate belongs to a later Decision/Envelope authority | Authority boundary, by design |
 
 ## The residual ratification round, and what this session verified of it
@@ -576,3 +576,56 @@ That is the fourth guard in this ADR's history to be hollow on first writing, an
 where the hole was in the terminal *classification* rather than the check itself. A guard that
 fails for the wrong stated reason is only marginally better than one that does not fail: it
 sends the reader to the wrong place.
+
+
+## R-12 — temporal coherence, and the two things it corrected
+
+**Coherence is not freshness.** Gate 13 reconciles each carried instant against the verifier's
+`as_of`; it cannot see a candidate that is internally impossible, because every instant can sit
+correctly relative to `as_of` while contradicting the others. The builder holds all six, and
+comparing them needs no clock — which is why this is Phase 5A's and not Phase 5B's.
+
+### What the contracts actually permit
+
+Derived from source, not from intuition, and **no total order was assumed**:
+
+| Relationship | Ground |
+|---|---|
+| `valid_from ≤ asserted_at ≤ valid_until` | Enforced upstream, `evaluation_contracts.py:880` `[V]` |
+| `evaluated_at ≤ expires_at` | **Newly ratified here** — the decision's contract does not bound its ttl; grounded on `controls.py:64`'s sibling principle `[I]` |
+| `asserted_at ≤ attestation_issued_at ≤ valid_until` | **Newly ratified here** — a producer cannot attest what does not yet exist, and a late attestation must not revive an expired recommendation |
+
+One relationship is deliberately **absent**. `decision_evaluated_at` is *not* required to fall
+inside the subject window: `adapter.py` checks its trusted clock against that window and then
+asserts `request.evaluation_time is None` rather than forwarding it, so the decision's instant
+is stamped by a different clock **by design**. Identity is disproven, not merely unproven `[V]`.
+
+### Two corrections this forced, both stated rather than absorbed
+
+**A ratified test's illustration was internally impossible.**
+`test_a_long_expired_decision_still_builds_a_candidate` proved "no clock is consulted" using an
+attestation stamped 3650 days *before the recommendation it attests*. That candidate is not
+merely stale — it cannot exist. The property is untouched and is now demonstrated with a
+coherent-but-ancient candidate; the old case is pinned separately as an R-12 refusal so the two
+ideas cannot collapse back together. No frozen value moved.
+
+**A mutation-sweep attribution became sibling-backed.** `_comparable_instant` re-checks
+awareness before comparing, because with the earlier awareness guard mutated away a naive value
+reached a comparison and escaped as a bare `TypeError` — an unclassified exception, the same
+failure class the R-7 review criticised. Guard 3 is therefore no longer *solely* attributed.
+Neither guard was weakened to preserve a kill count: correct fail-closed classification is
+worth more than exclusive attribution, and the sweep's expectation was updated to say so.
+
+### The finding: one ratified guard cannot fire `[G]`
+
+The subject-ordering guard is unreachable through the builder. Four protections precede it —
+the seam's own `__post_init__`, the projection's `context_digest`, `reconcile_phase4`'s check
+of it, and decisively `validate_subject_binding` re-deriving that digest from the **request**
+independently of the carried context. Measured: a fully forged projection with a recomputed
+digest is still refused by reconciliation, never by the guard.
+
+It is kept because it was ratified and because a builder should not assume its inputs came from
+the seam. But **defence in depth** is the honest description, not load-bearing, and a guard that
+cannot be demonstrated load-bearing does not meet the bar this ADR has been holding. Whether to
+keep or drop it is an open owner decision, and the unreachability is pinned as a test so it
+cannot be quietly forgotten.

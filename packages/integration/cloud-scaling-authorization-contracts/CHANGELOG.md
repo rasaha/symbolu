@@ -1,5 +1,65 @@
 # Changelog — ugence-cloud-scaling-authorization-contracts
 
+## [0.4.0] — Cloud Scaling R-12: temporal coherence among the carried facts
+
+Ratified in `docs/architecture/ADR_CLOUD_SCALING_DECISION_SCOPE_PHASE5B1_RATIFICATION.md`,
+owner ruling on R-12. **Breaking**, pre-1.0: a candidate whose carried instants contradict each
+other no longer constructs. No digest moves and no schema identifier moves.
+
+**Coherence is not freshness.** These guards read no clock — they compare carried facts against
+each other. Freshness stays Phase 5B's, and `test_time_authority.py` still proves no clock is
+consulted; only its illustration changed, for the reason below.
+
+### Added
+
+- `TemporalOrderingError` and three reasons — `SUBJECT_TEMPORAL_ORDERING`,
+  `DECISION_TEMPORAL_ORDERING`, `ATTESTATION_TEMPORAL_ORDERING`. Separate from
+  `PROJECTION_RECONCILIATION_FAILED`: the values reconcile against their sources and are
+  individually well-formed; the relationship between them is what fails.
+- `decision_evaluated_at <= decision_expires_at`. **A newly ratified candidate-coherence
+  invariant, not an upstream one** — the decision's own contract does not bound its ttl. The
+  ground is the sibling principle at `risk_authority/domain/controls.py:64`, which refuses a
+  control result whose `valid_until` precedes its `evaluated_at`.
+- `subject_asserted_at <= attestation_issued_at <= subject_valid_until`. A producer cannot
+  attest a recommendation before it exists, and an attestation first issued after it expired
+  must not make it usable again. This does not broaden the producer's authority and does not
+  close A-59.
+- `subject_valid_from <= subject_asserted_at <= subject_valid_until`, mirroring the seam
+  contract at `evaluation_contracts.py:880`. **See the finding below: this one cannot fire.**
+- `_comparable_instant`, one shared helper. Malformed or naive instants get the package's
+  existing `CanonicalFieldError` / `MALFORMED_CANONICAL_FIELD`; the R-12 reasons are reserved
+  for well-formed instants in an impossible order.
+
+### Changed
+
+- `test_a_long_expired_decision_still_builds_a_candidate` → `test_a_long_expired_candidate_
+  still_builds`. **Correction of an internally impossible fixture, not a relaxation of the
+  no-clock invariant.** The old illustration used an attestation stamped 3650 days *before the
+  recommendation it attests* — not merely stale but impossible. The property is unchanged and
+  now demonstrated with a coherent-but-ancient candidate. The old case is pinned separately as
+  an R-12 refusal, so the distinction cannot collapse back.
+- `test_the_awareness_gate_is_the_only_thing_refusing_a_naive_timestamp` →
+  `..._is_now_sibling_backed_rather_than_solely_attributed`. `_comparable_instant` re-checks
+  awareness, so guard 3 is no longer solely attributed. Neither guard was weakened to preserve
+  a kill count; correct fail-closed classification is worth more than exclusive attribution.
+- Guard inventory 52 → 57.
+
+### Finding — the subject-ordering guard is unreachable
+
+Four independent protections stand in front of it, and a seam-violating context dies at each:
+`SubjectContext.__post_init__` enforces the ordering; the projection carries a
+`context_digest`; `reconcile_phase4` re-checks it; and decisively it re-derives that digest
+from the **request** via `validate_subject_binding`, independently of the carried context, so
+recomputing a forged digest does not help. Measured: even a fully forged projection is refused
+by reconciliation, never by the builder's ordering guard.
+
+It is kept because it was ratified and because the builder should not assume its inputs came
+from the seam — but **defence in depth** is the honest description, not load-bearing. Whether
+to keep or drop it is an open decision. `test_the_subject_ordering_guard_is_unreachable_and_
+that_is_the_finding` pins the unreachability so it cannot be quietly forgotten.
+
+The other two guards **are** load-bearing and were demonstrated as such.
+
 ## [0.3.0] — Cloud Scaling Phase 5B-2 part 1: R-9
 
 Ratified in `docs/architecture/ADR_CLOUD_SCALING_DECISION_SCOPE_PHASE5B1_RATIFICATION.md`,

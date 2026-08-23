@@ -75,6 +75,15 @@ class MagnitudeBoundError(CandidateConstructionError):
     """A requested magnitude or delta exceeds the policy-bound maximum."""
 
 
+class TemporalOrderingError(CandidateConstructionError):
+    """The carried instants are individually valid and collectively impossible (R-12).
+
+    Distinct from :class:`ReconciliationError`, which means a fact disagrees with its source.
+    Here every fact matches its source and the *ordering between them* is unsatisfiable, so a
+    reader is pointed at the relationship rather than sent to re-check the inputs.
+    """
+
+
 class CandidateDigestError(CandidateConstructionError):
     """The candidate digest could not be computed, or did not equal the carried value."""
 
@@ -142,6 +151,20 @@ class AuthorizationCandidateRejectionReason(str, Enum):
     TARGET_SUBSTITUTION = "target_substitution"
     REQUESTED_MAGNITUDE_ABOVE_MAXIMUM = "requested_magnitude_above_maximum"
     DELTA_ABOVE_MAXIMUM = "delta_above_maximum"
+
+    # --- temporal coherence among the carried facts (R-12, 5B-2) ----------------------
+    #: The six carried instants must be coherent *with each other*, not merely with the
+    #: instant a verifier is later handed. Three members rather than one: the subject window,
+    #: the decision window and the attestation each fail for a different reason, and a reader
+    #: triaging one should not be handed the others.
+    #:
+    #: These are ordering violations, deliberately separate from
+    #: ``PROJECTION_RECONCILIATION_FAILED``: the values reconcile perfectly against their
+    #: sources and are individually well-formed. What is wrong is the relationship between
+    #: them.
+    SUBJECT_TEMPORAL_ORDERING = "subject_temporal_ordering"
+    DECISION_TEMPORAL_ORDERING = "decision_temporal_ordering"
+    ATTESTATION_TEMPORAL_ORDERING = "attestation_temporal_ordering"
 
     # --- evidence + digest -----------------------------------------------------------
     INVALID_EVIDENCE_BINDING = "invalid_evidence_binding"

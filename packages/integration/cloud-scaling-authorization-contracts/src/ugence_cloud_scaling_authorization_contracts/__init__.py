@@ -70,6 +70,7 @@ from .errors import (
     PolicyTargetBindingError,
     ProducerAttestationError,
     ReconciliationError,
+    TemporalOrderingError,
     TargetScopeError,
 )
 from .identifiers import (
@@ -143,6 +144,7 @@ __all__ = [
     "ExactTypeError",
     "CanonicalFieldError",
     "ReconciliationError",
+    "TemporalOrderingError",
     "ProducerAttestationError",
     "PolicyTargetBindingError",
     "TargetScopeError",

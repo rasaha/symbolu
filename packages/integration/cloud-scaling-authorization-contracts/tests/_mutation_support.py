@@ -227,15 +227,20 @@ def mutated_package(tmp_path: pathlib.Path, guard_number: int) -> MutatedPackage
     dst.mkdir(parents=True, exist_ok=True)
     shutil.copytree(SRC, dst / PKG_NAME)
     guards = canonical_guards(dst / PKG_NAME)
-    # 52 since 5B-2. 5B-1 brought the builder to 51 with guards 43 and 44 — the two policy
-    # references must name one policy, and the coordinate must bind this scope. 5B-2 adds the
-    # third of that family, closing R-9: a TENANT-scoped policy may bound only its own
-    # tenant's action. The count is asserted so a guard that disappears cannot go unnoticed;
-    # the numbered anchors the sweep aims at are checked separately, and all three new guards
-    # sort after every anchor.
-    if len(guards) != 52:
+    # 57 since R-12. The lineage: 5B-1 brought the builder to 51 with guards 43 and 44 (the
+    # two policy references must name one policy; the coordinate must bind this scope), 5B-2
+    # part 1 added the third of that family at 52 (R-9, a TENANT-scoped policy bounds only its
+    # own tenant's action), and R-12 adds five: three temporal-coherence guards — the subject
+    # ordering, the decision window, and the attestation's position inside the recommendation
+    # it attests — plus the two inside `_comparable_instant`, which re-check that an instant is
+    # a datetime and is aware before any comparison touches it. None of the five reads a clock:
+    # each compares carried facts against each other, which is what makes them constructible
+    # here rather than in Phase 5B.
+    # The count is asserted so a guard that disappears cannot go unnoticed; the numbered
+    # anchors the sweep aims at are checked separately, and every new guard sorts after them.
+    if len(guards) != 57:
         raise AssertionError(
-            f"canonical inventory drifted: {len(guards)} in-scope guards, expected 52"
+            f"canonical inventory drifted: {len(guards)} in-scope guards, expected 57"
         )
     _neutralise(dst / PKG_NAME, guards[guard_number - 1])
 

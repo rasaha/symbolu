@@ -28,7 +28,7 @@ bound but not trust-verified" means, and it is why this artifact grants nothing.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Final
 
 from risk_authority.integrations import SubjectRiskDecision
@@ -37,8 +37,10 @@ from ugence_cloud_scaling_risk_integration import CapacityRiskSubjectProjection
 from .attestation import ProducerAttestationEvidence
 from .canonical import canonical_digest, require_canonical_digest
 from .errors import AuthorizationCandidateRejectionReason as _Reason
+from .errors import TemporalOrderingError
 from .errors import (
     CandidateDigestError,
+    CanonicalFieldError,
     ExactTypeError,
     MagnitudeBoundError,
     PolicyTargetBindingError,
@@ -355,6 +357,29 @@ class CapacityAuthorizationCandidate:
         return canonical_digest(self.digest_payload())
 
 
+def _comparable_instant(name: str, value: Any) -> datetime:
+    """One aware UTC instant, or the package's existing canonical-field refusal (R-12).
+
+    Shared by every temporal-coherence comparison so the awareness rule is stated once. It
+    deliberately duplicates a check an earlier guard already performs: the mutation sweep
+    showed that with that guard neutralised a naive value reached a comparison and escaped as
+    a bare ``TypeError``. A gate whose fail-closed behaviour depends on another gate still
+    being present is not fail-closed. Correct classification beats exclusive attribution.
+    """
+
+    if not isinstance(value, datetime):
+        raise CanonicalFieldError(
+            f"{name} must be a datetime", _Reason.MALFORMED_CANONICAL_FIELD
+        )
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise CanonicalFieldError(
+            f"{name} must be timezone-aware; a naive datetime is rejected rather than "
+            "assumed UTC",
+            _Reason.MALFORMED_CANONICAL_FIELD,
+        )
+    return value.astimezone(timezone.utc)
+
+
 def build_capacity_authorization_candidate(
     *,
     projection: CapacityRiskSubjectProjection,
@@ -448,6 +473,58 @@ def build_capacity_authorization_candidate(
     c_policy_scope = policy_coordinate_binding.policy_scope
     c_policy_tenant_id = policy_coordinate_binding.policy_tenant_id
     c_digest = policy_coordinate_binding.digest()
+
+    # --- the carried instants must be coherent with each other (R-12, 5B-2) -----------
+    # Phase 5B's gate 13 reconciles each instant against the verifier's `as_of`. That cannot
+    # see a candidate that is internally impossible — one whose attestation predates the
+    # recommendation it attests — because every instant can sit correctly relative to `as_of`
+    # while contradicting the others. The builder holds all six, so this is where the
+    # relationship is checkable, and it is checkable *without a clock*: these compare carried
+    # facts against each other, never against now. Coherence is not freshness.
+    #
+    # Only relationships the upstream contracts support are enforced, and no total order is
+    # assumed. `decision_evaluated_at` is deliberately NOT required to fall inside the subject
+    # window: the adapter checks its trusted clock against that window and then asserts
+    # `request.evaluation_time is None` rather than forwarding it, so the decision's instant is
+    # stamped by a different clock by design. Identity is disproven, not merely unproven.
+    #
+    # Every value is normalised through `_comparable_instant` first. An earlier guard already
+    # refuses a naive or non-datetime fact, but this gate must not *depend* on that guard
+    # silently: with it mutated away a naive value reached the comparison below and escaped as
+    # a bare TypeError, which is an unclassified exception rather than a refusal. Malformed
+    # input gets the package's existing canonical-field refusal; the R-12 reasons are reserved
+    # for well-formed instants in an impossible order.
+    subject_from = _comparable_instant("subject_valid_from_fact", facts.subject_valid_from)
+    subject_asserted = _comparable_instant("subject_asserted_at_fact", facts.subject_asserted_at)
+    subject_until = _comparable_instant("subject_valid_until_fact", facts.subject_valid_until)
+    decision_at = _comparable_instant("decision_evaluated_at_fact", facts.decision_evaluated_at)
+    decision_until = _comparable_instant("decision_expires_at_fact", facts.decision_expires_at)
+    attested_at = _comparable_instant("attestation_issued_at_fact", a_issued_at)
+
+    if not (subject_from <= subject_asserted <= subject_until):
+        raise TemporalOrderingError(
+            f"the subject instants are not ordered: valid_from {subject_from.isoformat()}, "
+            f"asserted_at {subject_asserted.isoformat()}, valid_until "
+            f"{subject_until.isoformat()}. Risk Authority's own seam contract requires "
+            "valid_from <= asserted_at <= valid_until, inclusive",
+            _Reason.SUBJECT_TEMPORAL_ORDERING,
+        )
+    if decision_at > decision_until:
+        raise TemporalOrderingError(
+            f"the decision expires at {decision_until.isoformat()}, before it was evaluated "
+            f"at {decision_at.isoformat()}. A validity window that closes before evaluation "
+            "is not a window",
+            _Reason.DECISION_TEMPORAL_ORDERING,
+        )
+    if not (subject_asserted <= attested_at <= subject_until):
+        raise TemporalOrderingError(
+            f"the producer attestation was issued at {attested_at.isoformat()}, outside the "
+            f"recommendation it attests: asserted at {subject_asserted.isoformat()}, valid "
+            f"until {subject_until.isoformat()}. A producer cannot attest a recommendation "
+            "before it exists, and an attestation first issued after it expired must not make "
+            "it usable again",
+            _Reason.ATTESTATION_TEMPORAL_ORDERING,
+        )
 
     # --- the attestation must bind THIS recommendation ---------------------------------
     if a_recommendation_digest != facts.recommendation_digest:

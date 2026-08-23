@@ -66,6 +66,7 @@ from conftest import (
 from ugence_cloud_scaling_authorization_contracts import (
     DOMAIN_CLOUD_SCALING,
     AuthorizationCandidateRejectionReason as Reason,
+    CanonicalFieldError,
     CapacityAuthorizationCandidate,
     ReconciliationError,
     build_capacity_authorization_candidate,
@@ -503,17 +504,43 @@ def test_a_timezone_naive_validity_timestamp_is_refused(
     )
 
 
-def test_the_awareness_gate_is_the_only_thing_refusing_a_naive_timestamp(
+def test_the_awareness_gate_is_now_sibling_backed_rather_than_solely_attributed(
     tmp_path, projection, decision
 ):
-    """L-1 attribution: removing guard 3 admits; removing the isinstance sibling does not."""
+    """L-1 attribution, corrected by R-12 — and the correction is the point.
+
+    Guard 3 used to be the *only* thing refusing a naive timestamp: removing it admitted the
+    candidate, and the naive fact was carried into the digest as though it had been UTC all
+    along. That exclusive attribution is gone, deliberately.
+
+    R-12's temporal-coherence gate has to compare these instants, and a gate whose fail-closed
+    behaviour depends on another gate still being present is not fail-closed — with guard 3
+    mutated away, a naive value reached the comparison and escaped as a bare ``TypeError``,
+    an unclassified exception rather than a refusal. ``_comparable_instant`` now re-checks
+    awareness before comparing, so the same malformed input is still refused, and refused with
+    the package's existing canonical-field reason rather than an R-12 ordering reason.
+
+    Neither guard was weakened to preserve a kill count. Correct fail-closed classification is
+    worth more than exclusive attribution, and this test now measures the classification.
+    """
 
     naive = decision.expires_at.replace(tzinfo=None)
     forged = dataclasses.replace(decision, expires_at=naive)
-    candidate = _admits_when_removed(tmp_path, GUARD_TZ_AWARE, projection, forged)
-    # The admission is the dangerous part: the naive fact is carried, and the digest is
-    # computed over it as though it had been UTC all along.
-    assert candidate.decision_expires_at_fact.tzinfo is None
+    with tempfile.TemporaryDirectory(dir=tmp_path) as td:
+        mp = mutated_package(pathlib.Path(td), GUARD_TZ_AWARE)
+        with pytest.raises(Exception) as exc:
+            mp.build(projection, forged)
+
+    # Matched by class *name* and reason *value*: the mutated package is a separate module
+    # copy, so its exception classes are distinct objects from the ones imported here.
+    assert type(exc.value).__name__ == "CanonicalFieldError"
+    assert exc.value.reason.value == Reason.MALFORMED_CANONICAL_FIELD.value
+    assert "timezone-aware" in str(exc.value)
+    assert "decision_expires_at_fact" in str(exc.value)
+    # Not an R-12 ordering reason: the value is malformed, not validly ordered wrongly.
+    assert "temporal_ordering" not in exc.value.reason.value
+    # And not the unclassified escape this replaced.
+    assert not isinstance(exc.value, TypeError)
 
 
 def test_the_canonicalizer_silently_attaches_utc_to_a_naive_timestamp():

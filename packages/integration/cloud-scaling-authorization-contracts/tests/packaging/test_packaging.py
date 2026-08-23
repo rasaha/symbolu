@@ -15,7 +15,11 @@ PYPROJECT = (PROJECT / "pyproject.toml").read_text(encoding="utf-8")
 
 
 def test_version_is_the_declared_version():
-    """``0.3.0`` since 5B-2: the builder refuses a pairing it used to accept.
+    """``0.4.0`` since R-12: the builder refuses candidates it used to accept.
+
+    R-12 adds temporal-coherence refusals, so a candidate whose carried instants contradict
+    each other no longer constructs. Same shape of change as 0.3.0 below and the same reason
+    for a bump: nothing a consumer pins looks different, and the same inputs now raise.
 
     5B-1 took this to ``0.2.0`` — the candidate gained a required field and its digest moved.
     5B-2 moves no digest and no schema identifier; what it changes is that a candidate
@@ -24,7 +28,7 @@ def test_version_is_the_declared_version():
     the same inputs now raise.
     """
 
-    assert pkg.__version__ == "0.3.0"
+    assert pkg.__version__ == "0.4.0"
 
 
 def test_distribution_and_namespace_names():

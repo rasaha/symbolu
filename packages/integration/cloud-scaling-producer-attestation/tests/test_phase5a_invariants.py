@@ -55,27 +55,28 @@ PHASE_5A_NEGATIVE_ANCHOR = (
 def test_phase_5a_is_at_the_version_this_package_was_pinned_against():
     """P-1: Phase 5B-0A does not re-version Phase 5A — and pins what it reads.
 
-    ``0.2.0`` since 5B-1, which added the required policy coordinate to the candidate. This
+    ``0.4.0`` since R-12; ``0.2.0`` was 5B-1, which added the required policy coordinate to the candidate. This
     package's source is unchanged by that and its own version does not move; what moves is
     the fixture chain it verifies against. The assertion stays exact rather than becoming a
     range: a version that drifted without this suite being re-measured is the thing worth
     catching.
     """
 
-    assert p5a.__version__ == "0.3.0"
+    assert p5a.__version__ == "0.4.0"
 
 
 def test_phase_5a_exports_exactly_the_symbols_this_package_was_measured_against():
     """P-2: the Phase 5A public API is pinned; 5B-1 added four symbols and 5B-2 a fifth.
 
     5B-1: ``PolicyTargetBindingReferenceV2``, ``POLICY_TARGET_BINDING_V2_SCHEMA_VERSION``,
-    ``POLICY_COORDINATE_COMPONENTS`` and ``is_policy_authority_digest``. 5B-2 adds
-    ``POLICY_SCOPE_TENANT``, the one scope value that constrains which tenant a policy may
-    bound (R-9).
+    ``POLICY_COORDINATE_COMPONENTS`` and ``is_policy_authority_digest``. 5B-2 part 1 adds
+    ``POLICY_SCOPE_TENANT`` (R-9), and R-12 adds ``TemporalOrderingError`` — the refusal for
+    carried instants that are individually valid and collectively impossible.
     """
 
-    assert len(p5a.__all__) == 42
+    assert len(p5a.__all__) == 43
     assert "POLICY_SCOPE_TENANT" in p5a.__all__
+    assert "TemporalOrderingError" in p5a.__all__
 
 
 def test_the_phase_5a_v1_signing_payload_digest_is_unchanged():
