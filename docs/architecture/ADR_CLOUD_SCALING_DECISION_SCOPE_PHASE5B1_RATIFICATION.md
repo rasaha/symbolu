@@ -324,6 +324,7 @@ It pushed back on two things, and both are corrected above: R-9's framing was to
 | R-9 **CLOSED (5B-2 pt 1)** `[V]` | **Broadened by the independent design review, then closed.** Enforced at Phase 5A's builder (`CROSS_TENANT_POLICY_BINDING`) and gate 12 (`CANDIDATE_CROSS_TENANT_POLICY`), both keyed on the scope so the `GLOBAL` carve-out survives. Original framing kept below for the record:  The first framing asked only about the empty-string global tenant, which read as an edge case. It is not: **nothing anywhere in the tree ties a candidate's *action* tenant to the tenant of the policy it reconciles against.** A candidate describing an action for `tenant-1`, carrying a coordinate for a `TENANT`-scoped policy belonging to `tenant-elsewhere`, verifies `VERIFIED` `[V]` — gate 11 compares the candidate's coordinate against the *resolved* policy, and that policy is genuinely the other tenant's. Phase 5A does not compare them either. Inert today because no composition root calls `verify()`, which is exactly why it must be ruled on **before** 5B-2 wires one rather than discovered while wiring it. Pinned as executable behaviour by `test_a_candidate_reconciles_against_another_tenants_policy`, which measures today's permissive behaviour without endorsing it | Owner, before 5B-2 |
 | R-10 `[G]` | Two Phase 5A suite weaknesses found while implementing, both pre-existing: `test_non_reachability.py` strips docstrings with `ast.get_docstring`, whose dedented result does not match the indented source, so an indented docstring naming a forbidden symbol trips the scan; and `test_phase5a_invariants.py::test_no_phase_5a_source_file_was_modified` reads `git status`, so it measures a clean working tree rather than an unmodified package | Phase 5A |
 | R-11 **CLOSED (5B-2 pt 1)** `[V]` | Completeness now enumerates the public attribute surface statically and totally over names (`inspect.getmembers_static`), never executing a descriptor, with a five-member allowlist ratcheted against the merge base. Eleven distinct bypass constructs were planted and refused. The declared trust boundary — a contributor editing class, allowlist and disclosure together — is recorded, not claimed closed | Phase 5A |
+| R-12 `[G]` | **Found by the 5B-2 part 2 independent review.** Gate 13 compares each of the candidate's six timestamps against `as_of` and **never against each other**, so a candidate whose attestation predates its subject assertion by a year verifies `[V]`. That is internal *incoherence* rather than staleness — the pair is consistent with the instant and inconsistent with itself — and it belongs upstream at construction, where the builder holds all six. Out of scope for R-2, which is about reconciling the instant | Phase 5A |
 | A-59 (5B-0A) **INTENTIONAL BOUNDARY — not a defect** `[R]` | Measured: the attestation module never mentions `candidate_digest`, and two candidates with different digests were built from one attestation object `[V]`. **Owner ruling: this is not to be "closed" by adding `candidate_digest` to the producer signature.** The producer owns the recommendation, not the downstream policy, risk decision or authorization candidate. The producer signature authenticates the recommendation; the verified artifact binds that authenticated recommendation to the candidate examined; authorizing the complete candidate belongs to a later Decision/Envelope authority | Authority boundary, by design |
 
 ## The residual ratification round, and what this session verified of it
@@ -546,3 +547,32 @@ measurement to belong there.
 None. No fact moved between the halves, so the artifact digest and the partition fingerprint are
 unchanged and `VERIFICATION_PROFILE_VERSION` stays `v2` `[V]`. The distribution moves to `0.4.0`
 because a determination that verified at `0.3.0` may now be refused.
+
+
+### The independent review of part 2, and the one repair it forced
+
+The review confirmed both closures with measurements I had not made: every comparison operator
+in gate 13 checked against its upstream seam at source *and* at the boundary (`== valid_from`
+verifies, one microsecond earlier refuses; same at the decision bound), and a base-versus-head
+trace of every `verify()` call in the suite showing that of 134 common tests the 19 that differ
+**differ only in the `as_of` value, with every outcome identical** — which is the evidence that
+`T_CANDIDATE` masks nothing, and stronger than the neutralisation check I had run.
+
+**It also found a real defect in R-7's guard, and the defect was in the part I was most
+confident about.** `require_partition_agreement` compares each payload map against a declared
+membership — but `VERIFIED_DIGEST_KEYS` is the *union* of the two sets, so widening
+`DERIVED_FACT_NAMES` to swallow a name that is already a real field leaves the union unchanged
+and the comparison sees nothing short. The field is then dropped from the constructor call and
+the artifact dies on a missing keyword argument, classified `VERIFICATION_UNAVAILABLE` — *the
+verifier could not run* — when the truth is *the verifier's own partition is wrong*.
+
+Reproduced here before repairing: outcome `VERIFICATION_UNAVAILABLE`, detail `TypeError` `[V]`.
+The function's own docstring claimed it made this drift unavoidable. It did not. It now refuses
+a `DERIVED_FACT_NAMES` that intersects the artifact's real fields, and two controls pin it —
+one on the function, one end to end asserting the terminal classification is
+`INVARIANT_VIOLATION` and not `VERIFICATION_UNAVAILABLE`.
+
+That is the fourth guard in this ADR's history to be hollow on first writing, and the second
+where the hole was in the terminal *classification* rather than the check itself. A guard that
+fails for the wrong stated reason is only marginally better than one that does not fail: it
+sends the reader to the wrong place.

@@ -104,6 +104,8 @@ because a serialized verification artifact would be a forgeable one.
 
 from __future__ import annotations
 
+import dataclasses
+
 from dataclasses import dataclass, fields
 from datetime import datetime
 from typing import Any, Optional
@@ -231,6 +233,23 @@ def require_partition_agreement(
     must not conclude at all.
     """
 
+    # A name in DERIVED_FACT_NAMES is excluded from the constructor call, so widening it to
+    # swallow a *real* field slips past the membership comparison below — the union that
+    # defines VERIFIED_DIGEST_KEYS absorbs the name and nothing looks short. The artifact then
+    # dies on a missing keyword argument, which classifies as VERIFICATION_UNAVAILABLE: "the
+    # verifier could not run", when the truth is "the verifier's own partition is wrong".
+    # Found by independent review; the check below claimed to make this drift unavoidable and
+    # did not cover it.
+    smuggled = DERIVED_FACT_NAMES & {
+        f.name for f in dataclasses.fields(VerifiedPolicyAuthenticity)
+    }
+    if smuggled:
+        raise _IntegrityError(
+            f"DERIVED_FACT_NAMES names {sorted(smuggled)}, which the artifact carries as real "
+            "field(s). A derived name is one the digest covers and the artifact does not "
+            "store; naming a stored field here drops it from the artifact while leaving the "
+            "digest membership unchanged"
+        )
     for label, actual, expected in (
         ("verified", frozenset(verified_map), VERIFIED_DIGEST_KEYS),
         ("recorded", frozenset(recorded_map), RECORDED_FACT_NAMES),

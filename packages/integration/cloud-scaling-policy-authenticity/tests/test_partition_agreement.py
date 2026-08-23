@@ -104,3 +104,58 @@ def test_a_name_moved_between_the_halves_is_refused_by_both_sides():
     with pytest.raises(VerifiedPolicyArtifactIntegrityError) as exc:
         require_partition_agreement(verified_map=verified, recorded_map=recorded)
     assert moved in str(exc.value)
+
+
+@pytest.mark.adversarial
+def test_derived_cannot_be_widened_to_swallow_a_real_field():
+    """Found by independent review, and it defeated the first version of this guard.
+
+    Adding a real constructor field to ``DERIVED_FACT_NAMES`` does not change
+    ``VERIFIED_DIGEST_KEYS`` — the union already contained it — so the membership comparison
+    saw nothing short. The field was then dropped from the constructor call and the artifact
+    died on a missing keyword argument, which classifies as ``VERIFICATION_UNAVAILABLE``:
+    *the verifier could not run*, when the truth was *the verifier's partition is wrong*.
+
+    Measured before the repair: outcome ``VERIFICATION_UNAVAILABLE``, detail "TypeError".
+    """
+
+    import ugence_cloud_scaling_policy_authenticity.verified as V
+
+    original = V.DERIVED_FACT_NAMES
+    V.DERIVED_FACT_NAMES = original | {"policy_id"}
+    try:
+        assert (V.VERIFIED_FACT_NAMES | V.DERIVED_FACT_NAMES) == V.VERIFIED_DIGEST_KEYS, (
+            "the union is unchanged by the widening, which is exactly why the membership "
+            "comparison alone could not see it"
+        )
+        with pytest.raises(VerifiedPolicyArtifactIntegrityError) as exc:
+            require_partition_agreement(
+                verified_map={n: None for n in V.VERIFIED_DIGEST_KEYS},
+                recorded_map={n: None for n in RECORDED_FACT_NAMES},
+            )
+        assert "policy_id" in str(exc.value)
+    finally:
+        V.DERIVED_FACT_NAMES = original
+
+
+@pytest.mark.adversarial
+def test_the_real_verifier_refuses_the_widening_as_an_invariant_violation():
+    """End to end: the terminal classification is the honest one, not 'could not run'."""
+
+    import ugence_cloud_scaling_policy_authenticity.verification as VF
+    import ugence_cloud_scaling_policy_authenticity.verified as V
+    from ugence_cloud_scaling_policy_authenticity import PolicyAuthenticityOutcome as O
+
+    original = V.DERIVED_FACT_NAMES
+    V.DERIVED_FACT_NAMES = VF.DERIVED_FACT_NAMES = original | {"policy_id"}
+    try:
+        authority, record = issued()
+        result = verifier_for(authority).verify(
+            coordinate=record.coordinate,
+            expected_reference_tenant_id=record.coordinate.tenant_id,
+            as_of=T_MID,
+        )
+        assert result.outcome is O.INVARIANT_VIOLATION
+        assert result.outcome is not O.VERIFICATION_UNAVAILABLE
+    finally:
+        V.DERIVED_FACT_NAMES = VF.DERIVED_FACT_NAMES = original
