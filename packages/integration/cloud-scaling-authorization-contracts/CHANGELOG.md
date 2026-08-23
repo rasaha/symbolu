@@ -65,7 +65,8 @@ moves** — a refusal changes what is constructible, not what is hashed.
   - surface: trust_state — constant `PRESENT_BUT_NOT_TRUST_VERIFIED`; a read-only property
     rather than a field so `object.__setattr__` cannot forge it on a frozen dataclass.
   - surface: grants_authority — constant `False`, and no branch in this package returns `True`.
-- Suite 277 → 283, 0 failed, 0 skipped.
+- Suite 277 → 298, 0 failed, 0 skipped. (283 was the count before the enumeration was
+  rebuilt: the surface ratchet and the bypass-construct acceptance tests came after.)
 
 ## [0.2.0] — Cloud Scaling Phase 5B-1: decision-scope repair
 
