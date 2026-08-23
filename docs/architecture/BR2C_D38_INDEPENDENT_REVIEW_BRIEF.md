@@ -163,18 +163,25 @@ row's full text. This is the reconciliation performed once as a worked
 demonstration. It says nothing about a `0.3.0` head, which does not exist; the
 reviewer repeats it against the head they are given.
 
-**It is not yet merged, and that is a precondition still open** [G]. At the time
-of writing, `4920c878` is **not an ancestor of this repository's default
-branch**: it is reachable only from the BR-2C-0 line of work
-(`claude/symbolu-br2c-prose-fixes-lyhe5i` and the branches stacked on it), all
-published to the remote and immutable by hash, none merged. A baseline that lives
-only on the same unmerged line as the work it checks is weaker than one on the
-default branch, though pinning by full commit hash preserves what matters:
-immutability and independence from any later edit. **Landing the BR-2C-0 line on
-the default branch before the D-38 review is commissioned is an owner action, and
-it is outstanding.** If it is not closed, the reviewer should treat the baseline
-as hash-pinned rather than branch-anchored, and should say so in their findings
-rather than let the distinction pass silently.
+**The baseline must be branch-anchored before the review is commissioned** [R].
+A baseline reachable only from the same line of work it is used to check is
+weaker than one on the default branch: both are immutable by hash, but only the
+latter is independent of the branch under review, and only the latter survives
+that branch being deleted, rewritten or abandoned. **The requirement is therefore
+that `4920c878` be an ancestor of the repository's default branch at the moment
+the reviewer is engaged, and that the reviewer verify this rather than assume
+it** — `git merge-base --is-ancestor 4920c878 <default-branch>` answers it in one
+command, against whatever the default branch is on the day they are handed the
+work.
+
+**Merging the BR-2C-0 line establishes it.** That line — `4920c878` and the
+commits stacked on it, up to and including this brief — reaches the default
+branch through pull request **#1466**, whose merge is what promotes the baseline
+from hash-pinned to branch-anchored. Until some such merge has occurred the
+requirement above is unmet, and a reviewer who finds it unmet should say so in
+their findings rather than let the distinction pass silently: the fallback is to
+pin by full commit hash and record that the baseline was not branch-anchored,
+never to substitute the release head's own copy of D-33.
 
 **So the reviewer's procedure for (ii) is a reconciliation, not an inspection**
 [R]:
