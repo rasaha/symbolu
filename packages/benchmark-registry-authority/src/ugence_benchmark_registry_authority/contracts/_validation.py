@@ -50,6 +50,7 @@ __all__ = [
     "require_identifier",
     "require_digest",
     "require_detached_signature",
+    "require_public_key_material",
     "require_aware_datetime",
     "require_enum_member",
     "require_distinct_actors",
@@ -59,6 +60,12 @@ __all__ = [
 
 #: A bare lowercase sha-256 hex digest. One spelling only.
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+
+#: Ed25519 public-key material, carried as exactly 64 lowercase hex characters
+#: (32 bytes). A **separate** pattern from ``_SHA256_RE`` even though the two
+#: currently accept the same language: sharing one constant would mean a future
+#: change to the digest rule silently re-specified what a public key may be.
+_ED25519_PUBLIC_KEY_HEX_RE = re.compile(r"^[0-9a-f]{64}$")
 
 #: A detached Ed25519 signature, carried as exactly 128 lowercase hex
 #: characters (64 bytes). Canonicalization refuses ``bytes`` outright, so the
@@ -209,6 +216,37 @@ def require_detached_signature(value: object, name: str) -> str:
             "is carried as a string with exactly one admissible spelling. "
             "Validating this encoding is not verifying this signature",
             BenchmarkRegistryRefusalReason.SIGNATURE_INVALID,
+        )
+    return text
+
+
+def require_public_key_material(value: object, name: str) -> str:
+    """Require Ed25519 public-key material as exactly 64 lowercase hex chars.
+
+    **This validates an encoding, not a key.** It proves the field has the shape
+    Ed25519 public-key material would have — 32 bytes, one spelling, lowercase
+    hex. It does not decode those bytes, does not check that they are a valid
+    curve point, does not construct a key object and does not import anything to
+    do so. D-04 forbids this package from parsing key material and this package
+    ships no cryptographic dependency at all; a validator that decoded the point
+    would be the first half of a key parser.
+
+    Carried as a string rather than :class:`bytes` for the same reason every
+    other opaque value in this package is: canonicalization refuses ``bytes``
+    outright, and one value must have exactly one spelling or two differently
+    encoded anchors could share one digest — which, since D-25 makes the anchor
+    revision the record's canonical digest, would make two distinct anchors one
+    revision.
+    """
+
+    text = require_canonical_str(value, name, allow_empty=False)
+    if not _ED25519_PUBLIC_KEY_HEX_RE.match(text):
+        raise _fail(
+            f"{name} must be Ed25519 public-key material as exactly 64 "
+            "lowercase hex characters (32 bytes); the encoding is checked and "
+            "the bytes are never decoded, because this package parses no key "
+            "material and links no cryptographic library",
+            BenchmarkRegistryRefusalReason.INDETERMINATE,
         )
     return text
 

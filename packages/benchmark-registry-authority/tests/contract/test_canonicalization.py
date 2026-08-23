@@ -1,4 +1,4 @@
-"""One encoder, one digest path, and eighteen pinned byte vectors."""
+"""One encoder, one digest path, and twenty-two pinned byte vectors."""
 
 from __future__ import annotations
 
@@ -87,8 +87,8 @@ def test_happy_keys_are_sorted_and_whitespace_free():
 # --------------------------------------------------------------------------- #
 # Adversarial
 # --------------------------------------------------------------------------- #
-def test_eighteen_distinct_domains_no_two_artifacts_share_a_byte_space():
-    assert len(set(BENCHMARK_REGISTRY_AUTHORITY_DIGEST_DOMAINS)) == 18
+def test_twenty_two_distinct_domains_no_two_artifacts_share_a_byte_space():
+    assert len(set(BENCHMARK_REGISTRY_AUTHORITY_DIGEST_DOMAINS)) == 22
 
 
 def test_every_shipped_class_has_a_distinct_digest_under_one_fixture_family():
@@ -221,8 +221,8 @@ def test_the_encoder_module_contains_no_repr_fallback_and_no_default_hook():
 
 def test_the_domain_inventory_is_derived_from_the_sealed_registry():
     inventory = canonical_domain_inventory()
-    assert len(inventory) == 21
-    assert sum(1 for d in inventory.values() if d is not None) == 18
+    assert len(inventory) == 25
+    assert sum(1 for d in inventory.values() if d is not None) == 22
     assert sum(1 for d in inventory.values() if d is None) == 3
 
 

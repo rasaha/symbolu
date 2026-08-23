@@ -12,19 +12,37 @@
 # transition; typed refusals; ports as Protocols; fifteen digest domains; pure
 # validation. Contracts only.
 #
-# BR-2B (this release, 0.2.0) — "NON-AUTHORITATIVE LIFECYCLE KERNEL."
+# BR-2B (0.2.0) — "NON-AUTHORITATIVE LIFECYCLE KERNEL."
 # Transition validation, predecessor checks, terminality, and conflict and
 # idempotency calculation, all over CALLER-ASSERTED state. Three further digest
 # domains. It determines what transition WOULD BE valid; nothing here makes one
 # occur.
 #
+# BR-2C-0 (this release, 0.2.3; the rung carries 0.2.1, 0.2.2 and 0.2.3) —
+# BR-2C's ratified
+# CONTRACT SURFACE, and no
+# BR-2C capability (ADR §35.2 D-33 mints the rung and D-36 places all three
+# versions on it; D-24, D-25 and D-26 rule the surface):
+# the role-scoped trust-anchor record, the three distinct exact verified-result
+# types, and the reshaped approval-verifier and trust-directory ports;
+# BenchmarkTrustAnchorResolution (D-34), the anchor-resolution outcome carrying
+# an anchor record XOR one of the seam's two typed refusals; and
+# BENCHMARK_VERIFICATION_REFUSAL_REASONS (D-35), the twelve of the twenty-four a
+# REFUSED verified result may carry, derived from the fault-class map and never
+# written out. Four
+# further digest domains. NO VERIFIER, no anchor resolution, no key parsing, no
+# clock read and no cryptographic dependency — and THE VERIFIER THOSE CONTRACTS
+# DESCRIBE DOES NOT EXIST AND HAS NOT BEEN AUDITED.
+#
 # NOT in this distribution and not started:
 #   BR-2C (0.3.0) cryptographic trust authority: audited Ed25519 verifier,
 #                 signing-frame verification, composition-root trust-resolver
 #                 adapter, key entitlements and revocation. The injected
-#                 verifier arrives here, defaulting to exact deny-all. Blocked
-#                 on a secure cryptographic verifier and trust-resolver design,
-#                 specified and independently audited.
+#                 verifier arrives here, defaulting to exact deny-all. Still
+#                 blocked on a secure cryptographic verifier and trust-resolver
+#                 design, specified and EXTERNALLY AUDITED — D-32 waives only
+#                 the distinct in-repo reviewer, and makes that external
+#                 cryptographic audit a hard precondition to any production use.
 #   BR-2D (0.4.0) durable registry authority: persistence, the trusted clock,
 #                 compare-and-set transitions, immutable event history, the
 #                 process-local in-memory adapter, registry-event signing, and
@@ -59,7 +77,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ugence-benchmark-registry-authority"
 dynamic = ["version"]
-description = "Ugence Benchmark Registry Authority — BR-2B non-authoritative lifecycle kernel over BR-2A's registry and exact-resolution contracts: the administrative lifecycle, its closed transition relation, nested-binding record and event shapes, typed refusals, inert ports, and transition planning over caller-asserted state (internal platform infrastructure; no store, no verifier, no clock, no append path, no authority-issued result)."
+description = "Ugence Benchmark Registry Authority — BR-2C-0 contract surface over BR-2B's non-authoritative lifecycle kernel and BR-2A's registry and exact-resolution contracts: the administrative lifecycle and its closed transition relation, nested-binding record and event shapes, typed refusals, inert ports, transition planning over caller-asserted state, the role-scoped trust-anchor record and the three exact verified-result types, BenchmarkTrustAnchorResolution (an anchor record XOR a typed refusal at the trust-directory seam) and BENCHMARK_VERIFICATION_REFUSAL_REASONS (the twelve of the twenty-four a refused verified result may carry) (internal platform infrastructure; no store, no verifier, no clock, no append path, no authority-issued result, and the verifier these contracts describe does not exist and has not been audited)."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Proprietary" }

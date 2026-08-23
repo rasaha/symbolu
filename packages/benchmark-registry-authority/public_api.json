@@ -1,7 +1,7 @@
 {
   "distribution": "ugence-benchmark-registry-authority",
   "namespace": "ugence_benchmark_registry_authority",
-  "package_version": "0.2.0",
+  "package_version": "0.2.3",
   "curated_api_module": "ugence_benchmark_registry_authority.api",
   "note": "Machine-readable snapshot of the curated public API (ugence_benchmark_registry_authority.api.__all__). __version__ is carried separately as package_version and is NOT a member of 'symbols', so symbols is exactly one shorter than api.__all__ — both counts are asserted, and neither is 'corrected' to match the other. tests/packaging/test_public_api.py asserts this file equals the actual package surface, and verify_benchmark_registry_authority_distribution.py asserts the same for the built wheel, the built sdist and the isolated installed runtime.",
   "symbols": {
@@ -16,6 +16,10 @@
     "BENCHMARK_APPROVAL_SIGNING_FRAME_DOMAIN": {
       "kind": "constant",
       "value": "ugence.benchmark-registry-authority/approval-signing-frame/v1"
+    },
+    "BENCHMARK_APPROVAL_VERIFIED_RESULT_DIGEST_DOMAIN": {
+      "kind": "constant",
+      "value": "ugence.benchmark-registry-authority/approval-verified-result/v1"
     },
     "BENCHMARK_BANNED_REGISTRATION_STATE_NAMES": {
       "kind": "constant",
@@ -104,6 +108,10 @@
       "kind": "constant",
       "value": "ugence.benchmark-registry-authority/publisher-submission-signing-frame/v1"
     },
+    "BENCHMARK_PUBLISHER_VERIFIED_RESULT_DIGEST_DOMAIN": {
+      "kind": "constant",
+      "value": "ugence.benchmark-registry-authority/publisher-verified-result/v1"
+    },
     "BENCHMARK_REGISTRATION_EVENT_PAYLOAD_DIGEST_DOMAIN": {
       "kind": "constant",
       "value": "ugence.benchmark-registry-authority/registration-event-payload/v1"
@@ -172,7 +180,14 @@
         "APPROVAL_UNVERIFIED",
         "NOT_FOUND",
         "NOT_ADMITTED",
-        "INDETERMINATE"
+        "INDETERMINATE",
+        "TRUST_ANCHOR_NOT_FOUND",
+        "TRUST_ANCHOR_REVOKED",
+        "TRUST_ANCHOR_DISABLED",
+        "TRUST_ANCHOR_NOT_YET_VALID",
+        "TRUST_ANCHOR_EXPIRED",
+        "TRUST_DIRECTORY_UNAVAILABLE",
+        "STALE_TRUST_SNAPSHOT"
       ]
     },
     "BENCHMARK_REGISTRY_AUTHORITY_CANONICALIZATION_VERSION": {
@@ -199,7 +214,11 @@
         "ugence.benchmark-registry-authority/tenant-registry-scope-expectation/v1",
         "ugence.benchmark-registry-authority/registry-snapshot-assertion/v1",
         "ugence.benchmark-registry-authority/transition-plan/v1",
-        "ugence.benchmark-registry-authority/transition-refusal/v1"
+        "ugence.benchmark-registry-authority/transition-refusal/v1",
+        "ugence.benchmark-registry-authority/trust-anchor-record/v1",
+        "ugence.benchmark-registry-authority/publisher-verified-result/v1",
+        "ugence.benchmark-registry-authority/approval-verified-result/v1",
+        "ugence.benchmark-registry-authority/revocation-verified-result/v1"
       ]
     },
     "BENCHMARK_REGISTRY_DECLARED_CONSISTENCY": {
@@ -235,7 +254,14 @@
         "APPROVAL_UNVERIFIED": "TRUST_AND_AUTHENTICITY",
         "NOT_FOUND": "READ_NON_DISCLOSURE",
         "NOT_ADMITTED": "READ_NON_DISCLOSURE",
-        "INDETERMINATE": "INDETERMINATE"
+        "INDETERMINATE": "INDETERMINATE",
+        "TRUST_ANCHOR_NOT_FOUND": "TRUST_AND_AUTHENTICITY",
+        "TRUST_ANCHOR_REVOKED": "TRUST_AND_AUTHENTICITY",
+        "TRUST_ANCHOR_DISABLED": "TRUST_AND_AUTHENTICITY",
+        "TRUST_ANCHOR_NOT_YET_VALID": "TRUST_AND_AUTHENTICITY",
+        "TRUST_ANCHOR_EXPIRED": "TRUST_AND_AUTHENTICITY",
+        "TRUST_DIRECTORY_UNAVAILABLE": "TRUST_AND_AUTHENTICITY",
+        "STALE_TRUST_SNAPSHOT": "TRUST_AND_AUTHENTICITY"
       }
     },
     "BENCHMARK_REGISTRY_REFUSAL_REASONS": {
@@ -254,8 +280,15 @@
         "PUBLISHER_UNTRUSTED",
         "SIGNATURE_INVALID",
         "STALE_REGISTRY_SNAPSHOT",
+        "STALE_TRUST_SNAPSHOT",
         "STORE_INTEGRITY_INVALID",
         "STORE_UNAVAILABLE",
+        "TRUST_ANCHOR_DISABLED",
+        "TRUST_ANCHOR_EXPIRED",
+        "TRUST_ANCHOR_NOT_FOUND",
+        "TRUST_ANCHOR_NOT_YET_VALID",
+        "TRUST_ANCHOR_REVOKED",
+        "TRUST_DIRECTORY_UNAVAILABLE",
         "UNAUTHORIZED_TRANSITION",
         "UNSUPPORTED_SUPERSESSION"
       ]
@@ -287,6 +320,10 @@
     "BENCHMARK_REVOCATION_SIGNING_FRAME_DOMAIN": {
       "kind": "constant",
       "value": "ugence.benchmark-registry-authority/revocation-signing-frame/v1"
+    },
+    "BENCHMARK_REVOCATION_VERIFIED_RESULT_DIGEST_DOMAIN": {
+      "kind": "constant",
+      "value": "ugence.benchmark-registry-authority/revocation-verified-result/v1"
     },
     "BENCHMARK_SIGNING_FRAME_SPECIFICATION": {
       "kind": "constant",
@@ -417,6 +454,19 @@
       "kind": "constant",
       "value": "ugence.benchmark-registry-authority/transition-refusal/v1"
     },
+    "BENCHMARK_TRUST_ANCHOR_EVALUATION_ORDER": {
+      "kind": "constant",
+      "value": [
+        "TRUST_ANCHOR_REVOKED",
+        "TRUST_ANCHOR_DISABLED",
+        "TRUST_ANCHOR_NOT_YET_VALID",
+        "TRUST_ANCHOR_EXPIRED"
+      ]
+    },
+    "BENCHMARK_TRUST_ANCHOR_RECORD_DIGEST_DOMAIN": {
+      "kind": "constant",
+      "value": "ugence.benchmark-registry-authority/trust-anchor-record/v1"
+    },
     "BENCHMARK_UNBOUND_PAYLOAD_TYPES": {
       "kind": "constant",
       "value": [
@@ -431,6 +481,37 @@
         "approval_authenticity_established",
         "registry_admission_established",
         "trusted_resolution_established"
+      ]
+    },
+    "BENCHMARK_VERIFICATION_REFUSAL_REASONS": {
+      "kind": "constant",
+      "value": [
+        "NO_TRUST_ANCHOR_CONFIGURED",
+        "PUBLISHER_UNTRUSTED",
+        "SIGNATURE_INVALID",
+        "APPROVAL_UNVERIFIED",
+        "INDETERMINATE",
+        "TRUST_ANCHOR_NOT_FOUND",
+        "TRUST_ANCHOR_REVOKED",
+        "TRUST_ANCHOR_DISABLED",
+        "TRUST_ANCHOR_NOT_YET_VALID",
+        "TRUST_ANCHOR_EXPIRED",
+        "TRUST_DIRECTORY_UNAVAILABLE",
+        "STALE_TRUST_SNAPSHOT"
+      ]
+    },
+    "BENCHMARK_VERIFIED_RESULT_BOUND_FACTS": {
+      "kind": "constant",
+      "value": [
+        "verified_digest",
+        "signer_role",
+        "signer_identity",
+        "signer_key_id",
+        "signature_profile",
+        "anchor_record_digest",
+        "evaluated_at",
+        "outcome",
+        "refusal_reason"
       ]
     },
     "BenchmarkAdmissionDecisionPayload": {
@@ -464,6 +545,20 @@
         "validity_from",
         "validity_to",
         "detached_signature"
+      ]
+    },
+    "BenchmarkApprovalVerifiedResult": {
+      "kind": "contract",
+      "fields": [
+        "verified_digest",
+        "signer_role",
+        "signer_identity",
+        "signer_key_id",
+        "signature_profile",
+        "anchor_record_digest",
+        "evaluated_at",
+        "outcome",
+        "refusal_reason"
       ]
     },
     "BenchmarkApprovalVerifierPort": {
@@ -536,6 +631,20 @@
     },
     "BenchmarkPublisherTrustDirectoryPort": {
       "kind": "protocol"
+    },
+    "BenchmarkPublisherVerifiedResult": {
+      "kind": "contract",
+      "fields": [
+        "verified_digest",
+        "signer_role",
+        "signer_identity",
+        "signer_key_id",
+        "signature_profile",
+        "anchor_record_digest",
+        "evaluated_at",
+        "outcome",
+        "refusal_reason"
+      ]
     },
     "BenchmarkRegistrationEventPayload": {
       "kind": "contract",
@@ -617,7 +726,14 @@
         "APPROVAL_UNVERIFIED",
         "NOT_FOUND",
         "NOT_ADMITTED",
-        "INDETERMINATE"
+        "INDETERMINATE",
+        "TRUST_ANCHOR_NOT_FOUND",
+        "TRUST_ANCHOR_REVOKED",
+        "TRUST_ANCHOR_DISABLED",
+        "TRUST_ANCHOR_NOT_YET_VALID",
+        "TRUST_ANCHOR_EXPIRED",
+        "TRUST_DIRECTORY_UNAVAILABLE",
+        "STALE_TRUST_SNAPSHOT"
       ]
     },
     "BenchmarkRegistryScopeExpectation": {
@@ -672,6 +788,20 @@
         "declared_recorded_at"
       ]
     },
+    "BenchmarkRevocationVerifiedResult": {
+      "kind": "contract",
+      "fields": [
+        "verified_digest",
+        "signer_role",
+        "signer_identity",
+        "signer_key_id",
+        "signature_profile",
+        "anchor_record_digest",
+        "evaluated_at",
+        "outcome",
+        "refusal_reason"
+      ]
+    },
     "BenchmarkSignatureProfile": {
       "kind": "enum",
       "members": [
@@ -699,6 +829,54 @@
         "snapshot",
         "refused_to_state",
         "declared_refusal_reason"
+      ]
+    },
+    "BenchmarkTrustAnchorRecord": {
+      "kind": "contract",
+      "fields": [
+        "role",
+        "identity",
+        "key_id",
+        "signature_profile",
+        "public_key_material",
+        "validity_from",
+        "validity_to",
+        "status",
+        "revoked_at",
+        "revocation_reason"
+      ]
+    },
+    "BenchmarkTrustAnchorResolution": {
+      "kind": "contract",
+      "fields": [
+        "role",
+        "identity",
+        "key_id",
+        "anchor",
+        "refusal_reason"
+      ]
+    },
+    "BenchmarkTrustAnchorStatus": {
+      "kind": "enum",
+      "members": [
+        "ENABLED",
+        "REVOKED",
+        "DISABLED"
+      ]
+    },
+    "BenchmarkTrustRole": {
+      "kind": "enum",
+      "members": [
+        "PUBLISHER",
+        "APPROVER",
+        "REVOKER"
+      ]
+    },
+    "BenchmarkVerificationOutcome": {
+      "kind": "enum",
+      "members": [
+        "VERIFIED",
+        "REFUSED"
       ]
     },
     "PlatformRegistryScopeExpectation": {

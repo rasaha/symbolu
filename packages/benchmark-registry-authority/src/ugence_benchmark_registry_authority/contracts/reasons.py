@@ -11,7 +11,7 @@ Two vocabularies, provably disjoint
 -----------------------------------
 :class:`~ugence_benchmark_registry.BenchmarkRefusalReason` (BR-1, seventeen
 members, every value prefixed ``BENCHMARK_``) and
-:class:`BenchmarkRegistryRefusalReason` (BR-2, seventeen members, none so
+:class:`BenchmarkRegistryRefusalReason` (BR-2, twenty-four members, none so
 prefixed) share no member and no value, in either direction. There is no alias,
 no lookup helper that accepts one and returns the other, and no member of either
 that means the same thing as a member of the other.
@@ -187,6 +187,74 @@ class BenchmarkRegistryRefusalReason(str, Enum):
     #: fine". Every unknown condition in BR-2 maps here and refuses.
     INDETERMINATE = "INDETERMINATE"
 
+    # ---------------------------------------------------------------- #
+    # Trust-anchor lifecycle (D-27) and trust-state availability (D-28)
+    #
+    # Seven members appended at the END of the enum rather than inserted into
+    # the thematic block above, because §35.6 requires appending and never
+    # inserting: BR-2's members occupy composite indices 17..40 and an
+    # insertion would silently renumber every member after the insertion
+    # point, so a consumer that had recorded an index against §22.13 would
+    # find it pointing at a different refusal.
+    #
+    # All seven are **role-neutral** (D-27). A refusal says an anchor was
+    # revoked, not that a *publisher's* anchor was revoked: the role is carried
+    # as a bound field of the verified result, so folding it into the refusal
+    # name would be a second spelling of a fact already bound, and would
+    # multiply five conditions into fifteen members.
+    #
+    # D-27 also fixes the count at five for the lifecycle conditions and D-28
+    # at two for the availability conditions. Folding any condition into an
+    # existing member later needs its own ratification rather than being an
+    # implementation choice.
+    # ---------------------------------------------------------------- #
+    #: No anchor record exists for the exact (role, identity, key) triple.
+    #: Distinct from :attr:`PUBLISHER_UNTRUSTED`, which D-03 already used for
+    #: both an unknown key and a revoked one; D-27 separates them because
+    #: collapsing an absent anchor into a revoked one loses the operator's
+    #: single most useful distinction. **Role-scoped absence**: an anchor
+    #: entitled for another role is *not found* for this one (D-26), never
+    #: silently accepted.
+    TRUST_ANCHOR_NOT_FOUND = "TRUST_ANCHOR_NOT_FOUND"
+
+    #: The resolved anchor carries
+    #: :attr:`~.enums.BenchmarkTrustAnchorStatus.REVOKED`. First in D-28's
+    #: evaluation order, and **retroactive**: revocation invalidates prior
+    #: signatures at every trusted instant, so this refuses even for an
+    #: instant before the revocation. Ordinary key rotation does not.
+    TRUST_ANCHOR_REVOKED = "TRUST_ANCHOR_REVOKED"
+
+    #: The resolved anchor carries
+    #: :attr:`~.enums.BenchmarkTrustAnchorStatus.DISABLED`. Second in D-28's
+    #: order. Carries no retroactive effect, which is exactly why it is not
+    #: folded into :attr:`TRUST_ANCHOR_REVOKED`.
+    TRUST_ANCHOR_DISABLED = "TRUST_ANCHOR_DISABLED"
+
+    #: The trusted instant precedes the anchor's ``validity_from``. Third in
+    #: D-28's order, and derived from the record's interval rather than from
+    #: its status.
+    TRUST_ANCHOR_NOT_YET_VALID = "TRUST_ANCHOR_NOT_YET_VALID"
+
+    #: The trusted instant is at or after the anchor's ``validity_to`` — the
+    #: half-open ``[validity_from, validity_to)`` rule this package applies
+    #: everywhere. Last in D-28's order.
+    TRUST_ANCHOR_EXPIRED = "TRUST_ANCHOR_EXPIRED"
+
+    #: The trust directory could not be reached. Fails closed on exactly
+    #: :attr:`STORE_UNAVAILABLE`'s posture, extended from the store to anchors:
+    #: there is **never** a fallback to a cached, default or previously
+    #: successful verification (D-28). D-04's seventh constraint covered the
+    #: absence of a trust resolver at startup only; this covers it at every
+    #: evaluation thereafter.
+    TRUST_DIRECTORY_UNAVAILABLE = "TRUST_DIRECTORY_UNAVAILABLE"
+
+    #: The trust state available is older than the evaluation requires. D-21
+    #: records that a cached verification answer is indistinguishable from a
+    #: fresh one, which is why staleness must refuse rather than be tolerated:
+    #: a stale snapshot may predate a revocation, and serving from it is
+    #: indistinguishable from ignoring the revocation.
+    STALE_TRUST_SNAPSHOT = "STALE_TRUST_SNAPSHOT"
+
 
 #: Every BR-2 refusal reason, as an unordered set for membership tests.
 BENCHMARK_REGISTRY_REFUSAL_REASONS: frozenset = frozenset(
@@ -211,11 +279,11 @@ if frozenset(_BR1_PREFIX) != BR1_BENCHMARK_REFUSAL_REASONS:
     )
 
 #: The ordered composite refusal vocabulary: BR-1's seventeen members in
-#: declaration order, then BR-2's seventeen in declaration order.
+#: declaration order, then BR-2's twenty-four in declaration order.
 #:
 #: The BR-1 prefix is byte-for-byte BR-1's own order, so a consumer sorting by
 #: index against §22.13 gets the same answer from either package. BR-2's members
-#: occupy indices 17..33 and never displace a BR-1 index.
+#: occupy indices 17..40 and never displace a BR-1 index.
 BENCHMARK_REGISTRY_ALL_REFUSAL_REASONS: tuple = _BR1_PREFIX + tuple(
     BenchmarkRegistryRefusalReason
 )
@@ -275,6 +343,31 @@ BENCHMARK_REGISTRY_REFUSAL_FAULT_CLASSES: MappingProxyType = MappingProxyType(
         ),
         BenchmarkRegistryRefusalReason.INDETERMINATE: (
             BenchmarkRegistryFaultClass.INDETERMINATE
+        ),
+        # D-27's five and D-28's two. Every one of the seven is a statement
+        # that a key or the trust state behind it could not be trusted, which
+        # is TRUST_AND_AUTHENTICITY's own definition; none is a statement about
+        # the registry store, whose contents these refusals never consult.
+        BenchmarkRegistryRefusalReason.TRUST_ANCHOR_NOT_FOUND: (
+            BenchmarkRegistryFaultClass.TRUST_AND_AUTHENTICITY
+        ),
+        BenchmarkRegistryRefusalReason.TRUST_ANCHOR_REVOKED: (
+            BenchmarkRegistryFaultClass.TRUST_AND_AUTHENTICITY
+        ),
+        BenchmarkRegistryRefusalReason.TRUST_ANCHOR_DISABLED: (
+            BenchmarkRegistryFaultClass.TRUST_AND_AUTHENTICITY
+        ),
+        BenchmarkRegistryRefusalReason.TRUST_ANCHOR_NOT_YET_VALID: (
+            BenchmarkRegistryFaultClass.TRUST_AND_AUTHENTICITY
+        ),
+        BenchmarkRegistryRefusalReason.TRUST_ANCHOR_EXPIRED: (
+            BenchmarkRegistryFaultClass.TRUST_AND_AUTHENTICITY
+        ),
+        BenchmarkRegistryRefusalReason.TRUST_DIRECTORY_UNAVAILABLE: (
+            BenchmarkRegistryFaultClass.TRUST_AND_AUTHENTICITY
+        ),
+        BenchmarkRegistryRefusalReason.STALE_TRUST_SNAPSHOT: (
+            BenchmarkRegistryFaultClass.TRUST_AND_AUTHENTICITY
         ),
     }
 )

@@ -4,8 +4,11 @@ Four :class:`typing.Protocol` declarations name the seams a registry will need,
 and **nothing in this package satisfies any of them**:
 
 * :class:`BenchmarkRegistryStorePort` — the durable-store seam (D-14).
-* :class:`BenchmarkPublisherTrustDirectoryPort` — publisher/key entitlement.
-* :class:`BenchmarkApprovalVerifierPort` — independent approval verification.
+* :class:`BenchmarkPublisherTrustDirectoryPort` — role-scoped anchor resolution
+  (D-25, D-26). Formerly a Boolean entitlement predicate.
+* :class:`BenchmarkApprovalVerifierPort` — the three verification seams
+  (D-24, D-26), each returning a distinct exact verified result. Formerly two
+  methods returning ``bool``.
 * :class:`BenchmarkClockPort` — the one injected authoritative clock (D-11).
 
 What is deliberately absent
@@ -77,8 +80,16 @@ from .envelopes import (
     BenchmarkApprovalEnvelope,
     BenchmarkPublisherSubmissionEnvelope,
 )
+from .envelopes import BenchmarkRevocationEnvelope
+from .enums import BenchmarkTrustRole
 from .read_payloads import BenchmarkHistoricalRecordPayload
 from .requests import BenchmarkHistoricalInspectionRequest
+from .trust import (
+    BenchmarkApprovalVerifiedResult,
+    BenchmarkPublisherVerifiedResult,
+    BenchmarkRevocationVerifiedResult,
+    BenchmarkTrustAnchorResolution,
+)
 
 __all__ = [
     "BenchmarkRegistryStorePort",
@@ -137,7 +148,20 @@ class BenchmarkRegistryStorePort(Protocol):
 
 @runtime_checkable
 class BenchmarkPublisherTrustDirectoryPort(Protocol):
-    """The publisher/key entitlement seam. **Declared here, implemented nowhere.**
+    """The role-scoped anchor **resolution** seam. **Implemented nowhere.**
+
+    D-25 replaces Boolean entitlement with exact anchor resolution: the seam
+    resolves an **immutable role-scoped anchor record** rather than answering
+    true or false. A Boolean answered *entitled?* and nothing else, so a caller
+    could not learn which key, under which role, valid over which interval, in
+    which status — and a verified result had nowhere to bind the anchor revision
+    §35.1's BR-2C row requires it to bind.
+
+    D-26 makes the seam **role-scoped in its parameters**. Publisher, approver
+    and revoker occupy logically separate anchor namespaces; they may share one
+    physical directory implementation, but an anchor authorized for one role
+    **never** authorizes another automatically, so the role is a mandatory
+    argument rather than something a shared directory may infer.
 
     D-04: the **composition root** owns and configures benchmark trust anchors,
     under seven binding constraints — exact deny-all default; no registry-minted
@@ -146,15 +170,43 @@ class BenchmarkPublisherTrustDirectoryPort(Protocol):
     trust store inside the registry**; and production startup fails closed when a
     production trust resolver is absent.
 
-    This package holds no anchors, mints none, parses no key material and
-    imports no other authority's directory. There is no second trust store here
-    because there is no first one.
+    This package holds no anchors, mints none, resolves none, parses no key
+    material and imports no other authority's directory. There is no second
+    trust store here because there is no first one — declaring the shape a
+    resolver must have does not resolve anything, and a Protocol is not
+    instantiable.
     """
 
-    def is_entitled(
-        self, publisher_identity: str, publisher_key_id: str
-    ) -> bool:
-        """Whether the key is entitled to publish for that publisher."""
+    def resolve_anchor(
+        self,
+        role: BenchmarkTrustRole,
+        identity: str,
+        key_id: str,
+    ) -> BenchmarkTrustAnchorResolution:
+        """Resolve the anchor record for an exact (role, identity, key) triple.
+
+        Returns the record **as it stands**, with its own status and validity
+        interval intact. It deliberately takes **no trusted instant and performs
+        no lifecycle evaluation**: D-27 requires revoked, disabled, not-yet-valid
+        and expired to stay distinguishable, and a resolver that filtered on the
+        instant would collapse all four into an indistinguishable absence. The
+        evaluation belongs to the verification seam, which binds its outcome and
+        its reason into the verified result where D-27 requires the distinctions
+        to be preserved.
+
+        **The return is a resolution, not an optional record** (D-34). This seam
+        returned ``Optional[BenchmarkTrustAnchorRecord]`` when D-25 and D-26
+        reshaped it, which followed both rulings literally and left a ``None``
+        standing for two conditions D-27 and D-28 had ratified as separate
+        refusal members: the directory answered and held no anchor, and the
+        directory could not be consulted. D-28's fail-closed posture needs those
+        two separable — an unreachable directory reading as *no such anchor* is a
+        default answer substituted for an unavailable one, which D-28 forbids —
+        so the outcome carries a record **XOR** a typed refusal instead, and a
+        caller branches on which is present.
+
+        Never called here.
+        """
         ...
 
 
@@ -172,16 +224,67 @@ class BenchmarkApprovalVerifierPort(Protocol):
     be an implementation. **BR-2B ships no verifier at all**; BR-2C injects one
     whose default is exact deny-all and supplies the audited one, reusing neither the Policy
     Authority nor the Risk Authority Ed25519 implementation.
+
+    **No verifier ships at this contract slice either, and none has been
+    audited.** D-32 waives the distinct in-repo reviewer for BR-2C only and
+    narrows "independently audited" to an *external cryptographic audit of the
+    verifier*, which remains a hard precondition to any production use. The
+    engineering half of §35.1's blocker is untouched by that waiver.
+
+    Three seams, not two
+    ---------------------
+    D-24 replaces both Boolean returns with **distinct exact verified-result
+    types**, and D-26 adds a third method for the revocation seam. Each returns
+    its own type: a result about a revoker can never be handed to a caller
+    expecting one about a publisher, which §17's rule 10 requires and which one
+    shared return type would leave to call-site discipline.
+
+    Every seam takes the **explicit trusted instant** as an argument. D-28
+    records the consequence for D-11 so it is not discovered late: BR-2C ships
+    no clock, so the trusted instant is an *input* to verification and never a
+    clock read. The authoritative clock arrives at BR-2D and D-11 is unamended.
     """
 
     def verify_publisher_submission(
-        self, envelope: BenchmarkPublisherSubmissionEnvelope
-    ) -> bool:
-        """Whether the envelope's detached signature verifies. Never called here."""
+        self,
+        envelope: BenchmarkPublisherSubmissionEnvelope,
+        trusted_instant: datetime,
+    ) -> BenchmarkPublisherVerifiedResult:
+        """Verify the envelope's detached signature. Never called here.
+
+        Returns an exact result binding the envelope digest, the signer role,
+        identity and key, the profile, the anchor revision, ``trusted_instant``,
+        the outcome and any refusal reason — never a ``bool``, which had nowhere
+        to carry any of them and was indistinguishable from a cached copy of
+        itself (D-21, D-24).
+        """
         ...
 
-    def verify_approval(self, envelope: BenchmarkApprovalEnvelope) -> bool:
-        """Whether the approval's detached signature verifies. Never called here."""
+    def verify_approval(
+        self,
+        envelope: BenchmarkApprovalEnvelope,
+        trusted_instant: datetime,
+    ) -> BenchmarkApprovalVerifiedResult:
+        """Verify the approval's detached signature. Never called here.
+
+        A distinct result type from the publisher seam's, because D-02 forbids a
+        publisher's own signature from standing where an independent approver's
+        is required.
+        """
+        ...
+
+    def verify_revocation(
+        self,
+        envelope: BenchmarkRevocationEnvelope,
+        trusted_instant: datetime,
+    ) -> BenchmarkRevocationVerifiedResult:
+        """Verify the revocation assertion's signature. Never called here.
+
+        Added by D-26, which verifies revokers at BR-2C under role separation.
+        **Verifying a revoker's assertion is not appending a revocation**:
+        through BR-2C registry events remain unsigned and non-existent under
+        D-12, and nothing in this package revokes anything.
+        """
         ...
 
 

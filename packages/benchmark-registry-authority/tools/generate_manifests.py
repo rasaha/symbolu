@@ -173,6 +173,28 @@ LATER_MILESTONE = {
         "BR-2D — the authority-issued refusal appended when the move is "
         "actually attempted against observed rather than asserted state."
     ),
+    "BenchmarkTrustAnchorRecord": (
+        "BR-2C (engineering half, still blocked) — the composition-root trust "
+        "resolver that would actually resolve one. D-04 keeps anchor ownership "
+        "with the composition root and forbids a second trust store here, so "
+        "this package defines the record's shape and holds no anchor."
+    ),
+    "BenchmarkPublisherVerifiedResult": (
+        "BR-2C (engineering half, still blocked) — the audited Ed25519 "
+        "verifier that would produce one. UNAUDITED AND NOT PRODUCTION-READY: "
+        "no verifier exists, and D-32 makes an external cryptographic audit a "
+        "hard precondition to any production use of the one that will."
+    ),
+    "BenchmarkApprovalVerifiedResult": (
+        "BR-2C (engineering half, still blocked) — the approval-verification "
+        "seam that would produce one. UNAUDITED AND NOT PRODUCTION-READY."
+    ),
+    "BenchmarkRevocationVerifiedResult": (
+        "BR-2C (engineering half, still blocked) — the revocation-verification "
+        "seam D-26 adds, which would produce one. UNAUDITED AND NOT "
+        "PRODUCTION-READY. Verifying a revoker's assertion is not appending a "
+        "revocation; the revocation event itself remains BR-2D's."
+    ),
 }
 
 ACTOR_PROPERTIES = (
@@ -187,7 +209,7 @@ DIGEST_PROPERTY_SUFFIX = "_digest"
 
 
 def _root_canonicalizable_classes():
-    """The eighteen root-canonicalizable classes, in registry insertion order."""
+    """The twenty-two root-canonicalizable classes, in registry insertion order."""
 
     return [
         (cls, domain)
@@ -440,11 +462,11 @@ def main() -> int:
         "distribution": DISTRIBUTION,
         "namespace": NAMESPACE,
         "package_version": api.__version__,
-        "milestone": "BR-2B",
+        "milestone": "BR-2C-0",
         "note": (
             "Machine-readable public-contract inventory. "
             "'Every type is constructible and canonicalizable' applies to "
-            "PUBLIC DATA CONTRACTS ONLY — the eighteen rows under "
+            "PUBLIC DATA CONTRACTS ONLY — the twenty-two rows under "
             "'public_data_contracts'. It does NOT apply to Protocols, enums, "
             "errors, constants, pure validation functions, frozen descriptors "
             "or abstract type declarations, each of which is listed under "
