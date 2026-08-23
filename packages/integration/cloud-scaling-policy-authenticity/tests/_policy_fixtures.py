@@ -15,7 +15,7 @@ from __future__ import annotations
 import importlib.util
 import pathlib
 from dataclasses import dataclass, field
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from _authority_fixtures import (  # noqa: F401 - re-exported for the suite
@@ -31,6 +31,16 @@ from _authority_fixtures import (  # noqa: F401 - re-exported for the suite
     make_policy,
     make_signer,
 )
+#: An instant inside BOTH the fixture policy's effective window and the fixture candidate's
+#: own validity (5B-2, R-2). Before gate 13 existed the suite verified candidate-bearing
+#: determinations at ``T_MID`` — 2026-06-01, five months after the fixture candidate's
+#: recommendation expired at 00:08:10 on 2026-01-01. Nothing objected, which is precisely the
+#: residual: the instant was recorded beside the candidate's timestamps and never compared
+#: against them. The admissible window is ``[00:05:00, 00:08:10]`` — opened by the decision
+#: evaluation, closed by the recommendation's expiry — and this sits inside it.
+T_CANDIDATE = datetime(2026, 1, 1, 0, 6, tzinfo=timezone.utc)
+
+
 from ugence_policy_authority.api import (
     GLOBAL_TENANT,
     PolicyCoordinate,
@@ -302,6 +312,7 @@ __all__ = [
     "issued",
     "make_authority",
     "make_policy",
+    "T_CANDIDATE",
     "make_signer",
     "phase5a_builders",
     "port_for",

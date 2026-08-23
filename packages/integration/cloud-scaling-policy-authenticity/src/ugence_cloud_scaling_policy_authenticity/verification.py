@@ -120,9 +120,11 @@ from .outcomes import resolution_reason_outcome
 from .resolution_port import require_production_resolution_port
 from .verified import (
     _VERIFICATION_TOKEN,
+    DERIVED_FACT_NAMES,
     VerifiedPolicyAuthenticity,
     _partitioned_digest,
     _record_minted,
+    require_partition_agreement,
     require_verified_policy_authenticity,
 )
 
@@ -560,6 +562,18 @@ class PolicyAuthenticityVerifier:
             if crossing is not None:
                 return _refuse(_Outcome.CANDIDATE_CROSS_TENANT_POLICY, crossing)
 
+        # === 13. the candidate must be valid AT the verified instant (5B-2, R-2) ========
+        # `as_of` was already type-checked and round-tripped against the resolution, and the
+        # authority already refuses a policy that is revoked or outside its effective window.
+        # None of that says anything about the *candidate*: before this gate a candidate whose
+        # decision expired five months earlier verified VERIFIED, because the instant was
+        # recorded beside the candidate's six timestamps and never compared against them.
+        if candidate is not None:
+            staleness = _candidate_validity_problem(candidate, instant)
+            if staleness is not None:
+                outcome, detail = staleness
+                return _refuse(outcome, detail)
+
         # === every gate succeeded — and only now does an artifact exist =================
         artifact = _mint_verified_artifact(
             record=record,
@@ -660,6 +674,66 @@ def _cross_tenant_binding(candidate, coordinate) -> Optional[str]:
     )
 
 
+#: The candidate's carried instants, classified by what each *means* — read off the upstream
+#: contracts rather than inferred from the field names:
+#:
+#: * ``subject_valid_from_fact`` / ``subject_valid_until_fact`` are an explicit interval,
+#:   inclusive on both ends. ``cloud-scaling-risk-integration``'s ``_require_within_validity``
+#:   fails on ``now > valid_until`` and ``now < valid_from``, and this gate matches it exactly
+#:   so the two boundaries cannot disagree about an instant.
+#: * ``decision_expires_at_fact`` is an upper bound. Risk Authority's envelope issuer refuses
+#:   on ``now > decision.expires_at``; same comparison, same inclusivity.
+#: * the remaining three are *occurrence* instants — moments the candidate asserts already
+#:   happened. A determination cannot be about a moment before its own evidence existed.
+_OCCURRENCE_FACTS: Final = (
+    "subject_asserted_at_fact",
+    "decision_evaluated_at_fact",
+    "attestation_issued_at_fact",
+)
+
+
+def _candidate_validity_problem(candidate, instant):
+    """Return ``(outcome, detail)`` when ``instant`` falls outside the candidate's validity.
+
+    Ordered so the refusal a reader gets is the most specific one available: the two windows
+    the owner named explicitly first, then the occurrence family.
+    """
+
+    valid_from = candidate.subject_valid_from_fact
+    valid_until = candidate.subject_valid_until_fact
+    if instant < valid_from:
+        return (
+            _Outcome.CANDIDATE_RECOMMENDATION_NOT_YET_VALID,
+            f"the verified instant {instant.isoformat()} precedes the recommendation's "
+            f"validity, which opens at {valid_from.isoformat()}",
+        )
+    if instant > valid_until:
+        return (
+            _Outcome.CANDIDATE_RECOMMENDATION_EXPIRED,
+            f"the recommendation expired at {valid_until.isoformat()} and the verified "
+            f"instant is {instant.isoformat()}; a determination about a dead recommendation "
+            "is not a determination about this action",
+        )
+    expires_at = candidate.decision_expires_at_fact
+    if instant > expires_at:
+        return (
+            _Outcome.CANDIDATE_DECISION_EXPIRED,
+            f"the Risk Authority decision expired at {expires_at.isoformat()} and the "
+            f"verified instant is {instant.isoformat()}. A live recommendation can carry a "
+            "dead decision, so this is checked independently of the window above",
+        )
+    for name in _OCCURRENCE_FACTS:
+        occurred_at = getattr(candidate, name)
+        if instant < occurred_at:
+            return (
+                _Outcome.CANDIDATE_FACT_NOT_YET_OCCURRED,
+                f"the candidate states {name} = {occurred_at.isoformat()}, which is after "
+                f"the verified instant {instant.isoformat()}; the determination would be "
+                "about a moment before the evidence it rests on came into being",
+            )
+    return None
+
+
 def _terminal_outcome(exc: BaseException) -> _Outcome:
     """Classify an exception that escaped the routine. Every answer is a refusal.
 
@@ -743,10 +817,13 @@ def _mint_verified_artifact(
         "policy_type": record.policy_type,
         "trust_configuration_digest": trust_configuration_digest,
     }
-    derived = ("outcome", "grants_authority", "historical")
+    # R-7: the maps and the canonical declaration are compared before anything is minted, so
+    # a name added here and forgotten in verified.py (or the reverse) fails loudly and says
+    # which side is short. `DERIVED_FACT_NAMES` is why the two sets differ at all.
+    require_partition_agreement(verified_map=verified_map, recorded_map=recorded_map)
     return _record_minted(
         VerifiedPolicyAuthenticity(
-            **{key: value for key, value in verified_map.items() if key not in derived},
+            **{k: v for k, v in verified_map.items() if k not in DERIVED_FACT_NAMES},
             **recorded_map,
             artifact_digest=_partitioned_digest(
                 verified_map=verified_map, recorded_map=recorded_map

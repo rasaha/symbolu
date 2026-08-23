@@ -23,7 +23,7 @@ from dataclasses import replace
 
 import pytest
 
-from _policy_fixtures import T_MID, issued, verifier_for
+from _policy_fixtures import T_CANDIDATE, T_MID, issued, verifier_for
 from ugence_cloud_scaling_policy_authenticity.verified import VERIFIED_FACT_NAMES
 
 #: Verified facts whose value is copied from the issuance record, and the signed key each
@@ -175,10 +175,12 @@ def test_a_candidate_digest_is_verified_when_present_and_absent_otherwise():
 
     authority, record = issued()
     candidate = genuine_candidate(record)
+    # T_CANDIDATE, not T_MID: since gate 13 the instant must sit inside the candidate's own
+    # validity, and the fixture candidate's recommendation expires months before T_MID.
     result = verifier_for(authority).verify(
         coordinate=record.coordinate,
         expected_reference_tenant_id=record.coordinate.tenant_id,
-        as_of=T_MID,
+        as_of=T_CANDIDATE,
         candidate=candidate,
     )
     assert result.verified_policy.candidate_digest_fact == candidate.candidate_digest

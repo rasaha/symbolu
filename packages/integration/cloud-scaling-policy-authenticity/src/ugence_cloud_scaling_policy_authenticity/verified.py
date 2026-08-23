@@ -134,6 +134,9 @@ __all__ = [
     "require_verified_policy_authenticity",
     "VERIFIED_FACT_NAMES",
     "RECORDED_FACT_NAMES",
+    "DERIVED_FACT_NAMES",
+    "VERIFIED_DIGEST_KEYS",
+    "require_partition_agreement",
 ]
 
 #: The facts a gate actually checked. Ordered as a frozenset because membership, not order,
@@ -194,6 +197,52 @@ RECORDED_FACT_NAMES: "frozenset[str]" = frozenset(
         "trust_configuration_digest",
     }
 )
+
+#: Names that enter the **verified half of the digest** but are not constructor fields of
+#: :class:`VerifiedPolicyAuthenticity` — derived at mint time and constant on any artifact this
+#: package produces (R-7, 5B-2).
+#:
+#: Before this existed the membership lived in three places: the two sets above, the two literal
+#: maps in ``verification.py``, and an unnamed ``derived`` tuple reconciling them. Nothing
+#: compared the three, so the only thing catching a divergence was the artifact's own self-digest
+#: failing at some later point — a correctness backstop, but one that reports the symptom rather
+#: than the edit. :func:`require_partition_agreement` compares them at mint time, so a name added
+#: to one place and forgotten in another fails immediately and says which side is short.
+DERIVED_FACT_NAMES: "frozenset[str]" = frozenset(
+    {
+        "outcome",
+        "grants_authority",
+        "historical",
+    }
+)
+
+#: Exactly what the verified half of the digest payload must contain. The single canonical
+#: statement of that membership.
+VERIFIED_DIGEST_KEYS: "frozenset[str]" = VERIFIED_FACT_NAMES | DERIVED_FACT_NAMES
+
+
+def require_partition_agreement(
+    *, verified_map: "dict[str, object]", recorded_map: "dict[str, object]"
+) -> None:
+    """Refuse to mint when a payload map disagrees with the canonical membership (R-7).
+
+    Raises :class:`VerifiedPolicyArtifactIntegrityError`, this package's ``INVARIANT_VIOLATION``:
+    a verifier whose own partition has drifted cannot be trusted to say what it verified, so it
+    must not conclude at all.
+    """
+
+    for label, actual, expected in (
+        ("verified", frozenset(verified_map), VERIFIED_DIGEST_KEYS),
+        ("recorded", frozenset(recorded_map), RECORDED_FACT_NAMES),
+    ):
+        if actual == expected:
+            continue
+        raise _IntegrityError(
+            f"the {label} half of the digest payload does not match the canonical membership "
+            f"declared in verified.py: missing {sorted(expected - actual)}, "
+            f"unexpected {sorted(actual - expected)}. The payload and the declaration must be "
+            "edited together, and this refusal is what makes that unavoidable"
+        )
 
 #: The private construction token. Not exported, not in ``__all__``, not reachable from the
 #: curated API. Holding it is what distinguishes an artifact the verifier minted from one a
