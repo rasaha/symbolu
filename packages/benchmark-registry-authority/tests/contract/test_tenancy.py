@@ -52,13 +52,29 @@ def test_tenancy_is_never_inferred_or_defaulted():
 
 
 def test_no_visibility_dimension_is_added_anywhere():
-    """No publisher-private, shared-by-policy or visibility field is introduced."""
+    """No publisher-private, shared-by-policy or visibility field is introduced.
+
+    ``BenchmarkTrustAnchorRecord.public_key_material`` is exempt from the
+    ``public_`` token alone, and the collision is **incidental**: this ban is
+    about *visibility* — publisher-private, shared-by-policy, public-to-all —
+    and "public key" is cryptographic terminology in which "public" names the
+    half of a keypair that is not secret, not an audience who may read a
+    benchmark. D-25 ratifies the field. The exemption is one token on one field
+    of one class; every other token still applies to it, so a
+    ``public_visibility`` or ``shared_key_material`` field would still fail.
+    """
 
     banned = ("visibility", "private", "shared", "public_", "acl", "permission")
-    for _name, builder in fx.PINNED_VECTOR_BUILDERS:
+    for name, builder in fx.PINNED_VECTOR_BUILDERS:
         for f in dataclasses.fields(builder()):
             lowered = f.name.lower()
             for token in banned:
+                if (
+                    token == "public_"
+                    and (name, f.name)
+                    == ("BenchmarkTrustAnchorRecord", "public_key_material")
+                ):
+                    continue
                 assert token not in lowered, f.name
 
 

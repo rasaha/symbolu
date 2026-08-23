@@ -1,4 +1,4 @@
-"""Ugence Benchmark Registry Authority — BR-2B non-authoritative lifecycle kernel.
+"""Ugence Benchmark Registry Authority — BR-2C-0 contract surface, no capability.
 
 Independent distribution ``ugence-benchmark-registry-authority``. The
 **authority/registry layer** of the shared, platform-wide Benchmark Registry,
@@ -12,17 +12,32 @@ Milestone boundary
   relation; one structural representation bound to each transition; typed
   refusals; ports as Protocols; new digest domains; pure validation.
   **No engine, no store, no verifier, no clock read, no resolver.**
-* **BR-2B (this release, 0.2.0)** — the **non-authoritative lifecycle kernel**:
+* **BR-2B (0.2.0)** — the **non-authoritative lifecycle kernel**:
   transition validation, predecessor checks, terminality, and conflict and
   idempotency calculation over *caller-asserted* state. It ships **no store, no
   verifier, no clock, no append path and no authority-issued result**, and it
   **cannot admit, register, revoke or resolve**. It determines what transition
   *would be* valid; nothing here makes one occur.
+* **BR-2C-0 (this release, 0.2.3; the rung carries 0.2.1, 0.2.2 and 0.2.3)** —
+  BR-2C's ratified **contract surface**, and no BR-2C capability. A **version
+  rung, not a subphase** (D-33, with D-36 ruling that all three versions sit on
+  it): D-01's five subphases are unamended and it mints no closure audit. It
+  exists because the curated surface moved — ``api.__all__`` 93 → 108 across the
+  three versions — while ``0.3.0`` stays reserved for the audited verifier.
 * **BR-2C (0.3.0)** — the cryptographic trust authority: audited verifier,
   signing-frame verification, anchor resolution, key rotation and revocation.
-  The injected verifier arrives here, defaulting to exact deny-all. Blocked on
-  an audited cryptographic verifier and a composition-root trust-resolver
-  design.
+  The injected verifier arrives here, defaulting to exact deny-all. **Still
+  blocked** on an audited cryptographic verifier and a composition-root
+  trust-resolver design. Its ratified *contract surface* — the trust-anchor
+  record, the three distinct verified-result types and the reshaped ports
+  (D-24, D-25, D-26), D-34's ``BenchmarkTrustAnchorResolution`` at the
+  trust-directory seam, and D-35's
+  ``BENCHMARK_VERIFICATION_REFUSAL_REASONS``, the twelve of the twenty-four a
+  refused verified result may carry — ship at ``0.2.1``, ``0.2.2`` and
+  ``0.2.3``, because D-23 classifies the
+  governance and engineering blockers as independent and only the governance
+  half is cleared. **No verifier ships, and
+  none has been audited** (D-32).
 * **BR-2D (0.4.0)** — the durable registry authority: persistence, the trusted
   clock, compare-and-set transitions, immutable event history, the process-local
   in-memory adapter, and the **first authoritative** admission, registration,
@@ -145,6 +160,21 @@ from .api import (
     BENCHMARK_REGISTRY_SNAPSHOT_ASSERTION_DIGEST_DOMAIN,
     BENCHMARK_TRANSITION_PLAN_DIGEST_DOMAIN,
     BENCHMARK_TRANSITION_REFUSAL_DIGEST_DOMAIN,
+    BenchmarkTrustRole,
+    BenchmarkTrustAnchorStatus,
+    BenchmarkVerificationOutcome,
+    BenchmarkTrustAnchorRecord,
+    BenchmarkPublisherVerifiedResult,
+    BenchmarkApprovalVerifiedResult,
+    BenchmarkRevocationVerifiedResult,
+    BENCHMARK_TRUST_ANCHOR_EVALUATION_ORDER,
+    BENCHMARK_VERIFIED_RESULT_BOUND_FACTS,
+    BENCHMARK_TRUST_ANCHOR_RECORD_DIGEST_DOMAIN,
+    BENCHMARK_PUBLISHER_VERIFIED_RESULT_DIGEST_DOMAIN,
+    BENCHMARK_APPROVAL_VERIFIED_RESULT_DIGEST_DOMAIN,
+    BENCHMARK_REVOCATION_VERIFIED_RESULT_DIGEST_DOMAIN,
+    BenchmarkTrustAnchorResolution,
+    BENCHMARK_VERIFICATION_REFUSAL_REASONS,
 )
 from .version import __version__
 
@@ -242,5 +272,22 @@ __all__ = [
     "BENCHMARK_REGISTRY_SNAPSHOT_ASSERTION_DIGEST_DOMAIN",
     "BENCHMARK_TRANSITION_PLAN_DIGEST_DOMAIN",
     "BENCHMARK_TRANSITION_REFUSAL_DIGEST_DOMAIN",
+    "BenchmarkTrustRole",
+    "BenchmarkTrustAnchorStatus",
+    "BenchmarkVerificationOutcome",
+    "BenchmarkTrustAnchorRecord",
+    "BenchmarkPublisherVerifiedResult",
+    "BenchmarkApprovalVerifiedResult",
+    "BenchmarkRevocationVerifiedResult",
+    "BENCHMARK_TRUST_ANCHOR_EVALUATION_ORDER",
+    "BENCHMARK_VERIFIED_RESULT_BOUND_FACTS",
+    "BENCHMARK_TRUST_ANCHOR_RECORD_DIGEST_DOMAIN",
+    "BENCHMARK_PUBLISHER_VERIFIED_RESULT_DIGEST_DOMAIN",
+    "BENCHMARK_APPROVAL_VERIFIED_RESULT_DIGEST_DOMAIN",
+    "BENCHMARK_REVOCATION_VERIFIED_RESULT_DIGEST_DOMAIN",
+    # D-34: the anchor-resolution outcome. Appended, never inserted.
+    "BenchmarkTrustAnchorResolution",
+    # D-35: the refusal subset a verified result may carry.
+    "BENCHMARK_VERIFICATION_REFUSAL_REASONS",
     "api",
 ]

@@ -44,8 +44,14 @@ PORTS = (
 #: same discipline ``test_milestone_boundary.py`` applies to the tree-wide list.
 #:
 #: ``None`` is a permanent ban rather than a deferral. A stub, fake, dummy,
-#: no-op or null implementation is never correct at *any* subphase: §17 forbids
-#: shipping an executable placeholder, and that ruling has no expiry date.
+#: no-op or null implementation is never correct at *any* subphase, and that
+#: ruling has no expiry date. **This map is the enforcement, and it is a name
+#: ban.** §17 is *Registry and resolution semantics* — fourteen rules on lookup,
+#: registration, revocation and supersession, plus §17.1 on historical
+#: resolution — and it bans no placeholder; the word appears nowhere else in the
+#: ADR. The five permanent entries below are the whole of what stops one, they
+#: stop it by name only, and they sit in the same self-attested one-file
+#: two-literal pattern ADR §35.2 D-37 and D-38 rule.
 EXPORTED_IMPLEMENTATION_UNLOCK = {
     "denyall": "BR-2C",
     "deny_all": "BR-2C",
@@ -109,7 +115,7 @@ def test_the_exported_implementation_ban_is_not_weaker_than_br2a_froze():
 
 
 def test_a_placeholder_implementation_name_is_banned_at_every_subphase():
-    """§17's ban on executable placeholders has no expiry date."""
+    """The five permanent entries above never lift — a name ban, not §17."""
 
     permanent = {
         token

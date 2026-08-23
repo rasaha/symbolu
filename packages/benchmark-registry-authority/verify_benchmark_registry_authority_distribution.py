@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build, install offline, and verify the BR-2B distribution — with negative controls.
+"""Build, install offline, and verify the BR-2C-0 distribution — with negative controls.
 
 Builds a wheel and an sdist from a clean tree, installs the wheel **genuinely
 offline** into a throwaway virtual environment, and asserts that the installed
@@ -19,8 +19,21 @@ runtime is byte-for-byte the contract this repository committed.
 A verifier that only asserts positives proves little: if the isolation were
 broken, every positive assertion would still pass. So each isolation property is
 also **negatively controlled** — deliberately violated, and the check that
-should catch it is confirmed to fail. The six controls §20 specifies are all
-here, and each one is run and reported.
+should catch it is confirmed to fail.
+
+**Six** isolation properties are controlled, numbered 1-6 in the steps below;
+**eight** controls are run and reported. The two are not in conflict: control 6
+splits into **6a** (monorepo source shadowing the wheel) and **6b** (a leaked
+``PYTHONPATH`` in the child environment), and step 8's proof that the one
+dependency is genuinely required rather than optional is an eighth, run and
+reported but carrying no number in this scheme. The closing summary counts
+**runs**, not numbers, so it reads eight, and every run must have been caught.
+
+The earlier citation of these as "the six controls §20 specifies" is
+**withdrawn**: ADR §20 is the *Readiness integration boundary (future posture,
+not implemented)* and specifies no negative control at all. The six are this
+script's own numbering, not a ratified list, and nothing in the ADR fixes their
+count.
 
 Run:
     python packages/benchmark-registry-authority/verify_benchmark_registry_authority_distribution.py
@@ -154,8 +167,8 @@ def main() -> int:  # noqa: C901 - a verifier is a long list of assertions
         sdist = _latest(findlinks, f"{NAMESPACE}-*.tar.gz")
         br1_wheel = _latest(findlinks, "ugence_benchmark_registry-*.whl")
         print(f"      built {wheel.name}, {sdist.name}, {br1_wheel.name}")
-        check("the wheel carries the BR-2B version", "0.2.0" in wheel.name, wheel.name)
-        check("the sdist carries the BR-2B version", "0.2.0" in sdist.name, sdist.name)
+        check("the wheel carries the BR-2C-0 version", "0.2.3" in wheel.name, wheel.name)
+        check("the sdist carries the BR-2C-0 version", "0.2.3" in sdist.name, sdist.name)
 
         # ------------------------------------------------------------- #
         # 2. Artifact hygiene — both artifacts, negative-controlled
@@ -348,8 +361,8 @@ def main() -> int:  # noqa: C901 - a verifier is a long list of assertions
         )
         check(
             "installed api.__all__ count and manifest symbol count both hold",
-            installed_facts["api_all_count"] == 93
-            and len(source_manifest["symbols"]) == 92,
+            installed_facts["api_all_count"] == 108
+            and len(source_manifest["symbols"]) == 107,
             f"{installed_facts['api_all_count']} / {len(source_manifest['symbols'])}",
         )
         check(
@@ -370,12 +383,18 @@ def main() -> int:  # noqa: C901 - a verifier is a long list of assertions
             },
         )
         check(
-            "all eighteen pinned vectors were reproduced, including the "
-            "post-admission rejection event and the revocation event",
-            len(installed_facts["vectors"]) == 18
+            "all twenty-two pinned vectors were reproduced, including the "
+            "post-admission rejection event, the revocation event and the four "
+            "BR-2C trust and verification contracts",
+            len(installed_facts["vectors"]) == 22
             and "BenchmarkPostAdmissionRejectionEventPayload"
             in installed_facts["vectors"]
-            and "BenchmarkRevocationEventPayload" in installed_facts["vectors"],
+            and "BenchmarkRevocationEventPayload" in installed_facts["vectors"]
+            and "BenchmarkTrustAnchorRecord" in installed_facts["vectors"]
+            and "BenchmarkPublisherVerifiedResult" in installed_facts["vectors"]
+            and "BenchmarkApprovalVerifiedResult" in installed_facts["vectors"]
+            and "BenchmarkRevocationVerifiedResult"
+            in installed_facts["vectors"],
         )
         check(
             "installed contract inventory row set equals the committed one",
@@ -584,6 +603,9 @@ VT = datetime(2027, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
 EA = datetime(2026, 6, 1, 0, 0, 0, tzinfo=timezone.utc)
 AO = datetime(2026, 9, 1, 0, 0, 0, tzinfo=timezone.utc)
 P = A.BenchmarkSignatureProfile.ED25519_SHA512_V1
+PUB_K, APP_K, REV_K = "d4" * 32, "e5" * 32, "f6" * 32
+TI = datetime(2026, 4, 1, 0, 0, 0, tzinfo=timezone.utc)
+OT_D = "c3" * 32
 
 def coord(**kw):
     base = dict(benchmark_id="bmk", benchmark_family="fam",
@@ -663,6 +685,29 @@ tref = A.BenchmarkTransitionRefusal(
     declared_refusal_reason=(
         A.BenchmarkRegistryRefusalReason.UNAUTHORIZED_TRANSITION))
 
+anchor = A.BenchmarkTrustAnchorRecord(
+    role=A.BenchmarkTrustRole.PUBLISHER,
+    identity="publisher-alpha", key_id="publisher-key-1",
+    signature_profile=P, public_key_material=PUB_K,
+    validity_from=VF, validity_to=VT,
+    status=A.BenchmarkTrustAnchorStatus.ENABLED,
+    revoked_at=None, revocation_reason=None)
+pvr = A.BenchmarkPublisherVerifiedResult(
+    verified_digest=ID_D, signer_role=A.BenchmarkTrustRole.PUBLISHER,
+    signer_identity="publisher-alpha", signer_key_id="publisher-key-1",
+    signature_profile=P, anchor_record_digest=OT_D, evaluated_at=TI,
+    outcome=A.BenchmarkVerificationOutcome.VERIFIED, refusal_reason=None)
+avr = A.BenchmarkApprovalVerifiedResult(
+    verified_digest=CT_D, signer_role=A.BenchmarkTrustRole.APPROVER,
+    signer_identity="approval-authority-beta", signer_key_id="approval-key-1",
+    signature_profile=P, anchor_record_digest=OT_D, evaluated_at=TI,
+    outcome=A.BenchmarkVerificationOutcome.VERIFIED, refusal_reason=None)
+rvr = A.BenchmarkRevocationVerifiedResult(
+    verified_digest=OT_D, signer_role=A.BenchmarkTrustRole.REVOKER,
+    signer_identity="revoker-delta", signer_key_id="revocation-key-1",
+    signature_profile=P, anchor_record_digest=ID_D, evaluated_at=TI,
+    outcome=A.BenchmarkVerificationOutcome.VERIFIED, refusal_reason=None)
+
 objects = {
     "BenchmarkPublisherSubmissionEnvelope": pub,
     "BenchmarkApprovalEnvelope": app,
@@ -682,6 +727,10 @@ objects = {
     "BenchmarkRegistrySnapshotAssertion": snap,
     "BenchmarkTransitionPlan": plan,
     "BenchmarkTransitionRefusal": tref,
+    "BenchmarkTrustAnchorRecord": anchor,
+    "BenchmarkPublisherVerifiedResult": pvr,
+    "BenchmarkApprovalVerifiedResult": avr,
+    "BenchmarkRevocationVerifiedResult": rvr,
 }
 snapshot = _contract_type_registry_snapshot()
 print(json.dumps({

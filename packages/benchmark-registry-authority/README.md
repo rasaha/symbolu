@@ -1,4 +1,4 @@
-# ugence-benchmark-registry-authority — BR-2B
+# ugence-benchmark-registry-authority — BR-2C-0
 
 **Registry and exact-resolution contracts.** The authority/registry layer of the
 shared, platform-wide Benchmark Registry, sitting **above** the frozen identity
@@ -30,6 +30,9 @@ ugence-benchmark-registry 0.1.0          FROZEN — zero runtime dependencies,
 ugence-benchmark-registry-authority
   0.1.0  (BR-2A)  deps: ugence-benchmark-registry ==0.1.*   + stdlib
   0.2.0  (BR-2B)  deps: unchanged
+  0.2.1  (BR-2C-0) deps: unchanged — BR-2C's contracts, no BR-2C capability
+  0.2.2  (BR-2C-0) deps: unchanged — D-34's anchor-resolution outcome
+  0.2.3  (BR-2C-0) deps: unchanged — D-35's verified-result refusal subset
   0.3.0  (BR-2C)  deps: + an audited cryptographic verifier
   0.4.0  (BR-2D)  deps: + a durable backend named only after ADR DD-10
   0.5.0  (BR-2E)  deps: + whatever operations require, and nothing sooner
@@ -44,8 +47,9 @@ stored BR-1 canonical artifact or its identity digest.
 | Subphase | Version | Ships | Status |
 | --- | --- | --- | --- |
 | BR-2A | `0.1.0` | Registry and exact-resolution **contracts** | shipped |
-| **BR-2B** | `0.2.0` | **Non-authoritative lifecycle kernel**: transition validation, predecessor checks, terminality, conflict and idempotency calculation over *caller-asserted* state. **No store, no verifier, no clock, no append path, no authority-issued result** — it cannot admit, register, revoke or resolve | **this release** |
-| BR-2C | `0.3.0` | Cryptographic trust authority: audited Ed25519 verifier, signing-frame verification, composition-root trust-resolver adapter, key entitlements and revocation. The injected verifier arrives here, defaulting to **exact deny-all** | blocked on a secure cryptographic verifier and trust-resolver design, specified and independently audited |
+| BR-2B | `0.2.0` | **Non-authoritative lifecycle kernel**: transition validation, predecessor checks, terminality, conflict and idempotency calculation over *caller-asserted* state. **No store, no verifier, no clock, no append path, no authority-issued result** — it cannot admit, register, revoke or resolve | shipped |
+| **BR-2C-0** | `0.2.1`, `0.2.2`, `0.2.3` | **BR-2C's ratified contract surface, and no BR-2C capability.** A version rung, not a subphase (ADR §35.2 **D-33**, with **D-36** ruling that all three versions sit on the one rung): D-01's five subphases are unamended, it mints no closure audit, and it exists because the surface moved — `api.__all__` 93 → 106 at `0.2.1`, 106 → 107 at `0.2.2` under **D-34** and 107 → 108 at `0.2.3` under **D-35** — while `0.3.0` stays reserved for the audited verifier | **this release** |
+| BR-2C | `0.3.0` | Cryptographic trust authority: audited Ed25519 verifier, signing-frame verification, composition-root trust-resolver adapter, key entitlements and revocation. The injected verifier arrives here, defaulting to **exact deny-all** | **contract surface only, shipped in `0.2.1`–`0.2.3`** (ADR §35.2 D-24, D-25, D-26, D-34, D-35; rung minted by D-33); the subphase itself is still blocked on a secure cryptographic verifier and trust-resolver design, **externally audited** |
 | BR-2D | `0.4.0` | Durable registry authority: persistence, the trusted clock, compare-and-set transitions, immutable event history, the process-local in-memory adapter, registry-event signing, and the **first authoritative** admission, registration, revocation and exact resolution. Closes with the identity-locked composition root | blocked on ADR DD-10 |
 | BR-2E | `0.5.0` | Production composition and operations: tenant authorization, service APIs, deployment controls, migrations, backup/recovery, observability, audit export | blocked on BR-2D |
 
@@ -154,7 +158,7 @@ full depth, **post-order**: every nested node is proved to be an exact registere
 class and revalidated before its parent's validator — or any derived property
 that validator reads — touches a single one of its fields.
 
-### Eighteen artifact classes, eighteen domains, eighteen pinned vectors
+### Twenty-two artifact classes, twenty-two domains, twenty-two pinned vectors
 
 | Contract | Digest domain | Pinned digest |
 | --- | --- | --- |
@@ -176,11 +180,27 @@ that validator reads — touches a single one of its fields.
 | `BenchmarkRegistrySnapshotAssertion` | `…/registry-snapshot-assertion/v1` | `1d60f269a1e745304fb392f97039b307a5d29076cc39de2337ae4c49aee7554e` |
 | `BenchmarkTransitionPlan` | `…/transition-plan/v1` | `83b342bec31fb04c24d7214038e5c257c5ee22c6e5d332fba40978be877c96fd` |
 | `BenchmarkTransitionRefusal` | `…/transition-refusal/v1` | `efa9a8e8d79e06e6099126878e0bf78ecaf3a9193a54e71d3de23817cab8ea70` |
+| `BenchmarkTrustAnchorRecord` | `…/trust-anchor-record/v1` | `86d2ff9b9edbc2a4acd4a0edb1e54ef221e276a8b55a22fb35009189aee885f4` |
+| `BenchmarkPublisherVerifiedResult` | `…/publisher-verified-result/v1` | `7df2cff0f37e0544bebbcd977928fd2d91fd3c30490c053a3788eaf29eaebe0d` |
+| `BenchmarkApprovalVerifiedResult` | `…/approval-verified-result/v1` | `7ee8fb68bbbdfbf9715f136ca750d3df1391244c860cf70c3d74074ef4dfabd4` |
+| `BenchmarkRevocationVerifiedResult` | `…/revocation-verified-result/v1` | `fb697a58598890cddaedf744236485885904260d79cc14c9f1500dc7921926fa` |
 
 Each vector's exact canonical bytes are committed in
 [`pinned_canonical_vectors.json`](pinned_canonical_vectors.json) and every digest
 is independently recomputable with plain `hashlib` over the byte string alone,
 importing nothing from the package.
+
+The last four rows are BR-2C's ratified **contract surface**, landed in `0.2.1`
+under ADR §35.2 D-24, D-25 and D-26. They are shapes: the immutable role-scoped
+trust-anchor record the resolution seam returns, and the three distinct exact
+verified-result types that replaced the `bool` returns on the approval-verifier
+and publisher-trust-directory ports. **No verifier ships, no anchor is held or
+resolved, no key material is parsed, no clock is read and no cryptographic
+dependency is linked.** The verifier those contracts describe **does not exist
+and has not been audited**; D-32 makes an external cryptographic audit a hard
+precondition to any production use of it, and forbids any artifact here
+describing it as audited, independently reviewed or production-ready until that
+audit is obtained and recorded.
 
 The three **nested-admissible-only** classes — `BenchmarkCoordinate`,
 `BenchmarkScope`, `BenchmarkApplicabilityCoordinate` — may appear inside a BR-2
@@ -208,9 +228,9 @@ never represented as an issuer or a signer in any payload.
 
 BR-1's seventeen refusal reasons are frozen; BR-2 **appends and never inserts,
 renames, re-values, re-orders or removes**. `BenchmarkRegistryRefusalReason`
-holds seventeen BR-2 reasons, disjoint from BR-1's by member *and* by value.
+holds twenty-four BR-2 reasons, disjoint from BR-1's by member *and* by value.
 
-`BENCHMARK_REGISTRY_ALL_REFUSAL_REASONS` is the ordered composite (34 members).
+`BENCHMARK_REGISTRY_ALL_REFUSAL_REASONS` is the ordered composite (41 members).
 Its BR-1 prefix is taken from `tuple(BenchmarkRefusalReason)` — iterating the
 *enum*, which yields declaration order — and explicitly **not** from
 `BR1_BENCHMARK_REFUSAL_REASONS`, which is a `frozenset` whose iteration order is
@@ -238,23 +258,41 @@ python packages/benchmark-registry-authority/verify_br1_freeze_matrix.py
 python packages/benchmark-registry-authority/gate_mutation_sweep.py
 ```
 
-### Measured results — BR-2A-era, not re-measured at this revision
+### Measured results at this revision
 
-**These numbers were measured against `0.1.0` (BR-2A) and have not been
-re-stated for `0.2.0`.** They are measurements, not counts of a fixed set, so
-restating them requires a run rather than an edit; the committed ledger in
-[`gate_inventory.json`](gate_inventory.json) and the `0.2.0` section of
-[`CHANGELOG.md`](CHANGELOG.md) carry the current figures. This table is
-re-stated from a fresh sweep and verifier run in a README pass at BR-2C
-(ADR §35.2 D-31). No number below is edited here.
+**Re-measured, not edited.** ADR §35.2 D-31(a) deferred this table's
+re-statement to "a fresh sweep and verifier run in a README pass at BR-2C". Every
+number below was produced by executing the named check against this tree at
+`0.2.3`, in the closure pass that corrected the prose around it — never by
+adjusting the figures that stood here.
+
+**Nothing checks these figures.** No test, probe, verifier, sweep or generator
+compares a number in this table against a run. What attests them is the run
+recorded in the commit that states them, and the discipline of re-running rather
+than editing. That is weaker than a gate, and is said here rather than left to be
+assumed: a stale figure in this table would survive until someone re-ran the
+checks and noticed.
+
+**This file is not unread, though.** `pyproject.toml` sets
+`readme = "README.md"`, so setuptools embeds the **whole** of it — this paragraph
+and the table below included — in the built distribution's `METADATA`, and
+[`verify_benchmark_registry_authority_distribution.py`](verify_benchmark_registry_authority_distribution.py)
+substring-scans that blob for the banned cryptographic dependency names it lists
+in its own source. **Prose written here can turn a distribution check red**, and
+the margin is two letters: this README uses only the *adjective* for that
+discipline, never the library name it is derived from, and the scan matches the
+library name. That is why the banned strings are named nowhere in this document —
+writing one here would fail the very check it describes. The only place any check
+parses a document directly is BR-1's own `README.md`, where it looks for pinned
+digests.
 
 | Check | Result |
 | --- | --- |
-| Package suite | **1423 tests passed** |
-| Independent adversarial probes | **60 passed** (also inside the installed wheel) |
-| Distinct properties | **352 adversarial : 29 happy = 12.14 : 1** (required ≥ 2:1) |
-| Gate inventory | **48 gates** across 12 categories |
-| Mutation sweep | **43 KILLED, 5 SURVIVED, 0 errored** — every survivor classified |
+| Package suite | **2113 tests passed** |
+| Independent adversarial probes | **83 passed** (also inside the installed wheel) |
+| Distinct properties | **508 adversarial : 38 happy = 13.37 : 1** (required ≥ 2:1) |
+| Gate inventory | **72 gates** |
+| Mutation sweep | **67 KILLED, 5 SURVIVED, 0 errored** — every survivor classified |
 | Distribution | wheel + sdist built; offline `--no-index` install verified |
 | Negative controls | **8 run, 8 caught** |
 | pyflakes | clean |

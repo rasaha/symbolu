@@ -134,8 +134,8 @@ def test_every_member_is_a_refusal_including_the_idempotent_one():
 
 
 def test_the_reason_sets_are_the_expected_sizes():
-    assert len(BENCHMARK_REGISTRY_REFUSAL_REASONS) == 17
-    assert len(BENCHMARK_REGISTRY_ALL_REFUSAL_REASONS) == 34
+    assert len(BENCHMARK_REGISTRY_REFUSAL_REASONS) == 24
+    assert len(BENCHMARK_REGISTRY_ALL_REFUSAL_REASONS) == 41
 
 
 def test_no_br2_member_is_prefixed_benchmark_like_a_br1_member():

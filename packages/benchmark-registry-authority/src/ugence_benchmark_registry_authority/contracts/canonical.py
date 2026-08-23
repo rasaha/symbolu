@@ -71,8 +71,9 @@ Domain separation and versioning
 ADR §22.1 requires every digest to bind a canonicalization version and a
 domain-separation tag. BR-1 minted exactly one domain because it introduced
 exactly one artifact class. **BR-2A introduced fifteen distinct
-artifact classes and minted exactly fifteen domains; BR-2B appends three more**
-— one per class each subphase actually ships, and **no tag for an artifact that
+artifact classes and minted exactly fifteen domains; BR-2B appends three more
+and BR-2C's contract surface four more** — one per class each subphase actually
+ships, and **no tag for an artifact that
 does not exist**. The
 authority-issued result types reserved for BR-2D
 (``BenchmarkAdmissionDecision``, ``BenchmarkRegistrationEvent``,
@@ -125,8 +126,8 @@ BR-2A payloads nest **frozen BR-1 contracts** — the exact
 The registry therefore records two capabilities per class:
 
 * **root-canonicalizable** — the class owns a domain minted here and may be
-  handed to :func:`canonical_bytes` directly. Eighteen contract classes: BR-2A's
-  fifteen and BR-2B's three.
+  handed to :func:`canonical_bytes` directly. Twenty-two contract classes:
+  BR-2A's fifteen, BR-2B's three and BR-2C's four.
 * **nested-admissible only** — the class may appear *inside* a BR-2A graph and
   is encoded and revalidated there, but owns no BR-2A domain and is refused as a
   root. The three BR-1 classes that actually nest.
@@ -233,6 +234,10 @@ __all__ = [
     "BENCHMARK_REGISTRY_SNAPSHOT_ASSERTION_DIGEST_DOMAIN",
     "BENCHMARK_TRANSITION_PLAN_DIGEST_DOMAIN",
     "BENCHMARK_TRANSITION_REFUSAL_DIGEST_DOMAIN",
+    "BENCHMARK_TRUST_ANCHOR_RECORD_DIGEST_DOMAIN",
+    "BENCHMARK_PUBLISHER_VERIFIED_RESULT_DIGEST_DOMAIN",
+    "BENCHMARK_APPROVAL_VERIFIED_RESULT_DIGEST_DOMAIN",
+    "BENCHMARK_REVOCATION_VERIFIED_RESULT_DIGEST_DOMAIN",
     "BENCHMARK_REGISTRY_AUTHORITY_DIGEST_DOMAINS",
     "canonical_bytes",
     "canonical_digest",
@@ -251,9 +256,9 @@ BENCHMARK_REGISTRY_AUTHORITY_CANONICALIZATION_VERSION = (
 _DOMAIN_PREFIX = "ugence.benchmark-registry-authority/"
 
 # --------------------------------------------------------------------------- #
-# One domain per artifact class this subphase actually ships. Eighteen classes
-# and eighteen domains — BR-2A's fifteen and BR-2B's three — and no tag for
-# an artifact that does not exist.
+# One domain per artifact class this subphase actually ships. Twenty-two
+# classes and twenty-two domains — BR-2A's fifteen, BR-2B's three and BR-2C's
+# four — and no tag for an artifact that does not exist.
 # --------------------------------------------------------------------------- #
 
 #: Domain for :class:`~.envelopes.BenchmarkPublisherSubmissionEnvelope` — the
@@ -359,8 +364,37 @@ BENCHMARK_TRANSITION_REFUSAL_DIGEST_DOMAIN = (
     _DOMAIN_PREFIX + "transition-refusal/v1"
 )
 
+#: Domain for :class:`~.trust.BenchmarkTrustAnchorRecord`. BR-2C contracts.
+#: D-25 makes the **anchor revision** this record's canonical digest under this
+#: domain, so no parallel revision counter is invented and two anchor records
+#: differing in any bound field are two revisions by construction.
+BENCHMARK_TRUST_ANCHOR_RECORD_DIGEST_DOMAIN = (
+    _DOMAIN_PREFIX + "trust-anchor-record/v1"
+)
+
+#: Domain for :class:`~.trust.BenchmarkPublisherVerifiedResult`. BR-2C
+#: contracts. A **separate byte space** from the approval and revocation
+#: results for the same reason the three signing frames are separate: a
+#: verified result for one seam must never be replayable as one for another.
+BENCHMARK_PUBLISHER_VERIFIED_RESULT_DIGEST_DOMAIN = (
+    _DOMAIN_PREFIX + "publisher-verified-result/v1"
+)
+
+#: Domain for :class:`~.trust.BenchmarkApprovalVerifiedResult`. BR-2C contracts.
+BENCHMARK_APPROVAL_VERIFIED_RESULT_DIGEST_DOMAIN = (
+    _DOMAIN_PREFIX + "approval-verified-result/v1"
+)
+
+#: Domain for :class:`~.trust.BenchmarkRevocationVerifiedResult`. BR-2C
+#: contracts. D-26 adds the revocation seam, so its result owns a domain of its
+#: own rather than sharing the approval result's — a revocation is the one
+#: assertion that can take a registered artifact away.
+BENCHMARK_REVOCATION_VERIFIED_RESULT_DIGEST_DOMAIN = (
+    _DOMAIN_PREFIX + "revocation-verified-result/v1"
+)
+
 #: Every domain this distribution mints, pinned as an immutable tuple in
-#: declaration order — BR-2A's fifteen, then BR-2B's three. Used by the
+#: declaration order — BR-2A's fifteen, BR-2B's three, then BR-2C's four. Used by the
 #: canonical-domain inventory and by the uniqueness assertion below. Append-only:
 #: a later subphase adds at the end and never inserts or re-orders, because a
 #: moved domain re-digests an artifact that was already addressed under the old
@@ -384,6 +418,10 @@ BENCHMARK_REGISTRY_AUTHORITY_DIGEST_DOMAINS: tuple = (
     BENCHMARK_REGISTRY_SNAPSHOT_ASSERTION_DIGEST_DOMAIN,
     BENCHMARK_TRANSITION_PLAN_DIGEST_DOMAIN,
     BENCHMARK_TRANSITION_REFUSAL_DIGEST_DOMAIN,
+    BENCHMARK_TRUST_ANCHOR_RECORD_DIGEST_DOMAIN,
+    BENCHMARK_PUBLISHER_VERIFIED_RESULT_DIGEST_DOMAIN,
+    BENCHMARK_APPROVAL_VERIFIED_RESULT_DIGEST_DOMAIN,
+    BENCHMARK_REVOCATION_VERIFIED_RESULT_DIGEST_DOMAIN,
 )
 
 # Two artifact classes sharing a domain would collapse two byte spaces into one.
@@ -682,9 +720,9 @@ def _revalidate_value(value: Any, path: str) -> None:
 def canonical_bytes(contract: Any) -> bytes:
     """Return the exact UTF-8 bytes :func:`canonical_digest` is computed over.
 
-    ``contract`` must be an exact instance of one of the eighteen registered
-    **root-canonicalizable** contract classes — BR-2A's fifteen and BR-2B's
-    three — never a subclass, never a same-named foreign dataclass, never a
+    ``contract`` must be an exact instance of one of the twenty-two registered
+    **root-canonicalizable** contract classes — BR-2A's fifteen, BR-2B's three
+    and BR-2C's four — never a subclass, never a same-named foreign dataclass, never a
     duck type, and never a frozen BR-1 contract, which owns its own digest
     path and must keep exactly one digest.
     Membership is decided by class identity against the sealed registry, never

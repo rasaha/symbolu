@@ -63,9 +63,57 @@ FORBIDDEN_CAPABILITY_UNLOCK = {
     "production_composition_root": "BR-2D",
 }
 
-#: The exact token set BR-2A froze. Pinned separately from the map above so a
-#: restructuring cannot drop an entry unnoticed: a token that vanished from the
-#: map would simply stop being checked, and nothing else would fail.
+#: The exact token set BR-2A froze, held separately from the map above so that a
+#: **one-sided** edit is caught: a token dropped from the map alone stops being
+#: checked, and the equality against this set fails.
+#:
+#: **This vocabulary is self-attested, and the guard is weaker than it reads.**
+#: Both literals live in this one file, so an edit that removes a token from the
+#: map *and* from this set moves both sides of the comparison together and the
+#: suite stays green — measured, not supposed: deleting ``"keyparser"`` and
+#: ``"key_parser"`` from both while shipping a live ``class KeyParser`` under
+#: ``src/`` leaves the suite passing, and a capability the ADR bans until
+#: ``0.3.0`` would ship with nothing saying so.
+#:
+#: **ADR §35.2 D-37 ratifies this self-attestation as the standing posture at
+#: ``BR-2C-0``, for this list and for ``EXPORTED_IMPLEMENTATION_UNLOCK``'s twin
+#: in ``tests/contract/test_confusable_and_ports.py``.** It rules for this rung
+#: only: the tokens are inert here because no capability exists to name, and
+#: BR-2C re-decides the posture at ``0.3.0`` when a verifier makes them
+#: load-bearing.
+#:
+#: **The escape is not stub-sized.** A fourth independent audit falsified that
+#: ground, and the corrected measurement stands here in its place. With both
+#: spellings removed: a ``KeyParser`` that digests its input fails
+#: ``test_no_module_outside_canonical_computes_a_digest`` — because of **where
+#: the module sits**, not because it digests, since the same digesting parser
+#: written into ``contracts/canonical.py`` instead leaves the suite green; one
+#: that calls ``base64.b64decode`` fails the curated stdlib allow-list twice.
+#: But a ``KeyParser`` whose ``parse()`` validates ``"<key-id>:<base64>"`` with
+#: ``re`` and decodes the base64 in pure Python — a bit accumulator, no import
+#: beyond ``re`` — **ships green**, and it really parses: it round-trips
+#: ``base64.b64encode`` at every length 1..39 and raises on malformed input.
+#: Restore the two spellings and **exactly one** gate catches it,
+#: ``test_no_class_or_function_anywhere_carries_a_forbidden_capability_name``.
+#: This list is therefore the **sole** control preventing a working key parser
+#: from entering the package — not a naming guard layered over list-free gates
+#: that carry the load.
+#:
+#: **ADR §35.2 D-38 (2026-08-22) rules on that measurement.** D-37 stands for
+#: ``BR-2C-0`` on a **replaced** ground: the rung ships no cryptographic
+#: capability at all, and that inertness — not the size of the escape — is why
+#: self-attestation is survivable here. No shape scan is accepted as a
+#: substitute, because a new classifier would be another gameable one; that is
+#: a ruling, not an omission. Before any capability-bearing BR-2C release,
+#: including ``0.3.0``, a distinct independent authority must review and
+#: adversarially audit the exact release head.
+#:
+#: **No generated artifact in this tree carries a prohibition** — every manifest
+#: here is derived from what exists, so a ban set derived from the tree would
+#: pass by construction. That is a fact about the five committed JSONs, not a
+#: property of generators in general: a generator emitting a hand-authored list
+#: would carry one. The reviewer of any diff touching either literal is the
+#: check, and that is weaker than a gate.
 BR2A_FROZEN_CAPABILITY_TOKENS = frozenset(
     {
         "admissionengine",
@@ -107,8 +155,11 @@ FORBIDDEN_CAPABILITY_TOKENS = tuple(
 )
 
 
-def test_happy_the_package_version_is_the_br2b_version():
-    assert api.__version__ == "0.2.0"
+def test_happy_the_package_version_is_the_br2c_0_rung():
+    """D-33's rung: BR-2C's contracts landed, no BR-2C capability did."""
+
+    assert api.__version__ == "0.2.3"
+    assert VERSION_SUBPHASE[api.__version__] == "BR-2C-0"
 
 
 # --------------------------------------------------------------------------- #
@@ -177,6 +228,174 @@ def test_no_capability_is_scheduled_to_unlock_at_or_before_this_version():
         if unlock is None:
             continue
         assert SUBPHASE_LADDER.index(unlock) > reached, token
+
+
+# --------------------------------------------------------------------------- #
+# D-36: splitting the BR-2C-0 rung per version would rule nothing.
+# --------------------------------------------------------------------------- #
+#: The ladder D-36 closed: one rung per version instead of one rung carrying
+#: ``0.2.1``, ``0.2.2`` and ``0.2.3``. It is never the real ladder — it exists
+#: only so the option D-36 rejected can be *measured* rather than asserted.
+_PER_VERSION_LADDER = (
+    "BR-2A",
+    "BR-2B",
+    "BR-2C-0/0.2.1",
+    "BR-2C-0/0.2.2",
+    "BR-2C-0/0.2.3",
+    "BR-2C",
+    "BR-2D",
+    "BR-2E",
+)
+
+_SPLIT_RUNGS = ("BR-2C-0/0.2.1", "BR-2C-0/0.2.2", "BR-2C-0/0.2.3")
+
+#: Both unlock maps, so the check covers the tree-wide capability scan *and*
+#: the exported-symbol scan. D-33 records that ``0.3.0`` unlocks twelve tokens
+#: across the two, not eight across one, so a check reading only one map would
+#: measure two thirds of the ground it claims to pin.
+def _both_unlock_maps():
+    import importlib.util
+
+    other = PKG / "tests" / "contract" / "test_confusable_and_ports.py"
+    spec = importlib.util.spec_from_file_location("_d36_exported_unlock", other)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return (
+        ("FORBIDDEN_CAPABILITY_UNLOCK", FORBIDDEN_CAPABILITY_UNLOCK),
+        ("EXPORTED_IMPLEMENTATION_UNLOCK", module.EXPORTED_IMPLEMENTATION_UNLOCK),
+    )
+
+
+def test_no_token_unlocks_at_the_br2c_0_rung_itself():
+    """The precondition D-36's ground rests on, asserted rather than assumed.
+
+    D-36 closes the rung-per-version option because the extra ladder indices
+    would produce ban sets identical to ``BR-2C-0``'s, and so rule nothing.
+    That holds **only** while no token names ``BR-2C-0`` as its unlock phase: a
+    token that did would be shippable at one of the three versions and not the
+    others, the split rungs would stop being interchangeable, and D-36's ground
+    would be false with nothing saying so. Every unlock is `BR-2C`, `BR-2D` or
+    permanent, and this is the check that keeps it that way.
+    """
+
+    for name, unlock_map in _both_unlock_maps():
+        offenders = sorted(
+            token for token, unlock in unlock_map.items() if unlock == "BR-2C-0"
+        )
+        assert offenders == [], (
+            f"{name}: {offenders} unlock at BR-2C-0 itself, which falsifies "
+            "ADR §35.2 D-36's ground. The rung carries three versions; a token "
+            "first shippable at one of them needs its own ratification."
+        )
+
+
+def test_splitting_the_br2c_0_rung_per_version_changes_no_ban_set():
+    """D-36's ground, measured on both surfaces rather than asserted.
+
+    Builds the ladder D-36 rejected — ``BR-2C-0`` split into one rung per
+    version — and compares ban sets against the real ladder. At each of the
+    three split rungs the ban set must equal the real ``BR-2C-0``'s, and at
+    ``BR-2C``, ``BR-2D`` and ``BR-2E`` it must be unchanged by the insertion,
+    because :func:`banned_capability_tokens` compares by ladder **index**.
+    Identical ban sets at every rung is the whole of why the extra rungs would
+    rule nothing.
+
+    This weakens no ban: it asserts equality against the live ban set rather
+    than against a copied literal, so a ban that shrank would fail
+    :func:`test_the_effective_ban_set_is_exactly_what_br2a_froze` first and this
+    check would still see the two ladders agree.
+    """
+
+    for name, unlock_map in _both_unlock_maps():
+        real = banned_capability_tokens("BR-2C-0", unlock_map)
+        assert real, name
+
+        for rung in _SPLIT_RUNGS:
+            assert banned_capability_tokens(
+                rung, unlock_map, _PER_VERSION_LADDER
+            ) == real, (
+                f"{name}: splitting BR-2C-0 changed the ban set at {rung}"
+            )
+
+        for rung in ("BR-2C", "BR-2D", "BR-2E"):
+            assert banned_capability_tokens(
+                rung, unlock_map, _PER_VERSION_LADDER
+            ) == banned_capability_tokens(rung, unlock_map), (
+                f"{name}: inserting rungs moved the ban set at {rung}"
+            )
+
+
+def test_a_token_is_banned_below_its_unlock_rung_and_not_at_it():
+    """The ``reached`` boundary itself, which nothing pinned before.
+
+    :func:`banned_capability_tokens` bans a token whose unlock index is strictly
+    **greater** than the rung reached. Nothing exercised that boundary: every
+    check ran at rungs where no token unlocks, so drifting ``>`` to ``>=`` — a
+    one-character change that would keep every capability banned one rung too
+    long — left the suite green. Found by an independent audit of the D-36
+    check; the gap is older than that check.
+
+    This asserts the semantics directly, on both surfaces: at a token's own
+    unlock rung it is **not** banned, and one rung below it **is**.
+    """
+
+    for name, unlock_map in _both_unlock_maps():
+        checked = 0
+        for token, unlock in unlock_map.items():
+            if unlock is None:
+                continue
+            at = SUBPHASE_LADDER.index(unlock)
+            assert token not in banned_capability_tokens(unlock, unlock_map), (
+                f"{name}: {token} is still banned at its own unlock rung {unlock}"
+            )
+            below = SUBPHASE_LADDER[at - 1]
+            assert token in banned_capability_tokens(below, unlock_map), (
+                f"{name}: {token} is not banned at {below}, one rung below "
+                f"its unlock {unlock}"
+            )
+            checked += 1
+        assert checked, f"{name}: no token carries a real unlock phase"
+
+
+def test_the_rung_carries_exactly_the_three_versions_d36_ruled():
+    """D-36's **ruling**, not merely its ground.
+
+    D-36 rules that ``0.2.1``, ``0.2.2`` and ``0.2.3`` all sit on ``BR-2C-0``:
+    the rung names what a version ships, not how many times it shipped, and all
+    three ship BR-2C's contract surface and no BR-2C capability.
+
+    The ground — that splitting the rung would change no ban set — was pinned
+    first, and an independent audit found the ruling itself still unpinned:
+    re-mapping ``0.2.2`` to ``BR-2B`` left the suite green, because the
+    fail-closed ``KeyError`` every consumer relies on catches an **unmapped**
+    version, never a **mis**-mapped one, and only once that version is live.
+    """
+
+    assert {v: VERSION_SUBPHASE[v] for v in ("0.2.1", "0.2.2", "0.2.3")} == {
+        "0.2.1": "BR-2C-0",
+        "0.2.2": "BR-2C-0",
+        "0.2.3": "BR-2C-0",
+    }
+    assert [v for v, rung in VERSION_SUBPHASE.items() if rung == "BR-2C-0"] == [
+        "0.2.1",
+        "0.2.2",
+        "0.2.3",
+    ]
+
+
+def test_the_hypothetical_ladder_is_never_the_real_one():
+    """A guard on the guard: the rejected ladder must not become the shipped one."""
+
+    assert SUBPHASE_LADDER == (
+        "BR-2A",
+        "BR-2B",
+        "BR-2C-0",
+        "BR-2C",
+        "BR-2D",
+        "BR-2E",
+    )
+    assert _PER_VERSION_LADDER != SUBPHASE_LADDER
+    assert set(VERSION_SUBPHASE.values()) <= set(SUBPHASE_LADDER)
 
 
 def _is_port_declaration(name: str, value) -> bool:
@@ -700,7 +919,10 @@ def test_every_exported_callable_and_protocol_method_is_fully_annotated():
 #: covers less is the failure mode all three audits found. Moving this number is
 #: a reviewed change, the same as moving ``public_api.json``.
 EXPORTED_CALLABLES_WALKED = 13
-PROTOCOL_METHODS_WALKED = 9
+#: Ten, not nine, since D-26 added ``verify_revocation`` to
+#: ``BenchmarkApprovalVerifierPort``. The ports stay inert Protocols; the count
+#: moves because there is one more seam declared, not one more implemented.
+PROTOCOL_METHODS_WALKED = 10
 
 
 def test_the_surface_property_one_walks_is_exactly_what_is_pinned():

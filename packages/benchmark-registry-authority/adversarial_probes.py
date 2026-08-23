@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Independent adversarial probes for the Benchmark Registry Authority (BR-2B).
+"""Independent adversarial probes for the Benchmark Registry Authority (BR-2C-0).
 
 Deliberately **independent** of the package's own test suite: this file imports
 no test module, no ``_builders`` helper, no ``conftest`` and no private
@@ -65,6 +65,16 @@ from ugence_benchmark_registry_authority.api import (
     BenchmarkRegistrySnapshotAssertion,
     BenchmarkTransitionPlan,
     BenchmarkTransitionRefusal,
+    BenchmarkApprovalVerifiedResult,
+    BenchmarkPublisherVerifiedResult,
+    BenchmarkRevocationVerifiedResult,
+    BENCHMARK_TRUST_ANCHOR_EVALUATION_ORDER,
+    BENCHMARK_VERIFICATION_REFUSAL_REASONS,
+    BenchmarkTrustAnchorRecord,
+    BenchmarkTrustAnchorResolution,
+    BenchmarkTrustAnchorStatus,
+    BenchmarkTrustRole,
+    BenchmarkVerificationOutcome,
     BenchmarkPlanningOutcome,
     is_byte_identical_resubmission,
     plan_submission_outcome,
@@ -73,6 +83,7 @@ from ugence_benchmark_registry_authority.api import (
     BenchmarkRegistryCanonicalizationError,
     BenchmarkRegistryConsistencyClaim,
     BenchmarkRegistryContractError,
+    BenchmarkRegistryFaultClass,
     BenchmarkRegistryLifecycleError,
     BenchmarkRegistryRefusalReason,
     BenchmarkRegistryStoreConsistencyDescriptor,
@@ -136,6 +147,15 @@ T0 = datetime(2026, 3, 1, 12, 0, 0, tzinfo=timezone.utc)
 T1 = datetime(2026, 6, 1, 0, 0, 0, tzinfo=timezone.utc)
 T2 = datetime(2027, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
 PROFILE = BenchmarkSignatureProfile.ED25519_SHA512_V1
+# BR-2C fixtures. Re-declared here with the same literals the suite uses, and
+# arrived at independently: the pinned vectors only agree if both harnesses
+# encode the same values the same way.
+PUB_KEY = "d4" * 32
+APP_KEY = "e5" * 32
+REV_KEY = "f6" * 32
+ANCHOR_FROM = datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+TRUSTED_INSTANT = datetime(2026, 4, 1, 0, 0, 0, tzinfo=timezone.utc)
+ANCHOR_REVOKED_AT = datetime(2026, 7, 1, 0, 0, 0, tzinfo=timezone.utc)
 
 
 def coordinate(**kw):
@@ -277,6 +297,85 @@ def snapshot_assertion(**overrides):
     return BenchmarkRegistrySnapshotAssertion(**base)
 
 
+def anchor(**overrides):
+    kwargs = dict(
+        role=BenchmarkTrustRole.PUBLISHER,
+        identity="publisher-alpha",
+        key_id="publisher-key-1",
+        signature_profile=PROFILE,
+        public_key_material=PUB_KEY,
+        validity_from=ANCHOR_FROM,
+        validity_to=T2,
+        status=BenchmarkTrustAnchorStatus.ENABLED,
+        revoked_at=None,
+        revocation_reason=None,
+    )
+    kwargs.update(overrides)
+    return BenchmarkTrustAnchorRecord(**kwargs)
+
+
+def resolution(**overrides):
+    record = overrides.pop("anchor", anchor())
+    asked = record if record is not None else anchor()
+    kwargs = dict(
+        role=asked.role,
+        identity=asked.identity,
+        key_id=asked.key_id,
+        anchor=record,
+        refusal_reason=None,
+    )
+    kwargs.update(overrides)
+    return BenchmarkTrustAnchorResolution(**kwargs)
+
+
+def publisher_verified(**overrides):
+    kwargs = dict(
+        verified_digest=IDENTITY_DIGEST,
+        signer_role=BenchmarkTrustRole.PUBLISHER,
+        signer_identity="publisher-alpha",
+        signer_key_id="publisher-key-1",
+        signature_profile=PROFILE,
+        anchor_record_digest=OTHER_DIGEST,
+        evaluated_at=TRUSTED_INSTANT,
+        outcome=BenchmarkVerificationOutcome.VERIFIED,
+        refusal_reason=None,
+    )
+    kwargs.update(overrides)
+    return BenchmarkPublisherVerifiedResult(**kwargs)
+
+
+def approval_verified(**overrides):
+    kwargs = dict(
+        verified_digest=CONTENT_DIGEST,
+        signer_role=BenchmarkTrustRole.APPROVER,
+        signer_identity="approval-authority-beta",
+        signer_key_id="approval-key-1",
+        signature_profile=PROFILE,
+        anchor_record_digest=OTHER_DIGEST,
+        evaluated_at=TRUSTED_INSTANT,
+        outcome=BenchmarkVerificationOutcome.VERIFIED,
+        refusal_reason=None,
+    )
+    kwargs.update(overrides)
+    return BenchmarkApprovalVerifiedResult(**kwargs)
+
+
+def revocation_verified(**overrides):
+    kwargs = dict(
+        verified_digest=OTHER_DIGEST,
+        signer_role=BenchmarkTrustRole.REVOKER,
+        signer_identity="revoker-delta",
+        signer_key_id="revocation-key-1",
+        signature_profile=PROFILE,
+        anchor_record_digest=IDENTITY_DIGEST,
+        evaluated_at=TRUSTED_INSTANT,
+        outcome=BenchmarkVerificationOutcome.VERIFIED,
+        refusal_reason=None,
+    )
+    kwargs.update(overrides)
+    return BenchmarkRevocationVerifiedResult(**kwargs)
+
+
 ALL_BUILDERS = (
     publisher,
     approval,
@@ -322,6 +421,10 @@ ALL_BUILDERS = (
     lambda: BenchmarkHistoricalInspectionRequest(coordinate=coordinate(), as_of=T1),
     lambda: PlatformRegistryScopeExpectation(scope=BenchmarkScope.platform_wide()),
     lambda: TenantRegistryScopeExpectation(scope=BenchmarkScope.for_tenant("t1")),
+    lambda: anchor(),
+    lambda: publisher_verified(),
+    lambda: approval_verified(),
+    lambda: revocation_verified(),
 )
 
 
@@ -335,13 +438,13 @@ def _q00():
     assert event.declared_state is BenchmarkRegistrationState.REVOKED
 
 
-@probe("Q-01 all eighteen shipped artifacts canonicalize into eighteen byte spaces")
+@probe("Q-01 all twenty-two shipped artifacts canonicalize into twenty-two byte spaces")
 def _q01():
     domains = set()
     for builder in ALL_BUILDERS:
         framed = json.loads(canonical_bytes(builder()).decode("utf-8"))
         domains.add(framed["domain"])
-    assert len(domains) == 18, len(domains)
+    assert len(domains) == 22, len(domains)
     assert domains == set(BENCHMARK_REGISTRY_AUTHORITY_DIGEST_DOMAINS)
 
 
@@ -389,16 +492,52 @@ def _q05():
 
 @probe("Q-06 no caller-supplied upstream digest field exists anywhere")
 def _q06():
+    """Digest fields name only artifacts this package cannot recompute.
+
+    Two ratified exceptions, and they are exceptions to the *derived-property*
+    rule rather than holes in it. D-24 rules that each verified result binds
+    "the envelope or artifact digest" and "the anchor-record digest" among
+    exactly nine bound facts, and D-25 makes the second of those the anchor
+    revision. Both are digests by ratification, named as digests.
+
+    The rule they are excused from exists because a chain payload **chains**: a
+    caller-supplied ``prev_event_digest`` would let an artifact attest to a
+    predecessor nobody could reproduce. A verified result chains nothing, and it
+    is permanently ``authority_verified is False`` — a caller who wanted to forge
+    one could already write ``outcome=VERIFIED`` into it, so a settable digest
+    field admits no forgery the type did not already admit. Q-24 and Q-46 keep
+    the derivations in place; this probe keeps the exception at exactly two
+    fields on exactly three classes.
+    """
+
     allowed = {
         "benchmark_identity_digest",
         "benchmark_content_digest",
         "admitted_digest",
         "declared_admitted_digest",
     }
+    verified_results = {
+        "BenchmarkPublisherVerifiedResult",
+        "BenchmarkApprovalVerifiedResult",
+        "BenchmarkRevocationVerifiedResult",
+    }
+    ratified = {"verified_digest", "anchor_record_digest"}
+    seen_exceptions = set()
     for builder in ALL_BUILDERS:
-        for f in dataclasses.fields(builder()):
-            if f.name.endswith("_digest"):
-                assert f.name in allowed, f.name
+        instance = builder()
+        name = type(instance).__name__
+        for f in dataclasses.fields(instance):
+            if not f.name.endswith("_digest"):
+                continue
+            if name in verified_results and f.name in ratified:
+                seen_exceptions.add((name, f.name))
+                continue
+            assert f.name in allowed, f"{name}.{f.name}"
+    # Both directions: the exception is used exactly where it was ratified, so a
+    # verified-result type that quietly lost a bound digest fails here too.
+    assert seen_exceptions == {
+        (cls, field) for cls in verified_results for field in ratified
+    }, seen_exceptions
 
 
 @probe("Q-07 prev_event_digest cannot be supplied, assigned or overwritten")
@@ -937,7 +1076,7 @@ def _q41():
 def _q42():
     prefix = BENCHMARK_REGISTRY_ALL_REFUSAL_REASONS[: len(BenchmarkRefusalReason)]
     assert prefix == tuple(BenchmarkRefusalReason)
-    assert len(BENCHMARK_REGISTRY_ALL_REFUSAL_REASONS) == 34
+    assert len(BENCHMARK_REGISTRY_ALL_REFUSAL_REASONS) == 41
 
 
 @probe("Q-43 a BR-1 lifecycle state can never establish a BR-2 registration state")
@@ -1292,7 +1431,10 @@ def _q62():
     # unchanged, and a size failure says nothing about what was found.
     assert offenders == [], offenders
     assert unannotated == [], unannotated
-    assert len(surface) == 22, sorted(surface)
+    # Twenty-three, not twenty-two: D-26 adds ``verify_revocation`` to the
+    # approval-verifier port. The count is a floor against a vacuous probe, not
+    # a claim about behaviour, and it moves whenever a seam is declared.
+    assert len(surface) == 23, sorted(surface)
 
     # The check must be able to fail. Plant the shapes that walked past the
     # substring rule and require the leaf-walker to see each one. The annotation
@@ -1347,6 +1489,439 @@ def _q63():
     assert stale.declared_refusal_reason is (
         BenchmarkRegistryRefusalReason.STALE_REGISTRY_SNAPSHOT
     )
+
+
+# --------------------------------------------------------------------------- #
+# BR-2C trust and verification contracts (D-24 – D-29).
+#
+# Reconstructed through the curated public API alone, with this harness's own
+# literals. Every probe here asserts a refusal or an absence: no verifier ships,
+# and none has been audited (D-32).
+# --------------------------------------------------------------------------- #
+@probe("Q-65 the three verified-result types are distinct and role-pinned")
+def _q65():
+    types = {type(publisher_verified()), type(approval_verified()),
+             type(revocation_verified())}
+    assert len(types) == 3
+    for build, pinned in (
+        (publisher_verified, BenchmarkTrustRole.PUBLISHER),
+        (approval_verified, BenchmarkTrustRole.APPROVER),
+        (revocation_verified, BenchmarkTrustRole.REVOKER),
+    ):
+        assert build().signer_role is pinned
+        for role in BenchmarkTrustRole:
+            if role is not pinned:
+                refuses(
+                    lambda b=build, r=role: b(signer_role=r),
+                    BenchmarkRegistryContractError,
+                )
+        # A bare string spelling the member's value is not the member.
+        refuses(
+            lambda b=build, v=pinned.value: b(signer_role=v),
+            BenchmarkRegistryContractError,
+        )
+
+
+@probe("Q-66 a verified result establishes nothing, including when it says VERIFIED")
+def _q66():
+    for build in (publisher_verified, approval_verified, revocation_verified):
+        result = build()
+        assert result.outcome is BenchmarkVerificationOutcome.VERIFIED
+        for prop in (
+            "authority_verified",
+            "publisher_authenticity_established",
+            "approval_authenticity_established",
+            "registry_admission_established",
+            "trusted_resolution_established",
+        ):
+            assert getattr(result, prop) is False, prop
+            refuses(
+                lambda r=result, p=prop: object.__setattr__(r, p, True),
+                AttributeError,
+            )
+
+
+@probe("Q-67 the outcome/reason biconditional holds in both directions")
+def _q67():
+    for build in (publisher_verified, approval_verified, revocation_verified):
+        refuses(
+            lambda b=build: b(
+                outcome=BenchmarkVerificationOutcome.VERIFIED,
+                refusal_reason=BenchmarkRegistryRefusalReason.SIGNATURE_INVALID,
+            ),
+            BenchmarkRegistryContractError,
+        )
+        refuses(
+            lambda b=build: b(
+                outcome=BenchmarkVerificationOutcome.REFUSED,
+                refusal_reason=None,
+            ),
+            BenchmarkRegistryContractError,
+        )
+        # A VERIFIED result cannot omit the revision it verified against.
+        refuses(
+            lambda b=build: b(anchor_record_digest=None),
+            BenchmarkRegistryContractError,
+        )
+
+
+@probe("Q-68 the anchor revision is the record digest and no counter exists")
+def _q68():
+    record = anchor()
+    assert record.anchor_record_digest == canonical_digest(record)
+    names = {f.name for f in dataclasses.fields(record)}
+    assert "anchor_record_digest" not in names
+    for banned in ("revision", "version", "generation", "sequence", "serial"):
+        assert not any(banned in n for n in names), names
+    refuses(
+        lambda: object.__setattr__(record, "anchor_record_digest", "0" * 64),
+        AttributeError,
+    )
+    # Any bound field moves the revision.
+    base = record.anchor_record_digest
+    for override in (
+        {"identity": "publisher-omega"},
+        {"key_id": "publisher-key-2"},
+        {"public_key_material": APP_KEY},
+        {"role": BenchmarkTrustRole.APPROVER},
+    ):
+        assert anchor(**override).anchor_record_digest != base
+
+
+@probe("Q-69 the anchor's revocation facts and status can never disagree")
+def _q69():
+    refuses(
+        lambda: anchor(status=BenchmarkTrustAnchorStatus.REVOKED, revoked_at=None),
+        BenchmarkRegistryContractError,
+    )
+    for status in (
+        BenchmarkTrustAnchorStatus.ENABLED,
+        BenchmarkTrustAnchorStatus.DISABLED,
+    ):
+        refuses(
+            lambda s=status: anchor(status=s, revoked_at=ANCHOR_REVOKED_AT),
+            BenchmarkRegistryContractError,
+        )
+        refuses(
+            lambda s=status: anchor(status=s, revocation_reason="anything"),
+            BenchmarkRegistryContractError,
+        )
+    # An interval containing no instant is refused, never reordered.
+    refuses(
+        lambda: anchor(validity_from=T2, validity_to=ANCHOR_FROM),
+        BenchmarkRegistryContractError,
+    )
+
+
+@probe("Q-70 key material is an encoding that is checked and never decoded")
+def _q70():
+    record = anchor()
+    assert len(record.public_key_material) == 64
+    for bad in ("A" * 64, "d4" * 31, "", "0x" + "d4" * 32, "zz" * 32, " " + "d4" * 32):
+        refuses(
+            lambda b=bad: anchor(public_key_material=b),
+            BenchmarkRegistryContractError,
+        )
+    # No cryptographic library was imported to check any of that.
+    for module in ("cryptography", "nacl", "ed25519", "Crypto", "OpenSSL"):
+        assert module not in sys.modules, module
+
+
+@probe("Q-71 the seven trust refusals are appended, role-neutral and classified")
+def _q71():
+    members = list(BenchmarkRegistryRefusalReason)
+    assert len(members) == 24
+    tail = [m.name for m in members[-7:]]
+    assert tail == [
+        "TRUST_ANCHOR_NOT_FOUND",
+        "TRUST_ANCHOR_REVOKED",
+        "TRUST_ANCHOR_DISABLED",
+        "TRUST_ANCHOR_NOT_YET_VALID",
+        "TRUST_ANCHOR_EXPIRED",
+        "TRUST_DIRECTORY_UNAVAILABLE",
+        "STALE_TRUST_SNAPSHOT",
+    ], tail
+    for name in tail:
+        member = BenchmarkRegistryRefusalReason[name]
+        assert (
+            fault_class_for(member)
+            is BenchmarkRegistryFaultClass.TRUST_AND_AUTHENTICITY
+        )
+        for role in BenchmarkTrustRole:
+            assert role.value not in name, name
+    # BR-1's frozen prefix is untouched and still occupies indices 0..16.
+    assert BENCHMARK_REGISTRY_ALL_REFUSAL_REASONS[17:][:7] != tuple(tail)
+
+
+@probe("Q-72 the verification vocabulary is not the admission vocabulary")
+def _q72():
+    values = {m.value for m in BenchmarkVerificationOutcome}
+    assert values == {"VERIFIED", "REFUSED"}
+    assert not (values & {m.value for m in BenchmarkAdmissionOutcome})
+    # And no banned floating lifecycle word entered through the anchor status.
+    for member in BenchmarkTrustAnchorStatus:
+        for banned in BENCHMARK_BANNED_REGISTRATION_STATE_NAMES:
+            assert banned not in member.name.upper(), member.name
+
+
+@probe("Q-73 nothing in the package satisfies the reshaped ports")
+def _q73():
+    import ugence_benchmark_registry_authority as pkg
+
+    for port_name in (
+        "BenchmarkApprovalVerifierPort",
+        "BenchmarkPublisherTrustDirectoryPort",
+    ):
+        port = getattr(pkg, port_name)
+        assert getattr(port, "_is_protocol", False), port_name
+        refuses(lambda p=port: p(), TypeError)
+    seams = {
+        name
+        for name in vars(pkg.BenchmarkApprovalVerifierPort)
+        if not name.startswith("_")
+    }
+    assert seams == {
+        "verify_publisher_submission",
+        "verify_approval",
+        "verify_revocation",
+    }, seams
+    assert "is_entitled" not in vars(pkg.BenchmarkPublisherTrustDirectoryPort)
+    assert "resolve_anchor" in vars(pkg.BenchmarkPublisherTrustDirectoryPort)
+
+
+@probe("Q-74 the anchor-resolution seam returns a resolution, not an optional record")
+def _q74():
+    import typing
+
+    import ugence_benchmark_registry_authority as pkg
+
+    hints = typing.get_type_hints(
+        pkg.BenchmarkPublisherTrustDirectoryPort.resolve_anchor
+    )
+    # Not Optional[...] and not a union of any kind: exactly one return type.
+    assert hints["return"] is BenchmarkTrustAnchorResolution, hints["return"]
+    assert typing.get_origin(hints["return"]) is None
+    assert "BenchmarkTrustAnchorResolution" in pkg.__all__
+
+
+@probe("Q-75 a resolution carries a record XOR a refusal, and neither both nor neither")
+def _q75():
+    record = anchor()
+    resolved = resolution()
+    assert resolved.anchor == record and resolved.refusal_reason is None
+    refused = resolution(
+        anchor=None,
+        refusal_reason=BenchmarkRegistryRefusalReason.TRUST_ANCHOR_NOT_FOUND,
+    )
+    assert refused.anchor is None and refused.refusal_reason is not None
+    # Both, and neither. Constructed directly so no fixture default hides one.
+    for bad in (
+        dict(
+            anchor=record,
+            refusal_reason=BenchmarkRegistryRefusalReason.TRUST_ANCHOR_NOT_FOUND,
+        ),
+        dict(anchor=None, refusal_reason=None),
+    ):
+        refuses(
+            lambda kw=bad: BenchmarkTrustAnchorResolution(
+                role=record.role,
+                identity=record.identity,
+                key_id=record.key_id,
+                **kw,
+            ),
+            BenchmarkRegistryContractError,
+        )
+    # No Boolean anywhere: D-24 removed them from these seams.
+    for field in dataclasses.fields(BenchmarkTrustAnchorResolution):
+        assert not isinstance(getattr(resolved, field.name), bool), field.name
+
+
+@probe("Q-76 only the two no-record refusals may be carried by a resolution")
+def _q76():
+    admissible = {
+        BenchmarkRegistryRefusalReason.TRUST_ANCHOR_NOT_FOUND,
+        BenchmarkRegistryRefusalReason.TRUST_DIRECTORY_UNAVAILABLE,
+    }
+    for reason in BenchmarkRegistryRefusalReason:
+        build = lambda r=reason: resolution(anchor=None, refusal_reason=r)
+        if reason in admissible:
+            assert build().refusal_reason is reason
+        else:
+            refuses(build, BenchmarkRegistryContractError)
+    # Every lifecycle refusal is among the refused: this seam evaluates nothing.
+    for reason in BENCHMARK_TRUST_ANCHOR_EVALUATION_ORDER:
+        assert reason not in admissible, reason.name
+
+
+@probe("Q-77 a resolver may not answer a triple it was not asked")
+def _q77():
+    record = anchor()
+    for field, value in (
+        ("role", BenchmarkTrustRole.REVOKER),
+        ("identity", "publisher-beta"),
+        ("key_id", "publisher-key-2"),
+    ):
+        exc = refuses(
+            lambda f=field, v=value: resolution(**{f: v}),
+            BenchmarkRegistryContractError,
+        )
+        assert field in str(exc), (field, str(exc))
+    # A revoked anchor comes back as it stands: no filtering, no instant.
+    revoked = anchor(
+        status=BenchmarkTrustAnchorStatus.REVOKED,
+        revoked_at=T1,
+        revocation_reason="key compromise",
+    )
+    assert (
+        resolution(anchor=revoked).anchor.status
+        is BenchmarkTrustAnchorStatus.REVOKED
+    )
+    names = [f.name for f in dataclasses.fields(BenchmarkTrustAnchorResolution)]
+    for banned in ("at", "instant", "time", "now"):
+        assert not any(banned in n for n in names), banned
+    assert record.role is BenchmarkTrustRole.PUBLISHER
+
+
+@probe("Q-78 a resolution is not canonicalizable, mints no domain and grants nothing")
+def _q78():
+    import ugence_benchmark_registry_authority as pkg
+
+    resolved = resolution()
+    refuses(
+        lambda: canonical_bytes(resolved),
+        BenchmarkRegistryCanonicalizationError,
+    )
+    refuses(
+        lambda: canonical_digest(resolved),
+        BenchmarkRegistryCanonicalizationError,
+    )
+    assert not hasattr(resolved, "anchor_record_digest")
+    assert "BenchmarkTrustAnchorResolution" not in [
+        d for d in pkg.BENCHMARK_REGISTRY_AUTHORITY_DIGEST_DOMAINS
+    ]
+    # It carries a real anchor and still establishes nothing.
+    for prop in BENCHMARK_UNVERIFIED_AUTHORITY_PROPERTIES:
+        assert getattr(resolved, prop) is False, prop
+    # And no implementation of the seam ships to produce one.
+    assert getattr(
+        pkg.BenchmarkPublisherTrustDirectoryPort, "_is_protocol", False
+    )
+
+
+@probe("Q-79 a verified result may carry twelve of the twenty-four refusals")
+def _q79():
+    assert len(BenchmarkRegistryRefusalReason) == 24
+    assert len(BENCHMARK_VERIFICATION_REFUSAL_REASONS) == 12
+    assert len(set(BENCHMARK_VERIFICATION_REFUSAL_REASONS)) == 12
+    # Every admissible member constructs on all three result types.
+    for builder in (publisher_verified, approval_verified, revocation_verified):
+        for reason in BENCHMARK_VERIFICATION_REFUSAL_REASONS:
+            built = builder(
+                outcome=BenchmarkVerificationOutcome.REFUSED,
+                refusal_reason=reason,
+                anchor_record_digest=None,
+            )
+            assert built.refusal_reason is reason, reason.name
+    # Declaration order survives: §22.13 sorts this vocabulary by index.
+    members = list(BenchmarkRegistryRefusalReason)
+    positions = [members.index(r) for r in BENCHMARK_VERIFICATION_REFUSAL_REASONS]
+    assert positions == sorted(positions), positions
+
+
+@probe("Q-80 the excluded twelve cannot reach any verified-result type")
+def _q80():
+    excluded = [
+        r
+        for r in BenchmarkRegistryRefusalReason
+        if r not in BENCHMARK_VERIFICATION_REFUSAL_REASONS
+    ]
+    assert len(excluded) == 12
+    # The nine registry-state facts, named rather than derived: a phase that
+    # ships no registry state cannot establish any of them (§35.1's BR-2C row).
+    assert {r.name for r in excluded} == {
+        "IDEMPOTENT_DUPLICATE",
+        "COORDINATE_SLOT_CONFLICT",
+        "DIGEST_ALREADY_BOUND",
+        "CONFUSABLE_COORDINATE",
+        "LIFECYCLE_CONFLICT",
+        "UNAUTHORIZED_TRANSITION",
+        "STALE_REGISTRY_SNAPSHOT",
+        "STORE_INTEGRITY_INVALID",
+        "STORE_UNAVAILABLE",
+        # D-10 puts supersession out of BR-2's scope entirely.
+        "UNSUPPORTED_SUPERSESSION",
+        # D-27 places the non-disclosure collapse at an external read boundary.
+        "NOT_FOUND",
+        "NOT_ADMITTED",
+    }
+    for builder in (publisher_verified, approval_verified, revocation_verified):
+        for reason in excluded:
+            exc = refuses(
+                lambda b=builder, r=reason: b(
+                    outcome=BenchmarkVerificationOutcome.REFUSED,
+                    refusal_reason=r,
+                    anchor_record_digest=None,
+                ),
+                BenchmarkRegistryContractError,
+            )
+            assert "not one a verified result may carry" in str(exc), reason.name
+
+
+@probe("Q-81 the subset is derived from the total fault-class map, not written out")
+def _q81():
+    # Recomputed here from the map, so a literal that had drifted would fail.
+    derived = tuple(
+        reason
+        for reason in BenchmarkRegistryRefusalReason
+        if fault_class_for(reason)
+        in (
+            BenchmarkRegistryFaultClass.TRUST_AND_AUTHENTICITY,
+            BenchmarkRegistryFaultClass.INDETERMINATE,
+        )
+    )
+    assert BENCHMARK_VERIFICATION_REFUSAL_REASONS == derived
+    # Total classification is what makes deriving safe where a literal is not.
+    for reason in BenchmarkRegistryRefusalReason:
+        assert fault_class_for(reason) is not None, reason.name
+    trust = [
+        r
+        for r in BenchmarkRegistryRefusalReason
+        if fault_class_for(r) is BenchmarkRegistryFaultClass.TRUST_AND_AUTHENTICITY
+    ]
+    assert len(trust) == 11, len(trust)
+    # INDETERMINATE joins without being in the trust class: D-35 rules it in.
+    indeterminate = BenchmarkRegistryRefusalReason.INDETERMINATE
+    assert (
+        fault_class_for(indeterminate)
+        is BenchmarkRegistryFaultClass.INDETERMINATE
+    )
+    assert indeterminate in BENCHMARK_VERIFICATION_REFUSAL_REASONS
+    assert set(BENCHMARK_VERIFICATION_REFUSAL_REASONS) == set(trust) | {
+        indeterminate
+    }
+
+
+@probe("Q-82 narrowing the subset added no member and moved no refusal count")
+def _q82():
+    assert len(BenchmarkRegistryRefusalReason) == 24
+    assert len(BENCHMARK_REGISTRY_ALL_REFUSAL_REASONS) == 41
+    # The four lifecycle refusals land on the verification seam, which is the
+    # one that evaluates them; the resolution seam's two survive the handoff.
+    for reason in BENCHMARK_TRUST_ANCHOR_EVALUATION_ORDER:
+        assert reason in BENCHMARK_VERIFICATION_REFUSAL_REASONS, reason.name
+    for name in ("TRUST_ANCHOR_NOT_FOUND", "TRUST_DIRECTORY_UNAVAILABLE"):
+        assert (
+            BenchmarkRegistryRefusalReason[name]
+            in BENCHMARK_VERIFICATION_REFUSAL_REASONS
+        )
+    # The other half of the biconditional is untouched by the narrowing.
+    for reason in BENCHMARK_VERIFICATION_REFUSAL_REASONS:
+        refuses(
+            lambda r=reason: publisher_verified(
+                outcome=BenchmarkVerificationOutcome.VERIFIED, refusal_reason=r
+            ),
+            BenchmarkRegistryContractError,
+        )
 
 
 def main() -> int:
