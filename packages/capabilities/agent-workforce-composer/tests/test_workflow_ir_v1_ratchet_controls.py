@@ -32,7 +32,7 @@ def _awc_dumps(value):
 
 
 def _goldens():
-    return build_golden_payload(V.accepted_vectors(), _compiler,
+    return build_golden_payload(V.normative_vectors(), _compiler,
                                 V.CORPUS_VERSION, V.PINNED_DIGEST_COMPILER_VERSION)["vectors"]
 
 
@@ -47,7 +47,7 @@ def _one_byte_worse(fn):
 # -- control 1: drift in the compiler only ---------------------------------- #
 
 def test_detects_one_byte_change_in_compiler_output_only():
-    failures = compare_accepted(V.accepted_vectors(), _one_byte_worse(_compiler),
+    failures = compare_accepted(V.normative_vectors(), _one_byte_worse(_compiler),
                                 _awc_dumps, _goldens())
     assert failures
     assert any("PAIRWISE drift" in f for f in failures)
@@ -57,7 +57,7 @@ def test_detects_one_byte_change_in_compiler_output_only():
 # -- control 2: drift in AWC only ------------------------------------------- #
 
 def test_detects_one_byte_change_in_awc_output_only():
-    failures = compare_accepted(V.accepted_vectors(), _compiler,
+    failures = compare_accepted(V.normative_vectors(), _compiler,
                                 _one_byte_worse(_awc_dumps), _goldens())
     assert failures
     assert any("PAIRWISE drift" in f for f in failures)
@@ -73,7 +73,7 @@ def test_detects_symmetric_drift_that_pairwise_equivalence_would_miss():
     the control that justifies requiring both obligations.
     """
     broken_c, broken_a = _one_byte_worse(_compiler), _one_byte_worse(_awc_dumps)
-    vectors = V.accepted_vectors()
+    vectors = V.normative_vectors()
 
     # The two broken encoders still agree with each other...
     assert all(broken_c(v) == broken_a(v) for _, v in vectors)
@@ -94,7 +94,7 @@ def test_detects_symmetric_drift_that_pairwise_equivalence_would_miss():
 def test_detects_a_new_vector_missing_its_golden():
     goldens = _goldens()
     goldens.pop("model_ir")
-    failures = compare_accepted(V.accepted_vectors(), _compiler, _awc_dumps, goldens)
+    failures = compare_accepted(V.normative_vectors(), _compiler, _awc_dumps, goldens)
     assert any("model_ir" in f and "no committed golden entry" in f for f in failures)
 
 
@@ -103,18 +103,18 @@ def test_detects_a_new_vector_missing_its_golden():
 def test_detects_acceptance_disagreement_on_a_rejected_vector():
     """One side starts accepting a value the corpus pins as rejected."""
     lenient = lambda value: "\"accepted\""            # noqa: E731 - a stand-in encoder
-    failures = compare_rejected(V.rejected_vectors(), lenient, _awc_dumps)
+    failures = compare_rejected(V.structural_exclusion_vectors(), lenient, _awc_dumps)
     assert failures
     assert all("ACCEPTANCE DISAGREEMENT" in f for f in failures)
     assert any("compiler accepted it, AWC refused it" in f for f in failures)
 
-    failures = compare_rejected(V.rejected_vectors(), _compiler, lenient)
+    failures = compare_rejected(V.structural_exclusion_vectors(), _compiler, lenient)
     assert any("AWC accepted it, compiler refused it" in f for f in failures)
 
 
 def test_detects_both_sides_accepting_a_pinned_rejection():
     lenient = lambda value: "\"accepted\""            # noqa: E731
-    failures = compare_rejected(V.rejected_vectors(), lenient, lenient)
+    failures = compare_rejected(V.structural_exclusion_vectors(), lenient, lenient)
     assert failures
     assert all("BOTH accepted" in f for f in failures)
 
@@ -124,7 +124,7 @@ def test_detects_both_sides_accepting_a_pinned_rejection():
 def test_detects_a_tampered_golden_digest():
     goldens = _goldens()
     goldens["model_ir"] = dict(goldens["model_ir"], digest=digest_of("something else"))
-    failures = compare_accepted(V.accepted_vectors(), _compiler, _awc_dumps, goldens)
+    failures = compare_accepted(V.normative_vectors(), _compiler, _awc_dumps, goldens)
     assert any("digest drifted from golden" in f for f in failures)
 
 

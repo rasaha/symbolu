@@ -34,12 +34,12 @@ def main() -> int:
     args = ap.parse_args()
 
     from tests._ir_v1_compat_vectors import (  # noqa: E402
-        CORPUS_VERSION, PINNED_DIGEST_COMPILER_VERSION, accepted_vectors,
+        CORPUS_VERSION, PINNED_DIGEST_COMPILER_VERSION, normative_vectors,
     )
     from tests._ir_v1_ratchet_harness import build_golden_payload  # noqa: E402
     from ugence_policy_workflow_compiler.serialization import canonical_json  # noqa: E402
 
-    payload = build_golden_payload(accepted_vectors(), canonical_json.dumps,
+    payload = build_golden_payload(normative_vectors(), canonical_json.dumps,
                                    CORPUS_VERSION, PINNED_DIGEST_COMPILER_VERSION)
     rendered = json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
 

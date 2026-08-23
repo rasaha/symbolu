@@ -270,10 +270,11 @@ fingerprints for the same `workflow_ir.v1` semantic value, under the frozen
 
 | file | role |
 |---|---|
-| `tests/_ir_v1_compat_vectors.py` | 39 accepted + 7 rejected vectors, sorted, version-labelled `workflow_ir_v1_compat.v1`; includes the **real** compiled reference-procurement IR, not synthetic nodes alone |
+| `tests/_ir_v1_compat_vectors.py` | 33 normative + 6 diagnostic + 7 structural-exclusion vectors, sorted, version-labelled `workflow_ir_v1_compat.v2`; the normative set includes the **real** compiled reference-procurement IR and all three v1 digest preimages |
 | `tests/_ir_v1_ratchet_harness.py` | comparison core, free of pytest and of both distributions |
 | `tests/fixtures/workflow_ir_v1_canonical_golden.json` | committed golden bytes + digests |
 | `tests/test_workflow_ir_v1_canonicalization_ratchet.py` | the ratchet |
+| `tests/test_workflow_ir_v1_canonicalization_diagnostics.py` | non-normative observations; never gates v1 |
 | `tests/test_workflow_ir_v1_ratchet_controls.py` | negative controls |
 | `scripts/regenerate_workflow_ir_v1_golden.py` | candidate-only regeneration helper |
 
@@ -286,7 +287,9 @@ only by the golden.
 
 **Rejection parity.** A value one implementation accepts and the other refuses is a
 compatibility failure. Exception *messages* are not compared; neither implementation
-publishes its message text as contract.
+publishes its message text as contract. Refusal of the excluded bare values is a
+**structural-exclusion** check, not a published v1 canonicalization guarantee: it
+anchors no golden and freezes no bytes.
 
 `[V]` **Scope was verified before the ratchet was written**, not assumed. Over the
 complete `workflow_ir.v1` value domain the two implementations agree on every vector
@@ -296,8 +299,53 @@ and refuse the same bare values. The one divergence that exists —
 declares such a type, and `CompilerModel` is `extra="forbid"`.
 `test_workflow_ir_v1_declares_no_field_outside_the_agreed_domain` is what keeps that
 true; adding such a field becomes an explicit compatibility decision rather than a
-model edit. **`[R]` The out-of-scope divergence itself is flagged for a separate owner
-decision** — it is recorded, not normalized, and neither implementation was changed.
+model edit. That divergence is now ruled on in §9.1.
+
+
+### 9.1 `[R]` Projection mechanism, normative domain, and structural exclusion
+
+**Ruled.** The `model_dump(mode="json")` vs `mode="python"` difference between AWC and
+the compiler **is not required to converge**, and **no production normalization is
+authorized**. Neither canonicalizer was changed.
+
+1. **Model-internal projection mechanisms may differ.** How each implementation
+   projects a model is its own business; only *output* is contracted.
+2. **Output compatibility is required only over the reachable v1 domain** — values
+   structurally reachable through the ratified `workflow_ir.v1` schema or its three
+   documented digest preimages. Model-embedded `datetime`, `date`, `Decimal`, `UUID`
+   and `bytes` are **not** in that domain.
+3. **Out-of-domain behaviour creates no shared contract.** `float`, `-0.0`, `set`,
+   `frozenset`, `bool` and `None` are accepted by both implementations but are
+   unreachable from v1. They are reclassified `NON_NORMATIVE_DIAGNOSTIC`, removed
+   from the golden fixture, and moved to a test that cannot fail the v1 gate. They
+   are **not** ratified v1 capabilities and **not** permanent compatibility
+   obligations. Test coverage is not contract scope.
+4. **Structural exclusion keeps unreachable types out of v1**, enforced on four
+   fronts: no v1 field declares such a type (recursively, through nested models);
+   `extra="forbid"` refuses undeclared fields that could carry one in; nested runtime
+   values are validated identically, so nesting is not a bypass; and a hypothetical
+   future model that admits one is flagged *through nesting* by the same walk.
+5. **Future admission is an explicit review event.** Any future need for such a type
+   requires a reviewed schema change, a canonical representation defined *before*
+   use, demonstrated compiler/AWC parity, unchanged existing v1 bytes and
+   fingerprints, and a new schema or canonicalization version wherever representation
+   compatibility cannot be preserved. No implementation may silently extend the v1
+   canonicalization domain.
+
+**Vector classification** (audited against the live schema by
+`test_vector_classification_matches_the_live_schema`, so the labels cannot drift from
+what v1 actually admits):
+
+| class | count | golden-anchored | gates v1 |
+|---|---|---|---|
+| `NORMATIVE_V1_REACHABLE` | 33 | yes | yes |
+| `NON_NORMATIVE_DIAGNOSTIC` | 6 | no | **no** |
+| `STRUCTURAL_EXCLUSION` | 7 | no | as an exclusion check only |
+
+The corpus moved to `workflow_ir_v1_compat.v2` for this reclassification. One pinned
+digest moved — `model_nested_in_map`, because the *vector* dropped an unreachable
+`None` so it could stay normative. The other 32 normative digests are unchanged, which
+is the evidence that no canonicalization behaviour moved with it.
 
 **Enforcement, not decoration.** The ratchet runs in a dedicated CI job in both
 `policy-workflow-compiler-p2-ci.yml` and `agent-workforce-composer-p2-1-ci.yml`, each

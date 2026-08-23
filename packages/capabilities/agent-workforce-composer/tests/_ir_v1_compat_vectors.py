@@ -9,6 +9,27 @@ They do **not** define a shared canonicalization contract, do not apply to Risk
 Authority, Policy Authority, Cloud Scaling Controller or Producer Attestation,
 and are not evidence that any other canonicalizer should converge.
 
+Three vector classes (ADR §9 `[R]`)
+-----------------------------------
+``NORMATIVE_V1_REACHABLE``
+    Value classes structurally reachable through the ratified ``workflow_ir.v1``
+    schema or one of its three documented digest preimages. **Only these define
+    the frozen cross-component byte and fingerprint contract**, and only these are
+    anchored in the golden fixture.
+
+``STRUCTURAL_EXCLUSION``
+    Values the v1 schema must keep *out* of a valid model. Their refusal is not a
+    published v1 canonicalization guarantee, so they anchor no golden; they exist
+    to demonstrate the exclusion holds.
+
+``NON_NORMATIVE_DIAGNOSTIC``
+    Values both canonicalizers happen to accept that are **not** reachable from
+    v1 -- ``float``, ``-0.0``, ``set``, ``frozenset``, ``bool``, ``None``. They are
+    observations, never obligations. They carry no golden and cannot fail the v1
+    compatibility gate: an incidental out-of-domain behaviour change must not read
+    as a v1 contract break, and test coverage must never be mistaken for contract
+    scope.
+
 Vector discipline
 -----------------
 * Every vector is built here, in reviewable Python — never loaded from a blob.
@@ -21,10 +42,65 @@ Vector discipline
 from __future__ import annotations
 
 #: Label for this corpus. Bump on any vector addition, removal or edit.
-CORPUS_VERSION = "workflow_ir_v1_compat.v1"
+#: v2 -- ADR §9 classification ruling: the golden gate is narrowed to
+#: NORMATIVE_V1_REACHABLE vectors only. float/-0.0/set/frozenset/bool/None moved to
+#: non-normative diagnostics, and ``model_nested_in_map`` dropped its unreachable
+#: ``None`` so it stays normative. No retained normative digest moved.
+CORPUS_VERSION = "workflow_ir_v1_compat.v2"
 
 #: The canonicalization identity these vectors are pinned against.
 PINNED_DIGEST_COMPILER_VERSION = "0.1.0"
+
+
+#: The three digest preimages ``workflow_ir.v1`` actually canonicalizes, as built
+#: by ``WorkflowIR.logical_digest``, ``make_node_id`` and ``make_edge_id``. They
+#: introduce ``dict`` (string keys) into the reachable domain; the v1 models
+#: themselves declare no mapping field.
+PREIMAGE_SHAPES = ("logical_digest", "node_id", "edge_id")
+
+
+def reachable_value_types():
+    """The set of Python types reachable through the v1 schema + its preimages.
+
+    Derived from the live models, never hand-listed, so a schema change moves this
+    set instead of silently contradicting it.
+    """
+    import enum
+    import typing
+
+    from pydantic import BaseModel
+
+    T = _ir_objects()
+    found = {dict, list, tuple}          # contributed by the preimages and Tuple fields
+
+    def _walk_annotation(annotation, seen):
+        origin = typing.get_origin(annotation)
+        if origin is not None:
+            for arg in typing.get_args(annotation):
+                if arg is not Ellipsis:
+                    _walk_annotation(arg, seen)
+            return
+        if isinstance(annotation, type) and issubclass(annotation, BaseModel):
+            _walk_model(annotation, seen)
+            return
+        if isinstance(annotation, type) and issubclass(annotation, enum.Enum):
+            found.add(enum.Enum)
+            return
+        if isinstance(annotation, type):
+            found.add(annotation)
+
+    def _walk_model(model, seen):
+        if model in seen:
+            return
+        seen.add(model)
+        found.add(BaseModel)
+        for field in model.model_fields.values():
+            _walk_annotation(field.annotation, seen)
+
+    seen: set = set()
+    for model in (T["WorkflowNode"], T["WorkflowEdge"], T["WorkflowIR"]):
+        _walk_model(model, seen)
+    return found
 
 
 def _ir_objects():
@@ -61,8 +137,12 @@ def _reference_procurement_ir():
     return result.workflow_ir
 
 
-def accepted_vectors():
-    """Values BOTH canonicalizers must accept and encode to identical bytes.
+def normative_vectors():
+    """``NORMATIVE_V1_REACHABLE`` -- the frozen cross-component contract.
+
+    Values BOTH canonicalizers must accept and encode to identical bytes, and which
+    the golden fixture anchors. Every one is structurally reachable through the v1
+    schema or one of its three documented digest preimages.
 
     Returns ``[(vector_id, value), ...]`` sorted by ``vector_id``.
     """
@@ -101,10 +181,8 @@ def accepted_vectors():
         "seq_empty_list":          [],
         "seq_empty_tuple":         (),
         "seq_nested":              [[1, [2, [3]]], []],
-        # -- scalars
-        "scalar_bool":             {"t": True, "f": False},
+        # -- scalars (bool and None are NOT v1-reachable; see diagnostic_vectors)
         "scalar_int":              {"zero": 0, "neg": -7, "big": 10 ** 20},
-        "scalar_none":             {"n": None},
         "scalar_str":              {"s": "approve"},
         "scalar_str_empty":        {"s": ""},
         # -- unicode: normalization-sensitive pairs must NOT be folded together
@@ -130,7 +208,7 @@ def accepted_vectors():
         "model_ir_reference":      ir_reference,
         "preimage_reference_digest": {"nodes": list(ir_reference.nodes),
                                       "edges": list(ir_reference.edges)},
-        "model_nested_in_map":     {"workflow_ir": ir, "release_metadata": None},
+        "model_nested_in_map":     {"workflow_ir": ir, "release_label": "reference"},
         "model_list_of_nodes":     [node_full, node_defaults],
         # -- the two digest preimages workflow_ir.v1 actually canonicalizes
         "preimage_logical_digest": {"nodes": list(ir.nodes), "edges": list(ir.edges)},
@@ -140,21 +218,36 @@ def accepted_vectors():
         "preimage_edge_id":        {"kind": EdgeKind.ON_PASS.value,
                                     "source": node_full.node_id,
                                     "target": node_defaults.node_id},
-        # -- accepted by BOTH canonicalizers though not reachable from a v1 field.
-        #    Pinned so a change to either implementation's handling is visible.
-        "outside_v1_float":        {"f": 1.5},
-        "outside_v1_float_neg0":   {"f": -0.0},
-        "outside_v1_set":          {"s": {"b", "a", "c"}},
-        "outside_v1_frozenset":    {"s": frozenset({"y", "x"})},
     }
     return sorted(vectors.items())
 
 
-def rejected_vectors():
-    """Bare values BOTH canonicalizers must refuse.
+def diagnostic_vectors():
+    """``NON_NORMATIVE_DIAGNOSTIC`` -- accepted by both, unreachable from v1.
 
-    Rejection parity is asserted on the *class* of refusal, not the message:
-    neither implementation publishes its exception text as contract.
+    Observations, not obligations. No golden anchors these, and no v1 compatibility
+    gate may fail because one of them later changes: they are outside the domain
+    the ADR §9 ruling makes binding.
+    """
+    vectors = {
+        "diagnostic_bool":      {"t": True, "f": False},
+        "diagnostic_float":     {"f": 1.5},
+        "diagnostic_float_neg0": {"f": -0.0},
+        "diagnostic_frozenset": {"s": frozenset({"y", "x"})},
+        "diagnostic_none":      {"n": None},
+        "diagnostic_set":       {"s": {"b", "a", "c"}},
+    }
+    return sorted(vectors.items())
+
+
+def structural_exclusion_vectors():
+    """``STRUCTURAL_EXCLUSION`` -- values a valid ``workflow_ir.v1`` model must not
+    contain, checked as bare values.
+
+    Their refusal is **not** a published v1 canonicalization guarantee, so they
+    anchor no golden and define no frozen contract. They demonstrate that the
+    exclusion currently holds. Parity is asserted on the *class* of refusal, never
+    the message: neither implementation publishes its exception text as contract.
     """
     from datetime import date, datetime, timezone
     from decimal import Decimal
@@ -170,3 +263,15 @@ def rejected_vectors():
         "reject_bare_uuid":     UUID(int=1),
     }
     return sorted(vectors.items())
+
+
+#: Every vector id, mapped to its class. Audited against the live schema by
+#: ``test_vector_classification_matches_the_live_schema``: a normative vector whose
+#: runtime value tree uses a type the schema cannot reach is a failure, so this map
+#: cannot silently drift from what v1 actually admits.
+def vector_classes():
+    return {
+        **{vid: "NORMATIVE_V1_REACHABLE" for vid, _ in normative_vectors()},
+        **{vid: "NON_NORMATIVE_DIAGNOSTIC" for vid, _ in diagnostic_vectors()},
+        **{vid: "STRUCTURAL_EXCLUSION" for vid, _ in structural_exclusion_vectors()},
+    }
