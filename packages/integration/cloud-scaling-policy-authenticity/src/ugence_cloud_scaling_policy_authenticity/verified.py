@@ -250,6 +250,23 @@ def require_partition_agreement(
             "store; naming a stored field here drops it from the artifact while leaving the "
             "digest membership unchanged"
         )
+    # The mirror of the check above: a name in VERIFIED_FACT_NAMES is passed straight through
+    # to the constructor, so a name here that is NOT a real field is invisible to the smuggled
+    # check (which only ever looks at DERIVED_FACT_NAMES) and to the membership comparison
+    # below (which only compares a payload against this declaration, never the declaration
+    # against the dataclass). The artifact then dies on an *unexpected* keyword argument —
+    # VERIFICATION_UNAVAILABLE again, for the same underlying reason. Found by independent
+    # review of the fix above, which closed one direction of this boundary and not the other.
+    not_a_field = VERIFIED_FACT_NAMES - {
+        f.name for f in dataclasses.fields(VerifiedPolicyAuthenticity)
+    }
+    if not_a_field:
+        raise _IntegrityError(
+            f"VERIFIED_FACT_NAMES names {sorted(not_a_field)}, which the artifact does not "
+            "carry as (a) real field(s). A constructor-bound name must be an actual field of "
+            "VerifiedPolicyAuthenticity, or minting dies on an unexpected keyword argument "
+            "instead of refusing cleanly"
+        )
     for label, actual, expected in (
         ("verified", frozenset(verified_map), VERIFIED_DIGEST_KEYS),
         ("recorded", frozenset(recorded_map), RECORDED_FACT_NAMES),

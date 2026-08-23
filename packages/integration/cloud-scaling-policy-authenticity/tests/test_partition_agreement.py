@@ -159,3 +159,73 @@ def test_the_real_verifier_refuses_the_widening_as_an_invariant_violation():
         assert result.outcome is not O.VERIFICATION_UNAVAILABLE
     finally:
         V.DERIVED_FACT_NAMES = VF.DERIVED_FACT_NAMES = original
+
+
+@pytest.mark.adversarial
+def test_verified_cannot_be_widened_to_swallow_a_derived_name():
+    """The mirror of ``test_derived_cannot_be_widened_to_swallow_a_real_field``.
+
+    Moving ``historical`` out of ``DERIVED_FACT_NAMES`` and into ``VERIFIED_FACT_NAMES`` makes
+    it pass straight through to the constructor. The ``smuggled`` check only ever inspects
+    ``DERIVED_FACT_NAMES``, so it is blind to this direction, and the membership comparison
+    below it only compares a payload against the declaration — never the declaration against
+    the dataclass — so it cannot see it either. Before the mirrored check existed, the direct
+    call did not raise at all: the union is unchanged by the move (the name is still counted
+    once), so nothing here looked short.
+    """
+
+    import ugence_cloud_scaling_policy_authenticity.verified as V
+
+    original_verified = V.VERIFIED_FACT_NAMES
+    original_derived = V.DERIVED_FACT_NAMES
+    V.VERIFIED_FACT_NAMES = original_verified | {"historical"}
+    V.DERIVED_FACT_NAMES = original_derived - {"historical"}
+    V.VERIFIED_DIGEST_KEYS = V.VERIFIED_FACT_NAMES | V.DERIVED_FACT_NAMES
+    try:
+        assert V.VERIFIED_DIGEST_KEYS == (original_verified | original_derived), (
+            "the union is unchanged by the move, which is exactly why the membership "
+            "comparison alone could not see it"
+        )
+        with pytest.raises(VerifiedPolicyArtifactIntegrityError) as exc:
+            require_partition_agreement(
+                verified_map={n: None for n in V.VERIFIED_DIGEST_KEYS},
+                recorded_map={n: None for n in RECORDED_FACT_NAMES},
+            )
+        assert "historical" in str(exc.value)
+    finally:
+        V.VERIFIED_FACT_NAMES = original_verified
+        V.DERIVED_FACT_NAMES = original_derived
+        V.VERIFIED_DIGEST_KEYS = original_verified | original_derived
+
+
+@pytest.mark.adversarial
+def test_the_real_verifier_refuses_the_derived_promotion_as_an_invariant_violation():
+    """End to end: promoting a derived name into VERIFIED_FACT_NAMES is also refused cleanly.
+
+    Before the mirrored check existed: outcome ``VERIFICATION_UNAVAILABLE``, detail
+    "TypeError" — the mint routine excludes only ``DERIVED_FACT_NAMES`` keys from the
+    constructor call, so ``historical`` was passed through as an unexpected keyword argument.
+    """
+
+    import ugence_cloud_scaling_policy_authenticity.verification as VF
+    import ugence_cloud_scaling_policy_authenticity.verified as V
+    from ugence_cloud_scaling_policy_authenticity import PolicyAuthenticityOutcome as O
+
+    original_verified = V.VERIFIED_FACT_NAMES
+    original_derived = V.DERIVED_FACT_NAMES
+    V.VERIFIED_FACT_NAMES = original_verified | {"historical"}
+    V.DERIVED_FACT_NAMES = VF.DERIVED_FACT_NAMES = original_derived - {"historical"}
+    V.VERIFIED_DIGEST_KEYS = V.VERIFIED_FACT_NAMES | V.DERIVED_FACT_NAMES
+    try:
+        authority, record = issued()
+        result = verifier_for(authority).verify(
+            coordinate=record.coordinate,
+            expected_reference_tenant_id=record.coordinate.tenant_id,
+            as_of=T_MID,
+        )
+        assert result.outcome is O.INVARIANT_VIOLATION
+        assert result.outcome is not O.VERIFICATION_UNAVAILABLE
+    finally:
+        V.VERIFIED_FACT_NAMES = original_verified
+        V.DERIVED_FACT_NAMES = VF.DERIVED_FACT_NAMES = original_derived
+        V.VERIFIED_DIGEST_KEYS = original_verified | original_derived
