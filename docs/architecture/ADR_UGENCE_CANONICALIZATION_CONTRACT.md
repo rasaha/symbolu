@@ -1,10 +1,12 @@
 # ADR — Canonicalization Ownership: Extraction of a Neutral Contract (Rejected)
 
-**Status:** **Rejected (ratified).** Extraction was considered on measured evidence and
-declined. **No shared canonicalization package is authorized.** **No migration of
-`agent-workforce-composer` onto a shared contract is authorized.** The §6
-enforcement-test correction is independently accepted and stands.
-**Date:** 2026-08-23 (proposed) / 2026-08-23 (rejected)
+**Status:** **Rejected (ratified)**, with two accepted changes recorded alongside the
+rejection. Extraction was considered on measured evidence and declined: **no shared
+canonicalization package is authorized**, and **no migration of
+`agent-workforce-composer` onto a shared contract is authorized**. Independently
+accepted and in force: the §6 enforcement-test correction, and the §9 `[R]` Workflow IR
+v1 canonicalization compatibility ratchet.
+**Date:** 2026-08-23 (proposed) / 2026-08-23 (rejected) / 2026-08-23 (§9 ratified)
 **Owners:** Ugence platform architecture
 **Related:**
 - [`ADR_AGENT_WORKFORCE_COMPOSER_H16_CANONICALIZATION.md`](ADR_AGENT_WORKFORCE_COMPOSER_H16_CANONICALIZATION.md) — the canonicalization-ownership pattern this ADR applies
@@ -239,28 +241,90 @@ failing is sufficient to leave this ADR rejected.
 
 ---
 
-## 9. `[G]` Open gap the ruling depends on
+## 9. `[R]` Workflow IR v1 canonicalization compatibility ratchet — ratified
 
-The ratified rationale contemplates that duplication between AWC and the compiler "may
-remain guarded by the existing byte-equivalence compatibility ratchet."
+The open gap recorded when this ADR was first rejected is now closed by ruling.
 
-`[V]` **No such ratchet exists.** No test in either distribution compares AWC's
-canonical bytes to the compiler's. The nearest candidates do something else:
-`agent-workforce-composer/tests/test_compiler_reference.py` checks *adapter fidelity*
-against a live `WorkflowIR` and digests it with AWC's own canonicalizer (and skips
-entirely unless the optional `compiler-reference` extra is installed);
-`tests/test_p2_1_equivalence.py` compares v1/v2 *planning outcomes* within AWC. Neither
-would fail if the two canonicalizers drifted apart.
+`[V]` **The gap was real.** No test in either distribution compared AWC's canonical
+bytes to the compiler's. `agent-workforce-composer/tests/test_compiler_reference.py`
+checks *adapter fidelity* and digests with AWC's own canonicalizer;
+`tests/test_p2_1_equivalence.py` compares v1/v2 *planning outcomes*. Neither would
+fail if the two canonicalizers drifted apart. The 97-field comparison behind §2 was a
+one-off harness, not a committed guard.
 
-The 97-field byte-equivalence result in §2 was produced by a one-off harness in the
-session that drafted this ADR. It was a measurement, not a committed guard, and it
-protects nothing going forward.
+**`[R]` Ruling: AWC/compiler canonicalization drift is not acceptable for
+`workflow_ir.v1`. A committed compatibility ratchet is commissioned.**
 
-**Consequence:** the duplication the ruling accepts is currently **unguarded**. Two
-implementations that agree byte-for-byte today can diverge silently tomorrow, and
-trigger 3 in §8 would then be unprovable without re-deriving the comparison by hand.
+**What the ruling does not do.** Extraction of `ugence-canonical-json` **remains
+rejected** (§1). **Domain-owned canonicalization remains the governing architecture.**
+The ratchet protects **one existing cross-component artifact contract** — nothing
+wider. It is **not** evidence that Risk Authority, Policy Authority, Cloud Scaling
+Controller or Producer Attestation should converge on anything, and it establishes
+**compatibility only** — never ratification, authorization, signing, or truth.
 
-**`[R]` Requires a separate owner decision:** either commission a committed
-byte-equivalence ratchet as a guard on the accepted duplication, or ratify that the
-duplication stays unguarded and that drift between AWC and the compiler is acceptable.
-This ADR does not decide it, and rejecting extraction does not resolve it.
+**Obligation.** The compiler and AWC must derive identical canonical bytes and
+fingerprints for the same `workflow_ir.v1` semantic value, under the frozen
+`WORKFLOW_IR_V1_DIGEST_COMPILER_VERSION == "0.1.0"`.
+
+**Implementation** (`packages/capabilities/agent-workforce-composer/`):
+
+| file | role |
+|---|---|
+| `tests/_ir_v1_compat_vectors.py` | 39 accepted + 7 rejected vectors, sorted, version-labelled `workflow_ir_v1_compat.v1`; includes the **real** compiled reference-procurement IR, not synthetic nodes alone |
+| `tests/_ir_v1_ratchet_harness.py` | comparison core, free of pytest and of both distributions |
+| `tests/fixtures/workflow_ir_v1_canonical_golden.json` | committed golden bytes + digests |
+| `tests/test_workflow_ir_v1_canonicalization_ratchet.py` | the ratchet |
+| `tests/test_workflow_ir_v1_ratchet_controls.py` | negative controls |
+| `scripts/regenerate_workflow_ir_v1_golden.py` | candidate-only regeneration helper |
+
+**Two obligations, not one.** Every vector must satisfy *pairwise* equivalence (the two
+implementations agree with each other) **and** *golden anchoring* (each matches
+committed expected bytes). Pairwise alone cannot see **symmetric** drift — both
+implementations changing together still agree. A dedicated negative control proves
+exactly this: two identically-broken encoders pass pairwise comparison and are caught
+only by the golden.
+
+**Rejection parity.** A value one implementation accepts and the other refuses is a
+compatibility failure. Exception *messages* are not compared; neither implementation
+publishes its message text as contract.
+
+`[V]` **Scope was verified before the ratchet was written**, not assumed. Over the
+complete `workflow_ir.v1` value domain the two implementations agree on every vector
+and refuse the same bare values. The one divergence that exists —
+`model_dump(mode="json")` vs `mode="python")` on model-embedded `datetime`, `date`,
+`Decimal`, `UUID` and `bytes` — is **structurally unreachable** from v1: no v1 field
+declares such a type, and `CompilerModel` is `extra="forbid"`.
+`test_workflow_ir_v1_declares_no_field_outside_the_agreed_domain` is what keeps that
+true; adding such a field becomes an explicit compatibility decision rather than a
+model edit. **`[R]` The out-of-scope divergence itself is flagged for a separate owner
+decision** — it is recorded, not normalized, and neither implementation was changed.
+
+**Enforcement, not decoration.** The ratchet runs in a dedicated CI job in both
+`policy-workflow-compiler-p2-ci.yml` and `agent-workforce-composer-p2-1-ci.yml`, each
+installing both distributions. Those jobs set `WORKFLOW_IR_V1_RATCHET_REQUIRED=1`,
+under which an unimportable compiler is a **failure, not a skip** — a permanently
+skipped optional-extra test is not enforcement. Both jobs also assert the ratified
+fixtures were not rewritten by the test run.
+
+**Fixture governance.** Goldens are human-reviewable, deterministically ordered and
+version-labelled. No test regenerates them. `regenerate_workflow_ir_v1_golden.py`
+writes `*.candidate.json` and reports which digests moved; overwriting the ratified
+file requires both `--write` and `--i-reviewed-every-changed-digest`.
+
+**Dependency posture.** Test-only pairing. Neither distribution's source gains an
+import of the other, and §6's boundary check is unweakened — it was strengthened in the
+same branch and still passes.
+
+---
+
+## 10. Version discipline for `workflow_ir.v1` canonical bytes
+
+1. A change to the canonical bytes or fingerprints of `workflow_ir.v1` requires an
+   **explicit compatibility decision**, recorded here.
+2. Such a change **must not be hidden inside a refactor**. A moved digest is a change
+   to what two components agree an artifact canonicalizes to, whatever the commit
+   claims to be doing.
+3. Where a new representation is genuinely required, introduce an **explicitly
+   versioned successor**. Do not silently alter v1.
+4. A fingerprint identifies **content under a declared canonicalization version**. It
+   is not a signature, and it confers no authority.
