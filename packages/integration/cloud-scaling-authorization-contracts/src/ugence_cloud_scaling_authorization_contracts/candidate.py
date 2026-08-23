@@ -20,6 +20,12 @@ carries Phase 4's validity facts, the attestation's ``issued_at`` and the decisi
 field names that say so. Nothing here decides whether any of them is current: a candidate
 never claims a recommendation, attestation, policy or decision is valid *now*.
 
+Two of those facts are compared **against each other** at construction (R-12): an attestation
+may not be issued before the subject was asserted, nor after the decision was evaluated. That
+is a coherence check, not a freshness one — it reads no clock, needs none, and refuses only a
+candidate whose own instants contradict each other. Whether any of them is *current* remains
+Phase 5B's question, judged under its trusted clock.
+
 **Trust.** Both signature-bearing inputs report ``PRESENT_BUT_NOT_TRUST_VERIFIED``. Phase
 5A binds them structurally and verifies neither. That is the whole of what "structurally
 bound but not trust-verified" means, and it is why this artifact grants nothing.
@@ -455,6 +461,43 @@ def build_capacity_authorization_candidate(
             "the producer attestation binds a different recommendation_digest — an "
             "attestation for another recommendation is not evidence for this one",
             _Reason.PRODUCER_ATTESTATION_CONTENT_MISMATCH,
+        )
+
+    # --- the attestation's instant must cohere with the Phase 4 facts (R-12) -----------
+    # Not a freshness judgement and not a clock read. Both sides are instants this builder
+    # already holds, compared against **each other** rather than against "now" — which is
+    # exactly the class of error nothing downstream can see. Gate 13 (5B-2) compares each of
+    # the candidate's six carried instants against an injected ``as_of`` and never against
+    # another, so a candidate whose attestation was stamped a year before the assertion it
+    # attests to verified: consistent with the instant, inconsistent with itself. The builder
+    # is the only place that holds all six, so the refusal belongs here.
+    #
+    # Two comparisons, and deliberately only two. Every other ordering among the six is
+    # already refused upstream, and re-checking it here would duplicate an invariant Phase 5A
+    # does not own: ``valid_from <= asserted_at <= valid_until`` by Risk Authority's
+    # ``SubjectContext.__post_init__``; ``evaluated_at`` inside that window by the v2 seam
+    # *before* it stamps the decision it returns; ``expires_at = evaluated_at + TTL`` by
+    # Decision Authority. ``issued_at`` is the one instant no upstream contract relates to any
+    # other — 5B-0A §11 carries it forward deliberately unjudged, leaving the bounds to a
+    # later phase — so it is the only one a candidate can state incoherently.
+    #
+    # Nothing here bounds ``issued_at`` against ``subject_valid_until``. That pair was put to
+    # the owner and declined: it is the attestation freshness window 5B-0A §11 refused to
+    # invent, and the ``evaluated_at`` bound below already sits inside the subject window.
+    if a_issued_at < facts.subject_asserted_at:
+        raise ProducerAttestationError(
+            f"the producer attestation was issued at {a_issued_at.isoformat()}, before the "
+            f"subject was asserted at {facts.subject_asserted_at.isoformat()} — an "
+            "attestation cannot attest a recommendation that had not yet been made",
+            _Reason.ATTESTATION_INSTANT_INCOHERENT,
+        )
+    if a_issued_at > facts.decision_evaluated_at:
+        raise ProducerAttestationError(
+            f"the producer attestation was issued at {a_issued_at.isoformat()}, after the "
+            f"decision was evaluated at {facts.decision_evaluated_at.isoformat()} — the "
+            "producer signs at the Controller output boundary, so an attestation minted "
+            "after the evaluation it precedes is not the evidence that evaluation saw",
+            _Reason.ATTESTATION_INSTANT_INCOHERENT,
         )
 
     # --- the target scope must be the projected subject, not a substitute --------------

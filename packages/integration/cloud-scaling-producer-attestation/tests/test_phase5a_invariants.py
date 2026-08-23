@@ -55,14 +55,16 @@ PHASE_5A_NEGATIVE_ANCHOR = (
 def test_phase_5a_is_at_the_version_this_package_was_pinned_against():
     """P-1: Phase 5B-0A does not re-version Phase 5A — and pins what it reads.
 
-    ``0.2.0`` since 5B-1, which added the required policy coordinate to the candidate. This
-    package's source is unchanged by that and its own version does not move; what moves is
-    the fixture chain it verifies against. The assertion stays exact rather than becoming a
-    range: a version that drifted without this suite being re-measured is the thing worth
-    catching.
+    ``0.4.0`` since R-12, which made Phase 5A's builder refuse an attestation issued before
+    the subject was asserted or after the decision was evaluated. This package's source is
+    unchanged by that and its own version does not move — it mints `issued_at` and judges it
+    nowhere (5B-0A §11), which is exactly why the ordering had to be settled downstream of it
+    and why the fixture chain here already satisfies the new bounds. The assertion stays exact
+    rather than becoming a range: a version that drifted without this suite being re-measured
+    is the thing worth catching.
     """
 
-    assert p5a.__version__ == "0.3.0"
+    assert p5a.__version__ == "0.4.0"
 
 
 def test_phase_5a_exports_exactly_the_symbols_this_package_was_measured_against():

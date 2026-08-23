@@ -1,5 +1,13 @@
 # Canonical 49-guard mutation sweep — Cloud Scaling Phase 5A
 
+> **This file is a record of one sweep at one revision, not a live index.** The inventory has
+> grown since: 51 at 5B-1, 52 at 5B-2 (R-9), 54 at R-12 (the two attestation-instant coherence
+> guards in `candidate.py`). Numbers and `file:line` references below name the conditions they
+> named at `dd1c8724`; the numbering the suite actually aims at is recomputed from source by
+> `tests/_mutation_support.canonical_guards`, and every test that aims a mutation by number
+> asserts the condition that number resolves to before firing it. Guards added after this sweep
+> carry their own admission and misattribution proofs in their own test modules.
+
 Deterministic inventory: 87 raw `raise` sites -> 85 loose guards -> 81 strict guards ->
 **49 canonical in-scope guards** (`reconciliation.py` then `candidate.py`, source order).
 Anchors hold: guard 11 = `reconciliation.py:226 p_tenant != d_tenant`, guard 13 =

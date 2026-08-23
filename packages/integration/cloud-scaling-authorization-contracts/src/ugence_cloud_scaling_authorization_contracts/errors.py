@@ -116,6 +116,12 @@ class AuthorizationCandidateRejectionReason(str, Enum):
     PRODUCER_ATTESTATION_CONTENT_MISMATCH = "producer_attestation_content_mismatch"
     UNSUPPORTED_SIGNING_PURPOSE = "unsupported_signing_purpose"
     FORGED_TRUST_STATE = "forged_trust_state"
+    #: R-12 (Phase 5A). The attestation's issuance instant contradicts a Phase 4 fact the
+    #: same candidate carries. Deliberately *not* a freshness word: this member never means
+    #: "too old", "expired" or "not current" — Phase 5A holds no clock and cannot mean any
+    #: of those. It means the candidate's own instants disagree with each other, which is
+    #: readable without a clock and is therefore a construction-time refusal.
+    ATTESTATION_INSTANT_INCOHERENT = "attestation_instant_incoherent"
 
     # --- policy / target binding (structural only) -----------------------------------
     MISSING_POLICY_TARGET_BINDING = "missing_policy_target_binding"

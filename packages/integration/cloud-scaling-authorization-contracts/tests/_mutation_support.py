@@ -93,7 +93,7 @@ class MutatedPackage:
     # three Phase 5 artifacts must be rebuilt against the mutated module. They are built
     # with the same values conftest uses, through the same public constructors.
 
-    def attestation(self, *, recommendation_digest: str) -> Any:
+    def attestation(self, *, recommendation_digest: str, issued_at: Any = None) -> Any:
         from risk_authority.crypto import SigningKey, canonical_bytes
 
         import conftest as C
@@ -106,7 +106,7 @@ class MutatedPackage:
             "signing_purpose": self.module.PRODUCER_SIGNING_PURPOSE,
             "recommendation_id": C.RECOMMENDATION_ID,
             "recommendation_digest": recommendation_digest,
-            "issued_at": C.REC_TIME,
+            "issued_at": C.REC_TIME if issued_at is None else issued_at,
         }
         signature = SigningKey.from_seed(C.PRODUCER_SEED).sign(canonical_bytes(payload))
         return self.module.ProducerAttestationEvidence(
@@ -118,7 +118,7 @@ class MutatedPackage:
             recommendation_digest=recommendation_digest,
             signing_purpose=self.module.PRODUCER_SIGNING_PURPOSE,
             signing_payload_digest=self.module.canonical_digest(payload),
-            issued_at=C.REC_TIME,
+            issued_at=C.REC_TIME if issued_at is None else issued_at,
         )
 
     def target_scope(self, projection: Any) -> Any:
@@ -200,15 +200,22 @@ class MutatedPackage:
             binding_digest=self.module.canonical_digest(payload), **body
         )
 
-    def build(self, projection: Any, decision: Any) -> Any:
-        """Run the mutated package's REAL public builder on this projection/decision."""
+    def build(
+        self, projection: Any, decision: Any, *, attestation_issued_at: Any = None
+    ) -> Any:
+        """Run the mutated package's REAL public builder on this projection/decision.
+
+        ``attestation_issued_at`` moves the attestation's instant and nothing else, so an
+        R-12 admission proof can submit the incoherent pair the gate exists to refuse.
+        """
 
         scope = self.target_scope(projection)
         return self.module.build_capacity_authorization_candidate(
             projection=projection,
             decision=decision,
             producer_attestation=self.attestation(
-                recommendation_digest=projection.recommendation_digest
+                recommendation_digest=projection.recommendation_digest,
+                issued_at=attestation_issued_at,
             ),
             policy_binding=self.policy_binding(scope),
             policy_coordinate_binding=self.policy_coordinate_binding(scope),
@@ -227,15 +234,16 @@ def mutated_package(tmp_path: pathlib.Path, guard_number: int) -> MutatedPackage
     dst.mkdir(parents=True, exist_ok=True)
     shutil.copytree(SRC, dst / PKG_NAME)
     guards = canonical_guards(dst / PKG_NAME)
-    # 52 since 5B-2. 5B-1 brought the builder to 51 with guards 43 and 44 — the two policy
-    # references must name one policy, and the coordinate must bind this scope. 5B-2 adds the
-    # third of that family, closing R-9: a TENANT-scoped policy may bound only its own
-    # tenant's action. The count is asserted so a guard that disappears cannot go unnoticed;
-    # the numbered anchors the sweep aims at are checked separately, and all three new guards
-    # sort after every anchor.
-    if len(guards) != 52:
+    # 54 since R-12. 5B-1 brought the builder to 51 with guards 43 and 44 — the two policy
+    # references must name one policy, and the coordinate must bind this scope. 5B-2 added the
+    # third of that family at 52, closing R-9: a TENANT-scoped policy may bound only its own
+    # tenant's action. R-12 adds the two attestation-instant coherence guards. The count is
+    # asserted so a guard that disappears cannot go unnoticed; the numbered anchors the sweep
+    # aims at are checked separately, and every guard added since sorts after all of them —
+    # the anchors are all in ``reconciliation.py``, which the inventory numbers first.
+    if len(guards) != 54:
         raise AssertionError(
-            f"canonical inventory drifted: {len(guards)} in-scope guards, expected 52"
+            f"canonical inventory drifted: {len(guards)} in-scope guards, expected 54"
         )
     _neutralise(dst / PKG_NAME, guards[guard_number - 1])
 

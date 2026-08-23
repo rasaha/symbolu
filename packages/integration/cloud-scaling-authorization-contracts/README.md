@@ -93,6 +93,13 @@ attestation's `issued_at` and the decision's `expires_at` forward under `…_fac
 names, as **facts awaiting Phase 5B's trusted-clock evaluation**. A candidate never claims
 that a recommendation, attestation, policy or decision is currently valid.
 
+Two of those facts are compared **against each other** at construction (R-12): the
+attestation may not be issued before the subject was asserted, nor after the decision was
+evaluated. That is a *coherence* check, not a freshness one. It reads no clock and needs
+none — both sides are facts the builder already holds — and it refuses only a candidate whose
+own instants contradict each other, which is the one temporal error no later instant can
+reveal. Whether any fact is *current* remains Phase 5B's question.
+
 ## The account binding is new
 
 The frozen Phase 4 `CapacitySubject` has no account identity, and Phase 5A does not touch

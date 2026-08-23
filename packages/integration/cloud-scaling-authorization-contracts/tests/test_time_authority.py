@@ -107,25 +107,67 @@ def test_a_long_expired_decision_still_builds_a_candidate(projection, decision, 
                                                           target_scope, policy_binding):
     """Freshness is Phase 5B's: Phase 5A neither enforces nor claims it.
 
-    This is the positive proof that no clock is consulted — an attestation stamped far in
-    the past is carried forward as a fact, not rejected as stale, because Phase 5A has no
+    This is the positive proof that no clock is consulted — a decision whose expiry passed a
+    decade ago is carried forward as a fact, not rejected as stale, because Phase 5A has no
     clock with which to call it stale.
+
+    The staleness is put on ``expires_at``, which is what this test's name has always
+    claimed, and it is the honest place for it since R-12. Before R-12 the test made the
+    *attestation* ancient, which measured two things at once: that no clock is read, and
+    that the six carried instants are never compared with each other. The second is no
+    longer true — an attestation issued before the assertion it attests to is now refused at
+    construction — and an ordering refusal would have masqueraded here as the freshness
+    refusal the test exists to rule out. Moving the staleness onto ``expires_at`` isolates
+    the original claim: R-12 relates ``issued_at`` to two facts and relates ``expires_at``
+    to none, so nothing but a clock could reject the candidate below, and none is read.
     """
 
     from datetime import timedelta
+    import dataclasses
 
-    ancient = attestation.issued_at - timedelta(days=3650)
-    from conftest import build_attestation
+    # ``dataclasses.replace`` re-runs Risk Authority's own ``__post_init__``, so this is a
+    # genuine, internally valid decision — exactly the artifact a replayed evaluation hands
+    # to Phase 5A — that merely expired ten years ago.
+    ancient = decision.expires_at - timedelta(days=3650)
+    stale = dataclasses.replace(decision, expires_at=ancient)
 
-    old = build_attestation(
-        recommendation_digest=projection.recommendation_digest, issued_at=ancient
-    )
     candidate = build_capacity_authorization_candidate(
-        projection=projection, decision=decision, producer_attestation=old,
+        projection=projection, decision=stale, producer_attestation=attestation,
         policy_binding=policy_binding,
         policy_coordinate_binding=coordinate_for(policy_binding),
         target_scope=target_scope,
     )
-    assert candidate.attestation_issued_at_fact == ancient
+    assert candidate.decision_expires_at_fact == ancient
+    # Long past, and past its own evaluation instant — Phase 5A relates the two nowhere, and
+    # the owner declined to (the upstream ``expires_at = evaluated_at + TTL`` is Decision
+    # Authority's invariant, not a Phase 5A gate).
+    assert candidate.decision_expires_at_fact < candidate.decision_evaluated_at_fact
     # And it still grants nothing — carrying an old fact is not endorsing it.
+    assert candidate.grants_authority is False
+
+
+def test_the_r12_coherence_gate_is_not_a_freshness_gate(projection, decision, attestation,
+                                                        target_scope, policy_binding):
+    """R-12 compares carried facts to each other, never to an instant Phase 5A supplies.
+
+    An attestation issued *after* the subject assertion and *before* the decision evaluation
+    builds, however far in the past the whole chain sits. The gate has no notion of "recent".
+    """
+
+    from conftest import build_attestation
+
+    # Strictly between the two bounds, so both comparisons are exercised as admissions.
+    between = projection.asserted_at + (decision.evaluated_at - projection.asserted_at) / 2
+    assert projection.asserted_at < between < decision.evaluated_at
+
+    candidate = build_capacity_authorization_candidate(
+        projection=projection, decision=decision,
+        producer_attestation=build_attestation(
+            recommendation_digest=projection.recommendation_digest, issued_at=between
+        ),
+        policy_binding=policy_binding,
+        policy_coordinate_binding=coordinate_for(policy_binding),
+        target_scope=target_scope,
+    )
+    assert candidate.attestation_issued_at_fact == between
     assert candidate.grants_authority is False

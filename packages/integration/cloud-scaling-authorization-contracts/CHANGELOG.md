@@ -1,5 +1,56 @@
 # Changelog — ugence-cloud-scaling-authorization-contracts
 
+## [0.4.0] — R-12: the attestation instant must cohere with the Phase 4 facts
+
+Ratified in `docs/architecture/ADR_CLOUD_SCALING_DECISION_SCOPE_PHASE5B1_RATIFICATION.md`,
+owner ruling on the three ordering pairs the R-12 audit put forward. **Breaking**, pre-1.0: a
+candidate that was constructible at `0.3.0` may be refused at `0.4.0`. No schema identifier
+moves and **no digest moves** — a refusal changes what is constructible, not what is hashed.
+
+### Added
+
+- Rejection reason `ATTESTATION_INSTANT_INCOHERENT`. Deliberately not a freshness word: it
+  never means "too old", "expired" or "not current", none of which this package can mean. It
+  means the candidate's own instants disagree with each other.
+- Two builder guards (inventory 52 → 54), closing **R-12**: the producer attestation may not
+  be issued before `subject_asserted_at`, nor after `decision_evaluated_at`. Gate 13 (5B-2)
+  compares each of the six carried instants against an injected `as_of` and never against
+  another, so an attestation stamped a year before the assertion it attests to reached
+  `VERIFIED` — consistent with the instant, inconsistent with itself. The builder is the only
+  place that holds all six.
+
+  Both bounds are **inclusive**. `issued_at == asserted_at` is what the real chain produces,
+  and a strict comparison would refuse the ordinary case.
+
+### Not added, and why
+
+- `issued_at <= subject_valid_until` was offered to the owner and **declined**. It is the
+  attestation freshness window `ADR_CLOUD_SCALING_PRODUCER_AUTHENTICITY_PHASE5B0A.md` §11
+  deliberately refused to invent, and the ratified evaluation bound already subsumes it: the
+  v2 seam admits an evaluation only inside the subject window, so `evaluated_at <=
+  valid_until` in every chain Phase 5A can receive.
+- No guard on any other pair among the six. Each is already an invariant of the source that
+  produces it — `SubjectContext.__post_init__` for `valid_from <= asserted_at <= valid_until`,
+  the v2 seam for `evaluated_at` inside that window, Decision Authority for
+  `expires_at = evaluated_at + ttl` — and a second definition here would be free to drift from
+  the first. `attestation.issued_at` is the one instant no upstream contract relates to any
+  other, which is why it is the only one R-12 needed to bound.
+
+### Tests
+
+- `tests/test_attestation_instant_coherence.py`: both refusals, both inclusive boundaries, and
+  a mutation-backed admission and misattribution proof per guard — with the guard under test
+  neutralised the incoherent pair reaches construction; with the sibling recommendation-binding
+  guard neutralised instead it is still refused, so neither kill is the sibling's.
+- `test_a_long_expired_decision_still_builds_a_candidate` now puts its staleness on
+  `expires_at`, which is what its name always claimed. It previously made the *attestation*
+  ancient, which measured two things at once; since R-12 an ordering refusal would have
+  masqueraded there as the freshness refusal the test exists to rule out. R-12 relates
+  `expires_at` to nothing, so only a clock could reject the candidate it builds — and none is
+  read.
+- `_mutation_support.MutatedPackage.build` accepts `attestation_issued_at`, so an admission
+  proof can submit the incoherent pair. The canonical inventory count moves 52 → 54.
+
 ## [0.3.0] — Cloud Scaling Phase 5B-2 part 1: R-9
 
 Ratified in `docs/architecture/ADR_CLOUD_SCALING_DECISION_SCOPE_PHASE5B1_RATIFICATION.md`,
