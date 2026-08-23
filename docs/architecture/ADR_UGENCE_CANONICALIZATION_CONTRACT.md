@@ -1,29 +1,42 @@
-# ADR — A Neutral Canonicalization Contract for the Policy Workflow Compiler
+# ADR — Canonicalization Ownership: Extraction of a Neutral Contract (Rejected)
 
-**Status:** Proposed — **not ratified**. No implementation may begin until the owner
-decision in §7 is recorded.
-**Date:** 2026-08-23
+**Status:** **Rejected (ratified).** Extraction was considered on measured evidence and
+declined. **No shared canonicalization package is authorized.** **No migration of
+`agent-workforce-composer` onto a shared contract is authorized.** The §6
+enforcement-test correction is independently accepted and stands.
+**Date:** 2026-08-23 (proposed) / 2026-08-23 (rejected)
 **Owners:** Ugence platform architecture
 **Related:**
-- [`ADR_AGENT_WORKFORCE_COMPOSER_H16_CANONICALIZATION.md`](ADR_AGENT_WORKFORCE_COMPOSER_H16_CANONICALIZATION.md) — the canonicalization-ownership pattern this ADR extends
+- [`ADR_AGENT_WORKFORCE_COMPOSER_H16_CANONICALIZATION.md`](ADR_AGENT_WORKFORCE_COMPOSER_H16_CANONICALIZATION.md) — the canonicalization-ownership pattern this ADR applies
 - `packages/tooling/policy-workflow-compiler/src/ugence_policy_workflow_compiler/serialization/canonical_json.py`
 - `packages/capabilities/agent-workforce-composer/src/ugence_agent_workforce_composer/canonical.py`
 
 > *This ADR changes no production code, wheel, public API, schema, frozen identifier,
-> serialization, or digest. It proposes a package and records one completed test
-> correction (§6). Every implied code change is deferred to a ratified later phase.*
+> serialization, or digest. Its proposal was **rejected**; §3's surface sketch is
+> retained only as the rejected object and is **not** an approved future contract.
+> The one completed change it records is the test correction in §6.*
 
 ---
 
-## 1. Central decision put to the owner
+## 1. Central decision — ruled
 
-> **Extract the Policy Workflow Compiler's canonicalization rules into a new neutral
-> leaf distribution, `ugence-canonical-json`, and have the compiler consume it — while
-> leaving the other five canonicalization implementations divergent by design.**
+The proposal put to the owner was to extract the compiler's canonicalization rules into
+a new neutral leaf distribution, `ugence-canonical-json`, and have the compiler consume
+it. **`[R]` The owner selected Option B and rejected extraction.**
 
-The counter-proposal, which this ADR does **not** dismiss, is §7 Option B: change
-nothing, and record the six implementations as deliberate. §5 is where that argument
-is strongest.
+> **Ruling: canonicalization remains domain-owned. No shared canonicalization package
+> is authorized. No AWC migration is authorized.** Canonicalization stays with each
+> domain wherever its rules carry contract, policy, signing, authority or compatibility
+> semantics. Four implementations have documented reasons to remain distinct;
+> `producer-attestation` already converges by re-export and needs no further package;
+> AWC is the only presently eligible consumer. A separately versioned contract serving
+> **one** consumer would add package, compatibility and governance surface without
+> demonstrating sufficient reuse.
+
+**Scope of the ruling.** It does **not** ratify every existing implementation as
+permanently correct. It rejects *extraction* on the evidence currently available, and
+nothing more. The measured analysis in §2 and §5 is preserved as the record that
+evidence rests on, and §8 states what would have to become true to reopen it.
 
 ---
 
@@ -80,7 +93,12 @@ without moving a single existing digest.
 
 ---
 
-## 3. The proposed contract
+## 3. The rejected proposal, recorded for the record
+
+> **Not an approved contract.** What follows is the object the owner declined in §1. It
+> is retained so a future reader can see precisely what was rejected and on what terms.
+> The four-name surface below is **not** authorized, **not** a target for any package,
+> and **not** a design any implementation may cite as ratified.
 
 `ugence-canonical-json` — namespace `ugence_canonical_json`, a true leaf.
 
@@ -103,7 +121,7 @@ extraction is a move, not a redesign:
 compiler's declared core boundary ("Minimal core: only pydantic") because the contract's
 own closure is a subset of what the compiler already admits.
 
-**Acceptance gate (all four, or the package is not adopted):**
+**Acceptance gate as proposed (moot — the package is not authorized):**
 1. All 97 compiler digest fields byte-identical to the pre-adoption baseline.
 2. `WORKFLOW_IR_V1_DIGEST_COMPILER_VERSION` frozen at `"0.1.0"`.
 3. Compiler suite at its then-current baseline, no skips added.
@@ -149,15 +167,15 @@ blast radius of any of the six.
 **`producer-attestation` — already converged.** It is a re-export of `risk_authority`
 with validation helpers; it introduces no rules. Nothing to decide.
 
-**`agent-workforce-composer` — eligible, deferred.** It is the only one whose rules are
-compatible with the proposed contract, and adoption would collapse two implementations
-into one. But AWC has its own fingerprints and its own frozen-object tests, so its
-adoption needs its own digest-neutrality proof and its `mode="json"` choice needs an
-explicit ruling. Deferred to a later phase, not bundled here.
+**`agent-workforce-composer` — the sole eligible consumer; migration not authorized.**
+It is the only one whose rules were compatible with the rejected proposal. Its
+adoption is **not** authorized by §1 and is not deferred to a later phase — reopening
+it requires the §8 triggers. AWC keeps its own canonicalizer, its own fingerprints and
+its own `mode="json"` rule.
 
-**Consequence, stated plainly:** the contract launches with **one** consumer, with a
-second plausible later. That is the strongest argument against it and is put to the
-owner as Option B in §7 rather than argued away.
+**The consequence that decided it:** the proposed contract would have launched with
+**one** consumer. §1 ruled that this does not justify a separately versioned package,
+and §8 records what would have to change for that to be revisited.
 
 ---
 
@@ -184,18 +202,65 @@ This correction stands on its own and is independent of the §7 decision.
 
 ---
 
-## 7. Owner decisions required
+## 7. Recorded decisions
 
-1. **`[R]` Option A (extract) or Option B (record the six as intentional and stop)?**
-   Option B is defensible: §5 concludes four of five must never converge, so the
-   contract serves one consumer today. Option A's case rests on AWC adopting it later
-   and on the compiler's rules gaining a citable, testable definition of their own.
-2. **`[R]` If A: is `mode="python"` ratified as normative** in the contract, freezing
-   the compiler's current fail-closed behaviour on `datetime`/`Decimal`/`UUID`/`bytes`?
-3. **`[R]` If A: does AWC adopt it in a later phase**, or is its `mode="json"` rule
-   ratified as a permanent second contract?
-4. **`[R]` Is the six-implementation state recorded as an accepted architectural
-   property** of this repository, so future audits stop re-raising it as drift?
+1. **`[R]` Ratified — Option B: do not extract `ugence-canonical-json`.** Rationale as
+   recorded in §1. No shared package is authorized; no AWC migration is authorized.
+2. **`[R]` Moot.** Whether `mode="python"` is normative in a shared contract does not
+   arise, there being no shared contract. The compiler's own `mode="python"` behaviour
+   is unchanged and remains its own to define.
+3. **`[R]` Moot.** AWC does not adopt a shared contract. Its `mode="json"` rule stays
+   its own; §2 `[I]` records that the difference is a widening, not a digest divergence.
+4. **`[R]` Ratified, narrowly.** The six-implementation state is accepted **as the
+   current architectural position on the evidence available**, not as a permanent
+   ruling that each implementation is correct. A future audit should cite this ADR
+   rather than re-raise extraction as drift — but §8 remains open.
 
-No implementation may begin until 1 is recorded. If 1 resolves to B, §6 stands and the
-rest of this ADR is closed unimplemented.
+---
+
+## 8. Reconsideration triggers
+
+Extraction may be reopened only when **all six** of the following hold. Any one of them
+failing is sufficient to leave this ADR rejected.
+
+1. **At least two independent consumers** require identical canonical bytes — not one
+   consumer plus a plausible future one.
+2. Their **accepted and rejected input domains are proven equivalent** — a
+   canonicalizer that accepts what another refuses is not the same contract. §2 records
+   how far apart the current six are on exactly this point.
+3. **Unicode, float, numeric, ordering and serialization semantics are identical**,
+   including `model_dump` mode, `-0.0` handling, NFC posture and set ordering.
+4. The **dependency direction remains valid** — extraction must not create or restore
+   an edge between the compiler and AWC in either direction (§2).
+5. **Extraction removes more governance surface than it creates**, counting the new
+   distribution's own versioning, compatibility and release obligations.
+6. **Migration preserves every pinned digest and signature invariant** — demonstrated,
+   not asserted, against the pins named in §5.
+
+---
+
+## 9. `[G]` Open gap the ruling depends on
+
+The ratified rationale contemplates that duplication between AWC and the compiler "may
+remain guarded by the existing byte-equivalence compatibility ratchet."
+
+`[V]` **No such ratchet exists.** No test in either distribution compares AWC's
+canonical bytes to the compiler's. The nearest candidates do something else:
+`agent-workforce-composer/tests/test_compiler_reference.py` checks *adapter fidelity*
+against a live `WorkflowIR` and digests it with AWC's own canonicalizer (and skips
+entirely unless the optional `compiler-reference` extra is installed);
+`tests/test_p2_1_equivalence.py` compares v1/v2 *planning outcomes* within AWC. Neither
+would fail if the two canonicalizers drifted apart.
+
+The 97-field byte-equivalence result in §2 was produced by a one-off harness in the
+session that drafted this ADR. It was a measurement, not a committed guard, and it
+protects nothing going forward.
+
+**Consequence:** the duplication the ruling accepts is currently **unguarded**. Two
+implementations that agree byte-for-byte today can diverge silently tomorrow, and
+trigger 3 in §8 would then be unprovable without re-deriving the comparison by hand.
+
+**`[R]` Requires a separate owner decision:** either commission a committed
+byte-equivalence ratchet as a guard on the accepted duplication, or ratify that the
+duplication stays unguarded and that drift between AWC and the compiler is acceptable.
+This ADR does not decide it, and rejecting extraction does not resolve it.
