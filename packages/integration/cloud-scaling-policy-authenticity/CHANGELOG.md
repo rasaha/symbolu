@@ -1,5 +1,60 @@
 # Changelog — ugence-cloud-scaling-policy-authenticity
 
+## [0.4.0] — Cloud Scaling Phase 5B-2 part 2: R-2 and R-7
+
+Ratified in `docs/architecture/ADR_CLOUD_SCALING_DECISION_SCOPE_PHASE5B1_RATIFICATION.md`,
+owner ruling on the remaining residuals. **Breaking**, pre-1.0: a candidate-bearing
+determination that verified at `0.3.0` may be refused at `0.4.0`.
+
+**No partition change and no profile bump.** `VERIFICATION_PROFILE_VERSION` stays `v2`: no fact
+moved between the verified and recorded halves, so the artifact digest and the partition
+fingerprint are unchanged. What changed is which inputs produce an artifact.
+
+### Added — gate 13, the candidate must be valid AT the verified instant (R-2)
+
+`as_of` is the authoritative verification instant injected by the composition root; this
+package still reads no clock. What is new is that the instant is reconciled against the
+candidate's own carried validity rather than recorded beside it.
+
+Four typed refusals, not one generic staleness:
+
+- `CANDIDATE_RECOMMENDATION_NOT_YET_VALID` — `as_of` precedes `subject_valid_from_fact`.
+- `CANDIDATE_RECOMMENDATION_EXPIRED` — `as_of` is past `subject_valid_until_fact`.
+- `CANDIDATE_DECISION_EXPIRED` — `as_of` is past `decision_expires_at_fact`. Checked
+  independently: a live recommendation can carry a dead decision.
+- `CANDIDATE_FACT_NOT_YET_OCCURRED` — `as_of` precedes `subject_asserted_at_fact`,
+  `decision_evaluated_at_fact` or `attestation_issued_at_fact`; the detail names which.
+
+The six timestamps are classified from the upstream contracts rather than from their names:
+the subject interval is inclusive on both ends, matching
+`cloud-scaling-risk-integration`'s `_require_within_validity` (`now > valid_until` /
+`now < valid_from`), and the decision bound matches Risk Authority's `now > expires_at`. A
+boundary that disagreed with the seam above it about which instants are admissible would be a
+second opinion, not a second check.
+
+**R-2 was recorded wrongly and is corrected in the ADR.** It read as "whose clock supplies
+`as_of`". Measurement showed `as_of` was already type-checked and round-tripped, and that the
+authority already refuses a revoked policy *even at an instant before its revocation*. What was
+open was the missing reconciliation, and this suite's own fixtures demonstrated it: every
+candidate-bearing test verified at `T_MID`, five months after the fixture candidate's
+recommendation expired, and nothing objected. Those fixtures now state an honest instant
+(`T_CANDIDATE`).
+
+### Added — the partition maps agree with one canonical declaration (R-7)
+
+`DERIVED_FACT_NAMES` names the three digest-covered non-fields (`outcome`, `grants_authority`,
+`historical`) that were previously reconciled by an unnamed tuple, and `VERIFIED_DIGEST_KEYS`
+states the verified half's membership once. `require_partition_agreement` compares both payload
+maps against the declaration before anything is minted, raising the package's
+`INVARIANT_VIOLATION`. Membership went from three uncompared places to one declaration plus a
+mint-time check. R-7 remains what it was recorded as — a maintenance hazard, not a correctness
+one — but it now fails loudly and says which side is short.
+
+### Changed
+
+- Suite 289 → 309, 0 failed, 0 skipped. Both new guards were neutralised and observed to fail
+  (7 properties for gate 13, 4 for the agreement check) before being trusted.
+
 ## [0.3.0] — Cloud Scaling Phase 5B-2 part 1: R-9
 
 Ratified in `docs/architecture/ADR_CLOUD_SCALING_DECISION_SCOPE_PHASE5B1_RATIFICATION.md`,
