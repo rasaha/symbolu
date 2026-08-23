@@ -121,6 +121,12 @@ class PolicyAuthenticityOutcome(str, Enum):
     #: consumer together, and a proof about policy A beside a candidate about policy B is a
     #: misstatement however genuine each half is on its own.
     CANDIDATE_COORDINATE_MISMATCH = "CANDIDATE_COORDINATE_MISMATCH"
+    #: The candidate names *this* policy, and the policy belongs to another tenant (R-9,
+    #: 5B-2). Distinct from the mismatch above on purpose: there, the two artifacts are
+    #: about different policies; here they agree about the policy and the disagreement is
+    #: over whose action it may bound. Only ``TENANT``-scoped policies can trip it — a
+    #: ``GLOBAL`` policy carries the empty tenant and bounds any tenant's action.
+    CANDIDATE_CROSS_TENANT_POLICY = "CANDIDATE_CROSS_TENANT_POLICY"
 
     # --- fail-closed terminals ------------------------------------------------------------
     #: The resolution port could not be used — it raised, or returned a foreign type.

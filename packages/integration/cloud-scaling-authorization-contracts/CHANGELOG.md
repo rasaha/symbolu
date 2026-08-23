@@ -1,5 +1,73 @@
 # Changelog — ugence-cloud-scaling-authorization-contracts
 
+## [0.3.0] — Cloud Scaling Phase 5B-2 part 1: R-9
+
+Ratified in `docs/architecture/ADR_CLOUD_SCALING_DECISION_SCOPE_PHASE5B1_RATIFICATION.md`,
+owner ruling on the three residual decisions. **Breaking**, pre-1.0: a candidate that was
+constructible at `0.2.0` may be refused at `0.3.0`. No schema identifier moves and **no digest
+moves** — a refusal changes what is constructible, not what is hashed.
+
+### Added
+
+- `POLICY_SCOPE_TENANT` — the one `policy_scope` value that constrains which tenant a policy
+  may bound. A literal rather than an import: this package depends on neither the Policy
+  Authority nor the UVI contracts, which is why the coordinate travels as strings at all.
+- Rejection reason `CROSS_TENANT_POLICY_BINDING`. Its own member, deliberately not folded into
+  `POLICY_COORDINATE_CONTENT_MISMATCH`: the two references agree perfectly and the coordinate
+  is bound to this very scope. What is wrong is whose action the policy may bound, which is a
+  scope violation rather than a content disagreement.
+- A third builder guard in that family (inventory 51 → 52), closing **R-9**: a `TENANT`-scoped
+  policy may bound only its own tenant's action. Keyed on the scope, never on a bare tenant
+  equality — a `GLOBAL` policy carries the empty tenant, so `!=` alone would refuse every
+  global policy in the platform. Mirrors the ratified shape at
+  `uvi-policy-contracts/.../contracts/context.py:118` and `:223`.
+
+### Changed
+
+- The commentary at the two-reference cross-check said the coordinate's tenant was not
+  compared at all, reasoning from the empty global tenant. That is a correct reason not to
+  compare *unconditionally* and not a reason not to compare; it is corrected in place rather
+  than deleted, because the reasoning it records is what shaped the guard.
+
+### Tests
+
+- **R-11 closed.** The completeness test enumerated `__dataclass_fields__`, and a property is
+  not a field, so a binding could arrive outside the digest while appearing to bind. Measured:
+  one per-instance property outside `digest_payload()` left the suite green with zero test
+  edits.
+
+  R-11 is now stated precisely: *every public attribute declared on
+  `CapacityAuthorizationCandidate` or inherited through its MRO is either a dataclass field
+  covered by `digest_payload()` or an explicitly named non-field surface member, and the
+  allowlist cannot grow without a disclosed, reviewed change.* It does not claim coverage of
+  every attribute an instance could ever expose: the class is a frozen dataclass without
+  `__slots__`, so `object.__setattr__` can still staple an attribute onto a live instance, and
+  no static check sees that.
+
+  Enumeration is static — `inspect.getmembers_static`, falling back to `dir()` plus
+  `inspect.getattr_static` — so it never executes a descriptor, and total over *names*, so it
+  asks nothing about how a member is implemented. A first attempt classified instead, reading
+  an exempt property's source for the name `self`; that is source classification, and every
+  syntactic approximation of "derives from instance state" has a bypass class. The five that
+  defeated it — renamed receiver, helper delegate, `getattr`, custom descriptor, inherited or
+  class-attached — are now parametrised acceptance tests over the enumerator.
+
+  The allowlist is ratcheted against the merge base (`tests/_surface_ratchet.py`), so it
+  cannot grow silently. That closes accidental drift; it does not close a contributor editing
+  the class and the allowlist together, which no test in one trust domain can. What it buys is
+  that widening becomes disclosed rather than silent — the same residual D-5B1-3's third rule
+  carries, recorded rather than repaired.
+
+- The public non-field surface, disclosed in full because nothing was exempt before it existed:
+  - surface: digest — a method, computes the canonical digest and stores nothing.
+  - surface: digest_payload — a method, returns the payload the digest is taken over.
+  - surface: to_canonical_dict — a method, the canonical serialisation.
+  - surface: trust_state — constant `PRESENT_BUT_NOT_TRUST_VERIFIED`; a read-only property
+    rather than a field so `object.__setattr__` cannot forge it on a frozen dataclass.
+  - surface: grants_authority — constant `False`, and no branch in this package returns `True`.
+- Suite 277 → 298, 0 failed, 0 skipped. (283 was the count before the enumeration was
+  rebuilt: the surface ratchet and the bypass-construct acceptance tests came after.)
+
 ## [0.2.0] — Cloud Scaling Phase 5B-1: decision-scope repair
 
 Ratified in `docs/architecture/ADR_CLOUD_SCALING_DECISION_SCOPE_PHASE5B1_RATIFICATION.md`.

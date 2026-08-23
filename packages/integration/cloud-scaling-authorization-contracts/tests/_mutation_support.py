@@ -227,13 +227,15 @@ def mutated_package(tmp_path: pathlib.Path, guard_number: int) -> MutatedPackage
     dst.mkdir(parents=True, exist_ok=True)
     shutil.copytree(SRC, dst / PKG_NAME)
     guards = canonical_guards(dst / PKG_NAME)
-    # 51 since 5B-1: the builder gained guards 43 and 44 — the two policy references must
-    # name one policy, and the coordinate must bind this scope. The count is asserted so a
-    # guard that disappears cannot go unnoticed; the numbered anchors the sweep aims at are
-    # checked separately, and both new guards sort after every anchor.
-    if len(guards) != 51:
+    # 52 since 5B-2. 5B-1 brought the builder to 51 with guards 43 and 44 — the two policy
+    # references must name one policy, and the coordinate must bind this scope. 5B-2 adds the
+    # third of that family, closing R-9: a TENANT-scoped policy may bound only its own
+    # tenant's action. The count is asserted so a guard that disappears cannot go unnoticed;
+    # the numbered anchors the sweep aims at are checked separately, and all three new guards
+    # sort after every anchor.
+    if len(guards) != 52:
         raise AssertionError(
-            f"canonical inventory drifted: {len(guards)} in-scope guards, expected 51"
+            f"canonical inventory drifted: {len(guards)} in-scope guards, expected 52"
         )
     _neutralise(dst / PKG_NAME, guards[guard_number - 1])
 

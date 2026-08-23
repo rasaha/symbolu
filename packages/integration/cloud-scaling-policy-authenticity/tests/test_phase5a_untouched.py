@@ -40,7 +40,7 @@ def test_phase_5a_is_at_the_version_5b1_moved_it_to():
     """``0.2.0``: a required field on the candidate, and a moved candidate digest (D-5B1-2)."""
 
     version = (_phase5a() / "src" / "ugence_cloud_scaling_authorization_contracts" / "version.py").read_text()
-    assert '__version__ = "0.2.0"' in version
+    assert '__version__ = "0.3.0"' in version
 
 
 @pytest.mark.invariant
@@ -58,7 +58,7 @@ def test_this_package_ships_at_the_version_its_profile_change_requires():
         __version__,
     )
 
-    assert __version__ == "0.2.0"
+    assert __version__ == "0.3.0"
     assert VERIFICATION_PROFILE_VERSION == "v2"
 
 

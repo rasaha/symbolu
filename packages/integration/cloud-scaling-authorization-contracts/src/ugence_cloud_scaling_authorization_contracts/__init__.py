@@ -88,6 +88,7 @@ from .reconciliation import (
 from .target import (
     EXECUTION_TARGET_SCOPE_SCHEMA_VERSION,
     POLICY_COORDINATE_COMPONENTS,
+    POLICY_SCOPE_TENANT,
     POLICY_TARGET_BINDING_SCHEMA_VERSION,
     POLICY_TARGET_BINDING_V2_SCHEMA_VERSION,
     ExecutionTargetScope,
@@ -117,6 +118,7 @@ __all__ = [
     "PolicyTargetBindingReferenceV2",
     "EXECUTION_TARGET_SCOPE_SCHEMA_VERSION",
     "POLICY_COORDINATE_COMPONENTS",
+    "POLICY_SCOPE_TENANT",
     "POLICY_TARGET_BINDING_SCHEMA_VERSION",
     "POLICY_TARGET_BINDING_V2_SCHEMA_VERSION",
     # --- the single unverified trust state ---

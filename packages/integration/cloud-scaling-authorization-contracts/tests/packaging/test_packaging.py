@@ -15,14 +15,16 @@ PYPROJECT = (PROJECT / "pyproject.toml").read_text(encoding="utf-8")
 
 
 def test_version_is_the_declared_version():
-    """``0.2.0`` since 5B-1: the candidate gained a required field and its digest moved.
+    """``0.3.0`` since 5B-2: the builder refuses a pairing it used to accept.
 
-    Pre-1.0, that is a minor bump, and the digest is a value two merged packages pin — so a
-    version that stayed put would be telling a consumer nothing changed while the artifact
-    they pin changed shape.
+    5B-1 took this to ``0.2.0`` — the candidate gained a required field and its digest moved.
+    5B-2 moves no digest and no schema identifier; what it changes is that a candidate
+    constructible at ``0.2.0`` may be refused at ``0.3.0`` (R-9). Pre-1.0 that is still a minor
+    bump, and it is the kind a consumer most needs told: nothing they pin looks different, and
+    the same inputs now raise.
     """
 
-    assert pkg.__version__ == "0.2.0"
+    assert pkg.__version__ == "0.3.0"
 
 
 def test_distribution_and_namespace_names():

@@ -1,5 +1,40 @@
 # Changelog — ugence-cloud-scaling-policy-authenticity
 
+## [0.3.0] — Cloud Scaling Phase 5B-2 part 1: R-9
+
+Ratified in `docs/architecture/ADR_CLOUD_SCALING_DECISION_SCOPE_PHASE5B1_RATIFICATION.md`,
+owner ruling on the three residual decisions.
+
+**No partition change and no profile bump.** `VERIFICATION_PROFILE_VERSION` stays `v2`: no
+fact moved between the verified and recorded halves, and the artifact digest and partition
+fingerprint are unchanged. What changed is which inputs produce an artifact at all, not what
+an artifact contains.
+
+### Added
+
+- Gate 12, closing **R-9**: a `TENANT`-scoped policy bounds only its own tenant's action.
+  Refused as the new outcome `CANDIDATE_CROSS_TENANT_POLICY`.
+- Outcome member `CANDIDATE_CROSS_TENANT_POLICY`. Distinct from
+  `CANDIDATE_COORDINATE_MISMATCH` on purpose: there the two artifacts are about different
+  policies, here they agree about the policy and the disagreement is over whose action it may
+  bound. Reporting one as the other would send a reader looking for a disagreement that is
+  not there.
+
+Phase 5A refuses the same pairing at construction, and neither site is redundant. This
+boundary accepts a candidate object it did not build, so it cannot inherit that discipline: a
+candidate is shape- and digest-validated by its type but carries no cross-field policy guard
+there, so an internally consistent cross-tenant candidate can exist without the builder ever
+having produced one. The suite constructs exactly that, and with gate 12 neutralised it
+verifies `VERIFIED` — the residual, reproduced at this boundary.
+
+The resolved coordinate is the authority for the comparison, not the candidate's copy of it:
+gate 11 has already forced the two to agree, and reading the resolved side keeps the answer
+independent of what the candidate claims about itself.
+
+### Changed
+
+- Depends on Phase 5A `0.3.0`. Suite 286 → 289, 0 failed, 0 skipped.
+
 ## 0.2.0 — Cloud Scaling Phase 5B-1: decision-scope repair
 
 Ratified in `docs/architecture/ADR_CLOUD_SCALING_DECISION_SCOPE_PHASE5B1_RATIFICATION.md`.

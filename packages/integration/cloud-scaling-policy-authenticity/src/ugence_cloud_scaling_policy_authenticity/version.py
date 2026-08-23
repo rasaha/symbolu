@@ -17,4 +17,4 @@ from typing import Final
 __all__ = ["__version__"]
 
 #: Cloud Scaling Phase 5B-1 — decision-scope repair, on the 5B-0B foundation.
-__version__: Final[str] = "0.2.0"
+__version__: Final[str] = "0.3.0"
