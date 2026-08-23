@@ -44,13 +44,14 @@ jobs:
           python -m pytest ${{ env.PKG }}/tests/test_p1_compat.py ${{ env.PKG }}/tests/test_adapter.py \
             ${{ env.PKG }}/tests/test_eligibility.py ${{ env.PKG }}/tests/test_evidence.py \
             ${{ env.PKG }}/tests/test_examples.py ${{ env.PKG }}/tests/test_public_api.py -q
-      - name: version 0.2.0 + honest maturity
+      - name: version 0.2.1 + honest maturity
         env: { PYTHONPATH: "${{ env.SRC }}" }
         run: |
           python -m ugence_agent_workforce_composer.cli version
           python - <<'PY'
           import ugence_agent_workforce_composer as u
-          assert u.__version__ == "0.2.0" and u.CONTRACT_VERSION == "awc.v1"
+          # 0.2.1 since PR #1317 added the compiler v2 compatibility adapter.
+          assert u.__version__ == "0.2.1" and u.CONTRACT_VERSION == "awc.v1"
           i = u.version_info().to_dict()
           assert i["composition_contract_version"] == "awc.composition.v1"
           for k in ("deterministic_ranking_implemented","team_composition_implemented",

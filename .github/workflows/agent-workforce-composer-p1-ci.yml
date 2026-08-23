@@ -51,13 +51,15 @@ jobs:
           python -m ugence_agent_workforce_composer.cli version
           python - <<'PY'
           import ugence_agent_workforce_composer as u
-          assert u.__version__ == "0.1.0" and u.CONTRACT_VERSION == "awc.v1"
+          assert u.__version__ == "0.2.1" and u.CONTRACT_VERSION == "awc.v1"
           i = u.version_info().to_dict()
+          # Ranking and composition SHIPPED in P2 (PR #1310); asserting them absent
+          # made this gate claim the product is less capable than it is.
           for k in ("canonical_object_model_implemented","compiler_adapter_implemented",
-                    "hard_constraint_eligibility_implemented","deterministic_replay_verified"):
+                    "hard_constraint_eligibility_implemented","deterministic_replay_verified",
+                    "agent_ranking_implemented","team_composition_implemented"):
               assert i[k] is True, k
-          for k in ("agent_ranking_implemented","team_composition_implemented",
-                    "permission_assignment_implemented","runtime_handoff_implemented",
+          for k in ("permission_assignment_implemented","runtime_handoff_implemented",
                     "h16_migration_implemented","live_registry_implemented",
                     "pilot_validated","production_certified"):
               assert i[k] is False, k
@@ -170,8 +172,13 @@ jobs:
         run: |
           python - <<'PY'
           import ugence_agent_workforce_composer.api as api
+          # Narrowed per owner ruling: P2 deliberately ships AgentTeamPlan, so
+          # guarding against it asserted a boundary the product intentionally
+          # outgrew. Every other name remains genuinely absent and stays guarded --
+          # AWC still ranks nothing by API, composes no team, selects no agent and
+          # grants no permission.
           banned = {"rank_agents","score_agents","compose_team","select_agent",
-                    "AgentTeamPlan","PolicyWeights","assign_permissions"}
+                    "PolicyWeights","assign_permissions"}
           assert not (banned & set(api.__all__)), banned & set(api.__all__)
           # every eligibility result is score-free
           from ugence_agent_workforce_composer import fixtures

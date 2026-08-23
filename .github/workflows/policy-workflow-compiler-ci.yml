@@ -73,7 +73,10 @@ jobs:
           python -m ugence_policy_workflow_compiler version
           python - <<'PY'
           import ugence_policy_workflow_compiler as u
-          assert u.__version__ == "0.1.0"
+          # 0.2.0 since PR #1316 decoupled the package version from the frozen v1
+          # digest identity. The v1 digest version stays 0.1.0 and is asserted in
+          # policy-workflow-compiler-p2-ci.yml.
+          assert u.__version__ == "0.2.0"
           i = u.version_info().to_dict()
           for k in ("document_extraction_implemented", "runtime_deployment_implemented",
                     "pilot_validated", "production_certified"):
