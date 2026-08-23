@@ -1,0 +1,74 @@
+# Independent distribution for the Ugence Agent Constitution contracts (AC-0).
+#
+# This is a LEAF CONTRACT package. It defines the immutable, versioned, content-
+# addressed artifacts that carry an agent's constitutional text, the mutable
+# drafting artifact that precedes ratification, and the deterministic validation
+# that decides whether such an artifact is well-formed.
+#
+# It is NOT an authority. It ratifies nothing, approves nothing, authorizes
+# nothing, binds nothing at runtime, and resolves no capability. AC-0 ships NO
+# compiler, NO capability registry, NO conformance findings, NO signing, NO UI,
+# NO LLM assistance, NO runtime binding, and makes NO authority decision.
+#
+# Dependency direction: pydantic and the standard library ONLY. This package
+# imports no other Ugence package; tests/packaging/test_import_boundary.py
+# enforces that as a hard gate.
+#
+# Build:  python -m build packages/contracts/agent-constitution
+# Verify: pytest packages/contracts/agent-constitution/tests
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-agent-constitution"
+dynamic = ["version"]
+description = "Ugence Agent Constitution — immutable, versioned, content-addressed agent constitution contracts with deterministic fail-closed validation. Contracts, not an authority. Deterministic and offline; not pilot-validated, not production-certified."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["agent", "constitution", "conformance", "contracts", "governance", "ugence"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: Other/Proprietary License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Typing :: Typed",
+]
+# A leaf: pydantic and the standard library. NO other Ugence package, NO model
+# SDK, NO web framework, NO database driver, NO cloud/ERP SDK, NO crypto backend
+# (AC-0 fingerprints content; it does not sign it).
+dependencies = [
+    "pydantic>=2",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0", "hypothesis>=6.0"]
+dev = ["pytest>=7.0", "hypothesis>=6.0", "build>=1.0"]
+
+[project.urls]
+Documentation = "https://github.com/rasaha/symbolu/tree/main/packages/contracts/agent-constitution/docs"
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_agent_constitution.version.DISTRIBUTION_VERSION" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_agent_constitution*"]
+
+[tool.setuptools.package-data]
+ugence_agent_constitution = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+# No test-case classes are used; this stops pytest from trying to collect any
+# imported model class whose name happens to start with ``Test``.
+python_classes = ["_DisableClassCollection"]
+addopts = "--import-mode=importlib"

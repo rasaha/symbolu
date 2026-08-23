@@ -1,0 +1,406 @@
+{
+  "curated_api_module": "ugence_agent_constitution.api",
+  "digest_algorithm": "sha256",
+  "distribution": "ugence-agent-constitution",
+  "finding_codes": [
+    "AC_ARTIFACT_VERSION_MALFORMED",
+    "AC_CONTRACT_CONTRADICTORY_BEHAVIOUR",
+    "AC_CONTRACT_NO_OBLIGATIONS",
+    "AC_DIGEST_ABSENT",
+    "AC_DIGEST_MALFORMED",
+    "AC_DIGEST_MISMATCH",
+    "AC_DRAFT_IS_NOT_A_CONSTITUTION",
+    "AC_MANDATORY_FIELD_AMBIGUOUS",
+    "AC_MANDATORY_FIELD_MISSING",
+    "AC_OBLIGATION_CONTRADICTION",
+    "AC_PAYLOAD_NOT_A_MAPPING",
+    "AC_PREDECESSOR_SELF_REFERENCE",
+    "AC_REQUIREMENT_CONDITION_MISSING",
+    "AC_REQUIREMENT_CONDITION_UNEXPECTED",
+    "AC_REQUIREMENT_CONTRADICTORY",
+    "AC_REQUIREMENT_ID_AMBIGUOUS",
+    "AC_REQUIREMENT_UNRESOLVABLE",
+    "AC_SCHEMA_STRUCTURE_INVALID",
+    "AC_SCHEMA_VERSION_MISSING",
+    "AC_SCHEMA_VERSION_RETIRED",
+    "AC_SCHEMA_VERSION_UNRECOGNIZED",
+    "AC_SCHEMA_VERSION_WRONG_KIND",
+    "AC_SELF_RATIFICATION",
+    "AC_SUBJECT_ENTRY_AMBIGUOUS",
+    "AC_SUCCESSION_LINEAGE_MISMATCH",
+    "AC_SUCCESSION_NO_MATERIAL_CHANGE",
+    "AC_SUCCESSION_VERSION_NOT_BUMPED",
+    "AC_SUCCESSION_VERSION_UNORDERABLE"
+  ],
+  "namespace": "ugence_agent_constitution",
+  "note": "Machine-readable snapshot of the curated public API (ugence_agent_constitution.api.__all__). tests/packaging/test_public_api.py asserts this file equals the actual package surface; regenerate it whenever the curated API changes. This package is a LEAF: it depends on pydantic and the standard library and on no other Ugence package, which tests/packaging/test_import_boundary.py enforces. It is NOT an authority \u2014 it ratifies nothing, approves nothing, authorizes nothing, resolves no capability and binds nothing at runtime. AC-0 ships no compiler, no capability registry, no conformance findings, no signing, no UI, no LLM assistance and no runtime binding; those names are absent from this surface on purpose. The names CapabilityRegistry, CapabilityDefinition, CapabilityManifest, CompilationResult, AuthorityRequirement, GovernanceDisposition and resolve_policy belong to other packages and are never reused here. Canonical JSON is semantically identical by value to ugence_policy_workflow_compiler.serialization.canonical_json and is duplicated rather than imported to keep the leaf boundary; tests/serialization/test_canonical_json_equivalence.py gates the equivalence.",
+  "package_version": "0.1.0",
+  "schema_versions": {
+    "agent_constitution": [
+      "agent_constitution.v1"
+    ],
+    "agent_role_manifest": [
+      "agent_role_manifest.v1"
+    ],
+    "conformance_subject": [
+      "conformance_subject.v1"
+    ],
+    "developer_implementation_contract": [
+      "developer_implementation_contract.v1"
+    ]
+  },
+  "scope": "AC-0",
+  "symbols": {
+    "AGENT_CONSTITUTION_V1": {
+      "kind": "constant",
+      "type": "str"
+    },
+    "AGENT_ROLE_MANIFEST_V1": {
+      "kind": "constant",
+      "type": "str"
+    },
+    "AgentConstitution": {
+      "fields": [
+        "schema_version",
+        "constitution_id",
+        "artifact_version",
+        "predecessor",
+        "issuer",
+        "source_manifest_id",
+        "source_manifest_digest",
+        "source_manifest_author_id",
+        "role_name",
+        "role_summary",
+        "capability_requirements",
+        "prohibited_actions",
+        "ratified_at",
+        "content_digest"
+      ],
+      "frozen": true,
+      "kind": "model"
+    },
+    "AgentConstitutionContractError": {
+      "kind": "exception"
+    },
+    "AgentRoleManifest": {
+      "fields": [
+        "schema_version",
+        "manifest_id",
+        "draft_revision",
+        "role_name",
+        "role_summary",
+        "author_id",
+        "capability_requirements",
+        "prohibited_actions",
+        "notes",
+        "draft_digest"
+      ],
+      "frozen": true,
+      "kind": "model"
+    },
+    "ArtifactKind": {
+      "kind": "enum",
+      "values": [
+        "agent_role_manifest",
+        "agent_constitution",
+        "developer_implementation_contract",
+        "conformance_subject"
+      ]
+    },
+    "CONFORMANCE_SUBJECT_V1": {
+      "kind": "constant",
+      "type": "str"
+    },
+    "CapabilityRegistryEntryRef": {
+      "fields": [
+        "registry_namespace",
+        "entry_id",
+        "entry_version",
+        "entry_digest"
+      ],
+      "frozen": true,
+      "kind": "model"
+    },
+    "CapabilityRequirement": {
+      "fields": [
+        "requirement_id",
+        "summary",
+        "obligation",
+        "entry_ref",
+        "condition",
+        "rationale"
+      ],
+      "frozen": true,
+      "kind": "model"
+    },
+    "ConformanceSubject": {
+      "fields": [
+        "schema_version",
+        "subject_id",
+        "subject_kind",
+        "constitution_ref",
+        "contract_ref",
+        "declared_capability_entries",
+        "description",
+        "content_digest"
+      ],
+      "frozen": true,
+      "kind": "model"
+    },
+    "ConstitutionRef": {
+      "fields": [
+        "constitution_id",
+        "artifact_version",
+        "content_digest"
+      ],
+      "frozen": true,
+      "kind": "model"
+    },
+    "ContentRef": {
+      "fields": [
+        "ref_id",
+        "content_digest"
+      ],
+      "frozen": true,
+      "kind": "model"
+    },
+    "DEVELOPER_IMPLEMENTATION_CONTRACT_V1": {
+      "kind": "constant",
+      "type": "str"
+    },
+    "DIGEST_ALGORITHM": {
+      "kind": "constant",
+      "type": "str"
+    },
+    "DIGEST_PREFIX": {
+      "kind": "constant",
+      "type": "str"
+    },
+    "DISTRIBUTION_NAME": {
+      "kind": "constant",
+      "type": "str"
+    },
+    "DISTRIBUTION_VERSION": {
+      "kind": "constant",
+      "type": "str"
+    },
+    "DeveloperImplementationContract": {
+      "fields": [
+        "schema_version",
+        "contract_id",
+        "artifact_version",
+        "constitution_ref",
+        "implementation_target",
+        "required_behaviours",
+        "forbidden_behaviours",
+        "acceptance_criteria",
+        "notes",
+        "content_digest"
+      ],
+      "frozen": true,
+      "kind": "model"
+    },
+    "DigestScopeError": {
+      "kind": "exception"
+    },
+    "FrozenArtifact": {
+      "fields": [],
+      "frozen": true,
+      "kind": "model"
+    },
+    "IssuerIdentity": {
+      "fields": [
+        "issuer_id",
+        "issuer_display_name",
+        "issuer_kind"
+      ],
+      "frozen": true,
+      "kind": "model"
+    },
+    "IssuerKind": {
+      "kind": "enum",
+      "values": [
+        "HUMAN_OWNER",
+        "OWNER_BODY",
+        "DELEGATED_REVIEWER"
+      ]
+    },
+    "MalformedVersionError": {
+      "kind": "exception"
+    },
+    "PredecessorRef": {
+      "fields": [
+        "constitution_id",
+        "artifact_version",
+        "content_digest"
+      ],
+      "frozen": true,
+      "kind": "model"
+    },
+    "RequirementObligation": {
+      "kind": "enum",
+      "values": [
+        "MANDATORY",
+        "CONDITIONAL",
+        "PROHIBITED"
+      ]
+    },
+    "SUPPORTED_SCHEMA_VERSIONS": {
+      "kind": "constant",
+      "type": "dict"
+    },
+    "SchemaCompatibility": {
+      "kind": "enum",
+      "values": [
+        "SUPPORTED",
+        "RETIRED",
+        "UNRECOGNIZED"
+      ]
+    },
+    "SubjectKind": {
+      "kind": "enum",
+      "values": [
+        "AGENT_IMPLEMENTATION",
+        "DEVELOPER_ARTIFACT",
+        "DEPLOYMENT_CANDIDATE"
+      ]
+    },
+    "SuccessionCompatibility": {
+      "kind": "enum",
+      "values": [
+        "VALID_SUCCESSION",
+        "LINEAGE_ROOT",
+        "LINEAGE_MISMATCH",
+        "VERSION_NOT_BUMPED",
+        "NO_MATERIAL_CHANGE",
+        "UNORDERABLE_VERSION"
+      ]
+    },
+    "UnknownArtifactKind": {
+      "kind": "exception"
+    },
+    "ValidationFinding": {
+      "fields": [
+        "code",
+        "outcome",
+        "path",
+        "message"
+      ],
+      "frozen": true,
+      "kind": "model"
+    },
+    "ValidationOutcome": {
+      "kind": "enum",
+      "values": [
+        "VALID",
+        "INVALID",
+        "INDETERMINATE"
+      ]
+    },
+    "ValidationReport": {
+      "fields": [
+        "artifact_kind",
+        "outcome",
+        "findings"
+      ],
+      "frozen": true,
+      "kind": "model"
+    },
+    "VersionInfo": {
+      "kind": "class"
+    },
+    "combine_outcomes": {
+      "kind": "function",
+      "signature": "(outcomes: 'Iterable[ValidationOutcome]') -> 'ValidationOutcome'"
+    },
+    "compare_artifact_versions": {
+      "kind": "function",
+      "signature": "(left: 'str', right: 'str') -> 'int'"
+    },
+    "compute_content_digest": {
+      "kind": "function",
+      "signature": "(artifact: 'Any') -> 'str'"
+    },
+    "digest_scope": {
+      "kind": "function",
+      "signature": "(artifact: 'Any') -> 'dict'"
+    },
+    "digests_agree": {
+      "kind": "function",
+      "signature": "(declared: 'str', artifact: 'Any') -> 'bool'"
+    },
+    "dumps": {
+      "kind": "function",
+      "signature": "(value: 'Any') -> 'str'"
+    },
+    "dumps_pretty": {
+      "kind": "function",
+      "signature": "(value: 'Any') -> 'str'"
+    },
+    "fingerprint": {
+      "kind": "function",
+      "signature": "(value: 'Any') -> 'str'"
+    },
+    "fingerprint_sequence": {
+      "kind": "function",
+      "signature": "(values: 'Sequence[Any]') -> 'str'"
+    },
+    "fingerprint_text": {
+      "kind": "function",
+      "signature": "(text: 'str') -> 'str'"
+    },
+    "is_ratified_constitution": {
+      "kind": "function",
+      "signature": "(candidate: 'Any') -> 'bool'"
+    },
+    "is_semantic_version": {
+      "kind": "function",
+      "signature": "(value: 'str') -> 'bool'"
+    },
+    "is_well_formed_digest": {
+      "kind": "function",
+      "signature": "(value: 'Any') -> 'bool'"
+    },
+    "loads": {
+      "kind": "function",
+      "signature": "(text: 'str') -> 'Any'"
+    },
+    "parse_semantic_version": {
+      "kind": "function",
+      "signature": "(value: 'str') -> 'Tuple[int, int, int]'"
+    },
+    "requires_version_bump": {
+      "kind": "function",
+      "signature": "(predecessor_digest: 'str', successor_digest: 'str') -> 'bool'"
+    },
+    "schema_compatibility": {
+      "kind": "function",
+      "signature": "(kind: 'ArtifactKind', declared: 'str') -> 'SchemaCompatibility'"
+    },
+    "succession_compatibility": {
+      "kind": "function",
+      "signature": "(*, lineage_id: 'str', artifact_version: 'str', content_digest: 'str', predecessor_lineage_id: 'Optional[str]', predecessor_version: 'Optional[str]', predecessor_digest: 'Optional[str]') -> 'SuccessionCompatibility'"
+    },
+    "to_canonical_obj": {
+      "kind": "function",
+      "signature": "(value: 'Any') -> 'Any'"
+    },
+    "validate_artifact": {
+      "kind": "function",
+      "signature": "(payload: 'Any', kind: 'ArtifactKind') -> 'ValidationReport'"
+    },
+    "validate_constitution": {
+      "kind": "function",
+      "signature": "(payload: 'Any') -> 'ValidationReport'"
+    },
+    "version_info": {
+      "kind": "function",
+      "signature": "() -> 'VersionInfo'"
+    }
+  },
+  "validation_outcomes": [
+    "VALID",
+    "INVALID",
+    "INDETERMINATE"
+  ]
+}
