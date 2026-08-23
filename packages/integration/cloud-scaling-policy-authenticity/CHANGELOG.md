@@ -1,5 +1,51 @@
 # Changelog — ugence-cloud-scaling-policy-authenticity
 
+## [Unreleased] — governance: the partition ratchet gains a fourth rule
+
+Test-only. No shipped source changed, so the distribution stays at `0.4.0`, the partition,
+the artifact digest, `VERIFICATION_PROFILE_VERSION` and every frozen pin are untouched, and
+no residual moves. What changes is what the ratchet requires of the *next* change.
+
+### Added — rule 4, `added-verified:` disclosure for a fact that arrives rather than moves
+
+D-5B1-3's three rules are keyed on a fact **changing halves**: rule 3's population is
+`current.verified & baseline.recorded`. A name that was in *neither* half at the baseline is
+therefore not a promotion, and nothing fact-specific was ever asked of it. Rule 1 sees the
+membership tuple move and asks for a profile bump; rule 2 asks the changelog to name the new
+version; both are satisfied by a bump and one general sentence. A determination could begin
+attesting a fact no reader of the changelog could name.
+
+This is a property of the gate, not of any one residual. It applies to whatever the next
+verified fact turns out to be and to whatever establishes it, which is why the rule lands on
+its own rather than alongside the first change that would need it.
+
+Rule 4: every name in the current verified half that existed in neither baseline half must be
+disclosed on its own changelog line, in the form `added-verified: <fact> — <reason>`.
+
+- The prefix is `added-verified`, never a bare `added`: which half gained the fact is the
+  whole content of the disclosure, and the two halves carry different authority.
+- A profile bump, a general changelog sentence, a `promoted:` line about the same fact, and a
+  correctly-formed line about a different fact all fail it.
+- A rename is a removal plus an addition; the new verified name owes the disclosure.
+- Deliberately **not** extended to a name added only to the recorded half. A recorded fact is
+  carried, digest-covered and unchecked, so adding one does not change what a determination
+  establishes — rules 1 and 2 already surface it.
+
+Rule 3 is unchanged. One control drives a promotion mislabelled as an addition and an addition
+mislabelled as a promotion in the same change, and observes each refused by the rule that owns
+it, so the two are measured independent rather than assumed so.
+
+### Added — the controls that watch rule 4 fail
+
+A verified fact added under only a profile bump; under a general prose disclosure naming it;
+under a malformed entry (`added:`, a missing colon) or one naming another fact or another
+direction; without a bump at all (rules 1 and 4 both fire). A positive control carries the
+exact required entry and passes, one control renames a verified fact, one confirms a
+recorded-half addition owes no per-fact line, and one rewrites the shipped
+`VERIFIED_FACT_NAMES` assignment so the population is measured on parsed source rather than on
+a hand-built snapshot.
+
+
 ## [0.4.0] — Cloud Scaling Phase 5B-2 part 2: R-2 and R-7
 
 Ratified in `docs/architecture/ADR_CLOUD_SCALING_DECISION_SCOPE_PHASE5B1_RATIFICATION.md`,

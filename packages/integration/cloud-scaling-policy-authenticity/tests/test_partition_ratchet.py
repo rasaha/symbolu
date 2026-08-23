@@ -19,6 +19,11 @@ Three kinds of property here, and all three are needed:
 The controls are what make this file meaningful before the first real promotion: 5B-1 promotes
 ``candidate_digest_fact`` in a later step of the same change, and a guard built after that
 promotion would have missed the one event it exists to catch.
+
+The same argument is why rule 4's controls (below, under their own banner) land before any
+fact is added to the verified half: a name entering that half from *neither* baseline half is
+not a promotion, so nothing above it is fact-specific about the arrival, and a guard built
+after the first such fact would again have missed the one event it exists to catch.
 """
 
 from __future__ import annotations
@@ -369,3 +374,239 @@ def test_the_ratchet_refuses_to_invent_a_baseline_when_history_is_unavailable():
 
     with pytest.raises(RatchetBaselineUnavailable):
         sources_at_revision(pathlib.Path(REPO), "0" * 40)
+
+
+# --------------------------------------------------------------------------------------- #
+# Rule 4 — a fact entering the verified half from neither baseline half
+# --------------------------------------------------------------------------------------- #
+#
+# Rules 1-3 are keyed on movement between the halves. A brand-new verified fact does not move
+# through anything: it is in neither half at the baseline and in the verified half after, so
+# `promoted` is empty and nothing in rules 1-3 is fact-specific about it. The gap is generic —
+# it applies to whatever the next verified fact turns out to be, whatever establishes it — and
+# these controls drive it with a synthetic name for exactly that reason.
+
+#: A name no partition has ever carried, so the controls below cannot accidentally exercise a
+#: promotion of a real fact.
+_NEW_FACT = "synthetic_new_verified_fact"
+
+#: The changelog a disciplined bump carries, without any per-fact line.
+_BUMPED = "- VERIFICATION_PROFILE_VERSION moves to v99.\n"
+
+
+def _with_new_verified_fact(
+    current: PartitionSnapshot, fact: str = _NEW_FACT
+) -> PartitionSnapshot:
+    """``current`` plus one verified fact that was in neither half, under a profile bump."""
+
+    assert fact not in current.verified and fact not in current.recorded
+    return PartitionSnapshot(
+        verified=current.verified | {fact},
+        recorded=current.recorded,
+        verified_domain=current.verified_domain,
+        recorded_domain=current.recorded_domain,
+        profile_version="v99",
+    )
+
+
+@pytest.mark.adversarial
+def test_a_new_verified_fact_with_only_a_profile_bump_fails_the_gate():
+    """The bump and the version line are honest, and still say nothing about the fact.
+
+    Rules 1 and 2 are both satisfied here — the version moved and the changelog names it — so
+    before rule 4 this change reported clean while the artifact silently began attesting a
+    fact no reader of the changelog could name.
+    """
+
+    current = _working_tree_snapshot()
+    problems = ratchet_problems(
+        baseline=current, current=_with_new_verified_fact(current), changelog=_BUMPED
+    )
+    assert len(problems) == 1, problems
+    assert "added-verified" in problems[0] and _NEW_FACT in problems[0]
+
+
+@pytest.mark.adversarial
+def test_a_general_profile_disclosure_does_not_satisfy_the_addition_rule():
+    """Prose naming the fact is not a disclosure, for the same reason rule 3 rejects one."""
+
+    current = _working_tree_snapshot()
+    changelog = (
+        _BUMPED
+        + f"- The verified half now carries {_NEW_FACT}, and the artifact digest moved.\n"
+    )
+    problems = ratchet_problems(
+        baseline=current, current=_with_new_verified_fact(current), changelog=changelog
+    )
+    assert len(problems) == 1 and _NEW_FACT in problems[0]
+
+
+@pytest.mark.adversarial
+@pytest.mark.parametrize(
+    "line",
+    [
+        pytest.param(f"- added: {_NEW_FACT} — a gate now checks it.\n", id="ambiguous-prefix"),
+        pytest.param(
+            f"- added-verified {_NEW_FACT} — a gate now checks it.\n", id="no-colon"
+        ),
+        pytest.param(
+            "- added-verified: some_other_fact — a gate now checks it.\n", id="wrong-fact"
+        ),
+        pytest.param(f"- promoted: {_NEW_FACT} — a gate now checks it.\n", id="wrong-direction"),
+    ],
+)
+def test_a_malformed_or_misdirected_addition_entry_fails_the_gate(line):
+    """``added`` is not ``added-verified``, and a line about another fact is about another fact.
+
+    The bare prefix is refused rather than accepted as a shorthand: it does not say which half
+    gained the fact, and the two halves carry different authority — one says a gate checked it,
+    the other says nothing checked it. ``promoted`` is refused too, because it asserts the fact
+    was already carried and merely became attested, which is a different history.
+    """
+
+    current = _working_tree_snapshot()
+    problems = ratchet_problems(
+        baseline=current, current=_with_new_verified_fact(current), changelog=_BUMPED + line
+    )
+    assert len(problems) == 1 and _NEW_FACT in problems[0]
+
+
+@pytest.mark.happy
+def test_a_new_verified_fact_with_its_own_added_verified_line_passes():
+    """The disciplined addition, which the gate must not obstruct."""
+
+    current = _working_tree_snapshot()
+    changelog = _BUMPED + f"- added-verified: {_NEW_FACT} — a new gate establishes it.\n"
+    assert (
+        ratchet_problems(
+            baseline=current, current=_with_new_verified_fact(current), changelog=changelog
+        )
+        == []
+    )
+
+
+@pytest.mark.adversarial
+def test_the_promotion_rule_is_unchanged_by_the_addition_rule():
+    """Rule 3 still answers for movement, and rule 4 for arrival. Neither covers the other.
+
+    Both populations in one change: a promotion disclosed only as an addition, and an addition
+    disclosed only as a promotion. Each is refused by the rule that owns it, so the two rules
+    are measured to be independent rather than assumed to be.
+    """
+
+    current = _working_tree_snapshot()
+    promoted = sorted(current.recorded)[0]
+    mixed = PartitionSnapshot(
+        verified=current.verified | {promoted, _NEW_FACT},
+        recorded=current.recorded - {promoted},
+        verified_domain=current.verified_domain,
+        recorded_domain=current.recorded_domain,
+        profile_version="v99",
+    )
+    changelog = (
+        _BUMPED
+        + f"- added-verified: {promoted} — mislabelled; this fact was already carried.\n"
+        + f"- promoted: {_NEW_FACT} — mislabelled; this fact was in neither half.\n"
+    )
+    problems = ratchet_problems(baseline=current, current=mixed, changelog=changelog)
+    assert len(problems) == 2, problems
+    assert "does not disclose" in problems[0] and promoted in problems[0]
+    assert "added-verified" in problems[1] and _NEW_FACT in problems[1]
+
+
+@pytest.mark.adversarial
+def test_a_rename_owes_a_disclosure_for_the_new_verified_name():
+    """A rename is a removal plus an addition, and the addition is what rule 4 sees."""
+
+    current = _working_tree_snapshot()
+    renamed_from = "policy_body_digest"
+    assert renamed_from in current.verified
+    renamed = PartitionSnapshot(
+        verified=(current.verified - {renamed_from}) | {_NEW_FACT},
+        recorded=current.recorded,
+        verified_domain=current.verified_domain,
+        recorded_domain=current.recorded_domain,
+        profile_version="v99",
+    )
+    problems = ratchet_problems(baseline=current, current=renamed, changelog=_BUMPED)
+    assert len(problems) == 1 and _NEW_FACT in problems[0]
+
+    disclosed = _BUMPED + (
+        f"- added-verified: {_NEW_FACT} — renamed from {renamed_from}, same gate.\n"
+    )
+    assert ratchet_problems(baseline=current, current=renamed, changelog=disclosed) == []
+
+
+@pytest.mark.happy
+def test_a_fact_added_only_to_the_recorded_half_owes_no_per_fact_line():
+    """The deliberate boundary of rule 4, ratified rather than inferred.
+
+    A recorded fact is carried and digest-covered and nothing checked it, so adding one does
+    not change what a determination establishes. Rules 1 and 2 still surface it — the
+    membership tuple moved, so the profile version must move and the changelog must name it —
+    and that is the disclosure this direction owes.
+    """
+
+    current = _working_tree_snapshot()
+    recorded_addition = PartitionSnapshot(
+        verified=current.verified,
+        recorded=current.recorded | {_NEW_FACT},
+        verified_domain=current.verified_domain,
+        recorded_domain=current.recorded_domain,
+        profile_version="v99",
+    )
+    assert (
+        ratchet_problems(baseline=current, current=recorded_addition, changelog=_BUMPED) == []
+    )
+    # ...and without the bump it is still a membership change, so rule 1 still fires.
+    unbumped = PartitionSnapshot(
+        verified=current.verified,
+        recorded=current.recorded | {_NEW_FACT},
+        verified_domain=current.verified_domain,
+        recorded_domain=current.recorded_domain,
+        profile_version=current.profile_version,
+    )
+    problems = ratchet_problems(baseline=current, current=unbumped, changelog=_BUMPED)
+    assert len(problems) == 1 and "VERIFICATION_PROFILE_VERSION" in problems[0]
+
+
+@pytest.mark.adversarial
+def test_a_new_verified_fact_without_a_bump_trips_both_the_membership_and_addition_rules():
+    """Rule 4 does not replace rule 1: an undisclosed, unbumped addition breaks both."""
+
+    current = _working_tree_snapshot()
+    unbumped = PartitionSnapshot(
+        verified=current.verified | {_NEW_FACT},
+        recorded=current.recorded,
+        verified_domain=current.verified_domain,
+        recorded_domain=current.recorded_domain,
+        profile_version=current.profile_version,
+    )
+    problems = ratchet_problems(baseline=current, current=unbumped, changelog=_read("changelog"))
+    assert len(problems) == 2, problems
+    assert "VERIFICATION_PROFILE_VERSION" in problems[0]
+    assert "added-verified" in problems[1] and _NEW_FACT in problems[1]
+
+
+@pytest.mark.invariant
+def test_the_parser_sees_a_new_verified_fact_in_the_real_source_shape():
+    """Rule 4's population comes from parsed source, so it is measured on parsed source.
+
+    The controls above build snapshots directly. This one rewrites the shipped
+    ``VERIFIED_FACT_NAMES`` assignment, parses it back, and confirms the new name arrives as an
+    addition and not as a promotion — so the gate would see a real edit the same way.
+    """
+
+    current = _working_tree_snapshot()
+    added_source = _rewritten(
+        _read("verified"), "VERIFIED_FACT_NAMES", current.verified | {_NEW_FACT}
+    )
+    parsed = snapshot_from_sources(
+        verified_py=added_source, identifiers_py=_read("identifiers")
+    )
+    assert _NEW_FACT in parsed.verified
+    assert parsed.recorded == current.recorded
+    assert not (parsed.verified & current.recorded) - (current.verified & current.recorded)
+    problems = ratchet_problems(baseline=current, current=parsed, changelog=_BUMPED)
+    assert len(problems) == 2, problems
+    assert "added-verified" in problems[1] and _NEW_FACT in problems[1]

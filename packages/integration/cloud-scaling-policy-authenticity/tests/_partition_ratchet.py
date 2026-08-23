@@ -16,6 +16,14 @@ failure. A profile version that moved without a changelog entry naming it is a f
 a bumped version nobody documented tells a consumer that the profile changed and nothing about
 how.
 
+**A fact can also enter the verified half without moving through it.** The promotion rules
+below are keyed on a fact changing halves, so a name that existed in *neither* half at the
+baseline — a brand-new verified fact, or the second half of a rename — is not a promotion and
+was disclosed by nothing fact-specific. That is a generic gap in the ratchet rather than a
+property of any one residual: whatever the next verified fact turns out to be, it would arrive
+under a profile bump and a general changelog sentence, and no reader could tell from the
+changelog which fact the artifact now attests. The fourth rule closes it.
+
 Reading the baseline without importing it
 ------------------------------------------
 Two versions of one module cannot both be imported, so the baseline membership is **parsed**
@@ -151,7 +159,7 @@ def ratchet_problems(
 ) -> "list[str]":
     """The findings. Empty means the change is disciplined; anything else fails the gate.
 
-    Three rules, and they are the whole gate:
+    Four rules, and they are the whole gate:
 
     #. membership moved ⇒ the profile version must move in the same change;
     #. the profile version moved ⇒ the changelog must name it, on one line, beside
@@ -160,6 +168,8 @@ def ratchet_problems(
        form ``promoted: <fact> — …`` or ``demoted: <fact> — …``. A bump earned by one
        promotion does not carry a second, undisclosed one along with it, and an incidental
        mention of a fact name elsewhere in the changelog is not a disclosure.
+    #. **every name that entered the verified half from neither baseline half must be
+       disclosed on its own changelog line**, in the form ``added-verified: <fact> — …``.
 
     A version bump with no membership change is allowed and unremarked: a gate can be added,
     removed or reordered without the partition moving, and that bump is just as required.
@@ -170,6 +180,11 @@ def ratchet_problems(
     version_moved = baseline.profile_version != current.profile_version
     promoted = sorted(current.verified & baseline.recorded)
     demoted = sorted(current.recorded & baseline.verified)
+    # Rule 4's population: a name the verified half now carries that the baseline partition
+    # did not carry **anywhere**. Disjoint from `promoted` by construction — a promotion comes
+    # from the recorded half, and these came from nothing. A rename is a removal plus an
+    # addition, so the new name lands here and owes its own disclosure.
+    added_verified = sorted(current.verified - baseline.verified - baseline.recorded)
 
     if membership_moved and not version_moved:
         problems.append(
@@ -212,17 +227,54 @@ def ratchet_problems(
             "`promoted: <fact> — <what now establishes it>` or "
             "`demoted: <fact> — <what stopped establishing it>`."
         )
+    # Rules 1-3 are keyed on movement, and a fact can join the verified half without moving
+    # through it: it can simply be new. Nothing above is fact-specific for that case — rule 1
+    # sees the membership tuple change and asks for a bump, rule 2 asks the changelog to name
+    # the new version, and rule 3's `promoted` set is empty because the name was in neither
+    # baseline half. So a first-ever verified fact could arrive under a bump and one general
+    # sentence, and a reader of the changelog could not tell which fact the artifact now
+    # attests. That is not specific to any residual: it is what the gate does with *every*
+    # future verified fact, whatever establishes it.
+    #
+    # Deliberately not extended to a name added only to the **recorded** half. A recorded fact
+    # is carried and digest-covered and nothing checked it, so adding one does not change what
+    # a determination establishes; rules 1 and 2 already surface it as a membership change
+    # under a documented profile bump.
+    undisclosed_additions = [
+        fact
+        for fact in added_verified
+        if not _changelog_discloses(changelog, "added-verified", fact)
+    ]
+    if undisclosed_additions:
+        problems.append(
+            "the verified half gained facts the changelog does not disclose: "
+            f"{undisclosed_additions}. (added-verified: {added_verified or 'none'}.) A name "
+            "that entered the verified half from neither baseline half is not a promotion, "
+            "so rule 3 says nothing about it, and a profile bump or a general changelog "
+            "sentence is not a disclosure of which fact a determination now attests. "
+            "Disclose each on its own line, in the form "
+            "`added-verified: <fact> — <what establishes it>`. The prefix is "
+            "`added-verified`, not `added`: a bare `added` does not say which half gained "
+            "the fact, and the two halves carry different authority."
+        )
     return problems
 
 
-#: An explicit disclosure line: the direction, a colon, and the fact name.
+#: An explicit disclosure line: the direction, a colon, and the fact name. ``added-verified``
+#: is spelled in full and a bare ``added`` matches nothing — the half a fact entered is the
+#: whole content of the disclosure, so a prefix that omits it is not a shorter way of saying
+#: the same thing.
 _DISCLOSURE_RE: Final = re.compile(
-    r"^\s*[-*]?\s*(?P<direction>promoted|demoted)\s*:\s*(?P<rest>.*)$", re.IGNORECASE
+    r"^\s*[-*]?\s*(?P<direction>promoted|demoted|added-verified)\s*:\s*(?P<rest>.*)$",
+    re.IGNORECASE,
 )
 
 
 def _changelog_discloses(changelog: str, direction: str, fact: str) -> bool:
-    """True when a changelog line explicitly discloses this fact moving in this direction.
+    """True when a changelog line explicitly discloses this fact, in this direction.
+
+    ``direction`` is ``promoted`` or ``demoted`` for a fact that changed halves, and
+    ``added-verified`` for one that entered the verified half from neither.
 
     A **structured** line, not a mention. The first form of this rule asked only whether the
     fact name appeared anywhere in the changelog, and testing it end to end showed that was

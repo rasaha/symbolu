@@ -130,6 +130,36 @@ a squash-merge erases the sequence entirely. The ordering is author discipline a
 legibility, not an enforced property. What the ratchet actually guarantees is narrower and still
 correct: *this change's net effect* is disciplined, measured against the merge base.
 
+**The fourth rule, ratified on a later owner ruling — a fact that arrives rather than moves.**
+The three rules above are all keyed on a fact **changing halves**: rule 3's population is
+`current.verified & baseline.recorded` `[V]`
+(`packages/integration/cloud-scaling-policy-authenticity/tests/_partition_ratchet.py`,
+`ratchet_problems`). A name that existed in *neither* half at the baseline is therefore not a
+promotion, and nothing fact-specific was asked of it: rule 1 observes the membership tuple move
+and requires a profile bump, rule 2 requires the changelog to name the new version, and a bump
+plus one general sentence satisfies both `[V]`. A determination could begin attesting a fact no
+reader of the changelog could name.
+
+The gap is **generic**, not a property of any residual. It is what the gate does with every
+future verified fact, whatever establishes it, and closing it settles nothing about any
+particular fact's architecture. So the rule is ratified on its own: every name in the current
+verified half that existed in neither baseline half must be disclosed on its own changelog line,
+in the form `added-verified: <fact> — <reason>`. The prefix is spelled in full — a bare `added`
+does not say which half gained the fact, and the two halves carry different authority. A profile
+bump, a general changelog sentence, a `promoted:` line about the same fact, and a well-formed
+line about a different fact all fail it. A rename is a removal plus an addition, so the new
+verified name owes the disclosure.
+
+It is deliberately **not** extended to a name added only to the recorded half. A recorded fact
+is carried, digest-covered and unchecked, so adding one does not change what a determination
+establishes; rules 1 and 2 already surface it as a membership change under a documented bump.
+
+The same ordering argument applies as above, and for the same reason: the rule and its negative
+controls land *before* any fact is added to the verified half, because a guard built afterwards
+would miss the one event it exists to catch. Rule 3 is unchanged, and one control drives a
+promotion mislabelled as an addition beside an addition mislabelled as a promotion, observing
+each refused by the rule that owns it.
+
 ## D-5B1-4 — V2 carries the bare Policy Authority digest, under its own validator
 
 **Ratified.** `policy_body_digest` enters V2 as bare lowercase 64-hex, validated by a new Phase
