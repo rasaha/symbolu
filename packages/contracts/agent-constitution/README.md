@@ -59,12 +59,21 @@ from ugence_agent_constitution import dumps, fingerprint, compute_content_digest
 ```
 
 Canonical JSON is sorted keys, compact separators, UTF-8 preserved, enums by
-value, sets sorted. The semantics are **identical by value** to
-`ugence_policy_workflow_compiler.serialization.canonical_json`. The module is
-duplicated rather than imported because importing a tooling distribution from a
-contract distribution would invert the dependency direction; the equivalence is
-gated by `tests/serialization/test_canonical_json_equivalence.py`, which loads the
-compiler's file directly off disk and compares byte for byte.
+value, sets sorted.
+
+**This package owns canonicalization.** It is the canonical owner of the
+deterministic representation and fingerprinting rules for Agent Constitution
+contracts, and `to_canonical_obj` / `dumps` / `dumps_pretty` / `loads` are that
+published contract. A compiler or any other consumer must use it rather than
+maintain an independently authoritative implementation.
+
+`ugence_policy_workflow_compiler` predates this package and still carries its own
+copy of the same semantics. That copy is a legacy consumer implementation awaiting
+migration, not a second source of truth.
+`tests/serialization/test_canonical_json_compatibility_ratchet.py` loads it off disk
+and asserts it still matches **this package's** output — a one-directional migration
+ratchet, so the copy cannot drift before it is retired. If the two disagree, this
+package is correct and the copy is wrong.
 
 A fingerprint is `sha256:<64 hex>` over the canonical encoding. A digest-bearing
 artifact excludes its own digest field from its own scope, so stamping is

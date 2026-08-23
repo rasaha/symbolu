@@ -1,4 +1,4 @@
-"""Canonical JSON serialization.
+"""Canonical JSON serialization — the authoritative definition for these contracts.
 
 Deterministic, reproducible serialization is the backbone of content addressing.
 Canonical form: sorted keys, no insignificant whitespace, UTF-8, and a stable
@@ -6,15 +6,24 @@ representation of pydantic models and enums. Volatile values (timestamps,
 filesystem paths) are excluded from *logical* digests by the callers that build
 them — this module only guarantees a stable encoding of whatever it is given.
 
-DELIBERATE DUPLICATION. The semantics here are identical **by value** to
-``ugence_policy_workflow_compiler.serialization.canonical_json``: same recursion,
-same key ordering, same separators, same enum-by-value rule, same set ordering by
-``repr``. It is duplicated rather than imported because this package is a leaf —
-importing the compiler would invert the dependency direction and drag a tooling
-distribution into a contract distribution. The equivalence is not left to
-inspection: ``tests/serialization/test_canonical_json_equivalence.py`` loads the
-compiler's module directly off disk and asserts byte-identical output over a
-shared corpus, so a future divergence in either copy fails a gate.
+OWNERSHIP. This package is the canonical owner of the deterministic representation
+and fingerprinting rules for Agent Constitution contracts (ADR §4, ratified owner
+decision 2). This module **is** that definition, published through the curated API
+as ``to_canonical_obj`` / ``dumps`` / ``dumps_pretty`` / ``loads``. A compiler or
+any other consumer must use it rather than maintain an independently authoritative
+implementation of its own.
+
+``ugence_policy_workflow_compiler.serialization.canonical_json`` predates this
+package and still carries its own copy of these semantics. That copy is a legacy
+consumer implementation, not a second source of truth and not a reference this
+module follows. ``tests/serialization/test_canonical_json_compatibility_ratchet.py``
+loads it directly off disk and asserts it still matches **this** module's output —
+a one-directional migration ratchet, in that direction, so that the copy cannot
+drift unnoticed before it is retired. If the two ever disagree, this module is
+correct and the consumer copy is wrong.
+
+Nothing here reads the compiler, the clock, the environment, or anything outside
+its own arguments; the import boundary gate forbids it.
 """
 
 from __future__ import annotations
