@@ -3,19 +3,24 @@
 **Status:** Accepted (readiness record; no public contract frozen)
 **Stage:** S0 skeleton, with Stage P (ugence-jcs extraction) complete
 **Supersedes:** nothing
-**Depends on:** an Agent Constitution document that does not exist (see *Open
-architectural dependency*)
+**Depends on:** an Agent Constitution document that does not exist and will not
+exist before S1 (see *Open architectural dependency* and **D8**)
 
 This artifact exists so that no public contract is frozen and no version is
 declared before the ratified decisions, the missing dependency, and the authority
 boundary are on the record. It is a readiness record, not a design.
+
+D1–D5 were ratified before implementation. D6–D10 were ratified after Stage P and
+Stage S0 landed, and close every question this artifact previously carried as open;
+they are recorded under *Ratified resolutions* below. No owner decision remains
+open, so S1 is unblocked on ratification grounds.
 
 Evidence labels: `[V]` verified against this repository, `[I]` inferred,
 `[R]` requires ratification, `[G]` gap.
 
 ---
 
-## Ratified owner decisions
+## Ratified owner decisions (D1–D5)
 
 Recorded verbatim. These are authoritative and are not reinterpreted here.
 
@@ -92,9 +97,11 @@ What is unresolved while the document is absent:
 * how activation state is asserted, and by whom, such that the proposer can treat it
   as an input fact.
 
-`[R]` When that document exists, the CognitiveRoleContract projection must be
-re-derived from it rather than promoted as-is. Nothing in this repository should be
-read as evidence that the projection anticipates the constitution correctly.
+`[V]` **D8 ratifies that the document will not exist before S1.** The projection
+proceeds MVP-local with its re-derivation deferred, under the containment bounds in
+D8. When the document does exist, the projection must be re-derived from it rather
+than promoted as-is. Nothing in this repository should be read as evidence that the
+projection anticipates the constitution correctly.
 
 Until then D1's bounds hold: opaque external role identifier, minimum immutable
 attributes for deterministic matching, activation state as an input fact never
@@ -175,6 +182,10 @@ Workforce Composer, Risk Authority, Policy Authority and Cloud Scaling Controlle
 canonicalizers, whose semantics and domains differ. No such canonicalizer was
 touched.
 
+`[V]` **D9 ratifies that the production CER identity path is never migrated onto
+`ugence-jcs`.** Stage P's decision not to switch it is therefore permanent, not
+deferred.
+
 ---
 
 ## Authority-ownership boundary
@@ -195,8 +206,11 @@ pre-empt any of them.
 `[V]` `TransitionProposal` in Agent Runtime is immutable, deep-frozen,
 deterministically fingerprinted and bound to an exact provider invocation. The
 proposer's recommendation artifact is a different object at a different stage and
-must not be named or shaped so as to imply it is that one. `[R]` The name and shape
-of that artifact are an S1 decision; no such artifact exists at S0.
+must not be named or shaped so as to imply it is that one. `[V]` **D7 ratifies its
+name and shape**: `ProposerAdvisory`, with per-candidate `CandidateAdvisory`, kind
+`ugence.agentic_proposer.advisory.v0`, and a field exclusion list that keeps it
+structurally distinguishable from `TransitionProposal`. No such artifact exists at
+S0; D7 binds S1.
 
 ### Audit findings that bind this implementation
 
@@ -236,9 +250,9 @@ term cannot be quietly dropped from the prohibition.
 where it would read as an authority claim — and ratified only as a semantic-auditor
 finding status, where it describes the auditor's reading of documents and claims
 nothing about authorization. `test_vocabulary.py::test_indeterminate_is_scoped_to_the_semantic_auditor_only`
-pins both halves. This is the reading the implementation encodes; `[R]` if the owner
-intended `INDETERMINATE` to be reserved everywhere, the semantic-auditor status must
-be renamed before the auditor is built.
+pins both halves. `[V]` **D6 ratifies this reading**: reservation is by position,
+the semantic-auditor status is not renamed, and no auditor status may be projected
+into an outcome or disposition field.
 
 All ratified terms are advisory proposer classifications. None constitutes evidence
 admission, a business decision, authorization, clearance or execution permission.
@@ -285,15 +299,139 @@ exists, the isolated-wheel verifier, and the freeze verifier.
 
 ---
 
-## Owner decisions still open
+## Ratified resolutions
 
-1. `[R]` The Agent Constitution document, and whether the D1 CognitiveRoleContract
-   projection survives contact with it.
-2. `[R]` Whether `INDETERMINATE` is reserved everywhere or only in the two positions
-   where it reads as an authority claim — the implementation encodes the latter.
-3. `[R]` The name and shape of the proposer's recommendation artifact, which must not
-   imply it is Agent Runtime's `TransitionProposal`.
-4. `[R]` Whether the production CER identity path is ever migrated onto `ugence-jcs`,
-   and under what compatibility evidence. Stage P deliberately did not do this.
-5. `[R]` Whether `ugence-jcs` is published to an index. It is currently resolvable
-   only from a locally built wheel, which every consumer's verifier must build.
+D6–D10 were ratified after Stage P and Stage S0 landed. Each closes a question this
+artifact previously carried as open. They are recorded verbatim in substance and are
+not reinterpreted here. Nothing below is implemented in this session; D6 is already
+satisfied by the S0 code, and D7–D10 bind S1 and later stages.
+
+## D6 — INDETERMINATE stays reserved by position
+
+`INDETERMINATE` remains reserved **by position only** — as a terminal outcome and as
+a candidate disposition — and remains ratified as a semantic-auditor finding status.
+There is no rename.
+
+**Standing rule.** No semantic-auditor finding status may be projected into an
+outcome or disposition field. The reservation is positional, so it is defeated not
+by the term appearing in the auditor's vocabulary but by an auditor status being
+copied, mapped, coerced or defaulted into a `TerminalOutcome` or
+`CandidateDisposition` field. `CONSISTENT` becoming a terminal outcome would breach
+this rule exactly as `INDETERMINATE` would.
+
+`[V]` D6 requires no change to S0: `vocabulary.py` already encodes the positional
+split, and `tests/test_vocabulary.py::test_indeterminate_is_scoped_to_the_semantic_auditor_only`
+pins both halves.
+
+`[R]` The standing rule is not yet mechanically enforced, because S0 has no field
+into which a status could be projected. S1 must add a test that rejects any
+assignment or conversion from `SemanticAuditorFindingStatus` into an outcome or
+disposition field at the same time as it introduces the first such field.
+
+## D7 — The recommendation artifact is ProposerAdvisory
+
+The proposer's recommendation artifact is named **`ProposerAdvisory`**, carrying
+per-candidate **`CandidateAdvisory`** entries.
+
+| Property | Ratified value |
+| --- | --- |
+| Kind | `ugence.agentic_proposer.advisory.v0` |
+| Identity field | `advisory_digest` |
+| Identity computation | only through `ugence_jcs` |
+
+**Barred fields.** `ProposerAdvisory` and `CandidateAdvisory` must not carry
+`fingerprint`, `provider_id`, `operation`, `arguments`, `idempotency_key`,
+`workflow_id`, `instance_id` or `task_id`.
+
+`[I]` The exclusion list is what makes the boundary structural rather than nominal.
+Each barred field is the mark of an authority the proposer does not hold:
+`fingerprint`, `provider_id`, `operation` and `arguments` bind an object to an exact
+provider invocation, which is Agent Runtime's `TransitionProposal`;
+`idempotency_key` implies an execution the artifact may be replayed against; and
+`workflow_id`, `instance_id` and `task_id` bind it to a runtime execution context.
+An advisory that carried them would be consumable as an execution instruction no
+matter what it was named.
+
+**Barred name prefixes.** `Proposal*` and `Recommendation*` are barred. `[V]`
+`Proposal*` is already owned by Agent Runtime
+(`packages/runtime/agent-runtime/src/ugence_agent_runtime/models/proposal.py`);
+`Recommendation*` is owned by Decision Authority.
+
+`[R]` S1 must enforce D7 mechanically when it defines the contract: a test asserting
+the two type names, the kind string, that `advisory_digest` is the only identity
+field, that identity is computed only by a call into `ugence_jcs`, that none of the
+eight barred fields is present at any nesting depth, and that no exported name
+begins with `Proposal` or `Recommendation`.
+
+## D8 — The Agent Constitution will not exist before S1
+
+The Agent Constitution will not exist before S1. The D1 CognitiveRoleContract
+projection proceeds **MVP-local with re-derivation deferred**, bounded to:
+
+* a proposer-local **v0** projection;
+* never exported to shared contracts;
+* carrying no constitution-derived attribute;
+* exposing no role lifecycle verb.
+
+`[I]` The four bounds are containment for a projection built without its governing
+document. Not exporting it keeps the blast radius inside this capability, so
+re-derivation later is a local change rather than a cross-package migration.
+Carrying no constitution-derived attribute prevents the projection from encoding a
+guess about the absent document and having that guess read back as settled. Exposing
+no lifecycle verb — no mint, activate, suspend, ratify, revoke or replace — keeps D1
+and D3 intact: activation state stays an input fact, never computed.
+
+`[G]` The gap recorded under *Open architectural dependency* is unchanged. D8
+ratifies proceeding despite it; it does not close it. Nothing built under D8 may be
+cited as conformance with a constitution that does not exist.
+
+`[R]` S1 must enforce the export bound: the v0 projection is not re-exported from
+any shared contract package, and no lifecycle verb appears on its surface.
+
+## D9 — The production CER identity path is never migrated onto ugence-jcs
+
+The production CER identity path (`cer_v0_3/envelope.py` →
+`action_gate_ref.projection` + frozen `cer_v0_2`) is **never** migrated onto
+`ugence-jcs`.
+
+`[V]` The reasoning is the evidence structure itself. The clean-room exists to prove
+that CER identity semantics are reproducible by an implementation sharing no code
+with the reference path — enforced by `cer_v0_3/tests/test_forbidden_imports.py` and
+consumed by `cer_v0_3/conformance/differential.py` and `conformance/cross_domain.py`.
+Migrating production onto `ugence-jcs` would make the reference and clean-room paths
+one implementation. The differential runner would then compare an implementation
+with itself, and every agreement it reports would be vacuous. The independence
+evidence would not be weakened; it would be destroyed, and no test currently in the
+repository would fail to signal that.
+
+**Reopening conditions.** This decision may be revisited only with (a) a third
+independent implementation, so that differential conformance still compares two
+genuinely separate implementations after the migration, **and** (b) full CER V0.2
+conformance-corpus and frozen-digest equality demonstrated across them.
+
+`[V]` Stage P was already built to this decision: the production path was left
+untouched and only the clean-room consumes the extracted module.
+
+## D10 — ugence-jcs stays locally built and unpublished
+
+`ugence-jcs` is not published to an index. It stays locally built, consistent with
+every other package in this repository.
+
+`[V]` No package in `packages/` is index-published today; each consumer's verifier
+builds the wheels it needs. `packages/capabilities/agentic-proposer/verify_agentic_proposer_distribution.py`
+already builds the `ugence-jcs` wheel from the sibling package into a local
+wheelhouse and installs against it, which is what proves the declared dependency is
+satisfiable rather than aspirational.
+
+**Revisit condition.** Only an out-of-repository consumer. Until one exists,
+publishing would add a release surface with no reader.
+
+---
+
+## Open owner decisions
+
+None. D6–D10 close every question this artifact previously carried as open.
+
+`[R]` markers that remain above are implementation obligations that S1 must
+discharge — mechanical enforcement of D6's standing rule, D7's contract shape and
+D8's export bound — not unratified decisions.
