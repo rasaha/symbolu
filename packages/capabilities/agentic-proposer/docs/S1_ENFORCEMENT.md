@@ -24,6 +24,22 @@ Every scanner is self-tested against synthetic sources. A detector that stopped
 matching fails there rather than reporting a clean package — the failure mode that
 matters most while the surface being guarded is still empty.
 
+A self-test is only as good as the sample it runs on. An audit of the first version
+of these guards found that D6's samples were all written with bare, unaliased names,
+so the scan matched bare names too and every aliased or module-qualified projection
+passed — the detector was sound against its samples and blind to the ordinary
+spelling of the violation. Samples now cover each shape written three ways (bare,
+aliased, module-qualified), and a scanner without a self-test is treated as a gap in
+its own right, not as a scanner that happens to be untested.
+
+One interaction is worth recording because it is not obvious from either rule alone.
+D7 requires identity to be produced by `ugence_jcs.canonical_sha256_hex`; D2's text
+guard bars the substring `sha256` anywhere in this package. Read literally, no source
+can satisfy both. The text guard therefore masks the permitted substrate call
+spellings before scanning: the exemption is those exact spellings and nothing wider,
+so a local `hashlib.sha256` in the same position is still caught — by the text scan,
+the import scan, and D7's own substrate rule.
+
 `tests/test_no_local_canonicalization.py` now pins the three modules by name and
 asserts that every file in `src` and `tests` is either scanned or one of the two
 named exemptions, so a module cannot leave the scan silently.

@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import ast
 import enum
+import re
 import importlib
 import pathlib
 import pkgutil
@@ -109,6 +110,21 @@ def _defined_names(source, filename="<sample>"):
     return names
 
 
+def _projection_hits(names):
+    """Every name in ``names`` that carries the role projection."""
+    return sorted(n for n in names if any(m in n for m in PROJECTION_MARKERS))
+
+
+def _snapshot_projection_hits(body):
+    """Markers present in a public-API snapshot's text."""
+    return sorted(m for m in PROJECTION_MARKERS if m in body)
+
+
+def _capability_dependency_hits(text):
+    """References to this distribution or its namespace in another package's text."""
+    return sorted(m for m in (THIS_DISTRIBUTION, THIS_NAMESPACE) if m in text)
+
+
 def _lifecycle_offenders(names):
     return sorted(n for n in names
                   if any(verb in n.lower() for verb in LIFECYCLE_VERBS))
@@ -152,14 +168,89 @@ def test_the_verb_scanner_permits_reading_an_input_fact(sample):
     assert not _lifecycle_offenders(_defined_names(sample))
 
 
+def test_the_name_scanner_sees_a_bare_re_export():
+    """Without ``__all__``. The re-export self-test above is satisfied through the
+    ``__all__`` path, so a broken ImportFrom branch would survive it."""
+    names = _defined_names("from ugence_agentic_proposer import CognitiveRoleContract\n")
+    assert "CognitiveRoleContract" in names
+    names = _defined_names(
+        "from ugence_agentic_proposer import CognitiveRoleContract as RoleRef\n")
+    assert "RoleRef" in names
+
+
+@pytest.mark.parametrize("names,expected", [
+    ({"CognitiveRoleContract"}, ["CognitiveRoleContract"]),
+    ({"CognitiveRoleContractV0", "Unrelated"}, ["CognitiveRoleContractV0"]),
+    ({"COGNITIVE_ROLE_REF"}, ["COGNITIVE_ROLE_REF"]),
+    ({"cognitive_role_id"}, ["cognitive_role_id"]),
+    ({"RoleContract", "role_ref"}, []),
+])
+def test_the_projection_scanner_flags_a_carried_projection(names, expected):
+    """Substring matching, so a renamed or wrapped re-export is caught too."""
+    assert _projection_hits(names) == expected
+
+
+@pytest.mark.parametrize("body,expected", [
+    ('{"exports": ["CognitiveRoleContract"]}', ["CognitiveRole"]),
+    ('{"exports": ["cognitive_role_ref"]}', ["cognitive_role"]),
+    ('{"exports": ["RoleContract"]}', []),
+])
+def test_the_snapshot_scanner_flags_an_exported_projection(body, expected):
+    assert _snapshot_projection_hits(body) == expected
+
+
+@pytest.mark.parametrize("text,expected", [
+    ('dependencies = ["ugence-agentic-proposer>=0.0.1"]', [THIS_DISTRIBUTION]),
+    ("from ugence_agentic_proposer import vocabulary\n", [THIS_NAMESPACE]),
+    ('dependencies = ["ugence-jcs>=0.2.0"]', []),
+])
+def test_the_dependency_scanner_flags_a_reference_to_this_capability(text, expected):
+    assert _capability_dependency_hits(text) == expected
+
+
 # --------------------------------------------------------------------------- #
 # The export bound (D8), checked from the shared-contract side
 # --------------------------------------------------------------------------- #
 
+def _shared_contract_names_by_regex():
+    """The same discovery, done a different way, as an oracle for the scan above.
+
+    ``_distribution_name`` parses ``pyproject.toml`` line by line; this reads the
+    name with a regex instead. A narrowing to either one — a stricter filter, a
+    parser that stops recognising a name form — makes the two disagree.
+    """
+    names = set()
+    for pyproject in sorted(PACKAGES.rglob("pyproject.toml")):
+        if any(part in {"build", "dist", ".venv", "node_modules"} for part in pyproject.parts):
+            continue
+        match = re.search(r"""^\s*name\s*=\s*['"]([^'"]+)['"]""",
+                          pyproject.read_text(encoding="utf-8"), re.MULTILINE)
+        if match and "contract" in match.group(1) and match.group(1) != THIS_DISTRIBUTION:
+            names.add(match.group(1))
+    return names
+
+
+#: The repository holds at least this many shared contract distributions. Asserting a
+#: floor rather than non-emptiness is what makes a narrowed scan fail: a discovery
+#: that found one package instead of all of them would still be "not empty".
+MINIMUM_SHARED_CONTRACT_PACKAGES = 3
+
+
 def test_shared_contract_packages_are_discovered():
-    """The export bound is only enforced if the scan actually finds the packages."""
+    """The export bound is only enforced if the scan finds ALL the packages.
+
+    Non-emptiness is not enough: a scan narrowed to a single distribution would
+    satisfy it while leaving every other shared contract package unchecked.
+    """
     found = _shared_contract_packages()
-    assert found, f"no shared contract distribution found under {PACKAGES}"
+    names = {name for name, _ in found}
+    assert names == _shared_contract_names_by_regex(), (
+        "the discovery disagrees with an independent read of the same files: "
+        f"{sorted(names ^ _shared_contract_names_by_regex())}")
+    assert len(found) >= MINIMUM_SHARED_CONTRACT_PACKAGES, (
+        f"only {len(found)} shared contract distributions discovered under "
+        f"{PACKAGES}: {sorted(names)}")
+    assert len(names) == len(found), f"duplicate discovery: {sorted(names)}"
 
 
 @pytest.mark.parametrize(
@@ -168,8 +259,7 @@ def test_no_shared_contract_package_carries_the_role_projection(name, root):
     offenders = []
     for path in sorted((root / "src").rglob("*.py")):
         names = _defined_names(path.read_text(encoding="utf-8"), filename=str(path))
-        hits = sorted(n for n in names
-                      if any(marker in n for marker in PROJECTION_MARKERS))
+        hits = _projection_hits(names)
         if hits:
             offenders.append((path.name, hits))
     assert not offenders, f"{name} carries the projection: {offenders}"
@@ -179,10 +269,12 @@ def test_no_shared_contract_package_carries_the_role_projection(name, root):
     "name,root", _shared_contract_packages(), ids=lambda v: str(v)[:48])
 def test_no_shared_contract_package_snapshot_carries_the_role_projection(name, root):
     """The curated public-API snapshots are the exported surface of record."""
-    for snapshot in sorted(root.glob("public_api.json")):
-        body = snapshot.read_text(encoding="utf-8")
-        for marker in PROJECTION_MARKERS:
-            assert marker not in body, f"{name}/{snapshot.name} exports {marker}"
+    snapshots = sorted(root.glob("public_api.json"))
+    if not snapshots:
+        pytest.skip(f"{name} publishes no public_api.json snapshot")
+    for snapshot in snapshots:
+        hits = _snapshot_projection_hits(snapshot.read_text(encoding="utf-8"))
+        assert not hits, f"{name}/{snapshot.name} exports {hits}"
 
 
 @pytest.mark.parametrize(
@@ -190,10 +282,10 @@ def test_no_shared_contract_package_snapshot_carries_the_role_projection(name, r
 def test_no_shared_contract_package_depends_on_this_capability(name, root):
     """A shared package cannot re-export what it cannot import."""
     pyproject = (root / "pyproject.toml").read_text(encoding="utf-8")
-    assert THIS_DISTRIBUTION not in pyproject, f"{name} depends on this capability"
+    assert not _capability_dependency_hits(pyproject), f"{name} depends on this capability"
     for path in sorted((root / "src").rglob("*.py")):
-        body = path.read_text(encoding="utf-8")
-        assert THIS_NAMESPACE not in body, f"{name}/{path.name} imports this capability"
+        hits = _capability_dependency_hits(path.read_text(encoding="utf-8"))
+        assert not hits, f"{name}/{path.name} references this capability: {hits}"
 
 
 def test_the_projection_is_local_to_this_package_wherever_it_is_defined():

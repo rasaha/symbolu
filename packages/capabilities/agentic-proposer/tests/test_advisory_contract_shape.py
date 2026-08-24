@@ -39,6 +39,10 @@ SRC = pathlib.Path(ap.__file__).resolve().parent
 ADVISORY_TYPES = ("ProposerAdvisory", "CandidateAdvisory")
 #: The ratified kind string, verbatim.
 ADVISORY_KIND = "ugence.agentic_proposer.advisory.v0"
+#: The namespace the ratified kind lives in. Pinned as a constant so narrowing it to
+#: the ratified kind — which would make the rival-kind scan a tautology — fails the
+#: equality assertion below instead of passing silently.
+KIND_PREFIX = "ugence.agentic_proposer."
 #: The single ratified identity field.
 IDENTITY_FIELD = "advisory_digest"
 #: Fields D7 bars from both types, at any nesting depth. Each is the mark of an
@@ -135,6 +139,27 @@ def _runtime_fields_reachable_from(model):
             queue += [a for a in (annotation,) + typing.get_args(annotation)
                       if isinstance(a, type)]
     return found
+
+
+def _barred_prefix_names(names):
+    """Names owned by another authority: ``Proposal*`` or ``Recommendation*``."""
+    return sorted(n for n in names if n.startswith(BARRED_PREFIXES))
+
+
+def _barred_prefix_definitions(source, filename="<sample>"):
+    """Classes and functions defined here under a name owned by another authority."""
+    tree = ast.parse(source, filename=filename)
+    return sorted(node.name for node in ast.walk(tree)
+                  if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
+                  and node.name.startswith(BARRED_PREFIXES))
+
+
+def _declared_kind_strings(source, filename="<sample>"):
+    """Every string constant in ``source`` that claims this package's kind namespace."""
+    tree = ast.parse(source, filename=filename)
+    return {node.value for node in ast.walk(tree)
+            if isinstance(node, ast.Constant) and isinstance(node.value, str)
+            and node.value.startswith(KIND_PREFIX)}
 
 
 def _identity_assignments(tree):
@@ -236,13 +261,88 @@ def test_the_identity_scanner_permits_only_the_declared_substrate(sample):
     assert not _unpermitted_identity_sources(sample)
 
 
+@pytest.mark.parametrize("names,expected", [
+    ({"ProposerAdvisory", "ProposalDraft"}, ["ProposalDraft"]),
+    ({"RecommendationSet", "CandidateAdvisory"}, ["RecommendationSet"]),
+    ({"ProposalDraft", "RecommendationSet"}, ["ProposalDraft", "RecommendationSet"]),
+    ({"ProposerAdvisory", "CandidateAdvisory", "PROPOSAL"}, []),
+])
+def test_the_prefix_scanner_flags_only_names_owned_elsewhere(names, expected):
+    """``Proposer*`` is this package's; ``Proposal*`` is not, and the enum MEMBER
+    ``PROPOSAL`` is a value rather than a name, so it must not be flagged."""
+    assert _barred_prefix_names(names) == expected
+
+
+@pytest.mark.parametrize("sample,expected", [
+    ("class ProposalDraft:\n    pass\n", ["ProposalDraft"]),
+    ("def RecommendationFor(x):\n    return x\n", ["RecommendationFor"]),
+    ("async def ProposalBuild():\n    ...\n", ["ProposalBuild"]),
+    ("class ProposerAdvisory:\n    pass\n", []),
+    ("PROPOSAL = 'proposal'\n", []),
+])
+def test_the_definition_prefix_scanner_flags_a_barred_definition(sample, expected):
+    assert _barred_prefix_definitions(sample) == expected
+
+
+@pytest.mark.parametrize("sample,expected", [
+    ("KIND = 'ugence.agentic_proposer.advisory.v1'\n",
+     {"ugence.agentic_proposer.advisory.v1"}),
+    ("KIND = 'ugence.agentic_proposer.draft.v0'\n",
+     {"ugence.agentic_proposer.draft.v0"}),
+    ("KIND = 'ugence.agentic_proposer.advisory.v0'\n", {ADVISORY_KIND}),
+    ("KIND = 'ugence.decision_authority.recommendation.v0'\n", set()),
+])
+def test_the_kind_scanner_sees_every_claim_on_the_namespace(sample, expected):
+    """It must see rival kinds, not only the ratified one. A scan narrowed to
+    ``ADVISORY_KIND`` would return the ratified kind and nothing else, and the
+    rival-kind assertion would hold vacuously forever."""
+    assert _declared_kind_strings(sample) == expected
+
+
+def test_the_runtime_field_walk_descends_into_nested_models():
+    """The live-model twin of the source walk, self-tested to the same depth.
+
+    Its source-level counterpart is self-tested above; without this, a runtime walk
+    that stopped descending would report a clean model at every depth below one.
+    """
+    pydantic = pytest.importorskip("pydantic")
+
+    class Inner(pydantic.BaseModel):
+        task_id: str
+
+    class Middle(pydantic.BaseModel):
+        inner: Inner
+
+    class Advisory(pydantic.BaseModel):
+        kind: str
+        middle: Middle
+
+    reachable = _runtime_fields_reachable_from(Advisory)
+    assert {"kind", "middle", "inner", "task_id"} <= reachable
+    assert reachable & BARRED_FIELDS == {"task_id"}
+
+
+def test_the_runtime_field_walk_follows_optional_and_sequence_arguments():
+    """A barred field one union or list away is still reachable."""
+    pydantic = pytest.importorskip("pydantic")
+
+    class Entry(pydantic.BaseModel):
+        provider_id: str
+
+    class Advisory(pydantic.BaseModel):
+        entries: typing.List[Entry]
+        maybe: typing.Optional[Entry] = None
+
+    assert "provider_id" in _runtime_fields_reachable_from(Advisory)
+
+
 # --------------------------------------------------------------------------- #
 # D7, enforced over the package
 # --------------------------------------------------------------------------- #
 
 def test_no_exported_name_begins_with_a_barred_prefix():
     """``Proposal*`` is Agent Runtime's; ``Recommendation*`` is Decision Authority's."""
-    offenders = sorted(n for n in _public_names() if n.startswith(BARRED_PREFIXES))
+    offenders = _barred_prefix_names(_public_names())
     assert not offenders, f"exported names owned elsewhere: {offenders}"
 
 
@@ -250,11 +350,9 @@ def test_no_class_or_function_in_the_source_begins_with_a_barred_prefix():
     """The bar is on the names, not only on what happens to be re-exported."""
     offenders = []
     for path in _sources():
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-        for node in ast.walk(tree):
-            if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
-                if node.name.startswith(BARRED_PREFIXES):
-                    offenders.append((path.name, node.name))
+        for name in _barred_prefix_definitions(
+                path.read_text(encoding="utf-8"), filename=str(path)):
+            offenders.append((path.name, name))
     assert not offenders, f"definitions named for another authority: {offenders}"
 
 
@@ -267,14 +365,10 @@ def test_the_ratified_pair_is_defined_together_or_not_at_all():
 def test_no_rival_kind_string_is_declared():
     """One kind, at one version. A second ``ugence.agentic_proposer.*`` kind would
     make the ratified one ambiguous, whatever it was named."""
-    prefix = "ugence.agentic_proposer."
     found = set()
     for path in _sources():
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Constant) and isinstance(node.value, str):
-                if node.value.startswith(prefix):
-                    found.add(node.value)
+        found |= _declared_kind_strings(
+            path.read_text(encoding="utf-8"), filename=str(path))
     assert found <= {ADVISORY_KIND}, f"unratified kind strings: {sorted(found)}"
 
 
@@ -331,6 +425,8 @@ def test_the_enforcement_is_pinned_to_the_ratified_values():
     """D7's constants are asserted by equality, so none can be quietly relaxed."""
     assert ADVISORY_TYPES == ("ProposerAdvisory", "CandidateAdvisory")
     assert ADVISORY_KIND == "ugence.agentic_proposer.advisory.v0"
+    assert KIND_PREFIX == "ugence.agentic_proposer."
+    assert ADVISORY_KIND.startswith(KIND_PREFIX) and KIND_PREFIX != ADVISORY_KIND
     assert IDENTITY_FIELD == "advisory_digest"
     assert BARRED_FIELDS == frozenset({
         "fingerprint", "provider_id", "operation", "arguments",

@@ -33,10 +33,11 @@ The three `[R]` obligations the readiness ADR carries for S1, each enforced by a
 that holds before the surface it governs exists and arms itself when that surface
 lands. See `docs/S1_ENFORCEMENT.md`.
 
-* `tests/test_no_auditor_status_projection.py` — D6's standing rule. Rejects the five
-  source shapes a status-into-outcome projection takes, and is parametrized over
-  every outcome- or disposition-typed field the package defines, so it binds with the
-  first such field.
+* `tests/test_no_auditor_status_projection.py` — D6's standing rule. Rejects the six
+  source shapes a status-into-outcome projection takes, each resolved through import
+  aliases and module-qualified references, and is parametrized over every field the
+  package defines in a reserved position — union arms included — so it binds with the
+  first such field and judges the field's own annotation rather than the bare enum.
 * `tests/test_advisory_contract_shape.py` — D7. Bars the `Proposal*` and
   `Recommendation*` name prefixes, bars any unratified `ugence.agentic_proposer.*`
   kind string, requires identity to be computed only by a call into `ugence_jcs`, and
@@ -49,6 +50,36 @@ lands. See `docs/S1_ENFORCEMENT.md`.
 * `tests/test_no_local_canonicalization.py` — extended to pin the three modules above
   by name and to assert that every file in `src` and `tests` is either scanned or one
   of the two named exemptions.
+
+### Fixed — S1 enforcement defects found by audit
+
+Three defects in the guards above, none of which changed `src/` or the version.
+
+* **D6 did not bind.** All six shapes matched bare `ast.Name` ids, so a projection
+  written through an import alias (`TerminalOutcome as T`) or a module-qualified
+  reference (`vocabulary.TerminalOutcome`) was not detected — the ordinary way the
+  violation would be written. Every shape now resolves both. A sixth shape covers
+  member access (`TerminalOutcome.ABSTAIN`, `T[name]`) inside a scope that reads an
+  auditor status: an if/elif ladder or a guarded return never calls the enum, so the
+  conversion-call shape alone let it through. The runtime half now collects fields
+  whose annotation admits a reserved type as a union arm, and asserts against the
+  field's declared annotation instead of re-testing the enum.
+* **D7's blessed identity call could not be written.** `SUSPECT_TEXT` bars the
+  substring `sha256`, which `ugence_jcs.canonical_sha256_hex` contains, so the call
+  D7 mandates failed the D2 text guard: the two rules were jointly unsatisfiable.
+  The permitted substrate call spellings are now masked before the scan, and both
+  the permitted call and a local `hashlib.sha256` in the same position are
+  self-tested samples.
+* **The `ugence-jcs` floor was stale and pinned.** `>=0.1.0` does not guarantee
+  `canonical_sha256_hex`, which landed in 0.2.0; the floor is now `>=0.2.0`, and the
+  assertions that pinned the old string were updated with it.
+
+Scanners that had no self-test now have one — the `Proposal*`/`Recommendation*`
+prefix bars, the rival-kind-string prefix, the runtime field walk, and D8's three
+export scans. Shared-contract discovery is asserted against an independent read of
+the same files and a floor on the count, rather than non-emptiness. The snapshot
+check now skips explicitly, naming the distribution, where a package publishes no
+`public_api.json`, instead of passing with zero assertions executed.
 
 ### Not implemented
 

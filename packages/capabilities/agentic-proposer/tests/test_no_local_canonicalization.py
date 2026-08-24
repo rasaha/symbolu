@@ -46,6 +46,30 @@ SUSPECT_TEXT = (
     "hashlib", "sha256", "sha3_", "blake2",
 )
 
+#: Calls INTO the permitted substrate, which the text scan must not mistake for local
+#: hashing. D7 requires identity to be produced by ``ugence_jcs.canonical_sha256_hex``;
+#: that spelling contains ``sha256``, so without this the rule D7 mandates and the rule
+#: D2 enforces would be jointly unsatisfiable. Masked before the scan, longest first,
+#: so only these exact spellings are exempt — a bare ``hashlib.sha256`` in the same
+#: position still carries ``hashlib`` and an unmasked ``sha256``, and a locally defined
+#: ``canonical_*`` is caught by the definition scan regardless.
+PERMITTED_SUBSTRATE_CALLS = (
+    "ugence_jcs.canonical_sha256_hex",
+    "ugence_jcs.canonical_bytes",
+    "ugence_jcs.canonical_string",
+    "canonical_sha256_hex",
+    "canonical_bytes",
+    "canonical_string",
+)
+
+
+def _suspect_text(body):
+    """Suspect substrings in ``body``, with permitted substrate calls masked out."""
+    masked = body
+    for call in sorted(PERMITTED_SUBSTRATE_CALLS, key=len, reverse=True):
+        masked = masked.replace(call, "<permitted-substrate-call>")
+    return [s for s in SUSPECT_TEXT if s in masked]
+
 #: Modules whose presence would mean identity is being computed locally.
 FORBIDDEN_IMPORTS = {"hashlib", "hmac", "binascii", "struct"}
 
@@ -64,6 +88,47 @@ def test_package_has_files_to_scan():
     assert list(_package_files())
 
 
+#: Text the scan must flag: identity computed here, however it is spelled.
+LOCAL_HASHING_SAMPLES = (
+    "import hashlib\nadvisory_digest = hashlib.sha256(payload).hexdigest()\n",
+    "from hashlib import sha256\nadvisory_digest = sha256(payload).hexdigest()\n",
+    "blob = json.dumps(value, sort_keys=True, separators=(',', ':'))\n",
+    "digest = blake2b(payload).hexdigest()\n",
+)
+
+#: Text the scan must permit: identity produced by the one permitted substrate.
+#: D7 mandates exactly this call, so a scan that flagged it would leave D7 and D2
+#: jointly unsatisfiable — no source could both compute identity and pass.
+PERMITTED_SUBSTRATE_SAMPLES = (
+    "import ugence_jcs\nadvisory_digest = ugence_jcs.canonical_sha256_hex(payload)\n",
+    "from ugence_jcs import canonical_sha256_hex\nadvisory_digest = canonical_sha256_hex(payload)\n",
+    "import ugence_jcs\nblob = ugence_jcs.canonical_bytes(payload)\n",
+)
+
+
+@pytest.mark.parametrize("sample", LOCAL_HASHING_SAMPLES, ids=lambda s: s.split("\n")[0][:40])
+def test_the_text_scan_flags_local_hashing(sample):
+    assert _suspect_text(sample), "the text scan stopped seeing local hashing"
+
+
+@pytest.mark.parametrize("sample", PERMITTED_SUBSTRATE_SAMPLES, ids=lambda s: s.split("\n")[0][:40])
+def test_the_text_scan_permits_the_declared_substrate(sample):
+    assert not _suspect_text(sample), "the permitted substrate call was flagged"
+
+
+def test_masking_the_substrate_call_does_not_mask_local_hashing():
+    """The exemption is the exact call spelling, not the word ``sha256``.
+
+    A module that calls the substrate AND hashes locally is still caught: masking
+    removes only the permitted spellings, leaving the local call fully visible.
+    """
+    both = ("import hashlib\nimport ugence_jcs\n"
+            "a = ugence_jcs.canonical_sha256_hex(payload)\n"
+            "b = hashlib.sha256(payload).hexdigest()\n")
+    assert "hashlib" in _suspect_text(both)
+    assert "sha256" in _suspect_text(both)
+
+
 @pytest.mark.parametrize("path", list(_package_files()), ids=lambda p: p.name)
 def test_no_canonicalization_or_digest_function_is_defined(path):
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
@@ -79,8 +144,7 @@ def test_no_canonicalization_or_digest_function_is_defined(path):
 
 @pytest.mark.parametrize("path", list(_package_files()), ids=lambda p: p.name)
 def test_no_canonicalization_or_hashing_source_text(path):
-    body = path.read_text(encoding="utf-8")
-    found = [s for s in SUSPECT_TEXT if s in body]
+    found = _suspect_text(path.read_text(encoding="utf-8"))
     assert not found, f"{path.name} contains {found}"
 
 
@@ -169,4 +233,4 @@ def test_the_only_exempt_file_is_the_packaging_verifier():
 def test_ugence_jcs_is_the_declared_identity_substrate():
     """D2 is recorded in the packaging metadata, not only in prose."""
     pyproject = (PKG_ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    assert "ugence-jcs>=0.1.0" in pyproject
+    assert "ugence-jcs>=0.2.0" in pyproject
