@@ -30,7 +30,7 @@ from __future__ import annotations
 
 import pytest
 
-from _policy_fixtures import T_MID, issued, verifier_for
+from _policy_fixtures import T_MID, issued, issued_bounds, verifier_for
 from ugence_cloud_scaling_policy_authenticity import (
     POLICY_AUTHENTICITY_DIGEST_DOMAIN,
     POLICY_AUTHENTICITY_RECORDED_FACTS_DOMAIN,
@@ -47,7 +47,7 @@ from ugence_cloud_scaling_policy_authenticity.verified import (
 #: The digest of the reference determination: the authority's default fixture policy, resolved
 #: at ``T_MID`` with no candidate supplied, under the fixture key ring.
 FROZEN_ARTIFACT_DIGEST = (
-    "f245511d4efeaee342ae6fac65fe323cc187f7f39d0c09a0034bc7d05899335c"
+    "8ced1a5f7ef2ea2f7c5969d852d2f180f7942909c2745ff907f58c798822a392"
 )
 #: What the reference determination hashed to under profile ``v1``, before 5B-1 promoted
 #: ``candidate_digest_fact`` into the verified half. Pinned as a negative anchor: reproducing
@@ -55,21 +55,48 @@ FROZEN_ARTIFACT_DIGEST = (
 SUPERSEDED_V1_ARTIFACT_DIGEST = (
     "8b0ea25f368287715657f1ff2293e137de1f810de7946e4fc27e52d8af473c7f"
 )
+#: What it hashed to under ``v2``, before 5B-3 promoted ``policy_type`` and added
+#: ``capacity_bounds_fact``. A second negative anchor, for the same reason as the first.
+SUPERSEDED_V2_ARTIFACT_DIGEST = (
+    "f245511d4efeaee342ae6fac65fe323cc187f7f39d0c09a0034bc7d05899335c"
+)
 
 #: The identity of the fixture trust configuration. Moves when an anchor's authority, tenant,
 #: entitlements, window, revocation state or the adapter set changes — which is the point.
+#:
+#: **Deliberately unmoved by 5B-3**, and worth stating because the subphase's own ruling
+#: predicted otherwise. The promotion changes the *partition*, not the trust configuration:
+#: the reference determination still resolves the same UVI fixture policy under the same key
+#: ring and the same one registered adapter. The capacity-bounds family is exercised by
+#: ``FROZEN_BOUNDS_TRUST_CONFIGURATION_DIGEST`` below, under its own registry. Re-pinning
+#: this constant to a value nothing produced would have anchored a fiction.
 FROZEN_TRUST_CONFIGURATION_DIGEST = (
     "87e8a90e26944f27b7f87b189332de4a45ea8db78ae2c35f245ace38da46f429"
+)
+
+#: The reference **capacity-bounds** determination (5B-3, R-8): the bounds fixture policy,
+#: resolved at ``T_MID`` under a registry whose only adapter is the bounds family's.
+FROZEN_BOUNDS_ARTIFACT_DIGEST = (
+    "218dfd93670b31fa6b56baacfd113ad8b9ac86727675ea75e6b575dd0eb51407"
+)
+#: That determination's trust configuration — a different adapter set, so a different digest.
+#: This is where the adapter-set sensitivity of the digest is actually anchored.
+FROZEN_BOUNDS_TRUST_CONFIGURATION_DIGEST = (
+    "8bea54d17d9caaaa465917e963a8e579f5c43523a9567c8fd52ec2d84e376c05"
 )
 
 #: Covers the profile version together with both halves' exact membership and their domain
 #: tags. This is the constant that ties a partition change to a profile bump.
 FROZEN_PARTITION_FINGERPRINT = (
-    "242ac003c259a63b60f8f55fa26b8b002b7498267e1f8151ae78bca8db7afccc"
+    "98c66c7ede134d37ff148fb619de5b3bbd8de316977b856d47ef95014addd3aa"
 )
 #: The ``v1`` fingerprint: four recorded facts, nineteen verified ones.
 SUPERSEDED_V1_PARTITION_FINGERPRINT = (
     "86d39d254d0702ccc90df894ee44a8c5b51b4ebfedeaa7ef396e81ef33edda07"
+)
+#: The ``v2`` fingerprint: three recorded facts, twenty verified ones.
+SUPERSEDED_V2_PARTITION_FINGERPRINT = (
+    "242ac003c259a63b60f8f55fa26b8b002b7498267e1f8151ae78bca8db7afccc"
 )
 
 
@@ -85,6 +112,17 @@ def _partition_fingerprint() -> str:
             "recorded_domain": POLICY_AUTHENTICITY_RECORDED_FACTS_DOMAIN,
         },
     )
+
+
+def _bounds_determination():
+    """The reference capacity-bounds determination, under its own adapter registry."""
+
+    authority, record = issued_bounds()
+    return verifier_for(authority).verify(
+        coordinate=record.coordinate,
+        expected_reference_tenant_id="",
+        as_of=T_MID,
+    ).verified_policy
 
 
 def _reference_determination():
@@ -125,9 +163,9 @@ def test_the_partition_fingerprint_ties_membership_to_the_profile_version():
 
 @pytest.mark.invariant
 def test_the_profile_version_is_the_one_these_digests_were_recorded_under():
-    """``v2`` since 5B-1: gate 11 was added and ``candidate_digest_fact`` was promoted."""
+    """``v3`` since 5B-3: gates 14-15 were added, and ``policy_type`` was promoted."""
 
-    assert VERIFICATION_PROFILE_VERSION == "v2"
+    assert VERIFICATION_PROFILE_VERSION == "v3"
 
 
 @pytest.mark.invariant
@@ -138,6 +176,49 @@ def test_the_v1_artifact_digest_and_fingerprint_are_never_produced_again():
     assert _partition_fingerprint() != SUPERSEDED_V1_PARTITION_FINGERPRINT
     assert "candidate_digest_fact" in VERIFIED_FACT_NAMES
     assert "candidate_digest_fact" not in RECORDED_FACT_NAMES
+
+
+@pytest.mark.invariant
+def test_the_v2_artifact_digest_and_fingerprint_are_never_produced_again():
+    """5B-3's promotion, pinned from the other side, exactly as 5B-1's is."""
+
+    assert _reference_determination().artifact_digest != SUPERSEDED_V2_ARTIFACT_DIGEST
+    assert _partition_fingerprint() != SUPERSEDED_V2_PARTITION_FINGERPRINT
+    assert "policy_type" in VERIFIED_FACT_NAMES
+    assert "policy_type" not in RECORDED_FACT_NAMES
+    assert "capacity_bounds_fact" in VERIFIED_FACT_NAMES
+
+
+@pytest.mark.invariant
+def test_the_reference_bounds_artifact_digest_has_not_moved():
+    """The capacity-bounds determination, anchored the same way the UVI one is."""
+
+    assert _bounds_determination().artifact_digest == FROZEN_BOUNDS_ARTIFACT_DIGEST
+
+
+@pytest.mark.invariant
+def test_the_bounds_trust_configuration_digest_reflects_its_own_adapter_set():
+    """A different registered adapter set is a different trust configuration.
+
+    This is what the reference determination's own trust-configuration digest *cannot*
+    establish, because that fixture's adapter set did not change in 5B-3.
+    """
+
+    bounds = _bounds_determination()
+    assert bounds.trust_configuration_digest == FROZEN_BOUNDS_TRUST_CONFIGURATION_DIGEST
+    assert bounds.trust_configuration_digest != FROZEN_TRUST_CONFIGURATION_DIGEST
+
+
+@pytest.mark.invariant
+def test_the_reference_bounds_artifact_carries_its_authenticated_bounds():
+    """The facts 5B-3 promoted are actually on the artifact, not merely declared."""
+
+    bounds = _bounds_determination()
+    assert bounds.policy_type == "CapacityBoundsPolicy"
+    assert len(bounds.capacity_bounds_fact) == 1
+    only = bounds.capacity_bounds_fact[0]
+    assert only.max_permitted_magnitude == 100
+    assert only.max_permitted_delta == 25
 
 
 @pytest.mark.invariant

@@ -122,6 +122,7 @@ from .verification import (
 from .verified import (
     RECORDED_FACT_NAMES,
     VERIFIED_FACT_NAMES,
+    VerifiedCapacityBound,
     VerifiedPolicyAuthenticity,
     require_verified_policy_authenticity,
 )
@@ -144,6 +145,7 @@ __all__ = [
     "REFERENCE_GRADE_PORTS",
     "REFERENCE_GRADE_REGISTRIES",
     # --- the verified artifact (non-authoritative; revalidated at consumption) ---
+    "VerifiedCapacityBound",
     "VerifiedPolicyAuthenticity",
     "require_verified_policy_authenticity",
     # --- the ratified verified/recorded partition (D-5B0B-7) ---

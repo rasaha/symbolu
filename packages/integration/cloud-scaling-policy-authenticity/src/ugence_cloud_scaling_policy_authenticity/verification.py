@@ -87,7 +87,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Final, Optional
+from typing import Final, Mapping, Optional
 
 from ugence_cloud_scaling_authorization_contracts import CapacityAuthorizationCandidate
 from ugence_policy_authority.api import (
@@ -95,6 +95,7 @@ from ugence_policy_authority.api import (
     PolicyCoordinate,
     PolicyResolution,
     PolicyResolutionStatus,
+    framed_body_digest,
 )
 
 from .canonical import (
@@ -107,6 +108,9 @@ from .errors import CloudScalingPolicyAuthenticityError as _PackageError
 from .errors import PolicyAuthenticityConfigurationError as _ConfigError
 from .errors import VerifiedPolicyArtifactIntegrityError as _IntegrityError
 from .identifiers import (
+    CAPACITY_BOUND_FIELDS,
+    CAPACITY_BOUNDS_POLICY_FAMILY,
+    CAPACITY_BOUNDS_PROJECTION_KEY,
     POLICY_AUTHENTICITY_DIGEST_DOMAIN,
     POLICY_AUTHORITY_CANONICALIZATION_VERSION,
     POLICY_AUTHORITY_PROTOCOL_ID,
@@ -121,6 +125,7 @@ from .resolution_port import require_production_resolution_port
 from .verified import (
     _VERIFICATION_TOKEN,
     DERIVED_FACT_NAMES,
+    VerifiedCapacityBound,
     VerifiedPolicyAuthenticity,
     _partitioned_digest,
     _record_minted,
@@ -574,6 +579,32 @@ class PolicyAuthenticityVerifier:
                 outcome, detail = staleness
                 return _refuse(outcome, detail)
 
+        # === 14. the projection reproduces the signed body digest (5B-3, R-8) ===========
+        # Until Route 1 published the descriptor projection on the resolution, this check was
+        # impossible here: ``policy_body_digest`` is a one-way hash and this package holds no
+        # adapter registry with which to re-derive the descriptor. That impossibility is what
+        # kept ``policy_type`` in the recorded half, and it is what R-8 ran into — the
+        # artifact carried 26 facts and not one was a bound, so there was nothing to compare.
+        #
+        # Reframing the published projection and comparing it against the digest the issuance
+        # signature covered supplies the missing pre-image. It promotes ``policy_type``, which
+        # is one of the three inputs to that frame, and it authenticates the bounds carried
+        # inside the projection.
+        reproduction = _projection_problem(resolution, record)
+        if reproduction is not None:
+            outcome, detail = reproduction
+            return _refuse(outcome, detail)
+
+        # === 15. the bounds inside the reproduced projection are readable ================
+        # Separate from gate 14 on purpose: a digest match proves the bytes are the signed
+        # bytes, and says nothing about whether they form a bound this profile can state.
+        try:
+            capacity_bounds = _extract_capacity_bounds(
+                coordinate, resolution.descriptor_canonical_projection
+            )
+        except _BoundsShapeError as exc:
+            return _refuse(_Outcome.POLICY_BOUNDS_MALFORMED, str(exc))
+
         # === every gate succeeded — and only now does an artifact exist =================
         artifact = _mint_verified_artifact(
             record=record,
@@ -582,6 +613,7 @@ class PolicyAuthenticityVerifier:
             resolved_as_of=instant,
             trust_configuration_digest=self._trust_configuration_digest,
             candidate_digest_fact=None if candidate is None else candidate.candidate_digest,
+            capacity_bounds_fact=capacity_bounds,
         )
         return PolicyAuthenticityResult(verified_policy=artifact, resolution=resolution)
 
@@ -590,6 +622,153 @@ class PolicyAuthenticityVerifier:
             f"PolicyAuthenticityVerifier(port={type(self._port).__name__}, "
             f"production_mode={self._production_mode})"
         )
+
+
+class _BoundsShapeError(Exception):
+    """The projection's bounds are not the shape this profile can state. Internal."""
+
+
+def _projection_problem(resolution, record):
+    """Return ``(outcome, detail)`` when the published projection does not reproduce the
+    signed body digest, or ``None`` when it does.
+
+    **Refusing ``None`` is the point, not an edge case.** A resolution without the projection
+    is one whose body digest cannot be reproduced here, and this routine has no way to check
+    ``policy_type`` or read a bound out of it. Carrying those facts unchecked is exactly the
+    posture 5B-3 exists to end, so absence is a refusal rather than a quiet downgrade to the
+    recorded half.
+
+    The three fields arrive together or not at all — the Policy Authority's constructor
+    enforces that — but this boundary re-checks each rather than inferring two from one: it
+    accepts a ``PolicyResolution`` it did not construct, and a hand-assembled one reaches
+    here exactly like a genuine one.
+    """
+
+    adapter_id = getattr(resolution, "descriptor_adapter_id", None)
+    policy_type = getattr(resolution, "descriptor_policy_type", None)
+    projection = getattr(resolution, "descriptor_canonical_projection", None)
+
+    missing = [
+        name
+        for name, value in (
+            ("descriptor_adapter_id", adapter_id),
+            ("descriptor_policy_type", policy_type),
+            ("descriptor_canonical_projection", projection),
+        )
+        if value is None
+    ]
+    if missing:
+        return (
+            _Outcome.POLICY_PROJECTION_ABSENT,
+            f"the resolution published no descriptor projection ({', '.join(missing)} is "
+            "None), so the signed body digest cannot be reproduced here and neither the "
+            "policy type nor any bound inside the body can be established",
+        )
+    if type(adapter_id) is not str or type(policy_type) is not str:
+        return (
+            _Outcome.POLICY_PROJECTION_ABSENT,
+            "the published descriptor identity is not a pair of strings",
+        )
+    if not isinstance(projection, Mapping):
+        return (
+            _Outcome.POLICY_PROJECTION_ABSENT,
+            "the published descriptor projection is not a mapping",
+        )
+
+    # The record's own adapter id and policy type must be the ones being reframed. Reframing
+    # with the projection's copy while the artifact carries the record's would let the two
+    # disagree and still pass.
+    if adapter_id != record.adapter_id:
+        return (
+            _Outcome.POLICY_PROJECTION_DIGEST_MISMATCH,
+            f"the published projection names adapter {adapter_id!r} and the record names "
+            f"{record.adapter_id!r}",
+        )
+    if policy_type != record.policy_type:
+        return (
+            _Outcome.POLICY_PROJECTION_DIGEST_MISMATCH,
+            f"the published projection names policy type {policy_type!r} and the record "
+            f"names {record.policy_type!r}",
+        )
+
+    try:
+        reproduced = framed_body_digest(
+            adapter_id=adapter_id, policy_type=policy_type, projection=projection
+        )
+    except Exception as exc:  # noqa: BLE001 - a projection that will not canonicalize
+        return (
+            _Outcome.POLICY_PROJECTION_DIGEST_MISMATCH,
+            f"the published projection does not canonicalize: {type(exc).__name__}",
+        )
+    if reproduced != record.policy_body_digest:
+        return (
+            _Outcome.POLICY_PROJECTION_DIGEST_MISMATCH,
+            "the published projection does not reproduce the body digest the issuance "
+            f"signature covered: reframing yields {reproduced!r} and the record carries "
+            f"{record.policy_body_digest!r}",
+        )
+    return None
+
+
+def _extract_capacity_bounds(coordinate, projection):
+    """The authenticated bounds inside a reproduced projection, or ``None``.
+
+    ``None`` means the resolved policy is not a capacity-bounds policy and states no bound.
+    It never means unbounded: a consumer that needs a ceiling and finds none here has not
+    been told the action is permitted, it has been told this policy does not speak to it.
+
+    Keyed on the resolved coordinate's ``policy_family`` — the component the authority's
+    registry matches on — rather than on the presence of a ``bounds`` key, so a foreign
+    family that happens to carry that key is not read as a bounds statement.
+
+    Called only after gate 14, so every value below is one the issuance signature covered.
+    What this adds is that the bytes form a bound this profile can state exactly.
+    """
+
+    family = getattr(coordinate, "policy_family", None)
+    if str(getattr(family, "value", family)) != CAPACITY_BOUNDS_POLICY_FAMILY:
+        return None
+
+    raw = projection.get(CAPACITY_BOUNDS_PROJECTION_KEY)
+    if not isinstance(raw, (list, tuple)):
+        raise _BoundsShapeError(
+            f"a {CAPACITY_BOUNDS_POLICY_FAMILY} policy must carry a "
+            f"{CAPACITY_BOUNDS_PROJECTION_KEY!r} sequence in its canonical projection; found "
+            f"{type(raw).__name__}"
+        )
+    if not raw:
+        raise _BoundsShapeError(
+            f"a {CAPACITY_BOUNDS_POLICY_FAMILY} policy carrying no bound states nothing, and "
+            "an artifact that states nothing must not read as one that bounds nothing"
+        )
+
+    bounds = []
+    for index, entry in enumerate(raw):
+        if not isinstance(entry, Mapping):
+            raise _BoundsShapeError(f"bounds[{index}] is not a mapping")
+        absent = [key for key in CAPACITY_BOUND_FIELDS if key not in entry]
+        if absent:
+            raise _BoundsShapeError(f"bounds[{index}] omits {sorted(absent)}")
+        extra = sorted(set(entry) - set(CAPACITY_BOUND_FIELDS))
+        if extra:
+            # A field this profile does not know is a field it cannot attest. Refusing keeps
+            # "verified" meaning the routine evaluated everything it is carrying forward.
+            raise _BoundsShapeError(
+                f"bounds[{index}] carries {extra}, which this verification profile does not "
+                "know how to state; a fact carried without being evaluated is not verified"
+            )
+        try:
+            bounds.append(
+                VerifiedCapacityBound(
+                    action_type=entry["action_type"],
+                    resource_class=entry["resource_class"],
+                    max_permitted_magnitude=entry["max_permitted_magnitude"],
+                    max_permitted_delta=entry["max_permitted_delta"],
+                )
+            )
+        except Exception as exc:  # noqa: BLE001 - the typed refusal is the message
+            raise _BoundsShapeError(f"bounds[{index}]: {exc}") from exc
+    return tuple(bounds)
 
 
 #: What a candidate's policy coordinate must agree with, field by field: the six coordinate
@@ -771,6 +950,7 @@ def _mint_verified_artifact(
     resolved_as_of: datetime,
     trust_configuration_digest: str,
     candidate_digest_fact: Optional[str],
+    capacity_bounds_fact: Optional[tuple],
 ) -> VerifiedPolicyAuthenticity:
     """Assemble the verified artifact. Reached only after every gate above has succeeded."""
 
@@ -802,6 +982,13 @@ def _mint_verified_artifact(
         # coordinate by gate 11, and ``None`` means no candidate accompanied this
         # determination — never that one was carried unchecked.
         "candidate_digest_fact": candidate_digest_fact,
+        # Promoted in 5B-3 (R-8): gate 14 reproduces the body digest this value is framed
+        # into, so substituting it changes the digest and is caught.
+        "policy_type": record.policy_type,
+        # New in 5B-3 (R-8): read out of a projection gate 14 already reproduced, so these
+        # are the bounds the issuance signature covered. ``None`` means the resolved policy
+        # states no bound — never that the action is unbounded.
+        "capacity_bounds_fact": capacity_bounds_fact,
         # Framed into the verified half deliberately: that this artifact establishes policy
         # authenticity, grants nothing and is not historical are all gate outcomes.
         "outcome": _Outcome.VERIFIED.value,
@@ -809,12 +996,11 @@ def _mint_verified_artifact(
         "historical": False,
     }
     recorded_map = {
-        # R-2: injected, unvalidated. policy_type: absent from the signed payload and never
-        # compared at resolution. trust_configuration_digest: reported by the port about
-        # itself. See RECORDED_FACT_NAMES for each reason in full. R-4's candidate_digest_fact
-        # left this half in 5B-1, when gate 11 began reconciling it.
+        # R-2: injected, unvalidated. trust_configuration_digest: reported by the port about
+        # itself. See RECORDED_FACT_NAMES for each reason in full. Two facts have left this
+        # half: candidate_digest_fact in 5B-1 when gate 11 began reconciling it, and
+        # policy_type in 5B-3 when gate 14 began reproducing the digest it is framed into.
         "resolved_as_of_fact": resolved_as_of,
-        "policy_type": record.policy_type,
         "trust_configuration_digest": trust_configuration_digest,
     }
     # R-7: the maps and the canonical declaration are compared before anything is minted, so

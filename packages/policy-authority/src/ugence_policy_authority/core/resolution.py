@@ -42,6 +42,16 @@ truth beyond what the configured verifier attested, does not prove the policy
 is correct or wise, and — when ``historical`` is set — does **not** imply
 current validity.
 
+A ``RESOLVED`` answer also carries the adapter descriptor's own projection —
+``descriptor_adapter_id``, ``descriptor_policy_type`` and
+``descriptor_canonical_projection`` — because the body-digest equality this
+function enforces is otherwise unreproducible downstream: ``policy_body_digest``
+is a one-way hash, and a consumer that registers no adapter cannot re-derive the
+descriptor to check anything against it. Publishing the projection lets that
+consumer recompute :func:`~.canonical.framed_body_digest` over the same frame
+and reach the same digest. It is a *republication of an already-enforced
+equality*, not an additional claim.
+
 Registry retrieval is **not** resolution, and constructing a record or a
 resolution object proves nothing: both are public dataclasses, and a
 hand-assembled record reaches every digest, key and signature check here and
@@ -305,4 +315,12 @@ def resolve_policy(
             if historical
             else ""
         ),
+        # The descriptor whose body digest was proven equal to
+        # ``record.policy_body_digest`` above, published so a consumer holding no
+        # adapter registry can rebuild the same frame and reach the same digest.
+        # Nothing new is asserted here: the equality is already a precondition of
+        # arriving at this return.
+        descriptor_adapter_id=descriptor.adapter_id,
+        descriptor_policy_type=descriptor.policy_type,
+        descriptor_canonical_projection=descriptor.canonical_projection,
     )

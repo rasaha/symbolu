@@ -16,8 +16,11 @@ from typing import Final
 
 __all__ = ["__version__"]
 
-#: Cloud Scaling R-12b — **fixture pins only**. This package's verification source is
-#: untouched: its occurrence gate reads candidate facts by name, and Phase 5A re-sourcing
-#: those facts from the authenticated decision snapshot satisfies it without a change here.
-#: What moved is the ten-digest Phase 5A mirror the suite pins.
-__version__: Final[str] = "0.5.0"
+#: ``0.5.0`` was 5B-3, which promoted ``policy_type`` and added ``capacity_bounds_fact``, so
+#: the partition, the artifact digest and the profile version moved together to ``v3``.
+#:
+#: ``0.6.0`` is Cloud Scaling R-12b — **fixture pins only**, and the profile stays at ``v3``.
+#: This package's verification source is untouched: its occurrence gate reads candidate facts
+#: by name, and Phase 5A re-sourcing those facts from the digest-bound decision snapshot
+#: satisfies it without a change here. What moved is the Phase 5A mirror the suite pins.
+__version__: Final[str] = "0.6.0"

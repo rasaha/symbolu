@@ -60,24 +60,25 @@ def test_the_partition_is_total_and_disjoint_over_the_artifact_s_own_fields():
 
 @pytest.mark.invariant
 def test_the_recorded_half_holds_exactly_the_facts_nothing_established():
-    """Three members, three reasons. Each is pinned by its own test elsewhere in the suite.
+    """Two members, two reasons. Each is pinned by its own test elsewhere in the suite.
 
     * ``resolved_as_of_fact`` — R-2, injected and unvalidated;
-    * ``policy_type`` — not signature-covered and never compared at resolution;
     * ``trust_configuration_digest`` — reported by the resolution port about itself.
 
-    ``candidate_digest_fact`` was the fourth until 5B-1: gate 11 reconciles a supplied
-    candidate's policy coordinate against the resolved one, so the fact left this half. That
-    promotion moved the artifact digest and the profile version, which is what a promotion is
-    supposed to cost — ``tests/test_partition_ratchet.py`` is what makes the cost unavoidable.
+    Two facts have left this half, each when a gate began checking it. ``candidate_digest_fact``
+    left in 5B-1, when gate 11 began reconciling a supplied candidate's policy coordinate
+    against the resolved one. ``policy_type`` left in 5B-3, when gate 14 began reproducing the
+    body digest it is framed into from the projection Route 1 publishes. Each promotion moved
+    the artifact digest and the profile version, which is what a promotion is supposed to cost
+    — ``tests/test_partition_ratchet.py`` is what makes the cost unavoidable.
     """
 
     assert RECORDED_FACT_NAMES == {
         "resolved_as_of_fact",
-        "policy_type",
         "trust_configuration_digest",
     }
     assert "candidate_digest_fact" in VERIFIED_FACT_NAMES
+    assert "policy_type" in VERIFIED_FACT_NAMES
 
 
 @pytest.mark.invariant

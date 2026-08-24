@@ -14,7 +14,8 @@ if str(project_root) not in sys.path:
 # Canonical migrated packages live under packages/<name>/src. Put them on the
 # path so a source checkout resolves them without an editable install (e.g. the
 # governance_providers contract shims import ugence_governance_contracts).
-for _src in (project_root / "packages" / "governance-contracts" / "src",
+for _src in (project_root / "packages" / "jcs" / "src",
+             project_root / "packages" / "governance-contracts" / "src",
              project_root / "packages" / "governance-provider-framework" / "src",
              project_root / "packages" / "providers" / "tap" / "src",
              project_root / "packages" / "providers" / "actiongate" / "src",

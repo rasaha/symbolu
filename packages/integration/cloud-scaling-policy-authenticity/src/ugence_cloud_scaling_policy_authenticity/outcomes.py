@@ -152,6 +152,24 @@ class PolicyAuthenticityOutcome(str, Enum):
     #: cannot be about a moment before the evidence it rests on came into being.
     CANDIDATE_FACT_NOT_YET_OCCURRED = "CANDIDATE_FACT_NOT_YET_OCCURRED"
 
+    # --- the resolved projection, and the bounds it authenticates (R-8, 5B-3) ------------
+    #: The resolution carried no descriptor projection, so the body digest could not be
+    #: reproduced here. Refused rather than skipped: ``policy_body_digest`` is a one-way
+    #: hash, and without the projection this package has nothing to check it against — which
+    #: is exactly the condition that kept ``policy_type`` in the recorded half. A port that
+    #: omits the projection is a port whose answer cannot be independently reproduced, and
+    #: "cannot reproduce" is a refusal, never a downgrade to carrying the fact unchecked.
+    POLICY_PROJECTION_ABSENT = "POLICY_PROJECTION_ABSENT"
+    #: The projection was present and did **not** reproduce ``record.policy_body_digest``
+    #: when reframed through the Policy Authority's own ``framed_body_digest``. Either the
+    #: projection, the adapter id or the policy type is not what the signature covered.
+    POLICY_PROJECTION_DIGEST_MISMATCH = "POLICY_PROJECTION_DIGEST_MISMATCH"
+    #: The projection reproduced the digest, and the capacity bounds inside it are not the
+    #: shape this profile knows how to carry. A digest match proves the bytes are the signed
+    #: ones; it does not make an unreadable structure readable, and a bound this routine
+    #: cannot state exactly is not one it will attest.
+    POLICY_BOUNDS_MALFORMED = "POLICY_BOUNDS_MALFORMED"
+
     # --- fail-closed terminals ------------------------------------------------------------
     #: The resolution port could not be used — it raised, or returned a foreign type.
     #: Unavailable is a refusal.

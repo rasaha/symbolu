@@ -100,6 +100,153 @@ def verifier_for(authority: Authority, **kwargs) -> PolicyAuthenticityVerifier:
     return PolicyAuthenticityVerifier(resolution_port=port_for(authority), **kwargs)
 
 
+# --------------------------------------------------------------------------- #
+# A genuine capacity-bounds family, built here rather than imported (5B-3, R-8)
+# --------------------------------------------------------------------------- #
+# The bounds gates must be exercised against a real issuance under a real adapter. This
+# suite deliberately does **not** import
+# ``ugence-cloud-scaling-capacity-bounds-policy`` to get one: the verifier is downstream of
+# the family it verifies, and a test-time import would quietly invert that boundary and
+# couple this package's fixtures to a distribution its source may not name.
+#
+# What is under test is that the verifier reads the *projection shape* structurally — the
+# family's coordinate component and the four keys of each bound — not that it agrees with
+# one particular package's classes. Building an independent family here measures exactly
+# that, and would catch the real distribution drifting away from the shape this profile
+# knows how to state.
+
+
+@dataclass(frozen=True)
+class _BoundsMetadata:
+    policy_id: str
+    version: str
+    content_digest: str
+    scope: str
+    lifecycle_state: str
+    tenant_id: str = ""
+    supersedes_ref: str = ""
+    effective_from: Optional[datetime] = None
+    effective_to: Optional[datetime] = None
+
+
+@dataclass(frozen=True)
+class _Bound:
+    action_type: str
+    resource_class: str
+    max_permitted_magnitude: int
+    max_permitted_delta: int
+
+
+@dataclass(frozen=True)
+class _BoundsPolicy:
+    metadata: _BoundsMetadata
+    bounds: tuple
+
+
+BOUNDS_FAMILY = "cloud_scaling.capacity_bounds"
+BOUNDS_ADAPTER_ID = "ugence.cloud-scaling.capacity-bounds/v1"
+BOUNDS_POLICY_TYPE = "CapacityBoundsPolicy"
+
+DEFAULT_TEST_BOUNDS = (
+    _Bound(
+        action_type="cloud_scaling.scale_out",
+        resource_class="",
+        max_permitted_magnitude=100,
+        max_permitted_delta=25,
+    ),
+)
+
+
+class _BoundsAdapter:
+    """A genuine ``PolicyFamilyAdapter`` for the capacity-bounds family."""
+
+    @property
+    def adapter_id(self) -> str:
+        return BOUNDS_ADAPTER_ID
+
+    def recognizes(self, artifact: object) -> bool:
+        return type(artifact) is _BoundsPolicy
+
+    def coordinate_for(self, reference: object) -> Optional[PolicyCoordinate]:
+        if type(reference) is not _BoundsMetadata:
+            return None
+        return _bounds_coordinate(reference)
+
+    def describe(self, artifact: object):
+        from ugence_policy_authority.api import PolicyArtifactDescriptor, to_canonical_obj
+
+        body = to_canonical_obj(artifact, path="$")
+        metadata = dict(body["metadata"])
+        metadata.pop("content_digest")
+        body = dict(body)
+        body["metadata"] = metadata
+        return PolicyArtifactDescriptor(
+            adapter_id=BOUNDS_ADAPTER_ID,
+            policy_type=BOUNDS_POLICY_TYPE,
+            coordinate=_bounds_coordinate(artifact.metadata),
+            declared_content_digest=artifact.metadata.content_digest,
+            canonical_projection=body,
+            lifecycle_label=artifact.metadata.lifecycle_state,
+            lifecycle_is_active=artifact.metadata.lifecycle_state == "APPROVED_ACTIVE",
+            supersedes_ref=artifact.metadata.supersedes_ref,
+            effective_from=artifact.metadata.effective_from,
+            effective_to=artifact.metadata.effective_to,
+        )
+
+
+def _bounds_coordinate(metadata: "_BoundsMetadata") -> PolicyCoordinate:
+    return PolicyCoordinate(
+        policy_family=BOUNDS_FAMILY,
+        policy_id=metadata.policy_id,
+        version=metadata.version,
+        content_digest=metadata.content_digest,
+        scope=metadata.scope,
+        tenant_id=metadata.tenant_id,
+    )
+
+
+BOUNDS_ADAPTER = _BoundsAdapter()
+
+
+def make_bounds_policy(*, bounds: tuple = DEFAULT_TEST_BOUNDS, **meta) -> "_BoundsPolicy":
+    """A capacity-bounds artifact whose declared digest genuinely binds its own body."""
+
+    fields = dict(
+        policy_id="cloud-scaling-capacity-bounds",
+        version="1.0.0",
+        scope="GLOBAL",
+        lifecycle_state="APPROVED_ACTIVE",
+        tenant_id=GLOBAL_TENANT,
+        effective_from=T_FROM,
+        effective_to=T_TO,
+    )
+    fields.update(meta)
+    draft = _BoundsPolicy(
+        metadata=_BoundsMetadata(content_digest="0" * 64, **fields), bounds=bounds
+    )
+    digest = BOUNDS_ADAPTER.describe(draft).body_digest()
+    return _BoundsPolicy(
+        metadata=_BoundsMetadata(content_digest=digest, **fields), bounds=bounds
+    )
+
+
+def bounds_authority() -> Authority:
+    """An authority whose only registered family is capacity bounds."""
+
+    from ugence_policy_authority.api import AdapterRegistry
+
+    return make_authority(adapters=AdapterRegistry([BOUNDS_ADAPTER]))
+
+
+def issued_bounds(**policy_kwargs):
+    """A genuine authority with one genuinely issued bounds policy."""
+
+    authority = bounds_authority()
+    policy = make_bounds_policy(**policy_kwargs)
+    record = authority.issue(policy)
+    return authority, record
+
+
 def coordinate_of(record) -> PolicyCoordinate:
     """The coordinate a genuine record was issued under."""
 
