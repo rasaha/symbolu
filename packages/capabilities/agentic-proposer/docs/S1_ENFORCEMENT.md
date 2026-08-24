@@ -205,6 +205,52 @@ rest. Which of the two D2 means decides whether a sixth round is work or waste.
 asserts that every file in `src` and `tests` is either scanned or one of the two
 named exemptions, so a module cannot leave the scan silently.
 
+### What OD-1 – OD-3 corrected
+
+Auditing the O-1 – O-4 guards against representative contract shapes — planting the
+contracts in `src/` and watching what armed — found three things prose review had not.
+All three are recorded in the readiness ADR under *Ratified refinements, second round*;
+what follows is what changed in the guards.
+
+**OD-3 — the selection coupling was class-blind.** It matched the three dependent field
+names anywhere, so `CandidateAdvisory.requested_review_action` — the candidate's **own**
+required, non-null routing — was treated as selection-dependent, and the guard demanded
+a selector on the candidate record and demanded that field admit `None`. Both
+contradict the ratified contract. The coupling is now pinned to one bearer,
+`ProposerAdvisory`, by an exact registry; a class that merely shares a field name is not
+reached. The local rule is enforced in both directions, and it remains local: a
+validator holds `candidate_set_id`, not the set, so it establishes nothing about the
+referenced candidate set.
+
+**OD-1 — suffix inference classified six fields as nothing.** `agent_version`,
+`tool_name`, `allowed_source_scopes`, `excluded_data_classes`, `permitted_tool_scopes`
+and `tool_invocations` end in no identifier suffix and carry no free-text marker, so
+they were neither required to carry the pattern nor barred from it — they were checked
+by nothing. `tool_name` is the sharpest case, since it is matched by equality against
+`permitted_tool_scopes`. Classification now comes from an exact per-contract registry
+covering every declared field, across three categories: identifier or reference,
+canonical symbolic token (the identifier class minus the path separator, because a
+token is the operand of a membership test), and human-readable free text, which takes no
+ASCII grammar at all. An unregistered field fails rather than skips.
+
+**OD-2 — the boundary probe would have failed on the first contract.** Bare
+`import pydantic` does not load `socket`; *defining any* `BaseModel` does. Every
+contract is a `BaseModel` and `pydantic>=2` is ratified, so the whole-process
+`sys.modules` assertion was going to fail for a reason unrelated to this package's
+authority. The invariant is about possessing or exercising networking authority, not
+about module residency, and enforcement is now layered: a static scan of production
+source; that scan extended to aliases, `from` imports, module-qualified use and the
+dynamic-import spellings; a fresh-interpreter probe that establishes the ratified
+dependency baseline first and then asserts this package introduces no **additional**
+forbidden root; the unchanged dependency allowlist; and negative controls proving a
+direct `socket` import still fails.
+
+`[I]` The ceiling is stated in that module and is worth repeating here: the static
+layers do not catch a module name assembled at runtime, and the differential layer
+cannot see a direct import of something already in the baseline. Neither layer is
+sufficient alone and the pair is not a proof. The invariant stays architectural and
+review-enforced.
+
 ## What did not land, and why
 
 The eight canonical contracts and Equations 1–3 remain unimplemented. **Nothing in

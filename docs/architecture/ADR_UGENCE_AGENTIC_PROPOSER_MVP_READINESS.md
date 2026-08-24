@@ -535,19 +535,135 @@ on, so an ambiguity there corrupts identity; free text is carried, not matched, 
 ASCII bar on a reason or a summary would reject the languages those are written in —
 a defect rather than a safeguard.
 
-`[V]` The guard classifies fields by name — identifier and reference suffixes first,
-so `reason_code` is a code and `reason` is text — then requires the ratified pattern
-on the first kind and bars it on the second. The pattern is pinned by equality, and
-its application is pinned too: `re.match` admits a trailing newline against `$` and
-`re.fullmatch` does not, so stating the pattern without stating the application would
-leave the rule one convenience call away from admitting a value it names as invalid.
+`[V]` The guard classifies fields from an **exact pinned per-contract registry**, not
+from name shape — see OD-1 below for why suffix inference alone was insufficient. The
+patterns are pinned by equality, and their application is pinned too: `re.match` admits
+a trailing newline against `$` and `re.fullmatch` does not, so stating a pattern without
+stating the application would leave the rule one convenience call away from admitting a
+value it names as invalid.
+
+---
+
+## Ratified refinements, second round (OD-1 – OD-3)
+
+OD-1 – OD-3 were ratified after O-1 – O-4 were enforced and the guards were audited
+against representative contract shapes. Each corrects a guard, not a decision; none
+reopens D1–D10 or O-1 – O-4.
+
+## OD-1 — Descriptive fields, and the three-way classification
+
+`primary_function` and `declared_strategy` are **C5c human-readable descriptive
+fields**. They are neither identifiers or references nor closed canonical tokens, and
+they receive no ASCII identifier or token restriction.
+
+`[V]` Both are **excluded from `P_unsigned`**: neither is reachable from
+`ProposerAdvisory`, which references its inputs by identifier. The Unicode hazard that
+motivates O-4 therefore does not reach them. **If a future version moves either into an
+identity-bearing canonical payload, its normalization profile must be separately
+ratified before that change.**
+
+O-4's classification is correspondingly three-way, and assigned per field rather than
+inferred:
+
+| Category | Rule | Pattern |
+| --- | --- | --- |
+| C5a — identifier or reference | an opaque handle other parties match, route or join on | `^[A-Za-z0-9][A-Za-z0-9._:/-]*$` |
+| C5b — canonical symbolic token | a vocabulary term matched by equality against an allowlist | `^[A-Za-z0-9][A-Za-z0-9._:-]*$` |
+| C5c — human-readable free text | carried for a person to read, never matched on | none |
+
+`[I]` C5b is C5a **minus the path separator**, and the difference is semantic rather
+than cosmetic. A C5a value is carried and compared whole; a C5b value is the operand of
+a membership test — `tool_name in permitted_tool_scopes` — and a path-shaped spelling
+invites a consumer to split or normalize it before comparing, which would make the
+comparison depend on the consumer.
+
+`[V]` Suffix inference could not carry this. Six fields — `agent_version`, `tool_name`,
+`allowed_source_scopes`, `excluded_data_classes`, `permitted_tool_scopes` and
+`tool_invocations` — end in no identifier suffix and carry no free-text marker, so
+inference classified them as neither and they were checked by nothing at all.
+`tool_name` is the sharpest case: it is matched by equality against
+`permitted_tool_scopes`, so an unnormalized spelling changes an eligibility outcome. The
+guard now reads an exact per-contract registry in which every declared field appears;
+an unregistered field is a failure, not a skip. Inference is retained only as a
+secondary cross-check.
+
+## OD-2 — Networking authority, not module residency
+
+The boundary invariant prohibits the Agentic Proposer from **possessing or exercising
+networking authority**. It does not prohibit an approved runtime dependency from
+internally loading a Python standard-library module while constructing schemas.
+
+`pydantic` is an explicitly ratified dependency. Its transitive import of `socket`
+during `BaseModel` construction is permitted and must not by itself fail the package
+boundary.
+
+`[V]` The premise is a fact, demonstrated rather than assumed: bare `import pydantic`
+does **not** load `socket`; *defining any* `BaseModel` does, through pydantic-core's
+schema build. Every S1 contract is a `BaseModel`, so a whole-process `sys.modules`
+assertion would fail on the first contract module for a reason unrelated to this
+package's authority.
+
+The whole-process assertion is replaced by layered enforcement in
+`tests/test_boundaries.py`:
+
+1. a static scan rejecting direct imports of `socket` and the other forbidden roots
+   from production source;
+2. the same scan extended to `from … import …`, aliases, module-qualified use,
+   `importlib.import_module` and `__import__` resolving those roots;
+3. a fresh-interpreter probe that establishes the approved dependency baseline first —
+   import pydantic, define a minimal model — then imports this package and asserts it
+   introduces **no additional** forbidden module roots beyond that baseline;
+4. the declared-dependency allowlist, unchanged, so the exemption cannot authorize a
+   new networking library;
+5. negative controls proving a direct `socket` import or use in this package still
+   fails, even though pydantic's transitive load is permitted.
+
+`[I]` **The enforcement ceiling, stated exactly.** Layers 1–2 read source and an AST:
+they catch every declared import, alias, `from` import, module-qualified use and
+literal dynamic import, and they do **not** catch a module name assembled at runtime
+from parts, read from a file, an environment variable or a data structure — the same
+disclosed limitation `test_no_local_canonicalization.py` records for the identity
+substrate. Layer 3 compares module sets, so it catches an indirect load whatever spelled
+it, but only along the import path the probe executes, and once `socket` is in the
+baseline it structurally cannot see a direct import — which is why layers 1–2 are not
+optional. **Nothing here proves the impossibility of every dynamically assembled
+import. The invariant remains architectural and review-enforced; these guards are
+defence-in-depth, not a proof.**
+
+## OD-3 — The selection coupling is scoped to its bearer
+
+O-1's dependent-field coupling applies to **`ProposerAdvisory` and to nothing else**.
+The guard is pinned by exact bearer and field: bearer `ProposerAdvisory`, selector
+`selected_candidate_id`, dependents `recommended_disposition`,
+`requested_review_action` and `requested_review_destination_role_ref`.
+
+Fields are **not** classified by name globally across unrelated contracts. In
+particular, `CandidateAdvisory.requested_review_action` is the candidate's own required
+proposed routing; it is **not** nullable merely because `ProposerAdvisory` has a
+selection-dependent field of the same name.
+
+`[V]` Before this scoping the guard matched by name alone and demanded a selector on
+`CandidateAdvisory` and nullability of that field, contradicting the ratified contract.
+`[V]` With representative shapes planted, the coupling now arms on `ProposerAdvisory`
+alone, and `CandidateAdvisory` is reached only by the check that keeps its
+`requested_review_action` required and non-null. Narrowing, redirecting or widening the
+pinned registry each fail a self-test.
+
+`[I]` The local coupling is enforced in **both directions** — a selection requires all
+three dependents, and no selection requires none of them. It remains a **local**
+invariant: a model validator holds `candidate_set_id`, not the set, so it establishes
+nothing about the referenced `AdvisoryCandidateSet`. Correspondence between a dependent
+value and the selected candidate is the builder's obligation and an independent replay
+verifier's, and O-1's second clause continues to bind the stage that has candidates.
 
 ---
 
 ## Open owner decisions
 
-None. D6–D10 close every question this artifact previously carried as open, and
-O-1 – O-4 close the four the S1 enforcement audit raised.
+None. D6–D10 close every question this artifact previously carried as open,
+O-1 – O-4 close the four the S1 enforcement audit raised, and OD-1 – OD-3 close the
+three that auditing those guards against representative contract shapes raised in
+turn.
 
 `[R]` markers that remain above are implementation obligations, not unratified
 decisions. D6's standing rule, D7's contract shape and D8's export bound are now

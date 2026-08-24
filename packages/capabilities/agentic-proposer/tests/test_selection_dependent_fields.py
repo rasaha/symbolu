@@ -11,10 +11,19 @@ what keeps the advisory honest: a disposition or a routing request standing next
 no selected candidate is a recommendation about nothing, and a consumer cannot tell
 whether the selection was lost or the routing was invented.
 
+**The coupling is scoped to one bearer (OD-3).** It applies to ``ProposerAdvisory``
+and to nothing else. ``requested_review_action`` also appears on ``CandidateAdvisory``,
+where it is the candidate's **own** proposed routing: required, non-null, and not
+selection-dependent at all. A guard that matched the field name globally would demand a
+selector on the candidate record and force that field nullable, which contradicts the
+ratified contract. The bearer, the selector and the three dependents are therefore
+pinned together as one registry, and a class that merely shares a field name is not
+touched.
+
 Like the other S1 guards, this one is written to hold **before** the contract exists.
 The parts that need no contract — the reference model of the rule, and the scanners —
-are checked today. The parts that need the fields arm themselves the moment any class
-in this package declares one, and then require, of the class that declares it:
+are checked today. The parts that need the fields arm themselves the moment the bearer
+declares one, and then require, of that class:
 
 * the selector is declared on the same class, so the coupling is local and checkable;
 * every dependent field's annotation admits ``None``;
@@ -40,14 +49,26 @@ import ugence_agentic_proposer as ap
 
 SRC = pathlib.Path(ap.__file__).resolve().parent
 
-#: The selector every dependent field is bound to.
+#: The ONE contract the O-1 coupling binds (OD-3). Not a name pattern: an exact
+#: bearer. ``CandidateAdvisory.requested_review_action`` shares a name with a dependent
+#: field and is a different field — required, non-null, the candidate's own routing.
+SELECTION_BEARER = "ProposerAdvisory"
+#: The selector every dependent field is bound to, on the bearer.
 SELECTION_FIELD = "selected_candidate_id"
-#: The three fields O-1 makes nullable and couples to the selector.
+#: The three fields O-1 makes nullable and couples to the selector, on the bearer.
 DEPENDENT_FIELDS = (
     "recommended_disposition",
     "requested_review_action",
     "requested_review_destination_role_ref",
 )
+#: The pinned registry, asserted by equality below so it cannot be widened to other
+#: contracts or narrowed to fewer fields without a self-test failing.
+SELECTION_COUPLING = {
+    SELECTION_BEARER: {"selector": SELECTION_FIELD, "dependents": DEPENDENT_FIELDS},
+}
+#: Contracts that declare a name matching a dependent field but are NOT bearers. Named
+#: so the exclusion is deliberate and visible rather than a silent consequence.
+NON_BEARERS_SHARING_A_FIELD_NAME = ("CandidateAdvisory",)
 #: Names that make a class member the enforcement of a rule rather than a datum:
 #: a pydantic validator, a dataclass hook, or a plainly named check.
 ENFORCEMENT_MARKERS = (
@@ -93,14 +114,20 @@ def _annotated_fields(node):
 
 
 def _classes_with_dependent_fields(source, filename="<sample>"):
-    """Every class in ``source`` declaring at least one selection-dependent field."""
+    """Every **bearer** class in ``source`` declaring a selection-dependent field.
+
+    Bearer-scoped by OD-3: a class is examined only when its name is in
+    ``SELECTION_COUPLING``. A non-bearer that happens to declare a field of the same
+    name — ``CandidateAdvisory.requested_review_action`` — is not a selection-dependent
+    field and is deliberately not reached.
+    """
     tree = ast.parse(source, filename=filename)
     found = []
     for node in ast.walk(tree):
-        if not isinstance(node, ast.ClassDef):
+        if not isinstance(node, ast.ClassDef) or node.name not in SELECTION_COUPLING:
             continue
         fields = _annotated_fields(node)
-        if set(fields) & set(DEPENDENT_FIELDS):
+        if set(fields) & set(SELECTION_COUPLING[node.name]["dependents"]):
             found.append((node, fields))
     return found
 
@@ -165,21 +192,21 @@ def test_the_annotation_reader_rejects_an_undeclared_null(annotation):
 def test_the_class_scanner_finds_a_dependent_field():
     found = _classes_with_dependent_fields(
         "class A:\n    unrelated: str\n\n"
-        "class B:\n    selected_candidate_id: str | None\n"
+        "class ProposerAdvisory:\n    selected_candidate_id: str | None\n"
         "    recommended_disposition: CandidateDisposition | None\n")
-    assert [node.name for node, _ in found] == ["B"]
+    assert [node.name for node, _ in found] == ["ProposerAdvisory"]
 
 
 def test_the_class_scanner_flags_an_unconditionally_typed_dependent():
     (_, fields), = _classes_with_dependent_fields(
-        "class B:\n    selected_candidate_id: str | None\n"
+        "class ProposerAdvisory:\n    selected_candidate_id: str | None\n"
         "    recommended_disposition: CandidateDisposition\n"
         "    requested_review_action: ReviewAction | None\n")
     assert _unconditionally_typed_dependents(fields) == ["recommended_disposition"]
 
 
 COUPLED_SAMPLE = (
-    "class B:\n"
+    "class ProposerAdvisory:\n"
     "    selected_candidate_id: str | None\n"
     "    recommended_disposition: CandidateDisposition | None\n"
     "\n"
@@ -192,12 +219,12 @@ COUPLED_SAMPLE = (
 
 UNCOUPLED_SAMPLES = (
     # No enforcement at all: the rule lives only in the docstring.
-    "class B:\n"
+    "class ProposerAdvisory:\n"
     "    '''When selected_candidate_id is None, recommended_disposition is None.'''\n"
     "    selected_candidate_id: str | None\n"
     "    recommended_disposition: CandidateDisposition | None\n",
     # A validator that never reads the selector: it cannot be checking the coupling.
-    "class B:\n"
+    "class ProposerAdvisory:\n"
     "    selected_candidate_id: str | None\n"
     "    recommended_disposition: CandidateDisposition | None\n"
     "\n"
@@ -207,7 +234,7 @@ UNCOUPLED_SAMPLES = (
     "            raise ValueError('x')\n"
     "        return self\n",
     # A validator that reads the selector but ignores one declared dependent.
-    "class B:\n"
+    "class ProposerAdvisory:\n"
     "    selected_candidate_id: str | None\n"
     "    recommended_disposition: CandidateDisposition | None\n"
     "    requested_review_action: ReviewAction | None\n"
@@ -252,11 +279,22 @@ def _reference_model():
 
         @pydantic.model_validator(mode="after")
         def _dependents_follow_the_selection(self):
+            """Both directions. Presence with presence, absence with absence.
+
+            This is the LOCAL invariant only. It proves nothing about any referenced
+            candidate set: this model holds no set and no candidates, and a validator
+            that claimed otherwise would be asserting what it cannot see.
+            """
             if self.selected_candidate_id is None:
                 set_anyway = [name for name in DEPENDENT_FIELDS
                               if getattr(self, name) is not None]
                 if set_anyway:
                     raise ValueError(f"set without a selected candidate: {set_anyway}")
+            else:
+                missing = [name for name in DEPENDENT_FIELDS
+                           if getattr(self, name) is None]
+                if missing:
+                    raise ValueError(f"selected candidate with no {missing}")
             return self
 
     return Advisory
@@ -274,8 +312,12 @@ def test_the_reference_model_rejects_a_dependent_without_a_selection(field):
 
 
 def test_the_reference_model_permits_dependents_with_a_selection():
-    model = _reference_model()(selected_candidate_id="cand-1",
-                               recommended_disposition="RECOMMEND_WITHHOLD")
+    model = _reference_model()(
+        selected_candidate_id="cand-1",
+        recommended_disposition="RECOMMEND_WITHHOLD",
+        requested_review_action="ROUTE_APPROVAL_BUNDLE",
+        requested_review_destination_role_ref="role:approver",
+    )
     assert model.recommended_disposition == "RECOMMEND_WITHHOLD"
 
 
@@ -318,18 +360,36 @@ def test_the_coupling_is_enforced_in_code(label, node, fields):
         f"{SELECTION_FIELD}")
 
 
+def _live_annotations(attr):
+    annotations = dict(getattr(attr, "__annotations__", {}) or {})
+    model_fields = getattr(attr, "model_fields", None)
+    if isinstance(model_fields, dict):
+        annotations.update({n: f.annotation for n, f in model_fields.items()})
+    return annotations
+
+
 def _live_types_with_dependent_fields():
+    """The live bearer types only (OD-3). ``__name__`` is used, not the export name, so
+    a bearer re-exported under an alias is still reached and a non-bearer aliased to a
+    bearer's export name is not."""
     found = []
     for name in dir(ap):
         attr = getattr(ap, name)
-        if not isinstance(attr, type):
+        if not isinstance(attr, type) or getattr(attr, "__name__", None) not in SELECTION_COUPLING:
             continue
-        annotations = dict(getattr(attr, "__annotations__", {}) or {})
-        model_fields = getattr(attr, "model_fields", None)
-        if isinstance(model_fields, dict):
-            annotations.update({n: f.annotation for n, f in model_fields.items()})
-        if set(annotations) & set(DEPENDENT_FIELDS):
+        annotations = _live_annotations(attr)
+        if set(annotations) & set(SELECTION_COUPLING[attr.__name__]["dependents"]):
             found.append((name, attr, annotations))
+    return found
+
+
+def _live_non_bearers_sharing_a_field_name():
+    """Live types named in ``NON_BEARERS_SHARING_A_FIELD_NAME`` that actually exist."""
+    found = []
+    for name in dir(ap):
+        attr = getattr(ap, name)
+        if isinstance(attr, type) and getattr(attr, "__name__", None) in NON_BEARERS_SHARING_A_FIELD_NAME:
+            found.append((name, attr, _live_annotations(attr)))
     return found
 
 
@@ -369,3 +429,147 @@ def test_the_coupling_is_pinned_to_the_ratified_fields():
         "requested_review_action",
         "requested_review_destination_role_ref",
     )
+
+
+def test_the_bearer_registry_is_pinned():
+    """OD-3's bearer scoping, asserted by equality.
+
+    Narrowing the registry (dropping the bearer), redirecting it (renaming the bearer)
+    or widening it (adding a contract) all fail here, so the scoping cannot drift into
+    either a global name match or a disarmed guard.
+    """
+    assert SELECTION_BEARER == "ProposerAdvisory"
+    assert SELECTION_COUPLING == {
+        "ProposerAdvisory": {
+            "selector": "selected_candidate_id",
+            "dependents": (
+                "recommended_disposition",
+                "requested_review_action",
+                "requested_review_destination_role_ref",
+            ),
+        },
+    }
+    assert NON_BEARERS_SHARING_A_FIELD_NAME == ("CandidateAdvisory",)
+    assert set(SELECTION_COUPLING) & set(NON_BEARERS_SHARING_A_FIELD_NAME) == set()
+
+
+# --------------------------------------------------------------------------- #
+# OD-3 mutation probes — the bearer scoping, and the coupling in both directions
+# --------------------------------------------------------------------------- #
+
+#: A bearer declaring the selector and all three dependents.
+BEARER_SAMPLE = (
+    "class ProposerAdvisory:\n"
+    "    selected_candidate_id: str | None\n"
+    "    recommended_disposition: Disposition | None\n"
+    "    requested_review_action: ReviewAction | None\n"
+    "    requested_review_destination_role_ref: str | None\n"
+    "    @model_validator(mode='after')\n"
+    "    def _couple(self):\n"
+    "        if self.selected_candidate_id is None:\n"
+    "            assert self.recommended_disposition is None\n"
+    "            assert self.requested_review_action is None\n"
+    "            assert self.requested_review_destination_role_ref is None\n"
+    "        return self\n"
+)
+
+
+def test_the_relationship_arms_on_the_bearer():
+    """The four-field relationship is seen on ``ProposerAdvisory``."""
+    found = _classes_with_dependent_fields(BEARER_SAMPLE)
+    assert [node.name for node, _ in found] == ["ProposerAdvisory"]
+    _, fields = found[0]
+    assert SELECTION_FIELD in fields
+    assert set(DEPENDENT_FIELDS) <= set(fields)
+
+
+def test_the_bearer_without_its_selector_fails():
+    """A bearer declaring dependents but no selector is caught."""
+    sample = "class ProposerAdvisory:\n    recommended_disposition: Disposition | None\n"
+    found = _classes_with_dependent_fields(sample)
+    assert found, "the guard did not arm on the bearer"
+    _, fields = found[0]
+    assert SELECTION_FIELD not in fields
+
+
+@pytest.mark.parametrize("other", NON_BEARERS_SHARING_A_FIELD_NAME)
+def test_an_identically_named_field_on_another_class_is_not_reached(other):
+    """OD-3. ``CandidateAdvisory.requested_review_action`` is the candidate's own
+    required routing. Sharing a name with a dependent field does not make it one, and
+    the guard must not demand a selector or nullability of it."""
+    sample = (
+        f"class {other}:\n"
+        "    candidate_id: str\n"
+        "    requested_review_action: ReviewAction\n"
+    )
+    assert _classes_with_dependent_fields(sample) == [], (
+        f"{other} was treated as a selection-dependent bearer")
+
+
+def test_a_non_bearer_and_a_bearer_in_one_module_are_told_apart():
+    """Both in one file: only the bearer arms."""
+    found = _classes_with_dependent_fields(
+        "class CandidateAdvisory:\n    requested_review_action: ReviewAction\n"
+        + BEARER_SAMPLE)
+    assert [node.name for node, _ in found] == ["ProposerAdvisory"]
+
+
+def test_a_renamed_bearer_registry_stops_seeing_the_bearer():
+    """The scoping is load-bearing: point the registry elsewhere and the real bearer
+    goes unexamined. This is why ``test_the_bearer_registry_is_pinned`` exists."""
+    import unittest.mock
+    with unittest.mock.patch.dict(
+            "tests.test_selection_dependent_fields.SELECTION_COUPLING",
+            {"SomethingElse": SELECTION_COUPLING[SELECTION_BEARER]}, clear=True):
+        assert _classes_with_dependent_fields(BEARER_SAMPLE) == []
+
+
+def test_null_selector_with_all_dependents_null_passes():
+    model = _reference_model()
+    assert model().selected_candidate_id is None
+
+
+def test_null_selector_with_a_non_null_dependent_fails_at_runtime():
+    model = _reference_model()
+    for field in DEPENDENT_FIELDS:
+        with pytest.raises(Exception):
+            model(**{field: "X"})
+
+
+def test_non_null_selector_with_all_dependents_non_null_passes_locally():
+    model = _reference_model()
+    built = model(selected_candidate_id="cand-1",
+                  **{field: "X" for field in DEPENDENT_FIELDS})
+    assert built.selected_candidate_id == "cand-1"
+
+
+@pytest.mark.parametrize("omitted", DEPENDENT_FIELDS)
+def test_non_null_selector_with_any_null_dependent_fails(omitted):
+    model = _reference_model()
+    values = {field: "X" for field in DEPENDENT_FIELDS if field != omitted}
+    with pytest.raises(Exception):
+        model(selected_candidate_id="cand-1", **values)
+
+
+@pytest.mark.parametrize("name,model,annotations", _live_non_bearers_sharing_a_field_name(),
+                         ids=lambda v: str(v)[:40])
+def test_a_live_non_bearer_keeps_its_field_required_and_non_null(name, model, annotations):
+    """Arms with the contract. ``CandidateAdvisory.requested_review_action`` must stay
+    required and non-null — the opposite of what the dependent fields require."""
+    annotation = annotations.get("requested_review_action")
+    if annotation is None:
+        pytest.skip(f"{name} declares no requested_review_action")
+    assert type(None) not in typing.get_args(annotation), (
+        f"{name}.requested_review_action must not admit None: it is the candidate's "
+        "own required routing, not a selection-dependent field")
+
+
+def test_the_local_rule_is_not_a_correspondence_claim():
+    """The reference model enforces presence-with-presence and absence-with-absence and
+    nothing else. It holds no candidate set, so it cannot and does not establish that a
+    dependent value matches the selected candidate — that is the builder's obligation
+    and the replay verifier's, recorded in the readiness ADR."""
+    model = _reference_model()
+    built = model(selected_candidate_id="does-not-resolve-anywhere",
+                  **{field: "arbitrary" for field in DEPENDENT_FIELDS})
+    assert built.recommended_disposition == "arbitrary"
