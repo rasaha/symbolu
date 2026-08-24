@@ -722,3 +722,47 @@ moves**, on this ADR's own established rule: the F-2 precedent recorded at `cand
 identifiers track *which fields the artifact carries*, not what its payload covers. The Phase 5A
 candidate's field set is unchanged, and `RiskDecision` carries no schema identifier at all. Every
 superseded value is pinned alongside its replacement, as the 5B-1 and F-2 moves already are.
+
+### R-12b's own guard was hollow on first writing — the fifth `[V]`
+
+An independent review reproduced a defect the suite could not reach, and it is the fifth guard
+in this ADR's history to be hollow on first writing.
+
+The two new orderings compared canonical **strings**, on a comment claiming the format is
+"fixed-width, zero-padded and UTC-normalised". Two thirds were true — `%f` always pads and
+`astimezone` normalises. `%Y` does **not** pad below year 1000, so `"999-12-31T…"` sorts above
+`"2026-01-01T…"` while 999 precedes 2026, and both orderings inverted.
+
+The control is what makes it decisive `[V]`:
+
+| `evaluated_at` backdated to | before repair |
+|---|---|
+| year 2025 | refused |
+| years 999 / 99 / 9 | **admitted** |
+
+A gate written to bound how far `evaluated_at` may move refused a one-year move and admitted a
+thousand-year one — and `evaluated_at` exists precisely to bound Phase 5B's occurrence gate.
+
+**Second instance of the same class.** `snapshot_issued_at` was null-checked but never
+type-checked, so `issued_at = 0` reached the raw `>` and escaped as a bare `TypeError`. That is
+exactly the unclassified-exception failure `_comparable_instant` was written to prevent in
+`candidate.py` — diagnosed correctly there, and not applied here.
+
+**Why the suite missed it.** `test_reconciliation_integrity._canonical_ts` built every attack
+value through `to_canonical_obj`, so the tests probed the guards in the same representation the
+guards were wrong in. A test that shares its subject's blind spot measures nothing.
+
+**The repair.** One helper, `_bound_instant`, and both orderings routed through it — the
+`_comparable_instant` pattern applied where it was omitted. Ordering moves to parsed instants;
+**equality stays on strings**, because string equality is exact and the outer-equals-bound gates
+are about agreement, not order. Inventory 64 → 65.
+
+One asymmetry is recorded rather than smoothed over: `strptime`'s `%Y` requires exactly four
+digits, so the canonical writer can emit a sub-1000 year the reader will not parse. A four-digit
+backdate now loses on ordering; a sub-1000 one is refused as non-canonical. Different gates, both
+closed, and the asymmetry fails closed — the only direction it may fail.
+
+The recurring lesson, now with five instances: a guard is not load-bearing until an end-to-end
+negative control says so, and a negative control built from the same primitive as the guard is
+not independent of it.
+

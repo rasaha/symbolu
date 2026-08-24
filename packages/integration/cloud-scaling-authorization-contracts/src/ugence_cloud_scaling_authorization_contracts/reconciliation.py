@@ -24,7 +24,7 @@ canonical form*, never against "now". Phase 5A holds no clock; see :mod:`.candid
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Final, Mapping, Optional
 
 from risk_authority.integrations import (
@@ -125,6 +125,53 @@ def _require_datetime(name: str, value: Any, reason: _Reason) -> datetime:
     if value.tzinfo is None or value.utcoffset() is None:
         raise ReconciliationError(f"{name} must be timezone-aware", reason)
     return value
+
+
+#: The canonical instant format Risk Authority's ``to_canonical_obj`` writes. Mirrored here
+#: rather than imported: it is private to that module, and this package re-derives from public
+#: primitives by policy. ``_bound_instant`` below asserts the round trip, so a drift in the
+#: writer surfaces as a refusal rather than as a silent misparse.
+_BOUND_TS_FMT: Final = "%Y-%m-%dT%H:%M:%S.%fZ"
+
+
+def _bound_instant(name: str, value: Any) -> datetime:
+    """Parse a snapshot instant into a ``datetime`` for **ordering** comparisons.
+
+    Ordering must never be decided on the canonical *string*. ``strftime`` does not
+    zero-pad ``%Y`` below year 1000 while it always pads ``%f``, so ``"999-12-31T…"``
+    sorts **above** ``"2026-01-01T…"`` — lexicographic and chronological order diverge, and
+    a guard comparing strings admits exactly what it exists to refuse. Measured: backdating
+    ``evaluated_at`` by one year was refused and by a thousand years was admitted.
+
+    Equality is left on strings deliberately: string equality is exact, and the
+    outer-equals-bound gates are about agreement, not order.
+
+    A non-string, non-datetime value gets a typed refusal here rather than reaching a raw
+    ``>`` and escaping as a bare ``TypeError`` — the same fail-closed rule ``_comparable_instant``
+    applies in :mod:`.candidate`, applied where it was omitted.
+    """
+
+    if isinstance(value, datetime):
+        parsed = value
+    elif isinstance(value, str):
+        try:
+            parsed = datetime.strptime(value, _BOUND_TS_FMT)
+        except ValueError:
+            raise ReconciliationError(
+                f"{name} is not a canonical UTC instant (got {value!r})",
+                _Reason.DECISION_INSTANT_NOT_BOUND,
+            ) from None
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    else:
+        raise ReconciliationError(
+            f"{name} must be a canonical instant (got {value!r})",
+            _Reason.DECISION_INSTANT_NOT_BOUND,
+        )
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ReconciliationError(
+            f"{name} must be timezone-aware", _Reason.DECISION_INSTANT_NOT_BOUND
+        )
+    return parsed.astimezone(timezone.utc)
 
 
 def reconcile_phase4(
@@ -445,17 +492,24 @@ def reconcile_phase4(
             _Reason.DECISION_INSTANT_NOT_BOUND,
         )
 
-    # Two orderings over the authenticated instants. Both compare canonical forms rather than
-    # parsed datetimes, for the same reason as above; string order and instant order coincide
-    # because the canonical timestamp format is fixed-width, zero-padded and UTC-normalised.
-    if to_canonical_obj(subject_valid_from) > to_canonical_obj(snapshot_evaluated_at):
+    # Two orderings over the bound instants, compared as **instants**. An earlier revision
+    # compared canonical strings on the claim that the format is "fixed-width, zero-padded and
+    # UTC-normalised". Two thirds of that were true: ``%f`` always pads and ``astimezone``
+    # does normalise. ``%Y`` does not pad below year 1000, so a three-digit year sorted above
+    # every four-digit one and both guards inverted — refusing a one-year backdate while
+    # admitting a thousand-year one.
+    bound_evaluated_at = _bound_instant(
+        "decision_snapshot.evaluated_at", snapshot_evaluated_at
+    )
+    bound_issued_at = _bound_instant("decision_snapshot.issued_at", snapshot_issued_at)
+    if subject_valid_from > bound_evaluated_at:
         raise ReconciliationError(
             "the decision was evaluated before the recommendation it decides became valid",
             _Reason.DECISION_INSTANT_NOT_BOUND,
         )
     # Equality is legal and there is no tolerance window: an authority may bind an evaluation
     # in the same instant it was stamped, but it cannot bind one that has not happened yet.
-    if to_canonical_obj(snapshot_evaluated_at) > to_canonical_obj(snapshot_issued_at):
+    if bound_evaluated_at > bound_issued_at:
         raise ReconciliationError(
             "the decision was issued before the evaluation it binds was made",
             _Reason.DECISION_INSTANT_NOT_BOUND,

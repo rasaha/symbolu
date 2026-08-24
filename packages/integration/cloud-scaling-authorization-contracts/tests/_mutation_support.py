@@ -233,7 +233,7 @@ def mutated_package(tmp_path: pathlib.Path, guard_number: int) -> MutatedPackage
     dst.mkdir(parents=True, exist_ok=True)
     shutil.copytree(SRC, dst / PKG_NAME)
     guards = canonical_guards(dst / PKG_NAME)
-    # 64 since R-12b. The lineage: 5B-1 brought the builder to 51, 5B-2 part 1 added R-9's
+    # 65 since the R-12b ordering repair. The lineage: 5B-1 brought the builder to 51, 5B-2 part 1 added R-9's
     # cross-tenant guard at 52, R-12 added five (three temporal-coherence guards plus the two
     # inside `_comparable_instant`) for 57, and R-12b adds seven in `reconciliation.py`: the
     # decision snapshot must carry `evaluated_at`, `expires_at` and `issued_at`; each outer
@@ -241,14 +241,19 @@ def mutated_package(tmp_path: pathlib.Path, guard_number: int) -> MutatedPackage
     # instants — the decision cannot have been evaluated before the recommendation it decides
     # became valid, nor issued before the evaluation it binds was made.
     #
-    # Adding them in `reconciliation.py` shifted every `candidate.py` guard by +7. The sweep's
+    # The 65th is `_bound_instant`'s awareness check, added when the two orderings moved off
+    # canonical strings onto parsed instants: `strftime` does not zero-pad `%Y` below year
+    # 1000, so a three-digit year sorted above every four-digit one and both orderings
+    # inverted. It shifted every guard after `_require_datetime` by +1.
+    #
+    # Adding R-12b's seven in `reconciliation.py` shifted every `candidate.py` guard by +7. The sweep's
     # numbered anchors are asserted against their condition text in
     # `test_the_canonical_guard_numbers_still_name_these_conditions`, so a shift fails loudly
     # rather than silently retargeting a mutation — which is exactly what it did here.
     # The count is asserted so a guard that disappears cannot go unnoticed.
-    if len(guards) != 64:
+    if len(guards) != 65:
         raise AssertionError(
-            f"canonical inventory drifted: {len(guards)} in-scope guards, expected 64"
+            f"canonical inventory drifted: {len(guards)} in-scope guards, expected 65"
         )
     _neutralise(dst / PKG_NAME, guards[guard_number - 1])
 

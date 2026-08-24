@@ -81,22 +81,22 @@ FOREIGN_DOMAIN = "some_other_domain"
 # moves and a number now names a different condition, every test here fails loudly instead
 # of silently mutating the wrong line.
 GUARD_TZ_AWARE = 3
-GUARD_REQUEST_REDERIVATION = 9
-GUARD_SNAPSHOT_TENANT = 26
-GUARD_SNAPSHOT_DOMAIN = 27
-GUARD_EVIDENCE_BINDING = 32
+GUARD_REQUEST_REDERIVATION = 10
+GUARD_SNAPSHOT_TENANT = 27
+GUARD_SNAPSHOT_DOMAIN = 28
+GUARD_EVIDENCE_BINDING = 33
 # R-12b's seven, in source order.
-GUARD_SNAPSHOT_HAS_EVALUATED_AT = 34
-GUARD_SNAPSHOT_HAS_EXPIRES_AT = 35
-GUARD_SNAPSHOT_HAS_ISSUED_AT = 36
-GUARD_OUTER_EVALUATED_AT_IS_BOUND = 38
-GUARD_OUTER_EXPIRES_AT_IS_BOUND = 39
-GUARD_EVALUATED_AFTER_VALID_FROM = 40
-GUARD_EVALUATED_BEFORE_ISSUED = 41
+GUARD_SNAPSHOT_HAS_EVALUATED_AT = 35
+GUARD_SNAPSHOT_HAS_EXPIRES_AT = 36
+GUARD_SNAPSHOT_HAS_ISSUED_AT = 37
+GUARD_OUTER_EVALUATED_AT_IS_BOUND = 39
+GUARD_OUTER_EXPIRES_AT_IS_BOUND = 40
+GUARD_EVALUATED_AFTER_VALID_FROM = 41
+GUARD_EVALUATED_BEFORE_ISSUED = 42
 # R-12's own two. Both shifted +7 when R-12b added seven guards to `reconciliation.py`,
 # which the condition-text anchor below caught — which is what it is for.
-GUARD_COMPARABLE_IS_DATETIME = 42
-GUARD_SUBJECT_ORDERING = 45
+GUARD_COMPARABLE_IS_DATETIME = 43
+GUARD_SUBJECT_ORDERING = 46
 
 EXPECTED_CONDITIONS = {
     GUARD_TZ_AWARE: "value.tzinfo is None or value.utcoffset() is None",
@@ -115,12 +115,8 @@ EXPECTED_CONDITIONS = {
     GUARD_OUTER_EXPIRES_AT_IS_BOUND: (
         "to_canonical_obj(decision_expires_at) != to_canonical_obj(snapshot_expires_at)"
     ),
-    GUARD_EVALUATED_AFTER_VALID_FROM: (
-        "to_canonical_obj(subject_valid_from) > to_canonical_obj(snapshot_evaluated_at)"
-    ),
-    GUARD_EVALUATED_BEFORE_ISSUED: (
-        "to_canonical_obj(snapshot_evaluated_at) > to_canonical_obj(snapshot_issued_at)"
-    ),
+    GUARD_EVALUATED_AFTER_VALID_FROM: "subject_valid_from > bound_evaluated_at",
+    GUARD_EVALUATED_BEFORE_ISSUED: "bound_evaluated_at > bound_issued_at",
     GUARD_COMPARABLE_IS_DATETIME: "not isinstance(value, datetime)",
     GUARD_SUBJECT_ORDERING: "not subject_from <= subject_asserted <= subject_until",
 }
@@ -128,11 +124,11 @@ EXPECTED_CONDITIONS = {
 #: Sibling guards a reader might credit with each kill. Removing the sibling instead must
 #: leave the attack refused — otherwise the test is measuring the sibling, not its own gate.
 SIBLINGS = {
-    GUARD_SNAPSHOT_TENANT: 11,          # p_tenant != d_tenant, shares TENANT_MISMATCH
-    GUARD_SNAPSHOT_DOMAIN: 16,          # request requested_domain, shares D4_IDENTIFIER_MISMATCH
-    GUARD_REQUEST_REDERIVATION: 12,     # p_request_digest != d_request_digest, shares the reason
+    GUARD_SNAPSHOT_TENANT: 12,          # p_tenant != d_tenant, shares TENANT_MISMATCH
+    GUARD_SNAPSHOT_DOMAIN: 17,          # request requested_domain, shares D4_IDENTIFIER_MISMATCH
+    GUARD_REQUEST_REDERIVATION: 13,     # p_request_digest != d_request_digest, shares the reason
     GUARD_TZ_AWARE: 2,                  # the isinstance(datetime) check in the same helper
-    GUARD_EVIDENCE_BINDING: 31,         # the tuple/non-empty check on the same field
+    GUARD_EVIDENCE_BINDING: 32,         # the tuple/non-empty check on the same field
     # R-12b siblings: each is the gate a reader might credit with the same kill, and every
     # one shares DECISION_INSTANT_NOT_BOUND with its subject except where noted.
     GUARD_OUTER_EVALUATED_AT_IS_BOUND: GUARD_SNAPSHOT_HAS_EVALUATED_AT,
@@ -907,6 +903,117 @@ def test_an_expiry_that_does_not_project_the_bound_one_is_refused(
         diagnostic="outer expires_at does not equal the value bound",
     )
     _admits_when_removed(tmp_path, GUARD_OUTER_EXPIRES_AT_IS_BOUND, projection, stretched)
+
+
+def test_a_three_digit_year_cannot_invert_the_bound_orderings(projection, decision):
+    """**The ordering defect, pinned as the attack that found it.**
+
+    The two orderings were first written against canonical *strings*, on the claim that the
+    format is "fixed-width, zero-padded and UTC-normalised". Two thirds held: ``%f`` always
+    pads and ``astimezone`` normalises. ``%Y`` does **not** pad below year 1000, so
+    ``"999-12-31T…"`` sorts above ``"2026-01-01T…"`` while 999 precedes 2026 — and both
+    guards inverted. The control is what made it decisive: a backdate of one year was
+    refused and a backdate of a thousand was admitted.
+
+    Both are refused now, but **by different gates, and the difference is worth stating.** A
+    four-digit backdate parses and loses on ordering. A sub-1000 one never parses:
+    ``strptime``'s ``%Y`` requires exactly four digits, so the writer can emit a form the
+    reader will not accept. That asymmetry is the same one that caused the defect, and here
+    it fails closed — which is the only direction it may fail.
+    """
+
+    from risk_authority.crypto.canonical import to_canonical_obj
+
+    # The premise the old comment rested on, disproven in one line.
+    ancient = datetime_mod.datetime(999, 12, 31, 23, 59, 59, tzinfo=datetime_mod.timezone.utc)
+    modern = projection.context.subject_valid_from
+    assert to_canonical_obj(ancient) > to_canonical_obj(modern), "the inversion is gone"
+    assert ancient < modern, "…but chronologically it is a thousand years earlier"
+
+    cases = [
+        (2025, "evaluated before the recommendation it decides became valid"),
+        (999, "is not a canonical UTC instant"),
+        (99, "is not a canonical UTC instant"),
+        (9, "is not a canonical UTC instant"),
+    ]
+    for year, diagnostic in cases:
+        at = datetime_mod.datetime(year, 12, 31, 23, 59, 59, tzinfo=datetime_mod.timezone.utc)
+        forged = _snapshot_and_outer(
+            decision, evaluated_at=_canonical_ts(at), issued_at=_canonical_ts(at)
+        )
+        forged = dataclasses.replace(forged, evaluated_at=at)
+        _refuses(
+            projection,
+            forged,
+            reason=Reason.DECISION_INSTANT_NOT_BOUND,
+            diagnostic=diagnostic,
+        )
+
+
+def test_the_four_digit_ordering_refusal_is_the_guard_and_not_a_sibling(
+    tmp_path, projection, decision
+):
+    """Attribution for the ordering guard, on the case that actually reaches it."""
+
+    at = datetime_mod.datetime(2025, 12, 31, 23, 59, 59, tzinfo=datetime_mod.timezone.utc)
+    forged = _snapshot_and_outer(
+        decision, evaluated_at=_canonical_ts(at), issued_at=_canonical_ts(at)
+    )
+    forged = dataclasses.replace(forged, evaluated_at=at)
+    _admits_when_removed(tmp_path, GUARD_EVALUATED_AFTER_VALID_FROM, projection, forged)
+
+
+def test_a_three_digit_issuance_cannot_invert_the_second_ordering(projection, decision):
+    """The mirror: a genuine evaluation, issuance moved to year 999, was admitted."""
+
+    ancient = datetime_mod.datetime(999, 12, 31, 23, 59, 59, tzinfo=datetime_mod.timezone.utc)
+    forged = _snapshot_and_outer(decision, issued_at=_canonical_ts(ancient))
+    _refuses(
+        projection,
+        forged,
+        reason=Reason.DECISION_INSTANT_NOT_BOUND,
+        diagnostic="decision_snapshot.issued_at",
+    )
+
+
+@pytest.mark.parametrize("value", [0, "garbage", "2026-01-01T00:00:00Z"])
+def test_a_non_instant_snapshot_value_is_a_typed_refusal_not_a_bare_typeerror(
+    projection, decision, value
+):
+    """The second instance of the class ``_comparable_instant`` was written to prevent.
+
+    ``snapshot_issued_at`` was only null-checked, never type-checked, so a non-string reached
+    the raw ``>`` and escaped as ``builtins.TypeError`` — an unclassified exception rather
+    than a refusal. The author diagnosed exactly this in ``candidate.py`` and did not apply
+    it here; ``_bound_instant`` now does.
+
+    The third case is a *well-formed RFC 3339 instant in the wrong precision*: canonical form
+    carries microseconds, so a second-precision string is not the canonical encoding and is
+    refused rather than guessed at.
+    """
+
+    forged = _snapshot_and_outer(decision, issued_at=value)
+    error = _refuses(
+        projection,
+        forged,
+        reason=Reason.DECISION_INSTANT_NOT_BOUND,
+        diagnostic="decision_snapshot.issued_at",
+    )
+    assert not isinstance(error, TypeError), "a bare TypeError is not a refusal"
+
+
+def test_the_orderings_are_decided_on_instants_not_canonical_strings():
+    """Pinned structurally, so the comparison cannot quietly move back onto strings."""
+
+    import inspect
+
+    from ugence_cloud_scaling_authorization_contracts import reconciliation as module
+
+    source = inspect.getsource(module.reconcile_phase4)
+    assert "subject_valid_from > bound_evaluated_at" in source
+    assert "bound_evaluated_at > bound_issued_at" in source
+    assert "to_canonical_obj(subject_valid_from) >" not in source
+    assert "to_canonical_obj(snapshot_evaluated_at) >" not in source
 
 
 def test_the_canonicalizer_silently_attaches_utc_to_a_naive_timestamp():

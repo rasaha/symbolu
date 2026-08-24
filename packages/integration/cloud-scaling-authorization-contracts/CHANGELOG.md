@@ -1,5 +1,36 @@
 # Changelog — ugence-cloud-scaling-authorization-contracts
 
+## [0.6.0] — R-12b ordering repair: instants, not canonical strings
+
+Found by independent review against `0.5.0`, which was green including the gate-removal sweep.
+
+`0.5.0`'s two new orderings compared canonical strings, claiming the format is "fixed-width,
+zero-padded and UTC-normalised". `%Y` is not padded below year 1000, so a three-digit year
+sorted above every four-digit one and both orderings inverted: backdating `evaluated_at` by one
+year was refused, by a thousand years **admitted**. Since that instant bounds Phase 5B's
+occurrence gate, the gate added to bound backdating admitted it without limit.
+
+### Fixed
+
+- `_bound_instant` parses each bound instant and both orderings compare **instants**. Equality
+  (the outer-equals-bound gates) stays on strings: string equality is exact, and only *ordering*
+  was wrong.
+- `snapshot_issued_at` is type-checked. `issued_at = 0` previously reached a raw `>` and escaped
+  as a bare `TypeError` — the unclassified-exception failure `_comparable_instant` exists to
+  prevent, applied here at last.
+
+### Changed
+
+- Guard inventory 64 → 65; anchors after `_require_datetime` shift by +1.
+- The awareness sweep's attack values are no longer built solely through `to_canonical_obj`,
+  which is why the original defect was invisible to a green suite.
+
+### Known asymmetry, recorded
+
+`strptime`'s `%Y` requires four digits, so the canonical writer can emit a sub-1000 year the
+reader refuses as non-canonical. Four-digit backdates lose on ordering; sub-1000 ones lose on
+parsing. Both closed, and the asymmetry fails closed.
+
 ## [0.5.0] — Cloud Scaling R-12b: the decision instants come from the bound snapshot
 
 R-12 re-sourced the three *subject* instants from the digest-bound context and stopped there.

@@ -15,7 +15,13 @@ PYPROJECT = (PROJECT / "pyproject.toml").read_text(encoding="utf-8")
 
 
 def test_version_is_the_declared_version():
-    """``0.5.0`` since R-12b: the decision instants come from the digest-bound snapshot.
+    """``0.6.0`` since the R-12b ordering repair: orderings compare instants, not strings.
+
+    ``0.5.0`` compared canonical strings and inverted below year 1000, admitting an unbounded
+    backdate of the very instant it existed to bound. A refusal that was not happening now
+    happens, which is the same shape of change as every bump below.
+
+    ``0.5.0`` was R-12b: the decision instants come from the digest-bound snapshot.
 
     Unlike every bump below it, this one **moves digests**: the Risk Authority decision
     snapshot gained ``evaluated_at``, so ``FROZEN_DECISION_DIGEST`` and, beneath it,
@@ -36,7 +42,7 @@ def test_version_is_the_declared_version():
     the same inputs now raise.
     """
 
-    assert pkg.__version__ == "0.5.0"
+    assert pkg.__version__ == "0.6.0"
 
 
 def test_distribution_and_namespace_names():
