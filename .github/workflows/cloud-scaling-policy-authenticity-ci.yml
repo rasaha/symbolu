@@ -30,9 +30,19 @@ on:
       - "claude/phase-5b-0b-**"
       - "claude/phase-5b-1-**"
       - "claude/phase-5b-2-**"
+      # 5B-3 (R-8) lands on an r8-* branch. Added because the pull_request trigger above did
+      # not re-run this workflow on three successive pushes to the 5B-3 branch — it ran once,
+      # on the first commit, and never again — so the branch's most important check went
+      # absent while eleven other workflows re-ran. Whatever caused that, a branch pattern
+      # here is the mechanism this repository already relies on and does not depend on it.
+      - "claude/r8-**"
       - "claude/setup-symbolu-monorepo-**"
     paths:
       - "packages/integration/cloud-scaling-policy-authenticity/**"
+      # Added with the r8 pattern: the pull_request trigger watches the Policy Authority and
+      # this one did not, so a Route-1-only change — one that edits the authority this package
+      # delegates every trust decision to — triggered nothing on a push.
+      - "packages/policy-authority/**"
       - ".github/workflows/cloud-scaling-policy-authenticity-ci.yml"
 
 defaults:
