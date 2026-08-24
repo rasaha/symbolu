@@ -107,6 +107,13 @@ class AuthorizationCandidateRejectionReason(str, Enum):
     MISSING_BINDING_DECISION = "missing_binding_decision"
     MISSING_DECISION_SNAPSHOT = "missing_decision_snapshot"
     MISSING_EXPIRY_FACT = "missing_expiry_fact"
+    #: R-12b. Distinct from the two members around it, and deliberately not folded into
+    #: ``DECISION_DIGEST_MISMATCH``: the snapshot is present, the digest over it still
+    #: reconciles, and the expiry fact is present and canonical. What is wrong is that the
+    #: decision's *outer* ``expires_at`` disagrees with the digest-bound copy inside
+    #: ``decision_snapshot``, which no digest check can see because the outer field is not
+    #: covered by one.
+    DECISION_EXPIRY_MISMATCH = "decision_expiry_mismatch"
     IDEMPOTENCY_KEY_MISMATCH = "idempotency_key_mismatch"
     D4_IDENTIFIER_MISMATCH = "d4_identifier_mismatch"
 

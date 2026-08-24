@@ -5,6 +5,12 @@ Deterministic inventory: 87 raw `raise` sites -> 85 loose guards -> 81 strict gu
 Anchors hold: guard 11 = `reconciliation.py:226 p_tenant != d_tenant`, guard 13 =
 `reconciliation.py:236 p_subject_digest != d_subject_digest`.
 
+**Superseded in part.** This table is the sweep as scored at the 49-guard head. The inventory
+is 53 as of R-12b (51 at 5B-1, 52 at 5B-2, 53 at R-12b) and the numbering below is no longer
+current: R-12b's guard 35 lands in `reconciliation.py`, so every `candidate.py` row here is now
+one lower than its canonical number. The table is kept rather than edited — it records a sweep
+that was actually run, and re-numbering it would make it look like a sweep that was re-run.
+
 Mutation: the guard's `if` header is rewritten to `if False:`, neutralising exactly that
 guard. Every run is a disposable untracked copy; the tracked worktree is never mutated.
 A run is scored only if it collected the full suite.

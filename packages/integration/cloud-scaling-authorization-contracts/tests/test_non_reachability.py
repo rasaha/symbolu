@@ -16,6 +16,7 @@ from __future__ import annotations
 import ast
 import dataclasses
 import pathlib
+from datetime import timedelta
 
 import pytest
 
@@ -78,6 +79,14 @@ def invalid_cases(projection, decision, attestation, target_scope, policy_bindin
         **base, "decision": _forged(decision, decision_digest="sha256:" + "a" * 64)
     }
     yield "missing_expiry", {**base, "decision": _forged(decision, expires_at=None)}
+    # R-12b: the outer expiry moved off the digest-bound copy in decision_snapshot. Built
+    # with the ordinary public constructor rather than ``_forged`` — that is the finding.
+    yield "moved_decision_expiry", {
+        **base,
+        "decision": dataclasses.replace(
+            decision, expires_at=decision.expires_at + timedelta(days=3650)
+        ),
+    }
     yield "stale_request_digest", {
         **base, "decision": _forged(decision, request_digest="sha256:" + "0" * 64)
     }
@@ -114,7 +123,7 @@ def test_every_invalid_case_produces_no_candidate(
         seen.add(label)
         with pytest.raises(CandidateConstructionError):
             build_capacity_authorization_candidate(**kwargs)
-    assert len(seen) == 15, f"expected 15 distinct rejection paths, swept {len(seen)}"
+    assert len(seen) == 16, f"expected 16 distinct rejection paths, swept {len(seen)}"
 
 
 def test_no_invalid_case_reaches_a_collaborator(

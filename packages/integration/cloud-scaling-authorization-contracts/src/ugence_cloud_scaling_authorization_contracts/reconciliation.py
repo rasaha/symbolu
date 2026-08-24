@@ -18,7 +18,10 @@ discipline is ever reintroduced as a re-read.
 reconciliation leaves no candidate, no cached fragment and no observable side effect.
 
 **No trusted clock.** ``expires_at`` and the validity window are checked for *presence and
-canonical form*, never against "now". Phase 5A holds no clock; see :mod:`.candidate`.
+canonical form*, never against "now". Phase 5A holds no clock; see :mod:`.candidate`. Where a
+validity fact is carried twice — once bare and once inside a digest-bound snapshot — the two
+copies are reconciled against each other (R-12b). That is self-consistency, not freshness: it
+still takes no view on whether the instant has passed.
 """
 
 from __future__ import annotations
@@ -39,6 +42,7 @@ from .canonical import (
     digest_of_snapshot,
     require_canonical_digest,
     require_canonical_identifier,
+    to_canonical_obj,
 )
 from .errors import AuthorizationCandidateRejectionReason as _Reason
 from .errors import ExactTypeError, ReconciliationError
@@ -386,6 +390,29 @@ def reconcile_phase4(
     decision_expires_at = _require_datetime(
         "expires_at", d_expires_at, _Reason.MISSING_EXPIRY_FACT
     )
+    # R-12b. ``expires_at`` is carried twice: once as an outer field of the decision, and
+    # once inside ``decision_snapshot``, which the digest check above re-derived. Only the
+    # snapshot copy is covered by a digest, so a public ``dataclasses.replace`` on the exact
+    # frozen type moves the outer field alone — every check above still passes, the snapshot
+    # and digest are untouched, and the candidate carries the moved instant as
+    # ``decision_expires_at_fact``. Phase 5B's gate 13 decides CANDIDATE_DECISION_EXPIRED
+    # from that field and from nothing else, so an expired decision is made to verify by
+    # editing the one copy nobody hashed.
+    #
+    # The two copies are reconciled by canonicalizing the outer value with the same public
+    # primitive the snapshot was rendered with, so the comparison is byte-for-byte in the
+    # snapshot's own spelling rather than a second rendering invented here. This is a
+    # *coherence* check, not a clock: it says the decision agrees with itself about when it
+    # expires, and says nothing about whether that instant has passed.
+    snapshot_expires_at = d_decision_snapshot.get("expires_at")
+    if to_canonical_obj(decision_expires_at) != snapshot_expires_at:
+        raise ReconciliationError(
+            "the decision's outer expires_at disagrees with the digest-bound copy in "
+            f"decision_snapshot: the decision states "
+            f"{to_canonical_obj(decision_expires_at)!r} and the snapshot the digest covers "
+            f"states {snapshot_expires_at!r}",
+            _Reason.DECISION_EXPIRY_MISMATCH,
+        )
 
     return ReconciledPhase4Facts(
         tenant_id=require_canonical_identifier("tenant_id", p_tenant),

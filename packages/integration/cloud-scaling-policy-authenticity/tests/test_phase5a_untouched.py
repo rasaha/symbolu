@@ -37,10 +37,17 @@ def _phase5a() -> pathlib.Path:
 
 @pytest.mark.invariant
 def test_phase_5a_is_at_the_version_5b1_moved_it_to():
-    """``0.2.0``: a required field on the candidate, and a moved candidate digest (D-5B1-2)."""
+    """``0.4.0`` since R-12b, which is the version this suite was last measured against.
+
+    5B-1 took Phase 5A to ``0.2.0`` — a required field on the candidate, and a moved candidate
+    digest (D-5B1-2). 5B-2 took it to ``0.3.0`` (R-9) and R-12b to ``0.4.0``; neither moved a
+    digest or a schema identifier, so nothing this package pins changed. The assertion stays
+    exact rather than becoming a floor: a Phase 5A version that drifts without this suite being
+    re-run is exactly what it exists to catch.
+    """
 
     version = (_phase5a() / "src" / "ugence_cloud_scaling_authorization_contracts" / "version.py").read_text()
-    assert '__version__ = "0.3.0"' in version
+    assert '__version__ = "0.4.0"' in version
 
 
 @pytest.mark.invariant

@@ -1,5 +1,15 @@
 # Changelog — ugence-cloud-scaling-policy-authenticity
 
+## Unreleased — Phase 5A version re-pin for R-12b
+
+**No source change and the version does not move.** Phase 5A moved to `0.4.0` closing R-12b,
+which is a defect this package's gate 13 was the consumer of: `decision_expires_at_fact` — the
+sole input to `CANDIDATE_DECISION_EXPIRED` — was reachable by a public `dataclasses.replace` on
+the decision's un-hashed outer `expires_at`. Phase 5A now refuses that pairing, so a candidate
+reaching gate 13 states the expiry its own digest-bound snapshot records. No Phase 5A digest or
+schema identifier moves, so nothing pinned here changed; `test_phase5a_untouched.py`'s exact
+version assertion is re-pinned, which is that test working as designed.
+
 ## [0.5.0] — Cloud Scaling Phase 5B-3: close R-8, the authenticated capacity bound
 
 Ratified as Route 1 + Route 2 as one isolated subphase. **Breaking**, pre-1.0: a determination

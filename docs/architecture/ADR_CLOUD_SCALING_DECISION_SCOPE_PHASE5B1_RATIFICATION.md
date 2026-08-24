@@ -324,7 +324,8 @@ It pushed back on two things, and both are corrected above: R-9's framing was to
 | R-9 **CLOSED (5B-2 pt 1)** `[V]` | **Broadened by the independent design review, then closed.** Enforced at Phase 5A's builder (`CROSS_TENANT_POLICY_BINDING`) and gate 12 (`CANDIDATE_CROSS_TENANT_POLICY`), both keyed on the scope so the `GLOBAL` carve-out survives. Original framing kept below for the record:  The first framing asked only about the empty-string global tenant, which read as an edge case. It is not: **nothing anywhere in the tree ties a candidate's *action* tenant to the tenant of the policy it reconciles against.** A candidate describing an action for `tenant-1`, carrying a coordinate for a `TENANT`-scoped policy belonging to `tenant-elsewhere`, verifies `VERIFIED` `[V]` — gate 11 compares the candidate's coordinate against the *resolved* policy, and that policy is genuinely the other tenant's. Phase 5A does not compare them either. Inert today because no composition root calls `verify()`, which is exactly why it must be ruled on **before** 5B-2 wires one rather than discovered while wiring it. Pinned as executable behaviour by `test_a_candidate_reconciles_against_another_tenants_policy`, which measures today's permissive behaviour without endorsing it | Owner, before 5B-2 |
 | R-10 `[G]` | Two Phase 5A suite weaknesses found while implementing, both pre-existing: `test_non_reachability.py` strips docstrings with `ast.get_docstring`, whose dedented result does not match the indented source, so an indented docstring naming a forbidden symbol trips the scan; and `test_phase5a_invariants.py::test_no_phase_5a_source_file_was_modified` reads `git status`, so it measures a clean working tree rather than an unmodified package | Phase 5A |
 | R-11 **CLOSED (5B-2 pt 1)** `[V]` | Completeness now enumerates the public attribute surface statically and totally over names (`inspect.getmembers_static`), never executing a descriptor, with a five-member allowlist ratcheted against the merge base. Eleven distinct bypass constructs were planted and refused. The declared trust boundary — a contributor editing class, allowlist and disclosure together — is recorded, not claimed closed | Phase 5A |
-| R-12 `[G]` | **Found by the 5B-2 part 2 independent review.** Gate 13 compares each of the candidate's six timestamps against `as_of` and **never against each other**, so a candidate whose attestation predates its subject assertion by a year verifies `[V]`. That is internal *incoherence* rather than staleness — the pair is consistent with the instant and inconsistent with itself — and it belongs upstream at construction, where the builder holds all six. Out of scope for R-2, which is about reconciling the instant | Phase 5A |
+| R-12a `[G]` (was R-12) | **Found by the 5B-2 part 2 independent review.** Gate 13 compares each of the candidate's six timestamps against `as_of` and **never against each other**, so a candidate whose attestation predates its subject assertion by a year verifies `[V]`. That is internal *incoherence* rather than staleness — the pair is consistent with the instant and inconsistent with itself — and it belongs upstream at construction, where the builder holds all six. Out of scope for R-2, which is about reconciling the instant. Renamed R-12a when R-12b was split out of it below | Phase 5A |
+| R-12b **CLOSED** `[V]` | Split out of R-12 and closed in `0.4.0`: a *second* incoherence, inside one artifact rather than between two. `SubjectRiskDecision` carries `expires_at` twice — an outer field and a copy inside `decision_snapshot` — and only the snapshot copy is digest-bound. Phase 5A read the outer one, so a public `dataclasses.replace` on the exact frozen type moved it alone and nothing objected `[V]`. Closed by canonical guard 35, reconciling the outer value against the snapshot copy through the public canonicalization | 5B-3 |
 | A-59 (5B-0A) **INTENTIONAL BOUNDARY — not a defect** `[R]` | Measured: the attestation module never mentions `candidate_digest`, and two candidates with different digests were built from one attestation object `[V]`. **Owner ruling: this is not to be "closed" by adding `candidate_digest` to the producer signature.** The producer owns the recommendation, not the downstream policy, risk decision or authorization candidate. The producer signature authenticates the recommendation; the verified artifact binds that authenticated recommendation to the candidate examined; authorizing the complete candidate belongs to a later Decision/Envelope authority | Authority boundary, by design |
 
 ## The residual ratification round, and what this session verified of it
@@ -576,3 +577,103 @@ That is the fourth guard in this ADR's history to be hollow on first writing, an
 where the hole was in the terminal *classification* rather than the check itself. A guard that
 fails for the wrong stated reason is only marginally better than one that does not fail: it
 sends the reader to the wrong place.
+
+## R-12b — the decision that disagreed with itself about when it expired
+
+### The defect, and why every existing check passed
+
+`SubjectRiskDecision` carries `expires_at` twice: once as an outer dataclass field, and once
+inside `decision_snapshot`. Risk Authority binds `decision_digest == digest(to_canonical_obj(
+decision_snapshot))` in `SubjectRiskDecision._bind`, and canonical guard 24 re-derives that
+equality independently from the public primitives `[V]`. **The outer field is covered by no
+digest at all.**
+
+So the attack needs no forging. `dataclasses.replace(decision, expires_at=<a decade later>)` on
+the exact frozen type re-runs Risk Authority's own `__post_init__` and passes it: the snapshot
+is untouched, `decision_digest` still reconciles, the tenant, request digest, subject digest,
+idempotency key and evidence binding all still agree. Phase 5A read the outer field, so the
+candidate was built and carried the moved instant as `decision_expires_at_fact` `[V]`.
+
+That field is not inert. Phase 5B's gate 13 (`verification.py`, `_candidate_validity_problem`)
+decides `CANDIDATE_DECISION_EXPIRED` from `decision_expires_at_fact` **and from nothing else**,
+so a decision that died months ago could be made to verify by editing the one copy nobody
+hashed. This is the same class of defect R-2 closed — a fact recorded beside its evidence and
+never reconciled with it — one layer down.
+
+### The fix
+
+Canonical guard 35, at the end of `reconcile_phase4`:
+`to_canonical_obj(decision_expires_at) != snapshot_expires_at` -> `DECISION_EXPIRY_MISMATCH`.
+
+Three properties are load-bearing:
+
+* **It canonicalizes rather than parses.** The comparison runs in the snapshot's own spelling,
+  through the same public `to_canonical_obj` the snapshot was rendered with — re-exported from
+  `canonical.py` as `DIGEST_PREFIX` already was, so Phase 5A still introduces no second
+  rendering of a timestamp anywhere `[V]`.
+* **It is an equality, not an ordering.** Extending the window revives a dead decision and
+  shortening it retires a live one; neither is the decision Risk Authority made, and the gate
+  does not have to choose which is worse.
+* **It is not a clock.** An honestly shortened window and an honestly extended one — snapshot
+  moved together with the outer field, digest re-derived — both still build a candidate, which
+  is the only way a caller can state a window at all. Phase 5A takes no view on whether the
+  instant has passed; that is still gate 13's.
+
+Attribution is proven inside the suite rather than argued: with guard 35 neutralised the attack
+reaches candidate construction and the candidate carries the revived instant; with guard 24 —
+the digest re-derivation, the sibling a reader would credit — neutralised instead, the attack is
+still refused, and refused by guard 35 `[V]`
+(`tests/test_temporal_coherence.py::test_the_coherence_gate_is_the_only_thing_refusing_it`).
+
+### A correction to the brief that commissioned this, on record
+
+The brief asked that guard 39 be recorded as having had this defect as its only reachable
+vector, becoming defence in depth like guard 38. **That is not what the repository shows, and it
+is recorded as a correction rather than written in.** `[V]`
+
+* Guard 39 in the inventory this change starts from is `s_action_type != facts.action_type`
+  (`candidate.py`), and in the inventory it produces it is the same condition renumbered from 38.
+  Neither reading concerns an expiry, and both are killed by `test_action_substitution_is_refused`,
+  which never touches `expires_at`.
+* Guard 35 is an *addition* and it sorts last in `reconcile_phase4`, after every other
+  reconciliation guard and before every `candidate.py` guard. It can therefore shadow a guard
+  only for an input that also moves the outer expiry, and no test in the suite constructs one —
+  which is why the full suite is green with no test rewritten for reachability `[V]`.
+* No guard lost a reachable vector to this change. What changed is one guard gained one.
+
+The numbering consequence is real and is the part worth carrying forward: because guard 35 lands
+in `reconciliation.py` rather than at the end of `candidate.py`, **every `candidate.py` guard
+number moved up by one** (52 -> 53). The 5B-1 and 5B-2 additions sorted after every anchor and
+did not. The suite's numbered anchors are all in `reconciliation.py` at or below 34, so none
+moved; `GUARD_SWEEP.md` and the README's sweep table are marked superseded rather than
+renumbered, because renumbering them would make a sweep that was never re-run look as though it
+had been.
+
+### `decision_evaluated_at` is deliberately left open — an owner decision
+
+The same defect shape applies to `decision_evaluated_at`, and it is **not** fixed here, because
+there is no honest fix available at this layer. Guard 35 works only because a digest-bound copy
+of `expires_at` exists to compare against. For `evaluated_at` there is none: the snapshot carries
+`issued_at`, which is when Decision Authority *bound* the decision, not when the evaluation was
+performed. In the reference seam both happen to be stamped from one `now`, so they coincide in
+the fixture — which is exactly the coincidence a guard must not be built on `[V]`.
+
+Three options, none taken:
+
+1. **Bound it by `issued_at`.** Require `decision_evaluated_at <= snapshot["issued_at"]`: an
+   evaluation cannot postdate the binding it produced. Weaker than an equality — it constrains a
+   direction, not a value — and it asserts a causal ordering between two authorities that no
+   ratified contract states.
+2. **Source it from `issued_at` and move the candidate digest.** Take the fact from the
+   digest-bound copy and stop reading the outer field. Structurally strongest, and it changes
+   what `decision_evaluated_at_fact` *means* — from "when risk was evaluated" to "when the
+   decision was bound" — which moves the candidate digest and every frozen vector under it.
+3. **Accept it.** Record that the outer `evaluated_at` is unverifiable at this layer and that
+   gate 13 reads it as an occurrence instant only, where a moved value can refuse a
+   determination but cannot admit an expired one.
+
+Option 2 is the only one that closes it, and it is the only one that moves a digest, so it is
+not a model's call. Until it is ruled on, the exposure is bounded and should be stated
+precisely: `decision_evaluated_at_fact` reaches gate 13 only through `_OCCURRENCE_FACTS`, where
+moving it *later* refuses a determination that would otherwise verify, and moving it *earlier*
+admits nothing that the two windows above it do not already govern `[V]`.

@@ -126,6 +126,15 @@ in-scope guards** across `reconciliation.py` and `candidate.py`, in source order
 is `p_tenant != d_tenant` and guard 13 is `p_subject_digest != d_subject_digest`; both
 anchors are asserted by the suite so a line shift cannot silently renumber the inventory.
 
+**The counts in this section are as of the 49-guard head and have not been re-run since.**
+The inventory has grown four times: to 51 at 5B-1, 52 at 5B-2 (R-9) and **53 at R-12b**, whose
+guard 35 requires the decision's outer `expires_at` to equal the digest-bound copy inside
+`decision_snapshot`. Guard 35 lands in `reconciliation.py`, so — unlike the 5B-1/5B-2
+additions, which sorted after every anchor — every `candidate.py` guard number moved up by one.
+The four additions each carry their own admission and misattribution proof inside the suite;
+what is *not* claimed is a re-scored full sweep, and inventing one would be worse than saying
+so.
+
 Every one of the 49 is mutated — its `if` header rewritten to `if False:` — in a disposable
 copy, and the full suite is re-run against it. A run is scored only if it collected the
 whole suite; a run that failed to collect is recorded as invalid, never as a kill.

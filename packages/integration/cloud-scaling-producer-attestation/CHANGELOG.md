@@ -3,6 +3,14 @@
 All notable changes to this distribution. This package follows the Cloud Scaling phase
 numbering; each entry names the phase that produced it.
 
+## Unreleased — Phase 5A version re-pin for R-12b
+
+**No source change, no fixture change, and the version does not move.** Phase 5A moved to
+`0.4.0` closing R-12b: the decision's outer `expires_at` must equal the digest-bound copy inside
+`decision_snapshot`. No Phase 5A digest and no schema identifier moves with it, so every pin in
+this package is unchanged — only `test_phase5a_invariants.py`'s exact version assertion, which
+exists to fire on exactly this kind of drift and did.
+
 ## Unreleased — fixture re-pins for Cloud Scaling Phase 5B-1
 
 **No source change, and the version does not move.** Phase 5B-1 added the required policy

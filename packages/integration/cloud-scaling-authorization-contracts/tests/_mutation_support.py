@@ -227,15 +227,18 @@ def mutated_package(tmp_path: pathlib.Path, guard_number: int) -> MutatedPackage
     dst.mkdir(parents=True, exist_ok=True)
     shutil.copytree(SRC, dst / PKG_NAME)
     guards = canonical_guards(dst / PKG_NAME)
-    # 52 since 5B-2. 5B-1 brought the builder to 51 with guards 43 and 44 — the two policy
-    # references must name one policy, and the coordinate must bind this scope. 5B-2 adds the
+    # 53 since R-12b. 5B-1 brought the builder to 51 with guards 43 and 44 — the two policy
+    # references must name one policy, and the coordinate must bind this scope. 5B-2 added the
     # third of that family, closing R-9: a TENANT-scoped policy may bound only its own
-    # tenant's action. The count is asserted so a guard that disappears cannot go unnoticed;
-    # the numbered anchors the sweep aims at are checked separately, and all three new guards
-    # sort after every anchor.
-    if len(guards) != 52:
+    # tenant's action. R-12b adds the 53rd, in ``reconciliation.py``: the decision's outer
+    # ``expires_at`` must equal the digest-bound copy inside ``decision_snapshot``. Unlike the
+    # 5B-1/5B-2 additions it does **not** sort after every anchor — it lands between guard 34
+    # and the first ``candidate.py`` guard, so every ``candidate.py`` number moved up by one.
+    # The count is asserted so a guard that disappears cannot go unnoticed; the numbered
+    # anchors the sweep aims at are checked separately.
+    if len(guards) != 53:
         raise AssertionError(
-            f"canonical inventory drifted: {len(guards)} in-scope guards, expected 52"
+            f"canonical inventory drifted: {len(guards)} in-scope guards, expected 53"
         )
     _neutralise(dst / PKG_NAME, guards[guard_number - 1])
 

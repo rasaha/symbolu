@@ -15,6 +15,12 @@ independent recomputation over the published canonicalization contract, not a co
 private internal — and if Risk Authority ever changed that contract, this package's own
 frozen digests would move and its suite would fail rather than silently disagree.
 
+The same reasoning governs the one place a *value* rather than a digest has to be compared
+against a snapshot. ``to_canonical_obj`` is re-exported here — as ``DIGEST_PREFIX`` already is
+— so that a caller comparing a carried Python value against its canonical spelling inside a
+snapshot reaches Risk Authority's canonicalization through this module, and no second
+rendering of a timestamp is ever written anywhere in this distribution.
+
 Digest format is enforced, not assumed: every value that leaves this package is
 ``sha256:`` + 64 lowercase hex characters. A bare-hex digest is a rejection.
 """
@@ -37,6 +43,7 @@ from .errors import (
 
 __all__ = [
     "DIGEST_PREFIX",
+    "to_canonical_obj",
     "canonical_digest",
     "digest_of_snapshot",
     "is_canonical_digest",

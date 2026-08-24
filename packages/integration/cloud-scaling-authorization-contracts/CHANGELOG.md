@@ -1,5 +1,53 @@
 # Changelog — ugence-cloud-scaling-authorization-contracts
 
+## [0.4.0] — R-12b: the decision must agree with itself about when it expires
+
+**Breaking**, pre-1.0: a decision that was accepted at `0.3.0` may be refused at `0.4.0`. No
+schema identifier moves and **no digest moves** — a refusal changes what is constructible, not
+what is hashed.
+
+### Added
+
+- Rejection reason `DECISION_EXPIRY_MISMATCH`. Its own member rather than a reuse of
+  `DECISION_DIGEST_MISMATCH` or `MISSING_EXPIRY_FACT`: the snapshot is present, the digest over
+  it still reconciles, and the expiry fact is present and canonical. What is wrong is that the
+  decision's *outer* `expires_at` disagrees with the digest-bound copy inside
+  `decision_snapshot`.
+- A reconciliation guard closing **R-12b** (inventory 52 → 53, landing as canonical guard 35).
+  `SubjectRiskDecision` carries `expires_at` twice and only the snapshot copy is covered by a
+  digest, so a public `dataclasses.replace` on the exact frozen type moved the outer field
+  alone — Risk Authority's own `__post_init__` re-ran and passed, guard 24's independent
+  re-derivation still agreed, and the candidate carried the moved instant as
+  `decision_expires_at_fact`. Phase 5B's gate 13 decides `CANDIDATE_DECISION_EXPIRED` from that
+  field and from nothing else. The guard canonicalizes the outer value with the same public
+  primitive the snapshot was rendered with, so the comparison is byte-for-byte in the
+  snapshot's own spelling and an equal instant in another timezone is still equal.
+- `to_canonical_obj` is re-exported from `canonical.py`, as `DIGEST_PREFIX` already was, so the
+  one comparison of a carried *value* against a snapshot reaches Risk Authority's
+  canonicalization through the same module every digest does. No fourth canonicalization
+  scheme, and no second rendering of a timestamp anywhere in this distribution.
+
+### Unchanged, and recorded as an open owner decision
+
+- `decision_evaluated_at` gets no equivalent guard. There is no digest-bound copy of that
+  instant: the snapshot carries `issued_at`, which is when Decision Authority bound the
+  decision, not when the evaluation was performed. Three options and the reasoning are
+  recorded in `docs/architecture/ADR_CLOUD_SCALING_DECISION_SCOPE_PHASE5B1_RATIFICATION.md`;
+  none is taken here.
+
+### Tests
+
+- `tests/test_temporal_coherence.py`: the attack refused in both directions, the attribution
+  proof (removing guard 35 admits and the candidate carries the revived instant; removing
+  guard 24 instead leaves it refused), the two decision-window cases minted honestly — the
+  snapshot moved together with its outer field and the digest re-derived — and the
+  timezone-equality case that keeps the gate from becoming an accidental awareness check.
+- `tests/test_non_reachability.py` sweeps a sixteenth rejection path, `moved_decision_expiry`,
+  built with the ordinary public constructor rather than by forging. That it needs no forging
+  is the finding.
+
+- surface: no change to `CapacityAuthorizationCandidate`'s declared surface.
+
 ## [0.3.0] — Cloud Scaling Phase 5B-2 part 1: R-9
 
 Ratified in `docs/architecture/ADR_CLOUD_SCALING_DECISION_SCOPE_PHASE5B1_RATIFICATION.md`,
