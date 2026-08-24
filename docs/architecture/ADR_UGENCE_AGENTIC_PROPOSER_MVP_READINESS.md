@@ -444,6 +444,13 @@ This addendum is additive. **No D1–D10 text above is rewritten**; each remains
 verbatim record of what was ratified when it was ratified. What follows is a dated
 extension recording ratifications that landed after D10.
 
+**Ordering dependency.** This addendum assumes the *Ratified refinements (O-1 – O-4)*
+section above is already present — it lands with the guard branch
+`claude/governance-refinements-o1-o4-k96vbz`, which is expected to merge first. O-1 to
+O-4 are recorded **there and only there**; A5–A8 below cross-reference that section
+rather than restating it, so this artifact carries one account of each decision and not
+two.
+
 ### Provenance
 
 | Fact | Value |
@@ -505,57 +512,41 @@ revision. They are not redundant and not inconsistent.
 > `ReviewAction` contains exactly `ROUTE_APPROVAL_BUNDLE` and
 > `CREATE_EXCEPTION_REVIEW_BUNDLE`.
 
-### A5 — O-1: selection-dependent fields are nullable
+### A5–A8 — O-1 to O-4: recorded once, under *Ratified refinements*
 
-> `ProposerAdvisory.recommended_disposition`, `.requested_review_action` and
-> `.requested_review_destination_role_ref` are each nullable. When
-> `selected_candidate_id is None` all three must be `None`. When a selected candidate
-> becomes permitted in a future stage, all three must bind consistently to that
-> candidate, its disposition and its permitted review routing.
+O-1 (selection-dependent fields), O-2 (lifecycle authority, not vocabulary), O-3 (one
+kind, one bearer) and O-4 (ASCII identifiers, and only identifiers) are recorded in this
+artifact **once**, in the *Ratified refinements (O-1 – O-4)* section above, together
+with the *Narrowed by O-2* and *Narrowed by O-3* notes on D8 and D7. That section is the
+canonical record and this addendum does not restate it.
 
-Under A2, S1 has no selected candidate, so in S1 all three are always `None`.
+What this addendum adds, and that section does not carry, is how the four decisions bear
+on the contract specification:
 
-### A6 — O-2: lifecycle vocabulary is retained; lifecycle authority stays barred
-
-> `SUSPENDED`, `REVOKED`, `RoleActivationStatus`, `activation_status` and `expires_at`
-> are retained and must not be renamed merely to satisfy an over-broad lexical scanner.
-> Contracts may describe lifecycle states and validity periods determined by external
-> authority.
->
-> The lifecycle guard is narrowed to prohibit agent-owned lifecycle mutation authority
-> and mutation operations — not descriptive fields or enum values.
-
-`[V]` The current scan matches stems over class names, contract fields and enum
-members, and rejects all five retained names. Narrowing it to callable names — function
-and method definitions, non-model non-enum class definitions, and lambda-bound names —
-accepts all five and still rejects `activate`, `suspend_role`, `revoke_identity`,
-`expire_mandate`, `ActivateRole` and `reactivate`. The `LIFECYCLE_VERBS` stem list is
-not relaxed, and the shared-contract export bound and `CognitiveRole` re-export scan are
-unchanged. Mutation tests proving both halves are a condition of the narrowing.
-
-### A7 — O-3: the advisory kind applies to `ProposerAdvisory` only
-
-> The ratified `kind` requirement applies only to the authority-facing
-> `ProposerAdvisory`. `CandidateAdvisory` is a subordinate candidate record and must not
-> claim it.
-
-`[V]` The ratified-kind assertion is currently parametrized over both advisory types and
-cannot be satisfied by a `CandidateAdvisory`. It is narrowed to `ProposerAdvisory`, with
-a mutation test asserting that a `ProposerAdvisory` without the ratified kind still
-fails. The rival-identity walk, the barred-field walk and the barred-prefix scans
-continue to cover both types unchanged.
-
-### A8 — O-4: the identifier profile
-
-> Identifier and reference fields match `^[A-Za-z0-9][A-Za-z0-9._:/-]*$`. This applies
-> only to identifiers and references, never to claims, reasons, summaries, purpose or
-> other human-readable free text.
-
-The ASCII restriction is identity-load-bearing: the frozen `P_unsigned` profile has
-empty `nfc_paths`, so the identity function performs no Unicode normalization, and
-restricting identifiers to characters with no alternative NFC spelling removes the only
-route by which two visually identical advisories could carry different digests through
-an identifier.
+* **O-1** is implemented in the specification at **two distinct levels**. A local
+  `ProposerAdvisory` model validator couples the presence of `selected_candidate_id` to
+  the joint presence of `recommended_disposition`, `requested_review_action` and
+  `requested_review_destination_role_ref`, and their joint absence to its absence. A
+  separate cross-contract obligation on `build_proposer_advisory` and on an independent
+  replay verifier resolves the referenced `AdvisoryCandidateSet` and checks
+  correspondence. **The local validator does not, and cannot, establish the second**: it
+  holds `candidate_set_id`, not the set. `ProposerAdvisory` therefore carries a mirrored
+  `selected_candidate_id` — required as a field, nullable as a value, ASCII-constrained
+  when non-null, identity-participating in `P_unsigned` — without which the local
+  coupling would not be decidable on the advisory at all. Under A2 (V13) all four are
+  `None` in S1; the future-stage branch is preserved and unreachable.
+* **O-4** is implemented as an explicit **three-category classification** — identifier
+  or reference, canonical symbolic token, human-readable free text — assigned per field
+  rather than inferred from name shape. Six fields (`agent_version`, `tool_name`,
+  `allowed_source_scopes`, `excluded_data_classes`, `permitted_tool_scopes`,
+  `tool_invocations`) are symbolic tokens that a suffix rule reaches as neither
+  identifiers nor text; they carry their own canonical token pattern and are not
+  silently treated as free text. The guards must classify from an exact pinned field
+  registry, with mutation tests per category.
+* **O-2 and O-3** are enforced as ratified. The specification records the guard branch's
+  grammatical/syntactic O-2 rule as the preferred implementation, and its
+  required-on-`ProposerAdvisory`, barred-on-`CandidateAdvisory` O-3 rule as stronger
+  than the narrowing first proposed.
 
 ### A9 — The S1 contract and equation specification
 

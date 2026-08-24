@@ -219,16 +219,21 @@ recorded in `S1_CONTRACT_AND_EQUATION_SPECIFICATION.md` derive from that ratific
 together with D1, D3, D4, D7 and D8, and that document marks which content is
 owner-ratified and which is authored from it.
 
-### Three guard corrections the specification requires
+### Guard corrections: what is done, and what is left
 
-The specification records three corrections to these guards, each to be made in the
-same change that introduces the surface it governs, and each with mutation tests:
+The O-1 – O-4 refinements and their guards are recorded under *What O-1 – O-4 changed*
+above; that is the canonical account and this section does not restate it. What follows
+is only the residue the contract specification adds.
 
-| Guard | Correction | Why |
-| --- | --- | --- |
-| `test_no_local_canonicalization.py` | Module-path-scoped text mask for exactly `"sha256:"` and `"^sha256:[0-9a-f]{64}$"` in the one authorized identity module | The ratified prefix literal collides with `SUSPECT_TEXT`. No definition-name exemption is needed: the identity functions are named `compute_advisory_identity` and `verify_advisory_identity`, which contain no suspect substring |
-| `test_role_projection_bounds.py` | Narrow the lifecycle-verb scan to callable names; exempt contract fields, enum members and model/enum class names | A contract *describing* an externally determined lifecycle state or validity period is not a capability *exercising* lifecycle authority. The stem list is not relaxed |
-| `test_advisory_contract_shape.py` | Parametrize the ratified-kind assertion over `ProposerAdvisory` only | `CandidateAdvisory` is a subordinate candidate record and must not claim the authority-facing advisory kind |
+| Item | Status |
+| --- | --- |
+| Lifecycle bound narrowed to authority, not vocabulary (O-2) | **done** — `tests/test_role_projection_bounds.py` |
+| Ratified kind required on `ProposerAdvisory`, barred on `CandidateAdvisory` (O-3) | **done** — `tests/test_advisory_contract_shape.py` |
+| Selection-dependent coupling (O-1) | **done** — `tests/test_selection_dependent_fields.py`, with one correction outstanding: the dependent-field set is matched by name alone, so `CandidateAdvisory.requested_review_action` — the candidate's own required, non-null routing — is caught as if it were selection-dependent. It must be scoped to its bearer contract |
+| Identifier normalization (O-4) | **done** — `tests/test_identifier_normalization.py`, with one gap outstanding: classification is by name suffix, which reaches neither `tool_name` nor the scope fields. The specification classifies every field explicitly and requires the guard to read an exact pinned registry |
+| `sha256:` prefix literal vs. `SUSPECT_TEXT` | **outstanding** — a module-path-scoped text mask in the one authorised identity module, with mutation tests. No definition-name exemption is needed: the ratified identity functions are named `compute_advisory_identity` and `verify_advisory_identity`, which carry no suspect substring |
+| `pydantic` loads `socket`, which `tests/test_boundaries.py` forbids | **outstanding, owner decision** — bare `import pydantic` does not load `socket`; defining any `BaseModel` does. Every contract is a `BaseModel` and `pydantic>=2` is a ratified core dependency, so the first contract module trips that guard for a reason unrelated to the contracts |
+| `tests/test_vocabulary.py` pins the S0 export surface by equality | **outstanding** — it must be updated to the full S1 surface in the same change that exports the first contract, and not before |
 
 None of these is discharged by the specification document, which changes no test.
 

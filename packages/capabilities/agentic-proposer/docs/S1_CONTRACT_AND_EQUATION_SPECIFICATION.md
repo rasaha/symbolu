@@ -213,14 +213,22 @@ The ratified `kind` requirement applies to `ProposerAdvisory`. `CandidateAdvisor
 subordinate candidate record and must not claim it. The guard narrowing is specified
 in I3.
 
-## B6 — Selection-dependent fields are nullable (O-1)
+## B6 — Selection-dependent fields are nullable and coupled (O-1)
 
-`ProposerAdvisory.recommended_disposition`, `.requested_review_action` and
-`.requested_review_destination_role_ref` are each nullable. When
-`selected_candidate_id is None` all three must be `None`. When a selected candidate
-becomes permitted at a later stage, all three must bind consistently to that candidate,
-its disposition and its permitted review routing. Under B3, S1 has no selected
-candidate, so in S1 all three are always `None`.
+`ProposerAdvisory` carries `selected_candidate_id: str | None` — required as a field,
+nullable as a value, C5a-constrained when non-null, and **identity-participating in
+`P_unsigned`** — alongside the three fields that depend on it:
+`recommended_disposition`, `requested_review_action` and
+`requested_review_destination_role_ref`, each nullable.
+
+Enforcement is at **two distinct levels**, specified as R-1a and R-1b and explained in
+E1: a local model validator that couples presence to presence and absence to absence,
+and a cross-contract obligation on the builder and the replay verifier that resolves
+the referenced `AdvisoryCandidateSet` and checks correspondence. The local validator
+does not, and cannot, establish the second.
+
+Under B3, S1 has no selected candidate, so in S1 all four are always `None`. The
+future-stage branch is preserved in the contract and is not reachable in S1.
 
 ## B7 — `advisory_version`
 
@@ -242,6 +250,9 @@ Exactly `ROUTE_APPROVAL_BUNDLE` and `CREATE_EXCEPTION_REVIEW_BUNDLE`.
 Identifier and reference fields match `^[A-Za-z0-9][A-Za-z0-9._:/-]*$`. This applies
 **only** to identifiers and references — never to `purpose`, `claim_summaries`,
 `assumptions`, `uncertainties`, `declared_strategy` or any other human-readable text.
+Fields that are neither — closed symbolic tokens and scope names — carry their own
+canonical token pattern and are **not** silently treated as free text. The full
+three-category classification is C5.
 
 The ASCII restriction is **identity-load-bearing**: the frozen `P_unsigned` profile has
 empty `nfc_paths` (C6), so the identity function performs no Unicode normalisation.
@@ -283,7 +294,7 @@ Every one of the **eight top-level contracts** carries:
 | Field | Type | Required | Nullable | Default | Validation |
 | --- | --- | --- | --- | --- | --- |
 | `schema_version` | `Literal["1.0"]` | yes | no | `"1.0"` | literal equality |
-| `tenant_id` | `str` | yes | no | none | C5 |
+| `tenant_id` | `str` | yes | no | none | C5a |
 | `created_at` | `datetime` | yes | no | none | C4; caller-supplied |
 
 `[I]` `CandidateAdvisory` does **not** carry them. It is a nested public shape, not a
@@ -331,11 +342,52 @@ is rejected: ordering validations compare full-precision values while identity w
 carry a truncated one, so two advisories a hundred microseconds apart would be distinct
 objects sharing a digest. The stored value and the serialised value must agree exactly.
 
-## C5 — Identifier and reference format
+## C5 — Field classification: three categories, assigned explicitly
 
-Every identifier or reference field is `str` matching
-`^[A-Za-z0-9][A-Za-z0-9._:/-]*$`, per B9. Free-text fields are **not** subject to it;
-each such field's own constraint is given in its contract table.
+Every `str`-valued field belongs to exactly one of three categories. The category is
+**declared per field in its contract table**, never inferred from its name. A guard
+that classified by suffix alone would silently miss `tool_name` and the scope fields,
+which are neither `*_id`-shaped nor free text.
+
+### C5a — Identifier or reference
+
+An opaque, externally minted handle. `str` matching `^[A-Za-z0-9][A-Za-z0-9._:/-]*$`,
+maximum 200 characters (B9). `/` is permitted because an external issuer may mint a
+path-shaped handle.
+
+### C5b — Canonical symbolic token
+
+A vocabulary term **matched by equality against an allowlist**. `str` matching
+`^[A-Za-z0-9][A-Za-z0-9._:-]*$`, maximum 200 characters — the C5a class **minus `/`**.
+
+`[I]` The distinction is semantic, not cosmetic. A C5a value is carried and compared
+whole; a C5b value is the operand of a membership test, and a path-shaped spelling
+invites a consumer to split or normalise it before comparing, which would make
+`tool_name in permitted_tool_scopes` depend on the consumer. Excluding `/` removes
+that invitation. Both classes are ASCII, so both are NFC-invariant, which is what B9
+requires of anything reachable from `P_unsigned`.
+
+**C5b fields:** `agent_version`; `tool_name`; and each element of
+`allowed_source_scopes`, `excluded_data_classes`, `permitted_tool_scopes` and
+`tool_invocations`.
+
+### C5c — Human-readable free text
+
+No identifier restriction of any kind. Its own constraint — length, NFC, non-empty —
+is given in its contract table.
+
+**C5c fields:** `purpose`, `primary_function`, `declared_strategy`, and each element
+of `claim_summaries`, `assumptions` and `uncertainties`.
+
+`[I]` `primary_function` and `declared_strategy` are described as opaque and compared
+for equality only, which is the C5b shape — but neither is reachable from
+`P_unsigned` (D9), so the NFC hazard that motivates B9 does not apply to them, and the
+less restrictive classification cannot reject a lawful value. Recorded as owner
+decision **OD-1** in the closing section.
+
+**No field is left unclassified.** Every `str` field in Part D carries C5a, C5b or C5c
+in its Validation column, and I2 requires the guards to enforce that classification
+from an exact pinned registry rather than from name shape.
 
 ## C6 — Digest-shaped fields, and the frozen canonicalisation profile
 
@@ -403,11 +455,11 @@ lifecycle field is computed here and no lifecycle verb is exposed.
 
 | Field | Type | Required | Nullable | Default | Cardinality | Vocabulary | Validation | Ownership | Identity |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `agent_id` | `str` | yes | no | none | 1 | open | C5 | external identity issuer | no |
-| `agent_version` | `str` | yes | no | none | 1 | open | C5 | external identity issuer | no |
+| `agent_id` | `str` | yes | no | none | 1 | open | C5a | external identity issuer | no |
+| `agent_version` | `str` | yes | no | none | 1 | open | C5b | external identity issuer | no |
 | `lifecycle_state` | `AgentLifecycleState` | yes | no | none | 1 | **closed**: `ACTIVE`, `INACTIVE`, `SUSPENDED`, `REVOKED` | enum membership; an unrecognised value fails validation and coerces to no member | external identity issuer | no |
-| `bound_role_contract_id` | `str` | yes | no | none | 1 | open | C5 | external identity issuer | no |
-| `owner_role_ref` | `str` | yes | no | none | 1 | open | C5 | external identity issuer | no |
+| `bound_role_contract_id` | `str` | yes | no | none | 1 | open | C5a | external identity issuer | no |
+| `owner_role_ref` | `str` | yes | no | none | 1 | open | C5a | external identity issuer | no |
 
 `bound_role_contract_id` is the binding Equation 1's `RoleMatch` reads. This package
 validates it and never sets or changes it.
@@ -419,12 +471,12 @@ package, carrying no constitution-derived attribute, exposing no role lifecycle 
 
 | Field | Type | Required | Nullable | Default | Cardinality | Vocabulary | Validation | Ownership | Identity |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `role_contract_id` | `str` | yes | no | none | 1 | open | C5 | external role owner | no |
-| `primary_function` | `str` | yes | no | none | 1 | open | non-empty; **opaque** — compared for equality only, never semantically interpreted | external role owner | no |
-| `permitted_tool_scopes` | `list[str]` | yes | no | `[]` | 0..n | open | each C5; order preserved | external role owner | no |
+| `role_contract_id` | `str` | yes | no | none | 1 | open | C5a | external role owner | no |
+| `primary_function` | `str` | yes | no | none | 1 | open | **C5c**; non-empty; **opaque** — compared for equality only, never semantically interpreted (OD-1) | external role owner | no |
+| `permitted_tool_scopes` | `list[str]` | yes | no | `[]` | 0..n | open | each C5b; order preserved | external role owner | no |
 | `permitted_candidate_dispositions` | `list[CandidateDisposition]` | yes | no | none | 1..4 | **closed, D4** | enum membership; **rejects an empty list**; no duplicates | external role owner | no |
 | `permitted_review_actions` | `list[ReviewAction]` | yes | no | none | 1..n | **closed, B8** | enum membership; **rejects an empty list**; no duplicates | external role owner | no |
-| `escalation_role_ref` | `str` | yes | no | none | 1 | open | C5 | external role owner | no |
+| `escalation_role_ref` | `str` | yes | no | none | 1 | open | C5a | external role owner | no |
 | `activation_status` | `RoleActivationStatus` | yes | no | none | 1 | **closed**: `ACTIVE`, `INACTIVE` | enum membership | external role owner — **input fact, never computed** (D1) | no |
 
 `CandidateDisposition` is imported unchanged from
@@ -439,11 +491,11 @@ containing those substrings may be re-exported outside this package.
 
 | Field | Type | Required | Nullable | Default | Cardinality | Vocabulary | Validation | Ownership | Identity |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `mandate_id` | `str` | yes | no | none | 1 | open | C5 | mandate issuer | no |
-| `case_ref` | `str` | yes | no | none | 1 | open | C5; **domain-neutral** | mandate issuer | no |
-| `assigned_role_contract_id` | `str` | yes | no | none | 1 | open | C5 | mandate issuer | no |
-| `purpose` | `str` | yes | no | none | 1 | open | non-empty; length ≤ 4000; NFC required; **no content scanning** (B10) | mandate issuer — **non-authoritative** | no |
-| `allowed_source_scopes` | `list[str]` | yes | no | none | 1..n | open | each C5; rejects an empty list; no duplicates | mandate issuer | no |
+| `mandate_id` | `str` | yes | no | none | 1 | open | C5a | mandate issuer | no |
+| `case_ref` | `str` | yes | no | none | 1 | open | C5a; **domain-neutral** | mandate issuer | no |
+| `assigned_role_contract_id` | `str` | yes | no | none | 1 | open | C5a | mandate issuer | no |
+| `purpose` | `str` | yes | no | none | 1 | open | **C5c**; non-empty; length ≤ 4000; NFC required; **no content scanning** (B10) | mandate issuer — **non-authoritative** | no |
+| `allowed_source_scopes` | `list[str]` | yes | no | none | 1..n | open | each C5b; rejects an empty list; no duplicates | mandate issuer | no |
 | `expires_at` | `datetime` | yes | no | none | 1 | — | C4 | mandate issuer | no |
 
 `case_ref` is domain-neutral: it is neither named nor documented as invoice-specific.
@@ -452,10 +504,10 @@ containing those substrings may be re-exported outside this package.
 
 | Field | Type | Required | Nullable | Default | Cardinality | Vocabulary | Validation | Ownership | Identity |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `context_id` | `str` | yes | no | none | 1 | open | C5 | context assembler | no |
-| `mandate_id` | `str` | yes | no | none | 1 | open | C5; must reference `WorkMandate.mandate_id` | context assembler | no |
-| `allowed_record_refs` | `list[str]` | yes | no | `[]` | 0..n | open | each C5; order preserved | context assembler | no |
-| `excluded_data_classes` | `list[str]` | yes | no | `[]` | 0..n | open | each C5 | context assembler | no |
+| `context_id` | `str` | yes | no | none | 1 | open | C5a | context assembler | no |
+| `mandate_id` | `str` | yes | no | none | 1 | open | C5a; must reference `WorkMandate.mandate_id` | context assembler | no |
+| `allowed_record_refs` | `list[str]` | yes | no | `[]` | 0..n | open | each C5a; order preserved | context assembler | no |
+| `excluded_data_classes` | `list[str]` | yes | no | `[]` | 0..n | open | each C5b | context assembler | no |
 | `context_hash` | `str` | yes | no | none | 1 | open | C6 **format only** | **context assembler** | no |
 | `expires_at` | `datetime` | yes | no | none | 1 | — | C4 | context assembler | no |
 
@@ -467,14 +519,14 @@ against any content — doing so would require hashing locally, which D2 bars.
 
 | Field | Type | Required | Nullable | Default | Cardinality | Vocabulary | Validation | Ownership | Identity |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `observation_id` | `str` | yes | no | none | 1 | open | C5 | observation producer | no |
-| `case_ref` | `str` | yes | no | none | 1 | open | C5 | observation producer | no |
-| `tool_name` | `str` | yes | no | none | 1 | open | C5 | observation producer | no |
+| `observation_id` | `str` | yes | no | none | 1 | open | C5a | observation producer | no |
+| `case_ref` | `str` | yes | no | none | 1 | open | C5a | observation producer | no |
+| `tool_name` | `str` | yes | no | none | 1 | open | C5b | observation producer | no |
 | `operation_class` | `ToolOperationClass` | yes | no | none | 1 | **closed**: `READ_ONLY` | enum membership | observation producer | no |
-| `source_ref` | `str` | yes | no | none | 1 | open | C5 | observation producer | no |
+| `source_ref` | `str` | yes | no | none | 1 | open | C5a | observation producer | no |
 | `observed_at` | `datetime` | yes | no | none | 1 | — | C4 | observation producer | no |
 | `content_hash` | `str` | yes | no | none | 1 | open | C6 **format only** | **observation producer** | no |
-| `normalized_fields` | `dict[str, str]` | yes | no | `{}` | 0..n keys | open | keys C5; **values `str`** | observation producer | no |
+| `normalized_fields` | `dict[str, str]` | yes | no | `{}` | 0..n keys | open | keys C5a; **values `str`** | observation producer | no |
 | `admission_status` | `ToolObservationAdmissionStatus` | yes | no | `NOT_EVALUATED` | 1 | **closed**: `NOT_EVALUATED` | enum membership | this package | no |
 
 **`normalized_fields` values are `str`, not `Any`.** `[V]` A1: an `Any`-valued mapping
@@ -490,10 +542,10 @@ references it by `candidate_set_id`.
 
 | Field | Type | Required | Nullable | Default | Cardinality | Vocabulary | Validation | Ownership | Identity |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `candidate_set_id` | `str` | yes | no | none | 1 | open | C5 | this package | no |
-| `case_ref` | `str` | yes | no | none | 1 | open | C5 | this package | no |
+| `candidate_set_id` | `str` | yes | no | none | 1 | open | C5a | this package | no |
+| `case_ref` | `str` | yes | no | none | 1 | open | C5a | this package | no |
 | `candidates` | `list[CandidateAdvisory]` | yes | no | none | 1..n | — | **rejects an empty list**; `candidate_id` unique across the list; order preserved | this package | no |
-| `selected_candidate_id` | `str \| None` | yes (explicit) | yes | `None` | 0..1 | open | C5 when non-null; S-1 and S-2 below | this package | no |
+| `selected_candidate_id` | `str \| None` | yes (explicit) | yes | `None` | 0..1 | open | C5a when non-null; S-1 and S-2 below | this package | no |
 | `selection_reason_codes` | `list[str]` | yes | no | `[]` | 0..n | — | **rejects any non-empty value** | this package | no |
 
 **Locally decidable selection invariants**, both decidable from this contract alone:
@@ -518,16 +570,16 @@ S-1 and S-2 are satisfied vacuously in S1 and become load-bearing at S2.
 
 | Field | Type | Required | Nullable | Default | Cardinality | Vocabulary | Validation | Ownership | Identity |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `candidate_id` | `str` | yes | no | none | 1 | open | C5; unique within its set | this package | no |
+| `candidate_id` | `str` | yes | no | none | 1 | open | C5a; unique within its set | this package | no |
 | `disposition` | `CandidateDisposition` | yes | no | none | 1 | **closed, D4**: `RECOMMEND_MATCHED_FOR_APPROVAL`, `RECOMMEND_WITHHOLD`, `REQUEST_EVIDENCE`, `ESCALATE_EXCEPTION` | enum membership | this package | no |
 | `requested_review_action` | `ReviewAction` | yes | no | none | 1 | **closed, B8** | enum membership | this package | no |
 | `is_eligible` | `bool` | yes | no | none | 1 | closed: `true`, `false` | **package-computed** — see Part G | this package | no |
 | `domain_check_completion` | `DomainCheckCompletion` | yes | no | `NOT_EVALUATED` | 1 | **closed**: `NOT_EVALUATED`, `COMPLETE` | enum membership; **`COMPLETE` rejected unconditionally** (C7) | this package | no |
 | `evaluated_at` | `datetime` | yes | no | none | 1 | — | C4 | caller-supplied, package-recorded | no |
-| `claim_refs` | `list[str]` | yes | no | `[]` | 0..n | open | each C5 | this package | no |
-| `observation_refs` | `list[str]` | yes | no | `[]` | 0..n | open | each C5; no duplicates; every entry must reference a supplied `ToolObservation.observation_id` | this package | no |
-| `assumptions` | `list[str]` | yes | no | `[]` | 0..n | open | free text; no C5 | this package | no |
-| `uncertainties` | `list[str]` | yes | no | `[]` | 0..n | open | free text; no C5 | this package | no |
+| `claim_refs` | `list[str]` | yes | no | `[]` | 0..n | open | each C5a | this package | no |
+| `observation_refs` | `list[str]` | yes | no | `[]` | 0..n | open | each C5a; no duplicates; every entry must reference a supplied `ToolObservation.observation_id` | this package | no |
+| `assumptions` | `list[str]` | yes | no | `[]` | 0..n | open | C5c | this package | no |
+| `uncertainties` | `list[str]` | yes | no | `[]` | 0..n | open | C5c | this package | no |
 
 `requested_review_action` is the candidate's **own** proposed routing. Equation 1's
 `OutputPermitted` evaluates it together with `disposition` against the role's
@@ -558,18 +610,19 @@ A3: nesting `ToolObservation` makes `content_hash` reachable and fails a merged 
 | `advisory_version` | `str` | yes | no | `"1"` | 1 | open | `^[1-9][0-9]*$` (B7) | this package | yes |
 | `advisory_digest` | `str` | yes | **no** | none | 1 | open | C6; equals Equation 3 over `P_unsigned` | this package | **excluded from `P_unsigned`** |
 | `parent_advisory_digest` | `str \| None` | yes (explicit) | yes | `None` | 0..1 | open | C6 when non-null; L-1 | this package | **yes, including when `null`** |
-| `case_ref` | `str` | yes | no | none | 1 | open | C5 | this package | yes |
-| `agent_id` | `str` | yes | no | none | 1 | open | C5; references `AgentIdentityRef.agent_id` | this package | yes |
-| `role_contract_id` | `str` | yes | no | none | 1 | open | C5; references `CognitiveRoleContract.role_contract_id` | this package | yes |
-| `mandate_id` | `str` | yes | no | none | 1 | open | C5; references `WorkMandate.mandate_id` | this package | yes |
-| `context_id` | `str` | yes | no | none | 1 | open | C5; references `BoundedContextEnvelope.context_id` | this package | yes |
-| `candidate_set_id` | `str` | yes | no | none | 1 | open | C5; references `AdvisoryCandidateSet.candidate_set_id` | this package | yes |
-| `recommended_disposition` | `CandidateDisposition \| None` | yes (explicit) | yes | `None` | 0..1 | closed, D4 | R-1 (B6) | this package | yes |
-| `requested_review_action` | `ReviewAction \| None` | yes (explicit) | yes | `None` | 0..1 | closed, B8 | R-1 (B6) | this package | yes |
-| `requested_review_destination_role_ref` | `str \| None` | yes (explicit) | yes | `None` | 0..1 | open | C5 when non-null; R-1 (B6) | this package | yes |
-| `claim_summaries` | `list[str]` | yes | no | `[]` | 0..n | open | free text; no C5 | this package | yes |
-| `observation_refs` | `list[str]` | yes | no | `[]` | 0..n | open | each C5; no duplicates | this package | yes |
-| `uncertainties` | `list[str]` | yes | no | `[]` | 0..n | open | free text; no C5 | this package | yes |
+| `case_ref` | `str` | yes | no | none | 1 | open | C5a | this package | yes |
+| `agent_id` | `str` | yes | no | none | 1 | open | C5a; references `AgentIdentityRef.agent_id` | this package | yes |
+| `role_contract_id` | `str` | yes | no | none | 1 | open | C5a; references `CognitiveRoleContract.role_contract_id` | this package | yes |
+| `mandate_id` | `str` | yes | no | none | 1 | open | C5a; references `WorkMandate.mandate_id` | this package | yes |
+| `context_id` | `str` | yes | no | none | 1 | open | C5a; references `BoundedContextEnvelope.context_id` | this package | yes |
+| `candidate_set_id` | `str` | yes | no | none | 1 | open | C5a; references `AdvisoryCandidateSet.candidate_set_id` | this package | yes |
+| `selected_candidate_id` | `str \| None` | yes (explicit) | yes | `None` | 0..1 | open | C5a when non-null; **R-1a** (local), **R-1b** (cross-contract) | this package | yes |
+| `recommended_disposition` | `CandidateDisposition \| None` | yes (explicit) | yes | `None` | 0..1 | closed, D4 | R-1a, R-1b (B6) | this package | yes |
+| `requested_review_action` | `ReviewAction \| None` | yes (explicit) | yes | `None` | 0..1 | closed, B8 | R-1a, R-1b (B6) | this package | yes |
+| `requested_review_destination_role_ref` | `str \| None` | yes (explicit) | yes | `None` | 0..1 | open | C5a when non-null; R-1a, R-1b (B6) | this package | yes |
+| `claim_summaries` | `list[str]` | yes | no | `[]` | 0..n | open | C5c | this package | yes |
+| `observation_refs` | `list[str]` | yes | no | `[]` | 0..n | open | each C5a; no duplicates | this package | yes |
+| `uncertainties` | `list[str]` | yes | no | `[]` | 0..n | open | C5c | this package | yes |
 | `reason_codes` | `list[str]` | yes | no | `[]` | 0..n | — | **rejects any non-empty value** | this package | yes |
 | `expires_at` | `datetime` | yes | no | none | 1 | — | C4 | this package | yes |
 
@@ -598,14 +651,14 @@ is not reachable from `P_unsigned`, so nothing in it can alter an advisory ident
 
 | Field | Type | Required | Nullable | Default | Cardinality | Vocabulary | Validation | Ownership | Identity |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `process_record_id` | `str` | yes | no | none | 1 | open | C5 | this package | no |
-| `case_ref` | `str` | yes | no | none | 1 | open | C5 | this package | no |
-| `declared_strategy` | `str` | yes | no | none | 1 | open | non-empty; **opaque, not an enum** | this package | no |
+| `process_record_id` | `str` | yes | no | none | 1 | open | C5a | this package | no |
+| `case_ref` | `str` | yes | no | none | 1 | open | C5a | this package | no |
+| `declared_strategy` | `str` | yes | no | none | 1 | open | **C5c**; non-empty; **opaque, not an enum** (OD-1) | this package | no |
 | `state_transitions` | `list[ProposerProcessStateTransition]` | yes | no | `[]` | 0..n | — | R-3 | this package | no |
-| `tool_invocations` | `list[str]` | yes | no | `[]` | 0..n | open | each C5 | this package | no |
+| `tool_invocations` | `list[str]` | yes | no | `[]` | 0..n | open | each C5b | this package | no |
 | `deterministic_checks` | `list[str]` | yes | no | `[]` | 0..n | — | **rejects any non-empty value** | this package | no |
-| `candidate_ids` | `list[str]` | yes | no | `[]` | 0..n | open | each C5; no duplicates | this package | no |
-| `selected_candidate_id` | `str \| None` | yes (explicit) | yes | `None` | 0..1 | open | C5 when non-null | this package | no |
+| `candidate_ids` | `list[str]` | yes | no | `[]` | 0..n | open | each C5a; no duplicates | this package | no |
+| `selected_candidate_id` | `str \| None` | yes (explicit) | yes | `None` | 0..1 | open | C5a when non-null | this package | no |
 | `semantic_audit_refs` | `list[str]` | yes | no | `[]` | 0..n | — | **rejects any non-empty value** | this package | no |
 | `terminal_outcome` | `TerminalOutcome` | yes | no | none | 1 | **closed, D4**: `PROPOSAL`, `NEED_EVIDENCE`, `ABSTAIN`, `ESCALATE` | enum membership; R-2 | this package | no |
 | `reason_codes` | `list[str]` | yes | no | `[]` | 0..n | — | **rejects any non-empty value** | this package | no |
@@ -654,7 +707,8 @@ also appear in Equation 1; they are listed here once as contract obligations.
 
 | Id | Rule | Prevents |
 | --- | --- | --- |
-| R-1 | **Selection binding (B6).** When `selected_candidate_id is None`, `recommended_disposition`, `requested_review_action` and `requested_review_destination_role_ref` are all `None`. When it is not `None`, all three are non-null, `recommended_disposition` equals the resolved candidate's `disposition`, `requested_review_action` equals the resolved candidate's `requested_review_action`, and that action is a member of `CognitiveRoleContract.permitted_review_actions` | an advisory whose routing contradicts, or invents, the candidate it selects |
+| R-1a | **Selection binding — local (B6).** A `ProposerAdvisory` model validator enforces: if `selected_candidate_id is None`, then `recommended_disposition`, `requested_review_action` and `requested_review_destination_role_ref` are **all** `None`; if `selected_candidate_id is not None`, those three are **all** non-null. Decidable from this contract's own fields alone | a routing request standing next to no selection, and a selection with no routing — two failure modes that call for opposite responses |
+| R-1b | **Selection binding — cross-contract (B6).** `build_proposer_advisory` and the replay verifier resolve the referenced `AdvisoryCandidateSet` and enforce: `ProposerAdvisory.selected_candidate_id == AdvisoryCandidateSet.selected_candidate_id`; the selected id identifies **exactly one** candidate in that set; `recommended_disposition` equals that candidate's `disposition`; `requested_review_action` equals that candidate's `requested_review_action` and is a member of `CognitiveRoleContract.permitted_review_actions`; `requested_review_destination_role_ref` is consistent with that candidate's routing; and tenant, case and candidate-set references are continuous | an advisory whose routing contradicts, or invents, the candidate it claims to select |
 | R-2 | **V13 (B3).** `terminal_outcome is TerminalOutcome.PROPOSAL` **if and only if** `selected_candidate_id is not None` **and** `evaluate_readiness(...) is True` for the resolved candidate, recomputed at construction | a "proposal" that proposes nothing, a selection presented as an abstention, and a proposal made without domain readiness |
 | R-3 | **Process ordering.** `state_transitions` is a subsequence of `RECEIVED → VALIDATED → OBSERVING → RECONCILING → EVALUATING → {PROPOSAL, NEED_EVIDENCE, ABSTAIN, ESCALATE}`: no backward transition, no repeat, at most one terminal state and only in final position, and `at` non-decreasing across the list | a fabricated or reordered process history, and — since no execution state exists in the enum — any representation of execution |
 | R-4 | `terminal_outcome` on the process record equals the terminal `ProposerProcessState` when one is present in `state_transitions` | a record whose narrative and outcome disagree |
@@ -665,6 +719,43 @@ also appear in Equation 1; they are listed here once as contract obligations.
 | R-9 | **Envelope binding.** `BoundedContextEnvelope.mandate_id == WorkMandate.mandate_id` *(equation term)* | an envelope assembled for a different mandate |
 | R-10 | **Role binding.** `WorkMandate.assigned_role_contract_id == AgentIdentityRef.bound_role_contract_id == CognitiveRoleContract.role_contract_id` *(equation term)* | a mandate matched against an unrelated role or agent |
 | L-1 | **Lineage.** `parent_advisory_digest`, when non-null, is C6-shaped and is **not equal to** this advisory's own `advisory_digest` | an immediate self-referential lineage cycle |
+
+## E1 — The two levels of selection enforcement, and what neither proves
+
+R-1a and R-1b are **not** two statements of one rule. They live at different levels and
+prove different things, and conflating them would be the same error this document
+refuses to make about `is_eligible`.
+
+**R-1a is local and structural.** It is a `ProposerAdvisory` model validator. It sees
+only this advisory's own fields, so all it can decide is whether the selector and its
+three dependents are *jointly present or jointly absent*.
+
+> **R-1a proves nothing about the referenced `AdvisoryCandidateSet`.** A model
+> validator cannot resolve `candidate_set_id`; it has an identifier, not the set. It
+> cannot know whether the selected candidate exists, whether the recorded disposition
+> is that candidate's, or whether the routing is permitted. Any claim that the local
+> validator establishes correspondence with the candidate set is **false** and must not
+> appear in S1 documentation, tests or commit messages.
+
+**R-1b is cross-contract and behavioural.** It is discharged by
+`build_proposer_advisory` at construction and **independently re-established** by the
+replay verifier, each of which is given the `AdvisoryCandidateSet`, the
+`CognitiveRoleContract` and the observations, and each of which resolves the selection
+and checks correspondence itself. This mirrors B2 exactly: construction is
+defence-in-depth, and independent replay is the guarantee.
+
+`[I]` The mirrored `selected_candidate_id` on `ProposerAdvisory` exists to make R-1a
+decidable at all. Under the reference-by-id shape A3 forces, the advisory would
+otherwise carry three selection-dependent fields and no selector, so the coupling could
+not be checked on the advisory in isolation and would be enforceable only by a builder
+a consumer has no way to audit. Because it is identity-participating, a stored advisory
+also carries the selection it claims into its digest, so replay can detect a selector
+altered after signing.
+
+**Under V13 (B3), S1 sets `selected_candidate_id` and all three dependents to `None`.**
+The non-null branch is specified so that it is a behaviour change at S2 rather than a
+contract change, and it is not reachable in S1: `build_proposer_advisory` derives all
+four from the candidate set, and B3 makes a selection unconstructible.
 
 `[I]` R-5 and R-6 are **contract validators, not Equation 1 terms.** The owner's
 Equation 1 checks tenant equality across the four principal contracts and does not
@@ -996,18 +1087,36 @@ def verify_candidate_eligibility(
 ) -> bool: ...
 def compute_advisory_identity(*, advisory: ProposerAdvisory) -> str: ...
 def verify_advisory_identity(*, advisory: ProposerAdvisory) -> bool: ...
+
+
+def verify_advisory_selection(
+    *,
+    advisory: ProposerAdvisory,
+    candidate_set: AdvisoryCandidateSet,
+    role: CognitiveRoleContract,
+) -> bool: ...
 ```
+
+`verify_advisory_selection` is the independent replay of R-1b. It is a **separate
+function from `verify_advisory_identity`** because the two answer different questions:
+identity asks whether the stored bytes are the ones that were signed, correspondence
+asks whether what was signed agrees with the candidate set it references. A caller
+acting on an advisory's routing must call both. It returns `False` rather than raising,
+on the same terms as `verify_candidate_eligibility`.
 
 Notes that are part of the ratified behaviour:
 
 * `build_candidate_advisory` takes no `is_eligible` and no `domain_check_completion`.
   It computes the first and leaves the second at its `NOT_EVALUATED` default.
-* `build_proposer_advisory` **derives** `recommended_disposition`,
-  `requested_review_action` and `requested_review_destination_role_ref` from the
-  candidate set under R-1 rather than accepting them, so the two cannot disagree. Under
-  B3 it derives `None` for all three in S1. It calls `verify_candidate_eligibility` and
-  raises `EligibilityMismatchError` before constructing if any candidate's stored
-  `is_eligible` differs from the recomputation.
+* `build_proposer_advisory` **derives** `selected_candidate_id`,
+  `recommended_disposition`, `requested_review_action` and
+  `requested_review_destination_role_ref` from the candidate set under R-1b rather than
+  accepting them, so the two cannot disagree. It resolves the set, checks
+  correspondence, and rejects a mismatch. Under B3 it derives `None` for all four in S1.
+  It calls `verify_candidate_eligibility` and raises `EligibilityMismatchError` before
+  constructing if any candidate's stored `is_eligible` differs from the recomputation.
+  R-1a is additionally enforced by the model validator on every construction path,
+  including one the builder did not produce.
 * `build_proposer_process_record` enforces R-2, R-3 and R-4. Under B3, a `PROPOSAL`
   terminal outcome is unreachable in S1 and the builder rejects it.
 * `verify_candidate_eligibility` returns `False` — it does not raise — so a read-only
@@ -1053,7 +1162,7 @@ below.
 
 **Identity functions (2):** `compute_advisory_identity`, `verify_advisory_identity`
 
-**Verifier (1):** `verify_candidate_eligibility`
+**Verifiers (2):** `verify_candidate_eligibility`, `verify_advisory_selection`
 
 **Exceptions (1):** `EligibilityMismatchError`
 
@@ -1078,10 +1187,23 @@ name; and `PROPOSAL` and `RECOMMEND_*` are enum values, which
 These are obligations on the S1 implementation. **None of them is discharged by this
 document**, which changes no test and no source file.
 
-## I1 — D2 scan: a narrow, module-scoped exemption
+> **Status note.** O-2 and O-3 below are **already implemented** on branch
+> `claude/governance-refinements-o1-o4-k96vbz` (commit `30945dac8`), together with a
+> new O-1 guard and a new O-4 guard. That branch changes tests and documentation only —
+> `[V]` no `src/`, `version.py`, `pyproject.toml`, CI workflow, `public_api.json` or
+> platform-freeze artifact is touched — and its suite is green at 354 passed, 12
+> skipped, where 11 of the 12 skips are dormant parametrisations over a contract
+> surface that does not exist yet. `[V]` Planting representative contract shapes arms
+> them: failures go from 0 to 32. That branch is expected to merge **before** this
+> specification. I1, I5, I6 and I7 remain outstanding; I2 and I3 record what that
+> branch already did, plus one correction it needs.
+
+## I1 — D2 scan: a narrow, module-scoped exemption *(outstanding)*
 
 `[V]` A7: the ratified `"sha256:"` prefix literal and the C6 pattern
-`^sha256:[0-9a-f]{64}$` collide with `SUSPECT_TEXT`.
+`^sha256:[0-9a-f]{64}$` collide with `SUSPECT_TEXT`. `[V]` The guard branch did not
+address this — its only change to `test_no_local_canonicalization.py` adds the two new
+guard modules to the pinned module list.
 
 The resolution is a **module-path-scoped mask**, not a widened rule: the text mask for
 exactly the two strings `"sha256:"` and `"^sha256:[0-9a-f]{64}$"` applies only within
@@ -1092,55 +1214,107 @@ It must not permit: an arbitrary `sha256:` literal in any other module; a local
 `ugence_jcs`; or an identity computation from any module outside the authorised one.
 
 **No definition-name exemption is required.** The identity functions are named
-`compute_advisory_identity`, `verify_advisory_identity` and `verify_candidate_eligibility`;
-none contains `"digest"`, `"canonical"`, `"canon"`, `"jcs"`, `"fingerprint"` or any other
-`SUSPECT_DEF_SUBSTRINGS` member, so `SUSPECT_DEF_SUBSTRINGS` is left untouched. The
-field name `advisory_digest` is an `AnnAssign` target, not a `FunctionDef` or
-`ClassDef`, and is not scanned. **Test function names must not contain `"digest"`**, for
-the same reason.
+`compute_advisory_identity`, `verify_advisory_identity`, `verify_advisory_selection` and
+`verify_candidate_eligibility`; none contains `"digest"`, `"canonical"`, `"canon"`,
+`"jcs"`, `"fingerprint"` or any other `SUSPECT_DEF_SUBSTRINGS` member, so
+`SUSPECT_DEF_SUBSTRINGS` is left untouched. The field name `advisory_digest` is an
+`AnnAssign` target, not a `FunctionDef` or `ClassDef`, and is not scanned. **Test
+function names must not contain `"digest"`**, for the same reason.
 
-**Mutation tests required.** The exemption is accepted only with tests proving each of
-these is still rejected: `"sha256:"` in a module other than the authorised one; the
-authorised name defined at class scope; the authorised name defined without the
-substrate call; the authorised module importing `hashlib`; and a locally defined
-`canonical_sha256_hex`.
+**Mutation tests required**, proving each of these is still rejected: `"sha256:"` in a
+module other than the authorised one; the authorised name defined at class scope; the
+authorised name defined without the substrate call; the authorised module importing
+`hashlib`; and a locally defined `canonical_sha256_hex`.
 
-## I2 — Lifecycle-verb guard: narrow to callables (B4)
+## I2 — Lifecycle-verb guard: narrowed to authority, not vocabulary (B4) *(implemented)*
 
-`tests/test_role_projection_bounds.py::test_no_source_name_is_a_role_lifecycle_verb`
-must scan **callable names only**:
+`[V]` Implemented on the guard branch. It classifies by **grammatical form and
+syntactic position** rather than by stem: a mutation form is barred in every position;
+an actor form is barred as a type or callable and permitted as a field naming an
+external party; any lifecycle-stemmed field annotated `Callable` is barred. The
+retained vocabulary — `SUSPENDED`, `REVOKED`, `RoleActivationStatus`,
+`activation_status`, `expires_at` — is pinned permitted **by equality**, and the six
+verbs D8 names are pinned barred in all four positions. Six mutants each weaken one
+rule and must let a real violation escape without gaining a false positive on the
+retained vocabulary.
 
-* every `FunctionDef` and `AsyncFunctionDef` name, at module and class scope;
-* every `ClassDef` name that is **not** a `BaseModel` or `Enum` subclass;
-* every name bound to a `lambda`.
+This supersedes the cruder "callables only" rule an earlier draft of this document
+specified. `[V]` Both accept the retained vocabulary; the implemented rule additionally
+distinguishes an actor noun used as a field from one used as a type, which the cruder
+rule could not.
 
-Exempt from the verb scan: `AnnAssign` targets (contract fields), enum member
-assignments, and `ClassDef` names of model and enum types. The `LIFECYCLE_VERBS` stem
-list itself is **not** relaxed.
+## I3 — Ratified-kind guard: narrowed to `ProposerAdvisory` (B5) *(implemented)*
 
-`[V]` Verified: under this rule the retained vocabulary `SUSPENDED`, `REVOKED`,
-`RoleActivationStatus`, `activation_status`, `expires_at` yields `[]`, while
-`activate`, `suspend_role`, `revoke_identity`, `expire_mandate`, `ActivateRole` and
-`reactivate` all remain flagged.
+`[V]` Implemented on the guard branch: the kind is **required** on `ProposerAdvisory`
+and **barred** on `CandidateAdvisory`, along with any other kind in this capability's
+namespace, and the kind reader is self-tested against all three spellings (`KIND`,
+`kind`, a `kind` field default). This is stronger than the narrowing this document
+originally specified, which only removed `CandidateAdvisory` from the assertion.
 
-**Mutation tests required**, asserting exactly that: those six rejected, those five
-accepted. Without them the narrowing is indistinguishable from a weakening.
+## I4 — Two corrections the guard branch needs before it merges
 
-The shared-contract export bound and the `CognitiveRole` re-export scan are **not**
-changed.
+`[V]` Both were found by running that branch's suite against representative contract
+shapes planted in `src/`.
 
-## I3 — Ratified-kind guard: narrow to `ProposerAdvisory` (B5)
+1. **The O-1 guard has a class-blind false positive.** `DEPENDENT_FIELDS` is matched by
+   name alone, so `CandidateAdvisory.requested_review_action` — the candidate's **own**
+   proposed routing, required and non-null by D6 of this document — is treated as a
+   selection-dependent field. The guard then demands a `selected_candidate_id` on
+   `CandidateAdvisory` and demands the field admit `None`, which contradicts the
+   ratified contract. Four tests fail on that class:
+   `test_a_dependent_field_is_declared_with_its_selector`,
+   `test_every_dependent_field_admits_none`, `test_the_coupling_is_enforced_in_code` and
+   `test_a_live_dependent_field_accepts_none`.
 
-`test_a_defined_advisory_type_declares_the_ratified_kind` must be parametrised over
-`ProposerAdvisory` only. `[V]` A6: `CandidateAdvisory` has no `kind` field and cannot
-satisfy it.
+   `[V]` The corrected `ProposerAdvisory` specified here — carrying the mirrored
+   `selected_candidate_id` and the R-1a validator — **passes** all four. The defect is
+   confined to `CandidateAdvisory`.
 
-A mutation test must assert that a `ProposerAdvisory` **without** the ratified kind
-still fails, so the narrowing does not disarm the guard for the type it governs. The
-rival-identity walk, the barred-field walk and the barred-prefix scans continue to
-cover both types unchanged.
+   The fix is to scope the dependent-field set to the bearer contract: the three fields
+   are selection-dependent **on `ProposerAdvisory`**, and `requested_review_action` on a
+   candidate is a different field with the same name. Since `DEPENDENT_FIELDS` is pinned
+   by equality, the scoping must be pinned the same way.
 
-## I4 — Test obligations
+2. **`test_boundaries.py` will fail on the first contract module, for a reason unrelated
+   to either branch.** `[V]` Reproduced: bare `import pydantic` does **not** load
+   `socket`, but *defining any* `BaseModel` does — pydantic-core's schema build pulls it
+   in. `socket` is in that guard's `FORBIDDEN` set, and its own docstring records that
+   the probe "is meaningful only because the package is a stdlib-light leaf." Every
+   contract in Part D is a `BaseModel` and `pydantic>=2` is a ratified core dependency,
+   so this is unavoidable and is not a defect in the contracts.
+
+   This needs an owner ruling before S1 code lands — recorded as **OD-2**. It does not
+   affect any contract shape in this document.
+
+## I5 — Field classification must be pinned, not guessed (O-4)
+
+`[V]` The guard branch's O-4 guard classifies by name suffix (`_id`, `_ids`, `_ref`,
+`_refs`, `_key`, `_keys`, `_uri`, `_uris`, `_urn`, `_code`, `_codes`, `_slug`) with a
+free-text marker list. Run against this document's field set, six fields fall in
+**neither** bucket and are therefore unchecked: `agent_version`, `tool_name`,
+`allowed_source_scopes`, `excluded_data_classes`, `permitted_tool_scopes` and
+`tool_invocations`. `tool_name` is the sharpest case — it is matched by equality against
+`permitted_tool_scopes`, so an unnormalised spelling changes an eligibility outcome.
+
+The guard must classify from an **exact pinned field registry** derived from C5, not
+from suffix shape: every field name mapped to C5a, C5b or C5c, with a test that fails if
+any field in `src` is absent from the registry. Suffix inference may remain as a
+secondary check, never as the primary one.
+
+**Mutation tests required**, proving each category is recognised: `tool_name` and each
+of the five scope/token fields as C5b and carrying the C5b pattern, not the C5a one and
+not unchecked; `case_ref`, `mandate_id` and `observation_refs` as C5a; `purpose`,
+`claim_summaries` and `uncertainties` as C5c and **barred** from carrying an identifier
+pattern; and a field added to `src` but missing from the registry failing loudly.
+
+## I6 — The S0 export pin must be updated with the first contract
+
+`[V]` `tests/test_vocabulary.py::test_public_api_exports_only_the_vocabulary_and_version`
+pins the S0 public surface by equality and fails the moment a contract is exported —
+reproduced with the planted shapes. It must be updated in the same change that
+introduces the first contract, to the full H3 surface, and not before.
+
+## I7 — Test obligations
 
 1. **Frozen-profile suite** — a fixed advisory corpus pinned to exact canonical bytes
    and exact digests, asserting the C6 profile, the C4 `Z` serialisation at microsecond
@@ -1176,7 +1350,7 @@ cover both types unchanged.
     reachable from either advisory type, so a future change that re-nests
     `ToolObservation` fails loudly at the design boundary rather than deep in a guard.
 
-## I5 — Versioning and the ADR
+## I8 — Versioning and the ADR
 
 `public_api.json` is created only when S1 is implemented, and it must cover every item
 in H3. The version moves to `0.1.0` only after the public-API snapshot and its drift
@@ -1242,13 +1416,44 @@ mistakes their absence for coverage.
 
 ---
 
+## Outstanding decisions — none affecting contract shape
+
+Three items remain for the owner. **None changes a contract, a field type, a
+cardinality, a vocabulary or an equation term**; all three are about guards and
+dependencies.
+
+**OD-1 — `primary_function` and `declared_strategy` are classified C5c.** Both are
+described as opaque and compared for equality only, which is the C5b shape. They are
+classified as free text because neither is reachable from `P_unsigned` (D9), so the NFC
+hazard that motivates B9 does not apply, and the less restrictive classification cannot
+reject a lawful value — a role's primary function may legitimately contain a space.
+`[I]` This is a derivation from B9 and O-4, resolved here rather than left open;
+reviewer confirmation is invited but implementation is not blocked on it. Reclassifying
+either to C5b would be a narrowing, not a redesign.
+
+**OD-2 — `pydantic` loads `socket`, which `test_boundaries.py` forbids.** `[V]`
+Reproduced: bare `import pydantic` does not load `socket`; defining any `BaseModel`
+does. Every contract here is a `BaseModel` and `pydantic>=2` is a ratified core
+dependency, so the first S1 contract module fails
+`test_isolated_subprocess_import_loads_no_forbidden_module`. The narrowest resolution is
+to exempt exactly the transitive route — `socket` reached through `pydantic` — while
+keeping the bar on any direct import in `src/`, which is the allowlist shape this
+package already uses elsewhere. Dropping `socket` from `FORBIDDEN` outright would give
+up a real boundary. **This must be ruled on before S1 code lands.**
+
+**OD-3 — the O-1 guard's dependent-field set must be scoped to its bearer.** See I4.1.
+`DEPENDENT_FIELDS` is pinned by equality, so scoping it to `ProposerAdvisory` is a
+change to a pinned constant and should be ratified rather than adjusted in passing.
+
+---
+
 ## Ratification statement
 
-Every owner question this specification depends on is resolved: D1–D10, B2, B3 (V13),
-B4 (O-2), B5 (O-3), B6 (O-1), B7, B8 and B9 (O-4). No contract shape, field type,
-cardinality, vocabulary or equation term is left open, and this document contains no
-placeholder.
+Every owner question this specification's **contract shapes** depend on is resolved:
+D1–D10, B2, B3 (V13), B4 (O-2), B5 (O-3), B6 (O-1), B7, B8 and B9 (O-4). No contract
+shape, field type, cardinality, vocabulary or equation term is left open, and this
+document contains no placeholder.
 
 It is **ratified for S1 implementation**, subject to the implementation obligations in
-Part I, which S1 must discharge in the same change that introduces the surface they
-govern.
+Part I — which S1 must discharge in the same change that introduces the surface they
+govern — and to OD-2 being ruled on before the first contract module lands.
