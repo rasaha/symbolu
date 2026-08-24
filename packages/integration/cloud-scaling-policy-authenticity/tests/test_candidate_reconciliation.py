@@ -32,6 +32,7 @@ from __future__ import annotations
 import pytest
 
 from _policy_fixtures import (
+    T_CANDIDATE,
     T_MID,
     PolicyScope,
     genuine_candidate,
@@ -47,13 +48,24 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def _verify(candidate=None, authority=None, record=None):
+def _verify(candidate=None, authority=None, record=None, as_of=None):
+    """Verify at an instant the candidate is actually valid at, when one is supplied.
+
+    ``T_CANDIDATE`` rather than ``T_MID`` whenever a candidate is present (5B-2, gate 13).
+    The fixture candidate's recommendation expires 00:08:10 on 2026-01-01 and ``T_MID`` is
+    five months later, so every candidate-bearing case here used to assert ``VERIFIED`` on a
+    pair that was stale by more than the recommendation's entire lifetime. Nothing objected,
+    which is the residual R-2 names, measured by this suite's own fixtures.
+    """
+
     if authority is None or record is None:
         authority, record = issued()
+    if as_of is None:
+        as_of = T_CANDIDATE if candidate is not None else T_MID
     return verifier_for(authority).verify(
         coordinate=record.coordinate,
         expected_reference_tenant_id=record.coordinate.tenant_id,
-        as_of=T_MID,
+        as_of=as_of,
         candidate=candidate,
     )
 

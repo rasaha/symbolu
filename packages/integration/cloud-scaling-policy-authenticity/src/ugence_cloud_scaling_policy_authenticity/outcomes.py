@@ -128,6 +128,48 @@ class PolicyAuthenticityOutcome(str, Enum):
     #: ``GLOBAL`` policy carries the empty tenant and bounds any tenant's action.
     CANDIDATE_CROSS_TENANT_POLICY = "CANDIDATE_CROSS_TENANT_POLICY"
 
+    # --- the candidate must be valid AT the verified instant (R-2, 5B-2) -----------------
+    #: Four members rather than one, because "the pair is stale" is four different facts and
+    #: a reader triaging a refusal needs to know which. ``as_of`` is the authoritative
+    #: verification instant injected by the composition root; this package still reads no
+    #: clock. What these add is that the instant is now reconciled against the candidate's own
+    #: carried validity rather than merely recorded beside it.
+    #:
+    #: The boundaries are inclusive on both ends, matching the seam that already enforces the
+    #: same interval upstream (``cloud-scaling-risk-integration``'s ``_require_within_validity``
+    #: and Risk Authority's ``now > expires_at``), so the three do not disagree about which
+    #: instants are admissible.
+    #: ``as_of`` precedes ``subject_valid_from_fact`` — the recommendation is not yet valid.
+    CANDIDATE_RECOMMENDATION_NOT_YET_VALID = "CANDIDATE_RECOMMENDATION_NOT_YET_VALID"
+    #: ``as_of`` is past ``subject_valid_until_fact`` — the recommendation has expired.
+    CANDIDATE_RECOMMENDATION_EXPIRED = "CANDIDATE_RECOMMENDATION_EXPIRED"
+    #: ``as_of`` is past ``decision_expires_at_fact`` — the Risk Authority decision has
+    #: expired. Independent of the recommendation window: a live recommendation can carry a
+    #: dead decision.
+    CANDIDATE_DECISION_EXPIRED = "CANDIDATE_DECISION_EXPIRED"
+    #: ``as_of`` precedes an instant the candidate asserts already happened — the subject
+    #: assertion, the decision evaluation, or the attestation issuance. A determination
+    #: cannot be about a moment before the evidence it rests on came into being.
+    CANDIDATE_FACT_NOT_YET_OCCURRED = "CANDIDATE_FACT_NOT_YET_OCCURRED"
+
+    # --- the resolved projection, and the bounds it authenticates (R-8, 5B-3) ------------
+    #: The resolution carried no descriptor projection, so the body digest could not be
+    #: reproduced here. Refused rather than skipped: ``policy_body_digest`` is a one-way
+    #: hash, and without the projection this package has nothing to check it against — which
+    #: is exactly the condition that kept ``policy_type`` in the recorded half. A port that
+    #: omits the projection is a port whose answer cannot be independently reproduced, and
+    #: "cannot reproduce" is a refusal, never a downgrade to carrying the fact unchecked.
+    POLICY_PROJECTION_ABSENT = "POLICY_PROJECTION_ABSENT"
+    #: The projection was present and did **not** reproduce ``record.policy_body_digest``
+    #: when reframed through the Policy Authority's own ``framed_body_digest``. Either the
+    #: projection, the adapter id or the policy type is not what the signature covered.
+    POLICY_PROJECTION_DIGEST_MISMATCH = "POLICY_PROJECTION_DIGEST_MISMATCH"
+    #: The projection reproduced the digest, and the capacity bounds inside it are not the
+    #: shape this profile knows how to carry. A digest match proves the bytes are the signed
+    #: ones; it does not make an unreadable structure readable, and a bound this routine
+    #: cannot state exactly is not one it will attest.
+    POLICY_BOUNDS_MALFORMED = "POLICY_BOUNDS_MALFORMED"
+
     # --- fail-closed terminals ------------------------------------------------------------
     #: The resolution port could not be used — it raised, or returned a foreign type.
     #: Unavailable is a refusal.

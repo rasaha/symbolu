@@ -66,6 +66,24 @@ engine. **UVI policy schemas are its first policy-family adapter.**
   `KeyVerificationStatus`, `PolicyResolutionStatus`, `PolicyResolutionReason`,
   `PolicyRevocationReasonCode`, `HistoricalResolutionRule`, and an error taxonomy
   rooted at `PolicyAuthorityError`.
+- **The resolved descriptor projection.** A `RESOLVED` `PolicyResolution` carries
+  three optional trailing fields — `descriptor_adapter_id`,
+  `descriptor_policy_type` and `descriptor_canonical_projection` — populated by
+  `resolve_policy` from the descriptor it already re-derives. `resolve_policy`
+  has always enforced `descriptor.body_digest() == record.policy_body_digest`
+  before returning; these fields republish the *inputs* to that digest so a
+  consumer holding no adapter registry can rebuild the frame through the public
+  `framed_body_digest` and reach the same value. Downstream, `policy_body_digest`
+  is otherwise a one-way hash with nothing to check against — notably for
+  `policy_type`, which is framed into the body digest but absent from the
+  issuance signing payload. This is a **republication of an already-enforced
+  equality, not a new claim**: nothing about what a resolution proves changes.
+  The fields are optional because `PolicyResolution` is a public dataclass anyone
+  may hand-assemble, not because absence is acceptable to a consumer — a verifier
+  relying on them must refuse `None`. The constructor requires all three together
+  or none, so a partial triple that looks checkable and is not cannot exist, and
+  the projection is defensively copied behind a `MappingProxyType` as
+  `PolicyKeyRing` already does. Version stays 0.1.0: nothing has been released.
 - Package scaffolding: `api.py` with a controlled `__all__` (65 symbols),
   `public_api.json` snapshotting constants and field order, `py.typed`, README,
   this changelog, an isolated multi-wheel distribution verifier, 327 tests and 34

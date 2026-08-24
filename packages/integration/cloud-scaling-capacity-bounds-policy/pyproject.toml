@@ -1,0 +1,61 @@
+# The Cloud Scaling capacity-bounds policy family — the shared Policy Authority's
+# SECOND policy family, and the first registered from OUTSIDE the authority's own
+# distribution.
+#
+# The authority ratified that a second family is added by registering a second
+# adapter with no core change. This distribution exercises that claim across a
+# package boundary rather than inside the authority's test suite.
+#
+# Exactly one first-party dependency and no third-party runtime dependency at
+# all. There is deliberately NO dependency on:
+#
+#   * ugence-cloud-scaling-authorization-contracts — that package carries the
+#     Phase 5A candidate and transitively the Risk Authority. A leaf policy
+#     family that imported it to borrow the D-4 canonical action-type set would
+#     drag a risk engine in behind a declarative artifact. Reconciling this
+#     family's action tokens against that set belongs to the comparison
+#     subphase.
+#   * ugence-cloud-scaling-policy-authenticity — the verifier is downstream of
+#     this family, never the reverse.
+#   * ugence-uvi-policy-contracts — a Cloud Scaling family must not depend on
+#     UVI's envelope types. (They still arrive transitively through the
+#     authority's own declared requirement; nothing here imports them, and a
+#     test asserts that.)
+#   * the Trusted Evidence Authority, the Cloud Scaling Controller, Risk
+#     Authority, ActionGate, a cloud SDK or a Kubernetes client.
+#
+# Build:  python -m build packages/integration/cloud-scaling-capacity-bounds-policy
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-cloud-scaling-capacity-bounds-policy"
+dynamic = ["version"]
+description = "Cloud Scaling capacity-bounds policy family and Policy Authority adapter — issuable, signable, digest-bound capacity ceilings."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["ugence", "cloud-scaling", "policy", "capacity", "bounds", "adapter"]
+dependencies = [
+    "ugence-policy-authority>=0.1.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+dev = ["pytest>=7.0", "build>=1.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_cloud_scaling_capacity_bounds_policy.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_cloud_scaling_capacity_bounds_policy*"]
+
+[tool.setuptools.package-data]
+ugence_cloud_scaling_capacity_bounds_policy = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

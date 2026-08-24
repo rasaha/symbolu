@@ -23,7 +23,7 @@ from dataclasses import replace
 
 import pytest
 
-from _policy_fixtures import T_MID, issued, verifier_for
+from _policy_fixtures import T_CANDIDATE, T_MID, issued, verifier_for
 from ugence_cloud_scaling_policy_authenticity.verified import VERIFIED_FACT_NAMES
 
 #: Verified facts whose value is copied from the issuance record, and the signed key each
@@ -52,7 +52,16 @@ SIGNATURE_COVERED = {
 #: determination, and every non-``None`` value went through the gate. The property below
 #: measures both halves of that, because "verified when present" is a weaker statement than
 #: the rest of this set makes and a reader is owed the difference.
-GATE_ESTABLISHED = {"expected_reference_tenant_id", "candidate_digest_fact"}
+GATE_ESTABLISHED = {
+    "expected_reference_tenant_id",
+    "candidate_digest_fact",
+    # 5B-3 (R-8): gate 14 reframes (adapter_id, policy_type, projection) and compares the
+    # result against the body digest the issuance signature covered. `policy_type` is not
+    # itself in the signing payload — it is established by reproducing a digest that is.
+    "policy_type",
+    # 5B-3 (R-8): gate 15 reads these out of a projection gate 14 already reproduced.
+    "capacity_bounds_fact",
+}
 
 #: Verified facts that are this package's own constants, pinned at construction.
 PACKAGE_CONSTANTS = {
@@ -175,10 +184,12 @@ def test_a_candidate_digest_is_verified_when_present_and_absent_otherwise():
 
     authority, record = issued()
     candidate = genuine_candidate(record)
+    # T_CANDIDATE, not T_MID: since gate 13 the instant must sit inside the candidate's own
+    # validity, and the fixture candidate's recommendation expires months before T_MID.
     result = verifier_for(authority).verify(
         coordinate=record.coordinate,
         expected_reference_tenant_id=record.coordinate.tenant_id,
-        as_of=T_MID,
+        as_of=T_CANDIDATE,
         candidate=candidate,
     )
     assert result.verified_policy.candidate_digest_fact == candidate.candidate_digest

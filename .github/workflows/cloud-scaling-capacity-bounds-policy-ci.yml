@@ -1,0 +1,219 @@
+name: cloud-scaling-capacity-bounds-policy-ci
+
+# Scoped CI for the Cloud Scaling capacity-bounds policy family
+# (ugence-cloud-scaling-capacity-bounds-policy): the shared Policy Authority's SECOND policy
+# family, and the first registered from OUTSIDE the authority's own distribution.
+#
+# Why this workflow exists. The repository's per-package workflows are path-scoped, and this
+# package is new, so without this file its suite would run nowhere automated — the exact defect
+# cloud-scaling-policy-authenticity-ci was created to repair for Phase 5B-0B ("merged with its
+# suite running nowhere automated"). Repeating that on a package whose whole purpose is to make
+# a bound authentic would be a poor trade.
+#
+# What this package claims, and therefore what must be measured:
+#   * a capacity bound is issuable, signable and resolvable through the shared authority;
+#   * a second policy family needs NO core change to the authority;
+#   * the leaf boundary holds — one first-party dependency, reached only through its public
+#     `api` module, no signing, no clock, no local canonicalization.
+#
+# ADDITIVE and PATH-SCOPED. It does not touch, weaken or modify
+# cloud-scaling-policy-authenticity-ci, cloud-scaling-authorization-contracts-ci,
+# cloud-scaling-producer-attestation-ci, the Policy Authority workflows, or any Risk Authority
+# workflow.
+
+on:
+  pull_request:
+    paths:
+      - "packages/integration/cloud-scaling-capacity-bounds-policy/**"
+      - "packages/policy-authority/**"
+      - ".github/workflows/cloud-scaling-capacity-bounds-policy-ci.yml"
+  push:
+    branches:
+      - "claude/r8-**"
+      - "claude/phase-5b-**"
+      - "claude/setup-symbolu-monorepo-**"
+    paths:
+      - "packages/integration/cloud-scaling-capacity-bounds-policy/**"
+      - ".github/workflows/cloud-scaling-capacity-bounds-policy-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  # Installed in dependency order so each distribution's declared first-party requirement is
+  # already present; the monorepo's packages are not on any index, so a resolve would fail.
+  #
+  # uvi-policy-contracts and governance-contracts are NOT this package's dependencies. They
+  # arrive because ugence-policy-authority declares the UVI contracts for its first adapter,
+  # and its `api` module imports that adapter — a transitive cost this package's pyproject
+  # records rather than discovers. Nothing here imports either, and
+  # tests/test_import_boundary.py asserts that against the shipped source.
+  FIRST_PARTY: >-
+    packages/governance-contracts
+    packages/uvi-policy-contracts
+    packages/policy-authority
+    packages/integration/cloud-scaling-capacity-bounds-policy
+
+jobs:
+  capacity-bounds-suite:
+    name: Capacity-bounds policy family suite (source)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install tooling + first-party packages (editable, in dependency order)
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+          for pkg in $FIRST_PARTY; do pip install -e "$pkg"; done
+      - name: Full suite (one run; the report below is read, not re-measured)
+        run: |
+          python -m pytest packages/integration/cloud-scaling-capacity-bounds-policy/tests \
+            -rs --junitxml=/tmp/junit.xml
+      - name: The suite collected its properties, and none skipped silently
+        # Reads the report the run above already produced rather than running the suite twice.
+        #
+        # Zero collected is a failure, not a pass: pytest exits 5 for "no tests collected", so
+        # a rename or a moved path would otherwise turn this workflow green while running
+        # nothing. The floor is a floor, not an equality — adding properties must not fail it.
+        #
+        # A skip is also a failure here. Nothing in this suite is conditional on an
+        # unresolvable neighbour, so on a complete checkout every property must run.
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+
+          MINIMUM = 85
+
+          root = ET.parse("/tmp/junit.xml").getroot()
+          suites = [root] if root.tag == "testsuite" else list(root)
+          total = sum(int(s.get("tests", 0)) for s in suites)
+          failures = sum(int(s.get("failures", 0)) + int(s.get("errors", 0)) for s in suites)
+          skipped = [
+              case.get("name", "?")
+              for suite in suites
+              for case in suite.iter("testcase")
+              if case.find("skipped") is not None
+          ]
+          print(f"collected={total} failures={failures} skipped={len(skipped)}")
+          if failures:
+              sys.exit(f"FAIL: {failures} properties failed or errored")
+          if total < MINIMUM:
+              sys.exit(
+                  f"FAIL: collected {total} properties, expected at least {MINIMUM}. A target "
+                  "that collects nothing is a failure, not a green suite."
+              )
+          if skipped:
+              sys.exit(f"FAIL: {len(skipped)} properties skipped on a complete checkout: {skipped}")
+          PY
+      - name: The second family registers with no core change to the authority
+        # The claim this package exists to test, and the one a reader is most likely to doubt.
+        # Drives genuine issuance, real Ed25519 signing, the real registry and real resolution
+        # from OUTSIDE the authority's distribution.
+        run: |
+          python -m pytest \
+            packages/integration/cloud-scaling-capacity-bounds-policy/tests/test_authority_registration.py
+      - name: Leaf boundary — one dependency, public api only, no signing, no clock
+        # The load-bearing prohibition is the Phase 5A candidate contract: borrowing the D-4
+        # canonical action-type set from it would look like reuse and would in fact place the
+        # Risk Authority transitively behind a declarative artifact.
+        run: |
+          python -m pytest \
+            packages/integration/cloud-scaling-capacity-bounds-policy/tests/test_import_boundary.py
+      - name: Artifact construction is fail-closed
+        run: |
+          python -m pytest \
+            packages/integration/cloud-scaling-capacity-bounds-policy/tests/test_artifact.py
+
+  authority-baseline:
+    name: The authority this family registers with remains green
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install tooling + first-party packages
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+          for pkg in $FIRST_PARTY; do pip install -e "$pkg"; done
+      - name: Policy Authority suite
+        # This family delegates issuance, signing, the registry, resolution and revocation
+        # entirely to the authority. Its own guarantees are only as good as that suite.
+        run: python -m pytest packages/policy-authority
+      - name: The baseline actually collected tests
+        run: |
+          set -euo pipefail
+          python -m pytest packages/policy-authority --co > /tmp/c.txt 2>&1
+          count=$(grep -oE '[0-9]+ tests? collected' /tmp/c.txt | tail -1 | grep -oE '^[0-9]+')
+          if [ -z "${count:-}" ] || [ "$count" -eq 0 ]; then
+            echo "::error::packages/policy-authority collected zero tests"
+            tail -30 /tmp/c.txt
+            exit 1
+          fi
+          echo "packages/policy-authority: $count tests collected"
+
+  packaging:
+    name: Wheel and sdist build cleanly, and ship no test payload
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Build both artifacts
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+          python -m build packages/integration/cloud-scaling-capacity-bounds-policy
+      - name: The wheel ships the package and no tests
+        # A wheel carrying the test tree would ship the fixtures' synthetic family to
+        # consumers. `tool.setuptools.packages.find` scopes to src/, and this checks it held.
+        run: |
+          set -euo pipefail
+          cd packages/integration/cloud-scaling-capacity-bounds-policy
+          wheel=$(ls dist/*.whl)
+          python - "$wheel" <<'PY'
+          import sys
+          import zipfile
+
+          names = zipfile.ZipFile(sys.argv[1]).namelist()
+          top = {n.split("/")[0] for n in names}
+          expected = "ugence_cloud_scaling_capacity_bounds_policy"
+          if expected not in top:
+              sys.exit(f"FAIL: wheel does not ship {expected}; top-level = {sorted(top)}")
+          leaked = sorted(n for n in names if n.startswith(("tests/", "conftest")))
+          if leaked:
+              sys.exit(f"FAIL: wheel ships test payload: {leaked}")
+          if f"{expected}/py.typed" not in names:
+              sys.exit("FAIL: wheel omits py.typed")
+          print(f"wheel top-level: {sorted(top)}")
+          PY
+      - name: The distribution installs and imports in a clean environment
+        # An import failure here means the declared dependencies are wrong, which the source
+        # run above cannot catch: it installs every first-party package editable.
+        run: |
+          set -euo pipefail
+          cd packages/integration/cloud-scaling-capacity-bounds-policy
+          python -m venv /tmp/clean
+          /tmp/clean/bin/pip install --upgrade pip --quiet
+          /tmp/clean/bin/pip install --quiet \
+            ../../governance-contracts ../../uvi-policy-contracts ../../policy-authority
+          /tmp/clean/bin/pip install --quiet dist/*.whl
+          /tmp/clean/bin/python - <<'PY'
+          from ugence_cloud_scaling_capacity_bounds_policy import (
+              CAPACITY_BOUNDS_ADAPTER_ID,
+              CapacityBoundsPolicyFamilyAdapter,
+              __version__,
+          )
+
+          adapter = CapacityBoundsPolicyFamilyAdapter()
+          assert adapter.adapter_id == CAPACITY_BOUNDS_ADAPTER_ID, adapter.adapter_id
+          print(f"installed {__version__}, adapter {adapter.adapter_id}")
+          PY

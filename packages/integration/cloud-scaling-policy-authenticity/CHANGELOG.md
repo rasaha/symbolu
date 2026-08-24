@@ -1,5 +1,137 @@
 # Changelog — ugence-cloud-scaling-policy-authenticity
 
+## [0.5.0] — Cloud Scaling Phase 5B-3: close R-8, the authenticated capacity bound
+
+Ratified as Route 1 + Route 2 as one isolated subphase. **Breaking**, pre-1.0: a determination
+that verified at `0.4.0` may be refused at `0.5.0`, and every artifact digest moves.
+
+**Partition change and profile bump.** `VERIFICATION_PROFILE_VERSION` moves from `v2` to `v3`,
+because a fact moved between the verified and recorded halves and a new verified fact was
+added. The artifact digest and the partition fingerprint move with it. Both prior values are
+kept as negative anchors in `tests/test_frozen_digests.py`, so reverting the promotion fails
+rather than passes.
+
+- promoted: `policy_type` — gate 14 now reproduces `record.policy_body_digest` by reframing
+  `(adapter_id, policy_type, projection)` through the Policy Authority's own
+  `framed_body_digest`, and `policy_type` is one of the three inputs to that frame.
+  Substituting it makes the record and the published projection disagree, and the
+  determination is refused. It sat in the recorded half only because the pre-image was
+  unavailable here — the value is committed inside `policy_body_digest`, but a hash is one-way
+  and this package holds no adapter registry with which to re-derive the descriptor. Route 1
+  supplied the pre-image by publishing the descriptor's projection on `PolicyResolution`.
+  `tests/test_unattested_facts.py` keeps the test that measured the gap and **inverts** its
+  assertion rather than deleting it.
+- promoted: `capacity_bounds_fact` — new in this release, and verified from the moment it
+  exists rather than parked in the recorded half first. Gate 15 reads the bounds out of a
+  projection gate 14 has already reproduced, so they are the bounds the issuance signature
+  covered. `None` means the resolved policy is not a capacity-bounds policy and states no
+  bound; it never means the action is unbounded, and never means a bound was carried
+  unchecked. Same posture as `candidate_digest_fact`: "verified" means the routine correctly
+  evaluated the input including its absence.
+
+### Added — gate 14, the projection reproduces the signed body digest (R-8)
+
+Three new refusals, and the first is the load-bearing one:
+
+* `POLICY_PROJECTION_ABSENT` — the resolution published no descriptor projection. Refused
+  rather than degraded: a port whose answer cannot be independently reproduced here is one
+  this package cannot check, and carrying the facts unchecked is exactly the posture 5B-3
+  exists to end. The three fields arrive together or not at all upstream, but this boundary
+  re-checks each — it accepts a `PolicyResolution` it did not construct.
+* `POLICY_PROJECTION_DIGEST_MISMATCH` — the projection, the adapter id or the policy type is
+  not what the signature covered.
+* `POLICY_BOUNDS_MALFORMED` — gate 15. A digest match proves the bytes are the signed bytes;
+  it does not make an unreadable structure readable. A bound carrying a field this profile
+  does not know is refused rather than summarised, because a lossy reading of a signed body
+  is not a verified fact.
+
+### Added — `VerifiedCapacityBound`
+
+This package's own exact-typed carrier for an authenticated ceiling. Deliberately **not** the
+capacity-bounds family's `CapacityBound`: importing that would make the verifier depend on the
+family it verifies. The bounds are read structurally out of the reproduced projection, keyed
+on the resolved coordinate's `policy_family`, so a foreign family carrying a `bounds` key is
+not read as a bounds statement.
+
+### What R-8 actually required
+
+Not "compare the bounds". The verified artifact carried 26 facts and not one was a bound, so
+there was nothing to compare against — and no shipped policy family stated a capacity bound at
+all. The prerequisite shipped alongside this release as
+`ugence-cloud-scaling-capacity-bounds-policy`, a leaf distribution this package does **not**
+depend on. Its declared-dependency set is unchanged.
+
+### Deliberately not done
+
+* **No comparison against the candidate.** The bounds are carried, not reconciled against
+  `max_permitted_magnitude` / `max_permitted_delta`. That is a later subphase with its own
+  ruling.
+* **No change to the Phase 5A candidate contract**, and therefore no re-pin in
+  `cloud-scaling-producer-attestation`. That package declares no dependency on the Policy
+  Authority or on this one; its 5B-1 re-pin was caused by the candidate contract gaining a
+  policy coordinate, which moved `PHASE_5A_CANDIDATE_DIGEST`. Nothing here touches it.
+* **`FROZEN_TRUST_CONFIGURATION_DIGEST` does not move.** The subphase's own ruling predicted it
+  would, on the grounds that the registered adapter set changes. It does not: the reference
+  determination still resolves the same UVI fixture policy under the same registry. The
+  adapter-set sensitivity is anchored instead by the new
+  `FROZEN_BOUNDS_TRUST_CONFIGURATION_DIGEST`, under a registry whose only adapter is the
+  bounds family's. Re-pinning the reference constant would have anchored a fiction.
+
+## [0.4.0] — Cloud Scaling Phase 5B-2 part 2: R-2 and R-7
+
+Ratified in `docs/architecture/ADR_CLOUD_SCALING_DECISION_SCOPE_PHASE5B1_RATIFICATION.md`,
+owner ruling on the remaining residuals. **Breaking**, pre-1.0: a candidate-bearing
+determination that verified at `0.3.0` may be refused at `0.4.0`.
+
+**No partition change and no profile bump.** `VERIFICATION_PROFILE_VERSION` stays `v2`: no fact
+moved between the verified and recorded halves, so the artifact digest and the partition
+fingerprint are unchanged. What changed is which inputs produce an artifact.
+
+### Added — gate 13, the candidate must be valid AT the verified instant (R-2)
+
+`as_of` is the authoritative verification instant injected by the composition root; this
+package still reads no clock. What is new is that the instant is reconciled against the
+candidate's own carried validity rather than recorded beside it.
+
+Four typed refusals, not one generic staleness:
+
+- `CANDIDATE_RECOMMENDATION_NOT_YET_VALID` — `as_of` precedes `subject_valid_from_fact`.
+- `CANDIDATE_RECOMMENDATION_EXPIRED` — `as_of` is past `subject_valid_until_fact`.
+- `CANDIDATE_DECISION_EXPIRED` — `as_of` is past `decision_expires_at_fact`. Checked
+  independently: a live recommendation can carry a dead decision.
+- `CANDIDATE_FACT_NOT_YET_OCCURRED` — `as_of` precedes `subject_asserted_at_fact`,
+  `decision_evaluated_at_fact` or `attestation_issued_at_fact`; the detail names which.
+
+The six timestamps are classified from the upstream contracts rather than from their names:
+the subject interval is inclusive on both ends, matching
+`cloud-scaling-risk-integration`'s `_require_within_validity` (`now > valid_until` /
+`now < valid_from`), and the decision bound matches Risk Authority's `now > expires_at`. A
+boundary that disagreed with the seam above it about which instants are admissible would be a
+second opinion, not a second check.
+
+**R-2 was recorded wrongly and is corrected in the ADR.** It read as "whose clock supplies
+`as_of`". Measurement showed `as_of` was already type-checked and round-tripped, and that the
+authority already refuses a revoked policy *even at an instant before its revocation*. What was
+open was the missing reconciliation, and this suite's own fixtures demonstrated it: every
+candidate-bearing test verified at `T_MID`, five months after the fixture candidate's
+recommendation expired, and nothing objected. Those fixtures now state an honest instant
+(`T_CANDIDATE`).
+
+### Added — the partition maps agree with one canonical declaration (R-7)
+
+`DERIVED_FACT_NAMES` names the three digest-covered non-fields (`outcome`, `grants_authority`,
+`historical`) that were previously reconciled by an unnamed tuple, and `VERIFIED_DIGEST_KEYS`
+states the verified half's membership once. `require_partition_agreement` compares both payload
+maps against the declaration before anything is minted, raising the package's
+`INVARIANT_VIOLATION`. Membership went from three uncompared places to one declaration plus a
+mint-time check. R-7 remains what it was recorded as — a maintenance hazard, not a correctness
+one — but it now fails loudly and says which side is short.
+
+### Changed
+
+- Suite 289 → 309, 0 failed, 0 skipped. Both new guards were neutralised and observed to fail
+  (7 properties for gate 13, 4 for the agreement check) before being trusted.
+
 ## [0.3.0] — Cloud Scaling Phase 5B-2 part 1: R-9
 
 Ratified in `docs/architecture/ADR_CLOUD_SCALING_DECISION_SCOPE_PHASE5B1_RATIFICATION.md`,

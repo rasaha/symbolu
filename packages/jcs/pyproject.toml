@@ -1,0 +1,67 @@
+# Independent distribution for RFC 8785 (JCS) + Action-Profile canonicalization.
+#
+# ugence-jcs is a LEAF substrate, not a capability. It maps an already-parsed JSON
+# value to canonical bytes. It holds no authority, decides nothing, and defines no
+# governance vocabulary: no digest framing, no envelope schema, no profile registry,
+# no policy, no authorization/clearance/decision terms.
+#
+# It was extracted from ``cer_v0_3/cleanroom/canon.py`` (the CER V0.3 clean-room
+# implementation, independent of the reference ActionGate path) with its byte stream
+# preserved exactly. The clean-room package now consumes this distribution, and the
+# frozen CER V0.2 identity digests remain reproducible through it.
+#
+# Dependency policy: Python standard library ONLY. Zero runtime dependencies —
+# including no third-party JCS library. It must not depend on any Ugence package,
+# on cer_v0_1/cer_v0_2/cer_v0_3, on action_gate_ref, or on symbolu_robotics; the
+# extraction preserves the clean-room independence those boundaries exist to prove.
+#
+# Build:  python -m build packages/jcs
+# Verify: python packages/jcs/verify_jcs_distribution.py
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-jcs"
+dynamic = ["version"]
+description = "RFC 8785 (JCS) + Action-Profile canonicalization — standard-library-only, authority-neutral canonical bytes, plus a bare SHA-256 over them. No digest framing, no schema, no policy."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Ugence Labs" }]
+keywords = ["jcs", "rfc8785", "canonicalization", "json", "determinism", "ugence"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: Other/Proprietary License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Typing :: Typed",
+]
+# Standard library only. This list must stay empty.
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "build>=1.0"]
+
+[project.urls]
+Documentation = "https://github.com/rasaha/symbolu/tree/main/packages/jcs/docs"
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_jcs.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_jcs*"]
+
+[tool.setuptools.package-data]
+ugence_jcs = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "--import-mode=importlib"
