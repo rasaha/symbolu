@@ -55,11 +55,15 @@ def test_this_package_ships_at_the_version_its_profile_change_requires():
 
     The two travel together only when the *artifact* changes. 5B-1 took the package to
     ``0.2.0`` and the profile to ``v2`` because a fact was promoted between the halves. 5B-2
-    part 1 took the package to ``0.3.0`` and left the profile alone; part 2 takes it to
-    ``0.4.0`` and leaves it alone again. Gates 12 and 13 change which inputs produce an
+    part 1 took the package to ``0.3.0`` and left the profile alone; part 2 took it to
+    ``0.4.0`` and left it alone again. Gates 12 and 13 change which inputs produce an
     artifact, not what an artifact contains, so the partition fingerprint and the artifact
-    digest are untouched. A profile bump here would tell a consumer their pinned digest moved
-    when it did not.
+    digest were untouched. A profile bump there would have told a consumer their pinned
+    digest moved when it did not.
+
+    5B-3 is the other kind. It promotes ``policy_type`` and adds ``capacity_bounds_fact``,
+    so the partition, the artifact digest and the profile version all move together: package
+    ``0.5.0``, profile ``v3``.
     """
 
     from ugence_cloud_scaling_policy_authenticity import (
@@ -67,8 +71,8 @@ def test_this_package_ships_at_the_version_its_profile_change_requires():
         __version__,
     )
 
-    assert __version__ == "0.4.0"
-    assert VERIFICATION_PROFILE_VERSION == "v2"
+    assert __version__ == "0.5.0"
+    assert VERIFICATION_PROFILE_VERSION == "v3"
 
 
 @pytest.mark.invariant

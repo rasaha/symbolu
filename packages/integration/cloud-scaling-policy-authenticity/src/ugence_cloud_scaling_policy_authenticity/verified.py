@@ -114,6 +114,7 @@ from ugence_policy_authority.api import PolicyCoordinate
 
 from .canonical import (
     framed_digest,
+    require_nfc_text,
     require_phase5a_digest,
     require_policy_digest,
 )
@@ -133,6 +134,7 @@ from .outcomes import PolicyAuthenticityOutcome
 
 __all__ = [
     "VerifiedPolicyAuthenticity",
+    "VerifiedCapacityBound",
     "require_verified_policy_authenticity",
     "VERIFIED_FACT_NAMES",
     "RECORDED_FACT_NAMES",
@@ -168,34 +170,48 @@ VERIFIED_FACT_NAMES: "frozenset[str]" = frozenset(
         #: the resolved coordinate. ``None`` means no candidate accompanied the determination;
         #: it never means a candidate was carried unchecked.
         "candidate_digest_fact",
+        #: Promoted from the recorded half by 5B-3 (R-8). Gate 14 reproduces
+        #: ``record.policy_body_digest`` from the resolution's published descriptor
+        #: projection through the authority's own ``framed_body_digest``, and ``policy_type``
+        #: is one of the three inputs to that frame. Substituting it changes the digest, so
+        #: it is now checked rather than merely carried.
+        "policy_type",
+        #: New in 5B-3 (R-8). The capacity bounds read out of a projection whose digest has
+        #: already been reproduced, so they are the bounds the issuance signature covered.
+        #: ``None`` means the resolved policy is not a capacity-bounds policy and states no
+        #: bound — never that a bound was carried unchecked, and never that the action is
+        #: unbounded. Same posture as ``candidate_digest_fact``: "verified" means the routine
+        #: correctly evaluated the input including its absence.
+        "capacity_bounds_fact",
     }
 )
 
 #: The facts carried and digest-covered but **never attested** (D-5B0B-7). A member leaves
 #: this set only when something starts actually checking it, and doing so moves the artifact
-#: digest — which is the point. **Three** members since 5B-1, for three distinct reasons —
-#: ``candidate_digest_fact`` left this half when gate 11 began reconciling it, and the artifact
-#: digest and the profile version both moved with it, which is exactly what a promotion is
-#: supposed to look like:
+#: digest — which is the point. **Two** members since 5B-3, for two distinct reasons. Two facts
+#: have now left: ``candidate_digest_fact`` in 5B-1 when gate 11 began reconciling it, and
+#: ``policy_type`` in 5B-3 when gate 14 began reproducing the digest it is framed into. Each
+#: time the artifact digest and the profile version moved with it, which is exactly what a
+#: promotion is supposed to look like:
 #:
 #: * ``resolved_as_of_fact`` — open residual **R-2**: the instant is injected and unvalidated.
-#: * ``policy_type`` — **not signature-covered and never compared.** It is absent from the 21
-#:   keys of ``IssuedPolicyRecord.signing_payload()`` (``adapter_id`` is present; this is not),
-#:   and ``resolve_policy`` never compares the record's ``policy_type`` against the adapter
-#:   descriptor's. A record differing only in this field resolves ``RESOLVED`` and would mint a
-#:   ``VERIFIED`` artifact carrying the substituted value. It is transitively committed inside
-#:   ``policy_body_digest``, whose frame includes it — but a hash is one-way, and this package
-#:   holds no adapter registry with which to re-derive the descriptor, so there is nothing here
-#:   to check it against.
 #: * ``trust_configuration_digest`` — **self-reported by the resolution port.** The port is the
 #:   seam to the authority, so any check this package could make would be the port vouching for
 #:   itself: a wrapper delegating to a genuine ``PolicyAuthorityResolutionPort`` while reporting
 #:   an arbitrary well-formed digest is indistinguishable from the genuine port at this
 #:   boundary. Only the composition root knows which trust configuration it wired.
+#:
+#: ``policy_type``'s reason for sitting here is worth recording, because it is precisely what
+#: 5B-3 removed rather than argued around. It was absent from the 21 keys of
+#: ``IssuedPolicyRecord.signing_payload()`` and never compared at resolution, so a record
+#: differing only in this field resolved ``RESOLVED`` and minted a ``VERIFIED`` artifact
+#: carrying the substituted value. It was transitively committed inside ``policy_body_digest``,
+#: whose frame includes it — but a hash is one-way, and this package held no adapter registry
+#: with which to re-derive the descriptor. Route 1 published the descriptor's projection on the
+#: resolution itself, which supplies the missing pre-image; gate 14 reframes it and compares.
 RECORDED_FACT_NAMES: "frozenset[str]" = frozenset(
     {
         "resolved_as_of_fact",
-        "policy_type",
         "trust_configuration_digest",
     }
 )
@@ -290,6 +306,46 @@ _VERIFICATION_TOKEN = object()
 _MINTED_DIGESTS: set = set()
 
 
+@dataclass(frozen=True)
+class VerifiedCapacityBound:
+    """One authenticated capacity ceiling carried into a verified artifact (R-8, 5B-3).
+
+    **This package's own type, deliberately.** It is not the capacity-bounds family's
+    ``CapacityBound``: importing that would make the verifier depend on the family it
+    verifies, inverting the boundary. What arrives here is read structurally out of a
+    projection whose digest gate 14 has already reproduced against the signed
+    ``policy_body_digest`` — so these values are the ones the issuance signature covered,
+    regardless of which types produced them.
+
+    Exact-typed and revalidated on construction. A digest match proves the bytes are the
+    signed bytes; it does not prove they form a bound this profile can state, and a ceiling
+    this routine cannot state exactly is not one it will attest.
+    """
+
+    action_type: str
+    resource_class: str
+    max_permitted_magnitude: int
+    max_permitted_delta: int
+
+    def __post_init__(self) -> None:
+        require_nfc_text("VerifiedCapacityBound.action_type", self.action_type)
+        require_nfc_text(
+            "VerifiedCapacityBound.resource_class", self.resource_class, allow_empty=True
+        )
+        for name in ("max_permitted_magnitude", "max_permitted_delta"):
+            value = getattr(self, name)
+            # ``bool`` before ``int``: bool subclasses int, and a ceiling of ``True``
+            # silently meaning ``1`` is exactly the coercion an attested fact must not make.
+            if isinstance(value, bool) or type(value) is not int:
+                raise _IntegrityError(
+                    f"VerifiedCapacityBound.{name} must be an int, got {type(value).__name__}"
+                )
+            if value < 0:
+                raise _IntegrityError(
+                    f"VerifiedCapacityBound.{name} must be >= 0, got {value}"
+                )
+
+
 def _framed_partition(*, verified_map: dict, recorded_map: dict) -> dict:
     """The two separately framed maps, in the one shape the artifact digest covers.
 
@@ -355,8 +411,13 @@ class VerifiedPolicyAuthenticity:
     # --- validity facts, carried from the inputs; no clock was read ---------------------
     policy_issued_at_fact: datetime
     resolved_as_of_fact: datetime
-    # --- scope of the determination; recorded, never reconciled (R-4) -------------------
+    # --- scope of the determination; reconciled by gate 11 since 5B-1 (R-4) -------------
     candidate_digest_fact: Optional[str]
+    # --- the authenticated bounds, reproduced from the signed body by gate 14 (R-8) -----
+    #: ``None`` means the resolved policy is not a capacity-bounds policy and states no
+    #: bound. It never means the action is unbounded, and never means a bound was carried
+    #: unchecked.
+    capacity_bounds_fact: Optional[tuple]
     # --- how it was verified --------------------------------------------------------------
     verification_profile: str
     verification_profile_version: str
@@ -409,6 +470,37 @@ class VerifiedPolicyAuthenticity:
             require_policy_digest(name, getattr(self, name))
         if self.candidate_digest_fact is not None:
             require_phase5a_digest("candidate_digest_fact", self.candidate_digest_fact)
+        # The bounds, revalidated on the artifact itself for the same reason the R-3 gate
+        # below is: the verifier checks before minting, and checking here too means a
+        # mutated artifact cannot present bounds the routine never attested. A tuple, never
+        # a list — the artifact is frozen and digested, and a mutable member would let the
+        # value drift out from under a digest that already covered it.
+        if self.capacity_bounds_fact is not None:
+            if type(self.capacity_bounds_fact) is not tuple:
+                raise _IntegrityError(
+                    "capacity_bounds_fact must be a tuple or None, got "
+                    f"{type(self.capacity_bounds_fact).__name__}"
+                )
+            if not self.capacity_bounds_fact:
+                raise _IntegrityError(
+                    "capacity_bounds_fact must be None rather than an empty tuple: "
+                    "'this policy states no bound' and 'this policy states zero bounds' "
+                    "would otherwise be two spellings of one fact"
+                )
+            for index, bound in enumerate(self.capacity_bounds_fact):
+                if type(bound) is not VerifiedCapacityBound:
+                    raise _IntegrityError(
+                        f"capacity_bounds_fact[{index}] must be exactly a "
+                        f"VerifiedCapacityBound, got {type(bound).__name__}"
+                    )
+            selectors = [
+                (b.action_type, b.resource_class) for b in self.capacity_bounds_fact
+            ]
+            if len(set(selectors)) != len(selectors):
+                raise _IntegrityError(
+                    "capacity_bounds_fact carries two bounds for one selector; the "
+                    "applicable bound would be ambiguous"
+                )
         # The R-3 gate, re-asserted on the artifact itself: the coordinate's content digest
         # IS the body digest the signature covered. The verifier checks it before minting;
         # checking it here too means a mutated artifact cannot present a coordinate that
@@ -511,6 +603,10 @@ class VerifiedPolicyAuthenticity:
             "verification_profile": self.verification_profile,
             "verification_profile_version": self.verification_profile_version,
             "candidate_digest_fact": self.candidate_digest_fact,
+            # Promoted in 5B-3: gate 14 reproduces the body digest this is framed into.
+            "policy_type": self.policy_type,
+            # New in 5B-3: bounds read out of a projection whose digest was reproduced.
+            "capacity_bounds_fact": self.capacity_bounds_fact,
             # Framed in deliberately: the digest commits to the facts that this artifact
             # establishes policy authenticity, grants nothing, and is not historical.
             "outcome": self.outcome.value,
@@ -521,11 +617,11 @@ class VerifiedPolicyAuthenticity:
     def recorded_facts(self) -> dict:
         """Facts carried and digest-covered, but **never attested** (D-5B0B-7).
 
-        Three members since 5B-1, and each is here because nothing established it — see
+        Two members since 5B-3, and each is here because nothing established it — see
         :data:`RECORDED_FACT_NAMES` for the reason attached to each. One names an open residual
-        (``resolved_as_of_fact``/R-2); ``policy_type`` is neither signature-covered nor
-        compared at resolution; ``trust_configuration_digest`` is reported by the resolution
-        port about itself. ``candidate_digest_fact`` was the fourth until R-4 closed.
+        (``resolved_as_of_fact``/R-2); ``trust_configuration_digest`` is reported by the
+        resolution port about itself. ``candidate_digest_fact`` left in 5B-1 and
+        ``policy_type`` in 5B-3, each when a gate began checking it.
 
         Being in this map does **not** mean the value is unprotected: it is inside the
         artifact digest, so it cannot be rewritten after the fact. It means nobody checked it.
@@ -534,7 +630,6 @@ class VerifiedPolicyAuthenticity:
 
         return {
             "resolved_as_of_fact": self.resolved_as_of_fact,
-            "policy_type": self.policy_type,
             "trust_configuration_digest": self.trust_configuration_digest,
         }
 

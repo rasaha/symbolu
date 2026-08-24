@@ -52,7 +52,16 @@ SIGNATURE_COVERED = {
 #: determination, and every non-``None`` value went through the gate. The property below
 #: measures both halves of that, because "verified when present" is a weaker statement than
 #: the rest of this set makes and a reader is owed the difference.
-GATE_ESTABLISHED = {"expected_reference_tenant_id", "candidate_digest_fact"}
+GATE_ESTABLISHED = {
+    "expected_reference_tenant_id",
+    "candidate_digest_fact",
+    # 5B-3 (R-8): gate 14 reframes (adapter_id, policy_type, projection) and compares the
+    # result against the body digest the issuance signature covered. `policy_type` is not
+    # itself in the signing payload — it is established by reproducing a digest that is.
+    "policy_type",
+    # 5B-3 (R-8): gate 15 reads these out of a projection gate 14 already reproduced.
+    "capacity_bounds_fact",
+}
 
 #: Verified facts that are this package's own constants, pinned at construction.
 PACKAGE_CONSTANTS = {
