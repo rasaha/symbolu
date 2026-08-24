@@ -134,4 +134,4 @@ def test_the_only_exempt_file_is_the_packaging_verifier():
 def test_ugence_jcs_is_the_declared_identity_substrate():
     """D2 is recorded in the packaging metadata, not only in prose."""
     pyproject = (PKG_ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    assert "ugence-jcs>=0.1.0" in pyproject
+    assert "ugence-jcs>=0.2.0" in pyproject
