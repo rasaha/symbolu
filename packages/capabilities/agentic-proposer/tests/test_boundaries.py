@@ -145,4 +145,4 @@ def test_declared_dependencies_are_exactly_the_three_permitted():
     pyproject = (PKG_ROOT / "pyproject.toml").read_text(encoding="utf-8")
     block = pyproject.split("dependencies = [", 1)[1].split("]", 1)[0]
     declared = [ln.strip().strip('",') for ln in block.splitlines() if ln.strip().strip('",')]
-    assert declared == ["pydantic>=2", "ugence-jcs>=0.2.0"], declared
+    assert declared == ["pydantic>=2", "ugence-jcs>=0.1.0"], declared

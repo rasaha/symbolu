@@ -51,11 +51,9 @@ classifiers = [
 # Standard library + pydantic + ugence-jcs. This list must not grow.
 # ugence-jcs is declared now because it is the ONLY permitted implementation of
 # proposal identity; S0 imports nothing from it, since S0 implements no identity.
-# The floor is 0.2.0 because that is the first release exposing canonical_sha256_hex,
-# the only ratified way for S1 to compute Equation 3 without hashing locally.
 dependencies = [
     "pydantic>=2",
-    "ugence-jcs>=0.2.0",
+    "ugence-jcs>=0.1.0",
 ]
 
 [project.optional-dependencies]
