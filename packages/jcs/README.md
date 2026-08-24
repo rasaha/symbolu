@@ -47,6 +47,18 @@ canonical_bytes({"perms": ["write", "read"]}, frozenset({"perms"}))
 
 `canonical_string(value, set_paths, nfc_paths)` returns the same content as text.
 
+`canonical_sha256_hex(value, set_paths, nfc_paths)` returns the lowercase
+64-character SHA-256 hex digest of exactly those canonical bytes — a bare digest
+with no domain tag, no length prefix and no `sha256:` prefix; callers that need
+one apply it themselves.
+
+```python
+from ugence_jcs import canonical_sha256_hex
+
+canonical_sha256_hex({"b": "1", "a": "2"})
+# 'f7a837dc9b605d08d450f14bb4927ae8ab268b757d17b579b4e8e61500d87c4a'
+```
+
 ## Action Profile
 
 * UTF-8 output, no BOM, no insignificant whitespace.

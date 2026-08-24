@@ -10,7 +10,8 @@ behaves identically outside the repository:
      present; NO tests/docs; NO foreign package bundled;
   3. clean-install the wheel with ``--no-index`` (it must need nothing at all) and,
      with no ``/symbolu`` on ``sys.path``, reproduce the frozen canonical-byte
-     vectors captured before extraction, confirm the Action-Profile rejections,
+     vectors captured before extraction, confirm ``canonical_sha256_hex`` digests
+     those same bytes, confirm the Action-Profile rejections,
      confirm no forbidden module is loaded, and prove determinism ACROSS TWO
      SEPARATE PROCESSES;
   4. report wheel reproducibility honestly.
@@ -38,11 +39,11 @@ _BUILD_ENV = {**os.environ, "SOURCE_DATE_EPOCH": "1704067200", "PYTHONHASHSEED":
 CLEAN_INSTALL_CHECK = r'''
 import hashlib, sys
 import ugence_jcs
-from ugence_jcs import canonical_bytes
+from ugence_jcs import canonical_bytes, canonical_sha256_hex
 from ugence_jcs.errors import (BareNumberError, DuplicateSetElementError,
                                NonFiniteNumberError, NonNFCError, UnsupportedTypeError)
 
-assert ugence_jcs.__version__ == "0.1.0", ugence_jcs.__version__
+assert ugence_jcs.__version__ == "0.2.0", ugence_jcs.__version__
 assert "site-packages" in ugence_jcs.__file__, ugence_jcs.__file__
 assert not any("/symbolu" in p for p in sys.path), sys.path
 
@@ -67,6 +68,14 @@ for value, set_paths, digest in VECTORS:
     produced = canonical_bytes(value, set_paths)
     assert hashlib.sha256(produced).hexdigest() == digest, (value, produced)
     rolling.update(produced)
+
+# canonical_sha256_hex is the bare SHA-256 of exactly those canonical bytes.
+import re as _re
+for value, set_paths, digest in VECTORS:
+    hex_digest = canonical_sha256_hex(value, set_paths)
+    assert hex_digest == digest, (value, hex_digest)
+    assert _re.fullmatch(r"[0-9a-f]{64}", hex_digest), hex_digest
+assert "canonical_sha256_hex" in ugence_jcs.__all__
 
 # Action Profile fails closed.
 for thunk, exc in (
