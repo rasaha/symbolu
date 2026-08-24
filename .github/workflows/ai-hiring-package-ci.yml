@@ -12,6 +12,19 @@ name: ai-hiring-package-ci
 # platform-freeze verification. No network-dependent integrations run. Triggered
 # only by changes to the package, the historical ai_hiring source, its docs, or
 # this workflow.
+#
+# The repository-root `conftest.py` was in both path lists and has been removed from
+# them. That file is shared by every package in the monorepo — it puts the migrated
+# `packages/*/src` trees on `sys.path` — so any change to it pulled this product's
+# full matrix onto pull requests that touch nothing this workflow covers. It did
+# exactly that to the Cloud Scaling 5B-3 pull request, whose only overlap with AI
+# Hiring was one line added to that shared file by an unrelated extraction.
+#
+# Nothing this workflow measures is given up: the package, its providers, the
+# packaging trees, the historical source and its docs all still trigger it. What
+# changes is that a monorepo-wide file no longer speaks for this product. If a root
+# conftest change ever does need to be measured here, it should arrive as its own
+# path entry with a reason, not as a catch-all.
 
 on:
   pull_request:
@@ -22,7 +35,6 @@ on:
       - "packaging/dgm-actiongate-provider/**"
       - "ai_hiring/**"
       - "docs/ai-hiring/**"
-      - "conftest.py"
       - ".github/workflows/ai-hiring-package-ci.yml"
   push:
     branches:
@@ -36,7 +48,6 @@ on:
       - "packaging/dgm-actiongate-provider/**"
       - "ai_hiring/**"
       - "docs/ai-hiring/**"
-      - "conftest.py"
       - ".github/workflows/ai-hiring-package-ci.yml"
 
 defaults:

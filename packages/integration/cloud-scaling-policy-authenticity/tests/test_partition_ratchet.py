@@ -159,54 +159,101 @@ def test_the_partition_moved_only_with_a_profile_bump_and_a_changelog_line():
 
 
 @pytest.mark.adversarial
-def test_this_changes_own_promotion_fails_the_gate_without_the_bump():
-    """The 5B-3 negative control, driven by the **real** change rather than a synthetic one.
+def test_5b3s_promotion_fails_the_gate_without_the_bump():
+    """5B-3's own promotion, pinned by name and **never skipped**.
 
-    The controls below transform the working tree into a hypothetical promotion. This one
-    uses the promotion that actually happened — ``policy_type`` moving to the verified half —
-    against the real baseline, and reverts only ``VERIFICATION_PROFILE_VERSION``. It is the
-    check that the gate fires on *this* subphase, not merely on a shape resembling it.
+    The controls below promote ``sorted(recorded)[0]`` — whichever fact happens to sort first.
+    This one names the fact this subphase actually moved, so a future change that reverts the
+    promotion cannot leave the control still measuring something else and still green.
 
-    Skips under the same rule as the ratchet itself: no baseline, no measurement.
+    The baseline is **synthesized rather than read from history**, and that is the point. The
+    first version of this test took its baseline from the merge base, and on the 5B-3 pull
+    request the package's CI resolved that baseline to the pull request's own head commit —
+    so ``current.verified & baseline.recorded`` was empty and the property *skipped*. A
+    control that can silently decline to measure is not a control, and this repository's
+    workflow rightly treats a skip as a failure. Synthesizing the "before" removes the
+    dependency on how any particular CI step resolves a revision.
+
+    The history-driven guarantee is not lost: it lives in
+    :func:`test_the_partition_moved_only_with_a_profile_bump_and_a_changelog_line`, and the
+    baseline that feeds it now refuses a revision containing ``HEAD`` outright rather than
+    comparing the change against itself.
+    """
+
+    current = _working_tree_snapshot()
+
+    # The facts 5B-3 moved. Asserted, not assumed: if either is false the subphase has been
+    # reverted or reshaped, and this control must say so rather than pass.
+    assert "policy_type" in current.verified, current.verified
+    assert "policy_type" not in current.recorded, current.recorded
+    assert "capacity_bounds_fact" in current.verified, current.verified
+
+    # The pre-5B-3 partition: policy_type recorded, capacity_bounds_fact absent entirely.
+    before = PartitionSnapshot(
+        verified=(current.verified - {"policy_type", "capacity_bounds_fact"}),
+        recorded=current.recorded | {"policy_type"},
+        verified_domain=current.verified_domain,
+        recorded_domain=current.recorded_domain,
+        profile_version="v2",
+    )
+    assert before.membership != current.membership
+
+    # 1. The real change, against that baseline: disciplined, so no findings.
+    assert (
+        ratchet_problems(baseline=before, current=current, changelog=_read("changelog")) == []
+    )
+
+    # 2. The same membership move with the profile version reverted: refused.
+    without_bump = PartitionSnapshot(
+        verified=current.verified,
+        recorded=current.recorded,
+        verified_domain=current.verified_domain,
+        recorded_domain=current.recorded_domain,
+        profile_version=before.profile_version,
+    )
+    problems = ratchet_problems(
+        baseline=before, current=without_bump, changelog=_read("changelog")
+    )
+    assert problems, "5B-3's promotion passed the gate without a profile bump"
+    assert any("VERIFICATION_PROFILE_VERSION" in p for p in problems), problems
+
+    # 3. The bump kept, the disclosure removed: also refused, on its own account.
+    undisclosed = "\n".join(
+        line
+        for line in _read("changelog").splitlines()
+        if not line.lstrip().startswith("- promoted: `policy_type`")
+    )
+    problems = ratchet_problems(baseline=before, current=current, changelog=undisclosed)
+    assert problems, "an undisclosed promotion passed the gate"
+    assert any("does not disclose" in p and "policy_type" in p for p in problems), problems
+
+
+@pytest.mark.adversarial
+def test_a_baseline_containing_head_is_refused_rather_than_compared():
+    """The vacuous-pass hole, closed and measured (5B-3).
+
+    Injecting ``HEAD`` as the baseline used to be accepted. Every rule then evaluated the
+    post-change partition against itself: no membership move, nothing promoted, nothing
+    demoted, gate green. Measured on the 5B-3 pull request, where the package's CI computed
+    exactly that baseline and the ratchet reported nothing on a real promotion.
+
+    Never skips: the module-level ``pytestmark`` already guards the no-checkout case, so
+    ``HEAD`` resolves whenever this runs.
     """
 
     import os
 
+    previous = os.environ.get("UGENCE_RATCHET_BASE")
+    os.environ["UGENCE_RATCHET_BASE"] = "HEAD"
     try:
-        revision = baseline_revision(REPO)
-        baseline_sources = sources_at_revision(REPO, revision)
-    except RatchetBaselineUnavailable as exc:
-        if os.environ.get("UGENCE_RATCHET_REQUIRED") == "1":
-            pytest.fail(f"the partition ratchet could not run: {exc}")
-        pytest.skip(f"no ratchet baseline available: {exc}")
-
-    baseline = snapshot_from_sources(
-        verified_py=baseline_sources["verified"],
-        identifiers_py=baseline_sources["identifiers"],
-    )
-    current = _imported_snapshot()
-
-    # If this ever stops being true the subphase has been reverted, and the control below
-    # would be measuring nothing.
-    promoted = current.verified & baseline.recorded
-    if not promoted:
-        pytest.skip("no promotion between the baseline and the working tree to control for")
-
-    reverted_identifiers = _read("identifiers").replace(
-        f'VERIFICATION_PROFILE_VERSION: Final[str] = "{current.profile_version}"',
-        f'VERIFICATION_PROFILE_VERSION: Final[str] = "{baseline.profile_version}"',
-    )
-    without_bump = snapshot_from_sources(
-        verified_py=_read("verified"), identifiers_py=reverted_identifiers
-    )
-    assert without_bump.profile_version == baseline.profile_version
-    assert without_bump.membership == current.membership
-
-    problems = ratchet_problems(
-        baseline=baseline, current=without_bump, changelog=_read("changelog")
-    )
-    assert problems, "the real promotion passed the gate without a profile bump"
-    assert any("VERIFICATION_PROFILE_VERSION" in p for p in problems), problems
+        with pytest.raises(RatchetBaselineUnavailable) as excinfo:
+            baseline_revision(REPO)
+    finally:
+        if previous is None:
+            os.environ.pop("UGENCE_RATCHET_BASE", None)
+        else:
+            os.environ["UGENCE_RATCHET_BASE"] = previous
+    assert "vacuous" in str(excinfo.value)
 
 
 # --------------------------------------------------------------------------------------- #

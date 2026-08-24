@@ -288,17 +288,61 @@ def baseline_revision(repo: pathlib.Path) -> str:
             raise RatchetBaselineUnavailable(
                 f"UGENCE_RATCHET_BASE={injected!r} does not resolve to a commit"
             )
-        return resolved.strip()
+        return _require_baseline_precedes_head(repo, resolved.strip(), source=repr(injected))
     for ref in _candidate_base_refs(repo):
         if _git(repo, "rev-parse", "--verify", f"{ref}^{{commit}}") is None:
             continue
         merge_base = _git(repo, "merge-base", "HEAD", ref)
         if merge_base:
-            return merge_base.strip()
+            return _require_baseline_precedes_head(
+                repo, merge_base.strip(), source=f"merge base with {ref}"
+            )
     raise RatchetBaselineUnavailable(
         "no default-branch ref is available to take a merge base against; set "
         "UGENCE_RATCHET_BASE to the revision this change started from"
     )
+
+
+def _require_baseline_precedes_head(repo: pathlib.Path, revision: str, *, source: str) -> str:
+    """Refuse a baseline that already contains the change under test.
+
+    The docstring above says there is no fallback to ``HEAD`` because comparing a branch
+    against itself reports "no movement" for every promotion on it. That guard covered only
+    the *resolution* path — it did not check the answer. Both paths could still return a
+    revision that already contains ``HEAD``, and then every rule in
+    :func:`ratchet_problems` is evaluated against the post-change partition on both sides:
+    ``membership_moved`` is ``False``, ``promoted`` and ``demoted`` are empty, and the gate
+    passes **vacuously**.
+
+    That is not hypothetical. Measured on the 5B-3 pull request: the package's CI computes the
+    baseline itself as ``git merge-base HEAD origin/<default>`` and it resolved to the pull
+    request's own head commit, so the ratchet ran, reported nothing, and went green on a
+    change that promoted ``policy_type``. The only reason it surfaced at all is that a
+    separate property skipped, and the workflow treats a skip as a failure.
+
+    A baseline that contains the change is therefore refused as *unavailable* rather than
+    used: no baseline is a skip a reader can see, and a vacuous pass is not.
+    """
+
+    head = _git(repo, "rev-parse", "--verify", "HEAD^{commit}")
+    if head is None:
+        raise RatchetBaselineUnavailable("HEAD does not resolve to a commit")
+    head = head.strip()
+    if revision == head:
+        raise RatchetBaselineUnavailable(
+            f"the baseline ({source}) resolved to HEAD itself ({head[:12]}). Comparing the "
+            "change against itself reports no movement for every promotion on it, so the "
+            "gate would pass vacuously"
+        )
+    # ``--is-ancestor`` exits 0 when HEAD is an ancestor of ``revision``; ``_git`` maps a
+    # non-zero exit to None, so a non-None result means the baseline already contains HEAD.
+    if _git(repo, "merge-base", "--is-ancestor", head, revision) is not None:
+        raise RatchetBaselineUnavailable(
+            f"the baseline ({source}) resolved to {revision[:12]}, which already contains "
+            f"HEAD ({head[:12]}). A baseline that includes the change under test carries the "
+            "post-change partition on both sides, so the gate would pass vacuously"
+        )
+    return revision
 
 
 def _candidate_base_refs(repo: pathlib.Path) -> "list[str]":
