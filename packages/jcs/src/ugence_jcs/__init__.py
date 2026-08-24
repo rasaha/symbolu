@@ -12,11 +12,12 @@ frozen CER V0.2 identity digests remain reproducible through it.
 Public surface:
     canonical_string(value, set_paths=..., nfc_paths=...) -> str
     canonical_bytes(value, set_paths=..., nfc_paths=...)  -> bytes
+    canonical_sha256_hex(value, set_paths=..., nfc_paths=...) -> str
     JcsError and its canonicalization subclasses
 """
 from __future__ import annotations
 
-from .canon import canonical_bytes, canonical_string
+from .canon import canonical_bytes, canonical_sha256_hex, canonical_string
 from .errors import (
     BareNumberError,
     DuplicateSetElementError,
@@ -30,6 +31,7 @@ from .version import __version__
 __all__ = [
     "canonical_string",
     "canonical_bytes",
+    "canonical_sha256_hex",
     "JcsError",
     "BareNumberError",
     "NonFiniteNumberError",

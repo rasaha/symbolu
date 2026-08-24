@@ -27,6 +27,7 @@ Uses only the Python standard library.
 """
 from __future__ import annotations
 
+import hashlib
 import unicodedata
 from typing import Any, FrozenSet, List, Tuple
 
@@ -123,3 +124,16 @@ def canonical_bytes(value: Any, set_paths: FrozenSet[str] = frozenset(),
                     nfc_paths: FrozenSet[str] = frozenset()) -> bytes:
     """Canonical UTF-8 bytes."""
     return canonical_string(value, set_paths, nfc_paths).encode("utf-8")
+
+
+def canonical_sha256_hex(value: Any, set_paths: FrozenSet[str] = frozenset(),
+                         nfc_paths: FrozenSet[str] = frozenset()) -> str:
+    """Lowercase 64-character SHA-256 hex digest of ``canonical_bytes(value)``.
+
+    A bare digest of the canonical bytes: no domain tag, no length prefix, no
+    envelope framing, and no ``sha256:`` prefix — callers that need one apply it.
+    Canonicalization faults propagate unchanged.
+    """
+    return hashlib.sha256(
+        canonical_bytes(value, set_paths, nfc_paths)
+    ).hexdigest()
