@@ -324,7 +324,7 @@ It pushed back on two things, and both are corrected above: R-9's framing was to
 | R-9 **CLOSED (5B-2 pt 1)** `[V]` | **Broadened by the independent design review, then closed.** Enforced at Phase 5A's builder (`CROSS_TENANT_POLICY_BINDING`) and gate 12 (`CANDIDATE_CROSS_TENANT_POLICY`), both keyed on the scope so the `GLOBAL` carve-out survives. Original framing kept below for the record:  The first framing asked only about the empty-string global tenant, which read as an edge case. It is not: **nothing anywhere in the tree ties a candidate's *action* tenant to the tenant of the policy it reconciles against.** A candidate describing an action for `tenant-1`, carrying a coordinate for a `TENANT`-scoped policy belonging to `tenant-elsewhere`, verifies `VERIFIED` `[V]` — gate 11 compares the candidate's coordinate against the *resolved* policy, and that policy is genuinely the other tenant's. Phase 5A does not compare them either. Inert today because no composition root calls `verify()`, which is exactly why it must be ruled on **before** 5B-2 wires one rather than discovered while wiring it. Pinned as executable behaviour by `test_a_candidate_reconciles_against_another_tenants_policy`, which measures today's permissive behaviour without endorsing it | Owner, before 5B-2 |
 | R-10 `[G]` | Two Phase 5A suite weaknesses found while implementing, both pre-existing: `test_non_reachability.py` strips docstrings with `ast.get_docstring`, whose dedented result does not match the indented source, so an indented docstring naming a forbidden symbol trips the scan; and `test_phase5a_invariants.py::test_no_phase_5a_source_file_was_modified` reads `git status`, so it measures a clean working tree rather than an unmodified package | Phase 5A |
 | R-11 **CLOSED (5B-2 pt 1)** `[V]` | Completeness now enumerates the public attribute surface statically and totally over names (`inspect.getmembers_static`), never executing a descriptor, with a five-member allowlist ratcheted against the merge base. Eleven distinct bypass constructs were planted and refused. The declared trust boundary — a contributor editing class, allowlist and disclosure together — is recorded, not claimed closed | Phase 5A |
-| R-12 **PARTLY CLOSED** `[V]` | Ruled and implemented in Phase 5A as temporal coherence — three construction-time refusals reading no clock. Two are load-bearing: the decision window (`evaluated_at <= expires_at`, a **newly ratified candidate-coherence invariant**, grounded on the sibling principle at `controls.py:64` rather than falsely claimed as upstream-enforced) and the attestation window (`asserted_at <= issued_at <= valid_until`). The third, the subject ordering, is **unreachable** — four protections stand in front of it, decisively `validate_subject_binding` re-deriving the context digest from the *request* `[V]` — so it is defence in depth, and whether to keep it is open. Original finding:  Gate 13 compares each of the candidate's six timestamps against `as_of` and **never against each other**, so a candidate whose attestation predates its subject assertion by a year verifies `[V]`. That is internal *incoherence* rather than staleness — the pair is consistent with the instant and inconsistent with itself — and it belongs upstream at construction, where the builder holds all six. Out of scope for R-2, which is about reconciling the instant | Phase 5A |
+| R-12 **PARTLY CLOSED** `[V]` | Ruled and implemented in Phase 5A as temporal coherence — three construction-time refusals reading no clock. The decision window (`evaluated_at <= expires_at`, a **newly ratified candidate-coherence invariant** grounded on the sibling principle at `controls.py:64`, not claimed as upstream-enforced) and the attestation window (`asserted_at <= issued_at <= valid_until`) are load-bearing `[V]`. **Corrected 2026-08-24:** the subject-ordering guard was first recorded here as unreachable defence in depth; that was false. Reconciliation read the projection's *unauthenticated* outer `valid_from`/`valid_until`/`asserted_at` copy while reading every sibling fact from the digest-bound context, so a public `dataclasses.replace` both reached the guard and — widening `valid_until` — admitted an attestation issued eight years outside the bound window `[V]`. Reconciliation now sources all three from the context. The guard is kept as owner-ratified defence in depth, its status measured by neutralising it in the sweep rather than argued. Original finding: Gate 13 compares each of the candidate's six timestamps against `as_of` and **never against each other**, so a candidate whose attestation predates its subject assertion by a year verifies `[V]`. That is internal *incoherence* rather than staleness, and it belongs upstream at construction, where the builder holds all six. Out of scope for R-2, which is about reconciling the instant | Phase 5A |
 | A-59 (5B-0A) **INTENTIONAL BOUNDARY — not a defect** `[R]` | Measured: the attestation module never mentions `candidate_digest`, and two candidates with different digests were built from one attestation object `[V]`. **Owner ruling: this is not to be "closed" by adding `candidate_digest` to the producer signature.** The producer owns the recommendation, not the downstream policy, risk decision or authorization candidate. The producer signature authenticates the recommendation; the verified artifact binds that authenticated recommendation to the candidate examined; authorizing the complete candidate belongs to a later Decision/Envelope authority | Authority boundary, by design |
 
 ## The residual ratification round, and what this session verified of it
@@ -616,16 +616,49 @@ failure class the R-7 review criticised. Guard 3 is therefore no longer *solely*
 Neither guard was weakened to preserve a kill count: correct fail-closed classification is
 worth more than exclusive attribution, and the sweep's expectation was updated to say so.
 
-### The finding: one ratified guard cannot fire `[G]`
+### The correction: the unreachability claim was false, and a real vector was open `[V]`
 
-The subject-ordering guard is unreachable through the builder. Four protections precede it —
-the seam's own `__post_init__`, the projection's `context_digest`, `reconcile_phase4`'s check
-of it, and decisively `validate_subject_binding` re-deriving that digest from the **request**
-independently of the carried context. Measured: a fully forged projection with a recomputed
-digest is still refused by reconciliation, never by the guard.
+The finding first recorded here — that the subject-ordering guard is unreachable defence in
+depth — was **wrong**, and the argument was wrong in a way that hid a live defect. It reasoned
+entirely about the subject *context* and never asked where reconciliation actually read the
+instants from.
 
-It is kept because it was ratified and because a builder should not assume its inputs came from
-the seam. But **defence in depth** is the honest description, not load-bearing, and a guard that
-cannot be demonstrated load-bearing does not meet the bar this ADR has been holding. Whether to
-keep or drop it is an open owner decision, and the unreachability is pinned as a test so it
-cannot be quietly forgotten.
+`CapacityRiskSubjectProjection` carries `valid_from`, `valid_until` and `asserted_at` as an
+outer copy of the context's three instants. Nothing binds that copy: no digest covers it, and
+the projection's `__post_init__` does not order it. `reconcile_phase4` read the outer copy while
+reading every sibling placement fact — environment, region, zone, compute group, resource class,
+both magnitudes, action type — from the context. A plain `dataclasses.replace`, a public and
+`__post_init__`-valid construction, therefore diverged the two. Measured, both directions:
+
+* `valid_from = asserted_at + 1µs` tripped the ordering guard on a value `context_digest` never
+  covered — so the guard was reachable, and the "unreachable" claim false `[V]`;
+* widening `valid_until` by ten years carried through into the candidate, admitting a producer
+  attestation issued **eight years after** the recommendation expired and recording a
+  `subject_valid_until_fact` a decade past the digest-bound value `[V]`.
+
+**The fix is a source-of-truth correction, not a schema change.** Reconciliation now reads all
+three instants from `context.subject_valid_from` / `subject_valid_until` / `subject_asserted_at`,
+agreeing with every sibling field. The projection's outer fields are untouched and simply no
+longer consulted. No frozen digest moved.
+
+**Reason precedence, corrected with it.** The attestation's `recommendation_digest` binding check
+now runs *before* the temporal block, so a misbound attestation is always refused as
+`PRODUCER_ATTESTATION_CONTENT_MISMATCH` whatever its `issued_at`. Identity precedes coherence:
+naming a clock failure when the defect is identity sends an operator to the wrong place.
+
+### The subject-ordering guard's status, restated on a ground that holds `[V]`
+
+With the context as the sole source, the decisive protection is one the original argument did
+not name: `validate_subject_binding` does not merely re-derive a digest, it **reconstructs**
+`SubjectContext` via `from_dict`, re-running `__post_init__` and therefore the seam's own
+ordering rule. Measured at the strongest forgery available — the context mutated in place so the
+request holds the same out-of-order object and every digest re-derives consistently —
+reconciliation refuses it, naming the seam's rule, and the guard is never reached.
+
+Per owner ruling it is kept as **defence in depth**, preserving local candidate coherence if the
+upstream protections later change. It is **not** load-bearing today. Both the reachability the
+correction closed and the unreachability that now holds are pinned as tests, and the guard's
+status is measured by neutralising it in the mutation sweep rather than argued — because it was
+argued once and the argument was wrong.
+
+Corrected 2026-08-24, on two independent audits.

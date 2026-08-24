@@ -84,6 +84,10 @@ GUARD_REQUEST_REDERIVATION = 9
 GUARD_SNAPSHOT_TENANT = 26
 GUARD_SNAPSHOT_DOMAIN = 27
 GUARD_EVIDENCE_BINDING = 32
+# R-12's own two, anchored here so the reorder that moved the digest-binding check ahead of
+# the temporal block cannot silently retarget either mutation.
+GUARD_COMPARABLE_IS_DATETIME = 35
+GUARD_SUBJECT_ORDERING = 38
 
 EXPECTED_CONDITIONS = {
     GUARD_TZ_AWARE: "value.tzinfo is None or value.utcoffset() is None",
@@ -93,6 +97,8 @@ EXPECTED_CONDITIONS = {
     GUARD_EVIDENCE_BINDING: (
         "tuple(p_request.evidence_references) != tuple(p_evidence_references)"
     ),
+    GUARD_COMPARABLE_IS_DATETIME: "not isinstance(value, datetime)",
+    GUARD_SUBJECT_ORDERING: "not subject_from <= subject_asserted <= subject_until",
 }
 
 #: Sibling guards a reader might credit with each kill. Removing the sibling instead must
@@ -104,6 +110,22 @@ SIBLINGS = {
     GUARD_TZ_AWARE: 2,                  # the isinstance(datetime) check in the same helper
     GUARD_EVIDENCE_BINDING: 31,         # the tuple/non-empty check on the same field
 }
+
+
+def _bypassing_post_init(artifact, **overrides):
+    """A field-for-field copy with ``**overrides`` applied, skipping ``__post_init__``.
+
+    ``dataclasses.replace`` re-runs validation, which is exactly what these two tests must
+    get past: the point is to hand the builder an artifact its own upstream contract would
+    never have produced, and see what the builder itself does with it.
+    """
+
+    forged = object.__new__(type(artifact))
+    for field in dataclasses.fields(artifact):
+        object.__setattr__(forged, field.name, getattr(artifact, field.name))
+    for name, value in overrides.items():
+        object.__setattr__(forged, name, value)
+    return forged
 
 
 def test_the_canonical_guard_numbers_still_name_these_conditions():
@@ -450,11 +472,14 @@ def test_an_ordinarily_constructed_projection_cannot_carry_the_mismatch(projecti
 # L-1 — canonical guard 3: timezone-naive validity timestamps
 # ======================================================================================
 
-#: Every authoritative validity timestamp Phase 5A accepts, and where it is checked.
+#: Every authoritative validity timestamp Phase 5A accepts, and the artifact that holds the
+#: authenticated copy of it. The three subject instants live on the **context** — the R-12
+#: correction made that the reconciler's only source for them, replacing the projection's
+#: unauthenticated outer ``valid_from``/``valid_until``/``asserted_at`` fields.
 VALIDITY_TIMESTAMPS = [
-    ("projection", "valid_from", Reason.PROJECTION_RECONCILIATION_FAILED),
-    ("projection", "valid_until", Reason.PROJECTION_RECONCILIATION_FAILED),
-    ("projection", "asserted_at", Reason.PROJECTION_RECONCILIATION_FAILED),
+    ("context", "subject_valid_from", Reason.PROJECTION_RECONCILIATION_FAILED),
+    ("context", "subject_valid_until", Reason.PROJECTION_RECONCILIATION_FAILED),
+    ("context", "subject_asserted_at", Reason.PROJECTION_RECONCILIATION_FAILED),
     ("decision", "evaluated_at", Reason.PROJECTION_RECONCILIATION_FAILED),
     ("decision", "expires_at", Reason.MISSING_EXPIRY_FACT),
 ]
@@ -474,25 +499,31 @@ def test_a_timezone_naive_validity_timestamp_is_refused(
     The check is therefore a rejection, never a repair: Phase 5A does not attach UTC, does
     not convert from ambient local time, and does not normalize a malformed timestamp into a
     valid one.
+
+    **How the attack is constructed changed with the R-12 correction, and it matters.** The
+    three subject instants used to be attacked by ``dataclasses.replace`` on the projection's
+    outer copy, because the reconciler read that copy and nothing validated it. That is the
+    defect R-12 closed. They are now attacked on the context, which requires forcing past
+    ``SubjectContext.__post_init__`` and recomputing ``context_digest`` — so guard 3 is no
+    longer reachable for them by ordinary construction. It remains reachable that way for the
+    two decision instants, which is why they are still attacked with ``replace``.
     """
 
-    holder_obj = projection if holder == "projection" else decision
-    aware = getattr(holder_obj, field)
-    assert aware.tzinfo is not None
-
-    # Ordinary construction throughout: ``dataclasses.replace`` re-runs the artifact's own
-    # ``__post_init__``, and every one of these five timestamps survives it while naive.
-    # None of them participates in the Phase 4 context digest (asserted below), so guard 3
-    # is reachable by ordinary construction — it is not unreachable defence in depth.
-    naive = dataclasses.replace(holder_obj, **{field: aware.replace(tzinfo=None)})
-    assert getattr(naive, field).tzinfo is None
-    target, other = (naive, decision) if holder == "projection" else (projection, naive)
-
-    if holder == "projection":
-        assert naive.context_digest == projection.context_digest, (
-            "this timestamp is inside the context digest after all; the digest "
-            "re-derivation would fire first and this test would be misattributed"
-        )
+    if holder == "context":
+        context = projection.context
+        aware = getattr(context, field)
+        assert aware.tzinfo is not None
+        object.__setattr__(context, field, aware.replace(tzinfo=None))
+        # The context IS digest-bound, so the forgery must carry its own digest or it dies at
+        # the re-derivation and this test measures that instead of guard 3.
+        target = _bypassing_post_init(projection, context_digest=context.digest())
+        other = decision
+    else:
+        aware = getattr(decision, field)
+        assert aware.tzinfo is not None
+        naive = dataclasses.replace(decision, **{field: aware.replace(tzinfo=None)})
+        assert getattr(naive, field).tzinfo is None
+        target, other = projection, naive
 
     _refuses(
         target,
@@ -541,6 +572,89 @@ def test_the_awareness_gate_is_now_sibling_backed_rather_than_solely_attributed(
     assert "temporal_ordering" not in exc.value.reason.value
     # And not the unclassified escape this replaced.
     assert not isinstance(exc.value, TypeError)
+
+
+def test_the_comparable_type_gate_is_solely_responsible_for_classifying_a_non_datetime(
+    tmp_path, projection, decision
+):
+    """R-12 guard 35, killed rather than assumed.
+
+    The five Phase 4 instants are type-checked in ``reconciliation.py`` before they ever
+    reach the coherence block, so they cannot exercise this gate. The sixth — the producer
+    attestation's ``issued_at`` — is read straight off the attestation, and an attestation
+    whose ``__post_init__`` was bypassed can carry anything. That is the only input that
+    reaches ``_comparable_instant``'s type check, so that is the attack.
+
+    With the gate present the input is a typed canonical-field refusal. With it removed the
+    very next line dereferences ``.tzinfo`` on a string and the attack escapes as an
+    unclassified ``AttributeError`` — no candidate, but no refusal either. The gate is
+    therefore doing the classification on its own.
+    """
+
+    from conftest import build_attestation, build_policy_binding, build_target_scope
+
+    genuine = build_attestation(recommendation_digest=projection.recommendation_digest)
+    forged = _bypassing_post_init(genuine, issued_at="not-a-datetime")
+    scope = build_target_scope(projection)
+    policy = build_policy_binding(scope)
+
+    with pytest.raises(CanonicalFieldError) as exc:
+        build_capacity_authorization_candidate(
+            projection=projection,
+            decision=decision,
+            producer_attestation=forged,
+            policy_binding=policy,
+            policy_coordinate_binding=coordinate_for(policy),
+            target_scope=scope,
+        )
+    assert exc.value.reason is Reason.MALFORMED_CANONICAL_FIELD
+    assert "attestation_issued_at_fact must be a datetime" in str(exc.value)
+
+    with tempfile.TemporaryDirectory(dir=tmp_path) as td:
+        mp = mutated_package(pathlib.Path(td), GUARD_COMPARABLE_IS_DATETIME)
+        mutant = mp.attestation(recommendation_digest=projection.recommendation_digest)
+        object.__setattr__(mutant, "issued_at", "not-a-datetime")
+        with pytest.raises(Exception) as escaped:
+            mp.build(projection, decision, attestation=mutant)
+    assert type(escaped.value).__name__ == "AttributeError", (
+        "with guard 35 removed the non-datetime must escape unclassified; if some other "
+        "gate now refuses it, this kill belongs to that gate and not to guard 35"
+    )
+
+
+def test_removing_the_subject_ordering_guard_changes_nothing_it_is_not_load_bearing(
+    tmp_path, projection, decision
+):
+    """R-12 guard 38's status, measured rather than argued — and it has been wrong before.
+
+    The guard was claimed unreachable on an argument that reasoned only about the subject
+    *context* and missed the projection's unauthenticated outer copy of the same three
+    instants, which was a live vector until the R-12 correction sourced the reconciler from
+    the context. This test therefore measures the status instead of restating it: with the
+    guard neutralised and nothing else changed, the strongest available forgery — the
+    context mutated in place so every digest re-derives consistently — is refused exactly as
+    it is with the guard present, and by the same upstream rule.
+
+    That is what "defence in depth, not load-bearing" means here, and it will start failing
+    the moment some path does reach the guard.
+    """
+
+    from datetime import timedelta
+
+    context = projection.context
+    object.__setattr__(
+        context, "subject_valid_from", context.subject_asserted_at + timedelta(microseconds=1)
+    )
+    forged = _bypassing_post_init(projection, context_digest=context.digest())
+
+    with tempfile.TemporaryDirectory(dir=tmp_path) as td:
+        mp = mutated_package(pathlib.Path(td), GUARD_SUBJECT_ORDERING)
+        with pytest.raises(Exception) as exc:
+            mp.build(forged, decision)
+    assert type(exc.value).__name__ == "ReconciliationError"
+    assert exc.value.reason.value == Reason.PROJECTION_RECONCILIATION_FAILED.value
+    assert "subject_valid_from <= subject_asserted_at <= subject_valid_until" in str(exc.value)
+    assert "guard neutralised" not in str(exc.value)
 
 
 def test_the_canonicalizer_silently_attaches_utc_to_a_naive_timestamp():

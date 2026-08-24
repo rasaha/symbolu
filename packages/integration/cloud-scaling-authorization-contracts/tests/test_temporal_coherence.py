@@ -44,6 +44,7 @@ from conftest import (
     build_decision,
     build_policy_binding,
     build_projection,
+    build_recommendation,
     build_target_scope,
     coordinate_for,
 )
@@ -51,7 +52,7 @@ from ugence_cloud_scaling_authorization_contracts import (
     AuthorizationCandidateRejectionReason as Reason,
 )
 from ugence_cloud_scaling_authorization_contracts import (
-    CanonicalFieldError,
+    ProducerAttestationError,
     ReconciliationError,
     TemporalOrderingError,
     build_capacity_authorization_candidate,
@@ -81,18 +82,11 @@ def _build(projection=None, decision=None, attestation=None):
 def _forged_projection(projection, **overrides):
     """A projection carrying subject instants the seam would never have produced.
 
-    Two upstream protections stand in front of the subject ordering, and both had to be
-    bypassed to reach the builder's guard at all — which is itself the measurement:
-
-    * Risk Authority's ``SubjectContext.__post_init__`` enforces
-      ``valid_from <= asserted_at <= valid_until`` and raises ``SeamContractError``;
-    * the projection carries a ``context_digest`` over its context, so ``dataclasses.replace``
-      on the context is refused as a digest mismatch before construction is reached.
-
-    So the builder's subject guard is **defence in depth**, not a check that catches realistic
-    drift: a well-formed projection cannot violate it. It exists because the builder should not
-    assume its inputs were produced by the seam, and this helper constructs precisely the input
-    that assumption would let through.
+    Used to probe how far a forged subject context gets. Note what it forges: the
+    ``context`` and its ``context_digest``. Since the R-12 correction the reconciler reads
+    the validity instants from the context, so this is the only shape of forgery that could
+    reach the builder's ordering guard at all — and it does not, for the reason
+    ``test_the_subject_ordering_guard_is_unreachable_through_the_corrected_path`` measures.
     """
 
     context = object.__new__(type(projection.context))
@@ -143,39 +137,93 @@ def test_the_fixture_chain_already_sits_on_two_of_the_boundaries():
     assert candidate.attestation_issued_at_fact == candidate.subject_asserted_at_fact
 
 
-def test_the_subject_ordering_guard_is_unreachable_and_that_is_the_finding():
-    """**Ruling 1's guard cannot fire, and this pins why rather than hiding it.**
+def test_the_outer_projection_fields_no_longer_feed_the_ordering_guard():
+    """**The R-12 correction, measured as the attack it closes.**
 
-    Four independent protections stand in front of it, and a seam-violating subject context
-    dies at each in turn:
+    ``CapacityRiskSubjectProjection`` carries ``valid_from``/``valid_until``/``asserted_at``
+    as an outer copy of the context's three instants. Nothing binds that copy: no digest
+    covers it, and the projection's ``__post_init__`` does not order it. Reconciliation used
+    to read those outer fields while reading every sibling placement fact from the context,
+    so a plain ``dataclasses.replace`` — a public, ``__post_init__``-valid construction —
+    diverged them and tripped the builder's ordering guard on a value the context, and hence
+    ``context_digest``, never agreed to.
 
-    1. ``SubjectContext.__post_init__`` enforces ``valid_from <= asserted_at <= valid_until``
-       and raises ``SeamContractError`` — so the seam never emits one;
-    2. the projection carries a ``context_digest``, so replacing the context is a mismatch;
-    3. ``reconcile_phase4`` re-checks that digest;
-    4. and — decisively — it re-derives the digest from the **request** via
-       ``validate_subject_binding``, independently of the projection's carried context, so
-       recomputing the forged digest does not help either.
-
-    Measured: even with the context forged *and* its digest recomputed, construction is refused
-    by reconciliation, never by the builder's own ordering guard. The guard is therefore dead
-    code as the pipeline stands.
-
-    It is kept because the owner ratified it and because the builder should not assume its
-    inputs came from the seam — but "defence in depth" is the honest description, not
-    "load-bearing". Whether to keep or drop it is an open decision recorded in the PR.
+    That is what made the guard reachable, and the earlier claim that it was unreachable
+    false. The reconciler now sources all three from ``context``, so the same replace is
+    inert: construction succeeds and the carried fact equals the digest-bound value.
     """
 
     projection = build_projection()
-    broken = _forged_projection(
-        projection,
-        subject_valid_from=projection.context.subject_asserted_at + MICROSECOND,
+    diverged = dataclasses.replace(
+        projection, valid_from=projection.asserted_at + MICROSECOND
     )
+    candidate = _build(projection=diverged)
+
+    assert candidate.subject_valid_from_fact == projection.context.subject_valid_from
+    assert candidate.subject_valid_from_fact != diverged.valid_from
+    assert candidate.subject_asserted_at_fact == projection.context.subject_asserted_at
+    assert candidate.subject_valid_until_fact == projection.context.subject_valid_until
+
+
+def test_widening_the_outer_window_no_longer_admits_an_attestation_outside_it():
+    """The same defect's second vector: the outer copy as a *permission*, not a trip-wire.
+
+    Widening ``projection.valid_until`` by ten years used to carry straight through into the
+    candidate, and with it the attestation-position check — so an attestation issued eight
+    years after the recommendation expired was admitted, and the candidate recorded a
+    ``subject_valid_until_fact`` a decade past the value ``context_digest`` binds.
+    """
+
+    projection = build_projection()
+    widened = dataclasses.replace(
+        projection, valid_until=projection.valid_until + timedelta(days=3650)
+    )
+    late = build_attestation(
+        recommendation_digest=projection.recommendation_digest,
+        issued_at=projection.valid_until + timedelta(days=3000),
+    )
+    with pytest.raises(TemporalOrderingError) as exc:
+        _build(projection=widened, attestation=late)
+    assert exc.value.reason is Reason.ATTESTATION_TEMPORAL_ORDERING
+
+
+def test_the_subject_ordering_guard_is_unreachable_through_the_corrected_path():
+    """Unreachability restated on a ground that holds, having had one that did not.
+
+    The earlier argument — four protections in front of the guard — was incomplete: it
+    reasoned only about the *context* and missed the unauthenticated outer copy, which was
+    the live vector. With the reconciler reading the context, the question is what a forged
+    context can do, and the decisive protection is one the earlier argument did not name:
+    ``validate_subject_binding`` does not merely re-derive a digest, it **reconstructs**
+    ``SubjectContext`` via ``from_dict``, re-running ``__post_init__`` and therefore the
+    seam's own ordering rule.
+
+    Measured below at the strongest forgery available — the context mutated in place through
+    ``object.__setattr__``, so the request holds the *same* out-of-order object and every
+    digest re-derives consistently. Reconciliation still refuses it, naming the seam's rule,
+    and the builder's guard is never reached.
+
+    The owner ratified it as defence in depth: it preserves local candidate coherence if the
+    upstream protections later change. It is **not** load-bearing today, and this pins that
+    so the status cannot drift unnoticed in either direction.
+    """
+
+    projection = build_projection()
+    decision = build_decision(projection)
+    context = projection.context
+    object.__setattr__(
+        context, "subject_valid_from", context.subject_asserted_at + MICROSECOND
+    )
+    forged = object.__new__(type(projection))
+    for field in dataclasses.fields(projection):
+        object.__setattr__(forged, field.name, getattr(projection, field.name))
+    object.__setattr__(forged, "context_digest", context.digest())
+
     with pytest.raises(ReconciliationError) as exc:
-        _build(projection=broken)
-    assert exc.value.reason is Reason.CONTEXT_DIGEST_MISMATCH
-    assert "context_digest" in str(exc.value)
-    # Specifically NOT the builder's ordering reason — that is the whole point.
+        _build(projection=forged, decision=decision)
+    assert exc.value.reason is Reason.PROJECTION_RECONCILIATION_FAILED
+    assert "subject_valid_from <= subject_asserted_at <= subject_valid_until" in str(exc.value)
+    # Specifically NOT the builder's ordering reason — that is what "unreachable" means.
     assert exc.value.reason is not Reason.SUBJECT_TEMPORAL_ORDERING
 
 
@@ -259,7 +307,9 @@ def test_a_naive_decision_instant_is_a_canonical_field_refusal(field):
     with pytest.raises(Exception) as exc:
         _build(projection=projection, decision=naive)
     assert not isinstance(exc.value, TypeError), "a bare TypeError is not a refusal"
-    assert "temporal_ordering" not in getattr(exc.value, "reason", Reason.MALFORMED_CANONICAL_FIELD).value
+    assert "temporal_ordering" not in getattr(
+        exc.value, "reason", Reason.MALFORMED_CANONICAL_FIELD
+    ).value
 
 
 def test_no_bare_exception_escapes_for_any_malformed_instant():
@@ -278,6 +328,43 @@ def test_no_bare_exception_escapes_for_any_malformed_instant():
         object.__setattr__(broken, field, "not-a-datetime")
         with pytest.raises(CloudScalingAuthorizationContractError):
             _build(projection=projection, decision=broken)
+
+
+# ======================================================================================
+# Identity precedes coherence
+# ======================================================================================
+def test_a_misbound_attestation_is_a_content_mismatch_whatever_its_timing():
+    """An attestation for another recommendation is not evidence for this one.
+
+    The digest-binding check used to sit *after* the temporal block, so a misbound
+    attestation that was also mistimed was refused as an R-12 ordering failure — naming the
+    clock when the actual defect was identity, and sending an operator to the wrong place.
+    Identity is now decided first.
+    """
+
+    projection = build_projection()
+    other = build_projection(recommendation=build_recommendation(predicted=11))
+    assert other.recommendation_digest != projection.recommendation_digest
+
+    misbound_and_mistimed = build_attestation(
+        recommendation_digest=other.recommendation_digest,
+        issued_at=projection.context.subject_asserted_at - timedelta(days=3650),
+    )
+    with pytest.raises(ProducerAttestationError) as exc:
+        _build(projection=projection, attestation=misbound_and_mistimed)
+    assert exc.value.reason is Reason.PRODUCER_ATTESTATION_CONTENT_MISMATCH
+    assert not isinstance(exc.value, TemporalOrderingError)
+
+
+def test_a_misbound_but_well_timed_attestation_reports_the_same_reason():
+    """The precedence fix must not have made the reason depend on the timing at all."""
+
+    projection = build_projection()
+    other = build_projection(recommendation=build_recommendation(predicted=11))
+    misbound = build_attestation(recommendation_digest=other.recommendation_digest)
+    with pytest.raises(ProducerAttestationError) as exc:
+        _build(projection=projection, attestation=misbound)
+    assert exc.value.reason is Reason.PRODUCER_ATTESTATION_CONTENT_MISMATCH
 
 
 def test_the_three_reasons_are_distinct_and_named_for_what_failed():

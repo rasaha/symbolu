@@ -200,14 +200,20 @@ class MutatedPackage:
             binding_digest=self.module.canonical_digest(payload), **body
         )
 
-    def build(self, projection: Any, decision: Any) -> Any:
-        """Run the mutated package's REAL public builder on this projection/decision."""
+    def build(self, projection: Any, decision: Any, attestation: Any = None) -> Any:
+        """Run the mutated package's REAL public builder on this projection/decision.
+
+        ``attestation`` overrides the genuine one, for the sweeps whose attack lives on the
+        attestation rather than the projection or the decision. It must be an instance of
+        **this** module's ``ProducerAttestationEvidence`` — the builder admits exact types
+        only — which is what :meth:`attestation` above is for.
+        """
 
         scope = self.target_scope(projection)
         return self.module.build_capacity_authorization_candidate(
             projection=projection,
             decision=decision,
-            producer_attestation=self.attestation(
+            producer_attestation=attestation if attestation is not None else self.attestation(
                 recommendation_digest=projection.recommendation_digest
             ),
             policy_binding=self.policy_binding(scope),

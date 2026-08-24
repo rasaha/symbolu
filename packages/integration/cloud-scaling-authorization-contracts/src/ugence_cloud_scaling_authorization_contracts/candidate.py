@@ -474,6 +474,18 @@ def build_capacity_authorization_candidate(
     c_policy_tenant_id = policy_coordinate_binding.policy_tenant_id
     c_digest = policy_coordinate_binding.digest()
 
+    # --- the attestation must bind THIS recommendation ---------------------------------
+    # Identity precedes coherence. An attestation for *another* recommendation is not
+    # evidence for this one whatever its ``issued_at`` says, so a misbound attestation must
+    # always be refused as a content mismatch — never as an R-12 ordering failure, which
+    # would name the wrong defect and send an operator looking at clocks.
+    if a_recommendation_digest != facts.recommendation_digest:
+        raise ProducerAttestationError(
+            "the producer attestation binds a different recommendation_digest — an "
+            "attestation for another recommendation is not evidence for this one",
+            _Reason.PRODUCER_ATTESTATION_CONTENT_MISMATCH,
+        )
+
     # --- the carried instants must be coherent with each other (R-12, 5B-2) -----------
     # Phase 5B's gate 13 reconciles each instant against the verifier's `as_of`. That cannot
     # see a candidate that is internally impossible — one whose attestation predates the
@@ -524,14 +536,6 @@ def build_capacity_authorization_candidate(
             "before it exists, and an attestation first issued after it expired must not make "
             "it usable again",
             _Reason.ATTESTATION_TEMPORAL_ORDERING,
-        )
-
-    # --- the attestation must bind THIS recommendation ---------------------------------
-    if a_recommendation_digest != facts.recommendation_digest:
-        raise ProducerAttestationError(
-            "the producer attestation binds a different recommendation_digest — an "
-            "attestation for another recommendation is not evidence for this one",
-            _Reason.PRODUCER_ATTESTATION_CONTENT_MISMATCH,
         )
 
     # --- the target scope must be the projected subject, not a substitute --------------

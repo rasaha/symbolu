@@ -43,20 +43,43 @@ consulted; only its illustration changed, for the reason below.
   awareness, so guard 3 is no longer solely attributed. Neither guard was weakened to preserve
   a kill count; correct fail-closed classification is worth more than exclusive attribution.
 - Guard inventory 52 → 57.
+- The L-1 timezone-awareness sweep attacks the three subject instants on the **context** rather
+  than the projection's outer copy, following the corrected source. Guard 3 is no longer
+  reachable for them by ordinary construction; it remains so for the two decision instants.
 
-### Finding — the subject-ordering guard is unreachable
+### Correction — reconciliation was reading an unauthenticated copy
 
-Four independent protections stand in front of it, and a seam-violating context dies at each:
-`SubjectContext.__post_init__` enforces the ordering; the projection carries a
-`context_digest`; `reconcile_phase4` re-checks it; and decisively it re-derives that digest
-from the **request** via `validate_subject_binding`, independently of the carried context, so
-recomputing a forged digest does not help. Measured: even a fully forged projection is refused
-by reconciliation, never by the builder's ordering guard.
+The finding first recorded here — that the subject-ordering guard is unreachable defence in
+depth — was **wrong**, and wrong in a way that hid a live defect. Corrected 2026-08-24 on two
+independent audits, before this version was released.
 
-It is kept because it was ratified and because the builder should not assume its inputs came
-from the seam — but **defence in depth** is the honest description, not load-bearing. Whether
-to keep or drop it is an open decision. `test_the_subject_ordering_guard_is_unreachable_and_
-that_is_the_finding` pins the unreachability so it cannot be quietly forgotten.
+`CapacityRiskSubjectProjection` carries `valid_from`, `valid_until` and `asserted_at` as an
+outer copy of the subject context's three instants. Nothing binds that copy: no digest covers
+it, and the projection's `__post_init__` does not order it. `reconcile_phase4` read the outer
+copy while reading every sibling placement fact from the context, so a plain
+`dataclasses.replace` — a public, `__post_init__`-valid construction — diverged the two, and
+both directions were measured:
+
+- `valid_from = asserted_at + 1µs` tripped the ordering guard on a value `context_digest`
+  never covered — so the guard *was* reachable;
+- widening `valid_until` admitted a producer attestation issued **eight years after** the
+  recommendation expired, and recorded a `subject_valid_until_fact` a decade past the
+  digest-bound value.
+
+**Fixed** — reconciliation now reads all three from `context.subject_valid_from` /
+`subject_valid_until` / `subject_asserted_at`, agreeing with every sibling field. This is a
+source-of-truth correction: `CapacityRiskSubjectProjection` is unchanged, no schema moves and
+no frozen digest moves.
+
+**Fixed** — the attestation's `recommendation_digest` binding check now runs *before* the
+temporal block, so a misbound attestation is always `PRODUCER_ATTESTATION_CONTENT_MISMATCH`
+whatever its `issued_at`. Identity precedes coherence.
+
+With the context as the sole source, the subject-ordering guard is unreachable on a ground the
+original argument did not name: `validate_subject_binding` **reconstructs** `SubjectContext`
+via `from_dict`, re-running `__post_init__` and the seam's own ordering rule. It is kept per
+owner ruling as defence in depth, and its status is now measured by neutralising it in the
+mutation sweep rather than argued — because it was argued once and the argument was wrong.
 
 The other two guards **are** load-bearing and were demonstrated as such.
 

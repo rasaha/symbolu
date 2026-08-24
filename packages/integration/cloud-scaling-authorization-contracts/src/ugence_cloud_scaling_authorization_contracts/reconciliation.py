@@ -172,9 +172,15 @@ def reconcile_phase4(
     p_magnitude_before = p_context.magnitude_before
     p_magnitude_after = p_context.magnitude_after
     p_action_type = p_context.action_type
-    p_valid_from = projection.valid_from
-    p_valid_until = projection.valid_until
-    p_asserted_at = projection.asserted_at
+    # R-12 correction: the validity instants are read from the **context**, not from the
+    # projection's outer ``valid_from``/``valid_until``/``asserted_at`` fields. Those outer
+    # fields are an unauthenticated second copy — no digest covers them, and
+    # ``CapacityRiskSubjectProjection.__post_init__`` does not order them — so a public
+    # ``dataclasses.replace`` could diverge them from the values ``context_digest`` binds.
+    # Every sibling placement fact above already reads from ``p_context``; these now agree.
+    p_valid_from = p_context.subject_valid_from
+    p_valid_until = p_context.subject_valid_until
+    p_asserted_at = p_context.subject_asserted_at
 
     d_tenant = decision.tenant_id
     d_subject_digest = decision.subject_digest
@@ -368,13 +374,13 @@ def reconcile_phase4(
 
     # --- validity facts: presence and canonical form only, never "is it valid now" -----
     subject_valid_from = _require_datetime(
-        "valid_from", p_valid_from, _Reason.PROJECTION_RECONCILIATION_FAILED
+        "context.subject_valid_from", p_valid_from, _Reason.PROJECTION_RECONCILIATION_FAILED
     )
     subject_valid_until = _require_datetime(
-        "valid_until", p_valid_until, _Reason.PROJECTION_RECONCILIATION_FAILED
+        "context.subject_valid_until", p_valid_until, _Reason.PROJECTION_RECONCILIATION_FAILED
     )
     subject_asserted_at = _require_datetime(
-        "asserted_at", p_asserted_at, _Reason.PROJECTION_RECONCILIATION_FAILED
+        "context.subject_asserted_at", p_asserted_at, _Reason.PROJECTION_RECONCILIATION_FAILED
     )
     decision_evaluated_at = _require_datetime(
         "evaluated_at", d_evaluated_at, _Reason.PROJECTION_RECONCILIATION_FAILED
