@@ -88,6 +88,82 @@ SRC_ONLY_FORBIDDEN_IMPORTS = {"importlib"}
 SUBSTRATE_MODULE = "ugence_jcs"
 
 
+def _substrate_shadows(trees):
+    """Files or directories under ``trees`` named for the identity substrate."""
+    offenders = []
+    for tree in trees:
+        if not tree.exists():
+            continue
+        for path in tree.rglob("*"):
+            if any(part in {"build", "dist", ".venv", "__pycache__"} for part in path.parts):
+                continue
+            if path.is_dir() and path.name == SUBSTRATE_MODULE:
+                offenders.append(str(path))
+            elif path.suffix == ".py" and path.stem == SUBSTRATE_MODULE:
+                offenders.append(str(path))
+    return sorted(offenders)
+
+
+#: Dynamic-import entry points. A module imported through one of these is imported.
+DYNAMIC_IMPORT_CALLS = ("import_module", "__import__")
+
+
+def _dynamic_import_offenders(source, barred, filename="<sample>"):
+    """Dynamic imports that reach a barred module, or hide which module they reach.
+
+    Two shapes, because barring ``importlib`` alone stops one spelling of one route:
+
+    * a literal naming a barred module — ``import_module("hashlib")``;
+    * a module name ASSEMBLED at the call site — ``__import__("hash" + "lib")``.
+      The assembled form is barred whatever it spells, since no text scan can read
+      it. A plain name (``import_module(info.name)``) is permitted: that is how the
+      guards in this directory walk this package's own modules.
+    """
+    tree = ast.parse(source, filename=filename)
+    offenders = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        called = (func.id if isinstance(func, ast.Name)
+                  else func.attr if isinstance(func, ast.Attribute) else "")
+        if called not in DYNAMIC_IMPORT_CALLS or not node.args:
+            continue
+        argument = node.args[0]
+        if isinstance(argument, ast.Constant) and isinstance(argument.value, str):
+            if argument.value.split(".")[0] in barred:
+                offenders.append(f"{called}({argument.value!r})")
+        elif isinstance(argument, (ast.BinOp, ast.JoinedStr)) or (
+                isinstance(argument, ast.Call)
+                and (getattr(argument.func, "attr", "") in {"join", "format"})):
+            offenders.append(f"{called}(<assembled name>)")
+    return offenders
+
+
+def _barred_for(path):
+    """The modules ``path`` may not import, by where it lives."""
+    barred = set(FORBIDDEN_IMPORTS)
+    if (PKG_ROOT / "src") in path.parents:
+        barred |= SRC_ONLY_FORBIDDEN_IMPORTS
+    return barred
+
+
+def _import_offenders_for(path):
+    """Every barred module ``path`` reaches, by statement or by dynamic import.
+
+    One function so the per-file check and its self-test exercise the same wiring:
+    a scanner that is self-tested but never applied is a scanner that does nothing.
+    """
+    body = path.read_text(encoding="utf-8")
+    barred = _barred_for(path)
+    offenders = _forbidden_imports(body, barred, filename=str(path))
+    # A dynamic import reaches the same modules without an import statement, and an
+    # assembled name reaches them without spelling them. Barred in tests too: a
+    # canonicalizer parked in a fixture is still a second canonicalizer.
+    return offenders + _dynamic_import_offenders(body, FORBIDDEN_IMPORTS,
+                                                 filename=str(path))
+
+
 def _forbidden_imports(source, barred, filename="<sample>"):
     """Every module in ``barred`` that ``source`` imports, directly or by name."""
     tree = ast.parse(source, filename=filename)
@@ -150,18 +226,87 @@ def test_no_module_here_shadows_the_identity_substrate():
     local module of that name, reached by ``from . import ugence_jcs``, would pass
     both while computing identity here — the exact thing D2 exists to prevent.
     """
-    offenders = []
-    for tree in SCANNED_TREES:
-        if not tree.exists():
-            continue
-        for path in tree.rglob("*"):
-            if any(part in {"build", "dist", ".venv", "__pycache__"} for part in path.parts):
-                continue
-            if path.is_dir() and path.name == SUBSTRATE_MODULE:
-                offenders.append(str(path))
-            elif path.suffix == ".py" and path.stem == SUBSTRATE_MODULE:
-                offenders.append(str(path))
+    offenders = _substrate_shadows(SCANNED_TREES)
     assert not offenders, f"a local module shadows the substrate: {offenders}"
+
+
+def test_the_per_file_check_applies_both_scans():
+    """The wiring, not just the scanners.
+
+    Both routes must reach a real file through the same function the parametrized
+    check uses; otherwise either scan could be self-tested and never called.
+    """
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmp:
+        path = pathlib.Path(tmp) / "probe.py"
+
+        path.write_text("import pathlib\n", encoding="utf-8")
+        assert _import_offenders_for(path) == []
+
+        path.write_text("import hashlib\n", encoding="utf-8")
+        assert _import_offenders_for(path), "the statement scan is not applied"
+
+        path.write_text("_impl = __import__('hash' + 'lib')\n", encoding="utf-8")
+        assert _import_offenders_for(path), "the dynamic-import scan is not applied"
+
+    # The src-only bar must actually be applied by where a file lives.
+    assert SRC_ONLY_FORBIDDEN_IMPORTS <= _barred_for(PKG_ROOT / "src" / "pkg" / "m.py")
+    assert not (SRC_ONLY_FORBIDDEN_IMPORTS & _barred_for(SELF)), (
+        "the guards themselves need importlib")
+
+
+def test_the_shadow_detector_sees_both_a_module_and_a_package():
+    """Exercised against a synthetic tree, since the real one is clean.
+
+    Both branches matter: a shadow can be ``ugence_jcs.py`` or a directory
+    ``ugence_jcs/``. Nothing else in this suite fails if either stops matching.
+    """
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmp:
+        root = pathlib.Path(tmp)
+        (root / "clean.py").write_text("", encoding="utf-8")
+        assert _substrate_shadows([root]) == []
+
+        module = root / f"{SUBSTRATE_MODULE}.py"
+        module.write_text("", encoding="utf-8")
+        assert _substrate_shadows([root]) == [str(module)], "the .py branch stopped matching"
+        module.unlink()
+
+        package = root / SUBSTRATE_MODULE
+        package.mkdir()
+        (package / "__init__.py").write_text("", encoding="utf-8")
+        assert _substrate_shadows([root]) == [str(package)], "the directory branch stopped matching"
+
+
+@pytest.mark.parametrize("sample", [
+    "import importlib\n_impl = importlib.import_module('hash' + 'lib')\n",
+    "_impl = __import__('hash' + 'lib')\n",
+    "_impl = __import__('hashlib')\n",
+    "from importlib import import_module\n_impl = import_module('hashlib')\n",
+    "_impl = __import__(''.join(['hash', 'lib']))\n",
+    "part = 'lib'\n_impl = __import__(f'hash{part}')\n",
+])
+def test_a_dynamic_import_cannot_reach_a_barred_module(sample):
+    """Neither by naming it nor by assembling its name.
+
+    ``__import__`` reaches ``hashlib`` without importing ``importlib``, which is the
+    route barring ``importlib`` was meant to close. An assembled name is barred
+    whatever it spells: no text scan can read it.
+    """
+    assert _dynamic_import_offenders(sample, FORBIDDEN_IMPORTS)
+
+
+@pytest.mark.parametrize("sample", [
+    "import importlib\nmodule = importlib.import_module(info.name)\n",
+    "import importlib\nmodule = importlib.import_module(name)\n",
+    "module = __import__('pathlib')\n",
+])
+def test_a_dynamic_import_of_a_named_module_is_permitted(sample):
+    """The guards here walk this package's modules that way; barring it outright
+    would make the enforcement unwritable."""
+    assert not _dynamic_import_offenders(sample, FORBIDDEN_IMPORTS)
 
 
 @pytest.mark.parametrize("sample", [
@@ -214,11 +359,7 @@ def test_no_canonicalization_or_hashing_source_text(path):
 
 @pytest.mark.parametrize("path", list(_package_files()), ids=lambda p: p.name)
 def test_no_hashing_module_is_imported(path):
-    barred = set(FORBIDDEN_IMPORTS)
-    if (PKG_ROOT / "src") in path.parents:
-        barred |= SRC_ONLY_FORBIDDEN_IMPORTS
-    offenders = _forbidden_imports(path.read_text(encoding="utf-8"), barred,
-                                   filename=str(path))
+    offenders = _import_offenders_for(path)
     assert not offenders, f"{path.name} imports {offenders}"
 
 

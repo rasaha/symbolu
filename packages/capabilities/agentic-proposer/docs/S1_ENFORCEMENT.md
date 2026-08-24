@@ -44,11 +44,29 @@ references, in-package re-export chains closed to a fixpoint, string forward
 references (including under `from __future__ import annotations`), `TYPE_CHECKING`
 imports, and `getattr` with a literal or concatenated name.
 
-Named boundaries — deliberate, not oversights:
+### Known uncovered spellings
+
+These are gaps, not boundaries. Each is statically visible and could be closed; none
+is closed today. They are listed so the enforcement is not read as complete:
+
+| Spelling | Example |
+| --- | --- |
+| alias rebound by assignment | `T = TerminalOutcome` then `T.ABSTAIN` |
+| class-attribute alias | `class V: Result = TerminalOutcome` then `V.Result.ABSTAIN` |
+| `functools.partial` over the constructor | `_build = partial(TerminalOutcome)` |
+| `globals()` / `vars()` with a literal name | `globals()["TerminalOutcome"].ABSTAIN` |
+
+The last is statically visible in exactly the way the covered `getattr` case is; it
+is uncovered because no one has written the branch, not because analysis cannot
+reach it.
+
+### Named boundaries — deliberate, not oversights
 
 * **Dynamic construction is out of scope.** A name built at runtime from data the
-  scan cannot see (`getattr(module, name_from_config)`) is not detected. Static
-  analysis cannot reach it; the runtime half does not backstop it either (below).
+  scan cannot see — `getattr(module, name_from_config)`, an import driven by
+  configuration — is not detected, and cannot be by static analysis. This covers
+  only genuinely runtime-determined names: a literal name reached through
+  `globals()` is a gap above, not a boundary here.
 * **The runtime half detects widened annotations, not projections.** It asserts that
   a field in a reserved position refuses every auditor status. Code that converts a
   status to a lawful outcome *before* assignment passes it, correctly — the field is
@@ -59,7 +77,13 @@ Named boundaries — deliberate, not oversights:
   projection performed in a package neither of those covers is outside its reach.
 * **The substrate floor is asserted as `pyproject.toml` text**, not as a resolved
   installed distribution. `ugence_jcs` reaches the tests through `conftest.py`'s
-  `sys.path`, so nothing here proves an installed `ugence-jcs >= 0.2.0`.
+  `sys.path`, so nothing here proves an installed `ugence-jcs >= 0.2.0`. This is a
+  boundary only as far as *installed distributions* go: the imported
+  `ugence_jcs.__version__` is readable through the same path the tests already use
+  and is `0.2.0` today, so a resolved-version assertion is strictly stronger than
+  the text check and is not out of reach. It is not written because which of the two
+  the floor should mean — a declared floor or a resolved one — is an owner
+  decision, not a detail.
 
 ## The substrate is a distribution, not a name
 
@@ -75,9 +99,12 @@ That mask keys on a name, which makes the name itself load-bearing. A module ins
 this package called `ugence_jcs`, reached by `from . import ugence_jcs`, would
 satisfy every by-name check while hashing locally. Three rules close that together:
 a relative import can never bind the permitted substrate (the substrate is reached
-absolutely or not at all); no file or directory here may be named for it; and
-`importlib` is barred in `src`, since `importlib.import_module("hash" + "lib")`
-reaches a barred module without naming it.
+absolutely or not at all); no file or directory here may be named for it; and dynamic
+imports are constrained everywhere: a call to `import_module` or `__import__` may
+not name a barred module, and may not be handed a name assembled at the call site
+(`"hash" + "lib"`, an f-string, a `join`) whatever that name spells. A plain
+variable is still permitted — that is how the guards walk this package's own
+modules. `importlib` itself is additionally barred as an import in `src`.
 
 `tests/test_no_local_canonicalization.py` now pins the three modules by name and
 asserts that every file in `src` and `tests` is either scanned or one of the two

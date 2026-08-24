@@ -116,6 +116,42 @@ four boundaries it does not cross — dynamic construction, the runtime half det
 widened annotations rather than projections, the packages in reach, and the
 substrate floor being a text assertion rather than a resolved installed version.
 
+### Fixed — third audit round
+
+An audit of the previous revision confirmed the earlier findings closed, then found
+that the fix had cost more than it bought in one place. No `src/` change, no version
+bump, no public-API snapshot.
+
+* **The alias map is now per module.** Merging every module's aliases into one dict
+  made another module's import rename a global fact, and rejected ordinary code:
+  a module importing an unrelated `Result` from a sibling, a parameter named
+  `Result`, a local variable `Result = {...}`. All three are self-tested as lawful;
+  the two-hop relay still binds.
+* **`Literal["TerminalOutcome"]` is a value, not a forward reference.** A function
+  declaring which vocabulary it names was flagged. String constants inside a
+  `Literal[...]` subscript are skipped; quotes elsewhere still resolve.
+* **The shadow-module detector is self-tested.** Both branches — a `ugence_jcs.py`
+  and a `ugence_jcs/` package — could be deleted with the suite green. It is the
+  detector this package's substrate rule leans on hardest.
+* **Dynamic imports are constrained everywhere.** `__import__("hash" + "lib")`
+  reached `hashlib` from `src` without importing `importlib`, which is the route
+  barring `importlib` was meant to close; and a canonicalizer in `tests/` using
+  `importlib.import_module("hash" + "lib")` passed, contradicting that module's own
+  docstring. A dynamic import may now neither name a barred module nor be handed a
+  name assembled at the call site; a plain variable is still permitted, since the
+  guards walk this package's modules that way.
+* **The per-file wiring is self-tested**, not only the scanners. A scanner that is
+  self-tested but never applied does nothing, and dropping either scan — or the
+  `src`-only bar — from the per-file check left the suite green.
+
+`docs/S1_ENFORCEMENT.md` now separates **known uncovered spellings** (alias by
+assignment, class-attribute alias, `functools.partial`, `globals()` with a literal
+name — all statically visible, none closed) from the four **named boundaries**, and
+no longer lets `globals()` shelter under "dynamic construction". It also records
+that the substrate floor could assert the resolved `ugence_jcs.__version__` rather
+than `pyproject.toml` text, and that which the floor should mean is an owner
+decision.
+
 ### Not implemented
 
 The eight canonical contracts, Equations 1–3, proposal identity, invoice-domain

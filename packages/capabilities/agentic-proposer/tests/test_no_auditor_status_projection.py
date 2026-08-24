@@ -86,13 +86,18 @@ def _module_key(path):
     return path.stem
 
 
-def _reexported_names(paths):
-    """Names that reach a tracked type through in-package re-export chains.
+def _reexport_maps(paths):
+    """Per-module alias maps, closed to a fixpoint across in-package re-exports.
 
     ``relay.py`` doing ``from .vocabulary import TerminalOutcome as Result`` makes
     ``from .relay import Result`` an alias for ``TerminalOutcome`` one hop further
     out. Resolution stopping at one hop is the same blindness as not resolving
-    aliases at all, so the map is closed to a fixpoint across the package.
+    aliases at all, so the map is closed to a fixpoint.
+
+    Kept PER MODULE rather than merged. A merged map makes one module's import
+    rename a fact about every other: a parameter, a local variable or an unrelated
+    import that happens to reuse the name would resolve to a tracked type in a
+    module that never imported it, and lawful code would fail this guard.
     """
     per_module = {}
     trees = {}
@@ -118,10 +123,12 @@ def _reexported_names(paths):
                         changed = True
         if not changed:
             break
-    merged = {}
-    for bindings in per_module.values():
-        merged.update(bindings)
-    return merged
+    return per_module
+
+
+def _reexported_names(paths, module):
+    """The alias map for one module, resolved through the package's re-exports."""
+    return _reexport_maps(paths).get(module, {})
 
 
 def _resolve(node, aliases):
@@ -211,8 +218,17 @@ def _annotation_names(node, aliases=None):
     """
     aliases = {} if aliases is None else aliases
     found = _names(node, aliases)
+    literal_strings = set()
     for child in ast.walk(node):
-        if isinstance(child, ast.Constant) and isinstance(child.value, str):
+        # ``Literal["TerminalOutcome"]`` names a VALUE that happens to read like a
+        # type. Resolving inside it would flag a function for describing which
+        # vocabulary it is talking about.
+        if isinstance(child, ast.Subscript) and _plain_name(child.value) == "Literal":
+            literal_strings |= {id(n) for n in ast.walk(child.slice)
+                                if isinstance(n, ast.Constant)}
+    for child in ast.walk(node):
+        if (isinstance(child, ast.Constant) and isinstance(child.value, str)
+                and id(child) not in literal_strings):
             found |= {aliases.get(n, n) for n in _names_in_string_annotation(child.value)}
     return {n for n in found if n in TRACKED_TYPES}
 
@@ -466,6 +482,51 @@ def test_the_detector_follows_an_in_package_re_export(sample):
     assert _projections(sample, extra_aliases=RELAY_ALIASES)
 
 
+#: Lawful modules that reuse a name another module aliases to a tracked type. Each
+#: also names an auditor status, so a merged alias map would flag every one of them.
+NAME_REUSE_SAMPLES = (
+    # An unrelated import of the same name from a different module.
+    ("from .other import Result\n"
+     "from .vocabulary import SemanticAuditorFindingStatus\n"
+     "def f(s: SemanticAuditorFindingStatus):\n    return Result.ABSTAIN\n"),
+    # A parameter of that name.
+    ("from .vocabulary import SemanticAuditorFindingStatus\n"
+     "def f(s: SemanticAuditorFindingStatus, Result=None):\n    return Result.ABSTAIN\n"),
+    # A local variable of that name.
+    ("from .vocabulary import SemanticAuditorFindingStatus\n"
+     "def f(s: SemanticAuditorFindingStatus):\n"
+     "    Result = {'a': 1}\n    return Result.get('a')\n"),
+)
+
+
+@pytest.mark.parametrize("sample", NAME_REUSE_SAMPLES, ids=lambda s: s.split("\n")[0][:40])
+def test_another_modules_alias_is_not_a_fact_about_this_one(sample):
+    """``Result`` meaning ``TerminalOutcome`` in one module means nothing here.
+
+    A merged package-wide alias map would reject all three of these — ordinary code
+    that never imported a reserved type. The first S1 contract to name a variable
+    after another module's alias would fail this guard for no reason, and the
+    natural response would be to weaken the guard.
+    """
+    assert not _projections(sample, extra_aliases={})
+
+
+def test_a_literal_naming_a_type_is_not_a_reference_to_it():
+    """``Literal["TerminalOutcome"]`` is a value; the quotes are not a forward
+    reference. Resolving inside them flags a function for naming a vocabulary."""
+    lawful = ('from typing import Literal\n'
+              'from .vocabulary import SemanticAuditorFindingStatus\n'
+              'def which(status: SemanticAuditorFindingStatus)'
+              ' -> Literal["TerminalOutcome", "CandidateDisposition"]:\n'
+              '    return "TerminalOutcome"\n')
+    assert not _projections(lawful)
+
+    # The same quotes outside a Literal ARE a forward reference, and still bind.
+    projecting = ('def project(status: "SemanticAuditorFindingStatus")'
+                  ' -> "TerminalOutcome":\n    raise NotImplementedError\n')
+    assert _projections(projecting)
+
+
 def test_the_re_export_map_closes_over_a_chain():
     """Built from real files, to a fixpoint, so a two-hop relay resolves too."""
     import tempfile
@@ -478,10 +539,13 @@ def test_the_re_export_map_closes_over_a_chain():
             "from .vocabulary import TerminalOutcome as Result\n", encoding="utf-8")
         (root / "relay2.py").write_text(
             "from .relay import Result as Verdict\n", encoding="utf-8")
-        mapping = _reexported_names(sorted(root.rglob("*.py")))
+        maps = _reexport_maps(sorted(root.rglob("*.py")))
 
-    assert mapping.get("Result") == "TerminalOutcome"
-    assert mapping.get("Verdict") == "TerminalOutcome", "the chain stopped at one hop"
+    assert maps["relay"].get("Result") == "TerminalOutcome"
+    assert maps["relay2"].get("Verdict") == "TerminalOutcome", "the chain stopped at one hop"
+    # Per module, not merged: relay2 renamed it again, and relay never saw that name.
+    assert "Verdict" not in maps["relay"]
+    assert "Result" not in maps["vocabulary"]
 
 
 def test_sources_exist_to_scan():
@@ -491,7 +555,8 @@ def test_sources_exist_to_scan():
 @pytest.mark.parametrize("path", sorted(SRC.rglob("*.py")), ids=lambda p: p.name)
 def test_no_source_projects_an_auditor_status_into_a_reserved_position(path):
     found = _projections(path.read_text(encoding="utf-8"), filename=str(path),
-                         extra_aliases=_reexported_names(sorted(SRC.rglob("*.py"))))
+                         extra_aliases=_reexport_maps(
+                             sorted(SRC.rglob("*.py"))).get(_module_key(path), {}))
     assert not found, f"{path.name} projects an auditor status: {found}"
 
 
