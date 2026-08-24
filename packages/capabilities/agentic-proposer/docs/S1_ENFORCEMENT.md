@@ -221,19 +221,27 @@ owner-ratified and which is authored from it.
 
 ### Guard corrections: what is done, and what is left
 
-The O-1 – O-4 refinements and their guards are recorded under *What O-1 – O-4 changed*
-above; that is the canonical account and this section does not restate it. What follows
-is only the residue the contract specification adds.
+O-1 – O-4 are defined under *Ratified refinements (O-1 – O-4)* in
+[`docs/architecture/ADR_UGENCE_AGENTIC_PROPOSER_MVP_READINESS.md`](../../../../docs/architecture/ADR_UGENCE_AGENTIC_PROPOSER_MVP_READINESS.md);
+that is the canonical account and this section does not restate it. An earlier revision
+pointed at a *What O-1 – O-4 changed* section in this file, which does not exist here.
+What follows is only the residue the contract specification adds.
+
+`[R]` Every "done" below means "implemented on branch
+`claude/governance-refinements-o1-o4-k96vbz`", which is **not merged**. None of it is a
+fact about this branch, and each is to be re-verified on merge.
 
 | Item | Status |
 | --- | --- |
 | Lifecycle bound narrowed to authority, not vocabulary (O-2) | **done** — `tests/test_role_projection_bounds.py` |
 | Ratified kind required on `ProposerAdvisory`, barred on `CandidateAdvisory` (O-3) | **done** — `tests/test_advisory_contract_shape.py` |
-| Selection-dependent coupling (O-1) | **done** — `tests/test_selection_dependent_fields.py`, with one correction outstanding: the dependent-field set is matched by name alone, so `CandidateAdvisory.requested_review_action` — the candidate's own required, non-null routing — is caught as if it were selection-dependent. It must be scoped to its bearer contract |
-| Identifier normalization (O-4) | **done** — `tests/test_identifier_normalization.py`, with one gap outstanding: classification is by name suffix, which reaches neither `tool_name` nor the scope fields. The specification classifies every field explicitly and requires the guard to read an exact pinned registry |
+| Selection-dependent coupling (O-1) | **done, correction applied at `96510a1c4`** — `tests/test_selection_dependent_fields.py`. The dependent-field set was matched by name alone, so `CandidateAdvisory.requested_review_action` — the candidate's own required, non-null routing — was caught as if it were selection-dependent; it is now pinned by exact bearer and field. Recorded as **OD-3**, open here because the branch is unmerged |
+| Identifier normalization (O-4) | **done, correction applied at `96510a1c4`** — `tests/test_identifier_normalization.py`. Classification was by name suffix, which reached neither `tool_name` nor the scope fields; it now reads an exact per-contract registry in which an unregistered field is a failure rather than a skip, with inference retained only as a secondary cross-check. The specification classifies every field explicitly — including a fourth, mechanical class **C5d** for the reserved lists that admit no value — and requires the registry to carry non-`str` fields, `AgentIdentityRef.lifecycle_state` in particular |
 | `sha256:` prefix literal vs. `SUSPECT_TEXT` | **outstanding** — a module-path-scoped text mask in the one authorised identity module, with mutation tests. No definition-name exemption is needed: the ratified identity functions are named `compute_advisory_identity` and `verify_advisory_identity`, which carry no suspect substring |
 | `pydantic` loads `socket`, which `tests/test_boundaries.py` forbids | **outstanding, owner decision** — bare `import pydantic` does not load `socket`; defining any `BaseModel` does. Every contract is a `BaseModel` and `pydantic>=2` is a ratified core dependency, so the first contract module trips that guard for a reason unrelated to the contracts |
 | `tests/test_vocabulary.py` pins the S0 export surface by equality | **outstanding** — it must be updated to the full S1 surface in the same change that exports the first contract, and not before |
+| Constrained `str` fields declared through `Field(pattern=...)` | **outstanding** — the identity-source scanner collects every value expression assigned to `advisory_digest`, including an annotated assignment whose value is a `Field(...)` call, and rejects it for containing no substrate call. Every constrained `str` field must therefore be declared `Annotated[str, StringConstraints(...)]`. Specified as C8, with a mutation obligation |
+| `ProposerAdvisory` composition vs. ratified D7 | **outstanding, owner decision** — D7 says the advisory carries per-candidate `CandidateAdvisory` entries; the specification references them by `candidate_set_id`. The rival-identity walk bars only nested `ToolObservation` and reaches no field of `CandidateAdvisory`, so the departure is not forced. Recorded as **OD-4** |
 
 None of these is discharged by the specification document, which changes no test.
 

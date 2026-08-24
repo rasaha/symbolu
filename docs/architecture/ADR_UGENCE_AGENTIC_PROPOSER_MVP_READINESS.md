@@ -428,11 +428,142 @@ publishing would add a release surface with no reader.
 
 ---
 
+## Ratified refinements (O-1 – O-4)
+
+> **Provenance of this section.** O-1 – O-4 were first written on branch
+> `claude/governance-refinements-o1-o4-k96vbz`. They are recorded **here**, in this
+> artifact, because a decision that exists only on an unmerged branch is not a record.
+> Documents on this branch previously cross-referenced an *O-1 – O-4* section that no
+> merged revision of this artifact carried, leaving the four decisions cited and
+> undefined. The text below is that section, moved in verbatim in substance.
+>
+> `[R]` The `[V]` claims inside it are read from that branch's tests, which are not
+> merged here. Each is to be re-verified when that branch merges.
+
+O-1 – O-4 were ratified after the S1 enforcement guards landed and were audited.
+Each narrows or completes a rule D6–D8 already carry; none reopens a ratified
+decision. They are recorded verbatim in substance and are not reinterpreted here.
+
+## O-1 — Selection-dependent fields are nullable and coupled
+
+Three fields depend on a selected candidate and are nullable with it:
+
+* `recommended_disposition: CandidateDisposition | None`
+* `requested_review_action: ReviewAction | None`
+* `requested_review_destination_role_ref: str | None`
+
+When `selected_candidate_id` is `None`, all three are `None`. When a selected
+candidate exists in a future stage, they must match that candidate and its permitted
+routing.
+
+`[I]` The coupling is what keeps the advisory readable. A disposition or a routing
+request standing next to no selected candidate is a recommendation about nothing,
+and a consumer cannot tell whether the selection was lost in transit or the routing
+was invented — the two failure modes call for opposite responses.
+
+`[V]` The nullability clause is enforced by
+`tests/test_selection_dependent_fields.py`: the guard arms with the first class that
+declares any of the three, and then requires the selector on the same class, an
+annotation admitting `None` on each dependent field, and a coupling enforced by code
+in that class rather than by its docstring. The rule itself is stated executably on
+a reference model, so the required behaviour is exercised today.
+
+`[R]` The value-agreement clause — a dependent field agreeing with the selected
+candidate and its permitted routing — binds the stage that introduces candidates.
+Nothing in this package has candidates, so nothing here can check it; the guard
+records the boundary rather than covering it.
+
+## O-2 — The lifecycle bound is on authority, not on vocabulary
+
+The governance vocabulary is retained: `SUSPENDED`, `REVOKED`, `RoleActivationStatus`,
+`activation_status`, `expires_at`. D8's lifecycle-verb bound is narrowed to prohibit
+agent-owned lifecycle **mutation operations or callable authority** — `activate`,
+`suspend`, `revoke`, `expire` or equivalent state-changing methods — without
+prohibiting contracts from describing externally determined lifecycle states and
+validity periods.
+
+`[I]` D8's substance is unchanged: activation state stays an input fact, never
+computed. What changes is the reading of the guard. A scan matching stems alone
+cannot tell an act from a description, so it rejects the domain's correct words for
+facts some other authority determined — and a rename bought under that pressure
+costs the contract its meaning while removing no authority. The proposer is a
+*reader* of roles; a reader needs the vocabulary of what it read.
+
+`[V]` `tests/test_role_projection_bounds.py` now classifies each name by grammatical
+form and syntactic position: a mutation form (`activate`, `suspending_role`) is
+barred in every position, an actor form (`RoleActivator`) is barred as a type or a
+callable and permitted as a reference to an external party, and any lifecycle-stemmed
+field annotated as a callable is barred. The five retained names are pinned by
+equality, and the six verbs D8 names explicitly are still barred in every position.
+
+`[V]` The narrowing is mutation-tested. Each rule is weakened in turn and a real
+violation must escape the weakened guard, so no rule survives without a sample that
+would catch its removal; a mutant that gained a false positive against the retained
+vocabulary fails too.
+
+## O-3 — Only ProposerAdvisory bears the ratified kind
+
+The ratified-kind guard is narrowed to `ProposerAdvisory`. `CandidateAdvisory` is a
+subordinate candidate record and must not claim the authority-facing advisory kind.
+
+`[I]` A kind is what a consumer routes and stores on. A per-candidate record
+declaring the advisory kind would be consumable as an advisory in its own right —
+the boundary D7 draws by naming, defeated by a field default. D7's pairing is
+unaffected: both types are still ratified together, but only one is addressed to an
+authority.
+
+`[V]` `tests/test_advisory_contract_shape.py` requires the kind on `ProposerAdvisory`
+and bars `CandidateAdvisory` from declaring it or any other kind in this capability's
+namespace. The reader is self-tested against all three spellings a type can declare a
+kind through, so a narrowed reader fails rather than reporting a clean record.
+
+## O-4 — ASCII identifiers, and only identifiers
+
+Identifier and reference fields are validated against `^[A-Za-z0-9][A-Za-z0-9._:/-]*$`.
+The restriction applies to identifiers and references only — never to human-readable
+text, claims, reasons or summaries.
+
+`[V]` The restriction is required because this capability computes identity through
+`ugence_jcs` with an empty `nfc_paths` profile: no string is Unicode-normalized before
+canonicalization, so two normalization forms of one identifier produce two identities
+while reading identically. `tests/test_identifier_normalization.py` demonstrates this
+against the substrate rather than asserting it, and fails if a non-empty profile is
+ever passed.
+
+`[I]` The scope limit is not a softening. Identifiers are matched, routed and joined
+on, so an ambiguity there corrupts identity; free text is carried, not matched, and an
+ASCII bar on a reason or a summary would reject the languages those are written in —
+a defect rather than a safeguard.
+
+`[V]` The guard classifies fields from an **exact pinned per-contract registry**, not
+from name shape — see OD-1 below for why suffix inference alone was insufficient. The
+patterns are pinned by equality, and their application is pinned too: `re.match` admits
+a trailing newline against `$` and `re.fullmatch` does not, so stating a pattern without
+stating the application would leave the rule one convenience call away from admitting a
+value it names as invalid.
+
 ## Open owner decisions
 
-None. D6–D10 close every question this artifact previously carried as open.
+`[R]` **Four remain open**, recorded here so this artifact does not report a clean
+record its own subordinate documents contradict. D6–D10 close every question this
+artifact previously carried as open, and O-1 – O-4 close the four the S1 enforcement
+audit raised; what follows was raised afterwards, by auditing those guards against
+representative contract shapes and by reconciling this artifact with
+`packages/capabilities/agentic-proposer/docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md`,
+where each is stated in full.
 
-`[R]` markers that remain above are implementation obligations that S1 must
+| Id | Question | Bears on contract shape |
+| --- | --- | --- |
+| **OD-1** | `primary_function` and `declared_strategy` are classified **C5c** human-readable free text rather than C5b canonical tokens, on the ground that neither is reachable from `P_unsigned`, so O-4's Unicode hazard does not reach them and the stricter class could only reject lawful values. Reclassifying either to C5b would be a narrowing. | no |
+| **OD-2** | `pydantic` loads `socket` while constructing a `BaseModel`, which `tests/test_boundaries.py` forbids as a whole-process assertion. Every S1 contract is a `BaseModel` and `pydantic>=2` is a ratified dependency, so the first contract module fails that guard for a reason unrelated to this package's authority. The narrowest resolution exempts exactly the transitive route while keeping the bar on any direct import. **Must be ruled on before S1 code lands.** | no |
+| **OD-3** | O-1's dependent-field set is matched by name alone, so `CandidateAdvisory.requested_review_action` — the candidate's own required, non-null routing — is caught as if it were selection-dependent. It must be scoped to its bearer contract. `DEPENDENT_FIELDS` is pinned by equality, so the scoping is a change to a pinned constant. | no |
+| **OD-4** | D7 above says `ProposerAdvisory` carries per-candidate `CandidateAdvisory` entries; the specification instead has it reference an `AdvisoryCandidateSet` by `candidate_set_id`. `[V]` The departure is **not** forced by the rival-identity walk, which bars only nested `ToolObservation` and reaches no field of `CandidateAdvisory`. Its cost is that an advisory digest covers the candidate set's identifier and not the candidates. **Yes — the two resolutions produce different contracts.** | **yes** |
+
+`[R]` OD-1 – OD-3 are proposed, with resolutions, on branch
+`claude/governance-refinements-o1-o4-k96vbz`. That branch is not merged, so they are
+open here.
+
+`[R]` markers elsewhere above are implementation obligations that S1 must
 discharge — mechanical enforcement of D6's standing rule, D7's contract shape and
 D8's export bound — not unratified decisions.
 
@@ -444,12 +575,14 @@ This addendum is additive. **No D1–D10 text above is rewritten**; each remains
 verbatim record of what was ratified when it was ratified. What follows is a dated
 extension recording ratifications that landed after D10.
 
-**Ordering dependency.** This addendum assumes the *Ratified refinements (O-1 – O-4)*
-section above is already present — it lands with the guard branch
-`claude/governance-refinements-o1-o4-k96vbz`, which is expected to merge first. O-1 to
-O-4 are recorded **there and only there**; A5–A8 below cross-reference that section
-rather than restating it, so this artifact carries one account of each decision and not
-two.
+**Ordering dependency, resolved.** An earlier revision of this addendum assumed the
+*Ratified refinements (O-1 – O-4)* section would arrive with the guard branch
+`claude/governance-refinements-o1-o4-k96vbz` and cross-referenced it in the meantime.
+That branch is not merged, so the cross-references pointed at nothing and O-1 – O-4 were
+cited throughout this artifact and its subordinate documents while being defined in none
+of them. The section is now carried **above, in this artifact**. A5–A8 below still do not
+restate it; they record only how the four bear on the contract specification, so each
+decision has one account and not two.
 
 ### Provenance
 
@@ -535,14 +668,22 @@ on the contract specification:
   when non-null, identity-participating in `P_unsigned` — without which the local
   coupling would not be decidable on the advisory at all. Under A2 (V13) all four are
   `None` in S1; the future-stage branch is preserved and unreachable.
-* **O-4** is implemented as an explicit **three-category classification** — identifier
-  or reference, canonical symbolic token, human-readable free text — assigned per field
-  rather than inferred from name shape. Six fields (`agent_version`, `tool_name`,
+* **O-4** is implemented as an explicit **classification assigned per field** rather
+  than inferred from name shape: three semantic categories — identifier or reference
+  (C5a), canonical symbolic token (C5b), human-readable free text (C5c) — plus a fourth,
+  **mechanical** category, C5d, for the reserved lists that reject every non-empty value
+  (`selection_reason_codes`, `reason_codes`, `deterministic_checks`,
+  `semantic_audit_refs`). C5d exists because a `list[str]` admitting no value has no
+  content class, and assigning it one of the three would state something false about a
+  value that cannot exist. Six fields (`agent_version`, `tool_name`,
   `allowed_source_scopes`, `excluded_data_classes`, `permitted_tool_scopes`,
   `tool_invocations`) are symbolic tokens that a suffix rule reaches as neither
   identifiers nor text; they carry their own canonical token pattern and are not
-  silently treated as free text. The guards must classify from an exact pinned field
-  registry, with mutation tests per category.
+  silently treated as free text. C5c is restated as admitting **no pattern or regex
+  constraint of any kind**, not merely neither of the two named patterns. The guards must
+  classify from an exact pinned per-contract field registry that also carries non-`str`
+  fields — `AgentIdentityRef.lifecycle_state` in particular — with mutation tests per
+  category.
 * **O-2 and O-3** are enforced as ratified. The specification records the guard branch's
   grammatical/syntactic O-2 rule as the preferred implementation, and its
   required-on-`ProposerAdvisory`, barred-on-`CandidateAdvisory` O-3 rule as stronger
@@ -562,12 +703,22 @@ validation, ownership and canonical-identity participation; the frozen `P_unsign
 projection under an empty-`set_paths`, empty-`nfc_paths` profile; and every equation
 signature, including the independent verification function A1 requires.
 
-`ProposerAdvisory` references its inputs by identifier and nests no other contract.
-`[V]` This is forced, not preferred: the merged rival-identity walk in
+In that document `ProposerAdvisory` references its inputs by identifier and nests no
+other contract.
+
+`[V]` One half of that is forced: the merged rival-identity walk in
 `tests/test_advisory_contract_shape.py` reaches `content_hash` through a nested
 `ToolObservation` and fails, and `content_hash` is on that list precisely to prevent a
-second identity. The cost — that an advisory digest binds the identifiers of its inputs
-rather than their contents — is recorded as a residual limitation in that document.
+second identity. So `ToolObservation` is referenced, not carried.
+
+`[R]` The other half is **not** forced, and an earlier revision of this section said it
+was. That walk matches `RIVAL_IDENTITY_FIELDS` by exact name, and no field of
+`CandidateAdvisory` is a member, so nesting `CandidateAdvisory` fails nothing. D7 above
+says `ProposerAdvisory` carries per-candidate `CandidateAdvisory` entries; the
+specification's reference-by-id shape departs from that. The departure is open as
+**OD-4** under *Open owner decisions*, and its cost — that an advisory digest binds the
+identifier of a candidate set rather than the candidates — is recorded as a residual
+limitation in that document.
 
 It authorizes no invoice-domain check, no reason-code catalogue, no adapter, no LLM, no
 semantic auditor, no HTTP service, no authorization, no clearance and no execution.
@@ -598,6 +749,15 @@ documentation pull request is independently reviewed and merged.**
 
 ### Open owner decisions
 
-None. A1–A8 close every question the contract specification depends on. The `[R]`
-markers remaining in this artifact are implementation obligations for S1, not
+A1–A8 close every question the contract specification's *equations, vocabularies and
+enforcement interpretation* depend on. They do not close everything.
+
+`[R]` **OD-1 – OD-4 are open**, and are recorded once, under *Open owner decisions*
+above. OD-4 is the one that bears on contract shape: whether `ProposerAdvisory` carries
+its `CandidateAdvisory` entries as D7 says, or references them by `candidate_set_id` as
+the specification does. Until it is ruled on, the specification's status is
+`RATIFIED FOR S1 IMPLEMENTATION, QUALIFIED BY OD-4` and no contract module may be
+written against the reference-by-id shape.
+
+The `[R]` markers elsewhere in this artifact are implementation obligations for S1, not
 unratified decisions.
