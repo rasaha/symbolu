@@ -4,16 +4,16 @@ RFC 8785 (JSON Canonicalization Scheme) + Action-Profile canonicalization as an
 independently installable, standard-library-only, authority-neutral leaf
 distribution.
 
-It maps an already-parsed JSON value to canonical bytes. That is the whole
-capability.
+It maps an already-parsed JSON value to canonical bytes, and exposes a bare
+SHA-256 over exactly those bytes. That is the whole capability.
 
 ## What this package is not
 
 It carries no authority and decides nothing. It contains no digest framing, no
 envelope schema, no profile registry, no policy, and no decision, authorization,
-clearance or eligibility vocabulary. Callers that need an identity digest compose
-one over these bytes themselves — the domain separation, length prefixing and
-schema versioning belong to the caller's domain, not here.
+clearance or eligibility vocabulary. The one digest it exposes is bare: the
+domain separation, length prefixing and schema versioning that an identity scheme
+needs belong to the caller's domain, not here.
 
 ## Provenance
 

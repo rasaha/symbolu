@@ -24,7 +24,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ugence-jcs"
 dynamic = ["version"]
-description = "RFC 8785 (JCS) + Action-Profile canonicalization — standard-library-only, authority-neutral canonical bytes. No digesting, no schema, no policy."
+description = "RFC 8785 (JCS) + Action-Profile canonicalization — standard-library-only, authority-neutral canonical bytes, plus a bare SHA-256 over them. No digest framing, no schema, no policy."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Proprietary" }

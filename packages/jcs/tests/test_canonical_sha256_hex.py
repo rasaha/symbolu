@@ -63,13 +63,17 @@ def test_is_sha256_of_canonical_bytes(value, set_paths, nfc_paths):
 def test_output_is_64_lowercase_hex_with_no_prefix(value, set_paths, nfc_paths):
     produced = canonical_sha256_hex(value, set_paths, nfc_paths)
     assert HEX64.match(produced), produced
-    assert not produced.startswith("sha256:")
 
 
 @pytest.mark.parametrize("value,set_paths,nfc_paths", VALUES)
 def test_keyword_arguments_are_forwarded_unchanged(value, set_paths, nfc_paths):
-    assert canonical_sha256_hex(value, set_paths=set_paths, nfc_paths=nfc_paths) == \
-        canonical_sha256_hex(value, set_paths, nfc_paths)
+    # Compared against the independent oracle, not against the positional call:
+    # both sides of a self-comparison route through the same forwarding, so a
+    # swapped or dropped path set would survive it.
+    expected = hashlib.sha256(canonical_bytes(value, set_paths, nfc_paths)).hexdigest()
+    assert canonical_sha256_hex(
+        value, set_paths=set_paths, nfc_paths=nfc_paths
+    ) == expected
 
 
 def test_key_insertion_order_does_not_change_the_digest():
