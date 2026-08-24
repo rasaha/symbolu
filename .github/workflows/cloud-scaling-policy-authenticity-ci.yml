@@ -101,17 +101,27 @@ jobs:
         # a guard that lives only in YAML is not covered by anything.
         run: |
           set -euo pipefail
+          head=$(git rev-parse HEAD)
           base='${{ github.event.pull_request.base.sha }}'
           source='pull request base sha'
           if [ -z "${base}" ]; then
             default='${{ github.event.repository.default_branch }}'
             git fetch --no-tags origin \
               "+refs/heads/${default}:refs/remotes/origin/ratchet-base"
-            base=$(git merge-base HEAD refs/remotes/origin/ratchet-base)
-            source="merge base with ${default}"
+            if [ "$(git rev-parse refs/remotes/origin/ratchet-base)" = "${head}" ]; then
+              # A push ON the default branch. `merge-base HEAD default` is HEAD itself here,
+              # which is how this gate came to be vacuous on every default-branch merge before
+              # 5B-3: runs 3, 11, 15 and 19 all reported no movement because they compared the
+              # merged result against itself. The honest "before" is the commit this one landed
+              # on top of — for a merge commit, its first parent, i.e. the previous default tip.
+              base=$(git rev-parse "HEAD^1")
+              source='first parent (push on the default branch)'
+            else
+              base=$(git merge-base HEAD refs/remotes/origin/ratchet-base)
+              source="merge base with ${default}"
+            fi
           fi
           git rev-parse --verify "${base}^{commit}" >/dev/null
-          head=$(git rev-parse HEAD)
           if git merge-base --is-ancestor "${head}" "${base}"; then
             echo "::error::the ratchet baseline (${source}) resolved to ${base}, which already contains HEAD (${head}); comparing the change against itself reports no movement for every promotion on it, so the gate would pass vacuously"
             exit 1
