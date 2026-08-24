@@ -29,6 +29,17 @@ Owner decisions D1–D5 and the full boundary are recorded in
 The ratified D4 vocabulary and the boundary proofs that keep this a leaf. Nothing
 else.
 
+## What S1 added
+
+The three enforcement obligations the readiness ADR carries as `[R]` — D6's standing
+rule against projecting an auditor status into an outcome or disposition field, D7's
+advisory contract shape, and D8's containment bounds on the role projection. Each is
+a test that holds today and arms itself when the surface it guards appears.
+
+The eight canonical contracts and Equations 1–3 are still unimplemented: nothing in
+this repository defines them, so they were not inferred. See
+[`docs/S1_ENFORCEMENT.md`](docs/S1_ENFORCEMENT.md).
+
 ```python
 from ugence_agentic_proposer import (
     TerminalOutcome,               # PROPOSAL, NEED_EVIDENCE, ABSTAIN, ESCALATE
