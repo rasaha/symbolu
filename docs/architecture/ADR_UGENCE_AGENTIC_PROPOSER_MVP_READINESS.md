@@ -435,3 +435,178 @@ None. D6–D10 close every question this artifact previously carried as open.
 `[R]` markers that remain above are implementation obligations that S1 must
 discharge — mechanical enforcement of D6's standing rule, D7's contract shape and
 D8's export bound — not unratified decisions.
+
+---
+
+## Ratification addendum — 2026-08-24: the D2 interpretation and the S1 contract specification
+
+This addendum is additive. **No D1–D10 text above is rewritten**; each remains the
+verbatim record of what was ratified when it was ratified. What follows is a dated
+extension recording ratifications that landed after D10.
+
+### Provenance
+
+| Fact | Value |
+| --- | --- |
+| Base | the repository default branch at merge commit `e28538eb454fce6008e94e0772e0fd09c9c7ea7f` (PR #1474) |
+| Package version | `0.0.1`, unchanged |
+| Public-API snapshot | none, unchanged |
+| Platform-freeze substantive digest | `d993093570bb8ee132d4ab58406a14dd8c9b774b9de2c6d7ac45d3dfd3fac036`, unchanged |
+
+### A1 — D2 is a behavioural and architectural invariant
+
+D2 above ratifies the identity **substrate**. This addendum ratifies what D2 **means**,
+which `S1_ENFORCEMENT.md` previously carried as an open `[R]` question:
+
+> D2 is a behavioural and architectural invariant. An advisory identity is valid only
+> when an independent verifier recomputes it from the frozen unsigned advisory
+> projection using the ratified `ugence-jcs` canonicalization profile and obtains the
+> exact stored digest.
+>
+> Static scanning remains a mandatory release guard for declared imports, ordinary
+> aliases, known dynamic-import forms and accidental local canonicalization. It is
+> defence-in-depth and does not constitute proof against every intentionally obfuscated
+> Python construction.
+>
+> The helper-assembled `__import__` escape is a disclosed limitation of static
+> enforcement. It does not authorize local hashing. S1 must additionally provide
+> package-owned construction, independent canonical replay, frozen-profile tests and
+> installed-distribution verification.
+
+Recorded in full at `packages/capabilities/agentic-proposer/docs/S1_ENFORCEMENT.md`.
+
+### A2 — V13: a proposal requires readiness
+
+> `TerminalOutcome.PROPOSAL` requires `evaluate_readiness(...) is True` for the selected
+> candidate, independently recomputed by `build_proposer_advisory`.
+
+Because S1 cannot construct `DomainCheckCompletion.COMPLETE`, readiness is `False` for
+every candidate S1 can construct. Therefore S1 cannot emit `PROPOSAL`; every S1
+authority-facing advisory has `selected_candidate_id = None`; and the only terminal
+outcomes S1 may emit are `NEED_EVIDENCE`, `ABSTAIN` and `ESCALATE`.
+
+This is fail-closed and intended. A stage that authorizes no domain check must not be
+able to reach the proposer's strongest classification.
+
+### A3 — `advisory_version`
+
+> `advisory_version` is a required, non-null, identity-participating `str` matching
+> `^[1-9][0-9]*$`. Its initial value is `"1"`. `build_advisory_revision` increments it
+> as canonical positive decimal without leading zeroes.
+
+It is not `int`, because `ugence-jcs` rejects bare JSON numbers; it is not
+`Literal["1"]`, because that would make a revision unconstructible.
+`kind = "ugence.agentic_proposer.advisory.v0"` remains a separate axis: `kind`
+identifies the schema family, `advisory_version` identifies the advisory instance
+revision. They are not redundant and not inconsistent.
+
+### A4 — `ReviewAction`
+
+> `ReviewAction` contains exactly `ROUTE_APPROVAL_BUNDLE` and
+> `CREATE_EXCEPTION_REVIEW_BUNDLE`.
+
+### A5 — O-1: selection-dependent fields are nullable
+
+> `ProposerAdvisory.recommended_disposition`, `.requested_review_action` and
+> `.requested_review_destination_role_ref` are each nullable. When
+> `selected_candidate_id is None` all three must be `None`. When a selected candidate
+> becomes permitted in a future stage, all three must bind consistently to that
+> candidate, its disposition and its permitted review routing.
+
+Under A2, S1 has no selected candidate, so in S1 all three are always `None`.
+
+### A6 — O-2: lifecycle vocabulary is retained; lifecycle authority stays barred
+
+> `SUSPENDED`, `REVOKED`, `RoleActivationStatus`, `activation_status` and `expires_at`
+> are retained and must not be renamed merely to satisfy an over-broad lexical scanner.
+> Contracts may describe lifecycle states and validity periods determined by external
+> authority.
+>
+> The lifecycle guard is narrowed to prohibit agent-owned lifecycle mutation authority
+> and mutation operations — not descriptive fields or enum values.
+
+`[V]` The current scan matches stems over class names, contract fields and enum
+members, and rejects all five retained names. Narrowing it to callable names — function
+and method definitions, non-model non-enum class definitions, and lambda-bound names —
+accepts all five and still rejects `activate`, `suspend_role`, `revoke_identity`,
+`expire_mandate`, `ActivateRole` and `reactivate`. The `LIFECYCLE_VERBS` stem list is
+not relaxed, and the shared-contract export bound and `CognitiveRole` re-export scan are
+unchanged. Mutation tests proving both halves are a condition of the narrowing.
+
+### A7 — O-3: the advisory kind applies to `ProposerAdvisory` only
+
+> The ratified `kind` requirement applies only to the authority-facing
+> `ProposerAdvisory`. `CandidateAdvisory` is a subordinate candidate record and must not
+> claim it.
+
+`[V]` The ratified-kind assertion is currently parametrized over both advisory types and
+cannot be satisfied by a `CandidateAdvisory`. It is narrowed to `ProposerAdvisory`, with
+a mutation test asserting that a `ProposerAdvisory` without the ratified kind still
+fails. The rival-identity walk, the barred-field walk and the barred-prefix scans
+continue to cover both types unchanged.
+
+### A8 — O-4: the identifier profile
+
+> Identifier and reference fields match `^[A-Za-z0-9][A-Za-z0-9._:/-]*$`. This applies
+> only to identifiers and references, never to claims, reasons, summaries, purpose or
+> other human-readable free text.
+
+The ASCII restriction is identity-load-bearing: the frozen `P_unsigned` profile has
+empty `nfc_paths`, so the identity function performs no Unicode normalization, and
+restricting identifiers to characters with no alternative NFC spelling removes the only
+route by which two visually identical advisories could carry different digests through
+an identifier.
+
+### A9 — The S1 contract and equation specification
+
+`packages/capabilities/agentic-proposer/docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md`
+is the canonical, implementation-ready S1 specification, status
+`RATIFIED FOR S1 IMPLEMENTATION`, scoped to S1 contracts and deterministic equations
+only. It records the eight top-level contracts (`AgentIdentityRef`,
+`CognitiveRoleContract`, `WorkMandate`, `BoundedContextEnvelope`, `ToolObservation`,
+`AdvisoryCandidateSet`, `ProposerAdvisory`, `ProposerProcessRecord`) with
+`CandidateAdvisory` and `ProposerProcessStateTransition` as nested public shapes; every
+field with its type, requiredness, nullability, default, cardinality, closed vocabulary,
+validation, ownership and canonical-identity participation; the frozen `P_unsigned`
+projection under an empty-`set_paths`, empty-`nfc_paths` profile; and every equation
+signature, including the independent verification function A1 requires.
+
+`ProposerAdvisory` references its inputs by identifier and nests no other contract.
+`[V]` This is forced, not preferred: the merged rival-identity walk in
+`tests/test_advisory_contract_shape.py` reaches `content_hash` through a nested
+`ToolObservation` and fails, and `content_hash` is on that list precisely to prevent a
+second identity. The cost — that an advisory digest binds the identifiers of its inputs
+rather than their contents — is recorded as a residual limitation in that document.
+
+It authorizes no invoice-domain check, no reason-code catalogue, no adapter, no LLM, no
+semantic auditor, no HTTP service, no authorization, no clearance and no execution.
+D1–D10 and A1–A8 remain authoritative over it.
+
+### A10 — The superseded draft
+
+The specification proposed on the unmerged branch
+`claude/d2-enforcement-ratification-si5lmm` (PR #1475, head
+`4fab9d811ff15f59acf59c1f93db502be999a801`) is a **rejected draft** and must not be used
+for implementation: its authored field sets diverged from the owner's reconciled
+contract set on all eight contracts and on both equations, and its nested composition
+fails the guard described in A9. Several of its individual judgments were correct — the
+prohibition on numeric fields, the honest statement that an exported model's constructor
+remains reachable, recompute-and-reject as the operative eligibility guarantee,
+`strict=True`, and reading the substrate version from installed distribution metadata —
+and are carried forward. PR #1475 is left unaltered as a record of that scrutiny.
+
+### A11 — Implementation remains unauthorized
+
+`[V]` This addendum and the documents it references are **documentation only**. No
+`src/` module, test, `pyproject.toml`, `version.py`, public API, CI workflow or
+platform-freeze artifact is changed by them. The version stays `0.0.1`, no
+`public_api.json` is created, and the freeze digest is unchanged.
+
+**Implementation of the S1 contracts and equations remains unauthorized until this
+documentation pull request is independently reviewed and merged.**
+
+### Open owner decisions
+
+None. A1–A8 close every question the contract specification depends on. The `[R]`
+markers remaining in this artifact are implementation obligations for S1, not
+unratified decisions.
