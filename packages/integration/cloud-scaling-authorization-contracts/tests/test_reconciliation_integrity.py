@@ -117,7 +117,7 @@ EXPECTED_CONDITIONS = {
     ),
     GUARD_EVALUATED_AFTER_VALID_FROM: "subject_valid_from > bound_evaluated_at",
     GUARD_EVALUATED_BEFORE_ISSUED: "bound_evaluated_at > bound_issued_at",
-    GUARD_COMPARABLE_IS_DATETIME: "not isinstance(value, datetime)",
+    GUARD_COMPARABLE_IS_DATETIME: "type(value) is not datetime",
     GUARD_SUBJECT_ORDERING: "not subject_from <= subject_asserted <= subject_until",
 }
 
@@ -669,7 +669,7 @@ def test_the_comparable_type_gate_is_solely_responsible_for_classifying_a_non_da
             target_scope=scope,
         )
     assert exc.value.reason is Reason.MALFORMED_CANONICAL_FIELD
-    assert "attestation_issued_at_fact must be a datetime" in str(exc.value)
+    assert "attestation_issued_at_fact must be a datetime, not a str" in str(exc.value)
 
     with tempfile.TemporaryDirectory(dir=tmp_path) as td:
         mp = mutated_package(pathlib.Path(td), GUARD_COMPARABLE_IS_DATETIME)
@@ -1014,6 +1014,94 @@ def test_the_orderings_are_decided_on_instants_not_canonical_strings():
     assert "bound_evaluated_at > bound_issued_at" in source
     assert "to_canonical_obj(subject_valid_from) >" not in source
     assert "to_canonical_obj(snapshot_evaluated_at) >" not in source
+
+
+class _CompliantInstant(datetime_mod.datetime):
+    """A ``datetime`` subclass that satisfies every ordering by fiat.
+
+    Deliberately built **without** ``to_canonical_obj``: the previous defect survived a green
+    suite precisely because every attack value was constructed through the same primitive the
+    guards were wrong in. A control that shares its subject's representation measures nothing.
+
+    Overriding the comparison operators is not exotic — it is the cheapest way to defeat a
+    gate that decides ordering on an object it did not construct.
+    """
+
+    def __gt__(self, other):  # pragma: no cover - the point is that it is never reached
+        return False
+
+    def __lt__(self, other):  # pragma: no cover
+        return False
+
+    def __ge__(self, other):  # pragma: no cover
+        return True
+
+    def __le__(self, other):  # pragma: no cover
+        return True
+
+
+def test_the_digest_cannot_distinguish_a_live_datetime_from_its_canonical_string(decision):
+    """**Why the exact-type gate is load-bearing rather than tidy.**
+
+    ``to_canonical_obj`` renders a ``datetime`` to exactly the string it would have been, so a
+    snapshot carrying a live object and one carrying its rendered form hash identically. Every
+    digest gate downstream — ``_bind``, ``digest_of_snapshot``, the candidate payload — is
+    blind to the difference. The type is the only place it survives, which is why the check
+    has to live there and not in a digest comparison.
+    """
+
+    ancient = _CompliantInstant(
+        999, 12, 31, 23, 59, 59, tzinfo=datetime_mod.timezone.utc
+    )
+    live = {**decision.decision_snapshot, "evaluated_at": ancient, "issued_at": ancient}
+    rendered = {
+        **decision.decision_snapshot,
+        "evaluated_at": "999-12-31T23:59:59.000000Z",
+        "issued_at": "999-12-31T23:59:59.000000Z",
+    }
+    assert digest_of_snapshot(live) == digest_of_snapshot(rendered), (
+        "if these ever differ the type gate could be a digest check instead"
+    )
+
+
+def test_a_live_datetime_in_the_snapshot_is_refused(tmp_path, projection, decision):
+    """The hole the exact-type gate closes, measured end to end.
+
+    Before it: a ``datetime`` subclass overriding ``__gt__`` in ``decision_snapshot`` carried a
+    valid ``decision_digest``, was accepted by ``_bound_instant``'s ``isinstance`` branch, and
+    satisfied both orderings by fiat — admitting an evaluation stamped in year 999.
+    """
+
+    ancient = _CompliantInstant(
+        999, 12, 31, 23, 59, 59, tzinfo=datetime_mod.timezone.utc
+    )
+    forged = _snapshot_and_outer(decision, evaluated_at=ancient, issued_at=ancient)
+    forged = dataclasses.replace(forged, evaluated_at=ancient)
+    _refuses(
+        projection,
+        forged,
+        reason=Reason.DECISION_INSTANT_NOT_BOUND,
+        diagnostic="must be a canonical instant string, not a live",
+    )
+
+
+def test_a_live_datetime_as_the_outer_evaluated_at_is_refused(projection, decision):
+    """The same object on the outer field, which ``_comparable_instant`` guards.
+
+    ``candidate.py`` now applies the same exact-type rule, so a subclass cannot reach the
+    coherence comparisons there either.
+    """
+
+    ancient = _CompliantInstant(
+        999, 12, 31, 23, 59, 59, tzinfo=datetime_mod.timezone.utc
+    )
+    forged = dataclasses.replace(decision, evaluated_at=ancient)
+    _refuses(
+        projection,
+        forged,
+        reason=Reason.DECISION_INSTANT_NOT_BOUND,
+        diagnostic="does not equal the value bound",
+    )
 
 
 def test_the_canonicalizer_silently_attaches_utc_to_a_naive_timestamp():

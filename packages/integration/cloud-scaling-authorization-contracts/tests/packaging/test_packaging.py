@@ -15,7 +15,15 @@ PYPROJECT = (PROJECT / "pyproject.toml").read_text(encoding="utf-8")
 
 
 def test_version_is_the_declared_version():
-    """``0.6.0`` since the R-12b ordering repair: orderings compare instants, not strings.
+    """``0.7.0``: the temporal guards accept canonical values only, never live objects.
+
+    ``0.6.0`` moved ordering off canonical strings onto parsed instants and left an
+    ``isinstance`` branch that accepted a live ``datetime`` from the snapshot. Canonicalization
+    renders such an object to exactly the string it would have been, so no digest could tell
+    them apart, and a subclass overriding ``__gt__`` satisfied both orderings by fiat. Exact
+    types close it.
+
+    ``0.6.0`` was the R-12b ordering repair: orderings compare instants, not strings.
 
     ``0.5.0`` compared canonical strings and inverted below year 1000, admitting an unbounded
     backdate of the very instant it existed to bound. A refusal that was not happening now
@@ -42,7 +50,7 @@ def test_version_is_the_declared_version():
     the same inputs now raise.
     """
 
-    assert pkg.__version__ == "0.6.0"
+    assert pkg.__version__ == "0.7.0"
 
 
 def test_distribution_and_namespace_names():
