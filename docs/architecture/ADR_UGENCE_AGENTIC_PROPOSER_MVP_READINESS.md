@@ -1,6 +1,7 @@
 # ADR: Ugence Agentic Proposer — MVP readiness
 
-**Status:** Accepted (readiness record; no public contract frozen)
+**Status:** Accepted (readiness record; no public contract frozen), with
+Amendment 1 proposed and unratified
 **Stage:** S0 skeleton, with Stage P (ugence-jcs extraction) complete
 **Supersedes:** nothing
 **Depends on:** an Agent Constitution document that does not exist and will not
@@ -12,8 +13,11 @@ boundary are on the record. It is a readiness record, not a design.
 
 D1–D5 were ratified before implementation. D6–D10 were ratified after Stage P and
 Stage S0 landed, and close every question this artifact previously carried as open;
-they are recorded under *Ratified resolutions* below. No owner decision remains
-open, so S1 is unblocked on ratification grounds.
+they are recorded under *Ratified resolutions* below.
+
+**Amendment 1** (below) reopens the record with D11–D14, the S1 proposal-identity
+contract. They are **proposed and not ratified**, so S1 is blocked on ratification
+grounds until they are filled.
 
 Evidence labels: `[V]` verified against this repository, `[I]` inferred,
 `[R]` requires ratification, `[G]` gap.
@@ -430,8 +434,249 @@ publishing would add a release surface with no reader.
 
 ## Open owner decisions
 
-None. D6–D10 close every question this artifact previously carried as open.
+D6–D10 closed every question this artifact carried as open through Stage S0.
+**Amendment 1** then opened four more: **D11–D14**, the S1 proposal-identity
+contract. All four are unratified.
 
 `[R]` markers that remain above are implementation obligations that S1 must
 discharge — mechanical enforcement of D6's standing rule, D7's contract shape and
 D8's export bound — not unratified decisions.
+
+---
+
+# Amendment 1 — S1 proposal-identity contract (D11–D14)
+
+**Status:** Proposed. **Not ratified.** Each decision below carries an unfilled
+ratification line; until those are filled, *Open owner decisions* above is superseded
+by this amendment and S1 is **blocked on ratification grounds**.
+
+**Occasion.** `ugence-jcs` 0.2.0 adds one public function,
+`canonical_sha256_hex(value, set_paths=..., nfc_paths=...)`
+(`packages/jcs/src/ugence_jcs/canon.py:129`), the intended substrate for S1's
+Equation 3, `PID = SHA256(JCS(P_unsigned))`.
+
+References below to `packages/jcs/src/ugence_jcs/canon.py` and
+`packages/jcs/tests/test_canonical_sha256_hex.py` resolve against commit `582bf633`
+(PR #1473), which is not yet merged. Every other `file:line` resolves against the
+default branch at `0de0c93a`.
+
+`[V]` The function is safe and is exactly what it claims: `canon.py:137-139` is
+literally `hashlib.sha256(canonical_bytes(value, set_paths, nfc_paths)).hexdigest()`,
+so it cannot diverge from that expression for any input. `canonical_string`,
+`canonical_bytes` and every `ugence_jcs.errors` type are byte-for-byte unchanged,
+and the frozen CER V0.2 identity digests still reproduce
+(`cer_v0_3/tests/test_cleanroom.py` + `test_forbidden_imports.py`, 14 passed;
+`packages/jcs/tests/`, 108 passed; `platform_freeze.verify` substantive digest
+`d993093570bb8ee132d4ab58406a14dd8c9b774b9de2c6d7ac45d3dfd3fac036`).
+
+`[G]` Equation 3 itself is **not** recorded in any committed ADR. `P_unsigned`,
+`Equation 3` and `PID = SHA256(…)` return zero hits across `docs/` and
+`packages/capabilities/agentic-proposer/`. **D2** ratifies the substrate
+(`ugence-jcs` and nothing else) and is silent on the formula, the digest's surface
+form, the canonicalization profile and domain separation. D11–D14 close that gap.
+
+---
+
+## D11 — The surface form of `PID`, and which layer applies `sha256:`
+
+**Proposed:** `PID` is a **bare 64-character lowercase hex string**. No layer inside
+the Agentic Proposer applies a `sha256:` prefix. If a consumer's wire contract
+requires one, that consumer applies it at its own boundary and strips it before any
+comparison against a `PID`.
+
+**Precedent, and why it points this way.**
+
+`[V]` Identity digests in this repository are bare hex.
+`cer_v0_3/cleanroom/digest.py:35` (`action_digest`) returns `…hexdigest()` with no
+prefix, and the frozen V0.2 constants it is pinned against
+(`cer_v0_3/tests/test_cleanroom.py:21-22`) are bare 64-hex.
+
+`[V]` `sha256:` in this repository marks a **referenced-content field value**, never
+an identity. `cer_v0_3/cleanroom/profiles.py:93` fixes `_DIGEST_LEN = 71` — `"sha256:"`
+plus 64 hex — for `image_digest`, `current_manifest_digest` and `statement_digest`;
+`cer_v0_3/profiles/database.py:51` repeats it. These are pointers to content the
+envelope does not carry, not the envelope's own identity.
+
+`[V]` The prefix is affirmatively rejected as an identity elsewhere:
+`packages/trusted-evidence-authority/tests/contract/test_identity_contracts.py:169`
+lists `"sha256:" + CONTENT_DIGEST` among the malformed inputs, and
+`verify_trusted_evidence_authority_distribution.py:266` repeats it.
+
+`[I]` A `PID` carrying the prefix would therefore read, against this repository's own
+conventions, as a pointer to external content rather than as the proposal's identity
+— the opposite of what Equation 3 means.
+
+`[R]` **Coupled to D14.** If the owner instead rules that the proposer applies the
+prefix, the guard in `test_no_local_canonicalization.py:40` rejects the literal
+`"sha256:"` as source text. Probe G below: a one-line
+`return "sha256:" + canonical_sha256_hex(p)` fails
+`test_no_canonicalization_or_hashing_source_text` even under the amended guard. That
+is not an argument against the ruling; it is a second file the ruling would have to
+change.
+
+**Ratified:** ______________________  **Date:** ____________
+
+---
+
+## D12 — The frozen canonicalization profile for `P_unsigned`
+
+**Proposed:** `P_unsigned` is canonicalized with **empty `set_paths` and empty
+`nfc_paths`**. The profile is frozen at S1 and is part of the identity contract: any
+later change to either set is a `PID`-breaking change requiring its own ratification.
+
+**Consequences, recorded so they are not discovered later.**
+
+`[V]` **This is not "pure RFC 8785".** Empty path sets disable only the set-ordering
+and NFC-validation rules. The Action Profile still refuses bare JSON numbers
+(`packages/jcs/src/ugence_jcs/canon.py:86-93`: any `int` or `float` raises
+`BareNumberError`), and it implements none of RFC 8785's ES6 number serialization.
+Every numeric in `P_unsigned` must already be a typed string when it reaches the
+identity function. A contract that admits a bare number does not produce a wrong
+`PID`; it produces no `PID` at all.
+
+`[V]` **Array order is identity.** With empty `set_paths`, declaration order is
+preserved exactly (`canon.py:104-112`). Any semantically order-insensitive collection
+must be deterministically sorted **during contract construction, before
+canonicalization**. The identity function will not sort it, and must not be asked to:
+routing such a collection through `set_paths` would silently convert it to a set and
+reject duplicates that the contract may legitimately allow.
+
+`[V]` **No Unicode normalization beyond JCS.** With empty `nfc_paths`, strings pass
+through unnormalized and un-validated; a composed and a decomposed spelling of the
+same text are different proposals with different `PID`s
+(`packages/jcs/tests/test_canonical_sha256_hex.py:93-95`). If S1 requires NFC on
+any field, that is a `nfc_paths` entry under this decision, not a normalization step
+bolted on elsewhere.
+
+`[I]` The empty/empty default is the right one *because* it is the weakest: it adds
+no semantics to the substrate, so every normalization obligation stays visible in the
+contract layer where an owner can see it.
+
+**Ratified:** ______________________  **Date:** ____________
+
+---
+
+## D13 — Domain separation for `PID`
+
+**Proposed for ratification — no recommendation is offered; this is the one decision
+here that trades off two defensible positions.**
+
+`[R]` Equation 3 as written is **undomain-separated**: a bare SHA-256 over canonical
+bytes, with no domain tag, no length prefix and no schema version. This repository's
+own action identity is not.
+
+`[V]` `cer_v0_3/cleanroom/digest.py:38-44` computes
+`SHA-256( LP(domain_tag) || LP(canon_version) || LP(schema_version) || LP(canon) )`
+with `domain_tag(ACTION) = "SYMBOLU/ACTIONGATE/ACTION/v1"`, implementing
+`ACTION_CANONICALIZATION_AND_HASHING_SPEC.md` §9, §17. The clean-room deliberately
+left `digest.py` behind during Stage P precisely because a canonicalization substrate
+must not carry a domain tag (*Stage P*, above) — which means the framing is expected
+to be applied by the identity layer, and S1 currently plans to apply none.
+
+The two positions:
+
+**(i) Keep Equation 3 bare.** A `PID` is an internal handle for an advisory artifact
+that carries no authority (**D4**, *Authority-ownership boundary*). Domain framing
+buys nothing if `PID`s never leave the proposer and are never compared against an
+action digest.
+
+**(ii) Frame the `PID`.** `PID` and `action_digest` are both "SHA-256 over JCS bytes"
+to any reader and to any store keyed by hex string. Without a domain tag, the only
+thing preventing a `P_unsigned` from being constructed whose canonical bytes equal
+some other domain's canonical bytes is that no one has tried. Framing costs one
+constant and closes the class.
+
+`[G]` No evidence in this repository settles which position is correct, because no
+`PID` exists yet and no store holds both kinds of digest. What the owner is deciding
+is whether `PID`s will ever be persisted, logged, or compared alongside action
+digests. If the answer is or may become yes, (ii) is the only safe ruling, and it
+must be taken **before** the first `PID` is minted — retrofitting domain separation
+invalidates every `PID` already issued.
+
+`[I]` Whichever way this goes, `canonical_sha256_hex` remains the correct substrate.
+Under (ii) the framing is applied by S1 **around** the canonical bytes, which means
+S1 would need `canonical_bytes` rather than `canonical_sha256_hex` — a consequence
+that bears on D14's admitted-name list.
+
+**Ratified:** ______________________  **Date:** ____________
+
+---
+
+## D14 — Admitting the substrate call through the no-local-canonicalization guard
+
+**Proposed:** `packages/capabilities/agentic-proposer/tests/test_no_local_canonicalization.py`
+is amended to admit exactly one import form —
+`from ugence_jcs import canonical_sha256_hex` — and nothing else, and the declared
+dependency floor is raised to `ugence-jcs>=0.2.0`.
+
+**The problem is real and is a hard blocker, not a nuisance.**
+
+`[V]` The guard today rejects the very call D2 mandates. `SUSPECT_TEXT`
+(`test_no_local_canonicalization.py:38-41`) contains `"sha256"` at `:40`, matched as a raw
+substring against the whole file body, and `SUSPECT_DEF_SUBSTRINGS`
+(`:32-35`) contains `"canon"`, `"digest"` and `"proposal_id"`. A minimal S1 module —
+`from ugence_jcs import canonical_sha256_hex` plus
+`def proposal_identity(...)` — placed in a scratch copy of the package produces
+**2 failed**: `identity.py contains ['sha256']` and
+`identity.py defines ['proposal_identity']`.
+
+**The amendment, and why it does not widen the guard.**
+
+The exemption is pinned to one module, one name, no alias, and one call site. The
+text scan is not given a blanket carve-out: it runs on the source with the exact
+identifier `canonical_sha256_hex` blanked, and **only** in a file that imports it in
+the admitted form. Every other occurrence of every suspect string is still scanned.
+
+`[V]` The design was executed against a scratch copy of the package during the audit
+that produced this amendment. The patch is **not** applied to the repository — S1
+applies it — but the behaviour is measured, not assumed:
+
+| Probe | Expected | Result |
+| --- | --- | --- |
+| 0. Unmodified S0 package | pass | 26 passed |
+| A. Admitted import + `pid_for` | pass | 30 passed |
+| B. `hashlib` imported alongside it | fail | text scan + import scan |
+| C. `json.dumps(sort_keys=True)` alongside it | fail | text scan + json scan |
+| D. `import … as _h` (aliased) | fail | text scan + import-form test |
+| E. `canonical_bytes` also imported | fail | text scan + import-form test |
+| F. Two modules importing it | fail | one-call-site test |
+| G. `"sha256:" + …` prefix applied locally | fail | text scan (see **D11**) |
+| H. Function named `proposal_identity` | fail | def-name scan |
+
+`[V]` **Consequence: the S1 identity function may not be named
+`proposal_identity`.** `SUSPECT_DEF_SUBSTRINGS` is not relaxed, and
+`"proposal_id"` is a substring of it (probe H). `pid_for` is clean against every
+suspect substring and is the proposed name.
+
+`[R]` **If D13 rules (ii)**, S1 needs the canonical *bytes* to frame, so the admitted
+name becomes `canonical_bytes` rather than `canonical_sha256_hex`, and the framing
+code will itself contain `hashlib` and `struct` — both in `FORBIDDEN_IMPORTS`
+(`:44`). That is a materially larger guard amendment. **D13 must be ratified before
+D14 is implemented.**
+
+**Dependency floor.** `[V]` Three references to `ugence-jcs>=0.1.0` remain:
+`packages/capabilities/agentic-proposer/pyproject.toml:56` (the declaration), and two
+assertions pinning that exact string —
+`tests/test_boundaries.py:148` and `tests/test_no_local_canonicalization.py:137`.
+All three are satisfied by 0.2.0 today, so nothing is broken and nothing is urgent;
+but the floor still admits a 0.1.0 that lacks `canonical_sha256_hex` entirely, so S1
+must raise all three together.
+
+`[I]` `packages/jcs` appears nowhere in `platform/PLATFORM_FREEZE_V1.json`. The
+freeze verifier passing across the 0.2.0 change confirms no collateral damage to
+frozen components; it is not evidence about this package, and no owner should read it
+as such.
+
+**Ratified:** ______________________  **Date:** ____________
+
+---
+
+## What this amendment does not do
+
+`[V]` It implements no part of S1: no identity module, no guard patch, no version
+bump, no contract. `ugence-jcs` 0.2.0 is additive and byte-preserving, so nothing
+here is time-pressured.
+
+`[R]` Ratification order is **D13 → D11 → D12 → D14**. D13 determines what S1
+imports, which determines the shape of D14's guard amendment; D11 determines whether
+D14 must also admit a `"sha256:"` literal.
