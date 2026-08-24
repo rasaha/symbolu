@@ -152,6 +152,34 @@ that the substrate floor could assert the resolved `ugence_jcs.__version__` rath
 than `pyproject.toml` text, and that which the floor should mean is an owner
 decision.
 
+### Fixed — fourth audit round
+
+An audit of the previous revision found that the per-module alias fix had silently
+reopened ground closed one commit earlier, and that the dynamic-import rule read as
+coverage it did not have. No `src/` change, no version bump, no public-API snapshot.
+
+* **Three import spellings the per-module map had lost now bind again**:
+  `from .relay import *`, an aliased re-export reached by `from . import Name`
+  through the package `__init__`, and an absolute in-package import
+  `from ugence_agentic_proposer.relay import Name`. Each was caught before the
+  per-module change and passed after it. The three name-reuse shapes stay lawful.
+* **A dynamic import may not be handed a name this module composed**, wherever the
+  composition happens. `_NAME = "hash" + "lib"` followed by `__import__(_NAME)`
+  reached `hashlib` from `src` with the suite green, which composes into a working
+  local identity function — the invariant D2 exists to hold. Augmented assignment,
+  `bytes(...).decode()`, `%`-formatting and annotated assignment are covered with
+  it. The line is composition, not indirection: a name the module merely received —
+  a parameter, `info.name` — stays permitted.
+* **The fixpoint self-test was vacuous.** Its chain was in favourable sorted order,
+  so a single pass resolved it and the loop could be reduced to `range(1)` with the
+  suite green. A reverse-ordered chain now fails under that mutation.
+
+`docs/S1_ENFORCEMENT.md` no longer says a dynamic import may not be handed a name
+"assembled at the call site", which was literally true and read as coverage; it
+states what is tracked and what is not. Two entries join the known-uncovered list: a
+projection split across two modules where neither alone names both vocabularies, and
+a name composed through a route the scan does not model as composition.
+
 ### Not implemented
 
 The eight canonical contracts, Equations 1–3, proposal identity, invoice-domain

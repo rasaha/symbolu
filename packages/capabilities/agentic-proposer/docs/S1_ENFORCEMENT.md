@@ -55,10 +55,15 @@ is closed today. They are listed so the enforcement is not read as complete:
 | class-attribute alias | `class V: Result = TerminalOutcome` then `V.Result.ABSTAIN` |
 | `functools.partial` over the constructor | `_build = partial(TerminalOutcome)` |
 | `globals()` / `vars()` with a literal name | `globals()["TerminalOutcome"].ABSTAIN` |
+| a projection split across two modules, neither naming both vocabularies | module A maps status→key, module B maps key→outcome |
 
-The last is statically visible in exactly the way the covered `getattr` case is; it
-is uncovered because no one has written the branch, not because analysis cannot
-reach it.
+`globals()` with a literal name is statically visible in exactly the way the covered
+`getattr` case is; it is uncovered because no one has written the branch, not
+because analysis cannot reach it. The split-across-modules case is different in
+kind: each half is lawful in isolation and only their composition projects, so
+catching it means reasoning about values across module boundaries. It is listed here
+rather than as a boundary because it is a real hole either way — a reader should not
+have to infer it from what the scan does not say.
 
 ### Named boundaries — deliberate, not oversights
 
@@ -100,11 +105,19 @@ this package called `ugence_jcs`, reached by `from . import ugence_jcs`, would
 satisfy every by-name check while hashing locally. Three rules close that together:
 a relative import can never bind the permitted substrate (the substrate is reached
 absolutely or not at all); no file or directory here may be named for it; and dynamic
-imports are constrained everywhere: a call to `import_module` or `__import__` may
-not name a barred module, and may not be handed a name assembled at the call site
-(`"hash" + "lib"`, an f-string, a `join`) whatever that name spells. A plain
-variable is still permitted — that is how the guards walk this package's own
-modules. `importlib` itself is additionally barred as an import in `src`.
+imports are constrained everywhere. A call to `import_module` or `__import__` may
+not name a barred module, and may not be handed a name this module composed —
+whether the composition is written at the call site (`"hash" + "lib"`, an f-string,
+a `join`, `bytes(...).decode()`) or bound to a variable first (`_n = "hash";
+_n += "lib"; __import__(_n)`). The line is composition, not indirection: a name the
+module merely received — a parameter, an attribute such as `info.name` — stays
+permitted, which is how the guards walk this package's own modules. `importlib`
+itself is additionally barred as an import in `src`.
+
+The tracking is per binding, not per value: a name assembled through a route the
+scan does not model as composition (a helper function returning a built string, a
+name read from a file or environment) is not caught. That is the dynamic-construction
+boundary below, reached by a different road.
 
 `tests/test_no_local_canonicalization.py` now pins the three modules by name and
 asserts that every file in `src` and `tests` is either scanned or one of the two

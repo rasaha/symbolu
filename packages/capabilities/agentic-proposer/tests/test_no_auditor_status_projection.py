@@ -43,6 +43,8 @@ from ugence_agentic_proposer.vocabulary import (
 )
 
 SRC = pathlib.Path(ap.__file__).resolve().parent
+#: This package's own namespace, so an absolute in-package import still resolves.
+PACKAGE_NAME = ap.__name__
 
 #: The two positions D6 reserves. A status reaching either one is the violation.
 RESERVED_POSITION_TYPES = ("TerminalOutcome", "CandidateDisposition")
@@ -81,6 +83,24 @@ def _direct_aliases(tree):
     return bound
 
 
+def _import_source_module(node):
+    """The in-package module an ``ImportFrom`` reads from, or None if it is foreign.
+
+    Three spellings reach the same module and all three must resolve, since a
+    re-export chain is only as visible as the import that walks it:
+    ``from .relay import X`` (relative), ``from . import X`` (the package
+    ``__init__``), and ``from ugence_agentic_proposer.relay import X`` (absolute,
+    but still inside this package).
+    """
+    module = node.module or ""
+    if node.level:
+        return module.split(".")[-1] if module else "__init__"
+    if module.split(".")[0] == PACKAGE_NAME:
+        tail = module.split(".")[-1]
+        return "__init__" if tail == PACKAGE_NAME else tail
+    return None
+
+
 def _module_key(path):
     """A source path as the dotted tail a relative import would name it by."""
     return path.stem
@@ -112,15 +132,24 @@ def _reexport_maps(paths):
         changed = False
         for module, tree in trees.items():
             for node in ast.walk(tree):
-                if not isinstance(node, ast.ImportFrom) or not node.level:
+                if not isinstance(node, ast.ImportFrom):
                     continue
-                source = (node.module or "").split(".")[-1]
+                source = _import_source_module(node)
+                if source is None:
+                    continue
                 for alias in node.names:
-                    canonical = per_module.get(source, {}).get(alias.name)
-                    local = alias.asname or alias.name
-                    if canonical and per_module[module].get(local) != canonical:
-                        per_module[module][local] = canonical
-                        changed = True
+                    if alias.name == "*":
+                        # ``from .relay import *`` binds every name the source
+                        # module exports, under its own spelling.
+                        incoming = per_module.get(source, {}).items()
+                    else:
+                        canonical = per_module.get(source, {}).get(alias.name)
+                        incoming = ([(alias.asname or alias.name, canonical)]
+                                    if canonical else [])
+                    for local, canonical in incoming:
+                        if canonical and per_module[module].get(local) != canonical:
+                            per_module[module][local] = canonical
+                            changed = True
         if not changed:
             break
     return per_module
@@ -546,6 +575,65 @@ def test_the_re_export_map_closes_over_a_chain():
     # Per module, not merged: relay2 renamed it again, and relay never saw that name.
     assert "Verdict" not in maps["relay"]
     assert "Result" not in maps["vocabulary"]
+
+
+def test_the_re_export_map_closes_over_a_chain_in_any_file_order():
+    """The same chain, named so iteration order works against it.
+
+    A favourably ordered chain resolves in a single pass, so the fixpoint loop can
+    be reduced to one iteration with the suite still green. Here ``ra`` imports from
+    ``rb`` imports from ``rc``, so a single pass reaches only the last hop.
+    """
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmp:
+        root = pathlib.Path(tmp)
+        (root / "zvocabulary.py").write_text(
+            "class TerminalOutcome:\n    pass\n", encoding="utf-8")
+        (root / "rc.py").write_text(
+            "from .zvocabulary import TerminalOutcome as C\n", encoding="utf-8")
+        (root / "rb.py").write_text("from .rc import C as B\n", encoding="utf-8")
+        (root / "ra.py").write_text("from .rb import B as A\n", encoding="utf-8")
+        maps = _reexport_maps(sorted(root.rglob("*.py")))
+
+    assert maps["rc"].get("C") == "TerminalOutcome"
+    assert maps["rb"].get("B") == "TerminalOutcome"
+    assert maps["ra"].get("A") == "TerminalOutcome", "the fixpoint ran only once"
+
+
+def test_a_star_import_carries_every_name_the_source_module_binds():
+    """``from .relay import *`` binds them all, under their own spellings.
+
+    Resolved by name, a star import matches nothing: there is no alias to look up.
+    """
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmp:
+        root = pathlib.Path(tmp)
+        (root / "vocabulary.py").write_text(
+            "class TerminalOutcome:\n    pass\n", encoding="utf-8")
+        (root / "relay.py").write_text(
+            "from .vocabulary import TerminalOutcome as Result\n", encoding="utf-8")
+        (root / "user.py").write_text("from .relay import *\n", encoding="utf-8")
+        maps = _reexport_maps(sorted(root.rglob("*.py")))
+
+    assert maps["user"].get("Result") == "TerminalOutcome", "the star import bound nothing"
+
+
+@pytest.mark.parametrize("sample,expected", [
+    ("from .relay import Result\n", "relay"),
+    ("from . import Verdict\n", "__init__"),
+    ("from .relay import *\n", "relay"),
+    (f"from {PACKAGE_NAME}.relay import Result\n", "relay"),
+    (f"from {PACKAGE_NAME} import Result\n", "__init__"),
+    ("from typing import Optional\n", None),
+    ("from pydantic import BaseModel\n", None),
+])
+def test_every_in_package_import_spelling_resolves_to_its_module(sample, expected):
+    """Three spellings reach the same module, and a chain is only as visible as the
+    import that walks it. A foreign import must resolve to nothing."""
+    node = next(n for n in ast.walk(ast.parse(sample)) if isinstance(n, ast.ImportFrom))
+    assert _import_source_module(node) == expected
 
 
 def test_sources_exist_to_scan():

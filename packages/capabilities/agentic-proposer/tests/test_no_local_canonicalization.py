@@ -120,6 +120,7 @@ def _dynamic_import_offenders(source, barred, filename="<sample>"):
       guards in this directory walk this package's own modules.
     """
     tree = ast.parse(source, filename=filename)
+    assembled = _assembled_string_names(tree)
     offenders = []
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
@@ -133,11 +134,51 @@ def _dynamic_import_offenders(source, barred, filename="<sample>"):
         if isinstance(argument, ast.Constant) and isinstance(argument.value, str):
             if argument.value.split(".")[0] in barred:
                 offenders.append(f"{called}({argument.value!r})")
-        elif isinstance(argument, (ast.BinOp, ast.JoinedStr)) or (
-                isinstance(argument, ast.Call)
-                and (getattr(argument.func, "attr", "") in {"join", "format"})):
+        elif _is_assembled_string(argument):
             offenders.append(f"{called}(<assembled name>)")
+        elif isinstance(argument, ast.Name) and argument.id in assembled:
+            # Assembly one line earlier is still assembly. Without this the rule
+            # reads as coverage it does not have: ``_n = "hash" + "lib"`` followed
+            # by ``__import__(_n)`` passes a bare name the scan would permit.
+            offenders.append(f"{called}({argument.id} = <assembled name>)")
     return offenders
+
+
+#: Calls that build a string out of parts rather than writing it.
+ASSEMBLY_METHODS = {"join", "format", "decode", "replace", "translate"}
+ASSEMBLY_BUILTINS = {"bytes", "bytearray", "chr"}
+
+
+def _is_assembled_string(node):
+    """Whether ``node`` composes a string rather than spelling one."""
+    if isinstance(node, (ast.BinOp, ast.JoinedStr)):
+        return True
+    if isinstance(node, ast.Call):
+        if getattr(node.func, "attr", "") in ASSEMBLY_METHODS:
+            return True
+        if getattr(node.func, "id", "") in ASSEMBLY_BUILTINS:
+            return True
+    return False
+
+
+def _assembled_string_names(tree):
+    """Names bound anywhere in the module to an assembled string.
+
+    A dynamic import may be handed a name the module did not compose — that is how
+    the guards here walk this package's own modules — but not one it did.
+    """
+    names = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            if _is_assembled_string(node.value):
+                names |= {t.id for t in node.targets if isinstance(t, ast.Name)}
+        elif isinstance(node, ast.AugAssign) and isinstance(node.target, ast.Name):
+            # ``_n += "lib"`` composes just as ``_n = _n + "lib"`` does.
+            names.add(node.target.id)
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            if node.value is not None and _is_assembled_string(node.value):
+                names.add(node.target.id)
+    return names
 
 
 def _barred_for(path):
@@ -287,6 +328,16 @@ def test_the_shadow_detector_sees_both_a_module_and_a_package():
     "from importlib import import_module\n_impl = import_module('hashlib')\n",
     "_impl = __import__(''.join(['hash', 'lib']))\n",
     "part = 'lib'\n_impl = __import__(f'hash{part}')\n",
+    # Assembled one line earlier, then passed as a bare name.
+    "_NAME = 'hash' + 'lib'\n_impl = __import__(_NAME)\n",
+    "_n = 'hash'\n_n += 'lib'\n_impl = __import__(_n)\n",
+    "_impl = __import__(bytes([104, 97, 115, 104, 108, 105, 98]).decode())\n",
+    "_NAME = '%slib' % 'hash'\n_impl = __import__(_NAME)\n",
+    "_NAME: str = ''.join(['hash', 'lib'])\n_impl = __import__(_NAME)\n",
+    # Built from bytes or characters, with no string method to give it away.
+    "_impl = __import__(bytes(data))\n",
+    "_NAME = bytearray(data)\n_impl = __import__(_NAME)\n",
+    "_impl = __import__(chr(104))\n",
 ])
 def test_a_dynamic_import_cannot_reach_a_barred_module(sample):
     """Neither by naming it nor by assembling its name.
@@ -302,11 +353,37 @@ def test_a_dynamic_import_cannot_reach_a_barred_module(sample):
     "import importlib\nmodule = importlib.import_module(info.name)\n",
     "import importlib\nmodule = importlib.import_module(name)\n",
     "module = __import__('pathlib')\n",
+    # A name the module did not compose: bound from an attribute, or a parameter.
+    "import importlib\ndef load(spec):\n    return importlib.import_module(spec.name)\n",
+    "import importlib\nchosen = info.name\nmodule = importlib.import_module(chosen)\n",
 ])
 def test_a_dynamic_import_of_a_named_module_is_permitted(sample):
     """The guards here walk this package's modules that way; barring it outright
-    would make the enforcement unwritable."""
+    would make the enforcement unwritable.
+
+    The line the rule draws is composition, not indirection: a name this module
+    built is barred, a name it merely received is not.
+    """
     assert not _dynamic_import_offenders(sample, FORBIDDEN_IMPORTS)
+
+
+@pytest.mark.parametrize("source,expected", [
+    ("_n = 'hash' + 'lib'\n", {"_n"}),
+    ("_n = 'hash'\n_n += 'lib'\n", {"_n"}),
+    ("_n = ''.join(parts)\n", {"_n"}),
+    ("_n = f'{a}{b}'\n", {"_n"}),
+    ("_n: str = bytes(data).decode()\n", {"_n"}),
+    ("_n = 'hashlib'\n", set()),
+    ("_n = info.name\n", set()),
+    ("_n = other(x)\n", set()),
+])
+def test_assembled_string_names_are_tracked(source, expected):
+    """The binding, not just the call argument.
+
+    ``_n = "hash" + "lib"`` then ``__import__(_n)`` hands the call a bare name; a
+    rule that only reads the argument expression permits it.
+    """
+    assert _assembled_string_names(ast.parse(source)) == expected
 
 
 @pytest.mark.parametrize("sample", [
