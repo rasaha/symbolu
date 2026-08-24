@@ -1,4 +1,4 @@
-# S1 — enforcement obligations discharged, contracts blocked
+# S1 — enforcement obligations discharged; contracts specified, not implemented
 
 ## What landed
 
@@ -126,51 +126,99 @@ model as composition — a helper function returning a built string, a name read
 a file, an environment variable, a dict or list element — is not caught. That is the
 dynamic-construction boundary below, reached by a different road.
 
-### `[R]` Owner decision — does D2 require the invariant or the scan?
+### Ratified — D2 is the invariant, and the scan is a release guard
 
-This is not a scanner detail and should not be settled as one. An audit demonstrated
-a working, byte-correct local SHA-256 identity function living in `src/` with every
-guard green, by assembling the module and attribute names through a helper function:
+**This is settled. It is no longer an owner decision.**
+
+**D2 is a behavioral and architectural invariant.** An advisory identity is valid
+only when an independent verifier recomputes it from the frozen unsigned advisory
+projection using the ratified `ugence-jcs` canonicalization profile and obtains the
+exact stored digest. Identity that no independent recomputation reproduces is not
+identity, whatever produced it and whatever passed.
+
+**Static scanning remains a mandatory release guard** for declared imports, ordinary
+aliases, known dynamic-import forms and accidental local canonicalization. It is
+defense-in-depth. It does not constitute proof against every intentionally
+obfuscated Python construction, and it is not the definition of the rule.
+
+The distinction matters in both directions. A green scan is not a proof of identity
+correctness — only recomputation is. And a construction that defeats the scan does
+not thereby acquire authority: it produces a digest no independent verifier is
+obliged to accept.
+
+#### The disclosed exploit, and what it is
+
+An audit demonstrated a working, byte-correct local SHA-256 identity function living
+in `src/` with every guard green, by assembling the module and attribute names
+through a helper function:
 
 ```python
 def _b(*p): return ''.join(p)
 _m = __import__(_b('hash', 'lib'))
 ```
 
-The route is disclosed above as uncovered, but disclosure is not closure. Two
-readings of D2 are available and they differ in cost:
+The route is per-value rather than per-binding: the composition happens inside a
+callee and returns as an ordinary string, so the per-binding tracking described
+above never sees it. It is disclosed rather than closed.
 
-* **D2 means the invariant** — no working local digest is reachable from `src` at
-  all. Closing this means tracking assembly through call returns, subscripts and
-  external inputs: materially more analysis, and a scan that will keep growing
-  as new routes are found.
-* **D2 means the scan** — no *modelled* composition route reaches a hashing module,
-  and identity computed by deliberately defeating the scan is a governance failure
-  rather than a test failure.
+This is **an enforcement limitation of static analysis, not an unresolved owner
+decision, and not an authorization.** It does not authorize local hashing. Code
+reaching identity by this route violates D2 exactly as a bare `hashlib.sha256`
+would; it violates it invisibly to the scan, which is why the invariant and not the
+scan is the rule.
 
-Five rounds of hardening have closed every route an auditor named and disclosed the
-rest. Which of the two D2 means decides whether a sixth round is work or waste.
+Closing it would mean tracking assembly through call returns, subscripts and
+external inputs — materially more analysis, and a scan that keeps growing as new
+routes are found. That work is optional hardening. It is not what makes D2 hold.
 
-`tests/test_no_local_canonicalization.py` now pins the three modules by name and
-asserts that every file in `src` and `tests` is either scanned or one of the two
-named exemptions, so a module cannot leave the scan silently.
+#### What S1 must additionally provide
+
+Because the scan is a guard and not a proof, S1 must carry the invariant itself:
+
+* **package-owned construction** — a single authoritative builder that produces the
+  unsigned projection, computes its digest through the substrate, and returns a
+  frozen advisory, with no in-place mutation path;
+* **independent canonical replay** — a verifier that recomputes the digest from
+  stored advisory content alone and compares it with the stored value, sharing no
+  state with the builder;
+* **frozen-profile tests** — a fixed corpus pinned to exact canonical bytes and
+  exact digests under the ratified empty-`set_paths`, empty-`nfc_paths` profile, so
+  a substrate or serialization drift fails loudly rather than silently reminting
+  identities;
+* **installed-distribution verification** — `ugence-jcs` resolved as an installed
+  distribution exposing `canonical_sha256_hex`, superseding the `pyproject.toml`
+  text check recorded above as the weaker of the two available assertions.
+
+The contracts, the projection, the equations and these obligations are specified in
+`S1_CONTRACT_AND_EQUATION_RATIFICATION.md`.
+
+`tests/test_no_local_canonicalization.py` pins the three modules by name and asserts
+that every file in `src` and `tests` is either scanned or one of the two named
+exemptions, so a module cannot leave the scan silently.
 
 ## What did not land, and why
 
-The eight canonical contracts and Equations 1–3 remain unimplemented. **Nothing in
-this repository defines them**: not the ADR, which lists them only as out of scope at
-S0 and does not name them; not `docs/S0_SCOPE.md`; not any committed design document.
-The task that authorized S1 carried an empty specification block for them.
+The eight canonical contracts and Equations 1–4 remain **unimplemented**. They are no
+longer **undefined**: `S1_CONTRACT_AND_EQUATION_RATIFICATION.md` now specifies them
+literally — every contract, every field, the frozen `P_unsigned` projection and all
+four equation signatures. Specification is not authorization: no contract module
+exists in `src/`, the version is unchanged, and implementation stays unauthorized
+until that document is independently reviewed and merged.
 
-They were therefore not inferred, derived or invented. What is undefined is recorded
-in the session report: the eight contract names, their fields and cardinality, and
-the inputs and outputs of each of Equations 1–3.
+When this section was first written, nothing in this repository defined them: not the
+ADR, which lists them only as out of scope at S0 and does not name them; not
+`docs/S0_SCOPE.md`; not any committed design document. The task that authorized S1
+carried an empty specification block for them.
 
-`ProposerAdvisory` and `CandidateAdvisory` are **not** defined here for the same
-reason. D7 ratifies their names, kind, identity field and exclusions, but not their
-field sets; defining them from D7 alone would be inventing a contract and freezing a
-guess. The D7 guard is complete and dormant instead — it fails the moment either type
-appears without the ratified shape.
+They were therefore not inferred, derived or invented **at that time**: defining them
+from D7 alone would have been inventing a contract and freezing a guess. The D7 guard
+was left complete and dormant instead, and it still is — it fails the moment either
+type appears without the ratified shape.
+
+What closed the gap was an owner ratification, not an inference. The field sets now
+recorded in `S1_CONTRACT_AND_EQUATION_RATIFICATION.md` derive from that ratification
+together with D1, D3, D4, D7 and D8, and that document marks which content is
+owner-ratified verbatim and which is authored from it.
 
 ## Version
 

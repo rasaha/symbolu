@@ -435,3 +435,87 @@ None. D6–D10 close every question this artifact previously carried as open.
 `[R]` markers that remain above are implementation obligations that S1 must
 discharge — mechanical enforcement of D6's standing rule, D7's contract shape and
 D8's export bound — not unratified decisions.
+
+---
+
+## Ratification addendum — 2026-08-24: the D2 addendum and the S1 contract specification
+
+This addendum is additive. **No D1–D10 text above is rewritten**; each remains the
+verbatim record of what was ratified when it was ratified. What follows is a dated
+extension recording two ratifications that landed after D10.
+
+### Provenance
+
+| Fact | Value |
+| --- | --- |
+| Pull request | **#1474** — Agentic Proposer Stage S1: pre-S1 enforcement infrastructure (D6/D7/D8) |
+| Merge commit | **`e28538eb454fce6008e94e0772e0fd09c9c7ea7f`** |
+| Base for this addendum | the repository default branch at that merge commit |
+
+`[V]` `e28538eb454fce6008e94e0772e0fd09c9c7ea7f` is the tip of the default branch and
+carries PR #1474. `[V]` At that commit the package version is `0.0.1`, no
+`public_api.json` exists, `src/` is the unchanged S0 tree (last touched by the S0
+commit `c6567cf92`), and the platform-freeze substantive digest is
+`d993093570bb8ee132d4ab58406a14dd8c9b774b9de2c6d7ac45d3dfd3fac036`.
+
+### A1 — D2 addendum: D2 is a behavioral and architectural invariant
+
+D2 above ratifies the identity **substrate**. This addendum ratifies what D2
+**means**, which `S1_ENFORCEMENT.md` previously carried as an open `[R]` question:
+
+> D2 is a behavioral and architectural invariant. An advisory identity is valid only
+> when an independent verifier recomputes it from the frozen unsigned advisory
+> projection using the ratified `ugence-jcs` canonicalization profile and obtains the
+> exact stored digest.
+>
+> Static scanning remains a mandatory release guard for declared imports, ordinary
+> aliases, known dynamic-import forms and accidental local canonicalization. It is
+> defense-in-depth and does not constitute proof against every intentionally
+> obfuscated Python construction.
+>
+> The helper-assembled `__import__` escape is a disclosed limitation of static
+> enforcement. It does not authorize local hashing. S1 must additionally provide
+> package-owned construction, independent canonical replay, frozen-profile tests and
+> installed-distribution verification.
+
+`[V]` Recorded in full at
+`packages/capabilities/agentic-proposer/docs/S1_ENFORCEMENT.md`, replacing the `[R]`
+section that asked whether D2 meant the invariant or the scan. The disclosed exploit
+is preserved there and reclassified as an enforcement limitation.
+
+### A2 — The S1 contract and equation specification
+
+`[V]` `packages/capabilities/agentic-proposer/docs/S1_CONTRACT_AND_EQUATION_RATIFICATION.md`
+is added, status `RATIFIED FOR S1 IMPLEMENTATION`, scoped to S1 contracts and
+deterministic equations only. It records literally: the eight top-level contracts
+(`AgentIdentityRef`, `CognitiveRoleContract`, `WorkMandate`,
+`BoundedContextEnvelope`, `ToolObservation`, `AdvisoryCandidateSet`,
+`ProposerAdvisory`, `ProposerProcessRecord`) with `CandidateAdvisory` as a nested
+public shape; every field with its type, requiredness, nullability, default,
+cardinality, closed vocabulary, validation, ownership, lineage and
+canonical-identity participation; the frozen `P_unsigned` projection under an
+empty-`set_paths`, empty-`nfc_paths` profile; and the four equation signatures,
+including the independent digest-verification function A1 requires.
+
+It authorizes no invoice-domain check, no adapter, no LLM, no semantic auditor, no
+HTTP service, no authorization, no clearance and no execution. D1–D10 and A1 remain
+authoritative over it, and it resolves any conflict with the earlier external MVP
+draft in favour of the committed document.
+
+### A3 — Implementation remains unauthorized
+
+`[V]` This addendum and the two documents it references are **documentation only**.
+No `src/` module, test, `pyproject.toml`, `version.py`, public API, CI workflow or
+platform-freeze artifact is changed by them. The version stays `0.0.1`, no
+`public_api.json` is created, and the freeze digest is unchanged.
+
+**Implementation of the S1 contracts and equations remains unauthorized until this
+documentation pull request is independently reviewed and merged.** The specification
+distinguishes owner-ratified content from content authored to satisfy it, and
+confirming the authored field sets against the owner's reconciled contract set is a
+review obligation of that pull request, not a settled fact.
+
+### Open owner decisions
+
+Still none. A1 closes the last `[R]` that `S1_ENFORCEMENT.md` carried as a decision;
+the `[R]` markers remaining in this artifact are implementation obligations for S1.
