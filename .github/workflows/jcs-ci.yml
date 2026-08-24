@@ -1,0 +1,106 @@
+name: jcs-ci
+
+# Scoped CI for the independent ugence-jcs leaf distribution — the extracted RFC 8785
+# (JCS) + Action-Profile canonicalizer. Runs the package suite (byte-preservation
+# vectors, Action-Profile behaviour, leaf-dependency boundaries), the CER V0.3
+# clean-room suite that now consumes the package (proving the frozen CER V0.2 identity
+# digests are unchanged and that clean-room independence still holds), the
+# isolated-wheel install verifier, and the platform-freeze verifier. Triggered only by
+# changes to the package, its clean-room consumer, or this workflow.
+
+on:
+  pull_request:
+    paths:
+      - "packages/jcs/**"
+      - "cer_v0_3/**"
+      - ".github/workflows/jcs-ci.yml"
+  push:
+    # Run on feature-branch pushes AND on the repository's actual default branch, so a
+    # merge touching the package (matching the path filter) gets a recorded CI run.
+    branches:
+      - "claude/setup-symbolu-monorepo-**"
+      - "claude/agentic-proposer-**"
+      - "claude/jcs-**"
+    paths:
+      - "packages/jcs/**"
+      - "cer_v0_3/**"
+      - ".github/workflows/jcs-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  package-suite:
+    name: ugence-jcs package suite (source)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        # The package itself needs nothing. pytest is the only test-time requirement.
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest build
+      - name: Package suite (vectors, Action Profile, leaf boundaries)
+        run: python -m pytest packages/jcs/tests -q
+
+  cleanroom-consumer:
+    name: CER V0.3 clean-room through the extracted package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+      - name: Frozen CER V0.2 identity digests + clean-room independence
+        # test_cleanroom.py pins the frozen scale/rollout digests; test_forbidden_imports.py
+        # proves the clean-room and the extracted leaf both stay free of reference code.
+        # The remaining cer_v0_3 suites need the frozen ActionGate reference stack and are
+        # out of scope for this workflow.
+        run: |
+          python -m pytest \
+            cer_v0_3/tests/test_cleanroom.py \
+            cer_v0_3/tests/test_forbidden_imports.py -q
+
+  isolated-install:
+    name: Wheel build + isolated installation verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+      - name: Build wheel + sdist, install into a clean --no-index venv, run the leaf proof
+        run: python packages/jcs/verify_jcs_distribution.py
+
+  freeze:
+    name: Platform-freeze verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pydantic
+      - name: Freeze verification (blocking — frozen artifacts must be unchanged)
+        run: python -m platform_freeze.verify --manifest platform/PLATFORM_FREEZE_V1.json
