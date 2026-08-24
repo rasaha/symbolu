@@ -62,6 +62,11 @@ def _aliases(tree):
     clean module. Module bindings (``from . import vocabulary``) need no entry —
     ``vocabulary.TerminalOutcome`` is resolved by attribute name below.
     """
+    return _direct_aliases(tree)
+
+
+def _direct_aliases(tree):
+    """Bindings made by importing a tracked name directly, without following hops."""
     bound = {}
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom):
@@ -74,6 +79,49 @@ def _aliases(tree):
                 if tail in TRACKED_TYPES:
                     bound[alias.asname or tail] = tail
     return bound
+
+
+def _module_key(path):
+    """A source path as the dotted tail a relative import would name it by."""
+    return path.stem
+
+
+def _reexported_names(paths):
+    """Names that reach a tracked type through in-package re-export chains.
+
+    ``relay.py`` doing ``from .vocabulary import TerminalOutcome as Result`` makes
+    ``from .relay import Result`` an alias for ``TerminalOutcome`` one hop further
+    out. Resolution stopping at one hop is the same blindness as not resolving
+    aliases at all, so the map is closed to a fixpoint across the package.
+    """
+    per_module = {}
+    trees = {}
+    for path in paths:
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        except (OSError, SyntaxError):
+            continue
+        trees[_module_key(path)] = tree
+        per_module[_module_key(path)] = dict(_direct_aliases(tree))
+    for _ in range(len(trees) + 1):
+        changed = False
+        for module, tree in trees.items():
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.ImportFrom) or not node.level:
+                    continue
+                source = (node.module or "").split(".")[-1]
+                for alias in node.names:
+                    canonical = per_module.get(source, {}).get(alias.name)
+                    local = alias.asname or alias.name
+                    if canonical and per_module[module].get(local) != canonical:
+                        per_module[module][local] = canonical
+                        changed = True
+        if not changed:
+            break
+    merged = {}
+    for bindings in per_module.values():
+        merged.update(bindings)
+    return merged
 
 
 def _resolve(node, aliases):
@@ -90,6 +138,54 @@ def _resolve(node, aliases):
     return ""
 
 
+def _literal_string(node):
+    """``node`` as a string if it is one at parse time, else "".
+
+    Constant-folds, so a name assembled from pieces (``"Terminal" + "Outcome"``)
+    resolves to the name it spells.
+    """
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        # ``literal_eval`` folds arithmetic but not string concatenation, so a name
+        # split across two literals would otherwise read as no name at all.
+        left, right = _literal_string(node.left), _literal_string(node.right)
+        return left + right if left and right else ""
+    try:
+        value = ast.literal_eval(node)
+    except (ValueError, SyntaxError, TypeError, MemoryError, RecursionError):
+        return ""
+    return value if isinstance(value, str) else ""
+
+
+def _getattr_names(node, aliases):
+    """Tracked types reached through ``getattr``.
+
+    ``getattr(vocabulary, "TerminalOutcome")`` denotes the type as surely as writing
+    it does, and ``getattr(T, "ABSTAIN")`` selects a member of it.
+    """
+    found = set()
+    for child in ast.walk(node):
+        if not (isinstance(child, ast.Call) and _plain_name(child.func) == "getattr"):
+            continue
+        if child.args:
+            owner = _resolve(child.args[0], aliases)
+            if owner:
+                found.add(owner)
+        if len(child.args) > 1:
+            named = _literal_string(child.args[1])
+            if named in TRACKED_TYPES:
+                found.add(named)
+    return found
+
+
+def _plain_name(node):
+    """The bare name a node spells, without alias resolution."""
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        return node.attr
+    return ""
+
+
 def _names(node, aliases=None):
     """Every canonical type name referenced anywhere inside ``node``.
 
@@ -102,7 +198,23 @@ def _names(node, aliases=None):
         canonical = _resolve(child, aliases)
         if canonical:
             found.add(canonical)
-    return found
+    return found | _getattr_names(node, aliases)
+
+
+def _annotation_names(node, aliases=None):
+    """Canonical names an ANNOTATION references, string forward references included.
+
+    ``def project(s: "SemanticAuditorFindingStatus") -> "TerminalOutcome"`` is the
+    same signature as the unquoted one; only a scan that never reads inside the
+    quotes would call it clean. Applied to annotations only — a type name in a
+    docstring is prose, not a reference.
+    """
+    aliases = {} if aliases is None else aliases
+    found = _names(node, aliases)
+    for child in ast.walk(node):
+        if isinstance(child, ast.Constant) and isinstance(child.value, str):
+            found |= {aliases.get(n, n) for n in _names_in_string_annotation(child.value)}
+    return {n for n in found if n in TRACKED_TYPES}
 
 
 def _refers_to_status(node, aliases=None):
@@ -136,6 +248,9 @@ def _reserved_member_accesses(scope, aliases):
             owner = _resolve(node.value, aliases)
             if owner in RESERVED_POSITION_TYPES:
                 found.append(f"{owner}[...]")
+        elif isinstance(node, ast.Call) and _plain_name(node.func) == "getattr":
+            reached = _getattr_names(node, aliases) & set(RESERVED_POSITION_TYPES)
+            found += [f"getattr(... {owner} ...)" for owner in sorted(reached)]
     return found
 
 
@@ -159,7 +274,7 @@ def _scopes(tree):
             yield stmt
 
 
-def _projections(source, filename="<sample>"):
+def _projections(source, filename="<sample>", extra_aliases=None):
     """Return every place ``source`` moves an auditor status into a reserved position.
 
     Six shapes, because a projection can be written six ways and prose forbidding
@@ -167,7 +282,8 @@ def _projections(source, filename="<sample>"):
     module-qualified references, so renaming an import does not evade the scan.
     """
     tree = ast.parse(source, filename=filename)
-    aliases = _aliases(tree)
+    aliases = dict(extra_aliases or {})
+    aliases.update(_aliases(tree))
     found = []
     # 1. Conversion: a scope that reads an auditor status and builds a reserved value.
     # 6. Member access: the same scope selecting a reserved value instead of building it.
@@ -181,21 +297,33 @@ def _projections(source, filename="<sample>"):
             found.append(("reserved-member-access", access))
     for node in ast.walk(tree):
         # 2. Lookup table mapping one vocabulary onto the other, in either direction.
-        if isinstance(node, ast.Dict):
-            for key, value in zip(node.keys, node.values):
-                if key is None or value is None:
-                    continue
-                pair = (_refers_to_status(key, aliases), _refers_to_reserved_position(value, aliases))
-                reverse = (_refers_to_reserved_position(key, aliases), _refers_to_status(value, aliases))
+        if isinstance(node, (ast.Dict, ast.DictComp)):
+            # A comprehension building the same map is the same lookup table; only
+            # its syntax differs from a literal.
+            if isinstance(node, ast.DictComp):
+                pairs = [(node.key, node.value)]
+            else:
+                pairs = [(k, v) for k, v in zip(node.keys, node.values)
+                         if k is not None and v is not None]
+            for key, value in pairs:
+                whole = node if isinstance(node, ast.DictComp) else None
+                pair = (_refers_to_status(key, aliases) or
+                        (whole is not None and _refers_to_status(whole, aliases)),
+                        _refers_to_reserved_position(value, aliases) or
+                        (whole is not None and _refers_to_reserved_position(whole, aliases)))
+                reverse = (_refers_to_reserved_position(key, aliases),
+                           _refers_to_status(value, aliases))
                 if all(pair) or all(reverse):
                     found.append(("lookup-table", ast.unparse(node)[:60]))
         # 3. Annotation admitting both vocabularies in one field.
         if isinstance(node, ast.AnnAssign) and node.annotation is not None:
             ann = node.annotation
-            if _refers_to_status(ann, aliases) and _refers_to_reserved_position(ann, aliases):
+            if (STATUS_TYPE in _annotation_names(ann, aliases)
+                    and _annotation_names(ann, aliases) & set(RESERVED_POSITION_TYPES)):
                 found.append(("union-annotation", ast.unparse(ann)))
             # 4. A reserved-position field defaulted or assigned from a status.
-            if (_refers_to_reserved_position(ann, aliases) and node.value is not None
+            if (_annotation_names(ann, aliases) & set(RESERVED_POSITION_TYPES)
+                    and node.value is not None
                     and _refers_to_status(node.value, aliases)):
                 found.append(("status-valued-field", ast.unparse(ann)))
         # 5. A status-in / outcome-out function is a conversion whatever its body.
@@ -204,9 +332,10 @@ def _projections(source, filename="<sample>"):
             annotations = [a.annotation for a in
                            list(args.posonlyargs) + list(args.args) + list(args.kwonlyargs)
                            if a.annotation is not None]
-            takes_status = any(_refers_to_status(a, aliases) for a in annotations)
+            takes_status = any(STATUS_TYPE in _annotation_names(a, aliases) for a in annotations)
             returns_reserved = (node.returns is not None
-                                and _refers_to_reserved_position(node.returns, aliases))
+                                and bool(_annotation_names(node.returns, aliases)
+                                         & set(RESERVED_POSITION_TYPES)))
             if takes_status and returns_reserved:
                 found.append(("status-to-outcome-function", node.name))
     return found
@@ -251,6 +380,26 @@ PROJECTION_SAMPLES = (
     ("from . import vocabulary\n"
      "def project(status: vocabulary.SemanticAuditorFindingStatus)"
      " -> vocabulary.TerminalOutcome:\n    raise NotImplementedError\n"),
+    # A dict COMPREHENSION building the same lookup table as the literal above.
+    ("from .vocabulary import SemanticAuditorFindingStatus as S, TerminalOutcome as T\n"
+     "TABLE = {m: list(T)[i] for i, m in enumerate(S)}\n"),
+    # String forward references, quoted so an unquoted-only scan reads nothing.
+    ('def project(status: "SemanticAuditorFindingStatus") -> "TerminalOutcome":\n'
+     "    raise NotImplementedError\n"),
+    ("from typing import TYPE_CHECKING\n"
+     "if TYPE_CHECKING:\n"
+     "    from .vocabulary import SemanticAuditorFindingStatus, TerminalOutcome\n"
+     'def project(status: "SemanticAuditorFindingStatus") -> "TerminalOutcome":\n'
+     "    raise NotImplementedError\n"),
+    # getattr, including a name assembled from pieces.
+    ("from . import vocabulary\n"
+     "def f(s):\n"
+     "    if isinstance(s, vocabulary.SemanticAuditorFindingStatus):\n"
+     '        return getattr(vocabulary, "TerminalOutcome").ABSTAIN\n'),
+    ("from . import vocabulary\n"
+     "def f(s):\n"
+     "    if isinstance(s, vocabulary.SemanticAuditorFindingStatus):\n"
+     '        return getattr(vocabulary, "Terminal" + "Outcome").ABSTAIN\n'),
     # A pydantic validator coercing a status into a reserved-position field.
     ("from .vocabulary import SemanticAuditorFindingStatus as S, TerminalOutcome as T\n"
      "class M:\n"
@@ -292,13 +441,57 @@ def test_the_detector_does_not_flag_lawful_coexistence(sample):
     assert not _projections(sample)
 
 
+#: Spellings that reach a tracked type through an in-package re-export rather than a
+#: direct import. Resolved against a synthetic package map, since a single sample
+#: string has no package around it.
+RELAY_ALIASES = {"Finding": STATUS_TYPE, "Result": "TerminalOutcome"}
+
+RELAYED_PROJECTION_SAMPLES = (
+    "from .relay import Finding, Result\ndef f(s):\n    if isinstance(s, Finding):\n        return Result.ABSTAIN\n",
+    "from .relay import Finding, Result\ndef f(s):\n    return Result(s.value) if isinstance(s, Finding) else None\n",
+    "from .relay import Finding, Result\nTABLE = {Finding.CONSISTENT: Result.PROPOSAL}\n",
+    "from .relay import Finding, Result\ndef project(status: Finding) -> Result:\n    raise NotImplementedError\n",
+)
+
+
+@pytest.mark.parametrize("sample", RELAYED_PROJECTION_SAMPLES, ids=lambda s: s.split("\n")[1][:40])
+def test_the_detector_follows_an_in_package_re_export(sample):
+    """A re-export is an alias one hop further out.
+
+    Resolution that stops at the first hop is the same blindness as not resolving
+    aliases at all: the module doing the projection imports a name this scan has
+    never seen bound to a tracked type.
+    """
+    assert not _projections(sample), "sample must be invisible without the package map"
+    assert _projections(sample, extra_aliases=RELAY_ALIASES)
+
+
+def test_the_re_export_map_closes_over_a_chain():
+    """Built from real files, to a fixpoint, so a two-hop relay resolves too."""
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmp:
+        root = pathlib.Path(tmp)
+        (root / "vocabulary.py").write_text(
+            "class TerminalOutcome:\n    pass\n", encoding="utf-8")
+        (root / "relay.py").write_text(
+            "from .vocabulary import TerminalOutcome as Result\n", encoding="utf-8")
+        (root / "relay2.py").write_text(
+            "from .relay import Result as Verdict\n", encoding="utf-8")
+        mapping = _reexported_names(sorted(root.rglob("*.py")))
+
+    assert mapping.get("Result") == "TerminalOutcome"
+    assert mapping.get("Verdict") == "TerminalOutcome", "the chain stopped at one hop"
+
+
 def test_sources_exist_to_scan():
     assert sorted(SRC.rglob("*.py"))
 
 
 @pytest.mark.parametrize("path", sorted(SRC.rglob("*.py")), ids=lambda p: p.name)
 def test_no_source_projects_an_auditor_status_into_a_reserved_position(path):
-    found = _projections(path.read_text(encoding="utf-8"), filename=str(path))
+    found = _projections(path.read_text(encoding="utf-8"), filename=str(path),
+                         extra_aliases=_reexported_names(sorted(SRC.rglob("*.py"))))
     assert not found, f"{path.name} projects an auditor status: {found}"
 
 
@@ -306,6 +499,29 @@ def _modules():
     yield ap
     for info in pkgutil.walk_packages(ap.__path__, ap.__name__ + "."):
         yield importlib.import_module(info.name)
+
+
+def _names_in_string_annotation(text):
+    """Canonical type names named inside a string annotation.
+
+    ``"TerminalOutcome"``, ``"TerminalOutcome | SemanticAuditorFindingStatus"`` and
+    ``"Optional[TerminalOutcome]"`` all name a reserved position; only the first is
+    an exact match for the type's name.
+    """
+    for _ in range(3):
+        try:
+            expression = ast.parse(text, mode="eval")
+        except SyntaxError:
+            return {text} & set(TRACKED_TYPES)
+        # Under ``from __future__ import annotations`` an annotation that was
+        # already a string is stored still quoted, so one parse yields the inner
+        # string rather than the type it names. Unwrap before resolving.
+        if (isinstance(expression.body, ast.Constant)
+                and isinstance(expression.body.value, str)):
+            text = expression.body.value
+            continue
+        return _names(expression)
+    return set()
 
 
 def _is_reserved_position(annotation):
@@ -316,20 +532,27 @@ def _is_reserved_position(annotation):
     passed over for not being the bare enum.
     """
     if isinstance(annotation, str):
-        return annotation in RESERVED_POSITION_TYPES
+        # A dataclass under ``from __future__ import annotations`` keeps its
+        # annotation as a string, and a string union never resolves to a type at
+        # all, so equality against the bare names would skip exactly the fields
+        # most likely to carry the projection.
+        return bool(_names_in_string_annotation(annotation) & set(RESERVED_POSITION_TYPES))
     candidates = {annotation} | set(typing.get_args(annotation))
     return bool(candidates & {TerminalOutcome, CandidateDisposition})
 
 
-def _reserved_position_fields():
+def _reserved_position_fields(namespaces=None):
     """Every declared field typed as a terminal outcome or a candidate disposition.
 
     Covers pydantic models and dataclasses alike, since either could carry the first
-    such field. Empty until S1 defines a contract that has one.
+    such field. Empty until S1 defines a contract that has one — which is why
+    ``namespaces`` is a parameter: the package supplies none today, so the collection
+    can only be exercised against a synthetic one, and a collection that is never
+    exercised is a collection that can quietly stop collecting.
     """
     fields = []
     seen = set()
-    for module in _modules():
+    for module in (_modules() if namespaces is None else namespaces):
         for attr in vars(module).values():
             if not isinstance(attr, type) or attr in seen:
                 continue
@@ -344,6 +567,107 @@ def _reserved_position_fields():
                 if _is_reserved_position(annotation):
                     fields.append((attr, name, annotation))
     return fields
+
+
+# --------------------------------------------------------------------------- #
+# Self-tests for the RUNTIME half
+#
+# The package defines no reserved-position field in S0, so the parametrization below
+# is empty and nothing else exercises this half. Without these, both the union-arm
+# rule and the collection itself could be deleted and the suite would stay green —
+# which is exactly what an audit of the previous revision found.
+# --------------------------------------------------------------------------- #
+
+@pytest.mark.parametrize("annotation", [
+    TerminalOutcome,
+    CandidateDisposition,
+    typing.Optional[TerminalOutcome],
+    typing.Union[TerminalOutcome, SemanticAuditorFindingStatus],
+    "TerminalOutcome",
+    "CandidateDisposition",
+    "TerminalOutcome | SemanticAuditorFindingStatus",
+    "Optional[TerminalOutcome]",
+])
+def test_a_reserved_position_is_recognised_however_it_is_spelled(annotation):
+    """Union arms and string annotations are reserved positions too.
+
+    ``TerminalOutcome | SemanticAuditorFindingStatus`` IS the projection; skipping it
+    for not being the bare enum would leave the one field D6 most needs judged
+    uncollected.
+    """
+    assert _is_reserved_position(annotation)
+
+
+@pytest.mark.parametrize("annotation", [
+    str,
+    SemanticAuditorFindingStatus,
+    typing.Optional[str],
+    "str",
+    "SemanticAuditorFindingStatus",
+])
+def test_an_unreserved_position_is_not_collected(annotation):
+    """A status-typed field is lawful — the auditor's own vocabulary in its own
+    position. Collecting it would make the runtime half fail on correct code."""
+    assert not _is_reserved_position(annotation)
+
+
+def test_the_field_collection_finds_a_reserved_field_on_every_model_kind():
+    """The collection itself, run over a synthetic namespace.
+
+    Pydantic model, dataclass and plain annotated class, each carrying a reserved
+    position spelled differently. A collection returning nothing passes every other
+    test in this module by leaving the parametrization empty.
+    """
+    import types
+
+    class Plain:
+        outcome: TerminalOutcome
+
+    @dataclasses.dataclass
+    class AsDataclass:
+        disposition: CandidateDisposition = None
+
+    @dataclasses.dataclass
+    class AsStringUnion:
+        outcome: "TerminalOutcome | SemanticAuditorFindingStatus" = None
+
+    class AsModel(pydantic.BaseModel):
+        outcome: typing.Union[TerminalOutcome, SemanticAuditorFindingStatus]
+
+    class Unrelated:
+        note: str
+        finding: SemanticAuditorFindingStatus
+
+    namespace = types.SimpleNamespace(
+        Plain=Plain, AsDataclass=AsDataclass, AsStringUnion=AsStringUnion,
+        AsModel=AsModel, Unrelated=Unrelated)
+    collected = _reserved_position_fields([namespace])
+
+    assert {(owner.__name__, name) for owner, name, _ in collected} == {
+        ("Plain", "outcome"),
+        ("AsDataclass", "disposition"),
+        ("AsStringUnion", "outcome"),
+        ("AsModel", "outcome"),
+    }, collected
+
+
+def test_the_collected_union_field_is_then_refused():
+    """The two halves together: a union field is collected, and judged, and fails.
+
+    Asserted here rather than left to the parametrization, which is empty until S1
+    defines a contract.
+    """
+    import types
+
+    class Widened(pydantic.BaseModel):
+        outcome: typing.Union[TerminalOutcome, SemanticAuditorFindingStatus]
+
+    collected = _reserved_position_fields([types.SimpleNamespace(Widened=Widened)])
+    assert collected, "a widened reserved position was not collected"
+    for owner, name, annotation in collected:
+        with pytest.raises((AssertionError, pydantic.ValidationError)):
+            test_a_reserved_position_field_rejects_every_auditor_status(
+                owner, name, annotation)
 
 
 def _declared_annotation(owner, name):

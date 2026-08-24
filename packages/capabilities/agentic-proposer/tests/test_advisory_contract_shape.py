@@ -184,15 +184,27 @@ def _identity_assignments(tree):
 
 def _substrate_names(tree):
     """Names bound by importing the permitted identity substrate."""
-    names = {IDENTITY_SUBSTRATE}
+    names, shadowed = set(), set()
     for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom) and (node.module or "").split(".")[0] == IDENTITY_SUBSTRATE:
-            names |= {a.asname or a.name for a in node.names}
+        if isinstance(node, ast.ImportFrom):
+            root = (node.module or "").split(".")[0]
+            if node.level:
+                # A RELATIVE import cannot reach the substrate: it names a module
+                # inside this package. Seeding the permitted set with the bare
+                # string would let a local module called ``ugence_jcs`` satisfy the
+                # rule by name alone, which is the whole of what the rule asks.
+                if root == IDENTITY_SUBSTRATE:
+                    shadowed |= {a.asname or a.name for a in node.names}
+                shadowed |= {a.asname or a.name for a in node.names
+                             if a.name == IDENTITY_SUBSTRATE}
+            elif root == IDENTITY_SUBSTRATE:
+                names |= {a.asname or a.name for a in node.names}
+                names.add(IDENTITY_SUBSTRATE)
         elif isinstance(node, ast.Import):
             for alias in node.names:
                 if alias.name.split(".")[0] == IDENTITY_SUBSTRATE:
                     names.add(alias.asname or alias.name.split(".")[0])
-    return names
+    return names - shadowed
 
 
 def _root_name(node):
@@ -259,6 +271,21 @@ def test_the_identity_scanner_flags_a_foreign_identity_source(sample):
 ])
 def test_the_identity_scanner_permits_only_the_declared_substrate(sample):
     assert not _unpermitted_identity_sources(sample)
+
+
+@pytest.mark.parametrize("sample", [
+    "from . import ugence_jcs\nadvisory_digest = ugence_jcs.canonical_sha256_hex(payload)\n",
+    "from .ugence_jcs import canonical_sha256_hex\nadvisory_digest = canonical_sha256_hex(payload)\n",
+    "from . import ugence_jcs as jcs\nadvisory_digest = jcs.canonical_sha256_hex(payload)\n",
+])
+def test_a_local_module_named_for_the_substrate_does_not_satisfy_the_rule(sample):
+    """The substrate is a distribution, not a name.
+
+    A module inside this package called ``ugence_jcs`` is reached by a RELATIVE
+    import and can hash however it likes. Permitting it because the call reads
+    ``ugence_jcs.canonical_sha256_hex`` would satisfy D7 by spelling alone.
+    """
+    assert _unpermitted_identity_sources(sample)
 
 
 @pytest.mark.parametrize("names,expected", [

@@ -81,6 +81,41 @@ the same files and a floor on the count, rather than non-emptiness. The snapshot
 check now skips explicitly, naming the distribution, where a package publishes no
 `public_api.json`, instead of passing with zero assertions executed.
 
+### Fixed — second audit round
+
+An audit of the previous revision confirmed the seven enumerated D6 spellings bind,
+and found five further ordinary spellings that did not, two scanners with no
+self-test, and two ways to hash locally while satisfying every by-name check. No
+`src/` change, no version bump, no public-API snapshot.
+
+* **Five more D6 spellings now bind**: an in-package re-export chain (alias
+  resolution closed to a fixpoint across the package, so a two-hop relay resolves),
+  a dict comprehension building the same lookup table as a literal, `getattr` —
+  including a name assembled from concatenated literals — string forward references,
+  and `TYPE_CHECKING` imports paired with them. Each is a self-tested sample.
+* **The D6 runtime half is self-tested at last.** Nothing exercised it: the
+  parametrization is empty in S0, so both the union-arm rule and the collection
+  itself could be deleted with the suite green — the union-arm rule being the fix
+  the previous revision was named for. It is now exercised against a synthetic
+  namespace covering a pydantic model, a dataclass, a string-union dataclass and a
+  plain annotated class.
+* **String-annotated fields are collected.** A dataclass under
+  `from __future__ import annotations` keeps its annotation as a string, so exact
+  equality against the bare type names skipped exactly the fields most likely to
+  carry a widened position.
+* **The substrate is a distribution, not a name.** A module inside this package
+  called `ugence_jcs` satisfied D7's substrate rule and the D2 text mask by spelling
+  alone while hashing locally. A relative import can no longer bind the permitted
+  substrate, and no file or directory here may be named for it.
+* **`importlib` is barred in `src`.** `importlib.import_module("hash" + "lib")`
+  reached a barred module without naming it, defeating every text scan. Barred in
+  `src` only: the guards themselves import it to walk this package's modules.
+
+`docs/S1_ENFORCEMENT.md` now states what the D6 scan covers as a list, and names
+four boundaries it does not cross — dynamic construction, the runtime half detecting
+widened annotations rather than projections, the packages in reach, and the
+substrate floor being a text assertion rather than a resolved installed version.
+
 ### Not implemented
 
 The eight canonical contracts, Equations 1–3, proposal identity, invoice-domain

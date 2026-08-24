@@ -71,7 +71,34 @@ def _suspect_text(body):
     return [s for s in SUSPECT_TEXT if s in masked]
 
 #: Modules whose presence would mean identity is being computed locally.
+#: ``importlib`` is here because it reaches every other name on the list without
+#: naming it: ``importlib.import_module("hash" + "lib")`` imports nothing this scan
+#: would otherwise see.
 FORBIDDEN_IMPORTS = {"hashlib", "hmac", "binascii", "struct"}
+
+#: Barred in ``src`` only. The guards in ``tests`` import ``importlib`` to walk this
+#: package's own modules, which is how they arm themselves over a surface that does
+#: not exist yet; the shipped capability has no such need, and that is where a
+#: name-assembling import would do its work.
+SRC_ONLY_FORBIDDEN_IMPORTS = {"importlib"}
+
+#: The identity substrate is a distribution reached by an ABSOLUTE import. A module
+#: of this name inside the package would satisfy every by-name check while hashing
+#: locally, so the name itself is reserved here.
+SUBSTRATE_MODULE = "ugence_jcs"
+
+
+def _forbidden_imports(source, barred, filename="<sample>"):
+    """Every module in ``barred`` that ``source`` imports, directly or by name."""
+    tree = ast.parse(source, filename=filename)
+    offenders = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            offenders += [a.name for a in node.names if a.name.split(".")[0] in barred]
+        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+            if node.module.split(".")[0] in barred:
+                offenders.append(node.module)
+    return offenders
 
 
 def _package_files():
@@ -116,6 +143,43 @@ def test_the_text_scan_permits_the_declared_substrate(sample):
     assert not _suspect_text(sample), "the permitted substrate call was flagged"
 
 
+def test_no_module_here_shadows_the_identity_substrate():
+    """No file or package under this distribution may be named for the substrate.
+
+    The text mask and D7's substrate rule both key on the name ``ugence_jcs``. A
+    local module of that name, reached by ``from . import ugence_jcs``, would pass
+    both while computing identity here — the exact thing D2 exists to prevent.
+    """
+    offenders = []
+    for tree in SCANNED_TREES:
+        if not tree.exists():
+            continue
+        for path in tree.rglob("*"):
+            if any(part in {"build", "dist", ".venv", "__pycache__"} for part in path.parts):
+                continue
+            if path.is_dir() and path.name == SUBSTRATE_MODULE:
+                offenders.append(str(path))
+            elif path.suffix == ".py" and path.stem == SUBSTRATE_MODULE:
+                offenders.append(str(path))
+    assert not offenders, f"a local module shadows the substrate: {offenders}"
+
+
+@pytest.mark.parametrize("sample", [
+    "import importlib\n_impl = importlib.import_module('hash' + 'lib')\n",
+    "from importlib import import_module\n_impl = import_module('hashlib')\n",
+])
+def test_the_import_scan_sees_an_indirect_import(sample):
+    """A module imported through ``importlib`` is still imported.
+
+    Assembling the name from pieces defeats every text scan, so the reachable
+    mechanism is barred rather than the spelling of its argument.
+    """
+    barred = FORBIDDEN_IMPORTS | SRC_ONLY_FORBIDDEN_IMPORTS
+    assert _forbidden_imports(sample, barred), "an indirect import route is not barred"
+    assert not _forbidden_imports(sample, FORBIDDEN_IMPORTS), (
+        "importlib must be barred in src only; the guards themselves need it")
+
+
 def test_masking_the_substrate_call_does_not_mask_local_hashing():
     """The exemption is the exact call spelling, not the word ``sha256``.
 
@@ -150,15 +214,11 @@ def test_no_canonicalization_or_hashing_source_text(path):
 
 @pytest.mark.parametrize("path", list(_package_files()), ids=lambda p: p.name)
 def test_no_hashing_module_is_imported(path):
-    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-    offenders = []
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            offenders += [a.name for a in node.names
-                          if a.name.split(".")[0] in FORBIDDEN_IMPORTS]
-        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
-            if node.module.split(".")[0] in FORBIDDEN_IMPORTS:
-                offenders.append(node.module)
+    barred = set(FORBIDDEN_IMPORTS)
+    if (PKG_ROOT / "src") in path.parents:
+        barred |= SRC_ONLY_FORBIDDEN_IMPORTS
+    offenders = _forbidden_imports(path.read_text(encoding="utf-8"), barred,
+                                   filename=str(path))
     assert not offenders, f"{path.name} imports {offenders}"
 
 
