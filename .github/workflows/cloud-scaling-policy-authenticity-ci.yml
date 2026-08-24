@@ -30,9 +30,19 @@ on:
       - "claude/phase-5b-0b-**"
       - "claude/phase-5b-1-**"
       - "claude/phase-5b-2-**"
+      # 5B-3 (R-8) lands on an r8-* branch. Added because the pull_request trigger above did
+      # not re-run this workflow on three successive pushes to the 5B-3 branch — it ran once,
+      # on the first commit, and never again — so the branch's most important check went
+      # absent while eleven other workflows re-ran. Whatever caused that, a branch pattern
+      # here is the mechanism this repository already relies on and does not depend on it.
+      - "claude/r8-**"
       - "claude/setup-symbolu-monorepo-**"
     paths:
       - "packages/integration/cloud-scaling-policy-authenticity/**"
+      # Added with the r8 pattern: the pull_request trigger watches the Policy Authority and
+      # this one did not, so a Route-1-only change — one that edits the authority this package
+      # delegates every trust decision to — triggered nothing on a push.
+      - "packages/policy-authority/**"
       - ".github/workflows/cloud-scaling-policy-authenticity-ci.yml"
 
 defaults:
@@ -72,15 +82,52 @@ jobs:
         with:
           fetch-depth: 0
       - name: Resolve the partition ratchet's baseline
-        # The merge base with the repository's default branch — named by the event rather
-        # than hardcoded, because this repository's default branch is not called "main".
+        # On a pull request the authoritative "before" is the event's own base SHA. A locally
+        # computed `git merge-base HEAD <default>` is NOT equivalent and must not be the
+        # first choice: `actions/checkout` gives the pull request's *merge* commit, and the
+        # default ref moves under it, so the answer depends on when the merge ref was built.
+        #
+        # Measured on the 5B-3 pull request, which is why this step no longer looks like it
+        # did: the merge-base form resolved to the pull request's own head commit. The
+        # ratchet then compared the change against itself, found no movement, and went green
+        # on a change that promoted `policy_type`. It was caught only because an unrelated
+        # property skipped and the gate below treats a skip as a failure.
+        #
+        # The merge-base form survives as the fallback for `push` events, where there is no
+        # pull request payload. Either way the result is verified before it is used: a
+        # baseline that already contains HEAD is refused here rather than silently compared,
+        # so the failure names this step instead of surfacing as a puzzling test error.
+        # `tests/_partition_ratchet.py` refuses it a second time, in the tested code, because
+        # a guard that lives only in YAML is not covered by anything.
         run: |
           set -euo pipefail
-          default='${{ github.event.repository.default_branch }}'
-          git fetch --no-tags origin "+refs/heads/${default}:refs/remotes/origin/ratchet-base"
-          base=$(git merge-base HEAD refs/remotes/origin/ratchet-base)
+          head=$(git rev-parse HEAD)
+          base='${{ github.event.pull_request.base.sha }}'
+          source='pull request base sha'
+          if [ -z "${base}" ]; then
+            default='${{ github.event.repository.default_branch }}'
+            git fetch --no-tags origin \
+              "+refs/heads/${default}:refs/remotes/origin/ratchet-base"
+            if [ "$(git rev-parse refs/remotes/origin/ratchet-base)" = "${head}" ]; then
+              # A push ON the default branch. `merge-base HEAD default` is HEAD itself here,
+              # which is how this gate came to be vacuous on every default-branch merge before
+              # 5B-3: runs 3, 11, 15 and 19 all reported no movement because they compared the
+              # merged result against itself. The honest "before" is the commit this one landed
+              # on top of — for a merge commit, its first parent, i.e. the previous default tip.
+              base=$(git rev-parse "HEAD^1")
+              source='first parent (push on the default branch)'
+            else
+              base=$(git merge-base HEAD refs/remotes/origin/ratchet-base)
+              source="merge base with ${default}"
+            fi
+          fi
+          git rev-parse --verify "${base}^{commit}" >/dev/null
+          if git merge-base --is-ancestor "${head}" "${base}"; then
+            echo "::error::the ratchet baseline (${source}) resolved to ${base}, which already contains HEAD (${head}); comparing the change against itself reports no movement for every promotion on it, so the gate would pass vacuously"
+            exit 1
+          fi
           echo "UGENCE_RATCHET_BASE=${base}" >> "$GITHUB_ENV"
-          echo "ratchet baseline: ${base} (merge base with ${default})"
+          echo "ratchet baseline: ${base} (${source})"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"

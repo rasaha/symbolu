@@ -77,6 +77,9 @@ __all__ = [
     "POLICY_AUTHENTICITY_VERIFIED_FACTS_DOMAIN",
     "POLICY_AUTHENTICITY_RECORDED_FACTS_DOMAIN",
     "POLICY_TRUST_CONFIGURATION_DIGEST_DOMAIN",
+    "CAPACITY_BOUNDS_POLICY_FAMILY",
+    "CAPACITY_BOUNDS_PROJECTION_KEY",
+    "CAPACITY_BOUND_FIELDS",
     "REQUIRED_KEY_ENTITLEMENT",
     "FORBIDDEN_KEY_ENTITLEMENT",
     "REQUIRED_HISTORICAL_RESOLUTION_RULE",
@@ -93,11 +96,12 @@ __all__ = [
 VERIFICATION_PROFILE: Final[str] = "ugence.cloud-scaling/policy-authenticity/v1"
 
 #: The profile's own version. Bumped when a gate is added, removed or reordered, and when a
-#: fact moves between the verified and recorded halves — both changed in 5B-1, which added
-#: gate 11 (candidate/coordinate reconciliation) and promoted ``candidate_digest_fact``.
-#: ``tests/test_partition_ratchet.py`` enforces the bump from repository history rather than
-#: from a constant in the same commit as the change.
-VERIFICATION_PROFILE_VERSION: Final[str] = "v2"
+#: fact moves between the verified and recorded halves. Both changed in 5B-1 (gate 11, and
+#: ``candidate_digest_fact`` promoted) and both change again in 5B-3, which adds gate 14
+#: (projection reproduction) and promotes ``policy_type`` alongside the new
+#: ``capacity_bounds_fact``. ``tests/test_partition_ratchet.py`` enforces the bump from
+#: repository history rather than from a constant in the same commit as the change.
+VERIFICATION_PROFILE_VERSION: Final[str] = "v3"
 
 #: Domain tag bound into this package's verification-artifact digest.
 POLICY_AUTHENTICITY_DIGEST_DOMAIN: Final[str] = (
@@ -111,11 +115,11 @@ POLICY_AUTHENTICITY_VERIFIED_FACTS_DOMAIN: Final[str] = (
 )
 
 #: Domain tag of the **recorded** half: facts carried and digest-covered, but never attested.
-#: Three members since 5B-1, for three distinct reasons — ``resolved_as_of_fact`` (R-2: the
-#: instant is injected and unvalidated), ``policy_type`` (absent from the signed issuance
-#: payload and never compared at resolution) and ``trust_configuration_digest`` (reported by
-#: the resolution port about itself). ``candidate_digest_fact`` was the fourth until R-4
-#: closed; the domain tag itself does not move, because the frame is unchanged. See
+#: **Two** members since 5B-3 — ``resolved_as_of_fact`` (R-2: the instant is injected and
+#: unvalidated) and ``trust_configuration_digest`` (reported by the resolution port about
+#: itself). ``candidate_digest_fact`` left in 5B-1 when gate 11 began reconciling it, and
+#: ``policy_type`` left in 5B-3 when gate 14 began reproducing the body digest it is framed
+#: into. The domain tag itself does not move, because the frame is unchanged. See
 #: :data:`~.verified.RECORDED_FACT_NAMES`, which carries each reason in full.
 POLICY_AUTHENTICITY_RECORDED_FACTS_DOMAIN: Final[str] = (
     "ugence.cloud-scaling/policy-authenticity/artifact/recorded/v1"
@@ -124,6 +128,25 @@ POLICY_AUTHENTICITY_RECORDED_FACTS_DOMAIN: Final[str] = (
 #: Domain tag bound into the trust-configuration digest a resolution port reports.
 POLICY_TRUST_CONFIGURATION_DIGEST_DOMAIN: Final[str] = (
     "ugence.cloud-scaling/policy-authenticity/trust-configuration/v1"
+)
+
+#: The policy family whose artifacts carry capacity bounds (R-8, 5B-3). Named as a **string
+#: constant rather than an import**: the capacity-bounds family lives in its own leaf
+#: distribution, and depending on it here would invert the direction of the boundary — the
+#: verifier is downstream of the family, never the reverse. The coupling is therefore to the
+#: family's stable coordinate component, which is exactly what the resolved coordinate
+#: reports, and a divergence surfaces as an unbounded artifact rather than a wrong one.
+CAPACITY_BOUNDS_POLICY_FAMILY: Final[str] = "cloud_scaling.capacity_bounds"
+
+#: The key under which a capacity-bounds artifact's bounds appear in the adapter's canonical
+#: projection, and the four keys each bound carries. Read structurally out of a projection
+#: whose digest has already been reproduced, never by importing the family's types.
+CAPACITY_BOUNDS_PROJECTION_KEY: Final[str] = "bounds"
+CAPACITY_BOUND_FIELDS: Final[tuple] = (
+    "action_type",
+    "resource_class",
+    "max_permitted_magnitude",
+    "max_permitted_delta",
 )
 
 #: The entitlement an issuing key must hold. A constant, never a parameter (see above).

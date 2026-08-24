@@ -38,6 +38,7 @@ from .core.canonical import (
     framed_body_bytes,
     framed_body_digest,
     sha256_hex,
+    to_canonical_obj,
 )
 from .core.ed25519 import SigningKey, VerifyKey
 from .core.errors import (
@@ -129,6 +130,7 @@ __all__ = [
     "sha256_hex",
     "framed_body_bytes",
     "framed_body_digest",
+    "to_canonical_obj",
     # Approval boundary
     "ApprovalEvidenceRef",
     "ApprovalVerification",

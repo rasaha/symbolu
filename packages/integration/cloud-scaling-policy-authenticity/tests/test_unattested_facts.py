@@ -43,14 +43,25 @@ def test_policy_type_is_absent_from_the_signed_issuance_payload():
 
 
 @pytest.mark.adversarial
-def test_a_record_differing_only_in_policy_type_still_mints_verified():
-    """The gap itself. Nothing in the chain compares the record's policy_type to anything.
+def test_a_record_differing_only_in_policy_type_is_now_refused():
+    """The gap, closed (5B-3, R-8). Kept in place and **inverted** rather than deleted.
 
-    The signature does not cover it, and ``resolve_policy`` recomputes the body digest from
-    the *descriptor's* policy_type, never the record's. It is transitively committed inside
-    ``policy_body_digest`` — whose frame includes it — but a hash is one-way, and this package
-    holds no adapter registry with which to re-derive the descriptor. So there is no gate to
-    add here, and the honest place for the fact is the recorded half.
+    This test used to assert the opposite — that a substituted ``policy_type`` still minted
+    ``VERIFIED`` — and that assertion was the honest record of why the fact sat in the
+    recorded half: the signature does not cover it, ``resolve_policy`` recomputes the body
+    digest from the *descriptor's* policy type rather than the record's, and this package
+    held no adapter registry with which to re-derive the descriptor. The value was
+    transitively committed inside ``policy_body_digest``, whose frame includes it, but a hash
+    is one-way and there was no pre-image to check against.
+
+    Route 1 supplied the pre-image: the resolution now publishes the descriptor's projection,
+    so gate 14 reframes ``(adapter_id, policy_type, projection)`` and compares the result
+    against the digest the issuance signature covered. Substituting the record's policy type
+    makes the record and the published projection disagree, and the determination is refused.
+
+    Inverting the assertion in place is deliberate: the file still measures the same
+    substitution, so a regression restores the old behaviour and fails here rather than
+    quietly passing a suite that no longer looks.
     """
 
     authority, record = issued()
@@ -60,19 +71,20 @@ def test_a_record_differing_only_in_policy_type_still_mints_verified():
         expected_reference_tenant_id=record.coordinate.tenant_id,
         as_of=T_MID,
     )
-    assert result.outcome is O.VERIFIED
-    assert result.verified_policy.policy_type == "SomethingElseEntirely"
+    assert result.outcome is O.POLICY_PROJECTION_DIGEST_MISMATCH
+    assert result.verified_policy is None
 
 
 @pytest.mark.invariant
-def test_policy_type_is_recorded_and_refused_by_the_verified_accessor():
+def test_policy_type_is_verified_and_reachable_through_the_verified_accessor():
+    """The other half of the promotion: the accessor now answers instead of refusing."""
+
     _authority, _record = issued()
     artifact = _verified()
-    assert "policy_type" in RECORDED_FACT_NAMES
-    assert "policy_type" not in VERIFIED_FACT_NAMES
-    assert "policy_type" in artifact.recorded_facts()
-    with pytest.raises(VerifiedPolicyArtifactIntegrityError):
-        artifact.verified_fact("policy_type")
+    assert "policy_type" in VERIFIED_FACT_NAMES
+    assert "policy_type" not in RECORDED_FACT_NAMES
+    assert "policy_type" not in artifact.recorded_facts()
+    assert artifact.verified_fact("policy_type") == artifact.policy_type
 
 
 # --------------------------------------------------------------------------- #

@@ -2,6 +2,24 @@
 
 All notable changes to this distribution are recorded here.
 
+## 0.2.0 — unreleased
+
+### Added
+
+* `canonical_sha256_hex(value, set_paths=..., nfc_paths=...)`: the lowercase
+  64-character SHA-256 hex digest of exactly the bytes `canonical_bytes` returns.
+  It is a bare digest — no domain tag, no length prefix, no envelope schema
+  version, no `sha256:` prefix (callers apply that), and no CER-specific framing.
+  Canonicalization is not reimplemented and its faults are not caught, wrapped or
+  suppressed, so Unicode/NFC behaviour and the refusal taxonomy are inherited
+  unchanged from `canonical_bytes`.
+
+### Not changed
+
+* `canonical_string`, `canonical_bytes` and every `ugence_jcs.errors` exception
+  type are byte-for-byte unchanged; the frozen canonical-byte vectors and the
+  CER V0.3 clean-room suite reproduce exactly as before.
+
 ## 0.1.0 — unreleased
 
 ### Added

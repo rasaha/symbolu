@@ -16,7 +16,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Optional
+from types import MappingProxyType
+from typing import Any, Mapping, Optional
 
 from .adapters import PolicyCoordinate
 from .canonical import require_nfc, require_tzaware
@@ -200,6 +201,27 @@ class PolicyResolution:
     strictly before a verified revocation instant under an explicitly selected
     historical rule. A historical answer describes the past and **never implies
     current validity** — it always carries its own explicit ``as_of``.
+
+    The three trailing ``descriptor_*`` fields carry the **adapter descriptor's
+    own projection of the artifact**, populated by :func:`resolve_policy` from
+    the descriptor it already re-derives. They exist so a consumer that holds no
+    adapter registry can nonetheless recompute
+    :func:`~ugence_policy_authority.core.canonical.framed_body_digest` over
+    ``(adapter_id, policy_type, projection)`` and compare it against
+    ``record.policy_body_digest``.
+
+    They add **no new trust claim**. ``resolve_policy`` has already proven that
+    exact equality before it returns ``RESOLVED``; publishing the projection
+    only makes the proof reproducible on the other side of a package boundary,
+    where today the body digest is a one-way hash with nothing to check against.
+
+    They are ``Optional`` because this is a public dataclass anyone may
+    hand-assemble, not because absence is an acceptable state for a consumer: a
+    verifier that relies on them must **refuse ``None``** rather than skip the
+    check. A ``RESOLVED`` resolution produced by ``resolve_policy`` always
+    carries all three; the constructor enforces that they are present together
+    or absent together, so a partial triple — enough to look checkable and not
+    enough to check — cannot exist.
     """
 
     status: PolicyResolutionStatus
@@ -210,6 +232,9 @@ class PolicyResolution:
     record: Optional[IssuedPolicyRecord] = None
     historical: bool = False
     detail: str = ""
+    descriptor_adapter_id: Optional[str] = None
+    descriptor_policy_type: Optional[str] = None
+    descriptor_canonical_projection: Optional[Mapping[str, Any]] = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.status, PolicyResolutionStatus):
@@ -227,6 +252,45 @@ class PolicyResolution:
         require_tzaware(self.as_of, path="PolicyResolution.as_of")
         if not isinstance(self.historical, bool):
             raise PolicyAuthorityRequestError("PolicyResolution.historical must be a bool")
+
+        # -- descriptor projection -----------------------------------------
+        # All three or none. A partial triple cannot rebuild the digest frame,
+        # so admitting one would hand a consumer something that looks checkable
+        # and is not.
+        present = [
+            self.descriptor_adapter_id is not None,
+            self.descriptor_policy_type is not None,
+            self.descriptor_canonical_projection is not None,
+        ]
+        if any(present) and not all(present):
+            raise PolicyAuthorityRequestError(
+                "PolicyResolution descriptor_adapter_id, descriptor_policy_type and "
+                "descriptor_canonical_projection must be present together or absent together"
+            )
+        if all(present):
+            if not isinstance(self.descriptor_adapter_id, str):
+                raise PolicyAuthorityRequestError(
+                    "PolicyResolution.descriptor_adapter_id must be a string"
+                )
+            if not isinstance(self.descriptor_policy_type, str):
+                raise PolicyAuthorityRequestError(
+                    "PolicyResolution.descriptor_policy_type must be a string"
+                )
+            if not isinstance(self.descriptor_canonical_projection, Mapping):
+                raise PolicyAuthorityRequestError(
+                    "PolicyResolution.descriptor_canonical_projection must be a mapping"
+                )
+            # Defensively copied and exposed read-only, matching PolicyKeyRing.
+            # The copy is shallow, as PolicyKeyRing's is: it stops a caller
+            # rebinding or adding top-level keys. Deeper mutation is caught by
+            # the digest rather than prevented here — a consumer reframes this
+            # projection and compares it against the signed body digest, so a
+            # mutated nested value fails that comparison instead of passing.
+            object.__setattr__(
+                self,
+                "descriptor_canonical_projection",
+                MappingProxyType(dict(self.descriptor_canonical_projection)),
+            )
 
         if self.status is PolicyResolutionStatus.RESOLVED:
             if self.reason is not PolicyResolutionReason.RESOLVED:
@@ -249,6 +313,13 @@ class PolicyResolution:
             if self.policy is not None or self.record is not None:
                 raise PolicyAuthorityRequestError(
                     "an UNRESOLVED PolicyResolution must not carry a policy or a record"
+                )
+            # Nothing was proven, so there is nothing to republish. A projection
+            # here would invite a consumer to reframe a digest that no gate
+            # reached, which reads as evidence and is not.
+            if self.descriptor_adapter_id is not None:
+                raise PolicyAuthorityRequestError(
+                    "an UNRESOLVED PolicyResolution must not carry a descriptor projection"
                 )
             if self.historical:
                 raise PolicyAuthorityRequestError(
