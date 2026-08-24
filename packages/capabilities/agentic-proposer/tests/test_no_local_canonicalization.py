@@ -6,6 +6,12 @@ behind a flag, or a test fixture — would create a competing exact-identity sub
 which is precisely what D2 forbids. So this scans ``src`` and ``tests`` alike — a
 canonicalizer parked in a test fixture is still a second canonicalizer.
 
+The scan is a glob over both trees, so a module added later is covered by default;
+``test_scan_covers_the_s1_enforcement_modules_by_name`` additionally pins the three
+S1 enforcement guards by name, and
+``test_every_module_in_the_package_is_scanned_or_named_as_exempt`` closes the
+general case, so a file can only be scanned or explicitly exempt.
+
 Two files are outside that scan, and neither is a hole:
 
 * this guard module, which necessarily names every pattern it hunts for;
@@ -112,6 +118,35 @@ def test_scan_covers_both_src_and_tests():
     """The scan is only meaningful if it actually reaches both trees."""
     scanned = {p.parent.name for p in _package_files()}
     assert "ugence_agentic_proposer" in scanned and "tests" in scanned
+
+
+#: The modules discharging S1's three [R] enforcement obligations. They are named
+#: here, not just swept up by the glob, because each of them reasons about identity
+#: fields and about the permitted identity substrate — which is exactly the place a
+#: "temporary" helper computing an identity locally would be convenient to write.
+#: A module dropping out of the scan must fail here rather than pass quietly.
+S1_ENFORCEMENT_MODULES = (
+    "test_no_auditor_status_projection.py",
+    "test_advisory_contract_shape.py",
+    "test_role_projection_bounds.py",
+)
+
+
+def test_scan_covers_the_s1_enforcement_modules_by_name():
+    scanned = {p.name for p in _package_files()}
+    missing = [m for m in S1_ENFORCEMENT_MODULES if m not in scanned]
+    assert not missing, f"outside the scan: {missing}"
+
+
+def test_every_module_in_the_package_is_scanned_or_named_as_exempt():
+    """No third category. A file is scanned, or it is one of the two exemptions."""
+    exempt = {SELF.name, VERIFIER.name}
+    on_disk = {p.name for tree in SCANNED_TREES for p in tree.rglob("*.py")
+               if not any(part in {"build", "dist", ".venv", "__pycache__"}
+                          for part in p.parts)}
+    on_disk |= {VERIFIER.name}
+    unaccounted = on_disk - {p.name for p in _package_files()} - exempt
+    assert not unaccounted, f"neither scanned nor exempt: {sorted(unaccounted)}"
 
 
 def test_the_only_exempt_file_is_the_packaging_verifier():
