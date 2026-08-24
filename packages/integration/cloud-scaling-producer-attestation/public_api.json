@@ -3,7 +3,7 @@
   "distribution": "ugence-cloud-scaling-producer-attestation",
   "namespace": "ugence_cloud_scaling_producer_attestation",
   "note": "Machine-readable snapshot of the curated public API (ugence_cloud_scaling_producer_attestation.__all__). tests/packaging/test_public_api.py asserts this file equals the live package surface; scripts/verify_isolated_install.py asserts the same for the built wheel and for a genuinely offline isolated install. Regenerate with scripts/generate_public_api.py when the curated API changes deliberately.",
-  "package_version": "0.1.0",
+  "package_version": "0.2.0",
   "symbols": {
     "ANCHOR_LIFECYCLE_OUTCOMES": {
       "kind": "frozenset",
@@ -373,7 +373,7 @@
     },
     "__version__": {
       "kind": "constant",
-      "value": "0.1.0"
+      "value": "0.2.0"
     },
     "anchor_coordinate_digest": {
       "kind": "function",

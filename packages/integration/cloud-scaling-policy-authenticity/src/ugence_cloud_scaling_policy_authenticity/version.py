@@ -16,5 +16,8 @@ from typing import Final
 
 __all__ = ["__version__"]
 
-#: Cloud Scaling Phase 5B-1 — decision-scope repair, on the 5B-0B foundation.
-__version__: Final[str] = "0.4.0"
+#: Cloud Scaling R-12b — **fixture pins only**. This package's verification source is
+#: untouched: its occurrence gate reads candidate facts by name, and Phase 5A re-sourcing
+#: those facts from the authenticated decision snapshot satisfies it without a change here.
+#: What moved is the ten-digest Phase 5A mirror the suite pins.
+__version__: Final[str] = "0.5.0"

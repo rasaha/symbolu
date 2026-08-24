@@ -35,6 +35,8 @@ from risk_authority.integrations import (
 )
 from ugence_cloud_scaling_risk_integration import CapacityRiskSubjectProjection
 
+from risk_authority.crypto.canonical import to_canonical_obj
+
 from .canonical import (
     digest_of_snapshot,
     require_canonical_digest,
@@ -382,6 +384,43 @@ def reconcile_phase4(
     subject_asserted_at = _require_datetime(
         "context.subject_asserted_at", p_asserted_at, _Reason.PROJECTION_RECONCILIATION_FAILED
     )
+    # --- R-12b: the decision instants come from the authenticated snapshot -------------
+    # ``SubjectRiskDecision``'s outer ``evaluated_at`` / ``expires_at`` are not covered by
+    # ``decision_digest``, so a public ``dataclasses.replace`` moves either freely while the
+    # digest stays valid. Both feed admission — Phase 5B's occurrence gate refuses a
+    # determination about a moment before the evidence it rests on existed, so backdating
+    # ``evaluated_at`` widens what that gate accepts. The governing rule: a timestamp that
+    # affects admission must come from an authenticated decision artifact.
+    #
+    # The snapshot is the artifact. It has already been re-derived and digest-checked above,
+    # so reading from it here is reading from a value the digest covers. Phase 5A verifies
+    # no signature and claims none; "bound" is the whole of what it establishes.
+    snapshot_evaluated_at = d_decision_snapshot.get("evaluated_at")
+    if snapshot_evaluated_at is None:
+        # Refused, never fallen back to the outer field: a fallback would restore exactly the
+        # unauthenticated path this closes, and would do it silently.
+        raise ReconciliationError(
+            "the decision snapshot carries no evaluated_at; the instant Phase 5B's "
+            "occurrence gate depends on must come from the authenticated artifact, and a "
+            "decision minted before R-12b cannot supply one",
+            _Reason.DECISION_INSTANT_NOT_BOUND,
+        )
+    snapshot_expires_at = d_decision_snapshot.get("expires_at")
+    if snapshot_expires_at is None:
+        raise ReconciliationError(
+            "the decision snapshot carries no expires_at fact", _Reason.MISSING_EXPIRY_FACT
+        )
+    snapshot_issued_at = d_decision_snapshot.get("issued_at")
+    if snapshot_issued_at is None:
+        raise ReconciliationError(
+            "the decision snapshot carries no issued_at fact",
+            _Reason.DECISION_INSTANT_NOT_BOUND,
+        )
+
+    # The outer fields are retained as *validated projections* of the bound values, not as a
+    # second source. Comparison runs through ``to_canonical_obj`` — the same primitive the
+    # snapshot itself was canonicalized with — so no second timestamp format is introduced
+    # and a naive/aware or offset difference cannot masquerade as agreement.
     decision_evaluated_at = _require_datetime(
         "evaluated_at", d_evaluated_at, _Reason.PROJECTION_RECONCILIATION_FAILED
     )
@@ -392,6 +431,35 @@ def reconcile_phase4(
     decision_expires_at = _require_datetime(
         "expires_at", d_expires_at, _Reason.MISSING_EXPIRY_FACT
     )
+    if to_canonical_obj(decision_evaluated_at) != to_canonical_obj(snapshot_evaluated_at):
+        raise ReconciliationError(
+            "the decision's outer evaluated_at does not equal the value bound in "
+            "decision_snapshot; the carried instant is not a projection of the "
+            "authenticated one",
+            _Reason.DECISION_INSTANT_NOT_BOUND,
+        )
+    if to_canonical_obj(decision_expires_at) != to_canonical_obj(snapshot_expires_at):
+        raise ReconciliationError(
+            "the decision's outer expires_at does not equal the value bound in "
+            "decision_snapshot",
+            _Reason.DECISION_INSTANT_NOT_BOUND,
+        )
+
+    # Two orderings over the authenticated instants. Both compare canonical forms rather than
+    # parsed datetimes, for the same reason as above; string order and instant order coincide
+    # because the canonical timestamp format is fixed-width, zero-padded and UTC-normalised.
+    if to_canonical_obj(subject_valid_from) > to_canonical_obj(snapshot_evaluated_at):
+        raise ReconciliationError(
+            "the decision was evaluated before the recommendation it decides became valid",
+            _Reason.DECISION_INSTANT_NOT_BOUND,
+        )
+    # Equality is legal and there is no tolerance window: an authority may bind an evaluation
+    # in the same instant it was stamped, but it cannot bind one that has not happened yet.
+    if to_canonical_obj(snapshot_evaluated_at) > to_canonical_obj(snapshot_issued_at):
+        raise ReconciliationError(
+            "the decision was issued before the evaluation it binds was made",
+            _Reason.DECISION_INSTANT_NOT_BOUND,
+        )
 
     return ReconciledPhase4Facts(
         tenant_id=require_canonical_identifier("tenant_id", p_tenant),

@@ -174,6 +174,17 @@ copy of a private internal. If Risk Authority ever changed that contract, Phase 
 frozen digests would move and its suite would fail rather than silently disagree. **No
 public reconciliation contract was found to be missing**, so no blocker was raised.
 
+**Updated by R-12b (2026-08-24): the snapshot's field set changed, and that prediction held.**
+`RiskDecision` gained `evaluated_at`, so `decision_snapshot` now carries the evaluator's stamp
+alongside `issued_at` and `expires_at` — previously it carried the latter two and *no*
+`evaluated_at` at all, which left the instant Phase 5B's occurrence gate depends on travelling
+only on `SubjectRiskDecision`'s unbound outer field. Phase 5A now sources both decision instants
+from the snapshot and refuses one that carries no `evaluated_at`, rather than falling back.
+
+The frozen digests did move, exactly as this section predicted they would, and the suite failed
+rather than silently disagreeing. Nothing about the recomputation itself changed: it is still the
+same two public primitives over whatever the snapshot contains.
+
 ### §6.2 The recommendation identifier
 
 **Corrected by the F-5 audit finding.** An earlier revision of this section claimed Phase

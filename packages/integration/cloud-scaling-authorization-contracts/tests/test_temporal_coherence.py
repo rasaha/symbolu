@@ -79,6 +79,31 @@ def _build(projection=None, decision=None, attestation=None):
     )
 
 
+def _decision_with(decision, **snapshot_fields):
+    """A decision whose snapshot carries ``snapshot_fields``, with its digest re-derived.
+
+    Since R-12b the decision instants are sourced from ``decision_snapshot`` and the outer
+    fields must project them exactly, so an attack on either must move both. The canonical
+    string form is what the snapshot stores; the datetime is what the outer field holds.
+    """
+
+    from risk_authority.crypto.canonical import to_canonical_obj
+
+    from ugence_cloud_scaling_authorization_contracts.canonical import digest_of_snapshot
+
+    snapshot = dict(decision.decision_snapshot)
+    outer = {}
+    for name, value in snapshot_fields.items():
+        snapshot[name] = to_canonical_obj(value)
+        outer[name] = value
+    return dataclasses.replace(
+        decision,
+        decision_snapshot=snapshot,
+        decision_digest=digest_of_snapshot(snapshot),
+        **outer,
+    )
+
+
 def _forged_projection(projection, **overrides):
     """A projection carrying subject instants the seam would never have produced.
 
@@ -246,7 +271,7 @@ def test_a_decision_that_expires_exactly_when_evaluated_is_admitted():
 
     projection = build_projection()
     decision = build_decision(projection)
-    at_once = dataclasses.replace(decision, expires_at=decision.evaluated_at)
+    at_once = _decision_with(decision, expires_at=decision.evaluated_at)
     candidate = _build(projection=projection, decision=at_once)
     assert candidate.decision_expires_at_fact == candidate.decision_evaluated_at_fact
 
@@ -257,9 +282,7 @@ def test_a_decision_that_expires_exactly_when_evaluated_is_admitted():
 def test_a_decision_expiring_one_microsecond_before_evaluation_is_refused():
     projection = build_projection()
     decision = build_decision(projection)
-    broken = dataclasses.replace(
-        decision, expires_at=decision.evaluated_at - MICROSECOND
-    )
+    broken = _decision_with(decision, expires_at=decision.evaluated_at - MICROSECOND)
     with pytest.raises(TemporalOrderingError) as exc:
         _build(projection=projection, decision=broken)
     assert exc.value.reason is Reason.DECISION_TEMPORAL_ORDERING

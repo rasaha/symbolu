@@ -15,7 +15,15 @@ PYPROJECT = (PROJECT / "pyproject.toml").read_text(encoding="utf-8")
 
 
 def test_version_is_the_declared_version():
-    """``0.4.0`` since R-12: the builder refuses candidates it used to accept.
+    """``0.5.0`` since R-12b: the decision instants come from the digest-bound snapshot.
+
+    Unlike every bump below it, this one **moves digests**: the Risk Authority decision
+    snapshot gained ``evaluated_at``, so ``FROZEN_DECISION_DIGEST`` and, beneath it,
+    ``FROZEN_CANDIDATE_DIGEST`` both moved. It also raises this package's floor on
+    ``ugence-risk-authority`` to ``0.5.0``, because a decision snapshot minted by an earlier
+    version cannot supply the instant and is refused rather than fallen back from.
+
+    ``0.4.0`` was R-12: the builder refuses candidates it used to accept.
 
     R-12 adds temporal-coherence refusals, so a candidate whose carried instants contradict
     each other no longer constructs. Same shape of change as 0.3.0 below and the same reason
@@ -28,7 +36,7 @@ def test_version_is_the_declared_version():
     the same inputs now raise.
     """
 
-    assert pkg.__version__ == "0.4.0"
+    assert pkg.__version__ == "0.5.0"
 
 
 def test_distribution_and_namespace_names():

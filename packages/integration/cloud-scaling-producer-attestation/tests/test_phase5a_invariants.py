@@ -55,14 +55,16 @@ PHASE_5A_NEGATIVE_ANCHOR = (
 def test_phase_5a_is_at_the_version_this_package_was_pinned_against():
     """P-1: Phase 5B-0A does not re-version Phase 5A — and pins what it reads.
 
-    ``0.4.0`` since R-12; ``0.2.0`` was 5B-1, which added the required policy coordinate to the candidate. This
+    ``0.5.0`` since R-12b, which re-sourced the decision instants from the digest-bound
+    decision snapshot and moved two Phase 5A frozen digests with it; ``0.4.0`` was R-12;
+    ``0.2.0`` was 5B-1, which added the required policy coordinate to the candidate. This
     package's source is unchanged by that and its own version does not move; what moves is
     the fixture chain it verifies against. The assertion stays exact rather than becoming a
     range: a version that drifted without this suite being re-measured is the thing worth
     catching.
     """
 
-    assert p5a.__version__ == "0.4.0"
+    assert p5a.__version__ == "0.5.0"
 
 
 def test_phase_5a_exports_exactly_the_symbols_this_package_was_measured_against():
@@ -234,8 +236,9 @@ PHASE_5A_FROZEN_DIGESTS = {
     "idempotency_key": (
         "sha256:031179d6a8b9b1d77ec851e73b7a01f281ff88cf231677628c8012a170b4f41b"
     ),
+    # Moved by R-12b: the decision snapshot gained ``evaluated_at``.
     "decision_digest": (
-        "sha256:d08f94ba8ba174e3929da24efc151fa2cebb9743329a3a61c71f65e46aa23101"
+        "sha256:6aba137d8d2c057d768b1243469636e4c1137037883adfb9a078c9a3fbbf0ca2"
     ),
     "producer_signing_payload_digest": (
         "sha256:1035d2fc2ab8f4b443f815562f9f6ad8e4ce0032633f03a12e04e691c24cf2d0"
@@ -249,8 +252,11 @@ PHASE_5A_FROZEN_DIGESTS = {
     "policy_coordinate_binding_digest": (
         "sha256:ad1d1ad9d3fa574a071e98a8638c283e19d21d744c91b6848baaa0eca6670ed8"
     ),
+    # Moved with it: the candidate payload has always covered ``decision_digest`` and
+    # ``decision_snapshot_digest``, so the candidate digest moved beneath an unchanged
+    # field set.
     "candidate_digest": (
-        "sha256:be06c65385d73f66c52dd51024c30ed7939a836369db654f381d52270f2aa906"
+        "sha256:357bb3d4d660034c9abe50000986808a1e9c15fce05b4a22b6cb82836cc50e79"
     ),
 }
 

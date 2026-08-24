@@ -1,5 +1,61 @@
 # Changelog — ugence-cloud-scaling-authorization-contracts
 
+## [0.5.0] — Cloud Scaling R-12b: the decision instants come from the bound snapshot
+
+R-12 re-sourced the three *subject* instants from the digest-bound context and stopped there.
+The decision instants have the same shape and were never asked the same question. They failed
+it, and unlike R-12's subject-ordering guard this one was **live**.
+
+**Breaking**, pre-1.0, and unlike every release below it this one **moves digests**: a decision
+snapshot minted before `ugence-risk-authority` `0.5.0` is refused, and two frozen values moved.
+
+### The defect
+
+`SubjectRiskDecision.evaluated_at` is an outer field. `decision_digest` covers
+`decision_snapshot`, and that snapshot carried `issued_at` and `expires_at` but **no
+`evaluated_at` at all**. Measured: `dataclasses.replace(decision, evaluated_at=… - 3650 days)`
+— a public construction — succeeded with the digest unchanged, and the candidate carried the
+backdated value.
+
+Not inert. Phase 5B's occurrence gate refuses a determination whose `as_of` precedes an instant
+the candidate says already happened, so moving this one earlier **widens what that gate admits**.
+
+### Added
+
+- Seven reconciliation guards (inventory 57 → 64): the snapshot must carry `evaluated_at`,
+  `expires_at` and `issued_at`; each outer field must equal its bound value; and two orderings
+  over the bound instants — the decision cannot have been evaluated before the recommendation it
+  decides became valid, nor issued before the evaluation it binds was made. Equality legal, no
+  tolerance window.
+- Rejection reason `DECISION_INSTANT_NOT_BOUND`. Its own member, not `DECISION_DIGEST_MISMATCH`:
+  the digest is intact and the snapshot is exactly what the authority bound; what is wrong is
+  the *source* of a carried value. Named for binding, never authenticity — Phase 5A verifies no
+  signature, and `test_no_rejection_reason_asserts_authenticity` caught this member under its
+  first name.
+
+### Changed
+
+- **Both decision instants are sourced from `decision_snapshot`.** A snapshot with no
+  `evaluated_at` is refused rather than fallen back from; a fallback would silently restore the
+  unauthenticated path for exactly the artifacts that need it closed. The outer fields are kept
+  as *validated projections*, compared through `to_canonical_obj` so no second timestamp format
+  enters and an aware/naive difference cannot pass as agreement.
+- Floor on `ugence-risk-authority` raised to `0.5.0`.
+- `FROZEN_DECISION_DIGEST` and `FROZEN_CANDIDATE_DIGEST` moved. The candidate's own field set is
+  unchanged — its payload has always covered `decision_digest` and `decision_snapshot_digest`,
+  which moved beneath it. Both superseded values are pinned as negative anchors.
+- **No schema identifier moves**, on this repository's established rule (the F-2 precedent at
+  `candidate.py:68`): identifiers track which fields an artifact carries. The candidate's field
+  set is unchanged, and `RiskDecision` carries no schema identifier at all.
+
+### Not changed, deliberately
+
+The L-1 timezone-awareness sweep keeps the two decision instants on the *outer* fields. The
+snapshot stores instants as canonical UTC strings, so a naive snapshot timestamp is not
+representable — and moving those rows would delete live coverage, because `to_canonical_obj`
+formats a naive datetime by attaching UTC, so a naive outer value canonicalizes to exactly the
+bound string and passes the outer-equals-bound gates. Guard 3 is the only thing refusing it.
+
 ## [0.4.0] — Cloud Scaling R-12: temporal coherence among the carried facts
 
 Ratified in `docs/architecture/ADR_CLOUD_SCALING_DECISION_SCOPE_PHASE5B1_RATIFICATION.md`,

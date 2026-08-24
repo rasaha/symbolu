@@ -50,6 +50,7 @@ closed is a test that exercises it, and that is what this module is.
 from __future__ import annotations
 
 import dataclasses
+import datetime as datetime_mod
 import pathlib
 import tempfile
 import time
@@ -84,10 +85,18 @@ GUARD_REQUEST_REDERIVATION = 9
 GUARD_SNAPSHOT_TENANT = 26
 GUARD_SNAPSHOT_DOMAIN = 27
 GUARD_EVIDENCE_BINDING = 32
-# R-12's own two, anchored here so the reorder that moved the digest-binding check ahead of
-# the temporal block cannot silently retarget either mutation.
-GUARD_COMPARABLE_IS_DATETIME = 35
-GUARD_SUBJECT_ORDERING = 38
+# R-12b's seven, in source order.
+GUARD_SNAPSHOT_HAS_EVALUATED_AT = 34
+GUARD_SNAPSHOT_HAS_EXPIRES_AT = 35
+GUARD_SNAPSHOT_HAS_ISSUED_AT = 36
+GUARD_OUTER_EVALUATED_AT_IS_BOUND = 38
+GUARD_OUTER_EXPIRES_AT_IS_BOUND = 39
+GUARD_EVALUATED_AFTER_VALID_FROM = 40
+GUARD_EVALUATED_BEFORE_ISSUED = 41
+# R-12's own two. Both shifted +7 when R-12b added seven guards to `reconciliation.py`,
+# which the condition-text anchor below caught — which is what it is for.
+GUARD_COMPARABLE_IS_DATETIME = 42
+GUARD_SUBJECT_ORDERING = 45
 
 EXPECTED_CONDITIONS = {
     GUARD_TZ_AWARE: "value.tzinfo is None or value.utcoffset() is None",
@@ -96,6 +105,21 @@ EXPECTED_CONDITIONS = {
     GUARD_SNAPSHOT_DOMAIN: "snapshot_domain != DOMAIN_CLOUD_SCALING",
     GUARD_EVIDENCE_BINDING: (
         "tuple(p_request.evidence_references) != tuple(p_evidence_references)"
+    ),
+    GUARD_SNAPSHOT_HAS_EVALUATED_AT: "snapshot_evaluated_at is None",
+    GUARD_SNAPSHOT_HAS_EXPIRES_AT: "snapshot_expires_at is None",
+    GUARD_SNAPSHOT_HAS_ISSUED_AT: "snapshot_issued_at is None",
+    GUARD_OUTER_EVALUATED_AT_IS_BOUND: (
+        "to_canonical_obj(decision_evaluated_at) != to_canonical_obj(snapshot_evaluated_at)"
+    ),
+    GUARD_OUTER_EXPIRES_AT_IS_BOUND: (
+        "to_canonical_obj(decision_expires_at) != to_canonical_obj(snapshot_expires_at)"
+    ),
+    GUARD_EVALUATED_AFTER_VALID_FROM: (
+        "to_canonical_obj(subject_valid_from) > to_canonical_obj(snapshot_evaluated_at)"
+    ),
+    GUARD_EVALUATED_BEFORE_ISSUED: (
+        "to_canonical_obj(snapshot_evaluated_at) > to_canonical_obj(snapshot_issued_at)"
     ),
     GUARD_COMPARABLE_IS_DATETIME: "not isinstance(value, datetime)",
     GUARD_SUBJECT_ORDERING: "not subject_from <= subject_asserted <= subject_until",
@@ -109,7 +133,38 @@ SIBLINGS = {
     GUARD_REQUEST_REDERIVATION: 12,     # p_request_digest != d_request_digest, shares the reason
     GUARD_TZ_AWARE: 2,                  # the isinstance(datetime) check in the same helper
     GUARD_EVIDENCE_BINDING: 31,         # the tuple/non-empty check on the same field
+    # R-12b siblings: each is the gate a reader might credit with the same kill, and every
+    # one shares DECISION_INSTANT_NOT_BOUND with its subject except where noted.
+    GUARD_OUTER_EVALUATED_AT_IS_BOUND: GUARD_SNAPSHOT_HAS_EVALUATED_AT,
+    GUARD_OUTER_EXPIRES_AT_IS_BOUND: GUARD_SNAPSHOT_HAS_EXPIRES_AT,
+    GUARD_EVALUATED_AFTER_VALID_FROM: GUARD_EVALUATED_BEFORE_ISSUED,
+    GUARD_EVALUATED_BEFORE_ISSUED: GUARD_EVALUATED_AFTER_VALID_FROM,
 }
+
+
+def _canonical_ts(value):
+    """The canonical wire form of an instant, as the snapshot stores it."""
+
+    from risk_authority.crypto.canonical import to_canonical_obj
+
+    return to_canonical_obj(value)
+
+
+def _artifacts_for(projection):
+    """The four non-projection artifacts the builder needs, all genuine."""
+
+    from conftest import build_attestation, build_policy_binding, build_target_scope
+
+    scope = build_target_scope(projection)
+    policy = build_policy_binding(scope)
+    return dict(
+        producer_attestation=build_attestation(
+            recommendation_digest=projection.recommendation_digest
+        ),
+        policy_binding=policy,
+        policy_coordinate_binding=coordinate_for(policy),
+        target_scope=scope,
+    )
 
 
 def _bypassing_post_init(artifact, **overrides):
@@ -473,9 +528,19 @@ def test_an_ordinarily_constructed_projection_cannot_carry_the_mismatch(projecti
 # ======================================================================================
 
 #: Every authoritative validity timestamp Phase 5A accepts, and the artifact that holds the
-#: authenticated copy of it. The three subject instants live on the **context** — the R-12
-#: correction made that the reconciler's only source for them, replacing the projection's
-#: unauthenticated outer ``valid_from``/``valid_until``/``asserted_at`` fields.
+#: bound copy of it. The three subject instants live on the **context** — the R-12 correction
+#: made that the reconciler's only source for them, replacing the projection's unbound outer
+#: ``valid_from``/``valid_until``/``asserted_at`` fields.
+#:
+#: **The two decision instants stay on the decision, and that is deliberate.** R-12b re-sourced
+#: their *values* from ``decision_snapshot``, so the obvious move is to attack them there too.
+#: It cannot be done and must not be faked: the snapshot stores instants as canonical UTC
+#: **strings**, so a timezone-naive snapshot timestamp is not representable at all.
+#:
+#: Worse, moving these rows would delete live coverage. ``to_canonical_obj`` formats a naive
+#: datetime by *attaching* UTC, so a naive outer ``evaluated_at`` canonicalizes to exactly the
+#: bound string and sails through the outer-equals-bound gates. Guard 3 is the only thing that
+#: refuses it — solely attributed, still, and measured as such below.
 VALIDITY_TIMESTAMPS = [
     ("context", "subject_valid_from", Reason.PROJECTION_RECONCILIATION_FAILED),
     ("context", "subject_valid_until", Reason.PROJECTION_RECONCILIATION_FAILED),
@@ -577,7 +642,7 @@ def test_the_awareness_gate_is_now_sibling_backed_rather_than_solely_attributed(
 def test_the_comparable_type_gate_is_solely_responsible_for_classifying_a_non_datetime(
     tmp_path, projection, decision
 ):
-    """R-12 guard 35, killed rather than assumed.
+    """R-12 guard 42, killed rather than assumed.
 
     The five Phase 4 instants are type-checked in ``reconciliation.py`` before they ever
     reach the coherence block, so they cannot exercise this gate. The sixth — the producer
@@ -617,15 +682,15 @@ def test_the_comparable_type_gate_is_solely_responsible_for_classifying_a_non_da
         with pytest.raises(Exception) as escaped:
             mp.build(projection, decision, attestation=mutant)
     assert type(escaped.value).__name__ == "AttributeError", (
-        "with guard 35 removed the non-datetime must escape unclassified; if some other "
-        "gate now refuses it, this kill belongs to that gate and not to guard 35"
+        "with guard 42 removed the non-datetime must escape unclassified; if some other "
+        "gate now refuses it, this kill belongs to that gate and not to guard 42"
     )
 
 
 def test_removing_the_subject_ordering_guard_changes_nothing_it_is_not_load_bearing(
     tmp_path, projection, decision
 ):
-    """R-12 guard 38's status, measured rather than argued — and it has been wrong before.
+    """R-12 guard 45's status, measured rather than argued — and it has been wrong before.
 
     The guard was claimed unreachable on an argument that reasoned only about the subject
     *context* and missed the projection's unauthenticated outer copy of the same three
@@ -655,6 +720,193 @@ def test_removing_the_subject_ordering_guard_changes_nothing_it_is_not_load_bear
     assert exc.value.reason.value == Reason.PROJECTION_RECONCILIATION_FAILED.value
     assert "subject_valid_from <= subject_asserted_at <= subject_valid_until" in str(exc.value)
     assert "guard neutralised" not in str(exc.value)
+
+
+# ======================================================================================
+# R-12b — the decision instants must come from the digest-bound snapshot
+# ======================================================================================
+def _snapshot_and_outer(decision, **snapshot_fields):
+    """A decision whose snapshot carries ``snapshot_fields`` and whose digest re-derives.
+
+    The outer ``evaluated_at`` / ``expires_at`` are left alone deliberately: these attacks
+    are about the two disagreeing, and a helper that quietly kept them in step would measure
+    nothing. Where a test wants them in step it says so.
+    """
+
+    snapshot = dict(decision.decision_snapshot)
+    snapshot.update(snapshot_fields)
+    return dataclasses.replace(
+        decision, decision_snapshot=snapshot, decision_digest=digest_of_snapshot(snapshot)
+    )
+
+
+def test_backdating_the_outer_evaluated_at_no_longer_moves_the_carried_fact(
+    tmp_path, projection, decision
+):
+    """**The R-12b defect, measured as the attack it closes.**
+
+    ``SubjectRiskDecision.evaluated_at`` is an outer field: ``decision_digest`` covers
+    ``decision_snapshot``, and before R-12b that snapshot carried no ``evaluated_at`` at all.
+    So a plain ``dataclasses.replace`` moved the instant ten years with the digest still
+    valid, and the candidate carried the backdated value.
+
+    That fact is not inert. Phase 5B's occurrence gate refuses a determination whose ``as_of``
+    precedes an instant the candidate says already happened, so moving this one earlier
+    *widens* what that gate admits — a live bypass reachable by public construction.
+    """
+
+    backdated = dataclasses.replace(
+        decision, evaluated_at=decision.evaluated_at - datetime_mod.timedelta(days=3650)
+    )
+    # The forgery really is self-consistent: this is why the digest gate cannot catch it.
+    assert backdated.decision_digest == decision.decision_digest
+
+    error = _refuses(
+        projection,
+        backdated,
+        reason=Reason.DECISION_INSTANT_NOT_BOUND,
+        diagnostic="outer evaluated_at does not equal the value bound",
+    )
+    assert "decision_digest" not in str(error), "this is a source failure, not a corrupt artifact"
+    _admits_when_removed(tmp_path, GUARD_OUTER_EVALUATED_AT_IS_BOUND, projection, backdated)
+
+
+def test_backdating_it_in_the_snapshot_instead_cannot_even_be_constructed(decision):
+    """The other half: where the value is bound, moving it is refused before Phase 5A sees it.
+
+    Measured rather than assumed, and the measurement is stronger than expected — the forgery
+    does not reach ``reconcile_phase4`` at all. ``SubjectRiskDecision.__post_init__`` re-derives
+    ``decision_digest`` over the snapshot on every construction, ``dataclasses.replace``
+    included, so a snapshot edit without a matching digest dies at the seam contract.
+
+    Together with the test above, this is the whole of R-12b: before it, one of these two moves
+    was free. Now neither is, and they fail in different places for different reasons.
+    """
+
+    from risk_authority.integrations.evaluation_contracts import SeamContractError
+
+    forged = dict(decision.decision_snapshot)
+    forged["evaluated_at"] = "2016-01-04T00:05:00.000000Z"
+    with pytest.raises(SeamContractError) as exc:
+        dataclasses.replace(decision, decision_snapshot=forged)
+    assert "decision_digest must equal digest(decision_snapshot)" in str(exc.value)
+
+
+def test_a_snapshot_carrying_no_evaluated_at_is_refused_rather_than_fallen_back_from(
+    tmp_path, projection, decision
+):
+    """A pre-R-12b decision cannot supply the instant, and must not be allowed to pretend.
+
+    The tempting reading is "fall back to the outer field for compatibility". That would
+    silently restore the unauthenticated path for exactly the artifacts that need it closed,
+    so the snapshot's absence is a refusal.
+
+    **This guard is sibling-backed, not solely attributed, and that is stated rather than
+    engineered around.** With it removed the input is still refused — by the outer-equals-bound
+    gate, since a present outer instant cannot equal an absent bound one. What the guard adds
+    is the *right diagnostic*: for a decision minted before R-12b the answer is "this artifact
+    predates the field", not "someone rewrote a timestamp", and those send an operator to
+    different places. Measured below in both directions.
+    """
+
+    snapshot = {k: v for k, v in decision.decision_snapshot.items() if k != "evaluated_at"}
+    legacy = dataclasses.replace(
+        decision, decision_snapshot=snapshot, decision_digest=digest_of_snapshot(snapshot)
+    )
+    assert "evaluated_at" not in legacy.decision_snapshot
+
+    _refuses(
+        projection,
+        legacy,
+        reason=Reason.DECISION_INSTANT_NOT_BOUND,
+        diagnostic="carries no evaluated_at",
+    )
+
+    with tempfile.TemporaryDirectory(dir=tmp_path) as td:
+        mp = mutated_package(pathlib.Path(td), GUARD_SNAPSHOT_HAS_EVALUATED_AT)
+        with pytest.raises(Exception) as exc:
+            mp.build(legacy_projection := projection, legacy)
+    assert type(exc.value).__name__ == "ReconciliationError"
+    assert exc.value.reason.value == Reason.DECISION_INSTANT_NOT_BOUND.value
+    # Still refused, but now naming the wrong defect — which is what the guard buys.
+    assert "does not equal the value bound" in str(exc.value)
+    assert "carries no evaluated_at" not in str(exc.value)
+
+
+def test_an_evaluation_stamped_before_the_recommendation_became_valid_is_refused(
+    tmp_path, projection, decision
+):
+    """A fact cannot be decided before the thing it decides existed.
+
+    Bound in the snapshot *and* mirrored on the outer field, so the outer-equals-bound gates
+    cannot fire and the ordering gate is the only thing left.
+    """
+
+    early = projection.context.subject_valid_from - datetime_mod.timedelta(microseconds=1)
+    forged = _snapshot_and_outer(decision, evaluated_at=_canonical_ts(early))
+    forged = dataclasses.replace(forged, evaluated_at=early)
+
+    _refuses(
+        projection,
+        forged,
+        reason=Reason.DECISION_INSTANT_NOT_BOUND,
+        diagnostic="evaluated before the recommendation it decides became valid",
+    )
+    _admits_when_removed(tmp_path, GUARD_EVALUATED_AFTER_VALID_FROM, projection, forged)
+
+
+def test_a_decision_issued_before_the_evaluation_it_binds_is_refused(
+    tmp_path, projection, decision
+):
+    """Reversed order between the two bound instants: issuance cannot precede evaluation."""
+
+    later = decision.evaluated_at + datetime_mod.timedelta(microseconds=1)
+    forged = _snapshot_and_outer(decision, evaluated_at=_canonical_ts(later))
+    forged = dataclasses.replace(forged, evaluated_at=later)
+
+    _refuses(
+        projection,
+        forged,
+        reason=Reason.DECISION_INSTANT_NOT_BOUND,
+        diagnostic="issued before the evaluation it binds",
+    )
+    _admits_when_removed(tmp_path, GUARD_EVALUATED_BEFORE_ISSUED, projection, forged)
+
+
+def test_evaluation_and_issuance_in_the_same_instant_remain_legal(projection, decision):
+    """Equality is legal and there is no tolerance window — the genuine fixture depends on it.
+
+    The reference seam evaluates and issues at the same injected instant, so a strict
+    comparison anywhere here would refuse the real chain. Worth stating, not assuming.
+    """
+
+    snapshot = decision.decision_snapshot
+    assert snapshot["evaluated_at"] == snapshot["issued_at"]
+    candidate = build_capacity_authorization_candidate(
+        projection=projection,
+        decision=decision,
+        **_artifacts_for(projection),
+    )
+    assert candidate.decision_evaluated_at_fact == decision.evaluated_at
+
+
+def test_an_expiry_that_does_not_project_the_bound_one_is_refused(
+    tmp_path, projection, decision
+):
+    """``expires_at`` is the second outer field, and it bounds authorization directly."""
+
+    stretched = dataclasses.replace(
+        decision, expires_at=decision.expires_at + datetime_mod.timedelta(days=3650)
+    )
+    assert stretched.decision_digest == decision.decision_digest
+
+    _refuses(
+        projection,
+        stretched,
+        reason=Reason.DECISION_INSTANT_NOT_BOUND,
+        diagnostic="outer expires_at does not equal the value bound",
+    )
+    _admits_when_removed(tmp_path, GUARD_OUTER_EXPIRES_AT_IS_BOUND, projection, stretched)
 
 
 def test_the_canonicalizer_silently_attaches_utc_to_a_naive_timestamp():

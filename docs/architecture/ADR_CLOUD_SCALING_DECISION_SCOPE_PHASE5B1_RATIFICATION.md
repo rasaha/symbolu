@@ -317,14 +317,14 @@ It pushed back on two things, and both are corrected above: R-9's framing was to
 
 | # | Residual | Owner |
 |---|---|---|
-| R-2 **CLOSED (5B-2 pt 2)** `[V]` | **Recorded wrongly, corrected here.** It read as "whose clock supplies `as_of`". Measurement said otherwise: `as_of` was already type-checked (naive refused, never assumed UTC) and round-tripped against the resolution, and the authority already refuses a revoked policy **even at an instant before its revocation** and one outside its effective window `[V]`. You cannot resurrect a policy by choosing the moment. What was open was narrower and sharper: **nothing compared `as_of` against the candidate's own carried validity.** A candidate whose decision expired 2026-01-01 verified `VERIFIED` at 2026-06-01 `[V]`. Closed by gate 13 under four typed refusals | 5B-2 |
+| R-2 **CLOSED (5B-2 pt 2)** `[V]` | **Recorded wrongly, corrected here.** It read as "whose clock supplies `as_of`". Measurement said otherwise: `as_of` was already type-checked (naive refused, never assumed UTC) and round-tripped against the resolution, and the authority already refuses a revoked policy **even at an instant before its revocation** and one outside its effective window `[V]`. You cannot resurrect a policy by choosing the moment. What was open was narrower and sharper: **nothing compared `as_of` against the candidate's own carried validity.** A candidate whose decision expired 2026-01-01 verified `VERIFIED` at 2026-06-01 `[V]`. Closed by gate 13 under four typed refusals. **Qualified 2026-08-24 by R-12b:** that closure compared `as_of` against carried values, one of which — `decision_evaluated_at_fact` — was itself unauthenticated, so the gate was reconciling against a number the caller could choose `[V]`. The gate was right; its input was not. R-12b re-sources it from the digest-bound decision snapshot, which is what makes the closure hold | 5B-2 |
 | R-3 `[G]` | **Narrower than recorded.** Literally true of that one comparison and misleading overall: resolution enforces three equalities — stored coordinate == requested, body == declared content digest, body == signed body digest (`resolution.py:170`, `:182`, `:188`) `[V]`. Only `coordinate.content_digest` is not compared *directly*, and issuance enforces it at write time (`issuance.py:145`, `:150`) `[V]`, so the divergence requires a registry entry issuance never created. Defence-in-depth, not a live gap | **Policy Authority — not Cloud Scaling's to close** |
 | R-7 **CLOSED (5B-2 pt 2)** `[V]` | Three uncompared sources, not two: the sets in `verified.py`, the maps in `verification.py`, and an unnamed `derived` tuple reconciling them. No drift had occurred `[V]`. `DERIVED_FACT_NAMES` now names the difference and `require_partition_agreement` compares the maps against the declaration at mint time. Still a maintenance hazard rather than a correctness one — what changed is that it fails loudly and says which side is short | 5B-2 |
 | R-8 `[G]` | **Larger than recorded, and deferred by owner ruling.** Not "compare the bounds": the verified artifact carries 26 facts and **not one is a bound** `[V]`, so there is nothing to compare against. Closing it means first extracting authenticated bounds from the verified body into the artifact, which moves the artifact digest and the profile version and brings D-5B1-3's three ratchet rules into play. Handled as its own isolated subphase | 5B-2, next subphase |
 | R-9 **CLOSED (5B-2 pt 1)** `[V]` | **Broadened by the independent design review, then closed.** Enforced at Phase 5A's builder (`CROSS_TENANT_POLICY_BINDING`) and gate 12 (`CANDIDATE_CROSS_TENANT_POLICY`), both keyed on the scope so the `GLOBAL` carve-out survives. Original framing kept below for the record:  The first framing asked only about the empty-string global tenant, which read as an edge case. It is not: **nothing anywhere in the tree ties a candidate's *action* tenant to the tenant of the policy it reconciles against.** A candidate describing an action for `tenant-1`, carrying a coordinate for a `TENANT`-scoped policy belonging to `tenant-elsewhere`, verifies `VERIFIED` `[V]` — gate 11 compares the candidate's coordinate against the *resolved* policy, and that policy is genuinely the other tenant's. Phase 5A does not compare them either. Inert today because no composition root calls `verify()`, which is exactly why it must be ruled on **before** 5B-2 wires one rather than discovered while wiring it. Pinned as executable behaviour by `test_a_candidate_reconciles_against_another_tenants_policy`, which measures today's permissive behaviour without endorsing it | Owner, before 5B-2 |
 | R-10 `[G]` | Two Phase 5A suite weaknesses found while implementing, both pre-existing: `test_non_reachability.py` strips docstrings with `ast.get_docstring`, whose dedented result does not match the indented source, so an indented docstring naming a forbidden symbol trips the scan; and `test_phase5a_invariants.py::test_no_phase_5a_source_file_was_modified` reads `git status`, so it measures a clean working tree rather than an unmodified package | Phase 5A |
 | R-11 **CLOSED (5B-2 pt 1)** `[V]` | Completeness now enumerates the public attribute surface statically and totally over names (`inspect.getmembers_static`), never executing a descriptor, with a five-member allowlist ratcheted against the merge base. Eleven distinct bypass constructs were planted and refused. The declared trust boundary — a contributor editing class, allowlist and disclosure together — is recorded, not claimed closed | Phase 5A |
-| R-12 **PARTLY CLOSED** `[V]` | Ruled and implemented in Phase 5A as temporal coherence — three construction-time refusals reading no clock. The decision window (`evaluated_at <= expires_at`, a **newly ratified candidate-coherence invariant** grounded on the sibling principle at `controls.py:64`, not claimed as upstream-enforced) and the attestation window (`asserted_at <= issued_at <= valid_until`) are load-bearing `[V]`. **Corrected 2026-08-24:** the subject-ordering guard was first recorded here as unreachable defence in depth; that was false. Reconciliation read the projection's *unauthenticated* outer `valid_from`/`valid_until`/`asserted_at` copy while reading every sibling fact from the digest-bound context, so a public `dataclasses.replace` both reached the guard and — widening `valid_until` — admitted an attestation issued eight years outside the bound window `[V]`. Reconciliation now sources all three from the context. The guard is kept as owner-ratified defence in depth, its status measured by neutralising it in the sweep rather than argued. Original finding: Gate 13 compares each of the candidate's six timestamps against `as_of` and **never against each other**, so a candidate whose attestation predates its subject assertion by a year verifies `[V]`. That is internal *incoherence* rather than staleness, and it belongs upstream at construction, where the builder holds all six. Out of scope for R-2, which is about reconciling the instant | Phase 5A |
+| R-12 **PARTLY CLOSED** `[V]` | Ruled and implemented in Phase 5A as temporal coherence — three construction-time refusals reading no clock. The decision window (`evaluated_at <= expires_at`, a **newly ratified candidate-coherence invariant** grounded on the sibling principle at `controls.py:64`, not claimed as upstream-enforced) and the attestation window (`asserted_at <= issued_at <= valid_until`) are load-bearing `[V]`. **Corrected 2026-08-24:** the subject-ordering guard was first recorded here as unreachable defence in depth; that was false. Reconciliation read the projection's *unauthenticated* outer `valid_from`/`valid_until`/`asserted_at` copy while reading every sibling fact from the digest-bound context, so a public `dataclasses.replace` both reached the guard and — widening `valid_until` — admitted an attestation issued eight years outside the bound window `[V]`. Reconciliation now sources all three from the context. The guard is kept as owner-ratified defence in depth, its status measured by neutralising it in the sweep rather than argued. **Superseded in part 2026-08-24 by R-12b:** that correction covered the *projection* side only. The decision side carried the identical defect and it was live — `SubjectRiskDecision`'s outer `evaluated_at` is not covered by `decision_digest`, so a public `dataclasses.replace` moved it ten years with the digest still valid `[V]`, and Phase 5B's occurrence gate reads exactly that fact. R-12b adds `evaluated_at` to the decision snapshot and re-sources both decision instants from it. Original finding: Gate 13 compares each of the candidate's six timestamps against `as_of` and **never against each other**, so a candidate whose attestation predates its subject assertion by a year verifies `[V]`. That is internal *incoherence* rather than staleness, and it belongs upstream at construction, where the builder holds all six. Out of scope for R-2, which is about reconciling the instant | Phase 5A |
 | A-59 (5B-0A) **INTENTIONAL BOUNDARY — not a defect** `[R]` | Measured: the attestation module never mentions `candidate_digest`, and two candidates with different digests were built from one attestation object `[V]`. **Owner ruling: this is not to be "closed" by adding `candidate_digest` to the producer signature.** The producer owns the recommendation, not the downstream policy, risk decision or authorization candidate. The producer signature authenticates the recommendation; the verified artifact binds that authenticated recommendation to the candidate examined; authorizing the complete candidate belongs to a later Decision/Envelope authority | Authority boundary, by design |
 
 ## The residual ratification round, and what this session verified of it
@@ -662,3 +662,63 @@ status is measured by neutralising it in the mutation sweep rather than argued �
 argued once and the argument was wrong.
 
 Corrected 2026-08-24, on two independent audits.
+
+
+## R-12b — the decision side of the same defect, and it was live
+
+R-12's correction re-sourced the three *subject* instants from the digest-bound context. It
+stopped there, and the stopping point was not principled: the decision instants have the same
+shape and were never asked the same question. They failed it.
+
+`SubjectRiskDecision` carries `evaluated_at` and `expires_at` as outer fields. `decision_digest`
+covers `decision_snapshot`, and until R-12b that snapshot carried `issued_at` and `expires_at`
+but **no `evaluated_at` at all** `[V]`. So the evaluator's stamp existed only on an unauthenticated
+outer field. Measured: `dataclasses.replace(decision, evaluated_at=evaluated_at - 3650 days)` — a
+public construction — succeeded with `decision_digest` unchanged, and the candidate carried the
+backdated value as `decision_evaluated_at_fact` while the authenticated snapshot still said
+otherwise `[V]`.
+
+That fact is not inert. Phase 5B's `_OCCURRENCE_FACTS` refuses a determination whose `as_of`
+precedes an instant the candidate says has already happened. Moving `decision_evaluated_at_fact`
+earlier moves that floor down, so backdating it **widens what the occurrence gate admits** — a
+live bypass of a gate ratified under R-2, reachable by public construction.
+
+### The governing rule, stated once
+
+**If a timestamp affects admission or authorization, its value must come from an authenticated
+decision artifact, never an independently mutable projection.** R-12 applied it to the subject
+side; R-12b applies it to the decision side. The two together are the whole of it.
+
+### What changed
+
+`RiskDecision` gains `evaluated_at`, so the evaluator's stamp travels inside the snapshot the
+authority's digest covers. The seam passes its own injected clock — the same instant it already
+reports as the result's `evaluated_at` — so the two can no longer be made to disagree. The REST
+path forwards the caller's stamp per D-3, recording rather than inventing: with none supplied the
+decision says so instead of substituting the authority's clock, which would be the same
+conflation in a new place.
+
+`reconcile_phase4` now sources both decision instants from the snapshot and **refuses a snapshot
+carrying no `evaluated_at` rather than falling back** — a fallback would silently restore the
+unauthenticated path. The outer fields are retained as *validated projections*: each must equal
+its bound value, compared through `to_canonical_obj` so no second timestamp format enters and an
+aware/naive difference cannot pass as agreement. Two orderings over the authenticated instants
+join them: the decision cannot have been evaluated before the recommendation it decides became
+valid, and cannot have been issued before the evaluation it binds was made — equality legal, no
+tolerance window.
+
+Its own refusal reason, `DECISION_INSTANT_NOT_AUTHENTICATED`, not `DECISION_DIGEST_MISMATCH`: the
+digest is intact and the snapshot is exactly what the authority bound. What is wrong is the
+source of a carried value, and an operator would look in a different place for each.
+
+Phase 5B-0B's verification source is **unchanged**. Its occurrence gate reads candidate facts by
+name, and re-sourcing those facts upstream satisfies it without a line changing here — which is
+what a correctly drawn boundary looks like from the far side.
+
+### Digests move; no schema identifier does
+
+Four frozen digests move because the decision snapshot gains a key. **No schema identifier
+moves**, on this ADR's own established rule: the F-2 precedent recorded at `candidate.py:68` —
+identifiers track *which fields the artifact carries*, not what its payload covers. The Phase 5A
+candidate's field set is unchanged, and `RiskDecision` carries no schema identifier at all. Every
+superseded value is pinned alongside its replacement, as the 5B-1 and F-2 moves already are.

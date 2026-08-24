@@ -8,6 +8,7 @@ eight endpoints in the MVP API (user brief §21).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Optional
 
 from ..domain.enums import ActionGateDecision, RiskClass, RiskOutcome
@@ -62,6 +63,11 @@ class DecisionRequest:
     requested_scope: Scope
     evidence_snapshot_digest: str = ""
     model_digest: str = ""
+    #: The evaluator's stamp for the evaluation being bound (R-12b). Optional so an existing
+    #: caller is unaffected; when absent the authority records no evaluation instant rather
+    #: than substituting its own, because inventing one would be the very conflation this
+    #: field exists to end.
+    evaluated_at: Optional[datetime] = None
 
 
 @dataclass(frozen=True)

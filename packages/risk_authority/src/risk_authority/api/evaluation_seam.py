@@ -483,6 +483,11 @@ class RiskEvaluationSeam:
                     requested_scope=request.requested_scope,
                     evidence_snapshot_digest=_digest(sorted(request.evidence_references)),
                     model_digest=request.subject_digest,
+                    # The seam's injected clock is the evaluator's stamp, and it is the same
+                    # instant this result reports as ``evaluated_at`` below. Passing it here
+                    # puts it inside the digest-bound decision snapshot, so the two can no
+                    # longer be made to disagree (R-12b).
+                    evaluated_at=now,
                 ),
             )
         except AuthorityDeniedError as exc:

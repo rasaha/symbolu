@@ -116,6 +116,17 @@ class AuthorizationCandidateRejectionReason(str, Enum):
     MISSING_BINDING_DECISION = "missing_binding_decision"
     MISSING_DECISION_SNAPSHOT = "missing_decision_snapshot"
     MISSING_EXPIRY_FACT = "missing_expiry_fact"
+    #: R-12b. Its own member rather than ``DECISION_DIGEST_MISMATCH``: the digest is intact
+    #: and the snapshot is exactly what the authority bound. What is wrong is that a
+    #: timestamp the candidate carries is not sourced from — or does not agree with — the
+    #: digest-bound artifact it is supposed to project. A source failure, not a corrupt
+    #: artifact, and an operator would look in a different place for each.
+    #:
+    #: Named for *binding*, never authenticity: Phase 5A verifies no signature, so a member
+    #: claiming a value is "authenticated" would overstate what this package establishes.
+    #: ``test_no_rejection_reason_asserts_authenticity`` enforces that, and caught exactly
+    #: this member under its first name.
+    DECISION_INSTANT_NOT_BOUND = "decision_instant_not_bound"
     IDEMPOTENCY_KEY_MISMATCH = "idempotency_key_mismatch"
     D4_IDENTIFIER_MISMATCH = "d4_identifier_mismatch"
 

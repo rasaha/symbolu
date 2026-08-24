@@ -48,7 +48,18 @@ FROZEN_REQUEST_DIGEST = (
 FROZEN_IDEMPOTENCY_KEY = (
     "sha256:031179d6a8b9b1d77ec851e73b7a01f281ff88cf231677628c8012a170b4f41b"
 )
+#: **Moved by R-12b.** ``RiskDecision`` gained ``evaluated_at``, so the digest-bound decision
+#: snapshot gained a key — the first time in this ADR's history that a Phase 5A change moved a
+#: digest *upstream* of the candidate. The superseded value is pinned below.
 FROZEN_DECISION_DIGEST = (
+    "sha256:6aba137d8d2c057d768b1243469636e4c1137037883adfb9a078c9a3fbbf0ca2"
+)
+#: Superseded by R-12b. The pre-R-12b snapshot carried ``issued_at`` and ``expires_at`` but no
+#: ``evaluated_at`` at all, so the evaluator's stamp lived only on ``SubjectRiskDecision``'s
+#: outer field, which no digest covered — and a public ``dataclasses.replace`` moved it ten
+#: years with this digest unchanged. Pinned as a negative anchor so dropping the field back out
+#: is a failure rather than a re-baseline.
+SUPERSEDED_PRE_R12B_DECISION_DIGEST = (
     "sha256:d08f94ba8ba174e3929da24efc151fa2cebb9743329a3a61c71f65e46aa23101"
 )
 FROZEN_PRODUCER_SIGNING_PAYLOAD_DIGEST = (
@@ -70,7 +81,15 @@ FROZEN_POLICY_COORDINATE_BINDING_DIGEST = (
 #: constant an in-candidate policy coordinate can move, and the floor for any option that
 #: binds the coordinate inside the candidate at all (D-5B1-1). The superseded value is pinned
 #: below.
+#: **Moved again by R-12b**, this time not because the candidate's own payload changed — its
+#: field set is untouched — but because ``decision_snapshot_digest`` and ``decision_digest``,
+#: which the payload has always covered, moved beneath it. The superseded value is pinned below.
 FROZEN_CANDIDATE_DIGEST = (
+    "sha256:357bb3d4d660034c9abe50000986808a1e9c15fce05b4a22b6cb82836cc50e79"
+)
+#: Superseded by R-12b — the 5B-1 value, correct until the decision snapshot gained
+#: ``evaluated_at``. Pinned for the same reason as the two below it.
+SUPERSEDED_PRE_R12B_CANDIDATE_DIGEST = (
     "sha256:be06c65385d73f66c52dd51024c30ed7939a836369db654f381d52270f2aa906"
 )
 #: Superseded by the F-2 audit remediation. The pre-remediation candidate digest bound
@@ -159,9 +178,14 @@ def test_only_the_candidate_digest_moved_in_the_5b1_repair(frozen_chain):
     Widening the existing binding in place would have moved ``FROZEN_POLICY_BINDING_DIGEST``
     as well. Carrying the coordinate as its own field moves exactly one of the ten, which is
     the floor: no in-candidate binding can move none.
+
+    Still true *of 5B-1*. R-12b later moved ``FROZEN_DECISION_DIGEST`` as well, for an unrelated
+    reason — the decision snapshot gained a field — which is why the constants below are the
+    current values rather than 5B-1's.
     """
 
     projection, decision, attestation, scope, binding, candidate = frozen_chain
+    assert decision.decision_digest != SUPERSEDED_PRE_R12B_DECISION_DIGEST
     assert projection.recommendation_digest == FROZEN_RECOMMENDATION_DIGEST
     assert projection.context_digest == FROZEN_CONTEXT_DIGEST
     assert projection.subject_digest == FROZEN_SUBJECT_DIGEST
@@ -217,6 +241,7 @@ def test_the_pre_f2_candidate_digest_is_not_reachable(frozen_chain):
     *_, candidate = frozen_chain
     assert candidate.candidate_digest != SUPERSEDED_PRE_F2_CANDIDATE_DIGEST
     assert candidate.candidate_digest != SUPERSEDED_PRE_5B1_CANDIDATE_DIGEST
+    assert candidate.candidate_digest != SUPERSEDED_PRE_R12B_CANDIDATE_DIGEST
     assert candidate.candidate_digest == FROZEN_CANDIDATE_DIGEST
 
 
