@@ -233,7 +233,10 @@
         "policy",
         "record",
         "historical",
-        "detail"
+        "detail",
+        "descriptor_adapter_id",
+        "descriptor_policy_type",
+        "descriptor_canonical_projection"
       ]
     },
     "PolicyResolutionReason": {
@@ -398,6 +401,9 @@
       "kind": "function"
     },
     "sha256_hex": {
+      "kind": "function"
+    },
+    "to_canonical_obj": {
       "kind": "function"
     },
     "uvi_coordinate": {
