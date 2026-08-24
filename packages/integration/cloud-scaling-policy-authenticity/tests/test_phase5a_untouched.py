@@ -48,7 +48,7 @@ def test_phase_5a_is_at_the_version_5b1_moved_it_to():
     """
 
     version = (_phase5a() / "src" / "ugence_cloud_scaling_authorization_contracts" / "version.py").read_text()
-    assert '__version__ = "0.6.0"' in version
+    assert '__version__ = "0.7.0"' in version
 
 
 @pytest.mark.invariant

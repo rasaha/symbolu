@@ -365,11 +365,19 @@ def _comparable_instant(name: str, value: Any) -> datetime:
     showed that with that guard neutralised a naive value reached a comparison and escaped as
     a bare ``TypeError``. A gate whose fail-closed behaviour depends on another gate still
     being present is not fail-closed. Correct classification beats exclusive attribution.
+
+    **Exact type, not ``isinstance``** — the same doctrine :func:`reconcile_phase4` applies to
+    the projection and the decision, and for the same reason: a subclass can override any
+    comparison operator, so an ``isinstance`` check admits an object that satisfies every
+    subsequent ordering by fiat. Canonicalization renders such an object to exactly the value
+    a genuine ``datetime`` would produce, so no digest downstream can tell them apart. The type
+    is the only place the distinction survives.
     """
 
-    if not isinstance(value, datetime):
+    if type(value) is not datetime:
         raise CanonicalFieldError(
-            f"{name} must be a datetime", _Reason.MALFORMED_CANONICAL_FIELD
+            f"{name} must be a datetime, not a {type(value).__name__}",
+            _Reason.MALFORMED_CANONICAL_FIELD,
         )
     if value.tzinfo is None or value.utcoffset() is None:
         raise CanonicalFieldError(

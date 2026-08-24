@@ -129,49 +129,57 @@ def _require_datetime(name: str, value: Any, reason: _Reason) -> datetime:
 
 #: The canonical instant format Risk Authority's ``to_canonical_obj`` writes. Mirrored here
 #: rather than imported: it is private to that module, and this package re-derives from public
-#: primitives by policy. ``_bound_instant`` below asserts the round trip, so a drift in the
-#: writer surfaces as a refusal rather than as a silent misparse.
+#: primitives by policy.
+#:
+#: The round trip is deliberately **not** total, and that asymmetry fails closed.
+#: ``strftime`` does not zero-pad ``%Y``, so the writer can emit ``"999-12-31T…"``; ``strptime``
+#: requires exactly four digits and refuses it. A sub-1000 year is therefore rejected as
+#: non-canonical rather than parsed and ordered. No genuine decision carries one, and the only
+#: direction this can fail is closed.
 _BOUND_TS_FMT: Final = "%Y-%m-%dT%H:%M:%S.%fZ"
 
 
 def _bound_instant(name: str, value: Any) -> datetime:
-    """Parse a snapshot instant into a ``datetime`` for **ordering** comparisons.
+    """Parse a canonical snapshot instant into a ``datetime`` for **ordering** comparisons.
 
-    Ordering must never be decided on the canonical *string*. ``strftime`` does not
-    zero-pad ``%Y`` below year 1000 while it always pads ``%f``, so ``"999-12-31T…"``
-    sorts **above** ``"2026-01-01T…"`` — lexicographic and chronological order diverge, and
-    a guard comparing strings admits exactly what it exists to refuse. Measured: backdating
-    ``evaluated_at`` by one year was refused and by a thousand years was admitted.
+    Ordering must never be decided on the canonical *string*: ``strftime`` does not zero-pad
+    ``%Y`` below year 1000 while it always pads ``%f``, so ``"999-12-31T…"`` sorts above
+    ``"2026-01-01T…"`` and both orderings invert. Measured before the repair: backdating
+    ``evaluated_at`` by one year was refused and by a thousand years admitted.
+
+    **Only a string is accepted.** A ``decision_snapshot`` is a canonical artifact — a mapping
+    of primitives the authority's digest covers — so a live object inside one is not an input
+    to be trusted, it is a refusal. This is the same exact-type doctrine
+    :func:`reconcile_phase4` already applies to the projection and the decision, and it is
+    load-bearing rather than tidy: ``to_canonical_obj`` renders a ``datetime`` to exactly the
+    string it would have been, so **the digest cannot tell the two apart**. A ``datetime``
+    subclass overriding ``__gt__`` therefore carries a valid digest and defeats both orderings.
+    Accepting only ``str`` closes that, and the accompanying tests pin it with a live subclass
+    built without ``to_canonical_obj``.
 
     Equality is left on strings deliberately: string equality is exact, and the
     outer-equals-bound gates are about agreement, not order.
-
-    A non-string, non-datetime value gets a typed refusal here rather than reaching a raw
-    ``>`` and escaping as a bare ``TypeError`` — the same fail-closed rule ``_comparable_instant``
-    applies in :mod:`.candidate`, applied where it was omitted.
     """
 
-    if isinstance(value, datetime):
-        parsed = value
-    elif isinstance(value, str):
-        try:
-            parsed = datetime.strptime(value, _BOUND_TS_FMT)
-        except ValueError:
-            raise ReconciliationError(
-                f"{name} is not a canonical UTC instant (got {value!r})",
-                _Reason.DECISION_INSTANT_NOT_BOUND,
-            ) from None
-        parsed = parsed.replace(tzinfo=timezone.utc)
-    else:
+    if type(value) is not str:
         raise ReconciliationError(
-            f"{name} must be a canonical instant (got {value!r})",
+            f"{name} must be a canonical instant string, not a live "
+            f"{type(value).__name__} (got {value!r})",
             _Reason.DECISION_INSTANT_NOT_BOUND,
         )
-    if parsed.tzinfo is None or parsed.utcoffset() is None:
+    try:
+        parsed = datetime.strptime(value, _BOUND_TS_FMT)
+    except ValueError:
         raise ReconciliationError(
-            f"{name} must be timezone-aware", _Reason.DECISION_INSTANT_NOT_BOUND
-        )
-    return parsed.astimezone(timezone.utc)
+            f"{name} is not a canonical UTC instant (got {value!r})",
+            _Reason.DECISION_INSTANT_NOT_BOUND,
+        ) from None
+    # The canonical form is UTC by construction and carries no offset to honour, so this
+    # attaches UTC rather than converting. No awareness check follows: a value that reached
+    # here parsed from the canonical format, and the line above is the only thing that sets
+    # ``tzinfo`` — an awareness guard would be unreachable, and an unreachable guard that
+    # looks load-bearing is worse than no guard.
+    return parsed.replace(tzinfo=timezone.utc)
 
 
 def reconcile_phase4(

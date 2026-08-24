@@ -766,3 +766,32 @@ The recurring lesson, now with five instances: a guard is not load-bearing until
 negative control says so, and a negative control built from the same primitive as the guard is
 not independent of it.
 
+### The sixth: fixing *how* a guard compares, and leaving *what* it accepts `[V]`
+
+The ordering repair moved both comparisons off canonical strings onto parsed instants and left
+an `isinstance(value, datetime)` branch in `_bound_instant`. So the *comparison* became correct
+while the *admission* stayed wrong, and the second review found it.
+
+`to_canonical_obj` renders a `datetime` to exactly the string it would have been. A snapshot
+carrying a live object and one carrying its rendered form therefore **hash identically** —
+`_bind`, `digest_of_snapshot` and the candidate payload are all blind to the difference. A
+`datetime` subclass overriding `__gt__` carried a valid `decision_digest` and satisfied both
+orderings by fiat, admitting an evaluation stamped in year 999 `[V]`.
+
+**The type is the only place the distinction survives**, which is why the check belongs there
+and cannot be a digest comparison. Both helpers now require exact types — the doctrine
+`reconcile_phase4` has always applied to the projection and the decision, extended to the
+values inside a snapshot.
+
+Two things are recorded rather than smoothed over. The awareness check inside `_bound_instant`
+became unreachable once only canonical strings are admitted, so it was **removed** — an
+unreachable guard that reads as load-bearing is worse than none, which is the R-12 lesson
+applied to R-12b's own code. And the inventory stays at **65**, not the 64 predicted: the
+removed guard and the added type gate cancel out. Measured, not assumed.
+
+The pattern across six instances is now specific enough to state as a rule: **a guard has two
+halves — what it admits and how it decides — and fixing one is routinely mistaken for fixing
+both.** R-12 got admission right and ordering wrong. The ordering repair got ordering right and
+admission wrong. Each was verified end to end, and each verification tested only the half that
+had just changed.
+

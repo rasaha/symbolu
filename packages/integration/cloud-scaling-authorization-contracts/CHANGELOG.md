@@ -1,5 +1,44 @@
 # Changelog — ugence-cloud-scaling-authorization-contracts
 
+## [0.7.0] — canonical values only: the temporal guards refuse live objects
+
+`0.6.0` fixed *how* the orderings compare and left *what* they accept. `_bound_instant` had an
+`isinstance(value, datetime)` branch, so a `decision_snapshot` could carry a live object
+instead of a canonical string.
+
+That is not cosmetic. `to_canonical_obj` renders a `datetime` to exactly the string it would
+have been, so **the digest cannot distinguish the two** — `_bind`, `digest_of_snapshot` and the
+candidate payload are all blind to it. A `datetime` subclass overriding `__gt__` therefore
+carried a valid `decision_digest` and satisfied both orderings by fiat, admitting an evaluation
+stamped in year 999. The type is the only place the distinction survives.
+
+### Fixed
+
+- `_bound_instant` requires `type(value) is str`. A snapshot is a canonical artifact — a
+  mapping of primitives the authority's digest covers — so a live object inside one is a
+  refusal, not an input to trust.
+- `_comparable_instant` uses `type(value) is not datetime`, matching the exact-type doctrine
+  `reconcile_phase4` already applies to the projection and the decision.
+
+### Removed
+
+- The awareness check inside `_bound_instant`. With only canonical strings admitted, the parse
+  is the sole thing that sets `tzinfo`, so the guard was unreachable — and an unreachable guard
+  that reads as load-bearing is worse than none.
+
+### Changed
+
+- The `_BOUND_TS_FMT` comment now states the round trip is deliberately partial: `strftime`
+  writes three-digit years that `strptime` refuses. The asymmetry fails closed, which is the
+  only direction it may fail.
+- New negative controls are built **without** `to_canonical_obj`. The `0.5.0` defect survived a
+  green suite because every attack value went through the primitive the guards were wrong in.
+
+### Note on the guard inventory
+
+It stays at **65**, not 64: removing the unreachable awareness check and adding the type gate
+cancel out. Measured rather than predicted.
+
 ## [0.6.0] — R-12b ordering repair: instants, not canonical strings
 
 Found by independent review against `0.5.0`, which was green including the gate-removal sweep.
