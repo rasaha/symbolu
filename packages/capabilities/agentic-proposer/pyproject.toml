@@ -1,0 +1,83 @@
+# Independent distribution for the Ugence Agentic Proposer capability (S0 skeleton).
+#
+# The Agentic Proposer is an ADVISORY capability. It proposes; it decides nothing. It
+# mints no agent identity and authors no organizational role (both are supplied as
+# opaque externally issued facts); it admits no evidence, authorizes no action, grants
+# no operational clearance, and executes nothing. Owner decisions D1-D5 are recorded in
+# docs/architecture/ADR_UGENCE_AGENTIC_PROPOSER_MVP_READINESS.md.
+#
+# S0 implements exactly: the ratified D4 vocabulary, and the boundary proofs that keep
+# this a leaf. It implements NO canonical contracts, NO eligibility or readiness
+# equations, NO proposal identity, NO invoice-domain checks, NO reason codes, NO
+# read-only adapters, NO model-assisted extraction, NO semantic auditor, and NO HTTP
+# endpoint. No public-API snapshot is created or asserted.
+#
+# Dependency policy: Python standard library, pydantic, and ugence-jcs. Nothing else.
+# ugence-jcs is the ONLY permitted implementation of proposal identity; this package
+# contains no canonicalization code of any kind, enforced by
+# tests/test_no_local_canonicalization.py. It must NOT depend on
+# agentic.agentic_framework, symbolu.agentic_framework, agent_runtime_migration, Agent
+# Runtime, Decision Authority, ActionGate, Action Clearance, StoryGraph, Agent Workforce
+# Composer, the policy workflow compiler, cer_v0_1/2/3, action_gate_ref, the control
+# plane, the cloud controller, or any network or model SDK — enforced statically and in
+# an isolated subprocess by tests/test_boundaries.py.
+#
+# Build:  python -m build packages/capabilities/agentic-proposer
+# Verify: python packages/capabilities/agentic-proposer/verify_agentic_proposer_distribution.py
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-agentic-proposer"
+dynamic = ["version"]
+description = "Ugence Agentic Proposer — advisory proposal capability (S0 skeleton: ratified vocabulary and boundary proofs only). Decides nothing, authorizes nothing, executes nothing. Not pilot-validated, not production-certified."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Ugence Labs" }]
+keywords = ["agent", "proposer", "advisory", "governance", "ugence"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Developers",
+    "License :: Other/Proprietary License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Typing :: Typed",
+]
+# Standard library + pydantic + ugence-jcs. This list must not grow.
+# ugence-jcs is declared now because it is the ONLY permitted implementation of
+# proposal identity; S0 imports nothing from it, since S0 implements no identity.
+dependencies = [
+    "pydantic>=2",
+    "ugence-jcs>=0.1.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "build>=1.0"]
+
+[project.urls]
+Documentation = "https://github.com/rasaha/symbolu/tree/main/packages/capabilities/agentic-proposer/docs"
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_agentic_proposer.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_agentic_proposer*"]
+
+[tool.setuptools.package-data]
+ugence_agentic_proposer = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "--import-mode=importlib"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]

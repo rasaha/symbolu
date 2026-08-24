@@ -1,0 +1,101 @@
+name: agentic-proposer-ci
+
+# Scoped CI for the independent ugence-agentic-proposer leaf capability (S0 skeleton).
+# Runs the package suite (leaf-dependency and import boundaries, the ratified D4
+# vocabulary, and the no-local-canonicalization guard), builds the wheel + sdist, and
+# verifies isolated clean-venv installation against a locally built ugence-jcs wheel.
+# No public-API snapshot is created or asserted: S0 freezes no contract.
+# Triggered only by changes to the package, its declared identity substrate, or this
+# workflow.
+
+on:
+  pull_request:
+    paths:
+      - "packages/capabilities/agentic-proposer/**"
+      - "packages/jcs/**"
+      - "docs/architecture/ADR_UGENCE_AGENTIC_PROPOSER_MVP_READINESS.md"
+      - ".github/workflows/agentic-proposer-ci.yml"
+  push:
+    # Run on feature-branch pushes AND on the repository's actual default branch, so a
+    # merge touching the package (matching the path filter) gets a recorded CI run.
+    branches:
+      - "claude/setup-symbolu-monorepo-**"
+      - "claude/agentic-proposer-**"
+    paths:
+      - "packages/capabilities/agentic-proposer/**"
+      - "packages/jcs/**"
+      - "docs/architecture/ADR_UGENCE_AGENTIC_PROPOSER_MVP_READINESS.md"
+      - ".github/workflows/agentic-proposer-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  package-suite:
+    name: Agentic Proposer package suite (source)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        # pydantic is a declared core dependency; the S0 skeleton does not yet import
+        # it, but the environment must match what the package declares.
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest build pydantic
+      - name: Package suite (boundaries, vocabulary, no-local-canonicalization)
+        run: python -m pytest packages/capabilities/agentic-proposer/tests -q
+
+  readiness-artifact:
+    name: MVP readiness artifact must exist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Readiness artifact present and records D1-D5
+        # No public contract may be frozen and no version declared before this exists.
+        run: |
+          artifact=docs/architecture/ADR_UGENCE_AGENTIC_PROPOSER_MVP_READINESS.md
+          test -f "$artifact"
+          for d in D1 D2 D3 D4 D5; do
+            grep -q "^## $d" "$artifact" || { echo "missing decision $d"; exit 1; }
+          done
+      - name: No public-API snapshot may exist at S0
+        run: |
+          ! test -e packages/capabilities/agentic-proposer/public_api.json
+
+  isolated-install:
+    name: Wheel build + isolated installation verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+      - name: Build wheel + sdist, install into a clean venv, run the leaf proof
+        run: python packages/capabilities/agentic-proposer/verify_agentic_proposer_distribution.py
+
+  freeze:
+    name: Platform-freeze verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pydantic
+      - name: Freeze verification (blocking — frozen artifacts must be unchanged)
+        run: python -m platform_freeze.verify --manifest platform/PLATFORM_FREEZE_V1.json
