@@ -7,6 +7,12 @@ only through ``ugence_jcs``, eight barred fields, and the barred name prefixes
 ``Proposal*`` and ``Recommendation*``. The ADR records the enforcement as ``[R]``:
 S1 must assert all of it when it defines the contract.
 
+Owner decision O-3 narrows the kind rule to the type that bears it. The kind and the
+identity field belong to ``ProposerAdvisory`` alone; ``CandidateAdvisory`` is a
+subordinate record carried inside it and must claim neither. The pair is still
+ratified together — half a contract is not a contract — but only one half is
+addressed to an authority.
+
 Every check below is written so it does not depend on the contract already existing:
 
 * the prefix bar, the kind-string bar and the identity-substrate rule are scanned
@@ -45,6 +51,10 @@ ADVISORY_KIND = "ugence.agentic_proposer.advisory.v0"
 KIND_PREFIX = "ugence.agentic_proposer."
 #: The single ratified identity field.
 IDENTITY_FIELD = "advisory_digest"
+#: The one type that declares the ratified kind (O-3). ``CandidateAdvisory`` is a
+#: subordinate record carried inside the advisory, not a second advisory, and must
+#: not claim the authority-facing kind.
+KIND_BEARING_TYPE = "ProposerAdvisory"
 #: Fields D7 bars from both types, at any nesting depth. Each is the mark of an
 #: authority the proposer does not hold: a binding to an exact provider invocation,
 #: to a replayable execution, or to a runtime execution context.
@@ -429,13 +439,57 @@ def test_a_defined_advisory_type_carries_no_barred_field_at_runtime(name, model)
     assert not reachable & BARRED_FIELDS, sorted(reachable & BARRED_FIELDS)
 
 
-@pytest.mark.parametrize("name,model", _defined_advisory_types(), ids=lambda v: str(v)[:40])
-def test_a_defined_advisory_type_declares_the_ratified_kind(name, model):
-    tree_kinds = {getattr(model, "KIND", None), getattr(model, "kind", None)}
+def _declared_kinds_of(model):
+    """Every kind string a live type declares: ``KIND``, ``kind``, or the default of
+    a ``kind`` field."""
+    declared = {getattr(model, "KIND", None), getattr(model, "kind", None)}
     fields = getattr(model, "model_fields", {}) or {}
     if "kind" in fields:
-        tree_kinds.add(getattr(fields["kind"], "default", None))
-    assert ADVISORY_KIND in {k.value if hasattr(k, "value") else k for k in tree_kinds}
+        declared.add(getattr(fields["kind"], "default", None))
+    return {k.value if hasattr(k, "value") else k for k in declared if k is not None}
+
+
+def test_the_kind_reader_sees_each_way_a_type_can_declare_one():
+    """Self-test. A reader that stopped seeing one of the three spellings would
+    report a clean ``CandidateAdvisory`` that claims the kind through the other."""
+    pydantic = pytest.importorskip("pydantic")
+
+    class ByConstant:
+        KIND = ADVISORY_KIND
+
+    class ByAttribute:
+        kind = ADVISORY_KIND
+
+    class ByDefault(pydantic.BaseModel):
+        kind: str = ADVISORY_KIND
+
+    class ByNothing:
+        pass
+
+    for model in (ByConstant, ByAttribute, ByDefault):
+        assert _declared_kinds_of(model) == {ADVISORY_KIND}, model.__name__
+    assert _declared_kinds_of(ByNothing) == set()
+
+
+@pytest.mark.parametrize("name,model", _defined_advisory_types(), ids=lambda v: str(v)[:40])
+def test_only_the_authority_facing_advisory_declares_the_ratified_kind(name, model):
+    """O-3. The kind is ``ProposerAdvisory``'s and nothing else's.
+
+    ``CandidateAdvisory`` is a subordinate per-candidate record carried inside the
+    advisory; it is not itself addressed to an authority. A kind is what a consumer
+    routes and stores on, so a candidate record declaring the advisory kind would be
+    consumable as an advisory in its own right — the boundary D7 draws by naming,
+    defeated by a field default.
+    """
+    declared = _declared_kinds_of(model)
+    if name == KIND_BEARING_TYPE:
+        assert ADVISORY_KIND in declared, (
+            f"{name} does not declare the ratified kind: {sorted(declared)}")
+    else:
+        assert ADVISORY_KIND not in declared, (
+            f"{name} claims the authority-facing advisory kind")
+        assert not any(k.startswith(KIND_PREFIX) for k in declared), (
+            f"{name} claims a kind in this capability's namespace: {sorted(declared)}")
 
 
 @pytest.mark.parametrize("name,model", _defined_advisory_types(), ids=lambda v: str(v)[:40])
@@ -455,6 +509,9 @@ def test_the_enforcement_is_pinned_to_the_ratified_values():
     assert KIND_PREFIX == "ugence.agentic_proposer."
     assert ADVISORY_KIND.startswith(KIND_PREFIX) and KIND_PREFIX != ADVISORY_KIND
     assert IDENTITY_FIELD == "advisory_digest"
+    # O-3: one kind, borne by one type, and that type is the authority-facing one.
+    assert KIND_BEARING_TYPE == "ProposerAdvisory"
+    assert KIND_BEARING_TYPE in ADVISORY_TYPES
     assert BARRED_FIELDS == frozenset({
         "fingerprint", "provider_id", "operation", "arguments",
         "idempotency_key", "workflow_id", "instance_id", "task_id"})

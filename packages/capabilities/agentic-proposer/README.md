@@ -36,6 +36,15 @@ rule against projecting an auditor status into an outcome or disposition field, 
 advisory contract shape, and D8's containment bounds on the role projection. Each is
 a test that holds today and arms itself when the surface it guards appears.
 
+Owner decisions O-1 – O-4, ratified after those guards were audited, narrow two of
+them and add two more: D8's lifecycle bound now prohibits mutation operations and
+callable authority rather than the vocabulary of lifecycle facts determined elsewhere
+(`SUSPENDED`, `REVOKED`, `RoleActivationStatus`, `activation_status`, `expires_at` are
+retained); the ratified kind belongs to `ProposerAdvisory` alone; the three
+selection-dependent fields are nullable and coupled to `selected_candidate_id`; and
+identifiers and references — not claims, reasons or summaries — are ASCII-only,
+because identity is computed with an empty Unicode normalization profile.
+
 The eight canonical contracts and Equations 1–3 are still unimplemented: nothing in
 this repository defines them, so they were not inferred. See
 [`docs/S1_ENFORCEMENT.md`](docs/S1_ENFORCEMENT.md).

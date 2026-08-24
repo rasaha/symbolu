@@ -206,6 +206,55 @@ every guard green by assembling names through a helper function. The route is
 disclosed as uncovered; which reading of D2 applies decides whether closing it is
 work or waste.
 
+### Changed — owner decisions O-1 – O-4
+
+Four decisions ratified after the S1 enforcement guards were audited. Two narrow a
+guard that was over-broad, two add one that was missing. No `src/` change, no version
+bump, no public-API snapshot; all four are recorded in
+`docs/architecture/ADR_UGENCE_AGENTIC_PROPOSER_MVP_READINESS.md` under *Ratified
+refinements*.
+
+* **O-2 — the D8 lifecycle bound now prohibits authority, not vocabulary.** The scan
+  matched verb stems, so it rejected `SUSPENDED`, `REVOKED`, `RoleActivationStatus`,
+  `activation_status` and `expires_at`: the domain's correct words for lifecycle facts
+  another authority determined. Names are now classified by grammatical form and
+  syntactic position — a mutation form (`activate`, `suspending_role`) is barred in
+  every position; an actor form (`RoleActivator`) is barred as a type or a callable and
+  permitted as a reference to an external party; any lifecycle-stemmed field annotated
+  as a callable is barred. The six verbs D8 names explicitly are still barred in every
+  position, and the five retained names are pinned by equality.
+* **O-2 — the narrowing is mutation-tested.** Each rule is weakened in turn and a real
+  violation must escape the weakened guard, so no rule survives without a sample that
+  would catch its removal; a mutant that gained a false positive against the retained
+  vocabulary fails too.
+* **O-3 — the ratified kind is narrowed to `ProposerAdvisory`.** The D7 guard required
+  the kind of both advisory types. `CandidateAdvisory` is a subordinate per-candidate
+  record, and a kind is what a consumer routes and stores on, so a candidate record
+  declaring the advisory kind would be consumable as an advisory in its own right. It
+  is now barred from the ratified kind and from any other kind in this namespace, and
+  the kind reader is self-tested against all three spellings a type can declare one
+  through.
+
+### Added — O-1 and O-4 enforcement
+
+* `tests/test_selection_dependent_fields.py` — O-1. `recommended_disposition`,
+  `requested_review_action` and `requested_review_destination_role_ref` are nullable,
+  and all three are `None` when `selected_candidate_id` is. Dormant until a class
+  declares one of them, then requiring the selector on that class, a `None`-admitting
+  annotation on each dependent, and a coupling enforced by code rather than by a
+  docstring. The rule is stated executably on a reference model, so the required
+  behaviour runs today. O-1's value-agreement clause binds the stage that introduces
+  candidates and is recorded as a boundary, not covered.
+* `tests/test_identifier_normalization.py` — O-4. Identifier and reference fields are
+  validated against `^[A-Za-z0-9][A-Za-z0-9._:/-]*$`; claims, reasons, summaries and
+  other human-readable text must not be. The premise is demonstrated against the
+  substrate rather than asserted — with an empty `nfc_paths` profile, two normalization
+  forms of one identifier canonicalize to different bytes — and the guard fails if a
+  non-empty profile is ever passed. How the pattern is applied is pinned with it:
+  `re.match` admits a trailing newline against `$`, `re.fullmatch` does not.
+* Both modules are pinned by name in `tests/test_no_local_canonicalization.py`, so
+  neither can leave the no-local-canonicalization scan silently.
+
 ### Not implemented
 
 The eight canonical contracts, Equations 1–3, proposal identity, invoice-domain

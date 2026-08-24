@@ -2,14 +2,17 @@
 
 ## What landed
 
-The three `[R]` obligations the MVP readiness ADR carries for S1, each enforced by a
-test rather than by prose:
+The `[R]` obligations the MVP readiness ADR carries for S1 — D6–D8 as first
+ratified, and the O-1 – O-4 refinements ratified after those guards were audited —
+each enforced by a test rather than by prose:
 
 | Obligation | Decision | Test module |
 | --- | --- | --- |
 | No auditor status may be assigned or converted into a `TerminalOutcome` or `CandidateDisposition` field | D6 standing rule | `tests/test_no_auditor_status_projection.py` |
-| The advisory contract's names, kind, sole identity field, identity substrate, barred fields at any nesting depth, and barred name prefixes | D7 | `tests/test_advisory_contract_shape.py` |
-| The role projection is not re-exported from any shared contract package and exposes no role lifecycle verb | D8 | `tests/test_role_projection_bounds.py` |
+| The advisory contract's names, kind, sole identity field, identity substrate, barred fields at any nesting depth, and barred name prefixes | D7, narrowed by O-3 | `tests/test_advisory_contract_shape.py` |
+| The role projection is not re-exported from any shared contract package and takes no role lifecycle authority | D8, narrowed by O-2 | `tests/test_role_projection_bounds.py` |
+| The three selection-dependent fields are nullable and coupled to `selected_candidate_id` | O-1 | `tests/test_selection_dependent_fields.py` |
+| Identifier and reference fields are ASCII; human-readable text is not restricted | O-4 | `tests/test_identifier_normalization.py` |
 
 Each guard is written to hold **before** the surface it governs exists. The parts
 that can be checked today — the barred name prefixes, the kind-string bar, the
@@ -31,6 +34,53 @@ passed — the detector was sound against its samples and blind to the ordinary
 spelling of the violation. Samples now cover each shape written three ways (bare,
 aliased, module-qualified), and a scanner without a self-test is treated as a gap in
 its own right, not as a scanner that happens to be untested.
+
+## What O-1 – O-4 changed
+
+Four owner decisions were ratified after these guards were audited. Two narrow a
+guard that was over-broad, and two add one that was missing. All four are recorded in
+the readiness ADR under *Ratified refinements*.
+
+**O-2 — the lifecycle bound is on authority, not on vocabulary.** The D8 scan matched
+verb stems, so it rejected `SUSPENDED`, `REVOKED`, `RoleActivationStatus`,
+`activation_status` and `expires_at` — the domain's correct words for lifecycle facts
+some other authority determined. A stem scan cannot tell an act from a description,
+and a rename bought under that pressure removes no authority while costing the
+contract its meaning. The guard now reads grammatical form and syntactic position: a
+mutation form is barred everywhere, an actor form is barred as a type or a callable
+and permitted as a reference to an external party, and any lifecycle-stemmed field
+annotated as a callable is barred. The narrowing is mutation-tested — each rule is
+weakened in turn and a real violation must escape — because a guard that has just
+been narrowed is exactly the one whose remaining rules need showing to be
+load-bearing.
+
+**O-3 — one kind, one bearer.** The D7 guard required the ratified kind of both
+advisory types. `CandidateAdvisory` is a subordinate per-candidate record; a kind is
+what a consumer routes and stores on, so a candidate record declaring the advisory
+kind would be consumable as an advisory in its own right. The kind is now required on
+`ProposerAdvisory` and barred on `CandidateAdvisory`, along with any other kind in
+this capability's namespace.
+
+**O-1 — the selection-dependent fields.** `recommended_disposition`,
+`requested_review_action` and `requested_review_destination_role_ref` are nullable and
+all three are `None` when `selected_candidate_id` is. The guard arms with the first
+class declaring any of them and then requires the selector on the same class, a
+`None`-admitting annotation on each dependent, and a coupling enforced by code rather
+than by a docstring. O-1's second clause — that a dependent field agrees with the
+selected candidate and its permitted routing — is a statement about values a stage
+with candidates produces; nothing here has candidates, so the guard records that
+boundary instead of covering it.
+
+**O-4 — ASCII identifiers, and only identifiers.** Identity is computed through
+`ugence_jcs` with an empty `nfc_paths` profile, so nothing is Unicode-normalized before
+canonicalization and two normalization forms of one identifier are two identities. The
+guard demonstrates that against the substrate rather than asserting it, requires the
+ratified pattern on identifier and reference fields, and bars it from claims, reasons,
+summaries and other human-readable text, where an ASCII restriction would reject the
+languages those are written in. It also fails if a non-empty normalization profile is
+ever passed, since that is the premise the whole rule rests on. How the pattern is
+applied is pinned with it: `re.match` admits a trailing newline against `$`, and
+`re.fullmatch` does not.
 
 ## What the D6 scan covers, and what it does not
 

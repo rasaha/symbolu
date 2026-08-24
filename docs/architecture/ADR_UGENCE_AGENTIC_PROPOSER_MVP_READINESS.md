@@ -12,8 +12,10 @@ boundary are on the record. It is a readiness record, not a design.
 
 D1–D5 were ratified before implementation. D6–D10 were ratified after Stage P and
 Stage S0 landed, and close every question this artifact previously carried as open;
-they are recorded under *Ratified resolutions* below. No owner decision remains
-open, so S1 is unblocked on ratification grounds.
+they are recorded under *Ratified resolutions* below. O-1 – O-4 were ratified after
+the S1 enforcement guards landed and were audited, and are recorded under *Ratified
+refinements* below; each narrows or completes a rule D6–D8 already carry. No owner
+decision remains open, so S1 is unblocked on ratification grounds.
 
 Evidence labels: `[V]` verified against this repository, `[I]` inferred,
 `[R]` requires ratification, `[G]` gap.
@@ -363,6 +365,9 @@ field, that identity is computed only by a call into `ugence_jcs`, that none of 
 eight barred fields is present at any nesting depth, and that no exported name
 begins with `Proposal` or `Recommendation`.
 
+**Narrowed by O-3.** The kind belongs to `ProposerAdvisory` alone; `CandidateAdvisory`
+must not declare it. See *O-3* under *Ratified refinements*.
+
 ## D8 — The Agent Constitution will not exist before S1
 
 The Agent Constitution will not exist before S1. The D1 CognitiveRoleContract
@@ -387,6 +392,11 @@ cited as conformance with a constitution that does not exist.
 
 `[R]` S1 must enforce the export bound: the v0 projection is not re-exported from
 any shared contract package, and no lifecycle verb appears on its surface.
+
+**Narrowed by O-2.** The lifecycle bound is on mutation operations and callable
+authority, not on a contract's vocabulary for lifecycle facts determined elsewhere.
+`SUSPENDED`, `REVOKED`, `RoleActivationStatus`, `activation_status` and `expires_at`
+are retained. See *O-2* under *Ratified refinements*.
 
 ## D9 — The production CER identity path is never migrated onto ugence-jcs
 
@@ -428,10 +438,119 @@ publishing would add a release surface with no reader.
 
 ---
 
+## Ratified refinements (O-1 – O-4)
+
+O-1 – O-4 were ratified after the S1 enforcement guards landed and were audited.
+Each narrows or completes a rule D6–D8 already carry; none reopens a ratified
+decision. They are recorded verbatim in substance and are not reinterpreted here.
+
+## O-1 — Selection-dependent fields are nullable and coupled
+
+Three fields depend on a selected candidate and are nullable with it:
+
+* `recommended_disposition: CandidateDisposition | None`
+* `requested_review_action: ReviewAction | None`
+* `requested_review_destination_role_ref: str | None`
+
+When `selected_candidate_id` is `None`, all three are `None`. When a selected
+candidate exists in a future stage, they must match that candidate and its permitted
+routing.
+
+`[I]` The coupling is what keeps the advisory readable. A disposition or a routing
+request standing next to no selected candidate is a recommendation about nothing,
+and a consumer cannot tell whether the selection was lost in transit or the routing
+was invented — the two failure modes call for opposite responses.
+
+`[V]` The nullability clause is enforced by
+`tests/test_selection_dependent_fields.py`: the guard arms with the first class that
+declares any of the three, and then requires the selector on the same class, an
+annotation admitting `None` on each dependent field, and a coupling enforced by code
+in that class rather than by its docstring. The rule itself is stated executably on
+a reference model, so the required behaviour is exercised today.
+
+`[R]` The value-agreement clause — a dependent field agreeing with the selected
+candidate and its permitted routing — binds the stage that introduces candidates.
+Nothing in this package has candidates, so nothing here can check it; the guard
+records the boundary rather than covering it.
+
+## O-2 — The lifecycle bound is on authority, not on vocabulary
+
+The governance vocabulary is retained: `SUSPENDED`, `REVOKED`, `RoleActivationStatus`,
+`activation_status`, `expires_at`. D8's lifecycle-verb bound is narrowed to prohibit
+agent-owned lifecycle **mutation operations or callable authority** — `activate`,
+`suspend`, `revoke`, `expire` or equivalent state-changing methods — without
+prohibiting contracts from describing externally determined lifecycle states and
+validity periods.
+
+`[I]` D8's substance is unchanged: activation state stays an input fact, never
+computed. What changes is the reading of the guard. A scan matching stems alone
+cannot tell an act from a description, so it rejects the domain's correct words for
+facts some other authority determined — and a rename bought under that pressure
+costs the contract its meaning while removing no authority. The proposer is a
+*reader* of roles; a reader needs the vocabulary of what it read.
+
+`[V]` `tests/test_role_projection_bounds.py` now classifies each name by grammatical
+form and syntactic position: a mutation form (`activate`, `suspending_role`) is
+barred in every position, an actor form (`RoleActivator`) is barred as a type or a
+callable and permitted as a reference to an external party, and any lifecycle-stemmed
+field annotated as a callable is barred. The five retained names are pinned by
+equality, and the six verbs D8 names explicitly are still barred in every position.
+
+`[V]` The narrowing is mutation-tested. Each rule is weakened in turn and a real
+violation must escape the weakened guard, so no rule survives without a sample that
+would catch its removal; a mutant that gained a false positive against the retained
+vocabulary fails too.
+
+## O-3 — Only ProposerAdvisory bears the ratified kind
+
+The ratified-kind guard is narrowed to `ProposerAdvisory`. `CandidateAdvisory` is a
+subordinate candidate record and must not claim the authority-facing advisory kind.
+
+`[I]` A kind is what a consumer routes and stores on. A per-candidate record
+declaring the advisory kind would be consumable as an advisory in its own right —
+the boundary D7 draws by naming, defeated by a field default. D7's pairing is
+unaffected: both types are still ratified together, but only one is addressed to an
+authority.
+
+`[V]` `tests/test_advisory_contract_shape.py` requires the kind on `ProposerAdvisory`
+and bars `CandidateAdvisory` from declaring it or any other kind in this capability's
+namespace. The reader is self-tested against all three spellings a type can declare a
+kind through, so a narrowed reader fails rather than reporting a clean record.
+
+## O-4 — ASCII identifiers, and only identifiers
+
+Identifier and reference fields are validated against `^[A-Za-z0-9][A-Za-z0-9._:/-]*$`.
+The restriction applies to identifiers and references only — never to human-readable
+text, claims, reasons or summaries.
+
+`[V]` The restriction is required because this capability computes identity through
+`ugence_jcs` with an empty `nfc_paths` profile: no string is Unicode-normalized before
+canonicalization, so two normalization forms of one identifier produce two identities
+while reading identically. `tests/test_identifier_normalization.py` demonstrates this
+against the substrate rather than asserting it, and fails if a non-empty profile is
+ever passed.
+
+`[I]` The scope limit is not a softening. Identifiers are matched, routed and joined
+on, so an ambiguity there corrupts identity; free text is carried, not matched, and an
+ASCII bar on a reason or a summary would reject the languages those are written in —
+a defect rather than a safeguard.
+
+`[V]` The guard classifies fields by name — identifier and reference suffixes first,
+so `reason_code` is a code and `reason` is text — then requires the ratified pattern
+on the first kind and bars it on the second. The pattern is pinned by equality, and
+its application is pinned too: `re.match` admits a trailing newline against `$` and
+`re.fullmatch` does not, so stating the pattern without stating the application would
+leave the rule one convenience call away from admitting a value it names as invalid.
+
+---
+
 ## Open owner decisions
 
-None. D6–D10 close every question this artifact previously carried as open.
+None. D6–D10 close every question this artifact previously carried as open, and
+O-1 – O-4 close the four the S1 enforcement audit raised.
 
-`[R]` markers that remain above are implementation obligations that S1 must
-discharge — mechanical enforcement of D6's standing rule, D7's contract shape and
-D8's export bound — not unratified decisions.
+`[R]` markers that remain above are implementation obligations, not unratified
+decisions. D6's standing rule, D7's contract shape and D8's export bound are now
+mechanically enforced; what remains is O-1's value-agreement clause, which binds the
+stage that introduces candidates, and the contract surface itself, which is still
+undefined in this repository.
