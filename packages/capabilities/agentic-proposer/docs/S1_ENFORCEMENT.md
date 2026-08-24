@@ -114,10 +114,42 @@ module merely received — a parameter, an attribute such as `info.name` — sta
 permitted, which is how the guards walk this package's own modules. `importlib`
 itself is additionally barred as an import in `src`.
 
-The tracking is per binding, not per value: a name assembled through a route the
-scan does not model as composition (a helper function returning a built string, a
-name read from a file or environment) is not caught. That is the dynamic-construction
-boundary below, reached by a different road.
+The tracking is per binding and per scope: a binding in one scope is never a fact
+about another, so a module-level `name = "age" + "ntic"` says nothing about the
+parameter of `def load(name)` or about `import_module(name) for name in infos` — the
+shape the guards themselves use. A name rebound from a non-assembled source stops
+being composed, and an augmented assignment marks a name only when what it appends
+is text.
+
+It is per binding, not per value: a name assembled through a route the scan does not
+model as composition — a helper function returning a built string, a name read from
+a file, an environment variable, a dict or list element — is not caught. That is the
+dynamic-construction boundary below, reached by a different road.
+
+### `[R]` Owner decision — does D2 require the invariant or the scan?
+
+This is not a scanner detail and should not be settled as one. An audit demonstrated
+a working, byte-correct local SHA-256 identity function living in `src/` with every
+guard green, by assembling the module and attribute names through a helper function:
+
+```python
+def _b(*p): return ''.join(p)
+_m = __import__(_b('hash', 'lib'))
+```
+
+The route is disclosed above as uncovered, but disclosure is not closure. Two
+readings of D2 are available and they differ in cost:
+
+* **D2 means the invariant** — no working local digest is reachable from `src` at
+  all. Closing this means tracking assembly through call returns, subscripts and
+  external inputs: materially more analysis, and a scan that will keep growing
+  as new routes are found.
+* **D2 means the scan** — no *modelled* composition route reaches a hashing module,
+  and identity computed by deliberately defeating the scan is a governance failure
+  rather than a test failure.
+
+Five rounds of hardening have closed every route an auditor named and disclosed the
+rest. Which of the two D2 means decides whether a sixth round is work or waste.
 
 `tests/test_no_local_canonicalization.py` now pins the three modules by name and
 asserts that every file in `src` and `tests` is either scanned or one of the two

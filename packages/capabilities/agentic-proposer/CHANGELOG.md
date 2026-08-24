@@ -180,6 +180,32 @@ states what is tracked and what is not. Two entries join the known-uncovered lis
 projection split across two modules where neither alone names both vocabularies, and
 a name composed through a route the scan does not model as composition.
 
+### Fixed — fifth audit round
+
+The audit of the previous revision recommended merge and named one defect worth
+closing first: the assembled-name set was built by walking the whole module, so one
+scope's binding was a fact about every other. No `src/` change, no version bump, no
+public-API snapshot.
+
+* **Assembled names are tracked per scope.** A module-level `name = "age" + "ntic"`
+  marked the parameter of `def load(name)` as composed, and with it
+  `import_module(name) for name in infos` — the shape the guards themselves use to
+  walk this package. Parameters, loop and comprehension variables, `with`/`except`
+  bindings and imports now shadow an outer binding; a name rebound from a
+  non-assembled source stops being composed; and an augmented assignment marks a
+  name only when what it appends is text, so `n = 0; n += 1` no longer does.
+* This is the third appearance of one defect: a merged package-wide alias map, then
+  a merged module-wide alias map, now a merged module-wide assembled-name set. The
+  rule it yields is worth stating once — **a binding in one scope is never a fact
+  about another** — and is recorded in `docs/S1_ENFORCEMENT.md`.
+
+`docs/S1_ENFORCEMENT.md` records an `[R]` owner decision: whether D2 means the
+invariant (no working local digest reachable from `src`) or the scan (no modelled
+composition route). An audit demonstrated a byte-correct local SHA-256 in `src` with
+every guard green by assembling names through a helper function. The route is
+disclosed as uncovered; which reading of D2 applies decides whether closing it is
+work or waste.
+
 ### Not implemented
 
 The eight canonical contracts, Equations 1–3, proposal identity, invoice-domain

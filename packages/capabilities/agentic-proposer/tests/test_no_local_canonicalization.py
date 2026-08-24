@@ -120,7 +120,8 @@ def _dynamic_import_offenders(source, barred, filename="<sample>"):
       guards in this directory walk this package's own modules.
     """
     tree = ast.parse(source, filename=filename)
-    assembled = _assembled_string_names(tree)
+    by_scope = _assembled_names_by_scope(tree)
+    owner = _enclosing_scopes(tree)
     offenders = []
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
@@ -136,7 +137,8 @@ def _dynamic_import_offenders(source, barred, filename="<sample>"):
                 offenders.append(f"{called}({argument.value!r})")
         elif _is_assembled_string(argument):
             offenders.append(f"{called}(<assembled name>)")
-        elif isinstance(argument, ast.Name) and argument.id in assembled:
+        elif (isinstance(argument, ast.Name)
+              and argument.id in by_scope.get(owner.get(id(node), id(tree)), set())):
             # Assembly one line earlier is still assembly. Without this the rule
             # reads as coverage it does not have: ``_n = "hash" + "lib"`` followed
             # by ``__import__(_n)`` passes a bare name the scan would permit.
@@ -161,24 +163,120 @@ def _is_assembled_string(node):
     return False
 
 
-def _assembled_string_names(tree):
-    """Names bound anywhere in the module to an assembled string.
+#: Nodes that open a scope of their own. A binding inside one is not a binding
+#: outside it — including comprehensions, whose loop variable is exactly the shape
+#: the guards use to walk this package.
+SCOPE_NODES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda,
+               ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)
 
-    A dynamic import may be handed a name the module did not compose — that is how
-    the guards here walk this package's own modules — but not one it did.
+
+def _own_scope_nodes(scope):
+    """Nodes belonging to ``scope`` itself, not to any scope nested inside it."""
+    for child in ast.iter_child_nodes(scope):
+        if isinstance(child, SCOPE_NODES):
+            continue
+        yield child
+        yield from _own_scope_nodes(child)
+
+
+def _scope_bindings(scope):
+    """``(assembled, plain)`` — names this scope binds, by how it binds them.
+
+    ``plain`` is every other way a name is bound here: a parameter, a loop or
+    comprehension variable, an import, an assignment from something that is not
+    string assembly. Those SHADOW an outer binding of the same name rather than
+    inheriting its meaning.
     """
-    names = set()
-    for node in ast.walk(tree):
+    assembled, plain = set(), set()
+
+    def bind(target, is_assembled):
+        for node in ast.walk(target):
+            if isinstance(node, ast.Name):
+                (assembled if is_assembled else plain).add(node.id)
+                (plain if is_assembled else assembled).discard(node.id)
+
+    args = getattr(scope, "args", None)
+    if args is not None:
+        for argument in (list(args.posonlyargs) + list(args.args)
+                         + list(args.kwonlyargs)
+                         + [a for a in (args.vararg, args.kwarg) if a]):
+            plain.add(argument.arg)
+    for generator in getattr(scope, "generators", []):
+        bind(generator.target, False)
+
+    for node in _own_scope_nodes(scope):
         if isinstance(node, ast.Assign):
-            if _is_assembled_string(node.value):
-                names |= {t.id for t in node.targets if isinstance(t, ast.Name)}
-        elif isinstance(node, ast.AugAssign) and isinstance(node.target, ast.Name):
-            # ``_n += "lib"`` composes just as ``_n = _n + "lib"`` does.
-            names.add(node.target.id)
+            for target in node.targets:
+                bind(target, _is_assembled_string(node.value))
         elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
-            if node.value is not None and _is_assembled_string(node.value):
-                names.add(node.target.id)
-    return names
+            if node.value is not None:
+                bind(node.target, _is_assembled_string(node.value))
+        elif isinstance(node, ast.AugAssign) and isinstance(node.target, ast.Name):
+            # ``_n += "lib"`` composes; ``n += 1`` does not. The value decides,
+            # not the fact that an augmented assignment happened.
+            value = node.value
+            appends_text = (_is_assembled_string(value)
+                            or (isinstance(value, ast.Constant)
+                                and isinstance(value.value, str)))
+            if isinstance(node.op, ast.Add) and appends_text:
+                assembled.add(node.target.id)
+        elif isinstance(node, (ast.For, ast.AsyncFor)):
+            bind(node.target, False)
+        elif isinstance(node, ast.withitem) and node.optional_vars is not None:
+            bind(node.optional_vars, False)
+        elif isinstance(node, ast.NamedExpr):
+            bind(node.target, _is_assembled_string(node.value))
+        elif isinstance(node, (ast.Import, ast.ImportFrom)):
+            plain |= {a.asname or a.name.split(".")[0] for a in node.names}
+        elif isinstance(node, ast.ExceptHandler) and node.name:
+            plain.add(node.name)
+    return assembled, plain
+
+
+def _assembled_names_by_scope(tree):
+    """``{id(scope): names assembled and visible there}``, scope by scope.
+
+    Built per scope rather than per module. A set merged across the module makes one
+    scope's binding a fact about another: a module-level ``name = "age" + "ntic"``
+    would mark the parameter of ``def load(name)`` as composed, and the guards' own
+    ``import_module(name) for name in infos`` with it. That is the merged-alias-map
+    defect one level down, and it rejects ordinary code.
+    """
+    by_scope = {}
+
+    def visit(scope, inherited):
+        assembled, plain = _scope_bindings(scope)
+        visible = (inherited - plain) | assembled
+        by_scope[id(scope)] = visible
+        for node in ast.walk(scope):
+            if node is not scope and isinstance(node, SCOPE_NODES):
+                if id(node) not in by_scope:
+                    visit(node, visible)
+
+    visit(tree, set())
+    return by_scope
+
+
+def _enclosing_scopes(tree):
+    """``{id(node): id(nearest enclosing scope)}`` for every node in ``tree``."""
+    owner = {}
+
+    def visit(scope):
+        for node in _own_scope_nodes(scope):
+            owner[id(node)] = id(scope)
+        for node in ast.walk(scope):
+            if node is not scope and isinstance(node, SCOPE_NODES):
+                if id(node) not in owner:
+                    owner[id(node)] = id(scope)
+                    visit(node)
+
+    visit(tree)
+    return owner
+
+
+def _assembled_string_names(tree):
+    """Names assembled and visible at module scope."""
+    return _assembled_names_by_scope(tree)[id(tree)]
 
 
 def _barred_for(path):
@@ -349,6 +447,50 @@ def test_a_dynamic_import_cannot_reach_a_barred_module(sample):
     assert _dynamic_import_offenders(sample, FORBIDDEN_IMPORTS)
 
 
+#: Lawful modules that assemble a string somewhere and, separately, import by a
+#: variable of the same name. A module-wide set makes the first fact about the
+#: second and rejects all of these.
+SCOPED_NAME_REUSE_SAMPLES = (
+    # A parameter shadowing a module-level assembled name.
+    ("name = 'age' + 'ntic'\n"
+     "def load(name):\n    return __import__(name)\n"),
+    # A comprehension loop variable — the shape the guards themselves use.
+    ("import importlib\n"
+     "name = 'age' + 'ntic'\n"
+     "modules = [importlib.import_module(name) for name in infos]\n"),
+    # A for-loop variable.
+    ("import importlib\n"
+     "name = 'age' + 'ntic'\n"
+     "def load(infos):\n"
+     "    for name in infos:\n        importlib.import_module(name)\n"),
+    # Rebound from a non-assembled source before use.
+    ("import importlib\n"
+     "name = 'age' + 'ntic'\n"
+     "name = info.name\n"
+     "module = importlib.import_module(name)\n"),
+)
+
+
+@pytest.mark.parametrize("sample", SCOPED_NAME_REUSE_SAMPLES,
+                         ids=lambda s: s.strip().split("\n")[-1][:44])
+def test_an_assembled_name_in_one_scope_is_not_a_fact_about_another(sample):
+    """A binding in one scope is never a binding in another.
+
+    A set merged across the module is the merged alias map one level down: the
+    first lawful contract that assembles a string and elsewhere imports by a
+    same-named variable would fail this guard for no reason.
+    """
+    assert not _dynamic_import_offenders(sample, FORBIDDEN_IMPORTS)
+
+
+def test_a_nested_scope_still_inherits_a_genuinely_assembled_name():
+    """Scoping must not become a way out: an inner scope that does NOT rebind the
+    name still sees the outer assembly."""
+    sample = ("_NAME = 'hash' + 'lib'\n"
+              "def load():\n    return __import__(_NAME)\n")
+    assert _dynamic_import_offenders(sample, FORBIDDEN_IMPORTS)
+
+
 @pytest.mark.parametrize("sample", [
     "import importlib\nmodule = importlib.import_module(info.name)\n",
     "import importlib\nmodule = importlib.import_module(name)\n",
@@ -376,6 +518,11 @@ def test_a_dynamic_import_of_a_named_module_is_permitted(sample):
     ("_n = 'hashlib'\n", set()),
     ("_n = info.name\n", set()),
     ("_n = other(x)\n", set()),
+    # The value decides, not the fact of an augmented assignment.
+    ("n = 0\nn += 1\n", set()),
+    ("total = 0\nfor x in xs:\n    total += x\n", set()),
+    # A name rebound from a non-assembled source is no longer assembled.
+    ("_n = 'hash' + 'lib'\n_n = info.name\n", set()),
 ])
 def test_assembled_string_names_are_tracked(source, expected):
     """The binding, not just the call argument.
