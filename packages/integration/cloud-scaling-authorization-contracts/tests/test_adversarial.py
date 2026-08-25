@@ -713,3 +713,113 @@ def test_a_lying_int_subclass_cannot_carry_a_policy_ceiling(projection, decision
         build_policy_binding(scope, max_magnitude=10_000, max_delta=_LyingCeiling(5))
     assert exc.value.reason is Reason.MALFORMED_CANONICAL_FIELD
     assert "max_permitted_delta" in str(exc.value)
+
+
+# ======================================================================================
+# A-47 … A-51 — the string surface: every identity guard decides with ``!=``
+# ======================================================================================
+
+
+class _LyingText(str):
+    """A ``str`` that is never unequal to anything.
+
+    ``__eq__`` is left honest on purpose: an over-eager ``__eq__`` trips unrelated
+    emptiness and normalization checks, and the guards under test all decide with ``!=``.
+    Built by hand, never through ``to_canonical_obj`` — the canonical rendering of this
+    object is byte-identical to the honest string, which is precisely why no digest can
+    see it and why the admitted *type* is the only place the difference survives.
+    """
+
+    def __ne__(self, other):  # noqa: D105 - the lie is the point
+        return False
+
+    def __hash__(self):  # noqa: D105 - __ne__ overridden, so restate str's hash
+        return str.__hash__(self)
+
+
+def test_a_lying_string_cannot_relocate_the_action(projection):
+    """A-47: the scope's locus fields are admitted by exact type (candidate.py:601-607)."""
+
+    honest = build_target_scope(projection, region="ap-south-1")
+    assert honest.region == "ap-south-1"
+
+    with pytest.raises(CandidateConstructionError) as exc:
+        build_target_scope(projection, region=_LyingText("ap-south-1"))
+    assert exc.value.reason is Reason.MALFORMED_CANONICAL_FIELD
+    assert "region must be a string" in str(exc.value)
+
+
+def test_a_lying_scope_digest_cannot_rebind_a_policy_binding(
+    projection, decision, attestation
+):
+    """A-48: a binding cannot be made to reference a scope it was not issued for."""
+
+    scope_a = build_target_scope(projection)
+    scope_b = build_target_scope(projection, account_id="acct-999999999999")
+
+    # Control: the honest binding for scope B is refused against scope A.
+    with pytest.raises(PolicyTargetBindingError) as exc:
+        build_capacity_authorization_candidate(
+            projection=projection,
+            decision=decision,
+            producer_attestation=attestation,
+            policy_binding=build_policy_binding(scope_b),
+            policy_coordinate_binding=build_policy_coordinate_binding(scope_a),
+            target_scope=scope_a,
+        )
+    assert exc.value.reason is Reason.POLICY_TARGET_CONTENT_MISMATCH
+
+    # The attack cannot even be assembled: the digest is admitted by exact type.
+    with pytest.raises(CandidateConstructionError) as exc:
+        build_policy_binding(scope_b, target_scope_digest=_LyingText(scope_b.digest()))
+    assert exc.value.reason is Reason.MALFORMED_CANONICAL_FIELD
+
+
+def test_a_lying_policy_id_cannot_carry_two_policy_identities(projection):
+    """A-49: the candidate's two policy references are compared by exact-typed strings."""
+
+    scope = build_target_scope(projection)
+    with pytest.raises(CandidateConstructionError) as exc:
+        build_policy_coordinate_binding(scope, policy_id=_LyingText("someone.else"))
+    assert exc.value.reason is Reason.MALFORMED_CANONICAL_FIELD
+
+
+def test_a_lying_tenant_cannot_bound_another_tenants_action(projection):
+    """A-50: a TENANT-scoped policy's tenant is admitted by exact type (R-9)."""
+
+    scope = build_target_scope(projection)
+    with pytest.raises(CandidateConstructionError) as exc:
+        build_policy_coordinate_binding(
+            scope, policy_scope="TENANT", policy_tenant_id=_LyingText("tenant-999")
+        )
+    assert exc.value.reason is Reason.MALFORMED_CANONICAL_FIELD
+
+
+def test_a_lying_snapshot_tenant_is_refused_before_it_is_compared(projection, decision):
+    """A-51: the decision snapshot's tenant is admitted before reconciliation compares it.
+
+    The snapshot is a plain mapping the caller supplies; nothing admitted its values on
+    the way to ``reconciliation.py``'s ``!=``, and its digest renders a subclass to the
+    same bytes. Closing the string surface alone did **not** close this one — the value
+    had to be put through an admission before the comparison.
+    """
+
+    from ugence_cloud_scaling_authorization_contracts.canonical import digest_of_snapshot
+
+    def _with_tenant(value):
+        snapshot = dict(decision.decision_snapshot)
+        snapshot["tenant_id"] = value
+        return dataclasses.replace(
+            decision,
+            decision_snapshot=snapshot,
+            decision_digest=digest_of_snapshot(snapshot),
+        )
+
+    with pytest.raises(ReconciliationError) as exc:
+        reconcile_phase4(projection, _with_tenant("tenant-999"))
+    assert exc.value.reason is Reason.TENANT_MISMATCH
+
+    with pytest.raises(CandidateConstructionError) as exc:
+        reconcile_phase4(projection, _with_tenant(_LyingText("tenant-999")))
+    assert exc.value.reason is Reason.MALFORMED_CANONICAL_FIELD
+    assert "decision_snapshot.tenant_id" in str(exc.value)

@@ -400,12 +400,22 @@ def reconcile_phase4(
         )
     require_canonical_identifier("decision_snapshot.decision_id", decision_id)
 
-    snapshot_tenant = d_decision_snapshot.get("tenant_id")
+    # Admitted before it is compared. Both comparisons below decide with ``!=``, which a
+    # ``str`` subclass overrides, and neither value has passed through any admission on its
+    # way here: the snapshot is a plain mapping the caller supplies, and its digest renders
+    # a subclass to the same bytes. ``require_canonical_identifier`` is exact since the
+    # string surface was closed, so it is what makes these two guards decidable at all.
+    # No new ``if`` enters this module, so the canonical guard inventory does not move.
+    snapshot_tenant = require_canonical_identifier(
+        "decision_snapshot.tenant_id", d_decision_snapshot.get("tenant_id")
+    )
     if snapshot_tenant != p_tenant:
         raise ReconciliationError(
             "the decision snapshot names a different tenant", _Reason.TENANT_MISMATCH
         )
-    snapshot_domain = d_decision_snapshot.get("domain")
+    snapshot_domain = require_canonical_identifier(
+        "decision_snapshot.domain", d_decision_snapshot.get("domain")
+    )
     if snapshot_domain != DOMAIN_CLOUD_SCALING:
         raise ReconciliationError(
             f"the decision snapshot names domain {snapshot_domain!r}, not the D-4 "
