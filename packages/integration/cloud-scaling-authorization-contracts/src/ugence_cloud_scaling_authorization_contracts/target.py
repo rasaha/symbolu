@@ -90,9 +90,15 @@ POLICY_COORDINATE_COMPONENTS: Final[tuple] = (
 
 
 def _require_magnitude(name: str, value: Any) -> int:
-    """A non-negative ``int``. ``bool`` is refused — ``True`` is not a capacity."""
+    """A non-negative ``int``, admitted by **exact type**. ``True`` is not a capacity.
 
-    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+    Exact typing rather than ``isinstance``-plus-``bool``-exclusion: a subclass can override
+    the comparison a bound check relies on, and canonicalization renders an ``int`` subclass
+    to the identical value, so no digest downstream can tell them apart. ``bool`` was the one
+    subclass named explicitly; this closes the rest with it. Matches ``verified.py:339``.
+    """
+
+    if type(value) is not int or value < 0:
         raise TargetScopeError(
             f"{name} must be an int >= 0 (got {value!r})", _Reason.MALFORMED_CANONICAL_FIELD
         )

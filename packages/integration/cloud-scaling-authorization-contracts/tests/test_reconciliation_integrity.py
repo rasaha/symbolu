@@ -1067,11 +1067,16 @@ def test_the_digest_cannot_distinguish_a_live_datetime_from_its_canonical_string
 
 
 def test_a_live_datetime_in_the_snapshot_is_refused(tmp_path, projection, decision):
-    """The hole the exact-type gate closes, measured end to end.
+    """The hole the exact-type gates close, measured end to end.
 
-    Before it: a ``datetime`` subclass overriding ``__gt__`` in ``decision_snapshot`` carried a
+    Originally: a ``datetime`` subclass overriding ``__gt__`` in ``decision_snapshot`` carried a
     valid ``decision_digest``, was accepted by ``_bound_instant``'s ``isinstance`` branch, and
     satisfied both orderings by fiat — admitting an evaluation stamped in year 999.
+
+    **Attribution updated: it now dies one gate earlier.** ``_require_datetime`` (guard 2) was
+    itself tightened to exact type, so the subclass is refused on the outer field before
+    ``_bound_instant`` is reached at all. Still refused, by an earlier gate and a different
+    reason — asserted here rather than left claiming the old attribution.
     """
 
     ancient = _CompliantInstant(
@@ -1082,22 +1087,23 @@ def test_a_live_datetime_in_the_snapshot_is_refused(tmp_path, projection, decisi
     _refuses(
         projection,
         forged,
-        reason=Reason.DECISION_INSTANT_NOT_BOUND,
-        diagnostic="must be a canonical instant string, not a live",
+        reason=Reason.PROJECTION_RECONCILIATION_FAILED,
+        diagnostic="evaluated_at must be a datetime",
     )
 
 
 def test_a_live_datetime_as_the_outer_evaluated_at_is_refused(projection, decision):
     """The same object on the outer ``evaluated_at``.
 
-    **Guard 39 kills this, not ``_comparable_instant``** — measured, and worth naming
-    correctly. The outer field must canonically equal the value bound in the snapshot, and
-    the snapshot here still carries the genuine instant, so the outer-equals-bound equality
-    gate refuses it before any coherence comparison is reached. The diagnostic asserted
-    below is that gate's, which is what makes the attribution checkable rather than assumed.
+    **Attribution updated twice, which is the point of asserting it.** It was first credited
+    to ``_comparable_instant``; measurement said guard 39, the outer-equals-bound equality.
+    Now ``_require_datetime`` (guard 2) is exact-typed and refuses it earlier still, before
+    any equality or ordering runs.
 
-    ``candidate.py``'s exact-type rule is a separate, later line of defence; it is measured
-    on its own in ``test_a_datetime_subclass_in_any_carried_instant_is_refused_at_construction``.
+    Each move was measured, not assumed, and the diagnostic below names the gate that
+    actually fires. ``candidate.py``'s exact-type rule remains a separate, later line of
+    defence, measured on its own in
+    ``test_a_datetime_subclass_in_any_carried_instant_is_refused_at_construction``.
     """
 
     ancient = _CompliantInstant(
@@ -1107,8 +1113,8 @@ def test_a_live_datetime_as_the_outer_evaluated_at_is_refused(projection, decisi
     _refuses(
         projection,
         forged,
-        reason=Reason.DECISION_INSTANT_NOT_BOUND,
-        diagnostic="does not equal the value bound",
+        reason=Reason.PROJECTION_RECONCILIATION_FAILED,
+        diagnostic="evaluated_at must be a datetime",
     )
 
 
@@ -1174,6 +1180,52 @@ def test_the_candidate_digest_cannot_distinguish_a_subclass_instant():
     with_plain = _bypassing_post_init(genuine, decision_evaluated_at_fact=honest)
     assert canonical_digest(with_subclass.digest_payload()) == canonical_digest(
         with_plain.digest_payload()
+    )
+
+
+def test_a_subclass_in_the_context_cannot_defeat_the_valid_from_ordering(projection, decision):
+    """**Guard 41 was hollow against a same-valued subclass, and the digest could not see it.**
+
+    ``context.subject_valid_from`` reaches guard 41 through ``_require_datetime``, which used
+    ``isinstance``. A ``datetime`` subclass with the **same value** and an overridden
+    ``__gt__`` therefore passed admission, and ``subject_valid_from > bound_evaluated_at``
+    returned ``False`` for a 2026 ``valid_from`` against a 2016 ``evaluated_at`` — so a
+    decision evaluated ten years before the recommendation became valid reconciled cleanly.
+
+    Two things make this decisive, and both are asserted below. The value is identical, so
+    ``context_digest`` is **unchanged** — canonicalization renders the subclass to the same
+    string, and no digest anywhere can tell them apart. And the snapshot string is
+    hand-written rather than produced by ``to_canonical_obj``, so the control does not inherit
+    the representation the guard was wrong about.
+    """
+
+    context = projection.context
+    before = context.digest()
+    honest = context.subject_valid_from
+    object.__setattr__(
+        context,
+        "subject_valid_from",
+        _CompliantInstant(
+            honest.year, honest.month, honest.day, honest.hour, honest.minute,
+            honest.second, honest.microsecond, tzinfo=datetime_mod.timezone.utc,
+        ),
+    )
+    assert context.digest() == before, "the type is the only place the difference survives"
+
+    backdated = decision.evaluated_at - datetime_mod.timedelta(days=3650)
+    snapshot = {**decision.decision_snapshot, "evaluated_at": "2016-01-04T00:05:00.000000Z"}
+    forged = dataclasses.replace(
+        decision,
+        decision_snapshot=snapshot,
+        decision_digest=digest_of_snapshot(snapshot),
+        evaluated_at=backdated,
+    )
+
+    _refuses(
+        projection,
+        forged,
+        reason=Reason.PROJECTION_RECONCILIATION_FAILED,
+        diagnostic="must be a datetime",
     )
 
 

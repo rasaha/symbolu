@@ -111,7 +111,15 @@ class ReconciledPhase4Facts:
 
 
 def _require_int(name: str, value: Any) -> int:
-    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+    """A canonical non-negative integer, admitted by **exact type**.
+
+    Same rule as :func:`_require_datetime` and the same reason: a subclass can override the
+    comparisons a bound check relies on. ``bool`` was already excluded explicitly; exact
+    typing subsumes that and closes every other subclass with it. Matches
+    ``verified.py:339``.
+    """
+
+    if type(value) is not int or value < 0:
         raise ReconciliationError(
             f"{name} must be an int >= 0 (got {value!r})",
             _Reason.PROJECTION_RECONCILIATION_FAILED,
@@ -120,7 +128,20 @@ def _require_int(name: str, value: Any) -> int:
 
 
 def _require_datetime(name: str, value: Any, reason: _Reason) -> datetime:
-    if not isinstance(value, datetime):
+    """One aware instant, admitted by **exact type**.
+
+    ``isinstance`` would let a ``datetime`` subclass through, and a subclass may override
+    ``__gt__``. Measured before this changed: a same-valued subclass in
+    ``context.subject_valid_from`` left ``context_digest`` **unchanged** — canonicalization
+    renders it to the identical string — and defeated guard 41, so a decision evaluated ten
+    years before the recommendation became valid reconciled cleanly. The type is the only
+    place that distinction survives.
+
+    Changed in place rather than added beside: no new ``if``, so the canonical inventory
+    stays at 65 and no guard number shifts.
+    """
+
+    if type(value) is not datetime:
         raise ReconciliationError(f"{name} must be a datetime (got {value!r})", reason)
     if value.tzinfo is None or value.utcoffset() is None:
         raise ReconciliationError(f"{name} must be timezone-aware", reason)

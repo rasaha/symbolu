@@ -795,3 +795,48 @@ both.** R-12 got admission right and ordering wrong. The ordering repair got ord
 admission wrong. Each was verified end to end, and each verification tested only the half that
 had just changed.
 
+### The seventh: `isinstance` admission, swept to its root `[V]`
+
+Three separate repairs in this chain each tightened one admission gate and left its siblings.
+The sweep that ends it: **every type admission in the Phase 5A path is now exact.**
+
+`_require_datetime` still used `isinstance`, so a `datetime` subclass with the **same value**
+and an overridden `__gt__` reached guard 41 and defeated it — `subject_valid_from >
+bound_evaluated_at` returned `False` for a 2026 `valid_from` against a 2016 `evaluated_at`,
+and a decision evaluated ten years before the recommendation became valid reconciled cleanly
+`[V]`. `context_digest` was **unchanged**, because canonicalization renders the subclass to the
+identical string. The type is the only place the difference survives.
+
+`_require_int` and `_require_magnitude` carried the same shape — `isinstance` plus an explicit
+`bool` exclusion, which names one subclass and admits every other. All three are now
+`type(value) is not …`, changed **in place**: no new `if`, so the inventory stays at 65 and no
+guard number shifts. Matches `verified.py:339`.
+
+Two test attributions moved with it, and both are asserted rather than described.
+`test_a_live_datetime_as_the_outer_evaluated_at_is_refused` has now been re-attributed twice —
+first from `_comparable_instant` to guard 39, now to guard 2 — each time because the
+measurement said so.
+
+### Gate 13 should re-check the six carried instants — ruled `[R]`
+
+**Measured:** Phase 5B's verifier exact-types the *candidate object* but never re-checks its
+*field* types, and `_candidate_validity_problem` reads all six straight into `<`/`>`. A
+candidate restored by `pickle` keeps the exact class and skips `__post_init__` entirely, so
+subclass instants arrive at gate 13 with an identical `candidate_digest` and all six return
+`VERIFIED` `[V]`.
+
+**The ruling: gate 13 must re-check them.** Three grounds, none of them symmetry.
+
+1. The boundary **already** exact-types the candidate object, so it does not trust the caller's
+   type claims. Extending that to the fields it actually compares is consistent with what it
+   does, not a new posture.
+2. No digest can carry the distinction — measured here and in `_bound_instant`'s case. A
+   boundary that cannot detect a difference downstream must detect it on entry.
+3. This ADR already rejected the pattern once, in `_comparable_instant`: *a gate whose
+   fail-closed behaviour depends on another gate still being present is not fail-closed.*
+   Gate 13 currently depends on Phase 5A's `__post_init__`, which deserialization skips.
+
+Phase 5A's `__post_init__` closes honest construction and **cannot** close a forged or
+deserialized candidate; that is a property of where it sits, not a defect in it. The 5B-side
+repair is recorded here and **not implemented in this change**, which is scoped to Phase 5A.
+
