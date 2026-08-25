@@ -15,7 +15,33 @@ PYPROJECT = (PROJECT / "pyproject.toml").read_text(encoding="utf-8")
 
 
 def test_version_is_the_declared_version():
-    """``0.3.0`` since 5B-2: the builder refuses a pairing it used to accept.
+    """``0.7.0``: the temporal guards accept canonical values only, never live objects.
+
+    ``0.6.0`` moved ordering off canonical strings onto parsed instants and left an
+    ``isinstance`` branch that accepted a live ``datetime`` from the snapshot. Canonicalization
+    renders such an object to exactly the string it would have been, so no digest could tell
+    them apart, and a subclass overriding ``__gt__`` satisfied both orderings by fiat. Exact
+    types close it.
+
+    ``0.6.0`` was the R-12b ordering repair: orderings compare instants, not strings.
+
+    ``0.5.0`` compared canonical strings and inverted below year 1000, admitting an unbounded
+    backdate of the very instant it existed to bound. A refusal that was not happening now
+    happens, which is the same shape of change as every bump below.
+
+    ``0.5.0`` was R-12b: the decision instants come from the digest-bound snapshot.
+
+    Unlike every bump below it, this one **moves digests**: the Risk Authority decision
+    snapshot gained ``evaluated_at``, so ``FROZEN_DECISION_DIGEST`` and, beneath it,
+    ``FROZEN_CANDIDATE_DIGEST`` both moved. It also raises this package's floor on
+    ``ugence-risk-authority`` to ``0.5.0``, because a decision snapshot minted by an earlier
+    version cannot supply the instant and is refused rather than fallen back from.
+
+    ``0.4.0`` was R-12: the builder refuses candidates it used to accept.
+
+    R-12 adds temporal-coherence refusals, so a candidate whose carried instants contradict
+    each other no longer constructs. Same shape of change as 0.3.0 below and the same reason
+    for a bump: nothing a consumer pins looks different, and the same inputs now raise.
 
     5B-1 took this to ``0.2.0`` — the candidate gained a required field and its digest moved.
     5B-2 moves no digest and no schema identifier; what it changes is that a candidate
@@ -24,7 +50,7 @@ def test_version_is_the_declared_version():
     the same inputs now raise.
     """
 
-    assert pkg.__version__ == "0.3.0"
+    assert pkg.__version__ == "0.7.0"
 
 
 def test_distribution_and_namespace_names():

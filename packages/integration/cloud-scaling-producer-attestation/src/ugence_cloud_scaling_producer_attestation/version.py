@@ -6,5 +6,7 @@ from typing import Final
 
 __all__ = ["__version__"]
 
-#: Cloud Scaling Phase 5B-0A — producer authenticity foundation.
-__version__: Final[str] = "0.1.0"
+#: Cloud Scaling R-12b — **fixture pins only**, source untouched. The Phase 5A candidate
+#: digest moved when the decision snapshot gained ``evaluated_at``, so the pinned candidate
+#: fixture, the verified-artifact digest and the eleven-digest reproduction moved with it.
+__version__: Final[str] = "0.2.0"

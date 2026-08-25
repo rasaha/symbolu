@@ -34,6 +34,16 @@ class RiskDecision:
     evidence_snapshot_digest: str = ""
     model_digest: str = ""
     issued_at: Optional[datetime] = None
+    #: When the *evaluator* stamped the evaluation this decision binds, as distinct from
+    #: ``issued_at``, which is when the *authority* bound it. The two are separate facts and
+    #: are not required to be equal — an authority may bind an evaluation stamped earlier.
+    #:
+    #: It lives on the decision, and therefore inside the digest-bound decision snapshot,
+    #: because downstream admission depends on it: Phase 5B's occurrence gate refuses a
+    #: determination about a moment before the evidence it rests on existed. A timestamp that
+    #: affects admission must come from an authenticated artifact, and until R-12b this one
+    #: travelled only on ``SubjectRiskDecision``'s outer field, which no digest covered.
+    evaluated_at: Optional[datetime] = None
     expires_at: Optional[datetime] = None
     applicable_rules: tuple[str, ...] = ()
     reason: str = ""

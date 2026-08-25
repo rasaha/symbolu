@@ -673,6 +673,10 @@ class RiskAuthorityApplication:
             evidence_snapshot_digest=req.evidence_snapshot_digest,
             model_digest=req.model_digest,
             now=now,
+            # D-3: the evaluator's stamp travels on the request and is recorded on the
+            # decision, so the instant downstream admission depends on is covered by
+            # ``decision_digest`` rather than by an outer field anyone may rewrite (R-12b).
+            evaluated_at=req.evaluated_at,
         )
         self.decisions.save(decision)
 

@@ -89,7 +89,12 @@ def digest_of_snapshot(snapshot: Mapping[str, Any]) -> str:
 def is_canonical_digest(value: Any) -> bool:
     """True only for ``sha256:<64 lowercase hex>``."""
 
-    return isinstance(value, str) and _DIGEST_RE.match(value) is not None
+    # Exact, not ``isinstance``: a ``str`` subclass matches this pattern and renders to
+    # the same canonical bytes, so no digest can distinguish it, while overriding ``__ne__``
+    # alone defeats every ``!=`` identity guard that consults the value it is admitted as.
+    # The type is the only place the difference survives. Same doctrine as ``target.py:358``
+    # and ``verified.py:339``, now applied to the type that carries every digest here.
+    return type(value) is str and _DIGEST_RE.match(value) is not None
 
 
 def require_canonical_digest(name: str, value: Any) -> str:
@@ -112,7 +117,7 @@ def is_policy_authority_digest(value: Any) -> bool:
     on purpose: neither shape can be mistaken for the other, and neither is converted.
     """
 
-    return isinstance(value, str) and _POLICY_AUTHORITY_DIGEST_RE.match(value) is not None
+    return type(value) is str and _POLICY_AUTHORITY_DIGEST_RE.match(value) is not None
 
 
 def require_policy_authority_digest(name: str, value: Any) -> str:
@@ -137,7 +142,11 @@ def require_nfc_text(name: str, value: Any, *, allow_empty: bool = False) -> str
 
     import unicodedata
 
-    if not isinstance(value, str):
+    # Exact, not ``isinstance``. Every identifier in this package reaches its identity
+    # guards through here, and those guards decide with ``!=``, which a subclass overrides.
+    # An honest ``__eq__`` keeps the empty-check and the NFC comparison below satisfied, so
+    # this admission is the only place a lying ``__ne__`` can be stopped.
+    if type(value) is not str:
         raise CanonicalFieldError(
             f"{name} must be a string (got {type(value).__name__})",
             _Reason.MALFORMED_CANONICAL_FIELD,

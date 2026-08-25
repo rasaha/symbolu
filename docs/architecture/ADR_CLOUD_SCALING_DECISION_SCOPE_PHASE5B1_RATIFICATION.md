@@ -317,14 +317,14 @@ It pushed back on two things, and both are corrected above: R-9's framing was to
 
 | # | Residual | Owner |
 |---|---|---|
-| R-2 **CLOSED (5B-2 pt 2)** `[V]` | **Recorded wrongly, corrected here.** It read as "whose clock supplies `as_of`". Measurement said otherwise: `as_of` was already type-checked (naive refused, never assumed UTC) and round-tripped against the resolution, and the authority already refuses a revoked policy **even at an instant before its revocation** and one outside its effective window `[V]`. You cannot resurrect a policy by choosing the moment. What was open was narrower and sharper: **nothing compared `as_of` against the candidate's own carried validity.** A candidate whose decision expired 2026-01-01 verified `VERIFIED` at 2026-06-01 `[V]`. Closed by gate 13 under four typed refusals | 5B-2 |
+| R-2 **CLOSED (5B-2 pt 2)** `[V]` | **Recorded wrongly, corrected here.** It read as "whose clock supplies `as_of`". Measurement said otherwise: `as_of` was already type-checked (naive refused, never assumed UTC) and round-tripped against the resolution, and the authority already refuses a revoked policy **even at an instant before its revocation** and one outside its effective window `[V]`. You cannot resurrect a policy by choosing the moment. What was open was narrower and sharper: **nothing compared `as_of` against the candidate's own carried validity.** A candidate whose decision expired 2026-01-01 verified `VERIFIED` at 2026-06-01 `[V]`. Closed by gate 13 under four typed refusals. **Qualified 2026-08-24 by R-12b:** that closure compared `as_of` against carried values, one of which — `decision_evaluated_at_fact` — was itself unauthenticated, so the gate was reconciling against a number the caller could choose `[V]`. The gate was right; its input was not. R-12b re-sources it from the digest-bound decision snapshot, which is what makes the closure hold | 5B-2 |
 | R-3 `[G]` | **Narrower than recorded.** Literally true of that one comparison and misleading overall: resolution enforces three equalities — stored coordinate == requested, body == declared content digest, body == signed body digest (`resolution.py:170`, `:182`, `:188`) `[V]`. Only `coordinate.content_digest` is not compared *directly*, and issuance enforces it at write time (`issuance.py:145`, `:150`) `[V]`, so the divergence requires a registry entry issuance never created. Defence-in-depth, not a live gap | **Policy Authority — not Cloud Scaling's to close** |
 | R-7 **CLOSED (5B-2 pt 2)** `[V]` | Three uncompared sources, not two: the sets in `verified.py`, the maps in `verification.py`, and an unnamed `derived` tuple reconciling them. No drift had occurred `[V]`. `DERIVED_FACT_NAMES` now names the difference and `require_partition_agreement` compares the maps against the declaration at mint time. Still a maintenance hazard rather than a correctness one — what changed is that it fails loudly and says which side is short | 5B-2 |
 | R-8 `[G]` | **Larger than recorded, and deferred by owner ruling.** Not "compare the bounds": the verified artifact carries 26 facts and **not one is a bound** `[V]`, so there is nothing to compare against. Closing it means first extracting authenticated bounds from the verified body into the artifact, which moves the artifact digest and the profile version and brings D-5B1-3's three ratchet rules into play. Handled as its own isolated subphase | 5B-2, next subphase |
 | R-9 **CLOSED (5B-2 pt 1)** `[V]` | **Broadened by the independent design review, then closed.** Enforced at Phase 5A's builder (`CROSS_TENANT_POLICY_BINDING`) and gate 12 (`CANDIDATE_CROSS_TENANT_POLICY`), both keyed on the scope so the `GLOBAL` carve-out survives. Original framing kept below for the record:  The first framing asked only about the empty-string global tenant, which read as an edge case. It is not: **nothing anywhere in the tree ties a candidate's *action* tenant to the tenant of the policy it reconciles against.** A candidate describing an action for `tenant-1`, carrying a coordinate for a `TENANT`-scoped policy belonging to `tenant-elsewhere`, verifies `VERIFIED` `[V]` — gate 11 compares the candidate's coordinate against the *resolved* policy, and that policy is genuinely the other tenant's. Phase 5A does not compare them either. Inert today because no composition root calls `verify()`, which is exactly why it must be ruled on **before** 5B-2 wires one rather than discovered while wiring it. Pinned as executable behaviour by `test_a_candidate_reconciles_against_another_tenants_policy`, which measures today's permissive behaviour without endorsing it | Owner, before 5B-2 |
 | R-10 `[G]` | Two Phase 5A suite weaknesses found while implementing, both pre-existing: `test_non_reachability.py` strips docstrings with `ast.get_docstring`, whose dedented result does not match the indented source, so an indented docstring naming a forbidden symbol trips the scan; and `test_phase5a_invariants.py::test_no_phase_5a_source_file_was_modified` reads `git status`, so it measures a clean working tree rather than an unmodified package | Phase 5A |
 | R-11 **CLOSED (5B-2 pt 1)** `[V]` | Completeness now enumerates the public attribute surface statically and totally over names (`inspect.getmembers_static`), never executing a descriptor, with a five-member allowlist ratcheted against the merge base. Eleven distinct bypass constructs were planted and refused. The declared trust boundary — a contributor editing class, allowlist and disclosure together — is recorded, not claimed closed | Phase 5A |
-| R-12 `[G]` | **Found by the 5B-2 part 2 independent review.** Gate 13 compares each of the candidate's six timestamps against `as_of` and **never against each other**, so a candidate whose attestation predates its subject assertion by a year verifies `[V]`. That is internal *incoherence* rather than staleness — the pair is consistent with the instant and inconsistent with itself — and it belongs upstream at construction, where the builder holds all six. Out of scope for R-2, which is about reconciling the instant | Phase 5A |
+| R-12 **PARTLY CLOSED** `[V]` | Ruled and implemented in Phase 5A as temporal coherence — three construction-time refusals reading no clock. The decision window (`evaluated_at <= expires_at`, a **newly ratified candidate-coherence invariant** grounded on the sibling principle at `controls.py:64`, not claimed as upstream-enforced) and the attestation window (`asserted_at <= issued_at <= valid_until`) are load-bearing `[V]`. **Corrected 2026-08-24:** the subject-ordering guard was first recorded here as unreachable defence in depth; that was false. Reconciliation read the projection's *unauthenticated* outer `valid_from`/`valid_until`/`asserted_at` copy while reading every sibling fact from the digest-bound context, so a public `dataclasses.replace` both reached the guard and — widening `valid_until` — admitted an attestation issued eight years outside the bound window `[V]`. Reconciliation now sources all three from the context. The guard is kept as owner-ratified defence in depth, its status measured by neutralising it in the sweep rather than argued. **Superseded in part 2026-08-24 by R-12b:** that correction covered the *projection* side only. The decision side carried the identical defect and it was live — `SubjectRiskDecision`'s outer `evaluated_at` is not covered by `decision_digest`, so a public `dataclasses.replace` moved it ten years with the digest still valid `[V]`, and Phase 5B's occurrence gate reads exactly that fact. R-12b adds `evaluated_at` to the decision snapshot and re-sources both decision instants from it. Original finding: Gate 13 compares each of the candidate's six timestamps against `as_of` and **never against each other**, so a candidate whose attestation predates its subject assertion by a year verifies `[V]`. That is internal *incoherence* rather than staleness, and it belongs upstream at construction, where the builder holds all six. Out of scope for R-2, which is about reconciling the instant | Phase 5A |
 | A-59 (5B-0A) **INTENTIONAL BOUNDARY — not a defect** `[R]` | Measured: the attestation module never mentions `candidate_digest`, and two candidates with different digests were built from one attestation object `[V]`. **Owner ruling: this is not to be "closed" by adding `candidate_digest` to the producer signature.** The producer owns the recommendation, not the downstream policy, risk decision or authorization candidate. The producer signature authenticates the recommendation; the verified artifact binds that authenticated recommendation to the candidate examined; authorizing the complete candidate belongs to a later Decision/Envelope authority | Authority boundary, by design |
 
 ## The residual ratification round, and what this session verified of it
@@ -576,3 +576,267 @@ That is the fourth guard in this ADR's history to be hollow on first writing, an
 where the hole was in the terminal *classification* rather than the check itself. A guard that
 fails for the wrong stated reason is only marginally better than one that does not fail: it
 sends the reader to the wrong place.
+
+
+## R-12 — temporal coherence, and the two things it corrected
+
+**Coherence is not freshness.** Gate 13 reconciles each carried instant against the verifier's
+`as_of`; it cannot see a candidate that is internally impossible, because every instant can sit
+correctly relative to `as_of` while contradicting the others. The builder holds all six, and
+comparing them needs no clock — which is why this is Phase 5A's and not Phase 5B's.
+
+### What the contracts actually permit
+
+Derived from source, not from intuition, and **no total order was assumed**:
+
+| Relationship | Ground |
+|---|---|
+| `valid_from ≤ asserted_at ≤ valid_until` | Enforced upstream, `evaluation_contracts.py:880` `[V]` |
+| `evaluated_at ≤ expires_at` | **Newly ratified here** — the decision's contract does not bound its ttl; grounded on `controls.py:64`'s sibling principle `[I]` |
+| `asserted_at ≤ attestation_issued_at ≤ valid_until` | **Newly ratified here** — a producer cannot attest what does not yet exist, and a late attestation must not revive an expired recommendation |
+
+One relationship is deliberately **absent**. `decision_evaluated_at` is *not* required to fall
+inside the subject window: `adapter.py` checks its trusted clock against that window and then
+asserts `request.evaluation_time is None` rather than forwarding it, so the decision's instant
+is stamped by a different clock **by design**. Identity is disproven, not merely unproven `[V]`.
+
+### Two corrections this forced, both stated rather than absorbed
+
+**A ratified test's illustration was internally impossible.**
+`test_a_long_expired_decision_still_builds_a_candidate` proved "no clock is consulted" using an
+attestation stamped 3650 days *before the recommendation it attests*. That candidate is not
+merely stale — it cannot exist. The property is untouched and is now demonstrated with a
+coherent-but-ancient candidate; the old case is pinned separately as an R-12 refusal so the two
+ideas cannot collapse back together. No frozen value moved.
+
+**A mutation-sweep attribution became sibling-backed.** `_comparable_instant` re-checks
+awareness before comparing, because with the earlier awareness guard mutated away a naive value
+reached a comparison and escaped as a bare `TypeError` — an unclassified exception, the same
+failure class the R-7 review criticised. Guard 3 is therefore no longer *solely* attributed.
+Neither guard was weakened to preserve a kill count: correct fail-closed classification is
+worth more than exclusive attribution, and the sweep's expectation was updated to say so.
+
+### The correction: the unreachability claim was false, and a real vector was open `[V]`
+
+The finding first recorded here — that the subject-ordering guard is unreachable defence in
+depth — was **wrong**, and the argument was wrong in a way that hid a live defect. It reasoned
+entirely about the subject *context* and never asked where reconciliation actually read the
+instants from.
+
+`CapacityRiskSubjectProjection` carries `valid_from`, `valid_until` and `asserted_at` as an
+outer copy of the context's three instants. Nothing binds that copy: no digest covers it, and
+the projection's `__post_init__` does not order it. `reconcile_phase4` read the outer copy while
+reading every sibling placement fact — environment, region, zone, compute group, resource class,
+both magnitudes, action type — from the context. A plain `dataclasses.replace`, a public and
+`__post_init__`-valid construction, therefore diverged the two. Measured, both directions:
+
+* `valid_from = asserted_at + 1µs` tripped the ordering guard on a value `context_digest` never
+  covered — so the guard was reachable, and the "unreachable" claim false `[V]`;
+* widening `valid_until` by ten years carried through into the candidate, admitting a producer
+  attestation issued **eight years after** the recommendation expired and recording a
+  `subject_valid_until_fact` a decade past the digest-bound value `[V]`.
+
+**The fix is a source-of-truth correction, not a schema change.** Reconciliation now reads all
+three instants from `context.subject_valid_from` / `subject_valid_until` / `subject_asserted_at`,
+agreeing with every sibling field. The projection's outer fields are untouched and simply no
+longer consulted. No frozen digest moved.
+
+**Reason precedence, corrected with it.** The attestation's `recommendation_digest` binding check
+now runs *before* the temporal block, so a misbound attestation is always refused as
+`PRODUCER_ATTESTATION_CONTENT_MISMATCH` whatever its `issued_at`. Identity precedes coherence:
+naming a clock failure when the defect is identity sends an operator to the wrong place.
+
+### The subject-ordering guard's status, restated on a ground that holds `[V]`
+
+With the context as the sole source, the decisive protection is one the original argument did
+not name: `validate_subject_binding` does not merely re-derive a digest, it **reconstructs**
+`SubjectContext` via `from_dict`, re-running `__post_init__` and therefore the seam's own
+ordering rule. Measured at the strongest forgery available — the context mutated in place so the
+request holds the same out-of-order object and every digest re-derives consistently —
+reconciliation refuses it, naming the seam's rule, and the guard is never reached.
+
+Per owner ruling it is kept as **defence in depth**, preserving local candidate coherence if the
+upstream protections later change. It is **not** load-bearing today. Both the reachability the
+correction closed and the unreachability that now holds are pinned as tests, and the guard's
+status is measured by neutralising it in the mutation sweep rather than argued — because it was
+argued once and the argument was wrong.
+
+Corrected 2026-08-24, on two independent audits.
+
+
+## R-12b — the decision side of the same defect, and it was live
+
+R-12's correction re-sourced the three *subject* instants from the digest-bound context. It
+stopped there, and the stopping point was not principled: the decision instants have the same
+shape and were never asked the same question. They failed it.
+
+`SubjectRiskDecision` carries `evaluated_at` and `expires_at` as outer fields. `decision_digest`
+covers `decision_snapshot`, and until R-12b that snapshot carried `issued_at` and `expires_at`
+but **no `evaluated_at` at all** `[V]`. So the evaluator's stamp existed only on an unauthenticated
+outer field. Measured: `dataclasses.replace(decision, evaluated_at=evaluated_at - 3650 days)` — a
+public construction — succeeded with `decision_digest` unchanged, and the candidate carried the
+backdated value as `decision_evaluated_at_fact` while the authenticated snapshot still said
+otherwise `[V]`.
+
+That fact is not inert. Phase 5B's `_OCCURRENCE_FACTS` refuses a determination whose `as_of`
+precedes an instant the candidate says has already happened. Moving `decision_evaluated_at_fact`
+earlier moves that floor down, so backdating it **widens what the occurrence gate admits** — a
+live bypass of a gate ratified under R-2, reachable by public construction.
+
+### The governing rule, stated once
+
+**If a timestamp affects admission or authorization, its value must come from an authenticated
+decision artifact, never an independently mutable projection.** R-12 applied it to the subject
+side; R-12b applies it to the decision side. The two together are the whole of it.
+
+### What changed
+
+`RiskDecision` gains `evaluated_at`, so the evaluator's stamp travels inside the snapshot the
+authority's digest covers. The seam passes its own injected clock — the same instant it already
+reports as the result's `evaluated_at` — so the two can no longer be made to disagree. The REST
+path forwards the caller's stamp per D-3, recording rather than inventing: with none supplied the
+decision says so instead of substituting the authority's clock, which would be the same
+conflation in a new place.
+
+`reconcile_phase4` now sources both decision instants from the snapshot and **refuses a snapshot
+carrying no `evaluated_at` rather than falling back** — a fallback would silently restore the
+unauthenticated path. The outer fields are retained as *validated projections*: each must equal
+its bound value, compared through `to_canonical_obj` so no second timestamp format enters and an
+aware/naive difference cannot pass as agreement. Two orderings over the authenticated instants
+join them: the decision cannot have been evaluated before the recommendation it decides became
+valid, and cannot have been issued before the evaluation it binds was made — equality legal, no
+tolerance window.
+
+Its own refusal reason, `DECISION_INSTANT_NOT_AUTHENTICATED`, not `DECISION_DIGEST_MISMATCH`: the
+digest is intact and the snapshot is exactly what the authority bound. What is wrong is the
+source of a carried value, and an operator would look in a different place for each.
+
+Phase 5B-0B's verification source is **unchanged**. Its occurrence gate reads candidate facts by
+name, and re-sourcing those facts upstream satisfies it without a line changing here — which is
+what a correctly drawn boundary looks like from the far side.
+
+### Digests move; no schema identifier does
+
+Four frozen digests move because the decision snapshot gains a key. **No schema identifier
+moves**, on this ADR's own established rule: the F-2 precedent recorded at `candidate.py:68` —
+identifiers track *which fields the artifact carries*, not what its payload covers. The Phase 5A
+candidate's field set is unchanged, and `RiskDecision` carries no schema identifier at all. Every
+superseded value is pinned alongside its replacement, as the 5B-1 and F-2 moves already are.
+
+### R-12b's own guard was hollow on first writing — the fifth `[V]`
+
+An independent review reproduced a defect the suite could not reach, and it is the fifth guard
+in this ADR's history to be hollow on first writing.
+
+The two new orderings compared canonical **strings**, on a comment claiming the format is
+"fixed-width, zero-padded and UTC-normalised". Two thirds were true — `%f` always pads and
+`astimezone` normalises. `%Y` does **not** pad below year 1000, so `"999-12-31T…"` sorts above
+`"2026-01-01T…"` while 999 precedes 2026, and both orderings inverted.
+
+The control is what makes it decisive `[V]`:
+
+| `evaluated_at` backdated to | before repair |
+|---|---|
+| year 2025 | refused |
+| years 999 / 99 / 9 | **admitted** |
+
+A gate written to bound how far `evaluated_at` may move refused a one-year move and admitted a
+thousand-year one — and `evaluated_at` exists precisely to bound Phase 5B's occurrence gate.
+
+**Second instance of the same class.** `snapshot_issued_at` was null-checked but never
+type-checked, so `issued_at = 0` reached the raw `>` and escaped as a bare `TypeError`. That is
+exactly the unclassified-exception failure `_comparable_instant` was written to prevent in
+`candidate.py` — diagnosed correctly there, and not applied here.
+
+**Why the suite missed it.** `test_reconciliation_integrity._canonical_ts` built every attack
+value through `to_canonical_obj`, so the tests probed the guards in the same representation the
+guards were wrong in. A test that shares its subject's blind spot measures nothing.
+
+**The repair.** One helper, `_bound_instant`, and both orderings routed through it — the
+`_comparable_instant` pattern applied where it was omitted. Ordering moves to parsed instants;
+**equality stays on strings**, because string equality is exact and the outer-equals-bound gates
+are about agreement, not order. Inventory 64 → 65.
+
+One asymmetry is recorded rather than smoothed over: `strptime`'s `%Y` requires exactly four
+digits, so the canonical writer can emit a sub-1000 year the reader will not parse. A four-digit
+backdate now loses on ordering; a sub-1000 one is refused as non-canonical. Different gates, both
+closed, and the asymmetry fails closed — the only direction it may fail.
+
+The recurring lesson, now with five instances: a guard is not load-bearing until an end-to-end
+negative control says so, and a negative control built from the same primitive as the guard is
+not independent of it.
+
+### The sixth: fixing *how* a guard compares, and leaving *what* it accepts `[V]`
+
+The ordering repair moved both comparisons off canonical strings onto parsed instants and left
+an `isinstance(value, datetime)` branch in `_bound_instant`. So the *comparison* became correct
+while the *admission* stayed wrong, and the second review found it.
+
+`to_canonical_obj` renders a `datetime` to exactly the string it would have been. A snapshot
+carrying a live object and one carrying its rendered form therefore **hash identically** —
+`_bind`, `digest_of_snapshot` and the candidate payload are all blind to the difference. A
+`datetime` subclass overriding `__gt__` carried a valid `decision_digest` and satisfied both
+orderings by fiat, admitting an evaluation stamped in year 999 `[V]`.
+
+**The type is the only place the distinction survives**, which is why the check belongs there
+and cannot be a digest comparison. Both helpers now require exact types — the doctrine
+`reconcile_phase4` has always applied to the projection and the decision, extended to the
+values inside a snapshot.
+
+Two things are recorded rather than smoothed over. The awareness check inside `_bound_instant`
+became unreachable once only canonical strings are admitted, so it was **removed** — an
+unreachable guard that reads as load-bearing is worse than none, which is the R-12 lesson
+applied to R-12b's own code. And the inventory stays at **65**, not the 64 predicted: the
+removed guard and the added type gate cancel out. Measured, not assumed.
+
+The pattern across six instances is now specific enough to state as a rule: **a guard has two
+halves — what it admits and how it decides — and fixing one is routinely mistaken for fixing
+both.** R-12 got admission right and ordering wrong. The ordering repair got ordering right and
+admission wrong. Each was verified end to end, and each verification tested only the half that
+had just changed.
+
+### The seventh: `isinstance` admission, swept to its root `[V]`
+
+Three separate repairs in this chain each tightened one admission gate and left its siblings.
+The sweep that ends it: **every type admission in the Phase 5A path is now exact.**
+
+`_require_datetime` still used `isinstance`, so a `datetime` subclass with the **same value**
+and an overridden `__gt__` reached guard 41 and defeated it — `subject_valid_from >
+bound_evaluated_at` returned `False` for a 2026 `valid_from` against a 2016 `evaluated_at`,
+and a decision evaluated ten years before the recommendation became valid reconciled cleanly
+`[V]`. `context_digest` was **unchanged**, because canonicalization renders the subclass to the
+identical string. The type is the only place the difference survives.
+
+`_require_int` and `_require_magnitude` carried the same shape — `isinstance` plus an explicit
+`bool` exclusion, which names one subclass and admits every other. All three are now
+`type(value) is not …`, changed **in place**: no new `if`, so the inventory stays at 65 and no
+guard number shifts. Matches `verified.py:339`.
+
+Two test attributions moved with it, and both are asserted rather than described.
+`test_a_live_datetime_as_the_outer_evaluated_at_is_refused` has now been re-attributed twice —
+first from `_comparable_instant` to guard 39, now to guard 2 — each time because the
+measurement said so.
+
+### Gate 13 should re-check the six carried instants — ruled `[R]`
+
+**Measured:** Phase 5B's verifier exact-types the *candidate object* but never re-checks its
+*field* types, and `_candidate_validity_problem` reads all six straight into `<`/`>`. A
+candidate restored by `pickle` keeps the exact class and skips `__post_init__` entirely, so
+subclass instants arrive at gate 13 with an identical `candidate_digest` and all six return
+`VERIFIED` `[V]`.
+
+**The ruling: gate 13 must re-check them.** Three grounds, none of them symmetry.
+
+1. The boundary **already** exact-types the candidate object, so it does not trust the caller's
+   type claims. Extending that to the fields it actually compares is consistent with what it
+   does, not a new posture.
+2. No digest can carry the distinction — measured here and in `_bound_instant`'s case. A
+   boundary that cannot detect a difference downstream must detect it on entry.
+3. This ADR already rejected the pattern once, in `_comparable_instant`: *a gate whose
+   fail-closed behaviour depends on another gate still being present is not fail-closed.*
+   Gate 13 currently depends on Phase 5A's `__post_init__`, which deserialization skips.
+
+Phase 5A's `__post_init__` closes honest construction and **cannot** close a forged or
+deserialized candidate; that is a property of where it sits, not a defect in it. The 5B-side
+repair is recorded here and **not implemented in this change**, which is scoped to Phase 5A.
+

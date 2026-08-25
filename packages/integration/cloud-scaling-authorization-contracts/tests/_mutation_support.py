@@ -200,14 +200,20 @@ class MutatedPackage:
             binding_digest=self.module.canonical_digest(payload), **body
         )
 
-    def build(self, projection: Any, decision: Any) -> Any:
-        """Run the mutated package's REAL public builder on this projection/decision."""
+    def build(self, projection: Any, decision: Any, attestation: Any = None) -> Any:
+        """Run the mutated package's REAL public builder on this projection/decision.
+
+        ``attestation`` overrides the genuine one, for the sweeps whose attack lives on the
+        attestation rather than the projection or the decision. It must be an instance of
+        **this** module's ``ProducerAttestationEvidence`` — the builder admits exact types
+        only — which is what :meth:`attestation` above is for.
+        """
 
         scope = self.target_scope(projection)
         return self.module.build_capacity_authorization_candidate(
             projection=projection,
             decision=decision,
-            producer_attestation=self.attestation(
+            producer_attestation=attestation if attestation is not None else self.attestation(
                 recommendation_digest=projection.recommendation_digest
             ),
             policy_binding=self.policy_binding(scope),
@@ -227,15 +233,35 @@ def mutated_package(tmp_path: pathlib.Path, guard_number: int) -> MutatedPackage
     dst.mkdir(parents=True, exist_ok=True)
     shutil.copytree(SRC, dst / PKG_NAME)
     guards = canonical_guards(dst / PKG_NAME)
-    # 52 since 5B-2. 5B-1 brought the builder to 51 with guards 43 and 44 — the two policy
-    # references must name one policy, and the coordinate must bind this scope. 5B-2 adds the
-    # third of that family, closing R-9: a TENANT-scoped policy may bound only its own
-    # tenant's action. The count is asserted so a guard that disappears cannot go unnoticed;
-    # the numbered anchors the sweep aims at are checked separately, and all three new guards
-    # sort after every anchor.
-    if len(guards) != 52:
+    # 65 since the R-12b ordering repair. The lineage: 5B-1 brought the builder to 51, 5B-2 part 1 added R-9's
+    # cross-tenant guard at 52, R-12 added five (three temporal-coherence guards plus the two
+    # inside `_comparable_instant`) for 57, and R-12b adds seven in `reconciliation.py`: the
+    # decision snapshot must carry `evaluated_at`, `expires_at` and `issued_at`; each outer
+    # field must equal the value bound in the snapshot; and two orderings over the bound
+    # instants — the decision cannot have been evaluated before the recommendation it decides
+    # became valid, nor issued before the evaluation it binds was made.
+    #
+    # The 65th is `_bound_instant`'s **exact-string type gate**, not the awareness check that
+    # helper once had — that check became unreachable once only canonical strings are admitted
+    # and was removed. The two swapped one-for-one, which is why the count did not fall to 64,
+    # and the type gate is written as `if type(value) is not str: raise` precisely so the sweep
+    # inventories, neutralises and scores it: it is the only thing standing between a live
+    # `datetime` subclass and both orderings. Owner-ratified; do not rewrite it into an
+    # `else`-branch shape to reproduce the old denominator.
+    #
+    # The orderings moved off canonical strings onto parsed instants because `strftime` does
+    # not zero-pad `%Y` below year 1000, so a three-digit year sorted above every four-digit
+    # one and both orderings inverted. That work shifted every guard after `_require_datetime`
+    # by +1.
+    #
+    # Adding R-12b's seven in `reconciliation.py` shifted every `candidate.py` guard by +7. The sweep's
+    # numbered anchors are asserted against their condition text in
+    # `test_the_canonical_guard_numbers_still_name_these_conditions`, so a shift fails loudly
+    # rather than silently retargeting a mutation — which is exactly what it did here.
+    # The count is asserted so a guard that disappears cannot go unnoticed.
+    if len(guards) != 65:
         raise AssertionError(
-            f"canonical inventory drifted: {len(guards)} in-scope guards, expected 52"
+            f"canonical inventory drifted: {len(guards)} in-scope guards, expected 65"
         )
     _neutralise(dst / PKG_NAME, guards[guard_number - 1])
 

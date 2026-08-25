@@ -72,7 +72,16 @@ FROZEN_V2_SIGNATURE = (
 #: ``candidate_digest``, and the Phase 5A candidate gained the policy coordinate that closes
 #: R-4. This package's source did not change and its version does not move; the fixture it
 #: verifies did. The superseded value is pinned below.
+#: **Moved again by R-12b**, and again by nothing this package did: ``digest_payload()`` binds
+#: ``candidate_digest``, and the Phase 5A candidate digest moved when the Risk Authority
+#: decision snapshot gained ``evaluated_at``. Source untouched; fixture pins only.
 FROZEN_VERIFIED_ARTIFACT_DIGEST = (
+    "sha256:fefe4884af18907fc4e304e3142c4001f4f6280edd91d5259d78fe297058de29"
+)
+#: The verified artifact this package produced while the decision snapshot carried no
+#: ``evaluated_at`` — i.e. while the instant Phase 5B's occurrence gate depends on was
+#: unbound. Pinned as a negative anchor on this side too, so a revert surfaces on both.
+SUPERSEDED_PRE_R12B_VERIFIED_ARTIFACT_DIGEST = (
     "sha256:5a2a66489c00a5fef94c8fc5be231ee564786286315d6d60e75ecbc55f60d30e"
 )
 
@@ -95,6 +104,11 @@ FROZEN_REFUSAL_OUTCOME = O.SIGNATURE_INVALID
 # ======================================================================================= #
 
 PHASE_5A_CANDIDATE_DIGEST = (
+    "sha256:357bb3d4d660034c9abe50000986808a1e9c15fce05b4a22b6cb82836cc50e79"
+)
+#: What the Phase 5A candidate hashed to between 5B-1 and R-12b — correct until the decision
+#: snapshot gained ``evaluated_at`` and moved ``decision_digest`` beneath the candidate.
+SUPERSEDED_PRE_R12B_PHASE_5A_CANDIDATE_DIGEST = (
     "sha256:be06c65385d73f66c52dd51024c30ed7939a836369db654f381d52270f2aa906"
 )
 #: What the Phase 5A candidate hashed to before 5B-1 bound the policy coordinate inside it.
@@ -396,6 +410,7 @@ def test_the_superseded_verified_artifact_digest_is_never_produced_again():
     artifact = result.verified_attestation
     assert artifact is not None
     assert artifact.artifact_digest != SUPERSEDED_VERIFIED_ARTIFACT_DIGEST
+    assert artifact.artifact_digest != SUPERSEDED_PRE_R12B_VERIFIED_ARTIFACT_DIGEST
     assert artifact.artifact_digest == FROZEN_VERIFIED_ARTIFACT_DIGEST
     assert "attested_producer_id" in artifact.digest_payload()
     assert "verified_producer_id" not in artifact.digest_payload()
@@ -538,6 +553,7 @@ def test_only_these_three_phase_5b_0a_digests_moved():
     )
     assert candidate.candidate_digest == PHASE_5A_CANDIDATE_DIGEST
     assert candidate.candidate_digest != SUPERSEDED_PRE_5B1_PHASE_5A_CANDIDATE_DIGEST
+    assert candidate.candidate_digest != SUPERSEDED_PRE_R12B_PHASE_5A_CANDIDATE_DIGEST
 
 
 def test_the_frozen_candidate_payload_reproduces_the_genuine_chain_exactly():

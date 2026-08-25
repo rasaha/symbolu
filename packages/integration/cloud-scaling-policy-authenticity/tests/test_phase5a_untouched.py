@@ -37,10 +37,18 @@ def _phase5a() -> pathlib.Path:
 
 @pytest.mark.invariant
 def test_phase_5a_is_at_the_version_5b1_moved_it_to():
-    """``0.2.0``: a required field on the candidate, and a moved candidate digest (D-5B1-2)."""
+    """``0.5.0`` since R-12b, which moved two of Phase 5A's frozen digests.
+
+    That is the point of pinning it here: R-12b is a change made in Phase 5A and Risk
+    Authority, and it moved a value **this** package's fixtures depend on. It surfaced here
+    first, in a consumer, which is exactly what this file exists to do.
+
+    ``0.2.0`` was 5B-1: a required field on the candidate and a moved candidate digest
+    (D-5B1-2); ``0.4.0`` was R-12.
+    """
 
     version = (_phase5a() / "src" / "ugence_cloud_scaling_authorization_contracts" / "version.py").read_text()
-    assert '__version__ = "0.3.0"' in version
+    assert '__version__ = "0.7.0"' in version
 
 
 @pytest.mark.invariant
@@ -51,7 +59,16 @@ def test_the_policy_authority_stays_at_0_1_0():
 
 @pytest.mark.invariant
 def test_this_package_ships_at_the_version_its_profile_change_requires():
-    """``0.4.0`` since 5B-2 part 2 — and the profile deliberately did **not** move with it.
+    """``0.6.0`` since R-12b — and the profile deliberately did **not** move with it.
+
+    R-12b is a **fixture-pin bump**: this package's verification source is untouched. Its
+    occurrence gate reads candidate facts by name, and Phase 5A re-sourcing those facts from
+    the digest-bound decision snapshot satisfies it without a line changing here. What moved
+    is the Phase 5A mirror below, and the artifact digest — but only because the *candidate*
+    digest it binds moved upstream, not because this package's artifact changed shape. The
+    partition fingerprint is untouched, so the profile stays at ``v3``.
+
+    ``0.5.0`` was 5B-3; ``0.4.0`` was 5B-2 part 2, whose profile also did not move.
 
     The two travel together only when the *artifact* changes. 5B-1 took the package to
     ``0.2.0`` and the profile to ``v2`` because a fact was promoted between the halves. 5B-2
@@ -63,7 +80,8 @@ def test_this_package_ships_at_the_version_its_profile_change_requires():
 
     5B-3 is the other kind. It promotes ``policy_type`` and adds ``capacity_bounds_fact``,
     so the partition, the artifact digest and the profile version all move together: package
-    ``0.5.0``, profile ``v3``.
+    ``0.5.0``, profile ``v3``. R-12b is back to the first kind: ``0.6.0``, profile still
+    ``v3``.
     """
 
     from ugence_cloud_scaling_policy_authenticity import (
@@ -71,7 +89,7 @@ def test_this_package_ships_at_the_version_its_profile_change_requires():
         __version__,
     )
 
-    assert __version__ == "0.5.0"
+    assert __version__ == "0.6.0"
     assert VERIFICATION_PROFILE_VERSION == "v3"
 
 

@@ -17,10 +17,12 @@ from conftest import coordinate_for
 
 import ugence_cloud_scaling_authorization_contracts as pkg
 from ugence_cloud_scaling_authorization_contracts import (
+    AuthorizationCandidateRejectionReason as Reason,
     CapacityAuthorizationCandidate,
     ProducerAttestationEvidence,
     build_capacity_authorization_candidate,
     reconcile_phase4,
+    TemporalOrderingError,
 )
 
 SRC = pathlib.Path(pkg.__file__).resolve().parent
@@ -103,29 +105,74 @@ def test_no_field_or_property_claims_current_validity():
         assert forbidden not in fields and forbidden not in attrs
 
 
-def test_a_long_expired_decision_still_builds_a_candidate(projection, decision, attestation,
-                                                          target_scope, policy_binding):
+def test_a_long_expired_candidate_still_builds(projection, decision, attestation,
+                                              target_scope, policy_binding):
     """Freshness is Phase 5B's: Phase 5A neither enforces nor claims it.
 
-    This is the positive proof that no clock is consulted — an attestation stamped far in
-    the past is carried forward as a fact, not rejected as stale, because Phase 5A has no
-    clock with which to call it stale.
+    The positive proof that no clock is consulted — a candidate whose every instant lies
+    years in the past is carried forward as fact, not rejected as stale, because Phase 5A has
+    no clock with which to call it stale.
+
+    **The illustration was corrected by R-12; the property was not relaxed.** This test used
+    to demonstrate "no clock" with an attestation stamped 3650 days *before the recommendation
+    it attests*. That candidate is not merely stale — it is internally impossible, and R-12
+    now refuses it at construction for that reason and not for its age. The two ideas were
+    being conflated:
+
+    * **freshness** compares a fact against *now*, needs a clock, and stays Phase 5B's;
+    * **coherence** compares two carried facts against each other, needs no clock, and is
+      what R-12 added.
+
+    So the demonstration moved to a candidate that is coherent and ancient: the attestation
+    sits inside the recommendation it attests, and the whole set is long expired relative to
+    any real present. Construction succeeds and grants nothing, which is exactly what the
+    original test established. Nothing frozen moved to accommodate this.
     """
 
-    from datetime import timedelta
-
-    ancient = attestation.issued_at - timedelta(days=3650)
-    from conftest import build_attestation
-
-    old = build_attestation(
-        recommendation_digest=projection.recommendation_digest, issued_at=ancient
-    )
     candidate = build_capacity_authorization_candidate(
-        projection=projection, decision=decision, producer_attestation=old,
+        projection=projection, decision=decision, producer_attestation=attestation,
         policy_binding=policy_binding,
         policy_coordinate_binding=coordinate_for(policy_binding),
         target_scope=target_scope,
     )
-    assert candidate.attestation_issued_at_fact == ancient
+
+    # Ancient by any real reckoning — the fixture chain is dated 2026-01-01 — and Phase 5A
+    # neither knows nor asks what the present is.
+    assert candidate.subject_valid_until_fact.year == 2026
+    assert candidate.attestation_issued_at_fact == attestation.issued_at
+    # Coherent, which is the only temporal question Phase 5A is entitled to ask.
+    assert (
+        candidate.subject_asserted_at_fact
+        <= candidate.attestation_issued_at_fact
+        <= candidate.subject_valid_until_fact
+    )
     # And it still grants nothing — carrying an old fact is not endorsing it.
     assert candidate.grants_authority is False
+
+
+def test_an_attestation_predating_its_recommendation_is_refused_for_incoherence_not_age(
+    projection, decision, attestation, target_scope, policy_binding
+):
+    """The case the old illustration used, and why it now fails — R-12, not freshness.
+
+    Pinned so the distinction cannot quietly collapse back: the refusal names an ordering
+    reason, never a staleness one, and Phase 5A still has no clock to call anything stale.
+    """
+
+    from datetime import timedelta
+
+    from conftest import build_attestation
+
+    predates = build_attestation(
+        recommendation_digest=projection.recommendation_digest,
+        issued_at=attestation.issued_at - timedelta(days=3650),
+    )
+    with pytest.raises(TemporalOrderingError) as exc:
+        build_capacity_authorization_candidate(
+            projection=projection, decision=decision, producer_attestation=predates,
+            policy_binding=policy_binding,
+            policy_coordinate_binding=coordinate_for(policy_binding),
+            target_scope=target_scope,
+        )
+    assert exc.value.reason is Reason.ATTESTATION_TEMPORAL_ORDERING
+    assert "before it exists" in str(exc.value)

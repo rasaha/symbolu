@@ -75,6 +75,15 @@ class MagnitudeBoundError(CandidateConstructionError):
     """A requested magnitude or delta exceeds the policy-bound maximum."""
 
 
+class TemporalOrderingError(CandidateConstructionError):
+    """The carried instants are individually valid and collectively impossible (R-12).
+
+    Distinct from :class:`ReconciliationError`, which means a fact disagrees with its source.
+    Here every fact matches its source and the *ordering between them* is unsatisfiable, so a
+    reader is pointed at the relationship rather than sent to re-check the inputs.
+    """
+
+
 class CandidateDigestError(CandidateConstructionError):
     """The candidate digest could not be computed, or did not equal the carried value."""
 
@@ -107,6 +116,17 @@ class AuthorizationCandidateRejectionReason(str, Enum):
     MISSING_BINDING_DECISION = "missing_binding_decision"
     MISSING_DECISION_SNAPSHOT = "missing_decision_snapshot"
     MISSING_EXPIRY_FACT = "missing_expiry_fact"
+    #: R-12b. Its own member rather than ``DECISION_DIGEST_MISMATCH``: the digest is intact
+    #: and the snapshot is exactly what the authority bound. What is wrong is that a
+    #: timestamp the candidate carries is not sourced from — or does not agree with — the
+    #: digest-bound artifact it is supposed to project. A source failure, not a corrupt
+    #: artifact, and an operator would look in a different place for each.
+    #:
+    #: Named for *binding*, never authenticity: Phase 5A verifies no signature, so a member
+    #: claiming a value is "authenticated" would overstate what this package establishes.
+    #: ``test_no_rejection_reason_asserts_authenticity`` enforces that, and caught exactly
+    #: this member under its first name.
+    DECISION_INSTANT_NOT_BOUND = "decision_instant_not_bound"
     IDEMPOTENCY_KEY_MISMATCH = "idempotency_key_mismatch"
     D4_IDENTIFIER_MISMATCH = "d4_identifier_mismatch"
 
@@ -142,6 +162,20 @@ class AuthorizationCandidateRejectionReason(str, Enum):
     TARGET_SUBSTITUTION = "target_substitution"
     REQUESTED_MAGNITUDE_ABOVE_MAXIMUM = "requested_magnitude_above_maximum"
     DELTA_ABOVE_MAXIMUM = "delta_above_maximum"
+
+    # --- temporal coherence among the carried facts (R-12, 5B-2) ----------------------
+    #: The six carried instants must be coherent *with each other*, not merely with the
+    #: instant a verifier is later handed. Three members rather than one: the subject window,
+    #: the decision window and the attestation each fail for a different reason, and a reader
+    #: triaging one should not be handed the others.
+    #:
+    #: These are ordering violations, deliberately separate from
+    #: ``PROJECTION_RECONCILIATION_FAILED``: the values reconcile perfectly against their
+    #: sources and are individually well-formed. What is wrong is the relationship between
+    #: them.
+    SUBJECT_TEMPORAL_ORDERING = "subject_temporal_ordering"
+    DECISION_TEMPORAL_ORDERING = "decision_temporal_ordering"
+    ATTESTATION_TEMPORAL_ORDERING = "attestation_temporal_ordering"
 
     # --- evidence + digest -----------------------------------------------------------
     INVALID_EVIDENCE_BINDING = "invalid_evidence_binding"

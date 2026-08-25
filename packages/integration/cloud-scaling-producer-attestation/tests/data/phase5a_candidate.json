@@ -12,7 +12,7 @@
     "sha256:998181d54842ac5e17e5d997dca8eb8c99fa8d451d593ac8087167350dd8dd09",
     "sha256:c5b669cd770b98de3f94878675e114ef92ad03e06b27571ca1a320ddcd1b19ef"
   ],
-  "expected_candidate_digest": "sha256:be06c65385d73f66c52dd51024c30ed7939a836369db654f381d52270f2aa906",
+  "expected_candidate_digest": "sha256:357bb3d4d660034c9abe50000986808a1e9c15fce05b4a22b6cb82836cc50e79",
   "note": "Frozen serialization of the genuine Phase 5A CapacityAuthorizationCandidate. Regenerate with scripts/generate_frozen_candidate.py. The shipped sdist suite reconstructs this through Phase 5A's exact public types and asserts the candidate digest below, so a drift from the chain fails rather than passes.",
   "policy_binding": {
     "binding_digest": "sha256:227e6a199579a65d07bb2c060202fa341f917cc65b8ea91d1038a44469746fac",
@@ -57,11 +57,11 @@
   },
   "scalars": {
     "action_type": "scale_up",
-    "candidate_digest": "sha256:be06c65385d73f66c52dd51024c30ed7939a836369db654f381d52270f2aa906",
+    "candidate_digest": "sha256:357bb3d4d660034c9abe50000986808a1e9c15fce05b4a22b6cb82836cc50e79",
     "context_digest": "sha256:d0bd58ff75993e4451575315f99678e0ac22b84f36bf7223cd9928cf9aee5f6f",
-    "decision_digest": "sha256:d08f94ba8ba174e3929da24efc151fa2cebb9743329a3a61c71f65e46aa23101",
+    "decision_digest": "sha256:6aba137d8d2c057d768b1243469636e4c1137037883adfb9a078c9a3fbbf0ca2",
     "decision_id": "risk_dec_000001",
-    "decision_snapshot_digest": "sha256:d08f94ba8ba174e3929da24efc151fa2cebb9743329a3a61c71f65e46aa23101",
+    "decision_snapshot_digest": "sha256:6aba137d8d2c057d768b1243469636e4c1137037883adfb9a078c9a3fbbf0ca2",
     "disposition": "RISK_PASSED",
     "domain": "cloud_scaling",
     "evidence_snapshot_digest": "sha256:ef36ff71c71482f2fb241a8a76d4ef639f46d677abb6f3820d37fcb1d274f457",

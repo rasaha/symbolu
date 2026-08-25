@@ -90,9 +90,15 @@ POLICY_COORDINATE_COMPONENTS: Final[tuple] = (
 
 
 def _require_magnitude(name: str, value: Any) -> int:
-    """A non-negative ``int``. ``bool`` is refused — ``True`` is not a capacity."""
+    """A non-negative ``int``, admitted by **exact type**. ``True`` is not a capacity.
 
-    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+    Exact typing rather than ``isinstance``-plus-``bool``-exclusion: a subclass can override
+    the comparison a bound check relies on, and canonicalization renders an ``int`` subclass
+    to the identical value, so no digest downstream can tell them apart. ``bool`` was the one
+    subclass named explicitly; this closes the rest with it. Matches ``verified.py:339``.
+    """
+
+    if type(value) is not int or value < 0:
         raise TargetScopeError(
             f"{name} must be an int >= 0 (got {value!r})", _Reason.MALFORMED_CANONICAL_FIELD
         )
@@ -340,7 +346,16 @@ class PolicyTargetBindingReference:
         )
         for name in ("max_permitted_magnitude", "max_permitted_delta"):
             value = getattr(self, name)
-            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            # Exact, not ``isinstance``, and for the same reason as ``verified.py:339``.
+            # These two ceilings are the only bound the builder enforces the request
+            # against: ``candidate.py:620`` compares them with ``!=`` and
+            # ``candidate.py:678`` with ``>``, and ``>`` hands the *subclass* operand
+            # priority through its reflected ``__lt__``. An ``int`` subclass lying in
+            # both admits a magnitude the signed binding caps far lower, with
+            # ``binding_digest`` unmoved, because the canonical payload renders the
+            # subclass to the honest number. The type is the only place the difference
+            # survives. ``bool`` needs no separate clause: it is not ``int`` exactly.
+            if type(value) is not int or value < 0:
                 raise PolicyTargetBindingError(
                     f"{name} must be an int >= 0 (got {value!r})",
                     _Reason.MALFORMED_CANONICAL_FIELD,

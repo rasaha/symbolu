@@ -24,7 +24,7 @@ canonical form*, never against "now". Phase 5A holds no clock; see :mod:`.candid
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Final, Mapping, Optional
 
 from risk_authority.integrations import (
@@ -34,6 +34,8 @@ from risk_authority.integrations import (
     validate_subject_binding,
 )
 from ugence_cloud_scaling_risk_integration import CapacityRiskSubjectProjection
+
+from risk_authority.crypto.canonical import to_canonical_obj
 
 from .canonical import (
     digest_of_snapshot,
@@ -109,7 +111,15 @@ class ReconciledPhase4Facts:
 
 
 def _require_int(name: str, value: Any) -> int:
-    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+    """A canonical non-negative integer, admitted by **exact type**.
+
+    Same rule as :func:`_require_datetime` and the same reason: a subclass can override the
+    comparisons a bound check relies on. ``bool`` was already excluded explicitly; exact
+    typing subsumes that and closes every other subclass with it. Matches
+    ``verified.py:339``.
+    """
+
+    if type(value) is not int or value < 0:
         raise ReconciliationError(
             f"{name} must be an int >= 0 (got {value!r})",
             _Reason.PROJECTION_RECONCILIATION_FAILED,
@@ -118,11 +128,79 @@ def _require_int(name: str, value: Any) -> int:
 
 
 def _require_datetime(name: str, value: Any, reason: _Reason) -> datetime:
-    if not isinstance(value, datetime):
+    """One aware instant, admitted by **exact type**.
+
+    ``isinstance`` would let a ``datetime`` subclass through, and a subclass may override
+    ``__gt__``. Measured before this changed: a same-valued subclass in
+    ``context.subject_valid_from`` left ``context_digest`` **unchanged** — canonicalization
+    renders it to the identical string — and defeated guard 41, so a decision evaluated ten
+    years before the recommendation became valid reconciled cleanly. The type is the only
+    place that distinction survives.
+
+    Changed in place rather than added beside: no new ``if``, so the canonical inventory
+    stays at 65 and no guard number shifts.
+    """
+
+    if type(value) is not datetime:
         raise ReconciliationError(f"{name} must be a datetime (got {value!r})", reason)
     if value.tzinfo is None or value.utcoffset() is None:
         raise ReconciliationError(f"{name} must be timezone-aware", reason)
     return value
+
+
+#: The canonical instant format Risk Authority's ``to_canonical_obj`` writes. Mirrored here
+#: rather than imported: it is private to that module, and this package re-derives from public
+#: primitives by policy.
+#:
+#: The round trip is deliberately **not** total, and that asymmetry fails closed.
+#: ``strftime`` does not zero-pad ``%Y``, so the writer can emit ``"999-12-31T…"``; ``strptime``
+#: requires exactly four digits and refuses it. A sub-1000 year is therefore rejected as
+#: non-canonical rather than parsed and ordered. No genuine decision carries one, and the only
+#: direction this can fail is closed.
+_BOUND_TS_FMT: Final = "%Y-%m-%dT%H:%M:%S.%fZ"
+
+
+def _bound_instant(name: str, value: Any) -> datetime:
+    """Parse a canonical snapshot instant into a ``datetime`` for **ordering** comparisons.
+
+    Ordering must never be decided on the canonical *string*: ``strftime`` does not zero-pad
+    ``%Y`` below year 1000 while it always pads ``%f``, so ``"999-12-31T…"`` sorts above
+    ``"2026-01-01T…"`` and both orderings invert. Measured before the repair: backdating
+    ``evaluated_at`` by one year was refused and by a thousand years admitted.
+
+    **Only a string is accepted.** A ``decision_snapshot`` is a canonical artifact — a mapping
+    of primitives the authority's digest covers — so a live object inside one is not an input
+    to be trusted, it is a refusal. This is the same exact-type doctrine
+    :func:`reconcile_phase4` already applies to the projection and the decision, and it is
+    load-bearing rather than tidy: ``to_canonical_obj`` renders a ``datetime`` to exactly the
+    string it would have been, so **the digest cannot tell the two apart**. A ``datetime``
+    subclass overriding ``__gt__`` therefore carries a valid digest and defeats both orderings.
+    Accepting only ``str`` closes that, and the accompanying tests pin it with a live subclass
+    built without ``to_canonical_obj``.
+
+    Equality is left on strings deliberately: string equality is exact, and the
+    outer-equals-bound gates are about agreement, not order.
+    """
+
+    if type(value) is not str:
+        raise ReconciliationError(
+            f"{name} must be a canonical instant string, not a live "
+            f"{type(value).__name__} (got {value!r})",
+            _Reason.DECISION_INSTANT_NOT_BOUND,
+        )
+    try:
+        parsed = datetime.strptime(value, _BOUND_TS_FMT)
+    except ValueError:
+        raise ReconciliationError(
+            f"{name} is not a canonical UTC instant (got {value!r})",
+            _Reason.DECISION_INSTANT_NOT_BOUND,
+        ) from None
+    # The canonical form is UTC by construction and carries no offset to honour, so this
+    # attaches UTC rather than converting. No awareness check follows: a value that reached
+    # here parsed from the canonical format, and the line above is the only thing that sets
+    # ``tzinfo`` — an awareness guard would be unreachable, and an unreachable guard that
+    # looks load-bearing is worse than no guard.
+    return parsed.replace(tzinfo=timezone.utc)
 
 
 def reconcile_phase4(
@@ -172,9 +250,15 @@ def reconcile_phase4(
     p_magnitude_before = p_context.magnitude_before
     p_magnitude_after = p_context.magnitude_after
     p_action_type = p_context.action_type
-    p_valid_from = projection.valid_from
-    p_valid_until = projection.valid_until
-    p_asserted_at = projection.asserted_at
+    # R-12 correction: the validity instants are read from the **context**, not from the
+    # projection's outer ``valid_from``/``valid_until``/``asserted_at`` fields. Those outer
+    # fields are an unauthenticated second copy — no digest covers them, and
+    # ``CapacityRiskSubjectProjection.__post_init__`` does not order them — so a public
+    # ``dataclasses.replace`` could diverge them from the values ``context_digest`` binds.
+    # Every sibling placement fact above already reads from ``p_context``; these now agree.
+    p_valid_from = p_context.subject_valid_from
+    p_valid_until = p_context.subject_valid_until
+    p_asserted_at = p_context.subject_asserted_at
 
     d_tenant = decision.tenant_id
     d_subject_digest = decision.subject_digest
@@ -316,12 +400,22 @@ def reconcile_phase4(
         )
     require_canonical_identifier("decision_snapshot.decision_id", decision_id)
 
-    snapshot_tenant = d_decision_snapshot.get("tenant_id")
+    # Admitted before it is compared. Both comparisons below decide with ``!=``, which a
+    # ``str`` subclass overrides, and neither value has passed through any admission on its
+    # way here: the snapshot is a plain mapping the caller supplies, and its digest renders
+    # a subclass to the same bytes. ``require_canonical_identifier`` is exact since the
+    # string surface was closed, so it is what makes these two guards decidable at all.
+    # No new ``if`` enters this module, so the canonical guard inventory does not move.
+    snapshot_tenant = require_canonical_identifier(
+        "decision_snapshot.tenant_id", d_decision_snapshot.get("tenant_id")
+    )
     if snapshot_tenant != p_tenant:
         raise ReconciliationError(
             "the decision snapshot names a different tenant", _Reason.TENANT_MISMATCH
         )
-    snapshot_domain = d_decision_snapshot.get("domain")
+    snapshot_domain = require_canonical_identifier(
+        "decision_snapshot.domain", d_decision_snapshot.get("domain")
+    )
     if snapshot_domain != DOMAIN_CLOUD_SCALING:
         raise ReconciliationError(
             f"the decision snapshot names domain {snapshot_domain!r}, not the D-4 "
@@ -368,14 +462,51 @@ def reconcile_phase4(
 
     # --- validity facts: presence and canonical form only, never "is it valid now" -----
     subject_valid_from = _require_datetime(
-        "valid_from", p_valid_from, _Reason.PROJECTION_RECONCILIATION_FAILED
+        "context.subject_valid_from", p_valid_from, _Reason.PROJECTION_RECONCILIATION_FAILED
     )
     subject_valid_until = _require_datetime(
-        "valid_until", p_valid_until, _Reason.PROJECTION_RECONCILIATION_FAILED
+        "context.subject_valid_until", p_valid_until, _Reason.PROJECTION_RECONCILIATION_FAILED
     )
     subject_asserted_at = _require_datetime(
-        "asserted_at", p_asserted_at, _Reason.PROJECTION_RECONCILIATION_FAILED
+        "context.subject_asserted_at", p_asserted_at, _Reason.PROJECTION_RECONCILIATION_FAILED
     )
+    # --- R-12b: the decision instants come from the authenticated snapshot -------------
+    # ``SubjectRiskDecision``'s outer ``evaluated_at`` / ``expires_at`` are not covered by
+    # ``decision_digest``, so a public ``dataclasses.replace`` moves either freely while the
+    # digest stays valid. Both feed admission — Phase 5B's occurrence gate refuses a
+    # determination about a moment before the evidence it rests on existed, so backdating
+    # ``evaluated_at`` widens what that gate accepts. The governing rule: a timestamp that
+    # affects admission must come from an authenticated decision artifact.
+    #
+    # The snapshot is the artifact. It has already been re-derived and digest-checked above,
+    # so reading from it here is reading from a value the digest covers. Phase 5A verifies
+    # no signature and claims none; "bound" is the whole of what it establishes.
+    snapshot_evaluated_at = d_decision_snapshot.get("evaluated_at")
+    if snapshot_evaluated_at is None:
+        # Refused, never fallen back to the outer field: a fallback would restore exactly the
+        # unauthenticated path this closes, and would do it silently.
+        raise ReconciliationError(
+            "the decision snapshot carries no evaluated_at; the instant Phase 5B's "
+            "occurrence gate depends on must come from the authenticated artifact, and a "
+            "decision minted before R-12b cannot supply one",
+            _Reason.DECISION_INSTANT_NOT_BOUND,
+        )
+    snapshot_expires_at = d_decision_snapshot.get("expires_at")
+    if snapshot_expires_at is None:
+        raise ReconciliationError(
+            "the decision snapshot carries no expires_at fact", _Reason.MISSING_EXPIRY_FACT
+        )
+    snapshot_issued_at = d_decision_snapshot.get("issued_at")
+    if snapshot_issued_at is None:
+        raise ReconciliationError(
+            "the decision snapshot carries no issued_at fact",
+            _Reason.DECISION_INSTANT_NOT_BOUND,
+        )
+
+    # The outer fields are retained as *validated projections* of the bound values, not as a
+    # second source. Comparison runs through ``to_canonical_obj`` — the same primitive the
+    # snapshot itself was canonicalized with — so no second timestamp format is introduced
+    # and a naive/aware or offset difference cannot masquerade as agreement.
     decision_evaluated_at = _require_datetime(
         "evaluated_at", d_evaluated_at, _Reason.PROJECTION_RECONCILIATION_FAILED
     )
@@ -386,6 +517,42 @@ def reconcile_phase4(
     decision_expires_at = _require_datetime(
         "expires_at", d_expires_at, _Reason.MISSING_EXPIRY_FACT
     )
+    if to_canonical_obj(decision_evaluated_at) != to_canonical_obj(snapshot_evaluated_at):
+        raise ReconciliationError(
+            "the decision's outer evaluated_at does not equal the value bound in "
+            "decision_snapshot; the carried instant is not a projection of the "
+            "authenticated one",
+            _Reason.DECISION_INSTANT_NOT_BOUND,
+        )
+    if to_canonical_obj(decision_expires_at) != to_canonical_obj(snapshot_expires_at):
+        raise ReconciliationError(
+            "the decision's outer expires_at does not equal the value bound in "
+            "decision_snapshot",
+            _Reason.DECISION_INSTANT_NOT_BOUND,
+        )
+
+    # Two orderings over the bound instants, compared as **instants**. An earlier revision
+    # compared canonical strings on the claim that the format is "fixed-width, zero-padded and
+    # UTC-normalised". Two thirds of that were true: ``%f`` always pads and ``astimezone``
+    # does normalise. ``%Y`` does not pad below year 1000, so a three-digit year sorted above
+    # every four-digit one and both guards inverted — refusing a one-year backdate while
+    # admitting a thousand-year one.
+    bound_evaluated_at = _bound_instant(
+        "decision_snapshot.evaluated_at", snapshot_evaluated_at
+    )
+    bound_issued_at = _bound_instant("decision_snapshot.issued_at", snapshot_issued_at)
+    if subject_valid_from > bound_evaluated_at:
+        raise ReconciliationError(
+            "the decision was evaluated before the recommendation it decides became valid",
+            _Reason.DECISION_INSTANT_NOT_BOUND,
+        )
+    # Equality is legal and there is no tolerance window: an authority may bind an evaluation
+    # in the same instant it was stamped, but it cannot bind one that has not happened yet.
+    if bound_evaluated_at > bound_issued_at:
+        raise ReconciliationError(
+            "the decision was issued before the evaluation it binds was made",
+            _Reason.DECISION_INSTANT_NOT_BOUND,
+        )
 
     return ReconciledPhase4Facts(
         tenant_id=require_canonical_identifier("tenant_id", p_tenant),

@@ -1,5 +1,214 @@
 # Changelog — ugence-cloud-scaling-authorization-contracts
 
+## [0.7.0] — canonical values only: the temporal guards refuse live objects
+
+`0.6.0` fixed *how* the orderings compare and left *what* they accept. `_bound_instant` had an
+`isinstance(value, datetime)` branch, so a `decision_snapshot` could carry a live object
+instead of a canonical string.
+
+That is not cosmetic. `to_canonical_obj` renders a `datetime` to exactly the string it would
+have been, so **the digest cannot distinguish the two** — `_bind`, `digest_of_snapshot` and the
+candidate payload are all blind to it. A `datetime` subclass overriding `__gt__` therefore
+carried a valid `decision_digest` and satisfied both orderings by fiat, admitting an evaluation
+stamped in year 999. The type is the only place the distinction survives.
+
+### Fixed
+
+- `_bound_instant` requires `type(value) is str`. A snapshot is a canonical artifact — a
+  mapping of primitives the authority's digest covers — so a live object inside one is a
+  refusal, not an input to trust.
+- `_comparable_instant` uses `type(value) is not datetime`, matching the exact-type doctrine
+  `reconcile_phase4` already applies to the projection and the decision.
+
+### Removed
+
+- The awareness check inside `_bound_instant`. With only canonical strings admitted, the parse
+  is the sole thing that sets `tzinfo`, so the guard was unreachable — and an unreachable guard
+  that reads as load-bearing is worse than none.
+
+### Changed
+
+- The `_BOUND_TS_FMT` comment now states the round trip is deliberately partial: `strftime`
+  writes three-digit years that `strptime` refuses. The asymmetry fails closed, which is the
+  only direction it may fail.
+- New negative controls are built **without** `to_canonical_obj`. The `0.5.0` defect survived a
+  green suite because every attack value went through the primitive the guards were wrong in.
+
+### Note on the guard inventory
+
+It stays at **65**, not 64: removing the unreachable awareness check and adding the type gate
+cancel out. Measured rather than predicted.
+
+## [0.6.0] — R-12b ordering repair: instants, not canonical strings
+
+Found by independent review against `0.5.0`, which was green including the gate-removal sweep.
+
+`0.5.0`'s two new orderings compared canonical strings, claiming the format is "fixed-width,
+zero-padded and UTC-normalised". `%Y` is not padded below year 1000, so a three-digit year
+sorted above every four-digit one and both orderings inverted: backdating `evaluated_at` by one
+year was refused, by a thousand years **admitted**. Since that instant bounds Phase 5B's
+occurrence gate, the gate added to bound backdating admitted it without limit.
+
+### Fixed
+
+- `_bound_instant` parses each bound instant and both orderings compare **instants**. Equality
+  (the outer-equals-bound gates) stays on strings: string equality is exact, and only *ordering*
+  was wrong.
+- `snapshot_issued_at` is type-checked. `issued_at = 0` previously reached a raw `>` and escaped
+  as a bare `TypeError` — the unclassified-exception failure `_comparable_instant` exists to
+  prevent, applied here at last.
+
+### Changed
+
+- Guard inventory 64 → 65; anchors after `_require_datetime` shift by +1.
+- The awareness sweep's attack values are no longer built solely through `to_canonical_obj`,
+  which is why the original defect was invisible to a green suite.
+
+### Known asymmetry, recorded
+
+`strptime`'s `%Y` requires four digits, so the canonical writer can emit a sub-1000 year the
+reader refuses as non-canonical. Four-digit backdates lose on ordering; sub-1000 ones lose on
+parsing. Both closed, and the asymmetry fails closed.
+
+## [0.5.0] — Cloud Scaling R-12b: the decision instants come from the bound snapshot
+
+R-12 re-sourced the three *subject* instants from the digest-bound context and stopped there.
+The decision instants have the same shape and were never asked the same question. They failed
+it, and unlike R-12's subject-ordering guard this one was **live**.
+
+**Breaking**, pre-1.0, and unlike every release below it this one **moves digests**: a decision
+snapshot minted before `ugence-risk-authority` `0.5.0` is refused, and two frozen values moved.
+
+### The defect
+
+`SubjectRiskDecision.evaluated_at` is an outer field. `decision_digest` covers
+`decision_snapshot`, and that snapshot carried `issued_at` and `expires_at` but **no
+`evaluated_at` at all**. Measured: `dataclasses.replace(decision, evaluated_at=… - 3650 days)`
+— a public construction — succeeded with the digest unchanged, and the candidate carried the
+backdated value.
+
+Not inert. Phase 5B's occurrence gate refuses a determination whose `as_of` precedes an instant
+the candidate says already happened, so moving this one earlier **widens what that gate admits**.
+
+### Added
+
+- Seven reconciliation guards (inventory 57 → 64): the snapshot must carry `evaluated_at`,
+  `expires_at` and `issued_at`; each outer field must equal its bound value; and two orderings
+  over the bound instants — the decision cannot have been evaluated before the recommendation it
+  decides became valid, nor issued before the evaluation it binds was made. Equality legal, no
+  tolerance window.
+- Rejection reason `DECISION_INSTANT_NOT_BOUND`. Its own member, not `DECISION_DIGEST_MISMATCH`:
+  the digest is intact and the snapshot is exactly what the authority bound; what is wrong is
+  the *source* of a carried value. Named for binding, never authenticity — Phase 5A verifies no
+  signature, and `test_no_rejection_reason_asserts_authenticity` caught this member under its
+  first name.
+
+### Changed
+
+- **Both decision instants are sourced from `decision_snapshot`.** A snapshot with no
+  `evaluated_at` is refused rather than fallen back from; a fallback would silently restore the
+  unauthenticated path for exactly the artifacts that need it closed. The outer fields are kept
+  as *validated projections*, compared through `to_canonical_obj` so no second timestamp format
+  enters and an aware/naive difference cannot pass as agreement.
+- Floor on `ugence-risk-authority` raised to `0.5.0`.
+- `FROZEN_DECISION_DIGEST` and `FROZEN_CANDIDATE_DIGEST` moved. The candidate's own field set is
+  unchanged — its payload has always covered `decision_digest` and `decision_snapshot_digest`,
+  which moved beneath it. Both superseded values are pinned as negative anchors.
+- **No schema identifier moves**, on this repository's established rule (the F-2 precedent at
+  `candidate.py:68`): identifiers track which fields an artifact carries. The candidate's field
+  set is unchanged, and `RiskDecision` carries no schema identifier at all.
+
+### Not changed, deliberately
+
+The L-1 timezone-awareness sweep keeps the two decision instants on the *outer* fields. The
+snapshot stores instants as canonical UTC strings, so a naive snapshot timestamp is not
+representable — and moving those rows would delete live coverage, because `to_canonical_obj`
+formats a naive datetime by attaching UTC, so a naive outer value canonicalizes to exactly the
+bound string and passes the outer-equals-bound gates. Guard 3 is the only thing refusing it.
+
+## [0.4.0] — Cloud Scaling R-12: temporal coherence among the carried facts
+
+Ratified in `docs/architecture/ADR_CLOUD_SCALING_DECISION_SCOPE_PHASE5B1_RATIFICATION.md`,
+owner ruling on R-12. **Breaking**, pre-1.0: a candidate whose carried instants contradict each
+other no longer constructs. No digest moves and no schema identifier moves.
+
+**Coherence is not freshness.** These guards read no clock — they compare carried facts against
+each other. Freshness stays Phase 5B's, and `test_time_authority.py` still proves no clock is
+consulted; only its illustration changed, for the reason below.
+
+### Added
+
+- `TemporalOrderingError` and three reasons — `SUBJECT_TEMPORAL_ORDERING`,
+  `DECISION_TEMPORAL_ORDERING`, `ATTESTATION_TEMPORAL_ORDERING`. Separate from
+  `PROJECTION_RECONCILIATION_FAILED`: the values reconcile against their sources and are
+  individually well-formed; the relationship between them is what fails.
+- `decision_evaluated_at <= decision_expires_at`. **A newly ratified candidate-coherence
+  invariant, not an upstream one** — the decision's own contract does not bound its ttl. The
+  ground is the sibling principle at `risk_authority/domain/controls.py:64`, which refuses a
+  control result whose `valid_until` precedes its `evaluated_at`.
+- `subject_asserted_at <= attestation_issued_at <= subject_valid_until`. A producer cannot
+  attest a recommendation before it exists, and an attestation first issued after it expired
+  must not make it usable again. This does not broaden the producer's authority and does not
+  close A-59.
+- `subject_valid_from <= subject_asserted_at <= subject_valid_until`, mirroring the seam
+  contract at `evaluation_contracts.py:880`. **See the finding below: this one cannot fire.**
+- `_comparable_instant`, one shared helper. Malformed or naive instants get the package's
+  existing `CanonicalFieldError` / `MALFORMED_CANONICAL_FIELD`; the R-12 reasons are reserved
+  for well-formed instants in an impossible order.
+
+### Changed
+
+- `test_a_long_expired_decision_still_builds_a_candidate` → `test_a_long_expired_candidate_
+  still_builds`. **Correction of an internally impossible fixture, not a relaxation of the
+  no-clock invariant.** The old illustration used an attestation stamped 3650 days *before the
+  recommendation it attests* — not merely stale but impossible. The property is unchanged and
+  now demonstrated with a coherent-but-ancient candidate. The old case is pinned separately as
+  an R-12 refusal, so the distinction cannot collapse back.
+- `test_the_awareness_gate_is_the_only_thing_refusing_a_naive_timestamp` →
+  `..._is_now_sibling_backed_rather_than_solely_attributed`. `_comparable_instant` re-checks
+  awareness, so guard 3 is no longer solely attributed. Neither guard was weakened to preserve
+  a kill count; correct fail-closed classification is worth more than exclusive attribution.
+- Guard inventory 52 → 57.
+- The L-1 timezone-awareness sweep attacks the three subject instants on the **context** rather
+  than the projection's outer copy, following the corrected source. Guard 3 is no longer
+  reachable for them by ordinary construction; it remains so for the two decision instants.
+
+### Correction — reconciliation was reading an unauthenticated copy
+
+The finding first recorded here — that the subject-ordering guard is unreachable defence in
+depth — was **wrong**, and wrong in a way that hid a live defect. Corrected 2026-08-24 on two
+independent audits, before this version was released.
+
+`CapacityRiskSubjectProjection` carries `valid_from`, `valid_until` and `asserted_at` as an
+outer copy of the subject context's three instants. Nothing binds that copy: no digest covers
+it, and the projection's `__post_init__` does not order it. `reconcile_phase4` read the outer
+copy while reading every sibling placement fact from the context, so a plain
+`dataclasses.replace` — a public, `__post_init__`-valid construction — diverged the two, and
+both directions were measured:
+
+- `valid_from = asserted_at + 1µs` tripped the ordering guard on a value `context_digest`
+  never covered — so the guard *was* reachable;
+- widening `valid_until` admitted a producer attestation issued **eight years after** the
+  recommendation expired, and recorded a `subject_valid_until_fact` a decade past the
+  digest-bound value.
+
+**Fixed** — reconciliation now reads all three from `context.subject_valid_from` /
+`subject_valid_until` / `subject_asserted_at`, agreeing with every sibling field. This is a
+source-of-truth correction: `CapacityRiskSubjectProjection` is unchanged, no schema moves and
+no frozen digest moves.
+
+**Fixed** — the attestation's `recommendation_digest` binding check now runs *before* the
+temporal block, so a misbound attestation is always `PRODUCER_ATTESTATION_CONTENT_MISMATCH`
+whatever its `issued_at`. Identity precedes coherence.
+
+With the context as the sole source, the subject-ordering guard is unreachable on a ground the
+original argument did not name: `validate_subject_binding` **reconstructs** `SubjectContext`
+via `from_dict`, re-running `__post_init__` and the seam's own ordering rule. It is kept per
+owner ruling as defence in depth, and its status is now measured by neutralising it in the
+mutation sweep rather than argued — because it was argued once and the argument was wrong.
+
+The other two guards **are** load-bearing and were demonstrated as such.
+
 ## [0.3.0] — Cloud Scaling Phase 5B-2 part 1: R-9
 
 Ratified in `docs/architecture/ADR_CLOUD_SCALING_DECISION_SCOPE_PHASE5B1_RATIFICATION.md`,

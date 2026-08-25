@@ -69,6 +69,7 @@ class DecisionAuthorityPort(Protocol):
         evidence_snapshot_digest: str,
         model_digest: str,
         now: datetime,
+        evaluated_at: Optional[datetime] = None,
         ttl: timedelta = DEFAULT_DECISION_TTL,
     ) -> RiskDecision: ...
 
@@ -94,6 +95,7 @@ class ReferenceDecisionAuthority:
         evidence_snapshot_digest: str,
         model_digest: str,
         now: datetime,
+        evaluated_at: Optional[datetime] = None,
         ttl: timedelta = DEFAULT_DECISION_TTL,
     ) -> RiskDecision:
         """Issue a binding :class:`RiskDecision`.
@@ -144,6 +146,10 @@ class ReferenceDecisionAuthority:
             evidence_snapshot_digest=evidence_snapshot_digest,
             model_digest=model_digest,
             issued_at=now,
+            # Recorded, never invented: with no evaluator stamp supplied the decision says so
+            # rather than substituting ``now``, which would make the authority's own clock
+            # masquerade as the evaluator's (R-12b).
+            evaluated_at=evaluated_at,
             expires_at=now + ttl,
             applicable_rules=evaluation.applicable_rules,
             reason=("; ".join(evaluation.trace))[:512],
