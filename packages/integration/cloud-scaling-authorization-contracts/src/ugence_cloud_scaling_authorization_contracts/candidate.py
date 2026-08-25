@@ -246,11 +246,27 @@ class CapacityAuthorizationCandidate:
                 f"schema_version must be {AUTHORIZATION_CANDIDATE_SCHEMA_VERSION!r}",
                 _Reason.UNSUPPORTED_SCHEMA_VERSION,
             )
+        # The four carried artifacts and the six carried instants, admitted by **exact type**.
+        #
+        # The instants belong here for the same reason the artifacts do, and it is not
+        # symmetry for its own sake. ``canonical_digest`` renders a ``datetime`` subclass to
+        # exactly the string a plain ``datetime`` produces, so ``candidate_digest`` cannot
+        # tell them apart — and Phase 5B's gate 13 reads these six fields straight into ``<``
+        # and ``>``. A subclass overriding ``__lt__``/``__gt__`` therefore verifies
+        # ``VERIFIED`` on all six where the identical instant as a plain ``datetime`` is
+        # refused, ``decision_evaluated_at_fact`` included — the ``_OCCURRENCE_FACTS`` member
+        # R-12b exists to bind. Measured on all six before this gate was extended.
         for name in (
             "target_scope",
             "policy_binding",
             "policy_coordinate_binding",
             "producer_attestation",
+            "subject_valid_from_fact",
+            "subject_valid_until_fact",
+            "subject_asserted_at_fact",
+            "decision_evaluated_at_fact",
+            "decision_expires_at_fact",
+            "attestation_issued_at_fact",
         ):
             value = getattr(self, name)
             expected = {
@@ -258,6 +274,12 @@ class CapacityAuthorizationCandidate:
                 "policy_binding": PolicyTargetBindingReference,
                 "policy_coordinate_binding": PolicyTargetBindingReferenceV2,
                 "producer_attestation": ProducerAttestationEvidence,
+                "subject_valid_from_fact": datetime,
+                "subject_valid_until_fact": datetime,
+                "subject_asserted_at_fact": datetime,
+                "decision_evaluated_at_fact": datetime,
+                "decision_expires_at_fact": datetime,
+                "attestation_issued_at_fact": datetime,
             }[name]
             if type(value) is not expected:
                 raise ExactTypeError(

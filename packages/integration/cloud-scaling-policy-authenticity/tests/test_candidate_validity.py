@@ -30,6 +30,7 @@ above it about which instants are admissible would be a second opinion, not a se
 from __future__ import annotations
 
 import dataclasses
+import datetime as datetime_mod
 from datetime import timedelta
 
 import pytest
@@ -89,6 +90,88 @@ def _with_times(candidate, **overrides):
         object.__setattr__(forged, name, value)
     object.__setattr__(forged, "candidate_digest", canonical_digest(forged.digest_payload()))
     return forged
+
+
+class _CompliantInstant(datetime_mod.datetime):
+    """A ``datetime`` subclass that satisfies every ordering by fiat.
+
+    Declared directly, **not** derived through ``to_canonical_obj``. Two defects in this
+    chain survived fully green CI because every attack value was built from the primitive
+    the guards were wrong about, so the controls inherited the blind spot they existed to
+    detect.
+    """
+
+    def __lt__(self, other):  # pragma: no cover - never reached once construction refuses
+        return False
+
+    def __gt__(self, other):  # pragma: no cover
+        return False
+
+
+def _as_subclass(value):
+    return _CompliantInstant(
+        value.year, value.month, value.day, value.hour, value.minute,
+        value.second, value.microsecond, tzinfo=datetime_mod.timezone.utc,
+    )
+
+
+CARRIED_INSTANTS = (
+    "subject_valid_from_fact",
+    "subject_valid_until_fact",
+    "subject_asserted_at_fact",
+    "decision_evaluated_at_fact",
+    "decision_expires_at_fact",
+    "attestation_issued_at_fact",
+)
+
+
+@pytest.mark.adversarial
+@pytest.mark.parametrize("field", CARRIED_INSTANTS)
+def test_a_subclass_instant_is_refused_upstream_and_the_honest_one_still_reaches_this_gate(
+    field,
+):
+    """**Why gate 13 may compare these six fields with bare ``<``/``>``.**
+
+    It may because Phase 5A admits them by exact type. ``canonical_digest`` renders a
+    ``datetime`` subclass to exactly the string a plain ``datetime`` produces, so
+    ``candidate_digest`` cannot distinguish them and this gate reads the field straight into
+    a comparison — a subclass overriding ``__lt__``/``__gt__`` returned ``VERIFIED`` on all
+    six, including ``decision_evaluated_at_fact``, the ``_OCCURRENCE_FACTS`` member R-12b
+    exists to bind.
+
+    Two assertions, and the pairing is the point. The first is that honest construction
+    refuses the subclass. The second is that the **same instant** as a plain ``datetime``,
+    forged past construction, still earns its own typed refusal here — so the first cannot
+    be passing merely because the instant was harmless.
+    """
+
+    from ugence_cloud_scaling_authorization_contracts import (
+        CapacityAuthorizationCandidate,
+        ExactTypeError,
+    )
+
+    authority, record, candidate = _pair()
+    honest = _out_of_bounds_value(candidate, field)
+
+    kwargs = {f.name: getattr(candidate, f.name) for f in dataclasses.fields(candidate)}
+    kwargs[field] = _as_subclass(honest)
+    with pytest.raises(ExactTypeError):
+        CapacityAuthorizationCandidate(**kwargs)
+
+    plain = _with_times(candidate, **{field: honest})
+    result = _verify(plain, T_CANDIDATE, authority, record)
+    assert result.outcome is not O.VERIFIED, (
+        "the honest instant must be refused on its own merits, or the control above "
+        "proves nothing about the subclass"
+    )
+
+
+def _out_of_bounds_value(candidate, field):
+    """An instant that puts ``field`` outside what gate 13 admits at ``T_CANDIDATE``."""
+
+    if field in ("subject_valid_until_fact", "decision_expires_at_fact"):
+        return candidate.decision_evaluated_at_fact  # closes before the verified instant
+    return T_CANDIDATE + timedelta(days=365)  # opens or occurs after it
 
 
 # ======================================================================================

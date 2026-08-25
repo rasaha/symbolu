@@ -241,10 +241,18 @@ def mutated_package(tmp_path: pathlib.Path, guard_number: int) -> MutatedPackage
     # instants — the decision cannot have been evaluated before the recommendation it decides
     # became valid, nor issued before the evaluation it binds was made.
     #
-    # The 65th is `_bound_instant`'s awareness check, added when the two orderings moved off
-    # canonical strings onto parsed instants: `strftime` does not zero-pad `%Y` below year
-    # 1000, so a three-digit year sorted above every four-digit one and both orderings
-    # inverted. It shifted every guard after `_require_datetime` by +1.
+    # The 65th is `_bound_instant`'s **exact-string type gate**, not the awareness check that
+    # helper once had — that check became unreachable once only canonical strings are admitted
+    # and was removed. The two swapped one-for-one, which is why the count did not fall to 64,
+    # and the type gate is written as `if type(value) is not str: raise` precisely so the sweep
+    # inventories, neutralises and scores it: it is the only thing standing between a live
+    # `datetime` subclass and both orderings. Owner-ratified; do not rewrite it into an
+    # `else`-branch shape to reproduce the old denominator.
+    #
+    # The orderings moved off canonical strings onto parsed instants because `strftime` does
+    # not zero-pad `%Y` below year 1000, so a three-digit year sorted above every four-digit
+    # one and both orderings inverted. That work shifted every guard after `_require_datetime`
+    # by +1.
     #
     # Adding R-12b's seven in `reconciliation.py` shifted every `candidate.py` guard by +7. The sweep's
     # numbered anchors are asserted against their condition text in

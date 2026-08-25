@@ -66,6 +66,8 @@ from conftest import (
 )
 from ugence_cloud_scaling_authorization_contracts import (
     DOMAIN_CLOUD_SCALING,
+    ExactTypeError,
+    canonical_digest,
     AuthorizationCandidateRejectionReason as Reason,
     CanonicalFieldError,
     CapacityAuthorizationCandidate,
@@ -1086,10 +1088,16 @@ def test_a_live_datetime_in_the_snapshot_is_refused(tmp_path, projection, decisi
 
 
 def test_a_live_datetime_as_the_outer_evaluated_at_is_refused(projection, decision):
-    """The same object on the outer field, which ``_comparable_instant`` guards.
+    """The same object on the outer ``evaluated_at``.
 
-    ``candidate.py`` now applies the same exact-type rule, so a subclass cannot reach the
-    coherence comparisons there either.
+    **Guard 39 kills this, not ``_comparable_instant``** — measured, and worth naming
+    correctly. The outer field must canonically equal the value bound in the snapshot, and
+    the snapshot here still carries the genuine instant, so the outer-equals-bound equality
+    gate refuses it before any coherence comparison is reached. The diagnostic asserted
+    below is that gate's, which is what makes the attribution checkable rather than assumed.
+
+    ``candidate.py``'s exact-type rule is a separate, later line of defence; it is measured
+    on its own in ``test_a_datetime_subclass_in_any_carried_instant_is_refused_at_construction``.
     """
 
     ancient = _CompliantInstant(
@@ -1101,6 +1109,71 @@ def test_a_live_datetime_as_the_outer_evaluated_at_is_refused(projection, decisi
         forged,
         reason=Reason.DECISION_INSTANT_NOT_BOUND,
         diagnostic="does not equal the value bound",
+    )
+
+
+CARRIED_INSTANTS = (
+    "subject_valid_from_fact",
+    "subject_valid_until_fact",
+    "subject_asserted_at_fact",
+    "decision_evaluated_at_fact",
+    "decision_expires_at_fact",
+    "attestation_issued_at_fact",
+)
+
+
+@pytest.mark.parametrize("field", CARRIED_INSTANTS)
+def test_a_datetime_subclass_in_any_carried_instant_is_refused_at_construction(field):
+    """**The candidate's six instants are admitted by exact type, like its four artifacts.**
+
+    Not symmetry for its own sake. ``canonical_digest`` renders a ``datetime`` subclass to
+    exactly the string a plain ``datetime`` produces — asserted below — so
+    ``candidate_digest`` cannot tell them apart. Phase 5B's gate 13 reads all six fields
+    straight into ``<``/``>``, so a subclass overriding those operators verified ``VERIFIED``
+    on every one, ``decision_evaluated_at_fact`` included: the ``_OCCURRENCE_FACTS`` member
+    R-12b exists to bind.
+
+    The subclass is declared directly rather than derived through ``to_canonical_obj``, for
+    the reason the whole suite now follows: an attack value built from the primitive the
+    guard is wrong about inherits its blind spot.
+    """
+
+    from conftest import build_candidate
+
+    genuine = build_candidate()
+    honest = getattr(genuine, field)
+    sneaky = _CompliantInstant(
+        honest.year, honest.month, honest.day, honest.hour, honest.minute,
+        honest.second, honest.microsecond, tzinfo=datetime_mod.timezone.utc,
+    )
+    kwargs = {f.name: getattr(genuine, f.name) for f in dataclasses.fields(genuine)}
+    kwargs[field] = sneaky
+
+    with pytest.raises(ExactTypeError) as exc:
+        CapacityAuthorizationCandidate(**kwargs)
+    assert exc.value.reason is Reason.UNSUPPORTED_EXACT_TYPE
+    assert field in str(exc.value)
+
+
+def test_the_candidate_digest_cannot_distinguish_a_subclass_instant():
+    """Why the exact-type gate carries this and no digest check can.
+
+    If these ever differ, the distinction would survive in the digest and the type gate
+    could be relaxed. They do not differ, so it cannot.
+    """
+
+    from conftest import build_candidate
+
+    genuine = build_candidate()
+    honest = genuine.decision_evaluated_at_fact
+    sneaky = _CompliantInstant(
+        honest.year, honest.month, honest.day, honest.hour, honest.minute,
+        honest.second, honest.microsecond, tzinfo=datetime_mod.timezone.utc,
+    )
+    with_subclass = _bypassing_post_init(genuine, decision_evaluated_at_fact=sneaky)
+    with_plain = _bypassing_post_init(genuine, decision_evaluated_at_fact=honest)
+    assert canonical_digest(with_subclass.digest_payload()) == canonical_digest(
+        with_plain.digest_payload()
     )
 
 
