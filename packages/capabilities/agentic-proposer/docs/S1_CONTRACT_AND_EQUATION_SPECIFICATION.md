@@ -2388,7 +2388,12 @@ name, never by field name alone.
 records what landed: `SELECTION_BEARER`, a `SELECTION_FIELD` held apart from a
 three-element `DEPENDENT_FIELDS`, a `SELECTION_COUPLING` registry the class and live-type
 filters both gate on, `NON_BEARERS_SHARING_A_FIELD_NAME` naming the exclusion
-explicitly, and three equality self-tests pinning all of it.
+explicitly, and **two** self-tests pinning all of it by equality —
+`test_the_coupling_is_pinned_to_the_ratified_fields` on `SELECTION_FIELD` and
+`DEPENDENT_FIELDS`, and `test_the_bearer_registry_is_pinned` on `SELECTION_BEARER`,
+`SELECTION_COUPLING` and `NON_BEARERS_SHARING_A_FIELD_NAME`, the latter also asserting
+that the registry and the non-bearer list are **disjoint**, so a contract cannot be both
+a bearer and a named exclusion.
 
 *S1 production implementation:* unauthorized under A11.
 
