@@ -15,7 +15,9 @@ Evidence labels: `[V]` verified against the repository, `[I]` inferred, `[G]` ga
 application from its current replica count to a proposed replica count in response to
 rising load.
 
-**Agent.** An internal cloud-scaling agent operating through Ugence Agent Runtime.
+**Agent.** An internal cloud-scaling agent operating through Ugence Agent Runtime. *This
+is the scenario's intended target state; Agent Runtime is **not** wired today (§3) and its
+integration is scheduled under "Later" in the implementation sequence.*
 
 **Subject.** A simulated tenant application in a sandbox Kubernetes environment. **No
 real customer and no production infrastructure.**
@@ -47,6 +49,11 @@ load signal → agent scaling proposal → evidence/context display
    → Action Clearance when permitted → dry-run execution
    → outcome and audit record
 ```
+
+*Workflow caveat:* "Action Clearance" above names the **stage**, not the
+`ugence-action-clearance` package. That stage is served today by the console's own
+`operational_safety.py` (§3). The package is wired only at Slice 2, after a boundary
+review.
 
 The deliverable is a **standalone app plus service API**. ServiceNow is a later
 integration adapter, not the pilot host.
@@ -110,8 +117,10 @@ So none of the following is connected today:
 - **`ugence-agent-runtime`** → execution coordination and the audit event store. The
   console keeps its own simpler audit list.
 - **`ugence-action-clearance`** → the Clear stage, replacing `operational_safety.py`.
-  Note the console's gate returns `CLEAR / HOLD`; the package's vocabulary is
-  `CLEAR · HOLD · BLOCK · ESCALATE`, which is what the three-outcome demo needs.
+  The console's gate returns `CLEAR / HOLD`; the package's vocabulary is
+  `CLEAR · HOLD · BLOCK · ESCALATE`. The three acceptance outcomes are expressible
+  **without** the extra two (§8), so this is a fidelity gap, not a blocker — and it is
+  gated behind the boundary review in Slice 2.
 - **`ugence-policy-authority` / `ugence-risk-authority`** → the policy and risk evaluation
   step. Replica ceilings, budget ceilings, tenant boundaries and freeze windows have no
   home yet `[G]`.
@@ -171,44 +180,117 @@ No artifact, screen or document produced by this pilot may describe evidence as
 cryptographically verified, trusted by BR-2C, production-authorized, or independently
 audited. The audit record is a **reconstructable decision chain**, not a signed one.
 
-## 8. Resolved and still open
+## 8. Acceptance criterion
 
-**Resolved by this scenario:** what the pilot demonstrates; which app (the console API
-plus a front end over it); the primary user (an operator watching a governed scaling
-decision); that the API is internal-only for now; which packages compose §2.
+The first complete pilot must reproduce **all three governed outcomes through the same
+API and the same pipeline**. Each call must return an audit record, identify which inputs
+were mocked and which real, and perform **no external mutation**.
 
-**Still open** `[G]`:
+**Use the vocabulary the components actually emit.** These are the real field values
+`[V]`, and they do not line up with the informal permit/deny/escalate labels:
 
-- **Acceptance criterion.** With no external client, "done" must be chosen. Proposed:
-  all three outcomes reproducible end to end from a single API call each, with an audit
-  record for every one.
-- **Where policy limits live.** Replica ceiling, budget ceiling, tenant boundary and
-  freeze window need a home — Policy Authority, static pilot config, or both.
-- **Front end.** `apps/console`, `apps/ugence-governance-studio` and `frontend/` all
-  exist; none is identified as the target.
+| Model | Field | Values it emits |
+|---|---|---|
+| `AssertionVerdict` | `coverage` | `SUPPORTED` / `UNSUPPORTED` / `CONSTRAINED` / `INDETERMINATE` |
+| `ActionVerdict` | `outcome` | `AUTHORIZED` / `AUTHORIZED_WITH_CONSTRAINTS` / `DENIED` / … |
+| `ClearanceVerdict` | `disposition` | **`CLEAR` / `HOLD` only** |
+| `GovernedLoopResult` | `would_execute`, `final_disposition`, `recorded`, `correlation_id`, `cer_id`, `stages` | — |
+
+The three outcomes, stated in that vocabulary:
+
+1. **Allowed / would execute** — `AssertionVerdict.coverage = SUPPORTED`,
+   `ActionVerdict.outcome = AUTHORIZED` (or `AUTHORIZED_WITH_CONSTRAINTS`),
+   `ClearanceVerdict.disposition = CLEAR`, `would_execute = true`.
+2. **Refused or held because a hard control fails** — `would_execute = false`, reached
+   *either* by `ActionVerdict.outcome = DENIED` (authorization refusal: replica ceiling,
+   budget ceiling, tenant boundary) *or* by `ClearanceVerdict.disposition = HOLD`
+   (operational stop: change freeze). These are **different outcomes from different
+   authorities** and must be reported as what each emitted.
+3. **Held / review-required because evidence or authority is unsupported or
+   insufficient** — `AssertionVerdict.coverage = UNSUPPORTED` or `INDETERMINATE`,
+   `would_execute = false`.
+
+**Naming discipline, binding.** The console's clearance gate emits **only `CLEAR` and
+`HOLD`** `[V]`. It has no `BLOCK` and no `ESCALATE`. Do not relabel a `HOLD` as `DENY` or
+`ESCALATE` in the API, the UI or any demo narration — those words belong to authorities
+that did not produce the outcome. `BLOCK` and `ESCALATE` exist in the
+`ugence-action-clearance` package's vocabulary, which is **not wired** (§3); until it is,
+they must not appear.
+
+## 9. Policy limits — demo fixtures, not Policy Authority
+
+For the internal pilot, replica ceiling, budget ceiling, tenant boundary and change-freeze
+window come from **immutable, versioned scenario fixtures owned by the demo adapter**.
+
+Every surface that displays or returns them must label them:
+
+```
+DEMO POLICY — NON-AUTHORITATIVE
+```
+
+**No artifact may state or imply that Policy Authority evaluated them.** Policy Authority
+is not wired (§3), and a fixture is not a policy decision.
+
+Production policy must come from Policy Authority through a **separately defined
+integration seam**, specified and reviewed on its own terms. That seam does not exist and
+is not designed here `[G]`.
+
+## 10. Front end — `apps/console`
+
+**Selected: `apps/console`**, on measured grounds rather than its name `[V]`:
+
+- Its `src/api.ts` calls exactly the two endpoints this pilot needs —
+  `/v1/governed-loop/scenario/${id}` and `/v1/audit/${correlationId}` — and both exist in
+  `ugence_console_api/app.py` (`:118` and `:135`). The integration is already matched.
+- Its README states it "Talks to the `ugence_console_api` service."
+- It carries `dev`, `build`, `preview` and `type-check` scripts, and a `src/decision.ts`
+  plus `src/views/` structure suited to showing proposal → gates → outcome → audit.
+
+**Unverified** `[G]`: `node_modules` is absent and there is **no lockfile**
+(`package-lock.json`, `pnpm-lock.yaml`, `yarn.lock` all absent). Neither the build nor
+`type-check` has been run. "Smallest verified effort" here means smallest *API-integration
+distance*, which is measured; build health is not.
+
+**Deferred, with reasons:**
+
+- **`apps/ugence-governance-studio/frontend`** — targets `http://127.0.0.1:8000` and has a
+  generated API client, but is a larger app built around eligibility features, aimed at a
+  different domain. Deferred as disproportionate, not unsuitable.
+- **`frontend/`** (`symbolu-frontend`) — references port 8000 only in its README and Vite
+  config; no `/v1/` client code exists in `src`. Deferred: it would need the integration
+  written from scratch that `apps/console` already has.
 
 ---
 
-## Smallest slice that produces a working end-to-end demo
+## Implementation sequence
 
-**One scenario, one outcome, one honest record — not all three outcomes.**
+**Slice 1 — backend integration only.** `ugence-cloud-scaling-controller` becomes the
+real proposal source for **all three fixed scenarios**, running through the existing
+SHADOW governed loop. A mocked load signal yields a genuine recommendation instead of a
+hard-coded action; a minimal scaling payload carries current replicas, proposed replicas,
+tenant, budget and freeze state; each scenario returns its verdict and audit record from
+`/v1/governed-loop/scenario/{id}`. Policy limits come from the §9 demo fixtures, labelled
+non-authoritative. No front end, no vocabulary change, no external mutation.
 
-Wire `ugence-cloud-scaling-controller` into `ugence_console_api` as the proposal source,
-so a mocked load signal produces a real recommendation rather than a hard-coded action;
-add a minimal scaling decision payload (current replicas, proposed replicas, tenant,
-budget, freeze flag); run it through the existing governed loop in SHADOW mode; return
-the verdict and audit record from one endpoint.
+This is the acceptance criterion in §8 met at the API, and it is the whole of the first
+slice.
 
-Target the **Permit** path first, through `/v1/governed-loop/scenario/{id}`.
+**Slice 2 — clearance vocabulary, after a boundary review.** Only once a **separate
+boundary review** has run may the console's local safety/clearance module be replaced by
+or reconciled with `ugence-action-clearance`. The review is required because the two
+vocabularies differ — `CLEAR / HOLD` against `CLEAR · HOLD · BLOCK · ESCALATE` — and
+because Action Clearance may narrow or block an authorization but never create one. Which
+outcomes become expressible, and what that changes about the three scenarios, is a
+decision to take deliberately rather than as a side effect of wiring.
 
-That slice is small because it adds one real integration to a loop that already runs, and
-it is end-to-end because it spans load signal → proposal → evaluation → clearance →
-dry-run → audit. **Deny** and **Escalate** then follow by varying the mocked inputs
-against the same path, which is why they are not in the first slice.
+**Slice 3 — front end.** Connect `apps/console` (§10) to the Slice 1 API. Its two
+endpoint calls already match, so this is integration and display, not new client work.
+Build health must be established first (§10).
 
-Deliberately excluded from the slice: Agent Runtime integration, replacing
-`operational_safety.py` with `ugence-action-clearance`, Policy/Risk Authority wiring, and
-any front end. Each is worth doing; none is needed to prove the path runs.
+**Later.** Agent Runtime integration and its append-only audit event store; Policy
+Authority through the §9 seam; Risk Authority; production execution against a real
+cluster. None is required for the acceptance criterion, and none should be started before
+Slices 1–3 are complete.
 
 ---
 
