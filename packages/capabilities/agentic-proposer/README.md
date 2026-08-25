@@ -36,9 +36,21 @@ rule against projecting an auditor status into an outcome or disposition field, 
 advisory contract shape, and D8's containment bounds on the role projection. Each is
 a test that holds today and arms itself when the surface it guards appears.
 
-The eight canonical contracts and Equations 1–3 are still unimplemented: nothing in
-this repository defines them, so they were not inferred. See
-[`docs/S1_ENFORCEMENT.md`](docs/S1_ENFORCEMENT.md).
+The eight canonical contracts and Equations 1–4 are still **unimplemented**. They are no
+longer **undefined**: they were undefined when this section was first written, and
+nothing was inferred from D7 at that time; the gap was closed by an owner ratification,
+recorded literally in
+[`docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md`](docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md)
+— every contract, every field, the frozen `P_unsigned` projection and every equation
+signature. Specification is not authorization: no contract module exists in `src/`, the
+version is unchanged, and implementation stays unauthorized until that document is
+independently reviewed and merged. Owner decision OD-4 — whether the advisory carries
+its per-candidate entries or references them by id — is ratified, resolved by restoring
+the nesting ratified D7 requires. That document's status is
+`CONTRACT SPECIFICATION RATIFIED; IMPLEMENTATION AUTHORIZATION PENDING MERGED
+ENFORCEMENT`: every owner decision is resolved, and what is outstanding is the merge of
+the enforcement guards and the authorization itself.
+See also [`docs/S1_ENFORCEMENT.md`](docs/S1_ENFORCEMENT.md).
 
 ```python
 from ugence_agentic_proposer import (
