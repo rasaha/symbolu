@@ -67,11 +67,23 @@ def test_the_document_exists(path):
 # --------------------------------------------------------------------------- #
 
 def test_there_is_exactly_one_owner_decision_record():
-    """The ADR's OD-1 – OD-4 table is the single decision record.
+    """The ADR's OD-1 – OD-4 table is the single **decision record**.
 
-    A subordinate document may cite it and may carry guard evidence beneath it; none may
-    carry a second ratification section, because two accounts of one decision is how a
-    reader ends up believing whichever they read first.
+    That is a narrower claim than "one account", and the narrower claim is the true one.
+    The specification carries its own full per-decision statement under its
+    *Owner decisions* section, and that is correct rather than a duplication to be
+    removed: the specification is the implementation-ready document, OD-4 changed
+    contract shape, and OD-1 and OD-2 carry riders an implementer must read where the
+    contracts are stated. What the ADR alone carries is the **record** — the table that
+    says, for each decision, that it is ratified, on what date, whether it bears on
+    contract shape, and which guard enforces it.
+
+    So this guard checks the property that actually matters: no document outside the ADR
+    may carry a rival *ratification section* — a heading that reads as a second place a
+    decision was made — and, because a second full statement is permitted, the two
+    documents must not **disagree**. The divergence check is
+    ``test_the_adr_and_the_specification_agree_on_every_owner_decision`` below; without
+    it, narrowing this claim would trade a false sentence for an unguarded risk.
     """
     assert "## Owner decisions OD-1 – OD-4 — all resolved" in _text(ADR)
     competing = []
@@ -81,7 +93,79 @@ def test_there_is_exactly_one_owner_decision_record():
         for heading in re.findall(r"^#{1,6}\s+(.*OD-[1-4].*)$", _text(path), re.M):
             competing.append(f"{path.name}: {heading}")
     assert not competing, (
-        f"a second OD-1 – OD-4 account exists outside the ADR: {competing}")
+        f"a rival OD-1 – OD-4 ratification heading exists outside the ADR: {competing}")
+
+
+#: The four decisions, and the facts both documents must state identically about each.
+OWNER_DECISIONS = (1, 2, 3, 4)
+_DATE = r"(\d{4}-\d{2}-\d{2})"
+
+
+def _normalised(path):
+    """Whitespace-collapsed text. Both documents wrap these statements across lines, so
+    a line-oriented match would miss them for a reason that has nothing to do with what
+    they say."""
+    return " ".join(_text(path).split())
+
+
+def _ratification_dates(body, od):
+    return set(re.findall(rf"OD-{od}\b[^|]{{0,200}}?RATIFIED[^.|]{{0,40}}?{_DATE}", body))
+
+
+def _resolution_letters(body, od):
+    return set(re.findall(
+        rf"OD-{od}\b[^|]{{0,200}}?RATIFIED[^|]{{0,40}}?resolved\s*\(([a-z])\)", body))
+
+
+@pytest.mark.parametrize("od", OWNER_DECISIONS)
+def test_the_adr_and_the_specification_agree_on_every_owner_decision(od):
+    """The divergence check the narrowed claim above depends on.
+
+    Two documents stating one decision in full is only safe while they say the same
+    thing. Markdown headings cannot see that: both documents could record OD-4 as
+    ratified and disagree about *what was ratified*, and every heading-shaped guard
+    would stay green. This reads the statements themselves.
+
+    Compared, for each decision: that both documents record it as RATIFIED at all, and
+    that they name the **same ratification date**. A date that drifts in one document is
+    the cheapest early sign that the two accounts have been edited apart.
+    """
+    adr, spec = _normalised(ADR), _normalised(SPECIFICATION)
+    adr_dates, spec_dates = _ratification_dates(adr, od), _ratification_dates(spec, od)
+    assert adr_dates, f"the ADR records no ratification date for OD-{od}"
+    assert spec_dates, f"the specification records no ratification date for OD-{od}"
+    assert adr_dates == spec_dates, (
+        f"OD-{od} is ratified {sorted(adr_dates)} in the ADR and {sorted(spec_dates)} "
+        "in the specification; the two accounts have diverged")
+
+
+def test_the_adr_and_the_specification_agree_on_od_4s_resolution():
+    """OD-4 is the one decision that changed contract shape, so it is the one whose
+    divergence would silently misdirect an implementer. Both documents must name the
+    same resolution letter."""
+    adr = _resolution_letters(_normalised(ADR), 4)
+    spec = _resolution_letters(_normalised(SPECIFICATION), 4)
+    assert adr == {"a"}, f"the ADR does not record OD-4 resolved (a): {adr}"
+    assert spec == {"a"}, f"the specification does not record OD-4 resolved (a): {spec}"
+
+
+def test_only_od_4_is_recorded_as_bearing_on_contract_shape():
+    """The ADR table's third column is the load-bearing distinction between a decision
+    about a guard and a decision about the contracts. OD-1 – OD-3 change no contract,
+    field type, cardinality, vocabulary or equation term; OD-4 did. If that column ever
+    said otherwise for one of the first three, the specification's Part D would be
+    downstream of a decision nobody re-read it against."""
+    rows = re.findall(r"\| \*\*OD-([1-4])\*\* — \*\*RATIFIED[^|]*\|[^|]*\|([^|]*)\|",
+                      _text(ADR))
+    bears = {od: cell.strip().lower() for od, cell in rows}
+    assert set(bears) == {"1", "2", "3", "4"}, (
+        f"the ADR decision table does not carry all four rows: {sorted(bears)}")
+    for od in ("1", "2", "3"):
+        assert bears[od] == "no", f"OD-{od} is recorded as bearing on contract shape"
+    assert bears["4"].startswith("**yes"), (
+        f"OD-4 must be recorded as bearing on contract shape: {bears['4']!r}")
+    assert "OD-4 did change contract shape" in _normalised(SPECIFICATION), (
+        "the specification must agree that OD-4 is the one that changed contract shape")
 
 
 def test_no_competing_second_round_ratification_section_survives():

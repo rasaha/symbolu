@@ -472,10 +472,23 @@ introduced. A gate whose curated input does not name a document does not cover i
 whatever the gate's title suggests.
 
 The package-local guard additionally checks what a multi-document decision record can get
-wrong: that OD-1 – OD-4 have **one** account, in the readiness ADR; that no *Open owner
-decisions* section is restored; that no document both carries a section and says that
-section does not exist; and that no status claim rests on a branch state or a commit
+wrong: that OD-1 – OD-4 have **one decision record**, the table in the readiness ADR, and
+that no document outside the ADR carries a rival ratification heading; that the ADR and
+the specification **agree** on every decision, since the specification states each in
+full and two full statements are only safe while they say the same thing; that no *Open
+owner decisions* section is restored; that no document both carries a section and says
+that section does not exist; and that no status claim rests on a branch state or a commit
 identifier whose truth was temporary.
+
+`[I]` The specification's own *Owner decisions* section is not a duplication to be
+removed. The ADR carries the **record** — ratified, on what date, whether it bears on
+contract shape, which guard enforces it — and the specification carries each decision in
+full because it is the implementation-ready document: OD-4 changed contract shape, and
+OD-1 and OD-2 carry riders an implementer must read where the contracts are stated.
+What is barred is a **second place a decision is made**, not a second place it is
+explained. The agreement check is what keeps that distinction from decaying: it compares
+the ratification dates and OD-4's resolution letter across both documents, and pins that
+OD-4 is the only decision either records as bearing on contract shape.
 
 ## Version
 

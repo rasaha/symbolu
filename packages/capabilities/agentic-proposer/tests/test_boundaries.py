@@ -489,7 +489,6 @@ def test_a_widened_baseline_setup_fails():
     assert widened != _EXPECTED_BASELINE_SETUP, (
         "an added import must not survive the pinned-setup check")
     assert "import socket" in widened
-    assert set(_baseline_setup(("socket",) + DEPENDENCY_BASELINE_MODULES)) is not None
     honest = _module_roots(_BASELINE_SETUP)
     assert "socket" in honest, (
         "precondition: pydantic already loads socket transitively, so the widening "

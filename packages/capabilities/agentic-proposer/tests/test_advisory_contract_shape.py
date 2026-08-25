@@ -603,21 +603,43 @@ def test_a_tool_observation_is_not_reachable_from_either_advisory(graph):
     assert "observation_refs" in graph["CandidateAdvisory"].model_fields
 
 
+def _nested_candidate_failures(advisory, candidate_type):
+    """Why ``advisory`` does not carry the ratified nested candidate sequence, if it does
+    not. Empty means the composition holds.
+
+    Factored out so the mutation control below runs a **real model** through exactly this
+    code rather than through a parallel reimplementation of it. A mutation control that
+    re-derives the rule is testing its own copy of the rule.
+    """
+    failures = []
+    field = advisory.model_fields.get("candidates")
+    if field is None:
+        failures.append(
+            "declares no candidates sequence; this is the reference-by-id shape OD-4 "
+            "rejected")
+        return failures
+    annotation = field.annotation
+    if typing.get_origin(annotation) is not tuple:
+        failures.append(f"candidates is {annotation!r}, not a tuple")
+        return failures
+    args = typing.get_args(annotation)
+    if len(args) != 2 or args[1] is not Ellipsis:
+        failures.append("candidates is not a homogeneous variadic tuple")
+    elif args[0] is not candidate_type:
+        failures.append(f"candidates carries {args[0]!r}, not CandidateAdvisory")
+    if candidate_type not in _reachable_models(advisory):
+        failures.append("CandidateAdvisory is not in the advisory's reachable model set")
+    return failures
+
+
 def test_the_nested_candidate_advisory_is_required_not_merely_permitted(graph):
     """OD-4(a)'s half, and the one an earlier statement of this obligation left too
     weak. ``ProposerAdvisory.candidates`` must be declared, must be a sequence of
     ``CandidateAdvisory``, and ``CandidateAdvisory`` must appear in the advisory's
     reachable model set. **A reversion to reference-by-id fails here.**"""
-    advisory = graph["ProposerAdvisory"]
-    assert "candidates" in advisory.model_fields, (
-        "ProposerAdvisory declares no candidates sequence; this is the reference-by-id "
-        "shape OD-4 rejected")
-    annotation = advisory.model_fields["candidates"].annotation
-    assert typing.get_origin(annotation) is tuple
-    element, ellipsis = typing.get_args(annotation)
-    assert element is graph["CandidateAdvisory"]
-    assert ellipsis is Ellipsis, "the sequence is homogeneous and variadic"
-    assert graph["CandidateAdvisory"] in _reachable_models(advisory)
+    failures = _nested_candidate_failures(graph["ProposerAdvisory"],
+                                          graph["CandidateAdvisory"])
+    assert not failures, f"ProposerAdvisory: {failures}"
 
 
 def test_the_candidate_set_reference_is_retained_alongside_the_nesting(graph):
@@ -629,10 +651,46 @@ def test_the_candidate_set_reference_is_retained_alongside_the_nesting(graph):
 
 
 def test_a_mutant_that_reverts_to_reference_by_id_fails(graph):
-    """Mutation control for the required half."""
-    mutant_fields = set(graph["ProposerAdvisory"].model_fields) - {"candidates"}
-    assert "candidates" not in mutant_fields
-    assert len(mutant_fields) != 23
+    """Mutation control for the required half, run through the same assertion the live
+    test uses rather than through set arithmetic over field names.
+
+    The mutant is a **real model**: an advisory that references its candidates solely by
+    ``candidate_set_id``, which is the shape OD-4 rejected and the shape a future change
+    would most plausibly reintroduce. It is fed to ``_nested_candidate_failures`` — the
+    function the live assertion calls — and must be reported as failing. A control that
+    only observed that a name is absent from a set would pass even if the live assertion
+    had been deleted.
+    """
+    pydantic = pytest.importorskip("pydantic")
+
+    class ReferenceByIdAdvisory(pydantic.BaseModel):
+        advisory_digest: str
+        candidate_set_id: str
+
+    failures = _nested_candidate_failures(ReferenceByIdAdvisory,
+                                          graph["CandidateAdvisory"])
+    assert failures, (
+        "the reference-by-id mutant was accepted; the nested-candidate requirement is "
+        "not being enforced")
+    assert any("no candidates sequence" in f for f in failures), failures
+    assert graph["CandidateAdvisory"] not in _reachable_models(ReferenceByIdAdvisory)
+
+    # And a second mutant that keeps the field but loses the ratified element type, so
+    # the control covers the weaker reversion too — a sequence of identifiers rather
+    # than of candidates.
+    class IdSequenceAdvisory(pydantic.BaseModel):
+        advisory_digest: str
+        candidate_set_id: str
+        candidates: tuple[str, ...]
+
+    weaker = _nested_candidate_failures(IdSequenceAdvisory, graph["CandidateAdvisory"])
+    assert weaker, "a tuple of identifiers is not a tuple of CandidateAdvisory"
+    assert any("not CandidateAdvisory" in f for f in weaker), weaker
+
+    # The ratified shape passes the same function, so the control is discriminating
+    # rather than merely negative.
+    assert not _nested_candidate_failures(graph["ProposerAdvisory"],
+                                          graph["CandidateAdvisory"])
 
 
 def test_a_mutant_adding_a_second_identity_to_the_candidate_fails():

@@ -23,9 +23,43 @@ citation cannot rot into a comment nobody checks.
    (ADR addendum A11). They exist so a green suite means "these rules were executed"
    rather than "these rules were parsed".
 
-The representative shapes deliberately do **not** carry the C6 digest pattern. C6 format
-validation is not what the C5 probes test, and a literal digest-prefix pattern here would
-collide with the D2 text scan in ``test_no_local_canonicalization.py`` for no benefit.
+**Two declarations here deliberately depart from the specification. Both are recorded
+explicitly, because an undocumented substitution in a mirror is the one defect a mirror
+cannot survive.**
+
+1. **The C6 digest pattern is omitted.** Every digest-shaped field — ``advisory_digest``,
+   ``parent_advisory_digest``, ``context_hash``, ``content_hash`` — is declared a plain
+   ``str`` rather than carrying the anchored digest grammar C6 states. C6 format
+   validation is not what the C5 probes test, and writing that grammar out here would
+   collide with the D2 text scan in ``test_no_local_canonicalization.py`` for no
+   benefit — the grammar names the hash algorithm, which is a substring that scan
+   hunts, so it is described here rather than quoted. The
+   registry classifies these fields ``OTHER_PATTERN``, which is what the specification
+   says of them; no C5 probe reads their declared constraint.
+
+2. **``ProposerProcessStateTransition.state`` is typed ``TerminalOutcome``, and the
+   specification types it ``ProposerProcessState``.** This is a **placeholder, not a
+   mirrored value.** D8's nested-shape table gives the field's type as
+   ``ProposerProcessState``, whose members R-3 fixes as
+   ``RECEIVED → VALIDATED → OBSERVING → RECONCILING → EVALUATING`` followed by one of the
+   four terminal outcomes, and H3 counts it among the seven new enums S1 must export.
+   ``src/ugence_agentic_proposer/vocabulary.py`` declares three enums — ``TerminalOutcome``,
+   ``CandidateDisposition``, ``SemanticAuditorFindingStatus`` — and **not**
+   ``ProposerProcessState``.
+
+   ``TerminalOutcome`` is a strict **subset**: it carries the four terminal states and
+   none of the five process states, so a representative transition cannot express
+   ``RECEIVED`` or ``EVALUATING`` at all, and **no probe here exercises R-3's ordering
+   rule**. Nothing in this module may be read as evidence about process ordering.
+
+   The substitution is not repaired here, and deliberately so. Declaring
+   ``ProposerProcessState`` in this module would be the mirror **originating a
+   vocabulary**, which is exactly what a mirror may not do: the specification assigns
+   that enum to the package's public surface, and this stage authorizes no addition to
+   ``src/``. It is discharged by the change that declares the enum in ``vocabulary.py``,
+   at which point this annotation is corrected to name it and the placeholder note is
+   deleted. The registry entry is unaffected either way — the field is ``CLOSED``, an
+   enum validated by membership, under both the specification's type and this one.
 """
 from __future__ import annotations
 
@@ -465,6 +499,12 @@ def representative_shapes():
 
     class ProposerProcessStateTransition(pydantic.BaseModel):
         model_config = config
+        # PLACEHOLDER, documented in this module's docstring. The specification types
+        # this field `ProposerProcessState` (D8's nested-shape table; H3's enum list).
+        # `vocabulary.py` does not declare that enum, and this module may not originate
+        # it, so `TerminalOutcome` — a strict subset carrying only the four terminal
+        # states — stands in. R-3's ordering rule is therefore NOT exercised anywhere
+        # here. Corrected to `ProposerProcessState` by the change that declares it.
         state: TerminalOutcome
         at: _datetime.datetime
 

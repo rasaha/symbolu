@@ -491,20 +491,46 @@ def test_every_declared_field_is_registered(label, contract, field, constraints)
         "FIELD_CLASSIFICATION as C5a, C5b, C5c, other-pattern or closed")
 
 
+def _pattern_verdict(contract, field, constraints, classification=None):
+    """The guard's own decision about one field, factored out.
+
+    Returns ``(verdict, category)`` where verdict is:
+
+    * ``"accepted"`` — a patterned category, validated by exactly its own pattern;
+    * ``"rejected"`` — a patterned category, validated by nothing or by the wrong
+      grammar;
+    * ``"unchecked"`` — the registry gives it no patterned category, so this guard
+      does not look at it at all.
+
+    ``classification`` defaults to the real registry. It is a parameter so a **mutated
+    registry can be run through this exact code**, rather than through a mutation
+    control that re-derives the rule and therefore tests its own copy of it. The
+    ``"unchecked"`` verdict is what makes reclassification dangerous and is why it is a
+    distinct outcome rather than folded into ``"rejected"``: a reclassified field does
+    not fail, it silently leaves the checked set.
+    """
+    classification = FIELD_CLASSIFICATION if classification is None else classification
+    category = classification.get(contract, {}).get(field)
+    if category not in PATTERN_FOR:
+        return "unchecked", category
+    expected = PATTERN_FOR[category]
+    if not constraints or constraints != {expected}:
+        return "rejected", category
+    return "accepted", category
+
+
 @pytest.mark.parametrize("label,contract,field,constraints", _declared_fields(),
                          ids=lambda v: str(v)[:48])
 def test_a_classified_field_carries_its_category_pattern(label, contract, field,
                                                          constraints):
     """C5a and C5b fields must be validated, and by their own pattern rather than a
     lookalike or each other's."""
-    category = _classify(contract, field)
-    if category not in PATTERN_FOR:
+    verdict, category = _pattern_verdict(contract, field, constraints)
+    if verdict == "unchecked":
         pytest.skip(f"{label} is {category or 'unregistered'}, not a patterned category")
-    expected = PATTERN_FOR[category]
-    assert constraints, f"{label} is {category} with no validation"
-    assert constraints == {expected}, (
+    assert verdict == "accepted", (
         f"{label} is {category} but validated by {sorted(constraints)}, "
-        f"not {expected!r}")
+        f"not {PATTERN_FOR[category]!r}")
 
 
 @pytest.mark.parametrize("label,contract,field,constraints", _declared_fields(),
@@ -876,22 +902,50 @@ def test_every_c5b_entry_is_classified_c5b(contract, field):
                          ids=lambda v: str(v)[:40])
 @pytest.mark.parametrize("weakened", WEAKENING_CATEGORIES)
 def test_reclassifying_any_patterned_entry_fails(contract, field, weakened):
-    """G-3, the mutation itself: for **every** C5a and C5b entry, reclassifying it to
-    any weaker or unregistered category must be detectable, not merely for a chosen
-    example. The check is the one the guard runs — a patterned category demands its own
-    pattern, and every other category demands or permits something else."""
+    """G-3, the mutation itself: for **every** C5a and C5b entry, reclassifying it to any
+    weaker or unregistered category must change what the guard does — not merely differ
+    as a dict.
+
+    The mutated registry is fed through ``_pattern_verdict``, the function the real check
+    calls. With the ratified registry the field is ``"accepted"``: the guard demands its
+    pattern and the declared field carries it. With the mutated registry the same field
+    and the same declared constraints become ``"unchecked"`` — the guard stops looking at
+    it. That transition is the defect, and it is silent, which is why it is asserted
+    directly rather than inferred from the registries being unequal.
+    """
     original = FIELD_CLASSIFICATION[contract][field]
     assert original in PATTERN_FOR
     assert weakened != original
     assert weakened not in PATTERN_FOR, (
         f"{weakened} would still demand a pattern; it is not a weakening")
-    mutated = dict(FIELD_CLASSIFICATION[contract])
-    mutated[field] = weakened
-    assert mutated != FIELD_CLASSIFICATION[contract]
+
+    # The constraints the field actually declares on the representative shape, so the
+    # verdict turns on the registry and not on a made-up constraint set.
+    declared = {PATTERN_FOR[original]}
+    assert _pattern_verdict(contract, field, declared) == ("accepted", original), (
+        "precondition: under the ratified registry this field is checked and passes")
+
+    mutated = dict(FIELD_CLASSIFICATION)
+    mutated[contract] = dict(FIELD_CLASSIFICATION[contract])
+    mutated[contract][field] = weakened
+
+    verdict, category = _pattern_verdict(contract, field, declared,
+                                         classification=mutated)
+    assert verdict == "unchecked", (
+        f"reclassifying {contract}.{field} from {original} to {weakened} left the guard "
+        f"reporting {verdict}; the weakening must remove the field from the checked set "
+        "so that this control can see it")
+    assert category == weakened
+
+    # The mutation must also be visible to the pinning checks, which are what actually
+    # fail in a run: the class set for an unregistered category, and the per-entry
+    # category assertion for a registered but wrong one.
     if weakened == "not-a-registered-category":
         assert weakened not in CLASSES, "an unregistered category must not be accepted"
+        assert set(mutated[contract].values()) - set(CLASSES) == {weakened}
     else:
         assert weakened in CLASSES
+        assert mutated[contract][field] != FIELD_CLASSIFICATION[contract][field]
 
 
 @pytest.mark.parametrize("contract,field", C5A_ENTRIES, ids=lambda v: str(v)[:40])
