@@ -559,17 +559,73 @@ def test_the_advisory_reaches_every_candidate_field(graph):
     assert "candidates" in reachable and "candidate_set_id" in reachable
 
 
+#: Substrings that make a field name a *renamed* digest. D6 bars "a field of any name
+#: whose value is a digest, fingerprint or hash of this candidate's content", so the
+#: exact-name list is only half the rule and this closes the other half by shape.
+DIGEST_SHAPED_MARKS = ("digest", "fingerprint", "hash", "checksum")
+
+#: The only digest-shaped names D7 sanctions on ``ProposerAdvisory``, exempted by exact
+#: name rather than by weakening the shape rule for everything.
+#:
+#: * ``advisory_digest`` is the **sole identity field** (D7).
+#: * ``parent_advisory_digest`` is **lineage, not identity**: it holds the parent's
+#:   digest, is C6-shaped, participates in identity including when ``null``, and L-1 bars
+#:   it from equalling this advisory's own digest. It names another advisory's identity;
+#:   it does not mint a second one for this advisory.
+#:
+#: Pinned by equality in ``test_the_digest_exemption_is_exactly_the_two_ratified_fields``
+#: so it cannot be widened to hide a rival. ``CandidateAdvisory`` gets **no** exemption:
+#: it carries no identity at all.
+RATIFIED_DIGEST_FIELDS = frozenset({"advisory_digest", "parent_advisory_digest"})
+
+
+def _rival_identity_failures(root, walker=None, exempt=RATIFIED_DIGEST_FIELDS):
+    """Why ``root`` carries a rival identity, if it does. Empty means it does not.
+
+    This is the whole of D6's standing prohibition as the guard applies it, in one
+    place, so the live assertion and its mutation controls run the **same** code rather
+    than two copies that can drift apart:
+
+    * a reachable field whose name is on ``RIVAL_IDENTITY_FIELDS`` by exact match;
+    * a reachable field whose name is on ``BARRED_FIELDS`` (D7's eight);
+    * a reachable field that is **digest-shaped by name** — the renamed equivalent, which
+      an exact-name list cannot see.
+
+    ``exempt`` holds the sanctioned digest-shaped names — ``advisory_digest``, the sole
+    identity D7 ratifies, and ``parent_advisory_digest``, which names the *parent's*
+    identity rather than minting a second one here. Both are digest-shaped on purpose, so
+    they are exempted by exact name rather than by weakening the shape rule for
+    everything.
+
+    ``walker`` is injectable so a negative control can prove the verdict depends on the
+    reachability walk and not on something the test arranged for itself.
+    """
+    walk = _runtime_fields_reachable_from if walker is None else walker
+    reachable = walk(root)
+    failures = []
+    for name in sorted(reachable & RIVAL_IDENTITY_FIELDS):
+        failures.append(f"rival identity name reachable: {name}")
+    for name in sorted(reachable & BARRED_FIELDS):
+        failures.append(f"barred field reachable: {name}")
+    for name in sorted(reachable):
+        if name in exempt or name in RIVAL_IDENTITY_FIELDS:
+            continue
+        if any(mark in name for mark in DIGEST_SHAPED_MARKS):
+            failures.append(f"renamed digest reachable: {name}")
+    return failures
+
+
 def test_no_rival_identity_is_reachable_from_either_advisory_root(graph):
     """`reachable & RIVAL_IDENTITY_FIELDS` is empty for both roots, on the corrected
     graph. ``advisory_digest`` stays the sole identity field."""
     for root in ("ProposerAdvisory", "CandidateAdvisory"):
-        reachable = _runtime_fields_reachable_from(graph[root])
-        assert not reachable & RIVAL_IDENTITY_FIELDS, (
-            f"{root}: {sorted(reachable & RIVAL_IDENTITY_FIELDS)}")
-        assert not reachable & BARRED_FIELDS, (
-            f"{root}: {sorted(reachable & BARRED_FIELDS)}")
+        assert not _rival_identity_failures(graph[root]), (
+            f"{root}: {_rival_identity_failures(graph[root])}")
     assert IDENTITY_FIELD in _runtime_fields_reachable_from(graph["ProposerAdvisory"])
     assert IDENTITY_FIELD not in set(graph["CandidateAdvisory"].model_fields)
+    # The candidate carries no identity at all, so nothing there needs the exemption the
+    # advisory's sole ratified digest gets.
+    assert not _rival_identity_failures(graph["CandidateAdvisory"], exempt=frozenset())
 
 
 def _reachable_models(model):
@@ -693,19 +749,139 @@ def test_a_mutant_that_reverts_to_reference_by_id_fails(graph):
                                           graph["CandidateAdvisory"])
 
 
-def test_a_mutant_adding_a_second_identity_to_the_candidate_fails():
-    """D6's standing prohibition, as a mutation. A per-candidate digest would be a
-    second identity inside the first — and now that the candidates are inside
-    ``P_unsigned``, one *covered by* the first, which is worse than one standing beside
-    it. Each rival name and each renamed digest must be caught."""
-    for rival in sorted(RIVAL_IDENTITY_FIELDS) + ["candidate_digest", "body_fingerprint"]:
-        mutant = set(spec.FIELD_CLASSIFICATION["CandidateAdvisory"]) | {rival}
-        assert mutant != set(spec.FIELD_CLASSIFICATION["CandidateAdvisory"])
-        assert len(mutant) != spec.CONTRACT_CARDINALITY["CandidateAdvisory"]
-        caught = (rival in RIVAL_IDENTITY_FIELDS
-                  or any(mark in rival for mark in ("digest", "fingerprint", "hash",
-                                                    "checksum")))
-        assert caught, f"a renamed identity slipped through: {rival}"
+#: Every rival identity name D6 bars by exact match, plus renamed equivalents the exact
+#: list cannot see. Each is planted on a real model below.
+RIVAL_IDENTITY_MUTATIONS = tuple(sorted(RIVAL_IDENTITY_FIELDS)) + (
+    "candidate_digest", "body_fingerprint", "payload_checksum", "row_hash",
+)
+
+
+def _candidate_bearing(rival, base):
+    """The ratified ``CandidateAdvisory`` representative shape with one rival identity
+    field added — a real model, built by subclassing so the other ten fields are the
+    ratified ones and the only difference is the mutation."""
+    pydantic = pytest.importorskip("pydantic")
+    return pydantic.create_model(
+        "MutantCandidateAdvisory", __base__=base, **{rival: (str, ...)})
+
+
+@pytest.mark.parametrize("rival", RIVAL_IDENTITY_MUTATIONS)
+def test_a_mutant_adding_a_second_identity_to_the_candidate_fails(graph, rival):
+    """D6's standing prohibition, as a **real mutated model** run through the same
+    verdict the live guard uses.
+
+    A per-candidate digest would be a second identity inside the first — and now that the
+    candidates are inside ``P_unsigned``, one *covered by* the first, which is worse than
+    one standing beside it.
+
+    The mutant starts from the ratified ``CandidateAdvisory`` shape and adds one rival
+    field, then goes through ``_rival_identity_failures`` — the function
+    ``test_no_rival_identity_is_reachable_from_either_advisory_root`` calls. It must fail
+    because the rival is **actually reachable** by the walk, not because a set of names
+    was compared with another set of names.
+    """
+    base = graph["CandidateAdvisory"]
+    mutant = _candidate_bearing(rival, base)
+
+    assert not _rival_identity_failures(base, exempt=frozenset()), (
+        "precondition: the unmodified ratified shape carries no rival identity")
+
+    failures = _rival_identity_failures(mutant, exempt=frozenset())
+    assert failures, f"a second identity named {rival!r} was not caught"
+    assert any(rival in f for f in failures), (
+        f"the failure does not name the planted field: {failures}")
+    assert rival in _runtime_fields_reachable_from(mutant), (
+        "the mutation must actually be reachable, or the control proves nothing")
+
+
+@pytest.mark.parametrize("rival", RIVAL_IDENTITY_MUTATIONS)
+def test_a_second_identity_on_a_nested_candidate_is_reachable_from_the_advisory(graph,
+                                                                                rival):
+    """The nesting half. OD-4(a) put the candidates inside ``P_unsigned``, so a rival on
+    a nested candidate is reachable from ``ProposerAdvisory`` and covered by its digest.
+    The walk must find it from the advisory root, not only from the candidate."""
+    pydantic = pytest.importorskip("pydantic")
+    mutant_candidate = _candidate_bearing(rival, graph["CandidateAdvisory"])
+
+    class AdvisoryWithMutantCandidates(pydantic.BaseModel):
+        advisory_digest: str
+        candidate_set_id: str
+        candidates: tuple[mutant_candidate, ...]
+
+    failures = _rival_identity_failures(AdvisoryWithMutantCandidates)
+    assert failures, f"a nested second identity named {rival!r} was not caught"
+    assert any(rival in f for f in failures), failures
+    assert rival in _runtime_fields_reachable_from(AdvisoryWithMutantCandidates)
+
+
+def test_the_identity_exemption_is_exactly_the_two_ratified_fields(graph):
+    """The exemption is the one place this guard could be blunted, so it is pinned.
+
+    Widening it would let a renamed digest through by name. Narrowing it would fail the
+    ratified advisory, which carries both. Also asserted: the candidate is granted no
+    exemption at all, because it carries no identity.
+    """
+    assert RATIFIED_DIGEST_FIELDS == {"advisory_digest", "parent_advisory_digest"}
+    advisory_fields = set(graph["ProposerAdvisory"].model_fields)
+    assert RATIFIED_DIGEST_FIELDS <= advisory_fields
+    assert RATIFIED_DIGEST_FIELDS & set(graph["CandidateAdvisory"].model_fields) == set()
+
+    # Widening the exemption to a renamed digest must actually hide it — which is why
+    # the set is pinned rather than trusted.
+    mutant = _candidate_bearing("candidate_digest", graph["CandidateAdvisory"])
+    assert _rival_identity_failures(mutant, exempt=frozenset())
+    assert not _rival_identity_failures(
+        mutant, exempt=frozenset({"candidate_digest"})), (
+        "a widened exemption hides the rival; that is what the equality pin above "
+        "prevents")
+
+
+def test_sabotaging_the_walker_makes_the_rival_mutant_escape(graph):
+    """Negative control for the control: the verdict must depend on the reachability
+    walk, not on anything the test arranged for itself.
+
+    A blinded walker — one that reports the root's own fields and never descends, or one
+    that reports nothing — is injected, and the mutant that the real walk catches must
+    then escape. If the mutant still failed under a blinded walker, the mutation control
+    above would be passing for a reason unrelated to reachability.
+    """
+    mutant = _candidate_bearing("candidate_digest", graph["CandidateAdvisory"])
+    assert _rival_identity_failures(mutant, exempt=frozenset()), (
+        "precondition: the real walker catches this mutant")
+
+    assert not _rival_identity_failures(
+        mutant, walker=lambda model: set(), exempt=frozenset()), (
+        "a walker that reports nothing must let the mutant escape, proving the verdict "
+        "is driven by the walk")
+
+    nested = _candidate_bearing("candidate_digest", graph["CandidateAdvisory"])
+
+    class Advisory(pytest.importorskip("pydantic").BaseModel):
+        advisory_digest: str
+        candidates: tuple[nested, ...]
+
+    assert _rival_identity_failures(Advisory), (
+        "precondition: the real walker descends into the nested candidate")
+    shallow = lambda model: set(getattr(model, "model_fields", {}))
+    assert not _rival_identity_failures(Advisory, walker=shallow), (
+        "a non-descending walker must miss the nested rival, proving the descent is "
+        "what catches it")
+
+
+def test_the_name_predicate_alone_is_supplemental_not_the_enforcement_proof():
+    """Helper self-test, clearly labelled.
+
+    ``DIGEST_SHAPED_MARKS`` is a name predicate, and a name predicate on its own proves
+    nothing about a model: it says which spellings *would* be caught if they appeared, not
+    that none appears. The enforcement proof is the reachability walk above. This exists
+    only so the mark list itself is exercised, and it must never be read as the guard.
+    """
+    for rival in RIVAL_IDENTITY_MUTATIONS:
+        recognised = (rival in RIVAL_IDENTITY_FIELDS
+                      or any(mark in rival for mark in DIGEST_SHAPED_MARKS))
+        assert recognised, f"a planted mutation no predicate recognises: {rival}"
+    assert not any(mark in "candidate_id" for mark in DIGEST_SHAPED_MARKS), (
+        "the mark list must not match an ordinary identifier field")
 
 
 def test_a_mutant_nesting_a_tool_observation_fails(graph):

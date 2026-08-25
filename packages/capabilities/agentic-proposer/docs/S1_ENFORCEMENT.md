@@ -307,9 +307,17 @@ What the registry pins, each by equality:
 * the **exact field set for every contract**, checked against Part D's stated
   cardinality, so a field added, omitted or renamed fails;
 * the **exact C5 category for every classified field**, with **every** C5a and C5b entry
-  mutation-pinned — not a chosen sample: reclassifying any one of them to
-  `non-string`, `other-pattern`, C5c, C5d, `closed`, `structured` or an unregistered
-  category fails;
+  mutation-pinned — not a chosen sample. The sweep is **47 patterned entries × 8
+  weakening categories = 376 cases**, and every one is killed when the guard's verdict
+  helper is sabotaged. A *weakening* is a category that does not demand a pattern, so
+  the field silently leaves the checked set; the domain is **derived** from that
+  predicate rather than hand-listed, so a category added to the class set enters the
+  sweep automatically. The sibling patterned class — C5a↔C5b — is excluded from this
+  sweep because it is a **narrowing, not a weakening**: the guard still looks at the
+  field and refuses the grammar it now carries. It is covered per entry by
+  `test_swapping_a_patterned_entry_to_its_sibling_is_rejected_not_ignored`, 47 further
+  cases, so every registered category falls into one sweep or the other and none is
+  quietly dropped;
 * a **citation** to the canonical specification for each mirrored block.
 
 Four things the registry now carries that inference could not: the fourth, mechanical
@@ -452,6 +460,7 @@ here so a green suite is not read as a verified contract:
 | `sha256:` prefix literal vs. `SUSPECT_TEXT` | **outstanding** — a module-path-scoped text mask in the one authorised identity module, with mutation tests. No definition-name exemption is needed: the ratified identity functions are named `compute_advisory_identity` and `verify_advisory_identity`, which carry no suspect substring |
 | `tests/test_vocabulary.py` pins the S0 export surface by equality | **outstanding** — it must be updated to the full H3 surface in the same change that exports the first contract, and not before |
 | Installed-distribution verification of `ugence-jcs` | **outstanding** — the `pyproject.toml` text check is the weaker of the two available assertions (I7.10) |
+| **R-3 process ordering** | **not covered, and explicitly so** — `tests/test_process_ordering_obligation.py` carries the obligation as a **named skip**, not as a green test. The specification types `ProposerProcessStateTransition.state` as `ProposerProcessState`; `vocabulary.py` does not declare that enum, and the mirror may not originate a vocabulary the specification assigns to the public surface, so `TerminalOutcome` — a strict subset carrying no process state — stands in as a documented placeholder. The obligation **arms itself** when the enum is declared, and then fails until forward-only ordering is enforced. `[G]` Whether the four terminal outcomes are members of `ProposerProcessState` or arrive from `TerminalOutcome` is not stated in the specification and must be settled there |
 
 ## Documentation gates, and exactly what they cover
 

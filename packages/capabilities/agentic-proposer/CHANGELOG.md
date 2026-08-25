@@ -283,8 +283,12 @@ test originates, adds, renames or reinterprets no contract field.
   `test_the_suite_kills_a_no_op_validator_mutant` shows a validator naming all four
   fields and enforcing nothing passing the static layer and being killed behaviourally.
 * **Registry weakening (G-3).** Every C5a and C5b entry is mutation-pinned, not a
-  sample: reclassification to `non-string`, `other-pattern`, C5c, C5d, `closed`,
-  `structured` or an unregistered category fails for each.
+  sample. The mutated registry is fed through the guard's own verdict helper, and the
+  sweep is 47 patterned entries × 8 weakening categories = 376 cases, all killed when
+  that helper is sabotaged. The weakening domain is derived from the guard's predicate
+  rather than hand-listed; the sibling patterned class is excluded as a *narrowing* and
+  covered by its own 47-case sweep, so every registered category falls into one or the
+  other.
 * **Free text (G-4).** C5c bars the *mechanism*: no pattern or regex constraint of any
   kind, including arbitrary ASCII-only grammars that are neither named literal. Lawful
   Unicode free text is proved accepted by live model probes.
@@ -313,9 +317,27 @@ test originates, adds, renames or reinterprets no contract field.
 * **Composition and identity (G-9).** `tests/test_advisory_contract_shape.py` discharges
   I7.11 against the corrected nested candidate graph: it bars a nested `ToolObservation`,
   **requires** the nested `CandidateAdvisory` sequence so a reversion to reference-by-id
-  fails loudly, and bars any second identity on the candidate. The C8
+  fails loudly, and bars any second identity on the candidate — the last as real mutated
+  models, built by subclassing the ratified `CandidateAdvisory` shape and run through the
+  same reachability verdict the live guard calls, directly and through a nesting advisory
+  root, with a negative control proving a blinded walker lets the mutant escape. The C8
   `Annotated[str, StringConstraints(...)]` spelling is required and tested, and the
   declared-dependency count is corrected to two.
+
+### Added — R-3 process ordering recorded as an explicit obligation
+
+`tests/test_process_ordering_obligation.py` states R-3 as a **named skip**, not as a
+green test. Before it, R-3 appeared in the specification and in no test file at all, so a
+reader counting green tests would have found no signal that a ratified invariant was
+uncovered. The module documents why the representative shape cannot exercise the rule —
+`ProposerProcessStateTransition.state` is typed `ProposerProcessState` by the
+specification, `vocabulary.py` does not declare that enum, and the mirror may not
+originate a vocabulary the specification assigns to the public surface — pins that the
+placeholder is still documented as one, and **arms itself** when the enum is declared, at
+which point it fails until forward-only ordering is enforced. `[G]` Whether the four
+terminal outcomes belong to `ProposerProcessState` or to `TerminalOutcome` is not stated
+in the specification; the module refuses to settle it and names it as a question for the
+specification.
 
 ### Changed — documentation status language
 

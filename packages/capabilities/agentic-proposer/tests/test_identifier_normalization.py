@@ -874,13 +874,38 @@ C5B_ENTRIES = _entries(C5B)
 C5C_ENTRIES = _entries(C5C)
 C5D_ENTRIES = _entries(C5D)
 
-#: The categories a weakening mutation would reclassify a patterned field into. Each
-#: removes the field's pattern: NON_STRING and STRUCTURED exempt it from string rules,
-#: OTHER_PATTERN hands it an unnamed pattern of its own, C5c and C5d bar any pattern,
-#: CLOSED replaces validation with enum membership, and an unregistered name leaves it
-#: unchecked entirely.
-WEAKENING_CATEGORIES = (NON_STRING, OTHER_PATTERN, C5C, C5D, CLOSED, STRUCTURED,
-                        "not-a-registered-category")
+#: A category name that is in no registry, used as the ninth mutation: reclassifying a
+#: field to something the registry never heard of.
+UNREGISTERED_CATEGORY = "not-a-registered-category"
+
+#: **The exclusion rule, stated once and derived, not hand-listed.**
+#:
+#: A reclassification is a *weakening* — the thing this sweep is about — exactly when the
+#: new category does not demand a pattern, because then the guard stops checking the
+#: field at all. That is ``category not in PATTERN_FOR``, and it is the same predicate
+#: ``_pattern_verdict`` branches on, so the sweep's domain is derived from the guard's
+#: own rule rather than restated beside it.
+#:
+#: Two kinds of case are therefore **excluded, and neither is a survivor**:
+#:
+#: * **The entry's own category.** Reclassifying C5a to C5a is not a mutation.
+#: * **The sibling patterned category** — C5b for a C5a entry, C5a for a C5b entry. This
+#:   is a real and dangerous change, but it is a **narrowing, not a weakening**: the
+#:   guard still demands a pattern, so ``_pattern_verdict`` returns ``"rejected"``
+#:   rather than ``"unchecked"`` and this sweep's assertion does not apply to it. It is
+#:   covered by ``test_swapping_a_patterned_entry_to_its_sibling_is_rejected_not_ignored``
+#:   below, per entry, through the same verdict helper.
+#:
+#: ``test_the_weakening_domain_is_derived_from_the_guards_own_rule`` fails if this
+#: derivation is replaced by a hand-written list, and
+#: ``test_narrowing_the_exclusion_rule_loses_coverage`` fails if the rule is narrowed to
+#: exclude a category that genuinely is a weakening.
+WEAKENING_CATEGORIES = tuple(
+    category for category in CLASSES if category not in PATTERN_FOR
+) + (UNREGISTERED_CATEGORY,)
+
+#: The categories excluded because they still demand a pattern. Not weakenings.
+PATTERNED_CATEGORIES = tuple(PATTERN_FOR)
 
 
 @pytest.mark.parametrize("contract,field", C5A_ENTRIES,
@@ -901,26 +926,31 @@ def test_every_c5b_entry_is_classified_c5b(contract, field):
 @pytest.mark.parametrize("contract,field", C5A_ENTRIES + C5B_ENTRIES,
                          ids=lambda v: str(v)[:40])
 @pytest.mark.parametrize("weakened", WEAKENING_CATEGORIES)
-def test_reclassifying_any_patterned_entry_fails(contract, field, weakened):
-    """G-3, the mutation itself: for **every** C5a and C5b entry, reclassifying it to any
-    weaker or unregistered category must change what the guard does — not merely differ
-    as a dict.
+def test_weakening_any_patterned_entry_removes_it_from_the_checked_set(contract, field,
+                                                                      weakened):
+    """G-3, the mutation sweep: for **every** C5a and C5b entry crossed with **every**
+    weakening category, the mutated registry is fed through ``_pattern_verdict`` — the
+    function the real check calls — and must change what the guard does.
 
-    The mutated registry is fed through ``_pattern_verdict``, the function the real check
-    calls. With the ratified registry the field is ``"accepted"``: the guard demands its
-    pattern and the declared field carries it. With the mutated registry the same field
-    and the same declared constraints become ``"unchecked"`` — the guard stops looking at
-    it. That transition is the defect, and it is silent, which is why it is asserted
-    directly rather than inferred from the registries being unequal.
+    The name says *weakening* and not *any reclassification* because that is the sweep's
+    actual domain. A weakening is a category that does not demand a pattern, so the field
+    silently leaves the checked set; the sibling patterned category is a narrowing and is
+    tested separately. The exclusion is derived from the guard's own predicate, not
+    hand-listed — see ``WEAKENING_CATEGORIES``.
+
+    Under the ratified registry the field is ``"accepted"``: the guard demands its pattern
+    and the declared field carries it. Under the mutated registry the same field with the
+    same declared constraints becomes ``"unchecked"``. That transition is the defect, and
+    it is silent, which is why it is asserted directly rather than inferred from two
+    registries being unequal.
     """
     original = FIELD_CLASSIFICATION[contract][field]
     assert original in PATTERN_FOR
     assert weakened != original
     assert weakened not in PATTERN_FOR, (
-        f"{weakened} would still demand a pattern; it is not a weakening")
+        f"{weakened} still demands a pattern; it is a narrowing, not a weakening, and "
+        "belongs to the sibling test rather than this sweep")
 
-    # The constraints the field actually declares on the representative shape, so the
-    # verdict turns on the registry and not on a made-up constraint set.
     declared = {PATTERN_FOR[original]}
     assert _pattern_verdict(contract, field, declared) == ("accepted", original), (
         "precondition: under the ratified registry this field is checked and passes")
@@ -932,20 +962,138 @@ def test_reclassifying_any_patterned_entry_fails(contract, field, weakened):
     verdict, category = _pattern_verdict(contract, field, declared,
                                          classification=mutated)
     assert verdict == "unchecked", (
-        f"reclassifying {contract}.{field} from {original} to {weakened} left the guard "
+        f"weakening {contract}.{field} from {original} to {weakened} left the guard "
         f"reporting {verdict}; the weakening must remove the field from the checked set "
         "so that this control can see it")
     assert category == weakened
 
-    # The mutation must also be visible to the pinning checks, which are what actually
-    # fail in a run: the class set for an unregistered category, and the per-entry
-    # category assertion for a registered but wrong one.
-    if weakened == "not-a-registered-category":
+    if weakened == UNREGISTERED_CATEGORY:
         assert weakened not in CLASSES, "an unregistered category must not be accepted"
         assert set(mutated[contract].values()) - set(CLASSES) == {weakened}
     else:
         assert weakened in CLASSES
-        assert mutated[contract][field] != FIELD_CLASSIFICATION[contract][field]
+
+
+@pytest.mark.parametrize("contract,field", C5A_ENTRIES + C5B_ENTRIES,
+                         ids=lambda v: str(v)[:40])
+def test_swapping_a_patterned_entry_to_its_sibling_is_rejected_not_ignored(contract,
+                                                                           field):
+    """The excluded case, tested rather than waved through.
+
+    C5a and C5b both demand a pattern, so swapping one for the other never produces
+    ``"unchecked"`` and is outside the weakening sweep's domain. It is still a real
+    defect — C5a admits ``/`` and C5b does not, so the swap silently narrows an
+    externally minted path-shaped handle, or silently widens a token that is the operand
+    of a membership test. Fed through the same verdict helper, it must come back
+    ``"rejected"``: the guard still looks at the field and refuses the grammar it now
+    carries.
+
+    This is what makes the exclusion principled. Every registered category is covered by
+    one sweep or the other; none is quietly dropped.
+    """
+    original = FIELD_CLASSIFICATION[contract][field]
+    sibling = C5B if original == C5A else C5A
+    assert sibling in PATTERN_FOR and sibling != original
+
+    declared = {PATTERN_FOR[original]}
+    mutated = dict(FIELD_CLASSIFICATION)
+    mutated[contract] = dict(FIELD_CLASSIFICATION[contract])
+    mutated[contract][field] = sibling
+
+    verdict, category = _pattern_verdict(contract, field, declared,
+                                         classification=mutated)
+    assert verdict == "rejected", (
+        f"swapping {contract}.{field} from {original} to {sibling} produced {verdict}; "
+        "a sibling swap must still be looked at and refused, not ignored")
+    assert category == sibling
+
+
+def test_the_weakening_domain_is_derived_from_the_guards_own_rule():
+    """The exclusion rule is a derivation, not a hand-written list.
+
+    ``WEAKENING_CATEGORIES`` is every registered class the guard does not demand a
+    pattern for, plus one unregistered sentinel. Adding a tenth class to ``CLASSES``
+    therefore enters this sweep automatically. A hand-written list would not, and the
+    accidental omission this test exists to prevent is exactly what happened: an earlier
+    revision listed six categories by hand and silently left out
+    ``mapping-c5a-keys-c5c-values``, which is a weakening.
+    """
+    derived = tuple(c for c in CLASSES if c not in PATTERN_FOR) + (UNREGISTERED_CATEGORY,)
+    assert WEAKENING_CATEGORIES == derived, (
+        "WEAKENING_CATEGORIES has been replaced by a hand-written list; derive it from "
+        "CLASSES and PATTERN_FOR so a new category cannot be omitted")
+    assert MAPPING_C5A_KEYS_C5C_VALUES in WEAKENING_CATEGORIES, (
+        "the category an earlier hand-written list omitted must be covered")
+    assert set(WEAKENING_CATEGORIES) & set(PATTERN_FOR) == set(), (
+        "a category that demands a pattern is a narrowing, not a weakening")
+
+
+def test_every_registered_category_is_covered_by_one_sweep_or_the_other():
+    """The denominator, asserted. No registered class may fall between the two sweeps.
+
+    For a patterned entry, the candidate reclassifications are the other eight registered
+    classes plus the unregistered sentinel. Seven of the eight are weakenings and belong
+    to the sweep above; the ninth, the sibling patterned class, is a narrowing and
+    belongs to the sibling test. Self-reclassification is not a mutation. Nothing else
+    exists, so there is no unexplained case.
+    """
+    for original in PATTERNED_CATEGORIES:
+        others = set(CLASSES) - {original}
+        weakenings = others - set(PATTERN_FOR)
+        narrowings = others & set(PATTERN_FOR)
+        assert weakenings | narrowings == others, (
+            f"a registered category is in neither sweep for {original}: "
+            f"{sorted(others - weakenings - narrowings)}")
+        assert len(narrowings) == 1, (
+            f"exactly one sibling patterned category is expected for {original}: "
+            f"{sorted(narrowings)}")
+    applicable = len(C5A_ENTRIES + C5B_ENTRIES) * len(WEAKENING_CATEGORIES)
+    assert applicable == 47 * 8 == 376, (
+        f"the weakening sweep's applicable count changed to {applicable}; if that is "
+        "intended, update the count recorded in the enforcement documentation")
+
+
+def test_narrowing_the_exclusion_rule_loses_coverage():
+    """The self-test the exclusion rule needs: narrowing it must fail, not pass quietly.
+
+    Two narrowings are simulated. Dropping a genuine weakening from the domain leaves an
+    entry-category pair that no sweep covers — the defect that produced the omission
+    above. Widening the domain to include a patterned sibling puts a case into the sweep
+    whose assertion is false for it, so the sweep would fail rather than silently assert
+    the wrong thing. Both are asserted here so the rule cannot be edited in either
+    direction without a test saying so.
+    """
+    full = set(WEAKENING_CATEGORIES)
+
+    narrowed = full - {MAPPING_C5A_KEYS_C5C_VALUES}
+    uncovered = (set(CLASSES) - set(PATTERN_FOR)) - narrowed
+    assert uncovered == {MAPPING_C5A_KEYS_C5C_VALUES}, (
+        "narrowing the domain must leave a registered weakening uncovered, which is "
+        "what makes the narrowing detectable")
+
+    # And the narrowed domain would genuinely have missed a real weakening: fed through
+    # the guard, that category still removes a field from the checked set.
+    contract, field = C5A_ENTRIES[0]
+    mutated = dict(FIELD_CLASSIFICATION)
+    mutated[contract] = dict(FIELD_CLASSIFICATION[contract])
+    mutated[contract][field] = MAPPING_C5A_KEYS_C5C_VALUES
+    verdict, _ = _pattern_verdict(contract, field, {PATTERN_FOR[C5A]},
+                                  classification=mutated)
+    assert verdict == "unchecked", (
+        "the omitted category is a real weakening; excluding it would have hidden a "
+        "reclassification the guard stops checking")
+
+    widened = full | {C5B}
+    assert widened != full
+    contract, field = C5A_ENTRIES[0]
+    mutated = dict(FIELD_CLASSIFICATION)
+    mutated[contract] = dict(FIELD_CLASSIFICATION[contract])
+    mutated[contract][field] = C5B
+    verdict, _ = _pattern_verdict(contract, field, {PATTERN_FOR[C5A]},
+                                  classification=mutated)
+    assert verdict == "rejected", (
+        "widening the domain to a patterned sibling would put a case in the sweep whose "
+        "'unchecked' assertion is false for it")
 
 
 @pytest.mark.parametrize("contract,field", C5A_ENTRIES, ids=lambda v: str(v)[:40])
