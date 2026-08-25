@@ -451,6 +451,45 @@ specification also states.
   factored into `_baseline_pin_verdict` and both the live assertion and the control run
   it. Falsified: neutering the verdict kills the control.
 
+### Fixed — eighth audit round: the placeholder's reach, and coverage by registry
+
+* `tests/test_unenforced_local_rules.py` — the registry grows from nineteen constructed
+  violations to **twenty-eight**. Added: **S-1** on `AdvisoryCandidateSet`, both halves —
+  a selector naming no member and a selector resolving to two; **S-2** on
+  `AdvisoryCandidateSet` and, labelled `S-2 (via R-1b)`, on `ProposerAdvisory`, where
+  R-1b(iii)/(iv) carry it rather than the specification stating it twice; **R-1b(vii)**'s
+  local half — `requested_review_action` contradicting the selected nested candidate;
+  **R-3**'s `at`-monotonicity, no-repeat and entangled terminal-count/terminal-position
+  clauses; and **R-4**. Every one was confirmed accepted by the representative shapes
+  before being listed. The module's boundary paragraph now states, per rule, why anything
+  omitted is out of scope rather than leaving it to be inferred from the list's silence,
+  and records that S-1 and S-2 are vacuous in S1 under B3 but exercised anyway, because
+  the shapes do not enforce B3 either.
+* `tests/test_process_ordering_obligation.py` and `docs/S1_ENFORCEMENT.md` — the claim
+  that R-3's ordering rule "has nothing to be exercised against" was **false**. The
+  `TerminalOutcome` placeholder blocks exactly two clauses — no backward transition, and
+  subsequence of the chain — because each needs a process state to state a violation. The
+  other four are violable with terminal states alone. Both documents now say which
+  clauses are blocked and which are not, the skip reason names the distinction, and
+  **R-4's uncovered status is recorded explicitly**: the placeholder does not block it at
+  all, since both sides of R-4's comparison are `TerminalOutcome`, so the comparison-basis
+  ambiguity does not arise there.
+* `tests/test_documentation_consistency.py` — **coverage is decided by a registry, never
+  by a textual mention.** Deriving it from mentions made the opposite error to the
+  hand-written list it replaced: it classified R-4 as covered by the very module that
+  states it covers none of R-4. `_rules_exercised_by_some_test` now reads
+  `UNENFORCED`, the new `ENFORCED` registry, and the obligation module's new
+  `OBLIGATION_RULES`, and `test_exercise_is_decided_by_a_registry_and_never_by_a_mention`
+  asserts the reason rather than the outcome, so deleting a case fails rather than passing
+  on a mention.
+* `tests/test_documentation_consistency.py` — `_specified_rule_ids()` is pinned by set
+  equality against `RATIFIED_RULE_IDS`, in the same form as `RATIFIED_DIGEST_FIELDS`, so a
+  rule added to or removed from the specification fails here rather than silently changing
+  what every derivation is quantified over. `_RULE_ID` now matches the bold-bullet form as
+  well as table rows, so **S-1 and S-2** — stated as prose under D6, and previously invisible
+  to every derivation — fall inside the "every ratified rule is named somewhere" check.
+  The headline count in the enforcement row is pinned against the registry's length.
+
 ### Not implemented
 
 The eight canonical contracts, Equations 1–4, proposal identity, invoice-domain

@@ -18,8 +18,32 @@ this file must not have to go looking: the specification types
 may not originate a vocabulary the specification assigns to the package's public surface.
 The representative shape therefore stands ``TerminalOutcome`` in — a strict **subset**
 carrying the four terminal states and none of the five process states — so a
-representative transition cannot express ``RECEIVED`` or ``EVALUATING`` at all, and the
-ordering rule has nothing to be exercised against.
+representative transition cannot express ``RECEIVED`` or ``EVALUATING`` at all.
+
+**Precisely which clauses that blocks, and which it does not.** An earlier revision of
+this docstring said the ordering rule "has nothing to be exercised against". That was
+false, and overstated the placeholder's reach. R-3 has several clauses, and the
+placeholder blocks only those that need a **process** state:
+
+* **Blocked** — *no backward transition*, and *subsequence of*
+  ``RECEIVED → VALIDATED → OBSERVING → RECONCILING → EVALUATING``. Both need at least one
+  process state to state a violation, and ``TerminalOutcome`` has none. These are what
+  this module's skipped obligation carries, and they are genuinely uncovered.
+* **Not blocked** — *``at`` non-decreasing across the list*, *no repeat*, *at most one
+  terminal state*, and *terminal only in final position*. Each is violable with terminal
+  states alone, so each is expressible today. They are **not enforced** either, and they
+  are recorded where the rest of the unenforced local rules are recorded, with a
+  constructed violating instance each: ``tests/test_unenforced_local_rules.py``.
+
+`[G]` **R-4 is likewise uncovered, and is not blocked at all.** It requires
+``terminal_outcome`` to equal the terminal state present in ``state_transitions``, and
+under the placeholder both sides are ``TerminalOutcome`` — so the comparison-basis
+ambiguity recorded below does **not** arise here, and a record whose narrative and outcome
+disagree is constructible and accepted today. That case is in
+``tests/test_unenforced_local_rules.py`` too. Nothing in this module covers R-4; it is
+cited below only as the premise for terminal membership.
+
+Nothing here may be read as evidence about any R-3 clause, blocked or not.
 
 **Why this module exists rather than nothing.** A rule that no test mentions is
 indistinguishable from a rule nobody has thought about. Before this module, R-3 appeared
@@ -78,6 +102,16 @@ RATIFIED_PROCESS_STATES = (
 #: The enum the specification assigns to ``ProposerProcessStateTransition.state``.
 PROCESS_STATE_ENUM = "ProposerProcessState"
 
+#: The rules this module carries as a **named skip obligation** — written, deliberately
+#: not passing, and armed to run when the placeholder is replaced. Read by
+#: ``test_documentation_consistency.py`` so that "a test works with this rule" is decided
+#: by a registry rather than by a rule id appearing somewhere in prose.
+#:
+#: R-4 is **not** here. This module cites it as the premise for terminal membership and
+#: covers none of it; its uncovered status is recorded in
+#: ``tests/test_unenforced_local_rules.py``, which constructs a violating instance.
+OBLIGATION_RULES = ("R-3",)
+
 
 def _process_state_enum():
     """The declared ``ProposerProcessState``, or ``None`` while it does not exist.
@@ -94,9 +128,13 @@ _UNARMED_REASON = (
     "R-3 PROCESS ORDERING IS NOT COVERED. "
     f"{PROCESS_STATE_ENUM} is not declared in src/ugence_agentic_proposer/, so the "
     "representative shape stands TerminalOutcome in as a documented placeholder and no "
-    "transition here can express a process state. This skip is the obligation: it arms "
-    "itself when the enum is declared, and the implementation stage must then prove "
-    "forward-only ordering. Do not read a green suite as R-3 coverage."
+    "transition here can express a process state. That blocks R-3's no-backward-"
+    "transition and subsequence clauses specifically; its at-monotonicity, no-repeat and "
+    "terminal-state clauses ARE expressible today, are equally unenforced, and are "
+    "recorded with constructed violating instances in test_unenforced_local_rules.py. "
+    "This skip is the obligation for the blocked clauses: it arms itself when the enum "
+    "is declared, and the implementation stage must then prove forward-only ordering. Do "
+    "not read a green suite as R-3 coverage."
 )
 
 

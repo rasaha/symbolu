@@ -421,35 +421,60 @@ TESTS_DIR = PKG_ROOT / "tests"
 
 #: The row in ``S1_ENFORCEMENT.md`` this derivation keeps honest.
 UNEXERCISED_ROW = re.compile(
-    r"^\| \*\*((?:R-\d+[ab]?|L-\d+)(?:, (?:R-\d+[ab]?|L-\d+))*"
-    r"(?:,? and [^*]*?)?)\*\* \| \*\*named, not covered\*\*", re.M)
+    r"^\| \*\*((?:R-\d+[ab]?|L-\d+|S-\d+)(?:, (?:R-\d+[ab]?|L-\d+|S-\d+))*"
+    r"(?:,? and (?:R-\d+[ab]?|L-\d+|S-\d+))?)\*\* \| \*\*named, not covered\*\*", re.M)
 
-_RULE_ID = re.compile(r"^\| (R-\d+[ab]?|L-\d+) \|", re.M)
+#: Rule ids as the specification states them: most as rows of the rule table, and S-1 and
+#: S-2 as bold bullets under D6's *Locally decidable selection invariants*. Both forms are
+#: matched, because a rule stated as prose is as ratified as one stated in a table and the
+#: earlier pattern silently missed the two that are.
+_RULE_ID = re.compile(
+    r"^\| (R-\d+[ab]?|L-\d+|S-\d+) \||^\* \*\*(S-\d+|R-\d+[ab]?|L-\d+) — ", re.M)
 
-#: The module whose scope paragraph names the cross-contract rules. A mention there is a
-#: record of why a rule is out of scope, not an exercise of it, so it is discounted when
-#: deciding which rules any test actually works with.
-SCOPE_NOTE_MODULE = "test_unenforced_local_rules.py"
+#: The ratified rule ids, pinned by equality in the same form as
+#: ``RATIFIED_DIGEST_FIELDS``: a rule added to or removed from the specification must fail
+#: here rather than silently change what every derivation below is quantified over. A
+#: derivation over a set that can shrink unnoticed proves nothing about what it omits.
+RATIFIED_RULE_IDS = frozenset({
+    "R-1a", "R-1b", "R-2", "R-3", "R-4", "R-5", "R-6", "R-7", "R-8", "R-9", "R-10",
+    "L-1", "S-1", "S-2",
+})
+
+#: Modules carrying an explicit registry of the rules they work with, and the attribute
+#: holding it. "A test works with this rule" is decided by these, never by a rule id
+#: appearing in prose: a rule named only to say that nothing covers it is not coverage,
+#: and treating a mention as an exercise is how R-4 came to be classified as covered by
+#: the module that explicitly disclaims covering it.
+RULE_REGISTRIES = (
+    ("test_unenforced_local_rules", "UNENFORCED"),
+    ("test_unenforced_local_rules", "ENFORCED"),
+    ("test_process_ordering_obligation", "OBLIGATION_RULES"),
+)
 
 
 def _specified_rule_ids():
-    """Every rule id the specification's rule table declares, read from the table."""
-    return set(_RULE_ID.findall(_text(SPECIFICATION)))
+    """Every rule id the specification states, read from the document and pinned."""
+    found = {table or bullet for table, bullet in _RULE_ID.findall(_text(SPECIFICATION))}
+    assert found == set(RATIFIED_RULE_IDS), (
+        f"the specification's rule set changed: spec-only {sorted(found - RATIFIED_RULE_IDS)}, "
+        f"pinned-only {sorted(set(RATIFIED_RULE_IDS) - found)}. Update "
+        "RATIFIED_RULE_IDS deliberately, so the change is reviewed rather than absorbed")
+    return found
 
 
 def _rule_mentions_under_tests():
     """``{rule: {module names that mention it}}`` across ``tests/``.
 
-    Word-anchored on the right so ``R-1`` does not match ``R-10``.
+    Word-anchored on the right so ``R-1`` does not match ``R-10``. A mention is **not**
+    coverage — see ``_rules_exercised_by_some_test`` — but it is what
+    ``test_every_ratified_rule_is_named_somewhere_under_tests`` quantifies over.
 
     **This module is excluded from the scan.** It describes what the other modules do, and
     a rule named here only to say that nothing covers it is not coverage — left in, the
-    derivation would read its own prose and report every rule it discussed as mentioned,
-    which is what happened when it was first written. The exclusion is also the safe
-    direction: a mention here can only leave a rule *in* the unnamed set, never remove one
-    from it, so it cannot be used to fake coverage.
+    derivation would read its own prose. The exclusion is also the safe direction: a
+    mention here can only leave a rule *in* the unnamed set, never remove one from it.
     """
-    rules = _specified_rule_ids()
+    rules = RATIFIED_RULE_IDS
     mentions = {rule: set() for rule in rules}
     this_module = pathlib.Path(__file__).resolve()
     for path in sorted(TESTS_DIR.glob("*.py")):
@@ -463,21 +488,27 @@ def _rule_mentions_under_tests():
 
 
 def _rules_exercised_by_some_test():
-    """Rules a test actually works with, as opposed to merely names.
+    """Rules some test actually works with, read from the registries that declare it.
 
-    A rule counts as exercised when some module other than the scope-note module mentions
-    it, or when the scope-note module's own registry of violating constructions carries
-    it. That second clause matters: R-8 and R-1b are named in that module's scope
-    paragraph *and* carry constructed cases there, so discounting the whole module would
-    understate what it does.
+    A rule counts as exercised when it appears in a registry of constructed cases —
+    ``UNENFORCED``'s violating constructions or ``ENFORCED``'s rejecting ones — or in a
+    module's declared list of named skip obligations. Textual mentions are deliberately
+    **not** consulted: prose is where a module explains what it does *not* cover, so
+    reading it as coverage inverts the meaning of the sentence it is reading.
+
+    Registry labels may carry a clause or a derivation note — ``R-1b(vii)``,
+    ``S-2 (via R-1b)`` — so a label is matched to a rule id by prefix rather than by
+    equality. Exercising one clause of a rule counts as working with that rule; the row
+    this feeds distinguishes *covered* from *named*, not *fully covered* from *partly*.
     """
-    exercised = {rule for rule, where in _rule_mentions_under_tests().items()
-                 if where - {SCOPE_NOTE_MODULE}}
-    registry = importlib.import_module("test_unenforced_local_rules").UNENFORCED
-    for rule_label, _description, _construct in registry:
-        for rule in _specified_rule_ids():
-            if re.fullmatch(rf"{re.escape(rule)}(\([ivx]+\))?", rule_label):
-                exercised.add(rule)
+    exercised = set()
+    for module_name, attribute in RULE_REGISTRIES:
+        registry = getattr(importlib.import_module(module_name), attribute)
+        labels = [entry[0] if isinstance(entry, tuple) else entry for entry in registry]
+        for label in labels:
+            for rule in RATIFIED_RULE_IDS:
+                if re.match(rf"{re.escape(rule)}(?![0-9a-z])", label):
+                    exercised.add(rule)
     return exercised
 
 
@@ -489,7 +520,7 @@ def test_every_ratified_rule_is_named_somewhere_under_tests():
     that each has been written down somewhere a reader of the tests will meet it.
     """
     specified = _specified_rule_ids()
-    assert specified, "no rule ids were read from the specification's rule table"
+    assert specified, "no rule ids were read from the specification"
     unnamed = {rule for rule, where in _rule_mentions_under_tests().items() if not where}
     assert unnamed == set(), (
         f"these ratified rules are named in no test module: {sorted(unnamed)}. Record "
@@ -501,49 +532,95 @@ def test_the_named_but_unexercised_row_is_derived_from_the_test_tree():
     """The row listing rules that are named but not exercised must be recomputed.
 
     A hand-written list of what is *absent* rots the moment anything is added, and rots
-    silently, because nothing fails when a claim about absence stops being true. The
+    silently, because nothing fails when a claim about absence stops being true. An
     earlier version of this row was wrong in both directions at once: it named R-4, which
     ``test_process_ordering_obligation.py`` mentions five times, and omitted R-7, which
-    nothing mentioned at all.
+    nothing mentioned at all. Deriving membership from *mentions* then made the opposite
+    error — it classified R-4 as covered by the module that disclaims covering it — so
+    membership is now derived from the registries of constructed cases instead.
     """
     match = UNEXERCISED_ROW.search(_text(ENFORCEMENT))
     assert match, (
         "the 'named, not covered' row is missing or has been reworded; this derivation "
         "cannot check a row it cannot find")
-    claimed = set(re.findall(r"R-\d+[ab]?|L-\d+", match.group(1)))
+    claimed = set(re.findall(r"R-\d+[ab]?|L-\d+|S-\d+", match.group(1)))
 
     derived = _specified_rule_ids() - _rules_exercised_by_some_test()
     assert claimed == derived, (
-        f"the row claims {sorted(claimed)} are named but unexercised; the tree says "
+        f"the row claims {sorted(claimed)} are named but unexercised; the registries say "
         f"{sorted(derived)}. Row-only: {sorted(claimed - derived)} (each IS exercised). "
         f"Tree-only: {sorted(derived - claimed)} (each is only named and belongs in the "
         "row)")
 
 
-def test_the_derivation_separates_naming_from_exercising():
-    """Control for the derivation, run through the same scan the live checks use.
+def test_exercise_is_decided_by_a_registry_and_never_by_a_mention():
+    """Control for the derivation, on the case that produced the earlier error.
 
-    Three properties, each of which the live checks depend on: R-4 is exercised because a
-    module other than the scope note names it; R-8 is exercised because the scope-note
-    module carries constructed cases for it even though no other module names it; and a
-    rule that gains a mention leaves the unexercised set.
+    R-4 is mentioned in ``test_process_ordering_obligation.py``, which states in terms
+    that it covers none of R-4. Under a mention-based rule that made R-4 "exercised". It
+    counts as exercised now for a different and behavioural reason — a constructed case in
+    ``UNENFORCED`` — and this test asserts that reason rather than the outcome, so
+    deleting the case would fail here rather than pass on the mention.
     """
     mentions = _rule_mentions_under_tests()
     exercised = _rules_exercised_by_some_test()
 
-    assert mentions["R-4"] == {"test_process_ordering_obligation.py"}, mentions["R-4"]
-    assert "R-4" in exercised, (
-        "R-4 is cited by the R-3 obligation as the premise for terminal membership")
+    assert "test_process_ordering_obligation.py" in mentions["R-4"], (
+        "precondition: the obligation module mentions R-4")
+    registry = importlib.import_module("test_unenforced_local_rules").UNENFORCED
+    r4_cases = [entry for entry in registry if entry[0] == "R-4"]
+    assert r4_cases, (
+        "R-4 is exercised only by a constructed case; if that case is gone, R-4 belongs "
+        "in the 'named, not covered' row and this assertion is the thing that says so")
+    assert "R-4" in exercised
 
-    assert mentions["R-8"] == {SCOPE_NOTE_MODULE}, mentions["R-8"]
-    assert "R-8" in exercised, (
-        "R-8 carries constructed violating cases; discounting the whole scope-note "
-        "module would understate what that module does")
+    obligation = importlib.import_module("test_process_ordering_obligation")
+    assert "R-4" not in obligation.OBLIGATION_RULES, (
+        "the obligation module must not claim R-4; it cites R-4 as a premise and covers "
+        "none of it")
+    assert "R-3" in obligation.OBLIGATION_RULES and "R-3" in exercised
 
-    unexercised = _specified_rule_ids() - exercised
-    assert unexercised, "precondition: some rule is named but not exercised"
-    gained = sorted(unexercised)[0]
-    assert gained not in (exercised | {gained}) - {gained}
-    assert (unexercised - {gained}) == unexercised - {gained}, (
-        f"{gained} gaining an exercise must leave the unexercised set")
+    # A rule mentioned everywhere but in no registry is not exercised. R-2 is that case.
+    assert mentions["R-2"], "precondition: R-2 is mentioned somewhere"
+    assert "R-2" not in exercised, (
+        "a textual mention must never make a rule exercised; that inversion is what this "
+        "derivation exists to prevent")
+
+
+#: The row whose headline counts the constructed violations, so the number cannot drift
+#: away from the registry it describes.
+UNENFORCED_COUNT_ROW = re.compile(
+    r"^\| \*\*([A-Za-z-]+) locally decidable violations the representative shapes "
+    r"accept\*\* \|", re.M)
+
+#: Spelled numerals the row may use. Small and closed on purpose: a row that needs a
+#: number outside this range is a row that should be reworded rather than extended.
+_NUMERALS = {
+    "Nineteen": 19, "Twenty": 20, "Twenty-one": 21, "Twenty-two": 22,
+    "Twenty-three": 23, "Twenty-four": 24, "Twenty-five": 25, "Twenty-six": 26,
+    "Twenty-seven": 27, "Twenty-eight": 28, "Twenty-nine": 29, "Thirty": 30,
+    "Thirty-one": 31, "Thirty-two": 32, "Thirty-three": 33, "Thirty-four": 34,
+    "Thirty-five": 35,
+}
+
+
+def test_the_unenforced_row_counts_what_the_registry_actually_carries():
+    """The headline count is checked against the registry, not trusted.
+
+    A number written into prose is the part of a row most likely to go stale, because
+    adding a case is a diff nobody reads back against the sentence. This reads both.
+    """
+    match = UNENFORCED_COUNT_ROW.search(_text(ENFORCEMENT))
+    assert match, (
+        "the locally-decidable row's headline no longer states a count in the expected "
+        "form; either restore it or delete this check deliberately")
+    spelled = match.group(1)
+    assert spelled in _NUMERALS, (
+        f"{spelled!r} is not a numeral this check knows; add it to _NUMERALS or reword "
+        "the row")
+
+    registry = importlib.import_module("test_unenforced_local_rules").UNENFORCED
+    assert _NUMERALS[spelled] == len(registry), (
+        f"the row says {spelled} ({_NUMERALS[spelled]}) locally decidable violations; "
+        f"the registry carries {len(registry)}")
 

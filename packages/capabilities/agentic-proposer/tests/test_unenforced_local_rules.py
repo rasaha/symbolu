@@ -16,12 +16,44 @@ unenforced when it is, or quietly omit one that still is.
 
 **"Locally decidable" is the membership rule, and it is what keeps this list bounded.** A
 rule belongs here when one instance of one contract is enough to decide it — no builder,
-no verifier, no second contract, no supplied observation collection. R-5, R-6, R-7, R-9
-and R-10 are therefore absent by construction: each compares two contracts. R-2 is absent:
-it calls ``evaluate_readiness``. Most of R-1b is absent for the same reason — it resolves
-the referenced ``AdvisoryCandidateSet`` — but clauses (v) and (vi) became locally
-decidable when OD-4(a) nested the candidates inside the advisory, and those two halves are
-here.
+no verifier, no second contract, no supplied observation collection.
+
+Absent, and why — stated here rather than left to be inferred from the list's silence:
+
+* **R-5, R-6, R-7, R-9, R-10** each compare two contracts. Out of scope by construction.
+* **R-2** calls ``evaluate_readiness``. Out of scope by construction.
+* **R-1b clauses (i)–(iv), (viii), (ix)** resolve the referenced ``AdvisoryCandidateSet``.
+  Out of scope. Clauses **(v)**, **(vi)** and the **local half of (vii)** became decidable
+  from one instance when OD-4(a) nested the candidates inside the advisory, and are here.
+  (vii)'s other conjunct — membership in ``CognitiveRoleContract.permitted_review_actions``
+  — needs the role contract and stays out.
+* **R-3's chain clauses** — no backward transition, and subsequence of
+  ``RECEIVED → … → EVALUATING`` — cannot be *expressed* while
+  ``ProposerProcessStateTransition.state`` stands in as ``TerminalOutcome``, which carries
+  no process state. They are out of scope for that reason and only that reason, and
+  ``tests/test_process_ordering_obligation.py`` carries them as a named skip. R-3's
+  remaining clauses **are** expressible today and are here.
+* **``CandidateAdvisory.claim_refs``** is absent because no rule bars a duplicate there —
+  see the test at the foot of this module.
+
+Two entries are **derived** rather than stated twice, and are labelled as such:
+
+* **S-2 on ``ProposerAdvisory``.** S-2 is stated under D6, of ``AdvisoryCandidateSet``.
+  R-1b(iii) requires the advisory's nested ``candidates`` to equal the set's in content
+  and R-1b(iv) requires the selectors to be equal, so S-2 lands on the advisory as a
+  consequence. It is exercised on both, and the advisory-side case is labelled
+  ``S-2 (via R-1b)`` so that no reader takes it for a second statement of the rule.
+* **R-3's terminal-count and terminal-position clauses** are entangled under the
+  placeholder: with only terminal states available, a two-element list that puts one in
+  non-final position necessarily also carries two of them. One construction violates
+  both, and is labelled once rather than counted twice.
+
+`[I]` **S-1 and S-2 are vacuous in S1**, because B3 makes ``selected_candidate_id``
+``None`` for every advisory S1 can construct (spec: "Under B3, ``selected_candidate_id``
+is ``None`` for every advisory S1 can construct", and again under *What S1 does not
+build*). They are exercised here anyway: the representative shapes do not enforce B3
+either, so a non-null selector is constructible, and a rule that is vacuous by an
+invariant nothing checks is not a rule anything is enforcing.
 
 **When one of these is implemented**, its case fails, and the failure is the signal to
 delete the case and update the row in ``docs/S1_ENFORCEMENT.md`` in the same change. That
@@ -40,8 +72,25 @@ def _shapes():
     return spec.representative_shapes()
 
 
-def _candidate(candidate_id):
-    return _shapes()["CandidateAdvisory"](**spec.complete_candidate(candidate_id))
+def _candidate(candidate_id, **overrides):
+    return _shapes()["CandidateAdvisory"](
+        **{**spec.complete_candidate(candidate_id), **overrides})
+
+
+def _transition(state, at=None):
+    return _shapes()["ProposerProcessStateTransition"](
+        state=state, at=spec.FIXED_INSTANT if at is None else at)
+
+
+#: A second lawful ``ReviewAction``, so a contradiction can be built without inventing a
+#: value. Resolved from the ratified enum rather than written out.
+_OTHER_REVIEW_ACTION = next(
+    action for action in spec.ReviewAction
+    if action is not spec.ReviewAction.ROUTE_APPROVAL_BUNDLE)
+
+#: An instant strictly after ``FIXED_INSTANT``, for the ``at`` monotonicity clause. No
+#: wall clock is read (C4).
+_LATER_INSTANT = spec.FIXED_INSTANT.replace(year=spec.FIXED_INSTANT.year + 1)
 
 
 def _role_contract(**overrides):
@@ -190,6 +239,45 @@ UNENFORCED = (
          candidates=(_candidate("a-1"),),
          **_selection("a-1", recommended_disposition=(
              ap.CandidateDisposition.RECOMMEND_MATCHED_FOR_APPROVAL)))),
+    ("R-1b(vii)",
+     "requested_review_action contradicts the selected nested candidate (local half)",
+     lambda: _advisory(
+         candidates=(_candidate("a-1"),),
+         **_selection("a-1", requested_review_action=_OTHER_REVIEW_ACTION))),
+
+    ("S-1", "AdvisoryCandidateSet selector names no member of candidates",
+     lambda: _candidate_set(selected_candidate_id="not-a-candidate")),
+    ("S-1", "AdvisoryCandidateSet selector resolves to two candidates",
+     lambda: _candidate_set(candidates=(_candidate("dup"), _candidate("dup")),
+                            selected_candidate_id="dup")),
+
+    ("S-2", "AdvisoryCandidateSet resolved candidate has is_eligible False",
+     lambda: _candidate_set(candidates=(_candidate("a-1", is_eligible=False),),
+                            selected_candidate_id="a-1")),
+    ("S-2 (via R-1b)",
+     "ProposerAdvisory selected nested candidate has is_eligible False",
+     lambda: _advisory(candidates=(_candidate("a-1", is_eligible=False),),
+                       **_selection("a-1"))),
+
+    ("R-3", "state_transitions has a decreasing `at`",
+     lambda: _process_record(state_transitions=[
+         _transition(ap.TerminalOutcome.NEED_EVIDENCE, _LATER_INSTANT),
+         _transition(ap.TerminalOutcome.ABSTAIN)],
+         terminal_outcome=ap.TerminalOutcome.ABSTAIN)),
+    ("R-3", "state_transitions carries two terminal states, one in non-final position",
+     lambda: _process_record(state_transitions=[
+         _transition(ap.TerminalOutcome.ABSTAIN),
+         _transition(ap.TerminalOutcome.ESCALATE)],
+         terminal_outcome=ap.TerminalOutcome.ESCALATE)),
+    ("R-3", "state_transitions repeats a state",
+     lambda: _process_record(state_transitions=[
+         _transition(ap.TerminalOutcome.ABSTAIN),
+         _transition(ap.TerminalOutcome.ABSTAIN)])),
+
+    ("R-4", "terminal_outcome disagrees with the terminal state in state_transitions",
+     lambda: _process_record(
+         state_transitions=[_transition(ap.TerminalOutcome.ESCALATE)],
+         terminal_outcome=ap.TerminalOutcome.ABSTAIN)),
 )
 
 
@@ -213,22 +301,37 @@ def test_the_shape_accepts_this_violation(rule, description, construct):
             f"establish' row in docs/S1_ENFORCEMENT.md in the same change. ({error})")
 
 
-def test_the_two_validators_the_mirror_does_declare_still_hold():
+#: The rules the mirror **does** enforce, paired with a construction each must reject.
+#: The other side of the asymmetry, kept as a registry rather than as inline assertions so
+#: that ``test_documentation_consistency.py`` can read which rules a test actually works
+#: with instead of inferring it from a textual mention.
+ENFORCED = (
+    ("C7", "DomainCheckCompletion.COMPLETE on a candidate",
+     lambda: _shapes()["CandidateAdvisory"](**{
+         **spec.complete_candidate(),
+         "domain_check_completion": spec.DomainCheckCompletion.COMPLETE})),
+    ("R-1a", "a selector with none of its three dependents",
+     lambda: _advisory(selected_candidate_id="cand-1")),
+    ("R-1a", "a dependent with no selector",
+     lambda: _advisory(
+         recommended_disposition=ap.CandidateDisposition.RECOMMEND_WITHHOLD)),
+)
+
+
+@pytest.mark.parametrize("rule,description,construct", ENFORCED, ids=lambda v: str(v)[:60])
+def test_the_rules_the_mirror_does_declare_still_reject(rule, description, construct):
     """The other side of the asymmetry, so this module is discriminating rather than a
     list of things that happen not to raise.
 
-    C7 and R-1a **are** declared, and they reject. If they did not, every case above
-    would be unremarkable and this module would prove nothing about the mirror.
+    C7 and R-1a **are** declared, and they reject. If they did not, every case in
+    ``UNENFORCED`` would be unremarkable and this module would prove nothing about the
+    mirror.
     """
     pydantic = pytest.importorskip("pydantic")
     with pytest.raises(pydantic.ValidationError):
-        _shapes()["CandidateAdvisory"](**{
-            **spec.complete_candidate(),
-            "domain_check_completion": spec.DomainCheckCompletion.COMPLETE})
-    with pytest.raises(pydantic.ValidationError):
-        _advisory(selected_candidate_id="cand-1")
-    with pytest.raises(pydantic.ValidationError):
-        _advisory(recommended_disposition=ap.CandidateDisposition.RECOMMEND_WITHHOLD)
+        construct()
+    assert rule not in {entry[0] for entry in UNENFORCED}, (
+        f"{rule} is registered as both enforced and unenforced; one of the two is wrong")
 
 
 def test_claim_refs_is_not_listed_because_no_rule_bars_a_duplicate_there():
