@@ -12,8 +12,16 @@ boundary are on the record. It is a readiness record, not a design.
 
 D1–D5 were ratified before implementation. D6–D10 were ratified after Stage P and
 Stage S0 landed, and close every question this artifact previously carried as open;
-they are recorded under *Ratified resolutions* below. No owner decision remains
-open, so S1 is unblocked on ratification grounds.
+they are recorded under *Ratified resolutions* below. OD-1 – OD-4, raised later by
+auditing the S1 enforcement guards and reconciling this artifact with the contract
+specification, were ratified 2026-08-25 and are recorded under *Owner decisions
+OD-1 – OD-4* below. **No owner decision remains open, so S1 is unblocked on ratification grounds** —
+and on ratification grounds only. Two things still gate S1 code, neither of them a
+ruling: the O-1 – O-4 and OD-1 – OD-3 enforcement guards are implemented on an unmerged
+branch that needs two repairs before it merges, and A11 keeps implementation
+unauthorized until this documentation is independently reviewed and merged. "Unblocked
+on ratification grounds" is therefore not "authorized to implement", and this artifact
+does not claim it is.
 
 Evidence labels: `[V]` verified against this repository, `[I]` inferred,
 `[R]` requires ratification, `[G]` gap.
@@ -535,8 +543,11 @@ on, so an ambiguity there corrupts identity; free text is carried, not matched, 
 ASCII bar on a reason or a summary would reject the languages those are written in —
 a defect rather than a safeguard.
 
-`[V]` The guard classifies fields from an **exact pinned per-contract registry**, not
-from name shape — see **I5** of
+`[R]` The guard classifies fields from an **exact pinned per-contract registry**, not
+from name shape. This is read from the unmerged guard branch
+`claude/governance-refinements-o1-o4-k96vbz` at head `96510a1c4` and is **not** a fact
+about any merged branch: at `30945dac8` the same guard classified by name suffix. It is
+to be re-verified on merge, and it matches the `[R]` labelling of **I5** of
 `packages/capabilities/agentic-proposer/docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md`
 for why suffix inference alone was insufficient, and for the six fields it reached as
 neither identifiers nor text. The
@@ -545,28 +556,40 @@ a trailing newline against `$` and `re.fullmatch` does not, so stating a pattern
 stating the application would leave the rule one convenience call away from admitting a
 value it names as invalid.
 
-## Open owner decisions
+## Owner decisions OD-1 – OD-4 — all resolved
 
-`[R]` **Three remain open, and OD-4 is ratified**, recorded here so this artifact does
-not report a clean record its own subordinate documents contradict. D6–D10 close every
-question this artifact previously carried as open, and O-1 – O-4 close the four the S1
-enforcement audit raised; what follows was raised afterwards, by auditing those guards
-against representative contract shapes and by reconciling this artifact with
+**All four are ratified 2026-08-25**, recorded here so this artifact does not report a
+clean record its own subordinate documents contradict, nor a cleaner one than the
+enforcement supports. D6–D10 close every question this artifact previously carried as
+open, and O-1 – O-4 close the four the S1 enforcement audit raised; OD-1 – OD-4 were
+raised afterwards, by auditing those guards against representative contract shapes and
+by reconciling this artifact with
 `packages/capabilities/agentic-proposer/docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md`,
-where each is stated in full. OD-4 was the only one bearing on contract shape; it is
-resolved below and the specification implements the resolution.
+where each is stated in full with its rider, its enforcement design and its three
+statuses. OD-4 was the only one bearing on contract shape; it is resolved below and the
+specification implements the resolution.
 
-| Id | Question | Bears on contract shape |
-| --- | --- | --- |
-| **OD-1** | `primary_function` and `declared_strategy` are classified **C5c** human-readable free text rather than C5b canonical tokens, on the ground that neither is reachable from `P_unsigned`, so O-4's Unicode hazard does not reach them and the stricter class could only reject lawful values. Reclassifying either to C5b would be a narrowing. | no |
-| **OD-2** | `pydantic` loads `socket` while constructing a `BaseModel`, which `tests/test_boundaries.py` forbids as a whole-process assertion. Every S1 contract is a `BaseModel` and `pydantic>=2` is a ratified dependency, so the first contract module fails that guard for a reason unrelated to this package's authority. The narrowest resolution exempts exactly the transitive route while keeping the bar on any direct import. **Must be ruled on before S1 code lands.** | no |
-| **OD-3** | O-1's dependent-field set is matched by name alone, so `CandidateAdvisory.requested_review_action` — the candidate's own required, non-null routing — is caught as if it were selection-dependent. It must be scoped to its bearer contract. `DEPENDENT_FIELDS` is pinned by equality, so the scoping is a change to a pinned constant. | no |
+**No ruling is outstanding on any of the four.** What is outstanding on OD-1 – OD-3 is
+enforcement: `[R]` the guards are implemented on the unmerged branch
+`claude/governance-refinements-o1-o4-k96vbz` (head `96510a1c4`), which the
+specification's I4 records as needing two repairs before merge — the O-1 guard's
+class-blind dependent-field set (OD-3) and the `pydantic`/`socket` boundary probe
+(OD-2). S1 production implementation stays unauthorized under A11 independently of
+both. The *Enforcement* column below records that second axis; the decisions
+themselves are closed.
+
+| Id | Decision | Bears on contract shape | Enforcement |
+| --- | --- | --- | --- |
+| **OD-1** — **RATIFIED 2026-08-25** | `primary_function` and `declared_strategy` are classified **C5c** human-readable free text rather than C5b canonical tokens, on the ground that neither is reachable from `P_unsigned`, so O-4's Unicode hazard does not reach them and the stricter class could only reject lawful values. Reclassifying either to C5b, while it stays outside `P_unsigned`, is a narrowing needing no new ratification. **Ratified rider:** the classification rests on unreachability, not on the values, so making either field **identity-participating** requires a **separately ratified normalization profile** — C6 freezes `nfc_paths` empty and the identity function normalises nothing — and must not be done by reclassifying to C5b in passing. | no | `[R]` carried by the O-4 registry on `96510a1c4`; lands with it |
+| **OD-2** — **RATIFIED 2026-08-25** | `pydantic` loads `socket` while constructing a `BaseModel`, which `tests/test_boundaries.py` forbids as a whole-process assertion. Every S1 contract is a `BaseModel` and `pydantic>=2` is a ratified dependency, so the first contract module fails that guard for a reason unrelated to this package's authority. **Resolved:** exempt exactly the transitive route and keep the bar on any direct import; dropping `socket` from `FORBIDDEN` is rejected. **Ratified enforcement design:** direct-source checks on `src/` that consult no runtime module table; a baseline comparison against the module table produced by the approved dependencies alone, recomputed rather than hand-listed; and negative controls proving the guard still fails on a direct import, on a forbidden module outside the baseline, and on a locally written indirection. **Ceiling disclosed:** `[V]` this closes no dynamic-import route (K.5) — it establishes that nothing in `src/` imports `socket` statically and that this package adds nothing beyond its approved dependencies, not that no runtime path can reach a socket. | no | `[R]` **pending** — I4.2; one of the two repairs the branch needs |
+| **OD-3** — **RATIFIED 2026-08-25** | O-1's dependent-field set is matched by name alone, so `CandidateAdvisory.requested_review_action` — the candidate's own required, non-null routing — is caught as if it were selection-dependent. **Resolved:** `DEPENDENT_FIELDS` is scoped to the **bearer contract**, pinned by bearer **and** field name and never by field name alone, the four fields being selection-dependent on `ProposerAdvisory` only. | no | `[R]` **pending** — I4.1; the other of the two repairs |
 | **OD-4** — **RATIFIED 2026-08-25, resolved (a)** | D7 above says `ProposerAdvisory` carries per-candidate `CandidateAdvisory` entries; an earlier revision of the specification instead had it reference an `AdvisoryCandidateSet` by `candidate_set_id`. `[V]` That departure was **not** forced by the rival-identity walk, which bars only nested `ToolObservation` and reaches no field of `CandidateAdvisory`. **Resolution (a): restore the nesting D7 requires.** `ProposerAdvisory` carries an immutable `candidates` sequence of `CandidateAdvisory`, ordered ascending by `candidate_id`, participating in `P_unsigned`; `candidate_set_id` is retained as the reference to `AdvisoryCandidateSet`, which stays a **top-level contract** and is not nested; the two candidate lists must correspond exactly in membership, order and content, checked by the builder and by the independent replay verifier. `ToolObservation` stays referenced by id, which A3/the rival-identity walk does force. **Rejected alternative:** reference by id, ratified as an amendment narrowing D7 — rejected because it deviates from ratified text, leaves candidate dispositions, `is_eligible` Booleans and evidence references outside the advisory digest, and leaves an amended candidate set undetectable by replay. | **yes — resolved** |
 
-`[R]` OD-1 – OD-3 are proposed, with resolutions, on branch
-`claude/governance-refinements-o1-o4-k96vbz`. That branch is not merged, so they are
-open here. None of the three changes a contract, a field type, a cardinality, a
-vocabulary or an equation term.
+`[R]` The guards enforcing OD-1 – OD-3 live on branch
+`claude/governance-refinements-o1-o4-k96vbz`, which is not merged, so their
+*enforcement* is pending here and every statement about them is to be re-verified on
+merge. The *decisions* are ratified and are not reopened by that. None of the three
+changes a contract, a field type, a cardinality, a vocabulary or an equation term.
 
 `[R]` markers elsewhere above are implementation obligations that S1 must
 discharge — mechanical enforcement of D6's standing rule, D7's contract shape and
@@ -700,7 +723,7 @@ on the contract specification:
 
 `packages/capabilities/agentic-proposer/docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md`
 is the canonical, implementation-ready S1 specification, status
-`RATIFIED FOR S1 IMPLEMENTATION`, scoped to S1 contracts and deterministic equations
+`CONTRACT SPECIFICATION RATIFIED; IMPLEMENTATION AUTHORIZATION PENDING MERGED ENFORCEMENT`, scoped to S1 contracts and deterministic equations
 only. It records the eight top-level contracts (`AgentIdentityRef`,
 `CognitiveRoleContract`, `WorkMandate`, `BoundedContextEnvelope`, `ToolObservation`,
 `AdvisoryCandidateSet`, `ProposerAdvisory`, `ProposerProcessRecord`) with
@@ -724,7 +747,7 @@ was. That walk matches `RIVAL_IDENTITY_FIELDS` by exact name, and no field of
 `CandidateAdvisory` is a member, so nesting `CandidateAdvisory` fails nothing. D7 above
 says `ProposerAdvisory` carries per-candidate `CandidateAdvisory` entries, and an earlier
 revision of the specification departed from that by referencing them through
-`candidate_set_id`. **OD-4 is now resolved (a)** under *Open owner decisions*: the
+`candidate_set_id`. **OD-4 is now resolved (a)** under *Owner decisions OD-1 – OD-4*: the
 nesting D7 requires is restored, the candidates participate in `P_unsigned`,
 `candidate_set_id` is retained as a reference to `AdvisoryCandidateSet` — which remains a
 top-level contract — and the two candidate lists must correspond in membership, order and
@@ -761,20 +784,32 @@ platform-freeze artifact is changed by them. The version stays `0.0.1`, no
 **Implementation of the S1 contracts and equations remains unauthorized until this
 documentation pull request is independently reviewed and merged.**
 
-### Open owner decisions
+### Owner decisions, and what actually gates S1
 
 A1–A8 close every question the contract specification's *equations, vocabularies and
-enforcement interpretation* depend on. They do not close everything.
+enforcement interpretation* depend on. They do not close everything, and what remains is
+not a ruling.
 
-`[R]` **OD-1 – OD-3 are open**, and are recorded once, under *Open owner decisions*
-above. None of the three bears on contract shape. **OD-4, the one that did, is ratified
-2026-08-25, resolved (a)**: `ProposerAdvisory` carries its `CandidateAdvisory` entries as
-D7 says, and reference-by-id is the rejected alternative. The specification's status is
-therefore `RATIFIED FOR S1 IMPLEMENTATION`, unqualified, and the bar on writing a
-contract module for want of a composition ruling is lifted. What still gates the first
-contract module is **OD-2**, which must be ruled on before S1 code lands, and A11:
-implementation remains unauthorized until this documentation is independently reviewed
-and merged.
+**OD-1 – OD-4 are all resolved, ratified 2026-08-25**, and are recorded once, under
+*Owner decisions OD-1 – OD-4* above. **OD-4, the only one bearing on contract shape, is resolved
+(a)**: `ProposerAdvisory` carries its `CandidateAdvisory` entries as D7 says, and
+reference-by-id is the rejected alternative. OD-1 carries a ratified rider — future
+identity participation for `primary_function` or `declared_strategy` requires a
+separately ratified normalization profile — and OD-2 carries a ratified enforcement
+design: direct-source checks, an approved-dependency baseline comparison, and negative
+controls, with the dynamic-import ceiling disclosed rather than papered over.
+
+**Each of OD-1 – OD-3 carries three statuses, and they must not be collapsed.** The
+owner decision is **resolved**; the enforcement implementation is **pending** on the
+unmerged branch `claude/governance-refinements-o1-o4-k96vbz` (head `96510a1c4`), which
+`[R]` the specification's I4 records as needing two repairs before merge — the O-1
+guard's class-blind dependent-field set (OD-3) and the `pydantic`/`socket` boundary probe
+(OD-2); and **S1 production implementation is unauthorized under A11** regardless of
+either, until this documentation is independently reviewed and merged.
+
+The specification's status is therefore
+`CONTRACT SPECIFICATION RATIFIED; IMPLEMENTATION AUTHORIZATION PENDING MERGED ENFORCEMENT`. No
+ruling gates the first contract module — what gates it is merged enforcement and A11.
 
 The `[R]` markers elsewhere in this artifact are implementation obligations for S1, not
 unratified decisions.

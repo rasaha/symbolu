@@ -1,6 +1,6 @@
 # S1 — canonical contract and equation specification
 
-**Status:** `RATIFIED FOR S1 IMPLEMENTATION`
+**Status:** `CONTRACT SPECIFICATION RATIFIED; IMPLEMENTATION AUTHORIZATION PENDING MERGED ENFORCEMENT`
 **Ratified against:** the default branch at merge commit
 `e28538eb454fce6008e94e0772e0fd09c9c7ea7f` (PR #1474)
 **Package:** `ugence-agentic-proposer` (`packages/capabilities/agentic-proposer`)
@@ -1381,6 +1381,26 @@ into the `advisory_digest=` keyword. The construction is therefore:
    given below: no `model_dump()` of any mode is a lawful constructor input for this
    model.
 
+   **The keyword set must equal the field set exactly, and this is checked
+   structurally.** `[V]` Twelve of the twenty-three fields are declared with a
+   default — `schema_version`, `kind`, `advisory_version`, `parent_advisory_digest`,
+   `selected_candidate_id`, `recommended_disposition`, `requested_review_action`,
+   `requested_review_destination_role_ref`, `claim_summaries`, `observation_refs`,
+   `uncertainties` and `reason_codes` — so **omitting any one of them from this call is
+   silently well-formed**: construction succeeds and the field takes its default. That
+   is the hazard the pass-through introduces in exchange for being the only lawful
+   spelling, and it is why I7.16 requires a structural test that the call's keyword set
+   equals `set(ProposerAdvisory.model_fields)` exactly.
+
+   `[V]` The equivalence obligation below does **not** cover this. Verified on a
+   representative payload: with a defaulted identity-participating field omitted from the
+   pass-through and given a **non-default** value on the payload, construction succeeds,
+   the advisory silently carries the default, and the resulting digest does not verify —
+   the D2 failure. With the same omission and the field left at its **default** value,
+   the G1 projection equals `p_unsigned` and the digest verifies, so a corpus that does
+   not happen to vary that field passes. Only a structural check on the call catches the
+   omission, and only I7.16 requires one.
+
 **Why the payload is not dumped back into the constructor.** `[V]` Verified against
 `pydantic 2.13.4` on a representative `strict=True` payload carrying timezone-aware
 datetimes and a `tuple` of candidates:
@@ -1463,7 +1483,10 @@ decimal without leading zeroes; any integer arithmetic used to compute it is loc
 that function and never surfaces as a field, so C3 is not weakened.
 
 **Every identity-participating field of a revision has exactly one declared source.**
-There are four, and no field falls outside them:
+There are four, and no field falls outside them. `[I]` The table below is a completeness
+statement about the *sources*; the corresponding completeness statement about the
+*construction call* is G2's, enforced by I7.16 — a field may not be omitted from the
+pass-through merely because it carries a default, and twelve of the twenty-three do.
 
 | Source | Fields |
 | --- | --- |
@@ -2047,6 +2070,28 @@ introduces the first contract, to the full H3 surface, and not before.
     parent's or defaulting to empty; the three supplied values, and not the parent's,
     appear in the revision's `P_unsigned`; the continuity fields are inherited unchanged;
     and `advisory_version` increments while `parent_advisory_digest` binds the parent.
+16. **Construction-call completeness (G2)** — an introspection or AST test asserting
+    that the keyword set of the `ProposerAdvisory(...)` construction call in the identity
+    module equals `set(ProposerAdvisory.model_fields)` **exactly**: no field missing, no
+    keyword that is not a field, compared as sets rather than by count. The test reads
+    the call itself — by `ast` over the module's source, or by introspecting the bound
+    call — and not the builder's result, because the result is exactly what cannot
+    distinguish an omission from a default.
+
+    `[V]` It is required because omission is silent: twelve of the twenty-three fields
+    are declared with a default, so dropping one from the pass-through still constructs.
+    Verified on a representative payload — a defaulted identity-participating field
+    omitted from the call and given a non-default value on the payload constructs
+    successfully, silently carries the default, and produces a digest that does not
+    verify; with the field at its default value the equivalence corpus passes
+    unchanged. The failure a corpus test can only catch by luck, this test catches by
+    construction.
+
+    `[I]` The obligation is stated over the *field set*, not over a written list of
+    twenty-three names, so that adding a twenty-fourth field to `ProposerAdvisory`
+    fails this test until the pass-through is updated. A newly added defaulted
+    identity-participating field is precisely the case that would otherwise enter
+    `P_unsigned` through the payload while never being passed to the constructor.
 
 ## I8 — Versioning and the ADR
 
@@ -2172,33 +2217,124 @@ mistakes their absence for coverage.
 
 ## Owner decisions
 
-**Three remain open. OD-4 is resolved.** OD-1 to OD-3 change no contract, field type,
-cardinality, vocabulary or equation term; all three are about guards and dependencies.
-OD-4 did change contract shape, and its resolution is recorded below and implemented
-throughout Part D.
+**All four owner decisions are resolved.** What remains outstanding on OD-1 – OD-3 is
+not a ruling but an *implementation*, and the two must not be conflated: an unresolved
+question blocks a decision, whereas a resolved decision awaiting enforcement blocks a
+merge. OD-1 to OD-3 change no contract, field type, cardinality, vocabulary or equation
+term; all three are about guards and dependencies. OD-4 did change contract shape, and
+its resolution is recorded below and implemented throughout Part D.
 
-**OD-1 — `primary_function` and `declared_strategy` are classified C5c.** Both are
-described as opaque and compared for equality only, which is the C5b shape. They are
-classified as free text because neither is reachable from `P_unsigned` (D9), so the NFC
-hazard that motivates B9 does not apply, and the less restrictive classification cannot
-reject a lawful value — a role's primary function may legitimately contain a space.
-`[I]` This is a derivation from B9 and O-4, resolved here rather than left open;
-reviewer confirmation is invited but implementation is not blocked on it. Reclassifying
-either to C5b would be a narrowing, not a redesign.
+**Each of OD-1 – OD-3 therefore carries three distinct statuses**, and a reader must not
+collapse them:
 
-**OD-2 — `pydantic` loads `socket`, which `test_boundaries.py` forbids.** `[V]`
-Reproduced: bare `import pydantic` does not load `socket`; defining any `BaseModel`
-does. Every contract here is a `BaseModel` and `pydantic>=2` is a ratified core
-dependency, so the first S1 contract module fails
-`test_isolated_subprocess_import_loads_no_forbidden_module`. The narrowest resolution is
-to exempt exactly the transitive route — `socket` reached through `pydantic` — while
-keeping the bar on any direct import in `src/`, which is the allowlist shape this
-package already uses elsewhere. Dropping `socket` from `FORBIDDEN` outright would give
-up a real boundary. **This must be ruled on before S1 code lands.**
+| Axis | What it means | State for OD-1 – OD-3 |
+| --- | --- | --- |
+| **Owner decision** | Has the owner ruled? | **Resolved — ratified 2026-08-25.** No further ruling is sought or required. |
+| **Enforcement implementation** | Does a merged guard enforce the ruling? | **Pending.** Implemented on the unmerged branch `claude/governance-refinements-o1-o4-k96vbz` (head `96510a1c4`), which I4 records as needing **two repairs before merge**: the O-1 guard's class-blind dependent-field set (I4.1) and the `pydantic`/`socket` boundary probe (I4.2). |
+| **S1 production implementation** | May contract code be written? | **Unauthorized under A11**, independently of the two axes above, until this documentation is independently reviewed and merged. |
 
-**OD-3 — the O-1 guard's dependent-field set must be scoped to its bearer.** See I4.1.
-`DEPENDENT_FIELDS` is pinned by equality, so scoping it to `ProposerAdvisory` is a
-change to a pinned constant and should be ratified rather than adjusted in passing.
+`[R]` The middle axis is `[R]` for all three: every statement about the guard branch is
+read from an unmerged head and is to be re-verified on merge. The first axis is not
+`[R]` — a ratified decision is not a pending ratification.
+
+**OD-1 — `primary_function` and `declared_strategy` are classified C5c. RATIFIED
+2026-08-25.**
+
+*Owner decision:* **resolved.** Both fields are C5c human-readable free text, not C5b
+canonical tokens. Both are described as opaque and compared for equality only, which is
+the C5b shape; they are classified as free text because neither is reachable from
+`P_unsigned` (D9), so the NFC hazard that motivates B9 does not apply, and the more
+restrictive classification could only reject lawful values — a role's primary function
+may legitimately contain a space. `[I]` This is a derivation from B9 and O-4.
+
+**Ratified rider — the condition on any future identity participation.** The
+classification rests on unreachability from `P_unsigned`, not on a property of the
+values themselves. So if either field is ever made identity-participating, the C5c
+classification does **not** carry over: bringing it inside `P_unsigned` would expose it
+to exactly the hazard B9 exists to close, because C6 freezes `nfc_paths` empty and the
+identity function performs no Unicode normalisation, so two visually identical values
+with different NFC spellings would carry different digests. **Making either field
+identity-participating therefore requires a separately ratified normalization profile**
+— a ruling on which normal form applies, at which paths, and at which point relative to
+validation — and must not be done by reclassifying the field to C5b in passing.
+Reclassifying to C5b while the field stays outside `P_unsigned` remains a narrowing, not
+a redesign, and needs no new ratification.
+
+*Enforcement implementation:* the classification is carried by the O-4 registry on
+`96510a1c4` and lands with it; I5 states what the merged registry must carry.
+
+*S1 production implementation:* unauthorized under A11.
+
+**OD-2 — `pydantic` loads `socket`, which `test_boundaries.py` forbids. RATIFIED
+2026-08-25.**
+
+*Owner decision:* **resolved.** `[V]` Reproduced: bare `import pydantic` does not load
+`socket`; defining any `BaseModel` does. Every contract here is a `BaseModel` and
+`pydantic>=2` is a ratified core dependency, so the first S1 contract module would fail
+`test_isolated_subprocess_import_loads_no_forbidden_module` for a reason unrelated to
+this package's authority. The ruling is to **exempt exactly the transitive route** —
+`socket` reached through an approved dependency — and to keep the bar on any direct
+import in `src/`. Dropping `socket` from `FORBIDDEN` outright is rejected: it would give
+up a real boundary.
+
+**The ratified enforcement design.** The exemption is not a suppression, and it is
+specified so that it cannot become one. Three parts, all required:
+
+1. **Direct-source checks.** The bar on a direct import stays absolute and is checked at
+   the source: no module under `src/` may name `socket` in an `import` or `from ... import`
+   statement, at module scope or inside a function, and none may reach it through
+   `importlib.import_module("socket")` or an equivalent named call. This check does not
+   consult the runtime module table at all, so nothing a dependency loads can mask a
+   direct import.
+2. **Approved-dependency baseline comparison.** The runtime probe is not relaxed to "some
+   forbidden modules are fine". It compares the module table after importing this package
+   against a **baseline captured from the approved dependencies alone** — importing
+   `pydantic` and defining a `BaseModel`, and nothing of this package. Only modules
+   already present in that baseline are exempt, and the baseline is recomputed by the
+   test rather than pinned as a hand-written allowlist, so a dependency upgrade that
+   starts pulling in something new is visible as a baseline change under review rather
+   than as a silent pass.
+3. **Negative controls.** The guard must be proven still capable of failing. A control
+   module that imports `socket` directly must be rejected; a control that reaches a
+   forbidden module **not** in the approved-dependency baseline must be rejected; and a
+   control that imports `socket` through a *locally written* indirection rather than
+   through an approved dependency must also be rejected. Without these the exemption is
+   indistinguishable from a disabled test.
+
+**The ceiling, disclosed honestly.** `[V]` This design does not close the
+dynamic-import route, and no source-level or baseline check can. K.5 already records the
+general form: a helper-assembled `__import__` reaches a module without a static scan
+seeing it, and such a call can also run after the baseline comparison has been taken.
+The guard therefore establishes that **no module in `src/` imports `socket` statically,
+and that this package's import-time module table adds nothing beyond what its approved
+dependencies already add** — which is a real and checkable boundary — and it does **not**
+establish that no code path anywhere can reach a socket at runtime. Claiming the latter
+would be false and must not appear in S1 documentation, tests or commit messages. As
+with D2, the invariant is the rule and the scan is defence-in-depth.
+
+*Enforcement implementation:* **pending.** I4.2 records that the probe fails on the
+first contract module for this reason; the repair is one of the two the guard branch
+needs before merge.
+
+*S1 production implementation:* unauthorized under A11.
+
+**OD-3 — the O-1 guard's dependent-field set is scoped to its bearer. RATIFIED
+2026-08-25.**
+
+*Owner decision:* **resolved.** `DEPENDENT_FIELDS` is scoped to the **bearer contract**:
+`selected_candidate_id`, `recommended_disposition`, `requested_review_action` and
+`requested_review_destination_role_ref` are selection-dependent **on `ProposerAdvisory`**,
+and `CandidateAdvisory.requested_review_action` — the candidate's own required, non-null
+routing — is a different field that happens to share a name. Because `DEPENDENT_FIELDS`
+is pinned by equality, the scoping must be pinned the same way: by bearer **and** field
+name, never by field name alone.
+
+*Enforcement implementation:* **pending**, and this is the first of the two repairs I4
+records. I4.1 sets out the class-blind false positive precisely: the guard demands a
+`selected_candidate_id` on `CandidateAdvisory` and demands the field admit `None`, which
+contradicts the ratified contract, and four tests fail on that class.
+
+*S1 production implementation:* unauthorized under A11.
 
 **OD-4 — `ProposerAdvisory` carries its `CandidateAdvisory` entries. RATIFIED,
 resolved (a), 2026-08-25.**
@@ -2273,20 +2409,30 @@ participation.
 
 **OD-4 is resolved (a)**, and with it the one open question that bore on contract shape.
 `ProposerAdvisory` carries its `CandidateAdvisory` entries, as ratified D7 says; Part D
-is written for that shape and no longer for an alternative. The status line at the head
-of this document therefore reads `RATIFIED FOR S1 IMPLEMENTATION`, unqualified.
+is written for that shape and no longer for an alternative.
 
-**OD-1, OD-2 and OD-3 remain open.** None of them changes a contract, a field type, a
-cardinality, a vocabulary or an equation term; all three are about guards and
-dependencies. The document remains ratified for S1 implementation subject to
+**All four owner decisions are resolved. No ruling is outstanding.** OD-1, OD-2 and
+OD-3 are ratified 2026-08-25 and are recorded above with their riders and their
+enforcement designs; none changes a contract, a field type, a cardinality, a vocabulary
+or an equation term.
 
-* the implementation obligations in Part I, which S1 must discharge in the same change
-  that introduces the surface they govern; and
-* **OD-2 being ruled on before the first contract module lands**, because `pydantic`
-  loads `socket` and `tests/test_boundaries.py` forbids it, which is unrelated to any
-  contract shape here.
+**What is outstanding is enforcement and authorization, not ratification.** The status
+line at the head of this document therefore reads
+`CONTRACT SPECIFICATION RATIFIED; IMPLEMENTATION AUTHORIZATION PENDING MERGED ENFORCEMENT` — the contract
+specification is ratified, and implementation authorization waits on merged enforcement.
+Three things stand between this document and S1 code, and none of them is an owner
+question:
 
-There is no longer any gate on writing a contract module for want of a composition
-ruling: the composition is ratified. What remains unauthorized is implementation itself,
-which stays so until this documentation change is independently reviewed and merged
-(I8 of this document; ADR addendum A11).
+* **Merged enforcement.** The guards implementing O-1 – O-4 and OD-1 – OD-3 live on the
+  unmerged branch `claude/governance-refinements-o1-o4-k96vbz` (head `96510a1c4`), which
+  `[R]` I4 records as needing two repairs before merge: the O-1 guard's class-blind
+  dependent-field set (OD-3) and the `pydantic`/`socket` boundary probe (OD-2). Until
+  they merge, every claim about them is `[R]`.
+* **The Part I obligations**, which S1 must discharge in the same change that introduces
+  the surface they govern.
+* **A11.** Implementation stays unauthorized until this documentation change is
+  independently reviewed and merged (I8 of this document; ADR addendum A11).
+
+There is no gate on the contract *shape* for want of a ruling: every composition
+question is ratified. The gate is on writing production code before the enforcement that
+would catch a departure from it exists on a merged branch.
