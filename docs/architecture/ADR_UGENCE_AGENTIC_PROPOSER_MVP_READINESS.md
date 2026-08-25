@@ -536,7 +536,10 @@ ASCII bar on a reason or a summary would reject the languages those are written 
 a defect rather than a safeguard.
 
 `[V]` The guard classifies fields from an **exact pinned per-contract registry**, not
-from name shape — see OD-1 below for why suffix inference alone was insufficient. The
+from name shape — see **I5** of
+`packages/capabilities/agentic-proposer/docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md`
+for why suffix inference alone was insufficient, and for the six fields it reached as
+neither identifiers nor text. The
 patterns are pinned by equality, and their application is pinned too: `re.match` admits
 a trailing newline against `$` and `re.fullmatch` does not, so stating a pattern without
 stating the application would leave the rule one convenience call away from admitting a

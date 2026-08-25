@@ -731,7 +731,7 @@ candidate content — which is R-1b.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `candidate_set_id` | `str` | yes | no | none | 1 | open | C5a | this package | no |
 | `case_ref` | `str` | yes | no | none | 1 | open | C5a | this package | no |
-| `candidates` | `list[CandidateAdvisory]` | yes | no | none | 1..n | — | **rejects an empty list**; `candidate_id` unique across the list; **one ratified canonical order — ascending by `candidate_id`**; the builder **rejects** out-of-order caller input rather than silently reordering it | this package | no |
+| `candidates` | `tuple[CandidateAdvisory, ...]` | yes | no | none | 1..n | — | **rejects an empty sequence**; `candidate_id` unique across it; **one ratified canonical order — ascending by `candidate_id`**; the builder **rejects** out-of-order caller input rather than silently reordering it | this package | no |
 | `selected_candidate_id` | `str \| None` | yes (explicit) | yes | `None` | 0..1 | open | C5a when non-null; S-1 and S-2 below | this package | no |
 | `selection_reason_codes` | `list[str]` | yes | no | `[]` | 0..n | — | **C5d** — rejects any non-empty value | this package | no |
 
@@ -757,6 +757,19 @@ advisory that are equal in membership and content yet fail correspondence — a
 correspondence failure caused by nothing but the ordering rules disagreeing. One rule on
 both sides removes that. Semantic ordering a producer wants happens before construction,
 never inside the identity function (C6).
+
+**And the container is the same on both sides: `tuple[CandidateAdvisory, ...]`.** `[I]`
+This field was `list[CandidateAdvisory]` while `ProposerAdvisory.candidates` was
+`tuple[CandidateAdvisory, ...]`, which was a defect and not a stylistic difference.
+`[V]` Verified against `pydantic 2.13.4`: a `tuple` and a `list` of the same elements
+are **not** equal in Python, so any R-1b implementation that compared the two containers
+directly would report a mismatch on every well-formed pair. R-1b(ii) is therefore stated
+as an element-wise positional comparison, and the containers are made the same type so
+that the two rules cannot drift apart again. `[V]` A9 records that `tuple` and `list`
+both dump to a JSON array, so this retyping changes no canonical byte and no digest; it
+is a mutability and comparability statement. `[V]` Under C1's `strict=True` a `list`
+passed to this field is rejected with `tuple_type`, so the constraint is enforced at
+validation rather than trusted.
 
 `selection_reason_codes` is C5d: it rejects any non-empty value, because the reason-code
 catalogue is out of scope at this stage and an unvalidated free-form code list would
@@ -798,9 +811,15 @@ allowlists.
 its expiry terms, so an independent verifier that recomputes eligibility from stored
 content cannot do so without it. Storing it is forced by B2, not a convenience.
 
-`[V]` No field of `CandidateAdvisory` or `ProposerAdvisory` is typed
-`SemanticAuditorFindingStatus`, and none may be assigned one: D6's standing rule is
-enforced by `tests/test_no_auditor_status_projection.py`.
+`[R]` **No field of `CandidateAdvisory` or `ProposerAdvisory` may be typed
+`SemanticAuditorFindingStatus`, and none may be assigned one.** This is a **requirement
+on the unwritten contract surface**, not an observation about it: no contract module
+exists, so there is no field set to have verified. It is to be verified when the first
+contract module lands. `[V]` What is merged and verified is the guard:
+`tests/test_no_auditor_status_projection.py` enforces D6's standing rule. `[V]` The ADR
+records that the rule is not yet mechanically exercised, because S0 has no field into
+which a status could be projected; S1 must add the rejecting assertion in the same
+change that introduces the first such field.
 
 #### What `CandidateAdvisory` may never carry — a standing prohibition
 
@@ -1007,13 +1026,13 @@ also appear in Equation 1; they are listed here once as contract obligations.
 | Id | Rule | Prevents |
 | --- | --- | --- |
 | R-1a | **Selection binding — local (B6).** A `ProposerAdvisory` model validator enforces: if `selected_candidate_id is None`, then `recommended_disposition`, `requested_review_action` and `requested_review_destination_role_ref` are **all** `None`; if `selected_candidate_id is not None`, those three are **all** non-null. Decidable from this contract's own fields alone | a routing request standing next to no selection, and a selection with no routing — two failure modes that call for opposite responses |
-| R-1b | **Candidate and selection binding — cross-contract (B6, OD-4(a)).** `build_proposer_advisory` and `verify_advisory_selection` each resolve the referenced `AdvisoryCandidateSet` and enforce **correspondence of the candidates, not selector equality alone**: (i) `ProposerAdvisory.candidates` and `AdvisoryCandidateSet.candidates` are equal in **membership** — the same `candidate_id` set, no extra, no missing; (ii) equal in **order**, element by element, both being in the ratified ascending-`candidate_id` order (D6); (iii) equal in **candidate content** — for each position, all ten `CandidateAdvisory` fields compare equal, so a disposition, an `is_eligible` Boolean, an `observation_refs` list, an `evaluated_at` or a free-text entry that differs is a mismatch; (iv) `ProposerAdvisory.selected_candidate_id == AdvisoryCandidateSet.selected_candidate_id`; (v) when that selector is non-null it identifies **exactly one** element of `ProposerAdvisory.candidates` **and exactly one** element of `AdvisoryCandidateSet.candidates`, and those two are the same candidate; (vi) `recommended_disposition` equals the **selected nested candidate's** `disposition`; (vii) `requested_review_action` equals the **selected nested candidate's** `requested_review_action` and is a member of `CognitiveRoleContract.permitted_review_actions`; (viii) `requested_review_destination_role_ref` is consistent with that candidate's routing; and (ix) tenant, case and candidate-set references are continuous. A failure is a rejection: the builder raises, the verifier returns `False` | an advisory whose carried candidates differ from the set it names, and an advisory whose routing contradicts, or invents, the candidate it claims to select |
+| R-1b | **Candidate and selection binding — cross-contract (B6, OD-4(a)).** `build_proposer_advisory` and `verify_advisory_selection` each resolve the referenced `AdvisoryCandidateSet` and enforce **correspondence of the candidates, not selector equality alone**: (i) `ProposerAdvisory.candidates` and `AdvisoryCandidateSet.candidates` are equal in **membership** — the same `candidate_id` set, no extra, no missing; (ii) equal in **order**, compared **element by element at each position** — for `i` in `0..n-1`, the element at position `i` of one sequence is compared with the element at position `i` of the other — after **both** sequences have independently been checked to satisfy the same ascending-`candidate_id` invariant (D6). The comparison is never a single equality between the two containers: `[V]` a `tuple` and a `list` of identical elements compare unequal in Python, and both sides are `tuple[CandidateAdvisory, ...]` precisely so that no implementation is tempted to rely on container equality across differing types. Lengths are compared first, so a shorter or longer sequence is a membership failure under (i) rather than a truncated positional walk; (iii) equal in **candidate content** — for each position, all ten `CandidateAdvisory` fields compare equal, so a disposition, an `is_eligible` Boolean, an `observation_refs` list, an `evaluated_at` or a free-text entry that differs is a mismatch; (iv) `ProposerAdvisory.selected_candidate_id == AdvisoryCandidateSet.selected_candidate_id`; (v) when that selector is non-null it identifies **exactly one** element of `ProposerAdvisory.candidates` **and exactly one** element of `AdvisoryCandidateSet.candidates`, and those two are the same candidate; (vi) `recommended_disposition` equals the **selected nested candidate's** `disposition`; (vii) `requested_review_action` equals the **selected nested candidate's** `requested_review_action` and is a member of `CognitiveRoleContract.permitted_review_actions`; (viii) `requested_review_destination_role_ref` is consistent with that candidate's routing; and (ix) tenant, case and candidate-set references are continuous. A failure is a rejection: the builder raises, the verifier returns `False` | an advisory whose carried candidates differ from the set it names, and an advisory whose routing contradicts, or invents, the candidate it claims to select |
 | R-2 | **V13 (B3).** `terminal_outcome is TerminalOutcome.PROPOSAL` **if and only if** `selected_candidate_id is not None` **and** `evaluate_readiness(...) is True` for the resolved candidate, recomputed at construction | a "proposal" that proposes nothing, a selection presented as an abstention, and a proposal made without domain readiness |
 | R-3 | **Process ordering.** `state_transitions` is a subsequence of `RECEIVED → VALIDATED → OBSERVING → RECONCILING → EVALUATING → {PROPOSAL, NEED_EVIDENCE, ABSTAIN, ESCALATE}`: no backward transition, no repeat, at most one terminal state and only in final position, and `at` non-decreasing across the list | a fabricated or reordered process history, and — since no execution state exists in the enum — any representation of execution |
 | R-4 | `terminal_outcome` on the process record equals the terminal `ProposerProcessState` when one is present in `state_transitions` | a record whose narrative and outcome disagree |
 | R-5 | **Tenant scope.** `tenant_id` is identical across `AgentIdentityRef`, `CognitiveRoleContract`, `WorkMandate`, `BoundedContextEnvelope`, `AdvisoryCandidateSet`, `ProposerAdvisory` and **every** `ToolObservation` supplied to a builder | **cross-tenant acceptance** |
 | R-6 | **Case scope.** `case_ref` is identical across `WorkMandate`, `AdvisoryCandidateSet`, `ProposerAdvisory` and **every** `ToolObservation` supplied to a builder | **cross-case acceptance** |
-| R-7 | **Reference resolution.** Every `observation_refs` entry on a candidate and on the advisory resolves to a supplied `ToolObservation.observation_id` | a reference to evidence that was never supplied |
+| R-7 | **Reference resolution, at construction and on replay.** Every `observation_refs` entry — on every nested candidate and on the advisory itself — resolves to **exactly one** supplied `ToolObservation.observation_id`, and the resolved observation satisfies tenant, case and context continuity. Enforced by `build_proposer_advisory` at construction **and independently re-established on replay** by `verify_observation_resolution`, which `verify_advisory_selection` invokes. It is **not** a builder-only rule; the replay algorithm is specified in E2 | a reference to evidence that was never supplied, evidence substituted after signing, and a reference that resolves ambiguously or not at all |
 | R-8 | **Uniqueness.** `observation_id` unique across supplied observations; `candidate_id` unique across `candidates`; no duplicates in `observation_refs`, `candidate_ids`, `permitted_tool_scopes`, `permitted_candidate_dispositions`, `permitted_review_actions` or `allowed_source_scopes` | an identifier resolving ambiguously to two objects, and a list that overstates its breadth |
 | R-9 | **Envelope binding.** `BoundedContextEnvelope.mandate_id == WorkMandate.mandate_id` *(equation term)* | an envelope assembled for a different mandate |
 | R-10 | **Role binding.** `WorkMandate.assigned_role_contract_id == AgentIdentityRef.bound_role_contract_id == CognitiveRoleContract.role_contract_id` *(equation term)* | a mandate matched against an unrelated role or agent |
@@ -1091,6 +1110,78 @@ four from the candidate set, and B3 makes a selection unconstructible.
 Equation 1 checks tenant equality across the four principal contracts and does not
 reach the observations. Rejecting a cross-tenant or cross-case observation at
 construction closes that without altering the ratified equation.
+
+## E2 — R-7 on replay: the observation resolution algorithm
+
+R-7 is **not** a builder-only limitation. B2's rule is that construction is
+defence-in-depth and independent replay is the guarantee, and an evidence reference
+that only the builder ever checked is exactly the shape B2 refuses. R-7 therefore has a
+replay counterpart, `verify_observation_resolution`, which takes the **complete
+observation collection** and is invoked by `verify_advisory_selection` (H1).
+
+**Input.** The advisory, the `CognitiveRoleContract`, the `BoundedContextEnvelope`, and
+`observations` — the complete collection the caller holds, not a pre-filtered subset.
+`[I]` Passing a pre-filtered subset is the defect the algorithm exists to prevent: a
+caller who filters to "the observations this advisory references" and then checks that
+each reference is present has verified nothing, because the filter constructed the
+answer. The resolver is given everything and does the resolution itself.
+
+**Algorithm.** Let `required` be the concatenation of the advisory's own
+`observation_refs` with the `observation_refs` of **every** nested candidate — every
+reference, in order, including duplicates across candidates.
+
+1. **Index, detecting ambiguity.** Group `observations` by `observation_id`. Any id
+   holding more than one observation is an **ambiguous resolution** and is a refusal in
+   itself, before any reference is looked up. R-8's uniqueness rule is thereby
+   re-established on replay rather than assumed from construction.
+2. **Resolve every required reference — each one, not a membership test.** For each
+   entry of `required`: it must resolve to **exactly one** observation. Zero is a
+   **dangling reference**; more than one is **ambiguous**. Both are refusals. `[I]` The
+   quantifier is "exactly one", not "at least one", and the walk is over `required`
+   rather than over `observations`, so no reference can be skipped and none can be
+   satisfied by a set-membership shortcut.
+3. **Check continuity on each resolved observation.** `tenant_id` equals the advisory's
+   (R-5); `case_ref` equals the advisory's (R-6); and `source_ref` is a member of
+   `BoundedContextEnvelope.allowed_record_refs` (context continuity). A **substituted**
+   observation — same `observation_id`, different body — fails here if it moved tenant,
+   case or source, and is caught by the observation's own `content_hash` under its
+   producer's verification otherwise (K.1).
+4. **An extra supplied observation is not evidence.** Any `observation_id` in
+   `observations` that appears in no entry of `required` is **unreferenced**. It is not
+   an error — a caller may hold more observations than one advisory uses — but it is
+   **not advisory evidence**, contributes nothing to any equation term, and must be
+   reported as unreferenced rather than silently absorbed. `[I]` Equation 1 already
+   evaluates its quantified terms over `referenced`, not over `observations`; this makes
+   the same boundary explicit on the replay side, so an extra observation cannot be
+   presented afterwards as something the advisory rested on.
+5. **Refuse in a typed way.** A missing, substituted, duplicated or ambiguously resolved
+   observation causes a typed refusal naming which reference failed and how — dangling,
+   ambiguous, or a named continuity break. `verify_observation_resolution` **returns
+   `False`** on the same terms as `verify_candidate_eligibility` and
+   `verify_advisory_selection`, and reports the failing references; the **builder**
+   raises. A silent `True`, or a refusal that does not say which reference failed, is
+   not conformant.
+
+**Vacuity is bounded, not accidental.** A candidate with an empty `observation_refs`
+contributes no entry to `required`, and Equation 1's `ContextAllowed` and `ToolsAllowed`
+pass trivially for it — the owner's 0..n cardinality, recorded in K.4. What this
+algorithm forbids is the different thing: a **non-empty** reference list passing because
+nothing resolved it. `[V]` Verified on the specified algorithm against a representative
+resolver: a well-formed pair passes; a dangling reference, a duplicated
+`observation_id`, an observation substituted to another tenant, and an observation whose
+`source_ref` is outside `allowed_record_refs` are each refused with the failing
+reference named; and an extra supplied observation passes while being reported
+unreferenced.
+
+**What replay does and does not establish.** It establishes that the advisory's
+references resolve, unambiguously and continuously, to the observations the caller
+holds. It does **not** establish that those observation *bodies* are the ones the
+proposer saw: the observations are referenced, not nested, so their content is outside
+`P_unsigned` and outside `advisory_digest` (A3, D9). Each observation's own
+`content_hash`, minted and verified by its producer under D5, is what binds its content.
+Any claim that `verify_advisory_selection` or `verify_advisory_identity` binds
+observation content is **false** and must not appear in S1 documentation, tests or
+commit messages. The residue is K.1.
 
 ---
 
@@ -1245,18 +1336,87 @@ into the `advisory_digest=` keyword. The construction is therefore:
 1. `build_proposer_advisory` validates its inputs and constructs a **private**
    `_UnsignedAdvisoryPayload` — not exported — declaring exactly the fields of
    `ProposerAdvisory` **except** `advisory_digest`, with identical types, defaults,
-   validators and serializers.
-2. It computes `p_unsigned = payload.model_dump(mode="json", exclude_none=False)`.
-3. It constructs and returns the advisory in **one expression**, with the substrate
-   call inline in the `advisory_digest` keyword:
+   validators and serializers. Call the validated instance `payload`.
+2. It computes the canonicalisation input:
+   `p_unsigned = payload.model_dump(mode="json", exclude_none=False)`.
+   **This is the only thing `p_unsigned` is for.** It is the JSON-mode projection G1
+   defines, it is what is handed to the substrate, and it is **never** fed back into a
+   model constructor.
+3. It constructs and returns the advisory in **one expression**, from the **validated
+   payload's Python-typed field values**, with the substrate call inline in the
+   `advisory_digest=` keyword:
 
    ```python
    return ProposerAdvisory(
-       **p_unsigned,
+       schema_version=payload.schema_version,
+       tenant_id=payload.tenant_id,
+       created_at=payload.created_at,
+       kind=payload.kind,
+       advisory_version=payload.advisory_version,
+       parent_advisory_digest=payload.parent_advisory_digest,
+       case_ref=payload.case_ref,
+       agent_id=payload.agent_id,
+       role_contract_id=payload.role_contract_id,
+       mandate_id=payload.mandate_id,
+       context_id=payload.context_id,
+       candidate_set_id=payload.candidate_set_id,
+       candidates=payload.candidates,
+       selected_candidate_id=payload.selected_candidate_id,
+       recommended_disposition=payload.recommended_disposition,
+       requested_review_action=payload.requested_review_action,
+       requested_review_destination_role_ref=payload.requested_review_destination_role_ref,
+       claim_summaries=payload.claim_summaries,
+       observation_refs=payload.observation_refs,
+       uncertainties=payload.uncertainties,
+       reason_codes=payload.reason_codes,
+       expires_at=payload.expires_at,
        advisory_digest="sha256:" + ugence_jcs.canonical_sha256_hex(
            p_unsigned, set_paths=frozenset(), nfc_paths=frozenset()),
    )
    ```
+
+   The twenty-two pass-through keywords are the twenty-two D7 fields other than
+   `advisory_digest`; `advisory_digest` is the twenty-third and is the one computed
+   here. **Explicit field pass-through is the normative spelling**, and the reason is
+   given below: no `model_dump()` of any mode is a lawful constructor input for this
+   model.
+
+**Why the payload is not dumped back into the constructor.** `[V]` Verified against
+`pydantic 2.13.4` on a representative `strict=True` payload carrying timezone-aware
+datetimes and a `tuple` of candidates:
+
+| Construction input | Result |
+| --- | --- |
+| explicit field pass-through, as above | **accepted** — `created_at` is a `datetime`, `candidates` a `tuple` of `CandidateAdvisory` |
+| `**payload.model_dump(mode="json", exclude_none=False)` | **rejected**, 3 errors: `datetime_type` on `created_at` and `expires_at`, `tuple_type` on `candidates` |
+| `**payload.model_dump()` — Python mode | **rejected**, 4 `datetime_type` errors |
+
+**A JSON-mode dump cannot be fed back into a `strict=True` model.** JSON has no
+datetime and no tuple: `model_dump(mode="json")` renders every `datetime` as an ISO-8601
+`str` and every `tuple` as a `list`. `strict=True` performs no coercion — that is the
+whole point of C1's `strict=True` — so the string is rejected as `datetime_type` and the
+list as `tuple_type`. Passing such a dump to `ProposerAdvisory(...)` does not merely
+risk drift; it **fails validation outright**.
+
+`[V]` **A Python-mode dump does not fix it either, and the reason is C4.** C4 requires an
+explicit `@field_serializer` on every `datetime` field. A pydantic field serializer runs
+in **both** dump modes unless it is declared `when_used="json"`, so `payload.model_dump()`
+also yields ISO-8601 strings for the datetimes and is rejected for the same
+`datetime_type` reason. Python mode additionally converts each nested `CandidateAdvisory`
+to a `dict`. Neither dump mode is a constructor input; only the model's own Python-typed
+field values are.
+
+`[I]` This is why the shape is spelled out field by field rather than left to a
+`**dump` idiom. The idiom reads as the obvious one and is wrong under this contract's own
+ratified rules — `strict=True` from C1 and the mandatory serializer from C4 — and the
+failure is a construction-time `ValidationError`, not a silent one. The pass-through is
+also what an A5 reader wants: the substrate call stands inline in the `advisory_digest=`
+keyword with nothing between the computation and the field.
+
+**Canonicalisation happens exactly once.** `p_unsigned` is computed in step 2 and passed
+to `canonical_sha256_hex` in step 3. There is no second dump, no second canonicalisation,
+and no locally named digest helper — A5 rejects a local function passed by name into that
+keyword, and A7's `SUSPECT_DEF_SUBSTRINGS` would reject one named for what it does.
 
 There is no in-place mutation path and no setter: the model is frozen.
 
@@ -1269,6 +1429,17 @@ the unsigned representation never leaves the builder.
 evaluated on the resulting `ProposerAdvisory`, and that both canonicalise to identical
 bytes. Without that test the private payload could drift from the public contract and
 produce a digest no independent verifier could reproduce — precisely the D2 failure.
+`[V]` Verified on the representative payload: the G1 projection of the constructed
+advisory equals `p_unsigned` exactly, the two canonicalise to the same 64-character
+digest, and `verify_advisory_identity` therefore returns `True`.
+
+**Construction-shape obligation.** A second test asserts that feeding
+`payload.model_dump(mode="json", exclude_none=False)` into `ProposerAdvisory(...)`
+**raises** `ValidationError` with `datetime_type` and `tuple_type` among the error types,
+and that the explicit pass-through succeeds and yields a `datetime`-typed `created_at`
+and a `tuple`-typed `candidates`. Asserting the failure, and not only the success, is
+what keeps the round-trip idiom from being reintroduced as a "simplification" once
+`strict=True` or C4's serializer is quietly relaxed.
 
 `compute_advisory_identity` holds the same body over G1's expression and is what
 Equation 4 calls. `[V]` It is not scanned by A5's rule, which sees assignments and
@@ -1285,13 +1456,46 @@ identity, and substituting a fallback would be a second identity function.
 
 ## G3 — Revisions
 
-`build_advisory_revision` sets `parent_advisory_digest = parent.advisory_digest`,
-increments `advisory_version` per B7, and reuses the parent's `case_ref`, `tenant_id`,
-`agent_id`, `role_contract_id`, `mandate_id` and `context_id` unchanged. A revision is a
-new advisory with a new digest; nothing about the parent is mutated. The increment is
-computed as canonical positive decimal without leading zeroes; any integer arithmetic
-used to compute it is local to that function and never surfaces as a field, so C3 is
-not weakened.
+`build_advisory_revision` sets `parent_advisory_digest = parent.advisory_digest` and
+increments `advisory_version` per B7. A revision is a new advisory with a new digest;
+nothing about the parent is mutated. The increment is computed as canonical positive
+decimal without leading zeroes; any integer arithmetic used to compute it is local to
+that function and never surfaces as a field, so C3 is not weakened.
+
+**Every identity-participating field of a revision has exactly one declared source.**
+There are four, and no field falls outside them:
+
+| Source | Fields |
+| --- | --- |
+| **Inherited from the parent unchanged** — the ratified continuity fields | `tenant_id`, `case_ref`, `agent_id`, `role_contract_id`, `mandate_id`, `context_id` |
+| **Computed by the builder** | `advisory_version` (incremented, B7), `parent_advisory_digest` (`= parent.advisory_digest`), `advisory_digest` (Equation 3), `kind` and `schema_version` (literals) |
+| **Derived from the supplied `AdvisoryCandidateSet` under R-1b** | `candidate_set_id`, `candidates`, `selected_candidate_id`, `recommended_disposition`, `requested_review_action`, `requested_review_destination_role_ref` |
+| **Required of the caller, explicitly** | `claim_summaries`, `observation_refs`, `uncertainties`, `created_at`, `expires_at`; and `reason_codes` is C5d-empty and takes no caller value |
+
+**`claim_summaries`, `observation_refs` and `uncertainties` are required keyword
+parameters and are not inherited from the parent.** This is the correction the
+independent review required, and the reasoning is the point of B2. A revision is a
+**newly asserted identity-bearing advisory**, not an annotation on an old one: it
+carries its own digest over its own `P_unsigned`, and a consumer who verifies that
+digest is told that everything inside it is what this advisory asserts. Silently
+copying the parent's claim summaries, evidence references and uncertainties into a new
+digest would mint a fresh assertion out of stale content that no caller restated —
+and the three fields are exactly the ones that carry what the proposer *found*, which
+is what a revision most often exists to change.
+
+The builder therefore **validates** the three supplied values under their ratified
+classifications (`claim_summaries` and `uncertainties` C5c, `observation_refs` each C5a
+with no duplicates and every entry resolving under R-7), **binds them into the new
+`P_unsigned`**, increments `advisory_version`, and binds the parent through
+`parent_advisory_digest`.
+
+**Omission is refused, not defaulted.** All three are required keyword-only parameters
+with no default. A caller who omits one gets a `TypeError` from the call, not an
+inherited value and not an empty list; a caller who means "unchanged" must pass the
+parent's values explicitly, which is a statement they have made rather than one the
+builder made for them. `[I]` An empty-list default would be the worse of the two
+failures available here: it is silently well-formed, it canonicalises, and it would
+produce a digest-valid revision asserting that the proposer found nothing.
 
 ## G4 — Eligibility: what can and cannot be claimed
 
@@ -1359,7 +1563,7 @@ def build_advisory_candidate_set(
     tenant_id: str,
     case_ref: str,
     created_at: datetime,
-    candidates: list[CandidateAdvisory],
+    candidates: tuple[CandidateAdvisory, ...],
     selected_candidate_id: str | None,
 ) -> AdvisoryCandidateSet: ...
 
@@ -1392,6 +1596,9 @@ def build_advisory_revision(
     mandate: WorkMandate,
     context: BoundedContextEnvelope,
     observations: list[ToolObservation],
+    claim_summaries: list[str],
+    observation_refs: list[str],
+    uncertainties: list[str],
     created_at: datetime,
     expires_at: datetime,
 ) -> ProposerAdvisory: ...
@@ -1435,15 +1642,37 @@ def verify_advisory_selection(
     advisory: ProposerAdvisory,
     candidate_set: AdvisoryCandidateSet,
     role: CognitiveRoleContract,
+    context: BoundedContextEnvelope,
+    observations: list[ToolObservation],
+) -> bool: ...
+
+
+def verify_observation_resolution(
+    *,
+    advisory: ProposerAdvisory,
+    context: BoundedContextEnvelope,
+    observations: list[ToolObservation],
 ) -> bool: ...
 ```
 
-`verify_advisory_selection` is the independent replay of R-1b. It is a **separate
-function from `verify_advisory_identity`** because the two answer different questions:
-identity asks whether the stored bytes are the ones that were signed, correspondence
-asks whether what was signed agrees with the candidate set it references. A caller
-acting on an advisory's routing must call both. It returns `False` rather than raising,
-on the same terms as `verify_candidate_eligibility`.
+`verify_advisory_selection` is the independent replay of R-1b **and R-7**. It is a
+**separate function from `verify_advisory_identity`** because the two answer different
+questions: identity asks whether the stored bytes are the ones that were signed,
+correspondence asks whether what was signed agrees with the artifacts it references. A
+caller acting on an advisory's routing must call both. It returns `False` rather than
+raising, on the same terms as `verify_candidate_eligibility`.
+
+`[I]` It takes `observations` and `context` because R-7 has a replay counterpart. A
+verifier given only the advisory, the set and the role can check candidate
+correspondence but cannot tell whether a single `observation_refs` entry resolves to
+anything, which would leave R-7 enforced by the builder alone — the shape B2 refuses.
+`verify_advisory_selection` therefore invokes `verify_observation_resolution` and
+returns `False` if it does.
+
+`verify_observation_resolution` is the E2 algorithm as a separately named function. It
+is exported in its own right so that a read-only auditor can replay evidence resolution
+without also replaying selection, and so that a failure can be attributed to R-7 rather
+than to R-1b. It returns `False` and reports the failing references; it does not raise.
 
 Notes that are part of the ratified behaviour:
 
@@ -1515,7 +1744,8 @@ below.
 
 **Identity functions (2):** `compute_advisory_identity`, `verify_advisory_identity`
 
-**Verifiers (2):** `verify_candidate_eligibility`, `verify_advisory_selection`
+**Verifiers (3):** `verify_candidate_eligibility`, `verify_advisory_selection`,
+`verify_observation_resolution`
 
 **Exceptions (1):** `EligibilityMismatchError`
 
@@ -1528,10 +1758,14 @@ below.
 
 **Not exported:** `_UnsignedAdvisoryPayload`.
 
-`[V]` No exported name begins with `Proposal` or `Recommendation`, as D7 requires.
-`Proposer*` is not `Proposal*`; `recommended_disposition` is a field, not an exported
-name; and `PROPOSAL` and `RECOMMEND_*` are enum values, which
-`tests/test_advisory_contract_shape.py` records as out of the prefix rule's scope.
+`[R]` **No exported name may begin with `Proposal` or `Recommendation`, as D7
+requires.** This is a **requirement on the surface specified above**, which is not yet
+implemented or exported, and it is to be verified when S1 declares its
+`public_api.json` (I6, I8). The names in H3 are authored to satisfy it: `Proposer*` is
+not `Proposal*`, and `recommended_disposition` is a field, not an exported name. `[V]`
+What is merged and verified is the scope of the rule —
+`tests/test_advisory_contract_shape.py` records that `PROPOSAL` and `RECOMMEND_*` are
+enum **values** and out of the prefix rule's reach.
 
 ---
 
@@ -1575,7 +1809,8 @@ It must not permit: an arbitrary `sha256:` literal in any other module; a local
 `ugence_jcs`; or an identity computation from any module outside the authorised one.
 
 **No definition-name exemption is required.** The identity functions are named
-`compute_advisory_identity`, `verify_advisory_identity`, `verify_advisory_selection` and
+`compute_advisory_identity`, `verify_advisory_identity`, `verify_advisory_selection`,
+`verify_observation_resolution` and
 `verify_candidate_eligibility`; none contains `"digest"`, `"canonical"`, `"canon"`,
 `"jcs"`, `"fingerprint"` or any other `SUSPECT_DEF_SUBSTRINGS` member, so
 `SUSPECT_DEF_SUBSTRINGS` is left untouched. The field name `advisory_digest` is an
@@ -1789,6 +2024,29 @@ introduces the first contract, to the full H3 surface, and not before.
     `Annotated[str, StringConstraints(pattern=...)]` spelling is not; plus a scan
     asserting no `src` model declares a string constraint through `Field(...)` on any
     field.
+13. **Construction shape under `strict=True` (G2)** — the explicit field pass-through
+    constructs a `ProposerAdvisory` whose `created_at` is a `datetime` and whose
+    `candidates` is a `tuple` of `CandidateAdvisory`; and feeding
+    `payload.model_dump(mode="json", exclude_none=False)` into the same constructor
+    **raises** `ValidationError` carrying `datetime_type` and `tuple_type`, while
+    `payload.model_dump()` raises with `datetime_type`. Asserting both failures, not
+    only the success, is what stops the `**dump` idiom being reintroduced. A companion
+    assertion pins that a `list` passed to either `candidates` field is rejected with
+    `tuple_type`.
+14. **R-7 replay (E2)** — `verify_observation_resolution` returns `False`, naming the
+    failing reference, for each of: a dangling `observation_ref`; two supplied
+    observations sharing an `observation_id`; an observation substituted to another
+    tenant, another case, or a `source_ref` outside `allowed_record_refs`. It returns
+    `True` while reporting the extra as unreferenced when a supplied observation is
+    referenced by nothing, and that extra observation contributes to no equation term.
+    A candidate with an empty `observation_refs` must **not** be usable to make a
+    non-empty reference list pass vacuously. `verify_advisory_selection` must return
+    `False` whenever `verify_observation_resolution` does.
+15. **Revision inputs (G3)** — `build_advisory_revision` refuses a call omitting
+    `claim_summaries`, `observation_refs` or `uncertainties` rather than inheriting the
+    parent's or defaulting to empty; the three supplied values, and not the parent's,
+    appear in the revision's `P_unsigned`; the continuity fields are inherited unchanged;
+    and `advisory_version` increments while `parent_advisory_digest` binds the parent.
 
 ## I8 — Versioning and the ADR
 
@@ -1806,8 +2064,8 @@ Each item below is deliberately absent and is not a gap.
 * **A domain evaluator.** `DomainCheckCompletion.COMPLETE` has no producer. Until a
   separately ratified S2 boundary supplies one, C7's validator stands and Equation 2 is
   `False` everywhere.
-* **Candidate selection.** Under B3, S1 selects nothing. S-1, S-2 and R-1 are specified
-  now so that selection is a behaviour change at S2, not a contract change.
+* **Candidate selection.** Under B3, S1 selects nothing. S-1, S-2, R-1a and R-1b are
+  specified now so that selection is a behaviour change at S2, not a contract change.
 * **The reason-code catalogue.** `reason_codes`, `selection_reason_codes`,
   `deterministic_checks` and `semantic_audit_refs` are C5d: they reject non-empty values.
   The fields exist so that populating them later is not a schema change; the validators
@@ -1844,14 +2102,32 @@ mistakes their absence for coverage.
    covers the *identifiers* of everything the advisory does not carry, not the bodies
    behind them:
 
-   * **Externally referenced observations.** `observation_refs` entries are
-     `ToolObservation.observation_id` values; the observation bodies are outside the
-     digest. `[V]` This is **forced**: A3 bars nesting `ToolObservation` because
-     `content_hash` is a rival identity name, and an input-digest field on the advisory
-     would be a second identity, which D7 forbids. It is not closeable here. Each
-     observation carries its own `content_hash`, minted and verified by the observation
-     producer under D5, and that separately verified identity — not this advisory's
-     digest — is what binds an observation's content.
+   * **Externally referenced observations — narrowed by the E2 replay obligation, and
+     still open.** `observation_refs` entries are `ToolObservation.observation_id`
+     values; the observation bodies are outside the digest. `[V]` This is **forced**:
+     A3 bars nesting `ToolObservation` because `content_hash` is a rival identity name,
+     and an input-digest field on the advisory would be a second identity, which D7
+     forbids. It is not closeable here.
+
+     **What E2 closes.** R-7 is no longer enforced by the builder alone.
+     `verify_observation_resolution`, invoked by `verify_advisory_selection`, replays
+     resolution against the complete observation collection and refuses a dangling
+     reference, an ambiguous or duplicated `observation_id`, an observation that has
+     moved tenant, case or source, and any attempt to present an unreferenced
+     observation as evidence. So an advisory whose evidence references do not resolve,
+     or resolve to observations outside its own scope, is now detectable on replay by
+     any holder of the observations, not merely by whoever built it.
+
+     **What remains open, exactly.** Replay establishes correspondence to the
+     *referenced artifact*; it does not make the advisory digest bind the observation
+     *content*. An observation whose body was altered while keeping its
+     `observation_id`, `tenant_id`, `case_ref` and `source_ref` unchanged is **not**
+     detected by anything in this package: `P_unsigned` never covered it, and E2 checks
+     resolution and continuity, not content. Each observation carries its own
+     `content_hash`, minted and verified by the observation producer under D5, and that
+     separately verified identity — not this advisory's digest and not E2 — is what
+     binds an observation's content. A consumer that needs the content bound must verify
+     each observation against its producer's identity as a distinct step.
    * **Governance artifacts referenced by identifier** — `mandate_id`, `context_id`,
      `role_contract_id` and `agent_id`. Two different `WorkMandate` bodies sharing a
      `mandate_id` yield the same advisory digest, and likewise for the envelope, the
@@ -2013,4 +2289,4 @@ dependencies. The document remains ratified for S1 implementation subject to
 There is no longer any gate on writing a contract module for want of a composition
 ruling: the composition is ratified. What remains unauthorized is implementation itself,
 which stays so until this documentation change is independently reviewed and merged
-(I8, A11).
+(I8 of this document; ADR addendum A11).
