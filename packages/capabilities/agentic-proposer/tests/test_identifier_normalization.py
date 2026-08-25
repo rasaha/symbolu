@@ -815,6 +815,42 @@ def _declared_by(model):
     return set(model.model_fields)
 
 
+def _completeness_verdict(contract, classification=None, declared=None):
+    """The guard's own decision about one contract's registry entry, factored out.
+
+    Returns ``(verdict, extra)`` where verdict is:
+
+    * ``"complete"`` — the registered field set and the declared field set are equal,
+      and ``extra`` is the empty tuple;
+    * ``"declared-only"`` — the surface declares a field the registry does not carry;
+    * ``"registered-only"`` — the registry carries a field the surface does not declare;
+    * ``"divergent"`` — both at once, which is what a rename looks like.
+
+    ``extra`` names the offending fields, so a caller can assert *which* half of the
+    membership check fired rather than only that something did.
+
+    Both ``classification`` and ``declared`` default to the real registry and the real
+    declared surface. They are parameters for the same reason ``_pattern_verdict``'s
+    ``classification`` is one: a **mutated registry or a mutated surface can be run
+    through this exact code**, so a mutation control exercises the guard rather than a
+    re-derivation of the guard that would keep passing after the guard was deleted.
+    """
+    classification = FIELD_CLASSIFICATION if classification is None else classification
+    if declared is None:
+        declared = _declared_by(spec.representative_shapes()[contract])
+    declared = set(declared)
+    registered = set(classification.get(contract, {}))
+    missing = tuple(sorted(declared - registered))
+    surplus = tuple(sorted(registered - declared))
+    if missing and surplus:
+        return "divergent", missing + surplus
+    if missing:
+        return "declared-only", missing
+    if surplus:
+        return "registered-only", surplus
+    return "complete", ()
+
+
 @pytest.mark.parametrize("contract", sorted(FIELD_CLASSIFICATION))
 def test_the_registry_matches_the_declared_field_set_exactly(contract):
     """The completeness check, run in both directions against a declared surface.
@@ -824,38 +860,72 @@ def test_the_registry_matches_the_declared_field_set_exactly(contract):
     and this becomes redundant rather than wrong. Either way the check is exact
     membership: a field declared and unregistered fails, and a field registered and
     undeclared fails.
+
+    The decision itself lives in ``_completeness_verdict`` so that the three mutation
+    controls below run **this** code and not a copy of it.
     """
-    declared = _declared_by(spec.representative_shapes()[contract])
-    registered = set(FIELD_CLASSIFICATION[contract])
-    assert declared == registered, (
-        f"{contract}: declared-only {sorted(declared - registered)}, "
-        f"registered-only {sorted(registered - declared)}")
+    verdict, extra = _completeness_verdict(contract)
+    assert verdict == "complete", f"{contract}: {verdict} {list(extra)}"
 
 
 def test_an_added_field_fails_the_registry_check():
-    """Mutation control: a field the surface declares and the registry does not."""
-    declared = _declared_by(spec.representative_shapes()["ProposerAdvisory"])
-    mutant = declared | {"advisory_note"}
-    assert mutant != set(FIELD_CLASSIFICATION["ProposerAdvisory"])
+    """Mutation control: a field the surface declares and the registry does not.
+
+    The mutated surface is fed through ``_completeness_verdict`` — the function the live
+    assertion calls — and must change the verdict. Asserting set inequality here instead
+    would prove only that two sets differ, which stays true after the live assertion is
+    deleted.
+    """
+    contract = "ProposerAdvisory"
+    assert _completeness_verdict(contract) == ("complete", ()), (
+        "precondition: the unmutated surface and registry agree")
+
+    mutant = _declared_by(spec.representative_shapes()[contract]) | {"advisory_note"}
+    verdict, extra = _completeness_verdict(contract, declared=mutant)
+    assert verdict == "declared-only", (
+        f"an added field left the guard reporting {verdict}; the completeness check is "
+        "not being enforced")
+    assert extra == ("advisory_note",), extra
 
 
 def test_an_omitted_field_fails_the_registry_check():
-    """Mutation control: a registry entry dropped."""
-    registered = dict(FIELD_CLASSIFICATION["ProposerAdvisory"])
-    registered.pop("candidates")
-    declared = _declared_by(spec.representative_shapes()["ProposerAdvisory"])
-    assert set(registered) != declared
-    assert len(registered) != CONTRACT_CARDINALITY["ProposerAdvisory"]
+    """Mutation control: a registry entry dropped, fed through the same verdict."""
+    contract = "ProposerAdvisory"
+    assert _completeness_verdict(contract) == ("complete", ()), (
+        "precondition: the unmutated surface and registry agree")
+
+    mutated = dict(FIELD_CLASSIFICATION)
+    mutated[contract] = dict(FIELD_CLASSIFICATION[contract])
+    mutated[contract].pop("candidates")
+
+    verdict, extra = _completeness_verdict(contract, classification=mutated)
+    assert verdict == "declared-only", (
+        f"a dropped registry entry left the guard reporting {verdict}")
+    assert extra == ("candidates",), extra
+    assert len(mutated[contract]) != CONTRACT_CARDINALITY[contract], (
+        "an omission also changes the count; the count is the weaker of the two checks")
 
 
 def test_a_renamed_field_fails_the_registry_check():
     """Mutation control: a rename is an omission and an addition at once, and the
-    exact-membership check sees both halves."""
-    registered = dict(FIELD_CLASSIFICATION["ProposerAdvisory"])
-    registered["candidate_entries"] = registered.pop("candidates")
-    declared = _declared_by(spec.representative_shapes()["ProposerAdvisory"])
-    assert set(registered) != declared
-    assert len(registered) == CONTRACT_CARDINALITY["ProposerAdvisory"], (
+    exact-membership check sees both halves.
+
+    This is the mutation the cardinality check cannot see, so it is the one that most
+    needs to go through the guard rather than past it.
+    """
+    contract = "ProposerAdvisory"
+    assert _completeness_verdict(contract) == ("complete", ()), (
+        "precondition: the unmutated surface and registry agree")
+
+    mutated = dict(FIELD_CLASSIFICATION)
+    mutated[contract] = dict(FIELD_CLASSIFICATION[contract])
+    mutated[contract]["candidate_entries"] = mutated[contract].pop("candidates")
+
+    verdict, extra = _completeness_verdict(contract, classification=mutated)
+    assert verdict == "divergent", (
+        f"a rename left the guard reporting {verdict}; both halves must fire")
+    assert extra == ("candidates", "candidate_entries"), extra
+    assert len(mutated[contract]) == CONTRACT_CARDINALITY[contract], (
         "a rename keeps the count; only exact membership catches it")
 
 
@@ -1032,25 +1102,34 @@ def test_every_registered_category_is_covered_by_one_sweep_or_the_other():
     """The denominator, asserted. No registered class may fall between the two sweeps.
 
     For a patterned entry, the candidate reclassifications are the other eight registered
-    classes plus the unregistered sentinel. Seven of the eight are weakenings and belong
-    to the sweep above; the ninth, the sibling patterned class, is a narrowing and
-    belongs to the sibling test. Self-reclassification is not a mutation. Nothing else
-    exists, so there is no unexplained case.
+    classes plus the unregistered sentinel — **nine**, and 47 x 9 = 423. Seven of the
+    eight registered ones are weakenings and, with the sentinel, make the sweep above's
+    47 x 8 = 376; the ninth candidate, the sibling patterned class, is a narrowing and
+    makes the sibling test's 47. 376 + 47 = 423, so nothing is unexplained.
+    Self-reclassification is the tenth candidate and is not a mutation, so it stands
+    outside the 423 rather than inside it.
     """
     for original in PATTERNED_CATEGORIES:
         others = set(CLASSES) - {original}
         weakenings = others - set(PATTERN_FOR)
         narrowings = others & set(PATTERN_FOR)
-        assert weakenings | narrowings == others, (
-            f"a registered category is in neither sweep for {original}: "
-            f"{sorted(others - weakenings - narrowings)}")
         assert len(narrowings) == 1, (
             f"exactly one sibling patterned category is expected for {original}: "
             f"{sorted(narrowings)}")
-    applicable = len(C5A_ENTRIES + C5B_ENTRIES) * len(WEAKENING_CATEGORIES)
+    entries = len(C5A_ENTRIES + C5B_ENTRIES)
+    applicable = entries * len(WEAKENING_CATEGORIES)
     assert applicable == 47 * 8 == 376, (
         f"the weakening sweep's applicable count changed to {applicable}; if that is "
         "intended, update the count recorded in the enforcement documentation")
+    # The denominator itself, so the two sweeps are shown to exhaust it rather than
+    # asserted to by a set identity that cannot fail. Per entry the candidates are the
+    # other registered classes plus the unregistered sentinel; the entry's own class is
+    # not a mutation and is not among them.
+    candidates_per_entry = (len(CLASSES) - 1) + 1
+    narrowing_cases = entries * 1
+    assert applicable + narrowing_cases == entries * candidates_per_entry == 423, (
+        f"{applicable} weakening cases + {narrowing_cases} narrowing cases do not "
+        f"exhaust the {entries} x {candidates_per_entry} candidate reclassifications")
 
 
 def test_narrowing_the_exclusion_rule_loses_coverage():

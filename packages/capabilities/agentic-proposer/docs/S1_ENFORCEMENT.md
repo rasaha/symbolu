@@ -460,7 +460,9 @@ here so a green suite is not read as a verified contract:
 | `sha256:` prefix literal vs. `SUSPECT_TEXT` | **outstanding** — a module-path-scoped text mask in the one authorised identity module, with mutation tests. No definition-name exemption is needed: the ratified identity functions are named `compute_advisory_identity` and `verify_advisory_identity`, which carry no suspect substring |
 | `tests/test_vocabulary.py` pins the S0 export surface by equality | **outstanding** — it must be updated to the full H3 surface in the same change that exports the first contract, and not before |
 | Installed-distribution verification of `ugence-jcs` | **outstanding** — the `pyproject.toml` text check is the weaker of the two available assertions (I7.10) |
-| **R-3 process ordering** | **not covered, and explicitly so** — `tests/test_process_ordering_obligation.py` carries the obligation as a **named skip**, not as a green test. The specification types `ProposerProcessStateTransition.state` as `ProposerProcessState`; `vocabulary.py` does not declare that enum, and the mirror may not originate a vocabulary the specification assigns to the public surface, so `TerminalOutcome` — a strict subset carrying no process state — stands in as a documented placeholder. The obligation **arms itself** when the enum is declared, and then fails until forward-only ordering is enforced. `[G]` Whether the four terminal outcomes are members of `ProposerProcessState` or arrive from `TerminalOutcome` is not stated in the specification and must be settled there |
+| **R-3 process ordering** | **not covered, and explicitly so** — `tests/test_process_ordering_obligation.py` carries the obligation as a **named skip**, not as a green test. The specification types `ProposerProcessStateTransition.state` as `ProposerProcessState`; `vocabulary.py` does not declare that enum, and the mirror may not originate a vocabulary the specification assigns to the public surface, so `TerminalOutcome` — a strict subset carrying no process state — stands in as a documented placeholder. The obligation **arms itself** when the enum is declared, and then fails until forward-only ordering is enforced. `[G]` What the specification leaves open is the enum's **cardinality**, not terminal membership: D8 types `state` as `ProposerProcessState`, R-3 requires a terminal state in `state_transitions`, and R-4 speaks of "the terminal `ProposerProcessState`", so the four terminal outcomes are members by entailment. Whether the enum carries **nine** members or five plus a separate spelling of the four is not stated and must be settled in the specification |
+| **Six locally decidable rules the representative shapes accept** | **not enforced** — `tests/s1_specification_mirror.py` declares two model validators, C7's unconditional rejection of `DomainCheckCompletion.COMPLETE` and R-1a's selector/dependent coupling. Five further rules of the *same kind* — decidable from one instance, needing no builder — are not declared, and the shapes construct successfully in violation of each: **L-1** (`parent_advisory_digest` equal to this advisory's own `advisory_digest`); **D7**'s three `candidates` rules (an empty sequence, a duplicate `candidate_id`, and descending rather than ascending order); and **R-8**'s no-duplicates rule on `observation_refs`. A sixth, `WorkMandate.allowed_source_scopes` rejecting an empty list, is likewise accepted. These are omissions of enforcement, not departures from the declared shape: every field name, type and nullability in the mirror matches Part D exactly, and the mirror's own docstring records the only two **declaration**-level departures. Listing them here so that a green suite is not read as evidence about any of them |
+| **R-2, R-4, R-5, R-6, R-8, R-9 and R-10** | **not covered, and named in no test file at all** — unlike R-3, which carries an explicit named-skip obligation, these seven ratified rules appear nowhere under `tests/`. Each needs the builders and verifiers this stage does not authorize, so the state is expected; it is recorded here because a rule no test mentions is otherwise indistinguishable from a rule nobody has considered |
 
 ## Documentation gates, and exactly what they cover
 
@@ -490,12 +492,14 @@ that section does not exist; and that no status claim rests on a branch state or
 identifier whose truth was temporary.
 
 `[I]` The specification's own *Owner decisions* section is not a duplication to be
-removed. The ADR carries the **record** — ratified, on what date, whether it bears on
-contract shape, which guard enforces it — and the specification carries each decision in
-full because it is the implementation-ready document: OD-4 changed contract shape, and
-OD-1 and OD-2 carry riders an implementer must read where the contracts are stated.
-What is barred is a **second place a decision is made**, not a second place it is
-explained. The agreement check is what keeps that distinction from decaying: it compares
+removed. The ADR is the **authoritative locus of ratification** — the place a decision
+is made — and the specification carries each decision in full because it is the
+implementation-ready document: OD-4 changed contract shape, and OD-1 and OD-2 carry
+riders an implementer must read where the contracts are stated. The distinction is
+about authority, not about content: the specification states that each decision is
+ratified, on what date, whether it bears on contract shape and what enforces it, and
+may legitimately do so. What is barred is a **second place a decision is made**, not a
+second place it is explained. The agreement check is what keeps that distinction from decaying: it compares
 the ratification dates and OD-4's resolution letter across both documents, and pins that
 OD-4 is the only decision either records as bearing on contract shape.
 

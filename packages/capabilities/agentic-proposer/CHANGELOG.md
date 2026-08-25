@@ -334,9 +334,10 @@ uncovered. The module documents why the representative shape cannot exercise the
 specification, `vocabulary.py` does not declare that enum, and the mirror may not
 originate a vocabulary the specification assigns to the public surface — pins that the
 placeholder is still documented as one, and **arms itself** when the enum is declared, at
-which point it fails until forward-only ordering is enforced. `[G]` Whether the four
-terminal outcomes belong to `ProposerProcessState` or to `TerminalOutcome` is not stated
-in the specification; the module refuses to settle it and names it as a question for the
+which point it fails until forward-only ordering is enforced. `[G]` What is not stated in the
+specification is the enum's **cardinality**; terminal membership follows by entailment
+from D8's typing, R-3's chain and R-4's phrase "the terminal `ProposerProcessState`". The
+module refuses to settle the cardinality and names it as a question for the
 specification.
 
 ### Changed — documentation status language
@@ -345,8 +346,56 @@ Temporary status wording — unmerged-branch claims and SHA-based truths — is 
 the readiness ADR, the specification, the README and `docs/S1_ENFORCEMENT.md`. Durable
 text states that a decision is ratified, that a named guard enforces it, and that
 production implementation remains separately gated; those are three distinct statuses and
-are not collapsed. OD-1 – OD-4 have one account, the table in the readiness ADR, with
-guard evidence and enforcement limitations folded beneath it as subordinate detail.
+are not collapsed. OD-1 – OD-4 have one **decision record**, the table in the readiness
+ADR, with guard evidence and enforcement limitations folded beneath it as subordinate
+detail; the specification states each decision in full as the implementation-ready
+document, and the two must agree.
+
+### Fixed — sixth audit round: controls that did not run the guard
+
+* `tests/test_identifier_normalization.py` — the G-1 completeness check's decision is
+  factored into `_completeness_verdict`, in the style of `_pattern_verdict`, and
+  `test_the_registry_matches_the_declared_field_set_exactly` is refactored onto it. The
+  three mutation controls — an added field, an omitted entry, a rename — now feed their
+  mutated surface or registry through that function and assert the verdict changes,
+  instead of asserting set inequality directly. They were controls in name only: with the
+  live assertion neutered the whole suite stayed green at 1223 passed, and all three now
+  fail.
+* `tests/test_documentation_consistency.py` — the OD-4 agreement check anchored on
+  `RATIFIED` and so read exactly one statement per document. Both documents state OD-4's
+  resolution three times, including in Part D where an implementer reads contract shape,
+  and flipping one of the unread statements to `(b)` left the suite green.
+  `test_every_resolution_statement_in_each_document_says_the_same_thing` now collects
+  **every** `resolved (x)` statement through a tempered match, requires each to name OD-4
+  and `(a)`, pins the count per document, and checks the attributed count against the bare
+  population so an unattributable statement is reported rather than skipped. Falsified
+  against all six occurrences and against a deleted statement.
+* `tests/test_advisory_contract_shape.py` — `RATIFIED_DIGEST_FIELDS` is applied by name
+  over the whole reachable graph, so a `CandidateAdvisory` bearing `advisory_digest` or
+  `parent_advisory_digest` is invisible from the advisory root and is caught only by the
+  candidate root's empty exemption. That assertion had no mutation control. The per-root
+  exemption is factored into `_exemption_for` / `_root_failures`, the live guard and the
+  controls both run it, and both names are added to `RIVAL_IDENTITY_MUTATIONS`. Widening
+  the candidate root's exemption now kills three tests. The stale cross-reference naming
+  `test_the_digest_exemption_…` is corrected to `test_the_identity_exemption_…`.
+* `tests/test_identifier_normalization.py` — the assertion
+  `weakenings | narrowings == others` was a set identity that cannot fail; it is replaced
+  by the denominator itself, `47 x 8 = 376` weakening cases plus `47` narrowing cases
+  exhausting the `47 x 9 = 423` candidate reclassifications, with self-reclassification
+  standing outside that count as the tenth candidate rather than inside it.
+
+### Changed — what the guards do not yet establish, stated more completely
+
+`docs/S1_ENFORCEMENT.md` gains two rows. The mirror declares two model validators, C7 and
+R-1a, and **not** five further rules of the same locally decidable kind: L-1's self-parent
+bar, D7's three `candidates` rules (empty, duplicate `candidate_id`, descending order) and
+R-8's no-duplicates rule on `observation_refs`; `WorkMandate.allowed_source_scopes`
+rejecting an empty list is likewise unenforced. The representative shapes construct
+successfully in violation of each. These are omissions of enforcement, not departures from
+the declared shape — every field name, type and nullability matches Part D. Separately,
+R-2, R-4, R-5, R-6, R-8, R-9 and R-10 are named in no test file at all, unlike R-3, and
+that is now recorded. The "one decision record" gloss is restated as a claim about
+**authority** rather than as an enumeration of four facts the specification also states.
 
 ### Not implemented
 

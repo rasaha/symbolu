@@ -112,9 +112,34 @@ def _ratification_dates(body, od):
     return set(re.findall(rf"OD-{od}\b[^|]{{0,200}}?RATIFIED[^.|]{{0,40}}?{_DATE}", body))
 
 
+#: Any ``resolved (x)`` statement, wherever it stands. Written as a *tempered* match —
+#: the gap may not contain another ``OD-<n>`` — so each statement is attributed to the
+#: decision that actually introduces it rather than to whichever id appeared first.
+_RESOLUTION = re.compile(r"OD-(\d)\b((?:(?!OD-\d).){0,300}?)resolved\s*\(([a-z])\)")
+
+#: A bare ``resolved (x)``, used only to prove the attributed count above is the whole
+#: population and not the subset one anchor happened to reach.
+_BARE_RESOLUTION = re.compile(r"resolved\s*\(([a-z])\)")
+
+#: How many resolution statements each document carries today. Pinned so that adding a
+#: fourth, or deleting one, is a diff a reviewer sees rather than a silent change in what
+#: the agreement check covers.
+RESOLUTION_STATEMENTS = {"ADR": 3, "SPECIFICATION": 3}
+
+
+def _resolutions(body):
+    """Every ``(od, letter)`` resolution statement in ``body``.
+
+    An earlier form of this helper anchored on ``RATIFIED`` and so matched exactly one
+    statement per document. Both documents restate OD-4's resolution three times,
+    including in Part D where an implementer reads contract shape, and those
+    restatements were unguarded: flipping one to ``(b)`` left the whole suite green.
+    """
+    return [(int(od), letter) for od, _gap, letter in _RESOLUTION.findall(body)]
+
+
 def _resolution_letters(body, od):
-    return set(re.findall(
-        rf"OD-{od}\b[^|]{{0,200}}?RATIFIED[^|]{{0,40}}?resolved\s*\(([a-z])\)", body))
+    return {letter for found, letter in _resolutions(body) if found == od}
 
 
 @pytest.mark.parametrize("od", OWNER_DECISIONS)
@@ -139,14 +164,47 @@ def test_the_adr_and_the_specification_agree_on_every_owner_decision(od):
         "in the specification; the two accounts have diverged")
 
 
+@pytest.mark.parametrize("label,path", (("ADR", ADR), ("SPECIFICATION", SPECIFICATION)))
+def test_every_resolution_statement_in_each_document_says_the_same_thing(label, path):
+    """A document must not contradict itself, and a guard that reads one statement
+    cannot see that it does.
+
+    Every ``resolved (x)`` statement in the document is collected, not only the one an
+    anchor reaches. Each must name OD-4 — no other decision is recorded with a
+    resolution letter — and each must name ``(a)``. The count is pinned so a statement
+    added or removed changes this test rather than quietly changing its coverage, and
+    the attributed count is checked against the bare population so a statement standing
+    too far from its ``OD-<n>`` anchor is reported instead of skipped.
+    """
+    body = _normalised(path)
+    found = _resolutions(body)
+    bare = _BARE_RESOLUTION.findall(body)
+    assert len(found) == len(bare), (
+        f"{label}: {len(bare)} resolution statements exist but only {len(found)} could "
+        "be attributed to a decision; an unattributed statement is unguarded")
+    assert len(found) == RESOLUTION_STATEMENTS[label], (
+        f"{label} carries {len(found)} resolution statements, not "
+        f"{RESOLUTION_STATEMENTS[label]}; if that is intended, update the pinned count "
+        "so the change is reviewed rather than absorbed")
+    assert {od for od, _ in found} == {4}, (
+        f"{label} records a resolution letter for a decision other than OD-4: "
+        f"{sorted({od for od, _ in found})}")
+    assert {letter for _, letter in found} == {"a"}, (
+        f"{label} does not say OD-4 is resolved (a) everywhere it says so at all: "
+        f"{sorted({letter for _, letter in found})}")
+
+
 def test_the_adr_and_the_specification_agree_on_od_4s_resolution():
     """OD-4 is the one decision that changed contract shape, so it is the one whose
     divergence would silently misdirect an implementer. Both documents must name the
-    same resolution letter."""
+    same resolution letter — at **every** place either states it, per the test above."""
     adr = _resolution_letters(_normalised(ADR), 4)
     spec = _resolution_letters(_normalised(SPECIFICATION), 4)
     assert adr == {"a"}, f"the ADR does not record OD-4 resolved (a): {adr}"
     assert spec == {"a"}, f"the specification does not record OD-4 resolved (a): {spec}"
+    assert adr == spec, (
+        f"the two documents disagree on OD-4's resolution: ADR {sorted(adr)}, "
+        f"specification {sorted(spec)}")
 
 
 def test_only_od_4_is_recorded_as_bearing_on_contract_shape():

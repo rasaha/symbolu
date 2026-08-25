@@ -35,13 +35,16 @@ therefore written now, **skipped by name**, and it **arms itself** the moment
   replace the placeholder with the ratified ``ProposerProcessState`` and prove
   forward-only ordering in the same change.
 
-`[G]` **One thing this module does not settle, and must not.** The specification fixes
-R-3's ordering chain but does not state ``ProposerProcessState``'s member list as such:
-whether the four terminal outcomes are members of that enum, or arrive from
-``TerminalOutcome`` in the final position, is not written down. The assertions below pin
-only the five process states the chain names, and the implementation stage must settle
-the terminal question **against the specification**, not against this file. Inventing a
-cardinality here would be exactly the origination a mirror may not do.
+`[G]` **One thing this module does not settle, and must not.** What the specification
+leaves open is the enum's **cardinality**, not terminal membership. Membership follows by
+entailment: D8's nested-shape table types ``state`` as ``ProposerProcessState``, R-3
+requires a terminal state to appear in ``state_transitions``, and R-4 speaks of "the
+terminal ``ProposerProcessState``" — so the four terminal outcomes are members of that
+enum. What is **not** written down is whether the enum therefore carries nine members, or
+five process states alongside some other spelling of the four. The assertions below pin
+only the five process states the chain names; the implementation stage must settle the
+cardinality **against the specification**, not against this file. Inventing a cardinality
+here would be exactly the origination a mirror may not do.
 """
 from __future__ import annotations
 
@@ -57,7 +60,9 @@ SRC = pathlib.Path(ap.__file__).resolve().parent
 MIRROR = pathlib.Path(spec.__file__).resolve()
 
 #: The five process states R-3's chain names, in ratified order. The terminal states are
-#: deliberately absent — see the `[G]` note above.
+#: deliberately absent — not because their membership is in doubt (see the `[G]` note
+#: above: R-4 entails it) but because the enum's cardinality is, and pinning a count here
+#: would originate one.
 RATIFIED_PROCESS_STATES = (
     "RECEIVED", "VALIDATED", "OBSERVING", "RECONCILING", "EVALUATING",
 )
@@ -172,9 +177,9 @@ def test_the_process_state_enum_carries_the_five_ratified_process_states():
     """Armed by the enum's declaration. The five states R-3's chain names must all be
     members, in that order.
 
-    The terminal states are not asserted here: whether they are members of this enum or
-    arrive from ``TerminalOutcome`` is not stated in the specification, and this file
-    does not get to decide it.
+    The terminal states are not asserted here. R-4 entails that they are members, but the
+    enum's **cardinality** is not stated in the specification, and this file does not get
+    to decide it — so no count is pinned and no absence is asserted.
     """
     names = [member.name for member in _ENUM]
     for state in RATIFIED_PROCESS_STATES:
@@ -187,20 +192,21 @@ def test_the_process_state_enum_carries_the_five_ratified_process_states():
 def _state(name):
     """Resolve one state name to a member, from whichever enum carries it.
 
-    The specification does not settle whether the four terminal outcomes are members of
-    ``ProposerProcessState`` or arrive from ``TerminalOutcome``, so this resolves from
-    either rather than assuming one. If a name resolves from neither, that is the open
-    question surfacing as a concrete blocker, and it is reported as such instead of
-    escaping as an enum ``KeyError`` that says nothing to the implementer.
+    R-4 entails that the four terminal outcomes are members of ``ProposerProcessState``,
+    but the specification does not state the enum's cardinality, so this resolves from
+    either enum rather than assuming a spelling. If a name resolves from neither, that is
+    the open question surfacing as a concrete blocker, and it is reported as such instead
+    of escaping as an enum ``KeyError`` that says nothing to the implementer.
     """
     for enum in (_ENUM, ap.TerminalOutcome):
         if enum is not None and name in getattr(enum, "__members__", {}):
             return enum[name]
     pytest.fail(
         f"{name!r} is a member of neither {PROCESS_STATE_ENUM} nor TerminalOutcome. "
-        "R-3's chain ends in the four terminal outcomes, so one of the two must carry "
-        "them; the specification does not say which, and that question must be settled "
-        "there before this obligation can be discharged.")
+        f"R-3's chain ends in the four terminal outcomes and R-4 entails that "
+        f"{PROCESS_STATE_ENUM} carries them; the specification does not state the enum's "
+        "cardinality, and that must be settled there before this obligation can be "
+        "discharged.")
 
 
 @pytest.mark.skipif(_ENUM is None, reason=_UNARMED_REASON)
