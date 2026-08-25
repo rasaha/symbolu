@@ -16,12 +16,12 @@ they are recorded under *Ratified resolutions* below. OD-1 – OD-4, raised late
 auditing the S1 enforcement guards and reconciling this artifact with the contract
 specification, were ratified 2026-08-25 and are recorded under *Owner decisions
 OD-1 – OD-4* below. **No owner decision remains open, so S1 is unblocked on ratification grounds** —
-and on ratification grounds only. Two things still gate S1 code, neither of them a
-ruling: the O-1 – O-4 and OD-1 – OD-3 enforcement guards are implemented on an unmerged
-branch that needs two repairs before it merges, and A11 keeps implementation
-unauthorized until this documentation is independently reviewed and merged. "Unblocked
-on ratification grounds" is therefore not "authorized to implement", and this artifact
-does not claim it is.
+and on ratification grounds only. **Three** things still gate S1 code, none of them a
+ruling: the O-1 – O-4 and OD-1 – OD-3 enforcement guards are implemented on a branch
+that is **not merged**; the Part I implementation obligations in the contract
+specification are undischarged; and A11 keeps implementation unauthorized until this
+documentation is independently reviewed and merged. "Unblocked on ratification grounds"
+is therefore not "authorized to implement", and this artifact does not claim it is.
 
 Evidence labels: `[V]` verified against this repository, `[I]` inferred,
 `[R]` requires ratification, `[G]` gap.
@@ -548,9 +548,9 @@ from name shape. This is read from the unmerged guard branch
 `claude/governance-refinements-o1-o4-k96vbz` at head `96510a1c4` and is **not** a fact
 about any merged branch: at `30945dac8` the same guard classified by name suffix. It is
 to be re-verified on merge, and it matches the `[R]` labelling of **I5** of
-`packages/capabilities/agentic-proposer/docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md`
-for why suffix inference alone was insufficient, and for the six fields it reached as
-neither identifiers nor text. The
+`packages/capabilities/agentic-proposer/docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md`,
+which gives why suffix inference alone was insufficient and names the six fields it
+reached as neither identifiers nor text. The
 patterns are pinned by equality, and their application is pinned too: `re.match` admits
 a trailing newline against `$` and `re.fullmatch` does not, so stating a pattern without
 stating the application would leave the rule one convenience call away from admitting a
@@ -570,20 +570,21 @@ statuses. OD-4 was the only one bearing on contract shape; it is resolved below 
 specification implements the resolution.
 
 **No ruling is outstanding on any of the four.** What is outstanding on OD-1 – OD-3 is
-enforcement: `[R]` the guards are implemented on the unmerged branch
-`claude/governance-refinements-o1-o4-k96vbz` (head `96510a1c4`), which the
-specification's I4 records as needing two repairs before merge — the O-1 guard's
-class-blind dependent-field set (OD-3) and the `pydantic`/`socket` boundary probe
-(OD-2). S1 production implementation stays unauthorized under A11 independently of
-both. The *Enforcement* column below records that second axis; the decisions
-themselves are closed.
+a **merge**: `[R]` the guards are implemented on branch
+`claude/governance-refinements-o1-o4-k96vbz` at head `96510a1c4` — including both
+corrections the specification's I4 previously reported as outstanding, the O-1 guard's
+bearer scoping (OD-3) and the `pydantic`/`socket` boundary probe (OD-2), **both applied
+there** — but that branch is not merged, so none of it is a fact about this repository.
+`[R]` No further repair is identified. S1 production implementation stays unauthorized
+under A11 independently of all of it. The *Enforcement* column below records that second
+axis; the decisions themselves are closed.
 
 | Id | Decision | Bears on contract shape | Enforcement |
 | --- | --- | --- | --- |
 | **OD-1** — **RATIFIED 2026-08-25** | `primary_function` and `declared_strategy` are classified **C5c** human-readable free text rather than C5b canonical tokens, on the ground that neither is reachable from `P_unsigned`, so O-4's Unicode hazard does not reach them and the stricter class could only reject lawful values. Reclassifying either to C5b, while it stays outside `P_unsigned`, is a narrowing needing no new ratification. **Ratified rider:** the classification rests on unreachability, not on the values, so making either field **identity-participating** requires a **separately ratified normalization profile** — C6 freezes `nfc_paths` empty and the identity function normalises nothing — and must not be done by reclassifying to C5b in passing. | no | `[R]` carried by the O-4 registry on `96510a1c4`; lands with it |
-| **OD-2** — **RATIFIED 2026-08-25** | `pydantic` loads `socket` while constructing a `BaseModel`, which `tests/test_boundaries.py` forbids as a whole-process assertion. Every S1 contract is a `BaseModel` and `pydantic>=2` is a ratified dependency, so the first contract module fails that guard for a reason unrelated to this package's authority. **Resolved:** exempt exactly the transitive route and keep the bar on any direct import; dropping `socket` from `FORBIDDEN` is rejected. **Ratified enforcement design:** direct-source checks on `src/` that consult no runtime module table; a baseline comparison against the module table produced by the approved dependencies alone, recomputed rather than hand-listed; and negative controls proving the guard still fails on a direct import, on a forbidden module outside the baseline, and on a locally written indirection. **Ceiling disclosed:** `[V]` this closes no dynamic-import route (K.5) — it establishes that nothing in `src/` imports `socket` statically and that this package adds nothing beyond its approved dependencies, not that no runtime path can reach a socket. | no | `[R]` **pending** — I4.2; one of the two repairs the branch needs |
-| **OD-3** — **RATIFIED 2026-08-25** | O-1's dependent-field set is matched by name alone, so `CandidateAdvisory.requested_review_action` — the candidate's own required, non-null routing — is caught as if it were selection-dependent. **Resolved:** `DEPENDENT_FIELDS` is scoped to the **bearer contract**, pinned by bearer **and** field name and never by field name alone, the four fields being selection-dependent on `ProposerAdvisory` only. | no | `[R]` **pending** — I4.1; the other of the two repairs |
-| **OD-4** — **RATIFIED 2026-08-25, resolved (a)** | D7 above says `ProposerAdvisory` carries per-candidate `CandidateAdvisory` entries; an earlier revision of the specification instead had it reference an `AdvisoryCandidateSet` by `candidate_set_id`. `[V]` That departure was **not** forced by the rival-identity walk, which bars only nested `ToolObservation` and reaches no field of `CandidateAdvisory`. **Resolution (a): restore the nesting D7 requires.** `ProposerAdvisory` carries an immutable `candidates` sequence of `CandidateAdvisory`, ordered ascending by `candidate_id`, participating in `P_unsigned`; `candidate_set_id` is retained as the reference to `AdvisoryCandidateSet`, which stays a **top-level contract** and is not nested; the two candidate lists must correspond exactly in membership, order and content, checked by the builder and by the independent replay verifier. `ToolObservation` stays referenced by id, which A3/the rival-identity walk does force. **Rejected alternative:** reference by id, ratified as an amendment narrowing D7 — rejected because it deviates from ratified text, leaves candidate dispositions, `is_eligible` Booleans and evidence references outside the advisory digest, and leaves an amended candidate set undetectable by replay. | **yes — resolved** |
+| **OD-2** — **RATIFIED 2026-08-25** | `pydantic` loads `socket` while constructing a `BaseModel`, which `tests/test_boundaries.py` forbids as a whole-process assertion. Every S1 contract is a `BaseModel` and `pydantic>=2` is a ratified dependency, so the first contract module fails that guard for a reason unrelated to this package's authority. **Resolved:** exempt exactly the transitive route and keep the bar on any direct import; dropping `socket` from `FORBIDDEN` is rejected. **Ratified enforcement design:** direct-source checks on `src/` that consult no runtime module table; a baseline comparison against the module table produced by the approved dependencies alone, recomputed rather than hand-listed; and negative controls proving the guard still fails on a direct import, on a forbidden module outside the baseline, and on a locally written indirection. **Ceiling disclosed:** `[V]` a static scan cannot see a module name assembled at runtime, so no design here closes the dynamic-import route (K.5). `[R]` What the guard establishes — that nothing in `src/` imports `socket` statically and that this package adds no forbidden root beyond its approved-dependency baseline — is read from an unmerged branch and is not that no runtime path can reach a socket. | no | `[R]` **implemented at `96510a1c4`, not merged** — I4.2; the five-layer probe, `DEPENDENCY_BASELINE_MODULES` pinned by equality, and a baseline the test recomputes |
+| **OD-3** — **RATIFIED 2026-08-25** | O-1's dependent-field set is matched by name alone, so `CandidateAdvisory.requested_review_action` — the candidate's own required, non-null routing — is caught as if it were selection-dependent. **Resolved:** `DEPENDENT_FIELDS` is scoped to the **bearer contract**, pinned by bearer **and** field name and never by field name alone. The **three** dependent fields are selection-dependent on `ProposerAdvisory` only, coupled to its `selected_candidate_id` selector, which is held separately and is not itself a dependent field. | no | `[R]` **implemented at `96510a1c4`, not merged** — I4.1; `SELECTION_COUPLING`, `NON_BEARERS_SHARING_A_FIELD_NAME`, and three equality self-tests |
+| **OD-4** — **RATIFIED 2026-08-25, resolved (a)** | D7 above says `ProposerAdvisory` carries per-candidate `CandidateAdvisory` entries; an earlier revision of the specification instead had it reference an `AdvisoryCandidateSet` by `candidate_set_id`. `[V]` That departure was **not** forced by the rival-identity walk, which bars only nested `ToolObservation` and reaches no field of `CandidateAdvisory`. **Resolution (a): restore the nesting D7 requires.** `ProposerAdvisory` carries an immutable `candidates` sequence of `CandidateAdvisory`, ordered ascending by `candidate_id`, participating in `P_unsigned`; `candidate_set_id` is retained as the reference to `AdvisoryCandidateSet`, which stays a **top-level contract** and is not nested; the two candidate lists must correspond exactly in membership, order and content, checked by the builder and by the independent replay verifier. `ToolObservation` stays referenced by id, which A3/the rival-identity walk does force. **Rejected alternative:** reference by id, ratified as an amendment narrowing D7 — rejected because it deviates from ratified text, leaves candidate dispositions, `is_eligible` Booleans and evidence references outside the advisory digest, and leaves an amended candidate set undetectable by replay. | **yes — resolved** | `[R]` **outstanding** — no guard yet pins the ratified composition; the specification's I7.11 requires a test that bars a nested `ToolObservation` **and requires** a nested `CandidateAdvisory`, so a reversion to reference-by-id fails loudly. `[V]` The merged rival-identity walk in `tests/test_advisory_contract_shape.py` bars the observation half only |
 
 `[R]` The guards enforcing OD-1 – OD-3 live on branch
 `claude/governance-refinements-o1-o4-k96vbz`, which is not merged, so their
@@ -802,10 +803,12 @@ controls, with the dynamic-import ceiling disclosed rather than papered over.
 **Each of OD-1 – OD-3 carries three statuses, and they must not be collapsed.** The
 owner decision is **resolved**; the enforcement implementation is **pending** on the
 unmerged branch `claude/governance-refinements-o1-o4-k96vbz` (head `96510a1c4`), which
-`[R]` the specification's I4 records as needing two repairs before merge — the O-1
-guard's class-blind dependent-field set (OD-3) and the `pydantic`/`socket` boundary probe
-(OD-2); and **S1 production implementation is unauthorized under A11** regardless of
-either, until this documentation is independently reviewed and merged.
+`[R]` carries both corrections the specification's I4 previously reported as
+outstanding — the O-1 guard's bearer scoping (OD-3) and the `pydantic`/`socket` boundary
+probe (OD-2), both applied there — with no further repair identified, so what is
+outstanding is that branch's review and merge; and **S1 production implementation is
+unauthorized under A11** regardless of either, until this documentation is independently
+reviewed and merged.
 
 The specification's status is therefore
 `CONTRACT SPECIFICATION RATIFIED; IMPLEMENTATION AUTHORIZATION PENDING MERGED ENFORCEMENT`. No

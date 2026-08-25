@@ -1382,23 +1382,39 @@ into the `advisory_digest=` keyword. The construction is therefore:
    model.
 
    **The keyword set must equal the field set exactly, and this is checked
-   structurally.** `[V]` Twelve of the twenty-three fields are declared with a
-   default — `schema_version`, `kind`, `advisory_version`, `parent_advisory_digest`,
+   structurally.** `[V]` Twelve of the twenty-three fields are declared with a default —
+   `schema_version`, `kind`, `advisory_version`, `parent_advisory_digest`,
    `selected_candidate_id`, `recommended_disposition`, `requested_review_action`,
    `requested_review_destination_role_ref`, `claim_summaries`, `observation_refs`,
-   `uncertainties` and `reason_codes` — so **omitting any one of them from this call is
-   silently well-formed**: construction succeeds and the field takes its default. That
-   is the hazard the pass-through introduces in exchange for being the only lawful
-   spelling, and it is why I7.16 requires a structural test that the call's keyword set
-   equals `set(ProposerAdvisory.model_fields)` exactly.
+   `uncertainties` and `reason_codes` — so omitting one from this call **can be silently
+   well-formed**: construction succeeds and the field takes its default. That is the
+   hazard the pass-through introduces in exchange for being the only lawful spelling, and
+   it is why I7.16 requires a structural test that the call's keyword set equals
+   `set(ProposerAdvisory.model_fields)` exactly.
 
-   `[V]` The equivalence obligation below does **not** cover this. Verified on a
-   representative payload: with a defaulted identity-participating field omitted from the
-   pass-through and given a **non-default** value on the payload, construction succeeds,
-   the advisory silently carries the default, and the resulting digest does not verify —
-   the D2 failure. With the same omission and the field left at its **default** value,
-   the G1 projection equals `p_unsigned` and the digest verifies, so a corpus that does
-   not happen to vary that field passes. Only a structural check on the call catches the
+   `[V]` **The hazard is five of the twelve, not all twelve**, and the three-way split is
+   worth stating because it shows what is and is not already caught. Verified on a
+   representative payload carrying a selection, omitting each defaulted keyword in turn
+   from an advisory whose model validator implements R-1a:
+
+   | Omitted field | Outcome |
+   | --- | --- |
+   | `advisory_version`, `parent_advisory_digest`, `claim_summaries`, `observation_refs`, `uncertainties` | **constructs silently, digest fails to verify** — the real hazard, five fields |
+   | `selected_candidate_id`, `recommended_disposition`, `requested_review_action`, `requested_review_destination_role_ref` | **`ValidationError`** — R-1a fires, because omitting one breaks the joint-presence coupling. Not silent |
+   | `kind`, `schema_version`, `reason_codes` | constructs, **digest still verifies** — each admits only its default (`kind` and `schema_version` are `Literal`s, `reason_codes` is C5d-empty), so no other value could have been passed |
+
+   `[I]` R-1a is therefore load-bearing here in a way E1 does not claim for it: it is a
+   selection-coupling rule, and catching four omissions from the construction call is an
+   incidental consequence of that coupling, not a guarantee it offers. It would stop
+   catching them the moment a selection-dependent field ceased to be coupled. I7.16 does
+   not rest on it.
+
+   `[V]` The equivalence obligation below does **not** cover the five. Verified: with one
+   of them omitted and given a **non-default** value on the payload, construction
+   succeeds, the advisory silently carries the default, and the digest does not verify —
+   the D2 failure. With the same omission and the field left at its **default**, the G1
+   projection equals `p_unsigned` and the digest verifies, so a corpus that does not
+   happen to vary that field passes. Only a structural check on the call catches the
    omission, and only I7.16 requires one.
 
 **Why the payload is not dumped back into the constructor.** `[V]` Verified against
@@ -1872,44 +1888,73 @@ namespace, and the kind reader is self-tested against all three spellings (`KIND
 `kind`, a `kind` field default). This is stronger than the narrowing this document
 originally specified, which only removed `CandidateAdvisory` from the assertion.
 
-## I4 — Two corrections the guard branch needs before it merges
+## I4 — Two corrections the guard branch has already applied
 
-`[R]` Both were found by running that branch's suite against representative contract
-shapes planted in `src/`. The shapes are not committed anywhere, and the branch is not
-merged, so neither observation below is a fact about this repository: both are claims to
-be re-verified when the first contract module lands.
+**Both corrections this section previously reported as outstanding are applied at
+`96510a1c4`.** An earlier revision described them as repairs the branch still needed
+before it could merge. That was read from the branch's **earlier** head `30945dac8` and
+was wrong about `96510a1c4`; the correction is recorded here rather than quietly
+absorbed. `[R]` Everything below is read from an unmerged branch and is to be
+re-verified on merge — but "implemented there, unmerged" is a different status from
+"outstanding", and the two must not be confused.
 
-1. **The O-1 guard has a class-blind false positive.** `DEPENDENT_FIELDS` is matched by
-   name alone, so `CandidateAdvisory.requested_review_action` — the candidate's **own**
-   proposed routing, required and non-null by D6 of this document — is treated as a
-   selection-dependent field. The guard then demands a `selected_candidate_id` on
-   `CandidateAdvisory` and demands the field admit `None`, which contradicts the
-   ratified contract. Four tests fail on that class:
-   `test_a_dependent_field_is_declared_with_its_selector`,
-   `test_every_dependent_field_admits_none`, `test_the_coupling_is_enforced_in_code` and
-   `test_a_live_dependent_field_accepts_none`.
+1. **The O-1 guard's class-blind false positive — fixed.** At `30945dac8`
+   `DEPENDENT_FIELDS` was matched by name alone, so
+   `CandidateAdvisory.requested_review_action` — the candidate's **own** proposed
+   routing, required and non-null by D6 of this document — was treated as a
+   selection-dependent field, and the guard then demanded a `selected_candidate_id` on
+   `CandidateAdvisory` and demanded the field admit `None`, contradicting the ratified
+   contract.
 
-   `[R]` The corrected `ProposerAdvisory` specified here — carrying the mirrored
-   `selected_candidate_id` and the R-1a validator — passed all four against the planted
-   shapes. The defect appeared confined to `CandidateAdvisory`.
+   `[R]` At `96510a1c4` the guard is **bearer-scoped**, exactly as OD-3 ratifies.
+   `tests/test_selection_dependent_fields.py` declares `SELECTION_BEARER =
+   "ProposerAdvisory"`, holds `SELECTION_FIELD = "selected_candidate_id"` separately
+   from a three-element `DEPENDENT_FIELDS`, and registers both in `SELECTION_COUPLING`.
+   The class filter examines a class **only** when its name is a key of that registry,
+   and the live-type filter gates on it too. `NON_BEARERS_SHARING_A_FIELD_NAME =
+   ("CandidateAdvisory",)` names the exclusion so it is deliberate and visible rather
+   than a silent consequence. Three self-tests pin the registry by equality —
+   `test_the_coupling_is_pinned_to_the_ratified_fields`,
+   `test_the_bearer_registry_is_pinned` and the assertion on
+   `NON_BEARERS_SHARING_A_FIELD_NAME` — so it cannot be widened to another contract or
+   narrowed to fewer fields without failing.
 
-   The fix is to scope the dependent-field set to the bearer contract: the three fields
-   are selection-dependent **on `ProposerAdvisory`**, and `requested_review_action` on a
-   candidate is a different field with the same name. Since `DEPENDENT_FIELDS` is pinned
-   by equality, the scoping must be pinned the same way.
+2. **The `pydantic`/`socket` boundary probe — fixed.** `[V]` The underlying fact is
+   unchanged and reproduces against `pydantic 2.13.4`: bare `import pydantic` does
+   **not** load `socket`, but *defining any* `BaseModel` does, because pydantic-core's
+   schema build pulls it in. `socket` is in that guard's `FORBIDDEN` set, so a
+   whole-process `sys.modules` assertion fails the moment the first contract model
+   exists, for a reason unrelated to this package's authority.
 
-2. **`test_boundaries.py` will fail on the first contract module, for a reason unrelated
-   to either branch.** `[V]` Reproduced against `pydantic 2.13.4` in this environment:
-   bare `import pydantic` does **not** load `socket`, but *defining any* `BaseModel` does — pydantic-core's schema build pulls it
-   in. `socket` is in that guard's `FORBIDDEN` set, and its own docstring records that
-   the probe "is meaningful only because the package is a stdlib-light leaf." Every
-   contract in Part D is a `BaseModel` and `pydantic>=2` is a ratified core dependency,
-   so this is unavoidable and is not a defect in the contracts. `[R]` That the first
-   contract module actually fails that guard follows from the two facts above and is to
-   be verified when such a module exists.
+   `[R]` At `96510a1c4` `tests/test_boundaries.py` implements the OD-2 design in **five
+   layers**, none load-bearing alone: a static import scan of every production source;
+   an extension of that scan to aliases, `from` imports, module-qualified use and the
+   literal dynamic-import spellings; an isolated subprocess that establishes the
+   approved-dependency baseline first — `import pydantic`, define a minimal model — and
+   then imports this package, asserting it adds **no additional** forbidden root beyond
+   that baseline; the declared-dependency allowlist, so the exemption can never
+   authorize a new networking library; and negative controls proving a direct `socket`
+   import or use still fails. `DEPENDENCY_BASELINE_MODULES = ("pydantic",)` is pinned by
+   equality against the declared dependency set, and
+   `test_the_dependency_baseline_is_what_it_claims_to_be` demonstrates the premise
+   rather than assuming it — asserting that bare `import pydantic` does not load
+   `socket` **and** that defining a model does, each with a message saying what to
+   re-read if the behaviour changes.
 
-   This needs an owner ruling before S1 code lands — recorded as **OD-2**. It does not
-   affect any contract shape in this document.
+   `[R]` The whole-process assertion this document previously cited by name,
+   `test_isolated_subprocess_import_loads_no_forbidden_module`, **no longer exists** at
+   `96510a1c4`: the repair replaced it with
+   `test_isolated_subprocess_adds_no_forbidden_module_beyond_the_baseline`. A citation
+   to the old name is a citation to `30945dac8`.
+
+   The ruling is OD-2, ratified 2026-08-25. No ruling is outstanding, and this affects
+   no contract shape in this document.
+
+**What this means for merge readiness.** `[R]` This section names no outstanding repair.
+What stands between the guard branch and a merged fact is review and merge of that
+branch, not further work identified here. `[R]` The suite at `96510a1c4` is green on its
+own terms; any count taken against contract shapes planted in `src/` remains a claim
+about a throwaway working tree, since no contract module is committed on any branch.
 
 ## I5 — Field classification must be pinned, not guessed (O-4)
 
@@ -2078,14 +2123,16 @@ introduces the first contract, to the full H3 surface, and not before.
     call — and not the builder's result, because the result is exactly what cannot
     distinguish an omission from a default.
 
-    `[V]` It is required because omission is silent: twelve of the twenty-three fields
-    are declared with a default, so dropping one from the pass-through still constructs.
-    Verified on a representative payload — a defaulted identity-participating field
-    omitted from the call and given a non-default value on the payload constructs
-    successfully, silently carries the default, and produces a digest that does not
-    verify; with the field at its default value the equivalence corpus passes
-    unchanged. The failure a corpus test can only catch by luck, this test catches by
-    construction.
+    `[V]` It is required because omission can be silent: twelve of the twenty-three
+    fields are declared with a default, and for **five** of them — `advisory_version`,
+    `parent_advisory_digest`, `claim_summaries`, `observation_refs` and `uncertainties` —
+    dropping one from the pass-through constructs successfully, silently carries the
+    default, and produces a digest that does not verify, while the equivalence corpus
+    passes unchanged if it happens not to vary that field. G2 gives the full three-way
+    split: R-1a incidentally catches the four selection-coupled fields, and three admit
+    only their default. Five silent-omission fields is the justification; the test must
+    not be narrowed to those five, because the partition is a property of today's field
+    set and not of the rule.
 
     `[I]` The obligation is stated over the *field set*, not over a written list of
     twenty-three names, so that adding a twenty-fourth field to `ProposerAdvisory`
@@ -2230,7 +2277,7 @@ collapse them:
 | Axis | What it means | State for OD-1 – OD-3 |
 | --- | --- | --- |
 | **Owner decision** | Has the owner ruled? | **Resolved — ratified 2026-08-25.** No further ruling is sought or required. |
-| **Enforcement implementation** | Does a merged guard enforce the ruling? | **Pending.** Implemented on the unmerged branch `claude/governance-refinements-o1-o4-k96vbz` (head `96510a1c4`), which I4 records as needing **two repairs before merge**: the O-1 guard's class-blind dependent-field set (I4.1) and the `pydantic`/`socket` boundary probe (I4.2). |
+| **Enforcement implementation** | Does a **merged** guard enforce the ruling? | **Implemented, not merged.** All three are implemented on the branch `claude/governance-refinements-o1-o4-k96vbz` at head `96510a1c4`, including the two corrections I4 previously reported as outstanding — the O-1 guard's bearer scoping (I4.1) and the `pydantic`/`socket` boundary probe (I4.2), both applied there. `[R]` No further repair is identified; what remains is review and merge of that branch. Until it merges, none of it is a fact about this repository. |
 | **S1 production implementation** | May contract code be written? | **Unauthorized under A11**, independently of the two axes above, until this documentation is independently reviewed and merged. |
 
 `[R]` The middle axis is `[R]` for all three: every statement about the guard branch is
@@ -2271,8 +2318,11 @@ a redesign, and needs no new ratification.
 *Owner decision:* **resolved.** `[V]` Reproduced: bare `import pydantic` does not load
 `socket`; defining any `BaseModel` does. Every contract here is a `BaseModel` and
 `pydantic>=2` is a ratified core dependency, so the first S1 contract module would fail
-`test_isolated_subprocess_import_loads_no_forbidden_module` for a reason unrelated to
-this package's authority. The ruling is to **exempt exactly the transitive route** —
+a whole-process `sys.modules` assertion for a reason unrelated to this package's
+authority. (`[R]` That assertion was named
+`test_isolated_subprocess_import_loads_no_forbidden_module` at `30945dac8`; at
+`96510a1c4` the repair replaced it with
+`test_isolated_subprocess_adds_no_forbidden_module_beyond_the_baseline`.) The ruling is to **exempt exactly the transitive route** —
 `socket` reached through an approved dependency — and to keep the bar on any direct
 import in `src/`. Dropping `socket` from `FORBIDDEN` outright is rejected: it would give
 up a real boundary.
@@ -2312,27 +2362,33 @@ establish that no code path anywhere can reach a socket at runtime. Claiming the
 would be false and must not appear in S1 documentation, tests or commit messages. As
 with D2, the invariant is the rule and the scan is defence-in-depth.
 
-*Enforcement implementation:* **pending.** I4.2 records that the probe fails on the
-first contract module for this reason; the repair is one of the two the guard branch
-needs before merge.
+*Enforcement implementation:* **implemented at `96510a1c4`, not merged.** `[R]` I4.2
+records what landed: the five-layer probe, `DEPENDENCY_BASELINE_MODULES` pinned by
+equality against the declared dependency set, a baseline recomputed by the test rather
+than hand-listed, and `test_the_dependency_baseline_is_what_it_claims_to_be`, which
+demonstrates the premise instead of assuming it. The whole-process assertion was
+replaced, not exempted.
 
 *S1 production implementation:* unauthorized under A11.
 
 **OD-3 — the O-1 guard's dependent-field set is scoped to its bearer. RATIFIED
 2026-08-25.**
 
-*Owner decision:* **resolved.** `DEPENDENT_FIELDS` is scoped to the **bearer contract**:
-`selected_candidate_id`, `recommended_disposition`, `requested_review_action` and
-`requested_review_destination_role_ref` are selection-dependent **on `ProposerAdvisory`**,
-and `CandidateAdvisory.requested_review_action` — the candidate's own required, non-null
+*Owner decision:* **resolved.** `DEPENDENT_FIELDS` is scoped to the **bearer contract**.
+The **three** dependent fields — `recommended_disposition`, `requested_review_action` and
+`requested_review_destination_role_ref` — are selection-dependent **on
+`ProposerAdvisory`**, coupled to its `selected_candidate_id` **selector**, which is not
+itself a dependent field and is held separately (B6).
+`CandidateAdvisory.requested_review_action` — the candidate's own required, non-null
 routing — is a different field that happens to share a name. Because `DEPENDENT_FIELDS`
 is pinned by equality, the scoping must be pinned the same way: by bearer **and** field
 name, never by field name alone.
 
-*Enforcement implementation:* **pending**, and this is the first of the two repairs I4
-records. I4.1 sets out the class-blind false positive precisely: the guard demands a
-`selected_candidate_id` on `CandidateAdvisory` and demands the field admit `None`, which
-contradicts the ratified contract, and four tests fail on that class.
+*Enforcement implementation:* **implemented at `96510a1c4`, not merged.** `[R]` I4.1
+records what landed: `SELECTION_BEARER`, a `SELECTION_FIELD` held apart from a
+three-element `DEPENDENT_FIELDS`, a `SELECTION_COUPLING` registry the class and live-type
+filters both gate on, `NON_BEARERS_SHARING_A_FIELD_NAME` naming the exclusion
+explicitly, and three equality self-tests pinning all of it.
 
 *S1 production implementation:* unauthorized under A11.
 
@@ -2421,13 +2477,13 @@ line at the head of this document therefore reads
 `CONTRACT SPECIFICATION RATIFIED; IMPLEMENTATION AUTHORIZATION PENDING MERGED ENFORCEMENT` — the contract
 specification is ratified, and implementation authorization waits on merged enforcement.
 Three things stand between this document and S1 code, and none of them is an owner
-question:
+question. The ADR's introduction states the same three:
 
-* **Merged enforcement.** The guards implementing O-1 – O-4 and OD-1 – OD-3 live on the
-  unmerged branch `claude/governance-refinements-o1-o4-k96vbz` (head `96510a1c4`), which
-  `[R]` I4 records as needing two repairs before merge: the O-1 guard's class-blind
-  dependent-field set (OD-3) and the `pydantic`/`socket` boundary probe (OD-2). Until
-  they merge, every claim about them is `[R]`.
+* **Merged enforcement.** The guards implementing O-1 – O-4 and OD-1 – OD-3 are
+  implemented on the branch `claude/governance-refinements-o1-o4-k96vbz` at head
+  `96510a1c4` — including both corrections I4 previously reported as outstanding — but
+  that branch is **not merged**. `[R]` No further repair is identified; what is
+  outstanding is its review and merge, and until then every claim about it is `[R]`.
 * **The Part I obligations**, which S1 must discharge in the same change that introduces
   the surface they govern.
 * **A11.** Implementation stays unauthorized until this documentation change is
