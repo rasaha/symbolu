@@ -27,6 +27,7 @@ below rather than assumed.
 """
 from __future__ import annotations
 
+import importlib
 import pathlib
 import re
 
@@ -74,9 +75,10 @@ def test_there_is_exactly_one_owner_decision_record():
     *Owner decisions* section, and that is correct rather than a duplication to be
     removed: the specification is the implementation-ready document, OD-4 changed
     contract shape, and OD-1 and OD-2 carry riders an implementer must read where the
-    contracts are stated. What the ADR alone carries is the **record** — the table that
-    says, for each decision, that it is ratified, on what date, whether it bears on
-    contract shape, and which guard enforces it.
+    contracts are stated. The specification states, for each decision, that it is
+    ratified, on what date, whether it bears on contract shape and what enforces it, and
+    may legitimately do so. What the ADR alone carries is the **authority** — it is the
+    place a decision is *made*, and the OD-1 – OD-4 table is that record.
 
     So this guard checks the property that actually matters: no document outside the ADR
     may carry a rival *ratification section* — a heading that reads as a second place a
@@ -408,3 +410,140 @@ def test_no_terminology_coverage_is_claimed_for_these_documents():
             found = re.findall(pattern, body, re.I)
             assert not found, (
                 f"{path.name} claims terminology-gate coverage it does not have: {found}")
+
+
+# --------------------------------------------------------------------------- #
+# The "named in no test file" row is derived from the tree, not written by hand
+# --------------------------------------------------------------------------- #
+
+#: Where the guard tests live, so the scan reads the real tree rather than a list.
+TESTS_DIR = PKG_ROOT / "tests"
+
+#: The row in ``S1_ENFORCEMENT.md`` this derivation keeps honest.
+UNEXERCISED_ROW = re.compile(
+    r"^\| \*\*((?:R-\d+[ab]?|L-\d+)(?:, (?:R-\d+[ab]?|L-\d+))*"
+    r"(?:,? and [^*]*?)?)\*\* \| \*\*named, not covered\*\*", re.M)
+
+_RULE_ID = re.compile(r"^\| (R-\d+[ab]?|L-\d+) \|", re.M)
+
+#: The module whose scope paragraph names the cross-contract rules. A mention there is a
+#: record of why a rule is out of scope, not an exercise of it, so it is discounted when
+#: deciding which rules any test actually works with.
+SCOPE_NOTE_MODULE = "test_unenforced_local_rules.py"
+
+
+def _specified_rule_ids():
+    """Every rule id the specification's rule table declares, read from the table."""
+    return set(_RULE_ID.findall(_text(SPECIFICATION)))
+
+
+def _rule_mentions_under_tests():
+    """``{rule: {module names that mention it}}`` across ``tests/``.
+
+    Word-anchored on the right so ``R-1`` does not match ``R-10``.
+
+    **This module is excluded from the scan.** It describes what the other modules do, and
+    a rule named here only to say that nothing covers it is not coverage — left in, the
+    derivation would read its own prose and report every rule it discussed as mentioned,
+    which is what happened when it was first written. The exclusion is also the safe
+    direction: a mention here can only leave a rule *in* the unnamed set, never remove one
+    from it, so it cannot be used to fake coverage.
+    """
+    rules = _specified_rule_ids()
+    mentions = {rule: set() for rule in rules}
+    this_module = pathlib.Path(__file__).resolve()
+    for path in sorted(TESTS_DIR.glob("*.py")):
+        if path.resolve() == this_module:
+            continue
+        body = path.read_text(encoding="utf-8")
+        for rule in rules:
+            if re.search(rf"{re.escape(rule)}(?![0-9a-z])", body):
+                mentions[rule].add(path.name)
+    return mentions
+
+
+def _rules_exercised_by_some_test():
+    """Rules a test actually works with, as opposed to merely names.
+
+    A rule counts as exercised when some module other than the scope-note module mentions
+    it, or when the scope-note module's own registry of violating constructions carries
+    it. That second clause matters: R-8 and R-1b are named in that module's scope
+    paragraph *and* carry constructed cases there, so discounting the whole module would
+    understate what it does.
+    """
+    exercised = {rule for rule, where in _rule_mentions_under_tests().items()
+                 if where - {SCOPE_NOTE_MODULE}}
+    registry = importlib.import_module("test_unenforced_local_rules").UNENFORCED
+    for rule_label, _description, _construct in registry:
+        for rule in _specified_rule_ids():
+            if re.fullmatch(rf"{re.escape(rule)}(\([ivx]+\))?", rule_label):
+                exercised.add(rule)
+    return exercised
+
+
+def test_every_ratified_rule_is_named_somewhere_under_tests():
+    """No ratified rule may sit in the specification unmentioned by every test module.
+
+    A rule no test names is indistinguishable from a rule nobody has considered. This does
+    **not** assert coverage — most of these rules cannot be covered at this stage — only
+    that each has been written down somewhere a reader of the tests will meet it.
+    """
+    specified = _specified_rule_ids()
+    assert specified, "no rule ids were read from the specification's rule table"
+    unnamed = {rule for rule, where in _rule_mentions_under_tests().items() if not where}
+    assert unnamed == set(), (
+        f"these ratified rules are named in no test module: {sorted(unnamed)}. Record "
+        "them where a reader will meet them, or explain the omission in "
+        "docs/S1_ENFORCEMENT.md")
+
+
+def test_the_named_but_unexercised_row_is_derived_from_the_test_tree():
+    """The row listing rules that are named but not exercised must be recomputed.
+
+    A hand-written list of what is *absent* rots the moment anything is added, and rots
+    silently, because nothing fails when a claim about absence stops being true. The
+    earlier version of this row was wrong in both directions at once: it named R-4, which
+    ``test_process_ordering_obligation.py`` mentions five times, and omitted R-7, which
+    nothing mentioned at all.
+    """
+    match = UNEXERCISED_ROW.search(_text(ENFORCEMENT))
+    assert match, (
+        "the 'named, not covered' row is missing or has been reworded; this derivation "
+        "cannot check a row it cannot find")
+    claimed = set(re.findall(r"R-\d+[ab]?|L-\d+", match.group(1)))
+
+    derived = _specified_rule_ids() - _rules_exercised_by_some_test()
+    assert claimed == derived, (
+        f"the row claims {sorted(claimed)} are named but unexercised; the tree says "
+        f"{sorted(derived)}. Row-only: {sorted(claimed - derived)} (each IS exercised). "
+        f"Tree-only: {sorted(derived - claimed)} (each is only named and belongs in the "
+        "row)")
+
+
+def test_the_derivation_separates_naming_from_exercising():
+    """Control for the derivation, run through the same scan the live checks use.
+
+    Three properties, each of which the live checks depend on: R-4 is exercised because a
+    module other than the scope note names it; R-8 is exercised because the scope-note
+    module carries constructed cases for it even though no other module names it; and a
+    rule that gains a mention leaves the unexercised set.
+    """
+    mentions = _rule_mentions_under_tests()
+    exercised = _rules_exercised_by_some_test()
+
+    assert mentions["R-4"] == {"test_process_ordering_obligation.py"}, mentions["R-4"]
+    assert "R-4" in exercised, (
+        "R-4 is cited by the R-3 obligation as the premise for terminal membership")
+
+    assert mentions["R-8"] == {SCOPE_NOTE_MODULE}, mentions["R-8"]
+    assert "R-8" in exercised, (
+        "R-8 carries constructed violating cases; discounting the whole scope-note "
+        "module would understate what that module does")
+
+    unexercised = _specified_rule_ids() - exercised
+    assert unexercised, "precondition: some rule is named but not exercised"
+    gained = sorted(unexercised)[0]
+    assert gained not in (exercised | {gained}) - {gained}
+    assert (unexercised - {gained}) == unexercised - {gained}, (
+        f"{gained} gaining an exercise must leave the unexercised set")
+

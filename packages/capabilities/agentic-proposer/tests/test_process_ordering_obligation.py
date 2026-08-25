@@ -35,16 +35,24 @@ therefore written now, **skipped by name**, and it **arms itself** the moment
   replace the placeholder with the ratified ``ProposerProcessState`` and prove
   forward-only ordering in the same change.
 
-`[G]` **One thing this module does not settle, and must not.** What the specification
-leaves open is the enum's **cardinality**, not terminal membership. Membership follows by
-entailment: D8's nested-shape table types ``state`` as ``ProposerProcessState``, R-3
-requires a terminal state to appear in ``state_transitions``, and R-4 speaks of "the
-terminal ``ProposerProcessState``" — so the four terminal outcomes are members of that
-enum. What is **not** written down is whether the enum therefore carries nine members, or
-five process states alongside some other spelling of the four. The assertions below pin
-only the five process states the chain names; the implementation stage must settle the
-cardinality **against the specification**, not against this file. Inventing a cardinality
-here would be exactly the origination a mirror may not do.
+`[G]` **What this module does not settle, and must not.** Terminal **membership** is
+settled by entailment, and two other things are not.
+
+Membership: D8's nested-shape table types ``state`` as ``ProposerProcessState``, validated
+by enum membership, and R-4 says ``terminal_outcome`` equals "the terminal
+``ProposerProcessState`` **when one is present** in ``state_transitions``" — which
+presupposes that such a member exists. R-3 carries no weight in that argument: it says
+"at most one terminal state and only in final position", which *permits* a terminal state
+and does not require one. The load-bearing premises are D8's typing and R-4's
+presupposition, and nothing else.
+
+Left open, and for the specification rather than this file: **(i) cardinality** — whether
+the enum carries nine members or the five process states alongside some other spelling of
+the four; and **(ii) the comparison basis** — R-4 equates ``terminal_outcome``, a
+``TerminalOutcome``, with a ``ProposerProcessState``, and a cross-enum ``==`` is never
+true in Python, so R-4 must mean equality of name or of value and does not say which. The
+assertions below pin only the five process states the chain names. Inventing a cardinality
+or a comparison basis here would be exactly the origination a mirror may not do.
 """
 from __future__ import annotations
 
@@ -61,8 +69,8 @@ MIRROR = pathlib.Path(spec.__file__).resolve()
 
 #: The five process states R-3's chain names, in ratified order. The terminal states are
 #: deliberately absent — not because their membership is in doubt (see the `[G]` note
-#: above: R-4 entails it) but because the enum's cardinality is, and pinning a count here
-#: would originate one.
+#: above: D8's typing plus R-4's presupposition entail it) but because the enum's
+#: cardinality is, and pinning a count here would originate one.
 RATIFIED_PROCESS_STATES = (
     "RECEIVED", "VALIDATED", "OBSERVING", "RECONCILING", "EVALUATING",
 )
@@ -177,9 +185,10 @@ def test_the_process_state_enum_carries_the_five_ratified_process_states():
     """Armed by the enum's declaration. The five states R-3's chain names must all be
     members, in that order.
 
-    The terminal states are not asserted here. R-4 entails that they are members, but the
-    enum's **cardinality** is not stated in the specification, and this file does not get
-    to decide it — so no count is pinned and no absence is asserted.
+    The terminal states are not asserted here. D8's typing and R-4's "when one is
+    present" entail that they are members, but the enum's **cardinality** is not stated in
+    the specification, and this file does not get to decide it — so no count is pinned and
+    no absence is asserted.
     """
     names = [member.name for member in _ENUM]
     for state in RATIFIED_PROCESS_STATES:
@@ -192,21 +201,23 @@ def test_the_process_state_enum_carries_the_five_ratified_process_states():
 def _state(name):
     """Resolve one state name to a member, from whichever enum carries it.
 
-    R-4 entails that the four terminal outcomes are members of ``ProposerProcessState``,
-    but the specification does not state the enum's cardinality, so this resolves from
-    either enum rather than assuming a spelling. If a name resolves from neither, that is
-    the open question surfacing as a concrete blocker, and it is reported as such instead
-    of escaping as an enum ``KeyError`` that says nothing to the implementer.
+    D8's typing and R-4's "when one is present" entail that the four terminal outcomes are
+    members of ``ProposerProcessState``, but the specification states neither the enum's
+    cardinality nor the basis on which R-4 compares a ``TerminalOutcome`` with a
+    ``ProposerProcessState``, so this resolves from either enum rather than assuming a
+    spelling. If a name resolves from neither, that is the open question surfacing as a
+    concrete blocker, and it is reported as such instead of escaping as an enum
+    ``KeyError`` that says nothing to the implementer.
     """
     for enum in (_ENUM, ap.TerminalOutcome):
         if enum is not None and name in getattr(enum, "__members__", {}):
             return enum[name]
     pytest.fail(
         f"{name!r} is a member of neither {PROCESS_STATE_ENUM} nor TerminalOutcome. "
-        f"R-3's chain ends in the four terminal outcomes and R-4 entails that "
-        f"{PROCESS_STATE_ENUM} carries them; the specification does not state the enum's "
-        "cardinality, and that must be settled there before this obligation can be "
-        "discharged.")
+        f"R-3's chain ends in the four terminal outcomes and D8's typing plus R-4's "
+        f"\"when one is present\" entail that {PROCESS_STATE_ENUM} carries them; the "
+        "specification states neither the enum's cardinality nor R-4's comparison basis, "
+        "and both must be settled there before this obligation can be discharged.")
 
 
 @pytest.mark.skipif(_ENUM is None, reason=_UNARMED_REASON)

@@ -335,10 +335,11 @@ specification, `vocabulary.py` does not declare that enum, and the mirror may no
 originate a vocabulary the specification assigns to the public surface — pins that the
 placeholder is still documented as one, and **arms itself** when the enum is declared, at
 which point it fails until forward-only ordering is enforced. `[G]` What is not stated in the
-specification is the enum's **cardinality**; terminal membership follows by entailment
-from D8's typing, R-3's chain and R-4's phrase "the terminal `ProposerProcessState`". The
-module refuses to settle the cardinality and names it as a question for the
-specification.
+specification is the enum's **cardinality** and R-4's **comparison basis**; terminal
+membership follows by entailment from D8's typing and R-4's "when one is present". R-3
+carries no weight in that argument — it permits at most one terminal state, it does not
+require one. The module refuses to settle either open item and names both as questions for
+the specification.
 
 ### Changed — documentation status language
 
@@ -386,16 +387,69 @@ document, and the two must agree.
 
 ### Changed — what the guards do not yet establish, stated more completely
 
-`docs/S1_ENFORCEMENT.md` gains two rows. The mirror declares two model validators, C7 and
-R-1a, and **not** five further rules of the same locally decidable kind: L-1's self-parent
-bar, D7's three `candidates` rules (empty, duplicate `candidate_id`, descending order) and
-R-8's no-duplicates rule on `observation_refs`; `WorkMandate.allowed_source_scopes`
-rejecting an empty list is likewise unenforced. The representative shapes construct
-successfully in violation of each. These are omissions of enforcement, not departures from
-the declared shape — every field name, type and nullability matches Part D. Separately,
-R-2, R-4, R-5, R-6, R-8, R-9 and R-10 are named in no test file at all, unlike R-3, and
-that is now recorded. The "one decision record" gloss is restated as a claim about
-**authority** rather than as an enumeration of four facts the specification also states.
+`docs/S1_ENFORCEMENT.md` gains two rows, both derived rather than hand-written.
+
+The first records that the mirror declares two model validators, C7 and R-1a, and that
+**every** other rule decidable from one instance of one contract is unenforced —
+nineteen constructions the representative shapes accept: L-1; the three `candidates`
+rules on both `ProposerAdvisory` (D7) and `AdvisoryCandidateSet` (D6); R-8's
+no-duplicates rule on all six lists it names; the three Part D rejects-an-empty-list
+rules; and R-1b(v) and R-1b(vi), whose local halves became decidable when OD-4(a) nested
+the candidates. `tests/test_unenforced_local_rules.py` constructs a violating instance
+for each, so the row cannot claim a rule is unenforced once it is, nor omit one that
+still is. `CandidateAdvisory.claim_refs` is deliberately excluded and the exclusion is
+tested: R-8 does not name it and its Part D row states `each C5a` only, so a duplicate
+there is lawful and listing it would be a test originating a rule.
+
+The second records that R-2, R-5, R-6, R-7, R-9 and R-10 are **named but not covered**,
+and that a mention in a scope paragraph establishes nothing behavioural. These are
+omissions of enforcement, not departures from the declared shape: every field name, type
+and nullability in the mirror matches Part D. The "one decision record" gloss is restated
+as a claim about **authority** rather than as an enumeration of four facts the
+specification also states.
+
+### Fixed — seventh audit round: a real escape, and three false statements
+
+* `tests/test_advisory_contract_shape.py` — **the rival-identity exemption is now scoped
+  to the bearer.** It was applied by name over the whole reachable graph, so a shape
+  hanging off `ProposerAdvisory` but not reachable from `CandidateAdvisory` and declaring
+  `advisory_digest` was reported by **neither** root: the advisory exempted the name
+  wherever it appeared, and the candidate could not reach the shape. That is a second
+  identity inside `P_unsigned`, which is what D6 bars. The walk now carries ownership —
+  `_runtime_owned_fields_reachable_from` yields `(owner, field)` pairs and
+  `_runtime_fields_reachable_from` is its projection, so the guards that bar a name at any
+  depth are unchanged — and `exempt` is honoured only for a field the root itself
+  declares. The special-case branch that pinned the old blindness as expected behaviour is
+  deleted, and
+  `test_a_sanctioned_name_on_a_shape_off_the_advisory_alone_still_fails` is the
+  regression. Falsified two ways: un-scoping the exemption and discarding ownership each
+  kill four tests.
+* `docs/S1_ENFORCEMENT.md` — the "named in no test file" row was wrong in both directions
+  at once: it named R-4, which `tests/test_process_ordering_obligation.py` mentions five
+  times in text the previous commit added, and omitted R-7, which nothing mentioned at
+  all. The row is replaced by two derived checks —
+  `test_every_ratified_rule_is_named_somewhere_under_tests` and
+  `test_the_named_but_unexercised_row_is_derived_from_the_test_tree` — which recompute
+  membership from the specification's rule table and a scan of `tests/`, discounting the
+  scope paragraph that only records why a rule is out of scope. The derivation excludes
+  its own module, so it cannot read its own prose as coverage.
+* `docs/S1_ENFORCEMENT.md` and `tests/test_process_ordering_obligation.py` — the terminal
+  membership argument rested on a false premise. R-3 (`spec:1032`, not `:1030`) says "at
+  most one terminal state and only in final position": it **permits** a terminal state
+  and does not require one. The entailment survives on D8's typing plus R-4's "when one is
+  present", and now rests on those alone. A second open item is recorded alongside
+  cardinality: R-4 equates a `TerminalOutcome` with a `ProposerProcessState`, and a
+  cross-enum `==` is never true in Python, so R-4 must mean equality of name or of value
+  and does not say which.
+* `tests/test_documentation_consistency.py` — the docstring of
+  `test_there_is_exactly_one_owner_decision_record` still asserted the sentence the
+  previous commit corrected in `docs/S1_ENFORCEMENT.md`. The two artifacts agreed on
+  authority and disagreed in text; they now agree in both.
+* `tests/test_boundaries.py` — `test_a_widened_baseline_setup_fails` was the same defect
+  class as the three registry controls: deleting the equality pin at
+  `test_the_baseline_setup_is_pinned_by_equality` left the file at 51 passed. The pin is
+  factored into `_baseline_pin_verdict` and both the live assertion and the control run
+  it. Falsified: neutering the verdict kills the control.
 
 ### Not implemented
 

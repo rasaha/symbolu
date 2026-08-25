@@ -133,8 +133,16 @@ def _fields_reachable_from(tree, roots):
     return found
 
 
-def _runtime_fields_reachable_from(model):
-    """The same walk over a live pydantic model, following nested models to any depth."""
+def _runtime_owned_fields_reachable_from(model):
+    """Every ``(owner, field)`` pair reachable from ``model``, following nested models to
+    any depth.
+
+    Ownership is carried, not discarded, because a bare name cannot say which contract
+    declares it — and the digest exemption D7 grants is an entitlement of **one
+    contract**, not of a spelling. A walk that returns names alone forces any exemption
+    to be applied globally, which is how a nested shape bearing ``advisory_digest``
+    escaped every root.
+    """
     seen, queue, found = set(), [model], set()
     while queue:
         current = queue.pop()
@@ -146,10 +154,16 @@ def _runtime_fields_reachable_from(model):
                        if isinstance(model_fields, dict)
                        else dict(getattr(current, "__annotations__", {}) or {}))
         for name, annotation in annotations.items():
-            found.add(name)
+            found.add((current, name))
             queue += [a for a in (annotation,) + typing.get_args(annotation)
                       if isinstance(a, type)]
     return found
+
+
+def _runtime_fields_reachable_from(model):
+    """The same walk projected to bare names, for the guards that bar a name at **any**
+    depth and so have no use for its owner."""
+    return {name for _owner, name in _runtime_owned_fields_reachable_from(model)}
 
 
 def _barred_prefix_names(names):
@@ -580,6 +594,12 @@ DIGEST_SHAPED_MARKS = ("digest", "fingerprint", "hash", "checksum")
 RATIFIED_DIGEST_FIELDS = frozenset({"advisory_digest", "parent_advisory_digest"})
 
 
+def _owner_name(owner):
+    """A stable label for the model that declares a field, used in sort keys and in
+    failure text so a nested rival names the shape it was planted on."""
+    return getattr(owner, "__name__", str(owner))
+
+
 def _rival_identity_failures(root, walker=None, exempt=RATIFIED_DIGEST_FIELDS):
     """Why ``root`` carries a rival identity, if it does. Empty means it does not.
 
@@ -598,21 +618,36 @@ def _rival_identity_failures(root, walker=None, exempt=RATIFIED_DIGEST_FIELDS):
     they are exempted by exact name rather than by weakening the shape rule for
     everything.
 
+    **The exemption is scoped to the bearer.** It applies only to a field ``root`` itself
+    declares; a field of the same name on anything nested is barred like any other
+    renamed digest. That scoping is the whole reason the walk carries ownership. Applied
+    globally — as an earlier revision applied it — a nested shape bearing
+    ``advisory_digest`` was reported by no root at all: not by the advisory, which
+    exempted the name wherever it appeared, and not by the candidate, from which such a
+    shape need not be reachable. That is a second identity inside ``P_unsigned``, which is
+    precisely what D6 bars.
+
     ``walker`` is injectable so a negative control can prove the verdict depends on the
-    reachability walk and not on something the test arranged for itself.
+    reachability walk and not on something the test arranged for itself. It must return
+    ``(owner, field)`` pairs.
     """
-    walk = _runtime_fields_reachable_from if walker is None else walker
-    reachable = walk(root)
+    walk = _runtime_owned_fields_reachable_from if walker is None else walker
+    owned = walk(root)
+    reachable = {name for _owner, name in owned}
     failures = []
     for name in sorted(reachable & RIVAL_IDENTITY_FIELDS):
         failures.append(f"rival identity name reachable: {name}")
     for name in sorted(reachable & BARRED_FIELDS):
         failures.append(f"barred field reachable: {name}")
-    for name in sorted(reachable):
-        if name in exempt or name in RIVAL_IDENTITY_FIELDS:
+    for owner, name in sorted(owned, key=lambda pair: (pair[1], _owner_name(pair[0]))):
+        if name in RIVAL_IDENTITY_FIELDS:
+            continue
+        if name in exempt and owner is root:
             continue
         if any(mark in name for mark in DIGEST_SHAPED_MARKS):
-            failures.append(f"renamed digest reachable: {name}")
+            failures.append(f"renamed digest reachable: {name}"
+                            + ("" if owner is root else f" (declared on "
+                                                        f"{_owner_name(owner)})"))
     return failures
 
 
@@ -621,18 +656,18 @@ ADVISORY_ROOTS = ("ProposerAdvisory", "CandidateAdvisory")
 
 
 def _exemption_for(root):
-    """Which digest-shaped names are sanctioned **on this root**.
+    """Which digest-shaped names this root is **entitled to declare on itself**.
 
     ``ProposerAdvisory`` earns the exemption: D7 ratifies ``advisory_digest`` as its sole
     identity and ``parent_advisory_digest`` as lineage, and both are digest-shaped on
     purpose. ``CandidateAdvisory`` earns none, because it carries no identity at all.
 
-    The distinction lives here, in one place, because ``_rival_identity_failures``
-    applies ``exempt`` **by name over the whole reachable graph** rather than scoping it
-    to the bearer. So a candidate bearing ``advisory_digest`` is invisible from the
-    advisory root, and the empty exemption on the candidate root is the only thing that
-    catches it. Factoring the choice out means a control can run the guard's own
-    configuration instead of re-stating it — a control that passed ``exempt=frozenset()``
+    Entitlement and scope are two separate things and both are needed.
+    ``_rival_identity_failures`` supplies the scope — it honours ``exempt`` only for
+    fields the root itself declares — and this function supplies the entitlement, so that
+    the candidate does not gain the advisory's exemption merely by being walked as a
+    root. Factoring the choice out also means a control can run the guard's own
+    configuration instead of re-stating it: a control that passed ``exempt=frozenset()``
     itself would keep passing after this function was widened.
     """
     return RATIFIED_DIGEST_FIELDS if root == "ProposerAdvisory" else frozenset()
@@ -661,8 +696,7 @@ def test_no_rival_identity_is_reachable_from_either_advisory_root(graph):
     assert IDENTITY_FIELD in _runtime_fields_reachable_from(graph["ProposerAdvisory"])
     assert IDENTITY_FIELD not in set(graph["CandidateAdvisory"].model_fields)
     assert _exemption_for("CandidateAdvisory") == frozenset(), (
-        "the candidate must be walked with no exemption; it is the only guard against a "
-        "candidate bearing one of the advisory's two sanctioned digest names")
+        "the candidate is entitled to no digest-shaped name; it carries no identity")
 
 
 def _reachable_models(model):
@@ -790,14 +824,12 @@ def test_a_mutant_that_reverts_to_reference_by_id_fails(graph):
 #: list cannot see, plus the two names the advisory's exemption sanctions. Each is
 #: planted on a real model below.
 #:
-#: The last two are there because ``RATIFIED_DIGEST_FIELDS`` is applied **by name across
-#: the whole reachable graph**, not scoped to the root that earns the exemption. A
-#: candidate bearing ``advisory_digest`` or ``parent_advisory_digest`` is therefore
-#: invisible to the advisory-root walk, and is caught only by the separate
-#: ``exempt=frozenset()`` assertion on the candidate root in
-#: ``test_no_rival_identity_is_reachable_from_either_advisory_root``. That assertion is
-#: the whole of the guard for this class, and until these two names were planted it had
-#: no mutation control at all.
+#: The last two are the names D7 sanctions **on the advisory itself**. They are planted
+#: here because the exemption is an entitlement of one contract, not of a spelling: a
+#: nested shape bearing either is a second identity inside ``P_unsigned``, and must fail
+#: from the advisory root like any other rival. An earlier revision applied the exemption
+#: by name across the whole reachable graph, and these two mutations are what a control
+#: needs to keep that from returning.
 RIVAL_IDENTITY_MUTATIONS = tuple(sorted(RIVAL_IDENTITY_FIELDS)) + (
     "candidate_digest", "body_fingerprint", "payload_checksum", "row_hash",
 ) + tuple(sorted(RATIFIED_DIGEST_FIELDS))
@@ -858,26 +890,53 @@ def test_a_second_identity_on_a_nested_candidate_is_reachable_from_the_advisory(
     assert rival in _runtime_fields_reachable_from(AdvisoryWithMutantCandidates), (
         "the mutation must actually be reachable, or the control proves nothing")
 
-    if rival in RATIFIED_DIGEST_FIELDS:
-        # The exemption is applied by NAME over the whole reachable graph, so these two
-        # are invisible from the advisory root even though the walk reaches them. That is
-        # pinned here rather than left to be discovered, and the walk that actually
-        # catches this class is exercised immediately below — through ``_root_failures``,
-        # so widening the candidate root's exemption kills this control.
-        assert not _root_failures("ProposerAdvisory", graph,
-                                  model=AdvisoryWithMutantCandidates), (
-            f"{rival!r} is now reported from the advisory root; if the exemption has "
-            "been scoped to the bearer contract, this branch should be deleted and the "
-            "name handled like every other rival")
-        assert _root_failures("CandidateAdvisory", graph, model=mutant_candidate), (
-            f"a candidate bearing {rival!r} escaped the candidate-root walk; that walk "
-            "is the only thing standing between this name and a second identity")
-        return
-
     failures = _root_failures("ProposerAdvisory", graph,
                               model=AdvisoryWithMutantCandidates)
     assert failures, f"a nested second identity named {rival!r} was not caught"
     assert any(rival in f for f in failures), failures
+
+
+@pytest.mark.parametrize("sanctioned", tuple(sorted(RATIFIED_DIGEST_FIELDS)))
+def test_a_sanctioned_name_on_a_shape_off_the_advisory_alone_still_fails(graph,
+                                                                        sanctioned):
+    """The escape a globally applied exemption left open, pinned as a regression.
+
+    The shape hangs off ``ProposerAdvisory`` and is **not** reachable from
+    ``CandidateAdvisory``, so the candidate root cannot see it however it is walked. When
+    the exemption was applied by name over the whole graph, the advisory root exempted it
+    too and the field was reported by **neither** root — a second identity inside
+    ``P_unsigned``, which is exactly what D6 bars.
+
+    Scoping the exemption to the bearer is what closes it: the advisory may declare these
+    two names on itself, and nothing nested may declare them at all.
+    """
+    pydantic = pytest.importorskip("pydantic")
+
+    class Lineage(pydantic.BaseModel):
+        __annotations__ = {sanctioned: str}
+
+    class AdvisoryWithLineageShape(pydantic.BaseModel):
+        advisory_digest: str
+        parent_advisory_digest: str
+        candidate_set_id: str
+        candidates: tuple[graph["CandidateAdvisory"], ...]
+        lineage: Lineage
+
+    assert Lineage not in _reachable_models(graph["CandidateAdvisory"]), (
+        "precondition: the candidate root cannot reach this shape, so it cannot be the "
+        "thing that catches it")
+
+    failures = _root_failures("ProposerAdvisory", graph,
+                              model=AdvisoryWithLineageShape)
+    assert failures, (
+        f"a shape declaring {sanctioned!r} off the advisory escaped every root; the "
+        "exemption has been widened back to the whole reachable graph")
+    assert any(sanctioned in f and "Lineage" in f for f in failures), failures
+
+    # And the advisory's own two declarations are still lawful, so the fix is a scoping
+    # of the exemption rather than its removal.
+    assert not _root_failures("ProposerAdvisory", graph), (
+        "the ratified advisory declares both names on itself and must still pass")
 
 
 def test_the_identity_exemption_is_exactly_the_two_ratified_fields(graph):
@@ -928,7 +987,8 @@ def test_sabotaging_the_walker_makes_the_rival_mutant_escape(graph):
 
     assert _rival_identity_failures(Advisory), (
         "precondition: the real walker descends into the nested candidate")
-    shallow = lambda model: set(getattr(model, "model_fields", {}))
+    shallow = lambda model: {(model, name)
+                             for name in getattr(model, "model_fields", {})}
     assert not _rival_identity_failures(Advisory, walker=shallow), (
         "a non-descending walker must miss the nested rival, proving the descent is "
         "what catches it")

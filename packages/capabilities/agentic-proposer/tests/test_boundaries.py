@@ -471,23 +471,42 @@ def test_the_declared_dependency_roots_are_read_from_the_registry():
     assert "ugence_jcs" not in DEPENDENCY_BASELINE_MODULES
 
 
+def _baseline_pin_verdict(setup):
+    """The guard's own decision about one baseline setup, factored out.
+
+    Returns ``"pinned"`` when ``setup`` is byte-for-byte the single permitted setup, and
+    ``"unpinned"`` otherwise. It is a function rather than an inline equality for the
+    same reason ``_pattern_verdict`` and ``_completeness_verdict`` are functions in the
+    sibling guards: the control below must run **this** decision, not restate it. A
+    control that asserted ``widened != _EXPECTED_BASELINE_SETUP`` directly is only saying
+    that two different strings differ, which stays true after the live pin is deleted.
+    """
+    return "pinned" if setup == _EXPECTED_BASELINE_SETUP else "unpinned"
+
+
 def test_the_baseline_setup_is_pinned_by_equality():
     """G-6. The generated setup is exactly the one permitted setup, byte for byte, so a
     line added to it is a diff a reviewer sees rather than a silently wider exemption."""
-    assert _BASELINE_SETUP == _EXPECTED_BASELINE_SETUP
-    assert _baseline_setup(DEPENDENCY_BASELINE_MODULES) == _EXPECTED_BASELINE_SETUP
+    assert _baseline_pin_verdict(_BASELINE_SETUP) == "pinned"
+    assert _baseline_pin_verdict(_baseline_setup(DEPENDENCY_BASELINE_MODULES)) == "pinned"
 
 
 def test_a_widened_baseline_setup_fails():
     """G-6's control: a baseline carrying an added ``import socket`` must fail.
 
-    Both halves are asserted. The widened setup is not the pinned one, so the equality
-    check above rejects it; and it genuinely widens the module set it produces, so the
-    check is not merely cosmetic.
+    The widened setup goes through ``_baseline_pin_verdict`` — the function the live
+    assertion calls — and must come back ``"unpinned"``, with the ratified setup coming
+    back ``"pinned"`` through the same function so the control is discriminating rather
+    than merely negative. It also genuinely widens the declaration it produces, so the
+    check is not cosmetic.
     """
+    assert _baseline_pin_verdict(_BASELINE_SETUP) == "pinned", (
+        "precondition: the ratified setup is the pinned one")
+
     widened = _baseline_setup(DEPENDENCY_BASELINE_MODULES + ("socket",))
-    assert widened != _EXPECTED_BASELINE_SETUP, (
-        "an added import must not survive the pinned-setup check")
+    assert _baseline_pin_verdict(widened) == "unpinned", (
+        "an added import must not survive the pinned-setup check; the pin is not being "
+        "enforced")
     assert "import socket" in widened
     honest = _module_roots(_BASELINE_SETUP)
     assert "socket" in honest, (
