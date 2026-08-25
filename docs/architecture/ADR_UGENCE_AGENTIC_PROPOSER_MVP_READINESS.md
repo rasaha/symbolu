@@ -544,24 +544,26 @@ value it names as invalid.
 
 ## Open owner decisions
 
-`[R]` **Four remain open**, recorded here so this artifact does not report a clean
-record its own subordinate documents contradict. D6–D10 close every question this
-artifact previously carried as open, and O-1 – O-4 close the four the S1 enforcement
-audit raised; what follows was raised afterwards, by auditing those guards against
-representative contract shapes and by reconciling this artifact with
+`[R]` **Three remain open, and OD-4 is ratified**, recorded here so this artifact does
+not report a clean record its own subordinate documents contradict. D6–D10 close every
+question this artifact previously carried as open, and O-1 – O-4 close the four the S1
+enforcement audit raised; what follows was raised afterwards, by auditing those guards
+against representative contract shapes and by reconciling this artifact with
 `packages/capabilities/agentic-proposer/docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md`,
-where each is stated in full.
+where each is stated in full. OD-4 was the only one bearing on contract shape; it is
+resolved below and the specification implements the resolution.
 
 | Id | Question | Bears on contract shape |
 | --- | --- | --- |
 | **OD-1** | `primary_function` and `declared_strategy` are classified **C5c** human-readable free text rather than C5b canonical tokens, on the ground that neither is reachable from `P_unsigned`, so O-4's Unicode hazard does not reach them and the stricter class could only reject lawful values. Reclassifying either to C5b would be a narrowing. | no |
 | **OD-2** | `pydantic` loads `socket` while constructing a `BaseModel`, which `tests/test_boundaries.py` forbids as a whole-process assertion. Every S1 contract is a `BaseModel` and `pydantic>=2` is a ratified dependency, so the first contract module fails that guard for a reason unrelated to this package's authority. The narrowest resolution exempts exactly the transitive route while keeping the bar on any direct import. **Must be ruled on before S1 code lands.** | no |
 | **OD-3** | O-1's dependent-field set is matched by name alone, so `CandidateAdvisory.requested_review_action` — the candidate's own required, non-null routing — is caught as if it were selection-dependent. It must be scoped to its bearer contract. `DEPENDENT_FIELDS` is pinned by equality, so the scoping is a change to a pinned constant. | no |
-| **OD-4** | D7 above says `ProposerAdvisory` carries per-candidate `CandidateAdvisory` entries; the specification instead has it reference an `AdvisoryCandidateSet` by `candidate_set_id`. `[V]` The departure is **not** forced by the rival-identity walk, which bars only nested `ToolObservation` and reaches no field of `CandidateAdvisory`. Its cost is that an advisory digest covers the candidate set's identifier and not the candidates. **Yes — the two resolutions produce different contracts.** | **yes** |
+| **OD-4** — **RATIFIED 2026-08-25, resolved (a)** | D7 above says `ProposerAdvisory` carries per-candidate `CandidateAdvisory` entries; an earlier revision of the specification instead had it reference an `AdvisoryCandidateSet` by `candidate_set_id`. `[V]` That departure was **not** forced by the rival-identity walk, which bars only nested `ToolObservation` and reaches no field of `CandidateAdvisory`. **Resolution (a): restore the nesting D7 requires.** `ProposerAdvisory` carries an immutable `candidates` sequence of `CandidateAdvisory`, ordered ascending by `candidate_id`, participating in `P_unsigned`; `candidate_set_id` is retained as the reference to `AdvisoryCandidateSet`, which stays a **top-level contract** and is not nested; the two candidate lists must correspond exactly in membership, order and content, checked by the builder and by the independent replay verifier. `ToolObservation` stays referenced by id, which A3/the rival-identity walk does force. **Rejected alternative:** reference by id, ratified as an amendment narrowing D7 — rejected because it deviates from ratified text, leaves candidate dispositions, `is_eligible` Booleans and evidence references outside the advisory digest, and leaves an amended candidate set undetectable by replay. | **yes — resolved** |
 
 `[R]` OD-1 – OD-3 are proposed, with resolutions, on branch
 `claude/governance-refinements-o1-o4-k96vbz`. That branch is not merged, so they are
-open here.
+open here. None of the three changes a contract, a field type, a cardinality, a
+vocabulary or an equation term.
 
 `[R]` markers elsewhere above are implementation obligations that S1 must
 discharge — mechanical enforcement of D6's standing rule, D7's contract shape and
@@ -582,7 +584,9 @@ That branch is not merged, so the cross-references pointed at nothing and O-1 �
 cited throughout this artifact and its subordinate documents while being defined in none
 of them. The section is now carried **above, in this artifact**. A5–A8 below still do not
 restate it; they record only how the four bear on the contract specification, so each
-decision has one account and not two.
+decision has one account and not two. `[R]` Because that branch also carries a copy of
+*Ratified refinements (O-1 – O-4)*, the two copies will conflict when it merges: **the
+guard branch's copy is the one to drop**, this artifact's being the canonical record.
 
 ### Provenance
 
@@ -703,22 +707,29 @@ validation, ownership and canonical-identity participation; the frozen `P_unsign
 projection under an empty-`set_paths`, empty-`nfc_paths` profile; and every equation
 signature, including the independent verification function A1 requires.
 
-In that document `ProposerAdvisory` references its inputs by identifier and nests no
-other contract.
+In that document `ProposerAdvisory` **carries its `CandidateAdvisory` entries** and
+references every other input by identifier.
 
-`[V]` One half of that is forced: the merged rival-identity walk in
+`[V]` One half of that composition is forced: the merged rival-identity walk in
 `tests/test_advisory_contract_shape.py` reaches `content_hash` through a nested
 `ToolObservation` and fails, and `content_hash` is on that list precisely to prevent a
-second identity. So `ToolObservation` is referenced, not carried.
+second identity. So `ToolObservation` is referenced, not carried, and the specification
+records that as a standing prohibition with a test obligation.
 
-`[R]` The other half is **not** forced, and an earlier revision of this section said it
+`[V]` The other half is **not** forced, and an earlier revision of this section said it
 was. That walk matches `RIVAL_IDENTITY_FIELDS` by exact name, and no field of
 `CandidateAdvisory` is a member, so nesting `CandidateAdvisory` fails nothing. D7 above
-says `ProposerAdvisory` carries per-candidate `CandidateAdvisory` entries; the
-specification's reference-by-id shape departs from that. The departure is open as
-**OD-4** under *Open owner decisions*, and its cost — that an advisory digest binds the
-identifier of a candidate set rather than the candidates — is recorded as a residual
-limitation in that document.
+says `ProposerAdvisory` carries per-candidate `CandidateAdvisory` entries, and an earlier
+revision of the specification departed from that by referencing them through
+`candidate_set_id`. **OD-4 is now resolved (a)** under *Open owner decisions*: the
+nesting D7 requires is restored, the candidates participate in `P_unsigned`,
+`candidate_set_id` is retained as a reference to `AdvisoryCandidateSet` — which remains a
+top-level contract — and the two candidate lists must correspond in membership, order and
+content. `[R]` The rival-identity reachability analysis was re-run against the corrected
+object graph and no prohibited identity field becomes reachable; that run is `[R]` until
+a contract module exists. The residual limitation recorded in that document is now only
+that an advisory digest binds the *identifiers* of the inputs it still references — the
+observations and the governance artifacts — and not their bodies.
 
 It authorizes no invoice-domain check, no reason-code catalogue, no adapter, no LLM, no
 semantic auditor, no HTTP service, no authorization, no clearance and no execution.
@@ -752,12 +763,15 @@ documentation pull request is independently reviewed and merged.**
 A1–A8 close every question the contract specification's *equations, vocabularies and
 enforcement interpretation* depend on. They do not close everything.
 
-`[R]` **OD-1 – OD-4 are open**, and are recorded once, under *Open owner decisions*
-above. OD-4 is the one that bears on contract shape: whether `ProposerAdvisory` carries
-its `CandidateAdvisory` entries as D7 says, or references them by `candidate_set_id` as
-the specification does. Until it is ruled on, the specification's status is
-`RATIFIED FOR S1 IMPLEMENTATION, QUALIFIED BY OD-4` and no contract module may be
-written against the reference-by-id shape.
+`[R]` **OD-1 – OD-3 are open**, and are recorded once, under *Open owner decisions*
+above. None of the three bears on contract shape. **OD-4, the one that did, is ratified
+2026-08-25, resolved (a)**: `ProposerAdvisory` carries its `CandidateAdvisory` entries as
+D7 says, and reference-by-id is the rejected alternative. The specification's status is
+therefore `RATIFIED FOR S1 IMPLEMENTATION`, unqualified, and the bar on writing a
+contract module for want of a composition ruling is lifted. What still gates the first
+contract module is **OD-2**, which must be ruled on before S1 code lands, and A11:
+implementation remains unauthorized until this documentation is independently reviewed
+and merged.
 
 The `[R]` markers elsewhere in this artifact are implementation obligations for S1, not
 unratified decisions.

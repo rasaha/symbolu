@@ -1,6 +1,6 @@
 # S1 — canonical contract and equation specification
 
-**Status:** `RATIFIED FOR S1 IMPLEMENTATION, QUALIFIED BY OD-4`
+**Status:** `RATIFIED FOR S1 IMPLEMENTATION`
 **Ratified against:** the default branch at merge commit
 `e28538eb454fce6008e94e0772e0fd09c9c7ea7f` (PR #1474)
 **Package:** `ugence-agentic-proposer` (`packages/capabilities/agentic-proposer`)
@@ -25,10 +25,12 @@ belongs to:
 | J | Intentionally deferred future-stage behaviour |
 | K | Residual limitations that are not locally decidable |
 
-**OD-4 is open and bears on contract shape.** Whether `ProposerAdvisory` carries its
-`CandidateAdvisory` entries, as ratified D7 says, or references them by
-`candidate_set_id`, as Part D specifies, is unresolved. See A3, D9, K.1 and the closing
-section.
+**OD-4 is resolved.** Ratified 2026-08-25, resolution **(a)**: `ProposerAdvisory`
+carries its `CandidateAdvisory` entries, as ratified D7 says. The reference-by-id
+shape — the advisory carrying only `candidate_set_id`, with the candidates reachable
+solely through a separately transported `AdvisoryCandidateSet` — is the **rejected
+alternative**. Part D is written for the ratified nesting. See A3, D6, D7, D9, K.1 and
+the closing section.
 
 ---
 
@@ -97,7 +99,8 @@ substring, prefix or suffix rule.
 
 `[R]` Executed against a nested composition in which `ProposerAdvisory` carries
 `observations: tuple[ToolObservation, ...]`, the walker returned `['content_hash']`;
-executed against the reference-by-id composition specified in Part D, it returned `[]`.
+executed against the reference-by-id composition an earlier revision of Part D
+specified, it returned `[]`.
 Both runs were against shapes planted in `src/` on the guard branch, against a contract
 surface that does not exist on any merged branch. They are recorded here as claims to be
 re-verified when the first contract module lands, not as facts about this repository's
@@ -122,11 +125,29 @@ contract; that generalisation is withdrawn here.
 > The proposer's recommendation artifact is named **`ProposerAdvisory`**, carrying
 > per-candidate **`CandidateAdvisory`** entries.
 
-Part D's reference-by-id shape — `ProposerAdvisory` carrying `candidate_set_id` and the
-candidates living on a separately transported `AdvisoryCandidateSet` — is therefore a
-**departure from ratified D7**, not a consequence of this guard. `[R]` It is recorded,
-with its cost and with the alternative of restoring the nesting, as owner decision
-**OD-4** in the closing section. This document does not settle it.
+Part D therefore **carries the nesting**. The reference-by-id shape — `ProposerAdvisory`
+carrying `candidate_set_id` and the candidates living only on a separately transported
+`AdvisoryCandidateSet` — was a **departure from ratified D7**, not a consequence of this
+guard, and owner decision **OD-4** is resolved **(a)** in the closing section: the
+nesting is restored and reference-by-id is the rejected alternative. `candidate_set_id`
+remains, as the reference to the top-level `AdvisoryCandidateSet`, which stays a
+top-level contract and is not itself nested.
+
+**The corrected object graph, walked.** `[R]` Against the composition Part D now
+specifies — `ProposerAdvisory` carrying `candidates: tuple[CandidateAdvisory, ...]` and
+continuing to reference `ToolObservation` by id — the names nesting adds to
+`ProposerAdvisory`'s reachable set are exactly `candidate_id`, `disposition`,
+`requested_review_action`, `is_eligible`, `domain_check_completion`, `evaluated_at`,
+`claim_refs`, `observation_refs`, `assumptions` and `uncertainties`, and
+`reachable & RIVAL_IDENTITY_FIELDS` is **empty**. **No prohibited identity field becomes
+reachable.** `[V]` `test_identity_field_is_exactly_the_ratified_one` is parametrised over
+`ADVISORY_TYPES == ("ProposerAdvisory", "CandidateAdvisory")` and already asserts that
+intersection empty for each root **independently**, so nesting adds to
+`ProposerAdvisory`'s reachable set only names the merged guard already asserts clean —
+which is why the result follows from the merged guard rather than from a new argument.
+The corrected-graph run is nonetheless labelled `[R]`, per this document's evidence
+convention: it is a claim about a contract surface no merged branch carries, to be
+re-verified when the first contract module lands.
 
 ## A4 — The lifecycle-verb scan currently matches data names
 
@@ -234,6 +255,16 @@ outcomes S1 may emit are `NEED_EVIDENCE`, `ABSTAIN` and `ESCALATE`.
 This is fail-closed and intended. A stage that authorises no domain check must not be
 able to reach the proposer's strongest classification.
 
+**Nesting changes nothing here.** OD-4(a) puts the candidate entries inside
+`ProposerAdvisory` and inside `P_unsigned`. It supplies no `DomainCheckCompletion`
+producer, so C7 still makes `COMPLETE` unconstructible, `evaluate_readiness` is still
+`False` for every candidate S1 can construct, and neither a selection nor `PROPOSAL`
+becomes reachable in S1. Carrying a candidate is not selecting one. Under V13, S1 still
+requires `selected_candidate_id` and its three dependents — `recommended_disposition`,
+`requested_review_action`, `requested_review_destination_role_ref` — to be `None`, and
+the fail-closed ceiling on terminal outcomes remains exactly `NEED_EVIDENCE`, `ABSTAIN`
+and `ESCALATE`.
+
 ## B4 — Lifecycle vocabulary and lifecycle authority (O-2)
 
 `SUSPENDED`, `REVOKED`, `RoleActivationStatus`, `activation_status` and `expires_at`
@@ -264,8 +295,13 @@ nullable as a value, C5a-constrained when non-null, and **identity-participating
 Enforcement is at **two distinct levels**, specified as R-1a and R-1b and explained in
 E1: a local model validator that couples presence to presence and absence to absence,
 and a cross-contract obligation on the builder and the replay verifier that resolves
-the referenced `AdvisoryCandidateSet` and checks correspondence. The local validator
-does not, and cannot, establish the second.
+the referenced `AdvisoryCandidateSet` and checks correspondence against it. The local
+validator does not, and cannot, establish the second. `[I]` OD-4(a) makes the advisory
+carry its own nested candidates, so *some* of what R-1b once had to reach for — that the
+selector resolves to exactly one carried candidate, and that the two dependent values
+equal that candidate's — is now locally decidable; but the referenced
+`AdvisoryCandidateSet` is still a separate artifact, so correspondence **with it**
+remains cross-contract and R-1b does not collapse into R-1a.
 
 Under B3, S1 has no selected candidate, so in S1 all four are always `None`. The
 future-stage branch is preserved in the contract and is not reachable in S1.
@@ -599,6 +635,9 @@ validates it and never sets or changes it.
 
 ## D2 — `CognitiveRoleContract`
 
+**Cardinality: 10 fields** — the seven below plus the three C2 common fields (`schema_version`, `tenant_id`, `created_at`). Stated in D1's form so that I5's pinned registry can be checked
+for completeness by exact membership.
+
 D1 and D8: a proposer-local **v0** projection, never re-exported to any shared contract
 package, carrying no constitution-derived attribute, exposing no role lifecycle verb.
 
@@ -622,6 +661,9 @@ containing those substrings may be re-exported outside this package.
 
 ## D3 — `WorkMandate`
 
+**Cardinality: 9 fields** — the six below plus the three C2 common fields (`schema_version`, `tenant_id`, `created_at`). Stated in D1's form so that I5's pinned registry can be checked
+for completeness by exact membership.
+
 | Field | Type | Required | Nullable | Default | Cardinality | Vocabulary | Validation | Ownership | Identity |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `mandate_id` | `str` | yes | no | none | 1 | open | C5a | mandate issuer | no |
@@ -634,6 +676,9 @@ containing those substrings may be re-exported outside this package.
 `case_ref` is domain-neutral: it is neither named nor documented as invoice-specific.
 
 ## D4 — `BoundedContextEnvelope`
+
+**Cardinality: 9 fields** — the six below plus the three C2 common fields (`schema_version`, `tenant_id`, `created_at`). Stated in D1's form so that I5's pinned registry can be checked
+for completeness by exact membership.
 
 | Field | Type | Required | Nullable | Default | Cardinality | Vocabulary | Validation | Ownership | Identity |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -649,6 +694,9 @@ else with it. S1 does not compute it, does not recompute it and does not verify 
 against any content — doing so would require hashing locally, which D2 bars.
 
 ## D5 — `ToolObservation`
+
+**Cardinality: 12 fields** — the nine below plus the three C2 common fields (`schema_version`, `tenant_id`, `created_at`). Stated in D1's form so that I5's pinned registry can be checked
+for completeness by exact membership.
 
 | Field | Type | Required | Nullable | Default | Cardinality | Vocabulary | Validation | Ownership | Identity |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -670,26 +718,45 @@ this package constructs any `admission_status` other than `NOT_EVALUATED`.
 
 ## D6 — `AdvisoryCandidateSet`
 
-A top-level contract. Under the shape specified here it is **not** nested in
-`ProposerAdvisory`; the advisory references it by `candidate_set_id`. `[R]` That
-reference-by-id shape is a departure from ratified D7 and is open as **OD-4**; if OD-4
-resolves toward restoring the nesting, this contract becomes a nested public shape and
-`ProposerAdvisory.candidate_set_id` is replaced by the set itself.
+**Cardinality: 8 fields** — the five below plus the three C2 common fields (`schema_version`, `tenant_id`, `created_at`). Stated in D1's form so that I5's pinned registry can be checked
+for completeness by exact membership.
+
+A top-level contract, and OD-4(a) leaves it one. `AdvisoryCandidateSet` is **not**
+nested in `ProposerAdvisory` and is not demoted to a nested public shape: the advisory
+carries its own nested `candidates` sequence (D7) **and** retains `candidate_set_id` as
+the reference to this contract. The two must correspond exactly — membership, order and
+candidate content — which is R-1b.
 
 | Field | Type | Required | Nullable | Default | Cardinality | Vocabulary | Validation | Ownership | Identity |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `candidate_set_id` | `str` | yes | no | none | 1 | open | C5a | this package | no |
 | `case_ref` | `str` | yes | no | none | 1 | open | C5a | this package | no |
-| `candidates` | `list[CandidateAdvisory]` | yes | no | none | 1..n | — | **rejects an empty list**; `candidate_id` unique across the list; order preserved | this package | no |
+| `candidates` | `list[CandidateAdvisory]` | yes | no | none | 1..n | — | **rejects an empty list**; `candidate_id` unique across the list; **one ratified canonical order — ascending by `candidate_id`**; the builder **rejects** out-of-order caller input rather than silently reordering it | this package | no |
 | `selected_candidate_id` | `str \| None` | yes (explicit) | yes | `None` | 0..1 | open | C5a when non-null; S-1 and S-2 below | this package | no |
 | `selection_reason_codes` | `list[str]` | yes | no | `[]` | 0..n | — | **C5d** — rejects any non-empty value | this package | no |
 
 **Locally decidable selection invariants**, both decidable from this contract alone:
 
 * **S-1 — resolution.** If `selected_candidate_id` is not `None`, exactly one element of
-  `candidates` has that `candidate_id`.
+  `candidates` has that `candidate_id` — exactly one, never none and never two. Where
+  this set is the one a `ProposerAdvisory` references, the same selector must also
+  resolve to **exactly one** element of that advisory's own nested `candidates`
+  sequence, and the two resolved candidates must be the same candidate. The second half
+  is decidable only with both artifacts in hand and is therefore discharged under R-1b;
+  S-1 proper is the half decidable from this contract alone.
 * **S-2 — eligibility of the selection.** If `selected_candidate_id` is not `None`, the
   resolved candidate has `is_eligible is True`.
+
+**The ordering rule is `ProposerAdvisory.candidates`' rule, stated once.** Both
+sequences are ordered ascending by `candidate_id`, and neither builder reorders: an
+input in any other order is rejected. `[I]` This was previously "order preserved" here
+and would have been a second, weaker rule beside the nested sequence's. C6 makes list
+order identity-significant, and R-1b checks order equality between the nested sequence
+and this one, so two divergent ordering rules would let a caller produce a set and an
+advisory that are equal in membership and content yet fail correspondence — a
+correspondence failure caused by nothing but the ordering rules disagreeing. One rule on
+both sides removes that. Semantic ordering a producer wants happens before construction,
+never inside the identity function (C6).
 
 `selection_reason_codes` is C5d: it rejects any non-empty value, because the reason-code
 catalogue is out of scope at this stage and an unvalidated free-form code list would
@@ -703,6 +770,12 @@ D4 ratifies. Forcing selection would convert an abstention into a recommendation
 S-1 and S-2 are satisfied vacuously in S1 and become load-bearing at S2.
 
 ### `CandidateAdvisory` — nested public shape
+
+**Cardinality: 10 fields** — the ten below. It carries **no** C2 common field
+(`schema_version`, `tenant_id`, `created_at`), for the reason C2 gives: it is a nested
+public shape, not a ninth contract. Under OD-4(a) it is nested in **two** places — in
+`AdvisoryCandidateSet.candidates` and in `ProposerAdvisory.candidates` — with the same
+ten fields in both, and R-1b requires the two copies to be equal.
 
 | Field | Type | Required | Nullable | Default | Cardinality | Vocabulary | Validation | Ownership | Identity |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -729,6 +802,39 @@ content cannot do so without it. Storing it is forced by B2, not a convenience.
 `SemanticAuditorFindingStatus`, and none may be assigned one: D6's standing rule is
 enforced by `tests/test_no_auditor_status_projection.py`.
 
+#### What `CandidateAdvisory` may never carry — a standing prohibition
+
+**`CandidateAdvisory` must not carry `content_hash`, `advisory_digest`, or any other
+independently minted identity, and must not nest a `ToolObservation`.** The ten fields
+above are the whole of it, and each of the following is barred:
+
+* **`content_hash`, `advisory_digest`, `proposal_digest`, `advisory_id`, `id`, `uid`,
+  `uuid`, `identity`, `identifier`, `hash`, `checksum`** — every member of
+  `RIVAL_IDENTITY_FIELDS` (A3), by exact name.
+* **Any renamed equivalent** — a field of any name whose value is a digest, fingerprint
+  or hash of this candidate's content, or of anything else. D7 makes
+  `ProposerAdvisory.advisory_digest` the **sole** identity field; a per-candidate digest
+  would be a second identity inside the first, and now that the candidates are inside
+  `P_unsigned` it would be a second identity **covered by** the first, which is worse
+  than one standing beside it.
+* **A nested `ToolObservation`, at any depth.** `[V]` A3: `ToolObservation.content_hash`
+  is a rival identity name, and nesting the observation makes it reachable from
+  `ProposerAdvisory` through the candidate. Nesting `CandidateAdvisory` is lawful
+  **precisely because** none of its ten fields is a rival name; nesting an observation
+  inside it would reintroduce through the candidate exactly what A3 bars directly.
+
+Observation evidence stays **reference-by-id**, through `observation_refs`: each entry
+is a C5a reference to a `ToolObservation.observation_id` supplied to the builder, and
+R-7 requires every entry to resolve. That is the whole of the evidence link. The cost —
+that the advisory's digest covers the observation *references* and not the observation
+*bodies* — is real, is not closed by OD-4(a), and is recorded in K.1.
+
+**Test obligation.** This is not a remark. I7.11 carries it: a test must assert that
+`ToolObservation` is not reachable from either advisory type at any depth, and that no
+field of `CandidateAdvisory` is a member of `RIVAL_IDENTITY_FIELDS` or is otherwise
+digest-shaped under C6. A change that adds a per-candidate digest field, or that nests
+an observation, must fail that test rather than pass unexamined.
+
 ## D7 — `ProposerAdvisory`
 
 D7: kind `ugence.agentic_proposer.advisory.v0`; `advisory_digest` is the **sole**
@@ -737,16 +843,24 @@ identity field; identity is computed only through `ugence_jcs`; the eight barred
 `workflow_id`, `instance_id`, `task_id`) appear at no nesting depth; no exported name
 begins with `Proposal` or `Recommendation`.
 
-**This contract references its inputs by identifier.** It nests no other contract.
+**Cardinality: 23 fields** — the twenty below plus the three C2 common fields
+(`schema_version`, `tenant_id`, `created_at`). Stated in D1's form so that I5's pinned
+registry can be checked for completeness by exact membership. `[I]` The count is
+twenty-three and not twenty-two because OD-4(a) adds `candidates`; `candidate_set_id` is
+retained alongside it, not replaced by it.
 
-`[V]` A3 forces exactly one half of that: nesting `ToolObservation` makes `content_hash`
-reachable and fails the merged rival-identity walk. `[R]` The other half — that
-`CandidateAdvisory` is referenced through `candidate_set_id` rather than carried
-inline — is **not** forced by any guard, and it departs from ratified D7, which says
-`ProposerAdvisory` carries per-candidate `CandidateAdvisory` entries. It is open as
-**OD-4**. The field set below is written for the reference-by-id shape; restoring the
-nesting would replace `candidate_set_id` with the candidate entries and would change
-`P_unsigned` (G1), D9 and K.1 accordingly.
+**This contract carries its candidates and references every other input by identifier.**
+
+`[V]` A3 forces one half of that: nesting `ToolObservation` makes `content_hash`
+reachable and fails the merged rival-identity walk, so observations are referenced
+through `observation_refs` and never carried. The other half is now settled the other
+way: **OD-4 is resolved (a)**, and `ProposerAdvisory` carries per-candidate
+`CandidateAdvisory` entries as ratified D7 says. `[V]` No guard forced the reference-by-id
+shape — the rival-identity walk matches by exact name and reaches no field of
+`CandidateAdvisory` — so restoring the nesting removes a departure from ratified text
+without conceding a guard. The field set below is written for the nested shape;
+`candidate_set_id` remains as the reference to the top-level `AdvisoryCandidateSet`, and
+R-1b binds the nested sequence to that set's `candidates`.
 
 | Field | Type | Required | Nullable | Default | Cardinality | Vocabulary | Validation | Ownership | Identity |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -759,7 +873,8 @@ nesting would replace `candidate_set_id` with the candidate entries and would ch
 | `role_contract_id` | `str` | yes | no | none | 1 | open | C5a; references `CognitiveRoleContract.role_contract_id` | this package | yes |
 | `mandate_id` | `str` | yes | no | none | 1 | open | C5a; references `WorkMandate.mandate_id` | this package | yes |
 | `context_id` | `str` | yes | no | none | 1 | open | C5a; references `BoundedContextEnvelope.context_id` | this package | yes |
-| `candidate_set_id` | `str` | yes | no | none | 1 | open | C5a; references `AdvisoryCandidateSet.candidate_set_id` | this package | yes |
+| `candidate_set_id` | `str` | yes | no | none | 1 | open | C5a; references `AdvisoryCandidateSet.candidate_set_id`; **R-1b** — the referenced set's `candidates` must equal `candidates` below in membership, order and candidate content | this package | yes |
+| `candidates` | `tuple[CandidateAdvisory, ...]` | yes | no | none | 1..n | — | **rejects an empty sequence**; `candidate_id` unique across it; **one ratified canonical order — ascending by `candidate_id`**, the builder rejecting out-of-order caller input rather than silently reordering it; **R-1b** | this package | **yes** |
 | `selected_candidate_id` | `str \| None` | yes (explicit) | yes | `None` | 0..1 | open | C5a when non-null; **R-1a** (local), **R-1b** (cross-contract) | this package | yes |
 | `recommended_disposition` | `CandidateDisposition \| None` | yes (explicit) | yes | `None` | 0..1 | closed, D4 | R-1a, R-1b (B6) | this package | yes |
 | `requested_review_action` | `ReviewAction \| None` | yes (explicit) | yes | `None` | 0..1 | closed, B8 | R-1a, R-1b (B6) | this package | yes |
@@ -774,7 +889,16 @@ There is **no** `advisory_id`. D7 makes `advisory_digest` the only identity fiel
 second identifier would create a second, unverifiable identity. `[V]` A3: no field on
 this contract, and none reachable from `CandidateAdvisory`, is named `id`, `uid`,
 `uuid`, `identity`, `identifier`, `hash`, `checksum`, `content_hash`, `advisory_id` or
-`proposal_digest`.
+`proposal_digest`. That holds of the nested `candidates` sequence too, and the standing
+prohibition under D6 keeps it holding: no `CandidateAdvisory` field may be a rival
+identity name or a renamed digest, and no `ToolObservation` may be nested inside one.
+
+**`candidates` is an immutable deterministic sequence.** It is `tuple[...]`, not `list`,
+on a `frozen=True` model (C1): a stored advisory's candidate sequence cannot be mutated
+in place after the digest is computed. `[V]` A9: `tuple` and `list` both dump to a JSON
+array, so the choice of `tuple` changes no canonical byte and is a mutability statement,
+not an encoding one. Order is identity-significant under C6, and the ordering rule is
+the ratified ascending-`candidate_id` order stated once under D6.
 
 `requested_review_destination_role_ref` is an opaque role reference. It is deliberately
 not named `operation`, `fingerprint`, `provider_id`, `arguments`, `idempotency_key`,
@@ -789,6 +913,9 @@ keeps the advisory a statement of *what was found* and the record a statement of
 the run ended*.
 
 ## D8 — `ProposerProcessRecord`
+
+**Cardinality: 18 fields** — the fifteen below plus the three C2 common fields (`schema_version`, `tenant_id`, `created_at`). Stated in D1's form so that I5's pinned registry can be checked
+for completeness by exact membership.
 
 A non-identity-bearing audit record. It is **not** referenced by `ProposerAdvisory` and
 is not reachable from `P_unsigned`, so nothing in it can alter an advisory identity.
@@ -824,6 +951,9 @@ text check is the weaker of the two available assertions.
 
 ### `ProposerProcessStateTransition` — nested public shape
 
+**Cardinality: 2 fields** — the two below. It carries **no** C2 common field, for the
+reason C2 gives for `CandidateAdvisory`: it is a nested public shape, not a contract.
+
 | Field | Type | Required | Nullable | Default | Validation |
 | --- | --- | --- | --- | --- | --- |
 | `state` | `ProposerProcessState` | yes | no | none | enum membership |
@@ -831,24 +961,41 @@ text check is the weaker of the two available assertions.
 
 ## D9 — Identity scope, stated once
 
-`P_unsigned` covers `ProposerAdvisory` and nothing else. The other seven contracts and
-`CandidateAdvisory` are **inputs to** and **referents of** an advisory; they are not
-inside its identity.
+`P_unsigned` covers `ProposerAdvisory` **and everything reachable from it**, which under
+OD-4(a) means the advisory's own fields **plus every field of every `CandidateAdvisory`
+in its nested `candidates` sequence**. Nothing else. The seven other top-level
+contracts — `AgentIdentityRef`, `CognitiveRoleContract`, `WorkMandate`,
+`BoundedContextEnvelope`, `ToolObservation`, `AdvisoryCandidateSet` and
+`ProposerProcessRecord` — are **inputs to** and **referents of** an advisory; they are
+not inside its identity.
 
-`[I]` This has a real cost, stated plainly: an advisory's digest binds the *identifiers*
-of its inputs, not their *contents*. Two different `WorkMandate` bodies carrying the same
-`mandate_id` yield the same advisory digest.
+**What the candidates bring inside.** Each nested candidate's `candidate_id`,
+`disposition`, `requested_review_action`, `is_eligible`, `domain_check_completion`,
+`evaluated_at`, `claim_refs`, `observation_refs`, `assumptions` and `uncertainties` are
+covered by `advisory_digest`. Changing any one of them, or reordering the sequence
+(C6), changes the digest. Two advisories that recommend differently, or that rest on
+different eligibility Booleans or different evidence references, can no longer be
+byte-identical.
 
-`[V]` For `ToolObservation` the cost is forced: A3 bars nesting it, and an input-digest
-field would be a second identity, which D7 forbids.
+`[I]` The residual cost, stated plainly: for what is still referenced, an advisory's
+digest binds the *identifiers* of its inputs, not their *contents*. Two different
+`WorkMandate` bodies carrying the same `mandate_id` yield the same advisory digest, and
+the same holds of `context_id`, `role_contract_id`, `agent_id` and `candidate_set_id`.
 
-`[R]` For `CandidateAdvisory` the cost is **not** forced. A3 does not bar nesting it, and
-ratified D7 says it is carried. Excluding the candidate entries from `P_unsigned` is a
-consequence of **OD-4**, not of any guard: under the reference-by-id shape an advisory's
-digest does not cover the dispositions, eligibility Booleans or observation references of
-the candidates it was derived from, and two candidate sets sharing a `candidate_set_id`
-yield the same advisory digest. Restoring the nesting would bring all of that inside
-`P_unsigned` and would make R-1b locally decidable. Both are recorded in Part K.
+`[V]` For `ToolObservation` that cost is **forced**: A3 bars nesting it, and an
+input-digest field would be a second identity, which D7 forbids. It is not closed by
+OD-4(a) and it is not closeable here; it stays open in K.1.
+
+`[V]` For `CandidateAdvisory` it was **never** forced — A3 does not bar nesting it, and
+ratified D7 says it is carried — and OD-4(a) closes it. The candidate content is inside
+`P_unsigned`, and a `candidate_set_id` shared by two materially different sets no longer
+yields the same advisory: the advisory carries the candidates it was derived from, and
+they are in the digest.
+
+`[I]` R-1b does **not** collapse into R-1a as a result. The nested copy makes the
+selection correspondence locally decidable *within the advisory*; correspondence with
+the separately transported `AdvisoryCandidateSet` still requires that set in hand. See
+E1.
 
 ---
 
@@ -860,7 +1007,7 @@ also appear in Equation 1; they are listed here once as contract obligations.
 | Id | Rule | Prevents |
 | --- | --- | --- |
 | R-1a | **Selection binding — local (B6).** A `ProposerAdvisory` model validator enforces: if `selected_candidate_id is None`, then `recommended_disposition`, `requested_review_action` and `requested_review_destination_role_ref` are **all** `None`; if `selected_candidate_id is not None`, those three are **all** non-null. Decidable from this contract's own fields alone | a routing request standing next to no selection, and a selection with no routing — two failure modes that call for opposite responses |
-| R-1b | **Selection binding — cross-contract (B6).** `build_proposer_advisory` and the replay verifier resolve the referenced `AdvisoryCandidateSet` and enforce: `ProposerAdvisory.selected_candidate_id == AdvisoryCandidateSet.selected_candidate_id`; the selected id identifies **exactly one** candidate in that set; `recommended_disposition` equals that candidate's `disposition`; `requested_review_action` equals that candidate's `requested_review_action` and is a member of `CognitiveRoleContract.permitted_review_actions`; `requested_review_destination_role_ref` is consistent with that candidate's routing; and tenant, case and candidate-set references are continuous | an advisory whose routing contradicts, or invents, the candidate it claims to select |
+| R-1b | **Candidate and selection binding — cross-contract (B6, OD-4(a)).** `build_proposer_advisory` and `verify_advisory_selection` each resolve the referenced `AdvisoryCandidateSet` and enforce **correspondence of the candidates, not selector equality alone**: (i) `ProposerAdvisory.candidates` and `AdvisoryCandidateSet.candidates` are equal in **membership** — the same `candidate_id` set, no extra, no missing; (ii) equal in **order**, element by element, both being in the ratified ascending-`candidate_id` order (D6); (iii) equal in **candidate content** — for each position, all ten `CandidateAdvisory` fields compare equal, so a disposition, an `is_eligible` Boolean, an `observation_refs` list, an `evaluated_at` or a free-text entry that differs is a mismatch; (iv) `ProposerAdvisory.selected_candidate_id == AdvisoryCandidateSet.selected_candidate_id`; (v) when that selector is non-null it identifies **exactly one** element of `ProposerAdvisory.candidates` **and exactly one** element of `AdvisoryCandidateSet.candidates`, and those two are the same candidate; (vi) `recommended_disposition` equals the **selected nested candidate's** `disposition`; (vii) `requested_review_action` equals the **selected nested candidate's** `requested_review_action` and is a member of `CognitiveRoleContract.permitted_review_actions`; (viii) `requested_review_destination_role_ref` is consistent with that candidate's routing; and (ix) tenant, case and candidate-set references are continuous. A failure is a rejection: the builder raises, the verifier returns `False` | an advisory whose carried candidates differ from the set it names, and an advisory whose routing contradicts, or invents, the candidate it claims to select |
 | R-2 | **V13 (B3).** `terminal_outcome is TerminalOutcome.PROPOSAL` **if and only if** `selected_candidate_id is not None` **and** `evaluate_readiness(...) is True` for the resolved candidate, recomputed at construction | a "proposal" that proposes nothing, a selection presented as an abstention, and a proposal made without domain readiness |
 | R-3 | **Process ordering.** `state_transitions` is a subsequence of `RECEIVED → VALIDATED → OBSERVING → RECONCILING → EVALUATING → {PROPOSAL, NEED_EVIDENCE, ABSTAIN, ESCALATE}`: no backward transition, no repeat, at most one terminal state and only in final position, and `at` non-decreasing across the list | a fabricated or reordered process history, and — since no execution state exists in the enum — any representation of execution |
 | R-4 | `terminal_outcome` on the process record equals the terminal `ProposerProcessState` when one is present in `state_transitions` | a record whose narrative and outcome disagree |
@@ -890,19 +1037,50 @@ three dependents are *jointly present or jointly absent*.
 > appear in S1 documentation, tests or commit messages.
 
 **R-1b is cross-contract and behavioural.** It is discharged by
-`build_proposer_advisory` at construction and **independently re-established** by the
-replay verifier, each of which is given the `AdvisoryCandidateSet`, the
+`build_proposer_advisory` at construction and **independently re-established** by
+`verify_advisory_selection`, each of which is given the `AdvisoryCandidateSet`, the
 `CognitiveRoleContract` and the observations, and each of which resolves the selection
 and checks correspondence itself. This mirrors B2 exactly: construction is
 defence-in-depth, and independent replay is the guarantee.
 
+`[I]` **R-1b survives OD-4(a), and grows.** Under the nested shape the advisory carries
+its own candidates, so R-1b is no longer only about a selector: it is a **correspondence
+check between two copies of the same candidate list**, one inside the advisory's digest
+and one on the separately transported set, checked for equal membership, equal order and
+equal candidate content, not selector equality alone. It cannot fold into R-1a, because
+R-1a still holds only the advisory.
+
+**What happens if the referenced set is later amended.** This is the case R-1b is for,
+and the answer is that **replay fails rather than silently re-resolving**:
+
+* The stored advisory's `advisory_digest` covers its **own nested copy** of the
+  candidates (D9, G1). Amending the `AdvisoryCandidateSet` behind `candidate_set_id`
+  changes nothing about the stored advisory and cannot change its digest.
+  `verify_advisory_identity` therefore still returns `True` — correctly, because the
+  bytes that were signed are unaltered.
+* `verify_advisory_selection`, given the amended set, finds the two candidate lists
+  unequal in membership, order or content, and returns **`False`**. A caller acting on
+  the advisory's routing must call both functions (H1); the amendment surfaces as a
+  correspondence failure, not as a quietly different answer.
+* There is no re-resolution path. Nothing reads the amended set and substitutes its
+  candidates for the stored ones: the advisory's candidates are the advisory's, fixed at
+  construction and immutable (`frozen=True`, `tuple`). An amended set makes replay fail
+  **loudly**; it never re-derives the recommendation.
+* `[I]` This is a strengthening, not a new obligation on storage. Under the rejected
+  reference-by-id shape an amended set would have produced a digest-valid advisory whose
+  candidates could not be checked at all, which is why K.1 previously made whatever
+  stores advisories responsible for the immutability of what `candidate_set_id` resolves
+  to. That responsibility is now discharged by the contract for candidates. It still
+  stands for every input that remains referenced by identifier.
+
 `[I]` The mirrored `selected_candidate_id` on `ProposerAdvisory` exists to make R-1a
-decidable at all. Under the reference-by-id shape A3 forces, the advisory would
-otherwise carry three selection-dependent fields and no selector, so the coupling could
-not be checked on the advisory in isolation and would be enforceable only by a builder
-a consumer has no way to audit. Because it is identity-participating, a stored advisory
-also carries the selection it claims into its digest, so replay can detect a selector
-altered after signing.
+decidable at all: without it the advisory would carry three selection-dependent fields
+and no selector, so the coupling could not be checked on the advisory in isolation and
+would be enforceable only by a builder a consumer has no way to audit. That reasoning is
+independent of OD-4 and is unaffected by its resolution — it was never a consequence of
+A3, which forces only that `ToolObservation` is not nested. Because the field is
+identity-participating, a stored advisory also carries the selection it claims into its
+digest, so replay can detect a selector altered after signing.
 
 **Under V13 (B3), S1 sets `selected_candidate_id` and all three dependents to `None`.**
 The non-null branch is specified so that it is a behaviour change at S2 rather than a
@@ -1047,6 +1225,17 @@ advisory.model_dump(
 
 under the C6 profile. `[V]` A9 confirms this excludes only the top-level field and
 retains `parent_advisory_digest: null`.
+
+**The nested candidates are inside it.** Under OD-4(a) `ProposerAdvisory.candidates` is
+a field of the advisory, so `model_dump(mode="json")` renders the whole sequence and
+every field of every `CandidateAdvisory` in it into `P_unsigned`. `[V]` A9:
+`exclude={"advisory_digest"}` removes only the **top-level** field, which is exactly
+what is wanted here — no candidate carries a field of that name (D6's standing
+prohibition), so there is nothing nested for the exclusion to have to reach, and the
+prohibition is what keeps that true. `[V]` A9: a `tuple` dumps to a JSON array, so the
+sequence canonicalises as an array whose order is identity-significant under C6, and the
+ratified ascending-`candidate_id` order is what makes that order reproducible by an
+independent verifier rather than an artifact of caller input.
 
 ## G2 — The only permitted construction shape
 
@@ -1260,11 +1449,23 @@ Notes that are part of the ratified behaviour:
 
 * `build_candidate_advisory` takes no `is_eligible` and no `domain_check_completion`.
   It computes the first and leaves the second at its `NOT_EVALUATED` default.
+* `build_proposer_advisory` and `build_advisory_revision` **derive** the nested
+  `candidates` sequence from the supplied `AdvisoryCandidateSet` under R-1b rather than
+  accepting it, **on the same terms as the four selection fields**. Neither builder takes
+  a `candidates` parameter: the sequence is constructed from `candidate_set.candidates`,
+  placed in the ratified ascending-`candidate_id` order, and checked for equal
+  membership, order and content against the set it came from, so the carried copy and
+  the referenced set cannot disagree at construction. A caller-supplied sequence is not
+  accepted, and out-of-order input to `build_advisory_candidate_set` is rejected there
+  rather than reordered here.
 * `build_proposer_advisory` **derives** `selected_candidate_id`,
   `recommended_disposition`, `requested_review_action` and
   `requested_review_destination_role_ref` from the candidate set under R-1b rather than
   accepting them, so the two cannot disagree. It resolves the set, checks
-  correspondence, and rejects a mismatch. Under B3 it derives `None` for all four in S1.
+  correspondence, and rejects a mismatch. When the selector is non-null it must resolve
+  to exactly one nested candidate and exactly one candidate in the referenced set, and
+  the two dependent values must equal that **nested** candidate's `disposition` and
+  `requested_review_action`. Under B3 it derives `None` for all four in S1.
   It calls `verify_candidate_eligibility` and raises `EligibilityMismatchError` before
   constructing if any candidate's stored `is_eligible` differs from the recomputation.
   R-1a is additionally enforced by the model validator on every construction path,
@@ -1504,6 +1705,11 @@ stated cardinality of 8 is what makes that entry checkable for completeness.
   must fail (C5d);
 * `AgentIdentityRef.lifecycle_state` present in the registry as a closed enum, and a
   mutant retyping it to a bare `str` failing rather than passing unclassified;
+* `ProposerAdvisory.candidates` present in the registry as a **non-`str`, non-enum
+  structured field** carrying a sequence of `CandidateAdvisory`, on the same reasoning
+  that puts `AgentIdentityRef.lifecycle_state` there: a registry populated only from
+  `str`-annotated fields could not report its absence, and it is the field OD-4(a) added,
+  so it is exactly the field a stale registry would miss;
 * a field added to `src` but missing from the registry failing loudly, and a registry
   entry naming a field `src` does not declare failing loudly.
 
@@ -1521,9 +1727,14 @@ introduces the first contract, to the full H3 surface, and not before.
    and exact digests, asserting the C6 profile, the C4 `Z` serialisation at microsecond
    precision, the `exclude_none=False` retention of `parent_advisory_digest: null`, and
    the G2 payload/advisory projection equivalence.
-2. **List-order significance** — reordering `candidates`, `observation_refs`,
-   `claim_summaries`, `uncertainties`, `permitted_tool_scopes` or `allowed_record_refs`
-   changes the digest where the field is identity-participating.
+2. **List-order significance** — reordering `ProposerAdvisory.candidates`, a nested
+   candidate's `observation_refs`, `claim_refs`, `assumptions` or `uncertainties`, or the
+   advisory's own `observation_refs`, `claim_summaries` or `uncertainties`, changes the
+   digest; reordering `permitted_tool_scopes` or `allowed_record_refs` does not, those
+   fields not being identity-participating. The test must distinguish the two rather than
+   assert one rule over the whole set. Separately, a `ProposerAdvisory.candidates` or
+   `AdvisoryCandidateSet.candidates` supplied in any order other than ascending
+   `candidate_id` must be **rejected** by its builder, not reordered into place (D6).
 3. **No bare number** — canonicalising `P_unsigned` over the corpus raises no
    `BareNumberError`, and no `src` model declares a numeric field or an `Any`-valued
    container.
@@ -1547,12 +1758,30 @@ introduces the first contract, to the full H3 surface, and not before.
 10. **Installed distribution** — `ugence-jcs` resolves as an installed distribution at
     or above `0.2.0` and exposes `canonical_sha256_hex`, superseding the
     `pyproject.toml` text check `S1_ENFORCEMENT.md` records as the weaker assertion.
-11. **Rival-identity reachability** — an explicit test that `content_hash` is not
-    reachable from either advisory type, so a future change that re-nests
-    `ToolObservation` fails loudly at the design boundary rather than deep in a guard.
-    The test must assert `ToolObservation` specifically and must **not** be written so
-    that it also bars nesting `CandidateAdvisory`, which no rival name reaches (A3) and
-    which ratified D7 places inside the advisory (OD-4).
+11. **Rival-identity reachability, and the composition it pins** — an explicit test
+    that asserts **both halves** of the ratified composition, so that a future change in
+    either direction fails loudly at the design boundary rather than deep in a guard.
+
+    * It **must bar a nested `ToolObservation`**: `content_hash` must not be reachable
+      from either advisory type at any depth, and `ToolObservation` must not appear in
+      either type's reachable model set. `[V]` A3 forces this half. A change that
+      re-nests the observation must fail here.
+    * It **must require a nested `CandidateAdvisory`**: `ProposerAdvisory.candidates`
+      must be declared, must be a sequence of `CandidateAdvisory`, and
+      `CandidateAdvisory` must appear in `ProposerAdvisory`'s reachable model set. This
+      is the ratified D7 composition (OD-4(a)), so **a future change back to
+      reference-by-id must fail this test**, not pass it. An earlier statement of this
+      obligation said only that the test must not be written so as to bar the nesting;
+      that is too weak — a test that merely permits the nesting leaves the ratified shape
+      unpinned, and the departure OD-4 recorded could recur without any guard noticing.
+    * It **must bar a second identity on the candidate** (D6's standing prohibition): no
+      field of `CandidateAdvisory` may be a member of `RIVAL_IDENTITY_FIELDS`, and none
+      may be digest-shaped under C6. A mutant adding a per-candidate `content_hash`,
+      `advisory_digest` or renamed digest field must fail.
+    * `[R]` The corrected-graph walk recorded in A3 — nesting `CandidateAdvisory` adds
+      only names the merged guard already asserts clean, and
+      `reachable & RIVAL_IDENTITY_FIELDS` stays empty — is what this test re-establishes
+      against a real contract module. It is `[R]` until that module exists.
 12. **Constrained-`str` declaration form (C8)** — a mutation test asserting that
     `advisory_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")` is reported as an
     unpermitted identity source by
@@ -1598,17 +1827,49 @@ Each item below is deliberately absent and is not a gap.
 These are known and **not locally decidable**. They are recorded so that no reader
 mistakes their absence for coverage.
 
-1. **Identity binds identifiers, not input contents (D9).** An advisory digest covers
-   the `mandate_id`, `context_id`, `role_contract_id`, `agent_id` and `candidate_set_id`
-   it references, not the bodies behind them. Two different mandates sharing an id yield
-   the same advisory digest. `[V]` For `ToolObservation` this is forced: closing it needs
-   either nesting, which the merged rival-identity walk forbids, or an input-digest
-   field, which D7 forbids. `[R]` For `CandidateAdvisory` it is **not** forced — it
-   follows from the reference-by-id shape that **OD-4** leaves open — so under the
-   current shape the candidate dispositions, eligibility Booleans and observation
-   references behind `candidate_set_id` are outside the digest. Whatever stores
-   advisories is responsible for the immutability of what those identifiers resolve to
-   until OD-4 is resolved.
+1. **Identity binds referenced identifiers, not referenced contents (D9) — narrowed by
+   OD-4(a), and not closed.**
+
+   **The candidate-content limitation is closed.** OD-4(a) puts the
+   `CandidateAdvisory` entries inside `ProposerAdvisory` and therefore inside
+   `P_unsigned`, so an advisory's digest now covers the dispositions, `is_eligible`
+   Booleans, `observation_refs`, `evaluated_at` values, `claim_refs`, assumptions and
+   uncertainties of the candidates it was derived from, and covers their order. Two
+   materially different candidate sets sharing a `candidate_set_id` no longer produce
+   byte-identical advisories, and an amended set makes replay fail rather than
+   silently re-resolve (E1). What was recorded here as the cost of the reference-by-id
+   shape is no longer a limitation of this specification.
+
+   **The residue is open, and is the whole of what remains.** An advisory digest still
+   covers the *identifiers* of everything the advisory does not carry, not the bodies
+   behind them:
+
+   * **Externally referenced observations.** `observation_refs` entries are
+     `ToolObservation.observation_id` values; the observation bodies are outside the
+     digest. `[V]` This is **forced**: A3 bars nesting `ToolObservation` because
+     `content_hash` is a rival identity name, and an input-digest field on the advisory
+     would be a second identity, which D7 forbids. It is not closeable here. Each
+     observation carries its own `content_hash`, minted and verified by the observation
+     producer under D5, and that separately verified identity — not this advisory's
+     digest — is what binds an observation's content.
+   * **Governance artifacts referenced by identifier** — `mandate_id`, `context_id`,
+     `role_contract_id` and `agent_id`. Two different `WorkMandate` bodies sharing a
+     `mandate_id` yield the same advisory digest, and likewise for the envelope, the
+     role contract and the agent identity reference. Each of those artifacts is minted
+     and verified by its own issuer under its own identity and replay checks (D1–D4);
+     this package validates the reference and asserts nothing about the body.
+   * **`candidate_set_id`.** The reference to the top-level `AdvisoryCandidateSet`
+     remains by identifier. `[I]` The set's *candidates*, however, are pinned: R-1b
+     requires the referenced set's `candidates` to equal the advisory's nested copy in
+     membership, order and content, and the nested copy is in the digest. So an amended
+     set is detected; what is not covered is the set's own C2 fields and
+     `selection_reason_codes`, which are C5d-empty in S1.
+
+   **Whatever stores advisories remains responsible** for the immutability of what those
+   remaining identifiers resolve to, and for running each referent's own verification.
+   That responsibility no longer extends to the candidates. **This residue stays open**;
+   nothing in OD-4(a) closes it, and closing it would require either a nesting A3 forbids
+   or an input-digest field D7 forbids.
 2. **Lineage cycles beyond the immediate self-parent.** L-1 rejects only
    `parent_advisory_digest == advisory_digest`. Longer cycles are not decidable here:
    this package holds one advisory, not the chain. Parent existence, parent tenant and
@@ -1633,12 +1894,12 @@ mistakes their absence for coverage.
 
 ---
 
-## Outstanding owner decisions
+## Owner decisions
 
-Four items remain for the owner. **OD-1 to OD-3 change no contract, field type,
-cardinality, vocabulary or equation term**; all three are about guards and dependencies.
-**OD-4 does change contract shape**, and it is the reason this document's status is
-qualified in the ratification statement below.
+**Three remain open. OD-4 is resolved.** OD-1 to OD-3 change no contract, field type,
+cardinality, vocabulary or equation term; all three are about guards and dependencies.
+OD-4 did change contract shape, and its resolution is recorded below and implemented
+throughout Part D.
 
 **OD-1 — `primary_function` and `declared_strategy` are classified C5c.** Both are
 described as opaque and compared for equality only, which is the C5b shape. They are
@@ -1663,67 +1924,67 @@ up a real boundary. **This must be ruled on before S1 code lands.**
 `DEPENDENT_FIELDS` is pinned by equality, so scoping it to `ProposerAdvisory` is a
 change to a pinned constant and should be ratified rather than adjusted in passing.
 
-**`[R]` OD-4 — `ProposerAdvisory` references its candidates by id, and ratified D7 says
-it carries them.** This is the one open decision that changes contract shape.
+**OD-4 — `ProposerAdvisory` carries its `CandidateAdvisory` entries. RATIFIED,
+resolved (a), 2026-08-25.**
 
-`[V]` Ratified D7, at
-`docs/architecture/ADR_UGENCE_AGENTIC_PROPOSER_MVP_READINESS.md:333-334`, reads:
+**Resolution.** `ProposerAdvisory` carries per-candidate `CandidateAdvisory` entries in
+an immutable `candidates` sequence, as ratified D7 states. The nesting is restored;
+`candidate_set_id` is retained as the reference to the top-level `AdvisoryCandidateSet`,
+which stays a top-level contract. This is no longer a question and is not reopened by
+this document.
+
+`[V]` The ratified text it restores, at
+`docs/architecture/ADR_UGENCE_AGENTIC_PROPOSER_MVP_READINESS.md:333-334`:
 
 > The proposer's recommendation artifact is named **`ProposerAdvisory`**, carrying
 > per-candidate **`CandidateAdvisory`** entries.
 
-Part D specifies the opposite: `ProposerAdvisory` carries `candidate_set_id`, and the
-candidates live on a separately transported `AdvisoryCandidateSet`.
+**Rejected alternative: reference by id.** `ProposerAdvisory` carrying only
+`candidate_set_id`, with the candidates reachable solely through a separately
+transported `AdvisoryCandidateSet`, and ratified as an amendment narrowing D7. It is
+rejected. What it offered was one real thing — an advisory that references every input
+uniformly by identifier has one composition rule rather than two, so no reviewer has to
+ask why `CandidateAdvisory` is inside the digest and `ToolObservation` is not. `[I]` That
+is a consistency argument, not a constraint, and it does not outrank ratified D7. What it
+cost was three things, each now avoided:
 
-`[V]` **This departure is not forced by any merged guard.** A3 forces only that
-`ToolObservation` is not nested, because `content_hash` is a rival identity name. No
-field of `CandidateAdvisory` is in `RIVAL_IDENTITY_FIELDS`, and that set is matched by
-exact name, so nesting `CandidateAdvisory` fails nothing. Any earlier statement in this
-document that the reference-by-id shape was *forced* was an over-generalisation of A3 and
-is withdrawn.
+* **Identity coverage.** `P_unsigned` would have covered `candidate_set_id` and not the
+  candidates, so an advisory's digest would have said nothing about the dispositions,
+  `is_eligible` Booleans, `observation_refs`, assumptions or uncertainties it was derived
+  from, and two materially different candidate sets sharing an id would have produced
+  byte-identical advisories. Under (a) that content is in the digest (D9, G1, K.1).
+* **A validation split with no way to close it.** R-1a and R-1b would have been split
+  because a model validator holds an identifier and not the set, and an amended set
+  would have left a digest-valid advisory whose candidates could not be checked at all.
+  Under (a) the advisory carries its own copy, R-1b checks the two for equality of
+  membership, order and content, and an amendment makes replay fail rather than
+  silently re-resolve (E1).
+* **Deviation from a ratified decision.** D7 is ratified text; specifying against it,
+  however defensibly, is what this repository's evidence rules require be recorded as an
+  owner decision rather than absorbed. (a) removes the deviation.
 
-**The cost of the departure, stated plainly.**
+**What (a) does not do.**
 
-* **Identity coverage.** Under reference-by-id, `P_unsigned` covers `candidate_set_id`
-  and not the candidates. An advisory's digest therefore says nothing about the
-  dispositions, `is_eligible` Booleans, `observation_refs`, assumptions or uncertainties
-  it was derived from. Two materially different candidate sets sharing a
-  `candidate_set_id` produce byte-identical advisories. This is K.1, and under a nested
-  shape it would not exist.
-* **A validation split that would otherwise be unnecessary.** R-1a and R-1b, and the
-  whole of E1, exist because a model validator holds an identifier and not the set. Under
-  a nested shape the selection correspondence — selected id resolves to exactly one
-  carried candidate, and the three dependent values equal that candidate's — is
-  **locally decidable**, R-1b collapses into R-1a, and the mirrored
-  `selected_candidate_id` added for decidability is no longer load-bearing for that
-  purpose.
-* **A second transported artifact.** `AdvisoryCandidateSet` is a top-level contract only
-  because the advisory does not carry the candidates. Under a nested shape it is a nested
-  public shape or disappears, and H3's contract count drops from eight to seven.
-* **Deviation from a ratified decision.** D7 is ratified text. Specifying against it,
-  however defensibly, is precisely what this repository's evidence rules require be
-  recorded as an owner decision rather than absorbed.
+* It does **not** bar `ToolObservation` from being nested any less firmly. `[V]` A3
+  forces that bar, and observation evidence stays reference-by-id through
+  `observation_refs` (D6's standing prohibition, K.1).
+* It does **not** demote `AdvisoryCandidateSet`. That contract stays top-level, H3's
+  contract count stays at eight, and the nested-public-model count stays at two.
+* It does **not** collapse R-1b into R-1a. The referenced set is still a separate
+  artifact (E1, D9).
+* It does **not** make selection or `PROPOSAL` reachable in S1. C7 still makes
+  `DomainCheckCompletion.COMPLETE` unconstructible, so under V13 (B3)
+  `selected_candidate_id` and its three dependents are `None` on every advisory S1 can
+  construct, and the fail-closed ceiling remains `NEED_EVIDENCE`, `ABSTAIN`, `ESCALATE`.
+* `[R]` It does **not** trip the rival-identity walk. The corrected object graph was
+  re-analysed and `reachable & RIVAL_IDENTITY_FIELDS` is empty for both roots; the
+  analysis is recorded in A3 and stays `[R]` until the contract module exists.
 
-**What the departure buys.** One thing, and it is real: an advisory that references its
-inputs uniformly by identifier has one composition rule rather than two, so no future
-reviewer has to ask why `CandidateAdvisory` is inside the digest and `ToolObservation` is
-not. `[I]` That is a consistency argument, not a constraint, and it does not outrank
-ratified D7 on its own.
-
-**The two resolutions.**
-
-1. **Restore the nesting**, as D7 says. `ProposerAdvisory` carries the candidate entries;
-   `candidate_set_id` is dropped or demoted to a provenance reference; `P_unsigned` (G1)
-   widens to cover the candidates; D9's identity scope and K.1's limitation are rewritten
-   to cover only the remaining by-identifier inputs; R-1b folds into R-1a; H3 is
-   recounted. `ToolObservation` stays referenced by id, because A3 does force that.
-2. **Keep reference-by-id**, and ratify it as an amendment narrowing D7, with K.1 and
-   this section standing as the recorded cost.
-
-**Until this is decided, Part D's shape is provisional.** It is written for resolution 2
-because that is what the previous revision of this document specified, and rewriting it
-for resolution 1 before the owner rules would substitute one unratified shape for
-another.
+**Where it is implemented in this document.** The intro note; A3 (conclusion and the
+corrected-graph walk); B3 and B6; D6 (`AdvisoryCandidateSet` stays top-level, the
+ascending-`candidate_id` ordering rule, S-1, and `CandidateAdvisory`'s standing
+prohibition); D7 (the `candidates` field, cardinality 23); D9; R-1b and E1; G1; H1;
+I5; I7.11; K.1.
 
 ---
 
@@ -1734,21 +1995,22 @@ and this document contains no placeholder: every field carries a type, a require
 nullability, a default, a cardinality, a vocabulary, a classification and an identity
 participation.
 
-**One question remains open, and it bears on contract shape: OD-4.** Whether
-`ProposerAdvisory` carries its `CandidateAdvisory` entries, as ratified D7 says, or
-references them through `candidate_set_id`, as Part D specifies, is an owner decision
-that this document raises rather than settles. Everything in Part D other than that
-composition is unaffected by it.
+**OD-4 is resolved (a)**, and with it the one open question that bore on contract shape.
+`ProposerAdvisory` carries its `CandidateAdvisory` entries, as ratified D7 says; Part D
+is written for that shape and no longer for an alternative. The status line at the head
+of this document therefore reads `RATIFIED FOR S1 IMPLEMENTATION`, unqualified.
 
-The status line at the head of this document reads `RATIFIED FOR S1 IMPLEMENTATION`
-because it was ratified against the previous revision. **That status is now qualified**:
-this document is ratified for S1 implementation subject to
+**OD-1, OD-2 and OD-3 remain open.** None of them changes a contract, a field type, a
+cardinality, a vocabulary or an equation term; all three are about guards and
+dependencies. The document remains ratified for S1 implementation subject to
 
 * the implementation obligations in Part I, which S1 must discharge in the same change
-  that introduces the surface they govern;
-* OD-2 being ruled on before the first contract module lands; and
-* **OD-4 being ruled on before `ProposerAdvisory` is implemented**, because the two
-  resolutions produce different contracts.
+  that introduces the surface they govern; and
+* **OD-2 being ruled on before the first contract module lands**, because `pydantic`
+  loads `socket` and `tests/test_boundaries.py` forbids it, which is unrelated to any
+  contract shape here.
 
-`[R]` No contract module may be written against the reference-by-id shape until OD-4 is
-resolved.
+There is no longer any gate on writing a contract module for want of a composition
+ruling: the composition is ratified. What remains unauthorized is implementation itself,
+which stays so until this documentation change is independently reviewed and merged
+(I8, A11).

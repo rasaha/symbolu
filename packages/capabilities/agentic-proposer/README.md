@@ -44,7 +44,9 @@ recorded literally in
 — every contract, every field, the frozen `P_unsigned` projection and every equation
 signature. Specification is not authorization: no contract module exists in `src/`, the
 version is unchanged, and implementation stays unauthorized until that document is
-independently reviewed and merged. Its status is qualified by open owner decision OD-4.
+independently reviewed and merged. Owner decision OD-4 — whether the advisory carries
+its per-candidate entries or references them by id — is ratified, resolved by restoring
+the nesting ratified D7 requires, and that document's status is unqualified.
 See also [`docs/S1_ENFORCEMENT.md`](docs/S1_ENFORCEMENT.md).
 
 ```python
