@@ -346,7 +346,16 @@ class PolicyTargetBindingReference:
         )
         for name in ("max_permitted_magnitude", "max_permitted_delta"):
             value = getattr(self, name)
-            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            # Exact, not ``isinstance``, and for the same reason as ``verified.py:339``.
+            # These two ceilings are the only bound the builder enforces the request
+            # against: ``candidate.py:620`` compares them with ``!=`` and
+            # ``candidate.py:678`` with ``>``, and ``>`` hands the *subclass* operand
+            # priority through its reflected ``__lt__``. An ``int`` subclass lying in
+            # both admits a magnitude the signed binding caps far lower, with
+            # ``binding_digest`` unmoved, because the canonical payload renders the
+            # subclass to the honest number. The type is the only place the difference
+            # survives. ``bool`` needs no separate clause: it is not ``int`` exactly.
+            if type(value) is not int or value < 0:
                 raise PolicyTargetBindingError(
                     f"{name} must be an int >= 0 (got {value!r})",
                     _Reason.MALFORMED_CANONICAL_FIELD,

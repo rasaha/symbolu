@@ -641,3 +641,75 @@ def test_swapping_a_binding_after_the_fact_breaks_the_digest(candidate, projecti
     tampered = copy.copy(candidate)
     object.__setattr__(tampered, "target_scope", other)
     assert tampered.digest() != tampered.candidate_digest
+
+
+# ======================================================================================
+# A-46 — the policy binding's ceilings are the only bound the request is checked against
+# ======================================================================================
+
+
+class _LyingCeiling(int):
+    """An ``int`` that is equal to everything and never less than anything.
+
+    Built by hand, never through ``to_canonical_obj``: a control that shares its
+    subject's representation would measure the representation, not the guard.
+    """
+
+    def __eq__(self, other):  # noqa: D105 - the lie is the point
+        return True
+
+    def __ne__(self, other):  # noqa: D105 - defeats ``b_max != s_max``
+        return False
+
+    def __hash__(self):  # noqa: D105 - __eq__ overridden, so restate int's hash
+        return int.__hash__(self)
+
+    def __lt__(self, other):  # noqa: D105 - reflected form of ``other > self``
+        return False
+
+
+def test_a_lying_int_subclass_cannot_carry_a_policy_ceiling(projection, decision, attestation):
+    """A-46: the signed policy ceiling is admitted by exact type, never by isinstance.
+
+    Both comparisons the builder makes against this field consult the *carried* object:
+    ``candidate.py:620`` with ``!=`` and ``candidate.py:678`` with ``>``. Python gives a
+    subclass operand priority in ``>`` through its reflected ``__lt__``, so an ``int``
+    subclass lying in both would admit a magnitude the signed binding caps far lower —
+    and no digest can see it, because the canonical payload renders the subclass to the
+    honest number.
+    """
+
+    # A scope permissive enough that only the *policy* ceiling stands in the way.
+    scope = build_target_scope(projection, max_magnitude=10_000, max_delta=10_000)
+    assert scope.requested_magnitude > 5, "the ceiling under test must actually bind"
+
+    # Control: the honest ceiling is refused by the bounds-agreement guard, so the
+    # attack below is not passing through an already-open door.
+    honest = build_policy_binding(scope, max_magnitude=5, max_delta=10_000)
+    with pytest.raises(PolicyTargetBindingError) as exc:
+        build_capacity_authorization_candidate(
+            projection=projection,
+            decision=decision,
+            producer_attestation=attestation,
+            policy_binding=honest,
+            policy_coordinate_binding=build_policy_coordinate_binding(scope),
+            target_scope=scope,
+        )
+    assert exc.value.reason is Reason.POLICY_TARGET_CONTENT_MISMATCH
+
+    # No digest can distinguish the lie: the canonical payload renders it to ``5``.
+    assert honest.binding_payload()["max_permitted_magnitude"] == 5
+    assert type(honest.max_permitted_magnitude) is int
+
+    # The attack: the same signed ceiling, carried as the lying subclass. It must not
+    # reach the builder at all — the binding itself refuses to exist.
+    with pytest.raises(PolicyTargetBindingError) as exc:
+        build_policy_binding(scope, max_magnitude=_LyingCeiling(5), max_delta=10_000)
+    assert exc.value.reason is Reason.MALFORMED_CANONICAL_FIELD
+    assert "max_permitted_magnitude" in str(exc.value)
+
+    # The same exactness on the delta ceiling.
+    with pytest.raises(PolicyTargetBindingError) as exc:
+        build_policy_binding(scope, max_magnitude=10_000, max_delta=_LyingCeiling(5))
+    assert exc.value.reason is Reason.MALFORMED_CANONICAL_FIELD
+    assert "max_permitted_delta" in str(exc.value)
