@@ -255,15 +255,85 @@ refinements*.
 * Both modules are pinned by name in `tests/test_no_local_canonicalization.py`, so
   neither can leave the no-local-canonicalization scan silently.
 
+### Added — reconciliation with the canonical S1 specification
+
+`docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md` is the authoritative S1 contract and
+equation specification. The guards are reconciled to it and are exact mirrors of it: a
+test originates, adds, renames or reinterprets no contract field.
+
+* `tests/s1_specification_mirror.py` — the pinned registries, transcribed from the
+  specification and citing the section each block comes from, with
+  `test_the_registry_cites_its_source` failing if a cited section is renamed there. It
+  also builds **temporary representative shapes** — live models declared in the ratified
+  `Annotated[str, StringConstraints(...)]` spelling — so the guards are exercised
+  behaviourally before a production contract surface exists. These shapes declare no
+  contract, are exported from nothing, and authorize nothing.
+* **Registry authority (G-1).** `FIELD_CLASSIFICATION` pins the exact class set, the
+  exact field set for every contract against Part D's stated cardinality, and the exact
+  C5 category for every classified field. Self-tests fail on a field added, omitted,
+  renamed or reclassified. Reconciled to the merged specification: the fourth mechanical
+  class **C5d** for the five reserved lists; `AgentIdentityRef.lifecycle_state` and
+  `ProposerAdvisory.candidates` as non-`str` entries; the C5a-keys/C5c-values shape of
+  `normalized_fields`; the 23-field `ProposerAdvisory`; the retained `candidate_set_id`
+  beside the nested `candidates`; and the eight contracts plus two nested shapes.
+* **Behavioural O-1 coupling (G-2).** The bearer is constructed from a complete valid
+  fixture supplying all twenty-three required fields, and the four coupling cases are
+  exercised as live validation outcomes. Static AST inspection is retained as
+  supplemental and is no longer described as proof of behaviour;
+  `test_the_suite_kills_a_no_op_validator_mutant` shows a validator naming all four
+  fields and enforcing nothing passing the static layer and being killed behaviourally.
+* **Registry weakening (G-3).** Every C5a and C5b entry is mutation-pinned, not a
+  sample: reclassification to `non-string`, `other-pattern`, C5c, C5d, `closed`,
+  `structured` or an unregistered category fails for each.
+* **Free text (G-4).** C5c bars the *mechanism*: no pattern or regex constraint of any
+  kind, including arbitrary ASCII-only grammars that are neither named literal. Lawful
+  Unicode free text is proved accepted by live model probes.
+* **Decorative patterns (G-5).** Syntactic discovery is restricted to constraints that
+  actually bind the field value; a pattern in `json_schema_extra`, a `description` or an
+  `examples` entry is read as validating nothing. Live probes prove C5a rejects invalid
+  identifiers, C5b rejects invalid tokens including slash, spaces, newline and
+  homoglyphs, sequence-valued fields validate every element, and C5c accepts Unicode.
+* **Dependency baseline (G-6).** `DEPENDENCY_BASELINE_MODULES` is derived from the
+  declared dependency registry in `pyproject.toml` rather than written beside it, and the
+  generated baseline setup is pinned by equality — a baseline carrying an added
+  `import socket` fails a self-test. Pydantic's transitive schema-construction behaviour
+  stays permitted, direct networking imports stay prohibited, and the two-entry
+  allowlist is unchanged.
+* **Dynamic imports (G-7).** Detection extended to a literal bound to a local name and
+  passed to `__import__` or `import_module`, `exec("import socket")`,
+  `eval("__import__('socket')")`, an import inside `compile(...)`, and the prohibited
+  relative-import spellings — each with a negative control. The remaining ceiling is
+  stated and demonstrated: arbitrary runtime composition, externally supplied strings and
+  reflection are not proven absent by static scanning.
+* **Documentation gates (G-8).** The Agentic Proposer documents are added to
+  `scripts/check_doc_links.py`'s curated list, so its link coverage of them is real;
+  `tests/test_documentation_consistency.py` asserts that and enforces the same rule
+  package-locally. No terminology-gate coverage is claimed, and a self-test fails if such
+  a claim is introduced.
+* **Composition and identity (G-9).** `tests/test_advisory_contract_shape.py` discharges
+  I7.11 against the corrected nested candidate graph: it bars a nested `ToolObservation`,
+  **requires** the nested `CandidateAdvisory` sequence so a reversion to reference-by-id
+  fails loudly, and bars any second identity on the candidate. The C8
+  `Annotated[str, StringConstraints(...)]` spelling is required and tested, and the
+  declared-dependency count is corrected to two.
+
+### Changed — documentation status language
+
+Temporary status wording — unmerged-branch claims and SHA-based truths — is removed from
+the readiness ADR, the specification, the README and `docs/S1_ENFORCEMENT.md`. Durable
+text states that a decision is ratified, that a named guard enforces it, and that
+production implementation remains separately gated; those are three distinct statuses and
+are not collapsed. OD-1 – OD-4 have one account, the table in the readiness ADR, with
+guard evidence and enforcement limitations folded beneath it as subordinate detail.
+
 ### Not implemented
 
-The eight canonical contracts, Equations 1–3, proposal identity, invoice-domain
+The eight canonical contracts, Equations 1–4, proposal identity, invoice-domain
 checks, reason codes, read-only adapters, model-assisted extraction, the semantic
 auditor, and any HTTP endpoint.
 
-The contracts and equations are not merely unauthorized now: nothing in this
-repository defines them. They were not inferred, derived or invented, so
-`ProposerAdvisory` and `CandidateAdvisory` are not defined either — D7 ratifies their
-names and exclusions but not their field sets. The D7 guard is complete and dormant
-instead. No public-API snapshot is created: there is no S1 contract surface to freeze,
-and the version stays `0.0.1`.
+The contracts and equations are **specified and unimplemented**: no contract module
+exists in `src/`, and the guards that would catch a departure from the specification are
+dormant on that surface and exercised against temporary representative shapes instead.
+Production implementation is separately gated. No public-API snapshot is created: there
+is no S1 contract surface to freeze, and the version stays `0.0.1`.

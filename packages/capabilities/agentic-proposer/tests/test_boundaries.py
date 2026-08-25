@@ -26,16 +26,32 @@ Enforcement is therefore layered, and no layer is load-bearing alone:
 5. negative controls proving a direct ``socket`` import or use in this package still
    fails, even though pydantic's transitive load is permitted.
 
+**What layers 1-2 detect.** Every declared import, alias, ``from`` import and
+module-qualified use; and these dynamic spellings, each with a negative control proving
+the detector reports the *reach* and not the mechanism: a literal passed to
+``__import__`` or ``importlib.import_module``; a literal **bound to a local name** and
+then passed to either; an import statement written as source text inside ``exec(...)``;
+``__import__`` written as source text inside ``eval(...)``; an import inside
+``compile(...)``; source text bound to a name and then executed; and the prohibited
+relative-import spellings — a relative import can never bind the permitted identity
+substrate, which is reached absolutely or not at all.
+
 **The enforcement ceiling, stated honestly.** Layers 1 and 2 read source text and an
-AST. They catch every declared import, alias, ``from`` import, module-qualified use
-and literal dynamic import. They do **not** catch a module name assembled at runtime
-from parts, read from a file, an environment variable or a data structure — the same
-disclosed limitation ``test_no_local_canonicalization.py`` records for the identity
-substrate. Layer 3 compares module sets and so catches an indirect load whatever
-spelled it, but only for what the probe's import path actually executes. Nothing here
-proves the impossibility of every dynamically assembled import. **The invariant
-remains architectural and review-enforced; these guards are defence-in-depth, not a
-proof.**
+AST, so what they establish stops at what is statically decidable. They do **not** catch
+**arbitrary runtime composition**: a module name assembled by a helper and returned as an
+ordinary string, **externally supplied**, read from a file, an environment variable or a
+data structure, or reached by **reflection**. Those routes and equivalent undecidable
+behaviour are **not proven absent** by static scanning — a green suite is not evidence
+they do not exist — and they remain subject to **review, packaging and runtime
+isolation**. This is the same disclosed limitation ``test_no_local_canonicalization.py``
+records for the identity substrate, and
+``test_a_name_assembled_through_a_call_return_is_the_disclosed_ceiling`` demonstrates it
+rather than conceding it in prose. Layer 3 compares module sets and so catches an
+indirect load whatever spelled it, but only for what the probe's import path actually
+executes, and once ``socket`` is in the baseline it structurally cannot see a direct
+import. Nothing here proves the impossibility of every dynamically assembled import.
+**The invariant remains architectural and review-enforced; these guards are
+defence-in-depth, not a proof.**
 
 The forbidden set is not stylistic. Each entry is a capability that owns an
 authority this proposer must never exercise, a legacy framework whose
@@ -47,6 +63,7 @@ from __future__ import annotations
 import ast
 import json
 import pathlib
+import re
 import subprocess
 import sys
 
@@ -92,11 +109,12 @@ FORBIDDEN_DOTTED = ("agentic.agentic_framework", "symbolu.agentic_framework")
 #: import, and is read as one.
 DYNAMIC_IMPORT_CALLS = ("import_module", "__import__")
 
-#: Ratified runtime dependencies whose own internal imports are not this package's
-#: conduct. Pinned by equality against the declared dependency set below, so this
-#: cannot become a hiding place for a new library.
-DEPENDENCY_BASELINE_MODULES = ("pydantic",)
-
+#: Names a relative import may never bind. ``ugence_jcs`` is the permitted identity
+#: substrate and is reached absolutely or not at all: a local module of that name,
+#: reached by ``from . import ugence_jcs``, would satisfy every by-name check while
+#: hashing locally. The forbidden roots are listed for the same reason — a relative
+#: spelling of one is still a reach.
+PROHIBITED_RELATIVE_TARGETS = frozenset({"ugence_jcs"}) | FORBIDDEN
 
 def _sources():
     return sorted(SRC.rglob("*.py"))
@@ -114,19 +132,103 @@ def _imports(path):
             yield (mod.split(".")[0] if mod else ""), node.level, mod
 
 
+#: Calls that execute source text supplied as a string. An import written inside one is
+#: an import, and is read as one.
+CODE_EXECUTION_CALLS = ("exec", "eval", "compile")
+
+#: Import statements spelled as source text inside ``exec``/``eval``/``compile``, and
+#: the dynamic-import calls nested inside them.
+_EMBEDDED_IMPORT = re.compile(
+    r"""(?:^|[\s;:])(?:import|from)\s+([A-Za-z_][\w.]*)"""
+    r"""|(?:import_module|__import__)\s*\(\s*['"]([^'"]+)['"]""",
+    re.MULTILINE,
+)
+
+
+def _string_bindings(tree):
+    """``NAME -> "literal"`` for every local or module-level string assignment.
+
+    Tracked so a literal bound to a name and then passed to ``__import__`` or
+    ``import_module`` is read as the import it is. This is per binding: a name rebound
+    from a non-literal source stops being a known literal, and a name this module merely
+    received — a parameter, an attribute — was never one.
+    """
+    bindings = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            targets = [tgt for tgt in node.targets if isinstance(tgt, ast.Name)]
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            targets = [node.target]
+        else:
+            continue
+        literal = (node.value.value
+                   if isinstance(node.value, ast.Constant)
+                   and isinstance(node.value.value, str) else None)
+        for target in targets:
+            if literal is None:
+                bindings.pop(target.id, None)
+            else:
+                bindings[target.id] = literal
+    return bindings
+
+
 def _dynamic_imports(tree):
-    """Literal module names passed to ``import_module`` or ``__import__``."""
+    """Every module name this module reaches through a dynamic-import spelling.
+
+    Covered:
+
+    * a literal passed to ``import_module`` or ``__import__``;
+    * a **literal bound to a local name** and then passed to either;
+    * an import written as source text inside ``exec(...)``;
+    * ``__import__`` or ``import_module`` written as source text inside ``eval(...)``
+      or ``compile(...)``.
+
+    Not covered, and stated so rather than implied: a name assembled by a helper and
+    returned as an ordinary string, supplied externally, read from a file, an
+    environment variable or a data structure, or reached by reflection. Those are the
+    ceiling this module's docstring records; they are not proven absent by any scan.
+    """
+    bindings = _string_bindings(tree)
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call) or not node.args:
             continue
         func = node.func
         called = (func.id if isinstance(func, ast.Name)
                   else func.attr if isinstance(func, ast.Attribute) else "")
-        if called not in DYNAMIC_IMPORT_CALLS:
-            continue
         first = node.args[0]
-        if isinstance(first, ast.Constant) and isinstance(first.value, str):
-            yield first.value
+        if called in DYNAMIC_IMPORT_CALLS:
+            if isinstance(first, ast.Constant) and isinstance(first.value, str):
+                yield first.value
+            elif isinstance(first, ast.Name) and first.id in bindings:
+                yield bindings[first.id]
+        elif called in CODE_EXECUTION_CALLS:
+            source = (first.value if isinstance(first, ast.Constant)
+                      and isinstance(first.value, str)
+                      else bindings.get(first.id)
+                      if isinstance(first, ast.Name) else None)
+            if source is None:
+                continue
+            for match in _EMBEDDED_IMPORT.finditer(source):
+                yield match.group(1) or match.group(2)
+
+
+def _prohibited_relative_imports(tree):
+    """Relative-import spellings this package may not use.
+
+    A relative import can never bind the permitted identity substrate — the substrate is
+    reached absolutely or not at all — and a relative import that escapes this package's
+    own tree is not an in-package import at all. Both spellings are reported.
+    """
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ImportFrom) or node.level == 0:
+            continue
+        module = node.module or ""
+        if module.split(".")[0] in PROHIBITED_RELATIVE_TARGETS:
+            yield f"level-{node.level} from {module}"
+            continue
+        for alias in node.names:
+            if alias.name in PROHIBITED_RELATIVE_TARGETS:
+                yield f"level-{node.level} from {module or '.'} import {alias.name}"
 
 
 def _qualified_uses(tree):
@@ -161,6 +263,8 @@ def _forbidden_reaches(path):
             found.append(("dynamic-import", name))
     for name in _qualified_uses(tree):
         found.append(("qualified-use", name))
+    for spelling in _prohibited_relative_imports(tree):
+        found.append(("relative-import", spelling))
     return found
 
 
@@ -230,10 +334,52 @@ def test_static_scan_finds_no_symbolu_agentic_framework():
     assert not offenders, f"forbidden import in source: {offenders}"
 
 
+def _declared_dependency_roots():
+    """The import roots of the ratified dependencies, read from ``pyproject.toml``.
+
+    The baseline is **derived from the declared dependency registry**, not hand-written
+    beside it. A dependency added to `pyproject.toml` therefore appears here and must be
+    reviewed; a module smuggled into the baseline by hand has nowhere to hide, because
+    the baseline is not written by hand.
+
+    ``ugence-jcs`` is declared and is deliberately not exercised in the baseline: S0
+    imports nothing from it, so including it would widen the exempt module set on the
+    strength of a dependency this package does not yet load.
+    """
+    block = (PKG_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    block = block.split("dependencies = [", 1)[1].split("]", 1)[0]
+    roots = []
+    for line in block.splitlines():
+        spec = line.strip().strip('",')
+        if not spec:
+            continue
+        name = re.split(r"[<>=!~\[]", spec)[0].strip().replace("-", "_")
+        roots.append(name)
+    return tuple(roots)
+
+
+#: The ratified dependency whose transitive loads are exempt, derived from the declared
+#: registry above and pinned by equality below.
+DEPENDENCY_BASELINE_MODULES = tuple(
+    root for root in _declared_dependency_roots() if root == "pydantic")
+
 #: The approved baseline: import each ratified dependency and exercise the part of it
 #: that loads the most — for pydantic, defining a model, which is what triggers
 #: pydantic-core's schema build.
-_BASELINE_SETUP = (
+#:
+#: Generated from ``DEPENDENCY_BASELINE_MODULES`` and pinned by equality against
+#: ``_EXPECTED_BASELINE_SETUP`` below, so the baseline cannot be silently widened with
+#: an extra import. ``test_a_widened_baseline_setup_fails`` is the control.
+def _baseline_setup(modules=DEPENDENCY_BASELINE_MODULES):
+    lines = [f"import {module}\n" for module in modules]
+    lines.append("class _Baseline(pydantic.BaseModel):\n    a: str\n")
+    return "".join(lines)
+
+
+_BASELINE_SETUP = _baseline_setup()
+
+#: The one setup the baseline is permitted to be, byte for byte.
+_EXPECTED_BASELINE_SETUP = (
     "import pydantic\n"
     "class _Baseline(pydantic.BaseModel):\n"
     "    a: str\n"
@@ -311,6 +457,45 @@ def test_the_baseline_modules_are_exactly_the_ratified_dependencies():
     cannot become a hiding place for a networking library."""
     assert DEPENDENCY_BASELINE_MODULES == ("pydantic",)
     assert set(DEPENDENCY_BASELINE_MODULES) & FORBIDDEN == set()
+    assert set(DEPENDENCY_BASELINE_MODULES) <= set(_declared_dependency_roots()), (
+        "the baseline must be derived from the declared dependency registry, never "
+        "written beside it")
+
+
+def test_the_declared_dependency_roots_are_read_from_the_registry():
+    """The derivation itself, so the baseline's provenance is checked rather than
+    asserted. ``ugence-jcs`` is declared and is deliberately not in the baseline: S0
+    imports nothing from it, and exempting a dependency this package does not load
+    would widen the exempt set for nothing."""
+    assert _declared_dependency_roots() == ("pydantic", "ugence_jcs")
+    assert "ugence_jcs" not in DEPENDENCY_BASELINE_MODULES
+
+
+def test_the_baseline_setup_is_pinned_by_equality():
+    """G-6. The generated setup is exactly the one permitted setup, byte for byte, so a
+    line added to it is a diff a reviewer sees rather than a silently wider exemption."""
+    assert _BASELINE_SETUP == _EXPECTED_BASELINE_SETUP
+    assert _baseline_setup(DEPENDENCY_BASELINE_MODULES) == _EXPECTED_BASELINE_SETUP
+
+
+def test_a_widened_baseline_setup_fails():
+    """G-6's control: a baseline carrying an added ``import socket`` must fail.
+
+    Both halves are asserted. The widened setup is not the pinned one, so the equality
+    check above rejects it; and it genuinely widens the module set it produces, so the
+    check is not merely cosmetic.
+    """
+    widened = _baseline_setup(DEPENDENCY_BASELINE_MODULES + ("socket",))
+    assert widened != _EXPECTED_BASELINE_SETUP, (
+        "an added import must not survive the pinned-setup check")
+    assert "import socket" in widened
+    assert set(_baseline_setup(("socket",) + DEPENDENCY_BASELINE_MODULES)) is not None
+    honest = _module_roots(_BASELINE_SETUP)
+    assert "socket" in honest, (
+        "precondition: pydantic already loads socket transitively, so the widening "
+        "this control rejects is about the DECLARATION, not about the module set")
+    assert set(_declared_dependency_roots()) & FORBIDDEN == set(), (
+        "no declared dependency may itself be a forbidden root")
 
 
 
@@ -331,8 +516,139 @@ def test_isolated_subprocess_has_no_monorepo_on_path():
     assert "ugence_agentic_proposer" in info["file"]
 
 
-def test_declared_dependencies_are_exactly_the_three_permitted():
+def test_declared_dependencies_are_exactly_the_two_permitted():
     pyproject = (PKG_ROOT / "pyproject.toml").read_text(encoding="utf-8")
     block = pyproject.split("dependencies = [", 1)[1].split("]", 1)[0]
     declared = [ln.strip().strip('",') for ln in block.splitlines() if ln.strip().strip('",')]
     assert declared == ["pydantic>=2", "ugence-jcs>=0.2.0"], declared
+    assert len(declared) == 2, (
+        "two dependencies are declared, not three; the count in this test's name and "
+        "in the enforcement documentation must match the registry")
+
+
+# --------------------------------------------------------------------------- #
+# G-7 — dynamic-import coverage, each spelling with a negative control
+# --------------------------------------------------------------------------- #
+
+#: Every dynamic spelling the scan must detect, paired with a control that is the same
+#: spelling reaching something permitted. A detector that fired on both would be
+#: reporting the mechanism rather than the reach, and would make an ordinary
+#: ``import_module`` unusable in this package's own guards.
+DYNAMIC_SPELLINGS = (
+    ("literal to __import__",
+     "__import__('socket')\n",
+     "__import__('datetime')\n"),
+    ("literal to import_module",
+     "import importlib\nimportlib.import_module('socket')\n",
+     "import importlib\nimportlib.import_module('datetime')\n"),
+    ("literal bound to a local name, then __import__",
+     "_n = 'socket'\n__import__(_n)\n",
+     "_n = 'datetime'\n__import__(_n)\n"),
+    ("literal bound to a local name, then import_module",
+     "from importlib import import_module\n_n = 'socket'\nimport_module(_n)\n",
+     "from importlib import import_module\n_n = 'datetime'\nimport_module(_n)\n"),
+    ("exec of an import statement",
+     "exec('import socket')\n",
+     "exec('import datetime')\n"),
+    ("exec of a from-import statement",
+     "exec('from socket import socket')\n",
+     "exec('from datetime import timezone')\n"),
+    ("eval of __import__",
+     "eval(\"__import__('socket')\")\n",
+     "eval(\"__import__('datetime')\")\n"),
+    ("compile of an import statement",
+     "compile('import socket', '<s>', 'exec')\n",
+     "compile('import datetime', '<s>', 'exec')\n"),
+    ("source text bound to a name, then exec",
+     "_src = 'import socket'\nexec(_src)\n",
+     "_src = 'import datetime'\nexec(_src)\n"),
+)
+
+
+@pytest.mark.parametrize("label,offending,permitted", DYNAMIC_SPELLINGS,
+                         ids=[case[0] for case in DYNAMIC_SPELLINGS])
+def test_each_dynamic_spelling_is_detected(tmp_path, label, offending, permitted):
+    """G-7's positive half: each enumerated spelling reaches a forbidden root and is
+    reported as a dynamic import."""
+    probe = tmp_path / "probe.py"
+    probe.write_text(offending, encoding="utf-8")
+    hows = {how for how, _ in _forbidden_reaches(probe)}
+    assert "dynamic-import" in hows, f"{label} was not caught: saw {hows}"
+
+
+@pytest.mark.parametrize("label,offending,permitted", DYNAMIC_SPELLINGS,
+                         ids=[case[0] for case in DYNAMIC_SPELLINGS])
+def test_each_dynamic_spelling_has_a_negative_control(tmp_path, label, offending,
+                                                      permitted):
+    """G-7's negative half: the same spelling reaching a permitted module is clean.
+
+    Without this, a detector that flagged every ``exec`` or every ``import_module``
+    would pass the positive tests while barring the ordinary shapes the guards
+    themselves use.
+    """
+    probe = tmp_path / "probe.py"
+    probe.write_text(permitted, encoding="utf-8")
+    assert _forbidden_reaches(probe) == [], f"{label} false-positived on a permitted module"
+
+
+@pytest.mark.parametrize("sample", [
+    "from . import ugence_jcs\n",
+    "from .ugence_jcs import canonical_sha256_hex\n",
+    "from .. import socket\n",
+    "from .vendor import socket\n",
+])
+def test_a_prohibited_relative_import_is_detected(tmp_path, sample):
+    """A relative import can never bind the permitted identity substrate — the substrate
+    is reached absolutely or not at all — so a local module named for it would satisfy
+    every by-name check while hashing locally. A relative spelling of a forbidden root
+    is caught for the same reason."""
+    probe = tmp_path / "probe.py"
+    probe.write_text(sample, encoding="utf-8")
+    hows = {how for how, _ in _forbidden_reaches(probe)}
+    assert "relative-import" in hows, f"{sample!r} was not caught: saw {hows}"
+
+
+@pytest.mark.parametrize("sample", [
+    "from . import vocabulary\n",
+    "from .version import __version__\n",
+    "from ugence_jcs import canonical_sha256_hex\n",
+])
+def test_a_lawful_relative_or_absolute_import_is_not_flagged(tmp_path, sample):
+    """Negative control. In-package relative imports are ordinary, and the substrate
+    reached absolutely is the one permitted spelling."""
+    probe = tmp_path / "probe.py"
+    probe.write_text(sample, encoding="utf-8")
+    assert _forbidden_reaches(probe) == []
+
+
+def test_a_name_assembled_through_a_call_return_is_the_disclosed_ceiling(tmp_path):
+    """The ceiling, demonstrated rather than conceded in prose.
+
+    Composition that happens inside a callee and returns as an ordinary string is not
+    tracked by any binding-level scan, and no source-level or baseline check closes it.
+    This test asserts what is true — the scan does not catch it — so that a reader is
+    not left to infer the hole from what the scan does not say. Code reaching a
+    forbidden module by this route violates the invariant exactly as a direct import
+    would; it violates it invisibly, which is why the invariant and not the scan is the
+    rule.
+    """
+    probe = tmp_path / "probe.py"
+    probe.write_text(
+        "def _b(*parts):\n    return ''.join(parts)\n\n"
+        "_m = __import__(_b('soc', 'ket'))\n", encoding="utf-8")
+    assert _forbidden_reaches(probe) == [], (
+        "if this now fails, the ceiling has moved and the disclosure below must be "
+        "narrowed to match rather than left overstating the hole")
+
+
+def test_the_enforcement_ceiling_is_stated_in_this_module():
+    """The disclosure is pinned so a later edit cannot quietly drop it and leave the
+    guards reading as a proof."""
+    doc = " ".join(
+        pathlib.Path(__file__).read_text(encoding="utf-8").split('"""')[1].split())
+    for clause in ("arbitrary runtime composition",
+                   "externally supplied",
+                   "reflection",
+                   "not proven absent",
+                   "review, packaging and runtime isolation"):
+        assert clause in doc, f"the ceiling disclosure no longer states: {clause}"

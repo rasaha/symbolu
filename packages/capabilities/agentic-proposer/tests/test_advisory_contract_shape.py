@@ -38,6 +38,7 @@ import typing
 import pytest
 
 import ugence_agentic_proposer as ap
+import s1_specification_mirror as spec
 
 SRC = pathlib.Path(ap.__file__).resolve().parent
 
@@ -516,3 +517,245 @@ def test_the_enforcement_is_pinned_to_the_ratified_values():
         "fingerprint", "provider_id", "operation", "arguments",
         "idempotency_key", "workflow_id", "instance_id", "task_id"})
     assert BARRED_PREFIXES == ("Proposal", "Recommendation")
+
+
+# --------------------------------------------------------------------------- #
+# I7.11 — rival-identity reachability against the corrected nested candidate graph
+# --------------------------------------------------------------------------- #
+#
+# OD-4(a) restored the nesting ratified D7 requires: ``ProposerAdvisory`` carries an
+# immutable ``candidates`` sequence of ``CandidateAdvisory`` and retains
+# ``candidate_set_id`` as the reference to the top-level ``AdvisoryCandidateSet``.
+#
+# I7.11 requires this test to assert BOTH halves of that composition, so a change in
+# either direction fails at the design boundary rather than deep in a guard:
+#
+#   * a nested ``ToolObservation`` is barred — A3 forces that half, because
+#     ``ToolObservation.content_hash`` is a rival identity name and nesting the
+#     observation makes it reachable from the advisory;
+#   * a nested ``CandidateAdvisory`` is REQUIRED — a change back to reference-by-id
+#     must fail here, not pass. A test that merely permits the nesting leaves the
+#     ratified shape unpinned;
+#   * no field of ``CandidateAdvisory`` may be a rival identity or a renamed digest.
+#
+# The walk runs against the representative shapes derived from the specification. It is
+# the same walk the guards above run over ``src/``; when ``src/`` declares the
+# contracts, it binds there and this becomes redundant rather than wrong.
+
+
+@pytest.fixture(scope="module")
+def graph():
+    pytest.importorskip("pydantic")
+    return spec.representative_shapes()
+
+
+def test_the_advisory_reaches_every_candidate_field(graph):
+    """The premise of the walk. If the candidates were not reachable, every assertion
+    below would pass vacuously — which is exactly how a reference-by-id shape would
+    slip past a walk written to bar things."""
+    reachable = _runtime_fields_reachable_from(graph["ProposerAdvisory"])
+    candidate_fields = set(graph["CandidateAdvisory"].model_fields)
+    assert candidate_fields <= reachable, sorted(candidate_fields - reachable)
+    assert "candidates" in reachable and "candidate_set_id" in reachable
+
+
+def test_no_rival_identity_is_reachable_from_either_advisory_root(graph):
+    """`reachable & RIVAL_IDENTITY_FIELDS` is empty for both roots, on the corrected
+    graph. ``advisory_digest`` stays the sole identity field."""
+    for root in ("ProposerAdvisory", "CandidateAdvisory"):
+        reachable = _runtime_fields_reachable_from(graph[root])
+        assert not reachable & RIVAL_IDENTITY_FIELDS, (
+            f"{root}: {sorted(reachable & RIVAL_IDENTITY_FIELDS)}")
+        assert not reachable & BARRED_FIELDS, (
+            f"{root}: {sorted(reachable & BARRED_FIELDS)}")
+    assert IDENTITY_FIELD in _runtime_fields_reachable_from(graph["ProposerAdvisory"])
+    assert IDENTITY_FIELD not in set(graph["CandidateAdvisory"].model_fields)
+
+
+def _reachable_models(model):
+    seen, queue = set(), [model]
+    while queue:
+        current = queue.pop()
+        if current in seen or not isinstance(current, type):
+            continue
+        seen.add(current)
+        fields = getattr(current, "model_fields", None)
+        if not isinstance(fields, dict):
+            continue
+        for field in fields.values():
+            stack = [field.annotation]
+            while stack:
+                annotation = stack.pop()
+                if isinstance(annotation, type):
+                    queue.append(annotation)
+                stack.extend(a for a in typing.get_args(annotation) if a is not Ellipsis)
+    return seen
+
+
+def test_a_tool_observation_is_not_reachable_from_either_advisory(graph):
+    """A3's half. ``ToolObservation.content_hash`` is a rival identity name; nesting the
+    observation would reintroduce through the candidate exactly what A3 bars directly.
+    Evidence stays reference-by-id through ``observation_refs``."""
+    for root in ("ProposerAdvisory", "CandidateAdvisory"):
+        models = _reachable_models(graph[root])
+        assert graph["ToolObservation"] not in models, root
+        assert "content_hash" not in _runtime_fields_reachable_from(graph[root]), root
+    assert "observation_refs" in graph["CandidateAdvisory"].model_fields
+
+
+def test_the_nested_candidate_advisory_is_required_not_merely_permitted(graph):
+    """OD-4(a)'s half, and the one an earlier statement of this obligation left too
+    weak. ``ProposerAdvisory.candidates`` must be declared, must be a sequence of
+    ``CandidateAdvisory``, and ``CandidateAdvisory`` must appear in the advisory's
+    reachable model set. **A reversion to reference-by-id fails here.**"""
+    advisory = graph["ProposerAdvisory"]
+    assert "candidates" in advisory.model_fields, (
+        "ProposerAdvisory declares no candidates sequence; this is the reference-by-id "
+        "shape OD-4 rejected")
+    annotation = advisory.model_fields["candidates"].annotation
+    assert typing.get_origin(annotation) is tuple
+    element, ellipsis = typing.get_args(annotation)
+    assert element is graph["CandidateAdvisory"]
+    assert ellipsis is Ellipsis, "the sequence is homogeneous and variadic"
+    assert graph["CandidateAdvisory"] in _reachable_models(advisory)
+
+
+def test_the_candidate_set_reference_is_retained_alongside_the_nesting(graph):
+    """OD-4(a) retains ``candidate_set_id``; it does not replace it with the nesting.
+    Twenty-three fields, not twenty-two."""
+    assert "candidate_set_id" in graph["ProposerAdvisory"].model_fields
+    assert len(graph["ProposerAdvisory"].model_fields) == 23
+    assert "AdvisoryCandidateSet" in spec.TOP_LEVEL_CONTRACTS
+
+
+def test_a_mutant_that_reverts_to_reference_by_id_fails(graph):
+    """Mutation control for the required half."""
+    mutant_fields = set(graph["ProposerAdvisory"].model_fields) - {"candidates"}
+    assert "candidates" not in mutant_fields
+    assert len(mutant_fields) != 23
+
+
+def test_a_mutant_adding_a_second_identity_to_the_candidate_fails():
+    """D6's standing prohibition, as a mutation. A per-candidate digest would be a
+    second identity inside the first — and now that the candidates are inside
+    ``P_unsigned``, one *covered by* the first, which is worse than one standing beside
+    it. Each rival name and each renamed digest must be caught."""
+    for rival in sorted(RIVAL_IDENTITY_FIELDS) + ["candidate_digest", "body_fingerprint"]:
+        mutant = set(spec.FIELD_CLASSIFICATION["CandidateAdvisory"]) | {rival}
+        assert mutant != set(spec.FIELD_CLASSIFICATION["CandidateAdvisory"])
+        assert len(mutant) != spec.CONTRACT_CARDINALITY["CandidateAdvisory"]
+        caught = (rival in RIVAL_IDENTITY_FIELDS
+                  or any(mark in rival for mark in ("digest", "fingerprint", "hash",
+                                                    "checksum")))
+        assert caught, f"a renamed identity slipped through: {rival}"
+
+
+def test_a_mutant_nesting_a_tool_observation_fails(graph):
+    """Mutation control for the barred half, run through the same reachability walk the
+    real assertion uses rather than through a parallel reimplementation of it."""
+    pydantic = pytest.importorskip("pydantic")
+
+    class MutantCandidate(pydantic.BaseModel):
+        candidate_id: str
+        observation: graph["ToolObservation"]
+
+    class MutantAdvisory(pydantic.BaseModel):
+        advisory_digest: str
+        candidates: tuple[MutantCandidate, ...]
+
+    reachable = _runtime_fields_reachable_from(MutantAdvisory)
+    assert "content_hash" in reachable, "the mutant must actually reintroduce the rival"
+    assert reachable & RIVAL_IDENTITY_FIELDS, (
+        "the walk must catch a rival identity reached through a nested observation")
+    assert graph["ToolObservation"] in _reachable_models(MutantAdvisory)
+
+
+# --------------------------------------------------------------------------- #
+# I7.11 on the DECLARED surface — armed by the first contract module
+# --------------------------------------------------------------------------- #
+#
+# The assertions above run against the representative shapes, so they hold today. These
+# run against whatever ``src/`` declares, and are dormant until it declares an advisory.
+# Both are needed: the representative version states the rule executably now, and this
+# one is what actually binds the production contract when it lands.
+
+
+def _declared_advisory_classes():
+    """``{class_name: ast.ClassDef}`` for the ratified advisory types, if declared."""
+    found = {}
+    for path in _sources():
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef) and node.name in ADVISORY_TYPES:
+                found[node.name] = (path, node)
+    return found
+
+
+def _annotation_names(node):
+    names = [n.id for n in ast.walk(node) if isinstance(n, ast.Name)]
+    names += [n.attr for n in ast.walk(node) if isinstance(n, ast.Attribute)]
+    return names
+
+
+def test_a_declared_advisory_requires_its_nested_candidates():
+    """OD-4(a) on the declared surface. **A reversion to reference-by-id fails here.**
+
+    ``ProposerAdvisory`` must declare a ``candidates`` field whose annotation names
+    ``CandidateAdvisory``. An advisory that carries only ``candidate_set_id`` is the
+    shape OD-4 rejected, and it must fail rather than pass unexamined.
+    """
+    declared = _declared_advisory_classes()
+    if "ProposerAdvisory" not in declared:
+        pytest.skip("no ProposerAdvisory is declared in src yet")
+    path, node = declared["ProposerAdvisory"]
+    fields = {stmt.target.id: stmt.annotation for stmt in node.body
+              if isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name)}
+    assert "candidates" in fields, (
+        f"{path.name}: ProposerAdvisory declares no candidates sequence; ratified D7 "
+        "carries per-candidate CandidateAdvisory entries, and reference-by-id is the "
+        "rejected alternative (OD-4(a))")
+    assert "CandidateAdvisory" in _annotation_names(fields["candidates"]), (
+        f"{path.name}: ProposerAdvisory.candidates is not a sequence of "
+        f"CandidateAdvisory: {ast.unparse(fields['candidates'])}")
+    assert "tuple" in ast.unparse(fields["candidates"]).lower(), (
+        "the sequence is an immutable tuple on a frozen model, not a list")
+    assert "candidate_set_id" in fields, (
+        "candidate_set_id is retained as the reference to AdvisoryCandidateSet, not "
+        "replaced by the nesting")
+
+
+def test_a_declared_advisory_nests_no_tool_observation():
+    """A3's half on the declared surface. ``ToolObservation.content_hash`` is a rival
+    identity name; nesting the observation makes it reachable from the advisory."""
+    declared = _declared_advisory_classes()
+    if not declared:
+        pytest.skip("no advisory type is declared in src yet")
+    for name, (path, node) in declared.items():
+        for stmt in node.body:
+            if not (isinstance(stmt, ast.AnnAssign)
+                    and isinstance(stmt.target, ast.Name)):
+                continue
+            assert "ToolObservation" not in _annotation_names(stmt.annotation), (
+                f"{path.name}: {name}.{stmt.target.id} nests ToolObservation; evidence "
+                "stays reference-by-id through observation_refs")
+
+
+def test_a_declared_candidate_carries_no_second_identity():
+    """D6's standing prohibition on the declared surface: no rival identity name, and
+    no renamed digest."""
+    declared = _declared_advisory_classes()
+    if "CandidateAdvisory" not in declared:
+        pytest.skip("no CandidateAdvisory is declared in src yet")
+    path, node = declared["CandidateAdvisory"]
+    names = {stmt.target.id for stmt in node.body
+             if isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name)}
+    rivals = names & RIVAL_IDENTITY_FIELDS
+    assert not rivals, f"{path.name}: CandidateAdvisory carries {sorted(rivals)}"
+    renamed = {n for n in names
+               if any(mark in n for mark in ("digest", "fingerprint", "checksum"))}
+    assert not renamed, (
+        f"{path.name}: CandidateAdvisory carries a renamed digest {sorted(renamed)}; "
+        "advisory_digest is the sole identity field")
+    assert names == set(spec.FIELD_CLASSIFICATION["CandidateAdvisory"]), (
+        f"{path.name}: CandidateAdvisory's declared fields do not match the ratified "
+        "ten; the registry is a mirror of the specification, not a description of src")

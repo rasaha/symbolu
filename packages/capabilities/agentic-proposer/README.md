@@ -41,13 +41,28 @@ them and add two more: D8's lifecycle bound now prohibits mutation operations an
 callable authority rather than the vocabulary of lifecycle facts determined elsewhere
 (`SUSPENDED`, `REVOKED`, `RoleActivationStatus`, `activation_status`, `expires_at` are
 retained); the ratified kind belongs to `ProposerAdvisory` alone; the three
-selection-dependent fields are nullable and coupled to `selected_candidate_id`; and
-identifiers and references — not claims, reasons or summaries — are ASCII-only,
-because identity is computed with an empty Unicode normalization profile.
+selection-dependent fields on `ProposerAdvisory` are nullable and coupled to
+`selected_candidate_id`; and identifiers and references — not claims, reasons or
+summaries — are ASCII-only, because identity is computed with an empty Unicode
+normalization profile. Owner decisions OD-1 – OD-4, ratified 2026-08-25 after those
+refinements were audited against representative contract shapes, are all resolved; the
+guards enforcing them are in this package.
 
-The eight canonical contracts and Equations 1–3 are still unimplemented: nothing in
-this repository defines them, so they were not inferred. See
-[`docs/S1_ENFORCEMENT.md`](docs/S1_ENFORCEMENT.md).
+The eight canonical contracts and Equations 1–4 are still **unimplemented**. They are no
+longer **undefined**: they were undefined when this section was first written, and
+nothing was inferred from D7 at that time; the gap was closed by an owner ratification,
+recorded literally in
+[`docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md`](docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md)
+— every contract, every field, the frozen `P_unsigned` projection and every equation
+signature. That document is the authoritative S1 contract and equation specification,
+and the enforcement registries in `tests/` are exact mirrors of it: a test originates no
+contract field. Specification is not authorization: no contract module exists in `src/`,
+the version is unchanged, and production implementation remains separately gated on
+independent review. Owner decision OD-4 — whether the advisory carries its per-candidate
+entries or references them by id — is resolved by restoring the nesting ratified D7
+requires, so `ProposerAdvisory` carries a nested `candidates` sequence and retains
+`candidate_set_id` as the reference to the top-level `AdvisoryCandidateSet`.
+See also [`docs/S1_ENFORCEMENT.md`](docs/S1_ENFORCEMENT.md).
 
 ```python
 from ugence_agentic_proposer import (

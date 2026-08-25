@@ -20,9 +20,30 @@ ratified contract. The bearer, the selector and the three dependents are therefo
 pinned together as one registry, and a class that merely shares a field name is not
 touched.
 
-Like the other S1 guards, this one is written to hold **before** the contract exists.
-The parts that need no contract — the reference model of the rule, and the scanners —
-are checked today. The parts that need the fields arm themselves the moment the bearer
+**Behavioural enforcement is primary; static inspection is supplemental.** A validator
+is not sufficient merely because its body mentions the four field names — a function
+that names them and enforces nothing satisfies any such reading. The rule is therefore
+checked by *constructing* the bearer from a complete valid fixture supplying every
+required field, and observing what validation does:
+
+* selector ``None`` plus any non-null dependent must fail;
+* selector non-null plus any null dependent must fail;
+* selector ``None`` plus all three dependents ``None`` must pass;
+* selector non-null plus all three dependents non-null must pass **locally**;
+* ``CandidateAdvisory.requested_review_action`` stays required and non-null;
+* and the same field name on another class must not trigger the bearer-scoped rule.
+
+``test_the_suite_kills_a_no_op_validator_mutant`` proves the point directly: a mutant
+whose validator names all four fields and enforces nothing passes the AST layer and is
+killed by the behavioural probes. **AST inspection below is never described as proof of
+behaviour.** It is a second reading that catches a bearer declaring a dependent with no
+validator at all, which the behavioural layer cannot see until the class exists in
+``src/``.
+
+Like the other S1 guards, this one is written to hold **before** the production contract
+surface exists. The parts that need no contract — the executable statement of the rule,
+the behavioural probes over representative shapes, and the scanners — are checked today.
+The parts that need the declared fields arm themselves the moment ``src/``'s bearer
 declares one, and then require, of that class:
 
 * the selector is declared on the same class, so the coupling is local and checkable;
@@ -40,27 +61,30 @@ stage in the readiness ADR rather than silently treated as covered.
 from __future__ import annotations
 
 import ast
+import importlib
 import pathlib
+import pkgutil
 import typing
 
 import pytest
 
 import ugence_agentic_proposer as ap
+import s1_specification_mirror as spec
 
 SRC = pathlib.Path(ap.__file__).resolve().parent
 
 #: The ONE contract the O-1 coupling binds (OD-3). Not a name pattern: an exact
 #: bearer. ``CandidateAdvisory.requested_review_action`` shares a name with a dependent
 #: field and is a different field — required, non-null, the candidate's own routing.
-SELECTION_BEARER = "ProposerAdvisory"
-#: The selector every dependent field is bound to, on the bearer.
-SELECTION_FIELD = "selected_candidate_id"
+#:
+#: Mirrored from ``s1_specification_mirror`` (B6 / OD-3 of the canonical specification).
+#: This guard originates no field name.
+SELECTION_BEARER = spec.SELECTION_BEARER
+#: The selector every dependent field is bound to, on the bearer. Held apart from the
+#: dependents: it is what they are coupled to, not one of them.
+SELECTION_FIELD = spec.SELECTION_FIELD
 #: The three fields O-1 makes nullable and couples to the selector, on the bearer.
-DEPENDENT_FIELDS = (
-    "recommended_disposition",
-    "requested_review_action",
-    "requested_review_destination_role_ref",
-)
+DEPENDENT_FIELDS = spec.DEPENDENT_FIELDS
 #: The pinned registry, asserted by equality below so it cannot be widened to other
 #: contracts or narrowed to fewer fields without a self-test failing.
 SELECTION_COUPLING = {
@@ -68,9 +92,15 @@ SELECTION_COUPLING = {
 }
 #: Contracts that declare a name matching a dependent field but are NOT bearers. Named
 #: so the exclusion is deliberate and visible rather than a silent consequence.
-NON_BEARERS_SHARING_A_FIELD_NAME = ("CandidateAdvisory",)
+NON_BEARERS_SHARING_A_FIELD_NAME = spec.NON_BEARERS_SHARING_A_FIELD_NAME
 #: Names that make a class member the enforcement of a rule rather than a datum:
 #: a pydantic validator, a dataclass hook, or a plainly named check.
+#: Names through which a validator may read the dependent set instead of writing it out.
+#: A validator iterating the pinned registry is enforcing the ratified rule; only the
+#: behavioural probes can tell whether it enforces it correctly, which is the standing
+#: limitation of this static layer.
+REGISTRY_REFERENCES = ("DEPENDENT_FIELDS", "SELECTION_COUPLING")
+
 ENFORCEMENT_MARKERS = (
     "model_validator", "field_validator", "root_validator", "validator",
     "__post_init__", "__attrs_post_init__", "check", "validate",
@@ -156,7 +186,15 @@ def _enforces_the_coupling(node):
         if not marked:
             continue
         body = "\n".join(ast.unparse(child) for child in stmt.body)
-        if SELECTION_FIELD in body and all(name in body for name in declared):
+        if SELECTION_FIELD not in body:
+            continue
+        if all(name in body for name in declared):
+            return True
+        # A validator that reads the dependents through the pinned registry rather than
+        # naming each one is enforcing the same rule, and is the better spelling: it
+        # cannot fall out of step with the registry the way a written-out list can. It
+        # would be a false positive to report it as unenforced.
+        if any(marker in body for marker in REGISTRY_REFERENCES):
             return True
     return False
 
@@ -368,13 +406,33 @@ def _live_annotations(attr):
     return annotations
 
 
+def _live_attributes():
+    """Every public attribute of the package **and of every submodule**.
+
+    Walking only ``dir(ap)`` would reach a contract solely through the top-level
+    re-export, so a contract module that is not re-exported would go unexamined by the
+    live layer while looking checked. The walk is over the package tree instead.
+    """
+    seen = {}
+    modules = [ap]
+    for info in pkgutil.walk_packages(ap.__path__, ap.__name__ + "."):
+        try:
+            modules.append(importlib.import_module(info.name))
+        except Exception:  # pragma: no cover - an unimportable module is another
+            continue       # guard's failure, not this one's
+    for module in modules:
+        for name in dir(module):
+            if not name.startswith("_"):
+                seen.setdefault(name, getattr(module, name))
+    return seen
+
+
 def _live_types_with_dependent_fields():
     """The live bearer types only (OD-3). ``__name__`` is used, not the export name, so
     a bearer re-exported under an alias is still reached and a non-bearer aliased to a
     bearer's export name is not."""
     found = []
-    for name in dir(ap):
-        attr = getattr(ap, name)
+    for name, attr in _live_attributes().items():
         if not isinstance(attr, type) or getattr(attr, "__name__", None) not in SELECTION_COUPLING:
             continue
         annotations = _live_annotations(attr)
@@ -386,8 +444,7 @@ def _live_types_with_dependent_fields():
 def _live_non_bearers_sharing_a_field_name():
     """Live types named in ``NON_BEARERS_SHARING_A_FIELD_NAME`` that actually exist."""
     found = []
-    for name in dir(ap):
-        attr = getattr(ap, name)
+    for name, attr in _live_attributes().items():
         if isinstance(attr, type) and getattr(attr, "__name__", None) in NON_BEARERS_SHARING_A_FIELD_NAME:
             found.append((name, attr, _live_annotations(attr)))
     return found
@@ -573,3 +630,262 @@ def test_the_local_rule_is_not_a_correspondence_claim():
     built = model(selected_candidate_id="does-not-resolve-anywhere",
                   **{field: "arbitrary" for field in DEPENDENT_FIELDS})
     assert built.recommended_disposition == "arbitrary"
+
+
+# --------------------------------------------------------------------------- #
+# G-2 — behavioural enforcement over a COMPLETE required-field fixture
+# --------------------------------------------------------------------------- #
+#
+# The probes above run against a four-field reference model. That model states the rule
+# executably, which is worth having, but it is not the bearer: it declares four fields
+# where ``ProposerAdvisory`` declares twenty-three, so a rejection there says nothing
+# about whether the rule survives on a contract carrying every required field, a nested
+# candidate sequence, and a frozen, strict, extra-forbidding model config.
+#
+# Everything below constructs the representative ``ProposerAdvisory`` from a complete
+# valid fixture — all twenty-three fields supplied with lawful values — and varies only
+# the selector and its dependents. A probe run against a partial fixture would pass for
+# the wrong reason: construction would fail on a missing required field whatever the
+# coupling did.
+
+
+@pytest.fixture(scope="module")
+def bearer():
+    pytest.importorskip("pydantic")
+    return spec.representative_shapes()[SELECTION_BEARER]
+
+
+def test_the_complete_fixture_supplies_every_required_field(bearer):
+    """The premise of every probe below. If the fixture were partial, a rejection could
+    be a missing field rather than the coupling, and the suite would be reporting a rule
+    it never exercised."""
+    fixture = spec.complete_advisory_fixture()
+    assert set(fixture) == set(bearer.model_fields)
+    assert len(fixture) == spec.CONTRACT_CARDINALITY[SELECTION_BEARER] == 23
+    advisory = bearer(**fixture)
+    assert advisory.selected_candidate_id is None
+    assert len(advisory.candidates) == 1
+
+
+def test_selector_none_with_all_dependents_none_passes_on_the_bearer(bearer):
+    advisory = bearer(**spec.complete_advisory_fixture())
+    assert all(getattr(advisory, name) is None for name in DEPENDENT_FIELDS)
+
+
+@pytest.mark.parametrize("dependent", spec.DEPENDENT_FIELDS)
+def test_selector_none_with_any_non_null_dependent_fails_on_the_bearer(bearer,
+                                                                       dependent):
+    """A routing request standing next to no selection. Rejected, one dependent at a
+    time, so a validator that only looks at the first is caught."""
+    pydantic = pytest.importorskip("pydantic")
+    with pytest.raises(pydantic.ValidationError) as excinfo:
+        bearer(**spec.complete_advisory_fixture(
+            **{dependent: _lawful_value_for(dependent)}))
+    assert dependent in str(excinfo.value)
+
+
+def _lawful_value_for(name):
+    """A value that is valid for the field's own type, so a rejection can only be the
+    coupling and never a type error."""
+    if name == "recommended_disposition":
+        return ap.CandidateDisposition.RECOMMEND_WITHHOLD
+    if name == "requested_review_action":
+        return spec.ReviewAction.ROUTE_APPROVAL_BUNDLE
+    return "role:approver"
+
+
+def _all_dependents():
+    return {name: _lawful_value_for(name) for name in DEPENDENT_FIELDS}
+
+
+def test_selector_non_null_with_all_dependents_non_null_passes_locally(bearer):
+    """Passes **locally**, and that word is the whole claim.
+
+    The validator holds ``candidate_set_id``, not the set. It does not know whether
+    ``cand-1`` resolves, whether the recorded disposition is that candidate's, or
+    whether the routing is permitted by the role. R-1b is what checks those, in the
+    builder and in the independent replay verifier.
+    """
+    advisory = bearer(**spec.complete_advisory_fixture(
+        selected_candidate_id="cand-1", **_all_dependents()))
+    assert advisory.selected_candidate_id == "cand-1"
+    assert all(getattr(advisory, name) is not None for name in DEPENDENT_FIELDS)
+
+
+@pytest.mark.parametrize("omitted", spec.DEPENDENT_FIELDS)
+def test_selector_non_null_with_any_null_dependent_fails_on_the_bearer(bearer, omitted):
+    """A selection with no routing — the opposite failure, calling for the opposite
+    response, which is why the coupling is enforced in both directions."""
+    pydantic = pytest.importorskip("pydantic")
+    values = {name: value for name, value in _all_dependents().items()
+              if name != omitted}
+    values[omitted] = None
+    with pytest.raises(pydantic.ValidationError) as excinfo:
+        bearer(**spec.complete_advisory_fixture(
+            selected_candidate_id="cand-1", **values))
+    assert omitted in str(excinfo.value)
+
+
+def test_the_candidate_keeps_its_own_routing_required_and_non_null():
+    """OD-3's other half, behaviourally. ``CandidateAdvisory.requested_review_action``
+    is the candidate's own routing: required, non-null, and not reached by the
+    bearer-scoped rule despite sharing a name with a dependent field."""
+    pydantic = pytest.importorskip("pydantic")
+    shapes = spec.representative_shapes()
+    candidate = shapes["CandidateAdvisory"](**spec.complete_candidate())
+    assert candidate.requested_review_action is spec.ReviewAction.ROUTE_APPROVAL_BUNDLE
+    for bad in ({"requested_review_action": None}, {}):
+        fields = spec.complete_candidate()
+        fields.pop("requested_review_action", None)
+        fields.update(bad)
+        with pytest.raises(pydantic.ValidationError):
+            shapes["CandidateAdvisory"](**fields)
+
+
+def test_the_bearer_scoped_rule_does_not_reach_a_class_sharing_the_field_name():
+    """The candidate declares no selector and needs none. If the rule were matched by
+    field name it would demand one here, and the candidate could not be constructed at
+    all — so a successful construction is the assertion."""
+    shapes = spec.representative_shapes()
+    candidate_fields = set(shapes["CandidateAdvisory"].model_fields)
+    assert "requested_review_action" in candidate_fields
+    assert SELECTION_FIELD not in candidate_fields
+    assert shapes["CandidateAdvisory"](**spec.complete_candidate()).candidate_id
+
+
+# --------------------------------------------------------------------------- #
+# G-2 — the mutant that names everything and enforces nothing
+# --------------------------------------------------------------------------- #
+
+def _no_op_validator_mutant():
+    """A bearer whose validator names the selector and all three dependents in its body
+    and enforces nothing.
+
+    This is the exact shape a name-mentioning check cannot distinguish from the real
+    rule. It exists so the suite can be shown to kill it.
+    """
+    pydantic = pytest.importorskip("pydantic")
+
+    class NoOpBearer(pydantic.BaseModel):
+        selected_candidate_id: typing.Optional[str] = None
+        recommended_disposition: typing.Optional[str] = None
+        requested_review_action: typing.Optional[str] = None
+        requested_review_destination_role_ref: typing.Optional[str] = None
+
+        @pydantic.model_validator(mode="after")
+        def _validate_selection_coupling(self):
+            _named = (
+                self.selected_candidate_id,
+                self.recommended_disposition,
+                self.requested_review_action,
+                self.requested_review_destination_role_ref,
+            )
+            return self
+
+    return NoOpBearer
+
+
+def test_the_static_layer_alone_accepts_the_no_op_mutant():
+    """The limitation, stated by demonstrating it rather than by conceding it in prose.
+
+    The mutant's validator names the selector and every dependent, carries an
+    enforcement marker, and is decorated as a model validator — so the AST layer reports
+    the coupling as enforced. It is not. This is why the static layer is supplemental.
+    """
+    source = (
+        "class ProposerAdvisory:\n"
+        "    selected_candidate_id: str | None = None\n"
+        "    recommended_disposition: str | None = None\n"
+        "    requested_review_action: str | None = None\n"
+        "    requested_review_destination_role_ref: str | None = None\n"
+        "\n"
+        "    @model_validator(mode='after')\n"
+        "    def _validate_selection_coupling(self):\n"
+        "        _named = (self.selected_candidate_id, self.recommended_disposition,\n"
+        "                  self.requested_review_action,\n"
+        "                  self.requested_review_destination_role_ref)\n"
+        "        return self\n"
+    )
+    (node, fields), = _classes_with_dependent_fields(source)
+    assert _enforces_the_coupling(node), (
+        "precondition: the AST layer reads a name-mentioning validator as enforcement")
+
+
+def test_the_suite_kills_a_no_op_validator_mutant():
+    """G-2's mutation control. What the AST layer accepts, the behavioural probes
+    reject: the mutant admits a dependent with no selection, and admits a selection
+    with no dependents. Either alone kills it."""
+    pydantic = pytest.importorskip("pydantic")
+    mutant = _no_op_validator_mutant()
+
+    survived = []
+    for dependent in DEPENDENT_FIELDS:
+        try:
+            mutant(**{dependent: "X"})
+            survived.append(f"null selector accepted {dependent}")
+        except pydantic.ValidationError:
+            pass
+    try:
+        mutant(selected_candidate_id="cand-1")
+        survived.append("selection accepted with no dependents")
+    except pydantic.ValidationError:
+        pass
+
+    assert survived, "the mutant was not a no-op; the control proves nothing"
+    assert len(survived) == len(DEPENDENT_FIELDS) + 1
+
+    # And the real bearer fails every one of those, which is what kills the mutant.
+    bearer = spec.representative_shapes()[SELECTION_BEARER]
+    for dependent in DEPENDENT_FIELDS:
+        with pytest.raises(pydantic.ValidationError):
+            bearer(**spec.complete_advisory_fixture(
+                **{dependent: _lawful_value_for(dependent)}))
+    with pytest.raises(pydantic.ValidationError):
+        bearer(**spec.complete_advisory_fixture(selected_candidate_id="cand-1"))
+
+
+def test_static_inspection_is_documented_as_supplemental_not_as_proof():
+    """The claim itself is pinned, so a later edit cannot quietly promote the AST layer
+    back to evidence of behaviour."""
+    doc = " ".join(
+        pathlib.Path(__file__).read_text(encoding="utf-8").split('"""')[1].split())
+    assert "Behavioural enforcement is primary; static inspection is supplemental" in doc
+    assert "never described as proof of behaviour" in doc
+
+
+# --------------------------------------------------------------------------- #
+# OD-3 on the declared source — the non-bearer keeps its own field
+# --------------------------------------------------------------------------- #
+
+def _declared_non_bearer_classes():
+    """Every class in ``src`` named in ``NON_BEARERS_SHARING_A_FIELD_NAME``."""
+    found = []
+    for path in _sources():
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef) and node.name in NON_BEARERS_SHARING_A_FIELD_NAME:
+                found.append((f"{path.name}:{node.name}", node))
+    return found
+
+
+@pytest.mark.parametrize("label,node", _declared_non_bearer_classes(),
+                         ids=lambda v: str(v)[:48])
+def test_a_declared_non_bearer_keeps_its_shared_field_required_and_non_null(label, node):
+    """The source-level twin of the live check, and the one that binds a contract module
+    the package does not re-export.
+
+    ``CandidateAdvisory.requested_review_action`` is the candidate's **own** required,
+    non-null routing. Making it nullable is what the class-blind guard used to demand,
+    and it contradicts the ratified contract — so it must fail here, whether or not the
+    type is reachable from the package namespace.
+    """
+    for stmt in node.body:
+        if not (isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name)):
+            continue
+        if stmt.target.id not in DEPENDENT_FIELDS:
+            continue
+        assert not _admits_none(stmt.annotation), (
+            f"{label}.{stmt.target.id} admits None; on a non-bearer this field is "
+            "required and non-null, not selection-dependent (OD-3)")
+        assert stmt.value is None, (
+            f"{label}.{stmt.target.id} carries a default; it is required")
