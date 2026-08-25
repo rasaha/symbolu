@@ -823,3 +823,84 @@ def test_a_lying_snapshot_tenant_is_refused_before_it_is_compared(projection, de
         reconcile_phase4(projection, _with_tenant(_LyingText("tenant-999")))
     assert exc.value.reason is Reason.MALFORMED_CANONICAL_FIELD
     assert "decision_snapshot.tenant_id" in str(exc.value)
+
+
+# ======================================================================================
+# A-52 / A-53 — Phase 5A exact-type hygiene: the surfaces #1469 deliberately left open
+# ======================================================================================
+
+
+def test_a_lying_decision_tenant_or_key_is_refused_before_reconciliation_compares_it(
+    projection, decision
+):
+    """A-52: the decision's own tenant_id and idempotency_key are admitted first.
+
+    Neither could alter the emitted tenant — that is re-derived from the projection — but
+    each could carry a foreign decision past the binding its guard exists to enforce.
+    Both attack values are hand-built, never through ``to_canonical_obj``.
+    """
+
+    other_key = "sha256:" + "b" * 64
+
+    # Controls: honest mismatches keep the typed refusals they have always had.
+    with pytest.raises(ReconciliationError) as exc:
+        reconcile_phase4(projection, dataclasses.replace(decision, tenant_id="tenant-999"))
+    assert exc.value.reason is Reason.TENANT_MISMATCH
+
+    with pytest.raises(ReconciliationError) as exc:
+        reconcile_phase4(
+            projection, dataclasses.replace(decision, idempotency_key=other_key)
+        )
+    assert exc.value.reason is Reason.IDEMPOTENCY_KEY_MISMATCH
+
+    # The lies are refused at admission, before either comparison runs.
+    with pytest.raises(CandidateConstructionError) as exc:
+        reconcile_phase4(
+            projection, dataclasses.replace(decision, tenant_id=_LyingText("tenant-999"))
+        )
+    assert exc.value.reason is Reason.MALFORMED_CANONICAL_FIELD
+    assert "decision.tenant_id" in str(exc.value)
+
+    with pytest.raises(CandidateConstructionError) as exc:
+        reconcile_phase4(
+            projection,
+            dataclasses.replace(decision, idempotency_key=_LyingText(other_key)),
+        )
+    assert exc.value.reason is Reason.MALFORMED_CANONICAL_FIELD
+    assert "decision.idempotency_key" in str(exc.value)
+
+    # The missing-key diagnosis is not taken away by the new admission.
+    with pytest.raises(ReconciliationError) as exc:
+        reconcile_phase4(projection, dataclasses.replace(decision, idempotency_key=""))
+    assert exc.value.reason is Reason.IDEMPOTENCY_KEY_MISMATCH
+
+
+def test_a_lying_schema_identifier_cannot_claim_another_contract(projection, candidate):
+    """A-53: every public Phase 5A artifact admits its schema identifier by exact type."""
+
+    wrong = "cloud-scaling-not-this-schema-9"
+    scope = build_target_scope(projection)
+
+    # Controls: an honest wrong identifier is refused by each artifact's own gate.
+    with pytest.raises(TargetScopeError):
+        dataclasses.replace(scope, schema_version=wrong)
+    with pytest.raises(PolicyTargetBindingError):
+        dataclasses.replace(build_policy_binding(scope), schema_version=wrong)
+
+    # The lie is refused at admission, in every artifact that carries one.
+    for build in (
+        lambda sv: dataclasses.replace(scope, schema_version=sv),
+        lambda sv: dataclasses.replace(build_policy_binding(scope), schema_version=sv),
+        lambda sv: dataclasses.replace(
+            build_policy_coordinate_binding(scope), schema_version=sv
+        ),
+        lambda sv: dataclasses.replace(
+            build_attestation(recommendation_digest=projection.recommendation_digest),
+            schema_version=sv,
+        ),
+        lambda sv: dataclasses.replace(candidate, schema_version=sv),
+    ):
+        with pytest.raises(CandidateConstructionError) as exc:
+            build(_LyingText(wrong))
+        assert exc.value.reason is Reason.MALFORMED_CANONICAL_FIELD
+        assert "schema_version must be a string" in str(exc.value)

@@ -35,7 +35,22 @@ SRC = pathlib.Path(__file__).resolve().parents[1] / "src" / PKG_NAME
 IN_SCOPE = ("reconciliation.py", "candidate.py")
 
 
-def canonical_guards(srcdir: pathlib.Path) -> list[dict[str, Any]]:
+PERIPHERAL_SCOPE = ("attestation.py", "target.py")
+"""Files the canonical inventory deliberately does **not** cover.
+
+The canonical inventory is owner-ratified at 65 over ``IN_SCOPE``, and widening it would
+move a ratified denominator. These two files nevertheless carry real admissions — the
+signed policy ceiling and the schema identifiers among them — and "present in the source"
+is not "executed by a sweep". :func:`peripheral_guards` inventories them **separately**,
+so their guards can be neutralised and scored without touching the ratified 65. No claim
+of exhaustive coverage follows from either inventory; the measured figures are reported in
+``test_peripheral_guard_coverage_is_reported_honestly``.
+"""
+
+
+def canonical_guards(
+    srcdir: pathlib.Path, scope: tuple[str, ...] = IN_SCOPE
+) -> list[dict[str, Any]]:
     """The canonical in-scope guard inventory, in the audit's deterministic order."""
 
     strict: list[tuple[str, ast.If]] = []
@@ -59,7 +74,7 @@ def canonical_guards(srcdir: pathlib.Path) -> list[dict[str, Any]]:
             if found is not None and len(found.body) == 1 and found.body[0] is node:
                 strict.append((path.name, found))
     guards: list[dict[str, Any]] = []
-    for name in IN_SCOPE:
+    for name in scope:
         for fname, ifnode in strict:
             if fname == name:
                 guards.append(
@@ -220,6 +235,51 @@ class MutatedPackage:
             policy_coordinate_binding=self.policy_coordinate_binding(scope),
             target_scope=scope,
         )
+
+
+def peripheral_guards(srcdir: pathlib.Path) -> list[dict[str, Any]]:
+    """The separate inventory over :data:`PERIPHERAL_SCOPE`. Never mixed with the 65."""
+
+    return canonical_guards(srcdir, PERIPHERAL_SCOPE)
+
+
+def mutated_peripheral(tmp_path: pathlib.Path, guard_number: int) -> MutatedPackage:
+    """Import a copy of this package with *peripheral* guard ``guard_number`` neutralised.
+
+    Deliberately a separate entry point from :func:`mutated_package`: the two numbering
+    spaces are disjoint, and a caller that confuses them neutralises the wrong guard.
+    """
+
+    dst = tmp_path / f"per{guard_number}"
+    dst.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(SRC, dst / PKG_NAME)
+    guards = peripheral_guards(dst / PKG_NAME)
+    # No ratified count is asserted here on purpose. The 65 is a governance number; this
+    # inventory is a coverage instrument, and pinning it would invent a second denominator
+    # nobody ratified. What *is* asserted is that the guard being neutralised is the one the
+    # caller named — see ``peripheral_guard_condition``.
+    _neutralise(dst / PKG_NAME, guards[guard_number - 1])
+
+    saved = {k: v for k, v in sys.modules.items() if k.split(".")[0] == PKG_NAME}
+    for key in saved:
+        del sys.modules[key]
+    sys.path.insert(0, str(dst))
+    try:
+        module = importlib.import_module(PKG_NAME)
+        importlib.import_module(f"{PKG_NAME}.reconciliation")
+        importlib.import_module(f"{PKG_NAME}.candidate")
+        return MutatedPackage(module)
+    finally:
+        sys.path.remove(str(dst))
+        for key in [k for k in sys.modules if k.split(".")[0] == PKG_NAME]:
+            del sys.modules[key]
+        sys.modules.update(saved)
+
+
+def peripheral_guard_condition(guard_number: int) -> str:
+    """The source text of a peripheral guard's condition, for self-documenting asserts."""
+
+    return peripheral_guards(SRC)[guard_number - 1]["cond"]
 
 
 def mutated_package(tmp_path: pathlib.Path, guard_number: int) -> MutatedPackage:

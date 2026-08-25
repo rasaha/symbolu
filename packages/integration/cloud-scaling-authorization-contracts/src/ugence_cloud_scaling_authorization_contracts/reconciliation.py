@@ -307,6 +307,12 @@ def reconcile_phase4(
         )
 
     # --- projection ↔ decision binding -------------------------------------------------
+    # Admitted before it is compared. ``!=`` gives a subclass operand priority whichever
+    # side it appears on, and the decision is a caller-supplied object whose ``tenant_id``
+    # nothing has admitted on the way here. A lying ``__ne__`` could not alter the emitted
+    # tenant — that is re-derived from the projection below — but it could carry a
+    # foreign-tenant decision past the binding this guard exists to enforce.
+    d_tenant = require_canonical_identifier("decision.tenant_id", d_tenant)
     if p_tenant != d_tenant:
         raise ReconciliationError(
             f"tenant mismatch: projection {p_tenant!r} vs decision {d_tenant!r}",
@@ -433,6 +439,14 @@ def reconcile_phase4(
         raise ReconciliationError(
             "the decision carries no D-6 idempotency_key", _Reason.IDEMPOTENCY_KEY_MISMATCH
         )
+    # Admitted only now: the two emptiness guards above keep their own typed refusal for a
+    # missing key, and admission must not take that diagnosis away from them.
+    p_idempotency_key = require_canonical_digest(
+        "projection.idempotency_key", p_idempotency_key
+    )
+    d_idempotency_key = require_canonical_digest(
+        "decision.idempotency_key", d_idempotency_key
+    )
     if p_idempotency_key != d_idempotency_key:
         raise ReconciliationError(
             "the decision's idempotency_key differs from the projection's",

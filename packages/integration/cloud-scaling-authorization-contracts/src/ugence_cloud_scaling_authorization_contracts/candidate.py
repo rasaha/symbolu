@@ -35,7 +35,7 @@ from risk_authority.integrations import SubjectRiskDecision
 from ugence_cloud_scaling_risk_integration import CapacityRiskSubjectProjection
 
 from .attestation import ProducerAttestationEvidence
-from .canonical import canonical_digest, require_canonical_digest
+from .canonical import canonical_digest, require_canonical_digest, require_nfc_text
 from .errors import AuthorizationCandidateRejectionReason as _Reason
 from .errors import TemporalOrderingError
 from .errors import (
@@ -241,6 +241,10 @@ class CapacityAuthorizationCandidate:
     schema_version: str = AUTHORIZATION_CANDIDATE_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
+        # The schema identifier is admitted as an exact plain string before it is
+        # compared. Equality here decides which contract this artifact claims to be,
+        # and ``!=`` is overridable, so a subclass can claim any identifier it likes.
+        require_nfc_text("schema_version", self.schema_version)
         if self.schema_version != AUTHORIZATION_CANDIDATE_SCHEMA_VERSION:
             raise CandidateDigestError(
                 f"schema_version must be {AUTHORIZATION_CANDIDATE_SCHEMA_VERSION!r}",
