@@ -1,6 +1,11 @@
 # S1 — canonical contract and equation specification
 
-**Status:** `CONTRACT SPECIFICATION RATIFIED; PRODUCTION IMPLEMENTATION SEPARATELY GATED`
+**Status:** `CONTRACT SPECIFICATION FROZEN FOR IMPLEMENTATION`
+**Frozen:** 2026-08-26, by owner declaration, after independent review. The contract
+surface below is closed to change: a field, type, cardinality, vocabulary, equation term
+or validation rule may be altered only by a **ratified amendment** recorded in the
+readiness ADR's owner-decision table, never by an implementation change reconciling this
+document to code. Where code and this document disagree, this document is right.
 **Ratified against:** the default branch as of PR #1474
 **Package:** `ugence-agentic-proposer` (`packages/capabilities/agentic-proposer`)
 **Authority:** subordinate to D1–D10 and the ratification addenda in
@@ -1920,7 +1925,7 @@ document**, which changes no test and no source file.
 > `packages/capabilities/agentic-proposer/tests/`, and "implemented" below means exactly
 > that: a named guard enforces the ratified rule. It does **not** mean the rule has been
 > checked against a production contract surface, because none exists, and it does **not**
-> authorize one — production implementation is separately gated (ADR addendum A11).
+> authorize one — production implementation is gated on the Part I obligations (A12).
 >
 > `[R]` The guards are exercised against **temporary representative shapes** derived from
 > Part D and carried in `tests/s1_specification_mirror.py`. Those shapes are test support:
@@ -1994,7 +1999,7 @@ originally specified, which only removed `CandidateAdvisory` from the assertion.
 earlier revision described them as repairs still needed; that reading was taken before
 they landed and the correction is recorded here rather than quietly absorbed. `[V]` Each
 is implemented by a named guard below. "Implemented" is not "authorized": production
-implementation remains separately gated under A11, and the guards are exercised against
+implementation remains gated on the Part I obligations (A12), and the guards are exercised against
 temporary representative shapes rather than a declared contract module.
 
 1. **The O-1 guard's class-blind false positive — fixed.** An earlier revision matched
@@ -2440,7 +2445,7 @@ is not an authorization to write production code:
 | --- | --- | --- |
 | **Owner decision** | Has the owner ruled? | **Resolved — ratified 2026-08-25.** No further ruling is sought or required. |
 | **Enforcement implementation** | Does a named guard enforce the ruling? | **Implemented.** `[V]` All three are enforced by guards in `packages/capabilities/agentic-proposer/tests/`, including the two corrections I4 previously reported as outstanding — the O-1 guard's bearer scoping (I4.1) and the `pydantic`/`socket` boundary probe (I4.2). `[R]` They are exercised against temporary representative shapes rather than a declared contract module, so every claim that a guard arms on a contract is to be re-verified when the first contract module lands. |
-| **S1 production implementation** | May contract code be written? | **Unauthorized under A11**, independently of the two axes above, until this documentation is independently reviewed and merged. |
+| **S1 production implementation** | May contract code be written? | **Authorized on merge (A12)**, independently of the two axes above: A11's review-and-merge condition is discharged by the freeze. What remains is not a ruling and not a review — the undischarged Part I obligations, which are implementation work. |
 
 `[R]` The middle axis is `[R]` for all three: every statement about the guard branch is
 read against temporary representative shapes and is to be re-verified against the
@@ -2475,7 +2480,7 @@ a redesign, and needs no new ratification.
 as C5c and asserts they carry no pattern constraint of any kind; I5 states what the
 registry must carry.
 
-*S1 production implementation:* unauthorized under A11.
+*S1 production implementation:* authorized on merge (A12); the Part I obligations remain.
 
 **OD-2 — `pydantic` loads `socket`, which `test_boundaries.py` forbids. RATIFIED
 2026-08-25.**
@@ -2534,7 +2539,7 @@ fails a self-test, and `test_the_dependency_baseline_is_what_it_claims_to_be`, w
 demonstrates the premise instead of assuming it. The whole-process assertion was
 replaced, not exempted.
 
-*S1 production implementation:* unauthorized under A11.
+*S1 production implementation:* authorized on merge (A12); the Part I obligations remain.
 
 **OD-3 — the O-1 guard's dependent-field set is scoped to its bearer. RATIFIED
 2026-08-25.**
@@ -2559,7 +2564,7 @@ explicitly, and **two** self-tests pinning all of it by equality —
 that the registry and the non-bearer list are **disjoint**, so a contract cannot be both
 a bearer and a named exclusion.
 
-*S1 production implementation:* unauthorized under A11.
+*S1 production implementation:* authorized on merge (A12); the Part I obligations remain.
 
 **OD-4 — `ProposerAdvisory` carries its `CandidateAdvisory` entries. RATIFIED,
 resolved (a), 2026-08-25.**
@@ -2713,12 +2718,12 @@ a reasoning strategy, preserves the four-way distinction, and defers the strateg
 permission concept and its vocabulary together to S2. `[R]` That vocabulary requires its
 own ruling and is not given one here.
 
-**What is outstanding is enforcement and authorization, not ratification.** The status
-line at the head of this document therefore reads
-`CONTRACT SPECIFICATION RATIFIED; PRODUCTION IMPLEMENTATION SEPARATELY GATED` — the
-contract specification is ratified, and production implementation is gated on something
-other than a ruling. Two things stand between this document and S1 code, and neither is
-an owner question. The ADR's introduction states the same two:
+**The specification is frozen.** The status line at the head of this document reads
+`CONTRACT SPECIFICATION FROZEN FOR IMPLEMENTATION`. Freezing closes the contract
+surface to change and discharges A11's review condition; it does **not** discharge the
+Part I obligations, which are implementation work rather than specification questions.
+The two things that stood between this document and S1 code are therefore now one. The
+ADR's introduction states both, and what remains of each:
 
 * **The Part I obligations**, which S1 must discharge in the same change that introduces
   the surface they govern. `[V]` The guards implementing O-1 – O-4 and OD-1 – OD-3 are
@@ -2726,11 +2731,14 @@ an owner question. The ADR's introduction states the same two:
   previously reported as outstanding; `[R]` they are exercised against temporary
   representative shapes rather than a declared contract module, and I1, I6 and the
   unbuilt parts of I7 remain outstanding.
-* **A11.** Production implementation stays unauthorized until this documentation change
-  is independently reviewed (I8 of this document; ADR addendum A11). An implemented
-  guard does not lift this.
+* **A11 — discharged.** `[V]` The review-and-merge condition is met and the freeze is
+  recorded as **A12** in the readiness ADR. An implemented guard never lifted this; an
+  independent review and a merge did.
 
 There is no gate on the contract *shape* for want of a ruling: every composition
-question is ratified. The gate is on writing production code before the enforcement that
-would catch a departure from it has been independently reviewed alongside the
-specification it enforces.
+question is ratified, and the shape is now frozen. `[V]` The gate that stood — writing
+production code before the enforcement that would catch a departure from it had been
+independently reviewed alongside the specification it enforces — is discharged: the
+review happened and the freeze records it. What is left is to arm that enforcement
+against a real contract module, which is the Part I obligation above and is work, not
+permission.

@@ -20,7 +20,7 @@ citation cannot rot into a comment nobody checks.
    the ratified spelling — so the guards can be *armed* and exercised behaviourally
    today, before ``src/`` declares a contract. These shapes are not contracts, are not
    exported, and confer no authorization: production implementation is separately gated
-   (ADR addendum A11). They exist so a green suite means "these rules were executed"
+   (ADR addenda A11/A12). They exist so a green suite means "these rules were executed"
    rather than "these rules were parsed".
 
 **Two declarations here deliberately depart from the specification. Both are recorded

@@ -35,7 +35,7 @@ The field-level rules are written to hold before the production contract surface
 they arm themselves with the first annotated field ``src/`` declares, and are exercised
 today against temporary representative shapes derived from the specification. **A green
 run here is not a verified contract and authorizes no production code** — production
-implementation is separately gated (ADR addendum A11).
+implementation is gated on the Part I obligations (ADR addenda A11/A12).
 """
 from __future__ import annotations
 

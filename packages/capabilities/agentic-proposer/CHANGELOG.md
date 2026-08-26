@@ -653,6 +653,35 @@ shape.** Documentation and tests only.
   table asserts. The offence is now the **disagreement** — prose claiming one bearer while
   the table records several — which is what the original defect was.
 
+### Changed — the S1 specification is frozen for implementation (A12)
+
+Owner declaration, 2026-08-26. `docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md` moves
+from `CONTRACT SPECIFICATION RATIFIED; PRODUCTION IMPLEMENTATION SEPARATELY GATED` to
+**`CONTRACT SPECIFICATION FROZEN FOR IMPLEMENTATION`**. Documentation only: no `src/`
+change, no version bump, no `public_api.json`, no platform-freeze artifact; the
+substantive digest is unchanged.
+
+* **The contract surface is closed to change.** A field, type, cardinality, vocabulary,
+  equation term or validation rule may be altered only by a **ratified amendment**
+  recorded in the readiness ADR's owner-decision table — never by an implementation
+  change reconciling the specification to code. Where the two disagree, the
+  specification is right.
+* **A11 is discharged, and every statement that said otherwise is corrected.** Its
+  condition was independent review *and* merge; both are met, so the eight places across
+  the specification and the ADR that recorded production implementation as unauthorized
+  would have become false on merge. Each now points at **A12** and states what actually
+  remains.
+* **What remains is one thing, and it is not a ruling or a review.** The Part I
+  obligations — I1, I6 and the unbuilt parts of I7 — are undischarged. `[G]` The freeze
+  neither closes them nor authorizes skipping them; they are guards to be armed against a
+  contract module that does not yet exist.
+* `[R]` **The freeze is not a claim of correctness.** It is a decision to stop changing
+  the specification and to find its remaining defects by implementing against it: errors
+  are now discovered as amendments rather than as edits. Nothing the specification marks
+  `[R]` becomes ratified by it — the S2 strategy vocabulary, OD-1's normalization-profile
+  rider, and every guard claim verified only against a representative shape stand exactly
+  as they were.
+
 ### Not implemented
 
 The eight canonical contracts, Equations 1–4, proposal identity, invoice-domain

@@ -21,9 +21,9 @@ are recorded under *Owner decisions OD-1 – OD-5* below. **OD-5**, on reasoning
 and strategies, was ratified 2026-08-26 and is recorded in the same table. **No owner
 decision remains open, so S1 is unblocked on ratification grounds** — and on
 ratification grounds only.
-**Two** things still gate S1 code, neither of them a ruling: the Part I implementation
-obligations in the contract specification are undischarged, and A11 keeps production
-implementation unauthorized until this documentation is independently reviewed.
+**One** thing still gates S1 code, and it is not a ruling: the Part I implementation
+obligations in the contract specification are undischarged. A11's review-and-merge
+condition is discharged by the freeze recorded in **A12**.
 "Unblocked on ratification grounds" is therefore not "authorized to implement", and this
 artifact does not claim it is. The O-1 – O-4 and OD-1 – OD-3 enforcement guards are
 implemented in `packages/capabilities/agentic-proposer/tests/`; a guard being
@@ -853,7 +853,7 @@ on the contract specification:
 
 `packages/capabilities/agentic-proposer/docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md`
 is the canonical, implementation-ready S1 specification, status
-`CONTRACT SPECIFICATION RATIFIED; PRODUCTION IMPLEMENTATION SEPARATELY GATED`, scoped to S1 contracts and deterministic equations
+`CONTRACT SPECIFICATION FROZEN FOR IMPLEMENTATION` (frozen 2026-08-26), scoped to S1 contracts and deterministic equations
 only. It records the eight top-level contracts (`AgentIdentityRef`,
 `CognitiveRoleContract`, `WorkMandate`, `BoundedContextEnvelope`, `ToolObservation`,
 `AdvisoryCandidateSet`, `ProposerAdvisory`, `ProposerProcessRecord`) with
@@ -911,7 +911,50 @@ platform-freeze artifact is changed by them. The version stays `0.0.1`, no
 `public_api.json` is created, and the freeze digest is unchanged.
 
 **Implementation of the S1 contracts and equations remains unauthorized until this
-documentation pull request is independently reviewed and merged.**
+documentation pull request is independently reviewed and merged.** `[V]` **Both
+conditions are met as of A12 below**, which records the freeze; A11 stands as the rule
+that was applied, not as a gate still standing.
+
+### A12 — The specification is frozen for implementation
+
+**Declared by the owner on 2026-08-26.** The S1 contract and equation specification's
+status becomes `CONTRACT SPECIFICATION FROZEN FOR IMPLEMENTATION`.
+
+**What the freeze establishes.** The contract surface is **closed to change**. A field,
+type, cardinality, vocabulary, equation term or validation rule may be altered only by a
+**ratified amendment recorded in the owner-decision table above** — never by an
+implementation change reconciling the specification to code that was written against a
+different reading. Where code and the specification disagree, the specification is right
+and the code is wrong.
+
+**What the freeze rests on.** `[V]` A11's two conditions. Independent review: the
+specification and its guards were audited across successive rounds, each conducted
+against the repository rather than against the author's account of it, and each finding
+was either fixed or recorded — among them a lifecycle guard that matched vocabulary
+instead of authority, a registry that classified by name suffix, an enforcement scan
+narrower than the coverage claimed for it, and four stale cross-references left by a
+section rename. `[V]` Merge: this pull request. **The freeze takes effect on merge**, and
+before merge this section states an intent rather than a fact.
+
+**What the freeze does *not* establish.** Three things, stated so the declaration is not
+read as more than it is:
+
+* `[R]` **It is not a claim that the specification is correct.** It is a decision to stop
+  changing it and to find the remaining defects by implementing against it. A frozen
+  specification is one whose errors are now discovered as amendments rather than as
+  edits.
+* `[G]` **It does not discharge the Part I obligations.** I1, I6 and the unbuilt parts of
+  I7 remain outstanding. Those are implementation work — guards to be armed against a
+  contract module that does not yet exist — not specification questions, and the freeze
+  neither closes them nor authorizes skipping them.
+* `[R]` **It does not ratify anything the specification marks `[R]`.** The reasoning
+  strategy vocabulary deferred to S2 (OD-5(iii)), the normalization profile OD-1's rider
+  requires, and every guard claim verified only against a representative shape stay
+  exactly as they are. Each is to be re-verified when the first contract module lands.
+
+`[V]` No `src/` module, test, `pyproject.toml`, `version.py`, public API, CI workflow or
+platform-freeze artifact is changed by this declaration. The version stays `0.0.1` and
+the substantive freeze digest is unchanged.
 
 ### Owner decisions, and what actually gates S1
 
@@ -939,14 +982,15 @@ projection-absence assertion for `declared_strategy` in the same module, the
 strategy-authority document scan in `tests/test_documentation_consistency.py`, and the
 ten-field cardinality and five-entry `C5D_ENTRIES` pin that now hold the deferred field
 out; and **S1 production implementation
-remains unauthorized under A11**, independently of both, until this documentation is
-independently reviewed. A ratified decision is not an implemented guard, and an
-implemented guard is not an authorization.
+is authorized on merge under A12**, independently of both: A11's
+condition is discharged by the freeze, and what remains is the undischarged Part I
+obligations. A ratified decision is not an implemented guard, and an implemented guard
+was never an authorization — the review and the merge are.
 
-The specification's status is therefore
-`CONTRACT SPECIFICATION RATIFIED; PRODUCTION IMPLEMENTATION SEPARATELY GATED`. No
-ruling gates the first contract module — what gates it is A11 and the undischarged Part
-I obligations.
+The specification's status is therefore `CONTRACT SPECIFICATION FROZEN FOR IMPLEMENTATION`
+(frozen 2026-08-26; see *A12*). No ruling gates the first contract module, and A11's
+review condition is discharged; what remains are the undischarged Part I obligations,
+which are implementation work rather than owner questions.
 
 The `[R]` markers elsewhere in this artifact are implementation obligations for S1, not
 unratified decisions.
