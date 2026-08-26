@@ -16,7 +16,7 @@ Import the public surface from `ugence_actiongate_provider.api` (26 exports).
 - `ActionGateClient` (Protocol), `InProcessActionGateClient`, `RemoteActionGateClient`.
 
 ## Mapping
-- `MAPPING_VERSION` (`actiongate-map-1`), `KNOWN_CONSTRAINT_TYPES`, `KNOWN_OBLIGATION_TYPES`.
+- `MAPPING_VERSION` (`actiongate-map-2`), `KNOWN_CONSTRAINT_TYPES`, `KNOWN_OBLIGATION_TYPES`.
 
 ## Health, conformance, observability
 - `check_health`, `ActionGateHealthReport`.

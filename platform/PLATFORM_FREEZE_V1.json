@@ -29,11 +29,11 @@
     "dgm-tap-provider": "0.1.0"
   },
   "conformance_hashes": {
-    "packages/providers/actiongate/src/ugence_actiongate_provider": "07e08bd49e8eb64205025569a3fa5d02cd2efddea24a0c9dacd9183c28c98a26",
+    "packages/providers/actiongate/src/ugence_actiongate_provider": "ff605bf9f3ac0e50ad8b30fd6a7a0a8175c2cf8d2ff9ff376fefbb6f8f4b0372",
     "packages/providers/tap/src/ugence_tap_provider": "f52903dc7c630407140a134f8355328bb9d5f3d39b38759c0870f29021fe5d5a"
   },
   "core_tree_hashes": {
-    "actiongate_provider": "9cbeb83304cb0556360cb9fed7f7a52cf5435d20a9ab2495f8db50117ee3c3bc",
+    "actiongate_provider": "a0010fcf19476e17251c6c320742eb9e2e2ae0d9b84fa0bc95287cfbc55a0974",
     "decision_governance": "3e98d8dbbc2a5737a8f66c701653ac00b674a6c7c9336a582331d45a667485d0",
     "governance_providers": "9ec688e64fcd8f3c37f7f91d63751123ffa56d761d5f34ed64af4cd65517e9c3",
     "tap_provider": "53b7abf7534eaf084201c84a8bb26dda50fb2b835cf0e933fab53f018c938249"
@@ -191,11 +191,11 @@
       "statement": "Frozen package dependency direction remains acyclic."
     }
   ],
-  "manifest_digest": "05fdb1caace9216a9b42b979c66eb144e17d8a0032aae3500ab668a446094402",
+  "manifest_digest": "272abe561c55a12f9d0d5d1a4749f030a9e8fbf7bcde17ecc41cc15d64ffeb5d",
   "platform_name": "Decision Governance Platform",
   "platform_version": "1.0.0",
   "public_api_manifests": {
-    "actiongate_provider.api": "9eeb66e31430d9e65982826e9910fc571fbae0331b797c5bb1b735bc53887300",
+    "actiongate_provider.api": "5334cca1451d652718d3ceee66688882f6d51caf3fc4db5b07bdba913489cd55",
     "decision_governance.api": "1b89386992bb9572b82eca40fb36760ab9451c85db76e6ce43d3339c13ad5543",
     "governance_providers.api": "98dd02649e5fbb37879ef05e1b06afce1abd0cc10b5692b81974437d59f7a59b",
     "tap_provider.api": "68763307437994a94397b51f6ae9eff305f7e27fd03ac716085a35a74d51300a"

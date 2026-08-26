@@ -9,9 +9,9 @@ from actiongate_provider.core import (
 from .conftest import run_actiongate_lifecycle
 
 
-def _control_plane(engine):
+def _control_plane(engine, **kw):
     provider = build_actiongate_provider(engine); provider.initialize()
-    return ActionGovernanceControlPlaneAdapter(provider)
+    return ActionGovernanceControlPlaneAdapter(provider, **kw)
 
 
 def test_authorized_reaches_reconciled():
@@ -42,6 +42,24 @@ def test_denied_never_dispatches():
     cp = _control_plane(ActionGateEngine(denied=frozenset({"ACT"})))
     r = run_actiongate_lifecycle(cp)
     assert r.authorization_outcome == "DENIED"
+    assert r.reconciliation_status is None
+    assert not r.dispatched
+
+
+def test_expired_authorization_never_dispatches():
+    """The defect this change closes, proven end to end.
+
+    Before the fix ActionGate discarded ``authorization_expired``, so an action
+    riding an expired CER reached AUTHORIZED and dispatched. The clock here is
+    far past the CER's expiry, so the adapter reports the authorization expired
+    and ActionGate must refuse rather than authorize.
+    """
+    from datetime import datetime, timezone
+
+    far_future = datetime(2100, 1, 1, tzinfo=timezone.utc)
+    cp = _control_plane(ActionGateEngine(), clock=lambda: far_future)
+    r = run_actiongate_lifecycle(cp)
+    assert r.authorization_outcome == "EXPIRED"
     assert r.reconciliation_status is None
     assert not r.dispatched
 

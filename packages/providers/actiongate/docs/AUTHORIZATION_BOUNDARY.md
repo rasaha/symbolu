@@ -9,7 +9,7 @@ action.**
 - accept a neutral action-governance request;
 - map it to a native ActionGate request;
 - evaluate policy and authority;
-- return an authorization outcome (AUTHORIZED / AUTHORIZED_WITH_CONSTRAINTS / DENIED / INDETERMINATE);
+- return an authorization outcome (AUTHORIZED / AUTHORIZED_WITH_CONSTRAINTS / DENIED / INDETERMINATE / EXPIRED);
 - return constraints, obligations, an authorization expiry, authority basis, reason codes;
 - preserve correlation, trace, and idempotency data;
 - report health and lifecycle state; emit provider-level invocation records;

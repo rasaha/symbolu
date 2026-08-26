@@ -13,8 +13,16 @@
   but has no durable nonce store, consumption tracking, or cross-process replay
   detection. Classification: `NO_REPLAY_PROTECTION` (only
   `IDEMPOTENCY_KEY_PRESERVED` + `DETERMINISTIC_REPEAT_ONLY`).
-- **Expiry is emitted, not enforced.** Classification `PROVIDER_EMITS_EXPIRY`; whether
-  dispatch is blocked after expiry is a framework/execution-layer concern.
+- **The expiry ActionGate emits is not enforced by ActionGate.** Classification
+  `PROVIDER_EMITS_EXPIRY`; whether dispatch is blocked after that instant is a
+  framework/execution-layer concern. This is *not* true of the upstream
+  authorization's expiry, which ActionGate now honours by returning `EXPIRED` —
+  see `EXPIRY_AND_IDEMPOTENCY.md`.
+- **Policy dimensions are governed only where a policy declares them.** An
+  `ActionGatePolicy` that declares no rule for a dimension cannot make that
+  dimension dispositive. `ActionGateEngine.governed_dimensions` reports exactly
+  which dimensions a configured engine can act on, so an ungoverned dimension is
+  observable rather than an assumption; a default-constructed engine governs none.
 - **Tenant propagation is intentionally lossy** — the neutral request has no tenant
   field, so native `tenant` is empty. A semantic fix is a separate versioned phase.
 - **Unknown outcomes and provider failures become non-authorizing** (INDETERMINATE) —

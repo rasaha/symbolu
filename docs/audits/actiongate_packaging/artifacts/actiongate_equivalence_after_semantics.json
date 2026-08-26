@@ -1,0 +1,504 @@
+{
+  "capture_hash": "e1ff5d2a75aa7c06cdab6838e0b3c72501a80df55261f4d092a25531bc7a04ed",
+  "descriptor": {
+    "compatible_kernel_majors": [
+      "1"
+    ],
+    "contract_version": "1.0.0",
+    "default": true,
+    "deterministic": true,
+    "features": [
+      "authority_basis",
+      "authorize",
+      "constraints",
+      "expiry",
+      "in_process",
+      "obligations",
+      "reason_codes",
+      "remote"
+    ],
+    "implementation_version": "0.1.0",
+    "kind": "ACTION_GOVERNANCE",
+    "mode": "in_process",
+    "provider_id": "actiongate",
+    "vendor": "ActionGate"
+  },
+  "dimensions": {
+    "authority_absent": {
+      "offending": {
+        "authority_basis": "actiongate-policy",
+        "constraints": [],
+        "expiry": null,
+        "fingerprint": "9cb127db59178619c1bc87f794a0184b7107a7ef75c5a3fe26b8413749f3313e",
+        "obligations": [],
+        "outcome": "DENIED",
+        "provider_trace_id": "ag-4b5a56a3f4701012",
+        "reason_codes": [
+          "AUTHORITY_ABSENT"
+        ]
+      },
+      "permissive": {
+        "authority_basis": "actiongate-policy",
+        "constraints": [],
+        "expiry": null,
+        "fingerprint": "b424c81975561e374231a3af9e66c228350d3f0334ea3b1a7ed21df21a3b0ac7",
+        "obligations": [
+          "logging=audit"
+        ],
+        "outcome": "AUTHORIZED",
+        "provider_trace_id": "ag-c4ab6c463e234b1e",
+        "reason_codes": [
+          "POLICY_ALLOW"
+        ]
+      }
+    },
+    "authority_insufficient": {
+      "offending": {
+        "authority_basis": "actiongate-policy",
+        "constraints": [],
+        "expiry": null,
+        "fingerprint": "2a49c4b06de1b1447602cc797053626aaf212f99abb326345db39bffcc0ea2e2",
+        "obligations": [],
+        "outcome": "DENIED",
+        "provider_trace_id": "ag-54de149e33e69ead",
+        "reason_codes": [
+          "AUTHORITY_INSUFFICIENT"
+        ]
+      },
+      "permissive": {
+        "authority_basis": "actiongate-policy",
+        "constraints": [],
+        "expiry": null,
+        "fingerprint": "6b5f75741863979508e3dc5d81b253d70f8dd3672f478c3cb4203a97c4d27b6c",
+        "obligations": [
+          "logging=audit"
+        ],
+        "outcome": "AUTHORIZED",
+        "provider_trace_id": "ag-5f644ab2fa558d3a",
+        "reason_codes": [
+          "POLICY_ALLOW"
+        ]
+      }
+    },
+    "authorization_expired": {
+      "offending": {
+        "authority_basis": "",
+        "constraints": [],
+        "expiry": null,
+        "fingerprint": "71f7c335371d2213442b8c4088bb48b84cef6540a76a7888a7347a45419aece4",
+        "obligations": [],
+        "outcome": "EXPIRED",
+        "provider_trace_id": "ag-1c8b293799487618",
+        "reason_codes": [
+          "AUTHORIZATION_EXPIRED"
+        ]
+      },
+      "permissive": {
+        "authority_basis": "actiongate-policy",
+        "constraints": [],
+        "expiry": null,
+        "fingerprint": "a4c763af3d8789c42405523a0086756b97b84df526b53580ae14a3321237c7e2",
+        "obligations": [
+          "logging=audit"
+        ],
+        "outcome": "AUTHORIZED",
+        "provider_trace_id": "ag-4b5a56a3f4701012",
+        "reason_codes": [
+          "POLICY_ALLOW"
+        ]
+      }
+    },
+    "decision_ref_missing": {
+      "offending": {
+        "authority_basis": "actiongate-policy",
+        "constraints": [],
+        "expiry": null,
+        "fingerprint": "86afc65ec2485974d21687653f054a58c86f4c2e24fc7175b51ef916befcf8f1",
+        "obligations": [],
+        "outcome": "DENIED",
+        "provider_trace_id": "ag-4b5a56a3f4701012",
+        "reason_codes": [
+          "DECISION_REF_MISSING"
+        ]
+      },
+      "permissive": {
+        "authority_basis": "actiongate-policy",
+        "constraints": [],
+        "expiry": null,
+        "fingerprint": "cf166f5f55224c5b27bb7dc5cb50d7dc8b403b968f56d76c7ea220bd377f5d76",
+        "obligations": [
+          "logging=audit"
+        ],
+        "outcome": "AUTHORIZED",
+        "provider_trace_id": "ag-5255dc94ae9f09e5",
+        "reason_codes": [
+          "POLICY_ALLOW"
+        ]
+      }
+    },
+    "evidence_insufficient": {
+      "offending": {
+        "authority_basis": "",
+        "constraints": [],
+        "expiry": null,
+        "fingerprint": "fa71899270e582f034a317ee21d54448683a7fea407106d7e6734cdc13e8abab",
+        "obligations": [],
+        "outcome": "INDETERMINATE",
+        "provider_trace_id": "ag-1ce154256bc4871e",
+        "reason_codes": [
+          "EVIDENCE_INSUFFICIENT"
+        ]
+      },
+      "permissive": {
+        "authority_basis": "actiongate-policy",
+        "constraints": [],
+        "expiry": null,
+        "fingerprint": "a5c52d214d71fb1ee8f11f991098f41f64a159cd96da6597d37ab8f50c1ee95a",
+        "obligations": [
+          "logging=audit"
+        ],
+        "outcome": "AUTHORIZED",
+        "provider_trace_id": "ag-053edc6ea6d49da3",
+        "reason_codes": [
+          "POLICY_ALLOW"
+        ]
+      }
+    },
+    "parameter_limit": {
+      "offending": {
+        "authority_basis": "actiongate-policy",
+        "constraints": [],
+        "expiry": null,
+        "fingerprint": "caa58a60d0cb0472c1cf850fbe42cc5184464eacf3c66f9679464938204ff640",
+        "obligations": [],
+        "outcome": "DENIED",
+        "provider_trace_id": "ag-7932d8eb8d26da61",
+        "reason_codes": [
+          "PARAMETER_LIMIT_EXCEEDED"
+        ]
+      },
+      "permissive": {
+        "authority_basis": "actiongate-policy",
+        "constraints": [],
+        "expiry": null,
+        "fingerprint": "01488eb16e89d9500a84c28dd2788778e57d775a5816a38f7a40a4d732aa4423",
+        "obligations": [
+          "logging=audit"
+        ],
+        "outcome": "AUTHORIZED",
+        "provider_trace_id": "ag-d20536eb0ef9dc49",
+        "reason_codes": [
+          "POLICY_ALLOW"
+        ]
+      }
+    },
+    "policy_context_absent": {
+      "offending": {
+        "authority_basis": "",
+        "constraints": [],
+        "expiry": null,
+        "fingerprint": "8681a66e6cef056571a56ffc362b60aaf79c6910f1e8f760503584c3c69ee30d",
+        "obligations": [],
+        "outcome": "INDETERMINATE",
+        "provider_trace_id": "ag-4b5a56a3f4701012",
+        "reason_codes": [
+          "POLICY_NO_RULE"
+        ]
+      },
+      "permissive": {
+        "authority_basis": "actiongate-policy",
+        "constraints": [],
+        "expiry": null,
+        "fingerprint": "ee34e85ca8d641567515cc1a2af90c4206f3c53d9ff9d224ccfd179f774ddca8",
+        "obligations": [
+          "logging=audit"
+        ],
+        "outcome": "AUTHORIZED",
+        "provider_trace_id": "ag-98f9ac129e9247da",
+        "reason_codes": [
+          "POLICY_ALLOW"
+        ]
+      }
+    },
+    "principal_unrecognized": {
+      "offending": {
+        "authority_basis": "actiongate-policy",
+        "constraints": [],
+        "expiry": null,
+        "fingerprint": "b4d43c307a352c35655cfd43f46d8e1d974bf9a63ede3ac88d2680d94380d1e5",
+        "obligations": [],
+        "outcome": "DENIED",
+        "provider_trace_id": "ag-45138fb0268d501d",
+        "reason_codes": [
+          "PRINCIPAL_UNRECOGNIZED"
+        ]
+      },
+      "permissive": {
+        "authority_basis": "actiongate-policy",
+        "constraints": [],
+        "expiry": null,
+        "fingerprint": "20543b760726bf22fad9e8090f52fccc85134f348091f9b3efb2d55cdea13257",
+        "obligations": [
+          "logging=audit"
+        ],
+        "outcome": "AUTHORIZED",
+        "provider_trace_id": "ag-33bef094b8dd9ac9",
+        "reason_codes": [
+          "POLICY_ALLOW"
+        ]
+      }
+    },
+    "principal_unresolved": {
+      "offending": {
+        "authority_basis": "actiongate-policy",
+        "constraints": [],
+        "expiry": null,
+        "fingerprint": "656a17853d14e0ef0a437a7913c07507840da10dba11905f1f0098d3f7eb0681",
+        "obligations": [],
+        "outcome": "DENIED",
+        "provider_trace_id": "ag-4b5a56a3f4701012",
+        "reason_codes": [
+          "PRINCIPAL_UNRESOLVED"
+        ]
+      },
+      "permissive": {
+        "authority_basis": "actiongate-policy",
+        "constraints": [],
+        "expiry": null,
+        "fingerprint": "20543b760726bf22fad9e8090f52fccc85134f348091f9b3efb2d55cdea13257",
+        "obligations": [
+          "logging=audit"
+        ],
+        "outcome": "AUTHORIZED",
+        "provider_trace_id": "ag-33bef094b8dd9ac9",
+        "reason_codes": [
+          "POLICY_ALLOW"
+        ]
+      }
+    },
+    "resource_not_permitted": {
+      "offending": {
+        "authority_basis": "actiongate-policy",
+        "constraints": [],
+        "expiry": null,
+        "fingerprint": "358155ec938a10308dc2ac9b259548c17a2ed1261f4266c0cd35724d27f43c6c",
+        "obligations": [],
+        "outcome": "DENIED",
+        "provider_trace_id": "ag-bbc84890c51ec2d0",
+        "reason_codes": [
+          "RESOURCE_NOT_PERMITTED"
+        ]
+      },
+      "permissive": {
+        "authority_basis": "actiongate-policy",
+        "constraints": [],
+        "expiry": null,
+        "fingerprint": "e1cd962fec073633269efb2c7057ff086bfeb5b643bca3d869ea8471863db48e",
+        "obligations": [
+          "logging=audit"
+        ],
+        "outcome": "AUTHORIZED",
+        "provider_trace_id": "ag-4a8c5ef85c5e7b5a",
+        "reason_codes": [
+          "POLICY_ALLOW"
+        ]
+      }
+    },
+    "risk_threshold": {
+      "offending": {
+        "authority_basis": "actiongate-policy",
+        "constraints": [],
+        "expiry": null,
+        "fingerprint": "d4d18c19b921123d3fe6076e859d5e3d1ddc780874a6597c5c36455fa169ba6e",
+        "obligations": [],
+        "outcome": "DENIED",
+        "provider_trace_id": "ag-3c2a1d54303e4df2",
+        "reason_codes": [
+          "RISK_THRESHOLD_EXCEEDED"
+        ]
+      },
+      "permissive": {
+        "authority_basis": "actiongate-policy",
+        "constraints": [],
+        "expiry": null,
+        "fingerprint": "471eca8af165f619f10141b0a811f32f64fa8a61547cdbfcf0f7fb51c0f86cbb",
+        "obligations": [
+          "logging=audit"
+        ],
+        "outcome": "AUTHORIZED",
+        "provider_trace_id": "ag-19545b685540632d",
+        "reason_codes": [
+          "POLICY_ALLOW"
+        ]
+      }
+    }
+  },
+  "dimensions_all_dispositive": true,
+  "errors": {
+    "config": "ProviderConfigurationError",
+    "invalid_config": "ProviderConfigurationError",
+    "malformed": "ProviderResultValidationError",
+    "timeout": "ProviderTimeoutError",
+    "unavailable": "ProviderUnavailableError"
+  },
+  "expired_never_authorizes": true,
+  "health": {
+    "degraded_healthy": false,
+    "degraded_state": "DEGRADED",
+    "healthy_ok": true
+  },
+  "lifecycle_states": [
+    "REGISTERED",
+    "AVAILABLE"
+  ],
+  "namespace": "ugence_actiongate_provider",
+  "observability": [
+    {
+      "compatible": true,
+      "completed": true,
+      "error_class": null,
+      "failure_class": null,
+      "has_trace": true,
+      "mapping_version": "actiongate-map-2",
+      "mode": "in_process",
+      "outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+      "policy_version": "policy-2"
+    },
+    {
+      "compatible": true,
+      "completed": false,
+      "error_class": "ProviderTimeoutError",
+      "failure_class": "RETRYABLE",
+      "has_trace": false,
+      "mapping_version": "actiongate-map-2",
+      "mode": "in_process",
+      "outcome": "",
+      "policy_version": "policy-2"
+    }
+  ],
+  "repeated_request": {
+    "fingerprint": "fc5758025afd596daf203547ef98353c4389fd7c3a84effa7221b0d7263b740d",
+    "fingerprint_stable": true,
+    "outcome_stable": true
+  },
+  "request_mapping": {
+    "action_type": "ACT",
+    "authority": "auth-ctx",
+    "authorization_expired": false,
+    "correlation_id": "corr-id",
+    "decision_refs": [
+      "d1"
+    ],
+    "evidence_refs": [
+      "e1",
+      "e2"
+    ],
+    "idempotency_key": "idem-key",
+    "parameters": {
+      "amount": "10",
+      "k": "v"
+    },
+    "policy_context": [
+      "p:1",
+      "p:2"
+    ],
+    "principal": "u",
+    "resource": "res:1",
+    "risk_context": {
+      "score": "low"
+    },
+    "tenant": ""
+  },
+  "request_mapping_unmapped_fields": [],
+  "result_allow": {
+    "authority_basis": "actiongate-policy",
+    "constraints": [],
+    "expiry": null,
+    "fingerprint": "423d2f5087d79da81af11123cf616231a30da9acf9848bbb986e9a9b871f384d",
+    "obligations": [
+      "logging=audit"
+    ],
+    "outcome": "AUTHORIZED",
+    "provider_trace_id": "ag-a3fcf2765ee9ae82",
+    "reason_codes": [
+      "POLICY_ALLOW"
+    ]
+  },
+  "result_constrained": {
+    "authority_basis": "actiongate-policy",
+    "constraints": [
+      "ext:ext_custom=x",
+      "maximum_amount=100000",
+      "required_approval=senior"
+    ],
+    "expiry": "2024-01-01T01:00:00+00:00",
+    "fingerprint": "fc5758025afd596daf203547ef98353c4389fd7c3a84effa7221b0d7263b740d",
+    "obligations": [
+      "ext:ext_obl=y",
+      "human_review",
+      "notification=finance"
+    ],
+    "outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+    "provider_trace_id": "ag-4d4a963b5a65c5fd",
+    "reason_codes": [
+      "POLICY_ALLOW_WITH_CONSTRAINTS"
+    ]
+  },
+  "result_denied": {
+    "authority_basis": "actiongate-policy",
+    "constraints": [],
+    "expiry": null,
+    "fingerprint": "e8044e41dd5aee69f47572a34e5fbe4fa6cf8e87f34e449405e89cb14676b178",
+    "obligations": [],
+    "outcome": "DENIED",
+    "provider_trace_id": "ag-c143cbf18f8d7467",
+    "reason_codes": [
+      "POLICY_DENIED"
+    ]
+  },
+  "result_negative_expiry": {
+    "authority_basis": "actiongate-policy",
+    "constraints": [],
+    "expiry": "2023-12-31T23:59:00+00:00",
+    "fingerprint": "6886c660e00b41c1c67f2071a61d69bf190fe242a17460a4637860e601dfaab6",
+    "obligations": [
+      "logging=audit"
+    ],
+    "outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+    "provider_trace_id": "ag-df3943b55605ef5b",
+    "reason_codes": [
+      "POLICY_ALLOW_WITH_CONSTRAINTS"
+    ]
+  },
+  "result_unknown": {
+    "authority_basis": "",
+    "constraints": [],
+    "expiry": null,
+    "fingerprint": "67fbdc6f75c00253af2d824d35f411e6a050d7fbce406781c229efb2d971af74",
+    "obligations": [],
+    "outcome": "INDETERMINATE",
+    "provider_trace_id": "ag-1d5fd84f4f582bb2",
+    "reason_codes": [
+      "POLICY_UNKNOWN"
+    ]
+  },
+  "result_zero_expiry": {
+    "authority_basis": "actiongate-policy",
+    "constraints": [],
+    "expiry": "2024-01-01T00:00:00+00:00",
+    "fingerprint": "5edfbd7e49a148b6a157d9fc0ba930f2775ba02dff073b783b45ee2511a84969",
+    "obligations": [
+      "logging=audit"
+    ],
+    "outcome": "AUTHORIZED_WITH_CONSTRAINTS",
+    "provider_trace_id": "ag-6d0ce80987f76d19",
+    "reason_codes": [
+      "POLICY_ALLOW_WITH_CONSTRAINTS"
+    ]
+  },
+  "version": {
+    "__version__": "0.1.0",
+    "contract_version": "1.0.0",
+    "mapping_version": "actiongate-map-2"
+  }
+}

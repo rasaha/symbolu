@@ -88,7 +88,13 @@ class ActionGovernanceControlPlaneAdapter:
             decision_refs=(action_request.decision_id,),
             idempotency_key=action_request.idempotency_key,
             correlation_id=cer.correlation_id,
-            authorization_expired=cer.expires_at is not None and cer.expires_at < now)
+            # Inclusive boundary: the instant a CER expires, it is expired. The
+            # exclusive form (`expires_at < now`) treated the boundary instant as
+            # still valid, which disagreed by one instant with Action Clearance,
+            # where `evaluation_time >= expires_at` is expired. A one-instant
+            # disagreement about whether an authorization is live is a window in
+            # which one layer authorizes what the other has already retired.
+            authorization_expired=cer.expires_at is not None and now >= cer.expires_at)
         try:
             result = self._provider.authorize(req)
             outcome = k["OUTCOME_MAP"][result.outcome]

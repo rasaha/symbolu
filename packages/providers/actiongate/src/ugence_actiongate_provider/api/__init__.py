@@ -10,8 +10,10 @@ from ..health import ActionGateHealthReport, check as check_health
 from ..conformance import ActionGateConformanceReport, run_actiongate_conformance
 from ..core import (
     ActionGateConstraint, ActionGateDecision, ActionGateEngine, ActionGateObligation,
-    ActionGateOutcome, ActionGateRequest, ConstrainedRule)
+    ActionGateOutcome, ActionGateRequest, ConstrainedRule, TIER_TO_NATIVE)
 from ..mapping import MAPPING_VERSION, KNOWN_CONSTRAINT_TYPES, KNOWN_OBLIGATION_TYPES
+from ..vnext import (
+    ActionGatePolicy, ActionGateReasonCode, ActionGateTier, ParameterBound, is_expired)
 
 __all__ = [
     "__version__", "CONTRACT_VERSION", "TARGET_KERNEL_VERSION", "TARGET_FRAMEWORK_VERSION",
@@ -23,4 +25,7 @@ __all__ = [
     "ActionGateEngine", "ActionGateRequest", "ActionGateDecision", "ActionGateOutcome",
     "ActionGateConstraint", "ActionGateObligation", "ConstrainedRule",
     "MAPPING_VERSION", "KNOWN_CONSTRAINT_TYPES", "KNOWN_OBLIGATION_TYPES",
+    # vNext policy semantics
+    "ActionGatePolicy", "ParameterBound", "ActionGateReasonCode", "ActionGateTier",
+    "TIER_TO_NATIVE", "is_expired",
 ]

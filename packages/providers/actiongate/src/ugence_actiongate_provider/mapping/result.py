@@ -6,6 +6,13 @@ Outcome map (unknown never authorizes):
     ALLOW_WITH_CONSTRAINTS → AUTHORIZED_WITH_CONSTRAINTS
     DENY                   → DENIED
     UNKNOWN                → INDETERMINATE
+    EXPIRED                → EXPIRED
+
+``EXPIRED`` completes the map. The neutral contract has carried that outcome
+since it was written and the kernel has an ``EXPIRED`` authorization state, but
+ActionGate had no native counterpart, so an expired authorization could only be
+reported as something else. Composing this map with ``core.TIER_TO_NATIVE``
+reproduces ``vnext.NEUTRAL_OUTCOME_V2`` exactly.
 
 Preserves constraints, obligations, expiry, authority basis, reason codes, trace
 id, and publishes a deterministic result fingerprint.
@@ -28,10 +35,17 @@ _OUTCOME_MAP = {
     ActionGateOutcome.ALLOW_WITH_CONSTRAINTS: ActionGovernanceOutcome.AUTHORIZED_WITH_CONSTRAINTS,
     ActionGateOutcome.DENY: ActionGovernanceOutcome.DENIED,
     ActionGateOutcome.UNKNOWN: ActionGovernanceOutcome.INDETERMINATE,
+    ActionGateOutcome.EXPIRED: ActionGovernanceOutcome.EXPIRED,
 }
 
 #: The framework mapping-contract version (published in observability).
-MAPPING_VERSION = "actiongate-map-1"
+#:
+#: Bumped to -2 by the MAJOR change that made ``authorization_expired`` a mapped
+#: field and ``EXPIRED`` a native outcome. The mapping contract itself changed —
+#: an observability record stamped -1 and one stamped -2 describe different
+#: request/result translations, and the version is how a consumer tells them
+#: apart after the fact.
+MAPPING_VERSION = "actiongate-map-2"
 
 
 def _fingerprint(decision: ActionGateDecision, outcome: ActionGovernanceOutcome,

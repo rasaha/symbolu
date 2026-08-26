@@ -69,6 +69,7 @@ class ActionGateReasonCode(str, Enum):
 
     # positive
     POLICY_ALLOW = "POLICY_ALLOW"
+    POLICY_ALLOW_WITH_CONSTRAINTS = "POLICY_ALLOW_WITH_CONSTRAINTS"
 
     # action_type
     POLICY_DENIED = "POLICY_DENIED"
@@ -114,6 +115,7 @@ T = ActionGateTier
 #: to a harder tier; it may never soften a hard one (enforced in evaluator).
 DEFAULT_TIER: dict = {
     R.POLICY_ALLOW: T.AUTHORIZED,
+    R.POLICY_ALLOW_WITH_CONSTRAINTS: T.AUTHORIZED_WITH_CONSTRAINTS,
     R.POLICY_DENIED: T.DENIED,
     R.POLICY_UNKNOWN: T.ESCALATION_REQUIRED,
     R.POLICY_NO_RULE: T.ESCALATION_REQUIRED,

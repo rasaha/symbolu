@@ -9,11 +9,27 @@
   (an already-expired instant); ActionGate does not special-case them.
 
 ### Enforcement owner
-ActionGate **emits** expiry; it does **not** enforce it. Classification:
-**`PROVIDER_EMITS_EXPIRY`**. Whether dispatch is blocked after expiry is a
-**framework / execution-layer** responsibility (the control-plane adapter carries an
-`authorization_expired` signal and an `EXPIRED` kernel outcome). ActionGate itself
-provides no temporal replay protection.
+Two different things are meant by "expiry", and ActionGate's role differs for each.
+
+**The expiry ActionGate emits on its own decision** — it emits, it does not enforce.
+Classification: **`PROVIDER_EMITS_EXPIRY`**. Whether dispatch is blocked after that
+instant is a **framework / execution-layer** responsibility. ActionGate provides no
+temporal replay protection.
+
+**The expiry of the upstream authorization the request rides on** — ActionGate
+**does** honour this, as of the `authorization_expired` change. The neutral request
+carries the flag, the control-plane adapter computes it, and ActionGate returns
+`EXPIRED` without consulting policy. Previously ActionGate discarded the flag and
+had no native outcome able to express expiry, so an action riding an expired CER was
+authorized. Classification for this second sense: **`PROVIDER_HONOURS_UPSTREAM_EXPIRY`**.
+
+### The boundary instant
+`now >= expires_at` is expired — the instant an authorization expires, it is expired,
+not valid for that tick. `ugence_actiongate_provider.vnext.is_expired` states the rule
+once, and the control-plane adapter applies it. This previously read
+`expires_at < now`, which disagreed by one instant with Action Clearance
+(`evaluation_time >= expires_at`), leaving a window in which one layer would authorize
+what the other had already retired.
 
 ## Idempotency & replay
 - The neutral request's `idempotency_key` is **preserved** through request mapping.

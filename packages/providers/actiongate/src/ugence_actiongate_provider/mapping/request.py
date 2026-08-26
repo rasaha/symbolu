@@ -2,6 +2,14 @@
 
 Deterministic and total. Every field the neutral contract carries is preserved.
 
+``authorization_expired`` was previously the one exception — the only neutral
+field this mapping dropped, while the control-plane adapter computed it and the
+framework's own reference provider honoured it. ActionGate consequently
+authorized actions under an expired authorization. It is now mapped, and a
+regression test asserts the mapping is total against the neutral dataclass's
+fields rather than against a hand-maintained list, so a future neutral field
+cannot be added and silently ignored the same way.
+
 Intentionally lossy / not-populated (documented):
 
 * ``tenant`` — the neutral ``ActionGovernanceRequest`` has no tenant field (the
@@ -31,4 +39,5 @@ def map_request(request: ActionGovernanceRequest) -> ActionGateRequest:
         tenant="",  # not carried by the neutral contract (documented)
         correlation_id=request.correlation_id,
         idempotency_key=request.idempotency_key,
+        authorization_expired=request.authorization_expired,
     )

@@ -7,7 +7,7 @@ Five version concepts are kept explicit and separate:
 * :data:`DISTRIBUTION_VERSION` — the **canonical distribution**
   (``ugence-actiongate-provider``) packaging-lifecycle version.
 * :data:`CONTRACT_VERSION` — the ``ActionGovernanceProvider`` contract version.
-* the **mapping version** (``actiongate-map-1``) — reported by :func:`version_info`.
+* the **mapping version** (``actiongate-map-2``) — reported by :func:`version_info`.
 * :data:`TARGET_FRAMEWORK_VERSION` — the provider-framework version targeted.
 
 The implementation and initial canonical distribution both start at ``0.1.0``. A

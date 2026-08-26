@@ -1,16 +1,10 @@
-"""ActionGate vNext — the deterministic policy evaluator (staged, not yet public).
+"""ActionGate vNext — the deterministic policy evaluator.
 
-This subpackage is deliberately **not** re-exported from
-``ugence_actiongate_provider.api``. Everything the ActionGate ``.api`` surface
-exports is covered by a literal snapshot hash that CI asserts byte-for-byte
-(``actiongate-provider-package-ci.yml``, base
-``9eeb66e31430d9e65982826e9910fc571fbae0331b797c5bb1b735bc53887300``) and by
-``public_api_manifests`` in ``platform/PLATFORM_FREEZE_V1.json``. Adding a symbol
-there is a versioned decision, not a side effect of landing an evaluator.
-
-So this stages the semantics without moving a frozen surface: the evaluator is
-complete and tested, the public path is untouched, and wiring it in becomes a
-separate, explicitly classified change.
+``ActionGateEngine.evaluate`` delegates here, so this is where every governance
+dimension the neutral contract carries is actually read. The policy types are
+re-exported from ``ugence_actiongate_provider.api``; that export, and the native
+``EXPIRED`` outcome it accompanies, are the MAJOR change that moved the frozen
+``.api`` snapshot hash and ``public_api_manifests``.
 
 Provenance: reduced from the ActionGate reference evaluator at
 ``cyber_security/action_gate_reference/action_gate_ref/`` (195 tests, gated by
@@ -29,6 +23,7 @@ from .evaluator import (
     VNextDecision,
     evaluate,
 )
+from .expiry import is_expired
 from .policy import ActionGatePolicy, ParameterBound
 from .reason_codes import (
     DEFAULT_TIER,
@@ -58,4 +53,5 @@ __all__ = [
     "canonical_reason_order",
     "NEUTRAL_OUTCOME_STAGED",
     "NEUTRAL_OUTCOME_V2",
+    "is_expired",
 ]

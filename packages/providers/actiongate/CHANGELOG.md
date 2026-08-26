@@ -2,6 +2,71 @@
 
 All notable changes to the canonical ActionGate distribution are documented here.
 
+## [Unreleased] — deterministic policy semantics (change class **MAJOR**)
+
+Change class **MAJOR** per `platform/PLATFORM_FREEZE_V1.json` `compatibility_rules`
+(*"authority/lifecycle/dependency-direction/fail-safe changes"*). Note that the
+platform's own API-diff classifier reports this as `MINOR`/`ADDITIVE`: it compares
+API *shape*, and every shape change here is an addition. The MAJOR classification
+comes from the semantic change, which no shape diff can see.
+
+### Fixed (fail-safe)
+
+- **`authorization_expired` is no longer discarded.** It was the one neutral request
+  field `map_request` dropped, while the control-plane adapter computed it and the
+  framework's reference provider honoured it — so ActionGate authorized actions
+  riding an expired CER. It is now mapped, and an expired authorization short-circuits
+  to `EXPIRED` before any policy is consulted, carrying no authority basis and no
+  constraints.
+- **Governance dimensions are no longer inert.** The engine branched solely on
+  `action_type`; `principal`, `authority`, `resource`, `parameters`, `risk_context`,
+  `evidence_refs` and `decision_refs` were mapped and never read. Evaluation now
+  routes through `ugence_actiongate_provider.vnext`, which reads all of them.
+- **Trace ids distinguish requests that differ.** `_trace` covered `action_type`,
+  `parameters` and `tenant` only — and `tenant` is always empty — so requests
+  differing in actor, authority, risk and expiry shared a trace id.
+- **The inclusive expiry boundary is applied.** `now >= expires_at` is expired. The
+  control-plane adapter previously used `expires_at < now`, disagreeing by one
+  instant with Action Clearance.
+
+### Added
+
+- `ActionGateOutcome.EXPIRED` and `ActionGateRequest.authorization_expired`.
+- `ugence_actiongate_provider.vnext`: closed reason-code catalogue with a declared
+  tier per code, a non-compensatory severity lattice reduced from the ActionGate
+  reference evaluator, an immutable dimension-policy model, and a pure evaluator.
+- `ActionGateEngine(policy=...)` and `ActionGateEngine.governed_dimensions`.
+- `.api` exports: `ActionGatePolicy`, `ParameterBound`, `ActionGateReasonCode`,
+  `ActionGateTier`, `TIER_TO_NATIVE`, `is_expired`.
+
+### Changed (breaking)
+
+- **Reason codes are UPPER_SNAKE from a closed catalogue.** `policy_allow`,
+  `policy_denied`, `policy_unknown`, `policy_allow_with_constraints` become
+  `POLICY_ALLOW`, `POLICY_DENIED`, `POLICY_UNKNOWN`, `POLICY_ALLOW_WITH_CONSTRAINTS`.
+  A consumer string-matching the old lowercase values must be updated.
+- **Mapping version `actiongate-map-1` → `actiongate-map-2`.**
+- **Engine policy version `policy-1` → `policy-2`.**
+- A default-constructed `ActionGateEngine` governs no dimensions. Dimension rules
+  must be supplied via `policy=`; the `denied`/`unknown`/`constrained` shorthand
+  still works and is folded into the policy.
+
+### Re-baselined
+
+- `.api` snapshot `9eeb66e3…` → `5334cca1…` (workflow base and
+  `public_api_manifests`).
+- `conformance_hashes` `07e08bd4…` → `ff605bf9…`.
+- `core_tree_hashes["actiongate_provider"]` `9cbeb833…` → `a0010fcf…`.
+- Behavioural equivalence: a new `actiongate_equivalence_after_semantics.json`
+  baseline (`e1ff5d2a…`) is the comparison target.
+  `actiongate_equivalence_before.json` (`d805e6cf…`) is **kept** as the
+  pre-migration record and CI asserts it still differs.
+
+### Not changed
+
+- Implementation and distribution versions remain `0.1.0` — an owner decision,
+  deliberately not taken here.
+
 ## [0.1.0] — canonical package migration
 
 First independent distribution of the ActionGate action-governance provider.

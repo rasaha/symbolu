@@ -45,7 +45,9 @@ def test_reason_codes_and_trace_preserved_through_authorization():
                            obligations=(ActionGateObligation("human_review"),))
     p = build_actiongate_provider(ActionGateEngine(constrained={"C": rule})); p.initialize()
     r = p.authorize(ActionGovernanceRequest("C"))
-    assert r.reason_codes and "policy_allow_with_constraints" in r.reason_codes
+    # vNext reason codes are UPPER_SNAKE from a closed catalogue (the pre-vNext
+    # engine emitted four lowercase ad-hoc strings).
+    assert r.reason_codes == ("POLICY_ALLOW_WITH_CONSTRAINTS",)
     assert r.provider_trace_id.startswith("ag-")
 
 

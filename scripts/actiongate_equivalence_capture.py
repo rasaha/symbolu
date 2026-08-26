@@ -145,7 +145,38 @@ def capture(namespace: str) -> dict:
         "tenant": native.tenant,  # intentionally lossy (documented)
         "correlation_id": native.correlation_id,
         "idempotency_key": native.idempotency_key,
+        "authorization_expired": native.authorization_expired,
     }
+
+    # --- request mapping is TOTAL over the neutral contract ----------------
+    # Driven off the neutral dataclass's own fields rather than the fixed key
+    # list above. The old probe dumped a hand-written key set and never set
+    # authorization_expired, so it could not have detected that the mapping
+    # dropped it — the field was absent from both the mapping and the probe.
+    import dataclasses as _dc
+
+    _probe = ActionGovernanceRequest(
+        action_type="ACT", requested_parameters={"k": "v"}, actor="u",
+        authority_context="auth", target_resource="res", policy_refs=("p:1",),
+        risk_context={"score": "low"}, evidence_refs=("e1",), decision_refs=("d1",),
+        idempotency_key="idem", correlation_id="corr", authorization_expired=True)
+    _mapped = mapping.map_request(_probe)
+    _rename = {"requested_parameters": "parameters", "actor": "principal",
+               "authority_context": "authority", "target_resource": "resource",
+               "policy_refs": "policy_context"}
+    _missing = object()
+    _unmapped = []
+    for _f in _dc.fields(ActionGovernanceRequest):
+        _want = getattr(_probe, _f.name)
+        _got = getattr(_mapped, _rename.get(_f.name, _f.name), _missing)
+        if _got is _missing:
+            _unmapped.append(_f.name)
+            continue
+        if isinstance(_want, dict):
+            _got, _want = dict(_got), dict(_want)
+        if _got != _want:
+            _unmapped.append(_f.name)
+    out["request_mapping_unmapped_fields"] = sorted(_unmapped)
 
     # --- native outcomes → neutral results (fixed clock) -------------------
     def authorize(engine_kw, request):
@@ -169,6 +200,81 @@ def capture(namespace: str) -> dict:
         authorize({"denied": frozenset({"D"})}, ActionGovernanceRequest("D")))
     out["result_unknown"] = _result_dict(
         authorize({"unknown": frozenset({"U"})}, ActionGovernanceRequest("U")))
+
+    # --- every governance dimension must be able to move the outcome -------
+    # The pre-vNext probe varied action_type alone, so an engine that read
+    # action_type and ignored the other seven dimensions produced an identical
+    # capture to one that read them all. Each entry below holds the policy fixed
+    # and varies exactly one dimension; a regression to an inert dimension
+    # collapses the pair and moves this hash.
+    ActionGatePolicy = api.ActionGatePolicy
+    ParameterBound = api.ParameterBound
+
+    def dimension_pair(policy, permissive, offending):
+        p = build_clocked(ActionGateEngine(policy=policy))
+        p.initialize()
+        return {"permissive": _result_dict(p.authorize(permissive)),
+                "offending": _result_dict(p.authorize(offending))}
+
+    def _pol(**kw):
+        return ActionGatePolicy(policy_id="equivalence", policy_version="1", **kw)
+
+    ACT = "ACT"
+    out["dimensions"] = {
+        "authority_absent": dimension_pair(
+            _pol(authority_required_action_types=frozenset({ACT})),
+            ActionGovernanceRequest(ACT, authority_context="delegated:analyst"),
+            ActionGovernanceRequest(ACT, authority_context="")),
+        "authority_insufficient": dimension_pair(
+            _pol(accepted_authority_contexts={ACT: ("delegated:treasurer",)}),
+            ActionGovernanceRequest(ACT, authority_context="delegated:treasurer"),
+            ActionGovernanceRequest(ACT, authority_context="delegated:intern")),
+        "principal_unresolved": dimension_pair(
+            _pol(principal_required_action_types=frozenset({ACT})),
+            ActionGovernanceRequest(ACT, actor="alice"),
+            ActionGovernanceRequest(ACT, actor="")),
+        "principal_unrecognized": dimension_pair(
+            _pol(principal_allowlist=frozenset({"alice"})),
+            ActionGovernanceRequest(ACT, actor="alice"),
+            ActionGovernanceRequest(ACT, actor="mallory")),
+        "resource_not_permitted": dimension_pair(
+            _pol(permitted_resource_prefixes={ACT: ("ledger:",)}),
+            ActionGovernanceRequest(ACT, target_resource="ledger:42"),
+            ActionGovernanceRequest(ACT, target_resource="payroll:1")),
+        "parameter_limit": dimension_pair(
+            _pol(parameter_bounds=(ParameterBound("amount", deny_above=1000),)),
+            ActionGovernanceRequest(ACT, requested_parameters={"amount": "999"}),
+            ActionGovernanceRequest(ACT, requested_parameters={"amount": "1001"})),
+        "risk_threshold": dimension_pair(
+            _pol(risk_deny_scores=frozenset({"critical"})),
+            ActionGovernanceRequest(ACT, risk_context={"score": "low"}),
+            ActionGovernanceRequest(ACT, risk_context={"score": "critical"})),
+        "evidence_insufficient": dimension_pair(
+            _pol(minimum_evidence_refs={ACT: 2}),
+            ActionGovernanceRequest(ACT, evidence_refs=("e1", "e2")),
+            ActionGovernanceRequest(ACT, evidence_refs=("e1",))),
+        "decision_ref_missing": dimension_pair(
+            _pol(decision_ref_required_action_types=frozenset({ACT})),
+            ActionGovernanceRequest(ACT, decision_refs=("d:9",)),
+            ActionGovernanceRequest(ACT, decision_refs=())),
+        "policy_context_absent": dimension_pair(
+            _pol(policy_ref_required_action_types=frozenset({ACT})),
+            ActionGovernanceRequest(ACT, policy_refs=("p:1",)),
+            ActionGovernanceRequest(ACT, policy_refs=())),
+        "authorization_expired": dimension_pair(
+            _pol(),
+            ActionGovernanceRequest(ACT, authorization_expired=False),
+            ActionGovernanceRequest(ACT, authorization_expired=True)),
+    }
+
+    # Every pair above must actually differ. Captured rather than asserted so a
+    # regression shows up as a hash move with a readable diff, not a crash.
+    out["dimensions_all_dispositive"] = all(
+        pair["permissive"] != pair["offending"] for pair in out["dimensions"].values())
+
+    # An expired authorization is non-authorizing regardless of policy.
+    out["expired_never_authorizes"] = out["dimensions"]["authorization_expired"][
+        "offending"]["outcome"] == ActionGovernanceOutcome.EXPIRED.value
 
     # zero / negative expiry (documented live semantics)
     out["result_zero_expiry"] = _result_dict(authorize(

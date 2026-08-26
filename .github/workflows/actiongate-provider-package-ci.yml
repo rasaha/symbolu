@@ -64,19 +64,40 @@ jobs:
             packages/providers/actiongate/tests/compatibility \
             packages/providers/actiongate/tests/packaging -q
 
-      - name: Behavioral-equivalence comparison (before == canonical == legacy)
+      - name: Behavioral-equivalence comparison (after_semantics == canonical == legacy)
+        # The comparison target moved from `before` to `after_semantics` when the
+        # vNext evaluator landed: real dimension semantics and the native EXPIRED
+        # outcome change what the probe observes, so the pre-migration capture can
+        # no longer be an equality target. `before` is deliberately KEPT, and
+        # asserted to still differ, because it is the only remaining record that
+        # the canonical package once matched the legacy implementation
+        # byte-for-byte. Regenerating it in place would have destroyed that.
         run: |
           python scripts/actiongate_equivalence_capture.py ugence_actiongate_provider --out /tmp/after_canonical.json >/dev/null
           python scripts/actiongate_equivalence_capture.py actiongate_provider --out /tmp/after_legacy.json >/dev/null
           python - <<'PY'
           import json
+          ART = "docs/audits/actiongate_packaging/artifacts"
           def h(f):
               return json.load(open(f))["capture_hash"]
-          before = h("docs/audits/actiongate_packaging/artifacts/actiongate_equivalence_before.json")
+          baseline = h(f"{ART}/actiongate_equivalence_after_semantics.json")
+          before = h(f"{ART}/actiongate_equivalence_before.json")
           canon = h("/tmp/after_canonical.json")
           legacy = h("/tmp/after_legacy.json")
-          assert before == canon == legacy, "ActionGate behavioral regression"
-          print("behavioral equivalence: OK", before)
+          assert baseline == canon == legacy, "ActionGate behavioral regression"
+          assert before != baseline, (
+              "the pre-migration baseline must stay distinct; if these ever match, "
+              "`before` has been regenerated and the migration record is lost")
+
+          # The probe must remain non-vacuous: every governance dimension has to
+          # be able to move the outcome. This is the check the old probe lacked,
+          # which is why it could not have caught the dropped authorization_expired.
+          capture = json.load(open("/tmp/after_canonical.json"))
+          assert capture["dimensions_all_dispositive"], "a governance dimension went inert"
+          assert capture["expired_never_authorizes"], "expired authorization authorized"
+          assert capture["request_mapping_unmapped_fields"] == [], (
+              f"neutral fields dropped in mapping: {capture['request_mapping_unmapped_fields']}")
+          print("behavioral equivalence: OK", baseline)
           PY
         env:
           PYTHONPATH: ${{ env.SRC_PYTHONPATH }}
@@ -91,7 +112,10 @@ jobs:
           def hh(mod):
               return hashlib.sha256(json.dumps(snapshot_module(mod), sort_keys=True).encode()).hexdigest()
           legacy = hh("actiongate_provider.api")
-          base = "9eeb66e31430d9e65982826e9910fc571fbae0331b797c5bb1b735bc53887300"
+          # Re-baselined by the MAJOR change that added ActionGateOutcome.EXPIRED,
+          # ActionGateRequest.authorization_expired, and the vNext policy types.
+          # Previous base: 9eeb66e31430d9e65982826e9910fc571fbae0331b797c5bb1b735bc53887300
+          base = "5334cca1451d652718d3ceee66688882f6d51caf3fc4db5b07bdba913489cd55"
           assert legacy == base, f"ActionGate public .api surface changed: {legacy}"
           # canonical .api symbols must match the legacy snapshot (module label aside)
           a = snapshot_module("ugence_actiongate_provider.api")["symbols"]

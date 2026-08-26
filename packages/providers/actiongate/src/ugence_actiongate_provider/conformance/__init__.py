@@ -58,6 +58,57 @@ def _p(**engine_kw):
     return p
 
 
+#: Neutral ``ActionGovernanceRequest`` field -> native ``ActionGateRequest``
+#: field, where the two vocabularies use different names.
+NEUTRAL_TO_NATIVE = {
+    "requested_parameters": "parameters",
+    "actor": "principal",
+    "authority_context": "authority",
+    "target_resource": "resource",
+    "policy_refs": "policy_context",
+}
+
+#: Neutral fields ActionGate deliberately does not carry, each with its reason.
+#: Empty today. A field belongs here only after an explicit decision, never as a
+#: way to quiet the totality check below.
+NEUTRAL_NOT_CARRIED: dict = {}
+
+
+def unmapped_neutral_fields() -> set:
+    """Neutral request fields that do not survive ``map_request``.
+
+    Compares a probe request field-by-field against its mapped counterpart, so
+    the check is driven by the neutral dataclass rather than by a list someone
+    has to remember to update. ``authorization_expired`` was dropped for exactly
+    as long as the equivalent assertion was a hand-written field list.
+    """
+    import dataclasses
+
+    probe = ActionGovernanceRequest(
+        action_type="ACT", requested_parameters={"k": "v"}, actor="u",
+        authority_context="auth", target_resource="res", policy_refs=("p:1",),
+        risk_context={"score": "low"}, evidence_refs=("e1",), decision_refs=("d1",),
+        idempotency_key="idem", correlation_id="corr", authorization_expired=True)
+    mapped = map_request(probe)
+
+    _MISSING = object()
+    unmapped = set()
+    for f in dataclasses.fields(ActionGovernanceRequest):
+        if f.name in NEUTRAL_NOT_CARRIED:
+            continue
+        expected = getattr(probe, f.name)
+        actual = getattr(mapped, NEUTRAL_TO_NATIVE.get(f.name, f.name), _MISSING)
+        if actual is _MISSING:
+            unmapped.add(f.name)
+            continue
+        # Mappings are copied rather than aliased, so compare by value.
+        if isinstance(expected, dict):
+            actual, expected = dict(actual), dict(expected)
+        if actual != expected:
+            unmapped.add(f.name)
+    return unmapped
+
+
 def run_actiongate_conformance() -> ActionGateConformanceReport:
     rep = ActionGateConformanceReport()
 
@@ -68,14 +119,33 @@ def run_actiongate_conformance() -> ActionGateConformanceReport:
     native = map_request(ActionGovernanceRequest(
         action_type="ACT", requested_parameters={"k": "v"}, actor="u",
         authority_context="auth", target_resource="res", policy_refs=("p:1",),
-        decision_refs=("d1",), idempotency_key="idem", correlation_id="corr"))
+        decision_refs=("d1",), idempotency_key="idem", correlation_id="corr",
+        risk_context={"score": "low"}, evidence_refs=("e1",),
+        authorization_expired=True))
     check("request_mapping",
           native.action_type == "ACT" and native.principal == "u"
           and native.authority == "auth" and native.resource == "res"
           and native.policy_context == ("p:1",) and native.decision_refs == ("d1",)
-          and native.idempotency_key == "idem" and native.correlation_id == "corr")
+          and native.idempotency_key == "idem" and native.correlation_id == "corr"
+          and native.risk_context == {"score": "low"} and native.evidence_refs == ("e1",)
+          and native.authorization_expired is True)
 
-    # result mapping (all four outcomes; unknown never authorizes)
+    # request mapping is TOTAL over the neutral contract: no field may be
+    # silently dropped the way authorization_expired once was. Driven off the
+    # dataclass's own fields, so a newly added neutral field fails this check
+    # until it is either mapped or explicitly named as not carried.
+    check("request_mapping_total", not unmapped_neutral_fields(),
+          detail=f"unmapped: {sorted(unmapped_neutral_fields())}")
+
+    # an expired authorization never authorizes, whatever the policy says
+    expired = _p().authorize(ActionGovernanceRequest("OK", authorization_expired=True))
+    check("expired_outcome", expired.outcome is ActionGovernanceOutcome.EXPIRED)
+    check("expired_never_authorizes",
+          expired.outcome not in (ActionGovernanceOutcome.AUTHORIZED,
+                                  ActionGovernanceOutcome.AUTHORIZED_WITH_CONSTRAINTS))
+    check("expired_carries_no_authority_basis", expired.authority_basis == "")
+
+    # result mapping (every outcome; unknown and expired never authorize)
     check("result_allow", _p().authorize(ActionGovernanceRequest("OK")).outcome
           is ActionGovernanceOutcome.AUTHORIZED)
     check("result_denied", _p(denied=frozenset({"D"})).authorize(

@@ -39,7 +39,7 @@ facade owns `actiongate_provider`; the canonical wheel owns
 - **Implementation version**: `0.1.0` — unchanged by the relocation.
 - **Canonical distribution version**: `0.1.0`.
 - **Legacy compatibility distribution version**: `0.1.0`.
-- **Contract version**: `1.0.0`; **mapping version**: `actiongate-map-1`.
+- **Contract version**: `1.0.0`; **mapping version**: `actiongate-map-2`.
 
 `ugence_actiongate_provider.version_info()` reports all of these plus resolved
 dependency versions and `production_certified = False`.
