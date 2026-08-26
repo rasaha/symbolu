@@ -1031,6 +1031,107 @@ def test_a_mutant_nesting_a_tool_observation_fails(graph):
 
 
 # --------------------------------------------------------------------------- #
+# OD-5 — neither strategy field is inside the frozen projection
+# --------------------------------------------------------------------------- #
+
+#: The strategy names OD-5 keeps outside ``P_unsigned``.
+#:
+#: ``declared_strategy`` is a claim the process record makes about the method it used. It
+#: is not a property of the advisory and may not reach the digest: bringing it inside
+#: would make it identity-participating and so expose it to the B9 hazard OD-1's rider is
+#: explicit about, and would make an advisory's identity depend on an assertion nothing in
+#: this stage verifies.
+#:
+#: ``permitted_reasoning_strategies`` is listed beside it although **no S1 contract
+#: declares it** — the owner deferred it to S2 with its vocabulary (Part J). Keeping the
+#: name here is not redundant with its absence from the mirror: if a later change
+#: reintroduces the field, this guard fails unless it is also kept out of the advisory,
+#: which is the property OD-5 cares about and the cardinality pin does not express.
+STRATEGY_FIELDS_OUTSIDE_IDENTITY = ("declared_strategy", "permitted_reasoning_strategies")
+
+
+def _projection_keys(payload, prefix=""):
+    """Every key in a ``model_dump`` projection, nested keys included and path-qualified.
+
+    A flat top-level check would pass a design that hid either field one level down, on a
+    nested candidate, which is exactly where OD-4(a) made new content reachable.
+    """
+    keys = set()
+    if isinstance(payload, dict):
+        for key, value in payload.items():
+            keys.add(f"{prefix}{key}")
+            keys |= _projection_keys(value, f"{prefix}{key}.")
+    elif isinstance(payload, (list, tuple)):
+        for item in payload:
+            keys |= _projection_keys(item, f"{prefix}[].")
+    return keys
+
+
+@pytest.fixture(scope="module")
+def unsigned_projection(graph):
+    """``P_unsigned`` exactly as G1 freezes it, built from a complete advisory."""
+    pytest.importorskip("pydantic")
+    advisory = graph["ProposerAdvisory"](**spec.complete_advisory_fixture())
+    return advisory.model_dump(mode="json", exclude={"advisory_digest"},
+                               exclude_none=False)
+
+
+@pytest.mark.parametrize("field", STRATEGY_FIELDS_OUTSIDE_IDENTITY)
+def test_no_strategy_field_appears_in_the_unsigned_projection(unsigned_projection, field):
+    """OD-5: strategy is metadata, and metadata is not identity."""
+    offenders = sorted(key for key in _projection_keys(unsigned_projection)
+                       if key.rsplit(".", 1)[-1] == field)
+    assert not offenders, (
+        f"{field!r} is inside P_unsigned at {offenders}; it would be covered by "
+        "advisory_digest, which OD-5 says it is not")
+
+
+def test_the_projection_probe_would_notice_a_field_that_did_appear(unsigned_projection):
+    """The control. The assertion above runs over a projection that legitimately lacks
+    both names, and a walker that returned nothing would report exactly the same pass.
+
+    Two things are proved: the walker reaches real content at both levels, and a planted
+    key at either level is found. Without this, deleting the recursion would leave the
+    guard green.
+    """
+    keys = _projection_keys(unsigned_projection)
+    assert "case_ref" in keys, "the walker does not reach top-level keys"
+    assert any(key.startswith("candidates.[].") for key in keys), (
+        "the walker does not descend into the nested candidates OD-4(a) added")
+    assert "advisory_digest" not in keys, "G1 excludes the digest from its own projection"
+
+    for planted in ({"declared_strategy": "x"},
+                    {"candidates": [{"permitted_reasoning_strategies": []}]}):
+        found = _projection_keys(planted)
+        assert any(key.rsplit(".", 1)[-1] in STRATEGY_FIELDS_OUTSIDE_IDENTITY
+                   for key in found), (
+            f"the walker misses a planted strategy field in {planted!r}")
+
+
+def test_neither_strategy_field_is_declared_on_either_advisory_type(graph):
+    """The same rule read off the shapes rather than off one instance's projection.
+
+    A field excluded from a dump — by an alias, an ``exclude`` marker, or a serializer —
+    would pass the projection check while still being declared on the advisory, and a
+    later change to how the model dumps would then bring it inside the digest silently.
+    """
+    for root in ("ProposerAdvisory", "CandidateAdvisory"):
+        reachable = _runtime_fields_reachable_from(graph[root])
+        for field in STRATEGY_FIELDS_OUTSIDE_IDENTITY:
+            assert field not in reachable, (
+                f"{field!r} is reachable from {root}; OD-5 keeps it outside P_unsigned")
+    # ``declared_strategy`` still exists on its bearer, so the assertion above is about
+    # placement rather than about the field having quietly ceased to exist.
+    assert "declared_strategy" in graph["ProposerProcessRecord"].model_fields
+    # ``permitted_reasoning_strategies`` is deferred to S2 and is declared by NO contract.
+    # Asserted so the deferral is a checked fact rather than an omission a reader has to
+    # notice, and so reintroducing the field trips this test as well as the mirror's pins.
+    for contract in spec.TOP_LEVEL_CONTRACTS + spec.NESTED_PUBLIC_SHAPES:
+        assert "permitted_reasoning_strategies" not in graph[contract].model_fields, (
+            f"{contract} declares permitted_reasoning_strategies; OD-5 defers it to S2")
+
+
+# --------------------------------------------------------------------------- #
 # I7.11 on the DECLARED surface — armed by the first contract module
 # --------------------------------------------------------------------------- #
 #

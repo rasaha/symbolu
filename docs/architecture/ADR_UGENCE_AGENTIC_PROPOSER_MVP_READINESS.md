@@ -17,11 +17,13 @@ the S1 enforcement guards landed and were audited, and are recorded under *Ratif
 refinements* below; each narrows or completes a rule D6–D8 already carry. OD-1 – OD-4,
 raised later by auditing those refinements against representative contract shapes and
 reconciling this artifact with the contract specification, were ratified 2026-08-25 and
-are recorded under *Owner decisions OD-1 – OD-4* below. **No owner decision remains
-open, so S1 is unblocked on ratification grounds** — and on ratification grounds only.
-**Two** things still gate S1 code, neither of them a ruling: the Part I implementation
-obligations in the contract specification are undischarged, and A11 keeps production
-implementation unauthorized until this documentation is independently reviewed.
+are recorded under *Owner decisions OD-1 – OD-5* below. **OD-5**, on reasoning functions
+and strategies, was ratified 2026-08-26 and is recorded in the same table. **No owner
+decision remains open, so S1 is unblocked on ratification grounds** — and on
+ratification grounds only.
+**One** thing still gates S1 code, and it is not a ruling: the Part I implementation
+obligations in the contract specification are undischarged. A11's review-and-merge
+condition is discharged by the freeze recorded in **A12**.
 "Unblocked on ratification grounds" is therefore not "authorized to implement", and this
 artifact does not claim it is. The O-1 – O-4 and OD-1 – OD-3 enforcement guards are
 implemented in `packages/capabilities/agentic-proposer/tests/`; a guard being
@@ -564,9 +566,10 @@ a trailing newline against `$` and `re.fullmatch` does not, so stating a pattern
 stating the application would leave the rule one convenience call away from admitting a
 value it names as invalid.
 
-## Owner decisions OD-1 – OD-4 — all resolved
+## Owner decisions OD-1 – OD-5 — all resolved
 
-**All four are ratified 2026-08-25**, recorded here so this artifact does not report a
+**OD-1 – OD-4 are ratified 2026-08-25 and OD-5 is ratified 2026-08-26**, recorded here
+so this artifact does not report a
 clean record its own subordinate documents contradict, nor a cleaner one than the
 enforcement supports. D6–D10 close every question this artifact previously carried as
 open, and O-1 – O-4 close the four the S1 enforcement audit raised; OD-1 – OD-4 were
@@ -574,14 +577,18 @@ raised afterwards, by auditing those guards against representative contract shap
 by reconciling this artifact with
 `packages/capabilities/agentic-proposer/docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md`,
 where each is stated in full with its rider, its enforcement design and its three
-statuses. OD-4 was the only one bearing on contract shape; it is resolved below and the
-specification implements the resolution.
+statuses. OD-5 was raised separately, on the relationship between reasoning functions
+and reasoning strategies, and was ruled **not** to bear on contract shape: it defers the
+strategy permission concept and its vocabulary together to S2. OD-4 is the one decision of
+the five that bears on contract shape; it is resolved below and the specification
+implements the resolution.
 
-**No ruling is outstanding on any of the four.** Three statuses are distinguished
+**No ruling is outstanding on any of the five.** Three statuses are distinguished
 throughout and must not be collapsed: a **decision is ratified**; a **named guard
 implements** it in `packages/capabilities/agentic-proposer/tests/`; and **S1 production
-implementation remains unauthorized** under A11, independently of both. A guard that
-enforces a ratified decision authorizes no production contract. The *Enforcement* column
+implementation is authorized on merge** under A12, independently of both. A guard that
+enforces a ratified decision authorizes no production contract — the independent review
+and the merge do, and neither is a consequence of the guard. The *Enforcement* column
 below records the second axis only; the decisions themselves are closed.
 
 | Id | Decision | Bears on contract shape | Enforcement |
@@ -591,9 +598,13 @@ below records the second axis only; the decisions themselves are closed.
 | **OD-3** — **RATIFIED 2026-08-25** | O-1's dependent-field set is matched by name alone, so `CandidateAdvisory.requested_review_action` — the candidate's own required, non-null routing — is caught as if it were selection-dependent. **Resolved:** `DEPENDENT_FIELDS` is scoped to the **bearer contract**, pinned by bearer **and** field name and never by field name alone. The **three** dependent fields are selection-dependent on `ProposerAdvisory` only, coupled to its `selected_candidate_id` selector, which is held separately and is not itself a dependent field. | no | `[V]` **implemented** — `tests/test_selection_dependent_fields.py`: `SELECTION_COUPLING`, `NON_BEARERS_SHARING_A_FIELD_NAME`, two self-tests pinning both by equality and asserting them disjoint, and behavioural probes over a complete required-field fixture |
 | **OD-4** — **RATIFIED 2026-08-25, resolved (a)** | D7 above says `ProposerAdvisory` carries per-candidate `CandidateAdvisory` entries; an earlier revision of the specification instead had it reference an `AdvisoryCandidateSet` by `candidate_set_id`. `[V]` That departure was **not** forced by the rival-identity walk, which bars only nested `ToolObservation` and reaches no field of `CandidateAdvisory`. **Resolution (a): restore the nesting D7 requires.** `ProposerAdvisory` carries an immutable `candidates` sequence of `CandidateAdvisory`, ordered ascending by `candidate_id`, participating in `P_unsigned`; `candidate_set_id` is retained as the reference to `AdvisoryCandidateSet`, which stays a **top-level contract** and is not nested; the two candidate lists must correspond exactly in membership, order and content, checked by the builder and by the independent replay verifier. `ToolObservation` stays referenced by id, which A3/the rival-identity walk does force. **Rejected alternative:** reference by id, ratified as an amendment narrowing D7 — rejected because it deviates from ratified text, leaves candidate dispositions, `is_eligible` Booleans and evidence references outside the advisory digest, and leaves an amended candidate set undetectable by replay. | **yes — resolved** | `[V]` **implemented** — `tests/test_advisory_contract_shape.py` discharges I7.11 on representative shapes: it bars a nested `ToolObservation`, **requires** a nested `CandidateAdvisory` sequence so a reversion to reference-by-id fails loudly, and bars any second identity on the candidate |
 
+| **OD-5** — **RATIFIED 2026-08-26** | **Reasoning functions and reasoning strategies are different things, and only the first is a role's purpose.** Four parts. **(i) R-3's lifecycle is unchanged.** A reasoning strategy is a **method label**, not a process state: `ProposerProcessState` gains and loses nothing, and R-3's forward-only subsequence rule, R-4's agreement rule and the bar on representing execution state all stand as ratified. Strategies **operate within** that lifecycle. **(ii) The four-way distinction is preserved and stated:** `primary_function` is the role's organizational purpose; a role's **permitted reasoning strategies** — an S2 concept, not an S1 field — is the set of methods the role may select among; `declared_strategy` is the method the process record asserts was used; and `terminal_outcome` is where the work ended. Three of the four are S1 fields; the second is named as a concept so the distinction can be stated whole. **Evidence collection and verification remain contract mechanisms, and abstention and escalation remain outcomes** — none of the three is a reasoning strategy. **(iii) `permitted_reasoning_strategies` and its vocabulary are deferred together to S2.** **No field is added to `CognitiveRoleContract`, and OD-5 does not change S1 contract shape:** D2's cardinality stays 10 and the C5d roster stays at five fields. The concept and the vocabulary that gives it content arrive together, so the field is declared once, in its ratified form, against a vocabulary that already exists. **Rejected alternative — reserve it now as a C5d empty-only list.** Rejected because a reserved list would have had to be **retyped, revalidated and stripped of its default** to reach the intended allowlist, which rejects an empty list; reserving would therefore not have spared a schema change, which is the one thing reservation normally buys, while it would have cost three disclosed consequences — every conformant S1 pair internally unsatisfiable on this axis, every S1-era role contract carrying the one value the ratified form must refuse, and every stored contract needing reissue at the transition. `[R]` No member, spelling, bound or default of the eventual vocabulary is ratified, and none is ratified by deferring it. **(iv) S1 neither selects, validates nor cryptographically binds a reasoning strategy.** `declared_strategy` is metadata outside `P_unsigned`, declaration does not establish conformance, and strategy selection and enforcement are S2's in whole. **No strategy catalogue is drafted or ratified by this decision, and no individual strategy is named anywhere in it.** | **no** — no field added, no cardinality changed, no classification roster changed, and no field type, vocabulary or equation term changed; every part of the ruling states what S1 does not do, or records a distinction so it is not collapsed later | `[V]` **implemented** — `tests/test_advisory_contract_shape.py` (`declared_strategy` absent from the `P_unsigned` projection); `tests/s1_specification_mirror.py` and `tests/test_identifier_normalization.py`, whose ten-field `CONTRACT_CARDINALITY` entry and five-entry `C5D_ENTRIES` pin now hold the deferred field **out**, failing if it is reintroduced without a ruling; and `tests/test_documentation_consistency.py` (a **heuristic spot-check**, not coverage of a class: it classifies each sentence by actor, refusing a claim of selection, validation or binding whose subject is S1 or something inside it, and passing the same claim attributed to S2. `[I]` It is a regex over English prose and is **not** proof that no such claim can be written; what it is proven against is a named corpus of claims it must catch — including spellings two audits found escaping earlier versions — and correct statements it must leave alone, among them true statements about S2, which an earlier actor-blind version wrongly flagged) |
+
 None of OD-1 – OD-3 changes a contract, a field type, a cardinality, a vocabulary or
-an equation term; each is about a guard or a dependency. The *decisions* are ratified,
-and the guards named above enforce them. Neither fact authorizes production code.
+an equation term; each is about a guard or a dependency, and OD-5 changes none of them
+either. OD-4 bears on contract shape, and Part D of the specification is written for it. The *decisions* are
+ratified, and the guards named above enforce them. Neither fact authorizes production
+code.
 
 `[R]` markers elsewhere above are implementation obligations that S1 must
 discharge — mechanical enforcement of D6's standing rule, D7's contract shape and
@@ -843,7 +854,7 @@ on the contract specification:
 
 `packages/capabilities/agentic-proposer/docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md`
 is the canonical, implementation-ready S1 specification, status
-`CONTRACT SPECIFICATION RATIFIED; PRODUCTION IMPLEMENTATION SEPARATELY GATED`, scoped to S1 contracts and deterministic equations
+`CONTRACT SPECIFICATION FROZEN FOR IMPLEMENTATION` (frozen 2026-08-26), scoped to S1 contracts and deterministic equations
 only. It records the eight top-level contracts (`AgentIdentityRef`,
 `CognitiveRoleContract`, `WorkMandate`, `BoundedContextEnvelope`, `ToolObservation`,
 `AdvisoryCandidateSet`, `ProposerAdvisory`, `ProposerProcessRecord`) with
@@ -867,7 +878,7 @@ was. That walk matches `RIVAL_IDENTITY_FIELDS` by exact name, and no field of
 `CandidateAdvisory` is a member, so nesting `CandidateAdvisory` fails nothing. D7 above
 says `ProposerAdvisory` carries per-candidate `CandidateAdvisory` entries, and an earlier
 revision of the specification departed from that by referencing them through
-`candidate_set_id`. **OD-4 is now resolved (a)** under *Owner decisions OD-1 – OD-4*: the
+`candidate_set_id`. **OD-4 is now resolved (a)** under *Owner decisions OD-1 – OD-5*: the
 nesting D7 requires is restored, the candidates participate in `P_unsigned`,
 `candidate_set_id` is retained as a reference to `AdvisoryCandidateSet` — which remains a
 top-level contract — and the two candidate lists must correspond in membership, order and
@@ -893,7 +904,7 @@ remains reachable, recompute-and-reject as the operative eligibility guarantee,
 `strict=True`, and reading the substrate version from installed distribution metadata —
 and are carried forward. PR #1475 is left unaltered as a record of that scrutiny.
 
-### A11 — Implementation remains unauthorized
+### A11 — Implementation was unauthorized until review and merge
 
 `[V]` This addendum and the documents it references are **documentation only**. No
 `src/` module, test, `pyproject.toml`, `version.py`, public API, CI workflow or
@@ -901,7 +912,50 @@ platform-freeze artifact is changed by them. The version stays `0.0.1`, no
 `public_api.json` is created, and the freeze digest is unchanged.
 
 **Implementation of the S1 contracts and equations remains unauthorized until this
-documentation pull request is independently reviewed and merged.**
+documentation pull request is independently reviewed and merged.** `[V]` **Both
+conditions are met as of A12 below**, which records the freeze; A11 stands as the rule
+that was applied, not as a gate still standing.
+
+### A12 — The specification is frozen for implementation
+
+**Declared by the owner on 2026-08-26.** The S1 contract and equation specification's
+status becomes `CONTRACT SPECIFICATION FROZEN FOR IMPLEMENTATION`.
+
+**What the freeze establishes.** The contract surface is **closed to change**. A field,
+type, cardinality, vocabulary, equation term or validation rule may be altered only by a
+**ratified amendment recorded in the owner-decision table above** — never by an
+implementation change reconciling the specification to code that was written against a
+different reading. Where code and the specification disagree, the specification is right
+and the code is wrong.
+
+**What the freeze rests on.** `[V]` A11's two conditions. Independent review: the
+specification and its guards were audited across successive rounds, each conducted
+against the repository rather than against the author's account of it, and each finding
+was either fixed or recorded — among them a lifecycle guard that matched vocabulary
+instead of authority, a registry that classified by name suffix, an enforcement scan
+narrower than the coverage claimed for it, and four stale cross-references left by a
+section rename. `[V]` Merge: this pull request. **The freeze takes effect on merge**, and
+before merge this section states an intent rather than a fact.
+
+**What the freeze does *not* establish.** Three things, stated so the declaration is not
+read as more than it is:
+
+* `[R]` **It is not a claim that the specification is correct.** It is a decision to stop
+  changing it and to find the remaining defects by implementing against it. A frozen
+  specification is one whose errors are now discovered as amendments rather than as
+  edits.
+* `[G]` **It does not discharge the Part I obligations.** I1, I6 and the unbuilt parts of
+  I7 remain outstanding. Those are implementation work — guards to be armed against a
+  contract module that does not yet exist — not specification questions, and the freeze
+  neither closes them nor authorizes skipping them.
+* `[R]` **It does not ratify anything the specification marks `[R]`.** The reasoning
+  strategy vocabulary deferred to S2 (OD-5(iii)), the normalization profile OD-1's rider
+  requires, and every guard claim verified only against a representative shape stay
+  exactly as they are. Each is to be re-verified when the first contract module lands.
+
+`[V]` No `src/` module, test, `pyproject.toml`, `version.py`, public API, CI workflow or
+platform-freeze artifact is changed by this declaration. The version stays `0.0.1` and
+the substantive freeze digest is unchanged.
 
 ### Owner decisions, and what actually gates S1
 
@@ -909,30 +963,35 @@ A1–A8 close every question the contract specification's *equations, vocabulari
 enforcement interpretation* depend on. They do not close everything, and what remains is
 not a ruling.
 
-**OD-1 – OD-4 are all resolved, ratified 2026-08-25**, and are recorded once, under
-*Owner decisions OD-1 – OD-4* above. **OD-4, the only one bearing on contract shape, is resolved
-(a)**: `ProposerAdvisory` carries its `CandidateAdvisory` entries as D7 says, and
+**OD-1 – OD-4 are all resolved, ratified 2026-08-25, and OD-5 is resolved, ratified
+2026-08-26**; all five are recorded once, under *Owner decisions OD-1 – OD-5* above.
+**Of the five, OD-4 bears on contract shape; OD-5 was ruled not to.** **OD-4 is resolved (a)**: `ProposerAdvisory` carries its `CandidateAdvisory` entries as D7 says, and
 reference-by-id is the rejected alternative. OD-1 carries a ratified rider — future
 identity participation for `primary_function` or `declared_strategy` requires a
 separately ratified normalization profile — and OD-2 carries a ratified enforcement
 design: direct-source checks, an approved-dependency baseline comparison, and negative
 controls, with the dynamic-import ceiling disclosed rather than papered over.
 
-**Each of OD-1 – OD-4 carries three statuses, and they must not be collapsed.** The
+**Each of OD-1 – OD-5 carries three statuses, and they must not be collapsed.** The
 owner decision is **ratified**; a **named guard implements** it — `FIELD_CLASSIFICATION`,
 declared in `tests/s1_specification_mirror.py` and enforced by
 `tests/test_identifier_normalization.py`, for OD-1; the layered probe in
 `tests/test_boundaries.py` for OD-2, the bearer-scoped coupling in
-`tests/test_selection_dependent_fields.py` for OD-3, and the composition assertions in
-`tests/test_advisory_contract_shape.py` for OD-4; and **S1 production implementation
-remains unauthorized under A11**, independently of both, until this documentation is
-independently reviewed. A ratified decision is not an implemented guard, and an
-implemented guard is not an authorization.
+`tests/test_selection_dependent_fields.py` for OD-3, the composition assertions in
+`tests/test_advisory_contract_shape.py` for OD-4, and — for OD-5 — the `P_unsigned`
+projection-absence assertion for `declared_strategy` in the same module, the
+strategy-authority document scan in `tests/test_documentation_consistency.py`, and the
+ten-field cardinality and five-entry `C5D_ENTRIES` pin that now hold the deferred field
+out; and **S1 production implementation
+is authorized on merge under A12**, independently of both: A11's
+condition is discharged by the freeze, and what remains is the undischarged Part I
+obligations. A ratified decision is not an implemented guard, and an implemented guard
+was never an authorization — the review and the merge are.
 
-The specification's status is therefore
-`CONTRACT SPECIFICATION RATIFIED; PRODUCTION IMPLEMENTATION SEPARATELY GATED`. No
-ruling gates the first contract module — what gates it is A11 and the undischarged Part
-I obligations.
+The specification's status is therefore `CONTRACT SPECIFICATION FROZEN FOR IMPLEMENTATION`
+(frozen 2026-08-26; see *A12*). No ruling gates the first contract module, and A11's
+review condition is discharged; what remains are the undischarged Part I obligations,
+which are implementation work rather than owner questions.
 
 The `[R]` markers elsewhere in this artifact are implementation obligations for S1, not
 unratified decisions.

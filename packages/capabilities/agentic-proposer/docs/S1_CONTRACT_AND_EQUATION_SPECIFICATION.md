@@ -1,6 +1,11 @@
 # S1 — canonical contract and equation specification
 
-**Status:** `CONTRACT SPECIFICATION RATIFIED; PRODUCTION IMPLEMENTATION SEPARATELY GATED`
+**Status:** `CONTRACT SPECIFICATION FROZEN FOR IMPLEMENTATION`
+**Frozen:** 2026-08-26, by owner declaration, after independent review. The contract
+surface below is closed to change: a field, type, cardinality, vocabulary, equation term
+or validation rule may be altered only by a **ratified amendment** recorded in the
+readiness ADR's owner-decision table, never by an implementation change reconciling this
+document to code. Where code and this document disagree, this document is right.
 **Ratified against:** the default branch as of PR #1474
 **Package:** `ugence-agentic-proposer` (`packages/capabilities/agentic-proposer`)
 **Authority:** subordinate to D1–D10 and the ratification addenda in
@@ -487,12 +492,21 @@ decision **OD-1** in the closing section.
 ### C5d — Structurally empty reserved list
 
 A `list[str]` field that **rejects any non-empty value**. It is reserved so that
-populating it later is not a schema change, and it is closed now so that it cannot become
-a de facto vocabulary before one is ratified (Part J).
+populating it later is not a schema change — the element stays `str`, the default stays
+`[]`, and only a content class is added — and it is closed now so that it cannot become a
+de facto vocabulary before one is ratified (Part J).
 
 **C5d fields:** `AdvisoryCandidateSet.selection_reason_codes`,
 `ProposerAdvisory.reason_codes`, `ProposerProcessRecord.deterministic_checks`,
 `ProposerProcessRecord.semantic_audit_refs` and `ProposerProcessRecord.reason_codes`.
+
+`[I]` **The five are not all reason-code fields, and each awaits its own catalogue.**
+`selection_reason_codes` and the two `reason_codes` fields await a reason-code catalogue;
+`ProposerProcessRecord.deterministic_checks` names checks that were run and awaits a
+catalogue of those; `ProposerProcessRecord.semantic_audit_refs` holds references to audit
+records and awaits a reference scheme for them. Neither of the last two is a reason code,
+and ratifying a reason-code catalogue would tell an implementer nothing about either.
+What the five share is the *mechanism*, not the catalogue.
 
 `[I]` These are the fourth, **mechanical** class rather than members of C5a, C5b or C5c.
 Their element type is `str`, so a registry that admitted only the three semantic classes
@@ -654,11 +668,6 @@ package, carrying no constitution-derived attribute, exposing no role lifecycle 
 
 `CandidateDisposition` is imported unchanged from
 `src/ugence_agentic_proposer/vocabulary.py`; it is not redefined.
-
-`[V]` D8's export bound is not a field property. It is enforced by
-`tests/test_role_projection_bounds.py`, which scans every shared-contract package in
-this repository for `CognitiveRole`, `COGNITIVE_ROLE` and `cognitive_role`. No name
-containing those substrings may be re-exported outside this package.
 
 ## D3 — `WorkMandate`
 
@@ -969,6 +978,75 @@ from `pyproject.toml` text, so a process record states which substrate actually 
 `[V]` Carried forward from the PR #1475 draft, which was right that the declared-floor
 text check is the weaker of the two available assertions.
 
+### `declared_strategy` — an assertion, and only an assertion (OD-5)
+
+The field carries **the method the process record asserts was used**. Four properties
+hold together, and dropping any one of them makes the field read as more than it is:
+
+* **It is metadata outside `P_unsigned`.** `ProposerProcessRecord` is not referenced by
+  `ProposerAdvisory` and is not reachable from it (D9), so `declared_strategy` is not
+  covered by `advisory_digest` and no value it takes can change an advisory identity.
+* **Declaration does not establish conformance.** The value states what the producer
+  says it did. It is not evidence that the producer did it, and nothing in this stage
+  compares the declaration against the process it describes. `[I]` A record whose
+  `declared_strategy` names one method and whose work followed another is a **truthful
+  record of a false declaration**: it is well-formed under every rule in this document,
+  and this document supplies nothing that would detect it.
+* **S1 neither selects, validates nor cryptographically binds a reasoning strategy.**
+  It does not choose a method, does not check the declared value against any permitted
+  set — no S1 contract carries one — does not check it against a vocabulary, and does not
+  bring it inside any digest.
+* **Strategy selection and enforcement are S2.** Both are deferred in whole, together
+  with the permission concept a declaration would be checked against (Part J). `[R]` The
+  correspondence between a declaration and a role's permitted set is an S2 obligation and
+  is recorded here as a boundary, not as a rule this stage enforces.
+
+`[I]` OD-1 classifies `declared_strategy` C5c, which is consistent with all of this and
+is a separate matter: C5c is why the field carries no pattern, and the four properties
+above are why it carries no authority.
+
+### The four-way distinction (OD-5)
+
+Four things are routinely collapsed into one another, and each is a different kind of
+statement made by a different party. They are stated together once, here, because no
+single contract table shows all four:
+
+| | Where it lives | What it is | Who asserts it |
+| --- | --- | --- | --- |
+| `primary_function` | `CognitiveRoleContract` (D2) | the role's **organizational purpose** — what the role is *for* | external role owner |
+| a role's **permitted reasoning strategies** | **nowhere in S1 — an S2 concept** (Part J) | the **methods the role may select among** when it works | external role owner, at S2 |
+| `declared_strategy` | `ProposerProcessRecord` (D8) | the **method the process record asserts was used** on this occasion | this package, on the producer's word |
+| `terminal_outcome` | `ProposerProcessRecord` (D8) | the **terminal outcome** the work reached | this package, structurally constrained by R-2 and R-4 |
+
+The first is a purpose and not a method. The second is a permission and not a claim
+about what happened. The third is a claim about what happened and not a permission, and
+under the preceding subsection not evidence either. The fourth is where the work ended
+and says nothing about how it got there.
+
+`[V]` **Only three of the four are S1 fields.** The second is named here as a *concept*,
+so that the distinction can be stated whole and so that an implementer does not read
+`primary_function` or `declared_strategy` as carrying the permission. **S1 declares no
+field for it**, `CognitiveRoleContract`'s cardinality is unchanged at 10, and the concept
+arrives at S2 with the vocabulary that gives it content (Part J, OD-5(iii)).
+
+**What is *not* a reasoning strategy.** Evidence collection, verification, and
+abstention or escalation are named here because each is regularly mistaken for one:
+
+* **Evidence collection** is a contract mechanism. It is `ToolObservation` (D5),
+  `observation_refs`, and R-7's resolution obligation.
+* **Verification** is a contract mechanism. It is Equation 4, `verify_advisory_identity`,
+  `verify_advisory_selection` and E2's replay of observation resolution.
+* **Abstention and escalation** are **outcomes**, not methods: `ABSTAIN` and `ESCALATE`
+  are members of the `TerminalOutcome` vocabulary constrained by R-2 and R-4.
+
+`[I]` The distinction is load-bearing rather than tidy. Each of the three is already
+specified, enforced and — for the third — closed by a ratified vocabulary. Treating any
+of them as a method the role selects would recast a mechanism this stage enforces, or an
+outcome this stage constrains, as a matter of permitted method, and would make a role's
+freedom to *abstain* look like a choice of approach rather than the structural rule R-2
+makes it. `[R]` The point is recorded for whoever ratifies the S2 vocabulary: none of the
+three belongs in it.
+
 ### `ProposerProcessStateTransition` — nested public shape
 
 **Cardinality: 2 fields** — the two below. It carries **no** C2 common field, for the
@@ -978,6 +1056,35 @@ reason C2 gives for `CandidateAdvisory`: it is a nested public shape, not a cont
 | --- | --- | --- | --- | --- | --- |
 | `state` | `ProposerProcessState` | yes | no | none | enum membership |
 | `at` | `datetime` | yes | no | none | C4; caller-supplied |
+
+### What the forward-only record does not represent (R-3, OD-5)
+
+R-3 makes `state_transitions` a **subsequence** of a single forward chain: no backward
+transition, no repeat, at most one terminal state and only in final position. That
+shape is **deliberate, and it is a property of the record, not a claim about the work.**
+
+**The record represents the process's progress through its stages. It does not represent
+internal strategy control flow, and it is not capable of representing it.** There is no
+state for iterating, no state for branching, no state for revisiting, and R-3 forbids
+the two spellings — a repeat and a backward step — by which a forward-only vocabulary
+could otherwise have approximated either.
+
+`[I]` The consequence must be stated explicitly, because the natural reading of a
+forward-only list is the wrong one: **the absence of repeated or branching transitions
+in a conformant record is not evidence that no internal iteration or branching
+occurred.** A producer that revisited its evidence, explored several lines and discarded
+all but one, or re-entered a stage it had already left, produces exactly the same
+`state_transitions` as one that proceeded straight through — because R-3 admits only
+that spelling from either. A reader who infers a linear process from a linear record has
+inferred something the record cannot say. Whether internal iteration occurred, and what
+it was, is not recorded at this stage by any field: `declared_strategy` names a method
+and does not describe an execution, and no other field in D8 carries control flow.
+
+`[I]` This is also why R-3's bar on *any* representation of execution state is not
+weakened by OD-5. Reasoning strategies are **method labels that operate within** the
+R-3 lifecycle; they do not add states to it, reorder it, branch it or make it
+re-entrant. A ratified strategy vocabulary would change what a role may declare, and
+would change nothing about `ProposerProcessState`, R-3 or R-4.
 
 ## D9 — Identity scope, stated once
 
@@ -1818,7 +1925,7 @@ document**, which changes no test and no source file.
 > `packages/capabilities/agentic-proposer/tests/`, and "implemented" below means exactly
 > that: a named guard enforces the ratified rule. It does **not** mean the rule has been
 > checked against a production contract surface, because none exists, and it does **not**
-> authorize one — production implementation is separately gated (ADR addendum A11).
+> authorize one — production implementation is gated on the Part I obligations (A12).
 >
 > `[R]` The guards are exercised against **temporary representative shapes** derived from
 > Part D and carried in `tests/s1_specification_mirror.py`. Those shapes are test support:
@@ -1892,7 +1999,7 @@ originally specified, which only removed `CandidateAdvisory` from the assertion.
 earlier revision described them as repairs still needed; that reading was taken before
 they landed and the correction is recorded here rather than quietly absorbed. `[V]` Each
 is implemented by a named guard below. "Implemented" is not "authorized": production
-implementation remains separately gated under A11, and the guards are exercised against
+implementation remains gated on the Part I obligations (A12), and the guards are exercised against
 temporary representative shapes rather than a declared contract module.
 
 1. **The O-1 guard's class-blind false positive — fixed.** An earlier revision matched
@@ -2176,11 +2283,30 @@ Each item below is deliberately absent and is not a gap.
   `False` everywhere.
 * **Candidate selection.** Under B3, S1 selects nothing. S-1, S-2, R-1a and R-1b are
   specified now so that selection is a behaviour change at S2, not a contract change.
-* **The reason-code catalogue.** `reason_codes`, `selection_reason_codes`,
-  `deterministic_checks` and `semantic_audit_refs` are C5d: they reject non-empty values.
-  The fields exist so that populating them later is not a schema change; the validators
-  exist so that they cannot become a de facto vocabulary before one is ratified. A
-  content class attaches to them only when the catalogue is ratified.
+* **Three catalogues, not one.** `reason_codes` (on both bearers) and
+  `selection_reason_codes` await a **reason-code catalogue**; `deterministic_checks`
+  awaits a **catalogue of the checks a producer may name**; `semantic_audit_refs` awaits
+  a **reference scheme for audit records**. `[I]` The three were previously deferred
+  under the reason-code heading alone, which misdescribed the last two: a check that was
+  run and a reference to an audit record are not reason codes, and ratifying a
+  reason-code catalogue would not tell an implementer what may go in either. All five
+  fields are C5d and reject non-empty values; the fields exist so that populating them
+  later is not a schema change, and the validators exist so that none becomes a de facto
+  vocabulary before its own catalogue is ratified. A content class attaches to each only
+  when **that** catalogue is ratified.
+* **The reasoning-strategy permission concept and its vocabulary — deferred together
+  (OD-5(iii)).** `permitted_reasoning_strategies` is **not an S1 field**. No contract in
+  Part D declares it, `CognitiveRoleContract`'s cardinality is unchanged at 10, and the
+  C5d roster is unchanged at five. The concept and the vocabulary that would give it
+  content arrive together at S2, so that the field is declared once, in its ratified
+  form, against a vocabulary that already exists. `[I]` Reserving it here was considered
+  and **rejected by the owner**: a reserved empty-only list would have had to be retyped
+  and have its default removed to reach that form, so reserving would not have spared a
+  schema change, while it would have made every S1-era role contract carry the one value
+  the ratified form must refuse. Selection of a strategy, validation of a declared one
+  against a role's permitted set, and any binding of either into an identity are **S2's
+  in whole**; S1 does none of them. `[R]` No member, spelling, bound or default of the
+  eventual vocabulary is ratified, and none is ratified by this deferral.
 * **A disposition-to-outcome mapping.** None is ratified. R-2 constrains
   `terminal_outcome` structurally and computes nothing.
 * **The semantic auditor.** `SemanticAuditorFindingStatus` remains defined and
@@ -2278,14 +2404,38 @@ mistakes their absence for coverage.
    remains the D8-bounded v0 projection and must be re-derived when the document lands.
    Nothing here is conformance with it.
 
+7. **A conformant process record is not evidence about how the work was done (OD-5).**
+   Two distinct absences, both outside what this stage can decide. The detailed
+   statements are in D8 — *What the forward-only record does not represent* and
+   *`declared_strategy` — an assertion, and only an assertion* — and are recorded here
+   the way K.1 records D9's and G1's, so a reader consulting this part for what the
+   specification does not evidence is not told less than the truth.
+
+   * **Control flow is not represented.** R-3 admits only a forward subsequence, so a
+     producer that iterated, branched or revisited a stage yields the same
+     `state_transitions` as one that proceeded straight through. **The absence of
+     repeated or branching transitions is therefore not evidence that no internal
+     iteration or branching occurred**, and no other field in D8 carries control flow.
+     Not locally decidable: closing it would require a representation of execution that
+     R-3 exists to forbid.
+
+   * **The declared method is unverified.** `declared_strategy` states what the producer
+     says it did. Nothing in this stage compares that against the work, and — the field
+     being outside `P_unsigned` — nothing binds it either. A record naming one method
+     while the work followed another is well-formed under every rule in this document.
+     Not locally decidable at S1: no S1 contract carries a permitted set, so there is
+     nothing here to check a declaration against (Part J).
+
 ---
 
 ## Owner decisions
 
-**All four owner decisions are resolved.** OD-1 to OD-3 change no contract, field type,
+**All five owner decisions are resolved.** OD-1 to OD-3 change no contract, field type,
 cardinality, vocabulary or equation term; all three are about guards and dependencies.
 OD-4 did change contract shape, and its resolution is recorded below and implemented
-throughout Part D.
+throughout Part D. OD-5, ratified 2026-08-26, does **not** bear on contract shape: it
+defers the strategy permission concept and its vocabulary together to S2, so no field is
+added and `CognitiveRoleContract`'s cardinality is unchanged at 10.
 
 **Each of OD-1 – OD-3 therefore carries three distinct statuses**, and a reader must not
 collapse them. A ratified decision is not an implemented guard, and an implemented guard
@@ -2295,7 +2445,7 @@ is not an authorization to write production code:
 | --- | --- | --- |
 | **Owner decision** | Has the owner ruled? | **Resolved — ratified 2026-08-25.** No further ruling is sought or required. |
 | **Enforcement implementation** | Does a named guard enforce the ruling? | **Implemented.** `[V]` All three are enforced by guards in `packages/capabilities/agentic-proposer/tests/`, including the two corrections I4 previously reported as outstanding — the O-1 guard's bearer scoping (I4.1) and the `pydantic`/`socket` boundary probe (I4.2). `[R]` They are exercised against temporary representative shapes rather than a declared contract module, so every claim that a guard arms on a contract is to be re-verified when the first contract module lands. |
-| **S1 production implementation** | May contract code be written? | **Unauthorized under A11**, independently of the two axes above, until this documentation is independently reviewed and merged. |
+| **S1 production implementation** | May contract code be written? | **Authorized on merge (A12)**, independently of the two axes above: A11's review-and-merge condition is discharged by the freeze. What remains is not a ruling and not a review — the undischarged Part I obligations, which are implementation work. |
 
 `[R]` The middle axis is `[R]` for all three: every statement about the guard branch is
 read against temporary representative shapes and is to be re-verified against the
@@ -2330,7 +2480,7 @@ a redesign, and needs no new ratification.
 as C5c and asserts they carry no pattern constraint of any kind; I5 states what the
 registry must carry.
 
-*S1 production implementation:* unauthorized under A11.
+*S1 production implementation:* authorized on merge (A12); the Part I obligations remain.
 
 **OD-2 — `pydantic` loads `socket`, which `test_boundaries.py` forbids. RATIFIED
 2026-08-25.**
@@ -2389,7 +2539,7 @@ fails a self-test, and `test_the_dependency_baseline_is_what_it_claims_to_be`, w
 demonstrates the premise instead of assuming it. The whole-process assertion was
 replaced, not exempted.
 
-*S1 production implementation:* unauthorized under A11.
+*S1 production implementation:* authorized on merge (A12); the Part I obligations remain.
 
 **OD-3 — the O-1 guard's dependent-field set is scoped to its bearer. RATIFIED
 2026-08-25.**
@@ -2414,7 +2564,7 @@ explicitly, and **two** self-tests pinning all of it by equality —
 that the registry and the non-bearer list are **disjoint**, so a contract cannot be both
 a bearer and a named exclusion.
 
-*S1 production implementation:* unauthorized under A11.
+*S1 production implementation:* authorized on merge (A12); the Part I obligations remain.
 
 **OD-4 — `ProposerAdvisory` carries its `CandidateAdvisory` entries. RATIFIED,
 resolved (a), 2026-08-25.**
@@ -2478,6 +2628,72 @@ ascending-`candidate_id` ordering rule, S-1, and `CandidateAdvisory`'s standing
 prohibition); D7 (the `candidates` field, cardinality 23); D9; R-1b and E1; G1; H1;
 I5; I7.11; K.1.
 
+**OD-5 — reasoning functions and strategies are distinguished, and the strategy
+permission concept is deferred to S2. RATIFIED 2026-08-26.**
+
+*Owner decision:* **resolved.** The ruling has four parts.
+
+**(i) R-3's lifecycle is unchanged, and reasoning strategies operate within it.** A
+reasoning strategy is a **method label**, not a process state. No state is added to
+`ProposerProcessState`, none is removed, and R-3's forward-only subsequence rule, R-4's
+agreement rule and the bar on representing execution state all stand exactly as
+ratified. `[I]` The two are different kinds of thing: the lifecycle says which stages a
+record passed through, and a strategy says by what method the work inside those stages
+was done. A ratified strategy vocabulary would change what a role may declare and would
+change nothing about the lifecycle.
+
+**(ii) The four-way distinction is preserved and stated.** `primary_function` is the
+role's organizational purpose; a role's **permitted reasoning strategies** — an S2
+concept, not an S1 field — is the set of methods the role may select among;
+`declared_strategy` is the method the process record asserts was used; and
+`terminal_outcome` is where the work ended. The full statement, with the bearer of each
+and the party who asserts it, is in D8; three of the four are S1 fields and the second is
+named as a concept so the distinction can be stated whole. **Evidence collection and
+verification remain contract mechanisms, and abstention and escalation remain outcomes;
+none of the three is a reasoning strategy.**
+
+**(iii) `permitted_reasoning_strategies` is deferred to S2, together with its
+vocabulary.** **No field is added to D2, and OD-5 does not change S1 contract shape.**
+`CognitiveRoleContract`'s cardinality stays **10** and the C5d roster stays at **five**.
+The concept and the vocabulary that gives it content arrive together, so the field is
+declared once, in its ratified form, against a vocabulary that already exists.
+
+*Reserving it at S1 was considered and rejected.* A reserved C5d empty-only list would
+have had to be **retyped, revalidated and stripped of its default** to reach the intended
+allowlist — which rejects an empty list, the opposite rule on the same axis — so
+reserving would not have spared a schema change, which is the one thing reservation
+normally buys. Against that it would have cost three disclosed consequences: every
+conformant S1 pair internally unsatisfiable on this axis, every S1-era role contract
+carrying the one value the ratified form must refuse, and every stored contract needing
+reissue at the transition. `[R]` No member, spelling, bound or default of the eventual
+vocabulary is ratified here, and none is ratified by deferring it.
+
+**(iv) S1 neither selects, validates nor cryptographically binds a reasoning strategy.**
+`declared_strategy` is metadata outside `P_unsigned`; declaration does not establish
+conformance; and strategy selection and enforcement are S2's in whole (Part J). A
+conformant record may declare a method it did not use, and nothing in this stage detects
+that.
+
+*Bears on contract shape:* **no.** No field is added, no cardinality changes, no
+classification roster changes, and no field type, vocabulary or equation term changes.
+Every part of the ruling is a statement about what S1 does **not** do, or a distinction
+recorded so that it is not collapsed later.
+
+*Enforcement:* `[V]` the `P_unsigned` projection-absence assertion for
+`declared_strategy` in `tests/test_advisory_contract_shape.py`; the strategy-authority
+document scan, with its corpus of claims it must catch and correct statements it must
+leave alone, in `tests/test_documentation_consistency.py`; and — unchanged, and now
+pinning the *absence* of the deferred field — the ten-field `CONTRACT_CARDINALITY` entry
+and the five-entry `C5D_ENTRIES` equality pin, which fail if it is reintroduced without a
+ruling.
+`[R]` As with OD-1 – OD-4, the guards are exercised against representative shapes rather
+than a declared contract module, and every claim that a guard arms on a contract is to be
+re-verified when the first contract module lands.
+
+*Where it is implemented in this document.* D8 (`declared_strategy`, the four-way
+distinction, and what the forward-only record does not represent); Part J's deferral;
+K.7. Nothing in Part C or Part D changes.
+
 ---
 
 ## Ratification statement
@@ -2487,21 +2703,27 @@ and this document contains no placeholder: every field carries a type, a require
 nullability, a default, a cardinality, a vocabulary, a classification and an identity
 participation.
 
-**OD-4 is resolved (a)**, and with it the one open question that bore on contract shape.
-`ProposerAdvisory` carries its `CandidateAdvisory` entries, as ratified D7 says; Part D
-is written for that shape and no longer for an alternative.
+**OD-4 is resolved (a)**, and with it the question that had been open longest about
+contract shape. `ProposerAdvisory` carries its `CandidateAdvisory` entries, as ratified
+D7 says; Part D is written for that shape and no longer for an alternative. **Of the five
+owner decisions, OD-4 is the one that bears on contract shape**; OD-5 was ruled not to,
+and Part D is unchanged by it.
 
-**All four owner decisions are resolved. No ruling is outstanding.** OD-1, OD-2 and
+**All five owner decisions are resolved. No ruling is outstanding.** OD-1, OD-2 and
 OD-3 are ratified 2026-08-25 and are recorded above with their riders and their
 enforcement designs; none changes a contract, a field type, a cardinality, a vocabulary
-or an equation term.
+or an equation term. **OD-5 is ratified 2026-08-26**: it changes no contract, field
+type, cardinality, vocabulary or equation term either. It states what S1 does not do with
+a reasoning strategy, preserves the four-way distinction, and defers the strategy
+permission concept and its vocabulary together to S2. `[R]` That vocabulary requires its
+own ruling and is not given one here.
 
-**What is outstanding is enforcement and authorization, not ratification.** The status
-line at the head of this document therefore reads
-`CONTRACT SPECIFICATION RATIFIED; PRODUCTION IMPLEMENTATION SEPARATELY GATED` — the
-contract specification is ratified, and production implementation is gated on something
-other than a ruling. Two things stand between this document and S1 code, and neither is
-an owner question. The ADR's introduction states the same two:
+**The specification is frozen.** The status line at the head of this document reads
+`CONTRACT SPECIFICATION FROZEN FOR IMPLEMENTATION`. Freezing closes the contract
+surface to change and discharges A11's review condition; it does **not** discharge the
+Part I obligations, which are implementation work rather than specification questions.
+The two things that stood between this document and S1 code are therefore now one. The
+ADR's introduction states both, and what remains of each:
 
 * **The Part I obligations**, which S1 must discharge in the same change that introduces
   the surface they govern. `[V]` The guards implementing O-1 – O-4 and OD-1 – OD-3 are
@@ -2509,11 +2731,14 @@ an owner question. The ADR's introduction states the same two:
   previously reported as outstanding; `[R]` they are exercised against temporary
   representative shapes rather than a declared contract module, and I1, I6 and the
   unbuilt parts of I7 remain outstanding.
-* **A11.** Production implementation stays unauthorized until this documentation change
-  is independently reviewed (I8 of this document; ADR addendum A11). An implemented
-  guard does not lift this.
+* **A11 — discharged.** `[V]` The review-and-merge condition is met and the freeze is
+  recorded as **A12** in the readiness ADR. An implemented guard never lifted this; an
+  independent review and a merge did.
 
 There is no gate on the contract *shape* for want of a ruling: every composition
-question is ratified. The gate is on writing production code before the enforcement that
-would catch a departure from it has been independently reviewed alongside the
-specification it enforces.
+question is ratified, and the shape is now frozen. `[V]` The gate that stood — writing
+production code before the enforcement that would catch a departure from it had been
+independently reviewed alongside the specification it enforces — is discharged: the
+review happened and the freeze records it. What is left is to arm that enforcement
+against a real contract module, which is the Part I obligation above and is work, not
+permission.

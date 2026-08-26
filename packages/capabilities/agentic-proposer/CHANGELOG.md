@@ -490,6 +490,198 @@ specification also states.
   to every derivation — fall inside the "every ratified rule is named somewhere" check.
   The headline count in the enforcement row is pinned against the registry's length.
 
+### Changed — reasoning functions and strategies (OD-5)
+
+Documentation and guards only. No `src/` change, no version change, no
+public-API snapshot, no platform-freeze artifact touched.
+
+* **No field is added to `CognitiveRoleContract`.** The strategy permission concept and
+  its vocabulary are **deferred together to S2** (owner ruling, below). D2's cardinality
+  stays 10 and the C5d roster stays at five fields. No strategy catalogue is drafted or
+  ratified, and no individual strategy is named.
+* **The four-way distinction is stated once, in D8:** `primary_function` (the role's
+  organizational purpose), a role's **permitted reasoning strategies** (the methods the
+  role may select among — an S2 concept, not an S1 field), `declared_strategy` (the
+  method the process record asserts was used), and the terminal outcome. Three of the
+  four are S1 fields; the second is named as a concept so the distinction can be stated
+  whole. Evidence collection and verification stay **contract
+  mechanisms**, and abstention and escalation stay **outcomes**; none is a reasoning
+  strategy.
+* **R-3's lifecycle is unchanged**, and a new D8 subsection states what the record does
+  not represent: a forward-only record deliberately carries no internal strategy control
+  flow, so the **absence of repeated or branching transitions is not evidence that no
+  internal iteration or branching occurred**.
+* **`declared_strategy` carries no authority.** It is metadata outside `P_unsigned`;
+  declaration does not establish conformance; and S1 neither selects, validates nor
+  cryptographically binds a reasoning strategy — selection and enforcement are S2's.
+* **Guards.** The `P_unsigned` projection-absence assertion for `declared_strategy` in
+  `tests/test_advisory_contract_shape.py`, which also asserts that **no** contract
+  declares `permitted_reasoning_strategies`, so the deferral is a checked fact rather
+  than an omission a reader must notice; the ten-field `CONTRACT_CARDINALITY` entry and
+  five-entry `C5D_ENTRIES` pin, which now hold the deferred field **out** and fail if it
+  is reintroduced without a ruling; and a **heuristic spot-check** in
+  `tests/test_documentation_consistency.py` refusing claims of S1 authority over a
+  reasoning strategy — selection, validation or binding. `[I]` That scan is a regex over
+  English prose and is **not** coverage of a class: it is not proof that no such claim can
+  be written, and it is stated here as what it is proven against rather than as a
+  guarantee. It classifies each sentence by **actor**, which is what the subject matter
+  turns on — the same sentence is a defect with S1 as its subject and correct with S2 as
+  its subject. Proven against a named corpus of claims it must catch and correct
+  statements it must leave alone, the latter including true statements about S2.
+
+### Fixed — ninth audit round: OD-5's own overstatements
+
+An independent audit of the OD-5 commit confirmed the four-way distinction, the C5d
+classification and the unchanged R-3 lifecycle, and found five defects. Documentation and
+guards only.
+
+* **A rename left three dangling cross-references and a contradicted sentence.** Renaming
+  the ADR's table to *Owner decisions OD-1 – OD-5* left two references to the old heading,
+  a sentence crediting OD-4 with shape-bearing that OD-5 also has, and a
+  three-statuses sentence still scoped to four. The suite was green over all four because every existing guard
+  read the table rather than the prose around it. Two new scans close the class: italic
+  cross-references to the owner-decision section must resolve against the live heading, and
+  no document may claim one decision alone bears on contract shape.
+* **The strategy-authority scan was narrower than its stated coverage.** The ADR and this
+  file said it refused *any* affirmative claim; an audit found eight ordinary spellings
+  passing — an active-voice cross-field check naming the two fields is the representative
+  one, and the set is pinned in the test module rather than restated here. The
+  cause was structural: `\b` does not break at an underscore, so a pattern anchored on
+  `\breasoning` never reached `permitted_reasoning_strategies`, and the subject of such a
+  sentence is as often "the builder" as "S1". The patterns now cover both voices, three
+  subjects and the underscored field names; the eight escaping spellings are pinned as a
+  named regression set; and the coverage claim is stated as the forms enumerated rather
+  than as "any".
+* **C5d's class definition was false for its sixth member.** It said reservation means
+  "populating it later is not a schema change", which is untrue of a field whose ratified
+  form retypes the element and removes the default. The definition now states what C5d
+  guarantees in both cases — no value accrues before a vocabulary is ratified — instead of
+  leaving the correction to a note beneath it.
+* **The ADR labelled "Ratified rider" what the specification marks `[R]`.** Restated so
+  the two agree: what OD-5 ratifies is the **bar on the route**, the field may not be
+  brought into service by widening it in place. The allowlist form itself is not ratified.
+* **Two consequences went unstated.** The forward-only-record and unverified-declaration
+  limitations are now **K.7**, where a reader consulting Part K for what the specification
+  does not evidence will find them. D2 also stated, while the field was still reserved,
+  that the reserved half of the pair left every conformant S1 record declaring a method no
+  role could permit. That disclosure is what the owner ruled on below, and it is removed
+  with the field it described.
+
+`[R]` One question raised by the audit was recorded rather than resolved: whether a
+role's permitted **methods** fall within ratified D1's *minimum immutable attributes
+required for deterministic role matching* and outside D2's bar on a
+**constitution-derived attribute**. The owner's deferral below removes its subject from
+S1 entirely, so the question travels with the field to S2; the readiness ADR's general
+statement of it, under *Open architectural dependency: the Agent Constitution*, stands as
+it did before OD-5.
+
+### Fixed — tenth audit round: three contradictions and a rebuilt scan
+
+Documentation and guards only. The field's presence in D2 and D2's preamble were left
+untouched by this round; they were under a separate owner decision, ruled on below.
+
+* **The specification contradicted its own OD-5 entry.** Its ratification statement
+  credited OD-4 with closing the last shape-bearing question, while its OD-5 entry records
+  *Bears on contract shape: yes*. Corrected, and `_SOLE_SHAPE_BEARER_CLAIM` now carries
+  six wordings rather than two. `[I]` The two instances found so far are phrased so
+  differently — one about a decision, one about a question, sharing almost no substring —
+  that a fixed-sentence check would have caught one and certified the other. The wordings
+  themselves are enumerated in the test module, not restated here, since this scan reads
+  this file too.
+* **The ADR named guards for four of the five decisions** while asserting each of five
+  carries an implementing guard. OD-5's four are now named.
+* **C5d called all five original members reason-code fields.** `deterministic_checks`
+  names checks that were run and `semantic_audit_refs` holds references to audit records;
+  neither is a reason code, and ratifying a reason-code catalogue would tell an
+  implementer nothing about either. Corrected in the class definition, in the sixth-member
+  note, and in Part J, which deferred all three under one heading and now defers three
+  catalogues separately.
+* **The strategy-authority scan is rebuilt to discriminate by actor.** An audit found nine
+  of ten fresh claims escaping — verbs it did not carry, and "Stage S1" and "The advisory
+  builder" as subjects it did not know — and, in the other direction, two patterns that
+  named no actor and so flagged *true* statements about what S2 does. The scan now
+  classifies whole sentences: an authority claim offends when an S1 actor is the subject
+  of the verb and the subject matter its object; binding and conformance claims offend
+  without an actor, since identity is S1's by definition and a declaration evidences
+  nothing at any stage. `[V]` All ten fresh claims are caught, no true S2 statement is
+  flagged, and the guard is stated in the ADR and here as a **heuristic spot-check proven
+  against a named corpus**, not as coverage of a class.
+
+`[I]` Two things the rebuild had to keep, recorded because each was tried and reverted.
+**Adjacency**: a first draft let the actor, verb and subject matter fall anywhere in the
+sentence and flagged four true sentences from these documents, so the actor must stand
+within two words of its verb. **Block splitting**: collapsing a whole document merges list
+items that do not end in a full stop, pairing one item's actor with another's verb, so
+blocks are cut at blank lines, list markers, headings and table rows before sentences are
+split. Both failure modes are pinned as tests.
+
+### Changed — owner ruling: the strategy permission concept is deferred to S2
+
+The owner ruled on the question the previous two rounds recorded rather than resolved.
+**`permitted_reasoning_strategies` is not reserved in the S1 `CognitiveRoleContract`; it
+is deferred to S2 together with its vocabulary, and OD-5 does not change S1 contract
+shape.** Documentation and tests only.
+
+* **The field is removed from D2.** `CognitiveRoleContract`'s stated cardinality returns
+  to **10** and the C5d roster to **five**; `docs/S1_ENFORCEMENT.md` and this file are
+  corrected in the same change, as are `CONTRACT_CARDINALITY`, `FIELD_CLASSIFICATION` and
+  the representative shape in `tests/s1_specification_mirror.py` and the `C5D_ENTRIES`
+  equality pin in `tests/test_identifier_normalization.py`. `[V]` Those pins now hold the
+  field **out**: reintroducing it without a ruling fails them, and
+  `tests/test_advisory_contract_shape.py` additionally asserts that no contract declares
+  it, so the deferral is a checked fact rather than an absence a reader must notice.
+* **The reasoning is recorded with the decision.** Reserving a C5d empty-only list would
+  not have spared a schema change — the intended allowlist rejects an empty list, so the
+  field would have had to be retyped, revalidated and stripped of its default — while it
+  would have cost three consequences the specification had disclosed: every conformant S1
+  pair internally unsatisfiable on this axis, every S1-era role contract carrying the one
+  value the ratified form must refuse, and every stored contract needing reissue.
+* **Nothing else in OD-5 changes.** R-3's recorded lifecycle is unchanged and reasoning
+  methods remain method labels operating within it, not additional process states. The
+  four-way distinction stands, with the second term now described as a future S2 concept
+  rather than an S1 field. `declared_strategy` remains metadata outside `P_unsigned` that
+  establishes no conformance and carries no authority, and S1 still neither selects,
+  validates nor cryptographically binds a reasoning strategy. K.7 stands.
+* **Two questions travel with the field.** `[R]` The vocabulary itself is unratified, and
+  `[R]` whether a role's permitted methods are a constitution-derived attribute is now
+  S2's to answer rather than S1's to carry — the ADR's general statement of that question
+  stands unchanged, and its field-specific instance is removed with its subject.
+* **The sole-shape-bearer prose scan is gated on the ADR table rather than hard-coded.**
+  `[I]` It was added when two decisions bore on contract shape, making a sole-bearer
+  sentence false. This ruling makes OD-4 the sole bearer again and the same sentence true,
+  so a hard-coded bar would have forbidden the documents from stating a fact their own
+  table asserts. The offence is now the **disagreement** — prose claiming one bearer while
+  the table records several — which is what the original defect was.
+
+### Changed — the S1 specification is frozen for implementation (A12)
+
+Owner declaration, 2026-08-26. `docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md` moves
+from `CONTRACT SPECIFICATION RATIFIED; PRODUCTION IMPLEMENTATION SEPARATELY GATED` to
+**`CONTRACT SPECIFICATION FROZEN FOR IMPLEMENTATION`**. Documentation only: no `src/`
+change, no version bump, no `public_api.json`, no platform-freeze artifact; the
+substantive digest is unchanged.
+
+* **The contract surface is closed to change.** A field, type, cardinality, vocabulary,
+  equation term or validation rule may be altered only by a **ratified amendment**
+  recorded in the readiness ADR's owner-decision table — never by an implementation
+  change reconciling the specification to code. Where the two disagree, the
+  specification is right.
+* **A11 is discharged, and every statement that said otherwise is corrected.** Its
+  condition was independent review *and* merge; both are met, so the eight places across
+  the specification and the ADR that recorded production implementation as unauthorized
+  would have become false on merge. Each now points at **A12** and states what actually
+  remains.
+* **What remains is one thing, and it is not a ruling or a review.** The Part I
+  obligations — I1, I6 and the unbuilt parts of I7 — are undischarged. `[G]` The freeze
+  neither closes them nor authorizes skipping them; they are guards to be armed against a
+  contract module that does not yet exist.
+* `[R]` **The freeze is not a claim of correctness.** It is a decision to stop changing
+  the specification and to find its remaining defects by implementing against it: errors
+  are now discovered as amendments rather than as edits. Nothing the specification marks
+  `[R]` becomes ratified by it — the S2 strategy vocabulary, OD-1's normalization-profile
+  rider, and every guard claim verified only against a representative shape stand exactly
+  as they were.
+
 ### Not implemented
 
 The eight canonical contracts, Equations 1–4, proposal identity, invoice-domain

@@ -403,9 +403,10 @@ authority, and **the enforcement registries in `tests/` are exact mirrors of it 
 originates no contract field.**
 
 Specification is not authorization. No contract module exists in `src/`, the version is
-unchanged, and **production implementation remains separately gated**: the Part I
-obligations are undischarged, and A11 keeps implementation unauthorized until this
-documentation is independently reviewed.
+unchanged, and **production implementation remains gated on one thing**: the Part I
+obligations are undischarged. `[V]` A11's review-and-merge condition is discharged by the
+freeze recorded as **A12** in the readiness ADR, so what remains is work rather than
+permission.
 
 The ratified shape the guards now pin, in the terms Part D states it:
 

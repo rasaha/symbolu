@@ -35,7 +35,7 @@ The field-level rules are written to hold before the production contract surface
 they arm themselves with the first annotated field ``src/`` declares, and are exercised
 today against temporary representative shapes derived from the specification. **A green
 run here is not a verified contract and authorizes no production code** — production
-implementation is separately gated (ADR addendum A11).
+implementation is gated on the Part I obligations (ADR addenda A11/A12).
 """
 from __future__ import annotations
 
@@ -1249,6 +1249,13 @@ def test_every_c5d_entry_is_empty_only_and_declares_no_element_pattern(contract,
 
 
 def test_the_five_reserved_lists_are_exactly_the_c5d_fields():
+    """Set equality, so a sixth entry added without updating this pin fails here.
+
+    OD-5 considered adding ``CognitiveRoleContract.permitted_reasoning_strategies`` as a
+    sixth, and the owner **deferred it to S2 together with its vocabulary**. This pin now
+    holds that field *out*: reintroducing it without a ruling fails here rather than
+    passing as a plausible sixth reserved list.
+    """
     assert set(C5D_ENTRIES) == {
         ("AdvisoryCandidateSet", "selection_reason_codes"),
         ("ProposerAdvisory", "reason_codes"),
