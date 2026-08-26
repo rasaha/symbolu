@@ -16,10 +16,21 @@ enforced over the repository rather than over prose:
   is meaningful today: it would fail the moment a projection name appeared there,
   whether or not this package ever defines one.
 * the LIFECYCLE bound is checked over this package's whole defined surface —
-  modules, classes, methods and annotated fields — so a verb cannot arrive on a
-  projection later without failing here.
+  modules, classes, methods and annotated fields — so lifecycle authority cannot
+  arrive on a projection later without failing here.
 
-Scanners are self-tested against synthetic sources below.
+Owner decision O-2 narrows what the lifecycle bound prohibits. The bound is on
+AUTHORITY: an operation, or a callable this capability could invoke, that mints,
+activates, suspends, ratifies, revokes, expires or replaces a role. It is not a bar
+on the domain's vocabulary for lifecycle facts determined elsewhere — ``SUSPENDED``,
+``REVOKED``, ``RoleActivationStatus``, ``activation_status`` and ``expires_at`` are
+what a reader of roles calls what it read, and a scan that rejected them would buy
+no containment and cost the contract its correct words. The narrowed guard reads
+grammatical FORM and syntactic POSITION rather than the bare stem.
+
+Scanners are self-tested against synthetic sources below, and the narrowing itself
+is mutation-tested: each rule is weakened in turn and a real violation must escape,
+so no rule survives here without a sample that would catch its removal.
 """
 from __future__ import annotations
 
@@ -45,16 +56,81 @@ THIS_NAMESPACE = "ugence_agentic_proposer"
 #: Any name carrying the projection. Matched as a substring so a renamed or wrapped
 #: re-export (``CognitiveRoleContractV0``, ``CognitiveRoleRef``) is caught too.
 PROJECTION_MARKERS = ("CognitiveRole", "COGNITIVE_ROLE", "cognitive_role")
-#: Verbs that would make this capability an author of roles rather than a reader of
-#: them. D1 and D3 both depend on their absence: activation state is an input fact,
-#: never computed, and no identity or role is minted, changed or ended here.
-#: Matched as stems, so an inflected form ("activation", "ratified", "revoking")
-#: does not slip past a scan looking for the infinitive.
+#: Role lifecycle verbs, as infinitives. D1 and D3 both depend on this capability
+#: never authoring a role: activation state is an input fact, never computed, and no
+#: identity or role is minted, changed or ended here.
+#:
+#: Owner decision O-2 fixes what the presence of one of these verbs means. The bar is
+#: on OPERATIONS and on CALLABLE AUTHORITY — ``activate``, ``suspend``, ``revoke``,
+#: ``expire`` and their equivalents, wherever the capability could invoke one. It is
+#: not a bar on a contract DESCRIBING a lifecycle state somebody else determined, or
+#: a validity period somebody else set: ``SUSPENDED``, ``REVOKED``,
+#: ``RoleActivationStatus``, ``activation_status`` and ``expires_at`` are the
+#: vocabulary of a reader of roles, and renaming them would cost the domain its
+#: correct words to satisfy a lexical scan.
+#:
+#: The two are told apart by grammatical FORM and by syntactic POSITION, not by the
+#: stem alone. See ``_authority_offenders``.
 LIFECYCLE_VERBS = (
-    "mint", "activat", "deactivat", "reactivat", "suspend", "unsuspend",
-    "ratif", "revok", "reinstat", "issu", "expir", "provision", "grant",
-    "assign_role", "authoriz", "enroll", "replac",
+    "mint", "activate", "deactivate", "reactivate", "suspend", "unsuspend",
+    "ratify", "revoke", "reinstate", "issue", "expire", "provision", "grant",
+    "authorize", "authorise", "enroll", "enrol", "assign", "replace",
 )
+
+#: The positions a name can occupy. A name's position is what decides whether an
+#: actor form ("issuer") names an authority this capability holds or an external
+#: party it merely records.
+CALLABLE = "callable"
+TYPE = "type"
+FIELD = "field"
+#: A field whose annotation is itself callable: authority reachable through a
+#: state-shaped name.
+CALLABLE_FIELD = "callable-field"
+BINDING = "binding"
+
+#: Annotations that make a field a callable rather than a value.
+CALLABLE_ANNOTATIONS = ("Callable", "Awaitable", "Coroutine")
+
+
+def _stem(verb):
+    """The verb without its inflectable tail: ``activate`` -> ``activat``."""
+    return verb[:-1] if verb.endswith(("e", "y")) else verb
+
+
+def _mutation_forms(verb):
+    """The forms in which a verb names an ACT: the imperative and the progressive.
+
+    ``activate``/``activating``, ``revoke``/``revoking``, ``ratify``/``ratifying``.
+    These are barred in every position: a name in one of them describes something
+    being done, not something that is the case.
+    """
+    if verb.endswith("e"):
+        progressive = verb[:-1] + "ing"
+    elif verb.endswith("y"):
+        progressive = verb[:-1] + "ying"
+    else:
+        progressive = verb + "ing"
+    return {verb, progressive}
+
+
+def _actor_forms(verb):
+    """The forms in which a verb names an ACTOR: ``activator``, ``issuer``.
+
+    Barred as a type or a callable — that is this capability holding the authority.
+    Permitted as a field or a reference: ``issuer_ref`` records who issued a role
+    elsewhere, which is exactly the external fact D1 says the proposer reads.
+    """
+    base = verb[:-1] if verb.endswith("e") else verb
+    if verb.endswith("y"):
+        return {verb[:-1] + "ier"}
+    return {base + "er", base + "or"}
+
+
+def _tokens(name):
+    """``name`` split into lowercase word tokens, snake_case and CamelCase alike."""
+    spaced = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", name)
+    spaced = re.sub(r"(?<=[A-Z])(?=[A-Z][a-z])", "_", spaced)
+    return [token for token in re.split(r"[^A-Za-z0-9]+", spaced.lower()) if token]
 
 
 def _distribution_name(pyproject):
@@ -81,10 +157,34 @@ def _shared_contract_packages():
     return found
 
 
-def _defined_names(source, filename="<sample>"):
-    """Every NAME a module defines or re-exports: classes, functions, assignments,
-    class-level fields and methods, imported bindings, and the strings listed in
-    ``__all__``.
+def _is_callable_annotation(annotation):
+    """Whether an annotation makes the field it annotates a callable."""
+    referenced = {n.id for n in ast.walk(annotation) if isinstance(n, ast.Name)}
+    referenced |= {n.attr for n in ast.walk(annotation) if isinstance(n, ast.Attribute)}
+    referenced |= {n.value for n in ast.walk(annotation)
+                   if isinstance(n, ast.Constant) and isinstance(n.value, str)}
+    return any(any(marker in str(name) for marker in CALLABLE_ANNOTATIONS)
+               for name in referenced)
+
+
+def _is_callable_value(value):
+    """Whether an assigned value binds a callable rather than data."""
+    if isinstance(value, ast.Lambda):
+        return True
+    if isinstance(value, ast.Call):
+        called = (value.func.id if isinstance(value.func, ast.Name)
+                  else value.func.attr if isinstance(value.func, ast.Attribute) else "")
+        return called in {"partial", "partialmethod", "staticmethod", "classmethod"}
+    return False
+
+
+def _declared_names(source, filename="<sample>"):
+    """Every ``(name, position)`` a module declares or re-exports.
+
+    Classes, functions, assignments, class-level fields and methods, imported
+    bindings, and the strings listed in ``__all__``. The POSITION travels with the
+    name because O-2's bound is about what a name DOES, and the same token means
+    different things in different positions.
 
     Strings elsewhere — docstrings, enum VALUES — are deliberately excluded. A term
     in a docstring is not a name on the surface, and the ratified D4 values are
@@ -92,22 +192,33 @@ def _defined_names(source, filename="<sample>"):
     vocabulary question with a lifecycle one.
     """
     tree = ast.parse(source, filename=filename)
-    names = set()
+    declared = set()
     for node in ast.walk(tree):
-        if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
-            names.add(node.name)
+        if isinstance(node, ast.ClassDef):
+            declared.add((node.name, TYPE))
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            declared.add((node.name, CALLABLE))
         elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
-            names.add(node.target.id)
+            declared.add((node.target.id,
+                          CALLABLE_FIELD if _is_callable_annotation(node.annotation)
+                          else FIELD))
         elif isinstance(node, ast.Assign):
-            names |= {t.id for t in node.targets if isinstance(t, ast.Name)}
+            position = CALLABLE if _is_callable_value(node.value) else BINDING
+            declared |= {(t.id, position) for t in node.targets
+                         if isinstance(t, ast.Name)}
             if any(isinstance(t, ast.Name) and t.id == "__all__" for t in node.targets):
-                names |= {e.value for e in ast.walk(node.value)
-                          if isinstance(e, ast.Constant) and isinstance(e.value, str)}
+                declared |= {(e.value, BINDING) for e in ast.walk(node.value)
+                             if isinstance(e, ast.Constant) and isinstance(e.value, str)}
         elif isinstance(node, ast.ImportFrom):
-            names |= {a.asname or a.name for a in node.names}
+            declared |= {(a.asname or a.name, BINDING) for a in node.names}
         elif isinstance(node, ast.Import):
-            names |= {a.asname or a.name.split(".")[0] for a in node.names}
-    return names
+            declared |= {(a.asname or a.name.split(".")[0], BINDING) for a in node.names}
+    return declared
+
+
+def _defined_names(source, filename="<sample>"):
+    """The names alone, for the projection scans, which do not read position."""
+    return {name for name, _ in _declared_names(source, filename=filename)}
 
 
 def _projection_hits(names):
@@ -125,9 +236,46 @@ def _capability_dependency_hits(text):
     return sorted(m for m in (THIS_DISTRIBUTION, THIS_NAMESPACE) if m in text)
 
 
-def _lifecycle_offenders(names):
-    return sorted(n for n in names
-                  if any(verb in n.lower() for verb in LIFECYCLE_VERBS))
+def _authority_offenders(declared, *, verbs=LIFECYCLE_VERBS, tokens_of=_tokens,
+                         mutation_forms=_mutation_forms, actor_forms=_actor_forms,
+                         bar_actor_authority=True, bar_callable_fields=True):
+    """The names in ``declared`` that give this capability role lifecycle authority.
+
+    ``declared`` is a set of ``(name, position)`` pairs. Three rules, in order:
+
+    1. a MUTATION form in any position — ``activate``, ``suspending_role`` — is an
+       operation however it is bound, including an imported one;
+    2. an ACTOR form naming a type or a callable — ``class RoleActivator`` — is this
+       capability holding the authority, while the same token on a field records an
+       external party and is permitted;
+    3. any lifecycle-stemmed name whose annotation is a callable — ``activation_status:
+       Callable[[], None]`` — is authority smuggled through a state-shaped name.
+
+    A lifecycle-stemmed name in any other position is a description of a state or a
+    validity period this capability received, and O-2 requires it to pass.
+
+    The keyword arguments exist so the mutation tests below can weaken one rule at a
+    time and prove that a real violation escapes the weakened guard.
+    """
+    mutations = set().union(*(mutation_forms(verb) for verb in verbs))
+    actors = set().union(*(actor_forms(verb) for verb in verbs))
+    stems = {_stem(verb) for verb in verbs}
+    offenders = set()
+    for name, position in declared:
+        tokens = set(tokens_of(name))
+        if tokens & mutations:
+            offenders.add(name)
+        elif bar_actor_authority and position in (CALLABLE, TYPE) and tokens & actors:
+            offenders.add(name)
+        elif (bar_callable_fields and position == CALLABLE_FIELD
+              and any(stem in token for token in tokens for stem in stems)):
+            offenders.add(name)
+    return sorted(offenders)
+
+
+def _lifecycle_offenders(source, filename="<sample>"):
+    """``_authority_offenders`` over everything ``source`` declares."""
+    return _authority_offenders(_declared_names(source, filename=filename))
 
 
 # --------------------------------------------------------------------------- #
@@ -149,23 +297,92 @@ def test_the_name_scanner_sees_class_level_fields_and_methods():
     assert {"RoleProjection", "role_ref", "activate"} <= names
 
 
-@pytest.mark.parametrize("sample", [
+#: Sources in which this capability takes role lifecycle authority. Every one must
+#: be flagged, and each is the sole witness for at least one mutant below.
+UNAUTHORIZED_LIFECYCLE_SOURCES = (
     "def mint_role():\n    ...\n",
     "class R:\n    def suspend(self):\n        ...\n",
-    "class R:\n    activation_ratified: bool\n",
     "def revoke_role_binding():\n    ...\n",
-])
-def test_the_verb_scanner_flags_a_lifecycle_verb(sample):
-    assert _lifecycle_offenders(_defined_names(sample))
+    "class R:\n    def suspending_role(self):\n        ...\n",
+    "from role_service import activate\n",
+    "activate = _impl\n",
+    "class RoleActivator:\n    pass\n",
+    "class R:\n    activation_status: Callable[[], None]\n",
+    "class R:\n    on_expiry: Callable[[str], None]\n",
+    "expire_role = lambda ref: None\n",
+)
 
-
-@pytest.mark.parametrize("sample", [
+#: Sources describing a lifecycle state or a validity period somebody else
+#: determined. O-2 requires every one of them to pass: they are the domain's correct
+#: vocabulary, and the guard exists to bar authority, not words.
+PERMITTED_LIFECYCLE_SOURCES = (
     "class R:\n    role_ref: str\n    is_active: bool\n",
     "def read_role(role):\n    return role.role_ref\n",
-])
-def test_the_verb_scanner_permits_reading_an_input_fact(sample):
-    """``is_active`` supplied as an input fact is lawful; computing it is not."""
-    assert not _lifecycle_offenders(_defined_names(sample))
+    "class RoleActivationStatus(Enum):\n    ACTIVE = 'ACTIVE'\n"
+    "    SUSPENDED = 'SUSPENDED'\n    REVOKED = 'REVOKED'\n",
+    "class R:\n    activation_status: RoleActivationStatus\n",
+    "class R:\n    expires_at: str\n",
+    "class R:\n    activated_at: str\n    revoked_at: str\n",
+    "class R:\n    issuer_ref: str\n",
+    "class R:\n    granted_by_ref: str\n    reason_code: str\n",
+)
+
+
+@pytest.mark.parametrize("sample", UNAUTHORIZED_LIFECYCLE_SOURCES,
+                         ids=lambda s: s.split("\n")[0][:44])
+def test_the_verb_scanner_flags_lifecycle_authority(sample):
+    assert _lifecycle_offenders(sample), "unauthorized lifecycle authority passed"
+
+
+@pytest.mark.parametrize("sample", PERMITTED_LIFECYCLE_SOURCES,
+                         ids=lambda s: s.split("\n")[0][:44])
+def test_the_verb_scanner_permits_a_described_lifecycle_state(sample):
+    """O-2. An input fact is lawful; acting on it is not.
+
+    ``SUSPENDED``, ``REVOKED``, ``RoleActivationStatus``, ``activation_status`` and
+    ``expires_at`` are retained domain vocabulary. A guard that rejected them would
+    force a rename that costs the contract its meaning and buys no containment.
+    """
+    assert not _lifecycle_offenders(sample), "a described lifecycle state was flagged"
+
+
+#: Weakenings of the guard, each dropping exactly one thing it does. A mutant that
+#: still flags every unauthorized sample is a rule no sample pins — the guard would
+#: be free to lose it silently. Each entry must therefore let at least one violation
+#: through, and the sample it lets through names what that rule is for.
+GUARD_MUTANTS = {
+    "verb list truncated": {"verbs": ("mint",)},
+    "actor authority permitted": {"bar_actor_authority": False},
+    "callable fields permitted": {"bar_callable_fields": False},
+    "names not tokenized": {"tokens_of": lambda name: [name.lower()]},
+    "only the bare infinitive matched": {"mutation_forms": lambda verb: {verb}},
+    "stems matched instead of forms": {"actor_forms": lambda verb: set(),
+                                       "mutation_forms": lambda verb: {verb}},
+}
+
+
+@pytest.mark.parametrize("label,weakening", sorted(GUARD_MUTANTS.items()))
+def test_every_rule_in_the_guard_is_pinned_by_a_sample(label, weakening):
+    """Mutation test. O-2 narrowed this guard, so what remains must be load-bearing.
+
+    Narrowing a guard is only safe if the narrowed guard still fails on the thing it
+    was narrowed away from. Weakening one rule at a time and requiring a real
+    violation to escape proves that each rule is doing work, and that the samples
+    above would catch its removal.
+    """
+    escaped = [sample for sample in UNAUTHORIZED_LIFECYCLE_SOURCES
+               if not _authority_offenders(_declared_names(sample), **weakening)]
+    assert escaped, (
+        f"weakening the guard by '{label}' changed nothing: no sample pins that rule")
+
+
+@pytest.mark.parametrize("label,weakening", sorted(GUARD_MUTANTS.items()))
+def test_a_weakened_guard_still_permits_the_retained_vocabulary(label, weakening):
+    """A mutant may only lose detections. One that gained a false positive would
+    mean the samples above proved a rule the real guard does not have."""
+    for sample in PERMITTED_LIFECYCLE_SOURCES:
+        assert not _authority_offenders(_declared_names(sample), **weakening), \
+            f"'{label}' flags retained vocabulary: {sample!r}"
 
 
 def test_the_name_scanner_sees_a_bare_re_export():
@@ -306,43 +523,95 @@ def test_the_projection_is_local_to_this_package_wherever_it_is_defined():
 # --------------------------------------------------------------------------- #
 
 @pytest.mark.parametrize("path", sorted(SRC.rglob("*.py")), ids=lambda p: p.name)
-def test_no_source_name_is_a_role_lifecycle_verb(path):
+def test_no_source_name_takes_role_lifecycle_authority(path):
     offenders = _lifecycle_offenders(
-        _defined_names(path.read_text(encoding="utf-8"), filename=str(path)))
-    assert not offenders, f"{path.name} exposes a lifecycle verb: {offenders}"
+        path.read_text(encoding="utf-8"), filename=str(path))
+    assert not offenders, f"{path.name} takes lifecycle authority: {offenders}"
+
+
+def _runtime_position(value):
+    """The position an imported object occupies, read from the object itself."""
+    if isinstance(value, type):
+        return TYPE
+    return CALLABLE if callable(value) else BINDING
 
 
 def _public_surface():
-    """Every name reachable on the imported package: exports, class members, fields."""
-    names = set()
+    """Every ``(name, position)`` reachable on the imported package.
+
+    Exports, class members and model fields, each carrying what it actually is, so
+    the runtime half applies O-2's rules the same way the source half does.
+    """
+    declared = set()
     modules = [ap]
     for info in pkgutil.walk_packages(ap.__path__, ap.__name__ + "."):
         modules.append(importlib.import_module(info.name))
     for module in modules:
         exported = getattr(module, "__all__", None) or [
             n for n in vars(module) if not n.startswith("_")]
-        names |= set(exported)
+        declared |= {(n, _runtime_position(getattr(module, n, None))) for n in exported}
         for attr_name in exported:
             attr = getattr(module, attr_name, None)
             if isinstance(attr, type):
                 # Inherited str/Enum machinery is not this package's surface.
                 inherited = set(dir(str)) | set(dir(enum.Enum))
-                names |= {n for n in dir(attr)
-                          if not n.startswith("_") and n not in inherited}
+                declared |= {(n, _runtime_position(getattr(attr, n, None)))
+                             for n in dir(attr)
+                             if not n.startswith("_") and n not in inherited}
                 model_fields = getattr(attr, "model_fields", None)
                 if isinstance(model_fields, dict):
-                    names |= set(model_fields)
-    return names
+                    declared |= {(n, FIELD) for n in model_fields}
+    return declared
 
 
-def test_the_imported_surface_exposes_no_role_lifecycle_verb():
-    offenders = _lifecycle_offenders(_public_surface())
-    assert not offenders, f"lifecycle verbs on the public surface: {offenders}"
+def test_the_imported_surface_takes_no_role_lifecycle_authority():
+    offenders = _authority_offenders(_public_surface())
+    assert not offenders, f"lifecycle authority on the public surface: {offenders}"
+
+
+def test_the_runtime_position_reader_agrees_with_the_source_reader():
+    """The two halves must classify the same thing the same way, or O-2's narrowing
+    means one thing in ``src`` and another on the imported surface."""
+    class _Sample:
+        pass
+
+    assert _runtime_position(_Sample) == TYPE
+    assert _runtime_position(lambda: None) == CALLABLE
+    assert _runtime_position("ACTIVE") == BINDING
+    assert _authority_offenders({("RoleActivator", TYPE)}) == ["RoleActivator"]
+    assert _authority_offenders({("issuer_ref", FIELD)}) == []
 
 
 def test_the_bounds_are_pinned_to_the_ratified_wording():
     """D8's two enforceable bounds, asserted by equality so neither can be relaxed."""
     assert PROJECTION_MARKERS == ("CognitiveRole", "COGNITIVE_ROLE", "cognitive_role")
-    # D8 names six verbs explicitly; each must be matched by a stem in the scan.
+    # D8 names six verbs explicitly; an operation named for any of them is barred
+    # in every position the capability could invoke it from.
     for verb in ("mint", "activate", "suspend", "ratify", "revoke", "replace"):
-        assert _lifecycle_offenders({f"{verb}_role"}) == [f"{verb}_role"], verb
+        for position in (CALLABLE, TYPE, FIELD, BINDING):
+            assert _authority_offenders({(f"{verb}_role", position)}) == [f"{verb}_role"], \
+                (verb, position)
+
+
+def test_the_retained_governance_vocabulary_is_pinned():
+    """O-2, asserted by equality on the names themselves.
+
+    These five are the domain's words for a lifecycle state or a validity period
+    that some other authority determined. The guard must permit each of them in a
+    data position — a later re-widening that rejected them would fail here rather
+    than force a rename.
+    """
+    retained = [
+        ("SUSPENDED", BINDING),
+        ("REVOKED", BINDING),
+        ("RoleActivationStatus", TYPE),
+        ("activation_status", FIELD),
+        ("expires_at", FIELD),
+    ]
+    assert _authority_offenders(set(retained)) == []
+    # And the narrowing is not a hole: authority over the same concepts still fails.
+    assert _authority_offenders({("suspend", CALLABLE)}) == ["suspend"]
+    assert _authority_offenders({("revoke_role", BINDING)}) == ["revoke_role"]
+    assert _authority_offenders({("RoleActivator", TYPE)}) == ["RoleActivator"]
+    assert _authority_offenders({("activation_status", CALLABLE_FIELD)}) == \
+        ["activation_status"]

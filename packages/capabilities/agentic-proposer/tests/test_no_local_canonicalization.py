@@ -609,15 +609,20 @@ def test_scan_covers_both_src_and_tests():
     assert "ugence_agentic_proposer" in scanned and "tests" in scanned
 
 
-#: The modules discharging S1's three [R] enforcement obligations. They are named
-#: here, not just swept up by the glob, because each of them reasons about identity
-#: fields and about the permitted identity substrate — which is exactly the place a
-#: "temporary" helper computing an identity locally would be convenient to write.
+#: The modules discharging S1's [R] enforcement obligations, D6-D8 and the O-1/O-4
+#: refinements alike. They are named here, not just swept up by the glob, because
+#: each of them reasons about identity fields and about the permitted identity
+#: substrate — which is exactly the place a "temporary" helper computing an identity
+#: locally would be convenient to write. The identifier-normalization guard is the
+#: sharpest case: it exists because identity is computed with an empty normalization
+#: profile, so it names the substrate call while asserting nothing may replace it.
 #: A module dropping out of the scan must fail here rather than pass quietly.
 S1_ENFORCEMENT_MODULES = (
     "test_no_auditor_status_projection.py",
     "test_advisory_contract_shape.py",
     "test_role_projection_bounds.py",
+    "test_selection_dependent_fields.py",
+    "test_identifier_normalization.py",
 )
 
 

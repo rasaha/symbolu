@@ -10,6 +10,9 @@ import sys
 
 HERE = pathlib.Path(__file__).resolve().parent
 REPO_ROOT = HERE.parents[2]
-for _src in (HERE / "src", REPO_ROOT / "packages" / "jcs" / "src"):
+# ``tests`` is on the path so a guard module can import the specification mirror
+# that carries the pinned registries. The mirror is test support: it declares no
+# contract, is not exported, and ships in no wheel.
+for _src in (HERE / "src", HERE / "tests", REPO_ROOT / "packages" / "jcs" / "src"):
     if _src.is_dir() and str(_src) not in sys.path:
         sys.path.insert(0, str(_src))

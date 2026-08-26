@@ -1,16 +1,15 @@
 # S1 — canonical contract and equation specification
 
-**Status:** `CONTRACT SPECIFICATION RATIFIED; IMPLEMENTATION AUTHORIZATION PENDING MERGED ENFORCEMENT`
-**Ratified against:** the default branch at merge commit
-`e28538eb454fce6008e94e0772e0fd09c9c7ea7f` (PR #1474)
+**Status:** `CONTRACT SPECIFICATION RATIFIED; PRODUCTION IMPLEMENTATION SEPARATELY GATED`
+**Ratified against:** the default branch as of PR #1474
 **Package:** `ugence-agentic-proposer` (`packages/capabilities/agentic-proposer`)
 **Authority:** subordinate to D1–D10 and the ratification addenda in
 `docs/architecture/ADR_UGENCE_AGENTIC_PROPOSER_MVP_READINESS.md`.
 
 Evidence labels: `[V]` verified against this repository by execution or by reading a
-named artifact on a merged branch, `[I]` inferred or authored, `[R]` requires
-ratification, or verified only against an unmerged branch or an uncommitted planted
-shape and therefore to be re-verified, `[G]` gap.
+named artifact committed here, `[I]` inferred or authored, `[R]` requires ratification,
+or verified only against a temporary representative shape and therefore to be
+re-verified against the production contract surface, `[G]` gap.
 
 This document is the single canonical, implementation-ready S1 specification. It is
 organised so that a reader can tell, for any statement, which of five categories it
@@ -18,7 +17,7 @@ belongs to:
 
 | Part | Category |
 | --- | --- |
-| A | Verified repository constraints — facts about the substrate and the merged guards |
+| A | Verified repository constraints — facts about the substrate and the committed guards |
 | B | Ratified requirements — owner decisions this document implements |
 | C–H | The specification itself: model rules, contracts, validations, equations, identity, public surface |
 | I | Implementation obligations S1 must discharge |
@@ -37,8 +36,8 @@ the closing section.
 ## Supersession
 
 `packages/capabilities/agentic-proposer/docs/S1_CONTRACT_AND_EQUATION_RATIFICATION.md`,
-proposed on the unmerged draft branch `claude/d2-enforcement-ratification-si5lmm`
-(PR #1475, head `4fab9d811ff15f59acf59c1f93db502be999a801`), is a **rejected draft**.
+proposed on the draft branch `claude/d2-enforcement-ratification-si5lmm` (PR #1475), is
+a **rejected draft**.
 It must not be used for implementation. An independent review found that its authored
 field sets diverged from the owner's reconciled contract set on all eight contracts
 and on both equations, and that its nested-composition design fails a guard merged in
@@ -63,7 +62,7 @@ what S1 will export when S1 is separately authorised.
 # Part A — Verified repository constraints
 
 These are facts, not decisions. Each was established by execution or by reading a
-named artifact at `e28538eb`. They bound what any S1 specification may say.
+named artifact committed in PR #1474. They bound what any S1 specification may say.
 
 ## A1 — The identity substrate rejects bare numbers
 
@@ -101,10 +100,12 @@ substring, prefix or suffix rule.
 `observations: tuple[ToolObservation, ...]`, the walker returned `['content_hash']`;
 executed against the reference-by-id composition an earlier revision of Part D
 specified, it returned `[]`.
-Both runs were against shapes planted in `src/` on the guard branch, against a contract
-surface that does not exist on any merged branch. They are recorded here as claims to be
-re-verified when the first contract module lands, not as facts about this repository's
-committed source.
+Both runs were against temporary representative shapes rather than a declared contract
+module. They are recorded here as claims to be re-verified when the first contract
+module lands, not as facts about this repository's production source. `[V]` The
+corrected nested-candidate graph is re-established on every run by
+`tests/test_advisory_contract_shape.py`, which walks the representative shapes and
+asserts `reachable & RIVAL_IDENTITY_FIELDS` is empty for both advisory roots.
 
 **Consequence, exactly.** `ProposerAdvisory` may not nest `ToolObservation`. That is not
 a preference and cannot be resolved by an allowlist: `content_hash` is on the rival list
@@ -143,10 +144,10 @@ continuing to reference `ToolObservation` by id — the names nesting adds to
 reachable.** `[V]` `test_identity_field_is_exactly_the_ratified_one` is parametrised over
 `ADVISORY_TYPES == ("ProposerAdvisory", "CandidateAdvisory")` and already asserts that
 intersection empty for each root **independently**, so nesting adds to
-`ProposerAdvisory`'s reachable set only names the merged guard already asserts clean —
-which is why the result follows from the merged guard rather than from a new argument.
+`ProposerAdvisory`'s reachable set only names the committed guard already asserts clean —
+which is why the result follows from that guard rather than from a new argument.
 The corrected-graph run is nonetheless labelled `[R]`, per this document's evidence
-convention: it is a claim about a contract surface no merged branch carries, to be
+convention: it is a claim about a contract surface `src/` does not yet declare, to be
 re-verified when the first contract module lands.
 
 ## A4 — The lifecycle-verb scan currently matches data names
@@ -158,12 +159,12 @@ vocabulary, it returns
 `['REVOKED', 'RoleActivationStatus', 'SUSPENDED', 'activation_status', 'expires_at']`.
 
 **Consequence.** The ratified vocabulary in B4 cannot be expressed until the guard is
-narrowed as specified in I2. `[R]` Against shapes planted in `src/` on the guard branch,
+narrowed as specified in I2. `[R]` Against temporary representative shapes,
 restricting the scan to callable names returned `[]` for the retained vocabulary and
 still returned `['ActivateRole', 'activate', 'expire_mandate', 'reactivate',
-'revoke_identity', 'suspend_role']` for lifecycle authority. That run was against a
-contract surface no merged branch carries; it is a claim to be re-verified when the
-first contract module lands.
+'revoke_identity', 'suspend_role']` for lifecycle authority. That run was against
+temporary representative shapes rather than a declared contract module; it is a claim to
+be re-verified when the first contract module lands.
 
 ## A5 — Identity may be assigned only by an inline substrate call
 
@@ -1813,31 +1814,30 @@ enum **values** and out of the prefix rule's reach.
 These are obligations on the S1 implementation. **None of them is discharged by this
 document**, which changes no test and no source file.
 
-> **Status note.** `[R]` O-2 and O-3 below are implemented on branch
-> `claude/governance-refinements-o1-o4-k96vbz` (head `96510a1c4`, first landed at
-> `30945dac8`), together with a new O-1 guard and a new O-4 guard. **That branch is not
-> merged.** Nothing in this note is a fact about any merged branch, and every "implemented"
-> below means "implemented there, to be re-verified on merge".
+> **Status note.** The O-1 – O-4 and OD-1 – OD-3 guards are implemented in
+> `packages/capabilities/agentic-proposer/tests/`, and "implemented" below means exactly
+> that: a named guard enforces the ratified rule. It does **not** mean the rule has been
+> checked against a production contract surface, because none exists, and it does **not**
+> authorize one — production implementation is separately gated (ADR addendum A11).
 >
-> `[R]` That branch changes tests and documentation only — no `src/`, `version.py`,
+> `[R]` The guards are exercised against **temporary representative shapes** derived from
+> Part D and carried in `tests/s1_specification_mirror.py`. Those shapes are test support:
+> they declare no contract, are exported from nothing, and ship in no wheel. Every claim
+> below that a guard *arms* on a contract is a claim about those shapes and is to be
+> re-verified when the first contract module lands.
+>
+> The guards change tests and documentation only — no `src/`, `version.py`,
 > `pyproject.toml`, CI workflow, `public_api.json` or platform-freeze artifact is
-> touched — and its suite is green at 418 passed, 14 skipped, where the skips are dormant
-> parametrisations over a contract surface that does not exist yet. `[R]` Planting
-> representative contract shapes in `src/` arms them; those planted shapes are not
-> committed on any branch, so every count taken against them is a claim about a
-> throwaway working tree and is re-verifiable only by repeating the planting.
->
-> That branch is expected to merge **before** this specification, and the whole of this
-> note is to be re-verified at that point. I1, I5, I6 and I7 remain outstanding; I2 and
-> I3 record what that branch did.
+> touched. I1, I6 and the unbuilt parts of I7 remain outstanding; I2, I3, I4 and I5
+> record what the guards do.
 
 ## I1 — D2 scan: a narrow, module-scoped exemption *(outstanding)*
 
 `[V]` A7: the ratified `"sha256:"` prefix literal and the C6 pattern
-`^sha256:[0-9a-f]{64}$` collide with `SUSPECT_TEXT`. `[R]` The guard branch does not
-address this — its only change to `test_no_local_canonicalization.py` adds the two new
-guard modules to the pinned module list — but that branch is unmerged, so the statement
-is about its head `96510a1c4` and must be re-verified against whatever merges.
+`^sha256:[0-9a-f]{64}$` collide with `SUSPECT_TEXT`. `[V]` The guards do not address
+this: their only change to `test_no_local_canonicalization.py` adds the new guard modules
+to the pinned module list. It is outstanding, and lands with the identity module it
+governs.
 
 The resolution is a **module-path-scoped mask**, not a widened rule: the text mask for
 exactly the two strings `"sha256:"` and `"^sha256:[0-9a-f]{64}$"` applies only within
@@ -1861,11 +1861,9 @@ module other than the authorised one; the authorised name defined at class scope
 authorised name defined without the substrate call; the authorised module importing
 `hashlib`; and a locally defined `canonical_sha256_hex`.
 
-## I2 — Lifecycle-verb guard: narrowed to authority, not vocabulary (B4) *(implemented on an unmerged branch)*
+## I2 — Lifecycle-verb guard: narrowed to authority, not vocabulary (B4) *(implemented)*
 
-`[R]` Implemented on the guard branch `claude/governance-refinements-o1-o4-k96vbz`,
-which is not merged. Everything in this section is read from that branch and is to be
-re-verified on merge. It classifies by **grammatical form and
+`[V]` Implemented by `tests/test_role_projection_bounds.py`. It classifies by **grammatical form and
 syntactic position** rather than by stem: a mutation form is barred in every position;
 an actor form is barred as a type or callable and permitted as a field naming an
 external party; any lifecycle-stemmed field annotated `Callable` is barred. The
@@ -1876,37 +1874,36 @@ rule and must let a real violation escape without gaining a false positive on th
 retained vocabulary.
 
 This supersedes the cruder "callables only" rule an earlier draft of this document
-specified. `[R]` Both accept the retained vocabulary; the implemented rule additionally
+specified. `[V]` Both accept the retained vocabulary; the implemented rule additionally
 distinguishes an actor noun used as a field from one used as a type, which the cruder
-rule could not. Both halves were observed on the unmerged branch.
+rule could not. Both halves are exercised by the module's mutation controls.
 
-## I3 — Ratified-kind guard: narrowed to `ProposerAdvisory` (B5) *(implemented on an unmerged branch)*
+## I3 — Ratified-kind guard: narrowed to `ProposerAdvisory` (B5) *(implemented)*
 
-`[R]` Implemented on the guard branch, which is not merged: the kind is **required** on `ProposerAdvisory`
+`[V]` Implemented by `tests/test_advisory_contract_shape.py`: the kind is **required** on `ProposerAdvisory`
 and **barred** on `CandidateAdvisory`, along with any other kind in this capability's
 namespace, and the kind reader is self-tested against all three spellings (`KIND`,
 `kind`, a `kind` field default). This is stronger than the narrowing this document
 originally specified, which only removed `CandidateAdvisory` from the assertion.
 
-## I4 — Two corrections the guard branch has already applied
+## I4 — Two corrections the guards have applied
 
-**Both corrections this section previously reported as outstanding are applied at
-`96510a1c4`.** An earlier revision described them as repairs the branch still needed
-before it could merge. That was read from the branch's **earlier** head `30945dac8` and
-was wrong about `96510a1c4`; the correction is recorded here rather than quietly
-absorbed. `[R]` Everything below is read from an unmerged branch and is to be
-re-verified on merge — but "implemented there, unmerged" is a different status from
-"outstanding", and the two must not be confused.
+**Both corrections this section previously reported as outstanding are applied.** An
+earlier revision described them as repairs still needed; that reading was taken before
+they landed and the correction is recorded here rather than quietly absorbed. `[V]` Each
+is implemented by a named guard below. "Implemented" is not "authorized": production
+implementation remains separately gated under A11, and the guards are exercised against
+temporary representative shapes rather than a declared contract module.
 
-1. **The O-1 guard's class-blind false positive — fixed.** At `30945dac8`
-   `DEPENDENT_FIELDS` was matched by name alone, so
+1. **The O-1 guard's class-blind false positive — fixed.** An earlier revision matched
+   `DEPENDENT_FIELDS` by name alone, so
    `CandidateAdvisory.requested_review_action` — the candidate's **own** proposed
    routing, required and non-null by D6 of this document — was treated as a
    selection-dependent field, and the guard then demanded a `selected_candidate_id` on
    `CandidateAdvisory` and demanded the field admit `None`, contradicting the ratified
    contract.
 
-   `[R]` At `96510a1c4` the guard is **bearer-scoped**, exactly as OD-3 ratifies.
+   `[V]` The guard is now **bearer-scoped**, exactly as OD-3 ratifies.
    `tests/test_selection_dependent_fields.py` declares `SELECTION_BEARER =
    "ProposerAdvisory"`, holds `SELECTION_FIELD = "selected_candidate_id"` separately
    from a three-element `DEPENDENT_FIELDS`, and registers both in `SELECTION_COUPLING`.
@@ -1919,6 +1916,16 @@ re-verified on merge — but "implemented there, unmerged" is a different status
    `NON_BEARERS_SHARING_A_FIELD_NAME` — so it cannot be widened to another contract or
    narrowed to fewer fields without failing.
 
+   `[V]` **Enforcement is behavioural first.** The guard constructs the bearer from a
+   complete valid fixture supplying all twenty-three required fields and exercises the
+   four coupling cases as live validation outcomes, keeps
+   `CandidateAdvisory.requested_review_action` required and non-null, and proves the
+   bearer-scoped rule does not reach a class merely sharing the field name. Static AST
+   inspection is **supplemental** and is not described as proof of behaviour:
+   `test_the_suite_kills_a_no_op_validator_mutant` shows a validator that names all four
+   fields and enforces nothing passing the static layer and being killed by the
+   behavioural probes.
+
 2. **The `pydantic`/`socket` boundary probe — fixed.** `[V]` The underlying fact is
    unchanged and reproduces against `pydantic 2.13.4`: bare `import pydantic` does
    **not** load `socket`, but *defining any* `BaseModel` does, because pydantic-core's
@@ -1926,49 +1933,60 @@ re-verified on merge — but "implemented there, unmerged" is a different status
    whole-process `sys.modules` assertion fails the moment the first contract model
    exists, for a reason unrelated to this package's authority.
 
-   `[R]` At `96510a1c4` `tests/test_boundaries.py` implements the OD-2 design in **five
+   `[V]` `tests/test_boundaries.py` implements the OD-2 design in **five
    layers**, none load-bearing alone: a static import scan of every production source;
    an extension of that scan to aliases, `from` imports, module-qualified use and the
-   literal dynamic-import spellings; an isolated subprocess that establishes the
+   dynamic-import spellings — a literal passed to `import_module` or `__import__`, a
+   literal bound to a local name and then passed to either, `exec("import socket")`,
+   `eval("__import__('socket')")`, an import inside `compile(...)`, and the prohibited
+   relative-import spellings, each with its own negative control; an isolated subprocess that establishes the
    approved-dependency baseline first — `import pydantic`, define a minimal model — and
    then imports this package, asserting it adds **no additional** forbidden root beyond
    that baseline; the declared-dependency allowlist, so the exemption can never
    authorize a new networking library; and negative controls proving a direct `socket`
-   import or use still fails. `DEPENDENCY_BASELINE_MODULES = ("pydantic",)` is pinned by
-   equality against the declared dependency set, and
+   import or use still fails. `DEPENDENCY_BASELINE_MODULES` is **derived** from the
+   declared dependency registry in `pyproject.toml` rather than written beside it, the
+   generated baseline setup is **pinned by equality** so a baseline carrying an added
+   `import socket` fails `test_a_widened_baseline_setup_fails`, and
    `test_the_dependency_baseline_is_what_it_claims_to_be` demonstrates the premise
    rather than assuming it — asserting that bare `import pydantic` does not load
    `socket` **and** that defining a model does, each with a message saying what to
    re-read if the behaviour changes.
 
-   `[R]` The whole-process assertion this document previously cited by name,
-   `test_isolated_subprocess_import_loads_no_forbidden_module`, **no longer exists** at
-   `96510a1c4`: the repair replaced it with
-   `test_isolated_subprocess_adds_no_forbidden_module_beyond_the_baseline`. A citation
-   to the old name is a citation to `30945dac8`.
+   `[V]` The whole-process assertion this document previously cited by name,
+   `test_isolated_subprocess_import_loads_no_forbidden_module`, **no longer exists**: the
+   repair replaced it with
+   `test_isolated_subprocess_adds_no_forbidden_module_beyond_the_baseline`. A citation to
+   the old name is a citation to a superseded revision.
 
    The ruling is OD-2, ratified 2026-08-25. No ruling is outstanding, and this affects
    no contract shape in this document.
 
-**What this means for merge readiness.** `[R]` This section names no outstanding repair.
-What stands between the guard branch and a merged fact is review and merge of that
-branch, not further work identified here. `[R]` The suite at `96510a1c4` is green on its
-own terms; any count taken against contract shapes planted in `src/` remains a claim
-about a throwaway working tree, since no contract module is committed on any branch.
+**What this means.** `[V]` This section names no outstanding repair to either guard.
+`[R]` Both are exercised against temporary representative shapes rather than a declared
+contract module, so every claim that a guard *arms on a contract* is to be re-verified
+when the first contract module lands. Neither guard authorizes that module.
 
 ## I5 — Field classification must be pinned, not guessed (O-4)
 
-**The suffix-inference defect this section originally reported is fixed.** `[R]` At
-`30945dac8` the O-4 guard classified by name suffix (`_id`, `_ids`, `_ref`, `_refs`,
+**The suffix-inference defect this section originally reported is fixed.** An earlier
+revision of the O-4 guard classified by name suffix (`_id`, `_ids`, `_ref`, `_refs`,
 `_key`, `_keys`, `_uri`, `_uris`, `_urn`, `_code`, `_codes`, `_slug`) with a free-text
 marker list, and six fields — `agent_version`, `tool_name`, `allowed_source_scopes`,
 `excluded_data_classes`, `permitted_tool_scopes` and `tool_invocations` — fell in
-neither bucket and were checked by nothing. `[R]` At `96510a1c4` that branch replaced
-inference with an exact per-contract registry in which every declared field must appear,
-an unregistered field being a failure rather than a skip, and retained inference only as
-a secondary cross-check. The obligation below is therefore **what the merged guard must
-still carry**, not a defect report against it; the branch remains unmerged, so its state
-is `[R]` either way.
+neither bucket and were checked by nothing. `[V]` Inference is replaced by an exact
+per-contract registry in which every declared field must appear, an unregistered field
+being a failure rather than a skip, with inference retained only as a secondary
+cross-check.
+
+`[V]` **The registry is an enforcement mirror of this document and nothing else.** It is
+carried in `tests/s1_specification_mirror.py`, transcribed from the C5 tables and Part D
+above; it **originates no contract field**, adds none, renames none and reinterprets
+none, and where the registry and this document disagree, this document is right.
+`test_the_registry_cites_its_source` asserts that each block's cited section still
+resolves here. The obligation below is therefore **what the registry carries**, together
+with what it must additionally carry once a production surface exists; `[R]` its
+completeness check against `src/` is dormant until then.
 
 `tool_name` remains the sharpest case for why the registry is the primary mechanism — it
 is matched by equality against `permitted_tool_scopes`, so an unnormalised spelling
@@ -2082,7 +2100,7 @@ introduces the first contract, to the full H3 surface, and not before.
       may be digest-shaped under C6. A mutant adding a per-candidate `content_hash`,
       `advisory_digest` or renamed digest field must fail.
     * `[R]` The corrected-graph walk recorded in A3 — nesting `CandidateAdvisory` adds
-      only names the merged guard already asserts clean, and
+      only names the committed guard already asserts clean, and
       `reachable & RIVAL_IDENTITY_FIELDS` stays empty — is what this test re-establishes
       against a real contract module. It is `[R]` until that module exists.
 12. **Constrained-`str` declaration form (C8)** — a mutation test asserting that
@@ -2264,25 +2282,25 @@ mistakes their absence for coverage.
 
 ## Owner decisions
 
-**All four owner decisions are resolved.** What remains outstanding on OD-1 – OD-3 is
-not a ruling but an *implementation*, and the two must not be conflated: an unresolved
-question blocks a decision, whereas a resolved decision awaiting enforcement blocks a
-merge. OD-1 to OD-3 change no contract, field type, cardinality, vocabulary or equation
-term; all three are about guards and dependencies. OD-4 did change contract shape, and
-its resolution is recorded below and implemented throughout Part D.
+**All four owner decisions are resolved.** OD-1 to OD-3 change no contract, field type,
+cardinality, vocabulary or equation term; all three are about guards and dependencies.
+OD-4 did change contract shape, and its resolution is recorded below and implemented
+throughout Part D.
 
 **Each of OD-1 – OD-3 therefore carries three distinct statuses**, and a reader must not
-collapse them:
+collapse them. A ratified decision is not an implemented guard, and an implemented guard
+is not an authorization to write production code:
 
 | Axis | What it means | State for OD-1 – OD-3 |
 | --- | --- | --- |
 | **Owner decision** | Has the owner ruled? | **Resolved — ratified 2026-08-25.** No further ruling is sought or required. |
-| **Enforcement implementation** | Does a **merged** guard enforce the ruling? | **Implemented, not merged.** All three are implemented on the branch `claude/governance-refinements-o1-o4-k96vbz` at head `96510a1c4`, including the two corrections I4 previously reported as outstanding — the O-1 guard's bearer scoping (I4.1) and the `pydantic`/`socket` boundary probe (I4.2), both applied there. `[R]` No further repair is identified; what remains is review and merge of that branch. Until it merges, none of it is a fact about this repository. |
+| **Enforcement implementation** | Does a named guard enforce the ruling? | **Implemented.** `[V]` All three are enforced by guards in `packages/capabilities/agentic-proposer/tests/`, including the two corrections I4 previously reported as outstanding — the O-1 guard's bearer scoping (I4.1) and the `pydantic`/`socket` boundary probe (I4.2). `[R]` They are exercised against temporary representative shapes rather than a declared contract module, so every claim that a guard arms on a contract is to be re-verified when the first contract module lands. |
 | **S1 production implementation** | May contract code be written? | **Unauthorized under A11**, independently of the two axes above, until this documentation is independently reviewed and merged. |
 
 `[R]` The middle axis is `[R]` for all three: every statement about the guard branch is
-read from an unmerged head and is to be re-verified on merge. The first axis is not
-`[R]` — a ratified decision is not a pending ratification.
+read against temporary representative shapes and is to be re-verified against the
+production contract surface. The first axis is not `[R]` — a ratified decision is not a
+pending ratification, and neither is an implemented guard.
 
 **OD-1 — `primary_function` and `declared_strategy` are classified C5c. RATIFIED
 2026-08-25.**
@@ -2308,7 +2326,9 @@ Reclassifying to C5b while the field stays outside `P_unsigned` remains a narrow
 a redesign, and needs no new ratification.
 
 *Enforcement implementation:* the classification is carried by the O-4 registry on
-`96510a1c4` and lands with it; I5 states what the merged registry must carry.
+`tests/s1_specification_mirror.py`, which pins `primary_function` and `declared_strategy`
+as C5c and asserts they carry no pattern constraint of any kind; I5 states what the
+registry must carry.
 
 *S1 production implementation:* unauthorized under A11.
 
@@ -2320,8 +2340,8 @@ a redesign, and needs no new ratification.
 `pydantic>=2` is a ratified core dependency, so the first S1 contract module would fail
 a whole-process `sys.modules` assertion for a reason unrelated to this package's
 authority. (`[R]` That assertion was named
-`test_isolated_subprocess_import_loads_no_forbidden_module` at `30945dac8`; at
-`96510a1c4` the repair replaced it with
+`test_isolated_subprocess_import_loads_no_forbidden_module` in an earlier revision; the
+repair replaced it with
 `test_isolated_subprocess_adds_no_forbidden_module_beyond_the_baseline`.) The ruling is to **exempt exactly the transitive route** —
 `socket` reached through an approved dependency — and to keep the bar on any direct
 import in `src/`. Dropping `socket` from `FORBIDDEN` outright is rejected: it would give
@@ -2362,10 +2382,10 @@ establish that no code path anywhere can reach a socket at runtime. Claiming the
 would be false and must not appear in S1 documentation, tests or commit messages. As
 with D2, the invariant is the rule and the scan is defence-in-depth.
 
-*Enforcement implementation:* **implemented at `96510a1c4`, not merged.** `[R]` I4.2
-records what landed: the five-layer probe, `DEPENDENCY_BASELINE_MODULES` pinned by
-equality against the declared dependency set, a baseline recomputed by the test rather
-than hand-listed, and `test_the_dependency_baseline_is_what_it_claims_to_be`, which
+*Enforcement implementation:* **implemented.** `[V]` I4.2 records what landed: the
+five-layer probe, `DEPENDENCY_BASELINE_MODULES` derived from the declared dependency
+registry, a generated baseline setup pinned by equality so an added `import socket`
+fails a self-test, and `test_the_dependency_baseline_is_what_it_claims_to_be`, which
 demonstrates the premise instead of assuming it. The whole-process assertion was
 replaced, not exempted.
 
@@ -2384,8 +2404,7 @@ routing — is a different field that happens to share a name. Because `DEPENDEN
 is pinned by equality, the scoping must be pinned the same way: by bearer **and** field
 name, never by field name alone.
 
-*Enforcement implementation:* **implemented at `96510a1c4`, not merged.** `[R]` I4.1
-records what landed: `SELECTION_BEARER`, a `SELECTION_FIELD` held apart from a
+*Enforcement implementation:* **implemented.** `[V]` I4.1 records what landed: `SELECTION_BEARER`, a `SELECTION_FIELD` held apart from a
 three-element `DEPENDENT_FIELDS`, a `SELECTION_COUPLING` registry the class and live-type
 filters both gate on, `NON_BEARERS_SHARING_A_FIELD_NAME` naming the exclusion
 explicitly, and **two** self-tests pinning all of it by equality —
@@ -2479,21 +2498,22 @@ or an equation term.
 
 **What is outstanding is enforcement and authorization, not ratification.** The status
 line at the head of this document therefore reads
-`CONTRACT SPECIFICATION RATIFIED; IMPLEMENTATION AUTHORIZATION PENDING MERGED ENFORCEMENT` — the contract
-specification is ratified, and implementation authorization waits on merged enforcement.
-Three things stand between this document and S1 code, and none of them is an owner
-question. The ADR's introduction states the same three:
+`CONTRACT SPECIFICATION RATIFIED; PRODUCTION IMPLEMENTATION SEPARATELY GATED` — the
+contract specification is ratified, and production implementation is gated on something
+other than a ruling. Two things stand between this document and S1 code, and neither is
+an owner question. The ADR's introduction states the same two:
 
-* **Merged enforcement.** The guards implementing O-1 – O-4 and OD-1 – OD-3 are
-  implemented on the branch `claude/governance-refinements-o1-o4-k96vbz` at head
-  `96510a1c4` — including both corrections I4 previously reported as outstanding — but
-  that branch is **not merged**. `[R]` No further repair is identified; what is
-  outstanding is its review and merge, and until then every claim about it is `[R]`.
 * **The Part I obligations**, which S1 must discharge in the same change that introduces
-  the surface they govern.
-* **A11.** Implementation stays unauthorized until this documentation change is
-  independently reviewed and merged (I8 of this document; ADR addendum A11).
+  the surface they govern. `[V]` The guards implementing O-1 – O-4 and OD-1 – OD-3 are
+  in `packages/capabilities/agentic-proposer/tests/`, including both corrections I4
+  previously reported as outstanding; `[R]` they are exercised against temporary
+  representative shapes rather than a declared contract module, and I1, I6 and the
+  unbuilt parts of I7 remain outstanding.
+* **A11.** Production implementation stays unauthorized until this documentation change
+  is independently reviewed (I8 of this document; ADR addendum A11). An implemented
+  guard does not lift this.
 
 There is no gate on the contract *shape* for want of a ruling: every composition
 question is ratified. The gate is on writing production code before the enforcement that
-would catch a departure from it exists on a merged branch.
+would catch a departure from it has been independently reviewed alongside the
+specification it enforces.

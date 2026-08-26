@@ -36,20 +36,32 @@ rule against projecting an auditor status into an outcome or disposition field, 
 advisory contract shape, and D8's containment bounds on the role projection. Each is
 a test that holds today and arms itself when the surface it guards appears.
 
+Owner decisions O-1 – O-4, ratified after those guards were audited, narrow two of
+them and add two more: D8's lifecycle bound now prohibits mutation operations and
+callable authority rather than the vocabulary of lifecycle facts determined elsewhere
+(`SUSPENDED`, `REVOKED`, `RoleActivationStatus`, `activation_status`, `expires_at` are
+retained); the ratified kind belongs to `ProposerAdvisory` alone; the three
+selection-dependent fields on `ProposerAdvisory` are nullable and coupled to
+`selected_candidate_id`; and identifiers and references — not claims, reasons or
+summaries — are ASCII-only, because identity is computed with an empty Unicode
+normalization profile. Owner decisions OD-1 – OD-4, ratified 2026-08-25 after those
+refinements were audited against representative contract shapes, are all resolved; the
+guards enforcing them are in this package.
+
 The eight canonical contracts and Equations 1–4 are still **unimplemented**. They are no
 longer **undefined**: they were undefined when this section was first written, and
 nothing was inferred from D7 at that time; the gap was closed by an owner ratification,
 recorded literally in
 [`docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md`](docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md)
 — every contract, every field, the frozen `P_unsigned` projection and every equation
-signature. Specification is not authorization: no contract module exists in `src/`, the
-version is unchanged, and implementation stays unauthorized until that document is
-independently reviewed and merged. Owner decision OD-4 — whether the advisory carries
-its per-candidate entries or references them by id — is ratified, resolved by restoring
-the nesting ratified D7 requires. That document's status is
-`CONTRACT SPECIFICATION RATIFIED; IMPLEMENTATION AUTHORIZATION PENDING MERGED
-ENFORCEMENT`: every owner decision is resolved, and what is outstanding is the merge of
-the enforcement guards and the authorization itself.
+signature. That document is the authoritative S1 contract and equation specification,
+and the enforcement registries in `tests/` are exact mirrors of it: a test originates no
+contract field. Specification is not authorization: no contract module exists in `src/`,
+the version is unchanged, and production implementation remains separately gated on
+independent review. Owner decision OD-4 — whether the advisory carries its per-candidate
+entries or references them by id — is resolved by restoring the nesting ratified D7
+requires, so `ProposerAdvisory` carries a nested `candidates` sequence and retains
+`candidate_set_id` as the reference to the top-level `AdvisoryCandidateSet`.
 See also [`docs/S1_ENFORCEMENT.md`](docs/S1_ENFORCEMENT.md).
 
 ```python
