@@ -501,9 +501,9 @@ def test_a_projection_whose_request_digest_is_a_lie_is_refused(projection, decis
     """M-1: canonical guard 9, isolated.
 
     The audit refuted the claim that this property was safely sibling-backed. The named
-    sibling — guard 12, ``p_request_digest != d_request_digest`` — compares the projection's
+    sibling — guard 13, ``p_request_digest != d_request_digest`` — compares the projection's
     copy to the decision's, and a fabricator controls both. Here they are *made to agree* on
-    a fabricated digest, so guard 12 cannot fire.
+    a fabricated digest, so guard 13 cannot fire.
 
     What varies is the independent value: ``p_request.digest()``, recomputed from the
     carried request object. Guard 9 is the only check that consults it.
@@ -517,9 +517,9 @@ def test_a_projection_whose_request_digest_is_a_lie_is_refused(projection, decis
     agreeing = dataclasses.replace(decision, request_digest=fabricated)
 
     # The two attacker-controlled values agree; only the independent one differs.
-    assert forced.request_digest == agreeing.request_digest      # guard 12 cannot fire
+    assert forced.request_digest == agreeing.request_digest      # guard 13 cannot fire
     assert forced.request.digest() == true_digest != fabricated
-    assert agreeing.tenant_id == projection.tenant_id            # guard 11 cannot fire
+    assert agreeing.tenant_id == projection.tenant_id            # guard 12 cannot fire
 
     _refuses(
         projection=forced,
