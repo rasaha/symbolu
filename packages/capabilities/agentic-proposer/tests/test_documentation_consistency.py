@@ -264,6 +264,65 @@ def test_exactly_od_4_and_od_5_are_recorded_as_bearing_on_contract_shape():
         "the specification must agree that OD-5 bears on contract shape too")
 
 
+#: The ADR's owner-decision section heading, and the italic cross-references to it that
+#: the other documents and the ADR's own later sections carry.
+_OD_SECTION_HEADING = re.compile(r"^#{1,6}\s+(Owner decisions OD-1 – OD-\d[^\n]*)$", re.M)
+_OD_SECTION_REFERENCE = re.compile(r"\*(Owner decisions OD-1 – OD-\d)\*")
+
+#: A claim that exactly one decision bears on contract shape. True while OD-4 was the only
+#: one; false since OD-5. Written as a pattern rather than a fixed sentence because the
+#: claim appears in the ADR's prose in a different wording from the table it contradicts.
+_SOLE_SHAPE_BEARER_CLAIM = re.compile(
+    r"\bthe\s+only\s+one\s+(?:bearing|that\s+bears)\s+on\s+contract\s+shape", re.I)
+
+
+@pytest.mark.parametrize("path", DOCUMENTS, ids=lambda p: p.name)
+def test_every_owner_decision_section_cross_reference_resolves(path):
+    """A renamed section must not leave cross-references pointing at the old name.
+
+    This is the defect OD-5 introduced and an audit caught: renaming the ADR's table from
+    *OD-1 – OD-4* to *OD-1 – OD-5* left three references to the old heading, and every
+    guard stayed green because each read the table rather than the prose around it.
+    Markdown does not resolve an italic cross-reference, so nothing else would notice.
+    """
+    headings = _OD_SECTION_HEADING.findall(_text(ADR))
+    assert len(headings) == 1, f"the ADR carries {len(headings)} owner-decision headings"
+    live = headings[0].split(" — ")[0].strip()
+    dangling = [ref for ref in _OD_SECTION_REFERENCE.findall(_text(path)) if ref != live]
+    assert not dangling, (
+        f"{path.name} cross-references {dangling}, but the section is now {live!r}")
+
+
+@pytest.mark.parametrize("path", DOCUMENTS, ids=lambda p: p.name)
+def test_no_document_claims_one_decision_alone_bears_on_contract_shape(path):
+    """Two decisions bear on contract shape, OD-4 and OD-5.
+
+    The table column is checked elsewhere; this reads the prose, which is where the stale
+    claim survived. A document whose narrative says one thing and whose table says another
+    misdirects the reader who does not reach the table.
+    """
+    offenders = _SOLE_SHAPE_BEARER_CLAIM.findall(_text(path))
+    assert not offenders, f"{path.name}: {offenders}"
+
+
+def test_the_cross_reference_and_sole_bearer_detectors_catch_a_planted_violation():
+    """Both detectors above run over clean text and must be shown still capable of
+    failing. The clean controls prove they are discriminating rather than inert."""
+    live = _OD_SECTION_HEADING.findall(_text(ADR))[0].split(" — ")[0].strip()
+    stale = "see *Owner decisions OD-1 – OD-4* above"
+    found = [r for r in _OD_SECTION_REFERENCE.findall(stale) if r != live]
+    assert found, "the cross-reference detector no longer sees a stale reference"
+    assert not [r for r in _OD_SECTION_REFERENCE.findall(f"see *{live}* above")
+                if r != live], "the cross-reference detector flags the live heading"
+
+    assert _SOLE_SHAPE_BEARER_CLAIM.search(
+        "OD-4, the only one bearing on contract shape, is resolved (a)")
+    assert _SOLE_SHAPE_BEARER_CLAIM.search(
+        "OD-4 is the only one that bears on contract shape")
+    assert not _SOLE_SHAPE_BEARER_CLAIM.search(
+        "Two bear on contract shape, OD-4 and OD-5.")
+
+
 def test_no_competing_second_round_ratification_section_survives():
     """The fold rule: guard evidence is subordinate detail, not a rival ratification."""
     for path in DOCUMENTS:
@@ -353,14 +412,37 @@ TERMINOLOGY_CLAIM_PATTERNS = (
 #: does not establish conformance", "is not covered by ``advisory_digest``" — do not match
 #: them. A scan that flagged the denial along with the claim would be unusable here, since
 #: the denial is exactly what these documents are required to say.
+#: The subject an affirmative claim gives the authority to. ``S1`` names the stage; the
+#: builder and the validator are the two things inside it that a sentence would credit
+#: instead, and a claim about them is a claim about S1.
+_S1_ACTOR = r"(?:S1|the\s+S1\s+\w+|the\s+builder|the\s+validator)"
+#: Any spelling of the subject matter: the prose phrase, the two field names, and the
+#: bare noun. ``\b`` does not break at an underscore, so ``permitted_reasoning_strategies``
+#: is NOT reached by a pattern anchored on ``\breasoning``; the field names are matched
+#: literally for that reason.
+_STRATEGY_NOUN = (r"(?:reasoning\s+strateg(?:y|ies)|declared[\s_]strateg(?:y|ies)|"
+                  r"permitted_reasoning_strategies|declared_strategy|"
+                  r"(?:a|the|its|any|each)\s+strategy|strategy\s+conformance)")
+#: Verbs that assert authority over it. Selection, validation and binding as the task
+#: names them, plus the spellings each is naturally written in.
+_AUTHORITY_VERB = (r"(?:select|selects|validate|validates|verify|verifies|check|checks|"
+                   r"enforce|enforces|bind|binds|reject|rejects|constrain|constrains|"
+                   r"choose|chooses|match|matches|compare|compares)")
+_AUTHORITY_PARTICIPLE = (r"(?:selected|validated|verified|checked|enforced|bound|"
+                         r"rejected|constrained|chosen|matched|compared)")
+
 STRATEGY_AUTHORITY_CLAIM_PATTERNS = (
-    # Active voice, S1 as the subject of the verb.
-    r"\bS1\s+(?:selects|validates|binds|enforces|chooses)\b[^.\n]{0,80}?"
-    r"\breasoning\s+strateg",
-    # Passive voice, S1 as the agent.
-    r"\breasoning\s+strateg(?:y|ies)\b[^.\n]{0,80}?\b(?:is|are)\s+"
-    r"(?:selected|validated|bound|enforced|chosen)\b[^.\n]{0,30}?"
-    r"\b(?:by|at|in|within)\s+S1\b",
+    # Active voice: an S1 actor is the subject of an authority verb over a strategy.
+    rf"\b{_S1_ACTOR}\s+{_AUTHORITY_VERB}\b[^.\n]{{0,80}}?{_STRATEGY_NOUN}",
+    # Passive voice: the strategy is acted on, S1 named as the agent or the locus.
+    rf"{_STRATEGY_NOUN}[^.\n]{{0,80}}?\b(?:is|are|was|were)\s+{_AUTHORITY_PARTICIPLE}"
+    rf"\b[^.\n]{{0,60}}?\b(?:by|at|in|within|during)\s+{_S1_ACTOR}\b",
+    # The cross-field check, in either order and without naming S1 at all: the whole of
+    # what S2 adds is a comparison between the declaration and the permitted set.
+    r"\bdeclared[\s_]strateg(?:y|ies)\b[^.\n]{0,60}?\b(?:against|with|to)\b"
+    r"[^.\n]{0,40}?(?:permitted_reasoning_strategies|permitted\s+(?:set|strateg))",
+    r"\bpermitted_reasoning_strategies\b[^.\n]{0,60}?\b(?:against|with|to)\b"
+    r"[^.\n]{0,40}?declared[\s_]strateg",
     # The binding claim stated in field terms rather than in S1's name.
     r"\bdeclared_strategy\b[^.\n]{0,80}?\b(?:participates\s+in|is\s+inside|"
     r"is\s+part\s+of|is\s+covered\s+by|is\s+bound\s+into)\b[^.\n]{0,40}?"
@@ -515,9 +597,48 @@ def test_every_stale_status_pattern_matches_a_text_built_to_violate_it():
 _STRATEGY_AUTHORITY_POSITIVES = (
     "S1 validates the declared reasoning strategy against the role's permitted set.",
     "The reasoning strategy is enforced at S1, before the advisory is constructed.",
+    "A declared_strategy is checked against permitted_reasoning_strategies here.",
+    "The permitted_reasoning_strategies list is compared against declared_strategy.",
     "`declared_strategy` is covered by `advisory_digest`, so it cannot be altered.",
     "Declaring a strategy establishes conformance with the method it names.",
 )
+
+#: The spellings an independent audit found passing an earlier, narrower version of this
+#: scan. Kept as a named regression set rather than folded into the list above, because
+#: the failure they exposed was not a dead pattern — every pattern matched the sentence it
+#: was written from — but a scan whose reach was **narrower than the coverage the ADR and
+#: the CHANGELOG claimed for it**. That gap is invisible to a per-pattern self-test, so it
+#: needs cases nobody wrote a pattern from.
+#:
+#: The specific defect: ``\b`` does not break at an underscore, so a pattern anchored on
+#: ``\breasoning\s+strateg`` never reaches ``permitted_reasoning_strategies``; and the
+#: subject of a sentence claiming this authority is as often "the builder" as "S1".
+_STRATEGY_AUTHORITY_REGRESSIONS = (
+    "S1 validates `permitted_reasoning_strategies` against the declared strategy.",
+    "S1 checks `declared_strategy` against the role's permitted set.",
+    "The builder selects a reasoning strategy before constructing the advisory.",
+    "S1 enforces the role's permitted_reasoning_strategies at construction.",
+    "The declared strategy is validated against the permitted set at S1.",
+    "S1 binds the declared strategy into the advisory digest.",
+    "S1 rejects a declared strategy the role may not select.",
+    "Strategy conformance is enforced by the S1 builder.",
+)
+
+
+@pytest.mark.parametrize("text", _STRATEGY_AUTHORITY_REGRESSIONS,
+                         ids=lambda t: t[:40])
+def test_the_strategy_authority_scan_catches_the_spellings_that_once_escaped(text):
+    """Each sentence an audit found passing the narrower scan must now be caught.
+
+    Parametrized so a regression is named rather than reported as one failure among
+    eight, and kept separate from the paired self-test above so that widening the scan
+    later cannot quietly drop one of them.
+    """
+    assert _strategy_authority_claims(text, "regression"), (
+        f"the strategy-authority scan misses {text!r}; the ADR and the CHANGELOG claim "
+        "it refuses ANY affirmative claim of S1 authority over a reasoning strategy, and "
+        "a scan narrower than its stated coverage overstates what the documents are "
+        "guarded against")
 
 #: Text the scan must leave alone: the documents' own denials, which are adjacent to the
 #: claims in wording and opposite in meaning. Without this control the scan could be

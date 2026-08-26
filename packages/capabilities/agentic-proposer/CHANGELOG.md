@@ -524,11 +524,61 @@ public-API snapshot, no platform-freeze artifact touched.
   `tests/test_identifier_normalization.py`; assertions in
   `tests/test_advisory_contract_shape.py` that neither `declared_strategy` nor
   `permitted_reasoning_strategies` appears in the `P_unsigned` projection field list; and
-  a scan in `tests/test_documentation_consistency.py` refusing any affirmative claim of
-  S1 authority over a reasoning strategy — selection, validation or binding — self-tested
-  against one synthetic violation per pattern, so a pattern edited into inertness fails
-  rather than certifying every document clean, and against the documents' own denials, so
-  it cannot be broadened until it flags those too.
+  a scan in `tests/test_documentation_consistency.py` refusing affirmative claims of S1
+  authority over a reasoning strategy — selection, validation or binding — in the
+  documented forms: active and passive voice, `S1` or the builder or the validator as the
+  subject, and the underscored field names, which a `\b`-anchored pattern does not reach.
+  Self-tested three ways: one synthetic violation per pattern, so a pattern edited into
+  inertness fails rather than certifying every document clean; a named regression set of
+  spellings an audit found escaping an earlier, narrower version; and the documents' own
+  denials, so it cannot be broadened until it flags those too. `[I]` A pattern scan bounds
+  the forms it enumerates and is not proof that no such claim can be written.
+
+### Fixed — ninth audit round: OD-5's own overstatements
+
+An independent audit of the OD-5 commit confirmed the four-way distinction, the C5d
+classification and the unchanged R-3 lifecycle, and found five defects. Documentation and
+guards only.
+
+* **A rename left three dangling cross-references and a contradicted sentence.** Renaming
+  the ADR's table to *Owner decisions OD-1 – OD-5* left two references to the old heading,
+  a sentence naming OD-4 as the sole shape-bearing decision, and a
+  three-statuses sentence still scoped to four. The suite was green over all four because every existing guard
+  read the table rather than the prose around it. Two new scans close the class: italic
+  cross-references to the owner-decision section must resolve against the live heading, and
+  no document may claim one decision alone bears on contract shape.
+* **The strategy-authority scan was narrower than its stated coverage.** The ADR and this
+  file said it refused *any* affirmative claim; an audit found eight ordinary spellings
+  passing — an active-voice cross-field check naming the two fields is the representative
+  one, and the set is pinned in the test module rather than restated here. The
+  cause was structural: `\b` does not break at an underscore, so a pattern anchored on
+  `\breasoning` never reached `permitted_reasoning_strategies`, and the subject of such a
+  sentence is as often "the builder" as "S1". The patterns now cover both voices, three
+  subjects and the underscored field names; the eight escaping spellings are pinned as a
+  named regression set; and the coverage claim is stated as the forms enumerated rather
+  than as "any".
+* **C5d's class definition was false for its sixth member.** It said reservation means
+  "populating it later is not a schema change", which is untrue of a field whose ratified
+  form retypes the element and removes the default. The definition now states what C5d
+  guarantees in both cases — no value accrues before a vocabulary is ratified — instead of
+  leaving the correction to a note beneath it.
+* **The ADR labelled "Ratified rider" what the specification marks `[R]`.** Restated so
+  the two agree: what OD-5 ratifies is the **bar on the route**, the field may not be
+  brought into service by widening it in place. The allowlist form itself is not ratified.
+* **Two consequences went unstated.** The forward-only-record and unverified-declaration
+  limitations are now **K.7**, where a reader consulting Part K for what the specification
+  does not evidence will find them. D2 now states that `declared_strategy` is required and
+  non-empty while `permitted_reasoning_strategies` admits only `[]`, so every conformant S1
+  pair declares a method the role is not permitted to select, and `[R]` no S1-era role
+  contract survives the allowlist transition unrepopulated.
+
+`[R]` One question raised by the audit is **not** answered here and is recorded rather
+than resolved: whether a role's permitted **methods** fall within ratified D1's *minimum
+immutable attributes required for deterministic role matching* and outside D2's bar on a
+**constitution-derived attribute**. It is an instance of a question the readiness ADR
+already carries under *Open architectural dependency: the Agent Constitution*, and is
+recorded there. Nothing turns on it while the field admits no value; the ratification that
+lands the allowlist must answer it first.
 
 ### Not implemented
 

@@ -486,9 +486,17 @@ decision **OD-1** in the closing section.
 
 ### C5d — Structurally empty reserved list
 
-A `list[str]` field that **rejects any non-empty value**. It is reserved so that
-populating it later is not a schema change, and it is closed now so that it cannot become
-a de facto vocabulary before one is ratified (Part J).
+A `list[str]` field that **rejects any non-empty value**. It is closed now so that it
+cannot become a de facto vocabulary before one is ratified (Part J).
+
+**What reservation buys differs by field, and the class does not promise one answer.**
+For the five reason-code fields it is that populating them later is not a schema change:
+the element stays `str`, the default stays `[]`, and only a content class is added. For
+`CognitiveRoleContract.permitted_reasoning_strategies` it is **not** that, and the class
+definition must not be read as saying so — its ratified form retypes the element, replaces
+the validator and removes the default, which **is** a schema change (D2, OD-5). What C5d
+guarantees in both cases is narrower and is the whole of the guarantee: **no value accrues
+in the field before a vocabulary is ratified.**
 
 **C5d fields:** `AdvisoryCandidateSet.selection_reason_codes`,
 `ProposerAdvisory.reason_codes`, `ProposerProcessRecord.deterministic_checks`,
@@ -693,10 +701,45 @@ must not be implemented as one:
 * the default `[]` is **removed**, because a default that the validator refuses is not a
   default.
 
+**`[R]` A prior question the allowlist ratification must answer, not inherit.** D1 bounds
+this projection to the *minimum immutable attributes required for deterministic role
+matching*, and this section's preamble bars it from carrying a **constitution-derived
+attribute**. Whether a role's permitted **methods** are such an attribute is not decidable
+here: the Agent Constitution does not exist (K.6), and it is the document that would
+settle it. `[V]` Nothing turns on the answer while the field admits no value — no rule
+reads it and no value can be stored in it — but it becomes load-bearing the moment the
+allowlist lands, and the ratification that lands the allowlist must answer it first. The
+open question is recorded in the readiness ADR under *Open architectural dependency: the
+Agent Constitution*, where the general form of it already stood.
+
 **This requires separate ratification** and is S2's to carry out. Nothing in this
 document ratifies the vocabulary, its members, its spelling, its cardinality bounds or
 its default. `[R]` Until that ratification lands, the field is reserved and closed, and
 the shape described in this subsection is the *intended* target, not a ratified one.
+What OD-5 ratifies is the **bar on the route** — the field may not be brought into
+service by widening it in place — and not the destination.
+
+**What the reserved state costs, stated rather than left to be discovered.** The
+consequences below follow from this field being empty-only while `declared_strategy`
+(D8) is required and non-empty. They are not defects, and none is a reason to relax
+either rule; they are the price of reserving one half of a pair before the other half
+can be checked against it, and an implementer meets all three.
+
+* **Every conformant S1 pair is internally unsatisfiable on this axis.** A process
+  record must declare a method, and the role contract permits none. So every
+  well-formed S1 record declares a method the role is not permitted to select. `[I]`
+  This is not a contradiction the validators can catch, because no rule at this stage
+  relates the two fields — that relation is exactly what S2 adds.
+* **Every S1-era role contract carries the one value the ratified form must refuse.**
+  Under the intended allowlist an empty list is the single inadmissible value, and it
+  is the only admissible one now.
+* **`[R]` No S1-era instance survives the transition unrepopulated.** Every stored
+  `CognitiveRoleContract` becomes invalid the moment the allowlist lands and must be
+  reissued by its role owner with a non-empty list. That is a migration obligation on
+  whoever ratifies the vocabulary, and it is recorded here so it is not discovered
+  then. `[I]` Since no contract module exists and nothing is stored, the population to
+  migrate is empty today; the obligation is real for any deployment that stores one
+  before S2.
 
 `[V]` D8's export bound is not a field property. It is enforced by
 `tests/test_role_projection_bounds.py`, which scans every shared-contract package in
@@ -2421,6 +2464,28 @@ mistakes their absence for coverage.
 6. **`[G]` The Agent Constitution still does not exist.** `CognitiveRoleContract`
    remains the D8-bounded v0 projection and must be re-derived when the document lands.
    Nothing here is conformance with it.
+
+7. **A conformant process record is not evidence about how the work was done (OD-5).**
+   Two distinct absences, both outside what this stage can decide. The detailed
+   statements are in D8 — *What the forward-only record does not represent* and
+   *`declared_strategy` — an assertion, and only an assertion* — and are recorded here
+   the way K.1 records D9's and G1's, so a reader consulting this part for what the
+   specification does not evidence is not told less than the truth.
+
+   * **Control flow is not represented.** R-3 admits only a forward subsequence, so a
+     producer that iterated, branched or revisited a stage yields the same
+     `state_transitions` as one that proceeded straight through. **The absence of
+     repeated or branching transitions is therefore not evidence that no internal
+     iteration or branching occurred**, and no other field in D8 carries control flow.
+     Not locally decidable: closing it would require a representation of execution that
+     R-3 exists to forbid.
+
+   * **The declared method is unverified.** `declared_strategy` states what the producer
+     says it did. Nothing in this stage compares that against the work, and — the field
+     being outside `P_unsigned` — nothing binds it either. A record naming one method
+     while the work followed another is well-formed under every rule in this document.
+     Not locally decidable at S1: `permitted_reasoning_strategies` is C5d and admits no
+     value, so there is nothing here to check a declaration against.
 
 ---
 
