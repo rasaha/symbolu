@@ -586,8 +586,9 @@ implements the resolution.
 **No ruling is outstanding on any of the five.** Three statuses are distinguished
 throughout and must not be collapsed: a **decision is ratified**; a **named guard
 implements** it in `packages/capabilities/agentic-proposer/tests/`; and **S1 production
-implementation remains unauthorized** under A11, independently of both. A guard that
-enforces a ratified decision authorizes no production contract. The *Enforcement* column
+implementation is authorized on merge** under A12, independently of both. A guard that
+enforces a ratified decision authorizes no production contract — the independent review
+and the merge do, and neither is a consequence of the guard. The *Enforcement* column
 below records the second axis only; the decisions themselves are closed.
 
 | Id | Decision | Bears on contract shape | Enforcement |
@@ -903,7 +904,7 @@ remains reachable, recompute-and-reject as the operative eligibility guarantee,
 `strict=True`, and reading the substrate version from installed distribution metadata —
 and are carried forward. PR #1475 is left unaltered as a record of that scrutiny.
 
-### A11 — Implementation remains unauthorized
+### A11 — Implementation was unauthorized until review and merge
 
 `[V]` This addendum and the documents it references are **documentation only**. No
 `src/` module, test, `pyproject.toml`, `version.py`, public API, CI workflow or
