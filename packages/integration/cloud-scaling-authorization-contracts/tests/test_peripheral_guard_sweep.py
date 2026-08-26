@@ -41,15 +41,10 @@ SCORED = (
     P_ATTESTATION_IS_AWARE,
     P_SCOPE_SCHEMA,
     P_SCOPE_MAGNITUDE_CEILING,
+    P_SCOPE_DELTA_CEILING,
     P_BINDING_CEILING_TYPE,
 )
-"""Guards this module actually neutralises and observes. Nothing else is claimed.
-
-``P_SCOPE_DELTA_CEILING`` is **not** here: with the magnitude ceiling widened far enough
-for a delta-only attack, the request that clears it also clears the delta bound, so no
-attack was found that guard 15 alone refuses. Recorded as unscored rather than asserted
-into the list.
-"""
+"""Guards this module actually neutralises and observes. Nothing else is claimed."""
 
 
 def test_the_peripheral_guard_numbers_still_name_these_conditions():
@@ -99,6 +94,38 @@ def test_the_scope_magnitude_ceiling_is_load_bearing(tmp_path, projection):
         mp = mutated_peripheral(pathlib.Path(td), P_SCOPE_MAGNITUDE_CEILING)
         scope = mp.target_scope(projection, max_magnitude=5, max_delta=10_000)
     assert scope.requested_magnitude > scope.max_permitted_magnitude
+
+
+def test_the_scope_delta_ceiling_is_load_bearing(tmp_path, projection):
+    """Scored with the two ceilings varied independently.
+
+    An earlier revision of this module claimed no attack existed that guard 15 alone
+    refuses. That was wrong, and the claim was the defect: widening ``max_magnitude`` while
+    tightening ``max_delta`` isolates the delta bound in one line. The rationale is removed
+    rather than reworded.
+    """
+
+    from conftest import build_target_scope
+
+    # Pristine: guard 15 refuses, and names the delta rather than the magnitude.
+    with pytest.raises(Exception) as exc:
+        build_target_scope(projection, max_magnitude=10_000, max_delta=2)
+    assert "guard neutralised" not in str(exc.value)
+    assert "delta" in str(exc.value), "the magnitude sibling produced this refusal"
+
+    # Neutralising guard 14 alone still refuses: 15 is doing this work, not 14.
+    with tempfile.TemporaryDirectory(dir=tmp_path) as td:
+        mp = mutated_peripheral(pathlib.Path(td), P_SCOPE_MAGNITUDE_CEILING)
+        with pytest.raises(Exception) as exc:
+            mp.target_scope(projection, max_magnitude=10_000, max_delta=2)
+    assert "guard neutralised" not in str(exc.value)
+    assert "delta" in str(exc.value)
+
+    # Neutralising guard 15 admits.
+    with tempfile.TemporaryDirectory(dir=tmp_path) as td:
+        mp = mutated_peripheral(pathlib.Path(td), P_SCOPE_DELTA_CEILING)
+        scope = mp.target_scope(projection, max_magnitude=10_000, max_delta=2)
+    assert scope.requested_delta > scope.max_permitted_delta
 
 
 def test_the_scope_schema_gate_is_load_bearing(tmp_path, projection):
@@ -219,7 +246,6 @@ def test_peripheral_coverage_is_reported_honestly():
 
     total = len(peripheral_guards(SRC))
     assert total == 28, f"peripheral inventory moved to {total}"
-    assert len(set(SCORED)) == 5
-    # 5 of 28 scored. Guard 15 measured and deliberately not scored — see SCORED's note.
-    # Not exhaustive, and not described as such anywhere.
+    assert len(set(SCORED)) == 6
+    # 6 of 28 scored. Not exhaustive, and not described as such anywhere.
     assert len(set(SCORED)) < total

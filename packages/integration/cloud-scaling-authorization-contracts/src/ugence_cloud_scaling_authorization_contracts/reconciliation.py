@@ -543,7 +543,15 @@ def reconcile_phase4(
             "authenticated one",
             _Reason.DECISION_INSTANT_NOT_BOUND,
         )
-    if to_canonical_obj(decision_expires_at) != to_canonical_obj(snapshot_expires_at):
+    # The bound expiry is admitted before it is compared, exactly as ``evaluated_at`` and
+    # ``issued_at`` are below. ``_bound_instant`` enforces two things this comparison cannot:
+    # the value is an exact canonical *string* — no ``str`` subclass, whose lying ``__ne__``
+    # would survive ``to_canonical_obj`` untouched — and it parses as a canonical UTC
+    # instant. The comparison itself is unchanged: still exact canonical equality, never a
+    # permissive same-instant equivalence, and ``to_canonical_obj`` of the parsed value is
+    # byte-identical to ``to_canonical_obj`` of the string it came from.
+    bound_expires_at = _bound_instant("decision_snapshot.expires_at", snapshot_expires_at)
+    if to_canonical_obj(decision_expires_at) != to_canonical_obj(bound_expires_at):
         raise ReconciliationError(
             "the decision's outer expires_at does not equal the value bound in "
             "decision_snapshot",

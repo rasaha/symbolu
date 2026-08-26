@@ -1,5 +1,64 @@
 # Changelog — ugence-cloud-scaling-authorization-contracts
 
+## [Unreleased] — every value is admitted before it is compared
+
+*No version bump.* `cloud-scaling-policy-authenticity` pins Phase 5A's version literal in
+`test_phase_5a_is_at_the_version_5b1_moved_it_to`, and moving it would drag a second
+package into a change that ratified none. The pin did its job — it caught the bump — and
+the version moves when the owner rules on it, not as a side effect of a CHANGELOG heading.
+
+
+`0.7.0` applied the exact-type doctrine to `datetime` and `int`. It never applied it to
+`str`, which carries every digest and identifier in this package, and it never asked
+whether a value reaching a comparison had been admitted *at all*. Both gaps were live.
+
+### Fixed
+
+- `canonical.py`'s three admissions (`is_canonical_digest`, `is_policy_authority_digest`,
+  `require_nfc_text`) require `type(value) is str`. A subclass lying only in `__ne__` —
+  `__eq__` left honest, so it clears the empty check and the NFC comparison — defeated
+  every identity guard that decides with `!=`, with the carried digests byte-identical to
+  the honest ones.
+- `PolicyTargetBindingReference`'s two ceilings are admitted exactly. They are the only
+  bound a request is enforced against, and `>` hands a subclass operand priority through
+  its reflected `__lt__`.
+- Values that reached a comparison without passing through any admission now pass through
+  one first: `decision_snapshot`'s `tenant_id` and `domain`, the decision's own
+  `tenant_id`, `idempotency_key`, `request_digest` and `subject_digest`, and the bound
+  `expires_at` consumed by canonical guard 40.
+- Every public Phase 5A artifact admits its `schema_version` as an exact plain string
+  before comparing it. Two admitted an arbitrary identifier outright; three were caught
+  only by a later digest binding computed over the honest constant.
+
+### Changed — intentional narrowing of diagnosis precedence
+
+**This is a deliberate behavioural change, not an accident of the repairs above.** For
+`decision.*` values, the refusal a caller receives now depends on which of two things is
+wrong:
+
+| Input | Refusal |
+|---|---|
+| malformed or non-canonical (wrong type, bad shape) | `MALFORMED_CANONICAL_FIELD` — a canonical/identifier refusal |
+| well-formed but unequal | the existing semantic mismatch (`TENANT_MISMATCH`, `IDEMPOTENCY_KEY_MISMATCH`, `REQUEST_DIGEST_MISMATCH`, `SUBJECT_MISMATCH`, `DECISION_INSTANT_NOT_BOUND`) |
+
+A malformed value no longer receives a semantic mismatch reason, because the comparison
+that would diagnose the mismatch is exactly the comparison a malformed value can subvert.
+The semantic reasons are **not** restored for malformed inputs. Both branches are pinned
+in the suite — A-52 and
+`test_a_lying_bound_expiry_is_refused_before_guard_40_compares_it` each assert the honest
+mismatch keeps its own reason and the malformed one does not inherit it — so a later
+change cannot quietly widen either branch.
+
+Admission is placed *after* any emptiness guard that owns its own typed diagnosis, so a
+missing `idempotency_key` is still reported as missing rather than as malformed.
+
+### Coverage
+
+`target.py` and `attestation.py` carry 28 guards no sweep executed. They are now
+inventoried separately from the owner-ratified 65, with distinct entry points. **6 of 28
+are neutralised and scored.** No exhaustive coverage is claimed anywhere, and the measured
+figure is asserted in the suite so it cannot drift silently.
+
 ## [0.7.0] — canonical values only: the temporal guards refuse live objects
 
 `0.6.0` fixed *how* the orderings compare and left *what* they accept. `_bound_instant` had an
