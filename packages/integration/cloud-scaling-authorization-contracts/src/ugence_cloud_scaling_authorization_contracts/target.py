@@ -145,6 +145,10 @@ class ExecutionTargetScope:
     schema_version: str = EXECUTION_TARGET_SCOPE_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
+        # The schema identifier is admitted as an exact plain string before it is
+        # compared. Equality here decides which contract this artifact claims to be,
+        # and ``!=`` is overridable, so a subclass can claim any identifier it likes.
+        require_nfc_text("schema_version", self.schema_version)
         if self.schema_version != EXECUTION_TARGET_SCOPE_SCHEMA_VERSION:
             raise TargetScopeError(
                 f"schema_version must be {EXECUTION_TARGET_SCOPE_SCHEMA_VERSION!r}",
@@ -329,6 +333,7 @@ class PolicyTargetBindingReference:
     schema_version: str = POLICY_TARGET_BINDING_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
+        require_nfc_text("schema_version", self.schema_version)
         if self.schema_version != POLICY_TARGET_BINDING_SCHEMA_VERSION:
             raise PolicyTargetBindingError(
                 f"schema_version must be {POLICY_TARGET_BINDING_SCHEMA_VERSION!r}",
@@ -536,6 +541,7 @@ class PolicyTargetBindingReferenceV2:
     schema_version: str = POLICY_TARGET_BINDING_V2_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
+        require_nfc_text("schema_version", self.schema_version)
         if self.schema_version != POLICY_TARGET_BINDING_V2_SCHEMA_VERSION:
             raise PolicyTargetBindingError(
                 f"schema_version must be {POLICY_TARGET_BINDING_V2_SCHEMA_VERSION!r}",

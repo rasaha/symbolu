@@ -115,7 +115,7 @@ EXPECTED_CONDITIONS = {
         "to_canonical_obj(decision_evaluated_at) != to_canonical_obj(snapshot_evaluated_at)"
     ),
     GUARD_OUTER_EXPIRES_AT_IS_BOUND: (
-        "to_canonical_obj(decision_expires_at) != to_canonical_obj(snapshot_expires_at)"
+        "to_canonical_obj(decision_expires_at) != to_canonical_obj(bound_expires_at)"
     ),
     GUARD_EVALUATED_AFTER_VALID_FROM: "subject_valid_from > bound_evaluated_at",
     GUARD_EVALUATED_BEFORE_ISSUED: "bound_evaluated_at > bound_issued_at",
@@ -138,6 +138,43 @@ SIBLINGS = {
     GUARD_EVALUATED_AFTER_VALID_FROM: GUARD_EVALUATED_BEFORE_ISSUED,
     GUARD_EVALUATED_BEFORE_ISSUED: GUARD_EVALUATED_AFTER_VALID_FROM,
 }
+
+
+def test_a_lying_bound_expiry_is_refused_before_guard_40_compares_it(projection, decision):
+    """C40's bound operand is admitted as an exact canonical string, not merely compared.
+
+    ``to_canonical_obj`` returns a ``str`` subclass unchanged, so a subclass lying in
+    ``__ne__`` survived the canonicalisation and satisfied C40 by fiat — a forged expiry
+    presenting as the authenticated one. Hand-built, never through ``to_canonical_obj``.
+    """
+
+    class _LyingInstant(str):
+        def __ne__(self, other):
+            return False
+
+        def __hash__(self):
+            return str.__hash__(self)
+
+    forged = _canonical_ts(decision.expires_at + datetime_mod.timedelta(days=3650))
+
+    def _build(variant):
+        return build_capacity_authorization_candidate(
+            projection=projection, decision=variant, **_artifacts_for(projection)
+        )
+
+    # Control: an honest divergence keeps its existing typed refusal, and emits nothing.
+    honest = _snapshot_variant(decision, expires_at=forged)
+    with pytest.raises(ReconciliationError) as exc:
+        _build(honest)
+    assert exc.value.reason is Reason.DECISION_INSTANT_NOT_BOUND
+
+    # The lie is refused at admission, before C40 runs — and emits nothing either.
+    lying = _snapshot_variant(decision, expires_at=_LyingInstant(forged))
+    with pytest.raises(ReconciliationError) as exc:
+        _build(lying)
+    assert exc.value.reason is Reason.DECISION_INSTANT_NOT_BOUND
+    assert "decision_snapshot.expires_at" in str(exc.value)
+    assert "canonical instant string" in str(exc.value)
 
 
 def _canonical_ts(value):
@@ -464,9 +501,9 @@ def test_a_projection_whose_request_digest_is_a_lie_is_refused(projection, decis
     """M-1: canonical guard 9, isolated.
 
     The audit refuted the claim that this property was safely sibling-backed. The named
-    sibling — guard 12, ``p_request_digest != d_request_digest`` — compares the projection's
+    sibling — guard 13, ``p_request_digest != d_request_digest`` — compares the projection's
     copy to the decision's, and a fabricator controls both. Here they are *made to agree* on
-    a fabricated digest, so guard 12 cannot fire.
+    a fabricated digest, so guard 13 cannot fire.
 
     What varies is the independent value: ``p_request.digest()``, recomputed from the
     carried request object. Guard 9 is the only check that consults it.
@@ -480,9 +517,9 @@ def test_a_projection_whose_request_digest_is_a_lie_is_refused(projection, decis
     agreeing = dataclasses.replace(decision, request_digest=fabricated)
 
     # The two attacker-controlled values agree; only the independent one differs.
-    assert forced.request_digest == agreeing.request_digest      # guard 12 cannot fire
+    assert forced.request_digest == agreeing.request_digest      # guard 13 cannot fire
     assert forced.request.digest() == true_digest != fabricated
-    assert agreeing.tenant_id == projection.tenant_id            # guard 11 cannot fire
+    assert agreeing.tenant_id == projection.tenant_id            # guard 12 cannot fire
 
     _refuses(
         projection=forced,

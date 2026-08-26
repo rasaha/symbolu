@@ -112,6 +112,10 @@ class ProducerAttestationEvidence:
     schema_version: str = PRODUCER_ATTESTATION_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
+        # The schema identifier is admitted as an exact plain string before it is
+        # compared. Equality here decides which contract this artifact claims to be,
+        # and ``!=`` is overridable, so a subclass can claim any identifier it likes.
+        require_nfc_text("schema_version", self.schema_version)
         if self.schema_version != PRODUCER_ATTESTATION_SCHEMA_VERSION:
             raise ProducerAttestationError(
                 f"schema_version must be {PRODUCER_ATTESTATION_SCHEMA_VERSION!r}",

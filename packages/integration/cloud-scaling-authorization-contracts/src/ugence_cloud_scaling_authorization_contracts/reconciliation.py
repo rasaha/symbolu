@@ -307,16 +307,33 @@ def reconcile_phase4(
         )
 
     # --- projection ↔ decision binding -------------------------------------------------
-    if p_tenant != d_tenant:
+    # Admitted before it is compared. ``!=`` gives a subclass operand priority whichever
+    # side it appears on, and the decision is a caller-supplied object whose ``tenant_id``
+    # nothing has admitted on the way here. A lying ``__ne__`` could not alter the emitted
+    # tenant — that is re-derived from the projection below — but it could carry a
+    # foreign-tenant decision past the binding this guard exists to enforce.
+    d_tenant = require_canonical_identifier("decision.tenant_id", d_tenant)
+    # Both operands, not one. Admitting only the decision side left the projection's tenant
+    # to reach this comparison unchecked, so ``12345``, ``b"acme-tenant"``, an embedded
+    # newline or tab, and the empty string each arrived here and were reported as a tenant
+    # *mismatch* — a semantic answer to a malformed input, and the same answer an honest
+    # foreign tenant gets. Admitted inside the condition so no statement and no ``if`` is
+    # added: the canonical inventory does not move and no guard is renumbered.
+    if require_canonical_identifier("projection.tenant_id", p_tenant) != d_tenant:
         raise ReconciliationError(
             f"tenant mismatch: projection {p_tenant!r} vs decision {d_tenant!r}",
             _Reason.TENANT_MISMATCH,
         )
+    # The same admission as ``tenant_id`` above, for the same reason: these two decide
+    # which request and which subject the decision was made against, and both compare
+    # with ``!=``. Neither has passed through any admission on its way here.
+    d_request_digest = require_canonical_digest("decision.request_digest", d_request_digest)
     if p_request_digest != d_request_digest:
         raise ReconciliationError(
             "the decision was made against a different request_digest",
             _Reason.REQUEST_DIGEST_MISMATCH,
         )
+    d_subject_digest = require_canonical_digest("decision.subject_digest", d_subject_digest)
     if p_subject_digest != d_subject_digest:
         raise ReconciliationError(
             "the decision was made against a different subject_digest",
@@ -433,6 +450,14 @@ def reconcile_phase4(
         raise ReconciliationError(
             "the decision carries no D-6 idempotency_key", _Reason.IDEMPOTENCY_KEY_MISMATCH
         )
+    # Admitted only now: the two emptiness guards above keep their own typed refusal for a
+    # missing key, and admission must not take that diagnosis away from them.
+    p_idempotency_key = require_canonical_digest(
+        "projection.idempotency_key", p_idempotency_key
+    )
+    d_idempotency_key = require_canonical_digest(
+        "decision.idempotency_key", d_idempotency_key
+    )
     if p_idempotency_key != d_idempotency_key:
         raise ReconciliationError(
             "the decision's idempotency_key differs from the projection's",
@@ -524,7 +549,15 @@ def reconcile_phase4(
             "authenticated one",
             _Reason.DECISION_INSTANT_NOT_BOUND,
         )
-    if to_canonical_obj(decision_expires_at) != to_canonical_obj(snapshot_expires_at):
+    # The bound expiry is admitted before it is compared, exactly as ``evaluated_at`` and
+    # ``issued_at`` are below. ``_bound_instant`` enforces two things this comparison cannot:
+    # the value is an exact canonical *string* — no ``str`` subclass, whose lying ``__ne__``
+    # would survive ``to_canonical_obj`` untouched — and it parses as a canonical UTC
+    # instant. The comparison itself is unchanged: still exact canonical equality, never a
+    # permissive same-instant equivalence, and ``to_canonical_obj`` of the parsed value is
+    # byte-identical to ``to_canonical_obj`` of the string it came from.
+    bound_expires_at = _bound_instant("decision_snapshot.expires_at", snapshot_expires_at)
+    if to_canonical_obj(decision_expires_at) != to_canonical_obj(bound_expires_at):
         raise ReconciliationError(
             "the decision's outer expires_at does not equal the value bound in "
             "decision_snapshot",
