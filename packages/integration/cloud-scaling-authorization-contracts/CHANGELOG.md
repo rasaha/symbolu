@@ -33,8 +33,8 @@ whether a value reaching a comparison had been admitted *at all*. Both gaps were
 ### Changed — intentional narrowing of diagnosis precedence
 
 **This is a deliberate behavioural change, not an accident of the repairs above.** For
-`decision.*` values, the refusal a caller receives now depends on which of two things is
-wrong:
+the `decision.*` values above **and for `projection.tenant_id`**, the refusal a caller
+receives now depends on which of two things is wrong:
 
 | Input | Refusal |
 |---|---|
@@ -51,6 +51,13 @@ change cannot quietly widen either branch.
 
 Admission is placed *after* any emptiness guard that owns its own typed diagnosis, so a
 missing `idempotency_key` is still reported as missing rather than as malformed.
+
+The tenant comparison admits **both** operands. An earlier revision admitted only the
+decision's, which left `projection.tenant_id` values that `require_canonical_identifier`
+itself refuses — `12345`, `b"acme-tenant"`, an embedded newline or tab, the empty string —
+reaching the comparison and being answered with `TENANT_MISMATCH`: a semantic diagnosis of
+a malformed input, and the same answer an honest foreign tenant receives. Both directions
+are pinned in A-54.
 
 ### Coverage
 

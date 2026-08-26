@@ -927,3 +927,47 @@ def test_a_lying_schema_identifier_cannot_claim_another_contract(projection, can
             build(_LyingText(wrong))
         assert exc.value.reason is Reason.MALFORMED_CANONICAL_FIELD
         assert "schema_version must be a string" in str(exc.value)
+
+
+@pytest.mark.parametrize(
+    "label, value, reason",
+    [
+        ("an int", 12345, Reason.MALFORMED_CANONICAL_FIELD),
+        ("bytes", b"acme-tenant", Reason.MALFORMED_CANONICAL_FIELD),
+        ("an embedded newline", "acme\ntenant", Reason.NON_CANONICAL_IDENTIFIER),
+        ("an embedded tab", "acme\ttenant", Reason.NON_CANONICAL_IDENTIFIER),
+        ("the empty string", "", Reason.MALFORMED_CANONICAL_FIELD),
+    ],
+)
+def test_a_malformed_projection_tenant_is_not_reported_as_a_mismatch(
+    projection, decision, label, value, reason
+):
+    """A-54: both operands of the tenant comparison are admitted, not just the decision's.
+
+    Admitting only the decision side left this asymmetry: a projection tenant that
+    ``require_canonical_identifier`` itself refuses still passed the Phase 4C constructor,
+    reached ``p_tenant != d_tenant``, and was answered with ``TENANT_MISMATCH`` — a
+    semantic diagnosis of a malformed input, identical to what an honest foreign tenant
+    gets. Reached through public constructors only.
+    """
+
+    forged = dataclasses.replace(projection, tenant_id=value)
+    with pytest.raises(CandidateConstructionError) as exc:
+        reconcile_phase4(forged, decision)
+    assert exc.value.reason is reason, f"{label} did not receive a canonical refusal"
+    assert "projection.tenant_id" in str(exc.value)
+
+
+def test_an_honest_projection_tenant_mismatch_keeps_its_semantic_reason(
+    projection, decision
+):
+    """A-54's other direction: well-formed but different is still ``TENANT_MISMATCH``."""
+
+    forged = dataclasses.replace(projection, tenant_id="tenant-999")
+    with pytest.raises(ReconciliationError) as exc:
+        reconcile_phase4(forged, decision)
+    assert exc.value.reason is Reason.TENANT_MISMATCH
+
+    # And a matching canonical tenant continues normally.
+    facts = reconcile_phase4(projection, decision)
+    assert facts.tenant_id == projection.tenant_id

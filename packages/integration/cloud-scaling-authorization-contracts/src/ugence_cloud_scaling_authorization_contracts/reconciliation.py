@@ -313,7 +313,13 @@ def reconcile_phase4(
     # tenant — that is re-derived from the projection below — but it could carry a
     # foreign-tenant decision past the binding this guard exists to enforce.
     d_tenant = require_canonical_identifier("decision.tenant_id", d_tenant)
-    if p_tenant != d_tenant:
+    # Both operands, not one. Admitting only the decision side left the projection's tenant
+    # to reach this comparison unchecked, so ``12345``, ``b"acme-tenant"``, an embedded
+    # newline or tab, and the empty string each arrived here and were reported as a tenant
+    # *mismatch* — a semantic answer to a malformed input, and the same answer an honest
+    # foreign tenant gets. Admitted inside the condition so no statement and no ``if`` is
+    # added: the canonical inventory does not move and no guard is renumbered.
+    if require_canonical_identifier("projection.tenant_id", p_tenant) != d_tenant:
         raise ReconciliationError(
             f"tenant mismatch: projection {p_tenant!r} vs decision {d_tenant!r}",
             _Reason.TENANT_MISMATCH,
