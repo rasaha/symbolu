@@ -18,21 +18,50 @@ unenforced when it is, or quietly omit one that still is.
 rule belongs here when one instance of one contract is enough to decide it — no builder,
 no verifier, no second contract, no supplied observation collection.
 
+**The rule admits entailed consequences, and says so.** Where a rule stated of one
+contract lands on another because a ratified clause carries it there, and the resulting
+obligation is still decidable from one instance, the consequence belongs here and is
+labelled with the clause that carries it. What the membership rule excludes is a rule
+whose **decision** needs a second object, never a rule whose **derivation** cites one —
+the entailed obligation is discharged or violated by the single instance in hand. That
+distinction is stated here because the list would otherwise contradict itself: R-1b(iii)
+and (iv) are recorded below as out of scope, and the ``S-2 (via R-1b)`` entry is admitted
+on their authority. Both are correct under this rule, and it is the only entry that
+relies on it.
+
 Absent, and why — stated here rather than left to be inferred from the list's silence:
 
 * **R-5, R-6, R-7, R-9, R-10** each compare two contracts. Out of scope by construction.
 * **R-2** calls ``evaluate_readiness``. Out of scope by construction.
 * **R-1b clauses (i)–(iv), (viii), (ix)** resolve the referenced ``AdvisoryCandidateSet``.
-  Out of scope. Clauses **(v)**, **(vi)** and the **local half of (vii)** became decidable
-  from one instance when OD-4(a) nested the candidates inside the advisory, and are here.
+  Out of scope **as clauses to be violated**: deciding whether any of them holds needs the
+  referenced set. Clauses **(iii)** and **(iv)** nevertheless *carry* D6's S-2 onto the
+  advisory, and that consequence is decidable from the advisory alone, so it is admitted
+  under the entailed-consequence rule above and labelled ``S-2 (via R-1b)``. Clauses
+  **(v)**, **(vi)** and the **local half of (vii)** became decidable from one instance
+  when OD-4(a) nested the candidates inside the advisory, and are here as themselves.
   (vii)'s other conjunct — membership in ``CognitiveRoleContract.permitted_review_actions``
   — needs the role contract and stays out.
-* **R-3's chain clauses** — no backward transition, and subsequence of
-  ``RECEIVED → … → EVALUATING`` — cannot be *expressed* while
+* **R-3's *no backward transition* clause** cannot be *expressed* while
   ``ProposerProcessStateTransition.state`` stands in as ``TerminalOutcome``, which carries
-  no process state. They are out of scope for that reason and only that reason, and
-  ``tests/test_process_ordering_obligation.py`` carries them as a named skip. R-3's
-  remaining clauses **are** expressible today and are here.
+  no process state and fixes no order among the four terminal states it does carry. It is
+  out of scope for that reason and only that reason, and
+  ``tests/test_process_ordering_obligation.py`` carries it as a named skip. It is the
+  **only** blocked clause. **Subsequence of** ``RECEIVED → … → EVALUATING`` is *not*
+  blocked, and an earlier revision of this docstring wrongly said it was: the chain admits
+  at most one terminal state and only at its end, so a two-terminal list is not a
+  subsequence of it, and a two-terminal list is constructible from ``TerminalOutcome``
+  alone. R-3's every other clause is likewise expressible today, and all of them are here.
+* **C6's digest grammar** on ``advisory_digest``, ``parent_advisory_digest``,
+  ``context_hash`` and ``content_hash``. Every entry in this registry is a rule whose
+  field the mirror declares exactly as Part D declares it and then does not enforce. C6 is
+  not that: the mirror declares those four fields as plain ``str``, which is a
+  **declaration**-level departure recorded as the first of the two in
+  ``s1_specification_mirror``'s docstring, and taken deliberately — writing the anchored
+  grammar out there would name the hash algorithm and collide with the D2 text scan in
+  ``tests/test_no_local_canonicalization.py``. A constructed case against a constraint the
+  mirror never declared would report that substitution as an unenforced rule, which is the
+  one thing this list must not do. Departures are recorded where departures are recorded.
 * **``CandidateAdvisory.claim_refs``** is absent because no rule bars a duplicate there —
   see the test at the foot of this module.
 
@@ -43,10 +72,11 @@ Two entries are **derived** rather than stated twice, and are labelled as such:
   and R-1b(iv) requires the selectors to be equal, so S-2 lands on the advisory as a
   consequence. It is exercised on both, and the advisory-side case is labelled
   ``S-2 (via R-1b)`` so that no reader takes it for a second statement of the rule.
-* **R-3's terminal-count and terminal-position clauses** are entangled under the
-  placeholder: with only terminal states available, a two-element list that puts one in
-  non-final position necessarily also carries two of them. One construction violates
-  both, and is labelled once rather than counted twice.
+* **R-3's subsequence, terminal-count and terminal-position clauses** are entangled under
+  the placeholder: with only terminal states available, a two-element list that puts one in
+  non-final position necessarily also carries two of them, and a list carrying two of them
+  is not a subsequence of a chain that admits one. One construction violates all three, and
+  is labelled once rather than counted three times.
 
 `[I]` **S-1 and S-2 are vacuous in S1**, because B3 makes ``selected_candidate_id``
 ``None`` for every advisory S1 can construct (spec: "Under B3, ``selected_candidate_id``
@@ -60,6 +90,8 @@ delete the case and update the row in ``docs/S1_ENFORCEMENT.md`` in the same cha
 is the intended lifecycle, not a defect.
 """
 from __future__ import annotations
+
+import unicodedata
 
 import pytest
 
@@ -91,6 +123,69 @@ _OTHER_REVIEW_ACTION = next(
 #: An instant strictly after ``FIXED_INSTANT``, for the ``at`` monotonicity clause. No
 #: wall clock is read (C4).
 _LATER_INSTANT = spec.FIXED_INSTANT.replace(year=spec.FIXED_INSTANT.year + 1)
+
+#: The same instant with its offset stripped, for C4's timezone-awareness clause. `[V]`
+#: A9 and C4 both record that ``strict=True`` does not reject a naive ``datetime``, so
+#: the explicit ``@field_validator`` C4 requires is the only thing that would, and the
+#: mirror declares none.
+_NAIVE_INSTANT = spec.FIXED_INSTANT.replace(tzinfo=None)
+
+#: A ``purpose`` that is not NFC: the same text as ``"reconcile\u0301"`` would be after
+#: NFD decomposition, built with ``unicodedata`` rather than pasted so the file's own
+#: encoding cannot silently normalise it away.
+_NON_NFC_PURPOSE = unicodedata.normalize("NFD", "reconcil\u00e9 and propose")
+assert not unicodedata.is_normalized("NFC", _NON_NFC_PURPOSE), (
+    "the non-NFC fixture is NFC after all; D3's case would pass for the wrong reason")
+
+
+def _agent_identity_ref(**overrides):
+    fixture = {
+        "schema_version": "1.0",
+        "tenant_id": "tenant-1",
+        "created_at": spec.FIXED_INSTANT,
+        "agent_id": "agent-1",
+        "agent_version": "1.0.0",
+        "lifecycle_state": spec.AgentLifecycleState.ACTIVE,
+        "bound_role_contract_id": "role-1",
+        "owner_role_ref": "role-2",
+    }
+    fixture.update(overrides)
+    return _shapes()["AgentIdentityRef"](**fixture)
+
+
+def _context_envelope(**overrides):
+    fixture = {
+        "schema_version": "1.0",
+        "tenant_id": "tenant-1",
+        "created_at": spec.FIXED_INSTANT,
+        "context_id": "context-1",
+        "mandate_id": "mandate-1",
+        "allowed_record_refs": [],
+        "excluded_data_classes": [],
+        "context_hash": "placeholder",
+        "expires_at": spec.FIXED_INSTANT,
+    }
+    fixture.update(overrides)
+    return _shapes()["BoundedContextEnvelope"](**fixture)
+
+
+def _tool_observation(**overrides):
+    fixture = {
+        "schema_version": "1.0",
+        "tenant_id": "tenant-1",
+        "created_at": spec.FIXED_INSTANT,
+        "observation_id": "obs-1",
+        "case_ref": "case-1",
+        "tool_name": "tool-1",
+        "operation_class": spec.ToolOperationClass.READ_ONLY,
+        "source_ref": "source-1",
+        "observed_at": spec.FIXED_INSTANT,
+        "content_hash": "placeholder",
+        "normalized_fields": {},
+        "admission_status": spec.ToolObservationAdmissionStatus.NOT_EVALUATED,
+    }
+    fixture.update(overrides)
+    return _shapes()["ToolObservation"](**fixture)
 
 
 def _role_contract(**overrides):
@@ -183,10 +278,12 @@ def _selection(selected, **overrides):
     return fixture
 
 
-#: Every rule ``docs/S1_ENFORCEMENT.md`` records as locally decidable and unenforced,
-#: paired with a construction that violates it. ``rule`` is the specification's own id or
-#: table row, so the row and this registry can be read against each other by eye.
-UNENFORCED = (
+#: The rules stated case by case, each paired with a construction that violates it.
+#: ``rule`` is the specification's own id or table row, so the row and this registry can
+#: be read against each other by eye. C4's per-field cases are appended below, derived
+#: from a pinned field list rather than written out sixteen times; ``UNENFORCED`` — the
+#: registry the guards and the documentation read — is the concatenation of the two.
+_STATED_CASES = (
     ("L-1", "parent_advisory_digest equals this advisory's own advisory_digest",
      lambda: _advisory(advisory_digest="sha", parent_advisory_digest="sha")),
 
@@ -226,6 +323,8 @@ UNENFORCED = (
 
     ("D3 cardinality", "WorkMandate.allowed_source_scopes is empty",
      lambda: _work_mandate(allowed_source_scopes=[])),
+    ("D3 purpose", "WorkMandate.purpose is not NFC",
+     lambda: _work_mandate(purpose=_NON_NFC_PURPOSE)),
     ("D2 cardinality", "CognitiveRoleContract.permitted_candidate_dispositions is empty",
      lambda: _role_contract(permitted_candidate_dispositions=[])),
     ("D2 cardinality", "CognitiveRoleContract.permitted_review_actions is empty",
@@ -278,7 +377,70 @@ UNENFORCED = (
      lambda: _process_record(
          state_transitions=[_transition(ap.TerminalOutcome.ESCALATE)],
          terminal_outcome=ap.TerminalOutcome.ABSTAIN)),
+
+    ("D8 completed_at", "ProposerProcessRecord.completed_at precedes started_at",
+     lambda: _process_record(started_at=_LATER_INSTANT,
+                             completed_at=spec.FIXED_INSTANT)),
 )
+
+
+#: Every ``datetime`` field Part D declares, contract by contract, in the order the
+#: contracts are stated. Pinned rather than derived from the shapes so the headline count
+#: stays a reviewed number, and checked against the shapes by
+#: ``test_the_c4_cases_cover_every_datetime_field_the_shapes_declare`` below — a field
+#: added to Part D and mirrored fails there rather than escaping this registry in silence.
+C4_DATETIME_FIELDS = (
+    ("AgentIdentityRef", "created_at"),
+    ("CognitiveRoleContract", "created_at"),
+    ("WorkMandate", "created_at"),
+    ("WorkMandate", "expires_at"),
+    ("BoundedContextEnvelope", "created_at"),
+    ("BoundedContextEnvelope", "expires_at"),
+    ("ToolObservation", "created_at"),
+    ("ToolObservation", "observed_at"),
+    ("CandidateAdvisory", "evaluated_at"),
+    ("AdvisoryCandidateSet", "created_at"),
+    ("ProposerAdvisory", "created_at"),
+    ("ProposerAdvisory", "expires_at"),
+    ("ProposerProcessStateTransition", "at"),
+    ("ProposerProcessRecord", "created_at"),
+    ("ProposerProcessRecord", "started_at"),
+    ("ProposerProcessRecord", "completed_at"),
+)
+
+#: One complete-fixture builder per contract, so a C4 rejection could only ever be about
+#: the naive value and never about a missing required field.
+_CONTRACT_BUILDERS = {
+    "AgentIdentityRef": _agent_identity_ref,
+    "CognitiveRoleContract": _role_contract,
+    "WorkMandate": _work_mandate,
+    "BoundedContextEnvelope": _context_envelope,
+    "ToolObservation": _tool_observation,
+    "CandidateAdvisory": lambda **overrides: _candidate("cand-1", **overrides),
+    "AdvisoryCandidateSet": _candidate_set,
+    "ProposerAdvisory": _advisory,
+    "ProposerProcessStateTransition": (
+        lambda **overrides: _transition(ap.TerminalOutcome.ABSTAIN, **overrides)),
+    "ProposerProcessRecord": _process_record,
+}
+
+
+def _naive_case(contract, field):
+    """One C4 case: the complete fixture with ``field`` replaced by a naive instant."""
+    return lambda: _CONTRACT_BUILDERS[contract](**{field: _NAIVE_INSTANT})
+
+
+#: C4 requires **every** ``datetime`` field to be timezone-aware, enforced by an explicit
+#: ``@field_validator``. The mirror declares none, so each field accepts a naive value.
+#: One case per field rather than one case for the rule: the requirement is stated of each
+#: field, and a single case would leave fifteen fields unprobed.
+_C4_CASES = tuple(
+    ("C4", f"{contract}.{field} accepts a naive datetime", _naive_case(contract, field))
+    for contract, field in C4_DATETIME_FIELDS)
+
+#: Every rule ``docs/S1_ENFORCEMENT.md`` records as locally decidable and unenforced,
+#: paired with a construction that violates it.
+UNENFORCED = _STATED_CASES + _C4_CASES
 
 
 @pytest.mark.parametrize("rule,description,construct",
@@ -290,15 +452,52 @@ def test_the_shape_accepts_this_violation(rule, description, construct):
     unenforced, or the documentation understates what the guards establish. If this
     starts raising, the validator was implemented: delete the case and update
     ``docs/S1_ENFORCEMENT.md`` in the same change.
+
+    **The instance is required, not merely the absence of a raise.** A construct that
+    returned ``None`` — or that was quietly reduced to a no-op while its label stayed —
+    would satisfy a bare "did not raise" and would credit this registry, and every
+    derivation downstream of it, with a case that builds nothing. So the value is
+    checked: each entry must hand back a live model, which is the only evidence that the
+    violating shape was actually accepted.
     """
     pydantic = pytest.importorskip("pydantic")
     try:
-        construct()
+        instance = construct()
     except pydantic.ValidationError as error:
         pytest.fail(
             f"{rule} is now enforced for: {description}. That is progress, not a "
             f"failure — delete this case and update the 'What the guards do not yet "
             f"establish' row in docs/S1_ENFORCEMENT.md in the same change. ({error})")
+    assert isinstance(instance, pydantic.BaseModel), (
+        f"{rule}'s construct for {description!r} returned {instance!r} rather than a "
+        "model instance; a case that builds nothing is not evidence that the shape "
+        "accepts the violation")
+
+
+def test_the_c4_cases_cover_every_datetime_field_the_shapes_declare():
+    """C4 is stated of **each** ``datetime`` field, so the case list must be exhaustive.
+
+    ``C4_DATETIME_FIELDS`` is pinned so the headline count stays reviewable, and pinning
+    is only safe while something checks the pin. This reads the representative shapes and
+    requires exact agreement: a ``datetime`` field mirrored from Part D with no case fails
+    here, and a case naming a field the shapes no longer declare fails here too.
+    """
+    import datetime as datetime_module
+
+    pytest.importorskip("pydantic")
+    shapes = _shapes()
+    declared = {
+        (name, field)
+        for name, model in shapes.items()
+        for field, info in model.model_fields.items()
+        if info.annotation is datetime_module.datetime
+    }
+    assert set(C4_DATETIME_FIELDS) == declared, (
+        f"pinned-only {sorted(set(C4_DATETIME_FIELDS) - declared)}, "
+        f"shape-only {sorted(declared - set(C4_DATETIME_FIELDS))}; C4 applies to every "
+        "datetime field, so the pinned list and the shapes must agree exactly")
+    assert {contract for contract, _ in C4_DATETIME_FIELDS} <= set(_CONTRACT_BUILDERS), (
+        "a C4 case names a contract with no complete-fixture builder")
 
 
 #: The rules the mirror **does** enforce, paired with a construction each must reject.

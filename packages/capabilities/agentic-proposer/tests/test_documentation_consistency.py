@@ -288,14 +288,54 @@ STALE_STATUS_PATTERNS = (
 SHA_CLAIM = re.compile(r"\bat\s+`?[0-9a-f]{7,40}`?\b")
 
 
-@pytest.mark.parametrize("path", DOCUMENTS, ids=lambda p: p.name)
-def test_no_stale_unmerged_branch_assertion_survives(path):
-    body = _text(path)
+#: The section-contradiction detector's own pattern, named so the self-test below can
+#: exercise the same object the real check runs, rather than a copy that could drift.
+SECTION_ABSENCE_CLAIM = re.compile(r"\*?([A-Z][^*\n]{3,60}?)\*?\s+section[^.\n]*?"
+                                   r"(?:does not exist|no revision of this artifact "
+                                   r"carried)")
+
+#: An affirmative claim of terminology-gate coverage, in the three forms a document could
+#: make one. Lifted out of the test body so the self-test can run the real patterns.
+TERMINOLOGY_CLAIM_PATTERNS = (
+    r"validate_terminology[^.\n]*\b(?:covers|governs|enforces|includes|applies to)\b",
+    r"terminology (?:gate|validation|check)[^.\n]*\b(?:covers|governs|includes)\b",
+    r"\bcovered by (?:the )?terminology\b",
+)
+
+
+def _stale_status_offenders(body, label="text"):
+    """Every stale branch-status assertion in ``body``, located by line."""
     offenders = []
     for pattern in STALE_STATUS_PATTERNS:
         for match in re.finditer(pattern, body, re.I):
             line = body.count("\n", 0, match.start()) + 1
-            offenders.append(f"{path.name}:{line}: {match.group(0)!r}")
+            offenders.append(f"{label}:{line}: {match.group(0)!r}")
+    return offenders
+
+
+def _sha_claims(body):
+    """Every temporary SHA-based truth claim in ``body``."""
+    return [match.group(0) for match in SHA_CLAIM.finditer(body)]
+
+
+def _section_contradictions(body):
+    """Every section this text both carries as a heading and declares absent."""
+    claims = SECTION_ABSENCE_CLAIM.findall(body)
+    headings = {h.strip().strip("*`") for h in re.findall(r"^#{1,6}\s+(.*)$", body, re.M)}
+    return [claim for claim in claims if claim.strip().strip("*`") in headings]
+
+
+def _terminology_coverage_claims(body):
+    """Every affirmative terminology-gate coverage claim in ``body``."""
+    found = []
+    for pattern in TERMINOLOGY_CLAIM_PATTERNS:
+        found.extend(re.findall(pattern, body, re.I))
+    return found
+
+
+@pytest.mark.parametrize("path", DOCUMENTS, ids=lambda p: p.name)
+def test_no_stale_unmerged_branch_assertion_survives(path):
+    offenders = _stale_status_offenders(_text(path), path.name)
     assert not offenders, offenders
 
 
@@ -304,7 +344,7 @@ def test_no_temporary_sha_based_truth_survives(path):
     """The CHANGELOG may record history; a status claim may not rest on a SHA."""
     if path == CHANGELOG:
         pytest.skip("a changelog records what happened, including where")
-    offenders = [m.group(0) for m in SHA_CLAIM.finditer(_text(path))]
+    offenders = _sha_claims(_text(path))
     assert not offenders, f"{path.name}: {offenders}"
 
 
@@ -316,13 +356,139 @@ def test_no_contradictory_section_does_not_exist_statement(path):
     section was retained from one side while a sentence from the other side said the
     same section did not exist here.
     """
-    body = _text(path)
-    claims = re.findall(r"\*?([A-Z][^*\n]{3,60}?)\*?\s+section[^.\n]*?"
-                        r"(?:does not exist|no revision of this artifact carried)",
-                        body)
-    headings = {h.strip().strip("*`") for h in re.findall(r"^#{1,6}\s+(.*)$", body, re.M)}
-    contradictions = [c for c in claims if c.strip().strip("*`") in headings]
+    contradictions = _section_contradictions(_text(path))
     assert not contradictions, f"{path.name}: {contradictions}"
+
+
+# --------------------------------------------------------------------------- #
+# The detectors above are self-tested against synthetic sources
+# --------------------------------------------------------------------------- #
+#
+# Every check in this section runs over documents that are *clean*, and a clean document
+# is exactly what a detector that has stopped matching also reports. The two outcomes are
+# indistinguishable from a green run, so each detector is additionally run against text
+# built to violate it. A pattern edited into inertness — a typo in an alternation, a
+# character class that no longer matches, a regex whose group numbering shifted — fails
+# here instead of quietly certifying every document in ``DOCUMENTS``.
+#
+# The synthetic sources are written inline rather than kept as fixture files: a fixture
+# file under ``docs/`` would itself be scanned by the repository's own gates, and a
+# deliberately violating document is the last thing those should be asked to accept.
+
+#: One violating text per ``STALE_STATUS_PATTERNS`` entry, in the same order, so a dead
+#: pattern is reported by name rather than hidden behind another pattern's match.
+_STALE_STATUS_POSITIVES = (
+    "The guard is **not merged** yet.",
+    "The guard is not merged yet.",
+    "It lives on an unmerged branch today.",
+    "It lives at an unmerged head today.",
+    "The rule is implemented on an unmerged branch.",
+    "The rule is not merged, so the claim is provisional.",
+    "This row is pending merged enforcement.",
+    "The validator is implemented, not merged.",
+    "The work is done and only the merge is outstanding.",
+)
+
+
+def test_every_stale_status_pattern_matches_a_text_built_to_violate_it():
+    """Each ``STALE_STATUS_PATTERNS`` entry must still match something.
+
+    Paired one-to-one with the pattern list and asserted pairwise, so a pattern that
+    stopped matching is named. The clean control at the end proves the detector is
+    discriminating rather than matching everything it is shown.
+    """
+    assert len(_STALE_STATUS_POSITIVES) == len(STALE_STATUS_PATTERNS), (
+        f"{len(STALE_STATUS_PATTERNS)} stale-status patterns and "
+        f"{len(_STALE_STATUS_POSITIVES)} synthetic violations; a pattern added without a "
+        "violation to prove it is a pattern nothing tests")
+    for pattern, text in zip(STALE_STATUS_PATTERNS, _STALE_STATUS_POSITIVES):
+        assert re.search(pattern, text, re.I), (
+            f"the stale-status pattern {pattern!r} no longer matches {text!r}; it would "
+            "report every document in DOCUMENTS clean")
+        assert _stale_status_offenders(text, "synthetic"), (
+            f"the stale-status scan missed {text!r} even though {pattern!r} matches it")
+    assert not _stale_status_offenders(
+        "The guard is enforced by a named test, and production implementation is "
+        "separately gated.", "synthetic"), (
+        "the stale-status scan flags durable text; it is matching too much, not too "
+        "little")
+
+
+def test_the_sha_claim_detector_matches_a_temporary_truth_and_not_durable_text():
+    """``SHA_CLAIM`` must still find a SHA-anchored status claim.
+
+    Both spellings the documents could carry — backticked and bare — and both a short
+    and a full-length hexadecimal string, because the pattern's length bound is the part
+    most easily broken by an edit.
+    """
+    for text in ("enforced at `eac5547`, per the guard",
+                 "enforced at eac5547d, per the guard",
+                 "enforced at `" + "a" * 40 + "`, per the guard"):
+        assert _sha_claims(text), (
+            f"SHA_CLAIM no longer matches {text!r}; a status claim resting on a commit "
+            "would pass unreported")
+    assert not _sha_claims("enforced at the point the validator is declared"), (
+        "SHA_CLAIM matches prose carrying no commit identifier")
+
+
+def test_the_section_contradiction_detector_matches_a_document_that_contradicts_itself():
+    """The exact defect the real check exists for, reconstructed in miniature.
+
+    A document that carries a heading and also states that the section it names does not
+    exist. Both closing phrases the pattern admits are exercised, and a control document
+    carrying the heading with no absence claim must come back clean — otherwise the
+    detector would be reporting the heading rather than the contradiction.
+    """
+    sentences = (
+        "See the *What O-1 – O-4 changed* section, which does not exist here.",
+        "See the *What O-1 – O-4 changed* section, which no revision of this artifact "
+        "carried.",
+    )
+    for sentence in sentences:
+        document = f"## What O-1 – O-4 changed\n\n{sentence}\n"
+        assert _section_contradictions(document), (
+            f"the section-contradiction detector missed {sentence!r}; it would report a "
+            "self-contradicting document clean")
+    assert not _section_contradictions(
+        "## What O-1 – O-4 changed\n\nThe four refinements are recorded above.\n"), (
+        "the section-contradiction detector fires on a document that merely carries the "
+        "heading")
+    assert not _section_contradictions(f"## Ratified refinements\n\n{sentences[0]}\n"), (
+        "the detector fires on an absence claim about a section the document really does "
+        "not carry, which is a true statement rather than a contradiction")
+
+
+def test_every_terminology_claim_pattern_matches_a_text_built_to_violate_it():
+    """The G-8 half that asserts an absence, and so is the half most easily neutered.
+
+    ``test_no_terminology_coverage_is_claimed_for_these_documents`` passes when no
+    document makes an affirmative coverage claim **and** when the patterns have stopped
+    recognising one. Each pattern is therefore paired with a claim it must catch, and the
+    honest disclaiming form these documents actually use must come back clean.
+    """
+    positives = (
+        # No period between the gate's name and the verb: the first pattern's gap is
+        # sentence-bounded, and a synthetic claim written `validate_terminology.py covers`
+        # would fail to match for a reason that says nothing about the pattern's health.
+        "validate_terminology covers these documents.",
+        "The terminology gate covers this package's documents.",
+        "These documents are covered by the terminology gate.",
+    )
+    assert len(positives) == len(TERMINOLOGY_CLAIM_PATTERNS), (
+        f"{len(TERMINOLOGY_CLAIM_PATTERNS)} terminology-claim patterns and "
+        f"{len(positives)} synthetic claims; a pattern with no claim to prove it is a "
+        "pattern nothing tests")
+    for pattern, text in zip(TERMINOLOGY_CLAIM_PATTERNS, positives):
+        assert re.search(pattern, text, re.I), (
+            f"the terminology-claim pattern {pattern!r} no longer matches {text!r}")
+        assert _terminology_coverage_claims(text), (
+            f"the terminology-claim scan missed {text!r}")
+    assert not _terminology_coverage_claims(
+        "validate_terminology.py runs over a different curated list, and this package's "
+        "documents are deliberately not in it. No claim of terminology coverage is made "
+        "for these documents."), (
+        "the terminology-claim scan flags the disclaiming form the documents use; it "
+        "would make the honest statement unwritable")
 
 
 def test_the_enforcement_document_carries_the_section_it_points_at():
@@ -399,17 +565,10 @@ def test_no_terminology_coverage_is_claimed_for_these_documents():
             "rules now genuinely apply, or the addition is a false coverage claim")
     # A document may NAME the gate in order to disclaim it — that is the honest form,
     # and it is what these documents do. What may not appear is an affirmative claim.
-    claims = (
-        r"validate_terminology[^.\n]*\b(?:covers|governs|enforces|includes|applies to)\b",
-        r"terminology (?:gate|validation|check)[^.\n]*\b(?:covers|governs|includes)\b",
-        r"\bcovered by (?:the )?terminology\b",
-    )
     for path in DOCUMENTS:
-        body = _text(path)
-        for pattern in claims:
-            found = re.findall(pattern, body, re.I)
-            assert not found, (
-                f"{path.name} claims terminology-gate coverage it does not have: {found}")
+        found = _terminology_coverage_claims(_text(path))
+        assert not found, (
+            f"{path.name} claims terminology-gate coverage it does not have: {found}")
 
 
 # --------------------------------------------------------------------------- #
@@ -593,14 +752,23 @@ UNENFORCED_COUNT_ROW = re.compile(
     r"^\| \*\*([A-Za-z-]+) locally decidable violations the representative shapes "
     r"accept\*\* \|", re.M)
 
-#: Spelled numerals the row may use. Small and closed on purpose: a row that needs a
-#: number outside this range is a row that should be reworded rather than extended.
+#: Spelled numerals the row may use. Bounded rather than open: a row needing a number
+#: outside this range is a row that should be reworded rather than extended again. The
+#: upper end was raised when C4's per-field cases landed — C4 states its requirement of
+#: each ``datetime`` field, so it contributes one case per field rather than one per
+#: rule — and the range is deliberately left with headroom above the current count so a
+#: single added case is a one-line diff rather than a table edit.
 _NUMERALS = {
     "Nineteen": 19, "Twenty": 20, "Twenty-one": 21, "Twenty-two": 22,
     "Twenty-three": 23, "Twenty-four": 24, "Twenty-five": 25, "Twenty-six": 26,
     "Twenty-seven": 27, "Twenty-eight": 28, "Twenty-nine": 29, "Thirty": 30,
     "Thirty-one": 31, "Thirty-two": 32, "Thirty-three": 33, "Thirty-four": 34,
-    "Thirty-five": 35,
+    "Thirty-five": 35, "Thirty-six": 36, "Thirty-seven": 37,
+    "Thirty-eight": 38, "Thirty-nine": 39, "Forty": 40, "Forty-one": 41,
+    "Forty-two": 42, "Forty-three": 43, "Forty-four": 44, "Forty-five": 45,
+    "Forty-six": 46, "Forty-seven": 47, "Forty-eight": 48, "Forty-nine": 49,
+    "Fifty": 50, "Fifty-one": 51, "Fifty-two": 52, "Fifty-three": 53,
+    "Fifty-four": 54, "Fifty-five": 55,
 }
 
 

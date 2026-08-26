@@ -20,20 +20,30 @@ The representative shape therefore stands ``TerminalOutcome`` in — a strict **
 carrying the four terminal states and none of the five process states — so a
 representative transition cannot express ``RECEIVED`` or ``EVALUATING`` at all.
 
-**Precisely which clauses that blocks, and which it does not.** An earlier revision of
-this docstring said the ordering rule "has nothing to be exercised against". That was
-false, and overstated the placeholder's reach. R-3 has several clauses, and the
-placeholder blocks only those that need a **process** state:
+**Precisely which clause that blocks, and which it does not.** Two earlier revisions of
+this docstring got this wrong in the same direction. The first said the ordering rule
+"has nothing to be exercised against"; the second narrowed that to two blocked clauses.
+Both overstated the placeholder's reach. R-3 has several clauses, and the placeholder
+blocks exactly **one** of them:
 
-* **Blocked** — *no backward transition*, and *subsequence of*
-  ``RECEIVED → VALIDATED → OBSERVING → RECONCILING → EVALUATING``. Both need at least one
-  process state to state a violation, and ``TerminalOutcome`` has none. These are what
-  this module's skipped obligation carries, and they are genuinely uncovered.
+* **Blocked** — *no backward transition*, and only that. Stating a backward transition
+  needs an order over the states in hand: ``TerminalOutcome`` carries none of the five
+  process states, and R-3 fixes no order among the four terminal states it does carry —
+  they are alternatives at the end of the chain, not a sequence. So no list buildable from
+  ``TerminalOutcome`` is a backward transition. That clause is what this module's skipped
+  obligation carries, and it is genuinely inexpressible today.
 * **Not blocked** — *``at`` non-decreasing across the list*, *no repeat*, *at most one
-  terminal state*, and *terminal only in final position*. Each is violable with terminal
-  states alone, so each is expressible today. They are **not enforced** either, and they
-  are recorded where the rest of the unenforced local rules are recorded, with a
-  constructed violating instance each: ``tests/test_unenforced_local_rules.py``.
+  terminal state*, *terminal only in final position*, **and** *subsequence of*
+  ``RECEIVED → VALIDATED → OBSERVING → RECONCILING → EVALUATING``. The subsequence clause
+  belongs on this side, not the other: the chain admits at most one terminal state and
+  only at its end, so a two-element list of terminal states is not a subsequence of it,
+  and such a list is buildable from ``TerminalOutcome`` alone. It is entangled with the
+  terminal-count clause in exactly the way terminal-count and terminal-position are
+  entangled with each other — one two-terminal list violates all three at once — and the
+  entanglement is why an earlier reading mistook it for blocked. Each of these is
+  expressible today and **not enforced**, and each is recorded where the rest of the
+  unenforced local rules are recorded, with a constructed violating instance:
+  ``tests/test_unenforced_local_rules.py``.
 
 `[G]` **R-4 is likewise uncovered, and is not blocked at all.** It requires
 ``terminal_outcome`` to equal the terminal state present in ``state_transitions``, and
@@ -80,6 +90,7 @@ or a comparison basis here would be exactly the origination a mirror may not do.
 """
 from __future__ import annotations
 
+import inspect
 import pathlib
 import re
 
@@ -102,15 +113,20 @@ RATIFIED_PROCESS_STATES = (
 #: The enum the specification assigns to ``ProposerProcessStateTransition.state``.
 PROCESS_STATE_ENUM = "ProposerProcessState"
 
-#: The rules this module carries as a **named skip obligation** — written, deliberately
-#: not passing, and armed to run when the placeholder is replaced. Read by
-#: ``test_documentation_consistency.py`` so that "a test works with this rule" is decided
-#: by a registry rather than by a rule id appearing somewhere in prose.
+#: The rules this module **claims** to carry as a named skip obligation, each mapped to
+#: the test functions that are supposed to carry it. This is a claim, not the registry:
+#: ``OBLIGATION_RULES`` at the foot of this module is derived from it by checking that
+#: each named function actually exists here, is armed by the placeholder skip, names the
+#: rule in its own source, and carries assertions. A hand-written registry could claim a
+#: rule this module says nothing about — the same defect, one level up, that
+#: ``test_documentation_consistency.py`` exists to prevent for rule *mentions*.
 #:
 #: R-4 is **not** here. This module cites it as the premise for terminal membership and
 #: covers none of it; its uncovered status is recorded in
 #: ``tests/test_unenforced_local_rules.py``, which constructs a violating instance.
-OBLIGATION_RULES = ("R-3",)
+_CLAIMED_OBLIGATIONS = {
+    "R-3": ("test_r3_forward_only_ordering_is_enforced",),
+}
 
 
 def _process_state_enum():
@@ -128,13 +144,16 @@ _UNARMED_REASON = (
     "R-3 PROCESS ORDERING IS NOT COVERED. "
     f"{PROCESS_STATE_ENUM} is not declared in src/ugence_agentic_proposer/, so the "
     "representative shape stands TerminalOutcome in as a documented placeholder and no "
-    "transition here can express a process state. That blocks R-3's no-backward-"
-    "transition and subsequence clauses specifically; its at-monotonicity, no-repeat and "
-    "terminal-state clauses ARE expressible today, are equally unenforced, and are "
-    "recorded with constructed violating instances in test_unenforced_local_rules.py. "
-    "This skip is the obligation for the blocked clauses: it arms itself when the enum "
-    "is declared, and the implementation stage must then prove forward-only ordering. Do "
-    "not read a green suite as R-3 coverage."
+    "transition here can express a process state. That blocks exactly one of R-3's "
+    "clauses: no backward transition, which needs an order over the states in hand and "
+    "has none, since the four terminal outcomes are alternatives rather than a sequence. "
+    "Its at-monotonicity, no-repeat, terminal-count, terminal-position AND subsequence "
+    "clauses ARE expressible today — a two-terminal list violates the last three at once "
+    "— are equally unenforced, and are recorded with constructed violating instances in "
+    "test_unenforced_local_rules.py. This skip is the obligation for the one blocked "
+    "clause: it arms itself when the enum is declared, and the implementation stage must "
+    "then prove forward-only ordering for the whole rule. Do not read a green suite as "
+    "R-3 coverage."
 )
 
 
@@ -329,3 +348,74 @@ def _process_record_fixture(**overrides):
     }
     fixture.update(overrides)
     return fixture
+
+
+# --------------------------------------------------------------------------- #
+# The obligation registry, derived from the tests that carry it
+# --------------------------------------------------------------------------- #
+
+def _obligation_is_carried(rule, test_names):
+    """Whether this module really carries ``rule`` as an armed skip obligation.
+
+    Four things must hold of every test named for the rule, and each is the failure mode
+    a hand-written registry could not see:
+
+    * the function **exists** in this module — a renamed or deleted test must not keep
+      crediting the rule;
+    * it is **armed by the placeholder skip**, so the obligation lifts by itself rather
+      than staying dormant after the enum lands;
+    * its own source **names the rule**, so a test about something else cannot be
+      enlisted; and
+    * it carries **assertions**, so a body reduced to ``pass`` stops counting.
+    """
+    if not test_names:
+        return False
+    for name in test_names:
+        function = globals().get(name)
+        if not callable(function):
+            return False
+        marks = getattr(function, "pytestmark", ())
+        if not any(mark.name == "skipif" for mark in marks):
+            return False
+        source = inspect.getsource(function).lower()
+        spellings = (rule.lower(), rule.replace("-", "").lower())
+        if not any(spelling in source for spelling in spellings):
+            return False
+        if "assert " not in source and "pytest.fail" not in source:
+            return False
+    return rule in _UNARMED_REASON
+
+
+#: The rules this module carries as a **named skip obligation** — written, deliberately
+#: not passing, and armed to run when the placeholder is replaced. Read by
+#: ``test_documentation_consistency.py`` so that "a test works with this rule" is decided
+#: by a registry rather than by a rule id appearing somewhere in prose. Derived, so the
+#: registry cannot outlive the tests it describes.
+OBLIGATION_RULES = tuple(
+    rule for rule, tests in _CLAIMED_OBLIGATIONS.items()
+    if _obligation_is_carried(rule, tests))
+
+
+def test_the_obligation_registry_is_derived_and_discriminating():
+    """The registry must be earned by the module's contents, and must be refusable.
+
+    Two directions, because a derivation that admits everything proves nothing about what
+    it admits. R-3 is claimed and carried, so it is present; a rule claimed with a test
+    that does not exist, with no test at all, or with a test that is not skip-armed is
+    refused. Without the negative half, ``_obligation_is_carried`` could be a constant
+    ``True`` and this file would still look green.
+    """
+    assert OBLIGATION_RULES == ("R-3",), (
+        f"the derived obligation registry is {OBLIGATION_RULES}; either a claimed rule "
+        "lost the test that carried it, or a new obligation landed without this "
+        "assertion being updated")
+    assert not _obligation_is_carried("R-3", ()), "a rule with no test must be refused"
+    assert not _obligation_is_carried("R-3", ("test_no_such_obligation_exists",)), (
+        "a rule naming a test that does not exist must be refused")
+    assert not _obligation_is_carried(
+        "R-3", ("test_the_placeholder_is_still_a_placeholder_and_says_so",)), (
+        "a rule named against an always-running test must be refused; the obligation is "
+        "the skip, and an unarmed test is not one")
+    assert not _obligation_is_carried("R-9", _CLAIMED_OBLIGATIONS["R-3"]), (
+        "a rule the carrying test never names, and the skip reason never states, must "
+        "be refused")
