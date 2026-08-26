@@ -160,6 +160,13 @@ def ratchet_problems(
        form ``promoted: <fact> — …`` or ``demoted: <fact> — …``. A bump earned by one
        promotion does not carry a second, undisclosed one along with it, and an incidental
        mention of a fact name elsewhere in the changelog is not a disclosure.
+    #. **every name entering the verified half from neither baseline half must be disclosed**,
+       in the form ``added: <fact> — …``. Rule 3 disclosed only ``verified ∩ baseline.recorded``
+       — a fact that *moved*. A brand-new verified fact is in neither baseline set, so it was
+       promoted by nobody and demoted by nobody, and rule 3 asked no question about it. The
+       bump it forces was already earned by whatever else the change did, so a reader saw a
+       version move and a changelog that never named the fact now carrying authority. Ratified
+       as an extension to D-5B1-3.
 
     A version bump with no membership change is allowed and unremarked: a gate can be added,
     removed or reordered without the partition moving, and that bump is just as required.
@@ -170,6 +177,9 @@ def ratchet_problems(
     version_moved = baseline.profile_version != current.profile_version
     promoted = sorted(current.verified & baseline.recorded)
     demoted = sorted(current.recorded & baseline.verified)
+    # Neither half held it before. Not a promotion and not a demotion — an addition, which
+    # rules 1-3 were all silent about.
+    added = sorted(current.verified - baseline.verified - baseline.recorded)
 
     if membership_moved and not version_moved:
         problems.append(
@@ -199,25 +209,31 @@ def ratchet_problems(
     # on its own account.
     undisclosed = [
         f"{fact} ({direction})"
-        for direction, facts in (("promoted", promoted), ("demoted", demoted))
+        for direction, facts in (
+            ("promoted", promoted),
+            ("demoted", demoted),
+            ("added", added),
+        )
         for fact in facts
         if not _changelog_discloses(changelog, direction, fact)
     ]
     if undisclosed:
         problems.append(
             f"the partition moved facts the changelog does not disclose: {undisclosed}. "
-            f"(promoted: {promoted or 'none'}; demoted: {demoted or 'none'}.) A profile "
+            f"(promoted: {promoted or 'none'}; demoted: {demoted or 'none'}; "
+            f"added: {added or 'none'}.) A profile "
             "version bump is not a blanket permit for every fact that moves alongside the "
             "one it was raised for. Disclose each on its own line, in the form "
-            "`promoted: <fact> — <what now establishes it>` or "
-            "`demoted: <fact> — <what stopped establishing it>`."
+            "`promoted: <fact> — <what now establishes it>`, "
+            "`demoted: <fact> — <what stopped establishing it>` or "
+            "`added: <fact> — <what establishes it>`."
         )
     return problems
 
 
 #: An explicit disclosure line: the direction, a colon, and the fact name.
 _DISCLOSURE_RE: Final = re.compile(
-    r"^\s*[-*]?\s*(?P<direction>promoted|demoted)\s*:\s*(?P<rest>.*)$", re.IGNORECASE
+    r"^\s*[-*]?\s*(?P<direction>promoted|demoted|added)\s*:\s*(?P<rest>.*)$", re.IGNORECASE
 )
 
 

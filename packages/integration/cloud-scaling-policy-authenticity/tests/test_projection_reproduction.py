@@ -230,12 +230,18 @@ def test_a_genuine_bounds_policy_carries_its_authenticated_bounds():
 
     assert result.outcome is O.VERIFIED
     bounds = result.verified_policy.capacity_bounds_fact
-    assert len(bounds) == 1
+    assert len(bounds) == 2
     assert bounds[0] == VerifiedCapacityBound(
-        action_type="cloud_scaling.scale_out",
-        resource_class="",
+        action_type="scale_up",
+        resource_class="deploy/checkout-api",
         max_permitted_magnitude=100,
         max_permitted_delta=25,
+    )
+    assert bounds[1] == VerifiedCapacityBound(
+        action_type="scale_down",
+        resource_class="deploy/checkout-api",
+        max_permitted_magnitude=50,
+        max_permitted_delta=10,
     )
 
 

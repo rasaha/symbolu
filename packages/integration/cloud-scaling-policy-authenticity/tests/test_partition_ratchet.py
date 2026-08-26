@@ -467,3 +467,75 @@ def test_the_ratchet_refuses_to_invent_a_baseline_when_history_is_unavailable():
 
     with pytest.raises(RatchetBaselineUnavailable):
         sources_at_revision(pathlib.Path(REPO), "0" * 40)
+
+
+@pytest.mark.adversarial
+def test_a_fact_added_to_the_verified_half_cannot_ride_a_bump_and_a_generic_disclosure():
+    """Rule 4, the hole the R-8 audit found: a *new* verified fact was disclosed by nobody.
+
+    Rules 1-3 all keyed on movement. ``promoted`` was ``current.verified & baseline.recorded``
+    and ``demoted`` its mirror, so a name in **neither** baseline half was in neither set. It
+    had not moved; it had appeared. The bump it forces is real, but some other change in the
+    same commit had already earned it, and the changelog line that bump owes rule 2 says only
+    that the version moved.
+
+    Both halves of the concealment are supplied here on purpose — the version bump *and* a
+    changelog that names the version and discloses an unrelated promotion — because that is
+    the state a reader of a real commit sees. Nothing about the added fact appears anywhere,
+    and the gate must still refuse.
+    """
+
+    current = _working_tree_snapshot()
+    moved = sorted(current.recorded)[0]
+    appeared = "an_entirely_new_fact"
+    assert appeared not in current.verified and appeared not in current.recorded
+
+    after = PartitionSnapshot(
+        verified=current.verified | {moved, appeared},
+        recorded=current.recorded - {moved},
+        verified_domain=current.verified_domain,
+        recorded_domain=current.recorded_domain,
+        profile_version="v99",
+    )
+    concealing = (
+        f"- VERIFICATION_PROFILE_VERSION moves to v99.\n"
+        f"- promoted: {moved} — now checked by its own gate.\n"
+        f"- The release also adds several new verified facts.\n"
+    )
+    problems = ratchet_problems(baseline=current, current=after, changelog=concealing)
+    assert len(problems) == 1, problems
+    reported = problems[0].split("disclose: ")[1].split("]")[0]
+    assert f"{appeared} (added)" in reported, reported
+    assert moved not in reported, "the disclosed promotion was reported as undisclosed"
+
+    # The direction is part of the claim. A `promoted:` line for a fact that never moved is
+    # not a disclosure of its arrival — it asserts something false about where it came from,
+    # so the gate keeps refusing.
+    wrong_direction = concealing + f"- promoted: {appeared} — was recorded before.\n"
+    assert ratchet_problems(baseline=current, current=after, changelog=wrong_direction), (
+        "a `promoted:` line must not satisfy the disclosure owed by an added fact"
+    )
+
+    # Naming it in its own direction is what satisfies the gate.
+    honest = concealing + f"- added: {appeared} — established by the new gate that reads it.\n"
+    assert ratchet_problems(baseline=current, current=after, changelog=honest) == []
+
+
+@pytest.mark.adversarial
+def test_the_added_rule_does_not_fire_for_a_fact_that_merely_moved():
+    """Rule 4 must not double-report a promotion. Added means *neither* baseline half had it."""
+
+    current = _working_tree_snapshot()
+    moved = sorted(current.recorded)[0]
+    after = PartitionSnapshot(
+        verified=current.verified | {moved},
+        recorded=current.recorded - {moved},
+        verified_domain=current.verified_domain,
+        recorded_domain=current.recorded_domain,
+        profile_version="v99",
+    )
+    changelog = (
+        f"- VERIFICATION_PROFILE_VERSION moves to v99.\n"
+        f"- promoted: {moved} — now checked by its own gate.\n"
+    )
+    assert ratchet_problems(baseline=current, current=after, changelog=changelog) == []

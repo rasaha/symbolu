@@ -58,12 +58,29 @@ Everything else.
   attestation* is bound to the recommendation rather than to the candidate, and this package
   establishes nothing about that binding. Reading a ``VERIFIED`` here as "the recommendation
   this candidate carries is the one a trusted producer signed" is still wrong.
-* **Not the bounds the candidate carries.** Whether ``max_permitted_magnitude`` and
-  ``max_permitted_delta`` on a candidate are the bounds this policy states is bound-extraction
-  work, not authenticity work, and is out of scope. What this artifact gives a consumer who
-  later extracts bounds is :attr:`policy_body_digest`: the framed digest of the exact body
-  that was verified. Extract against that body, and the extraction is bound to a verified
-  artifact; extract against anything else, and it is not.
+* **The bounds the candidate carries — reconciled, when a candidate accompanies the
+  request.** This paragraph has been wrong twice, in opposite directions, so it is worth
+  stating exactly. Before 5B-3 nothing here extracted a bound at all. 5B-3 added extraction
+  (:attr:`capacity_bounds_fact`) and this text still said extraction was out of scope. R-8
+  closed the remaining half: gate 16 now selects the authenticated bound for the candidate's
+  ``(action_type, resource_class)`` and refuses unless the candidate's
+  ``max_permitted_magnitude``/``max_permitted_delta`` **and its request** are within it.
+
+  Extraction is not reconciliation. Extraction says "the signature covered these ceilings";
+  reconciliation says "this candidate is inside the one that applies to it". A ``VERIFIED``
+  artifact minted *with* a candidate now establishes both.
+
+  The refusal semantics are exact and fail-closed. Selector matching is by exact
+  ``(action_type, resource_class)`` — ``action_type`` from D-4's four canonical values, and
+  no ``None``/``""``/case/whitespace equivalence and no wildcard. A selector miss, an
+  ambiguous match, a policy family stating no bound, or a ceiling wider than the
+  authenticated one is a typed refusal, never a ``VERIFIED`` determination carrying no
+  applicable bound. Without a candidate there is nothing to reconcile, and a policy that
+  states no bound remains a legitimate determination: it is the *pairing* that is refused.
+
+  Which bound applied is not carried as a separate fact. It is derivable, exactly, from what
+  the artifact already carries — :attr:`capacity_bounds_fact` and the candidate's selector —
+  and a redundant scalar is a second thing to keep true.
 * **Not the policy body itself.** A verified artifact is fully digest-covered, so it carries
   no arbitrary object. The resolved artifact reaches a consumer through
   :attr:`~.verification.PolicyAuthenticityResult.resolution`, the Policy Authority's own

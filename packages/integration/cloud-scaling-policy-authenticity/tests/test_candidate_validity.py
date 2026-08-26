@@ -40,6 +40,7 @@ from _policy_fixtures import (
     T_MID,
     genuine_candidate,
     issued,
+    issued_bounds,
     phase5a_builders,
     verifier_for,
 )
@@ -58,7 +59,9 @@ def _pair():
     gate 13 is ever reached and every property below would measure the wrong gate.
     """
 
-    authority, record = issued()
+    # A *bounds* authority: gate 16 refuses a candidate paired with a policy that states no
+    # capacity bound, so a reconciliation test must run against a policy that states one.
+    authority, record = issued_bounds()
     return authority, record, genuine_candidate(record)
 
 

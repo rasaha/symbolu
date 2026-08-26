@@ -42,13 +42,18 @@ consumer:
   checks the *reference's* declared tenant, never the caller's right to it.
 * **Not bound to a recommendation, a scope or a candidate** — residual **R-4**, 5B-1's
   decision-scope repair. A candidate may be supplied; its digest is recorded as the scope of
-  the determination and is **never reconciled**, because a Phase 5A binding carries three of
-  the coordinate's six components and cannot name a coordinate. One genuine policy proof
-  therefore verifies alongside any candidate whatsoever. `tests/test_candidate_not_bound.py`
-  measures this rather than describing it.
-* **Not the bounds the candidate carries.** Bound extraction is out of scope. What a later
-  extractor gets is `policy_body_digest`: the framed digest of the exact body that was
-  verified.
+  the determination and was **never reconciled** at 5B-0B, because a Phase 5A binding carries
+  three of the coordinate's six components and cannot name a coordinate. One genuine policy
+  proof therefore verified alongside any candidate whatsoever.
+  `tests/test_candidate_not_bound.py` measures the original gap rather than describing it;
+  gates 11-13 and 16 are what closed it.
+* **The bounds the candidate carries — reconciled since R-8, when a candidate is supplied.**
+  This line has been wrong twice. Before 5B-3 nothing extracted a bound at all; 5B-3 added
+  extraction and this text still said extraction was out of scope. Gate 16 now selects the
+  authenticated bound for the candidate's exact `(action_type, resource_class)` and refuses
+  unless the candidate's ceilings **and its request** are within it. Extraction says "the
+  signature covered these ceilings"; reconciliation says "this candidate is inside the one
+  that applies to it".
 * **Not an honest instant** — residual **R-2**, open. See below.
 
 ## The ratified rulings this implements
@@ -106,15 +111,20 @@ canonical field:
 
 * **`verified`** — the facts a gate actually checked: the six coordinate components, the body
   digest, the issuing authority and key, the record and adapter ids, the profile.
-* **`recorded`** — carried and digest-covered, but **never attested**. Four members, three
+* **`recorded`** — carried and digest-covered, but **never attested**. Two members, two
   reasons:
 
-  | Fact | Why nothing established it |
+  | Fact | Why nothing establishes it |
   |---|---|
   | `resolved_as_of_fact` | R-2 — the instant is injected and unvalidated |
-  | `candidate_digest_fact` | R-4 — recorded, never reconciled |
-  | `policy_type` | absent from the 21 signed issuance keys, and `resolve_policy` never compares the record's value to the adapter descriptor's. Transitively committed inside `policy_body_digest`, but a hash is one-way and this package holds no adapter registry |
   | `trust_configuration_digest` | reported by the resolution port about itself. The port is the seam to the authority, so any check here would be the port vouching for itself |
+
+  Two facts have left this table since it was written, and the table listed them for longer
+  than it should have. `candidate_digest_fact` was promoted to the verified half in **5B-1**,
+  when gate 11 began reconciling the candidate's coordinate against the resolved one.
+  `policy_type` was promoted in **5B-3**, when gate 14 began reproducing the signed body
+  digest by reframing the resolution's descriptor projection — which supplied the pre-image a
+  one-way hash had denied this package until then.
 
 Being recorded does not mean unprotected — both halves are inside the artifact digest, so
 neither can be rewritten after the fact. It means nobody checked it. Read a fact through
@@ -162,7 +172,7 @@ result = verifier.verify(
     coordinate=coordinate,                       # all six components, exact
     expected_reference_tenant_id=coordinate.tenant_id,
     as_of=instant,                               # injected; this package reads no clock
-    candidate=candidate,                         # optional, recorded, never reconciled
+    candidate=candidate,                         # optional; when supplied, reconciled
 )
 if result.verified:
     proof = result.verified_policy               # binds the body by digest
@@ -204,6 +214,14 @@ source rather than imported — and fails when the partition moved without a bum
 version moved with no changelog line naming it. CI resolves the baseline from the event's own
 default branch and sets `UGENCE_RATCHET_REQUIRED=1`, so a baseline it cannot resolve fails the
 workflow instead of skipping.
+
+Four rules, not three. The fourth was ratified during R-8, after an audit measured that the
+third disclosed only `verified ∩ baseline.recorded` — a fact that *moved* halves. A name
+entering the verified half from **neither** baseline half had not moved; it had appeared, so
+it was promoted by nobody, demoted by nobody, and asked about by nothing. The bump it forces
+was already earned by whatever else the change did. Such a fact must now be disclosed on its
+own line as `added: <fact> — <what establishes it>`, and the direction is part of the claim:
+a `promoted:` line does not satisfy the disclosure an added fact owes.
 
 Pre-merge this was free — three remediation rounds reshaped the payload at `0.1.0` while
 nothing pinned a digest. That window is closed.

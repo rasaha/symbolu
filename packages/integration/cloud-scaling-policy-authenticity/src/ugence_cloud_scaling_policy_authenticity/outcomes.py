@@ -170,6 +170,29 @@ class PolicyAuthenticityOutcome(str, Enum):
     #: cannot state exactly is not one it will attest.
     POLICY_BOUNDS_MALFORMED = "POLICY_BOUNDS_MALFORMED"
 
+    # --- the candidate reconciled against those bounds (R-8 reconciliation) -------------
+    #: A candidate accompanied the request and the resolved policy states no capacity bound
+    #: at all — it is not a capacity-bounds policy. Refused, never ``VERIFIED``: an artifact
+    #: that says a candidate was checked against a bound must not be mintable when no bound
+    #: existed to check it against. ``capacity_bounds_fact=None`` remains a legitimate
+    #: determination *without* a candidate; it is the pairing that is refused.
+    CANDIDATE_POLICY_STATES_NO_BOUNDS = "CANDIDATE_POLICY_STATES_NO_BOUNDS"
+    #: The policy states bounds and none of them is for this candidate's
+    #: ``(action_type, resource_class)``. Selector matching is exact and fail-closed: no
+    #: wildcard, no normalization, and no treating an unspecified selector as "any". A miss
+    #: means this policy does not bound this action, which is a refusal rather than a
+    #: determination carrying somebody else's ceiling.
+    CANDIDATE_BOUND_SELECTOR_MISS = "CANDIDATE_BOUND_SELECTOR_MISS"
+    #: More than one authenticated bound matches the selector exactly. Which ceiling applies
+    #: is then not determined by the policy body, and a verifier that picked one would be
+    #: inventing the answer. Refused.
+    CANDIDATE_BOUND_SELECTOR_AMBIGUOUS = "CANDIDATE_BOUND_SELECTOR_AMBIGUOUS"
+    #: The selected authenticated bound is narrower than what the candidate carries or asks
+    #: for. A candidate may bound itself more tightly than the policy does; it may never
+    #: bound itself more loosely, and the request itself is compared against the
+    #: authenticated ceiling as well as the candidate's own copy of it.
+    CANDIDATE_BOUND_EXCEEDED = "CANDIDATE_BOUND_EXCEEDED"
+
     # --- fail-closed terminals ------------------------------------------------------------
     #: The resolution port could not be used — it raised, or returned a foreign type.
     #: Unavailable is a refusal.

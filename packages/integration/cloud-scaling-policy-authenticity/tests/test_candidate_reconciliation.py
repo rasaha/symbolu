@@ -37,6 +37,7 @@ from _policy_fixtures import (
     PolicyScope,
     genuine_candidate,
     issued,
+    issued_bounds,
     phase5a_builders,
     verifier_for,
 )
@@ -73,7 +74,9 @@ def _verify(candidate=None, authority=None, record=None, as_of=None):
 def _agreeing():
     """An authority, its issued record, and a candidate whose coordinate names that policy."""
 
-    authority, record = issued()
+    # A *bounds* authority: gate 16 refuses a candidate paired with a policy that states no
+    # capacity bound, so a reconciliation test must run against a policy that states one.
+    authority, record = issued_bounds()
     return authority, record, genuine_candidate(record)
 
 
@@ -353,7 +356,7 @@ def test_a_globally_scoped_policy_still_bounds_any_tenants_action():
     about, and why that framing read as an edge case rather than the hole it was.
     """
 
-    authority, record = issued()
+    authority, record = issued_bounds()
     assert record.coordinate.scope == "GLOBAL"
     assert record.coordinate.tenant_id == ""
 
@@ -371,7 +374,8 @@ def test_a_tenant_scoped_policy_bounds_its_own_tenants_action():
 
     builders = phase5a_builders()
     own_tenant = builders.build_target_scope(builders.build_projection()).tenant_id
-    authority, record = issued(scope=PolicyScope.TENANT, tenant_id=own_tenant)
+    # ``_BoundsMetadata.scope`` is a plain string, unlike ``issued()``'s enum-taking path.
+    authority, record = issued_bounds(scope=PolicyScope.TENANT.value, tenant_id=own_tenant)
 
     candidate = genuine_candidate(record)
     assert candidate.tenant_id == record.coordinate.tenant_id

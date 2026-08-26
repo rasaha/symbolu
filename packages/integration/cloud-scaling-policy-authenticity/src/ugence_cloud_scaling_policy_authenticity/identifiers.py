@@ -59,6 +59,7 @@ from __future__ import annotations
 from typing import Final
 
 from ugence_cloud_scaling_authorization_contracts import (
+    CANONICAL_ACTION_TYPES,
     POLICY_TARGET_BINDING_SCHEMA_VERSION as _PHASE_5A_BINDING_SCHEMA_VERSION,
 )
 from ugence_policy_authority.api import (
@@ -101,7 +102,7 @@ VERIFICATION_PROFILE: Final[str] = "ugence.cloud-scaling/policy-authenticity/v1"
 #: (projection reproduction) and promotes ``policy_type`` alongside the new
 #: ``capacity_bounds_fact``. ``tests/test_partition_ratchet.py`` enforces the bump from
 #: repository history rather than from a constant in the same commit as the change.
-VERIFICATION_PROFILE_VERSION: Final[str] = "v3"
+VERIFICATION_PROFILE_VERSION: Final[str] = "v4"
 
 #: Domain tag bound into this package's verification-artifact digest.
 POLICY_AUTHENTICITY_DIGEST_DOMAIN: Final[str] = (
@@ -210,4 +211,20 @@ if REQUIRED_KEY_ENTITLEMENT is FORBIDDEN_KEY_ENTITLEMENT:  # pragma: no cover - 
     raise AssertionError(
         "issuing and revoking entitlements must remain distinct; collapsing them would let "
         "a revoke-only key authenticate an issued policy"
+    )
+
+
+#: The controller's four canonical action types, re-exported so gate 16's selector matching
+#: reads them from one place. Not redefined here: a second copy is a second thing to drift.
+#: Ratified in R-8 as the *only* vocabulary a bound selector may use — no aliases, no
+#: normalization, no wildcard.
+_RATIFIED_ACTION_TYPES: Final = frozenset(
+    {"no_change", "scale_up", "scale_down", "coordinated"}
+)
+if CANONICAL_ACTION_TYPES != _RATIFIED_ACTION_TYPES:  # pragma: no cover - drift guard
+    raise ImportError(
+        "action-type drift: the canonical set "
+        f"{sorted(CANONICAL_ACTION_TYPES)} is not the D-4 ratified "
+        f"{sorted(_RATIFIED_ACTION_TYPES)}; gate 16 selects an authenticated bound by this "
+        "vocabulary and fails closed rather than selecting by an unratified one"
     )
