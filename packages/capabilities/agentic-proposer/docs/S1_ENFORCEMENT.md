@@ -321,7 +321,7 @@ What the registry pins, each by equality:
 * a **citation** to the canonical specification for each mirrored block.
 
 Four things the registry now carries that inference could not: the fourth, mechanical
-class **C5d** for the five reserved lists that admit no value; the non-`str` fields
+class **C5d** for the six reserved lists that admit no value; the non-`str` fields
 `AgentIdentityRef.lifecycle_state` and `ProposerAdvisory.candidates`, without which the
 completeness check would be circular; the C5a-keys/C5c-values shape of
 `ToolObservation.normalized_fields`; and the twenty-three-field cardinality OD-4(a)

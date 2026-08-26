@@ -272,7 +272,7 @@ test originates, adds, renames or reinterprets no contract field.
   exact field set for every contract against Part D's stated cardinality, and the exact
   C5 category for every classified field. Self-tests fail on a field added, omitted,
   renamed or reclassified. Reconciled to the merged specification: the fourth mechanical
-  class **C5d** for the five reserved lists; `AgentIdentityRef.lifecycle_state` and
+  class **C5d** for the six reserved lists; `AgentIdentityRef.lifecycle_state` and
   `ProposerAdvisory.candidates` as non-`str` entries; the C5a-keys/C5c-values shape of
   `normalized_fields`; the 23-field `ProposerAdvisory`; the retained `candidate_set_id`
   beside the nested `candidates`; and the eight contracts plus two nested shapes.
@@ -489,6 +489,46 @@ specification also states.
   well as table rows, so **S-1 and S-2** — stated as prose under D6, and previously invisible
   to every derivation — fall inside the "every ratified rule is named somewhere" check.
   The headline count in the enforcement row is pinned against the registry's length.
+
+### Changed — reasoning functions and strategies (OD-5)
+
+Documentation and guards only. No `src/` change, no version change, no
+public-API snapshot, no platform-freeze artifact touched.
+
+* **`CognitiveRoleContract.permitted_reasoning_strategies` added as a C5d reserved
+  list**, rejecting every non-empty value. D2's stated cardinality goes from 10 to 11 and
+  the C5d roster from five fields to six; `docs/S1_ENFORCEMENT.md` and this file are
+  updated in the same change so no document states the old count. `[R]` The eventual
+  ratified form is an **allowlist that rejects an empty list**, which is the opposite
+  rule on the same axis: S2 **replaces** the C5d validator and **retypes** the element
+  rather than widening the reserved field, and that transition **requires separate
+  ratification** which OD-5 does not give. No strategy catalogue is drafted or ratified,
+  and no individual strategy is named.
+* **The four-way distinction is stated once, in D8:** `primary_function` (the role's
+  organizational purpose), `permitted_reasoning_strategies` (the methods the role may
+  select among), `declared_strategy` (the method the process record asserts was used),
+  and the terminal outcome. Evidence collection and verification stay **contract
+  mechanisms**, and abstention and escalation stay **outcomes**; none is a reasoning
+  strategy.
+* **R-3's lifecycle is unchanged**, and a new D8 subsection states what the record does
+  not represent: a forward-only record deliberately carries no internal strategy control
+  flow, so the **absence of repeated or branching transitions is not evidence that no
+  internal iteration or branching occurred**.
+* **`declared_strategy` carries no authority.** It is metadata outside `P_unsigned`;
+  declaration does not establish conformance; and S1 neither selects, validates nor
+  cryptographically binds a reasoning strategy — selection and enforcement are S2's.
+* **Guards.** `CONTRACT_CARDINALITY`, `FIELD_CLASSIFICATION` and the
+  `CognitiveRoleContract` representative shape in `tests/s1_specification_mirror.py`; the
+  `C5D_ENTRIES` set-equality pin extended to six entries plus a behavioural probe that
+  the new field rejects every non-empty value, in
+  `tests/test_identifier_normalization.py`; assertions in
+  `tests/test_advisory_contract_shape.py` that neither `declared_strategy` nor
+  `permitted_reasoning_strategies` appears in the `P_unsigned` projection field list; and
+  a scan in `tests/test_documentation_consistency.py` refusing any affirmative claim of
+  S1 authority over a reasoning strategy — selection, validation or binding — self-tested
+  against one synthetic violation per pattern, so a pattern edited into inertness fails
+  rather than certifying every document clean, and against the documents' own denials, so
+  it cannot be broadened until it flags those too.
 
 ### Not implemented
 

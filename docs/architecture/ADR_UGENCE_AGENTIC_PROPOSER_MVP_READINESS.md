@@ -17,8 +17,10 @@ the S1 enforcement guards landed and were audited, and are recorded under *Ratif
 refinements* below; each narrows or completes a rule D6–D8 already carry. OD-1 – OD-4,
 raised later by auditing those refinements against representative contract shapes and
 reconciling this artifact with the contract specification, were ratified 2026-08-25 and
-are recorded under *Owner decisions OD-1 – OD-4* below. **No owner decision remains
-open, so S1 is unblocked on ratification grounds** — and on ratification grounds only.
+are recorded under *Owner decisions OD-1 – OD-5* below. **OD-5**, on reasoning functions
+and strategies, was ratified 2026-08-26 and is recorded in the same table. **No owner
+decision remains open, so S1 is unblocked on ratification grounds** — and on
+ratification grounds only.
 **Two** things still gate S1 code, neither of them a ruling: the Part I implementation
 obligations in the contract specification are undischarged, and A11 keeps production
 implementation unauthorized until this documentation is independently reviewed.
@@ -564,9 +566,10 @@ a trailing newline against `$` and `re.fullmatch` does not, so stating a pattern
 stating the application would leave the rule one convenience call away from admitting a
 value it names as invalid.
 
-## Owner decisions OD-1 – OD-4 — all resolved
+## Owner decisions OD-1 – OD-5 — all resolved
 
-**All four are ratified 2026-08-25**, recorded here so this artifact does not report a
+**OD-1 – OD-4 are ratified 2026-08-25 and OD-5 is ratified 2026-08-26**, recorded here
+so this artifact does not report a
 clean record its own subordinate documents contradict, nor a cleaner one than the
 enforcement supports. D6–D10 close every question this artifact previously carried as
 open, and O-1 – O-4 close the four the S1 enforcement audit raised; OD-1 – OD-4 were
@@ -574,10 +577,12 @@ raised afterwards, by auditing those guards against representative contract shap
 by reconciling this artifact with
 `packages/capabilities/agentic-proposer/docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md`,
 where each is stated in full with its rider, its enforcement design and its three
-statuses. OD-4 was the only one bearing on contract shape; it is resolved below and the
+statuses. OD-5 was raised separately, on the relationship between reasoning functions
+and reasoning strategies, and is the second decision bearing on contract shape. OD-4 was
+the only one of the first four bearing on contract shape; it is resolved below and the
 specification implements the resolution.
 
-**No ruling is outstanding on any of the four.** Three statuses are distinguished
+**No ruling is outstanding on any of the five.** Three statuses are distinguished
 throughout and must not be collapsed: a **decision is ratified**; a **named guard
 implements** it in `packages/capabilities/agentic-proposer/tests/`; and **S1 production
 implementation remains unauthorized** under A11, independently of both. A guard that
@@ -591,9 +596,13 @@ below records the second axis only; the decisions themselves are closed.
 | **OD-3** — **RATIFIED 2026-08-25** | O-1's dependent-field set is matched by name alone, so `CandidateAdvisory.requested_review_action` — the candidate's own required, non-null routing — is caught as if it were selection-dependent. **Resolved:** `DEPENDENT_FIELDS` is scoped to the **bearer contract**, pinned by bearer **and** field name and never by field name alone. The **three** dependent fields are selection-dependent on `ProposerAdvisory` only, coupled to its `selected_candidate_id` selector, which is held separately and is not itself a dependent field. | no | `[V]` **implemented** — `tests/test_selection_dependent_fields.py`: `SELECTION_COUPLING`, `NON_BEARERS_SHARING_A_FIELD_NAME`, two self-tests pinning both by equality and asserting them disjoint, and behavioural probes over a complete required-field fixture |
 | **OD-4** — **RATIFIED 2026-08-25, resolved (a)** | D7 above says `ProposerAdvisory` carries per-candidate `CandidateAdvisory` entries; an earlier revision of the specification instead had it reference an `AdvisoryCandidateSet` by `candidate_set_id`. `[V]` That departure was **not** forced by the rival-identity walk, which bars only nested `ToolObservation` and reaches no field of `CandidateAdvisory`. **Resolution (a): restore the nesting D7 requires.** `ProposerAdvisory` carries an immutable `candidates` sequence of `CandidateAdvisory`, ordered ascending by `candidate_id`, participating in `P_unsigned`; `candidate_set_id` is retained as the reference to `AdvisoryCandidateSet`, which stays a **top-level contract** and is not nested; the two candidate lists must correspond exactly in membership, order and content, checked by the builder and by the independent replay verifier. `ToolObservation` stays referenced by id, which A3/the rival-identity walk does force. **Rejected alternative:** reference by id, ratified as an amendment narrowing D7 — rejected because it deviates from ratified text, leaves candidate dispositions, `is_eligible` Booleans and evidence references outside the advisory digest, and leaves an amended candidate set undetectable by replay. | **yes — resolved** | `[V]` **implemented** — `tests/test_advisory_contract_shape.py` discharges I7.11 on representative shapes: it bars a nested `ToolObservation`, **requires** a nested `CandidateAdvisory` sequence so a reversion to reference-by-id fails loudly, and bars any second identity on the candidate |
 
+| **OD-5** — **RATIFIED 2026-08-26** | **Reasoning functions and reasoning strategies are different things, and only the first is a role's purpose.** Four parts. **(i) R-3's lifecycle is unchanged.** A reasoning strategy is a **method label**, not a process state: `ProposerProcessState` gains and loses nothing, and R-3's forward-only subsequence rule, R-4's agreement rule and the bar on representing execution state all stand as ratified. Strategies **operate within** that lifecycle. **(ii) The four-way distinction is preserved and stated:** `primary_function` is the role's organizational purpose; `permitted_reasoning_strategies` is the set of methods the role may select among; `declared_strategy` is the method the process record asserts was used; and `terminal_outcome` is where the work ended. **Evidence collection and verification remain contract mechanisms, and abstention and escalation remain outcomes** — none of the three is a reasoning strategy. **(iii) `permitted_reasoning_strategies` is added to `CognitiveRoleContract` as a C5d reserved list** rejecting every non-empty value, raising D2's cardinality from 10 to 11 and the C5d roster from five fields to six, so no method can be named in it and no catalogue can accrue in it by use. **Ratified rider:** the eventual form is an **allowlist that rejects an empty list** — the opposite rule on the same axis — so S2 **replaces the validator and retypes the element** rather than widening the reserved field, and **that transition requires separate ratification, which this decision does not give**; no member, spelling, bound or default of the eventual vocabulary is ratified here. **(iv) S1 neither selects, validates nor cryptographically binds a reasoning strategy.** `declared_strategy` is metadata outside `P_unsigned`, declaration does not establish conformance, and strategy selection and enforcement are S2's in whole. **No strategy catalogue is drafted or ratified by this decision, and no individual strategy is named anywhere in it.** | **yes** — one field added, one cardinality raised, one classification roster extended; no field type, vocabulary or equation term changes | `[V]` **implemented** — `tests/s1_specification_mirror.py` (`CONTRACT_CARDINALITY`, `FIELD_CLASSIFICATION`, the `CognitiveRoleContract` representative shape); `tests/test_identifier_normalization.py` (the `C5D_ENTRIES` set-equality pin and a behavioural probe that the field rejects every non-empty value); `tests/test_advisory_contract_shape.py` (both strategy fields absent from the `P_unsigned` projection); and `tests/test_documentation_consistency.py` (a scan refusing any affirmative claim of S1 authority over a reasoning strategy — selection, validation or binding — with a synthetic positive self-test per pattern) |
+
 None of OD-1 – OD-3 changes a contract, a field type, a cardinality, a vocabulary or
-an equation term; each is about a guard or a dependency. The *decisions* are ratified,
-and the guards named above enforce them. Neither fact authorizes production code.
+an equation term; each is about a guard or a dependency. OD-4 and OD-5 do bear on
+contract shape, and Part D of the specification is written for both. The *decisions* are
+ratified, and the guards named above enforce them. Neither fact authorizes production
+code.
 
 `[R]` markers elsewhere above are implementation obligations that S1 must
 discharge — mechanical enforcement of D6's standing rule, D7's contract shape and

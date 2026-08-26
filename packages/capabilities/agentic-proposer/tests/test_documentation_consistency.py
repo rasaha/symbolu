@@ -67,8 +67,16 @@ def test_the_document_exists(path):
 # One account of OD-1 – OD-4, and no restored open decisions
 # --------------------------------------------------------------------------- #
 
+#: Words that turn a heading citing a decision into a heading that reads as the place the
+#: decision was *made*. A subordinate document may head a section with a decision id as
+#: provenance — the specification states OD-5's consequences under four such headings, in
+#: the sections an implementer reads — and that is not a rival ratification. A heading
+#: that also announces ratification or resolution is.
+_RATIFICATION_HEADING_WORDS = ("ratified", "resolved", "owner decision", "decision record")
+
+
 def test_there_is_exactly_one_owner_decision_record():
-    """The ADR's OD-1 – OD-4 table is the single **decision record**.
+    """The ADR's OD-1 – OD-5 table is the single **decision record**.
 
     That is a narrower claim than "one account", and the narrower claim is the true one.
     The specification carries its own full per-decision statement under its
@@ -87,19 +95,41 @@ def test_there_is_exactly_one_owner_decision_record():
     ``test_the_adr_and_the_specification_agree_on_every_owner_decision`` below; without
     it, narrowing this claim would trade a false sentence for an unguarded risk.
     """
-    assert "## Owner decisions OD-1 – OD-4 — all resolved" in _text(ADR)
+    assert "## Owner decisions OD-1 – OD-5 — all resolved" in _text(ADR)
     competing = []
     for path in DOCUMENTS:
         if path == ADR:
             continue
-        for heading in re.findall(r"^#{1,6}\s+(.*OD-[1-4].*)$", _text(path), re.M):
-            competing.append(f"{path.name}: {heading}")
+        for heading in re.findall(r"^#{1,6}\s+(.*OD-[1-5].*)$", _text(path), re.M):
+            if any(w in heading.lower() for w in _RATIFICATION_HEADING_WORDS):
+                competing.append(f"{path.name}: {heading}")
     assert not competing, (
-        f"a rival OD-1 – OD-4 ratification heading exists outside the ADR: {competing}")
+        f"a rival OD-1 – OD-5 ratification heading exists outside the ADR: {competing}")
 
 
-#: The four decisions, and the facts both documents must state identically about each.
-OWNER_DECISIONS = (1, 2, 3, 4)
+def test_the_rival_heading_scan_still_catches_a_rival_heading():
+    """The scan above runs over clean documents, and a scan narrowed into inertness
+    reports clean too. Both halves of the narrowing are exercised: a heading that merely
+    cites a decision passes, and one that announces a ratification is caught."""
+    def offenders(heading):
+        return [heading] if any(
+            w in heading.lower() for w in _RATIFICATION_HEADING_WORDS) else []
+
+    for benign in ("### The four-way distinction (OD-5)",
+                   "### `declared_strategy` — an assertion (OD-5)",
+                   "### A reserved list, an allowlist later (OD-5)"):
+        assert not offenders(benign), f"the scan flags a provenance heading: {benign}"
+    for rival in ("## OD-5 — RATIFIED 2026-08-26",
+                  "## Owner decisions OD-1 – OD-5 — all resolved",
+                  "### OD-5 resolved here",
+                  "## The OD-5 decision record"):
+        assert offenders(rival), f"the scan no longer catches a rival heading: {rival}"
+
+
+#: The five decisions, and the facts both documents must state identically about each.
+#: OD-5 (2026-08-26) joins OD-1 – OD-4 (2026-08-25); the dates differ per decision and
+#: are compared per decision, so a fifth entry does not weaken the agreement check.
+OWNER_DECISIONS = (1, 2, 3, 4, 5)
 _DATE = r"(\d{4}-\d{2}-\d{2})"
 
 
@@ -209,23 +239,29 @@ def test_the_adr_and_the_specification_agree_on_od_4s_resolution():
         f"specification {sorted(spec)}")
 
 
-def test_only_od_4_is_recorded_as_bearing_on_contract_shape():
+def test_exactly_od_4_and_od_5_are_recorded_as_bearing_on_contract_shape():
     """The ADR table's third column is the load-bearing distinction between a decision
     about a guard and a decision about the contracts. OD-1 – OD-3 change no contract,
-    field type, cardinality, vocabulary or equation term; OD-4 did. If that column ever
-    said otherwise for one of the first three, the specification's Part D would be
-    downstream of a decision nobody re-read it against."""
-    rows = re.findall(r"\| \*\*OD-([1-4])\*\* — \*\*RATIFIED[^|]*\|[^|]*\|([^|]*)\|",
+    field type, cardinality, vocabulary or equation term; OD-4 and OD-5 do. If that
+    column ever said otherwise for one of the first three, the specification's Part D
+    would be downstream of a decision nobody re-read it against — and if it said ``no``
+    for OD-5, D2's eleventh field would be carried by a decision the table records as
+    shape-neutral."""
+    rows = re.findall(r"\| \*\*OD-([1-5])\*\* — \*\*RATIFIED[^|]*\|[^|]*\|([^|]*)\|",
                       _text(ADR))
     bears = {od: cell.strip().lower() for od, cell in rows}
-    assert set(bears) == {"1", "2", "3", "4"}, (
-        f"the ADR decision table does not carry all four rows: {sorted(bears)}")
+    assert set(bears) == {"1", "2", "3", "4", "5"}, (
+        f"the ADR decision table does not carry all five rows: {sorted(bears)}")
     for od in ("1", "2", "3"):
         assert bears[od] == "no", f"OD-{od} is recorded as bearing on contract shape"
-    assert bears["4"].startswith("**yes"), (
-        f"OD-4 must be recorded as bearing on contract shape: {bears['4']!r}")
-    assert "OD-4 did change contract shape" in _normalised(SPECIFICATION), (
-        "the specification must agree that OD-4 is the one that changed contract shape")
+    for od in ("4", "5"):
+        assert bears[od].startswith("**yes"), (
+            f"OD-{od} must be recorded as bearing on contract shape: {bears[od]!r}")
+    spec = _normalised(SPECIFICATION)
+    assert "OD-4 did change contract shape" in spec, (
+        "the specification must agree that OD-4 changed contract shape")
+    assert "OD-5, ratified 2026-08-26, also bears on contract shape" in spec, (
+        "the specification must agree that OD-5 bears on contract shape too")
 
 
 def test_no_competing_second_round_ratification_section_survives():
@@ -256,11 +292,11 @@ def test_no_owner_decision_is_described_as_outstanding(path):
         assert phrase.lower() not in body.lower(), f"{path.name}: {phrase}"
 
 
-def test_the_four_owner_decisions_are_each_recorded_as_ratified():
+def test_the_five_owner_decisions_are_each_recorded_as_ratified():
     body = _text(ADR)
-    for od in ("OD-1", "OD-2", "OD-3", "OD-4"):
+    for od in ("OD-1", "OD-2", "OD-3", "OD-4", "OD-5"):
         assert re.search(rf"\*\*{od}\*\* — \*\*RATIFIED", body), od
-    assert "All four owner decisions are resolved" in _text(SPECIFICATION)
+    assert "All five owner decisions are resolved" in _text(SPECIFICATION)
 
 
 # --------------------------------------------------------------------------- #
@@ -302,6 +338,38 @@ TERMINOLOGY_CLAIM_PATTERNS = (
     r"\bcovered by (?:the )?terminology\b",
 )
 
+#: OD-5: an **affirmative** claim that S1 has authority over a reasoning strategy.
+#:
+#: S1 neither selects, validates nor cryptographically binds one — selection and
+#: enforcement are S2's — and ``declared_strategy`` is metadata outside ``P_unsigned``
+#: whose declaration establishes no conformance. Those are the statements the documents
+#: make, and the risk is that a later edit quietly upgrades one of them: a sentence
+#: saying S1 checks a declared strategy against a role's permitted set, or that the
+#: declaration is inside the digest, would read as ratified authority this stage does not
+#: have and would put an implementer to work on it.
+#:
+#: Every pattern is **adjacency-anchored on the affirmative form**, so the documents' own
+#: negations — "S1 neither selects, validates nor cryptographically binds…", "declaration
+#: does not establish conformance", "is not covered by ``advisory_digest``" — do not match
+#: them. A scan that flagged the denial along with the claim would be unusable here, since
+#: the denial is exactly what these documents are required to say.
+STRATEGY_AUTHORITY_CLAIM_PATTERNS = (
+    # Active voice, S1 as the subject of the verb.
+    r"\bS1\s+(?:selects|validates|binds|enforces|chooses)\b[^.\n]{0,80}?"
+    r"\breasoning\s+strateg",
+    # Passive voice, S1 as the agent.
+    r"\breasoning\s+strateg(?:y|ies)\b[^.\n]{0,80}?\b(?:is|are)\s+"
+    r"(?:selected|validated|bound|enforced|chosen)\b[^.\n]{0,30}?"
+    r"\b(?:by|at|in|within)\s+S1\b",
+    # The binding claim stated in field terms rather than in S1's name.
+    r"\bdeclared_strategy\b[^.\n]{0,80}?\b(?:participates\s+in|is\s+inside|"
+    r"is\s+part\s+of|is\s+covered\s+by|is\s+bound\s+into)\b[^.\n]{0,40}?"
+    r"(?:P_unsigned|advisory_digest|digest|identity)",
+    # The conformance claim: that declaring a strategy shows one was followed.
+    r"\bdeclar(?:ation|ing|ed\s+strategy)\b[^.\n]{0,60}?\bestablishes\s+"
+    r"(?:conformance|that)\b",
+)
+
 
 def _stale_status_offenders(body, label="text"):
     """Every stale branch-status assertion in ``body``, located by line."""
@@ -333,6 +401,16 @@ def _terminology_coverage_claims(body):
     return found
 
 
+def _strategy_authority_claims(body, label="text"):
+    """Every affirmative claim of S1 strategy authority in ``body``, located by line."""
+    offenders = []
+    for pattern in STRATEGY_AUTHORITY_CLAIM_PATTERNS:
+        for match in re.finditer(pattern, body, re.I):
+            line = body.count("\n", 0, match.start()) + 1
+            offenders.append(f"{label}:{line}: {match.group(0)!r}")
+    return offenders
+
+
 @pytest.mark.parametrize("path", DOCUMENTS, ids=lambda p: p.name)
 def test_no_stale_unmerged_branch_assertion_survives(path):
     offenders = _stale_status_offenders(_text(path), path.name)
@@ -358,6 +436,20 @@ def test_no_contradictory_section_does_not_exist_statement(path):
     """
     contradictions = _section_contradictions(_text(path))
     assert not contradictions, f"{path.name}: {contradictions}"
+
+
+@pytest.mark.parametrize("path", DOCUMENTS, ids=lambda p: p.name)
+def test_no_document_claims_s1_has_authority_over_a_reasoning_strategy(path):
+    """OD-5(iv). Strategy selection and enforcement are S2's, in whole.
+
+    A document that said otherwise would not merely be inaccurate: `permitted_reasoning
+    _strategies` is C5d and rejects every value, so there is nothing for S1 to validate a
+    declaration against, and `declared_strategy` is outside ``P_unsigned``, so there is
+    nothing for S1 to bind it into. A claim of authority here describes machinery that
+    does not exist and cannot be written without a further ratification.
+    """
+    offenders = _strategy_authority_claims(_text(path), path.name)
+    assert not offenders, offenders
 
 
 # --------------------------------------------------------------------------- #
@@ -412,6 +504,61 @@ def test_every_stale_status_pattern_matches_a_text_built_to_violate_it():
         "separately gated.", "synthetic"), (
         "the stale-status scan flags durable text; it is matching too much, not too "
         "little")
+
+
+#: One violating text per ``STRATEGY_AUTHORITY_CLAIM_PATTERNS`` entry, in the same order.
+#:
+#: Each is a sentence a future edit could plausibly write, and each is refused. No
+#: individual reasoning strategy is named in any of them — none needs to be, because
+#: every pattern turns on the *authority verb* and not on the method, and naming one here
+#: would seed a candidate member of a vocabulary that is not ratified.
+_STRATEGY_AUTHORITY_POSITIVES = (
+    "S1 validates the declared reasoning strategy against the role's permitted set.",
+    "The reasoning strategy is enforced at S1, before the advisory is constructed.",
+    "`declared_strategy` is covered by `advisory_digest`, so it cannot be altered.",
+    "Declaring a strategy establishes conformance with the method it names.",
+)
+
+#: Text the scan must leave alone: the documents' own denials, which are adjacent to the
+#: claims in wording and opposite in meaning. Without this control the scan could be
+#: "fixed" by broadening a pattern until it matched the denial too, which would make
+#: every conformant document fail and the guard useless.
+_STRATEGY_AUTHORITY_NEGATIVES = (
+    "S1 neither selects, validates nor cryptographically binds a reasoning strategy.",
+    "Strategy selection and enforcement are S2's in whole.",
+    "Declaration does not establish conformance.",
+    "`declared_strategy` is not covered by `advisory_digest` and is outside "
+    "`P_unsigned`.",
+    "A reasoning strategy is a method label, not a process state.",
+    "`permitted_reasoning_strategies` rejects every non-empty value at this stage.",
+)
+
+
+def test_every_strategy_authority_pattern_matches_a_text_built_to_violate_it():
+    """The scan runs over documents that deny S1 has this authority, and a pattern
+    edited into inertness reports exactly the same green.
+
+    Paired one-to-one with the pattern list and asserted pairwise, so a dead pattern is
+    named rather than hidden behind another pattern's match. The negative controls then
+    prove the scan discriminates: it must catch the claim and leave the denial standing,
+    and a scan that cannot tell those apart is not usable on these documents at all.
+    """
+    assert len(_STRATEGY_AUTHORITY_POSITIVES) == len(STRATEGY_AUTHORITY_CLAIM_PATTERNS), (
+        f"{len(STRATEGY_AUTHORITY_CLAIM_PATTERNS)} strategy-authority patterns and "
+        f"{len(_STRATEGY_AUTHORITY_POSITIVES)} synthetic violations; a pattern added "
+        "without a violation to prove it is a pattern nothing tests")
+    for pattern, text in zip(STRATEGY_AUTHORITY_CLAIM_PATTERNS,
+                             _STRATEGY_AUTHORITY_POSITIVES):
+        assert re.search(pattern, text, re.I), (
+            f"the strategy-authority pattern {pattern!r} no longer matches {text!r}; it "
+            "would report every document in DOCUMENTS clean")
+        assert _strategy_authority_claims(text, "synthetic"), (
+            f"the strategy-authority scan missed {text!r} even though {pattern!r} "
+            "matches it")
+    for text in _STRATEGY_AUTHORITY_NEGATIVES:
+        assert not _strategy_authority_claims(text, "synthetic"), (
+            f"the strategy-authority scan flags the denial {text!r}; it is matching too "
+            "much, not too little, and would fail every conformant document")
 
 
 def test_the_sha_claim_detector_matches_a_temporary_truth_and_not_durable_text():

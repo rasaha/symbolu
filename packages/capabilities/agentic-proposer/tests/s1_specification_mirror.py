@@ -154,7 +154,15 @@ FIELD_CLASSIFICATION = {
         "schema_version": CLOSED, "tenant_id": C5A, "created_at": NON_STRING,
         "role_contract_id": C5A, "primary_function": C5C,
         "permitted_tool_scopes": C5B, "permitted_candidate_dispositions": CLOSED,
-        "permitted_review_actions": CLOSED, "escalation_role_ref": C5A,
+        "permitted_review_actions": CLOSED,
+        # OD-5. C5d for the same mechanical reason as the other five reserved lists and
+        # not for the same substantive one: this field's eventual form is an allowlist
+        # that REJECTS an empty list, so it leaves C5d by having its validator replaced
+        # and its element retyped, not by having a content class attached to a still-
+        # reserved ``list[str]``. Registering it C5c or C5b now would pin a content class
+        # for a vocabulary that is not ratified.
+        "permitted_reasoning_strategies": C5D,
+        "escalation_role_ref": C5A,
         "activation_status": CLOSED,
     },
     "WorkMandate": {
@@ -228,7 +236,7 @@ NESTED_PUBLIC_SHAPES = ("CandidateAdvisory", "ProposerProcessStateTransition")
 #: implicit.
 CONTRACT_CARDINALITY = {
     "AgentIdentityRef": 8,
-    "CognitiveRoleContract": 10,
+    "CognitiveRoleContract": 11,
     "WorkMandate": 9,
     "BoundedContextEnvelope": 9,
     "ToolObservation": 12,
@@ -370,6 +378,10 @@ def representative_shapes():
         permitted_tool_scopes: list[token] = []
         permitted_candidate_dispositions: list[CandidateDisposition]
         permitted_review_actions: list[ReviewAction]
+        # OD-5: reserved and closed. Declared with the same ``Reserved`` annotation the
+        # other five C5d fields carry, so a probe cannot pass here by accident of a
+        # different declaration.
+        permitted_reasoning_strategies: Reserved = []
         escalation_role_ref: identifier
         activation_status: RoleActivationStatus
 
