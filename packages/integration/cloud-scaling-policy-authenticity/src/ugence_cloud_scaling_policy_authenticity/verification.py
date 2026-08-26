@@ -119,6 +119,7 @@ from .identifiers import (
     VERIFICATION_PROFILE,
     VERIFICATION_PROFILE_VERSION,
 )
+from .identifiers import CANONICAL_ACTION_TYPES
 from .outcomes import PolicyAuthenticityOutcome as _Outcome
 from .outcomes import resolution_reason_outcome
 from .resolution_port import require_production_resolution_port
@@ -605,6 +606,21 @@ class PolicyAuthenticityVerifier:
         except _BoundsShapeError as exc:
             return _refuse(_Outcome.POLICY_BOUNDS_MALFORMED, str(exc))
 
+        # === 16. the candidate's ceilings reconcile with the authenticated ones (R-8) ====
+        # This is R-8's remaining half. Gates 14 and 15 *extract* an authenticated bound;
+        # until now nothing compared it against what the candidate carries, so a candidate
+        # self-asserting 20/5 verified against a genuinely issued bound of 5/1 for its exact
+        # selector. Extraction is not reconciliation.
+        #
+        # Reached only with a candidate: without one there is nothing to reconcile, and a
+        # policy that states no bound remains a legitimate determination. It is the *pairing*
+        # of a candidate with a policy that bounds nothing that is refused.
+        if candidate is not None:
+            mismatch = _bound_reconciliation_problem(candidate, capacity_bounds)
+            if mismatch is not None:
+                outcome, detail = mismatch
+                return _refuse(outcome, detail)
+
         # === every gate succeeded — and only now does an artifact exist =================
         artifact = _mint_verified_artifact(
             record=record,
@@ -769,6 +785,108 @@ def _extract_capacity_bounds(coordinate, projection):
         except Exception as exc:  # noqa: BLE001 - the typed refusal is the message
             raise _BoundsShapeError(f"bounds[{index}]: {exc}") from exc
     return tuple(bounds)
+
+
+def _bound_reconciliation_problem(candidate, capacity_bounds):
+    """R-8's reconciliation: the candidate's ceilings against the authenticated ones.
+
+    Returns ``None`` when the candidate reconciles, or ``(outcome, detail)``.
+
+    Four refusals, in a fixed precedence, each pinned by a test:
+
+    #. the policy states no bound at all — the family does not supply capacity bounds;
+    #. no authenticated bound is for this selector;
+    #. more than one is;
+    #. the one that is, is narrower than what the candidate carries or asks for.
+
+    Selector matching is **exact and fail-closed** by ratification. ``action_type`` must be
+    one of the controller's four canonical values, and ``resource_class`` must match exactly.
+    ``None``, ``""``, a normalization difference and an unspecified selector are none of them
+    equivalent, and none of them is a wildcard: a bound written for one resource class must
+    not silently apply to another. A wildcard, if it is ever wanted, is an explicit schema
+    addition, not an emergent property of a comparison.
+    """
+
+    scope = candidate.target_scope
+
+    # 1. no bound at all. `capacity_bounds_fact=None` is a legitimate determination on its
+    #    own; paired with a candidate it would mean "checked against nothing", so an artifact
+    #    that reads as a reconciliation must not be mintable here.
+    if not capacity_bounds:
+        return (
+            _Outcome.CANDIDATE_POLICY_STATES_NO_BOUNDS,
+            "a candidate accompanied this request and the resolved policy states no capacity "
+            "bound, so there is nothing to reconcile its ceilings against. A determination "
+            "must not read as one that bounded this action when no bound existed",
+        )
+
+    # The selector, taken from the candidate and refused if it is outside the ratified
+    # vocabulary. A scope built through Phase 5A cannot carry an unratified action type, but
+    # this boundary accepts a candidate object it did not build.
+    action_type = scope.action_type
+    if type(action_type) is not str or action_type not in CANONICAL_ACTION_TYPES:
+        return (
+            _Outcome.CANDIDATE_BOUND_SELECTOR_MISS,
+            f"the candidate's action_type {action_type!r} is not one of the D-4 canonical "
+            f"action types {sorted(CANONICAL_ACTION_TYPES)}, so no authenticated bound can "
+            "be selected for it",
+        )
+    resource_class = scope.resource_class
+
+    matches = [
+        bound
+        for bound in capacity_bounds
+        if bound.action_type == action_type and bound.resource_class == resource_class
+    ]
+
+    # 2. selector miss.
+    if not matches:
+        return (
+            _Outcome.CANDIDATE_BOUND_SELECTOR_MISS,
+            f"no authenticated bound is stated for (action_type={action_type!r}, "
+            f"resource_class={resource_class!r}); the policy states bounds for "
+            f"{sorted((b.action_type, b.resource_class) for b in capacity_bounds)!r}. "
+            "Selector matching is exact: an unspecified or differently-spelled selector is "
+            "not a wildcard, and this policy does not bound this action",
+        )
+
+    # 3. ambiguity. Which ceiling applies is then not determined by the policy body, and a
+    #    verifier that picked one would be inventing the answer rather than reading it.
+    if len(matches) > 1:
+        return (
+            _Outcome.CANDIDATE_BOUND_SELECTOR_AMBIGUOUS,
+            f"{len(matches)} authenticated bounds are stated for "
+            f"(action_type={action_type!r}, resource_class={resource_class!r}); which "
+            "ceiling applies is not determined by the policy body",
+        )
+
+    bound = matches[0]
+
+    # 4. the ceilings themselves. Narrower is allowed — a candidate may bind itself more
+    #    tightly than the policy does. Looser never is. The *request* is compared against the
+    #    authenticated ceiling too, as defence in depth: Phase 5A already checks it against
+    #    the candidate's own copy, and this check does not depend on that copy being honest.
+    for label, carried, authenticated in (
+        ("max_permitted_magnitude", scope.max_permitted_magnitude, bound.max_permitted_magnitude),
+        ("max_permitted_delta", scope.max_permitted_delta, bound.max_permitted_delta),
+        ("requested_magnitude", scope.requested_magnitude, bound.max_permitted_magnitude),
+        ("requested_delta", scope.requested_delta, bound.max_permitted_delta),
+    ):
+        if type(carried) is not int or isinstance(carried, bool):
+            return (
+                _Outcome.CANDIDATE_BOUND_EXCEEDED,
+                f"the candidate's {label} is {type(carried).__name__}, not an int; a ceiling "
+                "this routine cannot compare exactly is not one it will attest",
+            )
+        if carried > authenticated:
+            return (
+                _Outcome.CANDIDATE_BOUND_EXCEEDED,
+                f"the candidate's {label} ({carried}) exceeds the authenticated bound "
+                f"({authenticated}) stated for (action_type={action_type!r}, "
+                f"resource_class={resource_class!r}). A candidate may bound itself more "
+                "tightly than the policy does; it may never bound itself more loosely",
+            )
+    return None
 
 
 #: What a candidate's policy coordinate must agree with, field by field: the six coordinate

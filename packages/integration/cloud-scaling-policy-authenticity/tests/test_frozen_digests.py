@@ -47,6 +47,12 @@ from ugence_cloud_scaling_policy_authenticity.verified import (
 #: The digest of the reference determination: the authority's default fixture policy, resolved
 #: at ``T_MID`` with no candidate supplied, under the fixture key ring.
 FROZEN_ARTIFACT_DIGEST = (
+    "15696691cf9bbab56a2cf331509bcb8c2b8d4c19c004e8d31add34311b791c7e"
+)
+#: The ``v3`` value, before R-8's reconciliation took the profile to ``v4``. No fact moved
+#: and no fact was added; the digest moved because the profile version is *inside* the
+#: artifact. Pinned from the other side: never produced again.
+SUPERSEDED_V3_ARTIFACT_DIGEST = (
     "8ced1a5f7ef2ea2f7c5969d852d2f180f7942909c2745ff907f58c798822a392"
 )
 #: What the reference determination hashed to under profile ``v1``, before 5B-1 promoted
@@ -77,6 +83,21 @@ FROZEN_TRUST_CONFIGURATION_DIGEST = (
 #: The reference **capacity-bounds** determination (5B-3, R-8): the bounds fixture policy,
 #: resolved at ``T_MID`` under a registry whose only adapter is the bounds family's.
 FROZEN_BOUNDS_ARTIFACT_DIGEST = (
+    "496c290c85c20468a4b0ac3a720d9b5fcb44d15c943299a06fadb82a472f8eef"
+)
+#: The same determination under profile ``v3`` with the selectable bounds already in place.
+#: Distinguishes the two moves R-8 made — the fixture body, then the profile version — so
+#: neither can be mistaken for the other.
+SUPERSEDED_V3_BOUNDS_ARTIFACT_DIGEST = (
+    "c145bb7e3e76d8944b24ea64b9f1360942c6375a230429d7360841abb0eeaebd"
+)
+#: The value this anchor held while the reference bounds body carried one unselectable bound
+#: (``action_type="cloud_scaling.scale_out"``, ``resource_class=""``). R-8's gate 16 selects
+#: exactly and fail-closed, so that bound could never match a genuine candidate and the
+#: fixture could never exercise the gate it existed for. Replacing it moved the body, and so
+#: the artifact digest. Pinned from the other side: this determination must never be produced
+#: again.
+SUPERSEDED_UNSELECTABLE_BOUNDS_ARTIFACT_DIGEST = (
     "218dfd93670b31fa6b56baacfd113ad8b9ac86727675ea75e6b575dd0eb51407"
 )
 #: That determination's trust configuration — a different adapter set, so a different digest.
@@ -88,6 +109,12 @@ FROZEN_BOUNDS_TRUST_CONFIGURATION_DIGEST = (
 #: Covers the profile version together with both halves' exact membership and their domain
 #: tags. This is the constant that ties a partition change to a profile bump.
 FROZEN_PARTITION_FINGERPRINT = (
+    "8f8071298cbc94755865ac9c5baaa367438f6900b6c77a7a87d6b4ebfb26d6a5"
+)
+#: The ``v3`` fingerprint. **Membership is identical** across this move — R-8 promotes,
+#: demotes and adds nothing — so this pair is the measurement showing the fingerprint tracks
+#: the profile version as well as the two halves.
+SUPERSEDED_V3_PARTITION_FINGERPRINT = (
     "98c66c7ede134d37ff148fb619de5b3bbd8de316977b856d47ef95014addd3aa"
 )
 #: The ``v1`` fingerprint: four recorded facts, nineteen verified ones.
@@ -163,9 +190,14 @@ def test_the_partition_fingerprint_ties_membership_to_the_profile_version():
 
 @pytest.mark.invariant
 def test_the_profile_version_is_the_one_these_digests_were_recorded_under():
-    """``v3`` since 5B-3: gates 14-15 were added, and ``policy_type`` was promoted."""
+    """``v4`` since R-8: gate 16 reconciles a candidate against the authenticated bound.
 
-    assert VERIFICATION_PROFILE_VERSION == "v3"
+    ``v3`` was 5B-3, which added gates 14-15 and promoted ``policy_type``. ``v4`` moves
+    nothing between the halves — what changed is what a determination *establishes*, which
+    is the thing a profile version names.
+    """
+
+    assert VERIFICATION_PROFILE_VERSION == "v4"
 
 
 @pytest.mark.invariant
@@ -215,10 +247,16 @@ def test_the_reference_bounds_artifact_carries_its_authenticated_bounds():
 
     bounds = _bounds_determination()
     assert bounds.policy_type == "CapacityBoundsPolicy"
-    assert len(bounds.capacity_bounds_fact) == 1
-    only = bounds.capacity_bounds_fact[0]
-    assert only.max_permitted_magnitude == 100
-    assert only.max_permitted_delta == 25
+    # Two since R-8: one for the genuine candidate's exact selector, one for a different
+    # selector so a selector *miss* has something real to miss against.
+    assert len(bounds.capacity_bounds_fact) == 2
+    selected = [b for b in bounds.capacity_bounds_fact if b.action_type == "scale_up"]
+    assert len(selected) == 1
+    assert selected[0].resource_class == "deploy/checkout-api"
+    assert selected[0].max_permitted_magnitude == 100
+    assert selected[0].max_permitted_delta == 25
+    # And the superseded body is never produced again.
+    assert bounds.artifact_digest != SUPERSEDED_UNSELECTABLE_BOUNDS_ARTIFACT_DIGEST
 
 
 @pytest.mark.invariant
@@ -228,3 +266,20 @@ def test_the_frozen_digests_are_reproducible_within_a_process():
     first = _reference_determination()
     second = _reference_determination()
     assert first.artifact_digest == second.artifact_digest == FROZEN_ARTIFACT_DIGEST
+
+
+@pytest.mark.invariant
+def test_the_v3_digests_are_never_produced_again():
+    """R-8's bump, pinned from the other side — and the membership half held constant.
+
+    The other supersession tests in this file pair a moved digest with a moved partition.
+    This one cannot: R-8 promotes, demotes and adds nothing, so the two halves are
+    byte-identical across the move. That is the point of pinning it — it measures that the
+    fingerprint tracks the profile version and not only the membership, which no earlier
+    supersession in this file could distinguish.
+    """
+
+    assert _reference_determination().artifact_digest != SUPERSEDED_V3_ARTIFACT_DIGEST
+    assert _bounds_determination().artifact_digest != SUPERSEDED_V3_BOUNDS_ARTIFACT_DIGEST
+    assert _partition_fingerprint() != SUPERSEDED_V3_PARTITION_FINGERPRINT
+    assert set(VERIFIED_FACT_NAMES) and set(RECORDED_FACT_NAMES)

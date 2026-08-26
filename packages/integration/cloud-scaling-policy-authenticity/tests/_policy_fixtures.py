@@ -147,12 +147,26 @@ BOUNDS_FAMILY = "cloud_scaling.capacity_bounds"
 BOUNDS_ADAPTER_ID = "ugence.cloud-scaling.capacity-bounds/v1"
 BOUNDS_POLICY_TYPE = "CapacityBoundsPolicy"
 
+#: Two bounds: one for the genuine Phase 5A candidate's exact selector, one for a different
+#: one so a selector *miss* has something real to miss against.
+#:
+#: The first entry used to read ``action_type="cloud_scaling.scale_out"`` with
+#: ``resource_class=""``. R-8 measured that neither token can ever match a genuine candidate:
+#: ``scale_out`` is not one of D-4's four canonical action types, and ``""`` is not the
+#: candidate's resource class. Gate 16 selects exactly and fail-closed, so that bound was
+#: unselectable — a fixture that could never exercise the gate it exists for.
 DEFAULT_TEST_BOUNDS = (
     _Bound(
-        action_type="cloud_scaling.scale_out",
-        resource_class="",
+        action_type="scale_up",
+        resource_class="deploy/checkout-api",
         max_permitted_magnitude=100,
         max_permitted_delta=25,
+    ),
+    _Bound(
+        action_type="scale_down",
+        resource_class="deploy/checkout-api",
+        max_permitted_magnitude=50,
+        max_permitted_delta=10,
     ),
 )
 

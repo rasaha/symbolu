@@ -175,14 +175,16 @@ def test_a_candidate_digest_is_verified_when_present_and_absent_otherwise():
     there is no third state in which the fact is present but unverified.
     """
 
-    from _policy_fixtures import genuine_candidate, phase5a_builders
+    from _policy_fixtures import genuine_candidate, issued_bounds, phase5a_builders
 
     assert _verified().candidate_digest_fact is None
 
     if phase5a_builders() is None:
         pytest.skip("the Phase 5A test tree is unavailable outside a source checkout")
 
-    authority, record = issued()
+    # A bounds authority: since gate 16 a candidate paired with a policy stating no capacity
+    # bound is refused, so a determination carrying a candidate needs a policy that bounds it.
+    authority, record = issued_bounds()
     candidate = genuine_candidate(record)
     # T_CANDIDATE, not T_MID: since gate 13 the instant must sit inside the candidate's own
     # validity, and the fixture candidate's recommendation expires months before T_MID.
