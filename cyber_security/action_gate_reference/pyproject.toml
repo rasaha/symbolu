@@ -1,0 +1,16 @@
+# Test configuration for the ActionGate reference conformance harness.
+#
+# This file deliberately declares NO build system and NO distribution metadata.
+# The harness is not installable as a wheel: `action_gate_ref.conformance`
+# resolves its fixture set as `Path(__file__).parent.parent / "fixtures"`, which
+# is a source-checkout layout, not a package-data layout. Making it installable
+# is a separate change that must move the fixtures into package data first.
+#
+# What this file does provide is a pytest rootdir, so the suite runs from the
+# repository root (`python -m pytest cyber_security/action_gate_reference`) and
+# not only from inside this directory. That is what lets CI gate it.
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+pythonpath = ["."]

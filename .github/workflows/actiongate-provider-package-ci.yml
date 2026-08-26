@@ -60,6 +60,7 @@ jobs:
             packages/providers/actiongate/tests/authority \
             packages/providers/actiongate/tests/boundaries \
             packages/providers/actiongate/tests/mapping \
+            packages/providers/actiongate/tests/vnext \
             packages/providers/actiongate/tests/compatibility \
             packages/providers/actiongate/tests/packaging -q
 

@@ -1,0 +1,88 @@
+name: action-gate-reference-ci
+
+# Scoped CI for the ActionGate reference conformance harness
+# (`cyber_security/action_gate_reference`), which until now had no workflow at all
+# despite being the only deterministic ActionGate policy evaluator in the
+# repository. It is the migration source for the canonical ActionGate vNext
+# evaluator, so its behaviour must be gated before anything depends on it.
+#
+# Everything here is offline and stdlib-only: the harness has no third-party
+# dependency, no network service, no MCP server, and no production key custody
+# (its signing scheme is an HMAC reference stand-in, documented as such).
+
+on:
+  push:
+    paths:
+      - "cyber_security/action_gate_reference/**"
+      - ".github/workflows/action-gate-reference-ci.yml"
+  pull_request:
+    paths:
+      - "cyber_security/action_gate_reference/**"
+      - ".github/workflows/action-gate-reference-ci.yml"
+
+jobs:
+  action-gate-reference:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install tooling
+        run: python -m pip install --upgrade pip pytest
+
+      - name: Reference harness suite
+        run: python -m pytest cyber_security/action_gate_reference -q
+
+      - name: Conformance vectors (pinned canonicalization / hashing digests)
+        working-directory: cyber_security/action_gate_reference
+        run: python -m action_gate_ref.cli run-conformance
+
+      - name: Evaluator purity (same inputs twice => byte-identical decision)
+        working-directory: cyber_security/action_gate_reference
+        run: |
+          python - <<'PY'
+          import json
+          from action_gate_ref import gate, policy
+          from action_gate_ref.conformance import ref_envelope
+
+          env = ref_envelope()
+          signed = policy.sign_policy(policy.build_bundle())
+          now = "2026-01-01T00:00:00.000Z"
+
+          a = gate.evaluate(env, signed, now=now)
+          b = gate.evaluate(env, signed, now=now)
+          assert a == b, "gate.evaluate is not deterministic across identical calls"
+
+          # The decision must not depend on argument order in the input mapping.
+          reordered = {k: env[k] for k in reversed(list(env))}
+          c = gate.evaluate(reordered, signed, now=now)
+          assert a == c, "gate.evaluate depends on input key order"
+          print("evaluator purity: OK", json.dumps(a["outcome"]))
+          PY
+
+      - name: No third-party imports in the harness
+        working-directory: cyber_security/action_gate_reference
+        run: |
+          python - <<'PY'
+          import ast, pathlib, sys
+
+          STDLIB = set(sys.stdlib_module_names)
+          offenders = []
+          for path in sorted(pathlib.Path("action_gate_ref").rglob("*.py")):
+              tree = ast.parse(path.read_text(), filename=str(path))
+              for node in ast.walk(tree):
+                  if isinstance(node, ast.Import):
+                      names = [a.name.split(".")[0] for a in node.names]
+                  elif isinstance(node, ast.ImportFrom):
+                      # level > 0 is a relative (intra-package) import
+                      names = [] if node.level else [(node.module or "").split(".")[0]]
+                  else:
+                      continue
+                  for name in names:
+                      if name and name not in STDLIB and name != "action_gate_ref":
+                          offenders.append(f"{path}: {name}")
+          assert not offenders, "third-party imports found:\n" + "\n".join(offenders)
+          print("stdlib-only: OK")
+          PY
