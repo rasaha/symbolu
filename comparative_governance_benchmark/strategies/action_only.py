@@ -47,9 +47,10 @@ class ActionOnlyStrategy:
             pa.action_type, scenario.execution,
             id_factory=make_id_factory(scenario.scenario_id + ":execB"))
 
+        seed = scenario.scenario_id + ":B"
         try:
             control_plane, _rec = resolve_actiongate(pa.action_type, scenario.action_policy,
-                                                     register=not registry_failure)
+                                                     seed=seed, register=not registry_failure)
         except ProviderResolutionError:
             # registry failure → no authorization, fail-safe: nothing dispatches
             r.authorization_performed = True
@@ -63,8 +64,7 @@ class ActionOnlyStrategy:
                        "authorization_outcome": "INDETERMINATE", "dispatched": False}
             return r
 
-        dgm = build_services(scenario.scenario_id + ":B", control_plane=control_plane,
-                             execution_adapter=adapter)
+        dgm = build_services(seed, control_plane=control_plane, execution_adapter=adapter)
         assessment_id = "app-" + hashlib.sha256(scenario.assertion.encode()).hexdigest()[:12]
         flow = run_case_flow(dgm, scenario, coverage="SUPPORTED", assessment_id=assessment_id)
         cost["assessment_records"] += 1

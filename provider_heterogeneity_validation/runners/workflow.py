@@ -15,7 +15,7 @@ import dataclasses
 from comparative_governance_benchmark.runners.common import run_action_flow, run_case_flow
 from comparative_governance_benchmark.runners.dgm import build_services
 from comparative_governance_benchmark.runners.execution import build_execution_adapter
-from comparative_governance_benchmark.runners.determinism import make_id_factory
+from comparative_governance_benchmark.runners.determinism import make_clock, make_id_factory
 from governance_providers.api import (
     ActionGovernanceControlPlaneAdapter, AssertionGovernanceRequest)
 
@@ -146,7 +146,10 @@ def _run(scenario, config, failure_profile, r):
 
     r.action_provider_id = b_entry.provider_id
     action_provider = b_entry.build(); action_provider.initialize()
-    control_plane = ActionGovernanceControlPlaneAdapter(action_provider)
+    # same time domain as the DGM services built from `seed + ":act"` below: the
+    # CER is issued on the scenario clock, so the adapter must read it too.
+    control_plane = ActionGovernanceControlPlaneAdapter(
+        action_provider, clock=make_clock(seed + ":act"))
     adapter = build_execution_adapter(scenario.proposed_action.action_type, scenario.execution,
                                       id_factory=make_id_factory(seed + ":exec"))
     dgm2 = build_services(seed + ":act", control_plane=control_plane, execution_adapter=adapter)
