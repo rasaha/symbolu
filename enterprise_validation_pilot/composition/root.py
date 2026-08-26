@@ -129,7 +129,10 @@ class PilotComposition:
         return resolved, record
 
     def control_plane(self, action_provider) -> ActionGovernanceControlPlaneAdapter:
-        return ActionGovernanceControlPlaneAdapter(action_provider)
+        # The scenario clock is authoritative for a replayed scenario: the adapter
+        # must read the same instant the CER was issued against, or CER expiry and
+        # authorization validity land in two different time domains.
+        return ActionGovernanceControlPlaneAdapter(action_provider, clock=self._clock)
 
     # --- DGM service bundle -------------------------------------------------
 

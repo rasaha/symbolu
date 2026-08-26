@@ -13,6 +13,8 @@ from governance_providers.api import (
     ActionGovernanceControlPlaneAdapter, ProviderKind, ProviderRegistry, ResolutionRequest,
     resolve)
 
+from ..runners.determinism import make_clock
+
 
 def build_actiongate_engine(action_type: str, policy) -> ActionGateEngine:
     if policy.fail is not None:
@@ -30,10 +32,13 @@ def build_actiongate_engine(action_type: str, policy) -> ActionGateEngine:
     return ActionGateEngine(**kwargs)
 
 
-def resolve_actiongate(action_type: str, policy, *, register: bool = True):
+def resolve_actiongate(action_type: str, policy, *, seed: str, register: bool = True):
     """Register + resolve an ActionGate provider through the registry.
 
     ``register=False`` simulates a registry-resolution failure (empty registry).
+    ``seed`` must be the seed the DGM services for this run are built from: the
+    adapter is given that run's scenario clock, so CER expiry and authorization
+    validity are computed in one time domain rather than against the wall clock.
     Returns (control_plane_adapter, resolution_record).
     """
     registry = ProviderRegistry()
@@ -43,4 +48,4 @@ def resolve_actiongate(action_type: str, policy, *, register: bool = True):
             settings=ActionGateSettings(provider_id="actiongate-primary", mode="in_process"))
         registry.register(provider.descriptor())
     resolved, record = resolve(registry, ResolutionRequest(ProviderKind.ACTION_GOVERNANCE))
-    return ActionGovernanceControlPlaneAdapter(resolved), record
+    return ActionGovernanceControlPlaneAdapter(resolved, clock=make_clock(seed)), record
