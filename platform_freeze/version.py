@@ -27,6 +27,6 @@ PUBLIC_API_MODULES = ("decision_governance.api", "governance_providers.api",
 COMPONENT_VERSIONS = {
     "decision-governance": "1.0.0",
     "dgm-provider-framework": "0.1.0",
-    "dgm-actiongate-provider": "0.1.0",
+    "dgm-actiongate-provider": "0.2.0",
     "dgm-tap-provider": "0.1.0",
 }

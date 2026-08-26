@@ -10,8 +10,22 @@ Five version concepts are kept explicit and separate:
 * the **mapping version** (``actiongate-map-2``) — reported by :func:`version_info`.
 * :data:`TARGET_FRAMEWORK_VERSION` — the provider-framework version targeted.
 
-The implementation and initial canonical distribution both start at ``0.1.0``. A
-path migration does NOT bump the implementation version.
+The implementation and initial canonical distribution both started at ``0.1.0``.
+A path migration does NOT bump the implementation version; the vNext semantics
+change did, to ``0.2.0`` — see below.
+
+Both are ``0.2.0`` as of the vNext semantics change (MAJOR: a live input that
+previously yielded ``AUTHORIZED`` now yields a non-authorizing outcome). It is a
+minor-position bump because the distribution is pre-1.0 and
+``production_certified`` is ``False``; moving to ``1.0.0`` would assert a
+certification this package explicitly denies. On a 0.x line the minor position
+is the breaking position.
+
+The bump is not bookkeeping. ``platform_freeze.compat.classify`` compares public
+API *shape*, and every shape change in the vNext step was an addition, so it
+reported this MAJOR as MINOR/ADDITIVE. With the classifier blind to it, the
+version string is the only machine-readable signal a consumer has that the
+semantics moved.
 """
 from __future__ import annotations
 
@@ -19,11 +33,11 @@ import importlib.metadata as _md
 from dataclasses import dataclass, field
 
 #: ActionGate provider **implementation** version. Not changed by relocation.
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 VERSION = __version__
 
 #: Canonical **distribution** version (``ugence-actiongate-provider`` on the index).
-DISTRIBUTION_VERSION = "0.1.0"
+DISTRIBUTION_VERSION = "0.2.0"
 #: Canonical distribution name.
 DISTRIBUTION_NAME = "ugence-actiongate-provider"
 

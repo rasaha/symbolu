@@ -14,7 +14,7 @@ authors = [{ name = "Rakesh Mohan" }]
 dependencies = [
     "decision-governance==1.0.0",
     "dgm-provider-framework==0.1.0",
-    "dgm-actiongate-provider==0.1.0",
+    "dgm-actiongate-provider==0.2.0",
     "dgm-tap-provider==0.1.0",
     "dgm-baseline-assertion-provider==0.1.0",
     "dgm-baseline-action-provider==0.1.0",

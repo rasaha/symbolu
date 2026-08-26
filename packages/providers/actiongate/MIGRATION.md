@@ -26,7 +26,7 @@ New code should import from `ugence_actiongate_provider`.
 | Distribution | Ships | Depends on |
 |---|---|---|
 | `ugence-actiongate-provider` (canonical) | `ugence_actiongate_provider` implementation | `ugence-governance-provider-framework` (core); `[decision-authority]` extra for the kernel-bound control-plane integration |
-| `dgm-actiongate-provider` (legacy, compatibility) | only the `actiongate_provider` facade | `ugence-actiongate-provider[decision-authority]==0.1.0` |
+| `dgm-actiongate-provider` (legacy, compatibility) | only the `actiongate_provider` facade | `ugence-actiongate-provider[decision-authority]==0.2.0` |
 
 Installing only the canonical wheel provides `ugence_actiongate_provider`. Installing
 the legacy compatibility wheel provides `actiongate_provider` and pulls in the

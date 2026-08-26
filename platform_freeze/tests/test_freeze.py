@@ -84,7 +84,7 @@ def test_version_consistency():
     import tap_provider
     assert decision_governance.__version__ == "1.0.0"
     assert governance_providers.__version__ == "0.1.0"
-    assert actiongate_provider.__version__ == "0.1.0"
+    assert actiongate_provider.__version__ == "0.2.0"
     assert tap_provider.__version__ == "0.1.0"
 
 

@@ -621,7 +621,7 @@
     },
     "__version__": {
       "kind": "constant",
-      "value": "0.1.0"
+      "value": "0.2.0"
     },
     "build_actiongate_provider": {
       "kind": "function",

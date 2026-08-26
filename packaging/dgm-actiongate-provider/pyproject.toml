@@ -25,7 +25,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dgm-actiongate-provider"
-version = "0.1.0"
+version = "0.2.0"
 description = "ActionGate action-governance provider (compatibility distribution) — re-exports ugence-actiongate-provider."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -34,7 +34,7 @@ authors = [{ name = "Rakesh Mohan" }]
 # No implementation here: the canonical package carries ActionGate. The
 # ``decision-authority`` extra preserves the legacy wheel's kernel-bound transitive
 # closure (framework adapters → decision-governance kernel facade + contracts).
-dependencies = ["ugence-actiongate-provider[decision-authority]==0.1.0"]
+dependencies = ["ugence-actiongate-provider[decision-authority]==0.2.0"]
 
 [project.optional-dependencies]
 test = ["pytest>=7.0"]

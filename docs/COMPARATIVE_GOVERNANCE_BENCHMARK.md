@@ -7,7 +7,7 @@ against the same frozen Phase 5I enterprise scenarios.
 - Import package: `comparative_governance_benchmark` · Distribution:
   `dgm-comparative-governance-benchmark` 0.1.0
 - Depends on (never vendors): `decision-governance==1.0.0`,
-  `dgm-provider-framework==0.1.0`, `dgm-actiongate-provider==0.1.0`,
+  `dgm-provider-framework==0.1.0`, `dgm-actiongate-provider==0.2.0`,
   `dgm-tap-provider==0.1.0`, `dgm-enterprise-validation-pilot==0.1.0`
 - Run: `python -m comparative_governance_benchmark.run --output build/phase6a-results`
 

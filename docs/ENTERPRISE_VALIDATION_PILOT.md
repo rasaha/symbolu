@@ -9,7 +9,7 @@ decision workflows end to end.
 - Import package: `enterprise_validation_pilot` · Distribution:
   `dgm-enterprise-validation-pilot` 0.1.0
 - Depends on (never vendors): `decision-governance==1.0.0`,
-  `dgm-provider-framework==0.1.0`, `dgm-actiongate-provider==0.1.0`,
+  `dgm-provider-framework==0.1.0`, `dgm-actiongate-provider==0.2.0`,
   `dgm-tap-provider==0.1.0`
 - Run: `python -m enterprise_validation_pilot.run --output build/pilot-results`
 

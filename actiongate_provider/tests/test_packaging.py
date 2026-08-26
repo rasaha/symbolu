@@ -69,5 +69,5 @@ def test_legacy_distribution_symlinks_the_facade():
 def test_version_reporting_consistent():
     from actiongate_provider.version import __version__ as facade_v
     from ugence_actiongate_provider.version import __version__ as canon_v, DISTRIBUTION_VERSION
-    assert facade_v == canon_v == "0.1.0"
-    assert DISTRIBUTION_VERSION == "0.1.0"
+    assert facade_v == canon_v == "0.2.0"
+    assert DISTRIBUTION_VERSION == "0.2.0"

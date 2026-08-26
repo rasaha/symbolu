@@ -19,8 +19,9 @@ from ugence_governance_provider_framework.reference import (
     DeterministicExecutionProvider)
 
 
-def _cer(expired=False):
-    exp = datetime.now(timezone.utc) - timedelta(hours=1) if expired else None
+def _cer(expired=False, expires_at=None):
+    exp = expires_at if expires_at is not None else (
+        datetime.now(timezone.utc) - timedelta(hours=1) if expired else None)
     return SimpleNamespace(cer_id="cer-1", correlation_id="c", expires_at=exp,
                            policy_context=SimpleNamespace(policy_refs=()))
 
@@ -39,6 +40,42 @@ def test_action_adapter_conforms_and_maps():
     assert a.authorize(_req("D"), _cer()).outcome is KAuth.DENIED
     assert a.authorize(_req("C"), _cer()).outcome is KAuth.AUTHORIZED_WITH_CONSTRAINTS
     assert a.authorize(_req("ACT"), _cer(expired=True)).outcome is KAuth.EXPIRED
+
+
+def test_action_adapter_treats_the_expiry_instant_itself_as_expired():
+    """The boundary instant is expired, not the last valid tick.
+
+    The adapter previously read ``expires_at < now``, which authorizes at the
+    instant a CER expires. ``ugence_action_clearance`` uses the inclusive form
+    (``evaluation_time >= expires_at``) in both places it evaluates validity, so
+    the exclusive form left a one-instant window in which authorization and
+    clearance disagreed about whether the same CER was live. Neither this file
+    nor any other test in this package pinned the boundary instant, so the
+    disagreement was invisible here.
+
+    The adapter cannot call ``ugence_actiongate_provider.vnext.is_expired``,
+    which states the same rule: the framework does not depend on a provider, and
+    inverting that direction to share four lines would be the worse trade. The
+    rule is therefore written twice, and this test is what keeps the two copies
+    honest from the framework's side.
+    """
+    instant = datetime(2026, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+    a = ActionGovernanceControlPlaneAdapter(
+        DeterministicActionGovernanceProvider(), clock=lambda: instant)
+
+    # now == expires_at: expired. Under `expires_at < now` this authorized.
+    assert a.authorize(_req("ACT"), _cer(expires_at=instant)).outcome is KAuth.EXPIRED
+    # One microsecond earlier: still expired, and was under either form.
+    assert a.authorize(
+        _req("ACT"),
+        _cer(expires_at=instant - timedelta(microseconds=1))).outcome is KAuth.EXPIRED
+    # One microsecond later: live, and must stay live — the inclusive boundary
+    # retires the expiry instant itself, not the instant before it.
+    assert a.authorize(
+        _req("ACT"),
+        _cer(expires_at=instant + timedelta(microseconds=1))).outcome is KAuth.AUTHORIZED
+    # No declared expiry never expires.
+    assert a.authorize(_req("ACT"), _cer()).outcome is KAuth.AUTHORIZED
 
 
 def test_action_adapter_normalizes_provider_failure():

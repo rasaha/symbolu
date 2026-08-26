@@ -7,8 +7,8 @@
   ],
   "baseline_tests": 1006,
   "behaviour_tree_hashes": {
-    "comparative_governance_benchmark": "827ed95f7ae21abe8500a8b66d14de9a44a12b7048806a29094619c52da1e662",
-    "enterprise_validation_pilot": "9241f73c57fa5b9ba5186046caf714e93a3131b1384a7a06f69a5c9bbdf978af",
+    "comparative_governance_benchmark": "2f4e1da1bb4f434600063fbf26aad89e42a658ebadd5a7ea0ef936965ecd0322",
+    "enterprise_validation_pilot": "57f9af52aef43ff9cbc7a13ff9487c3ed22d927c3ed7fcf308368ad28d9b98a5",
     "provider_heterogeneity_validation": "85c35cba7ee55dce6e4fd73fd396e172bbdcbd257d8d7f5e5b8bd3a741e49c49"
   },
   "behaviour_trees": [
@@ -24,7 +24,7 @@
   },
   "components": {
     "decision-governance": "1.0.0",
-    "dgm-actiongate-provider": "0.1.0",
+    "dgm-actiongate-provider": "0.2.0",
     "dgm-provider-framework": "0.1.0",
     "dgm-tap-provider": "0.1.0"
   },
@@ -33,7 +33,7 @@
     "packages/providers/tap/src/ugence_tap_provider": "f52903dc7c630407140a134f8355328bb9d5f3d39b38759c0870f29021fe5d5a"
   },
   "core_tree_hashes": {
-    "actiongate_provider": "a0010fcf19476e17251c6c320742eb9e2e2ae0d9b84fa0bc95287cfbc55a0974",
+    "actiongate_provider": "b5da5bfd604603673d550835b5600b018ccbe87609b693d98ca8e997edbb62c8",
     "decision_governance": "3e98d8dbbc2a5737a8f66c701653ac00b674a6c7c9336a582331d45a667485d0",
     "governance_providers": "9ec688e64fcd8f3c37f7f91d63751123ffa56d761d5f34ed64af4cd65517e9c3",
     "tap_provider": "53b7abf7534eaf084201c84a8bb26dda50fb2b835cf0e933fab53f018c938249"
@@ -191,11 +191,11 @@
       "statement": "Frozen package dependency direction remains acyclic."
     }
   ],
-  "manifest_digest": "272abe561c55a12f9d0d5d1a4749f030a9e8fbf7bcde17ecc41cc15d64ffeb5d",
+  "manifest_digest": "38b66d587d3d0ff0ce9de94ea5b80f289d9e2799d737adb72ac1fd2c7d4734fd",
   "platform_name": "Decision Governance Platform",
   "platform_version": "1.0.0",
   "public_api_manifests": {
-    "actiongate_provider.api": "5334cca1451d652718d3ceee66688882f6d51caf3fc4db5b07bdba913489cd55",
+    "actiongate_provider.api": "ee2231294713061f3ae47818c5b52fa86f135a3ec4f70734fc0f6ef64e66cb31",
     "decision_governance.api": "1b89386992bb9572b82eca40fb36760ab9451c85db76e6ce43d3339c13ad5543",
     "governance_providers.api": "98dd02649e5fbb37879ef05e1b06afce1abd0cc10b5692b81974437d59f7a59b",
     "tap_provider.api": "68763307437994a94397b51f6ae9eff305f7e27fd03ac716085a35a74d51300a"

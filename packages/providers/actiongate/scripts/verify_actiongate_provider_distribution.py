@@ -56,7 +56,7 @@ import sys
 
 # 1) canonical import outside the repo
 import ugence_actiongate_provider as a
-assert a.__version__ == "0.1.0", a.__version__
+assert a.__version__ == "0.2.0", a.__version__
 info = a.version_info()
 assert info.distribution == "ugence-actiongate-provider"
 assert info.production_certified is False
@@ -115,7 +115,7 @@ _LEGACY_CHECK = r'''
 import actiongate_provider, ugence_actiongate_provider
 import actiongate_provider.api, ugence_actiongate_provider.api
 import actiongate_provider.core, ugence_actiongate_provider.core
-assert actiongate_provider.__version__ == ugence_actiongate_provider.__version__ == "0.1.0"
+assert actiongate_provider.__version__ == ugence_actiongate_provider.__version__ == "0.2.0"
 assert actiongate_provider.api is ugence_actiongate_provider.api
 assert actiongate_provider.api.ActionGateProvider is ugence_actiongate_provider.api.ActionGateProvider
 from actiongate_provider.mapping.result import map_result as a

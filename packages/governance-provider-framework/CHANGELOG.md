@@ -2,6 +2,41 @@
 
 All notable changes to the canonical Governance Provider Framework package.
 
+## Unreleased — inclusive expiry boundary in the control-plane adapter (MAJOR)
+
+`ActionGovernanceControlPlaneAdapter.authorize` now treats the expiry instant
+itself as expired: `now >= cer.expires_at`, where it previously read
+`cer.expires_at < now`.
+
+This is a **fail-safe change to the framework**, not to any one provider. Every
+action provider reached through this adapter is affected, including the
+reference `DeterministicActionGovernanceProvider` and any third-party provider.
+A CER evaluated at exactly its expiry instant previously authorized and now
+returns `EXPIRED`.
+
+Rationale: `ugence_action_clearance` applies the inclusive form in both places
+it evaluates validity (`evaluation/__init__.py`, authorization validity and
+signal validity). The exclusive form left a one-instant window in which
+authorization and clearance disagreed about whether the same CER was live.
+
+Provenance and scope — recorded because this hunk did not arrive through the
+framework's own change record. It was authored inside the ActionGate vNext
+commit `e32f9838`, whose deliberate hash re-baselining
+(`core_tree_hashes["actiongate_provider"]`, the ActionGate `.api` snapshot,
+`conformance_hashes[…ugence_actiongate_provider]`) covers ActionGate only. The
+freeze does not hash this package at all: `core_tree_hashes["governance_providers"]`
+covers the single-file legacy facade, so this change moved no frozen hash and
+passed no freeze gate. It also arrived with no test in this package pinning the
+boundary instant. Both gaps are closed here — see
+`tests/integration/test_adapters.py::test_action_adapter_treats_the_expiry_instant_itself_as_expired`,
+which fails against the exclusive form.
+
+The rule is deliberately **not** shared with
+`ugence_actiongate_provider.vnext.is_expired`, which states it identically: the
+framework does not depend on a provider, and inverting that direction to share
+four lines would be the worse trade. The rule is written twice; the test above
+and ActionGate's own expiry tests are what keep the copies honest.
+
 ## 0.1.0 — canonical-package migration (structural / PATCH)
 
 Relocation of the capability-neutral Governance Provider Framework into its own

@@ -36,5 +36,5 @@ MAJOR platform change.
 
 Pin exact component versions (`decision-governance==1.0.0`,
 `dgm-provider-framework==0.1.0`, `dgm-tap-provider==0.1.0`,
-`dgm-actiongate-provider==0.1.0`). A platform minor upgrade is additive and
+`dgm-actiongate-provider==0.2.0`). A platform minor upgrade is additive and
 backward compatible; a major upgrade requires re-validation.

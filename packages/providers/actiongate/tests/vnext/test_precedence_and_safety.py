@@ -146,6 +146,45 @@ def test_softening_attempt_leaves_the_default_tier_intact():
     assert evaluate(Req(ACT, authority=""), p).tier is Tier.DENIED
 
 
+@pytest.mark.parametrize("code", sorted(RC, key=lambda c: c.value))
+@pytest.mark.parametrize("softer", sorted(Tier, key=lambda t: TIER_PRECEDENCE[t]))
+def test_no_policy_override_softens_any_code_in_the_catalogue(code, softer):
+    """The refusal that carries the safety is the precedence comparison.
+
+    ``test_policy_may_never_soften_a_boundary_violation`` is parametrized over
+    ``NON_SOFTENABLE``, so it reads as though membership of that set is what
+    stops a policy downgrading a finding. It is not: ``_Accumulator._tier_for``
+    accepts an override only when it is strictly more restrictive than the
+    default, and that clause runs for every code. A test that exercises only
+    the six members would still pass if the clause were deleted, which is the
+    same shape of vacuity — asserting a property against a surface that is not
+    what makes it true — this evaluator exists to remove.
+
+    So assert it where it actually lives: over the whole catalogue, every tier
+    strictly more permissive than a code's default is refused, leaving the
+    default intact.
+    """
+    base = DEFAULT_TIER[code]
+    if TIER_PRECEDENCE[softer] <= TIER_PRECEDENCE[base]:
+        pytest.skip("not a softening of this code's default tier")
+    p = _policy(
+        denied_action_types=frozenset({ACT}),
+        unknown_action_types=frozenset({ACT}),
+        authority_required_action_types=frozenset({ACT}),
+        principal_required_action_types=frozenset({ACT}),
+        decision_ref_required_action_types=frozenset({ACT}),
+        resource_required_action_types=frozenset({ACT}),
+        permitted_resource_prefixes={ACT: ("allowed/",)},
+        parameter_bounds=(ParameterBound("amount", deny_above=10, constrain_above=1),),
+        risk_required_action_types=frozenset({ACT}),
+        minimum_evidence_refs={ACT: 1},
+        policy_ref_required_action_types=frozenset({ACT}),
+        tier_overrides={code.value: softer})
+    acc = evaluate.__globals__["_Accumulator"](p)
+    assert acc._tier_for(code) is base, (
+        f"policy softened {code.value} from {base.value} to {softer.value}")
+
+
 # --- determinism -----------------------------------------------------------
 
 def test_repeated_evaluation_is_byte_identical():

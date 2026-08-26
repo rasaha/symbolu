@@ -35,7 +35,7 @@ def test_deep_submodule_imports_preserve_identity():
 def test_legacy_top_level_reexports_version_info():
     import actiongate_provider
     import ugence_actiongate_provider
-    assert actiongate_provider.__version__ == ugence_actiongate_provider.__version__ == "0.1.0"
+    assert actiongate_provider.__version__ == ugence_actiongate_provider.__version__ == "0.2.0"
     assert actiongate_provider.version_info is ugence_actiongate_provider.version_info
 
 

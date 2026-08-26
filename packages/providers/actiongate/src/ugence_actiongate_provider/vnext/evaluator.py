@@ -105,12 +105,24 @@ class _Accumulator:
     def _tier_for(self, reason: RC) -> Tier:
         """Resolve a reason's tier, honouring policy elevation but not softening.
 
-        A policy may make a soft finding harder (an operator choosing to treat
-        missing risk data as a denial is making their own control stricter). It
-        may not make a hard finding softer: absent authority, an unresolved
-        principal, a missing decision binding and an expired authorization are
-        boundary violations, and a policy that could downgrade them would be
-        able to authorize its way around the boundary.
+        Two separate refusals, and it matters which one carries which weight:
+
+        1. The **precedence comparison** below accepts an override only when it
+           is strictly more restrictive than the default. That is what refuses
+           softening, and it refuses it for *every* code in the catalogue — a
+           policy cannot downgrade any finding, hard or soft, so none can
+           authorize its way around a boundary. A policy may still make a soft
+           finding harder (an operator treating missing risk data as a denial is
+           making their own control stricter), which is the intended latitude.
+        2. ``NON_SOFTENABLE`` membership refuses the override outright, in both
+           directions. Since softening is already gone, its live effect is to
+           refuse the remaining *hardenings*: for these codes that is only
+           DENIED -> EXPIRED, so a policy can never relabel an authority,
+           principal or decision-binding failure as an expiry.
+
+        ``resource`` and ``parameters`` are ratified hard/mixed without
+        appearing in ``NON_SOFTENABLE``, and lose nothing by it: refusal (1)
+        covers them identically.
         """
         base = default_tier(reason)
         override = self._policy.tier_overrides.get(reason.value)

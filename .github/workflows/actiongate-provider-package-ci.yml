@@ -114,8 +114,13 @@ jobs:
           legacy = hh("actiongate_provider.api")
           # Re-baselined by the MAJOR change that added ActionGateOutcome.EXPIRED,
           # ActionGateRequest.authorization_expired, and the vNext policy types.
-          # Previous base: 9eeb66e31430d9e65982826e9910fc571fbae0331b797c5bb1b735bc53887300
-          base = "5334cca1451d652718d3ceee66688882f6d51caf3fc4db5b07bdba913489cd55"
+          # Re-baselined again by the 0.1.0 -> 0.2.0 version bump ratified for that
+          # MAJOR: the `.api` surface exposes `__version__` as a constant, so the
+          # snapshot moves by exactly that one line. `platform_freeze.compat`
+          # grades a changed constant value INFO, so the bump is invisible to the
+          # classifier too — this assertion is what actually catches it.
+          # Bases: 9eeb66e3… (pre-vNext) -> 5334cca1… (vNext MAJOR) -> below.
+          base = "ee2231294713061f3ae47818c5b52fa86f135a3ec4f70734fc0f6ef64e66cb31"
           assert legacy == base, f"ActionGate public .api surface changed: {legacy}"
           # canonical .api symbols must match the legacy snapshot (module label aside)
           a = snapshot_module("ugence_actiongate_provider.api")["symbols"]

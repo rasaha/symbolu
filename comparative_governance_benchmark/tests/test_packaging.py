@@ -30,7 +30,7 @@ def test_distribution_metadata_and_dependencies():
     assert 'name = "dgm-comparative-governance-benchmark"' in text
     assert 'attr = "comparative_governance_benchmark.version.__version__"' in text
     for dep in ('decision-governance==1.0.0', 'dgm-provider-framework==0.1.0',
-                'dgm-actiongate-provider==0.1.0', 'dgm-tap-provider==0.1.0',
+                'dgm-actiongate-provider==0.2.0', 'dgm-tap-provider==0.1.0',
                 'dgm-enterprise-validation-pilot==0.1.0'):
         assert dep in text, dep
     assert 'include = ["comparative_governance_benchmark*"]' in text

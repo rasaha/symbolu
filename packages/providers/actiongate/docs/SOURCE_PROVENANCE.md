@@ -37,5 +37,5 @@ zero remaining `governance_providers` references in the canonical tree.
 - `actiongate_provider/tests/*` — retained as the monorepo-integration view;
   `test_packaging.py` and `test_dependency_boundaries.py` updated for the new layout.
 - `packaging/dgm-actiongate-provider/` — converted to a **compatibility
-  distribution** depending on `ugence-actiongate-provider[decision-authority]==0.1.0`;
+  distribution** depending on `ugence-actiongate-provider[decision-authority]==0.2.0`;
   the `actiongate_provider` entry remains a symlink to the root facade.

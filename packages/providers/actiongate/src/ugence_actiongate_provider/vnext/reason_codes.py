@@ -136,9 +136,27 @@ DEFAULT_TIER: dict = {
     R.AUTHORIZATION_EXPIRED: T.EXPIRED,
 }
 
-#: Codes whose tier a policy may not soften. These are the ratified "hard"
-#: dimensions plus expiry: absent authority, an unresolved principal and a
-#: missing decision binding are boundary violations, never uncertainty.
+#: Codes whose tier a policy may not change **in either direction**.
+#:
+#: Read the guarantee carefully, because the name understates it and once
+#: understated it was easy to believe this set is what stops a policy softening
+#: a boundary violation. It is not. ``_Accumulator._tier_for`` accepts an
+#: override only when the override is *strictly more restrictive* than the
+#: default, so softening is already refused for **every** code in the
+#: catalogue, whether or not it appears here. Membership of this set adds one
+#: further restriction on top of that: it refuses the remaining *hardening*
+#: moves too. Over the whole catalogue those number exactly five, and all five
+#: are DENIED -> EXPIRED — so what this set actually buys is that a policy can
+#: never relabel an authority, principal or decision-binding failure as an
+#: expiry, which would report a boundary violation as a lifecycle event.
+#:
+#: The membership is the ratified "hard" dimensions plus expiry: absent
+#: authority, an unresolved principal and a missing decision binding are
+#: boundary violations, never uncertainty. ``resource`` and ``parameters`` are
+#: ratified hard/mixed too and are deliberately absent, because absence costs
+#: them nothing: the precedence comparison protects them identically, and no
+#: hardening of RESOURCE_* or PARAMETER_LIMIT_EXCEEDED to EXPIRED is a
+#: relabelling worth forbidding by name.
 NON_SOFTENABLE = frozenset({
     R.AUTHORITY_ABSENT, R.AUTHORITY_INSUFFICIENT,
     R.PRINCIPAL_UNRESOLVED, R.PRINCIPAL_UNRECOGNIZED,

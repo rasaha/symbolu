@@ -2,13 +2,32 @@
 
 All notable changes to the canonical ActionGate distribution are documented here.
 
-## [Unreleased] — deterministic policy semantics (change class **MAJOR**)
+## 0.2.0 — deterministic policy semantics (change class **MAJOR**)
 
 Change class **MAJOR** per `platform/PLATFORM_FREEZE_V1.json` `compatibility_rules`
 (*"authority/lifecycle/dependency-direction/fail-safe changes"*). Note that the
 platform's own API-diff classifier reports this as `MINOR`/`ADDITIVE`: it compares
 API *shape*, and every shape change here is an addition. The MAJOR classification
 comes from the semantic change, which no shape diff can see.
+
+Version: `0.1.0` -> `0.2.0`, implementation and distribution together, with the
+legacy `dgm-actiongate-provider` shell bumped in lockstep. The minor position is
+the breaking position on a pre-1.0 line, and `production_certified` is still
+`False`, so `1.0.0` would claim more than this package supports. Because the
+classifier cannot see the semantic change, this version string is the only
+machine-readable signal a consumer gets that it happened — see
+`docs/VERSIONING.md` for the full consumer table. Two `>=0.1.0` floors
+(`packages/products/ai-hiring`, `packages/integration/risk-authority-runtime`)
+resolve to `0.2.0` with no edit: a floor signals nothing and blocks nothing.
+
+Known regression, not fixed in this release: 84 tests across
+`enterprise_validation_pilot`, `comparative_governance_benchmark` and
+`provider_heterogeneity_validation` fail once `authorization_expired` is
+honoured. Those harnesses build CERs on a frozen scenario clock and construct the
+control-plane adapter with its default wall clock, so every scenario CER reads as
+months expired. The mismatch predates this change and was inert only because the
+engine dropped the field. See the audit record's "Regression found while settling
+these items".
 
 ### Fixed (fail-safe)
 

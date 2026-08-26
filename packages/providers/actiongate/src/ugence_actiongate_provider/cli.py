@@ -66,7 +66,7 @@ def _cmd_verify() -> int:
     base = prov()
     d = base.descriptor()
 
-    check("canonical_import", impl_version == "0.1.0")
+    check("canonical_import", impl_version == "0.2.0")
     check("action_governance_kind", d.kind is ProviderKind.ACTION_GOVERNANCE)
     check("framework_compatibility", "1" in d.compatibility.compatible_kernel_majors)
     check("provider_descriptor", d.provider_id == "actiongate" and d.vendor == "ActionGate")

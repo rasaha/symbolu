@@ -34,7 +34,7 @@ def test_version_info_reports_not_production_certified():
     info = ugence_actiongate_provider.version_info()
     assert info.production_certified is False
     assert info.distribution == "ugence-actiongate-provider"
-    assert info.implementation_version == "0.1.0"
+    assert info.implementation_version == "0.2.0"
 
 
 def test_descriptor_features_are_authorization_only():

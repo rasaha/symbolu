@@ -83,7 +83,9 @@ class ActionGatePolicy:
 
     # --- policy-configurable tier elevation -------------------------------
     #: Reason code value -> tier, for codes the policy is permitted to elevate.
-    #: Softening a NON_SOFTENABLE code is rejected by the evaluator.
+    #: The evaluator accepts an override only when it is strictly more
+    #: restrictive than the code's default, so a softening override is rejected
+    #: for every code; a ``NON_SOFTENABLE`` code additionally rejects hardening.
     tier_overrides: Mapping[str, ActionGateTier] = field(default_factory=dict)
 
     @property
