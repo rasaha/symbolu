@@ -318,11 +318,16 @@ def reconcile_phase4(
             f"tenant mismatch: projection {p_tenant!r} vs decision {d_tenant!r}",
             _Reason.TENANT_MISMATCH,
         )
+    # The same admission as ``tenant_id`` above, for the same reason: these two decide
+    # which request and which subject the decision was made against, and both compare
+    # with ``!=``. Neither has passed through any admission on its way here.
+    d_request_digest = require_canonical_digest("decision.request_digest", d_request_digest)
     if p_request_digest != d_request_digest:
         raise ReconciliationError(
             "the decision was made against a different request_digest",
             _Reason.REQUEST_DIGEST_MISMATCH,
         )
+    d_subject_digest = require_canonical_digest("decision.subject_digest", d_subject_digest)
     if p_subject_digest != d_subject_digest:
         raise ReconciliationError(
             "the decision was made against a different subject_digest",

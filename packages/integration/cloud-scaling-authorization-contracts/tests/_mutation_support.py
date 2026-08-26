@@ -108,7 +108,16 @@ class MutatedPackage:
     # three Phase 5 artifacts must be rebuilt against the mutated module. They are built
     # with the same values conftest uses, through the same public constructors.
 
-    def attestation(self, *, recommendation_digest: str) -> Any:
+    def attestation(
+        self, *, recommendation_digest: str, issued_at: Any = None
+    ) -> Any:
+        """``issued_at`` overrides the genuine stamp.
+
+        Without it a sweep of ``_require_utc``'s gates is vacuous: every guard number
+        produces the same honest attestation, so the mutated half passes whatever was
+        neutralised. The override is what lets a naive instant reach the gate under test.
+        """
+
         from risk_authority.crypto import SigningKey, canonical_bytes
 
         import conftest as C
@@ -121,7 +130,7 @@ class MutatedPackage:
             "signing_purpose": self.module.PRODUCER_SIGNING_PURPOSE,
             "recommendation_id": C.RECOMMENDATION_ID,
             "recommendation_digest": recommendation_digest,
-            "issued_at": C.REC_TIME,
+            "issued_at": C.REC_TIME if issued_at is None else issued_at,
         }
         signature = SigningKey.from_seed(C.PRODUCER_SEED).sign(canonical_bytes(payload))
         return self.module.ProducerAttestationEvidence(
@@ -133,10 +142,19 @@ class MutatedPackage:
             recommendation_digest=recommendation_digest,
             signing_purpose=self.module.PRODUCER_SIGNING_PURPOSE,
             signing_payload_digest=self.module.canonical_digest(payload),
-            issued_at=C.REC_TIME,
+            issued_at=C.REC_TIME if issued_at is None else issued_at,
         )
 
-    def target_scope(self, projection: Any) -> Any:
+    def target_scope(
+        self, projection: Any, *, max_magnitude: Any = None, max_delta: Any = None
+    ) -> Any:
+        """``max_magnitude``/``max_delta`` override the fixture ceilings.
+
+        Needed to score the magnitude ceiling on its own: with both ceilings at their
+        fixture values, an attack that clears one is caught by its sibling, and the
+        neutralisation proves nothing about the guard it was aimed at.
+        """
+
         import conftest as C
 
         context = projection.context
@@ -152,8 +170,10 @@ class MutatedPackage:
             action_type=context.action_type,
             magnitude_before=context.magnitude_before,
             requested_magnitude=context.magnitude_after,
-            max_permitted_magnitude=C.MAX_MAGNITUDE,
-            max_permitted_delta=C.MAX_DELTA,
+            max_permitted_magnitude=(
+                C.MAX_MAGNITUDE if max_magnitude is None else max_magnitude
+            ),
+            max_permitted_delta=C.MAX_DELTA if max_delta is None else max_delta,
         )
 
     def policy_binding(self, target_scope: Any) -> Any:

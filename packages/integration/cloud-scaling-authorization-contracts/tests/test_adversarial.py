@@ -874,6 +874,29 @@ def test_a_lying_decision_tenant_or_key_is_refused_before_reconciliation_compare
         reconcile_phase4(projection, dataclasses.replace(decision, idempotency_key=""))
     assert exc.value.reason is Reason.IDEMPOTENCY_KEY_MISMATCH
 
+    # The two remaining binding digests, on the same footing. `evaluation_digest` is
+    # deliberately absent from this list: it exists on `SubjectRiskDecision` but Phase 5A
+    # reads it nowhere, so there is no comparison for a lie to reach. Recorded rather than
+    # given a guard nothing would exercise.
+    other_digest = "sha256:" + "c" * 64
+    for field, honest_reason in (
+        ("request_digest", Reason.REQUEST_DIGEST_MISMATCH),
+        ("subject_digest", Reason.SUBJECT_MISMATCH),
+    ):
+        with pytest.raises(ReconciliationError) as exc:
+            reconcile_phase4(
+                projection, dataclasses.replace(decision, **{field: other_digest})
+            )
+        assert exc.value.reason is honest_reason, f"{field} lost its typed refusal"
+
+        with pytest.raises(CandidateConstructionError) as exc:
+            reconcile_phase4(
+                projection,
+                dataclasses.replace(decision, **{field: _LyingText(other_digest)}),
+            )
+        assert exc.value.reason is Reason.MALFORMED_CANONICAL_FIELD
+        assert f"decision.{field}" in str(exc.value)
+
 
 def test_a_lying_schema_identifier_cannot_claim_another_contract(projection, candidate):
     """A-53: every public Phase 5A artifact admits its schema identifier by exact type."""

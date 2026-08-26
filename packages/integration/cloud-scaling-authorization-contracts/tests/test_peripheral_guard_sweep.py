@@ -14,6 +14,7 @@ than an implication.
 from __future__ import annotations
 
 import dataclasses
+import datetime
 import pathlib
 import tempfile
 
@@ -39,8 +40,16 @@ SCORED = (
     P_ATTESTATION_IS_DATETIME,
     P_ATTESTATION_IS_AWARE,
     P_SCOPE_SCHEMA,
+    P_SCOPE_MAGNITUDE_CEILING,
     P_BINDING_CEILING_TYPE,
 )
+"""Guards this module actually neutralises and observes. Nothing else is claimed.
+
+``P_SCOPE_DELTA_CEILING`` is **not** here: with the magnitude ceiling widened far enough
+for a delta-only attack, the request that clears it also clears the delta bound, so no
+attack was found that guard 15 alone refuses. Recorded as unscored rather than asserted
+into the list.
+"""
 
 
 def test_the_peripheral_guard_numbers_still_name_these_conditions():
@@ -70,13 +79,31 @@ def _scope_of(mp, projection):
     return mp.target_scope(projection)
 
 
+def test_the_scope_magnitude_ceiling_is_load_bearing(tmp_path, projection):
+    """Scored by widening the delta ceiling so its sibling cannot supply the refusal.
+
+    With both ceilings at their fixture values the attack is caught by guard 15, which is
+    why an earlier revision of this module left guard 14 unscored. Widening ``max_delta``
+    isolates it.
+    """
+
+    from conftest import build_target_scope
+
+    with pytest.raises(Exception) as exc:
+        build_target_scope(projection, max_magnitude=5, max_delta=10_000)
+    assert "guard neutralised" not in str(exc.value)
+    assert "exceeds the permitted maximum" in str(exc.value)
+    assert "delta" not in str(exc.value), "the delta sibling produced this refusal"
+
+    with tempfile.TemporaryDirectory(dir=tmp_path) as td:
+        mp = mutated_peripheral(pathlib.Path(td), P_SCOPE_MAGNITUDE_CEILING)
+        scope = mp.target_scope(projection, max_magnitude=5, max_delta=10_000)
+    assert scope.requested_magnitude > scope.max_permitted_magnitude
+
+
 def test_the_scope_schema_gate_is_load_bearing(tmp_path, projection):
     """The scope's schema identity gate is executed, not merely present.
 
-    The two magnitude ceilings (peripheral 14 and 15) were measured too and are **not**
-    scored here: neutralising 14 alone still refuses, because 15 catches the same attack
-    as its sibling. Recording that rather than forcing a passing assertion — an attack a
-    sibling also refuses does not score the guard it was aimed at.
     """
 
     with pytest.raises(Exception) as exc:
@@ -133,25 +160,53 @@ def test_the_signed_ceiling_type_gate_is_load_bearing(tmp_path, projection):
     assert type(binding.max_permitted_magnitude) is _LyingCeiling
 
 
-@pytest.mark.parametrize("guard", [P_ATTESTATION_IS_DATETIME, P_ATTESTATION_IS_AWARE])
-def test_an_attestation_instant_gate_is_load_bearing(tmp_path, projection, guard):
-    """``_require_utc``'s two gates are executed, not merely present."""
+@pytest.mark.parametrize(
+    "guard, bad_issued_at",
+    [
+        (P_ATTESTATION_IS_DATETIME, "2026-01-01T00:03:10.000000Z"),
+        (P_ATTESTATION_IS_AWARE, datetime.datetime(2026, 1, 1, 0, 3, 10)),
+    ],
+)
+def test_an_attestation_instant_gate_admits_exactly_when_it_is_removed(
+    tmp_path, projection, guard, bad_issued_at
+):
+    """``_require_utc``'s two gates are executed, not merely present.
+
+    The earlier form of this test was **vacuous**: ``MutatedPackage.attestation`` took no
+    ``issued_at``, so its mutated half built the same honest attestation for every guard
+    number and passed whatever was neutralised. The override added for this test is what
+    makes the neutralisation observable at all.
+    """
 
     from conftest import build_attestation
 
-    naive = __import__("datetime").datetime(2026, 1, 1, 0, 3, 10)
     with pytest.raises(Exception) as exc:
         build_attestation(
-            recommendation_digest=projection.recommendation_digest, issued_at=naive
+            recommendation_digest=projection.recommendation_digest,
+            issued_at=bad_issued_at,
         )
     assert "guard neutralised" not in str(exc.value)
+
+    pristine_message = str(exc.value)
 
     with tempfile.TemporaryDirectory(dir=tmp_path) as td:
         mp = mutated_peripheral(pathlib.Path(td), guard)
         try:
-            mp.attestation(recommendation_digest=projection.recommendation_digest)
-        except Exception as exc:  # pragma: no cover - diagnostic only
-            assert "guard neutralised" not in str(exc)
+            evidence = mp.attestation(
+                recommendation_digest=projection.recommendation_digest,
+                issued_at=bad_issued_at,
+            )
+        except Exception as mutated:  # noqa: BLE001 - the shape of the failure is the point
+            # Removing the type gate does not admit the value; it lets a non-datetime
+            # reach the awareness gate, which crashes on `.tzinfo`. That is still a score:
+            # the typed refusal this guard owns is gone, and no sibling supplies it.
+            assert "guard neutralised" not in str(mutated)
+            assert str(mutated) != pristine_message
+            assert not isinstance(mutated, type(exc.value)), (
+                "a sibling guard produced the same typed refusal"
+            )
+        else:
+            assert evidence.issued_at == bad_issued_at
 
 
 def test_peripheral_coverage_is_reported_honestly():
@@ -164,7 +219,7 @@ def test_peripheral_coverage_is_reported_honestly():
 
     total = len(peripheral_guards(SRC))
     assert total == 28, f"peripheral inventory moved to {total}"
-    assert len(set(SCORED)) == 4
-    # 4 of 28 scored; 14 and 15 measured and deliberately not scored. Not
-    # exhaustive, and not described as such anywhere.
+    assert len(set(SCORED)) == 5
+    # 5 of 28 scored. Guard 15 measured and deliberately not scored — see SCORED's note.
+    # Not exhaustive, and not described as such anywhere.
     assert len(set(SCORED)) < total
