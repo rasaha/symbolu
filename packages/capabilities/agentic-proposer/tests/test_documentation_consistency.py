@@ -21,6 +21,21 @@ implied:
   capability's contract specification. **No claim of terminology coverage is made for
   these documents**, here or in ``S1_ENFORCEMENT.md``.
 
+The **strategy-authority scan** (OD-5) is stated here on the same terms, because it is
+the one check in this module whose subject is a claim rather than a structure:
+
+* It is a **heuristic spot-check over enumerated forms, and it does not cover the
+  class.** It classifies sentences by actor, refusing a claim of selection, validation or
+  binding whose subject is S1 or something inside it, and passing the same claim
+  attributed to S2. What it is proven against is a named corpus — claims it must catch,
+  including spellings successive audits found escaping earlier versions, and correct
+  statements it must leave alone. That corpus is the whole of the guarantee.
+* Two shapes it **does not reach**, both structural rather than lexical: a claim written
+  **across two table cells**, where the actor sits in one column and the predicate in
+  another and no sentence contains both; and a claim **split between a lead-in stem and a
+  numbered item**, where the stem carries the actor and the item carries the predicate.
+  Sentences are found within blocks, and a block boundary falls between both pairs.
+
 A gate whose curated input does not name a document does not cover it, whatever the
 gate's title suggests. That is why the coverage each gate genuinely provides is asserted
 below rather than assumed.
@@ -288,22 +303,30 @@ def test_exactly_od_4_is_recorded_as_bearing_on_contract_shape():
 _OD_SECTION_HEADING = re.compile(r"^#{1,6}\s+(Owner decisions OD-1 – OD-\d[^\n]*)$", re.M)
 _OD_SECTION_REFERENCE = re.compile(r"\*(Owner decisions OD-1 – OD-\d)\*")
 
-#: A claim that exactly one decision bears on contract shape. True while OD-4 was the only
-#: one; false since OD-5.
+#: A claim that **one** decision bears on contract shape, in whatever words.
 #:
-#: Six wordings, because the claim is not written the same way twice. An audit found it in
-#: the ADR's prose as "the only one bearing on contract shape" and, separately, in the
-#: specification's ratification statement as "the one open question that bore on contract
-#: shape" — the same false statement in words sharing almost no substring with each other.
-#: A fixed-sentence check would have caught one and certified the other.
+#: Enumerating wordings does not work here. An earlier version listed six, and an audit
+#: wrote six more that escaped every one of them: the claim is a *quantity*, and English
+#: has unboundedly many ways to say "one". So the check is derived rather than listed — a
+#: **singular quantifier within a bounded distance of the subject** — and whether it is an
+#: offence at all is decided by the count the ADR table records, not by this pattern.
+#:
+#: The two halves are separate on purpose. This pattern says *a singular claim is being
+#: made*; ``_shape_bearing_decisions`` says *how many decisions actually bear*. A singular
+#: claim is true when the table records one bearer and false when it records several, and
+#: only the second case is a defect.
+_SHAPE_SUBJECT = (r"(?:contract[\s-]shape|contract's\s+shape|"
+                  r"shape\s+of\s+an?\s+contract|shape\s+of\s+the\s+contract)")
+#: Every way of saying "one", including the negative form — "no other decision bears on
+#: contract shape" is the same claim with the quantifier moved onto the complement.
+_SINGULAR_QUANTIFIER = (r"(?:the\s+only|only\s+one|just\s+one|exactly\s+one|"
+                        r"a\s+single|the\s+sole|\bsole\b|no\s+other|none\s+other|"
+                        r"the\s+one|one\s+alone|\balone\b)")
+#: Either order, because the subject leads as often as the quantifier does — "Contract
+#: shape is bore on by a single decision" puts the quantifier last.
 _SOLE_SHAPE_BEARER_CLAIM = re.compile(
-    r"\bthe\s+only\s+one\s+(?:bearing|that\s+bears)\s+on\s+contract\s+shape"
-    r"|\bthe\s+only\s+decision\s+(?:bearing|that\s+bears)\b[^.]{0,30}?contract\s+shape"
-    r"|\bthe\s+(?:one|sole|single)\s+(?:open\s+)?question\s+that\s+"
-    r"(?:bore|bears)\s+on\s+contract\s+shape"
-    r"|\bthe\s+sole\s+shape-bearing\s+decision"
-    r"|\bOD-\d\s+alone\s+bears\b"
-    r"|\bonly\s+OD-\d\s+(?:changes|change[sd]?|bears|bore|alters)\b", re.I)
+    rf"{_SINGULAR_QUANTIFIER}[^.]{{0,70}}?{_SHAPE_SUBJECT}"
+    rf"|{_SHAPE_SUBJECT}[^.]{{0,70}}?{_SINGULAR_QUANTIFIER}", re.I)
 
 
 @pytest.mark.parametrize("path", DOCUMENTS, ids=lambda p: p.name)
@@ -357,25 +380,33 @@ def test_the_cross_reference_and_sole_bearer_detectors_catch_a_planted_violation
     assert not [r for r in _OD_SECTION_REFERENCE.findall(f"see *{live}* above")
                 if r != live], "the cross-reference detector flags the live heading"
 
-    # Six wordings of one false claim. Each is asserted, so a pattern that stops matching
-    # is named rather than covered by a sibling.
+    # The claim is a quantity, not a wording. Both sets below were written by audits
+    # rather than by the pattern's author: the first six defeated an enumeration of six
+    # earlier spellings, which is the evidence that enumerating them cannot work.
     for claim in (
+            # Spellings an enumeration caught.
             "OD-4, the only one bearing on contract shape, is resolved (a)",
             "OD-4 is the only one that bears on contract shape",
-            "OD-4 is the only decision bearing on contract shape",
             "and with it the one open question that bore on contract shape",
-            "a sentence naming OD-4 as the sole shape-bearing decision",
-            "OD-4 alone bears on contract shape",
-            "only OD-4 changes a contract",
+            # Spellings that escaped it, and now do not.
+            "OD-4 is the only ratified decision that changes a contract's shape",
+            "Of the five, just one touches contract shape",
+            "No other owner decision bears on contract shape",
+            "Contract shape is bore on by a single decision, OD-4",
+            "Exactly one owner decision affects the shape of a contract",
+            "OD-4 remains the sole decision with a contract-shape consequence",
     ):
         assert _SOLE_SHAPE_BEARER_CLAIM.search(claim), (
             f"the sole-shape-bearer detector no longer matches {claim!r}")
-    # Controls: the true statements the documents now carry must stay clean.
+    # Controls. A plural statement is not a singular claim, and neither is a sentence
+    # that merely mentions contract shape — a detector that flagged those would fire on
+    # every document that discusses the subject at all.
     for fine in (
-            "Two bear on contract shape, OD-4 and OD-5.",
+            "Two decisions bear on contract shape, OD-4 and OD-5",
             "OD-4 and OD-5 both bear on contract shape.",
             "the question that had been open longest about contract shape",
             "OD-4 did change contract shape",
+            "Part D of the specification is written for that contract shape.",
     ):
         assert not _SOLE_SHAPE_BEARER_CLAIM.search(fine), (
             f"the sole-shape-bearer detector flags {fine!r}, which is true as written")
@@ -492,7 +523,7 @@ TERMINOLOGY_CLAIM_PATTERNS = (
 #: a claim about S1. No S2 spelling appears here, which is what makes a correct statement
 #: about S2 unreachable by the two authority patterns.
 _S1_ACTOR = (r"(?:S1|stage\s+S1|the\s+S1\s+\w+|this\s+stage|the\s+(?:\w+\s+)?builder|"
-             r"the\s+validator|build_proposer_advisory)")
+             r"the\s+validator|build_proposer_advisory|(?:\w+\s+)?construction)")
 #: The stage that legitimately does all of this.
 _S2_ACTOR = re.compile(r"\bS2\b")
 #: The subject matter, in every spelling. ``\b`` does not break at an underscore, so a
@@ -509,16 +540,34 @@ _STRATEGY_SUBJECT = (r"(?:reasoning\s+strateg(?:y|ies)|declared[\s_]strateg(?:y|
 #: ``permitted_reasoning_strategies`` admits only ``[]``" — a sentence whose whole point is
 #: that S1 has no authority here. Those verbs describe what a *field* does to a *value*,
 #: which is what C5d says on every page; they do not describe a stage choosing a method.
-_AUTHORITY_VERB = (r"(?:select|validate|verify|check|enforce|bind|reject|refuse|"
+#: ``verify`` is spelled separately. A ``-y`` stem does not inflect with the shared
+#: suffix group — ``verify`` + ``s`` is not ``verifies`` and ``verify`` + ``ed`` is not
+#: ``verified`` — so folding it in with the rest matched the bare infinitive only, and
+#: "S1 verifies the declared strategy" escaped while "S1 verify" was caught. Any further
+#: ``-y`` verb belongs in the second alternation, not the first.
+_AUTHORITY_VERB = (r"(?:(?:select|validate|check|enforce|bind|reject|refuse|"
                    r"constrain|choose|match|compare|ensure|confirm|approve|authoris|"
-                   r"authoriz|police|gate)(?:s|es|d|ed|ing|en)?")
+                   r"authoriz|police|gate)(?:s|es|d|ed|ing|en)?"
+                   r"|verif(?:y|ies|ied|ying))")
 _AUTHORITY_PARTICIPLE = (r"(?:selected|validated|verified|checked|enforced|bound|"
                          r"rejected|refused|constrained|chosen|matched|compared|"
                          r"ensured|confirmed|approved|authorised|authorized)")
 
 #: Active voice: an S1 actor is the subject of the verb, the subject matter its object.
+#:
+#: The separator is punctuation-tolerant. Requiring whitespace between the actor and its
+#: verb meant an appositive split them and the claim escaped — "S1, at construction,
+#: validates the declared strategy" was not caught, nor the parenthetical or em-dash forms
+#: of the same sentence. Widening it to ``\W+`` with up to three intervening words costs
+#: nothing: it flags no sentence in the negative corpus.
 _ACTIVE_AUTHORITY = re.compile(
-    rf"\b{_S1_ACTOR}\s+(?:\w+\s+){{0,2}}{_AUTHORITY_VERB}\b[^.]{{0,60}}?"
+    rf"\b{_S1_ACTOR}\W+(?:\w+\W+){{0,3}}{_AUTHORITY_VERB}\b[^.]{{0,60}}?"
+    rf"{_STRATEGY_SUBJECT}", re.I)
+#: The same claim with the actor left to anaphora — "S1 does not select a strategy, but
+#: **it** validates the declared strategy". Only ever applied to a clause of a sentence
+#: that names an S1 actor elsewhere, so a bare "it" cannot conjure one.
+_ANAPHORIC_AUTHORITY = re.compile(
+    rf"\b(?:it|they)\W+(?:\w+\W+){{0,3}}{_AUTHORITY_VERB}\b[^.]{{0,60}}?"
     rf"{_STRATEGY_SUBJECT}", re.I)
 #: Passive voice, with S1 named as the agent or the locus.
 _PASSIVE_AUTHORITY = re.compile(
@@ -571,26 +620,6 @@ def _strategy_sentences(body):
     return found
 
 
-def _sentence_offends(sentence):
-    """Why this sentence claims S1 authority over a reasoning strategy, or ``None``."""
-    if _RESERVED_FIELD_RULE.search(sentence):
-        return None
-    for claim, label in ((_BINDING_CLAIM, "binding"),
-                         (_CONFORMANCE_CLAIM, "conformance")):
-        found = claim.search(sentence)
-        # The negation must stand BEFORE the claim to excuse it. Scoped to the whole
-        # sentence, "is covered by `advisory_digest`, so it **cannot** be altered" excused
-        # itself on a trailing clause that asserts the binding rather than denying it —
-        # the strongest form of the claim reading as its own denial.
-        if found and not _NEGATION.search(sentence[:found.end()]):
-            return label
-    for pattern in (_ACTIVE_AUTHORITY, _PASSIVE_AUTHORITY):
-        found = pattern.search(sentence)
-        if found and not _NEGATION.search(sentence[:found.end()]):
-            return "authority"
-    return None
-
-
 def _stale_status_offenders(body, label="text"):
     """Every stale branch-status assertion in ``body``, located by line."""
     offenders = []
@@ -619,6 +648,66 @@ def _terminology_coverage_claims(body):
     for pattern in TERMINOLOGY_CLAIM_PATTERNS:
         found.extend(re.findall(pattern, body, re.I))
     return found
+
+
+#: Clause boundaries, used to scope a negation to the claim it actually denies.
+#:
+#: A negation searched over the whole sentence excuses any claim that follows *any*
+#: denial, however unrelated. "Although no vocabulary is ratified, S1 validates the
+#: declared strategy" escaped on the strength of a "no" in a subordinate clause about
+#: something else, and "S1 does not select a strategy, but it validates the declared
+#: strategy against the permitted set" escaped on its own first half. Both assert exactly
+#: what the guard exists to refuse.
+#:
+#: Splitting on punctuation and on the contrastive conjunctions keeps a denial inside the
+#: clause that makes it. It cannot be perfect on English prose and is not claimed to be;
+#: it is the difference between a denial anywhere and a denial *here*.
+_CLAUSE_SPLIT = re.compile(
+    r"[,;:()\[\]—–]|\b(?:but|although|though|whereas|while|however|yet|except)\b", re.I)
+
+
+def _clauses(sentence):
+    """``(offset, text)`` for each clause of ``sentence``, in order."""
+    found, last = [], 0
+    for boundary in _CLAUSE_SPLIT.finditer(sentence):
+        found.append((last, sentence[last:boundary.start()]))
+        last = boundary.end()
+    found.append((last, sentence[last:]))
+    return [(offset, text) for offset, text in found if text.strip()]
+
+
+def _negated_before(sentence, end):
+    """Whether a negation stands before ``end`` **within its own clause**."""
+    for start, clause in _clauses(sentence):
+        if start <= end <= start + len(clause):
+            return bool(_NEGATION.search(clause[:end - start]))
+    return bool(_NEGATION.search(sentence[:end]))
+
+
+def _sentence_offends(sentence):
+    """Why this sentence claims S1 authority over a reasoning strategy, or ``None``."""
+    if _RESERVED_FIELD_RULE.search(sentence):
+        return None
+    for claim, label in ((_BINDING_CLAIM, "binding"),
+                         (_CONFORMANCE_CLAIM, "conformance")):
+        found = claim.search(sentence)
+        if found and not _negated_before(sentence, found.end()):
+            return label
+    # An anaphoric "it" may stand for an S1 actor only where the sentence names one.
+    patterns = [_ACTIVE_AUTHORITY, _PASSIVE_AUTHORITY]
+    if re.search(_S1_ACTOR, sentence, re.I):
+        patterns.append(_ANAPHORIC_AUTHORITY)
+    # Searched over the WHOLE sentence, not clause by clause. An appositive splits an
+    # actor from its verb — "S1, at construction, validates …" — so a clause-by-clause
+    # search would put them in different clauses and find neither; the punctuation-
+    # tolerant separator exists precisely to cross that comma. Only the *negation* is
+    # clause-scoped. Every match is examined rather than the first alone, so a denial in
+    # one clause cannot hide a claim made in the next.
+    for pattern in patterns:
+        for found in pattern.finditer(sentence):
+            if not _negated_before(sentence, found.end()):
+                return "authority"
+    return None
 
 
 def _strategy_authority_claims(body, label="text"):
@@ -766,6 +855,24 @@ _STRATEGY_AUTHORITY_POSITIVES = (
     # Conformance claims. Actor-free: false at every stage, not merely unimplemented here.
     "Declaring a strategy establishes conformance with the method it names.",
     "The process record shows the reasoning strategy was used.",
+    # A ``-y`` stem, which the shared suffix group cannot inflect. Both tenses, because
+    # folding ``verify`` in with the rest matched the bare infinitive alone.
+    "S1 verifies the declared reasoning strategy.",
+    "S1 verified the declared reasoning strategy against the permitted set.",
+    # An appositive between the actor and its verb, in the three forms English writes
+    # one. Whitespace-only separators put the actor and the verb on opposite sides of a
+    # comma and found neither.
+    "S1, at construction, validates the declared strategy.",
+    "S1 (the advisory builder) validates the declared strategy.",
+    "S1 — the validator — validates the declared strategy.",
+    # Construction named as the locus, which the actor docstring claimed and the pattern
+    # did not carry.
+    "The declared strategy is validated during advisory construction.",
+    # A denial of something else, standing earlier in the sentence, must not excuse the
+    # claim that follows it.
+    "Although no vocabulary is ratified, S1 validates the declared strategy.",
+    "S1 does not select a strategy, but it validates the declared strategy against the "
+    "permitted set.",
 )
 
 #: Text the scan must leave alone. Four kinds, and the second is the one an audit had to
@@ -850,6 +957,92 @@ def test_the_strategy_classifier_turns_on_the_actor():
     assert _sentence_offends(s1) == "authority", "the S1 form is no longer caught"
     assert _sentence_offends(s2) is None, "the S2 form is flagged, and it is correct"
     assert _S2_ACTOR.search(s2) and not re.search(_S1_ACTOR, s2)
+
+
+def test_every_authority_verb_inflects():
+    """A stem that cannot take the shared suffix group is a verb matched in one tense.
+
+    ``verify`` was folded in with the rest and so matched only the bare infinitive: the
+    guard caught "S1 verify" — which nobody writes — and missed "S1 verifies", which is
+    how the claim is actually written. Each stem is exercised in the tenses a document
+    would use, so the next ``-y`` verb added to the wrong alternation fails here.
+    """
+    for verb in ("selects", "validates", "verifies", "verified", "checks", "enforces",
+                 "binds", "rejects", "refuses", "constrains", "ensures", "confirms",
+                 "approved", "authorised"):
+        sentence = f"S1 {verb} the declared reasoning strategy."
+        assert _sentence_offends(sentence) == "authority", (
+            f"the authority verb {verb!r} does not inflect: {sentence!r} escapes")
+
+
+def test_every_actor_the_docstring_names_is_matched():
+    """The actor comment claims construction is an S1-internal actor; the pattern must
+    carry it. It did not, so "validated during advisory construction" escaped while the
+    comment said it would not — a guard documented as stronger than it was."""
+    for actor, sentence in (
+            ("S1", "S1 validates the declared strategy."),
+            ("stage S1", "Stage S1 validates the declared strategy."),
+            ("this stage", "This stage validates the declared strategy."),
+            ("the builder", "The builder validates the declared strategy."),
+            ("the advisory builder", "The advisory builder validates the declared "
+                                     "strategy."),
+            ("the validator", "The validator validates the declared strategy."),
+            ("construction", "The declared strategy is validated during advisory "
+                             "construction."),
+    ):
+        assert _sentence_offends(sentence) == "authority", (
+            f"the actor {actor!r} is named in the comment but escapes: {sentence!r}")
+
+
+def test_a_negation_excuses_only_its_own_clause():
+    """A denial excuses the claim it denies, not every claim after it.
+
+    Both halves are asserted. A denial standing in the clause that makes the claim must
+    still excuse it — the documents are required to carry those — while a denial about
+    something else, or about a different verb, must not.
+    """
+    assert _sentence_offends(
+        "S1 neither selects, validates nor cryptographically binds a reasoning "
+        "strategy.") is None
+    assert _sentence_offends("S1 does not select a reasoning strategy.") is None
+    assert _sentence_offends(
+        "Although no vocabulary is ratified, S1 validates the declared strategy."
+    ) == "authority"
+    assert _sentence_offends(
+        "S1 does not select a strategy, but it validates the declared strategy against "
+        "the permitted set.") == "authority"
+
+
+def test_the_anaphoric_actor_needs_an_s1_actor_in_the_same_sentence():
+    """``it`` may stand for an S1 actor only where the sentence names one. Without this
+    the pronoun would conjure an actor out of any sentence, including one whose subject
+    is S2 — the exact failure the actor discrimination exists to prevent."""
+    assert _sentence_offends(
+        "S1 is bounded, and it validates the declared strategy.") == "authority"
+    assert _sentence_offends(
+        "S2 is bounded, and it validates the declared strategy.") is None
+
+
+def test_the_documented_blind_spots_are_real_and_still_blind():
+    """The module docstring names two shapes this scan does not reach. Both are asserted
+    so the disclosure stays accurate: if a later change closed one, the docstring would
+    be understating the guard, which is a defect in the other direction."""
+    across_rows = ("| S1 | the stage |\n"
+                   "| validates | the declared reasoning strategy |\n")
+    assert not _strategy_authority_claims(across_rows, "rows"), (
+        "the scan now reaches a claim split across two table rows; the docstring says it "
+        "does not and must be corrected")
+    for stem_and_item in (
+            "S1 does the following:\n\n1. validates the declared strategy\n",
+            "S1 does the following:\n\n* validates the declared strategy\n"):
+        assert not _strategy_authority_claims(stem_and_item, "item"), (
+            "the scan now reaches a claim split between a lead-in stem and a list item; "
+            "the docstring says it does not and must be corrected")
+    # The other half of the disclosure: a single row IS reached, so the docstring must
+    # not overstate the blind spot either.
+    one_row = "| S1 | validates the declared reasoning strategy |\n"
+    assert _strategy_authority_claims(one_row, "row"), (
+        "a claim inside one table row is no longer reached; the docstring says it is")
 
 
 def test_the_strategy_classifier_reads_whole_sentences_not_lines():
