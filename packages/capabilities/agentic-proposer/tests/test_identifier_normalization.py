@@ -1248,17 +1248,13 @@ def test_every_c5d_entry_is_empty_only_and_declares_no_element_pattern(contract,
     assert C5D in PATTERNLESS
 
 
-def test_the_six_reserved_lists_are_exactly_the_c5d_fields():
+def test_the_five_reserved_lists_are_exactly_the_c5d_fields():
     """Set equality, so a sixth entry added without updating this pin fails here.
 
-    ``CognitiveRoleContract.permitted_reasoning_strategies`` (OD-5) is the sixth. It is
-    C5d for the same *mechanical* reason as the other five — no value is admitted, so no
-    content class applies — and not for the same *substantive* one: the first five await
-    a reason-code catalogue and will take a content class when one is ratified, while
-    this field's eventual form is an allowlist that **rejects an empty list**. It leaves
-    C5d by having its validator replaced and its element retyped, not by having a content
-    class attached to a still-reserved ``list[str]``, and that transition needs its own
-    ratification.
+    OD-5 considered adding ``CognitiveRoleContract.permitted_reasoning_strategies`` as a
+    sixth, and the owner **deferred it to S2 together with its vocabulary**. This pin now
+    holds that field *out*: reintroducing it without a ruling fails here rather than
+    passing as a plausible sixth reserved list.
     """
     assert set(C5D_ENTRIES) == {
         ("AdvisoryCandidateSet", "selection_reason_codes"),
@@ -1266,7 +1262,6 @@ def test_the_six_reserved_lists_are_exactly_the_c5d_fields():
         ("ProposerProcessRecord", "deterministic_checks"),
         ("ProposerProcessRecord", "semantic_audit_refs"),
         ("ProposerProcessRecord", "reason_codes"),
-        ("CognitiveRoleContract", "permitted_reasoning_strategies"),
     }
 
 
@@ -1393,95 +1388,6 @@ def test_a_live_c5d_field_admits_only_the_empty_list(shapes, value):
         with pytest.raises(pydantic.ValidationError):
             shapes["ProposerAdvisory"](
                 **spec.complete_advisory_fixture(reason_codes=value))
-
-
-def _role_contract_fixture(**overrides):
-    """A complete ``CognitiveRoleContract`` payload, every required field supplied.
-
-    Written out rather than derived so that a field added to D2 makes this fail to
-    construct, which is the outcome that gets the new field looked at.
-    """
-    from ugence_agentic_proposer import CandidateDisposition
-
-    payload = dict(
-        schema_version="1.0", tenant_id="tenant-1", created_at=spec.FIXED_INSTANT,
-        role_contract_id="role-1", primary_function="Prüfung von Belegen",
-        permitted_tool_scopes=["ledger.read"],
-        permitted_candidate_dispositions=[CandidateDisposition.REQUEST_EVIDENCE],
-        permitted_review_actions=[spec.ReviewAction.ROUTE_APPROVAL_BUNDLE],
-        permitted_reasoning_strategies=[],
-        escalation_role_ref="role-2",
-        activation_status=spec.RoleActivationStatus.ACTIVE,
-    )
-    payload.update(overrides)
-    return payload
-
-
-#: Non-empty values the reserved strategy list must refuse. Deliberately content-free.
-#:
-#: No method is named in any of them, and none needs to be: the field's whole rule at
-#: this stage is emptiness, so every non-empty value is refused for the same reason and
-#: by the same code path, and a probe that named a method would be asserting nothing the
-#: single-character case does not already assert. Naming one would also read as a
-#: candidate member of a vocabulary that is not ratified — which is precisely what the
-#: C5d classification exists to prevent accruing (OD-5).
-_NON_EMPTY_STRATEGY_VALUES = (
-    [""],                      # the empty string is still a non-empty *list*
-    ["a"],
-    ["a", "b"],
-    [" "],
-    ["x" * 200],
-    ["é"],                # non-ASCII, to show the refusal is not a grammar check
-)
-
-
-@pytest.mark.parametrize("value", _NON_EMPTY_STRATEGY_VALUES,
-                         ids=lambda v: repr(v)[:24])
-def test_the_reserved_strategy_list_rejects_every_non_empty_value(shapes, value):
-    """OD-5: ``permitted_reasoning_strategies`` admits the empty list and nothing else.
-
-    The refusal is behavioural, not read off the annotation: a reserved field whose
-    validator was dropped still *looks* reserved in the registry, and only a construction
-    attempt shows that it is not. ``[""]`` is included because a list holding one empty
-    string is the value most likely to slip past a validator written as a truthiness test
-    on the elements rather than on the list.
-    """
-    pydantic = pytest.importorskip("pydantic")
-    with pytest.raises(pydantic.ValidationError):
-        shapes["CognitiveRoleContract"](
-            **_role_contract_fixture(permitted_reasoning_strategies=value))
-
-
-def test_the_reserved_strategy_list_admits_the_empty_list_and_defaults_to_it(shapes):
-    """The control. Without it the test above would pass against a field that rejects
-    everything, including the one value it must accept — and a field nothing can
-    construct is not a reserved field, it is a broken one."""
-    explicit = shapes["CognitiveRoleContract"](
-        **_role_contract_fixture(permitted_reasoning_strategies=[]))
-    assert explicit.permitted_reasoning_strategies == []
-
-    omitted = _role_contract_fixture()
-    del omitted["permitted_reasoning_strategies"]
-    assert shapes["CognitiveRoleContract"](
-        **omitted).permitted_reasoning_strategies == []
-
-
-def test_the_reserved_strategy_list_is_not_the_tool_scope_list(shapes):
-    """D2: the two are independent, and the reserved one is strictly the stricter.
-
-    A lawful C5b token — the value ``permitted_tool_scopes`` accepts — is refused by
-    ``permitted_reasoning_strategies``. Asserted because the fields sit next to each other
-    and carry similar names, and a copy-paste declaration would make the second field
-    silently admit the first field's vocabulary.
-    """
-    pydantic = pytest.importorskip("pydantic")
-    token = "ledger.read"
-    assert shapes["CognitiveRoleContract"](
-        **_role_contract_fixture(permitted_tool_scopes=[token])
-    ).permitted_tool_scopes == [token]
-    with pytest.raises(pydantic.ValidationError):
-        shapes["CognitiveRoleContract"](
-            **_role_contract_fixture(permitted_reasoning_strategies=[token]))
 
 
 def test_the_mapping_field_validates_keys_as_c5a_and_values_as_free_text(shapes):

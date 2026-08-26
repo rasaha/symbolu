@@ -104,19 +104,7 @@ implementation of, and confers no conformance with, any constitution.
 What is unresolved while the document is absent:
 
 * what an organizational role's authoritative attribute set is, and which of those
-  attributes a matcher may depend on. `[R]` **One instance is now concrete.** OD-5 adds
-  `permitted_reasoning_strategies` to the projection as a reserved, empty-only field.
-  Whether a role's permitted **methods** belong to the role's authoritative attribute
-  set — and so whether the field is within D1's *minimum immutable attributes required
-  for deterministic role matching* and outside D2's bar on carrying a
-  **constitution-derived attribute** — is not decidable here, because the document that
-  would settle it does not exist. `[I]` Two readings are open and this artifact takes
-  neither: that a permitted-methods list is a matching input the owner supplies like
-  `permitted_tool_scopes`, or that it is exactly the kind of attribute a constitution
-  determines, in which case the projection should not anticipate it. `[V]` Nothing turns
-  on the answer while the field admits no value; it becomes load-bearing at the
-  separately ratified allowlist (specification D2, Part J), and **that ratification is
-  where this question must be answered rather than inherited**;
+  attributes a matcher may depend on;
 * who mints, activates, suspends and ratifies a role, and by what lifecycle;
 * what conformance to the constitution requires of a capability that consumes role
   information;
@@ -590,9 +578,10 @@ by reconciling this artifact with
 `packages/capabilities/agentic-proposer/docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md`,
 where each is stated in full with its rider, its enforcement design and its three
 statuses. OD-5 was raised separately, on the relationship between reasoning functions
-and reasoning strategies, and is the second decision bearing on contract shape. OD-4 was
-the only one of the first four bearing on contract shape; it is resolved below and the
-specification implements the resolution.
+and reasoning strategies, and was ruled **not** to bear on contract shape: it defers the
+strategy permission concept and its vocabulary together to S2. OD-4 is the one decision of
+the five that bears on contract shape; it is resolved below and the specification
+implements the resolution.
 
 **No ruling is outstanding on any of the five.** Three statuses are distinguished
 throughout and must not be collapsed: a **decision is ratified**; a **named guard
@@ -608,11 +597,11 @@ below records the second axis only; the decisions themselves are closed.
 | **OD-3** — **RATIFIED 2026-08-25** | O-1's dependent-field set is matched by name alone, so `CandidateAdvisory.requested_review_action` — the candidate's own required, non-null routing — is caught as if it were selection-dependent. **Resolved:** `DEPENDENT_FIELDS` is scoped to the **bearer contract**, pinned by bearer **and** field name and never by field name alone. The **three** dependent fields are selection-dependent on `ProposerAdvisory` only, coupled to its `selected_candidate_id` selector, which is held separately and is not itself a dependent field. | no | `[V]` **implemented** — `tests/test_selection_dependent_fields.py`: `SELECTION_COUPLING`, `NON_BEARERS_SHARING_A_FIELD_NAME`, two self-tests pinning both by equality and asserting them disjoint, and behavioural probes over a complete required-field fixture |
 | **OD-4** — **RATIFIED 2026-08-25, resolved (a)** | D7 above says `ProposerAdvisory` carries per-candidate `CandidateAdvisory` entries; an earlier revision of the specification instead had it reference an `AdvisoryCandidateSet` by `candidate_set_id`. `[V]` That departure was **not** forced by the rival-identity walk, which bars only nested `ToolObservation` and reaches no field of `CandidateAdvisory`. **Resolution (a): restore the nesting D7 requires.** `ProposerAdvisory` carries an immutable `candidates` sequence of `CandidateAdvisory`, ordered ascending by `candidate_id`, participating in `P_unsigned`; `candidate_set_id` is retained as the reference to `AdvisoryCandidateSet`, which stays a **top-level contract** and is not nested; the two candidate lists must correspond exactly in membership, order and content, checked by the builder and by the independent replay verifier. `ToolObservation` stays referenced by id, which A3/the rival-identity walk does force. **Rejected alternative:** reference by id, ratified as an amendment narrowing D7 — rejected because it deviates from ratified text, leaves candidate dispositions, `is_eligible` Booleans and evidence references outside the advisory digest, and leaves an amended candidate set undetectable by replay. | **yes — resolved** | `[V]` **implemented** — `tests/test_advisory_contract_shape.py` discharges I7.11 on representative shapes: it bars a nested `ToolObservation`, **requires** a nested `CandidateAdvisory` sequence so a reversion to reference-by-id fails loudly, and bars any second identity on the candidate |
 
-| **OD-5** — **RATIFIED 2026-08-26** | **Reasoning functions and reasoning strategies are different things, and only the first is a role's purpose.** Four parts. **(i) R-3's lifecycle is unchanged.** A reasoning strategy is a **method label**, not a process state: `ProposerProcessState` gains and loses nothing, and R-3's forward-only subsequence rule, R-4's agreement rule and the bar on representing execution state all stand as ratified. Strategies **operate within** that lifecycle. **(ii) The four-way distinction is preserved and stated:** `primary_function` is the role's organizational purpose; `permitted_reasoning_strategies` is the set of methods the role may select among; `declared_strategy` is the method the process record asserts was used; and `terminal_outcome` is where the work ended. **Evidence collection and verification remain contract mechanisms, and abstention and escalation remain outcomes** — none of the three is a reasoning strategy. **(iii) `permitted_reasoning_strategies` is added to `CognitiveRoleContract` as a C5d reserved list** rejecting every non-empty value, raising D2's cardinality from 10 to 11 and the C5d roster from five fields to six, so no method can be named in it and no catalogue can accrue in it by use. **Ratified rider — a bar on a route, not a target.** What is ratified is the **prohibition**: the reserved field may **not** be brought into service by widening it in place. `[R]` The **allowlist that rejects an empty list is the intended form and is not ratified** — not its members, spelling, bounds or default, and not the form itself — so S2 must obtain its own ruling and, having obtained one, must **replace the validator and retype the element** rather than relax the emptiness rule. The specification marks the same statement `[R]` at D2, Part J and its ratification statement, and the two documents must not be read as disagreeing: the route is closed by this decision, the destination is not opened by it. **(iv) S1 neither selects, validates nor cryptographically binds a reasoning strategy.** `declared_strategy` is metadata outside `P_unsigned`, declaration does not establish conformance, and strategy selection and enforcement are S2's in whole. **No strategy catalogue is drafted or ratified by this decision, and no individual strategy is named anywhere in it.** | **yes** — one field added, one cardinality raised, one classification roster extended; no field type, vocabulary or equation term changes | `[V]` **implemented** — `tests/s1_specification_mirror.py` (`CONTRACT_CARDINALITY`, `FIELD_CLASSIFICATION`, the `CognitiveRoleContract` representative shape); `tests/test_identifier_normalization.py` (the `C5D_ENTRIES` set-equality pin and a behavioural probe that the field rejects every non-empty value); `tests/test_advisory_contract_shape.py` (both strategy fields absent from the `P_unsigned` projection); and `tests/test_documentation_consistency.py` (a **heuristic spot-check**, not coverage of a class: it classifies each sentence by actor, refusing a claim of selection, validation or binding whose subject is S1 or something inside it, and passing the same claim attributed to S2. `[I]` It is a regex over English prose and is **not** proof that no such claim can be written; what it is proven against is a named corpus of twenty-two claims it must catch — twelve of them spellings two audits found escaping earlier versions — and eighteen correct statements it must leave alone, including true statements about S2, which an earlier actor-blind version wrongly flagged) |
+| **OD-5** — **RATIFIED 2026-08-26** | **Reasoning functions and reasoning strategies are different things, and only the first is a role's purpose.** Four parts. **(i) R-3's lifecycle is unchanged.** A reasoning strategy is a **method label**, not a process state: `ProposerProcessState` gains and loses nothing, and R-3's forward-only subsequence rule, R-4's agreement rule and the bar on representing execution state all stand as ratified. Strategies **operate within** that lifecycle. **(ii) The four-way distinction is preserved and stated:** `primary_function` is the role's organizational purpose; a role's **permitted reasoning strategies** — an S2 concept, not an S1 field — is the set of methods the role may select among; `declared_strategy` is the method the process record asserts was used; and `terminal_outcome` is where the work ended. Three of the four are S1 fields; the second is named as a concept so the distinction can be stated whole. **Evidence collection and verification remain contract mechanisms, and abstention and escalation remain outcomes** — none of the three is a reasoning strategy. **(iii) `permitted_reasoning_strategies` and its vocabulary are deferred together to S2.** **No field is added to `CognitiveRoleContract`, and OD-5 does not change S1 contract shape:** D2's cardinality stays 10 and the C5d roster stays at five fields. The concept and the vocabulary that gives it content arrive together, so the field is declared once, in its ratified form, against a vocabulary that already exists. **Rejected alternative — reserve it now as a C5d empty-only list.** Rejected because a reserved list would have had to be **retyped, revalidated and stripped of its default** to reach the intended allowlist, which rejects an empty list; reserving would therefore not have spared a schema change, which is the one thing reservation normally buys, while it would have cost three disclosed consequences — every conformant S1 pair internally unsatisfiable on this axis, every S1-era role contract carrying the one value the ratified form must refuse, and every stored contract needing reissue at the transition. `[R]` No member, spelling, bound or default of the eventual vocabulary is ratified, and none is ratified by deferring it. **(iv) S1 neither selects, validates nor cryptographically binds a reasoning strategy.** `declared_strategy` is metadata outside `P_unsigned`, declaration does not establish conformance, and strategy selection and enforcement are S2's in whole. **No strategy catalogue is drafted or ratified by this decision, and no individual strategy is named anywhere in it.** | **no** — no field added, no cardinality changed, no classification roster changed, and no field type, vocabulary or equation term changed; every part of the ruling states what S1 does not do, or records a distinction so it is not collapsed later | `[V]` **implemented** — `tests/test_advisory_contract_shape.py` (`declared_strategy` absent from the `P_unsigned` projection); `tests/s1_specification_mirror.py` and `tests/test_identifier_normalization.py`, whose ten-field `CONTRACT_CARDINALITY` entry and five-entry `C5D_ENTRIES` pin now hold the deferred field **out**, failing if it is reintroduced without a ruling; and `tests/test_documentation_consistency.py` (a **heuristic spot-check**, not coverage of a class: it classifies each sentence by actor, refusing a claim of selection, validation or binding whose subject is S1 or something inside it, and passing the same claim attributed to S2. `[I]` It is a regex over English prose and is **not** proof that no such claim can be written; what it is proven against is a named corpus of claims it must catch — including spellings two audits found escaping earlier versions — and correct statements it must leave alone, among them true statements about S2, which an earlier actor-blind version wrongly flagged) |
 
 None of OD-1 – OD-3 changes a contract, a field type, a cardinality, a vocabulary or
-an equation term; each is about a guard or a dependency. OD-4 and OD-5 do bear on
-contract shape, and Part D of the specification is written for both. The *decisions* are
+an equation term; each is about a guard or a dependency, and OD-5 changes none of them
+either. OD-4 bears on contract shape, and Part D of the specification is written for it. The *decisions* are
 ratified, and the guards named above enforce them. Neither fact authorizes production
 code.
 
@@ -932,7 +921,7 @@ not a ruling.
 
 **OD-1 – OD-4 are all resolved, ratified 2026-08-25, and OD-5 is resolved, ratified
 2026-08-26**; all five are recorded once, under *Owner decisions OD-1 – OD-5* above.
-**Two bear on contract shape, OD-4 and OD-5.** **OD-4 is resolved (a)**: `ProposerAdvisory` carries its `CandidateAdvisory` entries as D7 says, and
+**Of the five, OD-4 bears on contract shape; OD-5 was ruled not to.** **OD-4 is resolved (a)**: `ProposerAdvisory` carries its `CandidateAdvisory` entries as D7 says, and
 reference-by-id is the rejected alternative. OD-1 carries a ratified rider — future
 identity participation for `primary_function` or `declared_strategy` requires a
 separately ratified normalization profile — and OD-2 carries a ratified enforcement
@@ -945,12 +934,11 @@ declared in `tests/s1_specification_mirror.py` and enforced by
 `tests/test_identifier_normalization.py`, for OD-1; the layered probe in
 `tests/test_boundaries.py` for OD-2, the bearer-scoped coupling in
 `tests/test_selection_dependent_fields.py` for OD-3, the composition assertions in
-`tests/test_advisory_contract_shape.py` for OD-4, and — for OD-5 — the eleven-field
-cardinality and the C5d registry entry in `tests/s1_specification_mirror.py`, the
-`C5D_ENTRIES` set-equality pin and the empty-only behavioural probe in
-`tests/test_identifier_normalization.py`, the `P_unsigned` projection-absence assertions
-in `tests/test_advisory_contract_shape.py`, and the strategy-authority document scan in
-`tests/test_documentation_consistency.py`; and **S1 production implementation
+`tests/test_advisory_contract_shape.py` for OD-4, and — for OD-5 — the `P_unsigned`
+projection-absence assertion for `declared_strategy` in the same module, the
+strategy-authority document scan in `tests/test_documentation_consistency.py`, and the
+ten-field cardinality and five-entry `C5D_ENTRIES` pin that now hold the deferred field
+out; and **S1 production implementation
 remains unauthorized under A11**, independently of both, until this documentation is
 independently reviewed. A ratified decision is not an implemented guard, and an
 implemented guard is not an authorization.

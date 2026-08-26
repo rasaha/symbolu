@@ -239,29 +239,48 @@ def test_the_adr_and_the_specification_agree_on_od_4s_resolution():
         f"specification {sorted(spec)}")
 
 
-def test_exactly_od_4_and_od_5_are_recorded_as_bearing_on_contract_shape():
-    """The ADR table's third column is the load-bearing distinction between a decision
-    about a guard and a decision about the contracts. OD-1 – OD-3 change no contract,
-    field type, cardinality, vocabulary or equation term; OD-4 and OD-5 do. If that
-    column ever said otherwise for one of the first three, the specification's Part D
-    would be downstream of a decision nobody re-read it against — and if it said ``no``
-    for OD-5, D2's eleventh field would be carried by a decision the table records as
-    shape-neutral."""
+def _shape_bearing_decisions():
+    """The set of owner decisions the ADR table records as bearing on contract shape.
+
+    Derived from the table rather than hard-coded, so the prose checks below follow the
+    ruling instead of needing to be rewritten whenever one changes.
+    """
     rows = re.findall(r"\| \*\*OD-([1-5])\*\* — \*\*RATIFIED[^|]*\|[^|]*\|([^|]*)\|",
                       _text(ADR))
     bears = {od: cell.strip().lower() for od, cell in rows}
     assert set(bears) == {"1", "2", "3", "4", "5"}, (
         f"the ADR decision table does not carry all five rows: {sorted(bears)}")
-    for od in ("1", "2", "3"):
-        assert bears[od] == "no", f"OD-{od} is recorded as bearing on contract shape"
-    for od in ("4", "5"):
-        assert bears[od].startswith("**yes"), (
-            f"OD-{od} must be recorded as bearing on contract shape: {bears[od]!r}")
+    return bears, {od for od, cell in bears.items() if cell.startswith("**yes")}
+
+
+def test_exactly_od_4_is_recorded_as_bearing_on_contract_shape():
+    """The ADR table's third column is the load-bearing distinction between a decision
+    about a guard and a decision about the contracts.
+
+    OD-4 changed contract shape. OD-1 – OD-3 did not, and **OD-5 does not**: the owner
+    deferred `permitted_reasoning_strategies` and its vocabulary together to S2, so no
+    field is added and `CognitiveRoleContract`'s cardinality is unchanged at 10. If this
+    column ever said ``yes`` for OD-5, a reader would go looking in Part D for a field
+    that is deliberately absent; if it said ``no`` for OD-4, Part D's nesting would be
+    downstream of a decision the table records as shape-neutral.
+    """
+    bears, bearing = _shape_bearing_decisions()
+    # OD-1 – OD-3 carry a bare ``no``; OD-5 carries an emphasised ``**no**`` with its
+    # reason, so the marker is stripped before comparing rather than each spelling being
+    # matched separately.
+    for od in ("1", "2", "3", "5"):
+        assert bears[od].lstrip("*").startswith("no"), (
+            f"OD-{od} is recorded as bearing on contract shape: {bears[od]!r}")
+    assert bears["4"].startswith("**yes"), (
+        f"OD-4 must be recorded as bearing on contract shape: {bears['4']!r}")
+    assert bearing == {"4"}, bearing
     spec = _normalised(SPECIFICATION)
     assert "OD-4 did change contract shape" in spec, (
         "the specification must agree that OD-4 changed contract shape")
-    assert "OD-5, ratified 2026-08-26, also bears on contract shape" in spec, (
-        "the specification must agree that OD-5 bears on contract shape too")
+    assert "does **not** bear on contract shape" in spec, (
+        "the specification must agree that OD-5 does not bear on contract shape")
+    assert "cardinality is unchanged at 10" in spec, (
+        "the specification must state D2's cardinality is unchanged by OD-5")
 
 
 #: The ADR's owner-decision section heading, and the italic cross-references to it that
@@ -306,12 +325,24 @@ def test_every_owner_decision_section_cross_reference_resolves(path):
 
 @pytest.mark.parametrize("path", DOCUMENTS, ids=lambda p: p.name)
 def test_no_document_claims_one_decision_alone_bears_on_contract_shape(path):
-    """Two decisions bear on contract shape, OD-4 and OD-5.
+    """The prose must not claim a sole shape-bearer while the table records several.
 
-    The table column is checked elsewhere; this reads the prose, which is where the stale
-    claim survived. A document whose narrative says one thing and whose table says another
-    misdirects the reader who does not reach the table.
+    **Gated on the table, not hard-coded.** When OD-5 was recorded as bearing on contract
+    shape, a sole-bearer sentence was false and this scan caught two of them. The owner
+    then deferred OD-5's field, making OD-4 the sole bearer again — at which point the
+    same sentence became *true*, and a hard-coded bar would have forbidden the documents
+    from stating a fact their own table asserts.
+
+    So the offence is the **disagreement**, which is what the original defect actually
+    was: prose claiming one bearer while the table records more than one. With a single
+    bearer the scan stands down, and `test_exactly_od_4_is_recorded_as_bearing_on_contract
+    _shape` holds the table itself.
     """
+    _bears, bearing = _shape_bearing_decisions()
+    if len(bearing) <= 1:
+        pytest.skip(
+            f"the table records {sorted(bearing)} as bearing on contract shape, so a "
+            "sole-bearer sentence is true; nothing to contradict")
     offenders = _SOLE_SHAPE_BEARER_CLAIM.findall(_text(path))
     assert not offenders, f"{path.name}: {offenders}"
 

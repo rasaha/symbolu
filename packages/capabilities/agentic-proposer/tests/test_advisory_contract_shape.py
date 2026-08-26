@@ -1034,14 +1034,19 @@ def test_a_mutant_nesting_a_tool_observation_fails(graph):
 # OD-5 — neither strategy field is inside the frozen projection
 # --------------------------------------------------------------------------- #
 
-#: The two fields OD-5 distinguishes that must stay outside ``P_unsigned``.
+#: The strategy names OD-5 keeps outside ``P_unsigned``.
 #:
-#: ``declared_strategy`` is a claim the process record makes about the method it used,
-#: and ``permitted_reasoning_strategies`` is a permission the role owner grants. Neither
-#: is a property of the advisory, and neither may reach the digest: bringing either
-#: inside would make it identity-participating and so expose it to the B9 hazard OD-1's
-#: rider is explicit about, and would make an advisory's identity depend on an assertion
-#: nothing in this stage verifies.
+#: ``declared_strategy`` is a claim the process record makes about the method it used. It
+#: is not a property of the advisory and may not reach the digest: bringing it inside
+#: would make it identity-participating and so expose it to the B9 hazard OD-1's rider is
+#: explicit about, and would make an advisory's identity depend on an assertion nothing in
+#: this stage verifies.
+#:
+#: ``permitted_reasoning_strategies`` is listed beside it although **no S1 contract
+#: declares it** — the owner deferred it to S2 with its vocabulary (Part J). Keeping the
+#: name here is not redundant with its absence from the mirror: if a later change
+#: reintroduces the field, this guard fails unless it is also kept out of the advisory,
+#: which is the property OD-5 cares about and the cardinality pin does not express.
 STRATEGY_FIELDS_OUTSIDE_IDENTITY = ("declared_strategy", "permitted_reasoning_strategies")
 
 
@@ -1115,11 +1120,15 @@ def test_neither_strategy_field_is_declared_on_either_advisory_type(graph):
         for field in STRATEGY_FIELDS_OUTSIDE_IDENTITY:
             assert field not in reachable, (
                 f"{field!r} is reachable from {root}; OD-5 keeps it outside P_unsigned")
-    # The bearers still declare them, so the assertion above is about placement rather
-    # than about the fields having quietly ceased to exist.
+    # ``declared_strategy`` still exists on its bearer, so the assertion above is about
+    # placement rather than about the field having quietly ceased to exist.
     assert "declared_strategy" in graph["ProposerProcessRecord"].model_fields
-    assert ("permitted_reasoning_strategies"
-            in graph["CognitiveRoleContract"].model_fields)
+    # ``permitted_reasoning_strategies`` is deferred to S2 and is declared by NO contract.
+    # Asserted so the deferral is a checked fact rather than an omission a reader has to
+    # notice, and so reintroducing the field trips this test as well as the mirror's pins.
+    for contract in spec.TOP_LEVEL_CONTRACTS + spec.NESTED_PUBLIC_SHAPES:
+        assert "permitted_reasoning_strategies" not in graph[contract].model_fields, (
+            f"{contract} declares permitted_reasoning_strategies; OD-5 defers it to S2")
 
 
 # --------------------------------------------------------------------------- #
