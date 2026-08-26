@@ -524,15 +524,15 @@ public-API snapshot, no platform-freeze artifact touched.
   `tests/test_identifier_normalization.py`; assertions in
   `tests/test_advisory_contract_shape.py` that neither `declared_strategy` nor
   `permitted_reasoning_strategies` appears in the `P_unsigned` projection field list; and
-  a scan in `tests/test_documentation_consistency.py` refusing affirmative claims of S1
-  authority over a reasoning strategy — selection, validation or binding — in the
-  documented forms: active and passive voice, `S1` or the builder or the validator as the
-  subject, and the underscored field names, which a `\b`-anchored pattern does not reach.
-  Self-tested three ways: one synthetic violation per pattern, so a pattern edited into
-  inertness fails rather than certifying every document clean; a named regression set of
-  spellings an audit found escaping an earlier, narrower version; and the documents' own
-  denials, so it cannot be broadened until it flags those too. `[I]` A pattern scan bounds
-  the forms it enumerates and is not proof that no such claim can be written.
+  a **heuristic spot-check** in `tests/test_documentation_consistency.py` refusing claims
+  of S1 authority over a reasoning strategy — selection, validation or binding. `[I]` It
+  is a regex over English prose and is **not** coverage of a class: it is not proof that
+  no such claim can be written, and it is stated here as what it is proven against rather
+  than as a guarantee. It classifies each sentence by **actor**, which is what the subject
+  matter turns on — the same sentence is a defect with S1 as its subject and correct with
+  S2 as its subject. Proven against a named corpus of twenty-two claims it must catch and
+  eighteen correct statements it must leave alone, the latter including true statements
+  about S2 and the reserved field's own emptiness rule.
 
 ### Fixed — ninth audit round: OD-5's own overstatements
 
@@ -542,7 +542,7 @@ guards only.
 
 * **A rename left three dangling cross-references and a contradicted sentence.** Renaming
   the ADR's table to *Owner decisions OD-1 – OD-5* left two references to the old heading,
-  a sentence naming OD-4 as the sole shape-bearing decision, and a
+  a sentence crediting OD-4 with shape-bearing that OD-5 also has, and a
   three-statuses sentence still scoped to four. The suite was green over all four because every existing guard
   read the table rather than the prose around it. Two new scans close the class: italic
   cross-references to the owner-decision section must resolve against the live heading, and
@@ -579,6 +579,46 @@ immutable attributes required for deterministic role matching* and outside D2's 
 already carries under *Open architectural dependency: the Agent Constitution*, and is
 recorded there. Nothing turns on it while the field admits no value; the ratification that
 lands the allowlist must answer it first.
+
+### Fixed — tenth audit round: three contradictions and a rebuilt scan
+
+Documentation and guards only. `permitted_reasoning_strategies`' presence in D2 and D2's
+preamble are untouched; they are under a separate owner decision.
+
+* **The specification contradicted its own OD-5 entry.** Its ratification statement
+  credited OD-4 with closing the last shape-bearing question, while its OD-5 entry records
+  *Bears on contract shape: yes*. Corrected, and `_SOLE_SHAPE_BEARER_CLAIM` now carries
+  six wordings rather than two. `[I]` The two instances found so far are phrased so
+  differently — one about a decision, one about a question, sharing almost no substring —
+  that a fixed-sentence check would have caught one and certified the other. The wordings
+  themselves are enumerated in the test module, not restated here, since this scan reads
+  this file too.
+* **The ADR named guards for four of the five decisions** while asserting each of five
+  carries an implementing guard. OD-5's four are now named.
+* **C5d called all five original members reason-code fields.** `deterministic_checks`
+  names checks that were run and `semantic_audit_refs` holds references to audit records;
+  neither is a reason code, and ratifying a reason-code catalogue would tell an
+  implementer nothing about either. Corrected in the class definition, in the sixth-member
+  note, and in Part J, which deferred all three under one heading and now defers three
+  catalogues separately.
+* **The strategy-authority scan is rebuilt to discriminate by actor.** An audit found nine
+  of ten fresh claims escaping — verbs it did not carry, and "Stage S1" and "The advisory
+  builder" as subjects it did not know — and, in the other direction, two patterns that
+  named no actor and so flagged *true* statements about what S2 does. The scan now
+  classifies whole sentences: an authority claim offends when an S1 actor is the subject
+  of the verb and the subject matter its object; binding and conformance claims offend
+  without an actor, since identity is S1's by definition and a declaration evidences
+  nothing at any stage. `[V]` All ten fresh claims are caught, no true S2 statement is
+  flagged, and the guard is stated in the ADR and here as a **heuristic spot-check proven
+  against a named corpus**, not as coverage of a class.
+
+`[I]` Two things the rebuild had to keep, recorded because each was tried and reverted.
+**Adjacency**: a first draft let the actor, verb and subject matter fall anywhere in the
+sentence and flagged four true sentences from these documents, so the actor must stand
+within two words of its verb. **Block splitting**: collapsing a whole document merges list
+items that do not end in a full stop, pairing one item's actor with another's verb, so
+blocks are cut at blank lines, list markers, headings and table rows before sentences are
+split. Both failure modes are pinned as tests.
 
 ### Not implemented
 

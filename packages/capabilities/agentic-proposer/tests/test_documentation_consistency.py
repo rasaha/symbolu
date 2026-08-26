@@ -270,10 +270,21 @@ _OD_SECTION_HEADING = re.compile(r"^#{1,6}\s+(Owner decisions OD-1 – OD-\d[^\n
 _OD_SECTION_REFERENCE = re.compile(r"\*(Owner decisions OD-1 – OD-\d)\*")
 
 #: A claim that exactly one decision bears on contract shape. True while OD-4 was the only
-#: one; false since OD-5. Written as a pattern rather than a fixed sentence because the
-#: claim appears in the ADR's prose in a different wording from the table it contradicts.
+#: one; false since OD-5.
+#:
+#: Six wordings, because the claim is not written the same way twice. An audit found it in
+#: the ADR's prose as "the only one bearing on contract shape" and, separately, in the
+#: specification's ratification statement as "the one open question that bore on contract
+#: shape" — the same false statement in words sharing almost no substring with each other.
+#: A fixed-sentence check would have caught one and certified the other.
 _SOLE_SHAPE_BEARER_CLAIM = re.compile(
-    r"\bthe\s+only\s+one\s+(?:bearing|that\s+bears)\s+on\s+contract\s+shape", re.I)
+    r"\bthe\s+only\s+one\s+(?:bearing|that\s+bears)\s+on\s+contract\s+shape"
+    r"|\bthe\s+only\s+decision\s+(?:bearing|that\s+bears)\b[^.]{0,30}?contract\s+shape"
+    r"|\bthe\s+(?:one|sole|single)\s+(?:open\s+)?question\s+that\s+"
+    r"(?:bore|bears)\s+on\s+contract\s+shape"
+    r"|\bthe\s+sole\s+shape-bearing\s+decision"
+    r"|\bOD-\d\s+alone\s+bears\b"
+    r"|\bonly\s+OD-\d\s+(?:changes|change[sd]?|bears|bore|alters)\b", re.I)
 
 
 @pytest.mark.parametrize("path", DOCUMENTS, ids=lambda p: p.name)
@@ -315,12 +326,28 @@ def test_the_cross_reference_and_sole_bearer_detectors_catch_a_planted_violation
     assert not [r for r in _OD_SECTION_REFERENCE.findall(f"see *{live}* above")
                 if r != live], "the cross-reference detector flags the live heading"
 
-    assert _SOLE_SHAPE_BEARER_CLAIM.search(
-        "OD-4, the only one bearing on contract shape, is resolved (a)")
-    assert _SOLE_SHAPE_BEARER_CLAIM.search(
-        "OD-4 is the only one that bears on contract shape")
-    assert not _SOLE_SHAPE_BEARER_CLAIM.search(
-        "Two bear on contract shape, OD-4 and OD-5.")
+    # Six wordings of one false claim. Each is asserted, so a pattern that stops matching
+    # is named rather than covered by a sibling.
+    for claim in (
+            "OD-4, the only one bearing on contract shape, is resolved (a)",
+            "OD-4 is the only one that bears on contract shape",
+            "OD-4 is the only decision bearing on contract shape",
+            "and with it the one open question that bore on contract shape",
+            "a sentence naming OD-4 as the sole shape-bearing decision",
+            "OD-4 alone bears on contract shape",
+            "only OD-4 changes a contract",
+    ):
+        assert _SOLE_SHAPE_BEARER_CLAIM.search(claim), (
+            f"the sole-shape-bearer detector no longer matches {claim!r}")
+    # Controls: the true statements the documents now carry must stay clean.
+    for fine in (
+            "Two bear on contract shape, OD-4 and OD-5.",
+            "OD-4 and OD-5 both bear on contract shape.",
+            "the question that had been open longest about contract shape",
+            "OD-4 did change contract shape",
+    ):
+        assert not _SOLE_SHAPE_BEARER_CLAIM.search(fine), (
+            f"the sole-shape-bearer detector flags {fine!r}, which is true as written")
 
 
 def test_no_competing_second_round_ratification_section_survives():
@@ -397,60 +424,140 @@ TERMINOLOGY_CLAIM_PATTERNS = (
     r"\bcovered by (?:the )?terminology\b",
 )
 
-#: OD-5: an **affirmative** claim that S1 has authority over a reasoning strategy.
+#: OD-5: an **affirmative** claim that **S1** has authority over a reasoning strategy.
 #:
 #: S1 neither selects, validates nor cryptographically binds one — selection and
 #: enforcement are S2's — and ``declared_strategy`` is metadata outside ``P_unsigned``
-#: whose declaration establishes no conformance. Those are the statements the documents
-#: make, and the risk is that a later edit quietly upgrades one of them: a sentence
-#: saying S1 checks a declared strategy against a role's permitted set, or that the
-#: declaration is inside the digest, would read as ratified authority this stage does not
-#: have and would put an implementer to work on it.
+#: whose declaration establishes no conformance. The risk is that a later edit quietly
+#: upgrades one of those denials into a claim, which would read as ratified authority this
+#: stage does not have and would put an implementer to work on it.
 #:
-#: Every pattern is **adjacency-anchored on the affirmative form**, so the documents' own
-#: negations — "S1 neither selects, validates nor cryptographically binds…", "declaration
-#: does not establish conformance", "is not covered by ``advisory_digest``" — do not match
-#: them. A scan that flagged the denial along with the claim would be unusable here, since
-#: the denial is exactly what these documents are required to say.
-#: The subject an affirmative claim gives the authority to. ``S1`` names the stage; the
-#: builder and the validator are the two things inside it that a sentence would credit
-#: instead, and a claim about them is a claim about S1.
-_S1_ACTOR = r"(?:S1|the\s+S1\s+\w+|the\s+builder|the\s+validator)"
-#: Any spelling of the subject matter: the prose phrase, the two field names, and the
-#: bare noun. ``\b`` does not break at an underscore, so ``permitted_reasoning_strategies``
-#: is NOT reached by a pattern anchored on ``\breasoning``; the field names are matched
-#: literally for that reason.
-_STRATEGY_NOUN = (r"(?:reasoning\s+strateg(?:y|ies)|declared[\s_]strateg(?:y|ies)|"
-                  r"permitted_reasoning_strategies|declared_strategy|"
-                  r"(?:a|the|its|any|each)\s+strategy|strategy\s+conformance)")
-#: Verbs that assert authority over it. Selection, validation and binding as the task
-#: names them, plus the spellings each is naturally written in.
-_AUTHORITY_VERB = (r"(?:select|selects|validate|validates|verify|verifies|check|checks|"
-                   r"enforce|enforces|bind|binds|reject|rejects|constrain|constrains|"
-                   r"choose|chooses|match|matches|compare|compares)")
-_AUTHORITY_PARTICIPLE = (r"(?:selected|validated|verified|checked|enforced|bound|"
-                         r"rejected|constrained|chosen|matched|compared)")
+#: **This is a heuristic spot-check over English prose, not coverage of a class.** Two
+#: audits found ordinary spellings passing earlier versions, and the second found the
+#: reverse fault: two patterns named no actor, so a *true* statement about S2 doing what S2
+#: is for was flagged. A regex cannot decide this question in general. The ADR and the
+#: CHANGELOG state the reach as the forms below and as a named corpus, not as a guarantee.
+#:
+#: What this version adds is **discrimination by actor**, which is what the subject matter
+#: turns on: the same sentence is a defect with S1 as its subject and correct with S2 as
+#: its subject. What it keeps from the version before is **adjacency** — the actor must
+#: stand within two words of its verb. Dropping adjacency was tried and reverted: with an
+#: actor anywhere, a verb anywhere and the subject matter anywhere, four true sentences
+#: tripped, and a guard that fires on correct prose is worse than one that misses, because
+#: it fails every conformant document and gets deleted rather than fixed.
+#:
+#: A sentence offends when it makes one of three claims:
+#:
+#: * **authority over a strategy attributed to S1** — an S1 actor as the subject of an
+#:   authority verb whose object is the subject matter, unnegated;
+#: * **a binding claim** — ``declared_strategy`` placed inside an identity. Actor-free:
+#:   identity construction is S1's by definition (G1), so there is no reading on which
+#:   this is another stage's statement;
+#: * **a conformance claim** — that declaring a method shows one was followed. Also
+#:   actor-free: false at every stage, not merely unimplemented at this one.
 
-STRATEGY_AUTHORITY_CLAIM_PATTERNS = (
-    # Active voice: an S1 actor is the subject of an authority verb over a strategy.
-    rf"\b{_S1_ACTOR}\s+{_AUTHORITY_VERB}\b[^.\n]{{0,80}}?{_STRATEGY_NOUN}",
-    # Passive voice: the strategy is acted on, S1 named as the agent or the locus.
-    rf"{_STRATEGY_NOUN}[^.\n]{{0,80}}?\b(?:is|are|was|were)\s+{_AUTHORITY_PARTICIPLE}"
-    rf"\b[^.\n]{{0,60}}?\b(?:by|at|in|within|during)\s+{_S1_ACTOR}\b",
-    # The cross-field check, in either order and without naming S1 at all: the whole of
-    # what S2 adds is a comparison between the declaration and the permitted set.
-    r"\bdeclared[\s_]strateg(?:y|ies)\b[^.\n]{0,60}?\b(?:against|with|to)\b"
-    r"[^.\n]{0,40}?(?:permitted_reasoning_strategies|permitted\s+(?:set|strateg))",
-    r"\bpermitted_reasoning_strategies\b[^.\n]{0,60}?\b(?:against|with|to)\b"
-    r"[^.\n]{0,40}?declared[\s_]strateg",
-    # The binding claim stated in field terms rather than in S1's name.
-    r"\bdeclared_strategy\b[^.\n]{0,80}?\b(?:participates\s+in|is\s+inside|"
-    r"is\s+part\s+of|is\s+covered\s+by|is\s+bound\s+into)\b[^.\n]{0,40}?"
-    r"(?:P_unsigned|advisory_digest|digest|identity)",
-    # The conformance claim: that declaring a strategy shows one was followed.
-    r"\bdeclar(?:ation|ing|ed\s+strategy)\b[^.\n]{0,60}?\bestablishes\s+"
-    r"(?:conformance|that)\b",
-)
+#: Who is acting. ``S1`` names the stage; the builder, the validator and construction are
+#: the things inside it a sentence would credit instead, and a claim about any of them is
+#: a claim about S1. No S2 spelling appears here, which is what makes a correct statement
+#: about S2 unreachable by the two authority patterns.
+_S1_ACTOR = (r"(?:S1|stage\s+S1|the\s+S1\s+\w+|this\s+stage|the\s+(?:\w+\s+)?builder|"
+             r"the\s+validator|build_proposer_advisory)")
+#: The stage that legitimately does all of this.
+_S2_ACTOR = re.compile(r"\bS2\b")
+#: The subject matter, in every spelling. ``\b`` does not break at an underscore, so a
+#: pattern anchored on ``\breasoning`` never reaches ``permitted_reasoning_strategies``;
+#: the field names are therefore matched literally.
+_STRATEGY_SUBJECT = (r"(?:reasoning\s+strateg(?:y|ies)|declared[\s_]strateg(?:y|ies)|"
+                     r"permitted_reasoning_strategies|declared_strategy|"
+                     r"strategy\s+conformance|(?:a|the|its|any|each|which)\s+strategy\b)")
+#: Exercising authority over it: choosing, checking or refusing one.
+#:
+#: Deliberately **not** widened to ``permit``, ``admit``, ``allow``, ``require``,
+#: ``govern`` or ``restrict``. A draft of this rebuild included them and flagged four true
+#: sentences, among them "``declared_strategy`` is required and non-empty while
+#: ``permitted_reasoning_strategies`` admits only ``[]``" — a sentence whose whole point is
+#: that S1 has no authority here. Those verbs describe what a *field* does to a *value*,
+#: which is what C5d says on every page; they do not describe a stage choosing a method.
+_AUTHORITY_VERB = (r"(?:select|validate|verify|check|enforce|bind|reject|refuse|"
+                   r"constrain|choose|match|compare|ensure|confirm|approve|authoris|"
+                   r"authoriz|police|gate)(?:s|es|d|ed|ing|en)?")
+_AUTHORITY_PARTICIPLE = (r"(?:selected|validated|verified|checked|enforced|bound|"
+                         r"rejected|refused|constrained|chosen|matched|compared|"
+                         r"ensured|confirmed|approved|authorised|authorized)")
+
+#: Active voice: an S1 actor is the subject of the verb, the subject matter its object.
+_ACTIVE_AUTHORITY = re.compile(
+    rf"\b{_S1_ACTOR}\s+(?:\w+\s+){{0,2}}{_AUTHORITY_VERB}\b[^.]{{0,60}}?"
+    rf"{_STRATEGY_SUBJECT}", re.I)
+#: Passive voice, with S1 named as the agent or the locus.
+_PASSIVE_AUTHORITY = re.compile(
+    rf"{_STRATEGY_SUBJECT}[^.]{{0,60}}?"
+    rf"\b(?:is|are|was|were|must\s+be|may\s+be|can\s+be|will\s+be)\s+"
+    rf"(?:\w+\s+){{0,1}}{_AUTHORITY_PARTICIPLE}\b[^.]{{0,40}}?"
+    rf"\b(?:by|at|in|within|during)\s+{_S1_ACTOR}\b", re.I)
+#: Placing the declaration inside an identity. Actor-free by design.
+_BINDING_CLAIM = re.compile(
+    r"\bdeclared_strategy\b[^.]{0,90}?\b(?:participates\s+in|is\s+inside|is\s+part\s+of|"
+    r"is\s+covered\s+by|is\s+bound\s+into|contributes\s+to|is\s+included\s+in|"
+    r"feeds\s+into)\b[^.]{0,50}?(?:P_unsigned|advisory_digest|digest|identity)", re.I)
+#: Claiming a declaration evidences the method it names. Also actor-free.
+_CONFORMANCE_CLAIM = re.compile(
+    r"\b(?:declar\w+|the\s+record|the\s+process\s+record)\b[^.]{0,70}?"
+    r"\b(?:establishes|demonstrates|proves|shows|evidences|attests)\b[^.]{0,70}?"
+    r"\b(?:conformance|conformant|was\s+(?:used|followed)|it\s+did)\b", re.I)
+#: A negation standing before the claim excuses it. The documents are *required* to carry
+#: these denials, so a scan that flagged them would be unusable.
+_NEGATION = re.compile(r"\b(?:not|never|neither|nor|without|cannot|nothing|none|no)\b",
+                       re.I)
+#: The reserved field's own emptiness rule is not a claim of authority over a strategy: it
+#: is what C5d says, and the documents state it repeatedly.
+_RESERVED_FIELD_RULE = re.compile(
+    r"permitted_reasoning_strategies\b[^.]{0,60}?"
+    r"\b(?:reject|admit|refuse|accept|is|are|stays?|remains?)\w*\b[^.]{0,80}?"
+    r"(?:empty|non-empty|value|reserved|closed|C5d|list)", re.I)
+
+#: Sentence-ish units, found in two steps because neither step alone is right.
+#:
+#: The documents wrap mid-sentence, so whitespace must be collapsed before splitting: a
+#: line-oriented scan would separate an actor from its predicate and miss a real violation
+#: for a reason unrelated to what the sentence says. But collapsing the *whole document*
+#: merges list items, which frequently do not end in a full stop, into one run — and a run
+#: spanning two bullets pairs an actor from one with a predicate from another and reports a
+#: violation neither bullet makes.
+#:
+#: So blocks are cut first — at blank lines, at list markers, at headings and at table
+#: rows — and only then is each block collapsed and split. A wrapped sentence stays inside
+#: its block; two bullets never join.
+_BLOCK_SPLIT = re.compile(r"\n\s*\n|\n(?=\s*(?:[-*+]\s|\d+\.\s|#{1,6}\s|\|))")
+_SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+")
+
+
+def _strategy_sentences(body):
+    found = []
+    for block in _BLOCK_SPLIT.split(body):
+        collapsed = " ".join(block.split())
+        found.extend(part for part in _SENTENCE_SPLIT.split(collapsed) if part.strip())
+    return found
+
+
+def _sentence_offends(sentence):
+    """Why this sentence claims S1 authority over a reasoning strategy, or ``None``."""
+    if _RESERVED_FIELD_RULE.search(sentence):
+        return None
+    for claim, label in ((_BINDING_CLAIM, "binding"),
+                         (_CONFORMANCE_CLAIM, "conformance")):
+        found = claim.search(sentence)
+        # The negation must stand BEFORE the claim to excuse it. Scoped to the whole
+        # sentence, "is covered by `advisory_digest`, so it **cannot** be altered" excused
+        # itself on a trailing clause that asserts the binding rather than denying it —
+        # the strongest form of the claim reading as its own denial.
+        if found and not _NEGATION.search(sentence[:found.end()]):
+            return label
+    for pattern in (_ACTIVE_AUTHORITY, _PASSIVE_AUTHORITY):
+        found = pattern.search(sentence)
+        if found and not _NEGATION.search(sentence[:found.end()]):
+            return "authority"
+    return None
 
 
 def _stale_status_offenders(body, label="text"):
@@ -484,12 +591,16 @@ def _terminology_coverage_claims(body):
 
 
 def _strategy_authority_claims(body, label="text"):
-    """Every affirmative claim of S1 strategy authority in ``body``, located by line."""
+    """Every affirmative claim of S1 strategy authority in ``body``.
+
+    Reported by sentence rather than by line: the classifier judges whole sentences, and a
+    line number would point at whichever wrapped fragment happened to hold the match.
+    """
     offenders = []
-    for pattern in STRATEGY_AUTHORITY_CLAIM_PATTERNS:
-        for match in re.finditer(pattern, body, re.I):
-            line = body.count("\n", 0, match.start()) + 1
-            offenders.append(f"{label}:{line}: {match.group(0)!r}")
+    for sentence in _strategy_sentences(body):
+        kind = _sentence_offends(sentence)
+        if kind:
+            offenders.append(f"{label} [{kind}]: {sentence[:140]!r}")
     return offenders
 
 
@@ -588,98 +699,145 @@ def test_every_stale_status_pattern_matches_a_text_built_to_violate_it():
         "little")
 
 
-#: One violating text per ``STRATEGY_AUTHORITY_CLAIM_PATTERNS`` entry, in the same order.
+#: Claims the scan must catch, grouped by why each offends. Every one is a sentence a
+#: future edit could plausibly write. No individual reasoning strategy is named in any of
+#: them: the classifier turns on the actor and the verb, never on the method, and naming
+#: one would seed a candidate member of an unratified vocabulary.
 #:
-#: Each is a sentence a future edit could plausibly write, and each is refused. No
-#: individual reasoning strategy is named in any of them — none needs to be, because
-#: every pattern turns on the *authority verb* and not on the method, and naming one here
-#: would seed a candidate member of a vocabulary that is not ratified.
+#: Twelve of these are spellings two successive audits found passing earlier versions of
+#: this guard. They are kept in the one corpus rather than in a separate regression list so
+#: that a later rewrite cannot drop them while still looking thorough.
 _STRATEGY_AUTHORITY_POSITIVES = (
+    # Authority attributed to S1, active voice.
     "S1 validates the declared reasoning strategy against the role's permitted set.",
-    "The reasoning strategy is enforced at S1, before the advisory is constructed.",
-    "A declared_strategy is checked against permitted_reasoning_strategies here.",
-    "The permitted_reasoning_strategies list is compared against declared_strategy.",
-    "`declared_strategy` is covered by `advisory_digest`, so it cannot be altered.",
-    "Declaring a strategy establishes conformance with the method it names.",
-)
-
-#: The spellings an independent audit found passing an earlier, narrower version of this
-#: scan. Kept as a named regression set rather than folded into the list above, because
-#: the failure they exposed was not a dead pattern — every pattern matched the sentence it
-#: was written from — but a scan whose reach was **narrower than the coverage the ADR and
-#: the CHANGELOG claimed for it**. That gap is invisible to a per-pattern self-test, so it
-#: needs cases nobody wrote a pattern from.
-#:
-#: The specific defect: ``\b`` does not break at an underscore, so a pattern anchored on
-#: ``\breasoning\s+strateg`` never reaches ``permitted_reasoning_strategies``; and the
-#: subject of a sentence claiming this authority is as often "the builder" as "S1".
-_STRATEGY_AUTHORITY_REGRESSIONS = (
-    "S1 validates `permitted_reasoning_strategies` against the declared strategy.",
     "S1 checks `declared_strategy` against the role's permitted set.",
-    "The builder selects a reasoning strategy before constructing the advisory.",
+    "S1 validates `permitted_reasoning_strategies` against the declared strategy.",
     "S1 enforces the role's permitted_reasoning_strategies at construction.",
-    "The declared strategy is validated against the permitted set at S1.",
-    "S1 binds the declared strategy into the advisory digest.",
     "S1 rejects a declared strategy the role may not select.",
-    "Strategy conformance is enforced by the S1 builder.",
+    "S1 ensures the declared reasoning strategy is one the role permits.",
+    "S1 refuses a reasoning strategy outside the permitted set.",
+    "S1 confirms the reasoning strategy named by the record.",
+    "S1 constrains which strategy a role may use.",
+    "Stage S1 validates the declared reasoning strategy.",
+    # Authority attributed to something inside S1.
+    "The builder selects a reasoning strategy before constructing the advisory.",
+    "The advisory builder selects a reasoning strategy.",
+    "This stage validates the declared reasoning strategy.",
+    # Authority attributed to S1, passive voice.
+    "The reasoning strategy is enforced at S1, before the advisory is constructed.",
+    "The declared strategy is validated against the permitted set at S1.",
+    "The reasoning strategy must be approved by S1 before use.",
+    "A reasoning strategy is authorised at S1.",
+    # Binding claims. Actor-free: identity construction is S1's by definition.
+    "`declared_strategy` is covered by `advisory_digest`, so it cannot be altered.",
+    "declared_strategy contributes to the advisory digest.",
+    "declared_strategy participates in the advisory identity.",
+    # Conformance claims. Actor-free: false at every stage, not merely unimplemented here.
+    "Declaring a strategy establishes conformance with the method it names.",
+    "The process record shows the reasoning strategy was used.",
 )
 
-
-@pytest.mark.parametrize("text", _STRATEGY_AUTHORITY_REGRESSIONS,
-                         ids=lambda t: t[:40])
-def test_the_strategy_authority_scan_catches_the_spellings_that_once_escaped(text):
-    """Each sentence an audit found passing the narrower scan must now be caught.
-
-    Parametrized so a regression is named rather than reported as one failure among
-    eight, and kept separate from the paired self-test above so that widening the scan
-    later cannot quietly drop one of them.
-    """
-    assert _strategy_authority_claims(text, "regression"), (
-        f"the strategy-authority scan misses {text!r}; the ADR and the CHANGELOG claim "
-        "it refuses ANY affirmative claim of S1 authority over a reasoning strategy, and "
-        "a scan narrower than its stated coverage overstates what the documents are "
-        "guarded against")
-
-#: Text the scan must leave alone: the documents' own denials, which are adjacent to the
-#: claims in wording and opposite in meaning. Without this control the scan could be
-#: "fixed" by broadening a pattern until it matched the denial too, which would make
-#: every conformant document fail and the guard useless.
+#: Text the scan must leave alone. Four kinds, and the second is the one an audit had to
+#: point out: a scan with no notion of *who* is acting flagged true statements about S2.
+#:
+#: * the documents' own denials, which are adjacent in wording and opposite in meaning,
+#:   and which these documents are *required* to carry;
+#: * correct statements about S2, the stage that legitimately selects, validates and
+#:   enforces — the same sentence is a defect with S1 as its subject and correct with S2 as
+#:   its subject, which is the whole reason the classifier discriminates by actor;
+#: * the reserved field's own emptiness rule, which is what C5d says on every page;
+#: * true sentences from the governed documents that a draft of this rebuild flagged when
+#:   adjacency was dropped. They are the evidence for keeping it.
 _STRATEGY_AUTHORITY_NEGATIVES = (
+    # Denials.
     "S1 neither selects, validates nor cryptographically binds a reasoning strategy.",
     "Strategy selection and enforcement are S2's in whole.",
     "Declaration does not establish conformance.",
     "`declared_strategy` is not covered by `advisory_digest` and is outside "
     "`P_unsigned`.",
     "A reasoning strategy is a method label, not a process state.",
+    "S1 does not select a reasoning strategy.",
+    "No rule at this stage validates a declared strategy.",
+    # Correct statements about S2.
+    "S2 checks declared_strategy against permitted_reasoning_strategies.",
+    "The permitted_reasoning_strategies list is compared against declared_strategy "
+    "by S2.",
+    "S2 validates the declared reasoning strategy against the role's permitted set.",
+    "S2 selects a reasoning strategy and enforces the role's permitted set.",
+    "Validation of a declared strategy is added by S2.",
+    # The reserved field's own rule.
     "`permitted_reasoning_strategies` rejects every non-empty value at this stage.",
+    "permitted_reasoning_strategies admits only the empty list.",
+    "The C5d validator on permitted_reasoning_strategies refuses every value.",
+    # True sentences an over-broad draft flagged.
+    "Admitting any of them into `permitted_reasoning_strategies` would put a mechanism "
+    "this stage enforces, or an outcome this stage constrains, into a list this stage "
+    "deliberately refuses to validate.",
+    "Selection of a strategy, validation of a declared one against a role's permitted "
+    "set, and any binding of either into an identity are S2's in whole; S1 does none of "
+    "them.",
+    "D2 now states that `declared_strategy` is required and non-empty while "
+    "`permitted_reasoning_strategies` admits only `[]`, so every conformant S1 pair "
+    "declares a method the role is not permitted to select.",
 )
 
 
-def test_every_strategy_authority_pattern_matches_a_text_built_to_violate_it():
-    """The scan runs over documents that deny S1 has this authority, and a pattern
-    edited into inertness reports exactly the same green.
+@pytest.mark.parametrize("text", _STRATEGY_AUTHORITY_POSITIVES, ids=lambda t: t[:44])
+def test_the_strategy_authority_scan_catches_each_claim(text):
+    """Every claim in the corpus must be caught, reported by name.
 
-    Paired one-to-one with the pattern list and asserted pairwise, so a dead pattern is
-    named rather than hidden behind another pattern's match. The negative controls then
-    prove the scan discriminates: it must catch the claim and leave the denial standing,
-    and a scan that cannot tell those apart is not usable on these documents at all.
+    Parametrized rather than looped so a regression names the sentence that escaped
+    instead of reporting one failure among twenty-two.
     """
-    assert len(_STRATEGY_AUTHORITY_POSITIVES) == len(STRATEGY_AUTHORITY_CLAIM_PATTERNS), (
-        f"{len(STRATEGY_AUTHORITY_CLAIM_PATTERNS)} strategy-authority patterns and "
-        f"{len(_STRATEGY_AUTHORITY_POSITIVES)} synthetic violations; a pattern added "
-        "without a violation to prove it is a pattern nothing tests")
-    for pattern, text in zip(STRATEGY_AUTHORITY_CLAIM_PATTERNS,
-                             _STRATEGY_AUTHORITY_POSITIVES):
-        assert re.search(pattern, text, re.I), (
-            f"the strategy-authority pattern {pattern!r} no longer matches {text!r}; it "
-            "would report every document in DOCUMENTS clean")
-        assert _strategy_authority_claims(text, "synthetic"), (
-            f"the strategy-authority scan missed {text!r} even though {pattern!r} "
-            "matches it")
-    for text in _STRATEGY_AUTHORITY_NEGATIVES:
-        assert not _strategy_authority_claims(text, "synthetic"), (
-            f"the strategy-authority scan flags the denial {text!r}; it is matching too "
-            "much, not too little, and would fail every conformant document")
+    assert _strategy_authority_claims(text, "positive"), (
+        f"the strategy-authority scan misses {text!r}")
+
+
+@pytest.mark.parametrize("text", _STRATEGY_AUTHORITY_NEGATIVES, ids=lambda t: t[:44])
+def test_the_strategy_authority_scan_leaves_correct_statements_alone(text):
+    """A false positive here is worse than a miss: it fails every conformant document,
+    and a guard that fires on correct prose gets deleted rather than fixed.
+
+    The S2 cases matter most. An earlier version carried two patterns naming no actor, so
+    a true statement of what S2 does — the thing these documents must be free to say — was
+    reported as a violation of the rule it correctly states.
+    """
+    assert not _strategy_authority_claims(text, "negative"), (
+        f"the strategy-authority scan flags {text!r}, which is correct as written; it is "
+        "matching too much, not too little")
+
+
+def test_the_strategy_classifier_turns_on_the_actor():
+    """The distinction the rebuild exists for, asserted on one minimal pair.
+
+    Same verb, same subject matter, different actor. If these two ever agree the
+    classifier has stopped discriminating, and one of the corpora above is passing for the
+    wrong reason.
+    """
+    s1 = "S1 validates the declared reasoning strategy against the permitted set."
+    s2 = "S2 validates the declared reasoning strategy against the permitted set."
+    assert _sentence_offends(s1) == "authority", "the S1 form is no longer caught"
+    assert _sentence_offends(s2) is None, "the S2 form is flagged, and it is correct"
+    assert _S2_ACTOR.search(s2) and not re.search(_S1_ACTOR, s2)
+
+
+def test_the_strategy_classifier_reads_whole_sentences_not_lines():
+    """The documents wrap mid-sentence. A line-oriented scan would separate an actor from
+    its verb and miss a violation for a reason unrelated to what it says."""
+    wrapped = ("S1 validates the declared reasoning\nstrategy against the role's\n"
+               "permitted set.")
+    assert _strategy_authority_claims(wrapped, "wrapped"), (
+        "a violation split across three lines escapes the scan")
+
+
+def test_the_strategy_classifier_does_not_join_two_list_items():
+    """The converse hazard. Collapsing a whole document merges bullets that do not end in
+    a full stop, pairing one item's actor with another's verb and reporting a violation
+    neither item makes."""
+    bullets = ("* S1 does none of this, and the field admits no value\n"
+               "* A reasoning strategy is a method label, not a process state\n")
+    assert not _strategy_authority_claims(bullets, "bullets"), (
+        "two innocent list items were joined into one sentence and flagged")
 
 
 def test_the_sha_claim_detector_matches_a_temporary_truth_and_not_durable_text():

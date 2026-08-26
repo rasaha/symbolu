@@ -490,8 +490,14 @@ A `list[str]` field that **rejects any non-empty value**. It is closed now so th
 cannot become a de facto vocabulary before one is ratified (Part J).
 
 **What reservation buys differs by field, and the class does not promise one answer.**
-For the five reason-code fields it is that populating them later is not a schema change:
-the element stays `str`, the default stays `[]`, and only a content class is added. For
+For the first five it is that populating them later is not a schema change: the element
+stays `str`, the default stays `[]`, and only a content class is added. `[I]` Those five
+are **not** all reason-code fields, and calling them that is wrong twice over:
+`ProposerProcessRecord.deterministic_checks` names checks that were run and
+`ProposerProcessRecord.semantic_audit_refs` holds references to audit records, neither of
+which is a reason code. What the five share is the *mechanism* — a reserved `list[str]`
+that gains a content class when its own catalogue is ratified — and each awaits a
+different catalogue. For
 `CognitiveRoleContract.permitted_reasoning_strategies` it is **not** that, and the class
 definition must not be read as saying so — its ratified form retypes the element, replaces
 the validator and removes the default, which **is** a schema change (D2, OD-5). What C5d
@@ -504,8 +510,11 @@ in the field before a vocabulary is ratified.**
 `CognitiveRoleContract.permitted_reasoning_strategies`.
 
 `[I]` The sixth is C5d for the same mechanical reason as the other five and **not** for
-the same substantive one. The first five await a reason-code catalogue and will take a
-content class when one is ratified. `permitted_reasoning_strategies` awaits a closed
+the same substantive one. The first five each await a catalogue — a reason-code catalogue
+for `selection_reason_codes` and the two `reason_codes` fields, and separately a
+deterministic-check catalogue and a semantic-audit reference scheme for the other two —
+and each will take a content class when its own catalogue is ratified.
+`permitted_reasoning_strategies` awaits a closed
 vocabulary and will not take a content class at all: its ratified form is an allowlist
 that **rejects an empty list**, so it leaves C5d by having its validator replaced and its
 element retyped, not by having a content class attached to a still-reserved `list[str]`
@@ -2355,11 +2364,17 @@ Each item below is deliberately absent and is not a gap.
   `False` everywhere.
 * **Candidate selection.** Under B3, S1 selects nothing. S-1, S-2, R-1a and R-1b are
   specified now so that selection is a behaviour change at S2, not a contract change.
-* **The reason-code catalogue.** `reason_codes`, `selection_reason_codes`,
-  `deterministic_checks` and `semantic_audit_refs` are C5d: they reject non-empty values.
-  The fields exist so that populating them later is not a schema change; the validators
-  exist so that they cannot become a de facto vocabulary before one is ratified. A
-  content class attaches to them only when the catalogue is ratified.
+* **Three catalogues, not one.** `reason_codes` (on both bearers) and
+  `selection_reason_codes` await a **reason-code catalogue**; `deterministic_checks`
+  awaits a **catalogue of the checks a producer may name**; `semantic_audit_refs` awaits
+  a **reference scheme for audit records**. `[I]` The three were previously deferred
+  under the reason-code heading alone, which misdescribed the last two: a check that was
+  run and a reference to an audit record are not reason codes, and ratifying a
+  reason-code catalogue would not tell an implementer what may go in either. All five
+  fields are C5d and reject non-empty values; the fields exist so that populating them
+  later is not a schema change, and the validators exist so that none becomes a de facto
+  vocabulary before its own catalogue is ratified. A content class attaches to each only
+  when **that** catalogue is ratified.
 * **The reasoning-strategy vocabulary, and its selection and enforcement (OD-5).**
   `permitted_reasoning_strategies` is C5d and rejects every non-empty value; no member,
   spelling or bound is ratified. Selection of a strategy, validation of a declared one
@@ -2753,9 +2768,11 @@ and this document contains no placeholder: every field carries a type, a require
 nullability, a default, a cardinality, a vocabulary, a classification and an identity
 participation.
 
-**OD-4 is resolved (a)**, and with it the one open question that bore on contract shape.
-`ProposerAdvisory` carries its `CandidateAdvisory` entries, as ratified D7 says; Part D
-is written for that shape and no longer for an alternative.
+**OD-4 is resolved (a)**, and with it the question that had been open longest about
+contract shape. `ProposerAdvisory` carries its `CandidateAdvisory` entries, as ratified
+D7 says; Part D is written for that shape and no longer for an alternative. **Two
+decisions bear on contract shape, OD-4 and OD-5**; OD-5 adds one reserved field to D2 and
+raises that contract's cardinality, and Part D is written for that too.
 
 **All five owner decisions are resolved. No ruling is outstanding.** OD-1, OD-2 and
 OD-3 are ratified 2026-08-25 and are recorded above with their riders and their
