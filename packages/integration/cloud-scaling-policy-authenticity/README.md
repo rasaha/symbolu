@@ -111,15 +111,20 @@ canonical field:
 
 * **`verified`** — the facts a gate actually checked: the six coordinate components, the body
   digest, the issuing authority and key, the record and adapter ids, the profile.
-* **`recorded`** — carried and digest-covered, but **never attested**. Four members, three
+* **`recorded`** — carried and digest-covered, but **never attested**. Two members, two
   reasons:
 
-  | Fact | Why nothing established it |
+  | Fact | Why nothing establishes it |
   |---|---|
   | `resolved_as_of_fact` | R-2 — the instant is injected and unvalidated |
-  | `candidate_digest_fact` | R-4 — recorded, never reconciled. Promoted in 5B-1 once gate 11 began reconciling it |
-  | `policy_type` | absent from the 21 signed issuance keys, and `resolve_policy` never compares the record's value to the adapter descriptor's. Transitively committed inside `policy_body_digest`, but a hash is one-way and this package holds no adapter registry |
   | `trust_configuration_digest` | reported by the resolution port about itself. The port is the seam to the authority, so any check here would be the port vouching for itself |
+
+  Two facts have left this table since it was written, and the table listed them for longer
+  than it should have. `candidate_digest_fact` was promoted to the verified half in **5B-1**,
+  when gate 11 began reconciling the candidate's coordinate against the resolved one.
+  `policy_type` was promoted in **5B-3**, when gate 14 began reproducing the signed body
+  digest by reframing the resolution's descriptor projection — which supplied the pre-image a
+  one-way hash had denied this package until then.
 
 Being recorded does not mean unprotected — both halves are inside the artifact digest, so
 neither can be rewritten after the fact. It means nobody checked it. Read a fact through
