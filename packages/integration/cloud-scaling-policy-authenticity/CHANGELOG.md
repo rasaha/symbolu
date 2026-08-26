@@ -1,5 +1,31 @@
 # Changelog — ugence-cloud-scaling-policy-authenticity
 
+## [Unreleased] — the ratchet's fourth rule: a fact that appears, not moves
+
+*No partition change and no profile bump in this entry.* `VERIFICATION_PROFILE_VERSION` stays
+`v3`: this extends the gate that guards the partition, not the partition.
+
+### Added — D-5B1-3 rule 4
+
+Rule 3 disclosed only facts that **moved** halves: `promoted` was
+`current.verified ∩ baseline.recorded` and `demoted` its mirror. A name entering the verified
+half from neither baseline half is in neither set. It had not moved, it had appeared — so it
+was promoted by nobody, demoted by nobody, and the rule asked no question about it. The profile
+bump such a change forces was already earned by whatever else moved, and the changelog line
+that bump owes rule 2 says only that the version moved. A reader saw a version change and never
+learned which fact had begun carrying authority.
+
+`ratchet_problems` now also reports `current.verified − baseline.verified − baseline.recorded`,
+disclosable only as `added: <fact> — …`. The direction is part of the claim: a `promoted:` line
+for a fact that never moved asserts something false about where it came from and does not
+satisfy the gate.
+
+### Fixed — one historical disclosure reclassified
+
+5B-3's `capacity_bounds_fact` line read `promoted:` while its own text said "new in this
+release". Under rule 4 it is an addition; the line now reads `added:`. The gate refused the
+working tree until it did, which is the rule working on the first real case it met.
+
 ## [0.5.0] — Cloud Scaling Phase 5B-3: close R-8, the authenticated capacity bound
 
 Ratified as Route 1 + Route 2 as one isolated subphase. **Breaking**, pre-1.0: a determination
@@ -21,7 +47,7 @@ rather than passes.
   supplied the pre-image by publishing the descriptor's projection on `PolicyResolution`.
   `tests/test_unattested_facts.py` keeps the test that measured the gap and **inverts** its
   assertion rather than deleting it.
-- promoted: `capacity_bounds_fact` — new in this release, and verified from the moment it
+- added: `capacity_bounds_fact` — new in this release, and verified from the moment it
   exists rather than parked in the recorded half first. Gate 15 reads the bounds out of a
   projection gate 14 has already reproduced, so they are the bounds the issuance signature
   covered. `None` means the resolved policy is not a capacity-bounds policy and states no

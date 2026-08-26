@@ -205,6 +205,14 @@ version moved with no changelog line naming it. CI resolves the baseline from th
 default branch and sets `UGENCE_RATCHET_REQUIRED=1`, so a baseline it cannot resolve fails the
 workflow instead of skipping.
 
+Four rules, not three. The fourth was ratified during R-8, after an audit measured that the
+third disclosed only `verified ∩ baseline.recorded` — a fact that *moved* halves. A name
+entering the verified half from **neither** baseline half had not moved; it had appeared, so
+it was promoted by nobody, demoted by nobody, and asked about by nothing. The bump it forces
+was already earned by whatever else the change did. Such a fact must now be disclosed on its
+own line as `added: <fact> — <what establishes it>`, and the direction is part of the claim:
+a `promoted:` line does not satisfy the disclosure an added fact owes.
+
 Pre-merge this was free — three remediation rounds reshaped the payload at `0.1.0` while
 nothing pinned a digest. That window is closed.
 
