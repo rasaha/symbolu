@@ -27,6 +27,98 @@ harness.
 
 ---
 
+## D1 applicability — the rule binds a composition root, not a tree
+
+**Decision `[R]`:** D1 applies at composition-root granularity. A composition
+root that injects a clock into any Decision Authority or
+governance-provider-framework collaborator must inject one into *every*
+clock-capable collaborator it wires. A root that injects nowhere is not replaying
+under an injected clock, and D1 says nothing about it.
+
+A **composition root** is the top-level definition that does the wiring: a class,
+a module-level function, or the module body for wiring done at import time.
+Definitions nested inside one of those belong to it — so `PilotComposition`, which
+builds its execution adapter in `__init__`, its control plane in `control_plane`
+and its DGM bundle in `build_dgm`, is one root, not three.
+
+**Rationale — why roots and not whole trees.** The rejected alternative was to
+require every clock-capable construction anywhere under a tree to pass a clock.
+That rule is unsound outside a replay harness, and measurably so. Applied to the
+surfaces that must stay silent it fires 78 times on code that is correct as it
+stands `[V]`:
+
+| Surface | Sites the whole-tree rule would reject |
+| --- | --- |
+| `packages/providers/actiongate/tests` | 12 |
+| `packages/providers/tap/tests` | 3 |
+| `packages/governance-provider-framework/tests` | 16 |
+| `packaging/external_consumer` | 12 |
+| `packages/products/ai-hiring/tests` | 35 |
+
+None of those is a defect. A conformance harness, a packaging smoke test and an
+external-consumer sample all construct the kernel the way a consumer would —
+on its defaults — and that is precisely what they exist to demonstrate. The
+whole-tree rule cannot distinguish "this code forgot the scenario clock" from
+"this code is not replaying a scenario at all", because the distinction is not a
+property of a file's location.
+
+It *is* a property of a composition root. Injecting a clock is the act that
+declares a root to be replaying in a chosen time domain; once a root has made
+that declaration, a sibling collaborator left on the wall clock is a genuine
+second time domain inside one run, which is the fault D1 exists to prevent. A
+root that never injects has made no such declaration and is judged by its own
+tests, not by this one.
+
+`packages/products/ai-hiring/tests/test_execution_binding.py` is the case that
+settles the wording `[V]`. Its two expiry tests deliberately run on **two**
+clocks — `_authorized_with_clocks` anchors the binder, the control plane and the
+authorization service at `t0`, and each test then builds an `ExecutionService`
+at `t_late` to prove that an authorization, or a CER, that was valid at submit
+time blocks execution once it expires. Every collaborator in every one of those
+roots is injected, so the rule is satisfied: D1 requires one *injected* clock
+domain per root, not one *instant* per test. The same file's
+`test_constrained_authorization_is_reflected_in_intent` injects nowhere and is
+silent. The whole-tree rule would have rejected both halves of that file.
+
+**Consequence `[V]` — the residual the granularity accepts.** A root holding a
+single clock-capable collaborator cannot be internally inconsistent, so removing
+its one injection makes the root silent rather than offending. Six roots across
+the three trees hold exactly one such site; mutating each in turn (drop `clock=`,
+run that tree's four guards) separates them:
+
+| Sole-site root | Mutation caught by |
+| --- | --- |
+| `comparative_governance_benchmark/strategies/_actiongate_support.py:resolve_actiongate` | the replay body — the adapter reaches the verdict |
+| `enterprise_validation_pilot/composition/engines.py:build_execution_adapter` | nothing (see below) |
+| `comparative_governance_benchmark/runners/execution.py:build_execution_adapter` | nothing (see below) |
+| `comparative_governance_benchmark/strategies/no_governance.py:NoGovernanceStrategy` | nothing |
+| `comparative_governance_benchmark/strategies/assertion_only.py:AssertionOnlyStrategy` | nothing |
+| `comparative_governance_benchmark/strategies/action_only.py:ActionOnlyStrategy` | nothing |
+
+The three strategy classes are the residual this granularity introduces: each
+wires exactly one clock-capable collaborator, `build_execution_adapter`, so
+dropping its `clock=` leaves the root silent, and the adapter's stamps reach no
+field the replay body compares. The whole-tree rule would have caught them — at
+the cost of the 78 false rejections above.
+
+The two `build_execution_adapter` bodies are a different and pre-existing blind
+spot: their injection is the forwarding step `extra["clock"] = clock`, which the
+factory-mediation exemption deliberately does not read. That exemption is
+unchanged by this decision and would be equally blind under the whole-tree rule.
+
+Everything else is caught. Dropping `clock=` at the control-plane adapter, the
+audit service, either validation service or any kernel service fails the scan;
+dropping the pilot's or the heterogeneity runner's adapter injection fails the
+replay body as well.
+
+This residual is the price of the property that keeps the guard silent on the
+five surfaces above: a rule that fires on a root with one collaborator is the
+whole-tree rule again. It is bounded and named, not open-ended — any of the
+three that grows a second clock-capable sibling in its root falls back under the
+scan immediately.
+
+---
+
 ## Regression found while settling these items
 
 **`[V]` Symptom.** 84 tests failed across `enterprise_validation_pilot`,
@@ -71,15 +163,27 @@ Only the audit service and the control-plane adapter reached a replay's
 injected anyway, because D1 is a property of the run, not of whichever fields
 the current result schema happens to expose.
 
-**`[V]` Guard.** Each tree carries `tests/test_clock_domain.py`. The scan is no
-longer single-class: for every call site under the tree it resolves the callee
-to the real object through that module's own imports and rejects the site when
-the object's signature has a `clock` parameter and the call passes none. That
-covers the kernel services, the audit service, both validation services and the
-execution adapter, and it will cover a collaborator that grows a clock later.
-Factory-mediated construction is covered from both ends — a factory that itself
-takes a `clock` is a collaborator, so its own call sites must pass one, while
-the constructor it mediates is exempt because the clock reaches it through a
+**`[V]` Guard.** One implementation, three trees:
+`enterprise_validation_pilot/tests/clock_domain_guard.py` — hosted in the pilot
+because the benchmark and the heterogeneity runner already depend on it and the
+reverse dependency does not exist. It carries the parts that do not vary: the
+call-site scan that implements the applicability rule above, and the skew seam.
+Each tree's `tests/test_clock_domain.py` keeps what does vary — its own replay
+body — and re-exports the shared guards as its own tests, so the count is
+unchanged at four per tree.
+
+The scan is not single-class: for every call site under the tree it resolves the
+callee to the real object through that module's own imports, groups the sites by
+composition root, and rejects a site whose object's signature has a `clock`
+parameter and whose call passes none — but only inside a root that hands an
+injected clock to an authority collaborator elsewhere. That covers the kernel
+services, the audit service, both validation services and the execution adapter,
+and it will cover a collaborator that grows a clock later. A tree-owned factory
+counts as an authority collaborator when its own body constructs one — which is
+how `build_execution_adapter` triggers the rule for the roots that wire it.
+Factory-mediated construction is covered from both ends: a factory that itself
+takes a `clock` is a collaborator, so its own call sites must pass one, while the
+constructor it mediates is exempt because the clock reaches it through a
 forwarded mapping the AST cannot read. A companion test asserts the scan still
 resolves the collaborators it is meant to guard, so a resolver that silently
 matched nothing cannot pass.
@@ -92,12 +196,21 @@ original object in `__init__.__kwdefaults__`, where a module-attribute patch
 cannot reach it — 14 kernel classes); and the framework adapter's lazily built
 kernel cache, `action_to_control_plane._KERNEL["utc_now"]`. A third test asserts
 the seam actually moves all three, so the replay guard cannot pass vacuously.
-Removing any injection fails the scan; removing the adapter's injection also
-fails the replay with the original `AuthorizationExpiredError`.
+Removing an injection fails the scan wherever the rule applies (see the residual
+named above); removing the pilot's adapter injection also fails the replay body.
+
+**`[V]` Silence off the harnesses.** Running the shared scan over the surfaces
+the rule must not disturb returns no offender on any of them:
+`packages/providers/actiongate/tests`, `packages/providers/tap/tests`,
+`packages/governance-provider-framework/tests`, `packaging/external_consumer`,
+and the whole of `packages/products/ai-hiring/tests` — including
+`test_execution_binding.py`, whose two-clock expiry tests are deliberate and
+fully injected.
 
 **`[V]` State.** 283 tests pass across the three trees (271 pre-existing, 12
-guards), with the wall clock at its true value and pinned to 2025-06-01 — the
-skew that originally reproduced the regression.
+guards — four per tree, unchanged by the consolidation), with the wall clock at
+its true value and pinned to 2025-06-01, the skew that originally reproduced the
+regression.
 
 ---
 
