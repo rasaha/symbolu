@@ -151,7 +151,8 @@ def _run(scenario, config, failure_profile, r):
     control_plane = ActionGovernanceControlPlaneAdapter(
         action_provider, clock=make_clock(seed + ":act"))
     adapter = build_execution_adapter(scenario.proposed_action.action_type, scenario.execution,
-                                      id_factory=make_id_factory(seed + ":exec"))
+                                      id_factory=make_id_factory(seed + ":exec"),
+                                      clock=make_clock(seed + ":exec"))
     dgm2 = build_services(seed + ":act", control_plane=control_plane, execution_adapter=adapter)
     flow2 = run_case_flow(dgm2, scenario, coverage=result.coverage.value,
                           assessment_id=assessment_id)
