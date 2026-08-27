@@ -1,12 +1,77 @@
 # ADR — Cloud Scaling: Predictive Capacity Intelligence (Phase 2)
 
-**Status:** **ACCEPTED.**
+**Status:** **ACCEPTED.** Amended 2026-08-27 (Amendment 1) to record five owner rulings authorizing a third-baseline replay **evaluation**. No third baseline is ratified; the two shipped baselines are unchanged.
 **Date:** 2026-08-11
 **Package:** `packages/capabilities/cloud-scaling-controller` (`ugence-cloud-scaling-controller`), v0.2.0 → **v0.3.0**.
 **Scope:** Additive, deterministic, provider-neutral, **shadow-only** forecasting and
 replay-evaluation layer built *around* the Phase-1 canonical layer. The controller's
 advisory authority, provider neutrality, and five-signal decision algorithm are unchanged,
 and forecasts never feed the controller.
+
+---
+
+## Amendment 1 (2026-08-27) — owner rulings authorizing a third-baseline replay evaluation
+
+> **Owner decisions authorize the evaluation design only. No third baseline is ratified.
+> Ratification requires an authorized replay run to clear all applicable preregistered gates.**
+
+**Documentation-only.** This amendment adds no code, no enum member, no schema, no digest and
+no dependency; it changes no shipped behavior. `persistence` and `linear_trend` remain the
+only forecasters this package ships, and the deferral recorded above — a third baseline
+"only if justified by replay evaluation" — stands unresolved.
+
+The evaluation design these rulings authorize is
+[`ADR_CLOUD_SCALING_THIRD_BASELINE_REPLAY_EVALUATION.md`](ADR_CLOUD_SCALING_THIRD_BASELINE_REPLAY_EVALUATION.md).
+It preregisters a four-arm ladder — `persistence` (P), `linear_trend` (T), a proposed
+`seasonal_naive` control (N) and a proposed `harmonic_phase` candidate (H) — over the
+existing leakage-safe replay harness, with per-cell gates and explicit falsification rules.
+`seasonal_naive` and `harmonic_phase` do not exist in the package and are not created by
+either document.
+
+### The five rulings
+
+**1 — Telemetry authorization.** Future replay against read-only historical production
+telemetry is authorized under shadow-only scope. No live requests, production writes, scaling
+actions, credential use or customer-identifying data are authorized. The run uses an
+anonymized, preregistered manifest naming every eligible subject in the approved export;
+subjects may not be selected after viewing results. Synthetic or staging data may validate
+the harness but cannot ratify a baseline.
+
+**2 — Clock and period definition.** UTC-fixed clock semantics for the first evaluation. Only
+the 86,400-second daily period is ratified for this experiment. A weekly period is excluded:
+it is not resolvable within the ratified lookback, and weekly evaluation requires a
+separately ratified multiweek lookback. Local-calendar and DST-aware periods remain deferred
+research.
+
+**3 — Lookback and compute budget.** A seven-day lookback at the canonical 60-second cadence
+(604,800 seconds / 10,080 samples before missing-data handling). All arms receive identical
+cutoffs, observations, lookback, feature configuration and admission policy. If compute is
+excessive, replay-origin density is reduced through a deterministic preregistered stride;
+H's window is never shortened and no arm receives a different window. The estimated run size
+is reported before execution.
+
+**4 — Seasonal-naive outcome.** `seasonal_naive` is an **outcome-eligible control**. If it
+satisfies the ratification gates and ties or beats `harmonic_phase`, then `harmonic_phase` is
+retired and `seasonal_naive` is ratified as **the** third baseline — not as a fourth. If
+`harmonic_phase` wins, `seasonal_naive` remains evaluation-only unless separately ratified.
+
+**5 — Ratification scope.** Target × horizon-restricted ratification is permitted. Success in
+all twelve gating cells is not required, and support is not claimed outside passing cells. A
+ratified implementation must deterministically reject or abstain outside its recorded
+capability envelope. The preregistered overall minimum of 8 passing cells out of 12 is
+preserved; the rule that failure in any 60-minute cell automatically retires the candidate is
+removed.
+
+### Scope of these rulings
+
+They authorize a design and a future run. They do not ratify a forecaster, do not permit
+implementation, do not relax this ADR's prohibition on neural networks, model services,
+hyperparameter search or automatic promotion, and do not alter Phase 2's shadow-only boundary:
+`FORECAST != RECOMMENDATION != RISK EVALUATION != AUTHORITY != EXECUTION` is unchanged.
+
+The evaluation concerns clock-anchored harmonic regression over timestamps. It bears on no
+verdict about learned content phases, neural Phase retrieval, BindingSlots or Phase-Quad, and
+reverses none of them.
 
 ---
 
