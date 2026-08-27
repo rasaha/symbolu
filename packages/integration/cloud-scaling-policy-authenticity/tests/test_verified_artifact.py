@@ -308,3 +308,36 @@ def test_a_genuine_artifact_cannot_be_paired_with_a_resolution_reached_at_anothe
 
     with pytest.raises(VerifiedPolicyArtifactIntegrityError):
         PolicyAuthenticityResult(verified_policy=artifact, resolution=elsewhen)
+
+
+@pytest.mark.adversarial
+def test_a_malformed_candidate_digest_fact_is_refused():
+    """``verified.py:488`` — the Phase 5A digest namespace, admitted on the artifact itself.
+
+    The guard the first sweep could not see. Its whole body is a call to an admission
+    helper, with no ``raise`` and no ``return`` of its own, so a raise-only inventory did
+    not list it and nothing measured it.
+
+    It is not redundant with the verifier. The verifier checks before minting; this checks
+    on the artifact, so a determination assembled with a valid construction token and a
+    correctly recomputed digest still cannot present a ``candidate_digest_fact`` from the
+    wrong digest namespace. A bare 64-hex value is exactly that: a well-formed *policy*
+    digest where a ``sha256:``-prefixed Phase 5A digest belongs, and the two namespaces are
+    never interchanged.
+    """
+
+    genuine = _genuine()
+    fields = _field_values(genuine)
+    fields["candidate_digest_fact"] = "a" * 64  # policy-shaped, not Phase 5A-shaped
+    from ugence_cloud_scaling_policy_authenticity.errors import (  # noqa: PLC0415
+        PolicyAuthenticityFieldError,
+    )
+
+    with pytest.raises(PolicyAuthenticityFieldError) as excinfo:
+        VerifiedPolicyAuthenticity(
+            **fields,
+            artifact_digest=_recompute(fields),
+            construction_token=genuine.construction_token,
+        )
+    assert "candidate_digest_fact" in str(excinfo.value)
+    assert "Phase 5A" in str(excinfo.value)
