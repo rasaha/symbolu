@@ -2,7 +2,7 @@
 
 > **Superseded for coverage purposes by `GUARD_INVENTORY.md` and
 > `guard_classification.json`.** That pair is generated from source, reconciled against the
-> recorded 65 + 28, and enforced in CI over **109** guards; the 49 below are a subset,
+> recorded 65 + 28, and enforced in CI over **114** guards; the 49 below are a subset,
 > measured at a head whose line numbers have since moved. This document is kept because it
 > records *classifications*, and three of them are refuted by measurement — which is worth
 > more as a correction than as a deletion. See "Three classifications this document got
@@ -118,7 +118,7 @@ for the builder path it was measured on and does not hold for the reconciler pat
 ## The current sweep, and what each surviving guard turned out to be
 
 The 49 guards above are a subset of the current inventory, measured at a head whose line
-numbers have moved. The current sweep covers **109**, and its verdicts are read against the
+numbers have moved. The current sweep covers **114**, and its verdicts are read against the
 definition ratified in ADR Phase 5 §9.1: the typed refusal is the pair
 `(exception class, AuthorizationCandidateRejectionReason)`, and the message is prose.
 
