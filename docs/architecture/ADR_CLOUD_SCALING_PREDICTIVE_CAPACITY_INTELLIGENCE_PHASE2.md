@@ -1,6 +1,6 @@
 # ADR — Cloud Scaling: Predictive Capacity Intelligence (Phase 2)
 
-**Status:** **ACCEPTED.** Amended 2026-08-27 (Amendments 1 and 2) to record owner rulings authorizing the design and then the **manifest preparation** for a third-baseline replay evaluation. No telemetry access or replay execution is authorized. No third baseline is ratified; the two shipped baselines are unchanged.
+**Status:** **ACCEPTED.** Amended 2026-08-27 (Amendments 1–3) to record owner rulings authorizing the design, the manifest preparation, and the resolution of both run-blocking gaps for a third-baseline replay evaluation. No telemetry access or replay execution is authorized. No third baseline is ratified; the two shipped baselines and the shipped uncertainty behavior are unchanged.
 **Date:** 2026-08-11
 **Package:** `packages/capabilities/cloud-scaling-controller` (`ugence-cloud-scaling-controller`), v0.2.0 → **v0.3.0**.
 **Scope:** Additive, deterministic, provider-neutral, **shadow-only** forecasting and
@@ -105,6 +105,63 @@ The two abstention values the design needs remain **proposed vocabulary**; they 
 to `AbstentionReason`. `seasonal_naive` and `harmonic_phase` remain proposed identities with
 no implementation. This ADR's prohibition on neural networks, model services, hyperparameter
 search and automatic promotion is unchanged, as is Phase 2's shadow-only boundary.
+
+## Amendment 3 (2026-08-27) — both run-blocking gaps ruled; execution still prohibited
+
+> **The replay remains unexecutable until the anonymized subject manifest and approved export
+> identity are populated and an evaluation implementation of the bounded causal residual-bank
+> protocol exists. No production uncertainty behavior is changed or ratified.**
+>
+> **No telemetry access is authorized by this amendment. No third baseline is ratified.**
+
+**Documentation-only.** No code, enum member, schema, digest or dependency changes. In
+particular `compute_uncertainty` and `rolling_origin_residuals` are **untouched**, and nothing
+here ratifies production uncertainty behavior.
+
+**Ruling 1 — regime breaks: none excluded.** The package has no canonical regime-break record
+carrying both an effective event time and an independent knowledge timestamp, and no new
+export-contract requirement is created to rescue the experiment. `DeploymentState`,
+`ObservationProvenance.collected_at` and `TopologySnapshot.as_of` are **not** treated as
+equivalent to a `recorded_at`. Every otherwise-eligible cutoff is retained, including those
+spanning deployments, incidents and configuration changes; post-hoc removal by later-known
+labels is prohibited; no regime-specific performance may be claimed; and if the harmonic arm
+fails because periodicity breaks during operational changes, that failure counts. This is the
+conservative direction — it retains the difficult origins. Adding exclusion later defines a
+different evaluation requiring a new preregistration and replay.
+
+**Ruling 2 — bounded causal uncertainty calibration.** The seven-day feature lookback is not
+shortened and the interval-coverage gate is not withdrawn. For this evaluation only, the
+nested per-forecast rolling-origin expansion is replaced by a causal prequential residual bank
+applied identically to all four arms: one bank per `(subject, target, horizon, arm)`,
+calibration origins on the ratified 15-minute UTC schedule, at most 672 residuals with
+deterministic oldest-origin-first eviction, a strict as-of admission rule, the preregistered
+`UncertaintyConfig` values unchanged with `allow_point_only_when_uncalibrated = false`, and the
+repository's existing interval mathematics reused without inventing a second formula. The
+history requirement rises from 42 to **49 days** (burn-in 0–7, calibration 7–14, scoring
+14–49); the calibration block enters no gate. Per fully eligible subject the run is bounded at
+**193,536 forecaster calls** (32,256 calibration + 161,280 scoring) with **no multiplicative R
+expansion**.
+
+**What this costs in meaning.** Interval estimates describe the error distribution at the
+preregistered decision-origin schedule, not at every raw telemetry timestamp; and because the
+protocol differs from the shipped nested implementation, **a successful replay does not by
+itself ratify production uncertainty implementation**. Point accuracy and interval calibration
+remain **separate ratification claims**: failure of the interval gate retires the harmonic arm
+even if its point MAE passes. The evaluation remains outcome-neutral — ratifying H, N, T, or no
+third baseline are all permitted conclusions.
+
+**Prerequisite recorded, not resolved.** `compute_uncertainty` computes its own residuals and
+accepts none from the caller, and the interval construction is inline with a module-private
+quantile helper, so **no residual-supply seam exists**. Building one — reusing the existing
+interval formula unchanged and carrying its own conformance evidence — is an implementation
+prerequisite recorded in the run manifest §10.2. `rolling_origin_residuals` must not be
+reinterpreted as already satisfying this ruling.
+
+Both rulings are recorded in
+[`CLOUD_SCALING_THIRD_BASELINE_REPLAY_RUN_MANIFEST.md`](CLOUD_SCALING_THIRD_BASELINE_REPLAY_RUN_MANIFEST.md)
+§7 and §10, and in
+[`ADR_CLOUD_SCALING_THIRD_BASELINE_REPLAY_EVALUATION.md`](ADR_CLOUD_SCALING_THIRD_BASELINE_REPLAY_EVALUATION.md)
+§8.3–§8.4.
 
 ---
 

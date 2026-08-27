@@ -7,9 +7,17 @@ in §11 are deliberately unpopulated.
 **Governing design:** [`ADR_CLOUD_SCALING_THIRD_BASELINE_REPLAY_EVALUATION.md`](ADR_CLOUD_SCALING_THIRD_BASELINE_REPLAY_EVALUATION.md)
 **Governing ADR:** [`ADR_CLOUD_SCALING_PREDICTIVE_CAPACITY_INTELLIGENCE_PHASE2.md`](ADR_CLOUD_SCALING_PREDICTIVE_CAPACITY_INTELLIGENCE_PHASE2.md)
 
-> **No telemetry access or replay execution is authorized by this document. No third baseline
-> is ratified.** Two run-blocking repository gaps are recorded in §10; the run is prohibited
-> while either stands, independently of §11.
+**Amended 2026-08-27 (Amendment 3)** — both §10 blockers are ruled on and closed **for design
+purposes**. Two execution prerequisites replace them (§10).
+
+> **The replay remains unexecutable until the anonymized subject manifest and approved export
+> identity are populated and an evaluation implementation of the bounded causal residual-bank
+> protocol exists. No production uncertainty behavior is changed or ratified.**
+>
+> **No telemetry access is authorized by this document. No third baseline is ratified.** The
+> evaluation remains outcome-neutral. Point accuracy and interval calibration are **separate
+> ratification claims**: failure of the interval-coverage gate retires H even if its point MAE
+> passes.
 
 ## 1. Scope and non-authorization
 
@@ -80,7 +88,7 @@ members and are not proposed as such.
 
 | Reason | Condition |
 |---|---|
-| `INSUFFICIENT_SPAN` | fewer than 42 consecutive days of history (§4) |
+| `INSUFFICIENT_SPAN` | fewer than 49 consecutive days of history (§4) |
 | `TARGET_NOT_PRESENT` | the subject never carries this `ForecastTarget` |
 | `TARGET_UNIT_INCONSISTENT` | the target appears under more than one unit across the span |
 | `SYNTHETIC_SUBJECT` | harness-validation subject; excluded from ratification |
@@ -88,28 +96,27 @@ members and are not proposed as such.
 
 ## 4. Historical span, burn-in and scoring blocks
 
-A subject × target requires **at least 42 consecutive days** of available history:
+A subject × target requires **at least 49 consecutive days** of available history
+(raised from 42 by Amendment 3, to fund a dedicated interval-calibration block):
 
 ```
-day  0  ..  6   burn-in / calibration only — never scored
-day  7  .. 41   five consecutive 7-day scoring blocks
+day  0  ..  7   model-history burn-in — no forecast scored, no residual admitted
+day  7  .. 14   interval-calibration block — residuals only, never scored
+day 14  .. 49   five consecutive 7-day scoring blocks — the only weeks that count
 ```
 
 The first possible scored cutoff is:
 
 ```
-first_scored_cutoff = first_observation_event_time + 604800 seconds
+first_scored_cutoff = first_observation_event_time + 1209600 seconds
 ```
 
 rounded **forward** to the next aligned cutoff instant under §5.
 
-The burn-in is a **fixed 7-day boundary**, not a percentage. It exists because the harmonic
-arm cannot fit before its lookback is populated, and the rolling-origin calibration inside
-`compute_uncertainty` draws only on in-window samples. The boundary must not be moved after
-results are inspected; doing so voids the run.
-
-The five 7-day blocks are the unit of the existing 4-of-5 week-consistency gate in the
-evaluation design.
+Both boundaries are **fixed day counts**, not percentages, and neither may be moved after
+results are inspected; doing so voids the run. The **point-model lookback remains exactly
+seven days for every arm at every forecast origin** — the calibration block funds the residual
+bank (§7.2), it does not widen any model's window.
 
 ## 5. Deterministic cutoff schedule
 
@@ -167,28 +174,104 @@ implementation can choose the flattering one:
 The first matching entry wins. Failures below the reported one are still **counted** in the
 diagnostic tally, so precedence changes what is reported, never what is measured.
 
-## 7. Regime-break exclusion
+## 7. Regime breaks and uncertainty calibration (Amendment 3)
 
-A regime-break record may affect a cutoff only when **both** hold:
+### 7.1 Regime-break exclusion — none is applied
+
+**Ruling: this evaluation applies no regime-break exclusion.**
+
+The repository has no canonical regime-break record carrying both an effective event time and
+an independent knowledge timestamp (§10.1). No new export-contract requirement is created to
+rescue the experiment, and `DeploymentState`, `ObservationProvenance.collected_at`,
+`TopologySnapshot.as_of` and every other nearby timestamp are **not** treated as equivalent to
+a `recorded_at`.
+
+Consequences, recorded:
+
+- Every otherwise-eligible cutoff is **retained**, including those spanning deployments,
+  incidents and configuration changes.
+- No post-hoc removal using later-known labels is permitted, at any stage.
+- This is the **conservative direction**: it keeps the difficult origins rather than removing
+  them, so no arm's skill is inflated by quiet-period selection.
+- **No regime-specific performance may be claimed** from this run, in either direction.
+- If H fails because periodicity breaks during operational changes, **that failure counts**.
+  Operational reality is part of what is being tested.
+- Adding regime-break exclusion later defines a **different evaluation**, requiring a new
+  preregistered amendment and a new replay. It is not a re-analysis of this run.
+
+### 7.2 Bounded causal prequential residual bank
+
+**Ruling: the seven-day feature lookback is not shortened and the interval-coverage gate is not
+withdrawn.** The nested per-forecast rolling-origin expansion is replaced, **for this
+evaluation only**, by a causal prequential residual bank applied identically to P, T, N and H.
+
+This is an **evaluation protocol ruling, not a claim about shipped behavior**. The production
+uncertainty path is unmodified by this document, and §10.2 records what would be needed to run
+the protocol at all.
+
+**Calibration origins.** The already-ratified UTC quarter-hour schedule of §5 — minute
+∈ {00, 15, 30, 45}, second 00. One calibration origin every **900 seconds**, not one per
+60-second observation.
+
+**Banks.** One bank per `(subject_hash, target, horizon, arm)`.
+
+**Admission (as-of rule, non-negotiable).** A residual from origin `o` may enter the bank used
+at a later cutoff `c` only when **all** hold:
 
 ```
-recorded_at <= cutoff
-effective_event_time ∈ ( cutoff − lookback_seconds , cutoff + forecast_horizon_seconds ]
+the forecast at o was produced without abstention
+its actual match is unique and valid
+the matched actual's event time <= c
+all provenance and subject-matching rules pass
+o < c
 ```
 
-The first condition is the as-of test: it permits a scheduled *future* change that was already
-recorded and knowable at the cutoff, and forbids later-created incident labels, post-hoc
-deployment annotations and every other form of future knowledge. The second is the relevance
-window.
+A residual whose outcome is not yet observable at `c` must never enter the interval. This is
+the reason a bank is required rather than an in-window computation: for the 60-minute horizon
+near a window edge, an origin's actual may fall outside that origin's own seven-day window
+while still being observed at or before `c`.
 
-**Required record classes:** deployments · incidents · scaling-policy changes · material
-workload-configuration changes. Each requires an effective event time **and** a distinct
-`recorded_at`.
+**Bank bound.** At most the **672** most recent eligible residuals per bank
+(7 days × 96 quarter-hour origins/day). Eviction is deterministic: oldest forecast origin
+first, with event time and the canonical replay tie-breaker applied if origins collide.
 
-**Repository state — see §10.1.** No canonical record type for these exists in the package,
-and no canonical `recorded_at` exists on `CanonicalCapacityState`. This section is therefore
-specified but **not satisfiable from repository contracts today**, which is recorded as a
-run-blocking gap rather than worked around.
+**Configuration.** The preregistered `UncertaintyConfig` values for method, requested coverage,
+minimum calibration samples, match tolerance and calibration-window identity are used
+unchanged. `allow_point_only_when_uncalibrated` is **false** — which is also the shipped
+default (`.../forecasting/uncertainty.py:69`). An origin without enough causal calibration
+residuals is **not eligible for the interval-coverage gate** and is accounted for explicitly;
+it is never accepted as a point-only success.
+
+**Interval mathematics.** After the bounded residual set exists, the repository's existing
+construction is reused verbatim — sort, `alpha = 1 − requested_coverage`, type-7 quantiles at
+`alpha/2` and `1 − alpha/2`, interval `point + [lower_offset, upper_offset]`
+(`.../forecasting/uncertainty.py:222-236`). **No second interval formula is invented.**
+
+### 7.3 Scoring semantics
+
+The seven-day calibration block is excluded from **all** gates: MAE, signed bias, interval
+coverage, abstention rate and the 4-of-5 week-consistency gate. Only the five scoring weeks
+count toward ratification.
+
+During scoring the bank continues to update **causally** from eligible quarter-hour forecasts
+whose actuals have become observable. A residual is never computed from the current or a
+future outcome.
+
+The same calibration schedule, bank size, minimum-sample rule and interval method apply to all
+four arms.
+
+### 7.4 Cost in evaluation meaning
+
+- Preserves the seven-cycle point-model lookback.
+- Preserves the interval-coverage gate.
+- Reduces calibration origins from every 60-second sample to every 15 minutes.
+- Interval estimates therefore describe the error distribution **at the preregistered
+  decision-origin schedule**, not at every raw telemetry timestamp.
+- It changes the uncertainty-evaluation protocol away from the shipped nested rolling-origin
+  implementation, so **a successful replay does not by itself ratify production uncertainty
+  implementation**.
+- If H passes, production interval calibration requires a **separate implementation and
+  conformance decision**.
 
 ## 8. Target × horizon matrix and paired-set rule
 
@@ -204,120 +287,100 @@ independent of the other arms, its eligible-origin count, `forecast_count`,
 `subject_mismatch_count` and `ambiguous_count`, so paired-set intersection cannot conceal
 operational coverage loss.
 
-## 9. Run size
+## 9. Run size (Amendment 3 — bounded, no multiplicative expansion)
 
-### 9.1 Base point forecasts
-
-One fully eligible subject, five 7-day scoring blocks:
+### 9.1 Per fully eligible subject
 
 ```
-35 days × 96 cutoffs/day                      =     3,360 cutoffs
-3,360 × 4 targets × 3 horizons × 4 arms       =   161,280 base arm-cell forecasts
+calibration block  7 days × 96 origins/day × 4 targets × 3 horizons × 4 arms =  32,256 calls
+five scoring weeks 35 days × 96 origins/day × 4 targets × 3 horizons × 4 arms = 161,280 calls
+                                                                       total  = 193,536 calls
 ```
 
-For M fully eligible subjects:
+**There is no multiplicative R expansion.** The nested per-forecast rolling-origin expansion
+is replaced by the bounded bank of §7.2, so the earlier ≈ 1.63 × 10⁹ figure no longer applies.
+
+### 9.2 Partial target eligibility
 
 ```
-base_forecasts = 161,280 × M
+Σ_targets eligible(subject, target) × [ 8,064 calibration calls + 40,320 scoring calls ]
+
+  8,064 =   672 calibration origins × 3 horizons × 4 arms
+ 40,320 = 3,360 scoring origins     × 3 horizons × 4 arms
 ```
 
-With partial target eligibility:
+For M fully eligible subjects, `total_calls = 193,536 × M`.
 
-```
-base_forecasts = Σ_subjects Σ_targets eligible(subject, target) × 3,360 × 3 × 4
-               = Σ_subjects Σ_targets eligible(subject, target) × 40,320
-```
+### 9.3 Storage bounds
 
-### 9.2 Uncertainty expansion — R is not a configuration value
-
-```
-estimated_forecaster_calls = base_forecasts × (1 + R)
-```
-
-R is **not** a field of `UncertaintyConfig` (`.../forecasting/uncertainty.py:50-71`, whose
-fields are `method`, `requested_coverage`, `min_calibration_samples`,
-`match_tolerance_seconds`, `allow_point_only_when_uncalibrated`, `calibration_window_id`).
-`rolling_origin_residuals` iterates over **every sample in the window**
-(`.../forecasting/uncertainty.py:151-192`), so R is determined by window size:
-
-```
-R = |{ origins i : i ≥ min_history − 1 and a matched in-window actual exists }|
-R ≤ n_samples − (min_history − 1)
-```
-
-For the ratified seven-day window at 60-second cadence, `n_samples ≈ 10,080`, so
-**R ≈ 1.0 × 10⁴**, and per fully eligible subject:
-
-```
-estimated_forecaster_calls ≈ 161,280 × 10,078 ≈ 1.63 × 10⁹
-```
-
-R is statically knowable in form but is a consequence of the ratified lookback, not a knob.
-The 15-minute stride reduces base forecasts; it does **not** reduce R. See §10.2.
-
-### 9.3 Report-record volume
-
-Calibration predictions produce no records. Per fully eligible subject the run emits
-**161,280 `CapacityForecastEvidence` + `ForecastEvaluationRecord` pairs**, one per base
-forecast, plus one `AggregateEvaluation` per (arm, target, horizon) — 48 aggregates per
-subject. Record volume scales with §9.1, compute with §9.2; the two must not be conflated.
+- **Residual banks:** at most **672** residuals per
+  `(subject_hash, target, horizon, arm)` bank, bounded by construction and by eviction.
+- **Gating records:** **161,280** evidence + evaluation-record pairs per fully eligible
+  subject, one per scored forecast, plus 48 aggregates (one per arm × target × horizon).
+- **Calibration records** are stored and reported **separately** from gating records and enter
+  no gate (§7.3). Conflating the two would let the calibration block inflate coverage counts.
 
 ### 9.4 Sharding
 
 The replay can run in bounded shards **without** changing cutoff order or aggregation
-semantics, sharded by `(subject, target, horizon, arm)`. Each such shard is one
-`run_replay_evaluation` invocation over the full ordered cutoff sequence, and every cutoff
-rebuilds its history from observations by event time rather than from carried state
+semantics, sharded by `(subject, target, horizon, arm)` — the same key as the residual banks.
+Each shard is one ordered pass over the full cutoff sequence, and every cutoff rebuilds its
+history from observations by event time rather than from carried state
 (`.../forecasting/replay.py:165-175`), so shard boundaries introduce no state coupling.
 
-Two constraints on sharding: aggregation must be computed over the records of a *complete*
-shard, and the four-arm paired set (§8) can only be intersected once **all four arms** of a
-cell have completed. Sharding within a single cell's cutoff sequence is permitted but gains
-nothing and complicates the paired-set join.
+Two constraints: the residual bank is **ordered state within a shard**, so a shard must be
+processed in cutoff order and may not be split across the calibration/scoring boundary; and
+the four-arm paired set (§8) can be intersected only once all four arms of a cell complete.
 
-## 10. Run-blocking repository gaps
+## 10. Execution prerequisites (replacing the closed §10 blockers)
 
-Both must be resolved by a further owner ruling before any run. Neither is worked around here.
+Amendment 3 closes both former run-blocking gaps **for design purposes**. What remains is not
+a design gap but an implementation and population prerequisite.
 
-### 10.1 No canonical regime-break source and no as-of timestamp
+### 10.1 Regime breaks — ruled, closed
 
-- `CanonicalCapacityState` carries `observed_at` only. There is **no `recorded_at`** and no
-  ingestion timestamp on the state (`.../canonical/state.py:411-427`).
-- `DeploymentState` (`.../canonical/state.py:231-236`) carries `deploy_active`,
-  `rollout_phase`, `canary_active`, `version` and `deployment_age`. These are *state
-  co-timestamped with the observation*, so they are knowable at the cutoff — but they are a
-  deployment **signal**, not a deployment **record** with an independent effective time.
-- There is **no** incident record, **no** scaling-policy-change record and **no**
-  workload-configuration-change record anywhere in the package.
-- The nearest as-of field in the package is `ObservationProvenance.collected_at`
-  (`.../canonical/provenance.py:69`), documented as "when this record was produced (optional;
-  distinct from observed)". It is **optional**, and it is provenance for an observation — there
-  is no regime-break record for it to timestamp. `TopologySnapshot.as_of`
-  (`.../planning/topology.py:165`) is a Phase 3 planning effective time, not a knowledge
-  timestamp, and is not a regime-break source.
+Recorded for the record, since the ruling depends on it: `CanonicalCapacityState` carries
+`observed_at` only, with **no `recorded_at`** (`.../canonical/state.py:411-427`);
+`DeploymentState` (`.../canonical/state.py:231-236`) is a co-timestamped deployment *signal*,
+not a record with an independent effective time; there is no incident, scaling-policy-change or
+workload-configuration-change record anywhere in the package; and the nearest as-of field,
+`ObservationProvenance.collected_at` (`.../canonical/provenance.py:69`), is optional and
+observation-scoped, with no regime-break record to timestamp.
+`TopologySnapshot.as_of` (`.../planning/topology.py:165`) is a Phase 3 planning effective time,
+not a knowledge timestamp.
 
-**Consequence.** §7's `recorded_at <= cutoff` test cannot be evaluated from repository
-contracts. Until the approved export contract supplies both a regime-break record type and a
-distinct `recorded_at`, **no regime-break exclusion may be applied at all** — and applying
-none is the safe direction, since it retains the hardest origins rather than removing them.
-The alternative, inferring breaks from co-timestamped `DeploymentState`, would cover only
-deployments and is not authorized here.
+**Closed by §7.1: no exclusion is applied.** No prerequisite remains.
 
-### 10.2 Calibration expansion is unbounded by the ratified rulings
+### 10.2 Residual-supply seam — **missing; implementation prerequisite**
 
-At R ≈ 10⁴, a single fully eligible subject implies ≈ 1.63 × 10⁹ forecaster calls (§9.2), and
-each harmonic call is an OLS over up to 10,080 points. `rolling_origin_residuals` also runs an
-O(n²) inner match loop per forecast. The ratified stride bounds §9.1 but not §9.2, and
-`UncertaintyConfig` exposes no origin cap.
+The §7.2 protocol cannot be executed against the shipped path as it stands:
 
-Reducing R would mean changing shipped calibration behavior — production code this
-documentation change may not touch — or ratifying a different lookback or an origin-subsample
-rule. Recorded, not resolved.
+- `compute_uncertainty(window, forecaster, point, config)` **unconditionally** computes its own
+  residuals by calling `rolling_origin_residuals(window, forecaster, config)`
+  (`.../forecasting/uncertainty.py:210`). It has **no parameter** for a caller-supplied
+  residual collection.
+- `rolling_origin_residuals` (`.../forecasting/uncertainty.py:151-192`) *produces* residuals
+  over every in-window sample; it does not *accept* them. It must **not** be reinterpreted as
+  already satisfying this ruling — its origin set, its in-window-only matching and its
+  unbounded count all differ from §7.2.
+- The interval mathematics is **inline** inside `compute_uncertainty`
+  (`.../forecasting/uncertainty.py:222-236`) and its quantile helper is module-private and
+  absent from `__all__` (`.../forecasting/uncertainty.py:239-249`). There is therefore **no
+  public entry point that turns a residual sequence into an `UncertaintyInterval`**, and §7.2's
+  requirement to reuse the existing formula cannot currently be met without one.
+- The replay path reaches uncertainty through `forecast_with_evidence`
+  (`.../forecasting/evidence.py:312`), so any seam must be threaded from
+  `run_replay_evaluation` through evidence construction, not introduced at the leaf alone.
+
+**Prerequisite:** an evaluation-scoped seam that supplies a residual collection and reuses the
+existing interval construction unchanged, plus its own conformance evidence. Whether that seam
+is an optional parameter, a separate public function, or an evaluation-only wrapper is an
+implementation decision **not made here**, and no code is written by this document.
 
 ## 11. Fields to populate immediately before an authorized run
 
 Every field below is **empty by design**. The manifest is incomplete and the run is prohibited
-while any remains empty or while either §10 gap stands.
+while any remains empty or while the §10.2 prerequisite stands.
 
 | Field | To be filled |
 |---|---|
@@ -328,16 +391,19 @@ while any remains empty or while either §10 gap stands.
 | `per_target_eligibility_counts` | `eligible(subject, target)` totals for §9.1 |
 | `first_observation_event_time` / `last_observation_event_time` | per subject, UTC |
 | `first_scored_cutoff` / `last_scored_cutoff` | per subject × target, UTC-aligned per §5 |
+| `burn_in_and_calibration_boundaries` | the day-7 and day-14 edges per subject × target |
 | `scoring_block_boundaries` | the five 7-day block edges per subject × target |
 | `base_forecasts` | exact value from §9.1 |
-| `resolved_R` and `estimated_forecaster_calls` | exact values from §9.2 |
-| `estimated_record_volume` | exact value from §9.3 |
+| `estimated_forecaster_calls` | exact value from §9.1/§9.2 (no R expansion) |
+| `estimated_record_volume` | gating and calibration volumes, reported separately (§9.3) |
 | `frozen_config_digests` | `FeatureConfig`, `AdmissionPolicy`, `UncertaintyConfig`, normalization and series policy digests, identical across arms |
 | `match_tolerance_seconds` | frozen value, identical across arms |
 | `cutoff_sequence_digest` | digest of the ordered cutoff list per subject × target |
-| `regime_break_source` | blocked by §10.1 |
+| `residual_bank_plan` | bank key, 672 bound, eviction order, and the seam used (blocked by §10.2) |
 | `shard_plan` | shard boundaries under §9.4 |
 
 **Manifest incomplete / run prohibited.** The replay may not be executed until every field
-above is populated, both §10 gaps are resolved by owner ruling, and the evaluation design's
-gates are unchanged from their preregistered form.
+above is populated, the §10.2 residual-supply seam exists with its own conformance evidence,
+and the evaluation design's gates are unchanged from their preregistered form. No production
+uncertainty behavior is changed or ratified by this manifest, and no third baseline is
+ratified.

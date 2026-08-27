@@ -291,6 +291,46 @@ not measurement.
 These thresholds are not tuned after execution. A change to any of them is a new
 preregistration, not an amendment to this one.
 
+### 8.3 Uncertainty calibration protocol (Amendment 3)
+
+The interval-coverage gate in §7.2 is **retained**, and the seven-day point-model lookback is
+**not shortened**. Its residuals come from an evaluation-specific **bounded causal prequential
+residual bank**, specified in the run manifest §7.2 and applied identically to P, T, N and H:
+one bank per `(subject, target, horizon, arm)`, calibration origins on the ratified 15-minute
+UTC schedule, at most 672 residuals with oldest-origin-first eviction, and a strict as-of
+admission rule — a residual enters the bank for cutoff `c` only if its origin precedes `c` and
+its matched actual was observable at or before `c`.
+
+A dedicated 7-day calibration block funds the bank (history requirement 42 → **49 days**;
+burn-in day 0–7, calibration day 7–14, scoring day 14–49). The calibration block enters **no**
+gate — not MAE, signed bias, coverage, abstention rate, or week consistency.
+
+**This is an evaluation protocol, not shipped behavior.** `compute_uncertainty` computes its
+own residuals over every in-window sample and exposes no residual-supply parameter
+(`.../forecasting/uncertainty.py:210`, `:151-192`). Two consequences are load-bearing for what
+a pass here would mean:
+
+1. Executing this protocol requires an evaluation-scoped residual-supply seam that does not
+   exist (run manifest §10.2). It is an implementation prerequisite, not a design gap.
+2. **A successful replay does not ratify production uncertainty implementation.** Point
+   accuracy and interval calibration are separate ratification claims, and if H passes,
+   production interval calibration needs its own implementation and conformance decision.
+
+Failure of the interval-coverage gate retires H **even if its point MAE passes** (§10).
+
+### 8.4 Regime breaks — none excluded (Amendment 3)
+
+No regime-break exclusion is applied. The package carries no regime-break record with both an
+effective event time and an independent knowledge timestamp, and no nearby timestamp is
+treated as a substitute (run manifest §7.1, §10.1). Every otherwise-eligible cutoff is
+retained, including those spanning deployments, incidents and configuration changes; no
+post-hoc removal by later-known labels is permitted; **no regime-specific performance may be
+claimed**; and if H fails because periodicity breaks during operational changes, that failure
+counts. Adding exclusion later would define a different evaluation requiring a new
+preregistration and a new replay.
+
+This is the conservative direction: it retains the difficult origins rather than removing them.
+
 ## 9. Outcome table
 
 | Outcome | Condition | Consequence |
@@ -348,7 +388,9 @@ re-derivation of the equations, never an import from the Hybrid LLM lab.
 | `AbstentionReason` members (neither proposed reason present) | `.../forecasting/abstention.py:20-39` |
 | `AdmissionPolicy`, `UncertaintyConfig` fields | `.../forecasting/evidence.py:81-96`, `.../forecasting/uncertainty.py:50-71` |
 | stdlib-and-local-only boundary; `hybrid_llm` forbidden | `.../tests/forecasting/test_boundary.py:35-43`, `:55-66` |
-| Rolling-origin calibration iterates every in-window sample (R is not a config field) | `.../forecasting/uncertainty.py:151-192` |
+| Rolling-origin calibration iterates every in-window sample; `compute_uncertainty` takes no caller-supplied residuals | `.../forecasting/uncertainty.py:151-192`, `:210` |
+| Interval construction is inline and its quantile helper is module-private (no public residual→interval entry point) | `.../forecasting/uncertainty.py:222-236`, `:239-249` |
+| Replay reaches uncertainty through evidence construction | `.../forecasting/evidence.py:312` |
 | Package version `0.4.0` | `.../src/ugence_cloud_scaling_controller/version.py:7` |
 
 Paths under `.../` are relative to `packages/capabilities/cloud-scaling-controller/`.
