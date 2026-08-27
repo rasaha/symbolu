@@ -65,6 +65,11 @@ class PackageConfig:
     refusal_calls: frozenset
     #: True when a bare ``return (_Outcome.X, ...)`` tuple is a refusal in this package.
     tuple_refusals: bool
+    #: ``module:function`` whose successful return is an artifact this package mints. The
+    #: sweep counts calls to it, so "removing this guard mints something the baseline did
+    #: not" becomes a measured property instead of a thing a reader has to notice. Three
+    #: such guards were found in this package by accident before this existed.
+    mint_site: str
     #: The inventories this package already records, and what each is defined over.
     recorded: tuple
     #: Guards this operator cannot score, keyed by ``(module, condition)`` rather than by
@@ -110,6 +115,8 @@ PACKAGES = {
         key="authorization-contracts",
         package_dir="packages/integration/cloud-scaling-authorization-contracts",
         dist_name="ugence_cloud_scaling_authorization_contracts",
+        mint_site="ugence_cloud_scaling_authorization_contracts.candidate:"
+                  "build_capacity_authorization_candidate",
         module_order=(
             "canonical.py",
             "identifiers.py",
@@ -192,6 +199,8 @@ PACKAGES = {
         key="policy-authenticity",
         package_dir="packages/integration/cloud-scaling-policy-authenticity",
         dist_name="ugence_cloud_scaling_policy_authenticity",
+        mint_site="ugence_cloud_scaling_policy_authenticity.verification:"
+                  "_mint_verified_artifact",
         module_order=(
             "canonical.py",
             "identifiers.py",
@@ -389,6 +398,13 @@ class Guard:
     header_end: int
     is_elif: bool
     shape: str
+    #: "if" — a statement guard, neutralised by rewriting its header to `if False:`.
+    #: "outcome-selection" — a conditional *expression* choosing between two typed
+    #: outcomes, neutralised by collapsing it to its ``else`` branch. The `if False:`
+    #: operator cannot touch one, which is why they were invisible until an audit
+    #: measured that they decide the reason a caller is entitled to act on.
+    kind: str = "if"
+    span: tuple = ()
     recorded_in: str = ""
     outcome: str = ""
     scored: bool = False
@@ -464,17 +480,14 @@ def _refusal_shape(node, config: PackageConfig) -> str:
         for inner in ast.walk(statement):
             if isinstance(inner, ast.Raise):
                 raises = True
-            elif isinstance(inner, ast.Expr) and isinstance(inner.value, ast.Call):
-                # A *statement* call, never one whose result is bound. An admission is
-                # called for its refusal and its return value is discarded;
-                # ``issued_at = _parse_ts(issued_at)`` calls the same kind of helper for
-                # its value, and that ``if`` is a normalisation branch rather than a gate.
-                # Counting it made the sweep unscorable: neutralising a conversion changes
-                # what the suite can even collect, which is not a kill and not a survival.
-                call_node = inner.value
-                name = getattr(call_node.func, "id", None) or getattr(
-                    call_node.func, "attr", None
-                )
+            elif isinstance(inner, ast.Call):
+                # Any call to a raising helper, whether or not its result is bound. This
+                # used to exclude bound calls as "conversions". An audit measured all three
+                # justifications false for the one site the carve-out excluded
+                # (``attestation.py:261``): neutralising it produces a typed refusal, leaves
+                # the collected population identical, and survives the entire suite — so the
+                # carve-out was not describing a conversion, it was hiding an untested gate.
+                name = getattr(inner.func, "id", None) or getattr(inner.func, "attr", None)
                 if name in helpers:
                     helper_call = True
             if isinstance(inner, ast.Return):
@@ -501,6 +514,29 @@ def _refusal_shape(node, config: PackageConfig) -> str:
     return ""
 
 
+def _selects_an_outcome(node) -> bool:
+    """A conditional expression choosing between two *different* typed outcomes.
+
+    ``reason = A if cond else B`` decides which reason a caller is entitled to act on, which
+    §9.1 makes part of the contract. It is a decision point by that definition even though no
+    ``if`` statement is involved, and the ``if False:`` operator cannot reach it — so it is
+    collapsed to its ``else`` branch instead.
+    """
+
+    def _outcome_attr(value):
+        return (
+            isinstance(value, ast.Attribute)
+            and isinstance(value.value, ast.Name)
+            and value.value.id in {"_Outcome", "_Reason", "Reason"}
+        )
+
+    return (
+        _outcome_attr(node.body)
+        and _outcome_attr(node.orelse)
+        and node.body.attr != node.orelse.attr
+    )
+
+
 def _raise_alone(node) -> bool:
     """The canonical-65 shape: a ``raise`` alone in the body of its enclosing ``if``."""
 
@@ -524,8 +560,34 @@ def inventory(config: PackageConfig) -> list:
                 shape = _refusal_shape(node, config)
                 if shape:
                     found.append((node, shape))
+            elif isinstance(node, ast.IfExp) and _selects_an_outcome(node):
+                found.append((node, "outcome selection"))
         for node, shape in sorted(found, key=lambda pair: pair[0].lineno):
             index += 1
+            if shape == "outcome selection":
+                guards.append(
+                    Guard(
+                        index=index,
+                        module=module,
+                        lineno=node.lineno,
+                        condition=ast.unparse(node.test),
+                        header_end=node.lineno,
+                        is_elif=False,
+                        shape=shape,
+                        recorded_in="",
+                        outcome=", ".join(
+                            sorted({node.body.attr, node.orelse.attr})
+                        ),
+                        kind="outcome-selection",
+                        span=(
+                            node.lineno,
+                            node.col_offset,
+                            node.end_lineno,
+                            node.end_col_offset,
+                        ),
+                    )
+                )
+                continue
             header = lines[node.lineno - 1].lstrip()
             recorded_in = ""
             for name, (scope, _count) in recorded_scope.items():
@@ -591,10 +653,45 @@ def excluded(config: PackageConfig) -> dict:
     return {"except_arms": except_arms, "boolean_subterms": boolean_subterms}
 
 
+def _span_text(lines, span) -> str:
+    """The exact source text of a node, from its (line, col, end_line, end_col) span."""
+
+    start_line, start_col, end_line, end_col = span
+    if start_line == end_line:
+        return lines[start_line - 1][start_col:end_col]
+    first = lines[start_line - 1][start_col:]
+    middle = "".join(lines[start_line : end_line - 1])
+    last = lines[end_line - 1][:end_col]
+    return first + middle + last
+
+
 def mutate(config: PackageConfig, guard: Guard, workdir: Path) -> None:
-    """Rewrite exactly this guard's ``if`` header to ``if False:`` in the copy."""
+    """Neutralise exactly this guard in the copy.
+
+    Two operators, one per kind. A statement guard has its ``if`` header rewritten to
+    ``if False:``. A decision point that is a conditional *expression* cannot be reached that
+    way — there is no header to rewrite — so it is collapsed to its ``else`` branch, which
+    removes the choice while leaving the program syntactically whole. Collapsing to the
+    ``else`` is deliberate: the ``if`` branch is the more specific diagnosis, and losing it
+    is exactly the defect the guard exists to prevent.
+    """
 
     path = workdir / "src" / config.dist_name / guard.module
+    if guard.kind == "outcome-selection":
+        source = path.read_text(encoding="utf-8")
+        lines = source.splitlines(keepends=True)
+        start_line, start_col, end_line, end_col = guard.span
+        prefix = "".join(lines[: start_line - 1]) + lines[start_line - 1][:start_col]
+        suffix = lines[end_line - 1][end_col:] + "".join(lines[end_line:])
+        # The ``else`` branch read back from the source, never reconstructed from the
+        # inventory, so a rename cannot silently substitute a different member. Parenthesised
+        # because a multi-line conditional carries its continuation indentation with it.
+        expression = ast.parse("(" + _span_text(lines, guard.span) + ")", mode="eval")
+        path.write_text(
+            prefix + ast.unparse(expression.body.orelse) + suffix, encoding="utf-8"
+        )
+        return
+
     lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
     original = lines[guard.lineno - 1]
     indent = original[: len(original) - len(original.lstrip())]
@@ -611,6 +708,7 @@ def run_suite(
     timeout: int = 1800,
     suite_args: tuple = ("tests",),
     require_green: bool = False,
+    mint_site: str = "",
 ) -> dict:
     """Run the suite in the copy, and score it only if it collected the same population.
 
@@ -623,7 +721,8 @@ def run_suite(
     """
 
     process = subprocess.run(
-        [sys.executable, "-m", "pytest", *suite_args, "-p", "no:cacheprovider", "--tb=no"],
+        [sys.executable, "-m", "pytest", *suite_args, "-p", "no:cacheprovider",
+         "-p", "_ugence_mint_counter", "--tb=no"],
         cwd=str(workdir),
         capture_output=True,
         text=True,
@@ -641,8 +740,12 @@ def run_suite(
             # collected population stays identical between baseline and mutant, which is what
             # the scorer compares.
             "UGENCE_GUARD_SWEEP": "1",
+            "UGENCE_MINT_SITE": mint_site,
+            "UGENCE_MINT_OUT": str(workdir / ".ugence-mints"),
         },
     )
+    mint_path = workdir / ".ugence-mints"
+    mints = int(mint_path.read_text()) if mint_path.exists() else None
     output = process.stdout + process.stderr
     tail = " | ".join(line for line in output.strip().splitlines()[-6:])[:600]
     # Every non-scorable answer carries the tail. "collection error" on its own names a
@@ -694,6 +797,7 @@ def run_suite(
         }
     return {
         "scored": True,
+        "mints": mints,
         "why": "",
         "collected": collected,
         "failed": re.findall(r"^FAILED (\S+)", output, re.M),
@@ -715,6 +819,50 @@ def _workdir(config: PackageConfig) -> Path:
     return root / config.package_dir.split("/")[-1]
 
 
+#: A pytest plugin dropped into the copy. It replaces the mint function everywhere it is
+#: already bound — not just on its defining module — because a test that did
+#: ``from pkg import build_x`` holds its own reference, and patching one name would count
+#: nothing. Written into the copy rather than the package: the tracked tree is never touched.
+_MINT_PLUGIN = '''
+import atexit
+import os
+import sys
+
+
+_COUNT = [0]
+
+
+def pytest_configure(config):
+    import importlib
+
+    module_name, function_name = os.environ["UGENCE_MINT_SITE"].split(":")
+    module = importlib.import_module(module_name)
+    original = getattr(module, function_name)
+
+    def counting(*args, **kwargs):
+        result = original(*args, **kwargs)
+        _COUNT[0] += 1
+        return result
+
+    counting.__wrapped__ = original
+    for bound in list(sys.modules.values()):
+        if bound is None:
+            continue
+        try:
+            names = vars(bound)
+        except TypeError:
+            continue
+        for name, value in list(names.items()):
+            if value is original:
+                setattr(bound, name, counting)
+
+
+def pytest_sessionfinish(session, exitstatus):
+    with open(os.environ["UGENCE_MINT_OUT"], "w", encoding="utf-8") as handle:
+        handle.write(str(_COUNT[0]))
+'''
+
+
 def prepare_copy(config: PackageConfig) -> Path:
     """A disposable copy **outside the repository**, so no repo-wide scan ever sees it."""
 
@@ -725,6 +873,7 @@ def prepare_copy(config: PackageConfig) -> Path:
     shutil.copytree(config.root, workdir, ignore=shutil.ignore_patterns(
         "__pycache__", "*.pyc", ".pytest_cache", "build", "dist", "*.egg-info"
     ))
+    (workdir / "_ugence_mint_counter.py").write_text(_MINT_PLUGIN, encoding="utf-8")
     return workdir
 
 
@@ -1117,7 +1266,9 @@ def main() -> int:
         mine = [g for g in mine if g.index in wanted]
 
     workdir = prepare_copy(config)
-    baseline = run_suite(workdir, suite_args=suite_args, require_green=True)
+    baseline = run_suite(
+        workdir, suite_args=suite_args, require_green=True, mint_site=config.mint_site
+    )
     if not baseline["scored"]:
         print(f"baseline is not scorable: {baseline['why']}", file=sys.stderr)
         return 2
@@ -1129,7 +1280,10 @@ def main() -> int:
         prepare_copy(config)
         mutate(config, guard, workdir)
         outcome = run_suite(
-            workdir, baseline_collected=baseline["collected"], suite_args=suite_args
+            workdir,
+            baseline_collected=baseline["collected"],
+            suite_args=suite_args,
+            mint_site=config.mint_site,
         )
         # Differential, not absolute. ``require_green`` already refuses a red baseline, so
         # this should never subtract anything — it is here because the failure it guards
@@ -1137,6 +1291,17 @@ def main() -> int:
         # kill it did not earn) is not one the numbers reveal on their own.
         new_failures = [f for f in outcome["failed"] if f not in baseline_failures]
         killed = outcome["scored"] and bool(new_failures)
+        # Did neutralising this guard let the package MINT something the baseline refused?
+        # That is a different and worse class than "the refusal changed": it means the guard
+        # was the last obstacle before an artifact. Three such guards were found by accident
+        # before this was measured; this makes the class visible rather than lucky.
+        baseline_mints = baseline.get("mints")
+        mutant_mints = outcome.get("mints")
+        mints_more = (
+            baseline_mints is not None
+            and mutant_mints is not None
+            and mutant_mints > baseline_mints
+        )
         results.append(
             {
                 "index": guard.index,
@@ -1149,10 +1314,15 @@ def main() -> int:
                 "why_not": outcome["why"],
                 "killed": killed,
                 "killed_by": new_failures[:5],
+                "mints": mutant_mints,
+                "mints_more_than_baseline": mints_more,
             }
         )
         state = "KILLED" if killed else ("SURVIVED" if outcome["scored"] else "UNSCORED")
-        print(f"  [{guard.index:>3}] {guard.module}:{guard.lineno} {state}", flush=True)
+        note = "  MINTS" if mints_more else ""
+        print(
+            f"  [{guard.index:>3}] {guard.module}:{guard.lineno} {state}{note}", flush=True
+        )
 
     # Outside the repository, deliberately. A sweep that wrote into the tracked tree would
     # make the very check that proves it did not mutate anything (`git diff --exit-code`)
