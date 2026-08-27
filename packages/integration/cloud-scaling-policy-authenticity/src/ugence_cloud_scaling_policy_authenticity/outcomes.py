@@ -151,6 +151,14 @@ class PolicyAuthenticityOutcome(str, Enum):
     #: assertion, the decision evaluation, or the attestation issuance. A determination
     #: cannot be about a moment before the evidence it rests on came into being.
     CANDIDATE_FACT_NOT_YET_OCCURRED = "CANDIDATE_FACT_NOT_YET_OCCURRED"
+    #: One of the candidate's six carried instants is not exactly a ``datetime``. Phase 5A
+    #: admits them exactly at construction, but this boundary accepts a candidate object it
+    #: did not build, and ``object.__new__`` and ``pickle`` both bypass ``__post_init__``.
+    #: A ``datetime`` subclass overriding the comparison operators satisfies every window
+    #: below by fiat, with ``candidate_digest`` unmoved because the canonical rendering of a
+    #: subclass is byte-identical to the plain value's. The type is the only place the
+    #: difference survives, so it is re-checked here rather than inherited.
+    CANDIDATE_FACT_NOT_EXACT_INSTANT = "CANDIDATE_FACT_NOT_EXACT_INSTANT"
 
     # --- the resolved projection, and the bounds it authenticates (R-8, 5B-3) ------------
     #: The resolution carried no descriptor projection, so the body digest could not be

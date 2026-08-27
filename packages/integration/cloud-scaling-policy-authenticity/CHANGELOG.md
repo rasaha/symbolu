@@ -1,5 +1,42 @@
 # Changelog — ugence-cloud-scaling-policy-authenticity
 
+## [0.8.0] — gate 13 re-checks the six carried instants by exact type
+
+**No partition change and no profile bump.** `VERIFICATION_PROFILE_VERSION` stays `v4` and
+every frozen digest is unmoved. This changes which inputs produce an artifact — a candidate
+carrying a lying `datetime` subclass no longer produces one — not what an artifact contains,
+nor what it establishes about an input that was already exactly typed.
+
+### Fixed — the residual the ratification ADR ruled on and 5B-3 left open
+
+Phase 5A admits the six carried instants exactly in `__post_init__`. This package accepts a
+candidate object it did not build, and both `object.__new__` and `pickle` construct one
+without running `__post_init__` at all — so that admission was never something this boundary
+could inherit.
+
+Measured before the repair, one field at a time, with a plain-`datetime` control for each:
+
+| Carried instant | plain `datetime` at the same value | `datetime` subclass |
+|---|---|---|
+| `subject_valid_from_fact` | `CANDIDATE_RECOMMENDATION_NOT_YET_VALID` | **VERIFIED** |
+| `subject_valid_until_fact` | `CANDIDATE_RECOMMENDATION_EXPIRED` | **VERIFIED** |
+| `subject_asserted_at_fact` | `CANDIDATE_FACT_NOT_YET_OCCURRED` | **VERIFIED** |
+| `decision_evaluated_at_fact` | `CANDIDATE_FACT_NOT_YET_OCCURRED` | **VERIFIED** |
+| `decision_expires_at_fact` | `CANDIDATE_DECISION_EXPIRED` | **VERIFIED** |
+| `attestation_issued_at_fact` | `CANDIDATE_FACT_NOT_YET_OCCURRED` | **VERIFIED** |
+
+Four overridden comparison operators were the whole attack, and no digest could see it:
+`to_canonical_obj` renders a subclass to exactly the string a plain `datetime` produces, so
+`candidate_digest` never moved. The type is the only place the difference survives.
+
+`CANDIDATE_FACT_NOT_EXACT_INSTANT` refuses it, **before** the window comparisons rather than
+beside them — a value that lies about `<` and `>` cannot be caught by comparing it. Among
+exactly-typed candidates the existing refusal order is untouched, which the suite asserts
+rather than assumes.
+
+`pickle` and `deepcopy` are covered too: the gate is written against the property, not
+against `object.__new__`.
+
 ## [0.7.0] — R-8 reconciliation: the authenticated bound and the candidate's meet
 
 **Profile bump with no partition change.** `VERIFICATION_PROFILE_VERSION` moves from `v3` to `v4` because gate 16 changes what a determination establishes about a candidate, and every frozen artifact digest moves with it.
