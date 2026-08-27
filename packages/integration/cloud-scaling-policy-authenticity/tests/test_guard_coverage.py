@@ -36,6 +36,7 @@ from ugence_cloud_scaling_policy_authenticity.errors import (
 # --- canonical.py ---------------------------------------------------------------------
 
 
+@pytest.mark.adversarial
 @pytest.mark.parametrize("domain", ["", 0, None, b"cloud_scaling"])
 def test_a_framed_digest_domain_that_is_not_a_non_empty_str_is_refused(domain):
     """Guard 1 — ``canonical.py:89``, ``type(domain) is not str or not domain``.
@@ -51,6 +52,7 @@ def test_a_framed_digest_domain_that_is_not_a_non_empty_str_is_refused(domain):
         framed_digest(domain=domain, body={"a": 1})
 
 
+@pytest.mark.adversarial
 def test_an_instant_that_is_not_exactly_a_datetime_is_refused():
     """Guard 9 — ``canonical.py:184``, ``type(value) is not datetime``.
 
@@ -75,6 +77,7 @@ def test_an_instant_that_is_not_exactly_a_datetime_is_refused():
 # --- resolution_port.py ---------------------------------------------------------------
 
 
+@pytest.mark.adversarial
 def test_a_resolution_port_built_without_a_registry_is_refused():
     """Guard 17 — ``resolution_port.py:193``, ``registry is None``.
 
@@ -100,6 +103,7 @@ def test_a_resolution_port_built_without_a_registry_is_refused():
 # --- verification.py: the verifier's own configuration --------------------------------
 
 
+@pytest.mark.adversarial
 def test_a_resolution_port_that_cannot_resolve_is_refused_at_construction():
     """Guard 65 — ``verification.py:315``, ``not hasattr(port, 'resolve_policy_version')``.
 
@@ -118,6 +122,7 @@ def test_a_resolution_port_that_cannot_resolve_is_refused_at_construction():
         PolicyAuthenticityVerifier(resolution_port=PortWithoutTheMethod())
 
 
+@pytest.mark.adversarial
 def test_a_result_carrying_a_foreign_resolution_type_is_refused():
     """Guard 57 — ``verification.py:207``, ``type(self.resolution) is not PolicyResolution``.
 
@@ -153,6 +158,7 @@ def test_a_result_carrying_a_foreign_resolution_type_is_refused():
 # --- verified.py: the R-3 gate on the artifact ----------------------------------------
 
 
+@pytest.mark.adversarial
 def test_an_artifact_whose_content_digest_differs_from_its_body_digest_is_refused():
     """Guard 41 — ``verified.py:525``, ``policy_content_digest != policy_body_digest``.
 
@@ -219,6 +225,7 @@ def _verify_with(port, record, **kwargs):
     )
 
 
+@pytest.mark.adversarial
 def test_a_record_carrying_another_coordinate_is_refused():
     """Guard 81 — ``verification.py:512``, ``record.coordinate != coordinate``.
 
@@ -244,6 +251,7 @@ def test_a_record_carrying_another_coordinate_is_refused():
     assert result.refusal.outcome is PolicyAuthenticityOutcome.RESOLUTION_MALFORMED
 
 
+@pytest.mark.adversarial
 def test_a_descriptor_identity_that_is_not_a_pair_of_strings_is_refused():
     """Guard 97 — ``verification.py:692``, the descriptor identity's exact typing.
 
@@ -263,6 +271,7 @@ def test_a_descriptor_identity_that_is_not_a_pair_of_strings_is_refused():
     assert result.refusal.outcome is PolicyAuthenticityOutcome.POLICY_PROJECTION_ABSENT
 
 
+@pytest.mark.adversarial
 def test_a_signed_bound_this_profile_cannot_read_is_refused():
     """Guard 105 — ``verification.py:775``, ``absent``.
 
@@ -318,6 +327,7 @@ def test_a_signed_bound_this_profile_cannot_read_is_refused():
 # without a test noticing.
 
 
+@pytest.mark.adversarial
 @pytest.mark.parametrize(
     "value",
     ["", "sha256:" + "a" * 64, "A" * 64, "z" * 64, "a" * 63, None, 0, b"a" * 64],
@@ -338,6 +348,7 @@ def test_a_value_that_is_not_a_bare_policy_digest_is_refused(value):
         require_policy_digest("policy_body_digest", value)
 
 
+@pytest.mark.adversarial
 @pytest.mark.parametrize(
     "value", ["", "a" * 64, "sha256:" + "A" * 64, "sha256:" + "a" * 63, None, 0]
 )
@@ -356,6 +367,7 @@ def test_a_value_that_is_not_a_phase_5a_digest_is_refused(value):
         require_phase5a_digest("candidate_digest_fact", value)
 
 
+@pytest.mark.adversarial
 def test_text_that_is_not_exactly_a_str_is_refused():
     """Guard 4 — ``canonical.py:146``, ``type(value) is not str``.
 
@@ -377,6 +389,7 @@ def test_text_that_is_not_exactly_a_str_is_refused():
         require_nfc_text("policy_id", LyingText("p-1"))
 
 
+@pytest.mark.adversarial
 def test_empty_text_is_refused_unless_explicitly_permitted():
     """Guard 5 — ``canonical.py:151``, ``not allow_empty and value == ''``.
 
@@ -394,6 +407,7 @@ def test_empty_text_is_refused_unless_explicitly_permitted():
     assert require_nfc_text("tenant_id", "", allow_empty=True) == ""
 
 
+@pytest.mark.adversarial
 def test_text_that_is_not_nfc_normalized_is_refused():
     """Guard 6 — ``canonical.py:153``, ``normalize('NFC', value) != value``.
 
@@ -411,6 +425,7 @@ def test_text_that_is_not_nfc_normalized_is_refused():
         require_nfc_text("policy_id", decomposed)
 
 
+@pytest.mark.adversarial
 def test_an_identifier_carrying_surrounding_whitespace_is_refused():
     """Guard 7 — ``canonical.py:169``, ``text != text.strip()``."""
 
@@ -422,6 +437,7 @@ def test_an_identifier_carrying_surrounding_whitespace_is_refused():
         require_canonical_identifier("policy_id", " p-1 ")
 
 
+@pytest.mark.adversarial
 def test_an_identifier_carrying_control_whitespace_is_refused():
     """Guard 8 — ``canonical.py:171``, control whitespace that is not a plain space.
 
@@ -438,6 +454,7 @@ def test_an_identifier_carrying_control_whitespace_is_refused():
         require_canonical_identifier("policy_id", "a\tb")
 
 
+@pytest.mark.adversarial
 def test_a_naive_instant_is_refused_rather_than_assumed_utc():
     """Guard 10 — ``canonical.py:186``, ``tzinfo is None or utcoffset() is None``.
 
@@ -456,6 +473,7 @@ def test_a_naive_instant_is_refused_rather_than_assumed_utc():
         require_aware_utc("as_of", datetime(2026, 1, 1, 0, 0))
 
 
+@pytest.mark.adversarial
 def test_a_value_of_the_wrong_exact_type_is_refused():
     """Guard 11 — ``canonical.py:202``, ``type(value) is not expected``."""
 
@@ -486,6 +504,7 @@ def test_a_value_of_the_wrong_exact_type_is_refused():
 # whatever is actually installed, so the exclusions are void the moment they stop holding.
 
 
+@pytest.mark.invariant
 def test_the_import_time_separations_hold_for_the_installed_distributions():
     """The test-time half of the import-time separations (guards 12-16).
 
@@ -542,6 +561,7 @@ def _genuine_port_parts():
     return port._registry, port._signature_verifier, port._adapters
 
 
+@pytest.mark.adversarial
 def test_a_resolution_port_built_without_a_signature_verifier_is_refused():
     """Guard 18 — ``resolution_port.py:195``, ``signature_verifier is None``.
 
@@ -560,6 +580,7 @@ def test_a_resolution_port_built_without_a_signature_verifier_is_refused():
         )
 
 
+@pytest.mark.adversarial
 @pytest.mark.parametrize("missing", ["get_issued", "revocations_for"])
 def test_a_registry_missing_a_required_method_is_refused(missing):
     """Guard 20 — ``resolution_port.py:206``, ``not hasattr(registry, attribute)``.
@@ -589,6 +610,7 @@ def test_a_registry_missing_a_required_method_is_refused(missing):
         )
 
 
+@pytest.mark.adversarial
 def test_a_signature_verifier_that_cannot_verify_is_refused():
     """Guard 21 — ``resolution_port.py:210``, ``not hasattr(verifier, 'verify')``."""
 
@@ -609,6 +631,7 @@ def test_a_signature_verifier_that_cannot_verify_is_refused():
         )
 
 
+@pytest.mark.adversarial
 def test_a_reference_grade_port_cannot_reach_a_production_determination(monkeypatch):
     """Guard 22 — ``resolution_port.py:354``, the reference-grade refusal.
 
@@ -662,6 +685,7 @@ def _build(genuine, fields, digest):
     )
 
 
+@pytest.mark.adversarial
 def test_an_artifact_naming_an_unadmitted_signature_algorithm_is_refused():
     """Guard 34 — ``verified.py:476``, ``signature_alg not in SUPPORTED_...``.
 
@@ -674,6 +698,7 @@ def test_an_artifact_naming_an_unadmitted_signature_algorithm_is_refused():
         _build(genuine, fields, digest)
 
 
+@pytest.mark.adversarial
 def test_a_capacity_bounds_fact_that_is_not_a_tuple_is_refused():
     """Guard 37 — ``verified.py:496``, ``type(capacity_bounds_fact) is not tuple``.
 
@@ -688,6 +713,7 @@ def test_a_capacity_bounds_fact_that_is_not_a_tuple_is_refused():
         _build(genuine, fields, digest)
 
 
+@pytest.mark.adversarial
 def test_an_empty_capacity_bounds_fact_is_refused_in_favour_of_none():
     """Guard 38 — ``verified.py:501``, ``not self.capacity_bounds_fact``.
 
@@ -701,6 +727,7 @@ def test_an_empty_capacity_bounds_fact_is_refused_in_favour_of_none():
         _build(genuine, fields, digest)
 
 
+@pytest.mark.adversarial
 def test_a_bound_that_is_not_exactly_a_verified_capacity_bound_is_refused():
     """Guard 39 — ``verified.py:508``, ``type(bound) is not VerifiedCapacityBound``."""
 
@@ -711,6 +738,7 @@ def test_a_bound_that_is_not_exactly_a_verified_capacity_bound_is_refused():
         _build(genuine, fields, digest)
 
 
+@pytest.mark.adversarial
 def test_an_artifact_whose_digest_does_not_cover_its_facts_is_refused():
     """Guard 42 — ``verified.py:534``, ``artifact_digest != expected``.
 
@@ -724,6 +752,7 @@ def test_an_artifact_whose_digest_does_not_cover_its_facts_is_refused():
         _build(genuine, fields, "c" * 64)
 
 
+@pytest.mark.adversarial
 @pytest.mark.parametrize("name", ["resolved_as_of_fact", "trust_configuration_digest"])
 def test_reading_a_recorded_fact_through_verified_fact_is_refused(name):
     """Guard 43 — ``verified.py:675``, ``name in RECORDED_FACT_NAMES``.
@@ -739,6 +768,7 @@ def test_reading_a_recorded_fact_through_verified_fact_is_refused(name):
         _genuine().verified_fact(name)
 
 
+@pytest.mark.adversarial
 def test_a_look_alike_is_refused_at_the_consumption_boundary():
     """Guard 46 — ``verified.py:737``, ``type(value) is not VerifiedPolicyAuthenticity``.
 
@@ -763,6 +793,7 @@ def test_a_look_alike_is_refused_at_the_consumption_boundary():
         require_verified_policy_authenticity(LookAlike(genuine))
 
 
+@pytest.mark.invariant
 def test_the_fact_partition_is_total_and_disjoint():
     """Guards 50 and 51 — ``verified.py:775`` and ``:780``, the partition's import guards.
 
