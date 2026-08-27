@@ -15,14 +15,19 @@ This package records no prior inventory; this is the first one.
 
 ## Classification
 
-Every guard is classified: **116 `SCORED`** — the
+Every guard is classified: **111 `SCORED`** — the
 sweep neutralises it and the suite must fail — and
-**1 `EXCLUDED`**, each with a reason from a closed vocabulary and
+**6 `EXCLUDED`**, each with a reason from a closed vocabulary and
 a test that measures the reason. A guard is never excluded because it survived; a
 survivor with no prior declaration fails the sweep.
 
 | Module:line | Reason | Why | Measured by |
 |---|---|---|---|
+| `identifiers.py:186` | `unscorable-by-single-checkout-fixture` | The right operand is `AUTHORITY_PROTOCOL_ID`, imported from `ugence_policy_authority.api`. A Policy Authority release that renamed its protocol identifier to this package's verification profile would make the condition true, and this package consumes that protocol rather than being a version of it. Real and reachable; only unscorable by a fixture that installs one resolution. | `tests/test_guard_coverage.py::test_the_import_time_separations_hold_for_the_installed_distributions` |
+| `identifiers.py:191` | `unscorable-by-single-checkout-fixture` | The right operand is the Policy Authority's own `POLICY_BODY_DIGEST_DOMAIN`. Collapsing the two domains would let a verification artifact's digest be read as a policy body digest, and an upstream release controls one side of the comparison. | `tests/test_guard_coverage.py::test_the_import_time_separations_hold_for_the_installed_distributions` |
+| `identifiers.py:196` | `equivalent-mutant` | The one of the five that is genuinely equivalent: all three domains are frozen literals in this module, in this distribution, so no resolution can move any of them and the condition is false in every program this package can be part of. | `tests/test_guard_coverage.py::test_the_import_time_separations_hold_for_the_installed_distributions` |
+| `identifiers.py:210` | `unscorable-by-single-checkout-fixture` | Both operands are members of the Policy Authority's `KeyEntitlement`. An upstream release that aliased ISSUE_POLICY and REVOKE_POLICY to one member would make the condition true and let a revoke-only key authenticate an issued policy. | `tests/test_guard_coverage.py::test_the_import_time_separations_hold_for_the_installed_distributions` |
+| `identifiers.py:224` | `unscorable-by-single-checkout-fixture` | The left operand is Phase 5A's `CANONICAL_ACTION_TYPES`, from a separately versioned distribution. Gate 16 selects an authenticated bound by this vocabulary, so a drifted set is exactly what this guard exists to refuse. | `tests/test_guard_coverage.py::test_the_import_time_separations_hold_for_the_installed_distributions` |
 | `verification.py:775` | `diagnostic-only` | Every input this guard refuses is refused identically without it. A bound missing a field reaches `entry[name]` nineteen lines below, inside a deliberate `except Exception` backstop that re-raises as the same `_BoundsShapeError` and therefore the same POLICY_BOUNDS_MALFORMED outcome; only the message changes, from "bounds[0] omits ['max_permitted_delta']" to "bounds[0]: 'max_permitted_delta'". Under ADR Phase 5 §9.1 the message is not the contract. The guard is kept because it names every absent field at once rather than the first one `entry[...]` happens to reach. | `tests/test_guard_coverage.py::test_a_signed_bound_this_profile_cannot_read_is_refused` |
 
 ## Not counted, and why
@@ -48,11 +53,11 @@ survivor with no prior declaration fails the sweep.
 | 9 | `canonical.py:184` | raise | SCORED | — | `type(value) is not datetime` |
 | 10 | `canonical.py:186` | raise | SCORED | — | `value.tzinfo is None or value.utcoffset() is None` |
 | 11 | `canonical.py:202` | raise | SCORED | — | `type(value) is not expected` |
-| 12 | `identifiers.py:186` | raise | SCORED | — | `VERIFICATION_PROFILE == POLICY_AUTHORITY_PROTOCOL_ID` |
-| 13 | `identifiers.py:191` | raise | SCORED | — | `POLICY_AUTHENTICITY_DIGEST_DOMAIN == POLICY_BODY_DIGEST_DOMAIN` |
-| 14 | `identifiers.py:196` | raise | SCORED | — | `len({POLICY_AUTHENTICITY_DIGEST_DOMAIN, POLICY_AUTHENTICITY_VERIFIED_FACTS_…` |
-| 15 | `identifiers.py:210` | raise | SCORED | — | `REQUIRED_KEY_ENTITLEMENT is FORBIDDEN_KEY_ENTITLEMENT` |
-| 16 | `identifiers.py:224` | raise | SCORED | — | `CANONICAL_ACTION_TYPES != _RATIFIED_ACTION_TYPES` |
+| 12 | `identifiers.py:186` | raise | EXCLUDED | — | `VERIFICATION_PROFILE == POLICY_AUTHORITY_PROTOCOL_ID` |
+| 13 | `identifiers.py:191` | raise | EXCLUDED | — | `POLICY_AUTHENTICITY_DIGEST_DOMAIN == POLICY_BODY_DIGEST_DOMAIN` |
+| 14 | `identifiers.py:196` | raise | EXCLUDED | — | `len({POLICY_AUTHENTICITY_DIGEST_DOMAIN, POLICY_AUTHENTICITY_VERIFIED_FACTS_…` |
+| 15 | `identifiers.py:210` | raise | EXCLUDED | — | `REQUIRED_KEY_ENTITLEMENT is FORBIDDEN_KEY_ENTITLEMENT` |
+| 16 | `identifiers.py:224` | raise | EXCLUDED | — | `CANONICAL_ACTION_TYPES != _RATIFIED_ACTION_TYPES` |
 | 17 | `resolution_port.py:193` | raise | SCORED | — | `registry is None` |
 | 18 | `resolution_port.py:195` | raise | SCORED | — | `signature_verifier is None` |
 | 19 | `resolution_port.py:200` | raise | SCORED | — | `not isinstance(adapters, AdapterRegistry)` |

@@ -317,3 +317,232 @@ def test_a_signed_bound_this_profile_cannot_read_is_refused():
     assert result.refusal is not None, "a bound this profile cannot read was verified"
     assert result.refusal.outcome is PolicyAuthenticityOutcome.POLICY_BOUNDS_MALFORMED
     assert "max_permitted_delta" in result.refusal.detail
+
+
+# --- canonical.py: the admission helpers ----------------------------------------------
+#
+# Nine guards, one call each. These are the primitives every field in the package is
+# admitted through, and not one of them had been reached: the suite exercised the artifacts
+# these helpers protect, never the helpers themselves, so every one could have been deleted
+# without a test noticing.
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["", "sha256:" + "a" * 64, "A" * 64, "z" * 64, "a" * 63, None, 0, b"a" * 64],
+)
+def test_a_value_that_is_not_a_bare_policy_digest_is_refused(value):
+    """Guard 2 — ``canonical.py:111``, ``not is_policy_digest(value)``.
+
+    The Policy Authority namespace: a bare lowercase 64-hex digest. Note what is refused —
+    a ``sha256:``-prefixed value is a *Phase 5A* digest and is refused here, because the two
+    namespaces are never interchanged.
+    """
+
+    from ugence_cloud_scaling_policy_authenticity.canonical import (  # noqa: PLC0415
+        require_policy_digest,
+    )
+
+    with pytest.raises(PolicyAuthenticityFieldError):
+        require_policy_digest("policy_body_digest", value)
+
+
+@pytest.mark.parametrize(
+    "value", ["", "a" * 64, "sha256:" + "A" * 64, "sha256:" + "a" * 63, None, 0]
+)
+def test_a_value_that_is_not_a_phase_5a_digest_is_refused(value):
+    """Guard 3 — ``canonical.py:130``, ``not is_phase5a_digest(value)``.
+
+    The mirror of guard 2: a bare 64-hex value is a *policy* digest and is refused where a
+    Phase 5A one belongs.
+    """
+
+    from ugence_cloud_scaling_policy_authenticity.canonical import (  # noqa: PLC0415
+        require_phase5a_digest,
+    )
+
+    with pytest.raises(PolicyAuthenticityFieldError):
+        require_phase5a_digest("candidate_digest_fact", value)
+
+
+def test_text_that_is_not_exactly_a_str_is_refused():
+    """Guard 4 — ``canonical.py:146``, ``type(value) is not str``.
+
+    Exact: a ``str`` subclass can override every comparison below it and canonicalizes to
+    the same bytes, so the admitted type is the only place the difference survives.
+    """
+
+    from ugence_cloud_scaling_policy_authenticity.canonical import (  # noqa: PLC0415
+        require_nfc_text,
+    )
+
+    class LyingText(str):
+        def __eq__(self, other):  # pragma: no cover - the type gate refuses first
+            return True
+
+        __hash__ = str.__hash__
+
+    with pytest.raises(PolicyAuthenticityFieldError) as excinfo:
+        require_nfc_text("policy_id", LyingText("p-1"))
+    assert "must be a string" in str(excinfo.value) or "str" in str(excinfo.value)
+
+
+def test_empty_text_is_refused_unless_explicitly_permitted():
+    """Guard 5 — ``canonical.py:151``, ``not allow_empty and value == ''``.
+
+    ``allow_empty`` is opt-in per field. An empty identifier that reads as absent in one
+    place and as a value in another is the difference this refuses to leave to the caller.
+    """
+
+    from ugence_cloud_scaling_policy_authenticity.canonical import (  # noqa: PLC0415
+        require_nfc_text,
+    )
+
+    with pytest.raises(PolicyAuthenticityFieldError) as excinfo:
+        require_nfc_text("policy_id", "")
+    assert "must not be empty" in str(excinfo.value)
+    # And the opt-in genuinely opts in, so the guard is not simply unconditional.
+    assert require_nfc_text("tenant_id", "", allow_empty=True) == ""
+
+
+def test_text_that_is_not_nfc_normalized_is_refused():
+    """Guard 6 — ``canonical.py:153``, ``normalize('NFC', value) != value``.
+
+    Two spellings of the same identifier digest to different bytes. Refusing the
+    unnormalized form rather than normalizing it keeps the caller's bytes and this package's
+    bytes identical, which is what makes a digest comparison meaningful.
+    """
+
+    from ugence_cloud_scaling_policy_authenticity.canonical import (  # noqa: PLC0415
+        require_nfc_text,
+    )
+
+    decomposed = "café"  # 'café' as e + combining acute
+    with pytest.raises(PolicyAuthenticityFieldError) as excinfo:
+        require_nfc_text("policy_id", decomposed)
+    assert "NFC" in str(excinfo.value)
+
+
+def test_an_identifier_carrying_surrounding_whitespace_is_refused():
+    """Guard 7 — ``canonical.py:169``, ``text != text.strip()``."""
+
+    from ugence_cloud_scaling_policy_authenticity.canonical import (  # noqa: PLC0415
+        require_canonical_identifier,
+    )
+
+    with pytest.raises(PolicyAuthenticityFieldError) as excinfo:
+        require_canonical_identifier("policy_id", " p-1 ")
+    assert "whitespace" in str(excinfo.value)
+
+
+def test_an_identifier_carrying_control_whitespace_is_refused():
+    """Guard 8 — ``canonical.py:171``, control whitespace that is not a plain space.
+
+    Distinct from guard 7, and the distinction is the point: ``"a\\tb"`` survives ``.strip()``
+    untouched. A tab or newline inside an identifier renders invisibly in a log and digests
+    differently.
+    """
+
+    from ugence_cloud_scaling_policy_authenticity.canonical import (  # noqa: PLC0415
+        require_canonical_identifier,
+    )
+
+    with pytest.raises(PolicyAuthenticityFieldError) as excinfo:
+        require_canonical_identifier("policy_id", "a\tb")
+    assert "control whitespace" in str(excinfo.value)
+
+
+def test_a_naive_instant_is_refused_rather_than_assumed_utc():
+    """Guard 10 — ``canonical.py:186``, ``tzinfo is None or utcoffset() is None``.
+
+    This package reads no clock. Every instant it handles was injected by a caller, and an
+    instant whose offset nobody stated is one nobody can reconstruct — so it is refused
+    rather than assumed to be UTC.
+    """
+
+    from datetime import datetime  # noqa: PLC0415
+
+    from ugence_cloud_scaling_policy_authenticity.canonical import (  # noqa: PLC0415
+        require_aware_utc,
+    )
+
+    with pytest.raises(PolicyAuthenticityFieldError) as excinfo:
+        require_aware_utc("as_of", datetime(2026, 1, 1, 0, 0))
+    assert "timezone-aware" in str(excinfo.value)
+
+
+def test_a_value_of_the_wrong_exact_type_is_refused():
+    """Guard 11 — ``canonical.py:202``, ``type(value) is not expected``."""
+
+    from ugence_cloud_scaling_policy_authenticity.canonical import (  # noqa: PLC0415
+        require_exact_type,
+    )
+    from ugence_cloud_scaling_policy_authenticity.errors import (  # noqa: PLC0415
+        PolicyAuthenticityExactTypeError,
+    )
+
+    with pytest.raises(PolicyAuthenticityExactTypeError):
+        require_exact_type("bounds", [1, 2], tuple)
+    assert require_exact_type("bounds", (1, 2), tuple) == (1, 2)
+
+
+# --- identifiers.py: the import-time separations ---------------------------------------
+#
+# Guards 12-16 are not killable by this operator: each compares two constants, and in the
+# installed checkout each comparison is false, so `if False:` is the same program on every
+# path this fixture can produce. Four of the five are *not* equivalent mutants, though — see
+# ADR Phase 5 §9.2. This package pins `ugence-policy-authority>=0.1.0` and
+# `ugence-cloud-scaling-authorization-contracts>=0.1.0`, both open-ended, and four of these
+# comparisons have an operand that comes from one of those distributions. Under a resolution
+# either pin permits, the condition can be true and the guard fires. Their falsity is a
+# property of this installation, not of the program.
+#
+# The test below is what those classifications rest on: it re-runs every comparison against
+# whatever is actually installed, so the exclusions are void the moment they stop holding.
+
+
+def test_the_import_time_separations_hold_for_the_installed_distributions():
+    """The test-time half of the import-time separations (guards 12-16).
+
+    Import-time alone is green in any process that imports a stale wheel, an editable install
+    pointing at an older checkout, or a resolution that satisfied a dependency from
+    elsewhere. Running them explicitly is what makes the exclusions checkable rather than
+    asserted.
+    """
+
+    from ugence_cloud_scaling_policy_authenticity import identifiers as ids  # noqa: PLC0415
+
+    # Guard 12 — this package consumes the Policy Authority protocol; it is not a version
+    # of it. ``POLICY_AUTHORITY_PROTOCOL_ID`` comes from ``ugence_policy_authority.api``.
+    assert ids.VERIFICATION_PROFILE != ids.POLICY_AUTHORITY_PROTOCOL_ID
+
+    # Guard 13 — a verification artifact is not a policy body, so the two digest domains
+    # must differ. ``POLICY_BODY_DIGEST_DOMAIN`` is the Policy Authority's.
+    from ugence_policy_authority.api import POLICY_BODY_DIGEST_DOMAIN  # noqa: PLC0415
+
+    assert ids.POLICY_AUTHENTICITY_DIGEST_DOMAIN != POLICY_BODY_DIGEST_DOMAIN
+
+    # Guard 14 — three distinct frames. Collapsing any two would let a recorded fact occupy
+    # an attested frame. All three are this package's own literals.
+    assert (
+        len(
+            {
+                ids.POLICY_AUTHENTICITY_DIGEST_DOMAIN,
+                ids.POLICY_AUTHENTICITY_VERIFIED_FACTS_DOMAIN,
+                ids.POLICY_AUTHENTICITY_RECORDED_FACTS_DOMAIN,
+            }
+        )
+        == 3
+    )
+
+    # Guard 15 — collapsing these would let a revoke-only key authenticate an issued policy.
+    # Both are members of the Policy Authority's own ``KeyEntitlement``.
+    assert ids.REQUIRED_KEY_ENTITLEMENT is not ids.FORBIDDEN_KEY_ENTITLEMENT
+
+    # Guard 16 — gate 16 selects an authenticated bound by this vocabulary and fails closed
+    # rather than selecting by an unratified one. The left operand is Phase 5A's.
+    from ugence_cloud_scaling_authorization_contracts import (  # noqa: PLC0415
+        CANONICAL_ACTION_TYPES,
+    )
+
+    assert CANONICAL_ACTION_TYPES == ids._RATIFIED_ACTION_TYPES
