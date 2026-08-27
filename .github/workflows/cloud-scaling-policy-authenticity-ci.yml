@@ -347,14 +347,12 @@ jobs:
       - name: Install tooling + first-party packages (editable)
         run: |
           python -m pip install --upgrade pip
-          pip install pytest build numpy "cryptography>=41.0.7,<47.0.0" "PyNaCl>=1.5.0,<2.0.0"
-          pip install -e packages/risk_authority
-          pip install -e packages/trusted-evidence-authority
-          pip install -e packages/policy-authority
-          pip install -e packages/capabilities/cloud-scaling-controller
-          pip install -e packages/integration/cloud-scaling-risk-integration
-          pip install -e packages/integration/cloud-scaling-authorization-contracts
-          pip install -e packages/integration/cloud-scaling-policy-authenticity
+          # `pytest numpy`, exactly what this workflow's other jobs install: D-5B0B-4 ruled
+          # this package has no cryptography or PyNaCl dependency, and $FIRST_PARTY already
+          # carries the install order. A hand-written list omitted uvi-policy-contracts,
+          # which `policy-authority` requires, and failed every shard in 25 seconds.
+          pip install pytest numpy
+          for pkg in $FIRST_PARTY; do pip install -e "$pkg"; done
       - name: Sweep this shard
         # 115 guards against a 191s suite is six wall-clock hours in one job. Eight shards
         # puts each at roughly three quarters of an hour.
