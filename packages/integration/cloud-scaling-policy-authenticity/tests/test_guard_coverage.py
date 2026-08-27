@@ -56,7 +56,7 @@ def test_a_framed_digest_domain_that_is_not_a_non_empty_str_is_refused(domain):
 
     from ugence_cloud_scaling_policy_authenticity.canonical import framed_digest  # noqa: PLC0415
 
-    with pytest.raises(PolicyAuthenticityFieldError) as excinfo:
+    with pytest.raises(PolicyAuthenticityFieldError):
         framed_digest(domain=domain, body={"a": 1})
 
 
@@ -78,7 +78,7 @@ def test_an_instant_that_is_not_exactly_a_datetime_is_refused():
             return True
 
     forged = LyingInstant(2026, 1, 1, tzinfo=__import__("datetime").timezone.utc)
-    with pytest.raises(PolicyAuthenticityFieldError) as excinfo:
+    with pytest.raises(PolicyAuthenticityFieldError):
         require_aware_utc("as_of", forged)
 
 
@@ -100,7 +100,7 @@ def test_a_resolution_port_built_without_a_registry_is_refused():
 
     authority = bounds_authority()
     genuine = port_for(authority)
-    with pytest.raises(PolicyAuthenticityConfigurationError) as excinfo:
+    with pytest.raises(PolicyAuthenticityConfigurationError):
         PolicyAuthorityResolutionPort(
             registry=None,
             signature_verifier=genuine._signature_verifier,
@@ -126,7 +126,7 @@ def test_a_resolution_port_that_cannot_resolve_is_refused_at_construction():
         trust_configuration_digest: str = "0" * 64
         is_production_authoritative: bool = False
 
-    with pytest.raises(PolicyAuthenticityConfigurationError) as excinfo:
+    with pytest.raises(PolicyAuthenticityConfigurationError):
         PolicyAuthenticityVerifier(resolution_port=PortWithoutTheMethod())
 
 
@@ -156,7 +156,7 @@ def test_a_result_carrying_a_foreign_resolution_type_is_refused():
             self.requested_coordinate = real.requested_coordinate
             self.as_of = real.as_of
 
-    with pytest.raises(TypeError) as excinfo:
+    with pytest.raises(TypeError):
         PolicyAuthenticityResult(
             verified_policy=genuine.verified_policy,
             resolution=LookAlikeResolution(genuine.resolution),
@@ -181,7 +181,7 @@ def test_an_artifact_whose_content_digest_differs_from_its_body_digest_is_refuse
     genuine = _genuine()
     fields = _field_values(genuine)
     fields["policy_content_digest"] = "b" * 64
-    with pytest.raises(VerifiedPolicyArtifactIntegrityError) as excinfo:
+    with pytest.raises(VerifiedPolicyArtifactIntegrityError):
         type(genuine)(
             **fields,
             artifact_digest=_recompute(fields),
@@ -407,7 +407,7 @@ def test_empty_text_is_refused_unless_explicitly_permitted():
         require_nfc_text,
     )
 
-    with pytest.raises(PolicyAuthenticityFieldError) as excinfo:
+    with pytest.raises(PolicyAuthenticityFieldError):
         require_nfc_text("policy_id", "")
     # And the opt-in genuinely opts in, so the guard is not simply unconditional.
     assert require_nfc_text("tenant_id", "", allow_empty=True) == ""
@@ -427,7 +427,7 @@ def test_text_that_is_not_nfc_normalized_is_refused():
     )
 
     decomposed = "café"  # 'café' as e + combining acute
-    with pytest.raises(PolicyAuthenticityFieldError) as excinfo:
+    with pytest.raises(PolicyAuthenticityFieldError):
         require_nfc_text("policy_id", decomposed)
 
 
@@ -439,7 +439,7 @@ def test_an_identifier_carrying_surrounding_whitespace_is_refused():
         require_canonical_identifier,
     )
 
-    with pytest.raises(PolicyAuthenticityFieldError) as excinfo:
+    with pytest.raises(PolicyAuthenticityFieldError):
         require_canonical_identifier("policy_id", " p-1 ")
 
 
@@ -456,7 +456,7 @@ def test_an_identifier_carrying_control_whitespace_is_refused():
         require_canonical_identifier,
     )
 
-    with pytest.raises(PolicyAuthenticityFieldError) as excinfo:
+    with pytest.raises(PolicyAuthenticityFieldError):
         require_canonical_identifier("policy_id", "a\tb")
 
 
@@ -475,7 +475,7 @@ def test_a_naive_instant_is_refused_rather_than_assumed_utc():
         require_aware_utc,
     )
 
-    with pytest.raises(PolicyAuthenticityFieldError) as excinfo:
+    with pytest.raises(PolicyAuthenticityFieldError):
         require_aware_utc("as_of", datetime(2026, 1, 1, 0, 0))
 
 
@@ -580,7 +580,7 @@ def test_a_resolution_port_built_without_a_signature_verifier_is_refused():
     )
 
     registry, _, adapters = _genuine_port_parts()
-    with pytest.raises(PolicyAuthenticityConfigurationError) as excinfo:
+    with pytest.raises(PolicyAuthenticityConfigurationError):
         PolicyAuthorityResolutionPort(
             registry=registry, signature_verifier=None, adapters=adapters
         )
@@ -610,7 +610,7 @@ def test_a_registry_missing_a_required_method_is_refused(missing):
         if name != missing:
             setattr(partial, name, getattr(registry, name))
 
-    with pytest.raises(PolicyAuthenticityConfigurationError) as excinfo:
+    with pytest.raises(PolicyAuthenticityConfigurationError):
         PolicyAuthorityResolutionPort(
             registry=partial, signature_verifier=verifier, adapters=adapters
         )
@@ -629,7 +629,7 @@ def test_a_signature_verifier_that_cannot_verify_is_refused():
     class VerifierWithoutVerify:
         pass
 
-    with pytest.raises(PolicyAuthenticityConfigurationError) as excinfo:
+    with pytest.raises(PolicyAuthenticityConfigurationError):
         PolicyAuthorityResolutionPort(
             registry=registry,
             signature_verifier=VerifierWithoutVerify(),
@@ -663,7 +663,7 @@ def test_a_reference_grade_port_cannot_reach_a_production_determination(monkeypa
     monkeypatch.setattr(rp, "REFERENCE_GRADE_PORTS", (AReferencePort,))
 
     for port in (AReferencePort(), ASubclassOfOne()):
-        with pytest.raises(PolicyAuthenticityConfigurationError) as excinfo:
+        with pytest.raises(PolicyAuthenticityConfigurationError):
             rp.require_production_resolution_port(port)
 
 
@@ -700,7 +700,7 @@ def test_an_artifact_naming_an_unadmitted_signature_algorithm_is_refused():
     """
 
     genuine, fields, digest = _artifact_with(signature_alg="rsa-md5")
-    with pytest.raises(VerifiedPolicyArtifactIntegrityError) as excinfo:
+    with pytest.raises(VerifiedPolicyArtifactIntegrityError):
         _build(genuine, fields, digest)
 
 
@@ -738,7 +738,7 @@ def test_an_empty_capacity_bounds_fact_is_refused_in_favour_of_none():
     """
 
     genuine, fields, digest = _artifact_with(capacity_bounds_fact=())
-    with pytest.raises(VerifiedPolicyArtifactIntegrityError) as excinfo:
+    with pytest.raises(VerifiedPolicyArtifactIntegrityError):
         _build(genuine, fields, digest)
 
 
@@ -749,7 +749,7 @@ def test_a_bound_that_is_not_exactly_a_verified_capacity_bound_is_refused():
     genuine, fields, digest = _artifact_with(
         capacity_bounds_fact=({"action_type": "scale_up"},)
     )
-    with pytest.raises(VerifiedPolicyArtifactIntegrityError) as excinfo:
+    with pytest.raises(VerifiedPolicyArtifactIntegrityError):
         _build(genuine, fields, digest)
 
 
@@ -763,7 +763,7 @@ def test_an_artifact_whose_digest_does_not_cover_its_facts_is_refused():
     """
 
     genuine, fields, _ = _artifact_with()
-    with pytest.raises(VerifiedPolicyArtifactIntegrityError) as excinfo:
+    with pytest.raises(VerifiedPolicyArtifactIntegrityError):
         _build(genuine, fields, "c" * 64)
 
 
@@ -779,7 +779,7 @@ def test_reading_a_recorded_fact_through_verified_fact_is_refused(name):
 
     from test_verified_artifact import _genuine  # noqa: PLC0415
 
-    with pytest.raises(VerifiedPolicyArtifactIntegrityError) as excinfo:
+    with pytest.raises(VerifiedPolicyArtifactIntegrityError):
         _genuine().verified_fact(name)
 
 
