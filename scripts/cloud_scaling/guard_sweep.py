@@ -257,6 +257,26 @@ PACKAGES = {
                 "tests/test_guard_coverage.py::"
                 "test_the_import_time_separations_hold_for_the_installed_distributions",
             ),
+            # --- verified.py: the partition's import guards -------------------------------
+            # Genuinely equivalent: every operand is a frozen set or a `dataclasses.fields`
+            # reading of a class in this module, so no resolution can move either side.
+            ("verified.py", "VERIFIED_FACT_NAMES & RECORDED_FACT_NAMES"): (
+                "equivalent-mutant",
+                "A fact cannot be both verified and recorded. Both operands are frozen sets "
+                "defined in this module, in this distribution, so the intersection is empty "
+                "in every program this package can be part of. Kept because it is what makes "
+                "a mis-classified new field fail at import rather than ship as a fact that "
+                "is digest-covered and unattested.",
+                "tests/test_guard_coverage.py::test_the_fact_partition_is_total_and_disjoint",
+            ),
+            ("verified.py", "_PARTITIONED != _DECLARED"): (
+                "equivalent-mutant",
+                "Every declared field of the artifact must be classified verified or "
+                "recorded. Both sides are read from this module — the two frozen sets and "
+                "`dataclasses.fields(VerifiedPolicyAuthenticity)` — so the comparison cannot "
+                "be made true by anything outside this distribution.",
+                "tests/test_guard_coverage.py::test_the_fact_partition_is_total_and_disjoint",
+            ),
             # --- verification.py ---------------------------------------------------------
             ("verification.py", "absent"): (
                 "diagnostic-only",

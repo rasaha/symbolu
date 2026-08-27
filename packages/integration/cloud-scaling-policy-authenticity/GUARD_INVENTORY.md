@@ -15,9 +15,9 @@ This package records no prior inventory; this is the first one.
 
 ## Classification
 
-Every guard is classified: **111 `SCORED`** — the
+Every guard is classified: **109 `SCORED`** — the
 sweep neutralises it and the suite must fail — and
-**6 `EXCLUDED`**, each with a reason from a closed vocabulary and
+**8 `EXCLUDED`**, each with a reason from a closed vocabulary and
 a test that measures the reason. A guard is never excluded because it survived; a
 survivor with no prior declaration fails the sweep.
 
@@ -28,6 +28,8 @@ survivor with no prior declaration fails the sweep.
 | `identifiers.py:196` | `equivalent-mutant` | The one of the five that is genuinely equivalent: all three domains are frozen literals in this module, in this distribution, so no resolution can move any of them and the condition is false in every program this package can be part of. | `tests/test_guard_coverage.py::test_the_import_time_separations_hold_for_the_installed_distributions` |
 | `identifiers.py:210` | `unscorable-by-single-checkout-fixture` | Both operands are members of the Policy Authority's `KeyEntitlement`. An upstream release that aliased ISSUE_POLICY and REVOKE_POLICY to one member would make the condition true and let a revoke-only key authenticate an issued policy. | `tests/test_guard_coverage.py::test_the_import_time_separations_hold_for_the_installed_distributions` |
 | `identifiers.py:224` | `unscorable-by-single-checkout-fixture` | The left operand is Phase 5A's `CANONICAL_ACTION_TYPES`, from a separately versioned distribution. Gate 16 selects an authenticated bound by this vocabulary, so a drifted set is exactly what this guard exists to refuse. | `tests/test_guard_coverage.py::test_the_import_time_separations_hold_for_the_installed_distributions` |
+| `verified.py:775` | `equivalent-mutant` | A fact cannot be both verified and recorded. Both operands are frozen sets defined in this module, in this distribution, so the intersection is empty in every program this package can be part of. Kept because it is what makes a mis-classified new field fail at import rather than ship as a fact that is digest-covered and unattested. | `tests/test_guard_coverage.py::test_the_fact_partition_is_total_and_disjoint` |
+| `verified.py:780` | `equivalent-mutant` | Every declared field of the artifact must be classified verified or recorded. Both sides are read from this module — the two frozen sets and `dataclasses.fields(VerifiedPolicyAuthenticity)` — so the comparison cannot be made true by anything outside this distribution. | `tests/test_guard_coverage.py::test_the_fact_partition_is_total_and_disjoint` |
 | `verification.py:775` | `diagnostic-only` | Every input this guard refuses is refused identically without it. A bound missing a field reaches `entry[name]` nineteen lines below, inside a deliberate `except Exception` backstop that re-raises as the same `_BoundsShapeError` and therefore the same POLICY_BOUNDS_MALFORMED outcome; only the message changes, from "bounds[0] omits ['max_permitted_delta']" to "bounds[0]: 'max_permitted_delta'". Under ADR Phase 5 §9.1 the message is not the contract. The guard is kept because it names every absent field at once rather than the first one `entry[...]` happens to reach. | `tests/test_guard_coverage.py::test_a_signed_bound_this_profile_cannot_read_is_refused` |
 
 ## Not counted, and why
@@ -91,8 +93,8 @@ survivor with no prior declaration fails the sweep.
 | 47 | `verified.py:751` | raise | SCORED | — | `value.construction_token is not _VERIFICATION_TOKEN` |
 | 48 | `verified.py:756` | raise | SCORED | — | `value.artifact_digest not in _MINTED_DIGESTS` |
 | 49 | `verified.py:763` | raise | SCORED | — | `value.artifact_digest != value.digest()` |
-| 50 | `verified.py:775` | raise | SCORED | — | `VERIFIED_FACT_NAMES & RECORDED_FACT_NAMES` |
-| 51 | `verified.py:780` | raise | SCORED | — | `_PARTITIONED != _DECLARED` |
+| 50 | `verified.py:775` | raise | EXCLUDED | — | `VERIFIED_FACT_NAMES & RECORDED_FACT_NAMES` |
+| 51 | `verified.py:780` | raise | EXCLUDED | — | `_PARTITIONED != _DECLARED` |
 | 52 | `verification.py:152` | raise | SCORED | — | `type(self.outcome) is not _Outcome` |
 | 53 | `verification.py:157` | raise | SCORED | — | `self.outcome is _Outcome.VERIFIED` |
 | 54 | `verification.py:190` | raise | SCORED | — | `(self.verified_policy is None) == (self.refusal is None)` |
