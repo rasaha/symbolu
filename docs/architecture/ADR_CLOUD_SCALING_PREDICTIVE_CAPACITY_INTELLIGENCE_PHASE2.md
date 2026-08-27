@@ -1,6 +1,6 @@
 # ADR — Cloud Scaling: Predictive Capacity Intelligence (Phase 2)
 
-**Status:** **ACCEPTED.** Amended 2026-08-27 (Amendment 1) to record five owner rulings authorizing a third-baseline replay **evaluation**. No third baseline is ratified; the two shipped baselines are unchanged.
+**Status:** **ACCEPTED.** Amended 2026-08-27 (Amendments 1 and 2) to record owner rulings authorizing the design and then the **manifest preparation** for a third-baseline replay evaluation. No telemetry access or replay execution is authorized. No third baseline is ratified; the two shipped baselines are unchanged.
 **Date:** 2026-08-11
 **Package:** `packages/capabilities/cloud-scaling-controller` (`ugence-cloud-scaling-controller`), v0.2.0 → **v0.3.0**.
 **Scope:** Additive, deterministic, provider-neutral, **shadow-only** forecasting and
@@ -72,6 +72,39 @@ hyperparameter search or automatic promotion, and do not alter Phase 2's shadow-
 The evaluation concerns clock-anchored harmonic regression over timestamps. It bears on no
 verdict about learned content phases, neural Phase retrieval, BindingSlots or Phase-Quad, and
 reverses none of them.
+
+## Amendment 2 (2026-08-27) — run-manifest thresholds authorized; execution still prohibited
+
+> **No telemetry access or replay execution is authorized by this amendment. No third
+> baseline is ratified.**
+
+**Documentation-only.** This amendment adds no code, no enum member, no schema, no digest and
+no dependency. It authorizes **preparation of the replay manifest only**.
+
+Owner rulings fix the subject-anonymization scheme (`HMAC-SHA256(run_secret,
+canonical_subject_id)`, secret and identifiers held outside the repository), outcome-blind
+per-subject×target eligibility with typed countable exclusions, a 42-day span requirement
+with a fixed 7-day burn-in and five 7-day scoring blocks, a deterministic 900-second
+UTC-quarter-hour cutoff stride shared by all four arms, the five frozen cycle-resolvability
+thresholds with a fixed reason precedence, and the as-of rule for regime-break exclusion.
+They are recorded in
+[`CLOUD_SCALING_THIRD_BASELINE_REPLAY_RUN_MANIFEST.md`](CLOUD_SCALING_THIRD_BASELINE_REPLAY_RUN_MANIFEST.md),
+which governs the design in
+[`ADR_CLOUD_SCALING_THIRD_BASELINE_REPLAY_EVALUATION.md`](ADR_CLOUD_SCALING_THIRD_BASELINE_REPLAY_EVALUATION.md).
+
+The manifest is deliberately **incomplete**: export identity, anonymized subject hashes,
+observation boundaries and exact run-size values are unpopulated, and the run is prohibited
+until they are filled. Two **run-blocking repository gaps** are recorded in its §10 and are
+not worked around: (1) the package has no canonical regime-break record type and no
+`recorded_at` on `CanonicalCapacityState`, so the as-of exclusion rule cannot be evaluated
+from repository contracts; (2) the rolling-origin calibration iterates every in-window
+sample, so the uncertainty expansion is unbounded by the ratified cutoff stride. Both require
+a further owner ruling.
+
+The two abstention values the design needs remain **proposed vocabulary**; they are not added
+to `AbstentionReason`. `seasonal_naive` and `harmonic_phase` remain proposed identities with
+no implementation. This ADR's prohibition on neural networks, model services, hyperparameter
+search and automatic promotion is unchanged, as is Phase 2's shadow-only boundary.
 
 ---
 

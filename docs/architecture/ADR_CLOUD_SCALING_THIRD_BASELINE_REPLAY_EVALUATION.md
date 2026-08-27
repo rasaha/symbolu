@@ -5,8 +5,12 @@ evaluation. It ratifies no forecaster, authorizes no implementation, and records
 **Date:** 2026-08-27
 **Package (evaluated, not modified here):** `packages/capabilities/cloud-scaling-controller`
 (`ugence-cloud-scaling-controller`, currently `0.4.0`)
-**Governing ADR:** [`ADR_CLOUD_SCALING_PREDICTIVE_CAPACITY_INTELLIGENCE_PHASE2.md`](ADR_CLOUD_SCALING_PREDICTIVE_CAPACITY_INTELLIGENCE_PHASE2.md),
-which states that "a **third baseline is deliberately deferred** until replay evaluation on
+**Governing ADR:** [`ADR_CLOUD_SCALING_PREDICTIVE_CAPACITY_INTELLIGENCE_PHASE2.md`](ADR_CLOUD_SCALING_PREDICTIVE_CAPACITY_INTELLIGENCE_PHASE2.md)
+**Run manifest:** [`CLOUD_SCALING_THIRD_BASELINE_REPLAY_RUN_MANIFEST.md`](CLOUD_SCALING_THIRD_BASELINE_REPLAY_RUN_MANIFEST.md)
+— preregistration template carrying the ratified thresholds; **manifest incomplete, run prohibited**,
+with two run-blocking repository gaps recorded in its §10.
+
+The governing ADR states that "a **third baseline is deliberately deferred** until replay evaluation on
 representative data justifies it" and prohibits "neural networks, model services,
 hyperparameter search, or automatic promotion".
 
@@ -265,7 +269,27 @@ computed deterministically from the window alone:
 4. **Numerical identifiability** — the 4×4 normal-equation system is full rank at a
    preregistered conditioning threshold. Failure → `PERIOD_NOT_RESOLVABLE`.
 
-Thresholds are frozen in the run manifest before execution and are not tuned afterwards.
+### 8.2 Ratified thresholds and reason precedence
+
+The thresholds are **ratified** and frozen in
+[`CLOUD_SCALING_THIRD_BASELINE_REPLAY_RUN_MANIFEST.md`](CLOUD_SCALING_THIRD_BASELINE_REPLAY_RUN_MANIFEST.md) §6.
+They are recorded here so this document contains no unresolved placeholder:
+
+| Condition | Ratified threshold | Maps to |
+|---|---|---|
+| Cycle span | in-lookback event-time span ≥ **604,740 s** | `INSUFFICIENT_CYCLE_COVERAGE` |
+| Phase-bin coverage | **96** 15-minute UTC bins/day; ≥ **90 of 96** bins occupied on ≥ **6 of 7** days | `INSUFFICIENT_CYCLE_COVERAGE` |
+| Maximum gap | no positive consecutive gap > **900 s** | `PERIOD_NOT_RESOLVABLE` |
+| p95 gap | 95th percentile of positive consecutive gaps ≤ **120 s** | `PERIOD_NOT_RESOLVABLE` |
+| Rank and conditioning | `[1, u, cos φ, sin φ]` full rank; ∞-norm condition number of the 4×4 normal matrix ≤ **1e8** | `PERIOD_NOT_RESOLVABLE` |
+
+When several conditions fail, the reported reason follows a fixed precedence — cycle span,
+phase-bin coverage, maximum gap, p95 gap, rank, conditioning — so an implementation cannot
+select the flattering reason. Every failure is still counted; precedence governs reporting,
+not measurement.
+
+These thresholds are not tuned after execution. A change to any of them is a new
+preregistration, not an amendment to this one.
 
 ## 9. Outcome table
 
@@ -324,6 +348,7 @@ re-derivation of the equations, never an import from the Hybrid LLM lab.
 | `AbstentionReason` members (neither proposed reason present) | `.../forecasting/abstention.py:20-39` |
 | `AdmissionPolicy`, `UncertaintyConfig` fields | `.../forecasting/evidence.py:81-96`, `.../forecasting/uncertainty.py:50-71` |
 | stdlib-and-local-only boundary; `hybrid_llm` forbidden | `.../tests/forecasting/test_boundary.py:35-43`, `:55-66` |
+| Rolling-origin calibration iterates every in-window sample (R is not a config field) | `.../forecasting/uncertainty.py:151-192` |
 | Package version `0.4.0` | `.../src/ugence_cloud_scaling_controller/version.py:7` |
 
 Paths under `.../` are relative to `packages/capabilities/cloud-scaling-controller/`.
