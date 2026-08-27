@@ -819,7 +819,7 @@ Two test attributions moved with it, and both are asserted rather than described
 first from `_comparable_instant` to guard 39, now to guard 2 — each time because the
 measurement said so.
 
-### Gate 13 should re-check the six carried instants — ruled `[R]`
+### Gate 13 should re-check the six carried instants — ruled `[R]`, **now implemented** `[V]`
 
 **Measured:** Phase 5B's verifier exact-types the *candidate object* but never re-checks its
 *field* types, and `_candidate_validity_problem` reads all six straight into `<`/`>`. A
@@ -909,3 +909,21 @@ The reference bounds body stated `action_type="cloud_scaling.scale_out"`, `resou
 Under exact matching neither can ever match a genuine candidate, so every bounds test since
 5B-3 ran against a policy that could not bound anything. Replaced with the candidate's own
 selector plus a second selector, and the superseded artifact digest pinned.
+
+
+### Gate 13's re-check, implemented
+
+The ruling above stood unimplemented through 5B-3 and R-8 because gate 13 is Phase 5B and
+each of those changes was scoped to Phase 5A. Implemented now, on its own, and measured
+first: for each of the six carried instants independently, a candidate forged past
+`__post_init__` with `object.__new__` and carrying a `datetime` subclass that overrides the
+four comparison operators verified **VERIFIED** against an instant outside that field's own
+window, while the identical forgery carrying a plain `datetime` was refused with that
+window's typed reason `[V]`.
+
+`CANDIDATE_FACT_NOT_EXACT_INSTANT` refuses it, placed **before** the window comparisons: a
+value that lies about `<` and `>` cannot be caught by comparing it. `pickle` and `deepcopy`
+are covered as well — the gate is written against the property, not against `object.__new__`.
+
+No fact moves, no profile version moves, and every frozen digest is unmoved. The residual is
+closed in the direction the ruling named; nothing else in the residual table is touched.

@@ -575,6 +575,15 @@ class PolicyAuthenticityVerifier:
         # decision expired five months earlier verified VERIFIED, because the instant was
         # recorded beside the candidate's six timestamps and never compared against them.
         if candidate is not None:
+            # Typing first. The comparisons below cannot catch a value that lies about how
+            # it compares, so the type is checked before anything is compared against it.
+            # This precedes rather than reorders the validity refusals: their order among
+            # themselves is unchanged, and an exactly-typed candidate reaches them exactly
+            # as it did before.
+            mistyped = _candidate_instant_type_problem(candidate)
+            if mistyped is not None:
+                outcome, detail = mistyped
+                return _refuse(outcome, detail)
             staleness = _candidate_validity_problem(candidate, instant)
             if staleness is not None:
                 outcome, detail = staleness
@@ -982,6 +991,49 @@ def _cross_tenant_binding(candidate, coordinate) -> Optional[str]:
 #:   on ``now > decision.expires_at``; same comparison, same inclusivity.
 #: * the remaining three are *occurrence* instants — moments the candidate asserts already
 #:   happened. A determination cannot be about a moment before its own evidence existed.
+#: Every instant gate 13 compares. The two windows, the decision expiry, and the three
+#: occurrence facts — six, and the same six Phase 5A admits exactly at construction.
+_CARRIED_INSTANTS: Final = (
+    "subject_valid_from_fact",
+    "subject_valid_until_fact",
+    "subject_asserted_at_fact",
+    "decision_evaluated_at_fact",
+    "decision_expires_at_fact",
+    "attestation_issued_at_fact",
+)
+
+
+def _candidate_instant_type_problem(candidate):
+    """Every carried instant is exactly a ``datetime``, re-checked at this boundary.
+
+    Phase 5A admits these six exactly in ``__post_init__``. This package accepts a candidate
+    object it did not build, and both ``object.__new__`` and ``pickle`` construct one without
+    ever running ``__post_init__`` — so the admission upstream is not something this boundary
+    may inherit. Measured before this check existed: a forged candidate carrying a single
+    ``datetime`` subclass that overrides the comparison operators verified ``VERIFIED``
+    against an instant outside every one of its windows, once for each of the six fields.
+
+    No digest sees it. ``to_canonical_obj`` renders a subclass to exactly the string a plain
+    ``datetime`` produces, so ``candidate_digest`` is unmoved. The type is the only place the
+    difference survives.
+
+    Runs **before** the comparisons, not beside them: a value that lies about ``<`` and ``>``
+    cannot be caught by comparing it.
+    """
+
+    for name in _CARRIED_INSTANTS:
+        value = getattr(candidate, name)
+        if type(value) is not datetime:
+            return (
+                _Outcome.CANDIDATE_FACT_NOT_EXACT_INSTANT,
+                f"the candidate's {name} is a {type(value).__name__}, not exactly a "
+                "datetime. A subclass can override every comparison this gate makes and no "
+                "digest can distinguish it, so the window checks below would be deciding "
+                "against a value that answers them by fiat",
+            )
+    return None
+
+
 _OCCURRENCE_FACTS: Final = (
     "subject_asserted_at_fact",
     "decision_evaluated_at_fact",
