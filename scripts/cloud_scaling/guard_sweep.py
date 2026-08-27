@@ -409,11 +409,77 @@ def write_inventory(config: PackageConfig, guards: list, agreement: dict, leftou
     (config.root / "GUARD_INVENTORY.md").write_text("\n".join(lines), encoding="utf-8")
 
 
+def shard_of(index: int, shard_n: int) -> int:
+    """Which shard owns this guard. One function, so assignment and aggregation agree.
+
+    ``(index - 1) % n`` partitions ``1..N`` into ``n`` classes that are disjoint and cover
+    every index — but the aggregator proves that against the actual results rather than
+    trusting the arithmetic, because a shard that never ran also produces no duplicate.
+    """
+
+    return (index - 1) % shard_n + 1
+
+
+def aggregate(config: PackageConfig, shard_dir: Path, shard_n: int) -> dict:
+    """Combine shard results and prove the sweep was total and non-overlapping.
+
+    Three separate claims, each measured:
+
+    * **assignment** — every inventory index belongs to exactly one shard;
+    * **completeness** — every index produced exactly one terminal result, so nothing is
+      missing and nothing was swept twice;
+    * **baseline agreement** — every shard measured the same collected population, since a
+      shard that collected a different suite was scoring against a different denominator.
+    """
+
+    guards = inventory(config)
+    expected = {g.index for g in guards}
+    seen = {}
+    duplicates = []
+    baselines = {}
+    missing_shards = []
+    for k in range(1, shard_n + 1):
+        path = shard_dir / f"guard_sweep.shard{k}of{shard_n}.json"
+        if not path.exists():
+            missing_shards.append(k)
+            continue
+        payload = json.loads(path.read_text())
+        baselines[k] = payload.get("baseline")
+        for row in payload["results"]:
+            index = row["index"]
+            if index in seen:
+                duplicates.append(index)
+            seen[index] = row
+            if shard_of(index, shard_n) != k:
+                row["_misassigned_to"] = k
+    misassigned = sorted(r["index"] for r in seen.values() if "_misassigned_to" in r)
+    return {
+        "package": config.key,
+        "shard_n": shard_n,
+        "inventory_total": len(guards),
+        "missing_shards": missing_shards,
+        "missing_guards": sorted(expected - set(seen)),
+        "duplicate_guards": sorted(set(duplicates)),
+        "misassigned_guards": misassigned,
+        "baselines": baselines,
+        "baseline_agrees": len(set(baselines.values())) <= 1,
+        "killed": sorted(i for i, r in seen.items() if r.get("killed")),
+        "survived": sorted(
+            i for i, r in seen.items() if r.get("scored") and not r.get("killed")
+        ),
+        "unscored": sorted(i for i, r in seen.items() if not r.get("scored")),
+        "results": {str(i): seen[i] for i in sorted(seen)},
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("package", choices=sorted(PACKAGES))
     parser.add_argument("--inventory-only", action="store_true")
     parser.add_argument("--shard", default="1/1", help="k/n — this shard of n")
+    parser.add_argument("--aggregate", metavar="DIR",
+                        help="combine shard results from DIR and prove the sweep was total")
+    parser.add_argument("--shards", type=int, default=8, help="shard count for --aggregate")
     args = parser.parse_args()
 
     config = PACKAGES[args.package]
@@ -447,8 +513,32 @@ def main() -> int:
               + (" (no prior inventory)" if not agreement else ""))
         return 0 if all(v["agrees"] for v in agreement.values()) else 1
 
+    if args.aggregate:
+        report = aggregate(config, Path(args.aggregate), args.shards)
+        (config.root / "guard_sweep_aggregate.json").write_text(
+            json.dumps(report, indent=2) + "\n"
+        )
+        total = report["inventory_total"]
+        print(f"{config.key}: inventory {total}; "
+              f"killed {len(report['killed'])}, survived {len(report['survived'])}, "
+              f"unscored {len(report['unscored'])}")
+        problems = []
+        if report["missing_shards"]:
+            problems.append(f"shards never reported: {report['missing_shards']}")
+        if report["missing_guards"]:
+            problems.append(f"guards with no result: {report['missing_guards']}")
+        if report["duplicate_guards"]:
+            problems.append(f"guards swept twice: {report['duplicate_guards']}")
+        if report["misassigned_guards"]:
+            problems.append(f"guards in the wrong shard: {report['misassigned_guards']}")
+        if not report["baseline_agrees"]:
+            problems.append(f"shards disagreed on the baseline: {report['baselines']}")
+        for problem in problems:
+            print(f"  INCOMPLETE: {problem}", file=sys.stderr)
+        return 1 if problems else 0
+
     shard_k, shard_n = (int(part) for part in args.shard.split("/"))
-    mine = [g for g in guards if (g.index - 1) % shard_n == shard_k - 1]
+    mine = [g for g in guards if shard_of(g.index, shard_n) == shard_k]
 
     workdir = prepare_copy(config)
     baseline = run_suite(workdir)

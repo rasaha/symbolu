@@ -288,3 +288,31 @@ jobs:
           name: authorization-contracts-guard-sweep-shard-${{ matrix.shard }}
           path: /tmp/ugence-sweep-authorization-contracts/*.json
           if-no-files-found: warn
+
+  guard-sweep-aggregate:
+    name: Every inventoried guard produced exactly one result
+    runs-on: ubuntu-latest
+    needs: guard-sweep
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: authorization-contracts-guard-sweep-shard-*
+          merge-multiple: true
+          path: shards
+      - name: Prove the sweep was total and non-overlapping
+        # Three separate claims, each measured against the real inventory rather than the
+        # shard arithmetic: every index belongs to one shard, every index produced exactly
+        # one terminal result, and every shard measured the same collected population. A
+        # shard that never ran produces no duplicate either, so absence is checked directly.
+        run: python scripts/cloud_scaling/guard_sweep.py authorization-contracts --aggregate shards --shards 8
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: authorization-contracts-guard-sweep-aggregate
+          path: packages/integration/cloud-scaling-authorization-contracts/guard_sweep_aggregate.json
+          if-no-files-found: warn
