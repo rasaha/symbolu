@@ -119,6 +119,20 @@ from .evaluation import (
     evaluate_forecast,
     unscored_record,
 )
+from .calibration import (
+    CALIBRATION_RESIDUALS_SCHEMA_VERSION,
+    CalibrationProvider,
+    CalibrationResiduals,
+    validate_calibration,
+)
+from .calibration_bank import (
+    DEFAULT_BANK_CAP,
+    PrequentialResidualBank,
+    ReplayCalibrationProvider,
+    ResidualEntry,
+    cutoff_sequence_digest,
+    is_calibration_origin,
+)
 from .replay import (
     ReplayError,
     ReplayEvaluationResult,
@@ -157,5 +171,9 @@ __all__ = [
     "AggregateEvaluation", "EvaluationError", "EvaluationStatus", "ForecastEvaluationRecord",
     "aggregate_evaluations", "evaluate_forecast", "unscored_record",
     # replay
-    "ReplayError", "ReplayEvaluationResult", "default_cutoffs", "run_replay_evaluation",
+    "ReplayError",
+    "CALIBRATION_RESIDUALS_SCHEMA_VERSION", "CalibrationProvider", "CalibrationResiduals",
+    "validate_calibration", "DEFAULT_BANK_CAP", "PrequentialResidualBank",
+    "ReplayCalibrationProvider", "ResidualEntry", "cutoff_sequence_digest",
+    "is_calibration_origin", "ReplayEvaluationResult", "default_cutoffs", "run_replay_evaluation",
 ]

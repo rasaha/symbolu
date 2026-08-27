@@ -21,6 +21,7 @@ time rather than trusting input position, and fails closed on any residual leaka
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -41,6 +42,7 @@ from .evidence import (
     CapacityForecastEvidence,
     forecast_with_evidence,
 )
+from .calibration import CalibrationProvider
 from .forecasters import BaselineForecaster
 from .series import (
     CanonicalCapacitySeries,
@@ -49,7 +51,7 @@ from .series import (
 )
 from .targets import ForecastTarget, extract_sample
 from .uncertainty import UncertaintyConfig
-from .window import FeatureConfig, ForecastHorizon
+from .window import FeatureConfig, ForecastHorizon, build_input_window
 
 
 class ReplayError(ValueError):
@@ -133,6 +135,47 @@ def _match_actual(
     return MATCH_UNIQUE, at_min[0][3]
 
 
+def _calibration_residual(
+    series: CanonicalCapacitySeries,
+    observations: Sequence[CanonicalCapacityState],
+    target: ForecastTarget,
+    cutoff: datetime,
+    horizon: ForecastHorizon,
+    forecaster: BaselineForecaster,
+    feature_config: FeatureConfig,
+    match_tolerance_seconds: float,
+) -> Optional[Tuple[datetime, float]]:
+    """``(actual_event_time, signed residual)`` for one calibration origin, or ``None``.
+
+    Deliberately independent of the gating outcome. Calibration residuals are accounted
+    separately from gating records (run manifest §9.3), and during the calibration block no
+    forecast is scored at all — feeding the bank only from scored records would deadlock: no
+    residuals means no interval, no interval means an abstention, and an abstention means no
+    residual.
+
+    Leakage safety is unchanged: the window is the same leakage-safe construction used by the
+    service, and the actual is matched by the same strictly-future matcher. The residual is
+    *timestamped* with that actual's event time, so the bank can refuse to serve it until it
+    was observable.
+    """
+    try:
+        window = build_input_window(series, target, cutoff, horizon, feature_config)
+    except Exception:  # a window we cannot build yields no calibration — never a hard failure
+        return None
+    point = forecaster.point_estimate(window)
+    if point is None or not isinstance(point, (int, float)) or not math.isfinite(float(point)):
+        return None
+    kind, actual = _match_actual(
+        observations, cutoff, window.forecast_for, match_tolerance_seconds, series.subject, target,
+    )
+    if kind != MATCH_UNIQUE or actual is None:
+        return None
+    sample = extract_sample(actual, target)
+    if sample is None or not math.isfinite(float(sample.value)):
+        return None
+    return actual.observed_at, float(sample.value) - float(point)
+
+
 def run_replay_evaluation(
     observations: Sequence[CanonicalCapacityState],
     target: ForecastTarget,
@@ -146,11 +189,20 @@ def run_replay_evaluation(
     admission_policy: Optional[AdmissionPolicy] = None,
     series_policy: Optional[SeriesConstructionPolicy] = None,
     match_tolerance_seconds: float = 5.0,
+    calibration_provider: Optional[CalibrationProvider] = None,
 ) -> ReplayEvaluationResult:
     """Replay ``observations`` through ``cutoffs`` and return evidences + evaluation records.
 
     All observations share one subject (a series requires it); cross-subject inputs fail
     closed in series construction. ``cutoffs`` defaults to the observation event times.
+
+    ``calibration_provider`` is optional evaluation machinery. When ``None`` — the default and
+    the only production behaviour — every forecast uses the shipped in-window rolling-origin
+    uncertainty path and the evidence is byte-identical to a run without this parameter. When
+    supplied, each cutoff asks the provider for a causally admissible residual collection, and
+    each *scored* forecast feeds its own residual back so later cutoffs can use it. Residuals
+    are fed strictly forward: a residual is admitted with the origin and the matched actual's
+    event time, and the provider itself refuses to serve it before that actual was observable.
     """
     observations = list(observations)
     if not observations:
@@ -174,6 +226,12 @@ def run_replay_evaluation(
                 f"({series.end_event_time.isoformat()} > {cutoff.isoformat()})"
             )
 
+        calibration = None
+        if calibration_provider is not None:
+            calibration = calibration_provider.calibration_for(
+                series.subject, target, horizon, forecaster.model_id, cutoff
+            )
+
         evidence = forecast_with_evidence(
             series, target, cutoff, horizon, forecaster,
             normalization_policy=normalization_policy,
@@ -181,6 +239,7 @@ def run_replay_evaluation(
             uncertainty_config=uncertainty_config,
             admission_policy=admission_policy,
             correlation_id=None,
+            calibration=calibration,
         )
 
         if evidence.forecast.is_forecast:
@@ -201,6 +260,26 @@ def run_replay_evaluation(
             record = evaluate_forecast(evidence, None, match_tolerance_seconds=match_tolerance_seconds)
         evidences.append(evidence)
         records.append(record)
+
+        # Feed the bank causally and independently of the gating outcome. A residual becomes
+        # usable only from a LATER cutoff, and the provider re-checks observability itself, so
+        # a residual can never calibrate its own origin.
+        if calibration_provider is not None and hasattr(calibration_provider, "observe"):
+            fed = _calibration_residual(
+                series, observations, target, cutoff, horizon, forecaster,
+                feature_config or FeatureConfig(), match_tolerance_seconds,
+            )
+            if fed is not None:
+                actual_time, residual = fed
+                calibration_provider.observe(
+                    subject=series.subject,
+                    target=target,
+                    horizon=horizon,
+                    arm_model_id=forecaster.model_id,
+                    origin=cutoff,
+                    actual_event_time=actual_time,
+                    residual=residual,
+                )
 
     aggregate = aggregate_evaluations(records, model_id=forecaster.model_id)
     return ReplayEvaluationResult(

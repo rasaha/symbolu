@@ -43,6 +43,7 @@ from .abstention import (
     AbstentionReason,
 )
 from .forecast import CAPACITY_FORECAST_SCHEMA_VERSION, CapacityForecast
+from .calibration import CalibrationResiduals, validate_calibration
 from .forecasters import BaselineForecaster
 from .series import CanonicalCapacitySeries, SeriesError, SeriesErrorReason, _as_utc
 from .targets import (
@@ -53,9 +54,11 @@ from .targets import (
 )
 from .uncertainty import (
     UncertaintyConfig,
+    REASON_INSUFFICIENT_CALIBRATION,
     UncertaintyInterval,
     UncertaintyMethod,
     compute_uncertainty,
+    interval_from_residuals,
 )
 from .window import (
     FeatureConfig,
@@ -67,6 +70,14 @@ from .window import (
 )
 
 FORECAST_EVIDENCE_SCHEMA_VERSION = "capacity-forecast-evidence-1"
+#: Evidence produced from externally supplied (bank-sourced) calibration residuals. It is a
+#: distinct version because it carries an additional authoritative field; version -1 evidence
+#: keeps its exact historical payload and digest.
+FORECAST_EVIDENCE_SCHEMA_VERSION_CALIBRATED = "capacity-forecast-evidence-2"
+SUPPORTED_FORECAST_EVIDENCE_SCHEMA_VERSIONS = (
+    FORECAST_EVIDENCE_SCHEMA_VERSION,
+    FORECAST_EVIDENCE_SCHEMA_VERSION_CALIBRATED,
+)
 ADMISSION_POLICY_SCHEMA_VERSION = "capacity-forecast-admission-1"
 
 # Excluded from the identity digest (documented above).
@@ -166,6 +177,7 @@ def _forecast_and_window(
     correlation_id: Optional[str],
     expected_subject: Optional[CapacitySubject],
     forecast_space: ForecastValueSpace,
+    calibration: Optional[CalibrationResiduals] = None,
 ) -> Tuple[CapacityForecast, ForecastInputWindow]:
     """Core deterministic decision: build the window, then forecast or abstain."""
     if not isinstance(series, CanonicalCapacitySeries):
@@ -309,7 +321,34 @@ def _forecast_and_window(
         )
 
     # --- uncertainty ---------------------------------------------------------------
-    uncertainty = compute_uncertainty(window, forecaster, point, uncertainty_config)
+    # Two residual-production paths, ONE interval formula. The point estimate above is
+    # already fixed and is never influenced by which path runs.
+    if calibration is None:
+        if uncertainty_config.method is UncertaintyMethod.EMPIRICAL_PREQUENTIAL_RESIDUAL_BANK:
+            # A bank-configured run with nothing banked yet — normal during the calibration
+            # block. Report it as the typed uncalibrated contract (which the policy below
+            # turns into an accounted abstention). Never fall back to in-window collection:
+            # that would silently substitute a different calibration source.
+            uncertainty = _unavailable_uncertainty(
+                uncertainty_config, REASON_INSUFFICIENT_CALIBRATION
+            )
+        else:
+            uncertainty = compute_uncertainty(window, forecaster, point, uncertainty_config)
+    else:
+        calibration_digest = validate_calibration(
+            calibration,
+            subject=series.subject,
+            target=target,
+            horizon=horizon,
+            arm_model_id=forecaster.model_id,
+            cutoff=cutoff,
+            config=uncertainty_config,
+        )
+        # Supplied residuals are never mixed with in-window collection.
+        uncertainty = interval_from_residuals(
+            point, calibration.values, uncertainty_config,
+            calibration_input_digest=calibration_digest,
+        )
     if (
         uncertainty_config.method is not UncertaintyMethod.NONE
         and not uncertainty.available
@@ -381,6 +420,11 @@ class CapacityForecastEvidence:
     evidence_produced_at: datetime
     diagnostic_annotation: str = ""
 
+    #: Digest of the externally supplied calibration input. Required on, and only on,
+    #: ``capacity-forecast-evidence-2``; ``None`` on the legacy rolling-origin path, where the
+    #: key is omitted from the canonical payload so historical digests never move.
+    calibration_input_digest: Optional[str] = None
+
     authority_class: str = AUTHORITY_CLASS_ADVISORY
     execution_capability: str = EXECUTION_CAPABILITY_NONE
     advisory_only: bool = True
@@ -390,6 +434,27 @@ class CapacityForecastEvidence:
     def __post_init__(self) -> None:
         if not isinstance(self.forecast, CapacityForecast):
             raise ForecastServiceError("forecast must be a CapacityForecast")
+        if self.evidence_schema_version not in SUPPORTED_FORECAST_EVIDENCE_SCHEMA_VERSIONS:
+            raise ForecastServiceError(
+                f"unsupported evidence_schema_version: {self.evidence_schema_version!r}"
+            )
+        calibrated = self.evidence_schema_version == FORECAST_EVIDENCE_SCHEMA_VERSION_CALIBRATED
+        if calibrated and not self.calibration_input_digest:
+            raise ForecastServiceError(
+                "calibrated evidence requires a calibration_input_digest"
+            )
+        if not calibrated and self.calibration_input_digest is not None:
+            raise ForecastServiceError(
+                "calibration_input_digest is only valid on calibrated evidence"
+            )
+        if calibrated:
+            # The interval and the evidence must name the SAME calibration input, or the
+            # evidence would attest to a calibration the interval did not use.
+            interval_digest = self.forecast.uncertainty.calibration_input_digest
+            if interval_digest != self.calibration_input_digest:
+                raise ForecastServiceError(
+                    "evidence and interval calibration_input_digest must match"
+                )
         if self.advisory_only is not True or self.shadow_only is not True:
             raise ForecastServiceError("evidence must be advisory-only and shadow-only")
         if self.actuation_performed is not False:
@@ -423,6 +488,8 @@ class CapacityForecastEvidence:
             "shadow_only": self.shadow_only,
             "actuation_performed": self.actuation_performed,
         }
+        if self.calibration_input_digest is not None:
+            data["calibration_input_digest"] = self.calibration_input_digest
         if include_digest:
             data["evidence_digest"] = self.digest()
         return data
@@ -456,8 +523,16 @@ def forecast_with_evidence(
     forecast_space: ForecastValueSpace = ForecastValueSpace.PROJECTED_WITHOUT_CONVERSION,
     evidence_produced_at: Optional[datetime] = None,
     diagnostic_annotation: str = "",
+    calibration: Optional[CalibrationResiduals] = None,
 ) -> CapacityForecastEvidence:
     """Controlled service path: build window → forecast/abstain → bind evidence.
+
+    ``calibration`` is an optional, evaluation-supplied residual collection. When it is
+    ``None`` — the default and the only production behaviour — the shipped in-window
+    rolling-origin path runs unchanged and the evidence keeps its historical schema version
+    and payload. When supplied, it is validated against this exact forecast's binding and its
+    digest is bound into both the interval and the evidence, which then carries the
+    calibrated schema version.
 
     ``evidence_produced_at`` is a caller-supplied trusted timestamp (never generated in
     this deterministic path); it defaults to the cutoff so the call stays clock-free and
@@ -476,13 +551,22 @@ def forecast_with_evidence(
         correlation_id=correlation_id,
         expected_subject=expected_subject,
         forecast_space=forecast_space,
+        calibration=calibration,
+    )
+    # Only a forecast that actually consumed supplied calibration is calibrated evidence; an
+    # abstention carries no interval and stays on the legacy schema version.
+    calibration_digest = forecast.uncertainty.calibration_input_digest
+    evidence_schema = (
+        FORECAST_EVIDENCE_SCHEMA_VERSION_CALIBRATED
+        if calibration_digest is not None
+        else FORECAST_EVIDENCE_SCHEMA_VERSION
     )
     produced_at = evidence_produced_at if evidence_produced_at is not None else cutoff
     if not isinstance(produced_at, datetime):
         raise ForecastServiceError("evidence_produced_at must be a datetime")
 
     return CapacityForecastEvidence(
-        evidence_schema_version=FORECAST_EVIDENCE_SCHEMA_VERSION,
+        evidence_schema_version=evidence_schema,
         series_schema_version=series.schema_version,
         input_window_schema_version=window.schema_version,
         forecast_schema_version=forecast.schema_version,
@@ -498,6 +582,7 @@ def forecast_with_evidence(
         forecast=forecast,
         evidence_produced_at=produced_at,
         diagnostic_annotation=diagnostic_annotation,
+        calibration_input_digest=calibration_digest,
     )
 
 
@@ -630,6 +715,8 @@ __all__ = [
     "FORECAST_EVIDENCE_SCHEMA_VERSION",
     "ADMISSION_POLICY_SCHEMA_VERSION",
     "DIGEST_EXCLUDED_FIELDS",
+    "FORECAST_EVIDENCE_SCHEMA_VERSION_CALIBRATED",
+    "SUPPORTED_FORECAST_EVIDENCE_SCHEMA_VERSIONS",
     "ForecastServiceError",
     "AdmissionPolicy",
     "CapacityForecastEvidence",
