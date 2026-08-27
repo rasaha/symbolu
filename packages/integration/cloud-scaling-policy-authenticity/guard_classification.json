@@ -1,8 +1,8 @@
 {
   "package": "policy-authenticity",
   "total": 117,
-  "scored": 102,
-  "excluded": 15,
+  "scored": 106,
+  "excluded": 11,
   "classification": {
     "1": {
       "status": "SCORED",
@@ -71,19 +71,13 @@
       "condition": "type(value) is not expected"
     },
     "12": {
-      "status": "EXCLUDED",
-      "reason": "unscorable-by-single-checkout-fixture",
-      "detail": "The right operand is `AUTHORITY_PROTOCOL_ID`, imported from `ugence_policy_authority.api`. A Policy Authority release that renamed its protocol identifier to this package's verification profile would make the condition true, and this package consumes that protocol rather than being a version of it. Real and reachable; only unscorable by a fixture that installs one resolution.",
-      "evidence": "tests/test_guard_coverage.py::test_the_import_time_separations_hold_for_the_installed_distributions",
+      "status": "SCORED",
       "module": "identifiers.py",
       "line": 186,
       "condition": "VERIFICATION_PROFILE == POLICY_AUTHORITY_PROTOCOL_ID"
     },
     "13": {
-      "status": "EXCLUDED",
-      "reason": "unscorable-by-single-checkout-fixture",
-      "detail": "The right operand is the Policy Authority's own `POLICY_BODY_DIGEST_DOMAIN`. Collapsing the two domains would let a verification artifact's digest be read as a policy body digest, and an upstream release controls one side of the comparison.",
-      "evidence": "tests/test_guard_coverage.py::test_the_import_time_separations_hold_for_the_installed_distributions",
+      "status": "SCORED",
       "module": "identifiers.py",
       "line": 191,
       "condition": "POLICY_AUTHENTICITY_DIGEST_DOMAIN == POLICY_BODY_DIGEST_DOMAIN"
@@ -98,19 +92,13 @@
       "condition": "len({POLICY_AUTHENTICITY_DIGEST_DOMAIN, POLICY_AUTHENTICITY_VERIFIED_FACTS_DOMAIN, POLICY_AUTHENTICITY_RECORDED_FACTS_DOMAIN}) != 3"
     },
     "15": {
-      "status": "EXCLUDED",
-      "reason": "unscorable-by-single-checkout-fixture",
-      "detail": "Both operands are members of the Policy Authority's `KeyEntitlement`. An upstream release that aliased ISSUE_POLICY and REVOKE_POLICY to one member would make the condition true and let a revoke-only key authenticate an issued policy.",
-      "evidence": "tests/test_guard_coverage.py::test_the_import_time_separations_hold_for_the_installed_distributions",
+      "status": "SCORED",
       "module": "identifiers.py",
       "line": 210,
       "condition": "REQUIRED_KEY_ENTITLEMENT is FORBIDDEN_KEY_ENTITLEMENT"
     },
     "16": {
-      "status": "EXCLUDED",
-      "reason": "unscorable-by-single-checkout-fixture",
-      "detail": "The left operand is Phase 5A's `CANONICAL_ACTION_TYPES`, from a separately versioned distribution. Gate 16 selects an authenticated bound by this vocabulary, so a drifted set is exactly what this guard exists to refuse.",
-      "evidence": "tests/test_guard_coverage.py::test_the_import_time_separations_hold_for_the_installed_distributions",
+      "status": "SCORED",
       "module": "identifiers.py",
       "line": 224,
       "condition": "CANONICAL_ACTION_TYPES != _RATIFIED_ACTION_TYPES"

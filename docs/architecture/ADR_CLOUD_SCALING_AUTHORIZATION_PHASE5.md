@@ -302,9 +302,30 @@ program, and calling it an equivalent mutant asserts the guard is pointless when
 fact the only thing standing between a permitted resolution and an unratified identifier
 bound into a candidate digest.
 
-Such guards are classified `unscorable-by-single-checkout-fixture`: real, reachable, and
-beyond what a fixture installing one resolution can measure. Scoring them needs a fixture
-that varies the resolution — deferred, not resolved by silence.
+Such guards were classified `unscorable-by-single-checkout-fixture`: real, reachable, and
+beyond what a fixture installing one resolution can measure. **That last clause was wrong,
+and the reason has since been emptied.**
+
+The *fixture* installs one resolution. A *test* is free to construct another: an
+open-ended pin admits later versions, so the test copies the real upstream source, applies
+the drift the guard names, bumps the version, and puts it first on `PYTHONPATH`, where it
+is the installed distribution for that process. Every guard the reason was ever applied to
+— one in Phase 5A, four in Phase 5B — was measured that way and killed. Nought for five.
+
+The reason stays in the closed vocabulary, because a guard could genuinely qualify, but it
+now carries a bar that matches its name only when earned:
+
+> `unscorable-by-single-checkout-fixture` requires evidence that **no resolution the
+> declared constraint permits** makes the condition authority-relevant. "The fixture
+> installs one resolution" is a fact about the fixture and is not sufficient. Where the
+> constraint is open-ended and the operand is upstream's to move, the expected outcome is a
+> constructed second resolution and a scored guard.
+
+Constructing one is not always a single edit. Phase 5B's action-type guard sits behind
+Phase 5A's own drift guards: moving the controller's enum alone is refused one package
+upstream, giving the same refusal with and without the guard under test. Reaching it meant
+drifting the controller, Phase 4C and Phase 5A together — a coordinated release the pins
+admit. A second resolution has to reach the guard, not merely exist.
 
 A guard made unreachable by an **earlier** guard, in this distribution or an upstream one, is
 a separate case (`unreachable-behind-earlier-guard`) and requires evidence that measures the

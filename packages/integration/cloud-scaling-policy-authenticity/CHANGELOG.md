@@ -1,5 +1,47 @@
 # Changelog — ugence-cloud-scaling-policy-authenticity
 
+## [Unreleased] — four exclusions withdrawn; the reason that held them is empty
+
+*No version bump and no production behaviour change.* Phase 5A's guard 9 disproved the
+rationale shared by every guard carrying `unscorable-by-single-checkout-fixture`: the
+fixture installs one dependency resolution, but a test can construct another. The four
+this package carried were re-measured under that instrument and all four are scorable.
+
+| Guard | Condition | Upstream, constraint | Drift the second resolution applies | Present | Removed |
+|---|---|---|---|---|---|
+| 12 `identifiers.py:186` | `VERIFICATION_PROFILE == …PROTOCOL_ID` | `ugence-policy-authority>=0.1.0` | protocol renamed onto this package's profile | `AssertionError` | imports; profile and protocol are one string |
+| 13 `identifiers.py:191` | `…DIGEST_DOMAIN == POLICY_BODY_DIGEST_DOMAIN` | same | policy-body domain adopts the artifact domain | `AssertionError` | imports; one tag serves both frames |
+| 15 `identifiers.py:210` | `REQUIRED… is FORBIDDEN_KEY_ENTITLEMENT` | same | `REVOKE_POLICY = "ISSUE_POLICY"` | `AssertionError` | imports; the two are one member |
+| 16 `identifiers.py:224` | `CANONICAL_ACTION_TYPES != _RATIFIED_…` | `…authorization-contracts>=0.1.0` | the chain ratifies a fifth action type | `ImportError` | imports; gate 16 selects by five |
+
+Each resolution is built from the real upstream source, not a stub, with every edit
+asserted to match exactly once so an upstream rename fails the test rather than quietly
+producing an undrifted copy.
+
+Full-suite sweep: **4 guards, 4 killed, 0 survived, 0 unscored**, baseline 476 collected.
+**The split is 106 `SCORED` / 11 `EXCLUDED`, not 102 / 15.** The inventory is still 117.
+
+### Two of these were load-bearing in ways the exclusion obscured
+
+Guard 15's operands are *both* upstream's — the case where a single-resolution fixture is
+least entitled to conclude anything. Python's `Enum` makes equal values aliases, so a
+release merging the two entitlements collapses them to one member and the `is` comparison
+goes true. Without the guard, D-5B0B-4's stated reason for choosing the Policy Authority's
+key ring over a TEV trust anchor — that entitlement granularity is expressible — is gone,
+and a revoke-only key satisfies the issuing requirement. The module docstring says this
+cannot happen because there is no parameter to divert; there is no parameter, and this
+guard is why that is enough.
+
+Guard 16's first attack measured nothing, and the test records why: adding a fifth
+`ActionKind` to the controller alone is refused by Phase 5A's drift guard one package
+upstream, producing the identical `ImportError` with and without guard 16. Only a
+coordinated drift across the controller, Phase 4C and Phase 5A reaches this guard.
+
+Guard 14 (`identifiers.py:196`) keeps `equivalent-mutant` and was not inferred from the
+others: all three of its operands are frozen literals in this distribution, so no
+resolution can move any of them.
+
+
 ## [Unreleased] — two exclusions withdrawn; one was the last obstacle before a mint
 
 *No version bump and no behaviour change.* An independent adversarial audit refuted two of

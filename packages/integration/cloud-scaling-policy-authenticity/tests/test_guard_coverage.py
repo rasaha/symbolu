@@ -1352,3 +1352,295 @@ def test_a_projection_entry_that_lies_about_its_own_keys_cannot_mint_a_bound():
     )
     assert result.refusal is not None
     assert result.refusal.outcome is PolicyAuthenticityOutcome.POLICY_BOUNDS_MALFORMED
+
+
+#: Source of the probe the second-resolution measurements below run.
+UPSTREAM_RESOLUTION_PROBE = (
+    "try:\n"
+    "    import ugence_cloud_scaling_policy_authenticity.identifiers  # noqa: F401\n"
+    "    print('NO-REFUSAL')\n"
+    "except AssertionError as exc:\n"
+    "    print('REFUSED AssertionError ' + str(exc))\n"
+    "except ImportError as exc:\n"
+    "    print('REFUSED ImportError ' + str(exc))\n"
+)
+
+
+def _second_resolution(tmp_path, label, origin, edits):
+    """A second resolution of one upstream distribution, built from its real source.
+
+    ``origin`` is the installed package directory; it is copied verbatim and then each
+    ``(relative_path, old, new)`` edit is applied, each asserted to match exactly once so a
+    rename upstream fails the test rather than silently producing an undrifted copy. A stub
+    would prove something about the stub; this proves something about the distribution.
+    """
+
+    import shutil  # noqa: PLC0415
+
+    root = tmp_path / label
+    root.mkdir(parents=True, exist_ok=True)
+    destination = root / origin.name
+    shutil.copytree(origin, destination, ignore=shutil.ignore_patterns("__pycache__"))
+    for relative, old, new in edits:
+        path = destination / relative
+        text = path.read_text(encoding="utf-8")
+        assert text.count(old) == 1, (
+            f"{origin.name}/{relative}: expected exactly one occurrence of {old!r}, found "
+            f"{text.count(old)} — the drift this resolution introduces may not have been "
+            "introduced at all"
+        )
+        path.write_text(text.replace(old, new), encoding="utf-8")
+    return root
+
+
+def _import_phase5b_under(tmp_path, roots):
+    """Import this package's identifiers with ``roots`` ahead of everything else.
+
+    Returns the probe's single line of stdout: ``NO-REFUSAL``, or ``REFUSED <class> …``.
+    The roots go first, so within that process they *are* the installed distributions.
+    Everything after them is whatever this suite is already running against — under the
+    sweep, that is the mutated copy.
+
+    In a subprocess because the measurement re-runs module-level import code; doing it
+    in-process would leave a drifted upstream in ``sys.modules`` for every later test.
+    """
+
+    import os  # noqa: PLC0415
+    import subprocess  # noqa: PLC0415
+    import sys  # noqa: PLC0415
+
+    probe = tmp_path / "resolution_probe.py"
+    probe.write_text(UPSTREAM_RESOLUTION_PROBE, encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, str(probe)],
+        capture_output=True,
+        text=True,
+        timeout=300,
+        env={
+            **os.environ,
+            "PYTHONPATH": os.pathsep.join(
+                [*(str(r) for r in roots), *(p for p in sys.path if p)]
+            ),
+        },
+    )
+    output = result.stdout.strip()
+    assert output, f"the probe printed nothing: {result.stderr[-600:]!r}"
+    return output
+
+
+def _upstream(name):
+    """The installed source directory of one first-party upstream distribution."""
+
+    import os  # noqa: PLC0415
+    from pathlib import Path  # noqa: PLC0415
+
+    declared = os.environ.get("UGENCE_REPO_ROOT")
+    repo = Path(declared).resolve() if declared else Path(__file__).resolve().parents[4]
+    where = {
+        "ugence_policy_authority": "packages/policy-authority",
+        "ugence_cloud_scaling_controller": "packages/capabilities/cloud-scaling-controller",
+        "ugence_cloud_scaling_risk_integration": (
+            "packages/integration/cloud-scaling-risk-integration"
+        ),
+        "ugence_cloud_scaling_authorization_contracts": (
+            "packages/integration/cloud-scaling-authorization-contracts"
+        ),
+    }[name]
+    origin = repo / where / "src" / name
+    assert origin.is_dir(), f"{name} source not found at {origin}"
+    return origin
+
+
+@pytest.mark.adversarial
+def test_the_protocol_separation_holds_under_a_policy_authority_that_renamed_its_protocol(
+    tmp_path,
+):
+    """Guard 12 — ``identifiers.py:186``, ``VERIFICATION_PROFILE == …PROTOCOL_ID``.
+
+    Excluded as ``unscorable-by-single-checkout-fixture`` until the fixture was asked to
+    vary the resolution rather than assumed unable to. ``ugence-policy-authority`` is pinned
+    ``>=0.1.0``, which admits a 0.2.0 that renames its protocol — and a rename onto this
+    package's own verification profile is the collision the guard names.
+
+    Built here from the real Policy Authority source: ``AUTHORITY_PROTOCOL_ID`` is composed
+    from two constants, so both are moved to land on
+    ``ugence.cloud-scaling/policy-authenticity/v1``.
+
+    Present, the package refuses to import. Removed, it imports and every verified artifact
+    then carries a profile identifier indistinguishable from the protocol it merely
+    consumes — a determination that reads as though this package *were* the Policy
+    Authority. Refusal versus no refusal is a change to the typed refusal under §9.1.
+    """
+
+    resolution = _second_resolution(
+        tmp_path,
+        "policy-authority-0.2.0",
+        _upstream("ugence_policy_authority"),
+        (
+            ("__init__.py", '__version__ = "0.1.0"', '__version__ = "0.2.0"'),
+            (
+                "core/statuses.py",
+                'AUTHORITY_PROTOCOL = "ugence.policy-authority"',
+                'AUTHORITY_PROTOCOL = "ugence.cloud-scaling/policy-authenticity"',
+            ),
+            (
+                "core/statuses.py",
+                'AUTHORITY_PROTOCOL_VERSION = "v0.1"',
+                'AUTHORITY_PROTOCOL_VERSION = "v1"',
+            ),
+        ),
+    )
+    outcome = _import_phase5b_under(tmp_path, [resolution])
+    assert outcome.startswith("REFUSED AssertionError"), (
+        "the verification profile collided with the Policy Authority protocol identifier "
+        f"and the package imported anyway: {outcome!r}"
+    )
+    assert "verification profile" in outcome, (
+        f"the refusal came from some separation other than the protocol one: {outcome!r}"
+    )
+
+
+@pytest.mark.adversarial
+def test_the_digest_domains_stay_apart_under_an_authority_that_adopted_this_ones(tmp_path):
+    """Guard 13 — ``identifiers.py:191``, ``…DIGEST_DOMAIN == POLICY_BODY_DIGEST_DOMAIN``.
+
+    Same pin, same reasoning, a different constant: a 0.2.0 that adopts this package's
+    artifact domain as its policy-body domain. One side of this comparison has always been
+    upstream's to move.
+
+    Present, the package refuses to import. Removed, it imports with one domain tag serving
+    both frames, and the only bytes this package originates — its verification artifact's
+    integrity digest — become forgeable as a policy body digest and vice versa. The
+    docstring's claim that the two "cannot collide" holds because of this guard, not
+    independently of it.
+    """
+
+    resolution = _second_resolution(
+        tmp_path,
+        "policy-authority-0.2.0",
+        _upstream("ugence_policy_authority"),
+        (
+            ("__init__.py", '__version__ = "0.1.0"', '__version__ = "0.2.0"'),
+            (
+                "core/canonical.py",
+                'POLICY_BODY_DIGEST_DOMAIN = "ugence.policy-authority/policy-body/v1"',
+                'POLICY_BODY_DIGEST_DOMAIN = '
+                '"ugence.cloud-scaling/policy-authenticity/artifact/v1"',
+            ),
+        ),
+    )
+    outcome = _import_phase5b_under(tmp_path, [resolution])
+    assert outcome.startswith("REFUSED AssertionError"), (
+        "the artifact digest domain collided with the policy-body digest domain and the "
+        f"package imported anyway: {outcome!r}"
+    )
+    assert "digest domain" in outcome, (
+        f"the refusal came from some separation other than the domain one: {outcome!r}"
+    )
+
+
+@pytest.mark.adversarial
+def test_the_entitlements_stay_distinct_under_an_authority_that_collapsed_them(tmp_path):
+    """Guard 15 — ``identifiers.py:210``, ``REQUIRED… is FORBIDDEN_KEY_ENTITLEMENT``.
+
+    Both operands are members of the Policy Authority's ``KeyEntitlement``, so *both* sides
+    are upstream's to move — the case where a single-resolution fixture is least entitled to
+    conclude anything. The drift is one line: give ``REVOKE_POLICY`` the value
+    ``"ISSUE_POLICY"``. Python's ``Enum`` makes equal values *aliases*, so the two names
+    become one member and the ``is`` comparison the guard uses becomes true. That is what a
+    release merging the two entitlements would actually look like.
+
+    Present, the package refuses to import. Removed, it imports with
+    ``REQUIRED_KEY_ENTITLEMENT is FORBIDDEN_KEY_ENTITLEMENT``, and D-5B0B-4's whole basis
+    for choosing the Policy Authority's key ring over a TEV anchor — that entitlement
+    granularity is expressible — is gone: a revoke-only key satisfies the issuing
+    requirement, which the module docstring says cannot happen because there is no parameter
+    to divert. There is no parameter, and this guard is why that is enough.
+    """
+
+    resolution = _second_resolution(
+        tmp_path,
+        "policy-authority-0.2.0",
+        _upstream("ugence_policy_authority"),
+        (
+            ("__init__.py", '__version__ = "0.1.0"', '__version__ = "0.2.0"'),
+            (
+                "core/statuses.py",
+                '    REVOKE_POLICY = "REVOKE_POLICY"',
+                '    REVOKE_POLICY = "ISSUE_POLICY"',
+            ),
+        ),
+    )
+    outcome = _import_phase5b_under(tmp_path, [resolution])
+    assert outcome.startswith("REFUSED AssertionError"), (
+        "issuing and revoking entitlements collapsed to one member and the package "
+        f"imported anyway: {outcome!r}"
+    )
+    assert "entitlements" in outcome, (
+        f"the refusal came from some separation other than the entitlement one: {outcome!r}"
+    )
+
+
+@pytest.mark.adversarial
+def test_the_action_vocabulary_guard_fires_when_the_whole_chain_ratifies_a_fifth_type(
+    tmp_path,
+):
+    """Guard 16 — ``identifiers.py:224``, ``CANONICAL_ACTION_TYPES != _RATIFIED_…``.
+
+    The one of the four that needs more than a single distribution moved, and the first
+    attempt at it measured nothing. Adding a fifth ``ActionKind`` to the controller alone
+    is refused by *Phase 5A's* own drift guard, one package upstream — the same ImportError
+    with and without this guard, which is a selector miss, not a measurement.
+
+    Reaching this guard means the chain agreeing: the controller's enum, Phase 4C's
+    ``CANONICAL_ACTION_TYPES`` and Phase 5A's, all carrying ``scale_sideways``. That is a
+    coordinated release the open-ended pins admit, and it is exactly the situation this
+    guard exists for — 5B ratified four types in R-8 and does not follow an upstream that
+    ratifies five.
+
+    Present, the package refuses to import. Removed, it imports and gate 16 selects an
+    authenticated capacity bound by a five-member vocabulary R-8 never ratified.
+    """
+
+    fifth = '    {"no_change", "scale_up", "scale_down", "coordinated"}'
+    widened = (
+        '    {"no_change", "scale_up", "scale_down", "coordinated", "scale_sideways"}'
+    )
+    chain = tmp_path / "action-vocabulary-0.2.0"
+    for origin, edits in (
+        (
+            _upstream("ugence_cloud_scaling_controller"),
+            (
+                (
+                    "planning/candidates.py",
+                    '    COORDINATED = "coordinated"',
+                    '    COORDINATED = "coordinated"\n    SIDEWAYS = "scale_sideways"',
+                ),
+            ),
+        ),
+        (
+            _upstream("ugence_cloud_scaling_risk_integration"),
+            (
+                ("version.py", '__version__ = "0.1.0"', '__version__ = "0.2.0"'),
+                ("identifiers.py", fifth, widened),
+            ),
+        ),
+        (
+            _upstream("ugence_cloud_scaling_authorization_contracts"),
+            (
+                ("version.py", '__version__ = "0.7.0"', '__version__ = "0.8.0"'),
+                ("identifiers.py", fifth, widened),
+            ),
+        ),
+    ):
+        _second_resolution(chain.parent, chain.name, origin, edits)
+
+    outcome = _import_phase5b_under(tmp_path, [chain])
+    assert outcome.startswith("REFUSED ImportError"), (
+        "the upstream chain ratified a fifth action type and this package imported anyway, "
+        f"leaving gate 16 to select a bound by an unratified vocabulary: {outcome!r}"
+    )
+    assert "action-type drift" in outcome, (
+        "the refusal came from a guard upstream of this one, which measures nothing about "
+        f"this one: {outcome!r}"
+    )

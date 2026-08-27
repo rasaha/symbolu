@@ -212,43 +212,6 @@ PACKAGES = {
             # `ugence-cloud-scaling-authorization-contracts>=0.1.0` pins. ADR Phase 5 §9.2:
             # a condition that can be true under a permitted resolution is not an equivalent
             # mutant, however false it is in this checkout.
-            ("identifiers.py", "VERIFICATION_PROFILE == POLICY_AUTHORITY_PROTOCOL_ID"): (
-                "unscorable-by-single-checkout-fixture",
-                "The right operand is `AUTHORITY_PROTOCOL_ID`, imported from "
-                "`ugence_policy_authority.api`. A Policy Authority release that renamed its "
-                "protocol identifier to this package's verification profile would make the "
-                "condition true, and this package consumes that protocol rather than being "
-                "a version of it. Real and reachable; only unscorable by a fixture that "
-                "installs one resolution.",
-                "tests/test_guard_coverage.py::"
-                "test_the_import_time_separations_hold_for_the_installed_distributions",
-            ),
-            ("identifiers.py", "POLICY_AUTHENTICITY_DIGEST_DOMAIN == POLICY_BODY_DIGEST_DOMAIN"): (
-                "unscorable-by-single-checkout-fixture",
-                "The right operand is the Policy Authority's own `POLICY_BODY_DIGEST_DOMAIN`. "
-                "Collapsing the two domains would let a verification artifact's digest be "
-                "read as a policy body digest, and an upstream release controls one side of "
-                "the comparison.",
-                "tests/test_guard_coverage.py::"
-                "test_the_import_time_separations_hold_for_the_installed_distributions",
-            ),
-            ("identifiers.py", "REQUIRED_KEY_ENTITLEMENT is FORBIDDEN_KEY_ENTITLEMENT"): (
-                "unscorable-by-single-checkout-fixture",
-                "Both operands are members of the Policy Authority's `KeyEntitlement`. An "
-                "upstream release that aliased ISSUE_POLICY and REVOKE_POLICY to one member "
-                "would make the condition true and let a revoke-only key authenticate an "
-                "issued policy.",
-                "tests/test_guard_coverage.py::"
-                "test_the_import_time_separations_hold_for_the_installed_distributions",
-            ),
-            ("identifiers.py", "CANONICAL_ACTION_TYPES != _RATIFIED_ACTION_TYPES"): (
-                "unscorable-by-single-checkout-fixture",
-                "The left operand is Phase 5A's `CANONICAL_ACTION_TYPES`, from a separately "
-                "versioned distribution. Gate 16 selects an authenticated bound by this "
-                "vocabulary, so a drifted set is exactly what this guard exists to refuse.",
-                "tests/test_guard_coverage.py::"
-                "test_the_import_time_separations_hold_for_the_installed_distributions",
-            ),
             ("identifiers.py",
              "len({POLICY_AUTHENTICITY_DIGEST_DOMAIN, POLICY_AUTHENTICITY_VERIFIED_FACTS_DOMAIN, POLICY_AUTHENTICITY_RECORDED_FACTS_DOMAIN}) != 3"): (
                 "equivalent-mutant",
