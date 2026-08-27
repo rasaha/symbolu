@@ -379,14 +379,12 @@ def test_text_that_is_not_exactly_a_str_is_refused():
         require_nfc_text,
     )
 
-    class LyingText(str):
-        def __eq__(self, other):  # pragma: no cover - the type gate refuses first
-            return True
-
-        __hash__ = str.__hash__
-
-    with pytest.raises(PolicyAuthenticityFieldError) as excinfo:
-        require_nfc_text("policy_id", LyingText("p-1"))
+    # Not a ``str`` subclass: one that lies in ``__eq__`` satisfies the empty-string check
+    # on the next line and is refused there with the same error class, so it measures that
+    # guard rather than this one. A plain ``int`` reaches ``unicodedata.normalize`` instead,
+    # which raises ``TypeError`` — a different class, and therefore this guard's own work.
+    with pytest.raises(PolicyAuthenticityFieldError):
+        require_nfc_text("policy_id", 123)
 
 
 @pytest.mark.adversarial
@@ -706,10 +704,19 @@ def test_a_capacity_bounds_fact_that_is_not_a_tuple_is_refused():
     from under a digest that already covered it.
     """
 
-    genuine, fields, digest = _artifact_with(
-        capacity_bounds_fact=list(_artifact_with()[1]["capacity_bounds_fact"] or ())
+    # A *populated* list. An empty one is caught by the guard on the next line — "must be
+    # None rather than an empty tuple" — with the same error class, so it would measure that
+    # guard instead of this one.
+    from ugence_cloud_scaling_policy_authenticity import VerifiedCapacityBound  # noqa: PLC0415
+
+    bound = VerifiedCapacityBound(
+        action_type="scale_up",
+        resource_class="deploy/checkout-api",
+        max_permitted_magnitude=100,
+        max_permitted_delta=25,
     )
-    with pytest.raises(VerifiedPolicyArtifactIntegrityError) as excinfo:
+    genuine, fields, digest = _artifact_with(capacity_bounds_fact=[bound])
+    with pytest.raises(VerifiedPolicyArtifactIntegrityError):
         _build(genuine, fields, digest)
 
 
@@ -784,12 +791,16 @@ def test_a_look_alike_is_refused_at_the_consumption_boundary():
 
     genuine = _genuine()
 
+    # Every field of a genuine artifact, so the field-presence check behind this guard has
+    # nothing to complain about and only the exact-type gate can refuse it.
+    import dataclasses as _dc  # noqa: PLC0415
+
     class LookAlike:
         def __init__(self, real):
-            for name in ("artifact_digest", "policy_body_digest", "outcome"):
-                setattr(self, name, getattr(real, name, None))
+            for field in _dc.fields(real):
+                setattr(self, field.name, getattr(real, field.name))
 
-    with pytest.raises(VerifiedPolicyArtifactIntegrityError) as excinfo:
+    with pytest.raises(VerifiedPolicyArtifactIntegrityError):
         require_verified_policy_authenticity(LookAlike(genuine))
 
 

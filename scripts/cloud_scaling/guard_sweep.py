@@ -257,6 +257,42 @@ PACKAGES = {
                 "tests/test_guard_coverage.py::"
                 "test_the_import_time_separations_hold_for_the_installed_distributions",
             ),
+            # --- resolution_port.py / verified.py: guards their own successor subsumes ----
+            # Each was attacked for isolation first and the attempt is recorded. None of the
+            # three has an input that reaches it without also reaching the guard behind it,
+            # and neither `PolicyAuthenticityConfigurationError` nor
+            # `VerifiedPolicyArtifactIntegrityError` carries an outcome enum — so under ADR
+            # Phase 5 §9.1 the typed refusal is the class alone, and the class does not move.
+            ("resolution_port.py", "registry is None"): (
+                "diagnostic-only",
+                "`None` cannot reach this guard without also failing "
+                "`hasattr(registry, 'get_issued')` thirteen lines below, which raises the "
+                "same PolicyAuthenticityConfigurationError: a None registry never has the "
+                "attribute, so no isolating input exists. Kept because 'there is no ambient "
+                "registry' is the more useful thing to tell a composition root than 'your "
+                "registry lacks get_issued'.",
+                "tests/test_guard_coverage.py::"
+                "test_a_resolution_port_built_without_a_registry_is_refused",
+            ),
+            ("resolution_port.py", "signature_verifier is None"): (
+                "diagnostic-only",
+                "The same shape as the registry guard above: a None verifier always fails "
+                "`hasattr(signature_verifier, 'verify')` below it with the same error class, "
+                "so no input isolates this one.",
+                "tests/test_guard_coverage.py::"
+                "test_a_resolution_port_built_without_a_signature_verifier_is_refused",
+            ),
+            ("verified.py", "name in RECORDED_FACT_NAMES"): (
+                "diagnostic-only",
+                "Measured: with the guard removed, both recorded names fall through to the "
+                "verified-fact lookup and raise the same VerifiedPolicyArtifactIntegrityError "
+                "('is not a fact of a verification artifact'). The guard changes the "
+                "diagnosis from 'not a fact' to 'a recorded fact, not a verified one' — which "
+                "is the difference between a typo and a category error, and is why it is "
+                "kept.",
+                "tests/test_guard_coverage.py::"
+                "test_reading_a_recorded_fact_through_verified_fact_is_refused",
+            ),
             # --- verified.py: the partition's import guards -------------------------------
             # Genuinely equivalent: every operand is a frozen set or a `dataclasses.fields`
             # reading of a class in this module, so no resolution can move either side.

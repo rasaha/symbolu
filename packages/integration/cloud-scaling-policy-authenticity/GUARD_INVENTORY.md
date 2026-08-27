@@ -15,9 +15,9 @@ This package records no prior inventory; this is the first one.
 
 ## Classification
 
-Every guard is classified: **109 `SCORED`** — the
+Every guard is classified: **106 `SCORED`** — the
 sweep neutralises it and the suite must fail — and
-**8 `EXCLUDED`**, each with a reason from a closed vocabulary and
+**11 `EXCLUDED`**, each with a reason from a closed vocabulary and
 a test that measures the reason. A guard is never excluded because it survived; a
 survivor with no prior declaration fails the sweep.
 
@@ -28,6 +28,9 @@ survivor with no prior declaration fails the sweep.
 | `identifiers.py:196` | `equivalent-mutant` | The one of the five that is genuinely equivalent: all three domains are frozen literals in this module, in this distribution, so no resolution can move any of them and the condition is false in every program this package can be part of. | `tests/test_guard_coverage.py::test_the_import_time_separations_hold_for_the_installed_distributions` |
 | `identifiers.py:210` | `unscorable-by-single-checkout-fixture` | Both operands are members of the Policy Authority's `KeyEntitlement`. An upstream release that aliased ISSUE_POLICY and REVOKE_POLICY to one member would make the condition true and let a revoke-only key authenticate an issued policy. | `tests/test_guard_coverage.py::test_the_import_time_separations_hold_for_the_installed_distributions` |
 | `identifiers.py:224` | `unscorable-by-single-checkout-fixture` | The left operand is Phase 5A's `CANONICAL_ACTION_TYPES`, from a separately versioned distribution. Gate 16 selects an authenticated bound by this vocabulary, so a drifted set is exactly what this guard exists to refuse. | `tests/test_guard_coverage.py::test_the_import_time_separations_hold_for_the_installed_distributions` |
+| `resolution_port.py:193` | `diagnostic-only` | `None` cannot reach this guard without also failing `hasattr(registry, 'get_issued')` thirteen lines below, which raises the same PolicyAuthenticityConfigurationError: a None registry never has the attribute, so no isolating input exists. Kept because 'there is no ambient registry' is the more useful thing to tell a composition root than 'your registry lacks get_issued'. | `tests/test_guard_coverage.py::test_a_resolution_port_built_without_a_registry_is_refused` |
+| `resolution_port.py:195` | `diagnostic-only` | The same shape as the registry guard above: a None verifier always fails `hasattr(signature_verifier, 'verify')` below it with the same error class, so no input isolates this one. | `tests/test_guard_coverage.py::test_a_resolution_port_built_without_a_signature_verifier_is_refused` |
+| `verified.py:675` | `diagnostic-only` | Measured: with the guard removed, both recorded names fall through to the verified-fact lookup and raise the same VerifiedPolicyArtifactIntegrityError ('is not a fact of a verification artifact'). The guard changes the diagnosis from 'not a fact' to 'a recorded fact, not a verified one' — which is the difference between a typo and a category error, and is why it is kept. | `tests/test_guard_coverage.py::test_reading_a_recorded_fact_through_verified_fact_is_refused` |
 | `verified.py:775` | `equivalent-mutant` | A fact cannot be both verified and recorded. Both operands are frozen sets defined in this module, in this distribution, so the intersection is empty in every program this package can be part of. Kept because it is what makes a mis-classified new field fail at import rather than ship as a fact that is digest-covered and unattested. | `tests/test_guard_coverage.py::test_the_fact_partition_is_total_and_disjoint` |
 | `verified.py:780` | `equivalent-mutant` | Every declared field of the artifact must be classified verified or recorded. Both sides are read from this module — the two frozen sets and `dataclasses.fields(VerifiedPolicyAuthenticity)` — so the comparison cannot be made true by anything outside this distribution. | `tests/test_guard_coverage.py::test_the_fact_partition_is_total_and_disjoint` |
 | `verification.py:775` | `diagnostic-only` | Every input this guard refuses is refused identically without it. A bound missing a field reaches `entry[name]` nineteen lines below, inside a deliberate `except Exception` backstop that re-raises as the same `_BoundsShapeError` and therefore the same POLICY_BOUNDS_MALFORMED outcome; only the message changes, from "bounds[0] omits ['max_permitted_delta']" to "bounds[0]: 'max_permitted_delta'". Under ADR Phase 5 §9.1 the message is not the contract. The guard is kept because it names every absent field at once rather than the first one `entry[...]` happens to reach. | `tests/test_guard_coverage.py::test_a_signed_bound_this_profile_cannot_read_is_refused` |
@@ -60,8 +63,8 @@ survivor with no prior declaration fails the sweep.
 | 14 | `identifiers.py:196` | raise | EXCLUDED | — | `len({POLICY_AUTHENTICITY_DIGEST_DOMAIN, POLICY_AUTHENTICITY_VERIFIED_FACTS_…` |
 | 15 | `identifiers.py:210` | raise | EXCLUDED | — | `REQUIRED_KEY_ENTITLEMENT is FORBIDDEN_KEY_ENTITLEMENT` |
 | 16 | `identifiers.py:224` | raise | EXCLUDED | — | `CANONICAL_ACTION_TYPES != _RATIFIED_ACTION_TYPES` |
-| 17 | `resolution_port.py:193` | raise | SCORED | — | `registry is None` |
-| 18 | `resolution_port.py:195` | raise | SCORED | — | `signature_verifier is None` |
+| 17 | `resolution_port.py:193` | raise | EXCLUDED | — | `registry is None` |
+| 18 | `resolution_port.py:195` | raise | EXCLUDED | — | `signature_verifier is None` |
 | 19 | `resolution_port.py:200` | raise | SCORED | — | `not isinstance(adapters, AdapterRegistry)` |
 | 20 | `resolution_port.py:206` | raise | SCORED | — | `not hasattr(registry, attribute)` |
 | 21 | `resolution_port.py:210` | raise | SCORED | — | `not hasattr(signature_verifier, 'verify')` |
@@ -86,7 +89,7 @@ survivor with no prior declaration fails the sweep.
 | 40 | `verified.py:516` | raise | SCORED | — | `len(set(selectors)) != len(selectors)` |
 | 41 | `verified.py:525` | raise | SCORED | — | `self.policy_content_digest != self.policy_body_digest` |
 | 42 | `verified.py:534` | raise | SCORED | — | `self.artifact_digest != expected` |
-| 43 | `verified.py:675` | raise | SCORED | — | `name in RECORDED_FACT_NAMES` |
+| 43 | `verified.py:675` | raise | EXCLUDED | — | `name in RECORDED_FACT_NAMES` |
 | 44 | `verified.py:681` | raise | SCORED | — | `name not in VERIFIED_FACT_NAMES` |
 | 45 | `verified.py:695` | raise | SCORED | — | `name not in RECORDED_FACT_NAMES` |
 | 46 | `verified.py:737` | raise | SCORED | — | `type(value) is not VerifiedPolicyAuthenticity` |

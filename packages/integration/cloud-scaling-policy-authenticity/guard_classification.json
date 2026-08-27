@@ -1,8 +1,8 @@
 {
   "package": "policy-authenticity",
   "total": 117,
-  "scored": 109,
-  "excluded": 8,
+  "scored": 106,
+  "excluded": 11,
   "classification": {
     "1": {
       "status": "SCORED",
@@ -116,13 +116,19 @@
       "condition": "CANONICAL_ACTION_TYPES != _RATIFIED_ACTION_TYPES"
     },
     "17": {
-      "status": "SCORED",
+      "status": "EXCLUDED",
+      "reason": "diagnostic-only",
+      "detail": "`None` cannot reach this guard without also failing `hasattr(registry, 'get_issued')` thirteen lines below, which raises the same PolicyAuthenticityConfigurationError: a None registry never has the attribute, so no isolating input exists. Kept because 'there is no ambient registry' is the more useful thing to tell a composition root than 'your registry lacks get_issued'.",
+      "evidence": "tests/test_guard_coverage.py::test_a_resolution_port_built_without_a_registry_is_refused",
       "module": "resolution_port.py",
       "line": 193,
       "condition": "registry is None"
     },
     "18": {
-      "status": "SCORED",
+      "status": "EXCLUDED",
+      "reason": "diagnostic-only",
+      "detail": "The same shape as the registry guard above: a None verifier always fails `hasattr(signature_verifier, 'verify')` below it with the same error class, so no input isolates this one.",
+      "evidence": "tests/test_guard_coverage.py::test_a_resolution_port_built_without_a_signature_verifier_is_refused",
       "module": "resolution_port.py",
       "line": 195,
       "condition": "signature_verifier is None"
@@ -272,7 +278,10 @@
       "condition": "self.artifact_digest != expected"
     },
     "43": {
-      "status": "SCORED",
+      "status": "EXCLUDED",
+      "reason": "diagnostic-only",
+      "detail": "Measured: with the guard removed, both recorded names fall through to the verified-fact lookup and raise the same VerifiedPolicyArtifactIntegrityError ('is not a fact of a verification artifact'). The guard changes the diagnosis from 'not a fact' to 'a recorded fact, not a verified one' \u2014 which is the difference between a typo and a category error, and is why it is kept.",
+      "evidence": "tests/test_guard_coverage.py::test_reading_a_recorded_fact_through_verified_fact_is_refused",
       "module": "verified.py",
       "line": 675,
       "condition": "name in RECORDED_FACT_NAMES"
