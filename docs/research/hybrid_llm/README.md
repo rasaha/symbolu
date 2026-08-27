@@ -13,6 +13,10 @@ Canonical, editable research-thesis documents, aligned to merged repository evid
   authorized-now).
 - **[HYBRID_LLM_V1_0_TO_V1_1_CHANGELOG.md](HYBRID_LLM_V1_0_TO_V1_1_CHANGELOG.md)** — Version 1.0 → 1.1
   change log.
+- **[HRR_BINDING_VARIANT_PREREGISTRATION.md](HRR_BINDING_VARIANT_PREREGISTRATION.md)**
+  — preregistration for a Phase variant restricted to true HRR binding (unit-modulus keys,
+  conjugate unbind, no decay). **Not authorized for implementation or execution**; it disturbs
+  no existing verdict and inherits the repository's own acceptance threshold.
 - **[PR1361_AUDIT_AND_MERGE.md](PR1361_AUDIT_AND_MERGE.md)** — audit record for the frozen-readout track
   closure merge that preceded this revision.
 
