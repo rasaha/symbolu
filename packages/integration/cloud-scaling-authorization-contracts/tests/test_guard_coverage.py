@@ -678,3 +678,115 @@ def test_an_attestation_rebuilt_from_its_canonical_wire_form_parses_its_instant(
     rebuilt = ProducerAttestationEvidence.from_dict(wire)
     assert rebuilt.issued_at == genuine.issued_at
     assert rebuilt.digest() == genuine.digest()
+
+
+#: Source of the second-resolution probe run by the guard-9 measurement below.
+SECOND_RESOLUTION_PROBE = (
+    "import sys\n"
+    "try:\n"
+    "    import ugence_cloud_scaling_authorization_contracts.identifiers\n"
+    "    print('NO-IMPORT-ERROR')\n"
+    "except ImportError as exc:\n"
+    "    print('IMPORT-ERROR ' + str(exc))\n"
+)
+
+
+def test_the_phase_4c_drift_guard_fires_under_a_second_permitted_resolution(tmp_path):
+    """Guard 9 — ``identifiers.py:93``, ``ours != theirs``. Scored, not unscorable.
+
+    This guard was previously excluded as ``unscorable-by-single-checkout-fixture``: its
+    right operand comes from ``ugence-cloud-scaling-risk-integration``, admitted by an
+    open-ended ``>=0.1.0`` pin, and the sweep fixture installs exactly one resolution. That
+    reasoning conflated two things. The *fixture* installs one resolution; the *test* is
+    free to construct another. A pin that admits any version at or above 0.1.0 admits a
+    0.2.0 that renames a ratified identifier, and building that distribution is the whole
+    measurement.
+
+    So it is built here, from the real Phase 4C source rather than a stub — a stub would
+    prove something about the stub — with two edits: the version bumped to 0.2.0, and
+    ``PURPOSE_CAPACITY_ACTION`` renamed. Placed first on ``PYTHONPATH`` it *is* the
+    resolution, exactly as a released 0.2.0 would be.
+
+    Under it the guard fires and Phase 5A refuses to import. Remove the guard and the import
+    succeeds, binding ``cloud_scaling.capacity_action`` into every candidate digest while
+    Phase 4C ratifies ``cloud_scaling.capacity_action.v2`` — the substitution the module
+    docstring says fails closed. That is a change to the typed refusal (ADR Phase 5 §9.1:
+    ImportError versus no refusal at all), so the guard is authority-bearing and scorable,
+    and the exclusion is withdrawn.
+
+    The kill rests on *whether* the import refused, not on what it said. The message is
+    asserted afterwards only to pin which of the three import-time guards answered.
+
+    In a subprocess because the measurement re-runs module-level import code; doing it
+    in-process would leave a drifted Phase 4C in ``sys.modules`` for every later test.
+    """
+
+    import os  # noqa: PLC0415
+    import shutil  # noqa: PLC0415
+    import subprocess  # noqa: PLC0415
+    import sys  # noqa: PLC0415
+    from pathlib import Path  # noqa: PLC0415
+
+    declared = os.environ.get("UGENCE_REPO_ROOT")
+    repo = Path(declared).resolve() if declared else Path(__file__).resolve().parents[4]
+    origin = (
+        repo
+        / "packages"
+        / "integration"
+        / "cloud-scaling-risk-integration"
+        / "src"
+        / "ugence_cloud_scaling_risk_integration"
+    )
+    assert origin.is_dir(), f"Phase 4C source not found at {origin}"
+
+    resolution = tmp_path / "resolution-0.2.0"
+    package = resolution / "ugence_cloud_scaling_risk_integration"
+    shutil.copytree(origin, package, ignore=shutil.ignore_patterns("__pycache__"))
+
+    version = package / "version.py"
+    bumped = version.read_text(encoding="utf-8").replace(
+        '__version__ = "0.1.0"', '__version__ = "0.2.0"'
+    )
+    assert '"0.2.0"' in bumped, "Phase 4C no longer declares 0.1.0; re-derive this bound"
+    version.write_text(bumped, encoding="utf-8")
+
+    identifiers = package / "identifiers.py"
+    before = identifiers.read_text(encoding="utf-8")
+    ratified = 'PURPOSE_CAPACITY_ACTION: Final[str] = "cloud_scaling.capacity_action"'
+    assert before.count(ratified) == 1, (
+        "the identifier this resolution renames is no longer spelled as expected, so the "
+        "drift it is supposed to introduce may not have been introduced at all"
+    )
+    identifiers.write_text(
+        before.replace(
+            ratified,
+            'PURPOSE_CAPACITY_ACTION: Final[str] = "cloud_scaling.capacity_action.v2"',
+        ),
+        encoding="utf-8",
+    )
+
+    probe = tmp_path / "second_resolution_probe.py"
+    probe.write_text(SECOND_RESOLUTION_PROBE, encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, str(probe)],
+        capture_output=True,
+        text=True,
+        timeout=300,
+        env={
+            **os.environ,
+            # The drifted resolution first, so it *is* the installed Phase 4C for this
+            # process. Everything after it is whatever this suite is already running
+            # against — under the sweep, that is the mutated copy.
+            "PYTHONPATH": os.pathsep.join(
+                [str(resolution), *(p for p in sys.path if p)]
+            ),
+        },
+    )
+    output = result.stdout.strip()
+    assert output.startswith("IMPORT-ERROR"), (
+        "Phase 5A imported cleanly against a Phase 4C resolution that renamed a ratified "
+        f"identifier, binding an unratified value: {output!r} {result.stderr[-400:]!r}"
+    )
+    assert "PURPOSE_CAPACITY_ACTION" in output, (
+        f"the refusal came from some guard other than the D-4 pair check: {output!r}"
+    )
