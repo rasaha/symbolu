@@ -21,7 +21,15 @@ from typing import Any, Optional
 
 import pytest
 
-from _policy_fixtures import T_MID, bounds_authority, issued, issued_bounds, port_for, verifier_for
+from _policy_fixtures import (
+    T_CANDIDATE,
+    T_MID,
+    bounds_authority,
+    issued,
+    issued_bounds,
+    port_for,
+    verifier_for,
+)
 from ugence_cloud_scaling_policy_authenticity import (
     PolicyAuthenticityResult,
     PolicyAuthenticityVerifier,
@@ -1120,3 +1128,129 @@ def test_a_descriptor_naming_another_adapter_than_the_records_is_refused():
 
     refusal, outcomes = _refusal_for(descriptor_adapter_id="ugence.some-other-adapter/v1")
     assert refusal.outcome is outcomes.POLICY_PROJECTION_DIGEST_MISMATCH
+
+
+# --- verification.py: signed bounds this profile cannot read, and R-8's typing ---------
+#
+# Like guard 105, none of these is reachable by rewriting the projection: gate 14 reproduces
+# the signed body digest from it, so a mutated projection dies an entire gate earlier. What
+# reaches them is a bound that is *genuinely signed* and still unreadable — an authority
+# issuing capacity bounds under a shape this profile does not know.
+
+
+def _issue_with_bounds(bounds):
+    from _policy_fixtures import make_bounds_policy  # noqa: PLC0415
+
+    authority = bounds_authority()
+    return authority, authority.issue(make_bounds_policy(bounds=bounds))
+
+
+@pytest.mark.adversarial
+def test_a_signed_bounds_key_that_is_not_a_sequence_is_refused():
+    """Guard 102 — ``verification.py:758``, ``not isinstance(raw, (list, tuple))``."""
+
+    from ugence_cloud_scaling_policy_authenticity import PolicyAuthenticityOutcome  # noqa: PLC0415
+
+    authority, record = _issue_with_bounds({"scale_up": 100})
+    result = _verify_with(port_for(authority), record)
+    assert result.refusal is not None
+    assert result.refusal.outcome is PolicyAuthenticityOutcome.POLICY_BOUNDS_MALFORMED
+
+
+@pytest.mark.adversarial
+def test_a_signed_bound_entry_that_is_not_a_mapping_is_refused():
+    """Guard 104 — ``verification.py:772``, ``not isinstance(entry, Mapping)``."""
+
+    from ugence_cloud_scaling_policy_authenticity import PolicyAuthenticityOutcome  # noqa: PLC0415
+
+    authority, record = _issue_with_bounds(("not-a-bound",))
+    result = _verify_with(port_for(authority), record)
+    assert result.refusal is not None
+    assert result.refusal.outcome is PolicyAuthenticityOutcome.POLICY_BOUNDS_MALFORMED
+
+
+@pytest.mark.adversarial
+def test_a_candidate_action_type_outside_the_ratified_vocabulary_selects_no_bound():
+    """Guard 108 — ``verification.py:836``, R-8's selector vocabulary.
+
+    A scope built through Phase 5A cannot carry an unratified action type — Phase 5A refuses
+    one at construction. This boundary accepts a candidate object it did not build, which is
+    exactly why the check is here and why the attack has to fabricate the scope rather than
+    build it.
+    """
+
+    from _policy_fixtures import genuine_candidate  # noqa: PLC0415
+    from ugence_cloud_scaling_policy_authenticity import PolicyAuthenticityOutcome  # noqa: PLC0415
+
+    from _policy_fixtures import _Bound  # noqa: PLC0415
+
+    # The authenticated bound is signed under the *same* unratified action type. Without
+    # that the attack measures nothing: removing this guard would merely produce a selector
+    # miss from the "no matching bound" refusal below, with the same outcome. With it, the
+    # selector matches and the candidate is attested against a bound whose action type D-4
+    # never ratified — measured: neutralising this guard turns this case VERIFIED.
+    unratified = _Bound(
+        action_type="scale_sideways",
+        resource_class="deploy/checkout-api",
+        max_permitted_magnitude=10_000,
+        max_permitted_delta=10_000,
+    )
+    authority, record = _issue_with_bounds((unratified,))
+    candidate = genuine_candidate(record)
+    if candidate is None:  # pragma: no cover - no Phase 5A checkout available
+        pytest.skip("no source checkout; the Phase 5A candidate builder is unavailable")
+
+    forged = _bypass(
+        candidate, target_scope=_bypass(candidate.target_scope, action_type="scale_sideways")
+    )
+    result = verifier_for(authority).verify(
+        coordinate=record.coordinate,
+        expected_reference_tenant_id=record.coordinate.tenant_id,
+        as_of=T_CANDIDATE,
+        candidate=forged,
+    )
+    assert result.refusal is not None, (
+        "a candidate was attested against a bound signed under an action type D-4 never "
+        "ratified"
+    )
+    assert result.refusal.outcome is PolicyAuthenticityOutcome.CANDIDATE_BOUND_SELECTOR_MISS
+
+
+@pytest.mark.adversarial
+@pytest.mark.parametrize(
+    "field",
+    # Three of the loop's four positions. The fourth, ``requested_delta``, is a derived
+    # *property* of ``ExecutionTargetScope`` — ``requested_magnitude - magnitude_before`` —
+    # with no setter and no dataclass field behind it, so it is an ``int`` by construction
+    # and that position of the guard cannot be reached with anything else. Recorded here
+    # rather than left as a silently missing case.
+    ["max_permitted_magnitude", "max_permitted_delta", "requested_magnitude"],
+)
+def test_a_candidate_ceiling_that_is_a_bool_is_refused(field):
+    """Guard 111 — ``verification.py:884``, R-8's exact-int admission.
+
+    ``bool`` is the case the guard names explicitly, and it is not pedantry: ``True > 1`` is
+    ``False``, so a bool ceiling would compare as satisfied against any authenticated bound
+    above 1. All four carried values are parametrised — a single case would leave three
+    positions of the loop unexercised.
+    """
+
+    from _policy_fixtures import genuine_candidate  # noqa: PLC0415
+    from ugence_cloud_scaling_policy_authenticity import PolicyAuthenticityOutcome  # noqa: PLC0415
+
+    authority, record = issued_bounds()
+    candidate = genuine_candidate(record)
+    if candidate is None:  # pragma: no cover - no Phase 5A checkout available
+        pytest.skip("no source checkout; the Phase 5A candidate builder is unavailable")
+
+    forged = _bypass(
+        candidate, target_scope=_bypass(candidate.target_scope, **{field: True})
+    )
+    result = verifier_for(authority).verify(
+        coordinate=record.coordinate,
+        expected_reference_tenant_id=record.coordinate.tenant_id,
+        as_of=T_CANDIDATE,
+        candidate=forged,
+    )
+    assert result.refusal is not None
+    assert result.refusal.outcome is PolicyAuthenticityOutcome.CANDIDATE_BOUND_EXCEEDED

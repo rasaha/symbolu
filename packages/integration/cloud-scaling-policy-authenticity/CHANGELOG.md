@@ -1,5 +1,50 @@
 # Changelog — ugence-cloud-scaling-policy-authenticity
 
+## [Unreleased] — 56 survivors, and why this package excludes more than Phase 5A
+
+*No version bump and no behaviour change.* The partition, the profile version and every
+frozen digest are unmoved.
+
+With the artefact gone, the first honest sweep of this package reported **117 inventoried,
+61 killed, 56 survived**. Every survivor is now resolved: **101 SCORED, 16 EXCLUDED**.
+
+### Why sixteen exclusions, against Phase 5A's five
+
+Structural, not a difference in rigour. Phase 5A raises a distinct exception type per
+failure, so removing a guard usually changes the class a caller sees. This package refuses
+through a **coarse outcome vocabulary with fine-grained guards behind it**: several guards
+narrow the *message* while sharing one `PolicyAuthenticityOutcome` with the guard on the
+next line. ADR Phase 5 §9.1 ratifies the outcome as the contract and the message as prose,
+so those guards change no authorization answer and are `diagnostic-only`.
+
+Every one of them was attacked for isolation first, and each attempt is recorded as
+impossible *by construction* rather than merely unsuccessful:
+
+- a historical resolution cannot also imply current validity — the attribute is a read-only
+  property equal to `resolved and not historical`;
+- `None` cannot pass an exact-`str` check or a `Mapping` check, so a missing descriptor
+  field always trips its successor;
+- an adapter id that disagrees with the record cannot reframe to the signed body digest,
+  because the adapter id is an input to the frame;
+- a `None` registry, verifier or port never satisfies the `hasattr` behind it.
+
+Four more are `unscorable-by-single-checkout-fixture` (§9.2) and three are genuine
+equivalent mutants over this module's own frozen constants.
+
+### Two findings worth more than the tests that found them
+
+- **`canonical.py` had never been reached at all.** All ten of its guards survived. These
+  are the admission primitives every field in the package passes through; the suite
+  exercised the artifacts they protect and never the helpers themselves, so any of them
+  could have been deleted without a test failing.
+- **R-8's ceiling-typing guard has an unreachable loop position.** It checks four carried
+  values, and `requested_delta` is a derived *property* of `ExecutionTargetScope`
+  (`requested_magnitude - magnitude_before`) with no setter — always an `int` by
+  construction. The other three are covered and the fourth is recorded as unreachable, so a
+  later reader does not read its absence as an oversight. The `bool` case the guard names
+  explicitly is not pedantry: `True > 1` is `False`, so a boolean ceiling would compare as
+  satisfied against any authenticated bound above 1.
+
 ## [Unreleased] — the 115/115 result was an artefact, and is withdrawn
 
 *No version bump and no behaviour change.* The partition, the profile version and every

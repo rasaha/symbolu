@@ -1,8 +1,8 @@
 {
   "package": "policy-authenticity",
   "total": 117,
-  "scored": 105,
-  "excluded": 12,
+  "scored": 101,
+  "excluded": 16,
   "classification": {
     "1": {
       "status": "SCORED",
@@ -494,13 +494,19 @@
       "condition": "resolution.status is not PolicyResolutionStatus.RESOLVED"
     },
     "77": {
-      "status": "SCORED",
+      "status": "EXCLUDED",
+      "reason": "diagnostic-only",
+      "detail": "Removing it leaves `implies_current_validity` \u2014 a read-only property equal to `resolved and not historical` \u2014 False on the next line, refusing with the same HISTORICAL_RESOLUTION_REFUSED outcome. Isolation would need a resolution that is historical *and* implies current validity, which the property makes impossible. Kept for the better message: 'this describes an instant before a verified revocation'.",
+      "evidence": "tests/test_guard_coverage.py::test_a_historical_resolution_is_refused",
       "module": "verification.py",
       "line": 487,
       "condition": "resolution.historical"
     },
     "78": {
-      "status": "SCORED",
+      "status": "EXCLUDED",
+      "reason": "unreachable-behind-earlier-guard",
+      "detail": "The mirror of the guard above. `implies_current_validity` is a read-only property of the authority's PolicyResolution, `verification.py:460` admits the resolution by exact type so no subclass can override it, and both ways to make it non-True are refused above: a non-RESOLVED status by the status gate and `historical` by the guard on the previous line. The two are a redundant pair defending one property, and neither single removal changes the typed refusal.",
+      "evidence": "tests/test_guard_coverage.py::test_the_current_validity_guard_is_unreachable_behind_the_historicity_guard",
       "module": "verification.py",
       "line": 494,
       "condition": "resolution.implies_current_validity is not True"
@@ -608,7 +614,10 @@
       "condition": "mismatch is not None"
     },
     "96": {
-      "status": "SCORED",
+      "status": "EXCLUDED",
+      "reason": "diagnostic-only",
+      "detail": "Each of the three published descriptor fields is backed by a successor carrying the same POLICY_PROJECTION_ABSENT outcome: a None adapter id or policy type fails the exact-str check on the next line, and a None projection fails the Mapping check below that. `None` cannot pass either, so no isolating input exists. Kept because naming *which* fields are absent is what tells a port author what to publish.",
+      "evidence": "tests/test_guard_coverage.py::test_a_resolution_publishing_no_descriptor_projection_is_refused",
       "module": "verification.py",
       "line": 685,
       "condition": "missing"
@@ -626,7 +635,10 @@
       "condition": "not isinstance(projection, Mapping)"
     },
     "99": {
-      "status": "SCORED",
+      "status": "EXCLUDED",
+      "reason": "diagnostic-only",
+      "detail": "`adapter_id` is an input to the frame the body digest is reproduced from, so any value that trips this guard also fails the reproduction below it with the same POLICY_PROJECTION_DIGEST_MISMATCH outcome \u2014 there is no adapter id that disagrees with the record and still reframes to the signed digest. Kept because 'the projection names adapter X and the record names Y' is a diagnosis a port author can act on; 'the digest did not reproduce' is not.",
+      "evidence": "tests/test_guard_coverage.py::test_a_descriptor_naming_another_adapter_than_the_records_is_refused",
       "module": "verification.py",
       "line": 706,
       "condition": "adapter_id != record.adapter_id"

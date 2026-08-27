@@ -282,6 +282,57 @@ PACKAGES = {
                 "tests/test_guard_coverage.py::"
                 "test_a_resolution_port_built_without_a_signature_verifier_is_refused",
             ),
+            # --- verification.py: guards that refine a diagnosis inside one outcome -------
+            # Phase 5B's verify path is layered: several guards narrow the *message* while
+            # sharing one PolicyAuthenticityOutcome with the guard behind them. Under ADR
+            # Phase 5 §9.1 the outcome is the contract, so these change no authorization
+            # answer. Each was attacked for isolation first and the attempt is recorded as
+            # impossible by construction, not merely unsuccessful.
+            ("verification.py", "resolution.historical"): (
+                "diagnostic-only",
+                "Removing it leaves `implies_current_validity` — a read-only property equal "
+                "to `resolved and not historical` — False on the next line, refusing with the "
+                "same HISTORICAL_RESOLUTION_REFUSED outcome. Isolation would need a "
+                "resolution that is historical *and* implies current validity, which the "
+                "property makes impossible. Kept for the better message: 'this describes an "
+                "instant before a verified revocation'.",
+                "tests/test_guard_coverage.py::test_a_historical_resolution_is_refused",
+            ),
+            ("verification.py", "resolution.implies_current_validity is not True"): (
+                "unreachable-behind-earlier-guard",
+                "The mirror of the guard above. `implies_current_validity` is a read-only "
+                "property of the authority's PolicyResolution, `verification.py:460` admits "
+                "the resolution by exact type so no subclass can override it, and both ways "
+                "to make it non-True are refused above: a non-RESOLVED status by the status "
+                "gate and `historical` by the guard on the previous line. The two are a "
+                "redundant pair defending one property, and neither single removal changes "
+                "the typed refusal.",
+                "tests/test_guard_coverage.py::"
+                "test_the_current_validity_guard_is_unreachable_behind_the_historicity_guard",
+            ),
+            ("verification.py", "missing"): (
+                "diagnostic-only",
+                "Each of the three published descriptor fields is backed by a successor "
+                "carrying the same POLICY_PROJECTION_ABSENT outcome: a None adapter id or "
+                "policy type fails the exact-str check on the next line, and a None "
+                "projection fails the Mapping check below that. `None` cannot pass either, "
+                "so no isolating input exists. Kept because naming *which* fields are absent "
+                "is what tells a port author what to publish.",
+                "tests/test_guard_coverage.py::"
+                "test_a_resolution_publishing_no_descriptor_projection_is_refused",
+            ),
+            ("verification.py", "adapter_id != record.adapter_id"): (
+                "diagnostic-only",
+                "`adapter_id` is an input to the frame the body digest is reproduced from, "
+                "so any value that trips this guard also fails the reproduction below it "
+                "with the same POLICY_PROJECTION_DIGEST_MISMATCH outcome — there is no "
+                "adapter id that disagrees with the record and still reframes to the signed "
+                "digest. Kept because 'the projection names adapter X and the record names "
+                "Y' is a diagnosis a port author can act on; 'the digest did not reproduce' "
+                "is not.",
+                "tests/test_guard_coverage.py::"
+                "test_a_descriptor_naming_another_adapter_than_the_records_is_refused",
+            ),
             ("verification.py", "resolution_port is None"): (
                 "diagnostic-only",
                 "The same construction as the two resolution_port guards above: a None port "
