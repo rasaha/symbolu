@@ -1,5 +1,42 @@
 # Changelog — ugence-agentic-proposer
 
+## Unreleased — I7.13–I7.16 test coverage completed
+
+`tests/test_s1_implementation_obligations.py` discharges the four I7 test
+obligations left undischarged by the `0.1.0` implementation commit: no `src/` or
+`public_api.json` change, no version bump — this is test coverage of behaviour
+that was already correct.
+
+* **I7.13 — construction shape under `strict=True` (G2).** The explicit
+  pass-through constructs the right leaf types (`created_at` a `datetime`,
+  `candidates` a `tuple` of `CandidateAdvisory`); feeding the payload's own
+  `model_dump(mode="json", exclude_none=False)` back into the constructor raises
+  `ValidationError` carrying both `datetime_type` and `tuple_type`, while
+  `model_dump()` (mode="python") raises `datetime_type` alone — the explicit C4
+  `field_serializer` carries no `when_used="json"`, so it runs in both modes and
+  stringifies every datetime either way, but the tuple container itself survives
+  mode="python" untouched; and a `list` passed to either `candidates` field is
+  rejected with `tuple_type`.
+* **I7.14 — R-7 replay (E2).** `verify_observation_resolution` returns `False`,
+  warning the failing reference, for a dangling reference, two observations
+  sharing an `observation_id`, and an observation substituted to another tenant,
+  case, or `source_ref` outside `allowed_record_refs`; returns `True` while
+  warning that an unreferenced extra observation is unreferenced; and a candidate
+  with an empty `observation_refs` is confirmed unable to make a *different*
+  candidate's dangling reference pass vacuously. `verify_advisory_selection` is
+  confirmed to return `False` whenever `verify_observation_resolution` does.
+* **I7.15 — revision inputs (G3).** `build_advisory_revision` refuses a call
+  omitting `claim_summaries`, `observation_refs` or `uncertainties` (a `TypeError`
+  from the keyword-only signature itself, not a silent inheritance); the three
+  supplied values, not the parent's, appear in the revision and in its
+  `P_unsigned`; the continuity fields (`tenant_id`, `case_ref`, `agent_id`,
+  `role_contract_id`, `mandate_id`, `context_id`) are inherited unchanged; and
+  `advisory_version` increments while `parent_advisory_digest` binds the parent.
+* **I7.16 — construction-call completeness (G2).** An AST test over `identity.py`
+  asserts the keyword set of the `ProposerAdvisory(...)` construction call equals
+  `set(ProposerAdvisory.model_fields)` exactly — no field missing, no keyword
+  that is not a field, no `**`-unpacking this check could not see through.
+
 ## Unreleased — OD-6 implemented
 
 `docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md` and

@@ -605,6 +605,267 @@ def test_i7_12_the_real_hash_shaped_fields_use_the_annotated_spelling():
 
 
 # --------------------------------------------------------------------------- #
+# I7.13 — construction shape under strict=True (G2)
+# --------------------------------------------------------------------------- #
+
+def _unsigned_payload_for(advisory):
+    """The private payload model, populated from an already-built advisory's own
+    fields — the same fields ``build_proposer_advisory`` itself passes through
+    before computing the identity value."""
+    PayloadModel = identity_module._unsigned_advisory_payload_model()
+    return PayloadModel(**{name: getattr(advisory, name)
+                           for name in PayloadModel.model_fields})
+
+
+def test_i7_13_the_explicit_pass_through_constructs_the_right_leaf_types(scenario):
+    payload = _unsigned_payload_for(scenario["advisory"])
+    assert isinstance(payload.created_at, datetime)
+    assert isinstance(payload.candidates, tuple)
+    assert all(isinstance(c, ap.CandidateAdvisory) for c in payload.candidates)
+
+
+def test_i7_13_the_json_mode_dump_idiom_raises_datetime_type_and_tuple_type(scenario):
+    """The exact regression I7.13 exists to block: feeding the payload's own
+    ``model_dump(mode="json", exclude_none=False)`` back into the constructor is
+    not a no-op under ``strict=True``. It fails on two independent grounds at
+    once — every datetime became a string, and the tuple became a JSON array —
+    and both must be asserted, not just that construction fails somehow."""
+    payload = _unsigned_payload_for(scenario["advisory"])
+    dumped = payload.model_dump(mode="json", exclude_none=False)
+    dumped["advisory_digest"] = spec.PLACEHOLDER_DIGEST
+    with pytest.raises(pydantic.ValidationError) as excinfo:
+        ap.ProposerAdvisory(**dumped)
+    types = {error["type"] for error in excinfo.value.errors()}
+    assert {"datetime_type", "tuple_type"} <= types
+
+
+def test_i7_13_the_default_mode_dump_idiom_raises_datetime_type_but_not_tuple_type(
+        scenario):
+    """The narrower failure under the *other* dump mode, asserted separately so
+    the two modes' distinct failure surfaces cannot collapse into one vague
+    "model_dump raises" claim. The explicit C4 field_serializer carries no
+    ``when_used="json"``, so it runs under ``model_dump()`` too and
+    ``created_at`` comes back a string either way; the tuple container itself
+    survives mode="python" untouched, so this mode fails on strictly fewer
+    grounds than the JSON-mode idiom above."""
+    payload = _unsigned_payload_for(scenario["advisory"])
+    dumped = payload.model_dump()
+    dumped["advisory_digest"] = spec.PLACEHOLDER_DIGEST
+    with pytest.raises(pydantic.ValidationError) as excinfo:
+        ap.ProposerAdvisory(**dumped)
+    types = {error["type"] for error in excinfo.value.errors()}
+    assert "datetime_type" in types
+    assert "tuple_type" not in types
+
+
+def test_i7_13_a_list_passed_to_either_candidates_field_is_rejected_with_tuple_type(
+        scenario):
+    with pytest.raises(pydantic.ValidationError) as excinfo:
+        ap.AdvisoryCandidateSet(
+            schema_version="1.0", tenant_id="tenant-1", created_at=FIXED_INSTANT,
+            candidate_set_id="set-1", case_ref="case-1",
+            candidates=[scenario["candidate"]], selected_candidate_id=None,
+            selection_reason_codes=[])
+    assert "tuple_type" in {e["type"] for e in excinfo.value.errors()}
+
+    with pytest.raises(pydantic.ValidationError) as excinfo:
+        _revalidated(scenario["advisory"], candidates=[scenario["candidate"]])
+    assert "tuple_type" in {e["type"] for e in excinfo.value.errors()}
+
+
+# --------------------------------------------------------------------------- #
+# I7.14 — R-7 replay (E2)
+# --------------------------------------------------------------------------- #
+
+def test_i7_14_a_dangling_reference_is_rejected_and_reported(scenario):
+    with pytest.warns(UserWarning, match="dangling"):
+        result = ap.verify_observation_resolution(
+            advisory=scenario["advisory"], context=scenario["context"],
+            observations=[])
+    assert result is False
+
+
+def test_i7_14_two_observations_sharing_an_id_are_rejected_as_ambiguous(scenario):
+    duplicate = scenario["observation"].model_copy(update={"tool_name": "other.read"})
+    with pytest.warns(UserWarning, match="ambiguous"):
+        result = ap.verify_observation_resolution(
+            advisory=scenario["advisory"], context=scenario["context"],
+            observations=[scenario["observation"], duplicate])
+    assert result is False
+
+
+def test_i7_14_an_observation_substituted_to_another_tenant_is_rejected(scenario):
+    substituted = scenario["observation"].model_copy(update={"tenant_id": "tenant-2"})
+    with pytest.warns(UserWarning, match="tenant"):
+        result = ap.verify_observation_resolution(
+            advisory=scenario["advisory"], context=scenario["context"],
+            observations=[substituted])
+    assert result is False
+
+
+def test_i7_14_an_observation_substituted_to_another_case_is_rejected(scenario):
+    substituted = scenario["observation"].model_copy(update={"case_ref": "case-2"})
+    with pytest.warns(UserWarning, match="case"):
+        result = ap.verify_observation_resolution(
+            advisory=scenario["advisory"], context=scenario["context"],
+            observations=[substituted])
+    assert result is False
+
+
+def test_i7_14_an_observation_with_a_source_ref_outside_allowed_record_refs_is_rejected(
+        scenario):
+    substituted = scenario["observation"].model_copy(update={"source_ref": "record-2"})
+    with pytest.warns(UserWarning, match="source_ref"):
+        result = ap.verify_observation_resolution(
+            advisory=scenario["advisory"], context=scenario["context"],
+            observations=[substituted])
+    assert result is False
+
+
+def test_i7_14_an_unreferenced_extra_observation_is_reported_but_not_a_failure(
+        scenario):
+    extra = scenario["observation"].model_copy(update={"observation_id": "obs-extra"})
+    with pytest.warns(UserWarning, match="unreferenced"):
+        result = ap.verify_observation_resolution(
+            advisory=scenario["advisory"], context=scenario["context"],
+            observations=[scenario["observation"], extra])
+    assert result is True
+
+
+def test_i7_14_an_empty_refs_candidate_cannot_vacuously_pass_a_dangling_reference_elsewhere(
+        scenario):
+    """The candidate-content half of I7.14. Two nested candidates: one with an
+    empty ``observation_refs`` — which alone would make the required list empty
+    and the check vacuously true — and one with a genuinely dangling reference.
+    The dangling reference must still be caught; the empty-refs candidate must
+    not be usable to short-circuit the check for the other one."""
+    empty_refs_candidate = ap.CandidateAdvisory(
+        candidate_id="cand-a", disposition=ap.CandidateDisposition.RECOMMEND_WITHHOLD,
+        requested_review_action=ap.ReviewAction.ROUTE_APPROVAL_BUNDLE, is_eligible=True,
+        evaluated_at=FIXED_INSTANT, observation_refs=[])
+    dangling_candidate = ap.CandidateAdvisory(
+        candidate_id="cand-b", disposition=ap.CandidateDisposition.RECOMMEND_WITHHOLD,
+        requested_review_action=ap.ReviewAction.ROUTE_APPROVAL_BUNDLE, is_eligible=True,
+        evaluated_at=FIXED_INSTANT, observation_refs=["obs-missing"])
+    advisory = _revalidated(
+        scenario["advisory"], candidates=(empty_refs_candidate, dangling_candidate))
+    with pytest.warns(UserWarning, match="dangling"):
+        result = ap.verify_observation_resolution(
+            advisory=advisory, context=scenario["context"], observations=[])
+    assert result is False
+
+
+def test_i7_14_verify_advisory_selection_returns_false_whenever_observation_resolution_does(
+        scenario):
+    with pytest.warns(UserWarning):
+        result = ap.verify_advisory_selection(
+            advisory=scenario["advisory"], candidate_set=scenario["candidate_set"],
+            role=scenario["role"], context=scenario["context"], observations=[])
+    assert result is False
+
+
+# --------------------------------------------------------------------------- #
+# I7.15 — revision inputs (G3)
+# --------------------------------------------------------------------------- #
+
+def _revision_kwargs(scenario, **overrides):
+    kwargs = dict(
+        parent=scenario["advisory"], candidate_set=scenario["candidate_set"],
+        identity=scenario["identity"], role=scenario["role"],
+        mandate=scenario["mandate"], context=scenario["context"],
+        observations=[scenario["observation"]], claim_summaries=["revised claim"],
+        observation_refs=["obs-1"], uncertainties=["revised uncertainty"],
+        created_at=FIXED_INSTANT, expires_at=scenario["mandate"].expires_at)
+    kwargs.update(overrides)
+    return kwargs
+
+
+def test_i7_15_omitting_claim_summaries_is_refused_not_inherited(scenario):
+    kwargs = _revision_kwargs(scenario)
+    del kwargs["claim_summaries"]
+    with pytest.raises(TypeError):
+        ap.build_advisory_revision(**kwargs)
+
+
+def test_i7_15_omitting_observation_refs_is_refused_not_inherited(scenario):
+    kwargs = _revision_kwargs(scenario)
+    del kwargs["observation_refs"]
+    with pytest.raises(TypeError):
+        ap.build_advisory_revision(**kwargs)
+
+
+def test_i7_15_omitting_uncertainties_is_refused_not_inherited(scenario):
+    kwargs = _revision_kwargs(scenario)
+    del kwargs["uncertainties"]
+    with pytest.raises(TypeError):
+        ap.build_advisory_revision(**kwargs)
+
+
+def test_i7_15_the_three_supplied_values_appear_not_the_parents(scenario):
+    revision = ap.build_advisory_revision(**_revision_kwargs(
+        scenario, claim_summaries=["a new claim, not the parent's"],
+        uncertainties=["a new uncertainty, not the parent's"]))
+    assert revision.claim_summaries == ["a new claim, not the parent's"]
+    assert revision.uncertainties == ["a new uncertainty, not the parent's"]
+    assert revision.claim_summaries != scenario["advisory"].claim_summaries
+    payload = _unsigned_payload_for(revision)
+    assert payload.claim_summaries == ["a new claim, not the parent's"]
+    assert payload.uncertainties == ["a new uncertainty, not the parent's"]
+
+
+def test_i7_15_continuity_fields_are_inherited_unchanged(scenario):
+    revision = ap.build_advisory_revision(**_revision_kwargs(scenario))
+    parent = scenario["advisory"]
+    assert revision.tenant_id == parent.tenant_id
+    assert revision.case_ref == parent.case_ref
+    assert revision.agent_id == parent.agent_id
+    assert revision.role_contract_id == parent.role_contract_id
+    assert revision.mandate_id == parent.mandate_id
+    assert revision.context_id == parent.context_id
+
+
+def test_i7_15_advisory_version_increments_and_parent_reference_binds(scenario):
+    parent = scenario["advisory"]
+    revision = ap.build_advisory_revision(**_revision_kwargs(scenario))
+    assert parent.advisory_version == "1"
+    assert revision.advisory_version == "2"
+    assert revision.parent_advisory_digest == parent.advisory_digest
+    assert ap.verify_advisory_identity(advisory=revision) is True
+
+
+# --------------------------------------------------------------------------- #
+# I7.16 — construction-call completeness (G2)
+# --------------------------------------------------------------------------- #
+
+def test_i7_16_the_construction_calls_keyword_set_equals_the_full_field_set():
+    """AST over ``identity.py``'s own source: the keyword set of the
+    ``ProposerAdvisory(...)`` construction call must equal
+    ``set(ProposerAdvisory.model_fields)`` exactly — no field missing, no
+    keyword that is not a field. Reads the call itself, not the builder's
+    result, because omitting a defaulted field constructs successfully and
+    silently carries the default — the failure mode this obligation exists to
+    catch."""
+    tree = ast.parse((SRC / "identity.py").read_text(encoding="utf-8"),
+                     filename="identity.py")
+    calls = [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "ProposerAdvisory"
+    ]
+    assert len(calls) == 1, (
+        f"expected exactly one ProposerAdvisory(...) construction call in "
+        f"identity.py, found {len(calls)}")
+    call = calls[0]
+    assert not call.args, "the construction call must be keyword-only"
+    assert not any(kw.arg is None for kw in call.keywords), (
+        "the construction call must not use **-unpacking, which this AST check "
+        "cannot verify field-by-field")
+    keywords = {kw.arg for kw in call.keywords}
+    assert keywords == set(ap.ProposerAdvisory.model_fields)
+
+
+# --------------------------------------------------------------------------- #
 # OD-6(i) — C9: a non-null selection is structurally unconstructible
 # --------------------------------------------------------------------------- #
 
