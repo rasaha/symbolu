@@ -421,3 +421,29 @@ def test_bank_never_calibrates_its_own_origin():
                                        "persistence", ev.forecast.forecast_cutoff)
         if cal is not None:
             assert cal.latest_origin < ev.forecast.forecast_cutoff
+
+
+# ------------------------------------------------------- adversarial: config/method mismatch
+def _zero_width_calibration(series, cutoff, arm="persistence"):
+    """Residuals that would collapse the interval to zero width if wrongly admitted."""
+    return _calib(series.subject, cutoff=cutoff, values=(0.0,) * 5, arm=arm)
+
+
+@pytest.mark.parametrize("method", [UncertaintyMethod.EMPIRICAL_ROLLING_ORIGIN_RESIDUAL,
+                                    UncertaintyMethod.NONE])
+def test_supplied_calibration_is_refused_unless_the_config_declares_the_bank(method):
+    """A bank may not be smuggled in under a config that asked for something else.
+
+    The residuals here are all zero, so admitting them would report a zero-width interval —
+    maximum apparent confidence from calibration the configuration never authorised.
+    """
+    states, series = _series([10.0, 12.0, 11.0, 13.0, 12.5, 14.0, 13.5, 15.0])
+    cutoff = states[-1].observed_at
+    cfg = UncertaintyConfig(method=method, min_calibration_samples=2,
+                            match_tolerance_seconds=5.0)
+    with pytest.raises(UncertaintyError):
+        forecast_with_evidence(series, ForecastTarget.CPU_UTILIZATION, cutoff, HZ,
+                               PersistenceForecaster(),
+                               normalization_policy=fx.cpu_norm_policy(),
+                               uncertainty_config=cfg,
+                               calibration=_zero_width_calibration(series, cutoff))
