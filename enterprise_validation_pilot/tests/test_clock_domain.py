@@ -26,8 +26,8 @@ from pathlib import Path
 from enterprise_validation_pilot.datasets.build_dataset import build
 from enterprise_validation_pilot.runners.workflow import run_scenario
 from enterprise_validation_pilot.tests.clock_domain_guard import (
-    SKEW, assert_no_root_mixes_clock_domains, assert_scan_reaches,
-    assert_the_skew_seam_bites, stable, wall_clock_at)
+    SKEW, assert_every_authority_collaborator_is_clocked, assert_no_root_mixes_clock_domains,
+    assert_scan_reaches, assert_the_skew_seam_bites, stable, wall_clock_at)
 
 
 _TREE = Path(__file__).resolve().parents[1]
@@ -45,6 +45,12 @@ def test_the_scan_reaches_the_collaborators_it_is_meant_to_guard():
 
 def test_no_composition_root_replays_in_two_clock_domains():
     assert_no_root_mixes_clock_domains(_TREE)
+
+
+def test_every_authority_collaborator_in_the_pilot_is_clocked():
+    """The pilot is a declared replay tree: whole-tree uniformity, not just
+    composition-root granularity — see ``clock_domain_guard.scan_uniform``."""
+    assert_every_authority_collaborator_is_clocked(_TREE)
 
 
 def test_the_skew_seam_actually_moves_a_default_clock():

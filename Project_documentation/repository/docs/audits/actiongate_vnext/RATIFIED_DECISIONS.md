@@ -80,42 +80,123 @@ domain per root, not one *instant* per test. The same file's
 `test_constrained_authorization_is_reflected_in_intent` injects nowhere and is
 silent. The whole-tree rule would have rejected both halves of that file.
 
-**Consequence `[V]` — the residual the granularity accepts.** A root holding a
+**Consequence `[V]` — the residual the granularity accepted.** A root holding a
 single clock-capable collaborator cannot be internally inconsistent, so removing
-its one injection makes the root silent rather than offending. Six roots across
+its one injection made the root silent rather than offending. Six roots across
 the three trees hold exactly one such site; mutating each in turn (drop `clock=`,
-run that tree's four guards) separates them:
+run that tree's guards) separates them:
 
 | Sole-site root | Mutation caught by |
 | --- | --- |
 | `comparative_governance_benchmark/strategies/_actiongate_support.py:resolve_actiongate` | the replay body — the adapter reaches the verdict |
 | `enterprise_validation_pilot/composition/engines.py:build_execution_adapter` | nothing (see below) |
 | `comparative_governance_benchmark/runners/execution.py:build_execution_adapter` | nothing (see below) |
-| `comparative_governance_benchmark/strategies/no_governance.py:NoGovernanceStrategy` | nothing |
-| `comparative_governance_benchmark/strategies/assertion_only.py:AssertionOnlyStrategy` | nothing |
-| `comparative_governance_benchmark/strategies/action_only.py:ActionOnlyStrategy` | nothing |
+| `comparative_governance_benchmark/strategies/no_governance.py:NoGovernanceStrategy` | the whole-tree uniformity assertion below `[V]` (previously nothing) |
+| `comparative_governance_benchmark/strategies/assertion_only.py:AssertionOnlyStrategy` | the whole-tree uniformity assertion below `[V]` (previously nothing) |
+| `comparative_governance_benchmark/strategies/action_only.py:ActionOnlyStrategy` | the whole-tree uniformity assertion below `[V]` (previously nothing) |
 
-The three strategy classes are the residual this granularity introduces: each
+The three strategy classes were the residual this granularity introduced: each
 wires exactly one clock-capable collaborator, `build_execution_adapter`, so
-dropping its `clock=` leaves the root silent, and the adapter's stamps reach no
-field the replay body compares. The whole-tree rule would have caught them — at
-the cost of the 78 false rejections above.
+dropping its `clock=` left the root silent, and the adapter's stamps reach no
+field the replay body compares. **This residual is now closed** — see "D1
+residual closed" below.
 
-The two `build_execution_adapter` bodies are a different and pre-existing blind
-spot: their injection is the forwarding step `extra["clock"] = clock`, which the
-factory-mediation exemption deliberately does not read. That exemption is
-unchanged by this decision and would be equally blind under the whole-tree rule.
+The two `build_execution_adapter` *bodies* (`enterprise_validation_pilot/
+composition/engines.py` and `comparative_governance_benchmark/runners/
+execution.py`) are a different and pre-existing blind spot, unrelated to the one
+above: their own injection into `OfflineDeterministicExecutionAdapter` is the
+forwarding step `extra["clock"] = clock`, which the factory-mediation exemption
+deliberately does not read. That exemption is unchanged by this decision and by
+the residual closure below — mediated construction stays exempt by design.
 
 Everything else is caught. Dropping `clock=` at the control-plane adapter, the
 audit service, either validation service or any kernel service fails the scan;
 dropping the pilot's or the heterogeneity runner's adapter injection fails the
-replay body as well.
+replay body as well (and, for the heterogeneity runner, the scan itself, since
+that root wires a second authority collaborator — the control-plane adapter —
+elsewhere).
 
-This residual is the price of the property that keeps the guard silent on the
-five surfaces above: a rule that fires on a root with one collaborator is the
-whole-tree rule again. It is bounded and named, not open-ended — any of the
-three that grows a second clock-capable sibling in its root falls back under the
-scan immediately.
+**Correction `[V]` — the 78 sites were never actually exposed to a scan.** The
+original wording of this residual said the whole-tree rule "would have caught
+[the three strategy sites] — at the cost of the 78 false rejections" on the five
+surfaces in the table above, as though composition-root granularity were
+actively holding those 78 rejections back on every run. It is not: `scan()` (and
+`scan_uniform()` below) are called from exactly one place each — the three
+declared replay trees' own `tests/test_clock_domain.py`, each scanning only its
+own tree. No test anywhere invokes the guard against
+`packages/providers/{actiongate,tap}/tests`, `packages/governance-provider-
+framework/tests`, `packaging/external_consumer`, or `packages/products/
+ai-hiring/tests`. The 78-count in the table came from a one-time manual run of
+the whole-tree logic over those five surfaces during this audit, to prove the
+rule is unsound there — not from a standing guard those surfaces run today.
+Composition-root granularity is still the correct doctrine for them (a future
+guard extended to cover them must stay root-scoped, or it inherits that
+unsoundness), but nothing in the current suite depends on it for those five
+paths right now.
+
+---
+
+## D1 residual closed — whole-tree uniformity for declared replay trees
+
+**Decision `[R]`:** Composition-root granularity remains D1's doctrine and the
+trigger for any tree that has not declared itself a replay tree in full — the
+five surfaces above stay governed by `scan()` exactly as ratified. But
+`enterprise_validation_pilot`, `comparative_governance_benchmark` and
+`provider_heterogeneity_validation` are not surfaces that sometimes replay:
+every one of them exists to replay every scenario it holds under one frozen
+clock. There is no root inside any of the three for which "construct a
+Decision Authority or governance-provider-framework collaborator on the wall
+clock" is ever the correct, intended behavior — the condition that makes
+composition-root grouping necessary elsewhere (distinguishing "forgot the
+clock" from "not replaying at all") cannot arise inside a tree that is replay,
+in full, everywhere. For these three trees only, D1 now also requires: every
+clock-capable Decision Authority or governance-provider-framework collaborator
+constructed anywhere in the tree must be injected, regardless of how many its
+own composition root wires.
+
+**Implementation `[V]`.** `enterprise_validation_pilot/tests/
+clock_domain_guard.py` adds `scan_uniform(tree)`, re-exported as
+`assert_every_authority_collaborator_is_clocked`. It walks the same call sites
+as `scan()` — resolved through the calling module's own imports, the same
+authority/factory-mediation classification — but drops the per-root gate:
+every authority-facing, clock-capable call site that is not injected is an
+offender, full stop. Each of the three trees' `tests/test_clock_domain.py`
+re-exports it as a fifth guard test.
+
+One narrow, named exemption: `clock_domain_guard.py` itself is excluded from
+`scan_uniform`'s walk. Its own `assert_the_skew_seam_bites` deliberately builds
+an `AuditService` on its default clock to prove the skew seam moves a
+collaborator that was left on one — forcing an injection onto that call would
+make the probe it performs vacuous. This is the same class of exemption the
+five surfaces get from `scan()`, scoped to one guard-verification line instead
+of an entire tree, and it is the only file the whole-tree scan excludes.
+
+**Verification by mutation `[V]`.** Before this closure, dropping `clock=` from
+the sole `build_execution_adapter` call in each of
+`comparative_governance_benchmark/strategies/{no_governance,assertion_only,
+action_only}.py` left all 283 tests passing — composition-root granularity's
+per-root gate saw no other injected authority collaborator in that root and
+went silent, exactly the residual named above. Dropping `clock=` from
+`provider_heterogeneity_validation/runners/workflow.py`'s
+`build_execution_adapter` call already failed under `scan()` alone before this
+closure — that root (`_run`) also wires the control-plane adapter with an
+injected clock, so composition-root granularity was never blind there; it is
+included here because the new whole-tree assertion catches it too, by a
+different and simpler path (unconditionally, not via the other collaborator).
+After adding `scan_uniform` and its guard test, all four mutations now fail —
+the three previously-silent sites at the new `assert_every_authority_
+collaborator_is_clocked` test, the fourth at both it and the pre-existing
+`assert_no_root_mixes_clock_domains`.
+
+**Silence preserved `[V]`.** `scan()` itself is unchanged by this decision.
+Re-running it over `packages/providers/{actiongate,tap}/tests`, `packages/
+governance-provider-framework/tests`, `packaging/external_consumer` and
+`packages/products/ai-hiring/tests` after this change still returns no
+offender on any of them.
+
+**State `[V]`.** 286 tests now pass across the three trees (271 pre-existing,
+12 prior guards, 3 new whole-tree guards — one per tree), with the wall clock
+at its true value and pinned to 2025-06-01.
 
 ---
 

@@ -285,6 +285,81 @@ def scan(tree: Path):
 
 
 # --------------------------------------------------------------------------
+# The stronger rule for a declared replay tree: whole-tree uniformity.
+#
+# ``scan`` above is D1's ratified doctrine and stays the trigger for every tree
+# that has not declared itself a replay tree in full — the composition-root
+# grouping is exactly what keeps it silent on a conformance harness, a
+# packaging smoke test or an external-consumer sample, which construct the
+# kernel on its defaults because that is what they exist to demonstrate.
+#
+# ``enterprise_validation_pilot``, ``comparative_governance_benchmark`` and
+# ``provider_heterogeneity_validation`` are not that: every one of them exists
+# to replay scenarios under one frozen clock, in full. There is no root inside
+# them for which "wires an authority collaborator on the wall clock" is the
+# correct, intended behavior — so the softer per-root gate is exactly the
+# residual D1 applicability leaves open: a root with a single clock-capable
+# collaborator (the three strategy classes' ``build_execution_adapter`` call,
+# the heterogeneity runner's) goes silent rather than offending when its one
+# injection is dropped, because dropping it leaves nothing in that root for
+# the gate ("does this root inject a clock into an authority collaborator
+# elsewhere") to see. ``scan_uniform`` drops the gate for these three trees:
+# every authority collaborator anywhere in the tree must be injected, full
+# stop, regardless of how many its own composition root wires.
+#
+# One file is deliberately exempted: the guard module itself constructs an
+# ``AuditService`` on its default clock in ``assert_the_skew_seam_bites`` to
+# prove the skew seam moves a collaborator left on its default — forcing a
+# clock onto that call would make the probe it performs vacuous. That is the
+# same class of exemption the five surfaces above get from ``scan``, scoped to
+# one guard-verification line instead of an entire tree.
+# --------------------------------------------------------------------------
+
+_EXEMPT_FILENAMES = {"clock_domain_guard.py"}
+
+
+def scan_uniform(tree: Path):
+    """(offenders, collaborators reached) for every authority collaborator under
+    ``tree``, injected or not — unconditionally, not gated by whether the site's
+    own composition root injects a clock into an authority collaborator
+    elsewhere. Only sound for a tree that replays every scenario it holds under
+    one frozen clock; see the module-level note above.
+    """
+    offenders = []
+    reached: set = set()
+    for path in sorted(tree.rglob("*.py")):
+        if "__pycache__" in path.parts or path.name in _EXEMPT_FILENAMES:
+            continue
+        module_name = _module_name(path)
+        try:
+            module_ast = ast.parse(path.read_text(encoding="utf-8"), str(path))
+        except SyntaxError:
+            continue
+        bindings = _bindings(module_ast, module_name)
+        mediated = {id(c) for f in _clock_bearing_functions(module_ast)
+                    for c in ast.walk(f) if isinstance(c, ast.Call)}
+        for node in ast.walk(module_ast):
+            if not isinstance(node, ast.Call):
+                continue
+            obj = _callee(node, bindings, module_name)
+            if not _accepts_clock(obj):
+                continue
+            reached.add(getattr(obj, "__name__", repr(obj)))
+            if not _is_authority_facing(obj):
+                continue
+            injected = any(kw.arg == "clock" for kw in node.keywords)
+            if not injected and id(node) in mediated and any(
+                    kw.arg is None for kw in node.keywords):
+                injected = True                       # forwarded through **extra
+            if not injected:
+                offenders.append(_Site(
+                    path=path, lineno=node.lineno,
+                    name=getattr(obj, "__name__", repr(obj)), injected=False,
+                    authority=True).render(tree))
+    return sorted(offenders), reached
+
+
+# --------------------------------------------------------------------------
 # The skew seam: move every default (wall) clock the replay stack can reach.
 #
 # A wall clock reaches a replay three ways, and all three have to move together
@@ -393,6 +468,23 @@ def assert_no_root_mixes_clock_domains(tree: Path) -> None:
         "these sites build a collaborator on its default wall clock inside a composition "
         "root that hands the scenario clock to an authority collaborator elsewhere, so the "
         f"root replays in two time domains: {offenders}")
+
+
+def assert_every_authority_collaborator_is_clocked(tree: Path) -> None:
+    """The stronger, whole-tree rule for a declared replay tree (see ``scan_uniform``):
+    every clock-capable Decision Authority or governance-provider-framework
+    collaborator built anywhere in ``tree`` must be injected, regardless of how many
+    its own composition root wires. Composition-root granularity remains the
+    ratified doctrine for any tree that has not declared itself a replay tree in
+    full — this is not a replacement for it, only the stricter rule this tree earns
+    by being one.
+    """
+    offenders, _reached = scan_uniform(tree)
+    assert not offenders, (
+        "these sites build a Decision Authority or governance-provider-framework "
+        "collaborator on its default wall clock; this tree replays every scenario it "
+        f"holds under one frozen clock, so every such collaborator must be injected: "
+        f"{offenders}")
 
 
 def assert_the_skew_seam_bites() -> None:
