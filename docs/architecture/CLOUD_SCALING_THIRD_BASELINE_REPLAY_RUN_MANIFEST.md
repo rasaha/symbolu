@@ -351,9 +351,17 @@ not a knowledge timestamp.
 
 **Closed by §7.1: no exclusion is applied.** No prerequisite remains.
 
-### 10.2 Residual-supply seam — **missing; implementation prerequisite**
+### 10.2 Residual-supply seam — **built and synthetically tested**
 
-The §7.2 protocol cannot be executed against the shipped path as it stands:
+**Status: closed.** The seam is implemented and covered by conformance tests, including a
+negative control proving a future-contaminated bank that would flatter interval coverage is
+rejected. The four arms (`persistence`, `linear_trend`, `seasonal_naive`, `harmonic_phase`)
+exist as evaluation forecasters, and synthetic fixtures demonstrate that H, N, T or no
+candidate can each win depending on the data.
+
+What remains is §11 population and the authorization itself — **the run is still prohibited**.
+
+The description below records why the seam was needed, against the pre-implementation state:
 
 - `compute_uncertainty(window, forecaster, point, config)` **unconditionally** computes its own
   residuals by calling `rolling_origin_residuals(window, forecaster, config)`
@@ -372,7 +380,7 @@ The §7.2 protocol cannot be executed against the shipped path as it stands:
   (`.../forecasting/evidence.py:312`), so any seam must be threaded from
   `run_replay_evaluation` through evidence construction, not introduced at the leaf alone.
 
-**Prerequisite — seam shape now selected (Amendment 4), seam not implemented.** The seam is a
+**Prerequisite — closed.** The seam is implemented (Amendment 4 selected its shape). It is a
 **separate public residuals-to-interval function**: one canonical interval formula, two
 residual-production paths (the shipped `rolling_origin_residuals` path and the §7.2 bank), both
 delegating to it. `compute_uncertainty` keeps its signature and default behavior. The bank
@@ -382,16 +390,16 @@ unchanged. Full design, candidate comparison, authority constraints and the 14 r
 conformance tests:
 [`CLOUD_SCALING_RESIDUAL_SUPPLY_SEAM_DESIGN.md`](CLOUD_SCALING_RESIDUAL_SUPPLY_SEAM_DESIGN.md).
 
-Two vocabulary prerequisites remain **unratified and are not invented**: `UncertaintyMethod`
-has no member describing bank-sourced residuals, and neither `UncertaintyInterval` nor
-`CapacityForecastEvidence` can carry the source and digest of externally supplied calibration
-residuals. A permitted in-boundary digest facility does exist (`content_digest`), so no digest
-gap is recorded. No code is written by this document.
+Both vocabulary prerequisites were subsequently ratified and implemented:
+`UncertaintyMethod.EMPIRICAL_PREQUENTIAL_RESIDUAL_BANK`, and `calibration_input_digest` on both
+`UncertaintyInterval` and `CapacityForecastEvidence` at schema version
+`capacity-forecast-evidence-2`. Legacy evidence keeps `capacity-forecast-evidence-1` and its
+exact historical payload, so committed digests are unmoved.
 
 ## 11. Fields to populate immediately before an authorized run
 
 Every field below is **empty by design**. The manifest is incomplete and the run is prohibited
-while any remains empty or while the §10.2 prerequisite stands.
+while any remains empty. (The §10.2 seam prerequisite is now closed.)
 
 | Field | To be filled |
 |---|---|
@@ -413,8 +421,9 @@ while any remains empty or while the §10.2 prerequisite stands.
 | `residual_bank_plan` | bank key, 672 bound, eviction order, and the implemented seam (shape selected; implementation blocked by §10.2) |
 | `shard_plan` | shard boundaries under §9.4 |
 
-**Manifest incomplete / run prohibited.** The replay may not be executed until every field
-above is populated, the §10.2 residual-supply seam exists with its own conformance evidence,
-and the evaluation design's gates are unchanged from their preregistered form. No production
+**Manifest incomplete / run prohibited.** The §10.2 seam now exists with its conformance
+evidence, but the replay may not be executed until every field above is populated and the
+evaluation design's gates are unchanged from their preregistered form. Synthetic tests make
+the replay executable in principle; they ratify nothing. No production
 uncertainty behavior is changed or ratified by this manifest, and no third baseline is
 ratified.

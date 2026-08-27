@@ -1,6 +1,13 @@
 # Cloud Scaling — Residual-Supply Seam Design
 
-**Status:** **SEAM SHAPE SELECTED — NO SEAM IMPLEMENTED.**
+**Status:** **IMPLEMENTED AND SYNTHETICALLY TESTED — NO THIRD BASELINE RATIFIED.**
+The seam described here is built: `interval_from_residuals` is the single interval formula,
+`compute_uncertainty` delegates to it unchanged, and `CalibrationResiduals` /
+`CalibrationProvider` carry bank-sourced residuals through
+`forecast_with_evidence(..., calibration=)` and
+`run_replay_evaluation(..., calibration_provider=)`. Ruled prerequisites are closed:
+`EMPIRICAL_PREQUENTIAL_RESIDUAL_BANK`, `calibration_input_digest` on the interval and on
+evidence at `capacity-forecast-evidence-2`, and the extended `UncertaintyError`.
 **Date:** 2026-08-27
 **Package (designed against, not modified):** `packages/capabilities/cloud-scaling-controller`
 (`ugence-cloud-scaling-controller`, currently `0.4.0`)
@@ -8,10 +15,10 @@
 **Evaluation design:** [`ADR_CLOUD_SCALING_THIRD_BASELINE_REPLAY_EVALUATION.md`](ADR_CLOUD_SCALING_THIRD_BASELINE_REPLAY_EVALUATION.md)
 **Governing ADR:** [`ADR_CLOUD_SCALING_PREDICTIVE_CAPACITY_INTELLIGENCE_PHASE2.md`](ADR_CLOUD_SCALING_PREDICTIVE_CAPACITY_INTELLIGENCE_PHASE2.md)
 
-> **The seam shape is selected. No seam is implemented.** Existing uncertainty semantics
-> remain authoritative. No replay is executable yet. No third baseline is ratified. The exact
-> public API and any new evidence vocabulary remain subject to repository-grounded
-> implementation specification and owner ratification where required (§10).
+> **No third baseline is ratified, and no telemetry has been accessed.** Synthetic tests make
+> the replay executable in principle; only the authorized replay on representative data can
+> ratify anything. Legacy uncertainty semantics remain authoritative: the no-provider path is
+> byte-identical, proven against 216 outputs frozen before the extraction.
 
 > This document writes no code, changes no export, adds no enum member, touches no telemetry
 > and runs nothing. Every signature below is **proposed and conceptual**; names are chosen to
