@@ -1,6 +1,6 @@
 # ADR — Cloud Scaling: Predictive Capacity Intelligence (Phase 2)
 
-**Status:** **ACCEPTED.** Amended 2026-08-27 (Amendments 1–3) to record owner rulings authorizing the design, the manifest preparation, and the resolution of both run-blocking gaps for a third-baseline replay evaluation. No telemetry access or replay execution is authorized. No third baseline is ratified; the two shipped baselines and the shipped uncertainty behavior are unchanged.
+**Status:** **ACCEPTED.** Amended 2026-08-27 (Amendments 1–4) to record owner rulings authorizing the design, the manifest preparation, the resolution of both run-blocking gaps, and the **shape** of the residual-supply seam for a third-baseline replay evaluation. No telemetry access or replay execution is authorized, and no seam is implemented. No third baseline is ratified; the two shipped baselines and the shipped uncertainty behavior are unchanged.
 **Date:** 2026-08-11
 **Package:** `packages/capabilities/cloud-scaling-controller` (`ugence-cloud-scaling-controller`), v0.2.0 → **v0.3.0**.
 **Scope:** Additive, deterministic, provider-neutral, **shadow-only** forecasting and
@@ -162,6 +162,67 @@ Both rulings are recorded in
 §7 and §10, and in
 [`ADR_CLOUD_SCALING_THIRD_BASELINE_REPLAY_EVALUATION.md`](ADR_CLOUD_SCALING_THIRD_BASELINE_REPLAY_EVALUATION.md)
 §8.3–§8.4.
+
+## Amendment 4 (2026-08-27) — residual-supply seam shape selected; nothing implemented
+
+> **The seam shape is selected. No seam is implemented.** Existing uncertainty semantics remain
+> authoritative. No replay is executable yet. **No third baseline is ratified.** The exact public
+> API and any new evidence vocabulary remain subject to repository-grounded implementation
+> specification and owner ratification.
+
+**Documentation-only.** No code, export, enum member, schema, digest or dependency changes.
+`compute_uncertainty`, `rolling_origin_residuals` and the inline interval formula are untouched.
+
+**Decision: a separate public residuals-to-interval function is the canonical seam.** The
+architecture carries **one canonical interval formula** and **two explicit residual-production
+paths** that both delegate to it: the shipped `rolling_origin_residuals` path, and the
+preregistered causal prequential residual bank of the run manifest §7.2. The evaluation path may
+change how residuals are collected; it may not change how a residual sequence becomes an
+interval.
+
+**Rejected as the primary design.** An optional raw-residuals parameter on `compute_uncertainty`
+— it would give one function two calibration authorities, admit unproven caller-supplied
+residuals without provenance, and make production semantics easier to change accidentally. An
+evaluation-only wrapper — it would duplicate evidence construction, the type-7 quantile logic and
+the interval mathematics outside the shipped forecasting path, so a passing evaluation would say
+nothing about what ships.
+
+**Preserved exactly:** `compute_uncertainty`'s signature and default behavior for every current
+caller; the type-7 quantile definition; requested-coverage handling; minimum-calibration-sample
+behavior; point-only/uncalibrated behavior; endpoint construction; validation and exception
+behavior; determinism and finite-value rules. Calls through `forecast_with_evidence` and
+`run_replay_evaluation` **with no provider** must remain semantically — and where feasible
+byte-for-byte — identical. Extraction of the inline formula is a **later** implementation
+prerequisite, not authorized here.
+
+**Plumbing.** A typed, evaluation-owned `CalibrationProvider` returns an immutable calibration
+object bound to subject, target, horizon and arm, carrying ordered signed residuals, count,
+contributing-origin bounds, evaluation cutoff, bank cap, configuration and bank digests, and the
+observability invariant. It reaches evidence assembly through **one explicitly-typed optional
+parameter** on `run_replay_evaluation` and `forecast_with_evidence`. Unlabelled residual tuples,
+mutable callbacks, module globals, monkeypatching, context variables, model-ID inspection and
+calls to private helpers are prohibited.
+
+**Authority.** The provider supplies calibration evidence, not a forecast: it cannot change the
+point prediction, `requested_coverage`, `min_calibration_samples` or the configured method, and
+cannot introduce cross-binding, future, reordered or unmatched residuals. Its absence preserves
+the shipped path exactly. Invalid calibration must fail closed; insufficient calibration remains
+the existing typed *unavailable* contract, not an error.
+
+**Unratified prerequisites, recorded rather than invented.** `UncertaintyMethod` has no member
+describing bank-sourced residuals, and neither `UncertaintyInterval` nor
+`CapacityForecastEvidence` can carry the source and digest of externally supplied calibration
+residuals — both require owner ratification with a schema-version consequence. Whether invalid
+calibration raises the existing `UncertaintyError` or a distinct type is unresolved. A permitted
+in-boundary digest facility does exist (`content_digest`), so no digest-facility gap is recorded,
+and `forecasting/` remains standard-library-and-local-only.
+
+Full design, three-candidate comparison and the fourteen required conformance tests — including
+a negative control proving a future-contaminated bank that would *flatter* interval coverage is
+rejected — are in
+[`CLOUD_SCALING_RESIDUAL_SUPPLY_SEAM_DESIGN.md`](CLOUD_SCALING_RESIDUAL_SUPPLY_SEAM_DESIGN.md).
+A seam passing every test would still **not** ratify production uncertainty implementation; point
+accuracy and interval calibration remain separate ratification claims.
 
 ---
 

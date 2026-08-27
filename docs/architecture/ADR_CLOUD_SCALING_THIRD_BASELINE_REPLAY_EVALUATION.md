@@ -311,7 +311,12 @@ own residuals over every in-window sample and exposes no residual-supply paramet
 a pass here would mean:
 
 1. Executing this protocol requires an evaluation-scoped residual-supply seam that does not
-   exist (run manifest §10.2). It is an implementation prerequisite, not a design gap.
+   exist (run manifest §10.2). Its **shape is selected** — a separate public
+   residuals-to-interval function, with `compute_uncertainty` unchanged and both paths
+   delegating to one canonical formula
+   ([`CLOUD_SCALING_RESIDUAL_SUPPLY_SEAM_DESIGN.md`](CLOUD_SCALING_RESIDUAL_SUPPLY_SEAM_DESIGN.md)) —
+   but **nothing is implemented**, and two evidence-vocabulary additions it needs remain
+   unratified. It is an implementation prerequisite, not a design gap.
 2. **A successful replay does not ratify production uncertainty implementation.** Point
    accuracy and interval calibration are separate ratification claims, and if H passes,
    production interval calibration needs its own implementation and conformance decision.

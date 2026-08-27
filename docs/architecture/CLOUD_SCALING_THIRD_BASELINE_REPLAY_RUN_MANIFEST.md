@@ -372,10 +372,21 @@ The §7.2 protocol cannot be executed against the shipped path as it stands:
   (`.../forecasting/evidence.py:312`), so any seam must be threaded from
   `run_replay_evaluation` through evidence construction, not introduced at the leaf alone.
 
-**Prerequisite:** an evaluation-scoped seam that supplies a residual collection and reuses the
-existing interval construction unchanged, plus its own conformance evidence. Whether that seam
-is an optional parameter, a separate public function, or an evaluation-only wrapper is an
-implementation decision **not made here**, and no code is written by this document.
+**Prerequisite — seam shape now selected (Amendment 4), seam not implemented.** The seam is a
+**separate public residuals-to-interval function**: one canonical interval formula, two
+residual-production paths (the shipped `rolling_origin_residuals` path and the §7.2 bank), both
+delegating to it. `compute_uncertainty` keeps its signature and default behavior. The bank
+reaches evidence assembly through one explicitly-typed optional calibration parameter on
+`run_replay_evaluation` and `forecast_with_evidence`; the `None` branch is today's path,
+unchanged. Full design, candidate comparison, authority constraints and the 14 required
+conformance tests:
+[`CLOUD_SCALING_RESIDUAL_SUPPLY_SEAM_DESIGN.md`](CLOUD_SCALING_RESIDUAL_SUPPLY_SEAM_DESIGN.md).
+
+Two vocabulary prerequisites remain **unratified and are not invented**: `UncertaintyMethod`
+has no member describing bank-sourced residuals, and neither `UncertaintyInterval` nor
+`CapacityForecastEvidence` can carry the source and digest of externally supplied calibration
+residuals. A permitted in-boundary digest facility does exist (`content_digest`), so no digest
+gap is recorded. No code is written by this document.
 
 ## 11. Fields to populate immediately before an authorized run
 
@@ -399,7 +410,7 @@ while any remains empty or while the §10.2 prerequisite stands.
 | `frozen_config_digests` | `FeatureConfig`, `AdmissionPolicy`, `UncertaintyConfig`, normalization and series policy digests, identical across arms |
 | `match_tolerance_seconds` | frozen value, identical across arms |
 | `cutoff_sequence_digest` | digest of the ordered cutoff list per subject × target |
-| `residual_bank_plan` | bank key, 672 bound, eviction order, and the seam used (blocked by §10.2) |
+| `residual_bank_plan` | bank key, 672 bound, eviction order, and the implemented seam (shape selected; implementation blocked by §10.2) |
 | `shard_plan` | shard boundaries under §9.4 |
 
 **Manifest incomplete / run prohibited.** The replay may not be executed until every field
