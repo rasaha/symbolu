@@ -290,13 +290,30 @@ def run_suite(workdir: Path, baseline_collected=None, timeout: int = 1800) -> di
         capture_output=True,
         text=True,
         timeout=timeout,
-        env={**os.environ, "UGENCE_REPO_ROOT": str(REPO)},
+        env={
+            **os.environ,
+            # The copy lives outside the repository and cannot find the checkout by walking
+            # upward.
+            "UGENCE_REPO_ROOT": str(REPO),
+            # And it announces itself, so the inventory pins can stand down. Those tests
+            # assert the guard *count* and the *condition text* of named guards — read from
+            # whatever source they are pointed at. Inside a mutated copy one of those
+            # conditions has been rewritten to `False`, so the pin fails and the sweep scores
+            # a kill its own test manufactured. They skip rather than deselect, so the
+            # collected population stays identical between baseline and mutant, which is what
+            # the scorer compares.
+            "UGENCE_GUARD_SWEEP": "1",
+        },
     )
     output = process.stdout + process.stderr
+    tail = " | ".join(line for line in output.strip().splitlines()[-6:])[:600]
+    # Every non-scorable answer carries the tail. "collection error" on its own names a
+    # category, not a cause, and a sweep that cannot say why it did not run is a sweep
+    # nobody can fix.
     if "SyntaxError" in output:
-        return {"scored": False, "why": "syntax error", "failed": []}
+        return {"scored": False, "why": f"syntax error; last lines: {tail}", "failed": []}
     if "during collection" in output.lower():
-        return {"scored": False, "why": "collection error", "failed": []}
+        return {"scored": False, "why": f"collection error; last lines: {tail}", "failed": []}
     counted = {
         outcome: int(value)
         for value, outcome in re.findall(
@@ -305,7 +322,13 @@ def run_suite(workdir: Path, baseline_collected=None, timeout: int = 1800) -> di
     }
     collected = sum(counted.values()) if counted else None
     if collected is None:
-        return {"scored": False, "why": "no outcome counts reported", "failed": []}
+        # Carry the tail. Without it "no outcome counts reported" says only that something
+        # went wrong, which is exactly as useful as saying nothing.
+        return {
+            "scored": False,
+            "why": f"no outcome counts reported; last lines: {tail}",
+            "failed": [],
+        }
     if baseline_collected is not None and collected != baseline_collected:
         return {
             "scored": False,

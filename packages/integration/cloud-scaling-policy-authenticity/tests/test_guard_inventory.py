@@ -8,6 +8,7 @@ listing a guard, or if the shard arithmetic silently dropped one.
 from __future__ import annotations
 
 import importlib
+import os
 import sys
 
 import pytest
@@ -17,6 +18,16 @@ from _policy_fixtures import _find_repo_root
 REPO = _find_repo_root()
 sys.path.insert(0, str(REPO / "scripts" / "cloud_scaling"))
 guard_sweep = importlib.import_module("guard_sweep")
+
+pytestmark = pytest.mark.skipif(
+    os.environ.get("UGENCE_GUARD_SWEEP") == "1",
+    reason=(
+        "the gate-removal sweep runs this suite against a copy with one guard "
+        "neutralised; these pins assert the guard count and the condition text of "
+        "named guards, so inside that copy they would fail on the mutation itself "
+        "and hand the sweep a kill its own test manufactured"
+    ),
+)
 
 CONFIG = guard_sweep.PACKAGES["policy-authenticity"]
 SHARDS = 8

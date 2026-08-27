@@ -13,14 +13,27 @@ defend.
 from __future__ import annotations
 
 import importlib
+import os
 import pathlib
 import sys
 
 import pytest
 
-REPO = pathlib.Path(__file__).resolve().parents[4]
+REPO = pathlib.Path(
+    os.environ.get("UGENCE_REPO_ROOT") or pathlib.Path(__file__).resolve().parents[4]
+)
 sys.path.insert(0, str(REPO / "scripts" / "cloud_scaling"))
 guard_sweep = importlib.import_module("guard_sweep")
+
+pytestmark = pytest.mark.skipif(
+    os.environ.get("UGENCE_GUARD_SWEEP") == "1",
+    reason=(
+        "the gate-removal sweep runs this suite against a copy with one guard "
+        "neutralised; these pins assert the guard count and the condition text of "
+        "named guards, so inside that copy they would fail on the mutation itself "
+        "and hand the sweep a kill its own test manufactured"
+    ),
+)
 
 CONFIG = guard_sweep.PACKAGES["authorization-contracts"]
 SHARDS = 8
