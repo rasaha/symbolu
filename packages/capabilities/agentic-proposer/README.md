@@ -70,7 +70,7 @@ from ugence_agentic_proposer import (
     evaluate_eligibility, evaluate_readiness,
     compute_advisory_identity, verify_advisory_identity,
     verify_candidate_eligibility, verify_advisory_selection, verify_observation_resolution,
-    EligibilityMismatchError,
+    EligibilityMismatchError, CrossContractViolationError,
     TerminalOutcome,               # PROPOSAL, NEED_EVIDENCE, ABSTAIN, ESCALATE
     CandidateDisposition,          # RECOMMEND_MATCHED_FOR_APPROVAL, RECOMMEND_WITHHOLD,
                                    # REQUEST_EVIDENCE, ESCALATE_EXCEPTION
@@ -78,7 +78,8 @@ from ugence_agentic_proposer import (
 )
 ```
 
-The full 38-name public surface (H3) is pinned in
+The full 39-name public surface (H3 plus OD-6(ii)'s `CrossContractViolationError`)
+is pinned in
 [`public_api.json`](public_api.json) and drift-tested by
 `tests/test_public_api.py`. Every one of the classification enums above is an
 advisory proposer classification. None is evidence admission, a business decision,

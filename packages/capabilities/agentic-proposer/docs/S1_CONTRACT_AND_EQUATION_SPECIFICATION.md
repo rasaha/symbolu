@@ -2880,16 +2880,17 @@ cardinality changes. (i) narrows an already-declared field's constructibility on
 pattern; (ii) adds an exported exception class; (iii) ratifies a previously unstated
 vocabulary/comparison-basis detail of an already-declared field and enum.
 
-*Enforcement:* `[G]` **not yet implemented.** This ratification is documentation only:
-no `src/` module, test, `public_api.json`, `version.py`, CI workflow or platform-freeze
-artifact is changed by it. Implementing the C9 validator, `CrossContractViolationError`
-and its call sites, and the corresponding test coverage is separately gated work,
-recorded in `docs/architecture/ADR_UGENCE_AGENTIC_PROPOSER_MVP_READINESS.md`'s OD-6
+*Enforcement:* `[V]` **implemented.** The C9 validator
+(`AdvisoryCandidateSet._selection_is_unconstructible`, `contracts.py`),
+`CrossContractViolationError` (`verification.py`, exported via `__init__.py` and
+`public_api.json`) at its three actual raise-statement sites in `identity.py` — the
+shared `_require_equal` helper (R-5, R-6, R-10) and two inline raises (R-9, R-7) —
+and the corresponding test coverage are recorded in
+`docs/architecture/ADR_UGENCE_AGENTIC_PROPOSER_MVP_READINESS.md`'s OD-6 row and
 guard-evidence paragraph and in `CHANGELOG.md`.
 
-*S1 production implementation:* the C9 validator, `CrossContractViolationError` and its
-call sites remain to be written; until then the pre-OD-6 behaviour is what actually
-runs.
+*S1 production implementation:* the C9 validator, `CrossContractViolationError` and
+its three call sites are written and tested; this is what actually runs at `0.1.0`.
 
 *Where it is implemented in this document.* B3; new C9; D6 (`selected_candidate_id`'s
 Validation column); the `ProposerProcessStateTransition` section; Part E's header note
@@ -2921,9 +2922,10 @@ own ruling and is not given one here. **OD-6 is ratified 2026-08-27**: it adds a
 validation rule (C9), an exported exception class (H2), and a previously unstated
 vocabulary/comparison-basis detail (`ProposerProcessState`, R-4) — none of which is a
 contract field, type or cardinality change — resolving an inconsistency between B3, H1
-and R-1b(iv) that an independent implementation review found. `[G]` Its three parts are
-ratified as specification text but not yet implemented against a contract module;
-that remains separately gated work.
+and R-1b(iv) that an independent implementation review found. `[V]` Its three parts
+are ratified as specification text and implemented against the contract module, with
+test coverage in `tests/test_s1_implementation_obligations.py`'s `OD-6` sections and
+`tests/test_process_ordering_obligation.py`.
 
 **The specification is frozen.** The status line at the head of this document reads
 `CONTRACT SPECIFICATION FROZEN FOR IMPLEMENTATION`. Freezing closes the contract

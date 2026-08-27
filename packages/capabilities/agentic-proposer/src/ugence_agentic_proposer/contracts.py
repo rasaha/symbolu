@@ -10,11 +10,13 @@ nested public shapes exported for typing and never transported alone —
 This module declares the models and the validations that are locally decidable from
 one instance of one contract: C1 (model configuration), C2 (common fields), C4
 (timestamps), C5 (field classification), C6 (digest-shaped field format), C7
-(``DomainCheckCompletion.COMPLETE`` is unconstructible), R-1a (selection coupling,
-local), the local half of R-1b ((v), (vi), and the local half of (vii)), R-3 and R-4
-(process ordering and outcome agreement), R-8's locally-decidable no-duplicates
-clauses, S-1 and S-2 (selection resolution and eligibility), L-1 (lineage), and the
-D3/D2 non-empty-list requirements.
+(``DomainCheckCompletion.COMPLETE`` is unconstructible), C9 (OD-6(i):
+``AdvisoryCandidateSet.selected_candidate_id`` is unconstructible when non-null),
+R-1a (selection coupling, local), the local half of R-1b ((v), (vi), and the local
+half of (vii)), R-3 and R-4 (process ordering and outcome agreement), R-8's
+locally-decidable no-duplicates clauses, S-1 and S-2 (selection resolution and
+eligibility — vacuous under C9), L-1 (lineage), and the D3/D2 non-empty-list
+requirements.
 
 What this module does **not** decide: R-2, R-5, R-6, R-7, R-9, R-10, and the
 cross-contract halves of R-1b. Those require a second contract, a builder or a
@@ -490,10 +492,39 @@ class AdvisoryCandidateSet(BaseModel):
     #: C5d — the reason-code catalogue is out of scope at this stage (Part J).
     selection_reason_codes: Reserved = []
 
+    @field_validator("selected_candidate_id", mode="after")
+    @classmethod
+    def _selection_is_unconstructible(cls, value):
+        """C9 (OD-6(i)). A non-null ``selected_candidate_id`` is rejected
+        unconditionally, on every path, including ``model_construct`` followed by
+        validation and direct construction by any caller who can import the name —
+        the same pattern C7 uses for ``DomainCheckCompletion.COMPLETE``. It becomes
+        constructible only through a separately ratified S2 transition that removes
+        this validator as an explicit, reviewed act.
+
+        Disclosed ceiling, on the same terms C7's docstring states for its own field:
+        ``model_construct`` alone (with no subsequent validation) bypasses every
+        pydantic validator, this one included, and so does ``model_copy(update=...)``,
+        which never re-runs validation either. Neither is a construction path this
+        package's builders use or accept from a caller; both are standing pydantic
+        primitives, not something a validator can close from the outside, and no
+        attempt is made here to defeat them by other means.
+        """
+        if value is not None:
+            raise ValueError(
+                "AdvisoryCandidateSet.selected_candidate_id must be None in S1 (C9, "
+                "OD-6(i)): a non-null selection is structurally unconstructible until "
+                "a separately ratified S2 transition removes this validator")
+        return value
+
     @model_validator(mode="after")
     def _s1_and_s2_selection_resolution(self):
-        """S-1 and S-2: locally decidable selection invariants. Both are vacuous in
-        S1 under B3 (Part J: S1 selects nothing) and become load-bearing at S2."""
+        """S-1 and S-2: locally decidable selection invariants. Both are satisfied
+        vacuously in S1: C9 above already makes ``selected_candidate_id`` ``None`` on
+        every ``AdvisoryCandidateSet`` this package can construct, so the non-null
+        branch below can never execute here. It is preserved rather than deleted so
+        that the rule is stated once and is already in place, unedited, for the
+        separately reviewed S2 transition that removes C9."""
         if self.selected_candidate_id is not None:
             matches = [c for c in self.candidates
                        if c.candidate_id == self.selected_candidate_id]

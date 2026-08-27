@@ -75,24 +75,29 @@ therefore written now, **skipped by name**, and it **arms itself** the moment
   replace the placeholder with the ratified ``ProposerProcessState`` and prove
   forward-only ordering in the same change.
 
-`[G]` **What this module does not settle, and must not.** Terminal **membership** is
-settled by entailment, and two other things are not.
+Membership is settled by entailment: D8's nested-shape table types ``state`` as
+``ProposerProcessState``, validated by enum membership, and R-4 says
+``terminal_outcome`` equals "the terminal ``ProposerProcessState`` **when one is
+present** in ``state_transitions``" — which presupposes that such a member exists.
+R-3 carries no weight in that argument: it says "at most one terminal state and only
+in final position", which *permits* a terminal state and does not require one. The
+load-bearing premises are D8's typing and R-4's presupposition, and nothing else.
 
-Membership: D8's nested-shape table types ``state`` as ``ProposerProcessState``, validated
-by enum membership, and R-4 says ``terminal_outcome`` equals "the terminal
-``ProposerProcessState`` **when one is present** in ``state_transitions``" — which
-presupposes that such a member exists. R-3 carries no weight in that argument: it says
-"at most one terminal state and only in final position", which *permits* a terminal state
-and does not require one. The load-bearing premises are D8's typing and R-4's
-presupposition, and nothing else.
-
-Left open, and for the specification rather than this file: **(i) cardinality** — whether
-the enum carries nine members or the five process states alongside some other spelling of
-the four; and **(ii) the comparison basis** — R-4 equates ``terminal_outcome``, a
-``TerminalOutcome``, with a ``ProposerProcessState``, and a cross-enum ``==`` is never
-true in Python, so R-4 must mean equality of name or of value and does not say which. The
-assertions below pin only the five process states the chain names. Inventing a cardinality
-or a comparison basis here would be exactly the origination a mirror may not do.
+**`[V]` No longer open.** The two questions this module's own earlier revisions left
+for the specification — **(i) cardinality** (whether the enum carries nine members
+or the five process states alongside some other spelling of the four) and **(ii) the
+comparison basis** (R-4 equates a ``TerminalOutcome`` with a ``ProposerProcessState``,
+and a cross-enum ``==`` is never true in Python, so R-4 must mean equality of name or
+of value) — are both ratified as specification text by OD-6(iii)
+(``docs/architecture/ADR_UGENCE_AGENTIC_PROPOSER_MVP_READINESS.md``): nine members;
+the four terminal members carry exactly ``TerminalOutcome``'s wire values; R-4
+compares by value. The assertions below still pin only the five process states this
+module's own claimed obligation (``R-3``, above) carries; the full nine-member
+membership, the shared wire values, R-4's value comparison, `strict=True`'s
+continued refusal of a cross-enum substitution, and identical serialisation on the
+four-value overlap are pinned in
+``tests/test_s1_implementation_obligations.py``'s ``OD-6(iii)`` section instead,
+since they are OD-6's obligation and this module's own is R-3 alone.
 """
 from __future__ import annotations
 
@@ -109,9 +114,11 @@ SRC = pathlib.Path(ap.__file__).resolve().parent
 MIRROR = pathlib.Path(spec.__file__).resolve()
 
 #: The five process states R-3's chain names, in ratified order. The terminal states are
-#: deliberately absent — not because their membership is in doubt (see the `[G]` note
-#: above: D8's typing plus R-4's presupposition entail it) but because the enum's
-#: cardinality is, and pinning a count here would originate one.
+#: deliberately absent from this tuple: it is scoped to R-3, the one obligation this
+#: module itself claims and carries (see ``_CLAIMED_OBLIGATIONS`` below), not because
+#: the terminal members' membership or cardinality is in any doubt — OD-6(iii) ratifies
+#: both, and ``tests/test_s1_implementation_obligations.py``'s ``OD-6(iii)`` section
+#: pins the full nine-member enum.
 RATIFIED_PROCESS_STATES = (
     "RECEIVED", "VALIDATED", "OBSERVING", "RECONCILING", "EVALUATING",
 )
@@ -127,9 +134,11 @@ PROCESS_STATE_ENUM = "ProposerProcessState"
 #: rule this module says nothing about — the same defect, one level up, that
 #: ``test_documentation_consistency.py`` exists to prevent for rule *mentions*.
 #:
-#: R-4 is **not** here. This module cites it as the premise for terminal membership and
-#: covers none of it; its uncovered status is recorded in
-#: ``tests/test_unenforced_local_rules.py``, which constructs a violating instance.
+#: R-4 is **not** here, but is not uncovered either: it is enforced by
+#: ``ProposerProcessRecord``'s own model validator and is in ``ENFORCED`` (not
+#: ``UNENFORCED``) in ``tests/test_unenforced_local_rules.py``. This module cites it
+#: only as the premise for terminal membership and claims no obligation for it — its
+#: own named skip obligation is R-3 alone.
 _CLAIMED_OBLIGATIONS = {
     "R-3": ("test_r3_forward_only_ordering_is_enforced",),
 }
@@ -243,10 +252,10 @@ def test_the_process_state_enum_carries_the_five_ratified_process_states():
     """Armed by the enum's declaration. The five states R-3's chain names must all be
     members, in that order.
 
-    The terminal states are not asserted here. D8's typing and R-4's "when one is
-    present" entail that they are members, but the enum's **cardinality** is not stated in
-    the specification, and this file does not get to decide it — so no count is pinned and
-    no absence is asserted.
+    The terminal states are not asserted here: this module's own claimed obligation
+    (``_CLAIMED_OBLIGATIONS``, above) is R-3 alone, and the full nine-member
+    cardinality — ratified by OD-6(iii), no longer an open question — is pinned in
+    ``tests/test_s1_implementation_obligations.py``'s ``OD-6(iii)`` section instead.
     """
     names = [member.name for member in _ENUM]
     for state in RATIFIED_PROCESS_STATES:
@@ -259,23 +268,22 @@ def test_the_process_state_enum_carries_the_five_ratified_process_states():
 def _state(name):
     """Resolve one state name to a member, from whichever enum carries it.
 
-    D8's typing and R-4's "when one is present" entail that the four terminal outcomes are
-    members of ``ProposerProcessState``, but the specification states neither the enum's
-    cardinality nor the basis on which R-4 compares a ``TerminalOutcome`` with a
-    ``ProposerProcessState``, so this resolves from either enum rather than assuming a
-    spelling. If a name resolves from neither, that is the open question surfacing as a
-    concrete blocker, and it is reported as such instead of escaping as an enum
-    ``KeyError`` that says nothing to the implementer.
+    OD-6(iii) ratifies that the four terminal outcomes are members of
+    ``ProposerProcessState`` with wire values identical to ``TerminalOutcome``'s, so
+    resolving from either enum now returns an equal value either way; this helper
+    predates that ratification and is kept because it is still correct, not because
+    the question it once hedged against remains open. If a name resolves from
+    neither enum, that is a real defect in the fixture calling this helper, reported
+    directly rather than escaping as an enum ``KeyError`` that says nothing to the
+    implementer.
     """
     for enum in (_ENUM, ap.TerminalOutcome):
         if enum is not None and name in getattr(enum, "__members__", {}):
             return enum[name]
     pytest.fail(
-        f"{name!r} is a member of neither {PROCESS_STATE_ENUM} nor TerminalOutcome. "
-        f"R-3's chain ends in the four terminal outcomes and D8's typing plus R-4's "
-        f"\"when one is present\" entail that {PROCESS_STATE_ENUM} carries them; the "
-        "specification states neither the enum's cardinality nor R-4's comparison basis, "
-        "and both must be settled there before this obligation can be discharged.")
+        f"{name!r} is a member of neither {PROCESS_STATE_ENUM} nor TerminalOutcome, "
+        "which OD-6(iii) ratifies as sharing wire values on their four-name overlap; "
+        "check the calling fixture for a misspelled state name.")
 
 
 @pytest.mark.skipif(_ENUM is None, reason=_UNARMED_REASON)

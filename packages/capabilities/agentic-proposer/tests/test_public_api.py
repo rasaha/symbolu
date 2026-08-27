@@ -105,7 +105,7 @@ def test_every_h3_category_is_present_in_the_snapshot():
     verifiers = {"verify_candidate_eligibility", "verify_advisory_selection",
                 "verify_observation_resolution"}
     assert builders | equations | identity_functions | verifiers == functions
-    assert exceptions == {"EligibilityMismatchError"}
+    assert exceptions == {"EligibilityMismatchError", "CrossContractViolationError"}
     assert constants == {"RESERVED_AUTHORITY_VOCABULARY", "ADVISORY_KIND",
                          "ADVISORY_IDENTITY_SET_PATHS", "ADVISORY_IDENTITY_NFC_PATHS"}
 

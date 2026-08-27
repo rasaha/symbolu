@@ -10,8 +10,9 @@ contract and equation specification is
 
 This package now exports the full H3 public surface: the eight canonical contracts,
 the two nested public shapes, all ten ratified enums, the five builders, the two
-equation functions, the two identity functions, the three verifiers, the one
-exception this package defines, and the four ratified constants.
+equation functions, the two identity functions, the three verifiers, the two
+exceptions this package defines (OD-6(ii) added ``CrossContractViolationError``
+alongside ``EligibilityMismatchError``), and the four ratified constants.
 
 Proposal identity is computed only by a call into ``ugence_jcs``, inside the single
 authorised identity module (``identity.py``). This package contains no
@@ -49,6 +50,7 @@ from .identity import (
     verify_advisory_identity,
 )
 from .verification import (
+    CrossContractViolationError,
     EligibilityMismatchError,
     verify_advisory_selection,
     verify_candidate_eligibility,
@@ -109,8 +111,9 @@ __all__ = [
     "verify_candidate_eligibility",
     "verify_advisory_selection",
     "verify_observation_resolution",
-    # Exceptions (1)
+    # Exceptions (2)
     "EligibilityMismatchError",
+    "CrossContractViolationError",
     # Constants (4)
     "RESERVED_AUTHORITY_VOCABULARY",
     "ADVISORY_KIND",

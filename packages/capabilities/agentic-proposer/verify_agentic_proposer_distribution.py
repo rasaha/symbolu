@@ -69,9 +69,10 @@ assert not {m.value for m in ap.CandidateDisposition} & reserved
 assert "INDETERMINATE" in reserved
 assert ap.SemanticAuditorFindingStatus.INDETERMINATE.value == "INDETERMINATE"
 
-# The public surface is exactly the full H3 surface (I6, I8): 8 contracts, 2 nested
-# public shapes, 10 enums, 5 builders, 2 equation functions, 2 identity functions,
-# 3 verifiers, 1 exception, 4 constants, __version__ = 38 names.
+# The public surface is exactly the full H3 surface plus OD-6(ii)'s addition (I6,
+# I8): 8 contracts, 2 nested public shapes, 10 enums, 5 builders, 2 equation
+# functions, 2 identity functions, 3 verifiers, 2 exceptions, 4 constants,
+# __version__ = 39 names.
 EXPECTED_SURFACE = {
     "AgentIdentityRef", "CognitiveRoleContract", "WorkMandate",
     "BoundedContextEnvelope", "ToolObservation", "AdvisoryCandidateSet",
@@ -88,13 +89,13 @@ EXPECTED_SURFACE = {
     "compute_advisory_identity", "verify_advisory_identity",
     "verify_candidate_eligibility", "verify_advisory_selection",
     "verify_observation_resolution",
-    "EligibilityMismatchError",
+    "EligibilityMismatchError", "CrossContractViolationError",
     "RESERVED_AUTHORITY_VOCABULARY", "ADVISORY_KIND",
     "ADVISORY_IDENTITY_SET_PATHS", "ADVISORY_IDENTITY_NFC_PATHS",
     "__version__",
 }
 assert set(ap.__all__) == EXPECTED_SURFACE, ap.__all__
-assert len(EXPECTED_SURFACE) == 38
+assert len(EXPECTED_SURFACE) == 39
 assert not any(n.startswith(("Proposal", "Recommendation")) for n in ap.__all__)
 
 # --- a complete advisory, built end to end through the installed ugence-jcs wheel ---

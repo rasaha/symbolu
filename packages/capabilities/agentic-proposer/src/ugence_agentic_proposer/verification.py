@@ -1,4 +1,4 @@
-"""Part H — verifiers, and the one exception this package defines (H2).
+"""Part H — verifiers, and the two exceptions this package defines (H2, OD-6(ii)).
 
 Independent replay: each verifier recomputes from stored content, consults no cache
 and no side table, and returns ``False`` rather than raising, "on the same terms" as
@@ -25,6 +25,7 @@ if typing.TYPE_CHECKING:
 
 __all__ = [
     "EligibilityMismatchError",
+    "CrossContractViolationError",
     "verify_candidate_eligibility",
     "verify_advisory_selection",
     "verify_observation_resolution",
@@ -36,6 +37,27 @@ class EligibilityMismatchError(ValueError):
 
     Not a field-validation failure: the value is well-formed and the object is
     well-typed. What failed is provenance (G4)."""
+
+
+class CrossContractViolationError(ValueError):
+    """H2, OD-6(ii). A Part E rule that compares fields across two or more
+    independently constructed contract instances — R-5, R-6, R-7, R-9 and R-10 as
+    implemented by ``identity.py``'s builders — and so cannot be decided, and cannot
+    raise ``pydantic.ValidationError``, from any single model's own validator.
+
+    Not a field-validation failure any more than ``EligibilityMismatchError`` is:
+    each of the objects involved is, on its own, well-formed and well-typed. What
+    failed is a relationship the builder is required to check between two or more of
+    them. R-1b's own cross-contract clauses ((i)-(iv), (viii), (ix)) fall under this
+    same exception conceptually, but the builder never has occasion to raise it for
+    them: the advisory's nested ``candidates`` and its four selection-dependent
+    fields are *derived* from the referenced ``AdvisoryCandidateSet`` rather than
+    separately supplied and checked, so those clauses hold by construction on every
+    path this package's builders support. ``verify_advisory_selection`` remains the
+    independent replay that reports a violation of them — including one produced by
+    a hand-constructed or tampered object outside the builder's own path — by
+    returning ``False``, on the same terms H1 states for every verifier.
+    """
 
 
 def verify_candidate_eligibility(

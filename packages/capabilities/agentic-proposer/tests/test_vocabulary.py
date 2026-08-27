@@ -126,8 +126,8 @@ def test_public_api_exports_only_the_vocabulary_and_version():
         # Verifiers (3)
         "verify_candidate_eligibility", "verify_advisory_selection",
         "verify_observation_resolution",
-        # Exceptions (1)
-        "EligibilityMismatchError",
+        # Exceptions (2)
+        "EligibilityMismatchError", "CrossContractViolationError",
         # Constants (4)
         "RESERVED_AUTHORITY_VOCABULARY", "ADVISORY_KIND",
         "ADVISORY_IDENTITY_SET_PATHS", "ADVISORY_IDENTITY_NFC_PATHS",

@@ -176,20 +176,20 @@ class ProposerProcessState(str, Enum):
     ``ProposerProcessStateTransition.state`` as ``ProposerProcessState`` and states R-3's
     chain literally as
     ``RECEIVED -> VALIDATED -> OBSERVING -> RECONCILING -> EVALUATING ->
-    {PROPOSAL, NEED_EVIDENCE, ABSTAIN, ESCALATE}``, but — as
-    ``tests/test_process_ordering_obligation.py`` records as an open ``[G]`` gap —
-    nowhere gives this enum an explicit membership table the way every other D-part
-    enum receives one, and R-4's cross-enum comparison basis is likewise unstated.
+    {PROPOSAL, NEED_EVIDENCE, ABSTAIN, ESCALATE}``. R-3's chain notation names the four
+    terminal outcomes as the values ``state`` takes at the end of the very sequence it
+    is the type of, and R-4 presupposes that ``ProposerProcessRecord.terminal_outcome``
+    can be compared against "the terminal ``ProposerProcessState``" — both make sense
+    only if the four terminal outcomes are themselves members of this enum, which is
+    why the nine-member membership was always entailed rather than chosen.
 
-    This is a completion of an entailment the specification itself states, not a
-    reconciliation against it: R-3's chain notation names the four terminal outcomes as
-    the values ``state`` takes at the end of the very sequence it is the type of, and
-    R-4 presupposes that ``ProposerProcessRecord.terminal_outcome`` can be compared
-    against "the terminal ``ProposerProcessState``" — both make sense only if the four
-    terminal outcomes are themselves members of this enum. The four terminal members are
-    given the identical wire values ``TerminalOutcome`` uses, so R-4 is a plain value
-    comparison rather than a comparison this package would otherwise have no basis for.
-    ``[I]``, recorded for ratification alongside the specification's own acknowledged gap.
+    What the specification did not itself state — the four terminal members' wire
+    values and R-4's comparison basis — is ratified as specification text by OD-6(iii)
+    (``docs/architecture/ADR_UGENCE_AGENTIC_PROPOSER_MVP_READINESS.md``): the four
+    terminal members carry exactly ``TerminalOutcome``'s wire values, so the two enums
+    compare equal and serialise identically on that overlap, and R-4's "equals" is
+    value equality. ``[V]``, ratified; see
+    ``tests/test_process_ordering_obligation.py`` for the pinning coverage.
     """
 
     RECEIVED = "RECEIVED"

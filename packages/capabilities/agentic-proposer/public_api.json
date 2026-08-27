@@ -104,6 +104,9 @@
         "activation_status"
       ]
     },
+    "CrossContractViolationError": {
+      "kind": "exception"
+    },
     "DomainCheckCompletion": {
       "kind": "enum",
       "values": [

@@ -602,3 +602,343 @@ def test_i7_12_the_real_hash_shaped_fields_use_the_annotated_spelling():
             continue
         text = ast.unparse(node.annotation)
         assert "Field(" not in text, f"{node.target.id}: {text}"
+
+
+# --------------------------------------------------------------------------- #
+# OD-6(i) — C9: a non-null selection is structurally unconstructible
+# --------------------------------------------------------------------------- #
+
+def test_od6_i_advisorycandidateset_rejects_a_non_null_selection_by_direct_construction(
+        scenario):
+    """Positive. The same shape S-1/S-2 would have resolved and accepted is refused
+    outright by C9 before either ever runs."""
+    with pytest.raises(pydantic.ValidationError):
+        ap.AdvisoryCandidateSet(
+            schema_version="1.0", tenant_id="tenant-1", created_at=FIXED_INSTANT,
+            candidate_set_id="set-1", case_ref="case-1",
+            candidates=(scenario["candidate"],),
+            selected_candidate_id=scenario["candidate"].candidate_id,
+            selection_reason_codes=[])
+
+
+def test_od6_i_advisorycandidateset_accepts_the_always_null_case(scenario):
+    """Negative control: C9 refuses only a non-null selector. The always-null shape
+    every builder in this package actually produces remains constructible."""
+    built = ap.AdvisoryCandidateSet(
+        schema_version="1.0", tenant_id="tenant-1", created_at=FIXED_INSTANT,
+        candidate_set_id="set-1", case_ref="case-1",
+        candidates=(scenario["candidate"],), selected_candidate_id=None,
+        selection_reason_codes=[])
+    assert built.selected_candidate_id is None
+
+
+def test_od6_i_c9_rejects_by_model_validate(scenario):
+    fields = dict(
+        schema_version="1.0", tenant_id="tenant-1", created_at=FIXED_INSTANT,
+        candidate_set_id="set-1", case_ref="case-1",
+        candidates=(scenario["candidate"],),
+        selected_candidate_id=scenario["candidate"].candidate_id,
+        selection_reason_codes=[])
+    with pytest.raises(pydantic.ValidationError):
+        ap.AdvisoryCandidateSet.model_validate(fields)
+
+
+def test_od6_i_model_construct_bypasses_c9_but_a_later_validate_still_catches_it(
+        scenario):
+    """The disclosed ceiling, on the same terms C7's own docstring states for
+    ``DomainCheckCompletion.COMPLETE``: ``model_construct`` alone bypasses every
+    validator, C9 included, and this package neither claims nor attempts to close
+    that pydantic primitive. A subsequent revalidation does catch it, because C9 is a
+    real validator, not merely absent from ``model_construct``'s own bypass path."""
+    forged = ap.AdvisoryCandidateSet.model_construct(
+        schema_version="1.0", tenant_id="tenant-1", created_at=FIXED_INSTANT,
+        candidate_set_id="set-1", case_ref="case-1",
+        candidates=(scenario["candidate"],),
+        selected_candidate_id=scenario["candidate"].candidate_id,
+        selection_reason_codes=[])
+    assert forged.selected_candidate_id == scenario["candidate"].candidate_id
+    with pytest.raises(pydantic.ValidationError):
+        ap.AdvisoryCandidateSet.model_validate(dict(forged))
+
+
+def test_od6_i_model_copy_update_also_bypasses_c9_a_second_disclosed_ceiling(scenario):
+    """``model_copy(update=...)`` never re-runs validation either, on a frozen model
+    or otherwise. This is pydantic's own documented behaviour, not a gap in C9's
+    validator, and is disclosed here rather than papered over with an unsupported
+    ``__setattr__``- or ``model_copy``-level interception this package does not add
+    anywhere else in its contracts."""
+    copied = scenario["candidate_set"].model_copy(
+        update={"selected_candidate_id": scenario["candidate"].candidate_id})
+    assert copied.selected_candidate_id == scenario["candidate"].candidate_id
+
+
+def test_od6_i_removing_the_validator_would_let_the_forbidden_set_through(scenario):
+    """Mutation control. A twin model declaring the identical
+    ``selected_candidate_id`` field but omitting C9's validator accepts exactly what
+    ``AdvisoryCandidateSet`` rejects — proving the validator, and not the field's
+    ``str | None`` type, is what blocks a non-null selector. If C9 were ever deleted
+    from ``contracts.py``, the positive test above would start passing on the real
+    class too, which is how this mutation would actually be caught in the suite."""
+    from typing import Optional
+
+    from ugence_agentic_proposer import contracts as c
+
+    class _AdvisoryCandidateSetWithoutC9(pydantic.BaseModel):
+        model_config = c._MODEL_CONFIG
+        schema_version: str = "1.0"
+        tenant_id: c.Identifier
+        created_at: object
+        candidate_set_id: c.Identifier
+        case_ref: c.Identifier
+        candidates: tuple
+        selected_candidate_id: Optional[c.Identifier] = None
+        selection_reason_codes: c.Reserved = []
+
+    with pytest.raises(pydantic.ValidationError):
+        ap.AdvisoryCandidateSet(
+            schema_version="1.0", tenant_id="tenant-1", created_at=FIXED_INSTANT,
+            candidate_set_id="set-1", case_ref="case-1",
+            candidates=(scenario["candidate"],),
+            selected_candidate_id=scenario["candidate"].candidate_id,
+            selection_reason_codes=[])
+
+    twin = _AdvisoryCandidateSetWithoutC9(
+        tenant_id="tenant-1", created_at=FIXED_INSTANT,
+        candidate_set_id="set-1", case_ref="case-1",
+        candidates=(scenario["candidate"],),
+        selected_candidate_id=scenario["candidate"].candidate_id)
+    assert twin.selected_candidate_id == scenario["candidate"].candidate_id
+
+
+def test_od6_i_build_proposer_advisory_inherits_c9_with_no_separate_check(scenario):
+    """``build_proposer_advisory`` no longer refuses a non-null selector itself
+    (that check was removed from ``identity.py`` under OD-6(i)): it cannot receive
+    one, because no valid ``AdvisoryCandidateSet`` can carry one. Confirmed here by
+    the only route that could still reach the builder with an illegal value — a
+    ``model_construct``-forged set — and showing the builder still produces a
+    correctly null-selected advisory rather than leaking the forged value: the
+    payload's four selection-dependent fields are derived, never copied from the
+    input, so a bypassed input cannot propagate harm even though it can exist."""
+    forged_set = ap.AdvisoryCandidateSet.model_construct(
+        schema_version="1.0", tenant_id="tenant-1", created_at=FIXED_INSTANT,
+        candidate_set_id="set-1", case_ref="case-1",
+        candidates=(scenario["candidate"],),
+        selected_candidate_id=scenario["candidate"].candidate_id,
+        selection_reason_codes=[])
+    advisory = ap.build_proposer_advisory(
+        tenant_id="tenant-1", case_ref="case-1", created_at=FIXED_INSTANT,
+        identity=scenario["identity"], role=scenario["role"],
+        mandate=scenario["mandate"], context=scenario["context"],
+        observations=[scenario["observation"]], candidate_set=forged_set,
+        parent_advisory_digest=None, claim_summaries=[], observation_refs=[],
+        uncertainties=[], expires_at=scenario["mandate"].expires_at)
+    assert advisory.selected_candidate_id is None
+    assert advisory.recommended_disposition is None
+    assert advisory.requested_review_action is None
+    assert advisory.requested_review_destination_role_ref is None
+
+
+def test_od6_i_no_separate_refusal_remains_in_construct_advisory_source():
+    """Static confirmation that the removed check is actually gone from source, not
+    merely unreachable: a reviewer reading ``identity.py`` should not find a second,
+    now-dead copy of C9's rule sitting beside the real one."""
+    source = (SRC / "identity.py").read_text(encoding="utf-8")
+    assert "cannot derive an advisory from a" not in source, (
+        "the pre-OD-6(i) builder-side refusal text is still present in identity.py; "
+        "it should have been removed when C9 took over the ceiling")
+
+
+# --------------------------------------------------------------------------- #
+# OD-6(ii) — CrossContractViolationError: the ratified cross-contract residue
+# --------------------------------------------------------------------------- #
+
+def _od6_ii_call(**overrides):
+    """``build_proposer_advisory``'s full keyword set, built from ``scenario`` with
+    zero or more contracts swapped out, so each cross-contract test mutates exactly
+    the one relationship it names."""
+    def call(scenario):
+        kwargs = dict(
+            tenant_id="tenant-1", case_ref="case-1", created_at=FIXED_INSTANT,
+            identity=scenario["identity"], role=scenario["role"],
+            mandate=scenario["mandate"], context=scenario["context"],
+            observations=[scenario["observation"]],
+            candidate_set=scenario["candidate_set"], parent_advisory_digest=None,
+            claim_summaries=[], observation_refs=[], uncertainties=[],
+            expires_at=scenario["mandate"].expires_at)
+        kwargs.update(overrides)
+        return ap.build_proposer_advisory(**kwargs)
+    return call
+
+
+def test_od6_ii_r5_tenant_mismatch_on_role_raises_cross_contract_violation_error(
+        scenario):
+    bad_role = scenario["role"].model_copy(update={"tenant_id": "tenant-2"})
+    with pytest.raises(ap.CrossContractViolationError):
+        _od6_ii_call(role=bad_role)(scenario)
+
+
+def test_od6_ii_r5_tenant_mismatch_on_an_observation_raises_cross_contract_violation_error(
+        scenario):
+    bad_observation = scenario["observation"].model_copy(
+        update={"tenant_id": "tenant-2"})
+    with pytest.raises(ap.CrossContractViolationError):
+        _od6_ii_call(observations=[bad_observation])(scenario)
+
+
+def test_od6_ii_r6_case_ref_mismatch_on_mandate_raises_cross_contract_violation_error(
+        scenario):
+    bad_mandate = scenario["mandate"].model_copy(update={"case_ref": "case-2"})
+    with pytest.raises(ap.CrossContractViolationError):
+        _od6_ii_call(mandate=bad_mandate)(scenario)
+
+
+def test_od6_ii_r6_case_ref_mismatch_on_an_observation_raises_cross_contract_violation_error(
+        scenario):
+    bad_observation = scenario["observation"].model_copy(update={"case_ref": "case-2"})
+    with pytest.raises(ap.CrossContractViolationError):
+        _od6_ii_call(observations=[bad_observation])(scenario)
+
+
+def test_od6_ii_r9_envelope_mandate_mismatch_raises_cross_contract_violation_error(
+        scenario):
+    bad_context = scenario["context"].model_copy(update={"mandate_id": "mandate-2"})
+    with pytest.raises(ap.CrossContractViolationError):
+        _od6_ii_call(context=bad_context)(scenario)
+
+
+def test_od6_ii_r10_role_binding_mismatch_raises_cross_contract_violation_error(
+        scenario):
+    bad_role = scenario["role"].model_copy(update={"role_contract_id": "role-2"})
+    with pytest.raises(ap.CrossContractViolationError):
+        _od6_ii_call(role=bad_role)(scenario)
+
+
+def test_od6_ii_r7_a_dangling_observation_reference_raises_cross_contract_violation_error(
+        scenario):
+    with pytest.raises(ap.CrossContractViolationError):
+        _od6_ii_call(observation_refs=["no-such-observation"])(scenario)
+
+
+def test_od6_ii_cross_contract_violation_error_is_a_valueerror_subclass():
+    assert issubclass(ap.CrossContractViolationError, ValueError)
+    assert not issubclass(ap.EligibilityMismatchError, ap.CrossContractViolationError)
+    assert not issubclass(ap.CrossContractViolationError, ap.EligibilityMismatchError)
+
+
+def test_od6_ii_eligibility_mismatch_error_is_preserved_not_reclassified(scenario):
+    """OD-6(ii) adds a fourth H2 class; it does not touch the third. A stored
+    ``is_eligible`` mismatch still raises exactly ``EligibilityMismatchError``, never
+    ``CrossContractViolationError``."""
+    forged = ap.CandidateAdvisory.model_construct(
+        **{**_ineligible_candidate_fields(), "is_eligible": True})
+    forged_set = scenario["candidate_set"].model_copy(update={"candidates": (forged,)})
+    with pytest.raises(ap.EligibilityMismatchError) as excinfo:
+        _od6_ii_call(candidate_set=forged_set)(scenario)
+    assert not isinstance(excinfo.value, ap.CrossContractViolationError)
+
+
+def test_od6_ii_build_advisory_revisions_own_continuity_checks_stay_plain_valueerror(
+        scenario):
+    """``build_advisory_revision``'s parent-continuity checks (G3) are a different
+    rule from R-5/R-6/R-7/R-9/R-10: they compare a new input against the *parent
+    advisory's own stored field*, not two independently supplied contracts to the
+    same call, and OD-6(ii) does not reclassify them. They must keep raising a plain
+    ``ValueError`` that is not a ``CrossContractViolationError``."""
+    other_identity = scenario["identity"].model_copy(update={"agent_id": "agent-2"})
+    with pytest.raises(ValueError) as excinfo:
+        ap.build_advisory_revision(
+            parent=scenario["advisory"], candidate_set=scenario["candidate_set"],
+            identity=other_identity, role=scenario["role"],
+            mandate=scenario["mandate"], context=scenario["context"],
+            observations=[scenario["observation"]], claim_summaries=[],
+            observation_refs=[], uncertainties=[], created_at=FIXED_INSTANT,
+            expires_at=scenario["mandate"].expires_at)
+    assert not isinstance(excinfo.value, ap.CrossContractViolationError)
+    assert not isinstance(excinfo.value, pydantic.ValidationError)
+
+
+def test_od6_ii_r1b_cross_contract_clauses_hold_by_construction_not_by_a_raise():
+    """What OD-6's own ADR text says conceptually — that R-1b's cross-contract
+    clauses fall under the same exception class — is not the same as a raise site
+    existing for them in the builder. It does not: the advisory's nested
+    ``candidates`` and its four selection-dependent fields are derived directly from
+    ``candidate_set`` rather than separately supplied and compared, so R-1b(i)-(iv),
+    (viii) and (ix) hold by construction on every path ``build_proposer_advisory``
+    and ``build_advisory_revision`` support. This is confirmed structurally rather
+    than asserted in prose: neither builder's source raises
+    ``CrossContractViolationError`` while also mentioning R-1b."""
+    source = (SRC / "identity.py").read_text(encoding="utf-8")
+    tree = ast.parse(source, filename="identity.py")
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Raise) and node.exc is not None:
+            text = ast.unparse(node.exc)
+            if "CrossContractViolationError" in text:
+                assert "R-1b" not in text, (
+                    "a CrossContractViolationError raise site in identity.py names "
+                    "R-1b; R-1b's cross-contract clauses hold by construction and "
+                    "have no raise site of their own")
+
+
+# --------------------------------------------------------------------------- #
+# OD-6(iii) — ProposerProcessState membership and R-4's comparison basis
+# --------------------------------------------------------------------------- #
+
+def test_od6_iii_proposerprocessstate_has_exactly_the_nine_ratified_members():
+    names = {member.name for member in ap.ProposerProcessState}
+    assert names == {
+        "RECEIVED", "VALIDATED", "OBSERVING", "RECONCILING", "EVALUATING",
+        "PROPOSAL", "NEED_EVIDENCE", "ABSTAIN", "ESCALATE",
+    }
+    assert len(ap.ProposerProcessState) == 9
+
+
+def test_od6_iii_the_four_terminal_members_share_terminaloutcomes_wire_values():
+    for name in ("PROPOSAL", "NEED_EVIDENCE", "ABSTAIN", "ESCALATE"):
+        assert ap.ProposerProcessState[name].value == ap.TerminalOutcome[name].value
+
+
+def test_od6_iii_r4_compares_by_value_agreement_is_accepted_disagreement_is_rejected(
+        scenario):
+    agreeing = ap.ProposerProcessRecord(**_record_fixture(
+        state_transitions=[_t(ap.ProposerProcessState.ABSTAIN)],
+        terminal_outcome=ap.TerminalOutcome.ABSTAIN))
+    assert agreeing.terminal_outcome is ap.TerminalOutcome.ABSTAIN
+
+    with pytest.raises(pydantic.ValidationError):
+        ap.ProposerProcessRecord(**_record_fixture(
+            state_transitions=[_t(ap.ProposerProcessState.ABSTAIN)],
+            terminal_outcome=ap.TerminalOutcome.ESCALATE))
+
+
+def test_od6_iii_strict_mode_still_refuses_a_cross_enum_substitution():
+    """The shared wire values settle only what R-4 compares (OD-6(iii)); they do not
+    weaken either field's own type. `strict=True` still refuses a `TerminalOutcome`
+    where `ProposerProcessState` is required, and the converse."""
+    with pytest.raises(pydantic.ValidationError):
+        ap.ProposerProcessStateTransition(state=ap.TerminalOutcome.ABSTAIN,
+                                          at=FIXED_INSTANT)
+
+
+def test_od6_iii_both_enums_serialise_identically_on_the_four_value_overlap():
+    """All four terminal names, on the ``ProposerProcessStateTransition.state`` side
+    (a standalone nested shape; V13/B3 does not reach it)."""
+    for name in ("PROPOSAL", "NEED_EVIDENCE", "ABSTAIN", "ESCALATE"):
+        transition = ap.ProposerProcessStateTransition(
+            state=ap.ProposerProcessState[name], at=FIXED_INSTANT)
+        outcome = ap.TerminalOutcome[name]
+        assert transition.model_dump(mode="json")["state"] == name
+        assert outcome.value == name
+
+
+def test_od6_iii_the_record_side_serialises_identically_for_every_reachable_terminal(
+        scenario):
+    """The three terminal names V13/B3 leave reachable on ``ProposerProcessRecord``
+    in S1 (``PROPOSAL`` is excluded by C7's own unreachability, not by this rule),
+    each pinned as a ``(transition, record)`` pair whose serialisations agree."""
+    for name in ("NEED_EVIDENCE", "ABSTAIN", "ESCALATE"):
+        transition = _t(ap.ProposerProcessState[name])
+        record = ap.ProposerProcessRecord(**_record_fixture(
+            state_transitions=[transition], terminal_outcome=ap.TerminalOutcome[name]))
+        transition_json = transition.model_dump(mode="json")["state"]
+        record_json = record.model_dump(mode="json")["terminal_outcome"]
+        assert transition_json == record_json == name

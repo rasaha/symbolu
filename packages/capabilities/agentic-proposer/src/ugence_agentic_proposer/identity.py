@@ -34,6 +34,7 @@ from datetime import datetime
 import ugence_jcs
 
 from .verification import (
+    CrossContractViolationError,
     EligibilityMismatchError,
     _resolve_references,
     verify_candidate_eligibility,
@@ -156,9 +157,14 @@ def verify_advisory_identity(*, advisory: "ProposerAdvisory") -> bool:
 
 
 def _require_equal(label: str, *values) -> None:
+    """Backs R-5 (tenant scope), R-6 (case scope) and R-10 (role binding) — each a
+    Part E rule that compares fields across two or more independently constructed
+    contract instances, so its failure is ``CrossContractViolationError`` (H2,
+    OD-6(ii)), not ``pydantic.ValidationError``: no single one of the compared
+    objects is malformed, and no single one of them could raise this on its own."""
     if len(set(values)) > 1:
-        raise ValueError(f"{label} must be identical across every supplied contract: "
-                          f"{values!r}")
+        raise CrossContractViolationError(
+            f"{label} must be identical across every supplied contract: {values!r}")
 
 
 def build_proposer_advisory(
@@ -183,12 +189,12 @@ def build_proposer_advisory(
     the advisory in one expression with the substrate call inline in the
     ``advisory_digest=`` keyword (G2).
 
-    **S1 selects nothing (Part J).** ``candidate_set.selected_candidate_id`` must be
-    ``None``: deriving the four selection-dependent fields for a non-null selection
-    would require choosing ``requested_review_destination_role_ref``, which no S1
-    contract specifies a source for, and Part J defers candidate selection to S2 in
-    whole. This is what makes ``selected_candidate_id`` (and its three dependents)
-    ``None`` on every advisory this builder produces (V13, B3).
+    **S1 selects nothing (Part J).** Under C9 (OD-6(i)), a candidate set carrying a
+    non-null selector cannot be constructed in S1 and therefore cannot reach this
+    builder, so this derivation is exercised, in S1, only on the always-null case; no
+    separate refusal is written here. This is what makes ``selected_candidate_id``
+    (and its three dependents) ``None`` on every advisory this builder produces
+    (V13, B3).
     """
     return _construct_advisory(
         tenant_id=tenant_id, case_ref=case_ref, created_at=created_at,
@@ -234,16 +240,16 @@ def _construct_advisory(
         _require_equal("case_ref", case_ref, observation.case_ref)
 
     if context.mandate_id != mandate.mandate_id:
-        raise ValueError("BoundedContextEnvelope.mandate_id must equal "
-                          "WorkMandate.mandate_id (R-9)")
+        raise CrossContractViolationError(
+            "BoundedContextEnvelope.mandate_id must equal WorkMandate.mandate_id "
+            "(R-9)")
     _require_equal("the bound role contract", mandate.assigned_role_contract_id,
                     identity.bound_role_contract_id, role.role_contract_id)
 
-    if candidate_set.selected_candidate_id is not None:
-        raise ValueError(
-            "build_proposer_advisory cannot derive an advisory from a "
-            "AdvisoryCandidateSet carrying a selection: S1 selects nothing "
-            "(Part J); candidate selection is deferred to S2 in whole")
+    # No separate refusal of a non-null candidate_set.selected_candidate_id is
+    # written here (OD-6(i)): C9 makes that unconstructible on AdvisoryCandidateSet
+    # itself, so no validly constructed candidate_set can ever carry one, and this
+    # builder cannot receive a lawfully constructed violating set.
 
     if not verify_candidate_eligibility(
             candidate_set=candidate_set, identity=identity, role=role,
@@ -258,7 +264,7 @@ def _construct_advisory(
     if not _resolve_references(
             required=required_refs, tenant_id=tenant_id, case_ref=case_ref,
             context=context, observations=observations):
-        raise ValueError(
+        raise CrossContractViolationError(
             "an observation_refs entry does not resolve to exactly one supplied "
             "ToolObservation, or fails tenant/case/context continuity (R-7)")
 
