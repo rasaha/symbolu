@@ -225,18 +225,47 @@ All four must hold in a cell for that cell to pass:
 - **Abstention.** `abstention_rate(H) − abstention_rate(P) ≤ 0.20` on the **unconditional**
   counts of §6.
 
-### 7.3 Scope gate (owner ruling 5)
+### 7.3 Ratification scopes (owner ruling, final)
 
-Ratification may be **target × horizon restricted**. At least **8 of the 12** gating cells
-must pass. There is no automatic-retirement rule attached to any individual horizon,
-including 60m. Support is claimed only for passing cells; a ratified implementation must
-deterministically reject or abstain outside its recorded capability envelope, and that
-envelope is part of what is ratified.
+Exactly **two** preregistered scopes exist. This **replaces** the earlier rule that permitted
+restricted ratification while also applying an unconditional 8-of-12 floor — those two
+statements contradicted each other, since a 60-minute-only result is at most 4 cells and
+could never reach 8.
+
+1. **General baseline.** H is ratified across the evaluated capability when it passes at
+   least **8 of the 12** target × horizon cells and every applicable accuracy, bias,
+   coverage, week-consistency and abstention gate on those cells.
+2. **60-minute-only baseline.** H is ratified strictly for the 60-minute horizon when **all
+   four** gating targets pass every per-cell gate at 60 minutes: `cpu_utilization`,
+   `memory_utilization`, `queue_depth`, `running_replicas`. Passing 1–3 of the four ratifies
+   **nothing**.
+
+A 60-minute-only ratification is enforced as a **capability envelope**: the implementation
+must reject or abstain at the 5- and 15-minute horizons. The envelope is part of what is
+ratified.
+
+No other target-only, individual-cell or post-hoc restricted scope is authorized. Any other
+scope requires a new preregistered evaluation.
+
+### 7.3.1 Target scope limitation
+
+What a win would mean is bounded by the vocabulary available. `ForecastTarget` carries no raw
+exogenous demand signal — no request-arrival rate, transaction volume, job-arrival rate or
+session count (`.../forecasting/targets.py:44-49`). Of the four gating targets:
+
+- **`running_replicas` is directly the scaling system's controlled output.**
+- `cpu_utilization`, `memory_utilization` and `queue_depth` are **operational signals affected
+  by both workload demand and deployed capacity** — they are not the controller's own output,
+  but neither are they demand in isolation.
+
+Therefore a win demonstrates prediction of the **current operational telemetry vocabulary**,
+not prediction of unconstrained workload demand. Forecasting demand directly would require a
+new canonical target and its own preregistration.
 
 ### 7.4 Gates for N
 
 N is outcome-eligible (owner ruling 4) and is judged by the same §7.2 quality gates and the
-same 8-of-12 scope gate, with the accuracy condition `MAE(N) ≤ 0.90 · MAE(P)` and
+same two §7.3 ratification scopes, with the accuracy condition `MAE(N) ≤ 0.90 · MAE(P)` and
 `MAE(N) ≤ 0.95 · MAE(T)`.
 
 ## 8. Abstention accounting
@@ -354,7 +383,8 @@ evaluation-only unless separately ratified.
 - **N ties or beats H** on the four-arm paired set across the gating cells. This is the
   decisive control, and it is decisive in both directions.
 - **T ties or beats H**: the gain was the trend term, not the harmonic component.
-- Fewer than 8 of 12 gating cells pass §7.1.
+- Neither §7.3 scope is met: fewer than 8 of 12 gating cells pass §7.1, **and** the
+  four 60-minute cells do not all pass.
 - The week-consistency gate fails: wins are week-specific, i.e. fitted noise.
 - Interval coverage breaks its ±0.05 band.
 - H's advantage disappears when P, T and N are given H's seven-day lookback — the gain was

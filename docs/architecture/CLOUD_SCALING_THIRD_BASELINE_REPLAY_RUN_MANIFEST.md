@@ -174,6 +174,39 @@ implementation can choose the flattering one:
 The first matching entry wins. Failures below the reported one are still **counted** in the
 diagnostic tally, so precedence changes what is reported, never what is measured.
 
+### 6.2 Cadence preflight (owner ruling — required before authorization)
+
+Before the replay is authorized, an **outcome-blind metadata preflight** runs per
+subject × target. It reads exported observation timestamps only; no forecast is produced and
+no result may influence which series are included.
+
+Verified from the actual exported observations:
+
+| Field | Why |
+|---|---|
+| native / source scrape interval, where available | the resolution the data was collected at |
+| export or query step | the resolution the data was *delivered* at, which may be coarser |
+| whether downsampling or aggregation occurred | an aggregated series is not the raw one |
+| p95 positive consecutive event-time gap | the ratified §6 condition 2 |
+| maximum positive consecutive event-time gap | the ratified §6 condition 3 |
+| 49-day continuous-history availability | §4 |
+| daily phase-bin coverage | §6 condition 4 |
+
+The replay is authorized **only** for subject × target series that already satisfy the
+ratified limits — p95 gap ≤ 120 s, maximum gap ≤ 900 s, and every other cycle-coverage and
+resolvability gate in §6.
+
+**No interpolation, forward-fill, upsampling or synthesis of intermediate observations** may
+be used to make a coarse export appear eligible. Manufacturing samples would not recover the
+missing cycle information; it would only hide its absence from the resolvability checks.
+
+**If no subject × target series qualifies, the replay is not run**, and `harmonic_phase` is
+recorded as **unevaluable on the approved export** — explicitly not as a modelling loss and
+not as a win. That outcome says something about the export's resolution, not about the model.
+
+The relevant fact is the **actual export/query resolution**, which is what the preflight
+measures. It is not assumed from any collector's configuration default.
+
 ## 7. Regime breaks and uncertainty calibration (Amendment 3)
 
 ### 7.1 Regime-break exclusion — none is applied
@@ -405,6 +438,7 @@ while any remains empty. (The §10.2 seam prerequisite is now closed.)
 |---|---|
 | `export_identity` | approved export identifier and its content digest |
 | `export_integrity_digest` | digest verified before and after the run |
+| `cadence_preflight_summary` | §6.2 metadata per subject × target, and the qualifying set |
 | `subject_manifest_digest` | digest of the external anonymized subject list (§2.1) |
 | `subject_count_M` | number of eligible non-synthetic subjects |
 | `per_target_eligibility_counts` | `eligible(subject, target)` totals for §9.1 |

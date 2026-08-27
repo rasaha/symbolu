@@ -55,12 +55,18 @@ satisfies the ratification gates and ties or beats `harmonic_phase`, then `harmo
 retired and `seasonal_naive` is ratified as **the** third baseline — not as a fourth. If
 `harmonic_phase` wins, `seasonal_naive` remains evaluation-only unless separately ratified.
 
-**5 — Ratification scope.** Target × horizon-restricted ratification is permitted. Success in
-all twelve gating cells is not required, and support is not claimed outside passing cells. A
-ratified implementation must deterministically reject or abstain outside its recorded
-capability envelope. The preregistered overall minimum of 8 passing cells out of 12 is
-preserved; the rule that failure in any 60-minute cell automatically retires the candidate is
-removed.
+**5 — Ratification scope (superseded by the final ruling below).** Restricted ratification was
+permitted alongside an unconditional 8-of-12 floor. Those two statements contradicted each
+other, and the final ruling replaces them with exactly **two** preregistered scopes: a
+**general baseline** (at least 8 of 12 cells, all applicable gates), or a **60-minute-only
+baseline** (all four gating targets passing at 60 minutes, enforced as a capability envelope
+that rejects or abstains at 5 and 15 minutes). Passing 1–3 of the four 60-minute cells
+ratifies nothing, and no other restricted scope is authorized. A **cadence preflight** is also
+required before authorization: the replay runs only on subject × target series whose exported
+timestamps already satisfy the ratified p95 (≤ 120 s) and maximum (≤ 900 s) gap limits, with
+no interpolation, forward-fill or upsampling to make a coarse export appear eligible. If no
+series qualifies, `harmonic_phase` is recorded **unevaluable on the approved export** — not as
+a modelling win or loss. See the evaluation ADR §7.3 and the run manifest §6.2.
 
 ### Scope of these rulings
 
