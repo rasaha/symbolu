@@ -1,6 +1,6 @@
 # Changelog — ugence-agentic-proposer
 
-## Unreleased — OD-6 ratified: a specification amendment, not yet implemented
+## Unreleased — OD-6 (specification amendment, not yet implemented)
 
 `docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md` and
 `docs/architecture/ADR_UGENCE_AGENTIC_PROPOSER_MVP_READINESS.md` are amended by OD-6,

@@ -2829,6 +2829,72 @@ re-verified when the first contract module lands.
 distinction, and what the forward-only record does not represent); Part J's deferral;
 K.7. Nothing in Part C or Part D changes.
 
+**OD-6 — B3, H1 and R-1b(iv) were mutually inconsistent; the inconsistency is resolved
+in three parts. RATIFIED 2026-08-27.**
+
+*Owner decision:* **resolved.** An independent review of implementation commit
+`6ef305fbe3ee0ff9960a7b52a1810a26f1e11953` found that B3 derived "every S1 advisory has
+`selected_candidate_id = None`" from `evaluate_readiness(...)` being `False`, but R-2
+conditions `PROPOSAL` on readiness **and** selection, not selection alone, and
+`AdvisoryCandidateSet` was constructible in S1 with a non-null selector — S-1 and S-2
+require only that it resolve and be eligible, and eligibility does not require
+readiness. B3's derivation was a non sequitur.
+
+**(i) Where the no-selection ceiling is enforced.** A non-null
+`AdvisoryCandidateSet.selected_candidate_id` is structurally unconstructible in S1 (new
+C9), on the same pattern C7 already uses for `DomainCheckCompletion.COMPLETE`, rather
+than being refused by `build_proposer_advisory`. No dead-end object exists;
+`build_proposer_advisory` and `build_advisory_revision` inherit the ceiling with no
+separate builder-side check; H1's derivation paragraph needs no amendment.
+
+**(ii) H2's exception surface.** H2 gains a fourth class, `CrossContractViolationError`
+(subclassing `ValueError`, on the same pattern as `EligibilityMismatchError`), for the
+Part E rules — R-1b(i)–(iv), (viii), (ix), and R-5, R-6, R-7, R-9, R-10 — that compare
+fields across more than one contract instance and so cannot be decided by any single
+model's own validator.
+
+**(iii) `ProposerProcessState`'s membership and R-4's comparison basis.** The nine
+members were already entailed by R-3's stated chain; what R-3 and R-4 left unstated —
+the four terminal members' wire values and R-4's comparison basis — is ratified here:
+the terminal four carry exactly `TerminalOutcome`'s wire values, and R-4's "equals" is
+value equality.
+
+**Rejected alternatives, for (i).** Refusing only at `build_proposer_advisory` (the
+implementation this decision replaces) leaves a public object — a set carrying a
+selection — that is constructible but unusable in S1, and would have required recasting
+H1's non-null-selector paragraph as S2-only, new test coverage, and an explicit
+statement that `build_advisory_revision` inherits the refusal. Deriving faithfully and
+dropping B3's null requirement is permitted by R-2, but lets S1 emit a
+`requested_review_destination_role_ref` with no specified source, and needs an
+amendment to the ADR's decision record, not only to this specification.
+
+**Rejected alternative, for (ii).** Restructuring the affected checks into single-model
+validators to reach `pydantic.ValidationError` instead: rejected because several of them
+(R-5, R-6, R-7) are stated over an unbounded list of supplied `ToolObservation`
+instances no single contract can carry without becoming a second identity surface, so
+reaching `ValidationError` this way would require a throwaway aggregate model
+constructed for the sole purpose of obtaining the right exception type.
+
+*Bears on contract shape:* **no.** No field is added, removed or retyped, and no
+cardinality changes. (i) narrows an already-declared field's constructibility on the C7
+pattern; (ii) adds an exported exception class; (iii) ratifies a previously unstated
+vocabulary/comparison-basis detail of an already-declared field and enum.
+
+*Enforcement:* `[G]` **not yet implemented.** This ratification is documentation only:
+no `src/` module, test, `public_api.json`, `version.py`, CI workflow or platform-freeze
+artifact is changed by it. Implementing the C9 validator, `CrossContractViolationError`
+and its call sites, and the corresponding test coverage is separately gated work,
+recorded in `docs/architecture/ADR_UGENCE_AGENTIC_PROPOSER_MVP_READINESS.md`'s OD-6
+guard-evidence paragraph and in `CHANGELOG.md`.
+
+*S1 production implementation:* the C9 validator, `CrossContractViolationError` and its
+call sites remain to be written; until then the pre-OD-6 behaviour is what actually
+runs.
+
+*Where it is implemented in this document.* B3; new C9; D6 (`selected_candidate_id`'s
+Validation column); the `ProposerProcessStateTransition` section; Part E's header note
+and the R-1b/R-4/R-5/R-6/R-7/R-9/R-10 rows; H1; H2; H3.
+
 ---
 
 ## Ratification statement
@@ -2840,18 +2906,24 @@ participation.
 
 **OD-4 is resolved (a)**, and with it the question that had been open longest about
 contract shape. `ProposerAdvisory` carries its `CandidateAdvisory` entries, as ratified
-D7 says; Part D is written for that shape and no longer for an alternative. **Of the five
-owner decisions, OD-4 is the one that bears on contract shape**; OD-5 was ruled not to,
-and Part D is unchanged by it.
+D7 says; Part D is written for that shape and no longer for an alternative. **Of the six
+owner decisions, OD-4 is the one that bears on contract shape**; OD-5 and OD-6 were
+ruled not to, and Part D is unchanged by either.
 
-**All five owner decisions are resolved. No ruling is outstanding.** OD-1, OD-2 and
+**All six owner decisions are resolved. No ruling is outstanding.** OD-1, OD-2 and
 OD-3 are ratified 2026-08-25 and are recorded above with their riders and their
 enforcement designs; none changes a contract, a field type, a cardinality, a vocabulary
 or an equation term. **OD-5 is ratified 2026-08-26**: it changes no contract, field
 type, cardinality, vocabulary or equation term either. It states what S1 does not do with
 a reasoning strategy, preserves the four-way distinction, and defers the strategy
 permission concept and its vocabulary together to S2. `[R]` That vocabulary requires its
-own ruling and is not given one here.
+own ruling and is not given one here. **OD-6 is ratified 2026-08-27**: it adds a
+validation rule (C9), an exported exception class (H2), and a previously unstated
+vocabulary/comparison-basis detail (`ProposerProcessState`, R-4) — none of which is a
+contract field, type or cardinality change — resolving an inconsistency between B3, H1
+and R-1b(iv) that an independent implementation review found. `[G]` Its three parts are
+ratified as specification text but not yet implemented against a contract module;
+that remains separately gated work.
 
 **The specification is frozen.** The status line at the head of this document reads
 `CONTRACT SPECIFICATION FROZEN FOR IMPLEMENTATION`. Freezing closes the contract
