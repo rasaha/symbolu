@@ -745,7 +745,15 @@ def run_suite(
         },
     )
     mint_path = workdir / ".ugence-mints"
-    mints = int(mint_path.read_text()) if mint_path.exists() else None
+    mints = None
+    message_only = []
+    if mint_path.exists():
+        try:
+            payload = json.loads(mint_path.read_text())
+            mints = payload.get("mints")
+            message_only = payload.get("message_only", [])
+        except ValueError:
+            mints = None
     output = process.stdout + process.stderr
     tail = " | ".join(line for line in output.strip().splitlines()[-6:])[:600]
     # Every non-scorable answer carries the tail. "collection error" on its own names a
@@ -798,6 +806,7 @@ def run_suite(
     return {
         "scored": True,
         "mints": mints,
+        "message_only_failures": message_only,
         "why": "",
         "collected": collected,
         "failed": re.findall(r"^FAILED (\S+)", output, re.M),
@@ -857,9 +866,46 @@ def pytest_configure(config):
                 setattr(bound, name, counting)
 
 
+_MESSAGE_ONLY = []
+_ANY_FAILURE = []
+
+
+def pytest_runtest_makereport(item, call):
+    """Record, per failing test, whether the assertion that failed reads a *message*.
+
+    §9.1 makes the typed refusal the contract and the message prose. A guard whose kill is
+    attributable only to a message assertion has not been shown to carry authority — it is a
+    diagnostic-only guard being scored. The source line of the failing assertion is the only
+    place that distinction survives, so it is captured here rather than inferred later.
+    """
+
+    if call.when != "call" or call.excinfo is None:
+        return
+    source = ""
+    try:
+        entry = item.repr_failure(call.excinfo).reprtraceback.reprentries[-1]
+        source = chr(10).join(entry.lines)
+    except Exception:  # noqa: BLE001 - a report shape we do not recognise is not message-only
+        source = ""
+    _ANY_FAILURE.append(item.nodeid)
+    reads_a_message = ".detail" in source or "str(excinfo.value)" in source
+    reads_a_type = " is " in source or "pytest.raises" in source or ".outcome" in source
+    if reads_a_message and not reads_a_type:
+        _MESSAGE_ONLY.append(item.nodeid)
+
+
 def pytest_sessionfinish(session, exitstatus):
+    import json
+
     with open(os.environ["UGENCE_MINT_OUT"], "w", encoding="utf-8") as handle:
-        handle.write(str(_COUNT[0]))
+        json.dump(
+            {
+                "mints": _COUNT[0],
+                "failed": _ANY_FAILURE,
+                "message_only": _MESSAGE_ONLY,
+            },
+            handle,
+        )
 '''
 
 
@@ -1116,6 +1162,10 @@ def aggregate(config: PackageConfig, shard_dir: Path, shard_n: int) -> dict:
         "surviving_scored_guards": [
             i for i in survived if classified.get(i, {}).get("status") != "EXCLUDED"
         ],
+        "message_only_kills": [
+            i for i, r in seen.items() if r.get("killed_only_by_message")
+        ],
+        "minting_guards": [i for i, r in seen.items() if r.get("mints_more_than_baseline")],
         "stale_exclusions": [
             i for i in killed if classified.get(i, {}).get("status") == "EXCLUDED"
         ],
@@ -1205,6 +1255,11 @@ def main() -> int:
         excluded_n = sum(
             1 for row in report["classification"].values() if row["status"] == "EXCLUDED"
         )
+        if report["minting_guards"]:
+            print(
+                "  the last obstacle before a mint — removing any of these lets the package "
+                f"produce an artifact the baseline refused: {report['minting_guards']}"
+            )
         print(f"{config.key}: inventory {total}; "
               f"killed {len(report['killed'])}, survived {len(report['survived'])}, "
               f"unscored {len(report['unscored'])}; "
@@ -1236,6 +1291,12 @@ def main() -> int:
             problems.append(
                 "guards classified SCORED that survived — an open coverage defect, not an "
                 f"exclusion: {report['surviving_scored_guards']}"
+            )
+        if report["message_only_kills"]:
+            problems.append(
+                "guards whose kill is attributable only to a message assertion — §9.1 makes "
+                "the message prose, so these are diagnostic-only guards being scored: "
+                f"{report['message_only_kills']}"
             )
         if report["colliding_exclusions"]:
             problems.append(
@@ -1295,6 +1356,11 @@ def main() -> int:
         # That is a different and worse class than "the refusal changed": it means the guard
         # was the last obstacle before an artifact. Three such guards were found by accident
         # before this was measured; this makes the class visible rather than lucky.
+        # A kill attributable ONLY to message assertions is not a kill under §9.1: the
+        # message is prose, so the guard changed no answer a caller may act on. It is a
+        # diagnostic-only guard being scored, and the aggregate refuses it.
+        message_only = set(outcome.get("message_only_failures") or ())
+        killed_only_by_message = bool(new_failures) and set(new_failures) <= message_only
         baseline_mints = baseline.get("mints")
         mutant_mints = outcome.get("mints")
         mints_more = (
@@ -1316,10 +1382,13 @@ def main() -> int:
                 "killed_by": new_failures[:5],
                 "mints": mutant_mints,
                 "mints_more_than_baseline": mints_more,
+                "killed_only_by_message": killed_only_by_message,
             }
         )
         state = "KILLED" if killed else ("SURVIVED" if outcome["scored"] else "UNSCORED")
         note = "  MINTS" if mints_more else ""
+        if killed_only_by_message:
+            note += "  MESSAGE-ONLY KILL"
         print(
             f"  [{guard.index:>3}] {guard.module}:{guard.lineno} {state}{note}", flush=True
         )
