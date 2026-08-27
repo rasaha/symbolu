@@ -203,6 +203,22 @@ PACKAGES = {
         refusal_calls=frozenset({"_refuse", "PolicyAuthenticityRefusal"}),
         tuple_refusals=True,
         recorded=(),
+        exclusions={
+            ("verification.py", "absent"): (
+                "diagnostic-only",
+                "Every input this guard refuses is refused identically without it. A bound "
+                "missing a field reaches `entry[name]` nineteen lines below, inside a "
+                "deliberate `except Exception` backstop that re-raises as the same "
+                "`_BoundsShapeError` and therefore the same POLICY_BOUNDS_MALFORMED "
+                "outcome; only the message changes, from \"bounds[0] omits "
+                "['max_permitted_delta']\" to \"bounds[0]: 'max_permitted_delta'\". Under "
+                "ADR Phase 5 §9.1 the message is not the contract. The guard is kept "
+                "because it names every absent field at once rather than the first one "
+                "`entry[...]` happens to reach.",
+                "tests/test_guard_coverage.py::"
+                "test_a_signed_bound_this_profile_cannot_read_is_refused",
+            ),
+        },
     ),
 }
 

@@ -15,13 +15,15 @@ This package records no prior inventory; this is the first one.
 
 ## Classification
 
-Every guard is classified: **117 `SCORED`** — the
+Every guard is classified: **116 `SCORED`** — the
 sweep neutralises it and the suite must fail — and
-**0 `EXCLUDED`**, each with a reason from a closed vocabulary and
+**1 `EXCLUDED`**, each with a reason from a closed vocabulary and
 a test that measures the reason. A guard is never excluded because it survived; a
 survivor with no prior declaration fails the sweep.
 
-No guard in this package is excluded: every one is scored.
+| Module:line | Reason | Why | Measured by |
+|---|---|---|---|
+| `verification.py:775` | `diagnostic-only` | Every input this guard refuses is refused identically without it. A bound missing a field reaches `entry[name]` nineteen lines below, inside a deliberate `except Exception` backstop that re-raises as the same `_BoundsShapeError` and therefore the same POLICY_BOUNDS_MALFORMED outcome; only the message changes, from "bounds[0] omits ['max_permitted_delta']" to "bounds[0]: 'max_permitted_delta'". Under ADR Phase 5 §9.1 the message is not the contract. The guard is kept because it names every absent field at once rather than the first one `entry[...]` happens to reach. | `tests/test_guard_coverage.py::test_a_signed_bound_this_profile_cannot_read_is_refused` |
 
 ## Not counted, and why
 
@@ -139,7 +141,7 @@ No guard in this package is excluded: every one is scored.
 | 102 | `verification.py:758` | raise | SCORED | — | `not isinstance(raw, (list, tuple))` |
 | 103 | `verification.py:764` | raise | SCORED | — | `not raw` |
 | 104 | `verification.py:772` | raise | SCORED | — | `not isinstance(entry, Mapping)` |
-| 105 | `verification.py:775` | raise | SCORED | — | `absent` |
+| 105 | `verification.py:775` | raise | EXCLUDED | — | `absent` |
 | 106 | `verification.py:778` | raise | SCORED | — | `extra` |
 | 107 | `verification.py:824` | typed-refusal tuple | SCORED | — | `not capacity_bounds` |
 | 108 | `verification.py:836` | typed-refusal tuple | SCORED | — | `type(action_type) is not str or action_type not in CANONICAL_ACTION_TYPES` |
