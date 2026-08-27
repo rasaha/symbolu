@@ -29,15 +29,20 @@ implementation change lands.
   `src/`, not a new one — but the previous `[I]`, "disclosed for ratification" status
   below is superseded: it is now `[V]`, ratified.
 * **Known follow-on work, tracked and not yet done:** the C9 validator; defining
-  `CrossContractViolationError` and updating its eight raise sites; replacing
+  `CrossContractViolationError` and updating its eight raise sites; and replacing
   `tests/test_process_ordering_obligation.py`'s own text asserting the
   `ProposerProcessState` cardinality and R-4 comparison basis are still open (OD-6(iii)
-  now closes both); and updating `test_documentation_consistency.py`'s
-  `test_there_is_exactly_one_owner_decision_record`, which still pins the literal
-  heading text `"## Owner decisions OD-1 – OD-5 — all resolved"` against an ADR now
-  titled `OD-1 – OD-6`. Per this repository's working agreement, tests are not edited
-  as part of a ratification commit; both are disclosed here rather than silently left
-  red.
+  now closes both). Per this repository's working agreement, tests were not edited as
+  part of the ratification commit itself; this is disclosed here rather than silently
+  left red.
+* **Done in a follow-on commit, not the ratification commit:** the CI fix that installs
+  `packages/jcs` in the package-suite job and removes the obsolete S0-era
+  public-API-absence assertion; `test_documentation_consistency.py`'s
+  `test_there_is_exactly_one_owner_decision_record` (previously pinned to the literal
+  heading text `"## Owner decisions OD-1 – OD-5 — all resolved"`) and its
+  `OWNER_DECISIONS` tuple, both now covering `OD-6`; and the OD-6 subsection this
+  document's amended specification needed to satisfy
+  `test_the_adr_and_the_specification_agree_on_every_owner_decision`.
 
 ## 0.1.0 — S1 contracts and equations implemented; the first public-API snapshot
 

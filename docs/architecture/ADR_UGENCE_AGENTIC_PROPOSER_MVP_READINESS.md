@@ -594,7 +594,7 @@ retyped, and no cardinality changes. OD-4 is the one decision of
 the six that bears on contract shape; it is resolved below and the specification
 implements the resolution.
 
-**No ruling is outstanding on any of the five.** Three statuses are distinguished
+**No ruling is outstanding on any of the six.** Three statuses are distinguished
 throughout and must not be collapsed: a **decision is ratified**; a **named guard
 implements** it in `packages/capabilities/agentic-proposer/tests/`; and **S1 production
 implementation is authorized on merge** under A12, independently of both. A guard that
