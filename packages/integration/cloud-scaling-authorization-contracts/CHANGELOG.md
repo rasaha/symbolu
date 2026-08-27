@@ -1,5 +1,42 @@
 # Changelog — ugence-cloud-scaling-authorization-contracts
 
+## [Unreleased] — 114 guards, and the carve-out that hid an untested one
+
+*No version bump and no production behaviour change.* An independent adversarial
+audit of the sweep found two of this package's definitions wrong. Both are corrected
+by measurement rather than by argument.
+
+### The conversion carve-out is withdrawn
+
+§9.1 excluded an `if` whose body *binds* a raising helper's result, on the stated
+grounds that neutralising it produces no refusal to compare and changes what the suite
+can collect. For the single site it excluded — `attestation.py:261`,
+`if isinstance(issued_at, str): issued_at = _parse_ts(issued_at)` — all three claims
+are false. Neutralised, it produces a typed `MALFORMED_CANONICAL_FIELD` refusal, the
+collected population is identical, and the mutant survives the entire suite.
+
+The carve-out was not describing a conversion. It was reasoning added to explain away
+an `UNSCORED` result, and it hid a line nothing executed: no test built an attestation
+from a canonical wire mapping, so the parse that lets `issued_at` cross the wire as a
+string and arrive as a `datetime` had never run. That round trip — serialize, transmit,
+rebuild — is what a real consumer does, and it now has a test.
+
+### Conditional expressions that select an outcome are decision points
+
+Four sites choose between two `AuthorizationCandidateRejectionReason` members with a
+ternary: `FORGED_TRUST_STATE` vs `UNKNOWN_FIELD` in three deserializers, and
+`MISSING_ACCOUNT_BINDING` vs `MALFORMED_CANONICAL_FIELD` in a fifth. §9.1 makes the
+reason the contract, so these decide it as surely as any `if` — but an `ast.If`-only
+shape rule cannot see them, and `if False:` cannot reach them.
+
+They get a second operator: collapse the conditional to its `else` branch, which is the
+more permissive half and therefore exactly the defect the guard prevents. All four are
+killed by assertions that already existed, which is the point — they were load-bearing
+and unmeasured, not untested.
+
+**The inventory is 114, not 109.** The recorded 65 + 28 are unchanged and still
+reconcile, because both are defined over a narrower shape than this inventory.
+
 ## [Unreleased] — the definitions the sweep rests on, ratified
 
 *No version bump and no production behaviour change.* An independent adversarial audit of

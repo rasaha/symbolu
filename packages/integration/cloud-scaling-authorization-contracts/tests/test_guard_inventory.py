@@ -45,7 +45,34 @@ def guards():
 
 
 def test_the_inventory_is_the_size_the_checked_in_report_records(guards):
-    assert len(guards) == 109
+    assert len(guards) == 114
+
+
+def test_the_two_shapes_an_audit_added_are_both_present(guards):
+    """114 is 109 plus five decision points an ``ast.If``-only reading could not see.
+
+    Pinned by condition text rather than count alone, because "five more guards" is
+    satisfied by any five and these are the specific ones an audit had to measure to find.
+
+    Four are conditional *expressions* choosing between two typed reasons — the reason is
+    the contract under ADR Phase 5 §9.1, so they decide it as surely as any ``if``. The
+    fifth is the site §9.1's conversion carve-out excluded until measurement showed all
+    three of the carve-out's justifications false for it.
+    """
+
+    selections = {
+        (g.module, g.lineno) for g in guards if g.kind == "outcome-selection"
+    }
+    assert selections == {
+        ("target.py", 283),
+        ("target.py", 445),
+        ("target.py", 668),
+        ("attestation.py", 242),
+    }
+    helper_calls = {
+        (g.module, g.condition) for g in guards if g.shape == "raising-helper call"
+    }
+    assert helper_calls == {("attestation.py", "isinstance(issued_at, str)")}
 
 
 def test_the_recorded_65_and_28_are_re_derived_and_agree(guards):
@@ -58,7 +85,7 @@ def test_the_recorded_65_and_28_are_re_derived_and_agree(guards):
 
 
 def test_the_sweeps_definition_is_wider_than_the_ratified_ones_and_says_so(guards):
-    """109 is not 65 + 28, and the difference is accounted for rather than waved at.
+    """114 is not 65 + 28, and the difference is accounted for rather than waved at.
 
     The ratified inventories are defined over four of the six modules and over a narrower
     shape — a ``raise`` alone in the body of its enclosing ``if``. Everything else in this

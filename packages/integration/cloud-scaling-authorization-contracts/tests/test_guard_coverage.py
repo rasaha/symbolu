@@ -647,3 +647,34 @@ def test_the_action_kind_drift_guard_is_unreachable_behind_phase_4c(tmp_path):
         "the drift was caught by some guard other than Phase 4C's import-time check; if "
         f"this names guard 10, guard 10 is reachable and its exclusion is void: {output!r}"
     )
+
+
+def test_an_attestation_rebuilt_from_its_canonical_wire_form_parses_its_instant():
+    """Guard 48 — ``attestation.py:261``, ``isinstance(issued_at, str)``.
+
+    The guard §9.1's conversion carve-out used to exclude, on the stated grounds that
+    neutralising it produces no refusal to compare and changes what the suite can collect.
+    An audit measured all three claims false, and this test is the third: nothing in the
+    suite built an attestation from a canonical wire mapping, so the conversion was not
+    merely excluded by definition — it was never executed.
+
+    ``issued_at`` crosses the wire as a canonical string and reaches ``__post_init__`` as a
+    ``datetime`` only because this line parses it. Without the parse the exact-type
+    admission refuses the string, so the round trip a real consumer performs — serialize,
+    transmit, rebuild — stops working.
+    """
+
+    from tests.conftest import build_attestation  # noqa: PLC0415
+
+    genuine = build_attestation(recommendation_digest="sha256:" + "a" * 64)
+    wire = genuine.to_canonical_dict()
+    wire.pop("trust_state", None)
+    # What a transport actually carries: the instant as its canonical string form.
+    from risk_authority.crypto.canonical import to_canonical_obj  # noqa: PLC0415
+
+    wire["issued_at"] = to_canonical_obj(genuine.issued_at)
+    assert isinstance(wire["issued_at"], str), "the fixture no longer exercises the parse"
+
+    rebuilt = ProducerAttestationEvidence.from_dict(wire)
+    assert rebuilt.issued_at == genuine.issued_at
+    assert rebuilt.digest() == genuine.digest()
