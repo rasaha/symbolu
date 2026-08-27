@@ -245,3 +245,76 @@ The Risk Authority illustrative canonicalization fixture
 replaced or reinterpreted. It is an **RA canonicalization fixture using the older
 illustrative subject-type value**, and it is **not the production Phase 4C adapter-output
 fixture**. No Phase 5A digest is expected to equal it, and a test asserts they are distinct.
+
+## §9. Guard coverage: what is authority-bearing, and what a refusal is
+
+Phase 5A and Phase 5B are both swept in CI by gate removal: each `if` guard is neutralised
+to `if False:` in a disposable copy and the whole suite is run against the result. The sweep
+is only as meaningful as the two definitions it rests on, and both were being decided
+case-by-case inside a script. They are ratified here.
+
+### §9.1 A guard is authority-bearing when removing it changes the typed refusal
+
+**The typed refusal is the ordered pair `(exception class, AuthorizationCandidateRejectionReason)`.**
+The message is prose written for a human reading a log. It is deliberately *not* part of the
+contract: no consumer may branch on it, it may be reworded without a version bump, and a
+test that asserts a substring of it is asserting something this package does not promise.
+
+A guard is **authority-bearing** when there is at least one constructible input for which
+neutralising it changes that pair — including changing it to *no refusal at all*. A guard
+for which no such input exists is **diagnostic-only**: it chooses which of two identical
+verdicts is reported, and removing it costs a clearer message and nothing else.
+
+Two consequences, both deliberate:
+
+* Changing the *reason* is enough. A refusal that reports `SUBJECT_DIGEST_MISMATCH` where
+  the contract says `CONTEXT_DIGEST_MISMATCH` is a wrong answer, not a cosmetic one, because
+  the reason is what a caller is entitled to act on.
+* Failing closed is not sufficient. A guard whose removal still refuses, with the same class
+  and the same reason, has not been shown to carry authority — and a suite that only asks
+  "was something refused?" cannot tell the two cases apart.
+
+**A guard refuses; it does not convert.** An `if` whose body *calls* an admission helper is
+a guard — the helper is called for its refusal and its return value is discarded. An `if`
+whose body *binds* the result of such a call is a normalisation branch, not a gate:
+`issued_at = _parse_ts(issued_at)` calls the same kind of helper for its value. The two are
+separated by whether the call is a statement or an assignment, and only the first is
+inventoried. Neutralising a conversion does not produce a refusal to compare — it changes
+what the suite can collect at all, which is neither a kill nor a survival.
+
+A diagnostic-only guard is not a defect and is not to be deleted. It is excluded from
+*scoring*, with the subsumption that makes it diagnostic-only recorded and measured.
+
+### §9.2 `equivalent-mutant` may not be claimed across a distribution boundary
+
+A guard is an **equivalent mutant** when its condition is false in every program the package
+can be part of, so `if False:` is the same program on every path, for every input. That is a
+claim about the program, and it may only be made when every operand is fixed by **the same
+distribution as the guard**.
+
+It may **not** be claimed for a guard comparing against a value imported from a separately
+versioned distribution admitted by an open-ended pin. This package depends on
+`ugence-cloud-scaling-controller>=0.4.0`, `ugence-risk-authority>=0.5.0` and
+`ugence-cloud-scaling-risk-integration>=0.1.0`. Under a resolution any of those pins permits,
+such a condition can be true — which is precisely why the drift guard exists. That the
+condition is false in the checkout under test is a property of the installation, not of the
+program, and calling it an equivalent mutant asserts the guard is pointless when it is in
+fact the only thing standing between a permitted resolution and an unratified identifier
+bound into a candidate digest.
+
+Such guards are classified `unscorable-by-single-checkout-fixture`: real, reachable, and
+beyond what a fixture installing one resolution can measure. Scoring them needs a fixture
+that varies the resolution — deferred, not resolved by silence.
+
+A guard made unreachable by an **earlier** guard, in this distribution or an upstream one, is
+a separate case (`unreachable-behind-earlier-guard`) and requires evidence that measures the
+unreachability — which guard actually fires first — rather than evidence that the condition
+is currently false.
+
+### §9.3 Drift assertions run at import *and* at test time
+
+The ratified identifiers are asserted against their Phase 4C originals when
+`identifiers.py` is imported, and again as an explicit test. Import-time alone is green in
+any process that imports a stale wheel, an editable install pointing at an older checkout,
+or a resolution that satisfied Phase 4C from elsewhere. `identifiers._assert_no_drift` cites
+this section for that requirement; it is recorded here so the citation resolves.

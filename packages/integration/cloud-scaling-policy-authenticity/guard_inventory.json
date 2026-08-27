@@ -1,6 +1,6 @@
 {
   "package": "policy-authenticity",
-  "total": 115,
+  "total": 117,
   "reconciliation": {},
   "excluded": {
     "except_arms": 2,
@@ -316,6 +316,15 @@
     {
       "index": 35,
       "module": "verified.py",
+      "line": 488,
+      "condition": "self.candidate_digest_fact is not None",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 36,
+      "module": "verified.py",
       "line": 495,
       "condition": "self.capacity_bounds_fact is not None",
       "shape": "raise",
@@ -323,7 +332,7 @@
       "outcome": ""
     },
     {
-      "index": 36,
+      "index": 37,
       "module": "verified.py",
       "line": 496,
       "condition": "type(self.capacity_bounds_fact) is not tuple",
@@ -332,7 +341,7 @@
       "outcome": ""
     },
     {
-      "index": 37,
+      "index": 38,
       "module": "verified.py",
       "line": 501,
       "condition": "not self.capacity_bounds_fact",
@@ -341,7 +350,7 @@
       "outcome": ""
     },
     {
-      "index": 38,
+      "index": 39,
       "module": "verified.py",
       "line": 508,
       "condition": "type(bound) is not VerifiedCapacityBound",
@@ -350,7 +359,7 @@
       "outcome": ""
     },
     {
-      "index": 39,
+      "index": 40,
       "module": "verified.py",
       "line": 516,
       "condition": "len(set(selectors)) != len(selectors)",
@@ -359,7 +368,7 @@
       "outcome": ""
     },
     {
-      "index": 40,
+      "index": 41,
       "module": "verified.py",
       "line": 525,
       "condition": "self.policy_content_digest != self.policy_body_digest",
@@ -368,7 +377,7 @@
       "outcome": ""
     },
     {
-      "index": 41,
+      "index": 42,
       "module": "verified.py",
       "line": 534,
       "condition": "self.artifact_digest != expected",
@@ -377,7 +386,7 @@
       "outcome": ""
     },
     {
-      "index": 42,
+      "index": 43,
       "module": "verified.py",
       "line": 675,
       "condition": "name in RECORDED_FACT_NAMES",
@@ -386,7 +395,7 @@
       "outcome": ""
     },
     {
-      "index": 43,
+      "index": 44,
       "module": "verified.py",
       "line": 681,
       "condition": "name not in VERIFIED_FACT_NAMES",
@@ -395,7 +404,7 @@
       "outcome": ""
     },
     {
-      "index": 44,
+      "index": 45,
       "module": "verified.py",
       "line": 695,
       "condition": "name not in RECORDED_FACT_NAMES",
@@ -404,7 +413,7 @@
       "outcome": ""
     },
     {
-      "index": 45,
+      "index": 46,
       "module": "verified.py",
       "line": 737,
       "condition": "type(value) is not VerifiedPolicyAuthenticity",
@@ -413,7 +422,7 @@
       "outcome": ""
     },
     {
-      "index": 46,
+      "index": 47,
       "module": "verified.py",
       "line": 751,
       "condition": "value.construction_token is not _VERIFICATION_TOKEN",
@@ -422,7 +431,7 @@
       "outcome": ""
     },
     {
-      "index": 47,
+      "index": 48,
       "module": "verified.py",
       "line": 756,
       "condition": "value.artifact_digest not in _MINTED_DIGESTS",
@@ -431,7 +440,7 @@
       "outcome": ""
     },
     {
-      "index": 48,
+      "index": 49,
       "module": "verified.py",
       "line": 763,
       "condition": "value.artifact_digest != value.digest()",
@@ -440,7 +449,7 @@
       "outcome": ""
     },
     {
-      "index": 49,
+      "index": 50,
       "module": "verified.py",
       "line": 775,
       "condition": "VERIFIED_FACT_NAMES & RECORDED_FACT_NAMES",
@@ -449,7 +458,7 @@
       "outcome": ""
     },
     {
-      "index": 50,
+      "index": 51,
       "module": "verified.py",
       "line": 780,
       "condition": "_PARTITIONED != _DECLARED",
@@ -458,7 +467,7 @@
       "outcome": ""
     },
     {
-      "index": 51,
+      "index": 52,
       "module": "verification.py",
       "line": 152,
       "condition": "type(self.outcome) is not _Outcome",
@@ -467,7 +476,7 @@
       "outcome": ""
     },
     {
-      "index": 52,
+      "index": 53,
       "module": "verification.py",
       "line": 157,
       "condition": "self.outcome is _Outcome.VERIFIED",
@@ -476,7 +485,7 @@
       "outcome": ""
     },
     {
-      "index": 53,
+      "index": 54,
       "module": "verification.py",
       "line": 190,
       "condition": "(self.verified_policy is None) == (self.refusal is None)",
@@ -485,7 +494,7 @@
       "outcome": ""
     },
     {
-      "index": 54,
+      "index": 55,
       "module": "verification.py",
       "line": 195,
       "condition": "self.verified_policy is not None",
@@ -494,7 +503,7 @@
       "outcome": ""
     },
     {
-      "index": 55,
+      "index": 56,
       "module": "verification.py",
       "line": 196,
       "condition": "type(self.verified_policy) is not VerifiedPolicyAuthenticity",
@@ -503,7 +512,7 @@
       "outcome": ""
     },
     {
-      "index": 56,
+      "index": 57,
       "module": "verification.py",
       "line": 207,
       "condition": "type(self.resolution) is not PolicyResolution",
@@ -512,7 +521,7 @@
       "outcome": ""
     },
     {
-      "index": 57,
+      "index": 58,
       "module": "verification.py",
       "line": 214,
       "condition": "self.refusal is not None and type(self.refusal) is not PolicyAuthenticityRefusal",
@@ -521,7 +530,7 @@
       "outcome": ""
     },
     {
-      "index": 58,
+      "index": 59,
       "module": "verification.py",
       "line": 240,
       "condition": "resolution.requested_coordinate != coordinate",
@@ -530,7 +539,7 @@
       "outcome": ""
     },
     {
-      "index": 59,
+      "index": 60,
       "module": "verification.py",
       "line": 247,
       "condition": "type(record) is not IssuedPolicyRecord or record.coordinate != coordinate",
@@ -539,7 +548,7 @@
       "outcome": ""
     },
     {
-      "index": 60,
+      "index": 61,
       "module": "verification.py",
       "line": 252,
       "condition": "record.policy_body_digest != artifact.policy_body_digest",
@@ -548,7 +557,7 @@
       "outcome": ""
     },
     {
-      "index": 61,
+      "index": 62,
       "module": "verification.py",
       "line": 259,
       "condition": "resolution.as_of != artifact.resolved_as_of_fact",
@@ -557,7 +566,7 @@
       "outcome": ""
     },
     {
-      "index": 62,
+      "index": 63,
       "module": "verification.py",
       "line": 266,
       "condition": "resolution.historical or resolution.implies_current_validity is not True",
@@ -566,7 +575,7 @@
       "outcome": ""
     },
     {
-      "index": 63,
+      "index": 64,
       "module": "verification.py",
       "line": 310,
       "condition": "resolution_port is None",
@@ -575,7 +584,7 @@
       "outcome": ""
     },
     {
-      "index": 64,
+      "index": 65,
       "module": "verification.py",
       "line": 315,
       "condition": "not hasattr(resolution_port, 'resolve_policy_version')",
@@ -584,7 +593,7 @@
       "outcome": ""
     },
     {
-      "index": 65,
+      "index": 66,
       "module": "verification.py",
       "line": 321,
       "condition": "not is_policy_digest(digest)",
@@ -593,7 +602,16 @@
       "outcome": ""
     },
     {
-      "index": 66,
+      "index": 67,
+      "module": "verification.py",
+      "line": 327,
+      "condition": "production_mode",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 68,
       "module": "verification.py",
       "line": 412,
       "condition": "type(coordinate) is not PolicyCoordinate",
@@ -602,7 +620,7 @@
       "outcome": "UNSUPPORTED_EXACT_TYPE"
     },
     {
-      "index": 67,
+      "index": 69,
       "module": "verification.py",
       "line": 419,
       "condition": "type(expected_reference_tenant_id) is not str",
@@ -611,7 +629,7 @@
       "outcome": "UNSUPPORTED_EXACT_TYPE"
     },
     {
-      "index": 68,
+      "index": 70,
       "module": "verification.py",
       "line": 424,
       "condition": "type(as_of) is not datetime or as_of.tzinfo is None or as_of.utcoffset() is None",
@@ -620,7 +638,7 @@
       "outcome": "UNSUPPORTED_EXACT_TYPE"
     },
     {
-      "index": 69,
+      "index": 71,
       "module": "verification.py",
       "line": 430,
       "condition": "candidate is not None and type(candidate) is not CapacityAuthorizationCandidate",
@@ -629,7 +647,7 @@
       "outcome": "UNSUPPORTED_EXACT_TYPE"
     },
     {
-      "index": 70,
+      "index": 72,
       "module": "verification.py",
       "line": 440,
       "condition": "expected_reference_tenant_id != coordinate.tenant_id",
@@ -638,7 +656,7 @@
       "outcome": "TENANT_EXPECTATION_MISMATCH"
     },
     {
-      "index": 71,
+      "index": 73,
       "module": "verification.py",
       "line": 460,
       "condition": "type(resolution) is not PolicyResolution",
@@ -647,7 +665,7 @@
       "outcome": "UNSUPPORTED_EXACT_TYPE"
     },
     {
-      "index": 72,
+      "index": 74,
       "module": "verification.py",
       "line": 467,
       "condition": "resolution.requested_coordinate != coordinate",
@@ -656,7 +674,7 @@
       "outcome": "RESOLUTION_ANSWERED_ANOTHER_QUESTION"
     },
     {
-      "index": 73,
+      "index": 75,
       "module": "verification.py",
       "line": 472,
       "condition": "resolution.as_of != instant",
@@ -665,7 +683,7 @@
       "outcome": "RESOLUTION_ANSWERED_ANOTHER_QUESTION"
     },
     {
-      "index": 74,
+      "index": 76,
       "module": "verification.py",
       "line": 479,
       "condition": "resolution.status is not PolicyResolutionStatus.RESOLVED",
@@ -674,7 +692,7 @@
       "outcome": ""
     },
     {
-      "index": 75,
+      "index": 77,
       "module": "verification.py",
       "line": 487,
       "condition": "resolution.historical",
@@ -683,7 +701,7 @@
       "outcome": "HISTORICAL_RESOLUTION_REFUSED"
     },
     {
-      "index": 76,
+      "index": 78,
       "module": "verification.py",
       "line": 494,
       "condition": "resolution.implies_current_validity is not True",
@@ -692,7 +710,7 @@
       "outcome": "HISTORICAL_RESOLUTION_REFUSED"
     },
     {
-      "index": 77,
+      "index": 79,
       "module": "verification.py",
       "line": 502,
       "condition": "type(record) is not IssuedPolicyRecord",
@@ -701,7 +719,7 @@
       "outcome": "RESOLUTION_MALFORMED"
     },
     {
-      "index": 78,
+      "index": 80,
       "module": "verification.py",
       "line": 507,
       "condition": "resolution.policy is None or record.policy is not resolution.policy",
@@ -710,7 +728,7 @@
       "outcome": "RESOLUTION_MALFORMED"
     },
     {
-      "index": 79,
+      "index": 81,
       "module": "verification.py",
       "line": 512,
       "condition": "record.coordinate != coordinate",
@@ -719,7 +737,7 @@
       "outcome": "RESOLUTION_MALFORMED"
     },
     {
-      "index": 80,
+      "index": 82,
       "module": "verification.py",
       "line": 519,
       "condition": "record.coordinate.content_digest != record.policy_body_digest",
@@ -728,7 +746,7 @@
       "outcome": "COORDINATE_DIGEST_UNBOUND"
     },
     {
-      "index": 81,
+      "index": 83,
       "module": "verification.py",
       "line": 529,
       "condition": "record.signature_alg not in SUPPORTED_SIGNATURE_ALGORITHMS",
@@ -737,7 +755,7 @@
       "outcome": "UNSUPPORTED_ALGORITHM"
     },
     {
-      "index": 82,
+      "index": 84,
       "module": "verification.py",
       "line": 536,
       "condition": "not is_policy_digest(record.policy_body_digest)",
@@ -746,7 +764,7 @@
       "outcome": "COORDINATE_MALFORMED"
     },
     {
-      "index": 83,
+      "index": 85,
       "module": "verification.py",
       "line": 541,
       "condition": "candidate is not None and (not is_phase5a_digest(candidate.candidate_digest))",
@@ -755,7 +773,7 @@
       "outcome": "COORDINATE_MALFORMED"
     },
     {
-      "index": 84,
+      "index": 86,
       "module": "verification.py",
       "line": 551,
       "condition": "candidate is not None",
@@ -764,7 +782,7 @@
       "outcome": "CANDIDATE_COORDINATE_MISMATCH"
     },
     {
-      "index": 85,
+      "index": 87,
       "module": "verification.py",
       "line": 553,
       "condition": "mismatch is not None",
@@ -773,7 +791,7 @@
       "outcome": "CANDIDATE_COORDINATE_MISMATCH"
     },
     {
-      "index": 86,
+      "index": 88,
       "module": "verification.py",
       "line": 566,
       "condition": "candidate is not None",
@@ -782,7 +800,7 @@
       "outcome": "CANDIDATE_CROSS_TENANT_POLICY"
     },
     {
-      "index": 87,
+      "index": 89,
       "module": "verification.py",
       "line": 568,
       "condition": "crossing is not None",
@@ -791,7 +809,7 @@
       "outcome": "CANDIDATE_CROSS_TENANT_POLICY"
     },
     {
-      "index": 88,
+      "index": 90,
       "module": "verification.py",
       "line": 577,
       "condition": "candidate is not None",
@@ -800,7 +818,7 @@
       "outcome": ""
     },
     {
-      "index": 89,
+      "index": 91,
       "module": "verification.py",
       "line": 584,
       "condition": "mistyped is not None",
@@ -809,7 +827,7 @@
       "outcome": ""
     },
     {
-      "index": 90,
+      "index": 92,
       "module": "verification.py",
       "line": 588,
       "condition": "staleness is not None",
@@ -818,7 +836,7 @@
       "outcome": ""
     },
     {
-      "index": 91,
+      "index": 93,
       "module": "verification.py",
       "line": 604,
       "condition": "reproduction is not None",
@@ -827,7 +845,7 @@
       "outcome": ""
     },
     {
-      "index": 92,
+      "index": 94,
       "module": "verification.py",
       "line": 627,
       "condition": "candidate is not None",
@@ -836,7 +854,7 @@
       "outcome": ""
     },
     {
-      "index": 93,
+      "index": 95,
       "module": "verification.py",
       "line": 629,
       "condition": "mismatch is not None",
@@ -845,7 +863,7 @@
       "outcome": ""
     },
     {
-      "index": 94,
+      "index": 96,
       "module": "verification.py",
       "line": 685,
       "condition": "missing",
@@ -854,7 +872,7 @@
       "outcome": "POLICY_PROJECTION_ABSENT"
     },
     {
-      "index": 95,
+      "index": 97,
       "module": "verification.py",
       "line": 692,
       "condition": "type(adapter_id) is not str or type(policy_type) is not str",
@@ -863,7 +881,7 @@
       "outcome": "POLICY_PROJECTION_ABSENT"
     },
     {
-      "index": 96,
+      "index": 98,
       "module": "verification.py",
       "line": 697,
       "condition": "not isinstance(projection, Mapping)",
@@ -872,7 +890,7 @@
       "outcome": "POLICY_PROJECTION_ABSENT"
     },
     {
-      "index": 97,
+      "index": 99,
       "module": "verification.py",
       "line": 706,
       "condition": "adapter_id != record.adapter_id",
@@ -881,7 +899,7 @@
       "outcome": "POLICY_PROJECTION_DIGEST_MISMATCH"
     },
     {
-      "index": 98,
+      "index": 100,
       "module": "verification.py",
       "line": 712,
       "condition": "policy_type != record.policy_type",
@@ -890,7 +908,7 @@
       "outcome": "POLICY_PROJECTION_DIGEST_MISMATCH"
     },
     {
-      "index": 99,
+      "index": 101,
       "module": "verification.py",
       "line": 728,
       "condition": "reproduced != record.policy_body_digest",
@@ -899,7 +917,7 @@
       "outcome": "POLICY_PROJECTION_DIGEST_MISMATCH"
     },
     {
-      "index": 100,
+      "index": 102,
       "module": "verification.py",
       "line": 758,
       "condition": "not isinstance(raw, (list, tuple))",
@@ -908,7 +926,7 @@
       "outcome": ""
     },
     {
-      "index": 101,
+      "index": 103,
       "module": "verification.py",
       "line": 764,
       "condition": "not raw",
@@ -917,7 +935,7 @@
       "outcome": ""
     },
     {
-      "index": 102,
+      "index": 104,
       "module": "verification.py",
       "line": 772,
       "condition": "not isinstance(entry, Mapping)",
@@ -926,7 +944,7 @@
       "outcome": ""
     },
     {
-      "index": 103,
+      "index": 105,
       "module": "verification.py",
       "line": 775,
       "condition": "absent",
@@ -935,7 +953,7 @@
       "outcome": ""
     },
     {
-      "index": 104,
+      "index": 106,
       "module": "verification.py",
       "line": 778,
       "condition": "extra",
@@ -944,7 +962,7 @@
       "outcome": ""
     },
     {
-      "index": 105,
+      "index": 107,
       "module": "verification.py",
       "line": 824,
       "condition": "not capacity_bounds",
@@ -953,7 +971,7 @@
       "outcome": "CANDIDATE_POLICY_STATES_NO_BOUNDS"
     },
     {
-      "index": 106,
+      "index": 108,
       "module": "verification.py",
       "line": 836,
       "condition": "type(action_type) is not str or action_type not in CANONICAL_ACTION_TYPES",
@@ -962,7 +980,7 @@
       "outcome": "CANDIDATE_BOUND_SELECTOR_MISS"
     },
     {
-      "index": 107,
+      "index": 109,
       "module": "verification.py",
       "line": 852,
       "condition": "not matches",
@@ -971,7 +989,7 @@
       "outcome": "CANDIDATE_BOUND_SELECTOR_MISS"
     },
     {
-      "index": 108,
+      "index": 110,
       "module": "verification.py",
       "line": 864,
       "condition": "len(matches) > 1",
@@ -980,7 +998,7 @@
       "outcome": "CANDIDATE_BOUND_SELECTOR_AMBIGUOUS"
     },
     {
-      "index": 109,
+      "index": 111,
       "module": "verification.py",
       "line": 884,
       "condition": "type(carried) is not int or isinstance(carried, bool)",
@@ -989,7 +1007,7 @@
       "outcome": "CANDIDATE_BOUND_EXCEEDED"
     },
     {
-      "index": 110,
+      "index": 112,
       "module": "verification.py",
       "line": 890,
       "condition": "carried > authenticated",
@@ -998,7 +1016,7 @@
       "outcome": "CANDIDATE_BOUND_EXCEEDED"
     },
     {
-      "index": 111,
+      "index": 113,
       "module": "verification.py",
       "line": 1026,
       "condition": "type(value) is not datetime",
@@ -1007,7 +1025,7 @@
       "outcome": "CANDIDATE_FACT_NOT_EXACT_INSTANT"
     },
     {
-      "index": 112,
+      "index": 114,
       "module": "verification.py",
       "line": 1053,
       "condition": "instant < valid_from",
@@ -1016,7 +1034,7 @@
       "outcome": "CANDIDATE_RECOMMENDATION_NOT_YET_VALID"
     },
     {
-      "index": 113,
+      "index": 115,
       "module": "verification.py",
       "line": 1059,
       "condition": "instant > valid_until",
@@ -1025,7 +1043,7 @@
       "outcome": "CANDIDATE_RECOMMENDATION_EXPIRED"
     },
     {
-      "index": 114,
+      "index": 116,
       "module": "verification.py",
       "line": 1067,
       "condition": "instant > expires_at",
@@ -1034,7 +1052,7 @@
       "outcome": "CANDIDATE_DECISION_EXPIRED"
     },
     {
-      "index": 115,
+      "index": 117,
       "module": "verification.py",
       "line": 1076,
       "condition": "instant < occurred_at",

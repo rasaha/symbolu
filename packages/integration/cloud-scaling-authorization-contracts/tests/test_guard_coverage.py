@@ -23,6 +23,7 @@ import dataclasses
 import pytest
 
 from ugence_cloud_scaling_authorization_contracts import (
+    AuthorizationCandidateRejectionReason as _Reason,
     CanonicalFieldError,
     ExactTypeError,
     ExecutionTargetScope,
@@ -67,7 +68,7 @@ def test_a_snapshot_that_is_not_a_mapping_is_refused():
 
     with pytest.raises(CanonicalFieldError) as excinfo:
         digest_of_snapshot([("decision_id", "d-1")])
-    assert "must be a mapping" in str(excinfo.value)
+    assert excinfo.value.reason is _Reason.MALFORMED_CANONICAL_FIELD
 
 
 def test_an_identifier_carrying_surrounding_whitespace_is_refused(projection):
@@ -83,7 +84,7 @@ def test_an_identifier_carrying_surrounding_whitespace_is_refused(projection):
 
     with pytest.raises(CanonicalFieldError) as excinfo:
         build_target_scope(projection, account_id=" acct-1 ")
-    assert "whitespace" in str(excinfo.value)
+    assert excinfo.value.reason is _Reason.NON_CANONICAL_IDENTIFIER
 
 
 # --- target.py ------------------------------------------------------------------------
@@ -102,7 +103,7 @@ def test_a_negative_permitted_ceiling_is_refused(projection):
 
     with pytest.raises(TargetScopeError) as excinfo:
         build_target_scope(projection, max_magnitude=-1)
-    assert "max_permitted_magnitude" in str(excinfo.value)
+    assert excinfo.value.reason is _Reason.MALFORMED_CANONICAL_FIELD
 
 
 def test_a_bool_permitted_ceiling_is_refused(projection):
@@ -129,7 +130,7 @@ def test_an_action_type_outside_the_ratified_set_is_refused(projection):
 
     with pytest.raises(TargetScopeError) as excinfo:
         build_target_scope(projection, action_type="scale_sideways")
-    assert "ratified canonical action type" in str(excinfo.value)
+    assert excinfo.value.reason is _Reason.ACTION_SUBSTITUTION
 
 
 def test_execution_target_scope_from_dict_refuses_a_non_mapping():
@@ -160,7 +161,7 @@ def test_policy_target_binding_from_dict_refuses_a_missing_field(policy_binding)
     data.pop("policy_id")
     with pytest.raises(CanonicalFieldError) as excinfo:
         PolicyTargetBindingReference.from_dict(data)
-    assert "policy_id" in str(excinfo.value)
+    assert excinfo.value.reason is _Reason.MALFORMED_CANONICAL_FIELD
 
 
 def test_policy_coordinate_binding_from_dict_refuses_a_non_mapping():
@@ -186,7 +187,7 @@ def test_an_unsupported_signature_algorithm_is_refused(projection):
     genuine = build_attestation(recommendation_digest=projection.recommendation_digest)
     with pytest.raises(ProducerAttestationError) as excinfo:
         dataclasses.replace(genuine, signature_algorithm="rsa-md5")
-    assert "unsupported signature_algorithm" in str(excinfo.value)
+    assert excinfo.value.reason is _Reason.MALFORMED_PRODUCER_ATTESTATION
 
 
 def test_producer_attestation_from_dict_refuses_a_non_mapping():
@@ -204,7 +205,7 @@ def test_producer_attestation_from_dict_refuses_a_missing_field(attestation):
     data.pop("producer_id")
     with pytest.raises(CanonicalFieldError) as excinfo:
         ProducerAttestationEvidence.from_dict(data)
-    assert "producer_id" in str(excinfo.value)
+    assert excinfo.value.reason is _Reason.MALFORMED_CANONICAL_FIELD
 
 
 def test_producer_attestation_from_dict_requires_an_explicit_schema_version(attestation):
@@ -220,7 +221,7 @@ def test_producer_attestation_from_dict_requires_an_explicit_schema_version(atte
     data.pop("schema_version")
     with pytest.raises(CanonicalFieldError) as excinfo:
         ProducerAttestationEvidence.from_dict(data)
-    assert "schema_version" in str(excinfo.value)
+    assert excinfo.value.reason is _Reason.UNSUPPORTED_SCHEMA_VERSION
 
 
 def test_a_coordinate_tenant_carrying_surrounding_whitespace_is_refused(target_scope):
@@ -235,7 +236,7 @@ def test_a_coordinate_tenant_carrying_surrounding_whitespace_is_refused(target_s
 
     with pytest.raises(PolicyTargetBindingError) as excinfo:
         build_policy_coordinate_binding(target_scope, policy_tenant_id=" t-1 ")
-    assert "whitespace" in str(excinfo.value)
+    assert excinfo.value.reason is _Reason.NON_CANONICAL_IDENTIFIER
 
 
 def test_a_coordinate_naming_a_body_its_signature_never_covered_is_refused(target_scope):
@@ -250,7 +251,7 @@ def test_a_coordinate_naming_a_body_its_signature_never_covered_is_refused(targe
 
     with pytest.raises(PolicyTargetBindingError) as excinfo:
         build_policy_coordinate_binding(target_scope, policy_content_digest="b" * 64)
-    assert "policy_content_digest must equal policy_body_digest" in str(excinfo.value)
+    assert excinfo.value.reason is _Reason.MALFORMED_POLICY_COORDINATE_BINDING
 
 
 # --- reconciliation.py ----------------------------------------------------------------
@@ -327,7 +328,7 @@ def test_a_projection_whose_context_digest_is_a_lie_is_refused(projection, decis
     forged = _bypassing_post_init(projection, context_digest="0" * 64)
     with pytest.raises(ReconciliationError) as excinfo:
         reconcile_phase4(forged, decision)
-    assert "revalidation produced a different context_digest" in str(excinfo.value)
+    assert excinfo.value.reason is _Reason.CONTEXT_DIGEST_MISMATCH
 
 
 def test_a_projection_whose_context_disagrees_with_its_request_is_refused(
@@ -348,7 +349,7 @@ def test_a_projection_whose_context_disagrees_with_its_request_is_refused(
     )
     with pytest.raises(ReconciliationError) as excinfo:
         reconcile_phase4(swapped, decision)
-    assert "context_digest does not match the carried context" in str(excinfo.value)
+    assert excinfo.value.reason is _Reason.CONTEXT_DIGEST_MISMATCH
 
 
 def test_a_self_consistent_unratified_action_type_is_refused(projection):
@@ -364,7 +365,7 @@ def test_a_self_consistent_unratified_action_type_is_refused(projection):
     forged = _reforged_projection(projection, action_type="scale_sideways")
     with pytest.raises(ReconciliationError) as excinfo:
         reconcile_phase4(forged, build_decision(forged))
-    assert "not a D-4 ratified canonical action type" in str(excinfo.value)
+    assert excinfo.value.reason is _Reason.ACTION_SUBSTITUTION
 
 
 def test_a_self_consistent_negative_magnitude_is_refused(projection):
@@ -380,7 +381,7 @@ def test_a_self_consistent_negative_magnitude_is_refused(projection):
     forged = _reforged_projection(projection, magnitude_before=-1)
     with pytest.raises(ReconciliationError) as excinfo:
         reconcile_phase4(forged, build_decision(forged))
-    assert "magnitude_before must be an int >= 0" in str(excinfo.value)
+    assert excinfo.value.reason is _Reason.PROJECTION_RECONCILIATION_FAILED
 
 
 def test_a_disposition_that_is_not_the_seam_enum_is_refused(projection, decision):
@@ -392,18 +393,18 @@ def test_a_disposition_that_is_not_the_seam_enum_is_refused(projection, decision
 
     with pytest.raises(ReconciliationError) as excinfo:
         reconcile_phase4(projection, _bypassing_post_init(decision, disposition="allow"))
-    assert "must be a SubjectRiskDisposition" in str(excinfo.value)
+    assert excinfo.value.reason is _Reason.UNSUPPORTED_EXACT_TYPE
 
 
 @pytest.mark.parametrize(
     ("guard", "overrides", "expected"),
     [
-        (64, {"risk_outcome": None}, "must carry a risk_outcome"),
-        (65, {"decision_snapshot": None}, "must carry the binding decision_snapshot"),
+        (64, {"risk_outcome": None}, _Reason.MISSING_BINDING_DECISION),
+        (65, {"decision_snapshot": None}, _Reason.MISSING_DECISION_SNAPSHOT),
         (66, {"decision_snapshot": [("decision_id", "d-1")]},
-         "decision_snapshot must be a canonical mapping"),
-        (67, {"decision_digest": None}, "must carry a decision_digest"),
-        (81, {"expires_at": None}, "must carry an expires_at"),
+         _Reason.MISSING_DECISION_SNAPSHOT),
+        (67, {"decision_digest": None}, _Reason.MISSING_BINDING_DECISION),
+        (81, {"expires_at": None}, _Reason.MISSING_EXPIRY_FACT),
     ],
 )
 def test_an_allow_family_decision_missing_a_binding_fact_is_refused(
@@ -418,14 +419,14 @@ def test_an_allow_family_decision_missing_a_binding_fact_is_refused(
 
     with pytest.raises(ReconciliationError) as excinfo:
         reconcile_phase4(projection, _bypassing_post_init(decision, **overrides))
-    assert expected in str(excinfo.value)
+    assert excinfo.value.reason is expected
 
 
 @pytest.mark.parametrize(
     ("guard", "key", "expected"),
     [
-        (69, "decision_id", "decision_snapshot carries no decision_id"),
-        (77, "evidence_snapshot_digest", "carries no evidence_snapshot_digest"),
+        (69, "decision_id", _Reason.MISSING_BINDING_DECISION),
+        (77, "evidence_snapshot_digest", _Reason.INVALID_EVIDENCE_BINDING),
     ],
 )
 def test_a_snapshot_missing_a_required_key_is_refused(
@@ -435,7 +436,7 @@ def test_a_snapshot_missing_a_required_key_is_refused(
 
     with pytest.raises(ReconciliationError) as excinfo:
         reconcile_phase4(projection, _snapshot_without(decision, key))
-    assert expected in str(excinfo.value)
+    assert excinfo.value.reason is expected
 
 
 def test_a_projection_with_no_idempotency_key_is_refused(projection, decision):
@@ -448,7 +449,7 @@ def test_a_projection_with_no_idempotency_key_is_refused(projection, decision):
     forged = _bypassing_post_init(projection, idempotency_key="")
     with pytest.raises(ReconciliationError) as excinfo:
         reconcile_phase4(forged, decision)
-    assert "carries no D-6 idempotency_key" in str(excinfo.value)
+    assert excinfo.value.reason is _Reason.IDEMPOTENCY_KEY_MISMATCH
 
 
 def test_a_projection_with_no_evidence_references_is_refused(projection, decision):
@@ -457,7 +458,7 @@ def test_a_projection_with_no_evidence_references_is_refused(projection, decisio
     forged = _bypassing_post_init(projection, evidence_references=())
     with pytest.raises(ReconciliationError) as excinfo:
         reconcile_phase4(forged, decision)
-    assert "at least one evidence reference" in str(excinfo.value)
+    assert excinfo.value.reason is _Reason.INVALID_EVIDENCE_BINDING
 
 
 # --- identifiers.py -------------------------------------------------------------------
@@ -526,3 +527,123 @@ def test_the_drift_guards_are_equivalent_mutants_because_their_conditions_are_fa
     # Guard 11 — ``PRODUCER_SIGNING_PURPOSE == PURPOSE_CAPACITY_ACTION``. The producer
     # signing purpose must stay distinct from the D-4 routing purpose.
     assert ids.PRODUCER_SIGNING_PURPOSE != ids.PURPOSE_CAPACITY_ACTION
+
+
+#: Source of the drift probe run by the guard-10 reachability measurement below.
+PROBE_SOURCE = (
+    "import enum, sys\n"
+    "import ugence_cloud_scaling_controller.planning.candidates as candidates\n"
+    "class Drifted(enum.Enum):\n"
+    "    NO_CHANGE = 'no_change'\n"
+    "    SCALE_UP = 'scale_up'\n"
+    "    SCALE_DOWN = 'scale_down'\n"
+    "    COORDINATED = 'coordinated'\n"
+    "    SIDEWAYS = 'scale_sideways'\n"
+    "candidates.ActionKind = Drifted\n"
+    "for name in list(sys.modules):\n"
+    "    if name.startswith(('ugence_cloud_scaling_risk_integration',\n"
+    "                        'ugence_cloud_scaling_authorization_contracts')):\n"
+    "        del sys.modules[name]\n"
+    "try:\n"
+    "    import ugence_cloud_scaling_authorization_contracts.identifiers\n"
+    "    print('NO-IMPORT-ERROR')\n"
+    "except ImportError as exc:\n"
+    "    print('IMPORT-ERROR ' + str(exc))\n"
+)
+
+
+def test_a_projection_whose_request_carries_a_different_context_is_refused(
+    projection, decision
+):
+    """Guard 50 — ``reconciliation.py:283``, isolated from guard 54.
+
+    Guard 54 digests the projection's own ``context``; guard 50 re-derives from the
+    *request*. Here the request is re-derived around a forged context — self-consistent, so
+    revalidation succeeds — while the projection's ``context`` and ``context_digest`` are
+    left genuine. Guard 54 is silent, because those two still agree; only guard 50 consults
+    the request's copy.
+
+    Without this test guard 50 survives under the ratified definition: the attack in
+    ``test_a_projection_whose_context_digest_is_a_lie_is_refused`` is caught by guard 54
+    with the *same* reason, so removing guard 50 changed nothing the typed refusal records.
+    That made guard 50 look diagnostic-only. It is not — it was under-attacked.
+    """
+
+    from risk_authority.integrations import SubjectBinding  # noqa: PLC0415
+
+    context = _bypassing_post_init(projection.context, action_type="scale_sideways")
+    binding = SubjectBinding(
+        tenant_id=projection.tenant_id,
+        subject_id=projection.subject_id,
+        subject_type=projection.request.subject_type,
+        recommendation_digest=projection.recommendation_digest,
+        context_digest=context.digest(),
+    )
+    request = _bypassing_post_init(
+        projection.request, subject_context=context, subject_digest=binding.digest()
+    )
+    forged = _bypassing_post_init(projection, request=request)
+    with pytest.raises(ReconciliationError) as excinfo:
+        reconcile_phase4(forged, decision)
+    assert excinfo.value.reason is _Reason.CONTEXT_DIGEST_MISMATCH
+
+
+def test_evidence_references_that_are_not_a_tuple_are_refused(projection, decision):
+    """Guard 75 — ``reconciliation.py:468``, the non-tuple half.
+
+    The *empty* case is caught downstream by the equality comparison against the request's
+    own references, with the same reason — so the empty-tuple attack alone left guard 75
+    looking diagnostic-only. A **list** with identical contents is a different matter:
+    ``tuple(list) == tuple(tuple)``, so that comparison is silent, and only this guard's
+    ``isinstance`` half stands between a mutable references container and the reconciled
+    facts.
+    """
+
+    forged = _bypassing_post_init(
+        projection, evidence_references=list(projection.evidence_references)
+    )
+    with pytest.raises(ReconciliationError) as excinfo:
+        reconcile_phase4(forged, decision)
+    assert excinfo.value.reason is _Reason.INVALID_EVIDENCE_BINDING
+
+
+def test_the_action_kind_drift_guard_is_unreachable_behind_phase_4c(tmp_path):
+    """Why guard 10 is ``unreachable-behind-earlier-guard``, not an equivalent mutant.
+
+    Guard 10 asks whether the controller's ``ActionKind`` value set equals this package's
+    ratified set. It can never observe a drift — and the reason is not that the condition
+    happens to be False today. It is that the *import supplying its left operand fails
+    first*: ``identifiers.py`` reaches Phase 4C for ``_PHASE4C_ACTION_TYPES``, and Phase
+    4C's own import-time guard compares ``ActionKind`` against its ratified set and raises
+    before this module finishes importing.
+
+    That is a claim about reachability, so it is measured rather than asserted: the
+    controller's enum is genuinely drifted and the resulting ``ImportError`` is read. If it
+    ever names guard 10, guard 10 is reachable and its exclusion is void.
+
+    In a subprocess, not under a monkeypatch, because the measurement has to re-run
+    module-level import code — doing that in-process would leave a drifted Phase 4C in
+    ``sys.modules`` for every test that follows.
+    """
+
+    import os  # noqa: PLC0415
+    import subprocess  # noqa: PLC0415
+    import sys  # noqa: PLC0415
+
+    probe = tmp_path / "drift_probe.py"
+    probe.write_text(PROBE_SOURCE, encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, str(probe)],
+        capture_output=True,
+        text=True,
+        timeout=300,
+        env={**os.environ, "PYTHONPATH": os.pathsep.join(p for p in sys.path if p)},
+    )
+    output = result.stdout.strip()
+    assert output.startswith("IMPORT-ERROR"), (
+        f"a drifted ActionKind did not fail the import: {output!r} {result.stderr[-400:]!r}"
+    )
+    assert "Phase 4C fails closed" in output, (
+        "the drift was caught by some guard other than Phase 4C's import-time check; if "
+        f"this names guard 10, guard 10 is reachable and its exclusion is void: {output!r}"
+    )

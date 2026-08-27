@@ -7,7 +7,7 @@ hand: CI regenerates this and fails on any difference.
 refusal. What counts as a refusal differs by package and is recorded per guard below:
 Phase 5A raises; Phase 5B also returns `_refuse(...)` at a gate and `(_Outcome.X, …)`
 from the helper that decided it. Applying one package's definition to the other is not
-a stylistic choice — the raise-only reading misses eleven real Phase 5B gates.
+a stylistic choice — a raise-only reading of this package would miss 0 of the guards below.
 
 ## Reconciliation with the recorded inventories
 
@@ -23,17 +23,19 @@ its enclosing `if` — which is why this total is larger and neither number move
 
 ## Classification
 
-Every guard is classified: **106 `SCORED`** — the
+Every guard is classified: **104 `SCORED`** — the
 sweep neutralises it and the suite must fail — and
-**3 `EXCLUDED`**, each with a reason from a closed vocabulary and
+**5 `EXCLUDED`**, each with a reason from a closed vocabulary and
 a test that measures the reason. A guard is never excluded because it survived; a
 survivor with no prior declaration fails the sweep.
 
 | Module:line | Reason | Why | Measured by |
 |---|---|---|---|
-| `identifiers.py:93` | `equivalent-mutant` | Import-time drift assertion over two frozen constants that are equal in-tree, so the branch is never taken and `if False:` is the same program. Making the condition true means editing a constant, which is a different mutation operator. The test named below measures that the condition is False, so the exclusion is void the moment it stops being. | `tests/test_guard_coverage.py::test_the_drift_guards_are_equivalent_mutants_because_their_conditions_are_false` |
-| `identifiers.py:100` | `equivalent-mutant` | Same shape as the guard above: the controller's ActionKind value set and the D-4 ratified set are equal in-tree, measured by the test named below. | `tests/test_guard_coverage.py::test_the_drift_guards_are_equivalent_mutants_because_their_conditions_are_false` |
-| `identifiers.py:109` | `equivalent-mutant` | A collision assertion between two distinct frozen constants. They differ in-tree, so the condition is False and the branch unreachable; the test named below measures the inequality. | `tests/test_guard_coverage.py::test_the_drift_guards_are_equivalent_mutants_because_their_conditions_are_false` |
+| `identifiers.py:93` | `unscorable-by-single-checkout-fixture` | Compares this package's ratified identifiers against Phase 4C's, which live in a separately-versioned distribution admitted by an open-ended `ugence-cloud-scaling-risk-integration>=0.1.0` pin. Under a resolution that pin permits, the condition is true and the guard fires — so this is not an equivalent mutant, and the earlier claim that it was is withdrawn. It is unscorable only because the sweep fixture installs one checkout and cannot vary the resolution. The test named below re-runs the assertion against whatever is actually installed. | `tests/test_guard_coverage.py::test_the_ratified_identifiers_have_not_drifted_from_phase_4c` |
+| `identifiers.py:100` | `unreachable-behind-earlier-guard` | Cannot observe an ActionKind drift, because the import that supplies its left operand fails first: reaching Phase 4C for `_PHASE4C_ACTION_TYPES` runs Phase 4C's own import-time ActionKind guard, which raises before this module finishes importing. Measured, not reasoned — the test below drifts the controller's enum in a subprocess and reads which guard's ImportError comes back. If it ever names this guard, this exclusion is void. | `tests/test_guard_coverage.py::test_the_action_kind_drift_guard_is_unreachable_behind_phase_4c` |
+| `identifiers.py:109` | `equivalent-mutant` | A collision assertion between two frozen literals defined in this module, in this distribution. No dependency resolution can move either, so the condition is false in every program this package can be part of and `if False:` is the same program on every path. The test below measures the inequality. | `tests/test_guard_coverage.py::test_the_drift_guards_are_equivalent_mutants_because_their_conditions_are_false` |
+| `reconciliation.py:388` | `diagnostic-only` | `None` is a strict subset of `not isinstance(d_decision_snapshot, Mapping)`, the guard on the next line, which raises ReconciliationError with the same MISSING_DECISION_SNAPSHOT reason. Removing this guard changes the message and nothing else. It is kept because the message is the better one for the commonest case. | `tests/test_guard_coverage.py::test_an_allow_family_decision_missing_a_binding_fact_is_refused` |
+| `reconciliation.py:538` | `diagnostic-only` | `None` is a strict subset of `not isinstance(value, datetime)` inside the `_require_datetime("expires_at", ..., MISSING_EXPIRY_FACT)` call on the next line, which raises ReconciliationError with the same MISSING_EXPIRY_FACT reason. Removing this guard changes the message and nothing else. | `tests/test_guard_coverage.py::test_an_allow_family_decision_missing_a_binding_fact_is_refused` |
 
 ## Not counted, and why
 
@@ -111,7 +113,7 @@ survivor with no prior declaration fails the sweep.
 | 62 | `reconciliation.py:371` | raise | SCORED | canonical-65 | `not isinstance(d_disposition, SubjectRiskDisposition)` |
 | 63 | `reconciliation.py:375` | raise | SCORED | canonical-65 | `d_disposition not in ALLOW_FAMILY_DISPOSITIONS` |
 | 64 | `reconciliation.py:381` | raise | SCORED | canonical-65 | `d_risk_outcome is None` |
-| 65 | `reconciliation.py:388` | raise | SCORED | canonical-65 | `d_decision_snapshot is None` |
+| 65 | `reconciliation.py:388` | raise | EXCLUDED | canonical-65 | `d_decision_snapshot is None` |
 | 66 | `reconciliation.py:393` | raise | SCORED | canonical-65 | `not isinstance(d_decision_snapshot, Mapping)` |
 | 67 | `reconciliation.py:398` | raise | SCORED | canonical-65 | `d_decision_digest is None` |
 | 68 | `reconciliation.py:407` | raise | SCORED | canonical-65 | `recomputed != d_decision_digest` |
@@ -127,7 +129,7 @@ survivor with no prior declaration fails the sweep.
 | 78 | `reconciliation.py:510` | raise | SCORED | canonical-65 | `snapshot_evaluated_at is None` |
 | 79 | `reconciliation.py:520` | raise | SCORED | canonical-65 | `snapshot_expires_at is None` |
 | 80 | `reconciliation.py:525` | raise | SCORED | canonical-65 | `snapshot_issued_at is None` |
-| 81 | `reconciliation.py:538` | raise | SCORED | canonical-65 | `d_expires_at is None` |
+| 81 | `reconciliation.py:538` | raise | EXCLUDED | canonical-65 | `d_expires_at is None` |
 | 82 | `reconciliation.py:545` | raise | SCORED | canonical-65 | `to_canonical_obj(decision_evaluated_at) != to_canonical_obj(snapshot_evalua…` |
 | 83 | `reconciliation.py:560` | raise | SCORED | canonical-65 | `to_canonical_obj(decision_expires_at) != to_canonical_obj(bound_expires_at)` |
 | 84 | `reconciliation.py:577` | raise | SCORED | canonical-65 | `subject_valid_from > bound_evaluated_at` |

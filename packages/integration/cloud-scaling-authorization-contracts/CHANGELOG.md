@@ -1,5 +1,57 @@
 # Changelog — ugence-cloud-scaling-authorization-contracts
 
+## [Unreleased] — the definitions the sweep rests on, ratified
+
+*No version bump and no production behaviour change.* An independent adversarial audit of
+the first sweep found that its two load-bearing definitions were being decided case by case
+inside a script. Both are now ratified in ADR Phase 5 §9, and the classification is redone
+under them.
+
+### Ratified
+
+- **The typed refusal is `(exception class, AuthorizationCandidateRejectionReason)`.** The
+  message is prose: no consumer may branch on it and no test may assert it. A guard is
+  authority-bearing when removing it changes that pair for some constructible input —
+  including changing it to no refusal at all. Every coverage test now asserts the reason
+  rather than a message substring.
+- **`equivalent-mutant` may not be claimed across a distribution boundary.** A guard
+  comparing against a value from a separately-versioned distribution admitted by an
+  open-ended pin can be true under a resolution that pin permits, so its falsity is a
+  property of the installation and not of the program.
+
+### Fixed
+
+- Guards 65 and 81 are `diagnostic-only`, not scored. Each is a strict subset of the guard
+  behind it, which carries the *same* reason — `None` ⊂ `not isinstance(..., Mapping)` and
+  `None` ⊂ `not isinstance(..., datetime)`. They were only ever killed by an assertion on
+  the message, which the ratification says is not the contract.
+- Guard 9's `equivalent-mutant` claim is withdrawn: it compares against Phase 4C across an
+  open-ended `>=0.1.0` pin. Reclassified `unscorable-by-single-checkout-fixture`.
+- Guard 10's reason is corrected to `unreachable-behind-earlier-guard`, with evidence that
+  measures unreachability rather than falsity: a subprocess drifts the controller's enum and
+  reads which guard's `ImportError` comes back. It is Phase 4C's, every time.
+- Guards 50 and 75 survived once the tests stopped asserting messages — and were then shown
+  to be authority-bearing after all, by sharper attacks. Both are scored, and
+  `GUARD_SWEEP.md` records why the first attacks missed.
+
+### Fixed — the sweep engine
+
+- **A red baseline is refused.** This is the one that mattered: the copy was named
+  `package`, Phase 5B's suite asserts its own directory name, and that test therefore failed
+  in *every* run of that package's sweep. Since a mutant counted as killed whenever any test
+  failed, **all 115 Phase 5B guards were reported killed regardless of the mutation.** The
+  copy now keeps the package's directory name, the baseline must be green, and a kill counts
+  only failures the baseline did not already have.
+- An `if` whose body *binds* the result of a raising helper is a conversion, not a guard,
+  and is not inventoried; an `if` whose body *calls* one is. That adds `verification.py:327`
+  and `verified.py:488` to Phase 5B, which a raise-only reading missed.
+- An exclusion whose `(module, condition)` key matches more than one guard is refused rather
+  than silently applied to all of them — `target.py` carries three guards reading exactly
+  `not isinstance(data, Mapping)`.
+- A guard the sweep could not score is a blocking failure, not a line in a report.
+- "eleven real Phase 5B gates" was written from the gates this work had touched rather than
+  counted. The report computes the figure now; at this commit it is 47 of 117.
+
 ## [Unreleased] — the sweep is measured, and every guard is classified
 
 *No version bump.* No production behaviour changes here: this is coverage, classification

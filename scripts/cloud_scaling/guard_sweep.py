@@ -11,8 +11,11 @@ Two things this had to get right that a copy of the existing script would have g
 **Refusal is not one shape.** Phase 5A refuses by ``raise``. Phase 5B refuses by *returning*
 a typed value: ``return _refuse(outcome, detail)`` at a gate, and ``return (_Outcome.X, "…")``
 from the helper that decided it. Applying Phase 5A's raise-only definition to Phase 5B misses
-**eleven** real gates, including gate 13's exact-type instant check and all six branches of
-R-8's bound reconciliation — precisely the gates most recently added. A definition is part of
+**47** real gates, including gate 13's exact-type instant check and all six branches of
+R-8's bound reconciliation — precisely the gates most recently added. That figure was
+"eleven" until it was measured: it was written from the gates this work had touched, not
+counted from the inventory. The generated report computes it rather than quoting it, so it
+cannot drift again. A definition is part of
 the measurement, so each package declares its own and the report names which one it used.
 
 **The decision and its effect are different lines.** Gate 13 decides in
@@ -93,6 +96,11 @@ EXCLUSION_REASONS = frozenset(
         "diagnostic-only",
         # Outside the ratified authority-bearing definition entirely.
         "outside-authority-bearing-definition",
+        # The guard's condition can be true under a dependency resolution this package's
+        # own pins permit, but the sweep fixture installs exactly one resolution and cannot
+        # vary it. Not an equivalent mutant: the condition's falsity is a property of the
+        # installation, not of the program. See ADR Phase 5 §9.2.
+        "unscorable-by-single-checkout-fixture",
     }
 )
 
@@ -117,30 +125,66 @@ PACKAGES = {
             ("peripheral-28", ("attestation.py", "target.py"), 28),
         ),
         exclusions={
+            # --- identifiers.py: the D-4 drift assertions --------------------------------
             ("identifiers.py", "ours != theirs"): (
-                "equivalent-mutant",
-                "Import-time drift assertion over two frozen constants that are equal "
-                "in-tree, so the branch is never taken and `if False:` is the same program. "
-                "Making the condition true means editing a constant, which is a different "
-                "mutation operator. The test named below measures that the condition is "
-                "False, so the exclusion is void the moment it stops being.",
+                "unscorable-by-single-checkout-fixture",
+                "Compares this package's ratified identifiers against Phase 4C's, which "
+                "live in a separately-versioned distribution admitted by an open-ended "
+                "`ugence-cloud-scaling-risk-integration>=0.1.0` pin. Under a resolution "
+                "that pin permits, the condition is true and the guard fires — so this is "
+                "not an equivalent mutant, and the earlier claim that it was is withdrawn. "
+                "It is unscorable only because the sweep fixture installs one checkout and "
+                "cannot vary the resolution. The test named below re-runs the assertion "
+                "against whatever is actually installed.",
                 "tests/test_guard_coverage.py::"
-                "test_the_drift_guards_are_equivalent_mutants_because_their_conditions_are_false",
+                "test_the_ratified_identifiers_have_not_drifted_from_phase_4c",
             ),
             ("identifiers.py", "controller_actions != CANONICAL_ACTION_TYPES"): (
-                "equivalent-mutant",
-                "Same shape as the guard above: the controller's ActionKind value set and "
-                "the D-4 ratified set are equal in-tree, measured by the test named below.",
+                "unreachable-behind-earlier-guard",
+                "Cannot observe an ActionKind drift, because the import that supplies its "
+                "left operand fails first: reaching Phase 4C for `_PHASE4C_ACTION_TYPES` "
+                "runs Phase 4C's own import-time ActionKind guard, which raises before "
+                "this module finishes importing. Measured, not reasoned — the test below "
+                "drifts the controller's enum in a subprocess and reads which guard's "
+                "ImportError comes back. If it ever names this guard, this exclusion is "
+                "void.",
                 "tests/test_guard_coverage.py::"
-                "test_the_drift_guards_are_equivalent_mutants_because_their_conditions_are_false",
+                "test_the_action_kind_drift_guard_is_unreachable_behind_phase_4c",
             ),
             ("identifiers.py", "PRODUCER_SIGNING_PURPOSE == PURPOSE_CAPACITY_ACTION"): (
                 "equivalent-mutant",
-                "A collision assertion between two distinct frozen constants. They differ "
-                "in-tree, so the condition is False and the branch unreachable; the test "
-                "named below measures the inequality.",
+                "A collision assertion between two frozen literals defined in this module, "
+                "in this distribution. No dependency resolution can move either, so the "
+                "condition is false in every program this package can be part of and "
+                "`if False:` is the same program on every path. The test below measures "
+                "the inequality.",
                 "tests/test_guard_coverage.py::"
                 "test_the_drift_guards_are_equivalent_mutants_because_their_conditions_are_false",
+            ),
+            # --- reconciliation.py: diagnosis-only guards --------------------------------
+            # Both are strict subsets of the guard immediately behind them, which carries
+            # the *same* reason. Under ADR Phase 5 §9.1 the typed refusal is
+            # (exception class, AuthorizationCandidateRejectionReason) and not the message,
+            # so neither changes an authorization outcome for any input.
+            ("reconciliation.py", "d_decision_snapshot is None"): (
+                "diagnostic-only",
+                "`None` is a strict subset of `not isinstance(d_decision_snapshot, "
+                "Mapping)`, the guard on the next line, which raises ReconciliationError "
+                "with the same MISSING_DECISION_SNAPSHOT reason. Removing this guard "
+                "changes the message and nothing else. It is kept because the message is "
+                "the better one for the commonest case.",
+                "tests/test_guard_coverage.py::"
+                "test_an_allow_family_decision_missing_a_binding_fact_is_refused",
+            ),
+            ("reconciliation.py", "d_expires_at is None"): (
+                "diagnostic-only",
+                "`None` is a strict subset of `not isinstance(value, datetime)` inside the "
+                "`_require_datetime(\"expires_at\", ..., MISSING_EXPIRY_FACT)` call on the "
+                "next line, which raises ReconciliationError with the same "
+                "MISSING_EXPIRY_FACT reason. Removing this guard changes the message and "
+                "nothing else.",
+                "tests/test_guard_coverage.py::"
+                "test_an_allow_family_decision_missing_a_binding_fact_is_refused",
             ),
         },
     ),
@@ -191,6 +235,46 @@ def _outcome_names(node) -> list:
     return sorted(set(names))
 
 
+def _raising_helpers(config: PackageConfig) -> frozenset:
+    """Function names in this package that can raise, directly or through each other.
+
+    Derived from the source, not hand-listed. A hand list is a second inventory to keep in
+    step with the first, and the guards it forgets are exactly the ones nobody was thinking
+    about — ``verification.py:327`` and ``verified.py:488`` are two that a raise-only
+    reading missed, each an ``if`` whose entire body is a call to an admission helper.
+
+    Transitive by fixpoint: ``require_policy_digest`` raises directly, and anything whose
+    body calls it inherits that. One level would miss the second rank.
+    """
+
+    direct = {}
+    calls = {}
+    for path in sorted(config.src.glob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            raises = any(isinstance(inner, ast.Raise) for inner in ast.walk(node))
+            named = set()
+            for inner in ast.walk(node):
+                if isinstance(inner, ast.Call):
+                    name = getattr(inner.func, "id", None) or getattr(inner.func, "attr", None)
+                    if name:
+                        named.add(name)
+            direct[node.name] = direct.get(node.name, False) or raises
+            calls.setdefault(node.name, set()).update(named)
+
+    raising = {name for name, raises in direct.items() if raises}
+    changed = True
+    while changed:
+        changed = False
+        for name, named in calls.items():
+            if name not in raising and (named & raising):
+                raising.add(name)
+                changed = True
+    return frozenset(raising)
+
+
 def _refusal_shape(node, config: PackageConfig) -> str:
     """How this guard refuses, or ``""`` when it does not.
 
@@ -201,11 +285,26 @@ def _refusal_shape(node, config: PackageConfig) -> str:
     raises = False
     call = False
     tuple_return = False
+    helper_call = False
+    helpers = _raising_helpers(config)
     for statement in node.body:
         for inner in ast.walk(statement):
             if isinstance(inner, ast.Raise):
                 raises = True
-            elif isinstance(inner, ast.Return):
+            elif isinstance(inner, ast.Expr) and isinstance(inner.value, ast.Call):
+                # A *statement* call, never one whose result is bound. An admission is
+                # called for its refusal and its return value is discarded;
+                # ``issued_at = _parse_ts(issued_at)`` calls the same kind of helper for
+                # its value, and that ``if`` is a normalisation branch rather than a gate.
+                # Counting it made the sweep unscorable: neutralising a conversion changes
+                # what the suite can even collect, which is not a kill and not a survival.
+                call_node = inner.value
+                name = getattr(call_node.func, "id", None) or getattr(
+                    call_node.func, "attr", None
+                )
+                if name in helpers:
+                    helper_call = True
+            if isinstance(inner, ast.Return):
                 value = inner.value
                 if isinstance(value, ast.Call):
                     name = getattr(value.func, "id", None) or getattr(
@@ -224,6 +323,8 @@ def _refusal_shape(node, config: PackageConfig) -> str:
         return "typed-refusal call"
     if tuple_return:
         return "typed-refusal tuple"
+    if helper_call:
+        return "raising-helper call"
     return ""
 
 
@@ -336,6 +437,7 @@ def run_suite(
     baseline_collected=None,
     timeout: int = 1800,
     suite_args: tuple = ("tests",),
+    require_green: bool = False,
 ) -> dict:
     """Run the suite in the copy, and score it only if it collected the same population.
 
@@ -401,6 +503,22 @@ def run_suite(
             ),
             "failed": [],
         }
+    if require_green and (counted.get("failed") or counted.get("error") or counted.get("errors")):
+        # A red baseline makes every later kill unattributable: the scorer decides a mutant
+        # died because *some* test failed, and a test that was already failing satisfies
+        # that without the mutation having done anything. The whole sweep is void, so this
+        # refuses rather than reporting numbers nobody can rely on.
+        return {
+            "scored": False,
+            "why": (
+                "the baseline suite is not green — "
+                f"{counted.get('failed', 0)} failed, "
+                f"{counted.get('error', 0) + counted.get('errors', 0)} errored; "
+                f"last lines: {tail}"
+            ),
+            "collected": collected,
+            "failed": re.findall(r"^FAILED (\S+)", output, re.M),
+        }
     return {
         "scored": True,
         "why": "",
@@ -410,8 +528,18 @@ def run_suite(
 
 
 def _workdir(config: PackageConfig) -> Path:
+    """The copy keeps the package's own directory name.
+
+    It used to be called ``package``, and that was not cosmetic. Phase 5B's suite asserts
+    its own directory name — ``assert here.name == "cloud-scaling-policy-authenticity"`` —
+    so under the old name that test failed in *every* run of that package's sweep, baseline
+    and mutant alike. Since a mutant was scored killed whenever any test failed, all 115
+    Phase 5B guards were reported killed no matter what the mutation did. A copy that is
+    not a faithful stand-in for the package measures the copy, not the package.
+    """
+
     root = Path(tempfile.gettempdir()) / f"ugence-sweep-{config.key}"
-    return root / "package"
+    return root / config.package_dir.split("/")[-1]
 
 
 def prepare_copy(config: PackageConfig) -> Path:
@@ -447,7 +575,8 @@ def write_inventory(
         "refusal. What counts as a refusal differs by package and is recorded per guard below:",
         "Phase 5A raises; Phase 5B also returns `_refuse(...)` at a gate and `(_Outcome.X, …)`",
         "from the helper that decided it. Applying one package's definition to the other is not",
-        "a stylistic choice — the raise-only reading misses eleven real Phase 5B gates.",
+        f"a stylistic choice — a raise-only reading of this package would miss "
+        f"{sum(1 for g in guards if g.shape != 'raise')} of the guards below.",
         "",
         "## Reconciliation with the recorded inventories",
         "",
@@ -541,10 +670,34 @@ def classify(config: PackageConfig, guards: list) -> dict:
     left behind after the guard it named was rewritten or removed.
     """
 
+    # ``(module, condition)`` is stable across line shifts, which is why it is the key —
+    # but it is not unique. ``target.py`` carries three guards reading exactly
+    # ``not isinstance(data, Mapping)``. An exclusion on such a key would silently cover
+    # all three, so a key matching more than one guard is refused rather than resolved.
+    occupants = {}
+    for guard in guards:
+        occupants.setdefault((guard.module, guard.condition), []).append(guard.index)
+    colliding = sorted(
+        f"{module}: {condition} (guards {indices})"
+        for (module, condition), indices in occupants.items()
+        if len(indices) > 1 and (module, condition) in config.exclusions
+    )
+
     classified = {}
     matched = set()
     for guard in guards:
         key = (guard.module, guard.condition)
+        if key in config.exclusions and len(occupants[key]) > 1:
+            # Ambiguous: classified SCORED so the sweep still demands a kill, and reported
+            # as invalid below so the run fails rather than quietly under-scoring.
+            classified[guard.index] = {
+                "status": "SCORED",
+                "module": guard.module,
+                "line": guard.lineno,
+                "condition": guard.condition,
+            }
+            matched.add(key)
+            continue
         if key in config.exclusions:
             matched.add(key)
             reason, detail, evidence = config.exclusions[key]
@@ -571,7 +724,12 @@ def classify(config: PackageConfig, guards: list) -> dict:
         for (module, condition), (reason, detail, evidence) in config.exclusions.items()
         if reason not in EXCLUSION_REASONS or not detail.strip() or not evidence.strip()
     )
-    return {"classified": classified, "orphan_exclusions": orphans, "invalid_exclusions": invalid}
+    return {
+        "classified": classified,
+        "orphan_exclusions": orphans,
+        "invalid_exclusions": invalid,
+        "colliding_exclusions": colliding,
+    }
 
 
 def aggregate(config: PackageConfig, shard_dir: Path, shard_n: int) -> dict:
@@ -632,6 +790,7 @@ def aggregate(config: PackageConfig, shard_dir: Path, shard_n: int) -> dict:
         "unclassified_guards": sorted(set(expected) - set(classified)),
         "orphan_exclusions": verdict["orphan_exclusions"],
         "invalid_exclusions": verdict["invalid_exclusions"],
+        "colliding_exclusions": verdict["colliding_exclusions"],
         "surviving_scored_guards": [
             i for i in survived if classified.get(i, {}).get("status") != "EXCLUDED"
         ],
@@ -701,7 +860,10 @@ def main() -> int:
             + "\n"
         )
         write_inventory(config, guards, agreement, leftout, verdict)
-        if verdict["orphan_exclusions"] or verdict["invalid_exclusions"]:
+        if (verdict["orphan_exclusions"] or verdict["invalid_exclusions"]
+                or verdict["colliding_exclusions"]):
+            for problem in verdict["colliding_exclusions"]:
+                print(f"  EXCLUSION KEY IS AMBIGUOUS: {problem}", file=sys.stderr)
             for problem in verdict["orphan_exclusions"]:
                 print(f"  EXCLUSION NAMES NO GUARD: {problem}", file=sys.stderr)
             for problem in verdict["invalid_exclusions"]:
@@ -753,6 +915,17 @@ def main() -> int:
                 "guards classified SCORED that survived — an open coverage defect, not an "
                 f"exclusion: {report['surviving_scored_guards']}"
             )
+        if report["colliding_exclusions"]:
+            problems.append(
+                "exclusions whose (module, condition) key matches more than one guard, so "
+                "the exclusion cannot say which it means: "
+                f"{report['colliding_exclusions']}"
+            )
+        if report["unscored"]:
+            problems.append(
+                "guards the sweep could not score at all — the mutant did not run, so "
+                f"nothing is known about them: {report['unscored']}"
+            )
         if report["stale_exclusions"]:
             problems.append(
                 "guards classified EXCLUDED that were in fact killed; the exclusion is "
@@ -771,10 +944,11 @@ def main() -> int:
         mine = [g for g in mine if g.index in wanted]
 
     workdir = prepare_copy(config)
-    baseline = run_suite(workdir, suite_args=suite_args)
+    baseline = run_suite(workdir, suite_args=suite_args, require_green=True)
     if not baseline["scored"]:
         print(f"baseline is not scorable: {baseline['why']}", file=sys.stderr)
         return 2
+    baseline_failures = set(baseline["failed"])
     print(f"baseline collected {baseline['collected']}", flush=True)
 
     results = []
@@ -784,7 +958,12 @@ def main() -> int:
         outcome = run_suite(
             workdir, baseline_collected=baseline["collected"], suite_args=suite_args
         )
-        killed = outcome["scored"] and bool(outcome["failed"])
+        # Differential, not absolute. ``require_green`` already refuses a red baseline, so
+        # this should never subtract anything — it is here because the failure it guards
+        # against (a test that fails identically in every run, crediting every guard with a
+        # kill it did not earn) is not one the numbers reveal on their own.
+        new_failures = [f for f in outcome["failed"] if f not in baseline_failures]
+        killed = outcome["scored"] and bool(new_failures)
         results.append(
             {
                 "index": guard.index,
@@ -796,7 +975,7 @@ def main() -> int:
                 "scored": outcome["scored"],
                 "why_not": outcome["why"],
                 "killed": killed,
-                "killed_by": outcome["failed"][:5],
+                "killed_by": new_failures[:5],
             }
         )
         state = "KILLED" if killed else ("SURVIVED" if outcome["scored"] else "UNSCORED")

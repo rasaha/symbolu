@@ -1,5 +1,31 @@
 # Changelog — ugence-cloud-scaling-policy-authenticity
 
+## [Unreleased] — the 115/115 result was an artefact, and is withdrawn
+
+*No version bump and no behaviour change.* The partition, the profile version and every
+frozen digest are unmoved. What moves is a claim.
+
+### Withdrawn
+
+The previous entry reported **all 115 guards killed, no survivors**. That result is void.
+The sweep copies the package to a disposable directory, which was named `package`; this
+package's own `test_phase5a_untouched.py` asserts `here.name ==
+"cloud-scaling-policy-authenticity"`, so that test failed in **every** run of the sweep —
+baseline and mutant alike. A mutant counted as killed whenever any test failed, so every
+guard was credited with a kill it had not earned. The copy was not a faithful stand-in for
+the package, and the sweep measured the copy.
+
+It was found by the audit-mandated change that refuses a baseline which is not green, which
+is exactly the failure that change exists to catch. The engine now also names the copy after
+the package, and counts only failures the baseline did not already have.
+
+### Added
+
+- Two guards a raise-only reading missed, now inventoried: `verification.py:327`
+  (`require_production_resolution_port`) and `verified.py:488` (`require_phase5a_digest`).
+  Each is an `if` whose entire body is a call to an admission helper. The inventory is
+  **117**, and a raise-only reading of this package would miss 47 of them.
+
 ## [Unreleased] — the sweep is measured, and every guard is classified
 
 *No version bump and no behaviour change.* Coverage and CI only; the partition, the profile
