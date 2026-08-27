@@ -1,0 +1,698 @@
+{
+  "package": "policy-authenticity",
+  "total": 115,
+  "scored": 115,
+  "excluded": 0,
+  "classification": {
+    "1": {
+      "status": "SCORED",
+      "module": "canonical.py",
+      "line": 89,
+      "condition": "type(domain) is not str or not domain"
+    },
+    "2": {
+      "status": "SCORED",
+      "module": "canonical.py",
+      "line": 111,
+      "condition": "not is_policy_digest(value)"
+    },
+    "3": {
+      "status": "SCORED",
+      "module": "canonical.py",
+      "line": 130,
+      "condition": "not is_phase5a_digest(value)"
+    },
+    "4": {
+      "status": "SCORED",
+      "module": "canonical.py",
+      "line": 146,
+      "condition": "type(value) is not str"
+    },
+    "5": {
+      "status": "SCORED",
+      "module": "canonical.py",
+      "line": 151,
+      "condition": "not allow_empty and value == ''"
+    },
+    "6": {
+      "status": "SCORED",
+      "module": "canonical.py",
+      "line": 153,
+      "condition": "unicodedata.normalize('NFC', value) != value"
+    },
+    "7": {
+      "status": "SCORED",
+      "module": "canonical.py",
+      "line": 169,
+      "condition": "text != text.strip()"
+    },
+    "8": {
+      "status": "SCORED",
+      "module": "canonical.py",
+      "line": 171,
+      "condition": "any((ch.isspace() and ch != ' ' for ch in text))"
+    },
+    "9": {
+      "status": "SCORED",
+      "module": "canonical.py",
+      "line": 184,
+      "condition": "type(value) is not datetime"
+    },
+    "10": {
+      "status": "SCORED",
+      "module": "canonical.py",
+      "line": 186,
+      "condition": "value.tzinfo is None or value.utcoffset() is None"
+    },
+    "11": {
+      "status": "SCORED",
+      "module": "canonical.py",
+      "line": 202,
+      "condition": "type(value) is not expected"
+    },
+    "12": {
+      "status": "SCORED",
+      "module": "identifiers.py",
+      "line": 186,
+      "condition": "VERIFICATION_PROFILE == POLICY_AUTHORITY_PROTOCOL_ID"
+    },
+    "13": {
+      "status": "SCORED",
+      "module": "identifiers.py",
+      "line": 191,
+      "condition": "POLICY_AUTHENTICITY_DIGEST_DOMAIN == POLICY_BODY_DIGEST_DOMAIN"
+    },
+    "14": {
+      "status": "SCORED",
+      "module": "identifiers.py",
+      "line": 196,
+      "condition": "len({POLICY_AUTHENTICITY_DIGEST_DOMAIN, POLICY_AUTHENTICITY_VERIFIED_FACTS_DOMAIN, POLICY_AUTHENTICITY_RECORDED_FACTS_DOMAIN}) != 3"
+    },
+    "15": {
+      "status": "SCORED",
+      "module": "identifiers.py",
+      "line": 210,
+      "condition": "REQUIRED_KEY_ENTITLEMENT is FORBIDDEN_KEY_ENTITLEMENT"
+    },
+    "16": {
+      "status": "SCORED",
+      "module": "identifiers.py",
+      "line": 224,
+      "condition": "CANONICAL_ACTION_TYPES != _RATIFIED_ACTION_TYPES"
+    },
+    "17": {
+      "status": "SCORED",
+      "module": "resolution_port.py",
+      "line": 193,
+      "condition": "registry is None"
+    },
+    "18": {
+      "status": "SCORED",
+      "module": "resolution_port.py",
+      "line": 195,
+      "condition": "signature_verifier is None"
+    },
+    "19": {
+      "status": "SCORED",
+      "module": "resolution_port.py",
+      "line": 200,
+      "condition": "not isinstance(adapters, AdapterRegistry)"
+    },
+    "20": {
+      "status": "SCORED",
+      "module": "resolution_port.py",
+      "line": 206,
+      "condition": "not hasattr(registry, attribute)"
+    },
+    "21": {
+      "status": "SCORED",
+      "module": "resolution_port.py",
+      "line": 210,
+      "condition": "not hasattr(signature_verifier, 'verify')"
+    },
+    "22": {
+      "status": "SCORED",
+      "module": "resolution_port.py",
+      "line": 354,
+      "condition": "REFERENCE_GRADE_PORTS and isinstance(port, REFERENCE_GRADE_PORTS)"
+    },
+    "23": {
+      "status": "SCORED",
+      "module": "resolution_port.py",
+      "line": 359,
+      "condition": "getattr(port, 'is_production_authoritative', False) is not True"
+    },
+    "24": {
+      "status": "SCORED",
+      "module": "verified.py",
+      "line": 279,
+      "condition": "smuggled"
+    },
+    "25": {
+      "status": "SCORED",
+      "module": "verified.py",
+      "line": 296,
+      "condition": "not_a_field"
+    },
+    "26": {
+      "status": "SCORED",
+      "module": "verified.py",
+      "line": 356,
+      "condition": "isinstance(value, bool) or type(value) is not int"
+    },
+    "27": {
+      "status": "SCORED",
+      "module": "verified.py",
+      "line": 360,
+      "condition": "value < 0"
+    },
+    "28": {
+      "status": "SCORED",
+      "module": "verified.py",
+      "line": 446,
+      "condition": "self.construction_token is not _VERIFICATION_TOKEN"
+    },
+    "29": {
+      "status": "SCORED",
+      "module": "verified.py",
+      "line": 453,
+      "condition": "self.verification_profile != VERIFICATION_PROFILE"
+    },
+    "30": {
+      "status": "SCORED",
+      "module": "verified.py",
+      "line": 457,
+      "condition": "self.verification_profile_version != VERIFICATION_PROFILE_VERSION"
+    },
+    "31": {
+      "status": "SCORED",
+      "module": "verified.py",
+      "line": 461,
+      "condition": "self.policy_trust_anchor_owner != POLICY_TRUST_ANCHOR_OWNER"
+    },
+    "32": {
+      "status": "SCORED",
+      "module": "verified.py",
+      "line": 466,
+      "condition": "self.authority_protocol_id != POLICY_AUTHORITY_PROTOCOL_ID"
+    },
+    "33": {
+      "status": "SCORED",
+      "module": "verified.py",
+      "line": 471,
+      "condition": "self.authority_canonicalization_version != POLICY_AUTHORITY_CANONICALIZATION_VERSION"
+    },
+    "34": {
+      "status": "SCORED",
+      "module": "verified.py",
+      "line": 476,
+      "condition": "self.signature_alg not in SUPPORTED_SIGNATURE_ALGORITHMS"
+    },
+    "35": {
+      "status": "SCORED",
+      "module": "verified.py",
+      "line": 495,
+      "condition": "self.capacity_bounds_fact is not None"
+    },
+    "36": {
+      "status": "SCORED",
+      "module": "verified.py",
+      "line": 496,
+      "condition": "type(self.capacity_bounds_fact) is not tuple"
+    },
+    "37": {
+      "status": "SCORED",
+      "module": "verified.py",
+      "line": 501,
+      "condition": "not self.capacity_bounds_fact"
+    },
+    "38": {
+      "status": "SCORED",
+      "module": "verified.py",
+      "line": 508,
+      "condition": "type(bound) is not VerifiedCapacityBound"
+    },
+    "39": {
+      "status": "SCORED",
+      "module": "verified.py",
+      "line": 516,
+      "condition": "len(set(selectors)) != len(selectors)"
+    },
+    "40": {
+      "status": "SCORED",
+      "module": "verified.py",
+      "line": 525,
+      "condition": "self.policy_content_digest != self.policy_body_digest"
+    },
+    "41": {
+      "status": "SCORED",
+      "module": "verified.py",
+      "line": 534,
+      "condition": "self.artifact_digest != expected"
+    },
+    "42": {
+      "status": "SCORED",
+      "module": "verified.py",
+      "line": 675,
+      "condition": "name in RECORDED_FACT_NAMES"
+    },
+    "43": {
+      "status": "SCORED",
+      "module": "verified.py",
+      "line": 681,
+      "condition": "name not in VERIFIED_FACT_NAMES"
+    },
+    "44": {
+      "status": "SCORED",
+      "module": "verified.py",
+      "line": 695,
+      "condition": "name not in RECORDED_FACT_NAMES"
+    },
+    "45": {
+      "status": "SCORED",
+      "module": "verified.py",
+      "line": 737,
+      "condition": "type(value) is not VerifiedPolicyAuthenticity"
+    },
+    "46": {
+      "status": "SCORED",
+      "module": "verified.py",
+      "line": 751,
+      "condition": "value.construction_token is not _VERIFICATION_TOKEN"
+    },
+    "47": {
+      "status": "SCORED",
+      "module": "verified.py",
+      "line": 756,
+      "condition": "value.artifact_digest not in _MINTED_DIGESTS"
+    },
+    "48": {
+      "status": "SCORED",
+      "module": "verified.py",
+      "line": 763,
+      "condition": "value.artifact_digest != value.digest()"
+    },
+    "49": {
+      "status": "SCORED",
+      "module": "verified.py",
+      "line": 775,
+      "condition": "VERIFIED_FACT_NAMES & RECORDED_FACT_NAMES"
+    },
+    "50": {
+      "status": "SCORED",
+      "module": "verified.py",
+      "line": 780,
+      "condition": "_PARTITIONED != _DECLARED"
+    },
+    "51": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 152,
+      "condition": "type(self.outcome) is not _Outcome"
+    },
+    "52": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 157,
+      "condition": "self.outcome is _Outcome.VERIFIED"
+    },
+    "53": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 190,
+      "condition": "(self.verified_policy is None) == (self.refusal is None)"
+    },
+    "54": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 195,
+      "condition": "self.verified_policy is not None"
+    },
+    "55": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 196,
+      "condition": "type(self.verified_policy) is not VerifiedPolicyAuthenticity"
+    },
+    "56": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 207,
+      "condition": "type(self.resolution) is not PolicyResolution"
+    },
+    "57": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 214,
+      "condition": "self.refusal is not None and type(self.refusal) is not PolicyAuthenticityRefusal"
+    },
+    "58": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 240,
+      "condition": "resolution.requested_coordinate != coordinate"
+    },
+    "59": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 247,
+      "condition": "type(record) is not IssuedPolicyRecord or record.coordinate != coordinate"
+    },
+    "60": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 252,
+      "condition": "record.policy_body_digest != artifact.policy_body_digest"
+    },
+    "61": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 259,
+      "condition": "resolution.as_of != artifact.resolved_as_of_fact"
+    },
+    "62": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 266,
+      "condition": "resolution.historical or resolution.implies_current_validity is not True"
+    },
+    "63": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 310,
+      "condition": "resolution_port is None"
+    },
+    "64": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 315,
+      "condition": "not hasattr(resolution_port, 'resolve_policy_version')"
+    },
+    "65": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 321,
+      "condition": "not is_policy_digest(digest)"
+    },
+    "66": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 412,
+      "condition": "type(coordinate) is not PolicyCoordinate"
+    },
+    "67": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 419,
+      "condition": "type(expected_reference_tenant_id) is not str"
+    },
+    "68": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 424,
+      "condition": "type(as_of) is not datetime or as_of.tzinfo is None or as_of.utcoffset() is None"
+    },
+    "69": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 430,
+      "condition": "candidate is not None and type(candidate) is not CapacityAuthorizationCandidate"
+    },
+    "70": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 440,
+      "condition": "expected_reference_tenant_id != coordinate.tenant_id"
+    },
+    "71": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 460,
+      "condition": "type(resolution) is not PolicyResolution"
+    },
+    "72": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 467,
+      "condition": "resolution.requested_coordinate != coordinate"
+    },
+    "73": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 472,
+      "condition": "resolution.as_of != instant"
+    },
+    "74": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 479,
+      "condition": "resolution.status is not PolicyResolutionStatus.RESOLVED"
+    },
+    "75": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 487,
+      "condition": "resolution.historical"
+    },
+    "76": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 494,
+      "condition": "resolution.implies_current_validity is not True"
+    },
+    "77": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 502,
+      "condition": "type(record) is not IssuedPolicyRecord"
+    },
+    "78": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 507,
+      "condition": "resolution.policy is None or record.policy is not resolution.policy"
+    },
+    "79": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 512,
+      "condition": "record.coordinate != coordinate"
+    },
+    "80": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 519,
+      "condition": "record.coordinate.content_digest != record.policy_body_digest"
+    },
+    "81": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 529,
+      "condition": "record.signature_alg not in SUPPORTED_SIGNATURE_ALGORITHMS"
+    },
+    "82": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 536,
+      "condition": "not is_policy_digest(record.policy_body_digest)"
+    },
+    "83": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 541,
+      "condition": "candidate is not None and (not is_phase5a_digest(candidate.candidate_digest))"
+    },
+    "84": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 551,
+      "condition": "candidate is not None"
+    },
+    "85": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 553,
+      "condition": "mismatch is not None"
+    },
+    "86": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 566,
+      "condition": "candidate is not None"
+    },
+    "87": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 568,
+      "condition": "crossing is not None"
+    },
+    "88": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 577,
+      "condition": "candidate is not None"
+    },
+    "89": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 584,
+      "condition": "mistyped is not None"
+    },
+    "90": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 588,
+      "condition": "staleness is not None"
+    },
+    "91": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 604,
+      "condition": "reproduction is not None"
+    },
+    "92": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 627,
+      "condition": "candidate is not None"
+    },
+    "93": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 629,
+      "condition": "mismatch is not None"
+    },
+    "94": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 685,
+      "condition": "missing"
+    },
+    "95": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 692,
+      "condition": "type(adapter_id) is not str or type(policy_type) is not str"
+    },
+    "96": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 697,
+      "condition": "not isinstance(projection, Mapping)"
+    },
+    "97": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 706,
+      "condition": "adapter_id != record.adapter_id"
+    },
+    "98": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 712,
+      "condition": "policy_type != record.policy_type"
+    },
+    "99": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 728,
+      "condition": "reproduced != record.policy_body_digest"
+    },
+    "100": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 758,
+      "condition": "not isinstance(raw, (list, tuple))"
+    },
+    "101": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 764,
+      "condition": "not raw"
+    },
+    "102": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 772,
+      "condition": "not isinstance(entry, Mapping)"
+    },
+    "103": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 775,
+      "condition": "absent"
+    },
+    "104": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 778,
+      "condition": "extra"
+    },
+    "105": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 824,
+      "condition": "not capacity_bounds"
+    },
+    "106": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 836,
+      "condition": "type(action_type) is not str or action_type not in CANONICAL_ACTION_TYPES"
+    },
+    "107": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 852,
+      "condition": "not matches"
+    },
+    "108": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 864,
+      "condition": "len(matches) > 1"
+    },
+    "109": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 884,
+      "condition": "type(carried) is not int or isinstance(carried, bool)"
+    },
+    "110": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 890,
+      "condition": "carried > authenticated"
+    },
+    "111": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 1026,
+      "condition": "type(value) is not datetime"
+    },
+    "112": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 1053,
+      "condition": "instant < valid_from"
+    },
+    "113": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 1059,
+      "condition": "instant > valid_until"
+    },
+    "114": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 1067,
+      "condition": "instant > expires_at"
+    },
+    "115": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 1076,
+      "condition": "instant < occurred_at"
+    }
+  }
+}

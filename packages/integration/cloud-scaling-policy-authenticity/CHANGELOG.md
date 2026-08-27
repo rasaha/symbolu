@@ -1,5 +1,30 @@
 # Changelog — ugence-cloud-scaling-policy-authenticity
 
+## [Unreleased] — the sweep is measured, and every guard is classified
+
+*No version bump and no behaviour change.* Coverage and CI only; the partition, the profile
+version and every frozen digest are unmoved.
+
+The first complete CI mutation sweep of this package neutralised all **115** authority-
+bearing guards and ran the whole suite against each. **All 115 died. No survivors, none
+unscored** — so every guard is classified `SCORED`, and this package declares no exclusion
+at all.
+
+That total depends on this package's own definition of a refusal. Phase 5A refuses by
+`raise`; this package also refuses by *returning* `_refuse(outcome, detail)` at a gate and
+`(_Outcome.X, "…")` from the helper that decided it. A raise-only inventory misses 17 real
+gates here, gate 13's exact-type instant check and all six R-8 bound-reconciliation branches
+among them — the gates most recently added. Each of those seven appears individually in the
+aggregated result, and each was killed.
+
+### Added
+
+- `guard_classification.json` (generated, tracked) — all 115 guards, each `SCORED`.
+- The same six blocking aggregate conditions as the Phase 5A workflow: inventory drift, an
+  unclassified guard, an invalid or orphaned exclusion, a `SCORED` guard that survived, a
+  stale exclusion, a missing shard, a duplicated result, and a shard that collected a
+  different population.
+
 ## [0.8.0] — gate 13 re-checks the six carried instants by exact type
 
 **No partition change and no profile bump.** `VERIFICATION_PROFILE_VERSION` stays `v4` and

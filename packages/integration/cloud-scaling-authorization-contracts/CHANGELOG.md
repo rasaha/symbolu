@@ -1,5 +1,48 @@
 # Changelog — ugence-cloud-scaling-authorization-contracts
 
+## [Unreleased] — the sweep is measured, and every guard is classified
+
+*No version bump.* No production behaviour changes here: this is coverage, classification
+and the CI that enforces both.
+
+The first complete CI mutation sweep of this package neutralised all **109** authority-
+bearing guards and ran the whole suite against each. **78 died; 31 survived.** A survivor
+is not a guard the suite tests weakly — it is a guard the suite never reached, so removing
+it changed nothing any test could see.
+
+### Added
+
+- `tests/test_guard_coverage.py` — 31 tests reaching 28 of the 31 survivors through the
+  public surface each defends. Each asserts the specific typed refusal that guard alone
+  produces, so a test that merely observed "something was refused" cannot stand in for it.
+- `guard_classification.json` (generated, tracked) — every one of the 109 guards
+  classified `SCORED` or `EXCLUDED`. Exclusions are declared in the engine, keyed by
+  `(module, condition)` rather than by line so a shifted line cannot silently re-point one
+  at a different guard, and each must name a reason from a closed four-item vocabulary and
+  a test that measures the reason.
+- Six blocking CI conditions on the aggregate: inventory drift, an unclassified guard, an
+  invalid or orphaned exclusion, a `SCORED` guard that survived, an `EXCLUDED` guard that
+  was in fact killed, a missing shard, a duplicated result, and a shard that collected a
+  different population.
+- The test-time half of the D-4 drift assertion (ADR Phase 5 §9), which was missing.
+  Import-time alone is green in any process that imports a stale wheel.
+
+### Measured
+
+- Of the 28 newly-covered guards, **7 ADMIT their attack outright** when removed — the
+  boundary produces no refusal at all — **5 fail closed through an untyped `AttributeError`
+  or `KeyError`**, and 16 refuse with another guard's reason. `GUARD_SWEEP.md` records
+  which is which, per guard, with the mutant's actual output.
+- Three classifications in the earlier 49-guard `GUARD_SWEEP.md` are refuted. All three
+  rest on attacks routed through the candidate builder; `reconcile_phase4` is exported in
+  `__all__` and is a public entry point of its own, and on that path two of the three
+  guards admit their attack with no refusal. The document is corrected in place rather
+  than deleted.
+- Guards 9, 10 and 11 (`identifiers.py`) are `EXCLUDED` as equivalent mutants: each
+  compares two frozen constants that are equal in-tree, so `if False:` is the same program
+  on every path. The claim is not asserted — a test measures that each condition is False,
+  and the exclusion is void the moment it stops being.
+
 ## [Unreleased] — every value is admitted before it is compared
 
 *No version bump.* `cloud-scaling-policy-authenticity` pins Phase 5A's version literal in

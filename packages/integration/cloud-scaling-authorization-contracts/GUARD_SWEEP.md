@@ -1,5 +1,13 @@
 # Canonical 49-guard mutation sweep — Cloud Scaling Phase 5A
 
+> **Superseded for coverage purposes by `GUARD_INVENTORY.md` and
+> `guard_classification.json`.** That pair is generated from source, reconciled against the
+> recorded 65 + 28, and enforced in CI over **109** guards; the 49 below are a subset,
+> measured at a head whose line numbers have since moved. This document is kept because it
+> records *classifications*, and three of them are refuted by measurement — which is worth
+> more as a correction than as a deletion. See "Three classifications this document got
+> wrong" below.
+
 Deterministic inventory: 87 raw `raise` sites -> 85 loose guards -> 81 strict guards ->
 **49 canonical in-scope guards** (`reconciliation.py` then `candidate.py`, source order).
 Anchors hold: guard 11 = `reconciliation.py:226 p_tenant != d_tenant`, guard 13 =
@@ -81,3 +89,76 @@ neutralised, and every one of them still refused: **no surviving guard admits a 
 invalid candidate.** Three (guards 2, 18, 20) fail closed with an untyped `AttributeError`
 rather than a typed rejection — disclosed as a robustness observation, not a lapse, since
 no candidate is constructed in any of them.
+
+
+## Three classifications this document got wrong
+
+Every survivor above was attacked "directly through the public builder". That is the flaw:
+`reconcile_phase4` is exported in `__all__` and is a public entry point of its own, and a
+caller reaching it does not pass through `ExecutionTargetScope` or the candidate builder at
+all. Three survivors classified as needing no coverage admit their attack outright on that
+path, measured with only the named guard removed:
+
+| Here | Now | This document said | Measured on the `reconcile_phase4` path |
+|---|---|---|---|
+| 1 | 44 | *unreachable defence in depth — the same magnitudes are validated by ExecutionTargetScope* | **ADMITTED.** A self-consistent projection carrying `magnitude_before=-1` reconciles with no refusal. No scope is involved. |
+| 10 | 54 | *sibling-backed — guard 6 compares the same `p_context_digest`* | **Not interchangeable.** Guard 6/50 re-derives from the **request**; guard 10/54 digests the projection's **own** `context` object. A projection with a genuine request and a swapped context passes the first and fails only the second. |
+| 17 | 61 | *unreachable defence in depth — ExecutionTargetScope refuses a non-canonical action* | **ADMITTED.** A fully re-derived projection naming `scale_sideways` reconciles with no refusal. |
+
+The remaining thirteen classifications are accurate about what they claim — the guard's
+removal still fails closed, via a sibling or an untyped attribute access. They were wrong
+only in what was concluded from it: a guard whose removal changes the *reason* a refusal is
+given is not covered by a test that only checks that some refusal happened. This package
+has since ratified the typed refusal as part of the contract, so all thirteen are now
+scored rather than excluded.
+
+The summary sentence above — *"no surviving guard admits a new invalid candidate"* — holds
+for the builder path it was measured on and does not hold for the reconciler path.
+
+## What this PR added, and what each new test measures
+
+The 2026-08-27 CI sweep at `932869c3` neutralised all **109** guards of the current
+inventory — a superset of the 49 above — and found **31 survivors**. 28 of them are now
+covered. A kill says the suite noticed the guard was gone; it does not say what it
+noticed, so each was measured a second time with only that guard removed:
+
+* **ADMITTED** — the boundary produced *no refusal at all*. The guard is the only thing
+  between the attack and a reconciled fact.
+* **UNTYPED** — it still failed closed, but through an `AttributeError` or `KeyError`
+  rather than a typed refusal.
+* **MISDIAGNOSED** — it still refused, with another guard's reason.
+
+All three are defects under this package's ratified position that the typed refusal is
+part of the contract. They are not the same defect, and the distinction is recorded here
+rather than flattened into the word *killed*.
+
+| # | Module:line | Effect with the guard removed | What the mutant did instead |
+|---|---|---|---|
+| 1 | `canonical.py:82` | ADMITTED | `— (no exception)` |
+| 7 | `canonical.py:171` | ADMITTED | `— (no exception)` |
+| 12 | `target.py:101` | MISDIAGNOSED | `MagnitudeBoundError: requested delta 3 exceeds the permitted maximum delta True` |
+| 15 | `target.py:168` | ADMITTED | `— (no exception)` |
+| 18 | `target.py:268` | MISDIAGNOSED | `CanonicalFieldError: unknown execution-target-scope field(s): [('tenant_id', 't-1')]` |
+| 24 | `target.py:436` | MISDIAGNOSED | `CanonicalFieldError: unknown policy-target-binding field(s): [('policy_id', 'p-1')]` |
+| 26 | `target.py:453` | UNTYPED | `KeyError: 'policy_id'` |
+| 28 | `target.py:562` | ADMITTED | `— (no exception)` |
+| 29 | `target.py:572` | ADMITTED | `— (no exception)` |
+| 31 | `target.py:659` | MISDIAGNOSED | `CanonicalFieldError: unknown policy-coordinate-binding field(s): [('policy_id', 'p-1')]` |
+| 37 | `attestation.py:133` | MISDIAGNOSED | `ProducerAttestationError('signing_payload_digest does not equal the digest of the canonical signing payload')` |
+| 40 | `attestation.py:234` | MISDIAGNOSED | `CanonicalFieldError: unknown producer-attestation field(s): [('producer_id', 'p-1')]` |
+| 42 | `attestation.py:250` | UNTYPED | `KeyError: 'producer_id'` |
+| 43 | `attestation.py:255` | UNTYPED | `KeyError: 'schema_version'` |
+| 44 | `reconciliation.py:122` | ADMITTED | `— (no exception)` |
+| 50 | `reconciliation.py:283` | MISDIAGNOSED | `ReconciliationError('context_digest does not match the carried context')` |
+| 54 | `reconciliation.py:303` | MISDIAGNOSED | `ReconciliationError("action_type 'scale_sideways' is not a D-4 ratified canonical action type")` |
+| 61 | `reconciliation.py:364` | ADMITTED | `— (no exception)` |
+| 62 | `reconciliation.py:371` | UNTYPED | `AttributeError: 'str' object has no attribute 'value'` |
+| 64 | `reconciliation.py:381` | UNTYPED | `AttributeError: 'NoneType' object has no attribute 'value'` |
+| 65 | `reconciliation.py:388` | MISDIAGNOSED | `ReconciliationError('decision_snapshot must be a canonical mapping')` |
+| 66 | `reconciliation.py:393` | MISDIAGNOSED | `CanonicalFieldError: a canonical snapshot must be a mapping` |
+| 67 | `reconciliation.py:398` | MISDIAGNOSED | `CanonicalFieldError: decision_digest must be a canonical sha256:<64 lowercase hex> digest (got None)` |
+| 69 | `reconciliation.py:414` | MISDIAGNOSED | `CanonicalFieldError: decision_snapshot.decision_id must be a string (got NoneType)` |
+| 72 | `reconciliation.py:444` | MISDIAGNOSED | `CanonicalFieldError: projection.idempotency_key must be a canonical sha256:<64 lowercase hex> digest (got ''` |
+| 75 | `reconciliation.py:468` | MISDIAGNOSED | `ReconciliationError("the request's evidence_references differ from the projection's")` |
+| 77 | `reconciliation.py:481` | MISDIAGNOSED | `CanonicalFieldError: evidence_snapshot_digest must be a canonical sha256:<64 lowercase hex> digest (got None` |
+| 81 | `reconciliation.py:538` | MISDIAGNOSED | `ReconciliationError('expires_at must be a datetime (got None)')` |

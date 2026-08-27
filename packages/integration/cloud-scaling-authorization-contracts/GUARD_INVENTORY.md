@@ -21,6 +21,20 @@ reproduce is a count nobody can defend. They are defined over a *subset* of the
 modules and a *narrower* shape than this inventory — a `raise` alone in the body of
 its enclosing `if` — which is why this total is larger and neither number moves.
 
+## Classification
+
+Every guard is classified: **106 `SCORED`** — the
+sweep neutralises it and the suite must fail — and
+**3 `EXCLUDED`**, each with a reason from a closed vocabulary and
+a test that measures the reason. A guard is never excluded because it survived; a
+survivor with no prior declaration fails the sweep.
+
+| Module:line | Reason | Why | Measured by |
+|---|---|---|---|
+| `identifiers.py:93` | `equivalent-mutant` | Import-time drift assertion over two frozen constants that are equal in-tree, so the branch is never taken and `if False:` is the same program. Making the condition true means editing a constant, which is a different mutation operator. The test named below measures that the condition is False, so the exclusion is void the moment it stops being. | `tests/test_guard_coverage.py::test_the_drift_guards_are_equivalent_mutants_because_their_conditions_are_false` |
+| `identifiers.py:100` | `equivalent-mutant` | Same shape as the guard above: the controller's ActionKind value set and the D-4 ratified set are equal in-tree, measured by the test named below. | `tests/test_guard_coverage.py::test_the_drift_guards_are_equivalent_mutants_because_their_conditions_are_false` |
+| `identifiers.py:109` | `equivalent-mutant` | A collision assertion between two distinct frozen constants. They differ in-tree, so the condition is False and the branch unreachable; the test named below measures the inequality. | `tests/test_guard_coverage.py::test_the_drift_guards_are_equivalent_mutants_because_their_conditions_are_false` |
+
 ## Not counted, and why
 
 * **3 `except` arms** that raise. The `if False:` operator
@@ -31,114 +45,114 @@ its enclosing `if` — which is why this total is larger and neither number move
 
 ## Every guard
 
-| # | Module:line | Shape | Recorded in | Condition |
-|---|---|---|---|---|
-| 1 | `canonical.py:82` | raise | — | `not isinstance(snapshot, Mapping)` |
-| 2 | `canonical.py:103` | raise | — | `not is_canonical_digest(value)` |
-| 3 | `canonical.py:126` | raise | — | `not is_policy_authority_digest(value)` |
-| 4 | `canonical.py:149` | raise | — | `type(value) is not str` |
-| 5 | `canonical.py:154` | raise | — | `not allow_empty and value == ''` |
-| 6 | `canonical.py:158` | raise | — | `unicodedata.normalize('NFC', value) != value` |
-| 7 | `canonical.py:171` | raise | — | `text != text.strip()` |
-| 8 | `canonical.py:176` | raise | — | `any((ch.isspace() and ch != ' ' for ch in text))` |
-| 9 | `identifiers.py:93` | raise | — | `ours != theirs` |
-| 10 | `identifiers.py:100` | raise | — | `controller_actions != CANONICAL_ACTION_TYPES` |
-| 11 | `identifiers.py:109` | raise | — | `PRODUCER_SIGNING_PURPOSE == PURPOSE_CAPACITY_ACTION` |
-| 12 | `target.py:101` | raise | peripheral-28 | `type(value) is not int or value < 0` |
-| 13 | `target.py:152` | raise | peripheral-28 | `self.schema_version != EXECUTION_TARGET_SCOPE_SCHEMA_VERSION` |
-| 14 | `target.py:160` | raise | peripheral-28 | `self.account_id is None or self.account_id == ''` |
-| 15 | `target.py:168` | raise | peripheral-28 | `action not in CANONICAL_ACTION_TYPES` |
-| 16 | `target.py:188` | raise | peripheral-28 | `self.requested_magnitude > self.max_permitted_magnitude` |
-| 17 | `target.py:194` | raise | peripheral-28 | `self.requested_delta > self.max_permitted_delta` |
-| 18 | `target.py:268` | raise | peripheral-28 | `not isinstance(data, Mapping)` |
-| 19 | `target.py:275` | raise | peripheral-28 | `unknown` |
-| 20 | `target.py:281` | raise | — | `missing` |
-| 21 | `target.py:337` | raise | peripheral-28 | `self.schema_version != POLICY_TARGET_BINDING_SCHEMA_VERSION` |
-| 22 | `target.py:363` | raise | peripheral-28 | `type(value) is not int or value < 0` |
-| 23 | `target.py:371` | raise | peripheral-28 | `self.binding_digest != expected` |
-| 24 | `target.py:436` | raise | peripheral-28 | `not isinstance(data, Mapping)` |
-| 25 | `target.py:443` | raise | — | `unknown` |
-| 26 | `target.py:453` | raise | peripheral-28 | `missing` |
-| 27 | `target.py:545` | raise | peripheral-28 | `self.schema_version != POLICY_TARGET_BINDING_V2_SCHEMA_VERSION` |
-| 28 | `target.py:562` | raise | peripheral-28 | `tenant != tenant.strip()` |
-| 29 | `target.py:572` | raise | peripheral-28 | `self.policy_content_digest != self.policy_body_digest` |
-| 30 | `target.py:581` | raise | peripheral-28 | `self.binding_digest != expected` |
-| 31 | `target.py:659` | raise | peripheral-28 | `not isinstance(data, Mapping)` |
-| 32 | `target.py:666` | raise | — | `unknown` |
-| 33 | `target.py:676` | raise | peripheral-28 | `missing` |
-| 34 | `attestation.py:63` | raise | peripheral-28 | `not isinstance(value, datetime)` |
-| 35 | `attestation.py:67` | raise | peripheral-28 | `value.tzinfo is None or value.utcoffset() is None` |
-| 36 | `attestation.py:119` | raise | peripheral-28 | `self.schema_version != PRODUCER_ATTESTATION_SCHEMA_VERSION` |
-| 37 | `attestation.py:133` | raise | peripheral-28 | `algorithm not in SUPPORTED_SIGNATURE_ALGORITHMS` |
-| 38 | `attestation.py:142` | raise | peripheral-28 | `purpose not in SUPPORTED_PRODUCER_SIGNING_PURPOSES` |
-| 39 | `attestation.py:155` | raise | peripheral-28 | `self.signing_payload_digest != expected` |
-| 40 | `attestation.py:234` | raise | peripheral-28 | `type(data) is not dict and (not isinstance(data, Mapping))` |
-| 41 | `attestation.py:240` | raise | — | `unknown` |
-| 42 | `attestation.py:250` | raise | peripheral-28 | `missing` |
-| 43 | `attestation.py:255` | raise | peripheral-28 | `'schema_version' not in data` |
-| 44 | `reconciliation.py:122` | raise | canonical-65 | `type(value) is not int or value < 0` |
-| 45 | `reconciliation.py:144` | raise | canonical-65 | `type(value) is not datetime` |
-| 46 | `reconciliation.py:146` | raise | canonical-65 | `value.tzinfo is None or value.utcoffset() is None` |
-| 47 | `reconciliation.py:185` | raise | canonical-65 | `type(value) is not str` |
-| 48 | `reconciliation.py:219` | raise | canonical-65 | `type(projection) is not CapacityRiskSubjectProjection` |
-| 49 | `reconciliation.py:225` | raise | canonical-65 | `type(decision) is not SubjectRiskDecision` |
-| 50 | `reconciliation.py:283` | raise | canonical-65 | `validation.context_digest != p_context_digest` |
-| 51 | `reconciliation.py:288` | raise | canonical-65 | `validation.subject_digest != p_subject_digest` |
-| 52 | `reconciliation.py:293` | raise | canonical-65 | `validation.recommendation_digest != p_recommendation_digest` |
-| 53 | `reconciliation.py:298` | raise | canonical-65 | `p_request.digest() != p_request_digest` |
-| 54 | `reconciliation.py:303` | raise | canonical-65 | `p_context.digest() != p_context_digest` |
-| 55 | `reconciliation.py:322` | raise | canonical-65 | `require_canonical_identifier('projection.tenant_id', p_tenant) != d_tenant` |
-| 56 | `reconciliation.py:331` | raise | canonical-65 | `p_request_digest != d_request_digest` |
-| 57 | `reconciliation.py:337` | raise | canonical-65 | `p_subject_digest != d_subject_digest` |
-| 58 | `reconciliation.py:344` | raise | canonical-65 | `p_request.subject_type != SUBJECT_TYPE_CAPACITY_SUBJECT` |
-| 59 | `reconciliation.py:350` | raise | canonical-65 | `p_request.requested_purpose != PURPOSE_CAPACITY_ACTION` |
-| 60 | `reconciliation.py:356` | raise | canonical-65 | `p_request.requested_domain != DOMAIN_CLOUD_SCALING` |
-| 61 | `reconciliation.py:364` | raise | canonical-65 | `action_type not in CANONICAL_ACTION_TYPES` |
-| 62 | `reconciliation.py:371` | raise | canonical-65 | `not isinstance(d_disposition, SubjectRiskDisposition)` |
-| 63 | `reconciliation.py:375` | raise | canonical-65 | `d_disposition not in ALLOW_FAMILY_DISPOSITIONS` |
-| 64 | `reconciliation.py:381` | raise | canonical-65 | `d_risk_outcome is None` |
-| 65 | `reconciliation.py:388` | raise | canonical-65 | `d_decision_snapshot is None` |
-| 66 | `reconciliation.py:393` | raise | canonical-65 | `not isinstance(d_decision_snapshot, Mapping)` |
-| 67 | `reconciliation.py:398` | raise | canonical-65 | `d_decision_digest is None` |
-| 68 | `reconciliation.py:407` | raise | canonical-65 | `recomputed != d_decision_digest` |
-| 69 | `reconciliation.py:414` | raise | canonical-65 | `decision_id is None` |
-| 70 | `reconciliation.py:429` | raise | canonical-65 | `snapshot_tenant != p_tenant` |
-| 71 | `reconciliation.py:436` | raise | canonical-65 | `snapshot_domain != DOMAIN_CLOUD_SCALING` |
-| 72 | `reconciliation.py:444` | raise | canonical-65 | `not p_idempotency_key` |
-| 73 | `reconciliation.py:449` | raise | canonical-65 | `not d_idempotency_key` |
-| 74 | `reconciliation.py:461` | raise | canonical-65 | `p_idempotency_key != d_idempotency_key` |
-| 75 | `reconciliation.py:468` | raise | canonical-65 | `not isinstance(p_evidence_references, tuple) or not p_evidence_references` |
-| 76 | `reconciliation.py:475` | raise | canonical-65 | `tuple(p_request.evidence_references) != tuple(p_evidence_references)` |
-| 77 | `reconciliation.py:481` | raise | canonical-65 | `not evidence_snapshot_digest` |
-| 78 | `reconciliation.py:510` | raise | canonical-65 | `snapshot_evaluated_at is None` |
-| 79 | `reconciliation.py:520` | raise | canonical-65 | `snapshot_expires_at is None` |
-| 80 | `reconciliation.py:525` | raise | canonical-65 | `snapshot_issued_at is None` |
-| 81 | `reconciliation.py:538` | raise | canonical-65 | `d_expires_at is None` |
-| 82 | `reconciliation.py:545` | raise | canonical-65 | `to_canonical_obj(decision_evaluated_at) != to_canonical_obj(snapshot_evalua…` |
-| 83 | `reconciliation.py:560` | raise | canonical-65 | `to_canonical_obj(decision_expires_at) != to_canonical_obj(bound_expires_at)` |
-| 84 | `reconciliation.py:577` | raise | canonical-65 | `subject_valid_from > bound_evaluated_at` |
-| 85 | `reconciliation.py:584` | raise | canonical-65 | `bound_evaluated_at > bound_issued_at` |
-| 86 | `candidate.py:248` | raise | canonical-65 | `self.schema_version != AUTHORIZATION_CANDIDATE_SCHEMA_VERSION` |
-| 87 | `candidate.py:288` | raise | canonical-65 | `type(value) is not expected` |
-| 88 | `candidate.py:296` | raise | canonical-65 | `self.candidate_digest != expected_digest` |
-| 89 | `candidate.py:403` | raise | canonical-65 | `type(value) is not datetime` |
-| 90 | `candidate.py:408` | raise | canonical-65 | `value.tzinfo is None or value.utcoffset() is None` |
-| 91 | `candidate.py:457` | raise | — | `value is None` |
-| 92 | `candidate.py:465` | raise | canonical-65 | `type(value) is not expected` |
-| 93 | `candidate.py:516` | raise | canonical-65 | `a_recommendation_digest != facts.recommendation_digest` |
-| 94 | `candidate.py:550` | raise | canonical-65 | `not subject_from <= subject_asserted <= subject_until` |
-| 95 | `candidate.py:558` | raise | canonical-65 | `decision_at > decision_until` |
-| 96 | `candidate.py:565` | raise | canonical-65 | `not subject_asserted <= attested_at <= subject_until` |
-| 97 | `candidate.py:576` | raise | canonical-65 | `s_tenant != facts.tenant_id` |
-| 98 | `candidate.py:580` | raise | canonical-65 | `not s_account` |
-| 99 | `candidate.py:585` | raise | canonical-65 | `s_action_type != facts.action_type` |
-| 100 | `candidate.py:591` | raise | canonical-65 | `s_magnitude_before != facts.magnitude_before` |
-| 101 | `candidate.py:596` | raise | canonical-65 | `s_requested_magnitude != facts.magnitude_after` |
-| 102 | `candidate.py:611` | raise | canonical-65 | `scope_value != projected_value` |
-| 103 | `candidate.py:619` | raise | canonical-65 | `b_target_scope_digest != s_digest` |
-| 104 | `candidate.py:624` | raise | canonical-65 | `b_max_magnitude != s_max_magnitude or b_max_delta != s_max_delta` |
-| 105 | `candidate.py:649` | raise | canonical-65 | `c_policy_id != b_policy_id or c_policy_version != b_policy_version` |
-| 106 | `candidate.py:657` | raise | canonical-65 | `c_target_scope_digest != s_digest` |
-| 107 | `candidate.py:669` | raise | canonical-65 | `c_policy_scope == POLICY_SCOPE_TENANT and c_policy_tenant_id != facts.tenan…` |
-| 108 | `candidate.py:682` | raise | canonical-65 | `s_requested_magnitude > b_max_magnitude` |
-| 109 | `candidate.py:688` | raise | canonical-65 | `facts.requested_delta > b_max_delta` |
+| # | Module:line | Shape | Class | Recorded in | Condition |
+|---|---|---|---|---|---|
+| 1 | `canonical.py:82` | raise | SCORED | — | `not isinstance(snapshot, Mapping)` |
+| 2 | `canonical.py:103` | raise | SCORED | — | `not is_canonical_digest(value)` |
+| 3 | `canonical.py:126` | raise | SCORED | — | `not is_policy_authority_digest(value)` |
+| 4 | `canonical.py:149` | raise | SCORED | — | `type(value) is not str` |
+| 5 | `canonical.py:154` | raise | SCORED | — | `not allow_empty and value == ''` |
+| 6 | `canonical.py:158` | raise | SCORED | — | `unicodedata.normalize('NFC', value) != value` |
+| 7 | `canonical.py:171` | raise | SCORED | — | `text != text.strip()` |
+| 8 | `canonical.py:176` | raise | SCORED | — | `any((ch.isspace() and ch != ' ' for ch in text))` |
+| 9 | `identifiers.py:93` | raise | EXCLUDED | — | `ours != theirs` |
+| 10 | `identifiers.py:100` | raise | EXCLUDED | — | `controller_actions != CANONICAL_ACTION_TYPES` |
+| 11 | `identifiers.py:109` | raise | EXCLUDED | — | `PRODUCER_SIGNING_PURPOSE == PURPOSE_CAPACITY_ACTION` |
+| 12 | `target.py:101` | raise | SCORED | peripheral-28 | `type(value) is not int or value < 0` |
+| 13 | `target.py:152` | raise | SCORED | peripheral-28 | `self.schema_version != EXECUTION_TARGET_SCOPE_SCHEMA_VERSION` |
+| 14 | `target.py:160` | raise | SCORED | peripheral-28 | `self.account_id is None or self.account_id == ''` |
+| 15 | `target.py:168` | raise | SCORED | peripheral-28 | `action not in CANONICAL_ACTION_TYPES` |
+| 16 | `target.py:188` | raise | SCORED | peripheral-28 | `self.requested_magnitude > self.max_permitted_magnitude` |
+| 17 | `target.py:194` | raise | SCORED | peripheral-28 | `self.requested_delta > self.max_permitted_delta` |
+| 18 | `target.py:268` | raise | SCORED | peripheral-28 | `not isinstance(data, Mapping)` |
+| 19 | `target.py:275` | raise | SCORED | peripheral-28 | `unknown` |
+| 20 | `target.py:281` | raise | SCORED | — | `missing` |
+| 21 | `target.py:337` | raise | SCORED | peripheral-28 | `self.schema_version != POLICY_TARGET_BINDING_SCHEMA_VERSION` |
+| 22 | `target.py:363` | raise | SCORED | peripheral-28 | `type(value) is not int or value < 0` |
+| 23 | `target.py:371` | raise | SCORED | peripheral-28 | `self.binding_digest != expected` |
+| 24 | `target.py:436` | raise | SCORED | peripheral-28 | `not isinstance(data, Mapping)` |
+| 25 | `target.py:443` | raise | SCORED | — | `unknown` |
+| 26 | `target.py:453` | raise | SCORED | peripheral-28 | `missing` |
+| 27 | `target.py:545` | raise | SCORED | peripheral-28 | `self.schema_version != POLICY_TARGET_BINDING_V2_SCHEMA_VERSION` |
+| 28 | `target.py:562` | raise | SCORED | peripheral-28 | `tenant != tenant.strip()` |
+| 29 | `target.py:572` | raise | SCORED | peripheral-28 | `self.policy_content_digest != self.policy_body_digest` |
+| 30 | `target.py:581` | raise | SCORED | peripheral-28 | `self.binding_digest != expected` |
+| 31 | `target.py:659` | raise | SCORED | peripheral-28 | `not isinstance(data, Mapping)` |
+| 32 | `target.py:666` | raise | SCORED | — | `unknown` |
+| 33 | `target.py:676` | raise | SCORED | peripheral-28 | `missing` |
+| 34 | `attestation.py:63` | raise | SCORED | peripheral-28 | `not isinstance(value, datetime)` |
+| 35 | `attestation.py:67` | raise | SCORED | peripheral-28 | `value.tzinfo is None or value.utcoffset() is None` |
+| 36 | `attestation.py:119` | raise | SCORED | peripheral-28 | `self.schema_version != PRODUCER_ATTESTATION_SCHEMA_VERSION` |
+| 37 | `attestation.py:133` | raise | SCORED | peripheral-28 | `algorithm not in SUPPORTED_SIGNATURE_ALGORITHMS` |
+| 38 | `attestation.py:142` | raise | SCORED | peripheral-28 | `purpose not in SUPPORTED_PRODUCER_SIGNING_PURPOSES` |
+| 39 | `attestation.py:155` | raise | SCORED | peripheral-28 | `self.signing_payload_digest != expected` |
+| 40 | `attestation.py:234` | raise | SCORED | peripheral-28 | `type(data) is not dict and (not isinstance(data, Mapping))` |
+| 41 | `attestation.py:240` | raise | SCORED | — | `unknown` |
+| 42 | `attestation.py:250` | raise | SCORED | peripheral-28 | `missing` |
+| 43 | `attestation.py:255` | raise | SCORED | peripheral-28 | `'schema_version' not in data` |
+| 44 | `reconciliation.py:122` | raise | SCORED | canonical-65 | `type(value) is not int or value < 0` |
+| 45 | `reconciliation.py:144` | raise | SCORED | canonical-65 | `type(value) is not datetime` |
+| 46 | `reconciliation.py:146` | raise | SCORED | canonical-65 | `value.tzinfo is None or value.utcoffset() is None` |
+| 47 | `reconciliation.py:185` | raise | SCORED | canonical-65 | `type(value) is not str` |
+| 48 | `reconciliation.py:219` | raise | SCORED | canonical-65 | `type(projection) is not CapacityRiskSubjectProjection` |
+| 49 | `reconciliation.py:225` | raise | SCORED | canonical-65 | `type(decision) is not SubjectRiskDecision` |
+| 50 | `reconciliation.py:283` | raise | SCORED | canonical-65 | `validation.context_digest != p_context_digest` |
+| 51 | `reconciliation.py:288` | raise | SCORED | canonical-65 | `validation.subject_digest != p_subject_digest` |
+| 52 | `reconciliation.py:293` | raise | SCORED | canonical-65 | `validation.recommendation_digest != p_recommendation_digest` |
+| 53 | `reconciliation.py:298` | raise | SCORED | canonical-65 | `p_request.digest() != p_request_digest` |
+| 54 | `reconciliation.py:303` | raise | SCORED | canonical-65 | `p_context.digest() != p_context_digest` |
+| 55 | `reconciliation.py:322` | raise | SCORED | canonical-65 | `require_canonical_identifier('projection.tenant_id', p_tenant) != d_tenant` |
+| 56 | `reconciliation.py:331` | raise | SCORED | canonical-65 | `p_request_digest != d_request_digest` |
+| 57 | `reconciliation.py:337` | raise | SCORED | canonical-65 | `p_subject_digest != d_subject_digest` |
+| 58 | `reconciliation.py:344` | raise | SCORED | canonical-65 | `p_request.subject_type != SUBJECT_TYPE_CAPACITY_SUBJECT` |
+| 59 | `reconciliation.py:350` | raise | SCORED | canonical-65 | `p_request.requested_purpose != PURPOSE_CAPACITY_ACTION` |
+| 60 | `reconciliation.py:356` | raise | SCORED | canonical-65 | `p_request.requested_domain != DOMAIN_CLOUD_SCALING` |
+| 61 | `reconciliation.py:364` | raise | SCORED | canonical-65 | `action_type not in CANONICAL_ACTION_TYPES` |
+| 62 | `reconciliation.py:371` | raise | SCORED | canonical-65 | `not isinstance(d_disposition, SubjectRiskDisposition)` |
+| 63 | `reconciliation.py:375` | raise | SCORED | canonical-65 | `d_disposition not in ALLOW_FAMILY_DISPOSITIONS` |
+| 64 | `reconciliation.py:381` | raise | SCORED | canonical-65 | `d_risk_outcome is None` |
+| 65 | `reconciliation.py:388` | raise | SCORED | canonical-65 | `d_decision_snapshot is None` |
+| 66 | `reconciliation.py:393` | raise | SCORED | canonical-65 | `not isinstance(d_decision_snapshot, Mapping)` |
+| 67 | `reconciliation.py:398` | raise | SCORED | canonical-65 | `d_decision_digest is None` |
+| 68 | `reconciliation.py:407` | raise | SCORED | canonical-65 | `recomputed != d_decision_digest` |
+| 69 | `reconciliation.py:414` | raise | SCORED | canonical-65 | `decision_id is None` |
+| 70 | `reconciliation.py:429` | raise | SCORED | canonical-65 | `snapshot_tenant != p_tenant` |
+| 71 | `reconciliation.py:436` | raise | SCORED | canonical-65 | `snapshot_domain != DOMAIN_CLOUD_SCALING` |
+| 72 | `reconciliation.py:444` | raise | SCORED | canonical-65 | `not p_idempotency_key` |
+| 73 | `reconciliation.py:449` | raise | SCORED | canonical-65 | `not d_idempotency_key` |
+| 74 | `reconciliation.py:461` | raise | SCORED | canonical-65 | `p_idempotency_key != d_idempotency_key` |
+| 75 | `reconciliation.py:468` | raise | SCORED | canonical-65 | `not isinstance(p_evidence_references, tuple) or not p_evidence_references` |
+| 76 | `reconciliation.py:475` | raise | SCORED | canonical-65 | `tuple(p_request.evidence_references) != tuple(p_evidence_references)` |
+| 77 | `reconciliation.py:481` | raise | SCORED | canonical-65 | `not evidence_snapshot_digest` |
+| 78 | `reconciliation.py:510` | raise | SCORED | canonical-65 | `snapshot_evaluated_at is None` |
+| 79 | `reconciliation.py:520` | raise | SCORED | canonical-65 | `snapshot_expires_at is None` |
+| 80 | `reconciliation.py:525` | raise | SCORED | canonical-65 | `snapshot_issued_at is None` |
+| 81 | `reconciliation.py:538` | raise | SCORED | canonical-65 | `d_expires_at is None` |
+| 82 | `reconciliation.py:545` | raise | SCORED | canonical-65 | `to_canonical_obj(decision_evaluated_at) != to_canonical_obj(snapshot_evalua…` |
+| 83 | `reconciliation.py:560` | raise | SCORED | canonical-65 | `to_canonical_obj(decision_expires_at) != to_canonical_obj(bound_expires_at)` |
+| 84 | `reconciliation.py:577` | raise | SCORED | canonical-65 | `subject_valid_from > bound_evaluated_at` |
+| 85 | `reconciliation.py:584` | raise | SCORED | canonical-65 | `bound_evaluated_at > bound_issued_at` |
+| 86 | `candidate.py:248` | raise | SCORED | canonical-65 | `self.schema_version != AUTHORIZATION_CANDIDATE_SCHEMA_VERSION` |
+| 87 | `candidate.py:288` | raise | SCORED | canonical-65 | `type(value) is not expected` |
+| 88 | `candidate.py:296` | raise | SCORED | canonical-65 | `self.candidate_digest != expected_digest` |
+| 89 | `candidate.py:403` | raise | SCORED | canonical-65 | `type(value) is not datetime` |
+| 90 | `candidate.py:408` | raise | SCORED | canonical-65 | `value.tzinfo is None or value.utcoffset() is None` |
+| 91 | `candidate.py:457` | raise | SCORED | — | `value is None` |
+| 92 | `candidate.py:465` | raise | SCORED | canonical-65 | `type(value) is not expected` |
+| 93 | `candidate.py:516` | raise | SCORED | canonical-65 | `a_recommendation_digest != facts.recommendation_digest` |
+| 94 | `candidate.py:550` | raise | SCORED | canonical-65 | `not subject_from <= subject_asserted <= subject_until` |
+| 95 | `candidate.py:558` | raise | SCORED | canonical-65 | `decision_at > decision_until` |
+| 96 | `candidate.py:565` | raise | SCORED | canonical-65 | `not subject_asserted <= attested_at <= subject_until` |
+| 97 | `candidate.py:576` | raise | SCORED | canonical-65 | `s_tenant != facts.tenant_id` |
+| 98 | `candidate.py:580` | raise | SCORED | canonical-65 | `not s_account` |
+| 99 | `candidate.py:585` | raise | SCORED | canonical-65 | `s_action_type != facts.action_type` |
+| 100 | `candidate.py:591` | raise | SCORED | canonical-65 | `s_magnitude_before != facts.magnitude_before` |
+| 101 | `candidate.py:596` | raise | SCORED | canonical-65 | `s_requested_magnitude != facts.magnitude_after` |
+| 102 | `candidate.py:611` | raise | SCORED | canonical-65 | `scope_value != projected_value` |
+| 103 | `candidate.py:619` | raise | SCORED | canonical-65 | `b_target_scope_digest != s_digest` |
+| 104 | `candidate.py:624` | raise | SCORED | canonical-65 | `b_max_magnitude != s_max_magnitude or b_max_delta != s_max_delta` |
+| 105 | `candidate.py:649` | raise | SCORED | canonical-65 | `c_policy_id != b_policy_id or c_policy_version != b_policy_version` |
+| 106 | `candidate.py:657` | raise | SCORED | canonical-65 | `c_target_scope_digest != s_digest` |
+| 107 | `candidate.py:669` | raise | SCORED | canonical-65 | `c_policy_scope == POLICY_SCOPE_TENANT and c_policy_tenant_id != facts.tenan…` |
+| 108 | `candidate.py:682` | raise | SCORED | canonical-65 | `s_requested_magnitude > b_max_magnitude` |
+| 109 | `candidate.py:688` | raise | SCORED | canonical-65 | `facts.requested_delta > b_max_delta` |

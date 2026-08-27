@@ -13,6 +13,16 @@ a stylistic choice — the raise-only reading misses eleven real Phase 5B gates.
 
 This package records no prior inventory; this is the first one.
 
+## Classification
+
+Every guard is classified: **115 `SCORED`** — the
+sweep neutralises it and the suite must fail — and
+**0 `EXCLUDED`**, each with a reason from a closed vocabulary and
+a test that measures the reason. A guard is never excluded because it survived; a
+survivor with no prior declaration fails the sweep.
+
+No guard in this package is excluded: every one is scored.
+
 ## Not counted, and why
 
 * **2 `except` arms** that raise. The `if False:` operator
@@ -23,120 +33,120 @@ This package records no prior inventory; this is the first one.
 
 ## Every guard
 
-| # | Module:line | Shape | Recorded in | Condition |
-|---|---|---|---|---|
-| 1 | `canonical.py:89` | raise | — | `type(domain) is not str or not domain` |
-| 2 | `canonical.py:111` | raise | — | `not is_policy_digest(value)` |
-| 3 | `canonical.py:130` | raise | — | `not is_phase5a_digest(value)` |
-| 4 | `canonical.py:146` | raise | — | `type(value) is not str` |
-| 5 | `canonical.py:151` | raise | — | `not allow_empty and value == ''` |
-| 6 | `canonical.py:153` | raise | — | `unicodedata.normalize('NFC', value) != value` |
-| 7 | `canonical.py:169` | raise | — | `text != text.strip()` |
-| 8 | `canonical.py:171` | raise | — | `any((ch.isspace() and ch != ' ' for ch in text))` |
-| 9 | `canonical.py:184` | raise | — | `type(value) is not datetime` |
-| 10 | `canonical.py:186` | raise | — | `value.tzinfo is None or value.utcoffset() is None` |
-| 11 | `canonical.py:202` | raise | — | `type(value) is not expected` |
-| 12 | `identifiers.py:186` | raise | — | `VERIFICATION_PROFILE == POLICY_AUTHORITY_PROTOCOL_ID` |
-| 13 | `identifiers.py:191` | raise | — | `POLICY_AUTHENTICITY_DIGEST_DOMAIN == POLICY_BODY_DIGEST_DOMAIN` |
-| 14 | `identifiers.py:196` | raise | — | `len({POLICY_AUTHENTICITY_DIGEST_DOMAIN, POLICY_AUTHENTICITY_VERIFIED_FACTS_…` |
-| 15 | `identifiers.py:210` | raise | — | `REQUIRED_KEY_ENTITLEMENT is FORBIDDEN_KEY_ENTITLEMENT` |
-| 16 | `identifiers.py:224` | raise | — | `CANONICAL_ACTION_TYPES != _RATIFIED_ACTION_TYPES` |
-| 17 | `resolution_port.py:193` | raise | — | `registry is None` |
-| 18 | `resolution_port.py:195` | raise | — | `signature_verifier is None` |
-| 19 | `resolution_port.py:200` | raise | — | `not isinstance(adapters, AdapterRegistry)` |
-| 20 | `resolution_port.py:206` | raise | — | `not hasattr(registry, attribute)` |
-| 21 | `resolution_port.py:210` | raise | — | `not hasattr(signature_verifier, 'verify')` |
-| 22 | `resolution_port.py:354` | raise | — | `REFERENCE_GRADE_PORTS and isinstance(port, REFERENCE_GRADE_PORTS)` |
-| 23 | `resolution_port.py:359` | raise | — | `getattr(port, 'is_production_authoritative', False) is not True` |
-| 24 | `verified.py:279` | raise | — | `smuggled` |
-| 25 | `verified.py:296` | raise | — | `not_a_field` |
-| 26 | `verified.py:356` | raise | — | `isinstance(value, bool) or type(value) is not int` |
-| 27 | `verified.py:360` | raise | — | `value < 0` |
-| 28 | `verified.py:446` | raise | — | `self.construction_token is not _VERIFICATION_TOKEN` |
-| 29 | `verified.py:453` | raise | — | `self.verification_profile != VERIFICATION_PROFILE` |
-| 30 | `verified.py:457` | raise | — | `self.verification_profile_version != VERIFICATION_PROFILE_VERSION` |
-| 31 | `verified.py:461` | raise | — | `self.policy_trust_anchor_owner != POLICY_TRUST_ANCHOR_OWNER` |
-| 32 | `verified.py:466` | raise | — | `self.authority_protocol_id != POLICY_AUTHORITY_PROTOCOL_ID` |
-| 33 | `verified.py:471` | raise | — | `self.authority_canonicalization_version != POLICY_AUTHORITY_CANONICALIZATIO…` |
-| 34 | `verified.py:476` | raise | — | `self.signature_alg not in SUPPORTED_SIGNATURE_ALGORITHMS` |
-| 35 | `verified.py:495` | raise | — | `self.capacity_bounds_fact is not None` |
-| 36 | `verified.py:496` | raise | — | `type(self.capacity_bounds_fact) is not tuple` |
-| 37 | `verified.py:501` | raise | — | `not self.capacity_bounds_fact` |
-| 38 | `verified.py:508` | raise | — | `type(bound) is not VerifiedCapacityBound` |
-| 39 | `verified.py:516` | raise | — | `len(set(selectors)) != len(selectors)` |
-| 40 | `verified.py:525` | raise | — | `self.policy_content_digest != self.policy_body_digest` |
-| 41 | `verified.py:534` | raise | — | `self.artifact_digest != expected` |
-| 42 | `verified.py:675` | raise | — | `name in RECORDED_FACT_NAMES` |
-| 43 | `verified.py:681` | raise | — | `name not in VERIFIED_FACT_NAMES` |
-| 44 | `verified.py:695` | raise | — | `name not in RECORDED_FACT_NAMES` |
-| 45 | `verified.py:737` | raise | — | `type(value) is not VerifiedPolicyAuthenticity` |
-| 46 | `verified.py:751` | raise | — | `value.construction_token is not _VERIFICATION_TOKEN` |
-| 47 | `verified.py:756` | raise | — | `value.artifact_digest not in _MINTED_DIGESTS` |
-| 48 | `verified.py:763` | raise | — | `value.artifact_digest != value.digest()` |
-| 49 | `verified.py:775` | raise | — | `VERIFIED_FACT_NAMES & RECORDED_FACT_NAMES` |
-| 50 | `verified.py:780` | raise | — | `_PARTITIONED != _DECLARED` |
-| 51 | `verification.py:152` | raise | — | `type(self.outcome) is not _Outcome` |
-| 52 | `verification.py:157` | raise | — | `self.outcome is _Outcome.VERIFIED` |
-| 53 | `verification.py:190` | raise | — | `(self.verified_policy is None) == (self.refusal is None)` |
-| 54 | `verification.py:195` | raise | — | `self.verified_policy is not None` |
-| 55 | `verification.py:196` | raise | — | `type(self.verified_policy) is not VerifiedPolicyAuthenticity` |
-| 56 | `verification.py:207` | raise | — | `type(self.resolution) is not PolicyResolution` |
-| 57 | `verification.py:214` | raise | — | `self.refusal is not None and type(self.refusal) is not PolicyAuthenticityRe…` |
-| 58 | `verification.py:240` | raise | — | `resolution.requested_coordinate != coordinate` |
-| 59 | `verification.py:247` | raise | — | `type(record) is not IssuedPolicyRecord or record.coordinate != coordinate` |
-| 60 | `verification.py:252` | raise | — | `record.policy_body_digest != artifact.policy_body_digest` |
-| 61 | `verification.py:259` | raise | — | `resolution.as_of != artifact.resolved_as_of_fact` |
-| 62 | `verification.py:266` | raise | — | `resolution.historical or resolution.implies_current_validity is not True` |
-| 63 | `verification.py:310` | raise | — | `resolution_port is None` |
-| 64 | `verification.py:315` | raise | — | `not hasattr(resolution_port, 'resolve_policy_version')` |
-| 65 | `verification.py:321` | raise | — | `not is_policy_digest(digest)` |
-| 66 | `verification.py:412` | typed-refusal call | — | `type(coordinate) is not PolicyCoordinate` |
-| 67 | `verification.py:419` | typed-refusal call | — | `type(expected_reference_tenant_id) is not str` |
-| 68 | `verification.py:424` | typed-refusal call | — | `type(as_of) is not datetime or as_of.tzinfo is None or as_of.utcoffset() is…` |
-| 69 | `verification.py:430` | typed-refusal call | — | `candidate is not None and type(candidate) is not CapacityAuthorizationCandi…` |
-| 70 | `verification.py:440` | typed-refusal call | — | `expected_reference_tenant_id != coordinate.tenant_id` |
-| 71 | `verification.py:460` | typed-refusal call | — | `type(resolution) is not PolicyResolution` |
-| 72 | `verification.py:467` | typed-refusal call | — | `resolution.requested_coordinate != coordinate` |
-| 73 | `verification.py:472` | typed-refusal call | — | `resolution.as_of != instant` |
-| 74 | `verification.py:479` | typed-refusal call | — | `resolution.status is not PolicyResolutionStatus.RESOLVED` |
-| 75 | `verification.py:487` | typed-refusal call | — | `resolution.historical` |
-| 76 | `verification.py:494` | typed-refusal call | — | `resolution.implies_current_validity is not True` |
-| 77 | `verification.py:502` | typed-refusal call | — | `type(record) is not IssuedPolicyRecord` |
-| 78 | `verification.py:507` | typed-refusal call | — | `resolution.policy is None or record.policy is not resolution.policy` |
-| 79 | `verification.py:512` | typed-refusal call | — | `record.coordinate != coordinate` |
-| 80 | `verification.py:519` | typed-refusal call | — | `record.coordinate.content_digest != record.policy_body_digest` |
-| 81 | `verification.py:529` | typed-refusal call | — | `record.signature_alg not in SUPPORTED_SIGNATURE_ALGORITHMS` |
-| 82 | `verification.py:536` | typed-refusal call | — | `not is_policy_digest(record.policy_body_digest)` |
-| 83 | `verification.py:541` | typed-refusal call | — | `candidate is not None and (not is_phase5a_digest(candidate.candidate_digest))` |
-| 84 | `verification.py:551` | typed-refusal call | — | `candidate is not None` |
-| 85 | `verification.py:553` | typed-refusal call | — | `mismatch is not None` |
-| 86 | `verification.py:566` | typed-refusal call | — | `candidate is not None` |
-| 87 | `verification.py:568` | typed-refusal call | — | `crossing is not None` |
-| 88 | `verification.py:577` | typed-refusal call | — | `candidate is not None` |
-| 89 | `verification.py:584` | typed-refusal call | — | `mistyped is not None` |
-| 90 | `verification.py:588` | typed-refusal call | — | `staleness is not None` |
-| 91 | `verification.py:604` | typed-refusal call | — | `reproduction is not None` |
-| 92 | `verification.py:627` | typed-refusal call | — | `candidate is not None` |
-| 93 | `verification.py:629` | typed-refusal call | — | `mismatch is not None` |
-| 94 | `verification.py:685` | typed-refusal tuple | — | `missing` |
-| 95 | `verification.py:692` | typed-refusal tuple | — | `type(adapter_id) is not str or type(policy_type) is not str` |
-| 96 | `verification.py:697` | typed-refusal tuple | — | `not isinstance(projection, Mapping)` |
-| 97 | `verification.py:706` | typed-refusal tuple | — | `adapter_id != record.adapter_id` |
-| 98 | `verification.py:712` | typed-refusal tuple | — | `policy_type != record.policy_type` |
-| 99 | `verification.py:728` | typed-refusal tuple | — | `reproduced != record.policy_body_digest` |
-| 100 | `verification.py:758` | raise | — | `not isinstance(raw, (list, tuple))` |
-| 101 | `verification.py:764` | raise | — | `not raw` |
-| 102 | `verification.py:772` | raise | — | `not isinstance(entry, Mapping)` |
-| 103 | `verification.py:775` | raise | — | `absent` |
-| 104 | `verification.py:778` | raise | — | `extra` |
-| 105 | `verification.py:824` | typed-refusal tuple | — | `not capacity_bounds` |
-| 106 | `verification.py:836` | typed-refusal tuple | — | `type(action_type) is not str or action_type not in CANONICAL_ACTION_TYPES` |
-| 107 | `verification.py:852` | typed-refusal tuple | — | `not matches` |
-| 108 | `verification.py:864` | typed-refusal tuple | — | `len(matches) > 1` |
-| 109 | `verification.py:884` | typed-refusal tuple | — | `type(carried) is not int or isinstance(carried, bool)` |
-| 110 | `verification.py:890` | typed-refusal tuple | — | `carried > authenticated` |
-| 111 | `verification.py:1026` | typed-refusal tuple | — | `type(value) is not datetime` |
-| 112 | `verification.py:1053` | typed-refusal tuple | — | `instant < valid_from` |
-| 113 | `verification.py:1059` | typed-refusal tuple | — | `instant > valid_until` |
-| 114 | `verification.py:1067` | typed-refusal tuple | — | `instant > expires_at` |
-| 115 | `verification.py:1076` | typed-refusal tuple | — | `instant < occurred_at` |
+| # | Module:line | Shape | Class | Recorded in | Condition |
+|---|---|---|---|---|---|
+| 1 | `canonical.py:89` | raise | SCORED | — | `type(domain) is not str or not domain` |
+| 2 | `canonical.py:111` | raise | SCORED | — | `not is_policy_digest(value)` |
+| 3 | `canonical.py:130` | raise | SCORED | — | `not is_phase5a_digest(value)` |
+| 4 | `canonical.py:146` | raise | SCORED | — | `type(value) is not str` |
+| 5 | `canonical.py:151` | raise | SCORED | — | `not allow_empty and value == ''` |
+| 6 | `canonical.py:153` | raise | SCORED | — | `unicodedata.normalize('NFC', value) != value` |
+| 7 | `canonical.py:169` | raise | SCORED | — | `text != text.strip()` |
+| 8 | `canonical.py:171` | raise | SCORED | — | `any((ch.isspace() and ch != ' ' for ch in text))` |
+| 9 | `canonical.py:184` | raise | SCORED | — | `type(value) is not datetime` |
+| 10 | `canonical.py:186` | raise | SCORED | — | `value.tzinfo is None or value.utcoffset() is None` |
+| 11 | `canonical.py:202` | raise | SCORED | — | `type(value) is not expected` |
+| 12 | `identifiers.py:186` | raise | SCORED | — | `VERIFICATION_PROFILE == POLICY_AUTHORITY_PROTOCOL_ID` |
+| 13 | `identifiers.py:191` | raise | SCORED | — | `POLICY_AUTHENTICITY_DIGEST_DOMAIN == POLICY_BODY_DIGEST_DOMAIN` |
+| 14 | `identifiers.py:196` | raise | SCORED | — | `len({POLICY_AUTHENTICITY_DIGEST_DOMAIN, POLICY_AUTHENTICITY_VERIFIED_FACTS_…` |
+| 15 | `identifiers.py:210` | raise | SCORED | — | `REQUIRED_KEY_ENTITLEMENT is FORBIDDEN_KEY_ENTITLEMENT` |
+| 16 | `identifiers.py:224` | raise | SCORED | — | `CANONICAL_ACTION_TYPES != _RATIFIED_ACTION_TYPES` |
+| 17 | `resolution_port.py:193` | raise | SCORED | — | `registry is None` |
+| 18 | `resolution_port.py:195` | raise | SCORED | — | `signature_verifier is None` |
+| 19 | `resolution_port.py:200` | raise | SCORED | — | `not isinstance(adapters, AdapterRegistry)` |
+| 20 | `resolution_port.py:206` | raise | SCORED | — | `not hasattr(registry, attribute)` |
+| 21 | `resolution_port.py:210` | raise | SCORED | — | `not hasattr(signature_verifier, 'verify')` |
+| 22 | `resolution_port.py:354` | raise | SCORED | — | `REFERENCE_GRADE_PORTS and isinstance(port, REFERENCE_GRADE_PORTS)` |
+| 23 | `resolution_port.py:359` | raise | SCORED | — | `getattr(port, 'is_production_authoritative', False) is not True` |
+| 24 | `verified.py:279` | raise | SCORED | — | `smuggled` |
+| 25 | `verified.py:296` | raise | SCORED | — | `not_a_field` |
+| 26 | `verified.py:356` | raise | SCORED | — | `isinstance(value, bool) or type(value) is not int` |
+| 27 | `verified.py:360` | raise | SCORED | — | `value < 0` |
+| 28 | `verified.py:446` | raise | SCORED | — | `self.construction_token is not _VERIFICATION_TOKEN` |
+| 29 | `verified.py:453` | raise | SCORED | — | `self.verification_profile != VERIFICATION_PROFILE` |
+| 30 | `verified.py:457` | raise | SCORED | — | `self.verification_profile_version != VERIFICATION_PROFILE_VERSION` |
+| 31 | `verified.py:461` | raise | SCORED | — | `self.policy_trust_anchor_owner != POLICY_TRUST_ANCHOR_OWNER` |
+| 32 | `verified.py:466` | raise | SCORED | — | `self.authority_protocol_id != POLICY_AUTHORITY_PROTOCOL_ID` |
+| 33 | `verified.py:471` | raise | SCORED | — | `self.authority_canonicalization_version != POLICY_AUTHORITY_CANONICALIZATIO…` |
+| 34 | `verified.py:476` | raise | SCORED | — | `self.signature_alg not in SUPPORTED_SIGNATURE_ALGORITHMS` |
+| 35 | `verified.py:495` | raise | SCORED | — | `self.capacity_bounds_fact is not None` |
+| 36 | `verified.py:496` | raise | SCORED | — | `type(self.capacity_bounds_fact) is not tuple` |
+| 37 | `verified.py:501` | raise | SCORED | — | `not self.capacity_bounds_fact` |
+| 38 | `verified.py:508` | raise | SCORED | — | `type(bound) is not VerifiedCapacityBound` |
+| 39 | `verified.py:516` | raise | SCORED | — | `len(set(selectors)) != len(selectors)` |
+| 40 | `verified.py:525` | raise | SCORED | — | `self.policy_content_digest != self.policy_body_digest` |
+| 41 | `verified.py:534` | raise | SCORED | — | `self.artifact_digest != expected` |
+| 42 | `verified.py:675` | raise | SCORED | — | `name in RECORDED_FACT_NAMES` |
+| 43 | `verified.py:681` | raise | SCORED | — | `name not in VERIFIED_FACT_NAMES` |
+| 44 | `verified.py:695` | raise | SCORED | — | `name not in RECORDED_FACT_NAMES` |
+| 45 | `verified.py:737` | raise | SCORED | — | `type(value) is not VerifiedPolicyAuthenticity` |
+| 46 | `verified.py:751` | raise | SCORED | — | `value.construction_token is not _VERIFICATION_TOKEN` |
+| 47 | `verified.py:756` | raise | SCORED | — | `value.artifact_digest not in _MINTED_DIGESTS` |
+| 48 | `verified.py:763` | raise | SCORED | — | `value.artifact_digest != value.digest()` |
+| 49 | `verified.py:775` | raise | SCORED | — | `VERIFIED_FACT_NAMES & RECORDED_FACT_NAMES` |
+| 50 | `verified.py:780` | raise | SCORED | — | `_PARTITIONED != _DECLARED` |
+| 51 | `verification.py:152` | raise | SCORED | — | `type(self.outcome) is not _Outcome` |
+| 52 | `verification.py:157` | raise | SCORED | — | `self.outcome is _Outcome.VERIFIED` |
+| 53 | `verification.py:190` | raise | SCORED | — | `(self.verified_policy is None) == (self.refusal is None)` |
+| 54 | `verification.py:195` | raise | SCORED | — | `self.verified_policy is not None` |
+| 55 | `verification.py:196` | raise | SCORED | — | `type(self.verified_policy) is not VerifiedPolicyAuthenticity` |
+| 56 | `verification.py:207` | raise | SCORED | — | `type(self.resolution) is not PolicyResolution` |
+| 57 | `verification.py:214` | raise | SCORED | — | `self.refusal is not None and type(self.refusal) is not PolicyAuthenticityRe…` |
+| 58 | `verification.py:240` | raise | SCORED | — | `resolution.requested_coordinate != coordinate` |
+| 59 | `verification.py:247` | raise | SCORED | — | `type(record) is not IssuedPolicyRecord or record.coordinate != coordinate` |
+| 60 | `verification.py:252` | raise | SCORED | — | `record.policy_body_digest != artifact.policy_body_digest` |
+| 61 | `verification.py:259` | raise | SCORED | — | `resolution.as_of != artifact.resolved_as_of_fact` |
+| 62 | `verification.py:266` | raise | SCORED | — | `resolution.historical or resolution.implies_current_validity is not True` |
+| 63 | `verification.py:310` | raise | SCORED | — | `resolution_port is None` |
+| 64 | `verification.py:315` | raise | SCORED | — | `not hasattr(resolution_port, 'resolve_policy_version')` |
+| 65 | `verification.py:321` | raise | SCORED | — | `not is_policy_digest(digest)` |
+| 66 | `verification.py:412` | typed-refusal call | SCORED | — | `type(coordinate) is not PolicyCoordinate` |
+| 67 | `verification.py:419` | typed-refusal call | SCORED | — | `type(expected_reference_tenant_id) is not str` |
+| 68 | `verification.py:424` | typed-refusal call | SCORED | — | `type(as_of) is not datetime or as_of.tzinfo is None or as_of.utcoffset() is…` |
+| 69 | `verification.py:430` | typed-refusal call | SCORED | — | `candidate is not None and type(candidate) is not CapacityAuthorizationCandi…` |
+| 70 | `verification.py:440` | typed-refusal call | SCORED | — | `expected_reference_tenant_id != coordinate.tenant_id` |
+| 71 | `verification.py:460` | typed-refusal call | SCORED | — | `type(resolution) is not PolicyResolution` |
+| 72 | `verification.py:467` | typed-refusal call | SCORED | — | `resolution.requested_coordinate != coordinate` |
+| 73 | `verification.py:472` | typed-refusal call | SCORED | — | `resolution.as_of != instant` |
+| 74 | `verification.py:479` | typed-refusal call | SCORED | — | `resolution.status is not PolicyResolutionStatus.RESOLVED` |
+| 75 | `verification.py:487` | typed-refusal call | SCORED | — | `resolution.historical` |
+| 76 | `verification.py:494` | typed-refusal call | SCORED | — | `resolution.implies_current_validity is not True` |
+| 77 | `verification.py:502` | typed-refusal call | SCORED | — | `type(record) is not IssuedPolicyRecord` |
+| 78 | `verification.py:507` | typed-refusal call | SCORED | — | `resolution.policy is None or record.policy is not resolution.policy` |
+| 79 | `verification.py:512` | typed-refusal call | SCORED | — | `record.coordinate != coordinate` |
+| 80 | `verification.py:519` | typed-refusal call | SCORED | — | `record.coordinate.content_digest != record.policy_body_digest` |
+| 81 | `verification.py:529` | typed-refusal call | SCORED | — | `record.signature_alg not in SUPPORTED_SIGNATURE_ALGORITHMS` |
+| 82 | `verification.py:536` | typed-refusal call | SCORED | — | `not is_policy_digest(record.policy_body_digest)` |
+| 83 | `verification.py:541` | typed-refusal call | SCORED | — | `candidate is not None and (not is_phase5a_digest(candidate.candidate_digest))` |
+| 84 | `verification.py:551` | typed-refusal call | SCORED | — | `candidate is not None` |
+| 85 | `verification.py:553` | typed-refusal call | SCORED | — | `mismatch is not None` |
+| 86 | `verification.py:566` | typed-refusal call | SCORED | — | `candidate is not None` |
+| 87 | `verification.py:568` | typed-refusal call | SCORED | — | `crossing is not None` |
+| 88 | `verification.py:577` | typed-refusal call | SCORED | — | `candidate is not None` |
+| 89 | `verification.py:584` | typed-refusal call | SCORED | — | `mistyped is not None` |
+| 90 | `verification.py:588` | typed-refusal call | SCORED | — | `staleness is not None` |
+| 91 | `verification.py:604` | typed-refusal call | SCORED | — | `reproduction is not None` |
+| 92 | `verification.py:627` | typed-refusal call | SCORED | — | `candidate is not None` |
+| 93 | `verification.py:629` | typed-refusal call | SCORED | — | `mismatch is not None` |
+| 94 | `verification.py:685` | typed-refusal tuple | SCORED | — | `missing` |
+| 95 | `verification.py:692` | typed-refusal tuple | SCORED | — | `type(adapter_id) is not str or type(policy_type) is not str` |
+| 96 | `verification.py:697` | typed-refusal tuple | SCORED | — | `not isinstance(projection, Mapping)` |
+| 97 | `verification.py:706` | typed-refusal tuple | SCORED | — | `adapter_id != record.adapter_id` |
+| 98 | `verification.py:712` | typed-refusal tuple | SCORED | — | `policy_type != record.policy_type` |
+| 99 | `verification.py:728` | typed-refusal tuple | SCORED | — | `reproduced != record.policy_body_digest` |
+| 100 | `verification.py:758` | raise | SCORED | — | `not isinstance(raw, (list, tuple))` |
+| 101 | `verification.py:764` | raise | SCORED | — | `not raw` |
+| 102 | `verification.py:772` | raise | SCORED | — | `not isinstance(entry, Mapping)` |
+| 103 | `verification.py:775` | raise | SCORED | — | `absent` |
+| 104 | `verification.py:778` | raise | SCORED | — | `extra` |
+| 105 | `verification.py:824` | typed-refusal tuple | SCORED | — | `not capacity_bounds` |
+| 106 | `verification.py:836` | typed-refusal tuple | SCORED | — | `type(action_type) is not str or action_type not in CANONICAL_ACTION_TYPES` |
+| 107 | `verification.py:852` | typed-refusal tuple | SCORED | — | `not matches` |
+| 108 | `verification.py:864` | typed-refusal tuple | SCORED | — | `len(matches) > 1` |
+| 109 | `verification.py:884` | typed-refusal tuple | SCORED | — | `type(carried) is not int or isinstance(carried, bool)` |
+| 110 | `verification.py:890` | typed-refusal tuple | SCORED | — | `carried > authenticated` |
+| 111 | `verification.py:1026` | typed-refusal tuple | SCORED | — | `type(value) is not datetime` |
+| 112 | `verification.py:1053` | typed-refusal tuple | SCORED | — | `instant < valid_from` |
+| 113 | `verification.py:1059` | typed-refusal tuple | SCORED | — | `instant > valid_until` |
+| 114 | `verification.py:1067` | typed-refusal tuple | SCORED | — | `instant > expires_at` |
+| 115 | `verification.py:1076` | typed-refusal tuple | SCORED | — | `instant < occurred_at` |

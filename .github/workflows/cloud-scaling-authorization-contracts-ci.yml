@@ -246,7 +246,8 @@ jobs:
           python scripts/cloud_scaling/guard_sweep.py authorization-contracts --inventory-only
           git diff --exit-code -- \
             packages/integration/cloud-scaling-authorization-contracts/GUARD_INVENTORY.md \
-            packages/integration/cloud-scaling-authorization-contracts/guard_inventory.json
+            packages/integration/cloud-scaling-authorization-contracts/guard_inventory.json \
+            packages/integration/cloud-scaling-authorization-contracts/guard_classification.json
 
   guard-sweep:
     name: Gate-removal mutation sweep (shard ${{ matrix.shard }} of 8)

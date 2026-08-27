@@ -328,7 +328,8 @@ jobs:
           python scripts/cloud_scaling/guard_sweep.py policy-authenticity --inventory-only
           git diff --exit-code -- \
             packages/integration/cloud-scaling-policy-authenticity/GUARD_INVENTORY.md \
-            packages/integration/cloud-scaling-policy-authenticity/guard_inventory.json
+            packages/integration/cloud-scaling-policy-authenticity/guard_inventory.json \
+            packages/integration/cloud-scaling-policy-authenticity/guard_classification.json
 
   guard-sweep:
     name: Gate-removal mutation sweep (shard ${{ matrix.shard }} of 8)

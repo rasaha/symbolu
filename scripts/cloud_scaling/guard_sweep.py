@@ -64,6 +64,10 @@ class PackageConfig:
     tuple_refusals: bool
     #: The inventories this package already records, and what each is defined over.
     recorded: tuple
+    #: Guards this operator cannot score, keyed by ``(module, condition)`` rather than by
+    #: line number: a line shifts every time anything above it changes, and an exclusion
+    #: that silently re-points at a different guard is worse than no exclusion at all.
+    exclusions: dict = field(default_factory=dict)
 
     @property
     def src(self) -> Path:
@@ -72,6 +76,25 @@ class PackageConfig:
     @property
     def root(self) -> Path:
         return REPO / self.package_dir
+
+
+#: The only reasons a guard may be excluded from scoring. Closed on purpose: "it survived"
+#: is not on the list, and cannot be added by a reviewer in a hurry. Each entry must also
+#: name the test that measures the claim, so an exclusion is a checkable statement rather
+#: than an assertion of confidence.
+EXCLUSION_REASONS = frozenset(
+    {
+        # Removing the guard yields a program that behaves identically on every path, for
+        # every input. Scoring it would need a different operator, not a better test.
+        "equivalent-mutant",
+        # An earlier guard refuses every input that could reach this one.
+        "unreachable-behind-earlier-guard",
+        # The guard shapes a diagnosis; it changes no authorization outcome.
+        "diagnostic-only",
+        # Outside the ratified authority-bearing definition entirely.
+        "outside-authority-bearing-definition",
+    }
+)
 
 
 PACKAGES = {
@@ -93,6 +116,33 @@ PACKAGES = {
             ("canonical-65", ("reconciliation.py", "candidate.py"), 65),
             ("peripheral-28", ("attestation.py", "target.py"), 28),
         ),
+        exclusions={
+            ("identifiers.py", "ours != theirs"): (
+                "equivalent-mutant",
+                "Import-time drift assertion over two frozen constants that are equal "
+                "in-tree, so the branch is never taken and `if False:` is the same program. "
+                "Making the condition true means editing a constant, which is a different "
+                "mutation operator. The test named below measures that the condition is "
+                "False, so the exclusion is void the moment it stops being.",
+                "tests/test_guard_coverage.py::"
+                "test_the_drift_guards_are_equivalent_mutants_because_their_conditions_are_false",
+            ),
+            ("identifiers.py", "controller_actions != CANONICAL_ACTION_TYPES"): (
+                "equivalent-mutant",
+                "Same shape as the guard above: the controller's ActionKind value set and "
+                "the D-4 ratified set are equal in-tree, measured by the test named below.",
+                "tests/test_guard_coverage.py::"
+                "test_the_drift_guards_are_equivalent_mutants_because_their_conditions_are_false",
+            ),
+            ("identifiers.py", "PRODUCER_SIGNING_PURPOSE == PURPOSE_CAPACITY_ACTION"): (
+                "equivalent-mutant",
+                "A collision assertion between two distinct frozen constants. They differ "
+                "in-tree, so the condition is False and the branch unreachable; the test "
+                "named below measures the inequality.",
+                "tests/test_guard_coverage.py::"
+                "test_the_drift_guards_are_equivalent_mutants_because_their_conditions_are_false",
+            ),
+        },
     ),
     "policy-authenticity": PackageConfig(
         key="policy-authenticity",
@@ -281,11 +331,24 @@ def mutate(config: PackageConfig, guard: Guard, workdir: Path) -> None:
     path.write_text("".join(lines), encoding="utf-8")
 
 
-def run_suite(workdir: Path, baseline_collected=None, timeout: int = 1800) -> dict:
-    """Run the suite in the copy, and score it only if it collected the same population."""
+def run_suite(
+    workdir: Path,
+    baseline_collected=None,
+    timeout: int = 1800,
+    suite_args: tuple = ("tests",),
+) -> dict:
+    """Run the suite in the copy, and score it only if it collected the same population.
+
+    ``suite_args`` exists for local iteration only. CI always sweeps the whole suite, which
+    is the scoring instrument of record; narrowing it to the one test module that attacks a
+    guard turns a 2.5-minute mutant into a 3-second one while writing that attack. The
+    narrowed run can only ever be *weaker* than the full one — every test it runs, the full
+    suite also runs — so a kill it reports is a kill CI will reproduce, and a survivor it
+    reports still has to be confirmed against the full suite before anyone believes it.
+    """
 
     process = subprocess.run(
-        [sys.executable, "-m", "pytest", "tests", "-p", "no:cacheprovider", "--tb=no"],
+        [sys.executable, "-m", "pytest", *suite_args, "-p", "no:cacheprovider", "--tb=no"],
         cwd=str(workdir),
         capture_output=True,
         text=True,
@@ -364,7 +427,9 @@ def prepare_copy(config: PackageConfig) -> Path:
     return workdir
 
 
-def write_inventory(config: PackageConfig, guards: list, agreement: dict, leftout: dict) -> None:
+def write_inventory(
+    config: PackageConfig, guards: list, agreement: dict, leftout: dict, verdict: dict
+) -> None:
     """The checked-in inventory: every guard, its shape, and its classification.
 
     Checked in on purpose. The *sweep* is a pass/fail gate and its output belongs in CI
@@ -406,6 +471,30 @@ def write_inventory(config: PackageConfig, guards: list, agreement: dict, leftou
     else:
         lines += ["This package records no prior inventory; this is the first one.", ""]
 
+    excluded_rows = [
+        row for row in verdict["classified"].values() if row["status"] == "EXCLUDED"
+    ]
+    lines += [
+        "## Classification",
+        "",
+        f"Every guard is classified: **{len(guards) - len(excluded_rows)} `SCORED`** — the",
+        "sweep neutralises it and the suite must fail — and",
+        f"**{len(excluded_rows)} `EXCLUDED`**, each with a reason from a closed vocabulary and",
+        "a test that measures the reason. A guard is never excluded because it survived; a",
+        "survivor with no prior declaration fails the sweep.",
+        "",
+    ]
+    if excluded_rows:
+        lines += ["| Module:line | Reason | Why | Measured by |", "|---|---|---|---|"]
+        for row in excluded_rows:
+            lines.append(
+                f"| `{row['module']}:{row['line']}` | `{row['reason']}` | "
+                f"{row['detail']} | `{row['evidence']}` |"
+            )
+        lines.append("")
+    else:
+        lines += ["No guard in this package is excluded: every one is scored.", ""]
+
     lines += [
         "## Not counted, and why",
         "",
@@ -417,15 +506,16 @@ def write_inventory(config: PackageConfig, guards: list, agreement: dict, leftou
         "",
         "## Every guard",
         "",
-        "| # | Module:line | Shape | Recorded in | Condition |",
-        "|---|---|---|---|---|",
+        "| # | Module:line | Shape | Class | Recorded in | Condition |",
+        "|---|---|---|---|---|---|",
     ]
     for g in guards:
         condition = g.condition.replace("|", "\\|")
         if len(condition) > 78:
             condition = condition[:75] + "…"
+        status = verdict["classified"][g.index]["status"]
         lines.append(
-            f"| {g.index} | `{g.module}:{g.lineno}` | {g.shape} | "
+            f"| {g.index} | `{g.module}:{g.lineno}` | {g.shape} | {status} | "
             f"{g.recorded_in or '—'} | `{condition}` |"
         )
     lines.append("")
@@ -441,6 +531,47 @@ def shard_of(index: int, shard_n: int) -> int:
     """
 
     return (index - 1) % shard_n + 1
+
+
+def classify(config: PackageConfig, guards: list) -> dict:
+    """Every inventoried guard, with its declared classification.
+
+    A guard is ``SCORED`` unless it is declared excluded, and a declared exclusion that
+    matches no guard is an error rather than a no-op — that is what catches an exclusion
+    left behind after the guard it named was rewritten or removed.
+    """
+
+    classified = {}
+    matched = set()
+    for guard in guards:
+        key = (guard.module, guard.condition)
+        if key in config.exclusions:
+            matched.add(key)
+            reason, detail, evidence = config.exclusions[key]
+            classified[guard.index] = {
+                "status": "EXCLUDED",
+                "reason": reason,
+                "detail": detail,
+                "evidence": evidence,
+                "module": guard.module,
+                "line": guard.lineno,
+                "condition": guard.condition,
+            }
+        else:
+            classified[guard.index] = {
+                "status": "SCORED",
+                "module": guard.module,
+                "line": guard.lineno,
+                "condition": guard.condition,
+            }
+    orphans = sorted(f"{module}: {condition}"
+                     for module, condition in set(config.exclusions) - matched)
+    invalid = sorted(
+        f"{module}: {condition}"
+        for (module, condition), (reason, detail, evidence) in config.exclusions.items()
+        if reason not in EXCLUSION_REASONS or not detail.strip() or not evidence.strip()
+    )
+    return {"classified": classified, "orphan_exclusions": orphans, "invalid_exclusions": invalid}
 
 
 def aggregate(config: PackageConfig, shard_dir: Path, shard_n: int) -> dict:
@@ -476,6 +607,14 @@ def aggregate(config: PackageConfig, shard_dir: Path, shard_n: int) -> dict:
             if shard_of(index, shard_n) != k:
                 row["_misassigned_to"] = k
     misassigned = sorted(r["index"] for r in seen.values() if "_misassigned_to" in r)
+
+    verdict = classify(config, guards)
+    classified = verdict["classified"]
+    survived = sorted(i for i, r in seen.items() if r.get("scored") and not r.get("killed"))
+    killed = sorted(i for i, r in seen.items() if r.get("killed"))
+    # A survivor is a coverage defect unless it was declared unscorable *before* it
+    # survived. Reading the exclusion off the result would make every survivor its own
+    # excuse, so the declaration is checked against the result rather than derived from it.
     return {
         "package": config.key,
         "shard_n": shard_n,
@@ -486,11 +625,19 @@ def aggregate(config: PackageConfig, shard_dir: Path, shard_n: int) -> dict:
         "misassigned_guards": misassigned,
         "baselines": baselines,
         "baseline_agrees": len(set(baselines.values())) <= 1,
-        "killed": sorted(i for i, r in seen.items() if r.get("killed")),
-        "survived": sorted(
-            i for i, r in seen.items() if r.get("scored") and not r.get("killed")
-        ),
+        "killed": killed,
+        "survived": survived,
         "unscored": sorted(i for i, r in seen.items() if not r.get("scored")),
+        "classification": {str(i): classified[i] for i in sorted(classified)},
+        "unclassified_guards": sorted(set(expected) - set(classified)),
+        "orphan_exclusions": verdict["orphan_exclusions"],
+        "invalid_exclusions": verdict["invalid_exclusions"],
+        "surviving_scored_guards": [
+            i for i in survived if classified.get(i, {}).get("status") != "EXCLUDED"
+        ],
+        "stale_exclusions": [
+            i for i in killed if classified.get(i, {}).get("status") == "EXCLUDED"
+        ],
         "results": {str(i): seen[i] for i in sorted(seen)},
     }
 
@@ -503,6 +650,9 @@ def main() -> int:
     parser.add_argument("--aggregate", metavar="DIR",
                         help="combine shard results from DIR and prove the sweep was total")
     parser.add_argument("--shards", type=int, default=8, help="shard count for --aggregate")
+    # Local iteration only; CI passes neither. See ``run_suite`` for why narrowing is safe.
+    parser.add_argument("--only", help="sweep only these guard indices (comma-separated)")
+    parser.add_argument("--suite", help="pytest target(s) instead of the whole suite")
     args = parser.parse_args()
 
     config = PACKAGES[args.package]
@@ -530,7 +680,33 @@ def main() -> int:
             ],
         }
         (config.root / "guard_inventory.json").write_text(json.dumps(payload, indent=2) + "\n")
-        write_inventory(config, guards, agreement, leftout)
+        verdict = classify(config, guards)
+        (config.root / "guard_classification.json").write_text(
+            json.dumps(
+                {
+                    "package": config.key,
+                    "total": len(guards),
+                    "scored": sum(
+                        1 for r in verdict["classified"].values() if r["status"] == "SCORED"
+                    ),
+                    "excluded": sum(
+                        1 for r in verdict["classified"].values() if r["status"] == "EXCLUDED"
+                    ),
+                    "classification": {
+                        str(i): verdict["classified"][i] for i in sorted(verdict["classified"])
+                    },
+                },
+                indent=2,
+            )
+            + "\n"
+        )
+        write_inventory(config, guards, agreement, leftout, verdict)
+        if verdict["orphan_exclusions"] or verdict["invalid_exclusions"]:
+            for problem in verdict["orphan_exclusions"]:
+                print(f"  EXCLUSION NAMES NO GUARD: {problem}", file=sys.stderr)
+            for problem in verdict["invalid_exclusions"]:
+                print(f"  INVALID EXCLUSION: {problem}", file=sys.stderr)
+            return 1
         print(f"{config.key}: {len(guards)} guards; reconciliation "
               + ", ".join(f"{k}={'ok' if v['agrees'] else 'DRIFTED'}" for k, v in agreement.items())
               + (" (no prior inventory)" if not agreement else ""))
@@ -542,9 +718,13 @@ def main() -> int:
             json.dumps(report, indent=2) + "\n"
         )
         total = report["inventory_total"]
+        excluded_n = sum(
+            1 for row in report["classification"].values() if row["status"] == "EXCLUDED"
+        )
         print(f"{config.key}: inventory {total}; "
               f"killed {len(report['killed'])}, survived {len(report['survived'])}, "
-              f"unscored {len(report['unscored'])}")
+              f"unscored {len(report['unscored'])}; "
+              f"classified {total - excluded_n} SCORED / {excluded_n} EXCLUDED")
         problems = []
         if report["missing_shards"]:
             problems.append(f"shards never reported: {report['missing_shards']}")
@@ -556,6 +736,28 @@ def main() -> int:
             problems.append(f"guards in the wrong shard: {report['misassigned_guards']}")
         if not report["baseline_agrees"]:
             problems.append(f"shards disagreed on the baseline: {report['baselines']}")
+        if report["unclassified_guards"]:
+            problems.append(f"guards with no classification: {report['unclassified_guards']}")
+        if report["orphan_exclusions"]:
+            problems.append(
+                "exclusions naming no guard in the current inventory — the guard was "
+                f"rewritten or removed and the exclusion outlived it: {report['orphan_exclusions']}"
+            )
+        if report["invalid_exclusions"]:
+            problems.append(
+                "exclusions with a reason outside the closed vocabulary, or with no detail "
+                f"or no evidence: {report['invalid_exclusions']}"
+            )
+        if report["surviving_scored_guards"]:
+            problems.append(
+                "guards classified SCORED that survived — an open coverage defect, not an "
+                f"exclusion: {report['surviving_scored_guards']}"
+            )
+        if report["stale_exclusions"]:
+            problems.append(
+                "guards classified EXCLUDED that were in fact killed; the exclusion is "
+                f"stale and the guard is scored: {report['stale_exclusions']}"
+            )
         for problem in problems:
             print(f"  INCOMPLETE: {problem}", file=sys.stderr)
         return 1 if problems else 0
@@ -563,8 +765,13 @@ def main() -> int:
     shard_k, shard_n = (int(part) for part in args.shard.split("/"))
     mine = [g for g in guards if shard_of(g.index, shard_n) == shard_k]
 
+    suite_args = tuple(args.suite.split()) if args.suite else ("tests",)
+    if args.only:
+        wanted = {int(part) for part in args.only.replace(",", " ").split()}
+        mine = [g for g in mine if g.index in wanted]
+
     workdir = prepare_copy(config)
-    baseline = run_suite(workdir)
+    baseline = run_suite(workdir, suite_args=suite_args)
     if not baseline["scored"]:
         print(f"baseline is not scorable: {baseline['why']}", file=sys.stderr)
         return 2
@@ -574,7 +781,9 @@ def main() -> int:
     for guard in mine:
         prepare_copy(config)
         mutate(config, guard, workdir)
-        outcome = run_suite(workdir, baseline_collected=baseline["collected"])
+        outcome = run_suite(
+            workdir, baseline_collected=baseline["collected"], suite_args=suite_args
+        )
         killed = outcome["scored"] and bool(outcome["failed"])
         results.append(
             {
@@ -596,22 +805,38 @@ def main() -> int:
     # Outside the repository, deliberately. A sweep that wrote into the tracked tree would
     # make the very check that proves it did not mutate anything (`git diff --exit-code`)
     # report its own output as a mutation.
-    out = workdir.parent / f"guard_sweep.shard{shard_k}of{shard_n}.json"
+    narrowed = bool(args.only or args.suite)
+    name = "guard_sweep.local.json" if narrowed else f"guard_sweep.shard{shard_k}of{shard_n}.json"
+    out = workdir.parent / name
     out.write_text(json.dumps({"baseline": baseline["collected"], "results": results}, indent=2))
     print(f"wrote {out}")
 
-    survivors = [r for r in results if r["scored"] and not r["killed"]]
+    verdict = classify(config, guards)["classified"]
+    survivors = [
+        r for r in results
+        if r["scored"] and not r["killed"]
+        and verdict.get(r["index"], {}).get("status") != "EXCLUDED"
+    ]
+    declared = [
+        r for r in results
+        if r["scored"] and not r["killed"]
+        and verdict.get(r["index"], {}).get("status") == "EXCLUDED"
+    ]
     unscored = [r for r in results if not r["scored"]]
     print(f"\nshard {shard_k}/{shard_n}: {len(results)} guards, "
-          f"{len(results) - len(survivors) - len(unscored)} killed, "
-          f"{len(survivors)} survived, {len(unscored)} unscored")
+          f"{len(results) - len(survivors) - len(declared) - len(unscored)} killed, "
+          f"{len(survivors)} survived, {len(declared)} declared unscorable, "
+          f"{len(unscored)} unscored")
+    for row in declared:
+        reason = verdict[row["index"]]["reason"]
+        print(f"  EXCLUDED  {row['module']}:{row['line']}  {reason}")
     for row in survivors:
         print(f"  SURVIVED {row['module']}:{row['line']}  {row['condition'][:70]}")
     for row in unscored:
         print(f"  UNSCORED {row['module']}:{row['line']}  {row['why_not'][:70]}")
-    # A survivor is not automatically a defect — some guards are unreachable by construction
-    # and are classified as excluded in GUARD_INVENTORY.md. What this exit code says is that
-    # the shard found something the inventory has not accounted for.
+    # A survivor is a defect unless it was *declared* unscorable before it survived, with a
+    # reason from the closed vocabulary and a test that measures the claim. Anything else
+    # this shard found is unaccounted for, and the shard says so with its exit code.
     return 1 if survivors or unscored else 0
 
 
