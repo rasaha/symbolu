@@ -17,8 +17,12 @@ the S1 enforcement guards landed and were audited, and are recorded under *Ratif
 refinements* below; each narrows or completes a rule D6–D8 already carry. OD-1 – OD-4,
 raised later by auditing those refinements against representative contract shapes and
 reconciling this artifact with the contract specification, were ratified 2026-08-25 and
-are recorded under *Owner decisions OD-1 – OD-5* below. **OD-5**, on reasoning functions
-and strategies, was ratified 2026-08-26 and is recorded in the same table. **No owner
+are recorded under *Owner decisions OD-1 – OD-6* below. **OD-5**, on reasoning functions
+and strategies, was ratified 2026-08-26 and is recorded in the same table. **OD-6**,
+resolving an internal inconsistency an independent implementation review found between
+B3, H1 and R-1b(iv) of the contract specification, plus a dependent question on H2's
+exception surface and the `ProposerProcessState` vocabulary R-3/R-4 left unstated, was
+ratified 2026-08-27 and is recorded in the same table. **No owner
 decision remains open, so S1 is unblocked on ratification grounds** — and on
 ratification grounds only.
 **One** thing still gates S1 code, and it is not a ruling: the Part I implementation
@@ -566,10 +570,10 @@ a trailing newline against `$` and `re.fullmatch` does not, so stating a pattern
 stating the application would leave the rule one convenience call away from admitting a
 value it names as invalid.
 
-## Owner decisions OD-1 – OD-5 — all resolved
+## Owner decisions OD-1 – OD-6 — all resolved
 
-**OD-1 – OD-4 are ratified 2026-08-25 and OD-5 is ratified 2026-08-26**, recorded here
-so this artifact does not report a
+**OD-1 – OD-4 are ratified 2026-08-25, OD-5 is ratified 2026-08-26, and OD-6 is ratified
+2026-08-27**, recorded here so this artifact does not report a
 clean record its own subordinate documents contradict, nor a cleaner one than the
 enforcement supports. D6–D10 close every question this artifact previously carried as
 open, and O-1 – O-4 close the four the S1 enforcement audit raised; OD-1 – OD-4 were
@@ -579,11 +583,18 @@ by reconciling this artifact with
 where each is stated in full with its rider, its enforcement design and its three
 statuses. OD-5 was raised separately, on the relationship between reasoning functions
 and reasoning strategies, and was ruled **not** to bear on contract shape: it defers the
-strategy permission concept and its vocabulary together to S2. OD-4 is the one decision of
-the five that bears on contract shape; it is resolved below and the specification
+strategy permission concept and its vocabulary together to S2. OD-6 was raised by an
+independent review of the S1 implementation commit
+(`6ef305fbe3ee0ff9960a7b52a1810a26f1e11953`), which found the specification's own B3, H1
+and R-1b(iv) mutually inconsistent on where a caller-supplied candidate selection is
+refused, its H2 exception table silent on the type a cross-contract Part E rule raises,
+and its `ProposerProcessState` enum's wire values and R-4 comparison basis unstated; it
+was ruled **not** to bear on contract shape either: no field is added, removed or
+retyped, and no cardinality changes. OD-4 is the one decision of
+the six that bears on contract shape; it is resolved below and the specification
 implements the resolution.
 
-**No ruling is outstanding on any of the five.** Three statuses are distinguished
+**No ruling is outstanding on any of the six.** Three statuses are distinguished
 throughout and must not be collapsed: a **decision is ratified**; a **named guard
 implements** it in `packages/capabilities/agentic-proposer/tests/`; and **S1 production
 implementation is authorized on merge** under A12, independently of both. A guard that
@@ -599,10 +610,15 @@ below records the second axis only; the decisions themselves are closed.
 | **OD-4** — **RATIFIED 2026-08-25, resolved (a)** | D7 above says `ProposerAdvisory` carries per-candidate `CandidateAdvisory` entries; an earlier revision of the specification instead had it reference an `AdvisoryCandidateSet` by `candidate_set_id`. `[V]` That departure was **not** forced by the rival-identity walk, which bars only nested `ToolObservation` and reaches no field of `CandidateAdvisory`. **Resolution (a): restore the nesting D7 requires.** `ProposerAdvisory` carries an immutable `candidates` sequence of `CandidateAdvisory`, ordered ascending by `candidate_id`, participating in `P_unsigned`; `candidate_set_id` is retained as the reference to `AdvisoryCandidateSet`, which stays a **top-level contract** and is not nested; the two candidate lists must correspond exactly in membership, order and content, checked by the builder and by the independent replay verifier. `ToolObservation` stays referenced by id, which A3/the rival-identity walk does force. **Rejected alternative:** reference by id, ratified as an amendment narrowing D7 — rejected because it deviates from ratified text, leaves candidate dispositions, `is_eligible` Booleans and evidence references outside the advisory digest, and leaves an amended candidate set undetectable by replay. | **yes — resolved** | `[V]` **implemented** — `tests/test_advisory_contract_shape.py` discharges I7.11 on representative shapes: it bars a nested `ToolObservation`, **requires** a nested `CandidateAdvisory` sequence so a reversion to reference-by-id fails loudly, and bars any second identity on the candidate |
 
 | **OD-5** — **RATIFIED 2026-08-26** | **Reasoning functions and reasoning strategies are different things, and only the first is a role's purpose.** Four parts. **(i) R-3's lifecycle is unchanged.** A reasoning strategy is a **method label**, not a process state: `ProposerProcessState` gains and loses nothing, and R-3's forward-only subsequence rule, R-4's agreement rule and the bar on representing execution state all stand as ratified. Strategies **operate within** that lifecycle. **(ii) The four-way distinction is preserved and stated:** `primary_function` is the role's organizational purpose; a role's **permitted reasoning strategies** — an S2 concept, not an S1 field — is the set of methods the role may select among; `declared_strategy` is the method the process record asserts was used; and `terminal_outcome` is where the work ended. Three of the four are S1 fields; the second is named as a concept so the distinction can be stated whole. **Evidence collection and verification remain contract mechanisms, and abstention and escalation remain outcomes** — none of the three is a reasoning strategy. **(iii) `permitted_reasoning_strategies` and its vocabulary are deferred together to S2.** **No field is added to `CognitiveRoleContract`, and OD-5 does not change S1 contract shape:** D2's cardinality stays 10 and the C5d roster stays at five fields. The concept and the vocabulary that gives it content arrive together, so the field is declared once, in its ratified form, against a vocabulary that already exists. **Rejected alternative — reserve it now as a C5d empty-only list.** Rejected because a reserved list would have had to be **retyped, revalidated and stripped of its default** to reach the intended allowlist, which rejects an empty list; reserving would therefore not have spared a schema change, which is the one thing reservation normally buys, while it would have cost three disclosed consequences — every conformant S1 pair internally unsatisfiable on this axis, every S1-era role contract carrying the one value the ratified form must refuse, and every stored contract needing reissue at the transition. `[R]` No member, spelling, bound or default of the eventual vocabulary is ratified, and none is ratified by deferring it. **(iv) S1 neither selects, validates nor cryptographically binds a reasoning strategy.** `declared_strategy` is metadata outside `P_unsigned`, declaration does not establish conformance, and strategy selection and enforcement are S2's in whole. **No strategy catalogue is drafted or ratified by this decision, and no individual strategy is named anywhere in it.** | **no** — no field added, no cardinality changed, no classification roster changed, and no field type, vocabulary or equation term changed; every part of the ruling states what S1 does not do, or records a distinction so it is not collapsed later | `[V]` **implemented** — `tests/test_advisory_contract_shape.py` (`declared_strategy` absent from the `P_unsigned` projection); `tests/s1_specification_mirror.py` and `tests/test_identifier_normalization.py`, whose ten-field `CONTRACT_CARDINALITY` entry and five-entry `C5D_ENTRIES` pin now hold the deferred field **out**, failing if it is reintroduced without a ruling; and `tests/test_documentation_consistency.py` (a **heuristic spot-check**, not coverage of a class: it classifies each sentence by actor, refusing a claim of selection, validation or binding whose subject is S1 or something inside it, and passing the same claim attributed to S2. `[I]` It is a regex over English prose and is **not** proof that no such claim can be written; what it is proven against is a named corpus of claims it must catch — including spellings two audits found escaping earlier versions — and correct statements it must leave alone, among them true statements about S2, which an earlier actor-blind version wrongly flagged) |
+| **OD-6** — **RATIFIED 2026-08-27** | **Resolves an internal inconsistency in the frozen specification, found by an independent review of implementation commit `6ef305fbe3ee0ff9960a7b52a1810a26f1e11953`.** B3 stated that every S1 advisory has `selected_candidate_id = None` and derived this from `evaluate_readiness(...)` being `False`; H1 specified a non-null-selector derivation path for `build_proposer_advisory`; R-1b(iv) required the advisory's selector to equal the set's; and `AdvisoryCandidateSet` was constructible in S1 with a non-null selector, because S-1 and S-2 require only that the selection resolve and be eligible, and eligibility does not require readiness. These cannot all hold at once, and B3's derivation was a non sequitur: R-2 conditions `PROPOSAL` on readiness, not on selection. Three parts. **(i) Where the no-selection ceiling is enforced.** **Resolved: at `AdvisoryCandidateSet` construction (new C9), on the pattern C7 already uses for `DomainCheckCompletion.COMPLETE`.** A non-null `selected_candidate_id` is structurally unconstructible in S1; the refusal is a `pydantic.ValidationError`, inside H2's exception surface, at the point the caller errs; no dead-end object exists; `build_proposer_advisory` and `build_advisory_revision` both inherit the ceiling with no separate builder-side check, because neither can ever receive a set that violates it; and H1's derivation paragraph needs no amendment, because it is now exercised, in S1, only on the always-null case. **Cost, accepted:** S-1 and S-2 become satisfied vacuously in S1 one level earlier than B3 already said they were, and the S2 transition removes this validator as an explicit, reviewed act rather than changing a builder. **Rejected alternative — refuse at `build_proposer_advisory` only.** The current (pre-OD-6) implementation. Rejected because `AdvisoryCandidateSet` stays permissive and the public API then contains an object that is constructible but unusable in S1 — a dead end reachable through the public surface — and because it would additionally have required recasting H1's non-null-selector paragraph as S2-only by amendment, new test coverage for the refusal, and an explicit statement that `build_advisory_revision` inherits it. **Rejected alternative — derive faithfully and drop B3's null requirement where the set carries a selection.** R-2 permits this, but it was rejected because it lets S1 emit a `requested_review_destination_role_ref` for which no S1 contract specifies a source, and because it would have required amending this ADR's ratified decision record, not only the specification. **(ii) H2's exception surface.** The pre-OD-6 implementation raised a bare `ValueError` at the sites implementing R-1b's cross-contract clauses and R-5, R-6, R-7, R-9 and R-10 — rules that compare fields across two or more independently constructed contract instances and so cannot be decided by any single model's own validator, meaning they structurally cannot raise `pydantic.ValidationError` the way H2's first row assumed every Part E validator would. **Resolved: H2 gains a fourth exception class, `CrossContractViolationError`** (subclassing `ValueError`, on the same pattern as `EligibilityMismatchError`), scoped to exactly that residue. **Rejected alternative — restructure the checks into validators to reach `ValidationError`.** Rejected because several of the rules (R-5, R-6, R-7 in particular) are stated over an unbounded list of supplied `ToolObservation` instances no single contract can carry without becoming a second identity surface, so reaching `ValidationError` this way would require constructing a throwaway aggregate model for the sole purpose of obtaining the right exception type — asserting nothing true about the object actually being validated. **(iii) `ProposerProcessState`'s membership and R-4's comparison basis.** Entailed but previously unstated: R-3 already named all nine spellings in its chain and already typed `ProposerProcessStateTransition.state` as `ProposerProcessState` exactly, so the nine-member enum was not itself a new decision, but neither the four terminal members' wire values nor R-4's comparison basis were written anywhere, and `docs/S1_ENFORCEMENT.md` recorded both as open pending exactly this ratification. **Resolved: the implementation's existing choice is ratified as specification text** — the four terminal members (`PROPOSAL`, `NEED_EVIDENCE`, `ABSTAIN`, `ESCALATE`) carry exactly `TerminalOutcome`'s wire values, the two enums compare equal and serialise identically on that overlap, and R-4's "equals" is value equality. `pydantic`'s `strict=True` continues to refuse a cross-enum substitution at validation; the shared values settle only what R-4 compares. | **no** — no field added, removed or retyped and no cardinality changed on any contract; (i) narrows an already-declared field's constructibility on the C7 pattern, (ii) adds an exported exception class, and (iii) ratifies a previously unstated vocabulary/comparison-basis detail of an already-declared enum and field | `[V]` **implemented.** (i) `AdvisoryCandidateSet._selection_is_unconstructible` (`contracts.py`), a field validator on `selected_candidate_id` following the C7 pattern; the pre-OD-6 builder-side refusal is removed from `identity.py`'s `_construct_advisory`. Covered by `tests/test_s1_implementation_obligations.py`'s `OD-6(i)` section: direct construction and `model_validate` raise `pydantic.ValidationError`; `model_construct` and `model_copy(update=...)` are confirmed and disclosed as the pydantic-level validation bypasses they are, not defeated by other means; a mutation control (a twin model built from the identical field but without the validator) proves the validator, not the field's type, is what blocks it; and the builder is confirmed to produce a correctly null-selected advisory even given a `model_construct`-forged input. (ii) `CrossContractViolationError` (`verification.py`), exported via `__init__.py` and `public_api.json`. The actual call-site inventory, derived from source rather than assumed to be eight: **three** raise statements — `identity.py`'s shared `_require_equal` helper (R-5's two call sites, R-6's two, and R-10's one) and two further inline raises (R-9; R-7, via `_resolve_references`). R-1b's cross-contract clauses fall under this exception conceptually but have no raise site to convert: they hold by construction, since the advisory's nested `candidates` and its four selection-dependent fields are derived from `candidate_set` rather than separately supplied and compared; `verify_advisory_selection` remains the independent replay reporting a violation of them by returning `False`. `EligibilityMismatchError` is unchanged. Covered by the `OD-6(ii)` section of the same test file: one test per rule (R-5 ×2, R-6 ×2, R-9, R-10, R-7), an exception-classification control, a control confirming `EligibilityMismatchError` is untouched, a control confirming `build_advisory_revision`'s own parent-continuity checks (G3, a distinct rule) stay plain `ValueError`, and a structural check that no `CrossContractViolationError` raise site names R-1b. (iii) Fully pinned in the `OD-6(iii)` sections of `tests/test_s1_implementation_obligations.py` (the exact nine-member set, the four terminal members' shared wire values, R-4's value-based agreement/disagreement, `strict=True`'s continued cross-enum refusal, and identical serialisation on the overlap) and `tests/test_process_ordering_obligation.py` (whose own text asserting the cardinality and comparison basis were still open is replaced). Verified: `pytest packages/capabilities/agentic-proposer/tests -q` passes in full; `public_api.json` and `version.py` (`0.1.0`, unchanged) reflect the one added export; the platform-freeze substantive digest is unchanged |
 
 None of OD-1 – OD-3 changes a contract, a field type, a cardinality, a vocabulary or
 an equation term; each is about a guard or a dependency, and OD-5 changes none of them
-either. OD-4 bears on contract shape, and Part D of the specification is written for it. The *decisions* are
+either. OD-6 changes no contract field, type, cardinality or nesting either — it adds a
+validation rule (C9), an exception class (H2), and a previously unstated enum-vocabulary
+and comparison-basis detail (`ProposerProcessState`, R-4), none of which is a contract
+*shape* change in the sense OD-4 is. OD-4 bears on contract shape, and Part D of the
+specification is written for it. The *decisions* are
 ratified, and the guards named above enforce them. Neither fact authorizes production
 code.
 
@@ -721,6 +737,26 @@ is run against the corrected nested candidate graph: `ProposerAdvisory` reaches 
 advisory roots, `ToolObservation` is unreachable from either at any depth, and a mutant
 that nests an observation, that adds a per-candidate digest field, or that removes the
 nested `candidates` sequence each fail.
+
+**OD-6 — ratified and implemented.** `[V]` A guard in
+`packages/capabilities/agentic-proposer/tests/` now enforces each of OD-6's three
+parts, following the same A11-consistent sequence OD-1 – OD-5 record (ratify, then
+implement and arm a guard, then note both here): (i) `AdvisoryCandidateSet`'s
+`_selection_is_unconstructible` field validator (`contracts.py`), on the same
+pattern as `_completion_is_unconstructible`, with the pre-OD-6 builder-side refusal
+removed from `identity.py`; (ii) `CrossContractViolationError`, defined in
+`verification.py` and exported via `__init__.py` and `public_api.json`, replacing
+the bare `ValueError` at the three raise statements in `identity.py` that actually
+implement the residue — the shared `_require_equal` helper (R-5's two call sites,
+R-6's two, R-10's one) and two further inline raises (R-9; R-7) — not eight sites as
+this paragraph's own earlier revision assumed without checking source; R-1b's
+cross-contract clauses hold by construction in the builder and have no raise site of
+their own; and (iii) `tests/test_process_ordering_obligation.py`'s own text
+asserting that `ProposerProcessState`'s cardinality and R-4's comparison basis were
+still open, superseded by full pinning coverage in that module and in
+`tests/test_s1_implementation_obligations.py`'s `OD-6` sections. `public_api.json`
+is regenerated for the one added export; `version.py` stays `0.1.0`, as directed,
+since 0.1.0 has not merged or been released.
 
 **What no guard in this package establishes.** None of them constitutes a proof against
 arbitrary runtime behaviour, and none of them arms fully until a production contract
@@ -878,7 +914,7 @@ was. That walk matches `RIVAL_IDENTITY_FIELDS` by exact name, and no field of
 `CandidateAdvisory` is a member, so nesting `CandidateAdvisory` fails nothing. D7 above
 says `ProposerAdvisory` carries per-candidate `CandidateAdvisory` entries, and an earlier
 revision of the specification departed from that by referencing them through
-`candidate_set_id`. **OD-4 is now resolved (a)** under *Owner decisions OD-1 – OD-5*: the
+`candidate_set_id`. **OD-4 is now resolved (a)** under *Owner decisions OD-1 – OD-6*: the
 nesting D7 requires is restored, the candidates participate in `P_unsigned`,
 `candidate_set_id` is retained as a reference to `AdvisoryCandidateSet` — which remains a
 top-level contract — and the two candidate lists must correspond in membership, order and
@@ -963,16 +999,23 @@ A1–A8 close every question the contract specification's *equations, vocabulari
 enforcement interpretation* depend on. They do not close everything, and what remains is
 not a ruling.
 
-**OD-1 – OD-4 are all resolved, ratified 2026-08-25, and OD-5 is resolved, ratified
-2026-08-26**; all five are recorded once, under *Owner decisions OD-1 – OD-5* above.
-**Of the five, OD-4 bears on contract shape; OD-5 was ruled not to.** **OD-4 is resolved (a)**: `ProposerAdvisory` carries its `CandidateAdvisory` entries as D7 says, and
+**OD-1 – OD-4 are all resolved, ratified 2026-08-25, OD-5 is resolved, ratified
+2026-08-26, and OD-6 is resolved, ratified 2026-08-27**; all six are recorded once, under
+*Owner decisions OD-1 – OD-6* above.
+**Of the six, OD-4 bears on contract shape; OD-5 and OD-6 were ruled not to.** **OD-4 is resolved (a)**: `ProposerAdvisory` carries its `CandidateAdvisory` entries as D7 says, and
 reference-by-id is the rejected alternative. OD-1 carries a ratified rider — future
 identity participation for `primary_function` or `declared_strategy` requires a
 separately ratified normalization profile — and OD-2 carries a ratified enforcement
 design: direct-source checks, an approved-dependency baseline comparison, and negative
-controls, with the dynamic-import ceiling disclosed rather than papered over.
+controls, with the dynamic-import ceiling disclosed rather than papered over. **OD-6 is
+resolved in three parts**: (i) the no-selection ceiling is enforced by a
+construction-time validator on `AdvisoryCandidateSet` (C9), not by the builder; (ii) H2
+gains a fourth exception class, `CrossContractViolationError`, for the Part E rules no
+single model's validator can decide; (iii) `ProposerProcessState`'s nine-member
+composition, its terminal members' shared wire values with `TerminalOutcome`, and R-4's
+value-based comparison are ratified as specification text.
 
-**Each of OD-1 – OD-5 carries three statuses, and they must not be collapsed.** The
+**Each of OD-1 – OD-6 carries three statuses, and they must not be collapsed.** The
 owner decision is **ratified**; a **named guard implements** it — `FIELD_CLASSIFICATION`,
 declared in `tests/s1_specification_mirror.py` and enforced by
 `tests/test_identifier_normalization.py`, for OD-1; the layered probe in
@@ -982,7 +1025,10 @@ declared in `tests/s1_specification_mirror.py` and enforced by
 projection-absence assertion for `declared_strategy` in the same module, the
 strategy-authority document scan in `tests/test_documentation_consistency.py`, and the
 ten-field cardinality and five-entry `C5D_ENTRIES` pin that now hold the deferred field
-out; and **S1 production implementation
+out; for OD-6, the `OD-6(i)`/`OD-6(ii)`/`OD-6(iii)` sections of
+`tests/test_s1_implementation_obligations.py` and the pinning coverage in
+`tests/test_process_ordering_obligation.py`, on the terms recorded under *OD-6 —
+ratified and implemented* above; and **S1 production implementation
 is authorized on merge under A12**, independently of both: A11's
 condition is discharged by the freeze, and what remains is the undischarged Part I
 obligations. A ratified decision is not an implemented guard, and an implemented guard

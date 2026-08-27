@@ -1,5 +1,165 @@
 # Changelog — ugence-agentic-proposer
 
+## Unreleased — OD-6 implemented
+
+`docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md` and
+`docs/architecture/ADR_UGENCE_AGENTIC_PROPOSER_MVP_READINESS.md` were amended by
+OD-6, ratified 2026-08-27, resolving an inconsistency an independent review of the
+`0.1.0` implementation commit found between B3, H1 and R-1b(iv). All three parts are
+now implemented against `src/` and covered by tests, in the same commit sequence as
+this entry. Package stays `0.1.0`; `public_api.json` is regenerated for the one added
+export.
+
+* **(i) The no-selection ceiling moves from the builder to the input.** New **C9**
+  (`AdvisoryCandidateSet._selection_is_unconstructible`, `contracts.py`) makes a
+  non-null `selected_candidate_id` structurally unconstructible in S1, on the same
+  pattern C7 uses for `DomainCheckCompletion.COMPLETE`. The pre-OD-6 builder-side
+  refusal is removed from `identity.py`'s `_construct_advisory`; `build_proposer_
+  advisory` and `build_advisory_revision` inherit the ceiling with no separate check,
+  because neither can now receive a set that violates it. Covered by
+  `tests/test_s1_implementation_obligations.py`'s `OD-6(i)` section: direct
+  construction and `model_validate` both raise `pydantic.ValidationError`;
+  `model_construct` and `model_copy(update=...)` are confirmed and disclosed as the
+  pydantic-level bypasses they are (neither runs validation, on either field); a
+  mutation control shows a twin model built from the identical field but without the
+  validator accepts what the real class rejects; and the builder is confirmed to
+  produce a correctly null-selected advisory even given a `model_construct`-forged
+  input, since the four selection-dependent fields are derived, never copied.
+* **(ii) H2 gains a fourth exception class, `CrossContractViolationError`**
+  (`verification.py`), exported via `__init__.py` and `public_api.json`. The actual
+  call-site inventory, derived from source rather than assumed: **three** raise
+  statements, not eight — `identity.py`'s shared `_require_equal` helper (covering
+  R-5's two call sites and R-6's two, plus R-10's one) and two further inline raises
+  (R-9; R-7, via `_resolve_references`'s `False` return). R-1b's cross-contract
+  clauses ((i)-(iv), (viii), (ix)) fall under this exception conceptually but have no
+  raise site to convert: the advisory's nested `candidates` and its four
+  selection-dependent fields are derived directly from `candidate_set` rather than
+  separately supplied and compared, so those clauses hold by construction on every
+  path the builders support; `verify_advisory_selection` remains the independent
+  replay that reports a violation of them by returning `False`. `EligibilityMismatch
+  Error` is unchanged and unreclassified. Covered by the `OD-6(ii)` section of the
+  same test file: one test per rule (R-5 ×2, R-6 ×2, R-9, R-10, R-7), a classification
+  control distinguishing the two exception classes, a control confirming
+  `EligibilityMismatchError` is untouched, a control confirming `build_advisory_
+  revision`'s own parent-continuity checks (a distinct G3 rule, not R-5/R-6/R-9/R-10)
+  stay plain `ValueError`, and a structural check that no `CrossContractViolationError`
+  raise site in `identity.py` names R-1b.
+* **(iii) `ProposerProcessState`'s nine-member composition and R-4's comparison basis
+  are ratified as specification text and now fully pinned.** The enum and its
+  value-based R-4 comparison were already correct in `src/`; what changed is
+  coverage. `tests/test_s1_implementation_obligations.py`'s `OD-6(iii)` section pins
+  the exact nine-member set, the four terminal members' shared wire values with
+  `TerminalOutcome`, R-4's value-based agreement and disagreement, `strict=True`'s
+  continued refusal of a cross-enum substitution, and identical JSON serialisation on
+  the four-value overlap; `tests/test_process_ordering_obligation.py`'s own text
+  asserting the cardinality and comparison basis were still open is replaced.
+* **Done alongside this entry:** the CI fix that installs `packages/jcs` in the
+  package-suite job and removes the obsolete S0-era public-API-absence assertion;
+  `test_documentation_consistency.py`'s `test_there_is_exactly_one_owner_decision_
+  record` (previously pinned to the literal heading text `"## Owner decisions OD-1 –
+  OD-5 — all resolved"`) and its `OWNER_DECISIONS` tuple, both now covering `OD-6`;
+  and the OD-6 subsection the amended specification needed to satisfy
+  `test_the_adr_and_the_specification_agree_on_every_owner_decision`.
+
+## 0.1.0 — S1 contracts and equations implemented; the first public-API snapshot
+
+Implements `docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md` in full against `src/`
+and moves the version to `0.1.0` in the same change that creates `public_api.json`
+and its drift test (`tests/test_public_api.py`), per I6 and I8. The specification
+itself is frozen and unedited; this release is the implementation of it.
+
+### Frozen at this version
+
+* **The eight canonical contracts** — `AgentIdentityRef`, `CognitiveRoleContract`,
+  `WorkMandate`, `BoundedContextEnvelope`, `ToolObservation`, `AdvisoryCandidateSet`,
+  `ProposerAdvisory`, `ProposerProcessRecord` — and the **two nested public shapes**
+  — `CandidateAdvisory`, `ProposerProcessStateTransition` — in `src/ugence_
+  agentic_proposer/contracts.py`, with every C1–C9 model rule: shared `frozen=True,
+  extra="forbid", strict=True` configuration; the C2 common fields; C4's
+  timezone-aware, UTC-normalising, microsecond-precision-`Z`-serialising datetime
+  validator/serializer pair on every `datetime` field; the exact C5a/C5b/C5c/C5d
+  classification of every `str`-valued field, declared per C8 as `Annotated[str,
+  StringConstraints(...)]` and never `Field(pattern=...)`; C6's digest-shaped-field
+  format grammar; C7's unconditional rejection of `DomainCheckCompletion.COMPLETE`;
+  and, added by OD-6(i), C9's unconditional rejection of a non-null
+  `AdvisoryCandidateSet.selected_candidate_id`.
+* **Seven new enums** — `ReviewAction`, `DomainCheckCompletion`,
+  `AgentLifecycleState`, `RoleActivationStatus`, `ToolOperationClass`,
+  `ToolObservationAdmissionStatus`, `ProposerProcessState` — added to
+  `vocabulary.py` alongside the three ratified D4 enums. `ProposerProcessState`'s
+  nine members (the five R-3 process states plus the four terminal outcomes, at
+  identical wire values to `TerminalOutcome`) discharge a gap the specification
+  itself records as open — no explicit membership table, and no stated basis for
+  R-4's cross-enum comparison — by direct entailment from R-3's own stated chain;
+  it is not a reconciliation of any stated rule. `[I]`, disclosed for ratification.
+* **The identity module** (`identity.py`, the single module I1 exempts from the D2
+  text scan for the `sha256:` prefix and the C6 grammar): `compute_advisory_
+  identity`, `verify_advisory_identity`, `build_proposer_advisory` and
+  `build_advisory_revision`, each following G1–G3 exactly — the frozen `P_unsigned`
+  projection, the private unexported `_UnsignedAdvisoryPayload`, and the one lawful
+  construction shape (explicit field pass-through, the substrate call inline in the
+  `advisory_digest=` keyword).
+* **Equations 1 and 2** (`equations.py`) — `evaluate_eligibility` and
+  `evaluate_readiness`, both `all((...))`-based total functions returning an actual
+  `bool`.
+* **The three verifiers and one exception** (`verification.py`) —
+  `verify_candidate_eligibility`, `verify_advisory_selection` (the independent
+  replay of R-1b and R-7), `verify_observation_resolution` (E2's algorithm), and
+  `EligibilityMismatchError`.
+* **The remaining three builders** (`builders.py`) — `build_candidate_advisory`,
+  `build_advisory_candidate_set`, `build_proposer_process_record`.
+* **R-1a through R-10 and L-1**, enforced exactly where Part E places each:
+  locally, on the contract itself, wherever one instance suffices (R-1a, the local
+  half of R-1b, R-3, R-4, R-8's locally-decidable clauses, S-1, S-2, L-1); in the
+  builders and verifiers wherever a second contract, a builder or a verifier is
+  required (R-2, R-5, R-6, R-7, R-9, R-10, the cross-contract half of R-1b).
+* **`public_api.json`** and `tests/test_public_api.py` — the full H3 surface plus
+  OD-6(ii)'s addition (39 exported names: 8 contracts, 2 nested public shapes, 10
+  enums, 5 builders, 2 equation functions, 2 identity functions, 3 verifiers, 2
+  exceptions — `EligibilityMismatchError` and `CrossContractViolationError` — 4
+  constants, `__version__`), drift-tested against the installed package. No exported
+  name begins with `Proposal` or `Recommendation` (D7).
+* **I1** — the module-path-scoped mask for the `sha256:` prefix and the C6 pattern,
+  scoped to `identity.py` alone, with the five required mutation tests in
+  `tests/test_no_local_canonicalization.py`.
+* **I7's twelve test obligations**, in `tests/test_s1_implementation_obligations.py`
+  and (I7.9, I7.11) the now-armed pre-existing guards: the frozen-profile suite;
+  list-order significance; no bare number; no wall clock; naive-datetime rejection
+  and non-UTC normalisation; eligibility forgery; `COMPLETE` unconstructibility;
+  V13; R-3 process ordering; the installed `ugence-jcs` distribution check; the
+  rival-identity composition `test_advisory_contract_shape.py` now binds against
+  the real `ProposerAdvisory`/`CandidateAdvisory`; and the C8 declaration-form
+  mutation test.
+
+### Retired
+
+* **`tests/s1_specification_mirror.py`'s temporary representative shapes.**
+  `representative_shapes()` now returns the declared `src/` contracts directly
+  instead of building parallel duplicates. `ProposerProcessStateTransition.state`'s
+  `TerminalOutcome` placeholder is replaced with the real `ProposerProcessState`,
+  and the placeholder note is removed. The pinned registries — `FIELD_
+  CLASSIFICATION`, `CONTRACT_CARDINALITY`, `SELECTION_COUPLING`, the C5d entries —
+  are unchanged in content: they remain a hand-transcribed, independent mirror of
+  the specification, checked against the now-real declared surface rather than
+  against a stand-in for it.
+* **`tests/test_unenforced_local_rules.py`'s `UNENFORCED` registry**, from
+  forty-six entries to one (`S-2 (via R-1b)`, which remains a builder/verifier
+  obligation — see D9/E1). Every discharged entry moved to `ENFORCED` with a
+  construction the real contract now rejects, so the discharge history stays
+  legible rather than being silently deleted.
+* **`tests/test_process_ordering_obligation.py`'s skip-based obligation.** R-3 is
+  armed and enforced; the two tests that asserted the placeholder was still in
+  place are replaced with tests asserting the discharge.
+
+### Deferred (Part J) — unchanged by this release
+
+Candidate selection, a domain evaluator, a disposition-to-outcome mapping, the
+semantic auditor, storage, transport, service and authorisation surfaces, the
+three reason/check/audit-reference catalogues behind the five C5d fields, and the
+reasoning-strategy permission concept and its vocabulary (OD-5(iii)). None of these
+is implemented, specified beyond Part D/E's structural placeholders, or
+authorized by this release.
+
 ## 0.0.1 — unreleased (S0 skeleton; S1 enforcement guards)
 
 A version is declared only because the MVP readiness artifact
@@ -536,7 +696,7 @@ classification and the unchanged R-3 lifecycle, and found five defects. Document
 guards only.
 
 * **A rename left three dangling cross-references and a contradicted sentence.** Renaming
-  the ADR's table to *Owner decisions OD-1 – OD-5* left two references to the old heading,
+  the ADR's table to "Owner decisions OD-1 – OD-5" left two references to the old heading,
   a sentence crediting OD-4 with shape-bearing that OD-5 also has, and a
   three-statuses sentence still scoped to four. The suite was green over all four because every existing guard
   read the table rather than the prose around it. Two new scans close the class: italic

@@ -25,6 +25,13 @@ authorization. ``tests/test_vocabulary.py`` pins that split.
 This module defines the ratified enums and nothing else. It contains no scoring,
 no threshold, no gate, no policy-decision point, and no confidence-to-outcome
 conversion.
+
+S1 (`docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md`) adds seven closed vocabularies
+alongside the three D4 enums above: ``ReviewAction`` (B8), ``DomainCheckCompletion``
+(C7), ``AgentLifecycleState`` (D1), ``RoleActivationStatus`` (D2), ``ToolOperationClass``
+and ``ToolObservationAdmissionStatus`` (D5), and ``ProposerProcessState`` (D8, R-3).
+Each is a closed membership vocabulary for a contract field; none is an authority
+claim, and none grants, clears, admits evidence or decides anything.
 """
 from __future__ import annotations
 
@@ -35,6 +42,13 @@ __all__ = [
     "CandidateDisposition",
     "SemanticAuditorFindingStatus",
     "RESERVED_AUTHORITY_VOCABULARY",
+    "ReviewAction",
+    "DomainCheckCompletion",
+    "AgentLifecycleState",
+    "RoleActivationStatus",
+    "ToolOperationClass",
+    "ToolObservationAdmissionStatus",
+    "ProposerProcessState",
 ]
 
 
@@ -102,3 +116,88 @@ RESERVED_AUTHORITY_VOCABULARY = frozenset({
     "CONSTRAINED",
     "EXPIRED",
 })
+
+
+class ReviewAction(str, Enum):
+    """B8. Exactly the two ratified review-routing actions."""
+
+    ROUTE_APPROVAL_BUNDLE = "ROUTE_APPROVAL_BUNDLE"
+    CREATE_EXCEPTION_REVIEW_BUNDLE = "CREATE_EXCEPTION_REVIEW_BUNDLE"
+
+
+class DomainCheckCompletion(str, Enum):
+    """C7. ``COMPLETE`` is defined so the enum is closed and Equation 2 is total.
+
+    It is structurally unconstructible on every path in this package: a validator on
+    ``CandidateAdvisory.domain_check_completion`` rejects ``COMPLETE`` unconditionally
+    until a separately ratified S2 domain-evaluator boundary removes that validator as
+    an explicit, reviewed act.
+    """
+
+    NOT_EVALUATED = "NOT_EVALUATED"
+    COMPLETE = "COMPLETE"
+
+
+class AgentLifecycleState(str, Enum):
+    """D1's closed vocabulary. An externally issued fact; never computed here."""
+
+    ACTIVE = "ACTIVE"
+    INACTIVE = "INACTIVE"
+    SUSPENDED = "SUSPENDED"
+    REVOKED = "REVOKED"
+
+
+class RoleActivationStatus(str, Enum):
+    """D2's closed vocabulary. An input fact, never computed by this package."""
+
+    ACTIVE = "ACTIVE"
+    INACTIVE = "INACTIVE"
+
+
+class ToolOperationClass(str, Enum):
+    """D5's closed vocabulary. The proposer reads read-only tool evidence only."""
+
+    READ_ONLY = "READ_ONLY"
+
+
+class ToolObservationAdmissionStatus(str, Enum):
+    """D5's closed vocabulary. No code path in this package sets a value other than
+    ``NOT_EVALUATED``."""
+
+    NOT_EVALUATED = "NOT_EVALUATED"
+
+
+class ProposerProcessState(str, Enum):
+    """D8/R-3's process lifecycle: the five in-progress states, in ratified order,
+    followed by the four terminal outcomes R-3's own chain names as the states a
+    process may end in.
+
+    The specification (D8's nested-shape table and H3) types
+    ``ProposerProcessStateTransition.state`` as ``ProposerProcessState`` and states R-3's
+    chain literally as
+    ``RECEIVED -> VALIDATED -> OBSERVING -> RECONCILING -> EVALUATING ->
+    {PROPOSAL, NEED_EVIDENCE, ABSTAIN, ESCALATE}``. R-3's chain notation names the four
+    terminal outcomes as the values ``state`` takes at the end of the very sequence it
+    is the type of, and R-4 presupposes that ``ProposerProcessRecord.terminal_outcome``
+    can be compared against "the terminal ``ProposerProcessState``" — both make sense
+    only if the four terminal outcomes are themselves members of this enum, which is
+    why the nine-member membership was always entailed rather than chosen.
+
+    What the specification did not itself state — the four terminal members' wire
+    values and R-4's comparison basis — is ratified as specification text by OD-6(iii)
+    (``docs/architecture/ADR_UGENCE_AGENTIC_PROPOSER_MVP_READINESS.md``): the four
+    terminal members carry exactly ``TerminalOutcome``'s wire values, so the two enums
+    compare equal and serialise identically on that overlap, and R-4's "equals" is
+    value equality. ``[V]``, ratified; see
+    ``tests/test_process_ordering_obligation.py`` for the pinning coverage.
+    """
+
+    RECEIVED = "RECEIVED"
+    VALIDATED = "VALIDATED"
+    OBSERVING = "OBSERVING"
+    RECONCILING = "RECONCILING"
+    EVALUATING = "EVALUATING"
+    PROPOSAL = "PROPOSAL"
+    NEED_EVIDENCE = "NEED_EVIDENCE"
+    ABSTAIN = "ABSTAIN"
+    ESCALATE = "ESCALATE"

@@ -1314,7 +1314,7 @@ def test_a_live_c5b_field_rejects_an_invalid_symbolic_token(shapes, value):
             created_at=spec.FIXED_INSTANT, observation_id="obs-1", case_ref="case-1",
             tool_name=value, operation_class=spec.ToolOperationClass.READ_ONLY,
             source_ref="src-1", observed_at=spec.FIXED_INSTANT,
-            content_hash="placeholder", normalized_fields={},
+            content_hash=spec.PLACEHOLDER_DIGEST, normalized_fields={},
             admission_status=spec.ToolObservationAdmissionStatus.NOT_EVALUATED)
 
 
@@ -1398,7 +1398,7 @@ def test_the_mapping_field_validates_keys_as_c5a_and_values_as_free_text(shapes)
         schema_version="1.0", tenant_id="tenant-1", created_at=spec.FIXED_INSTANT,
         observation_id="obs-1", case_ref="case-1", tool_name="invoice.read",
         operation_class=spec.ToolOperationClass.READ_ONLY, source_ref="src-1",
-        observed_at=spec.FIXED_INSTANT, content_hash="placeholder",
+        observed_at=spec.FIXED_INSTANT, content_hash=spec.PLACEHOLDER_DIGEST,
         admission_status=spec.ToolObservationAdmissionStatus.NOT_EVALUATED)
     observation = shapes["ToolObservation"](
         normalized_fields={"vendor.name": "Müller & Söhne GmbH"}, **base)

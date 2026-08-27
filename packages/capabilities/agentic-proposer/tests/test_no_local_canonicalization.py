@@ -19,10 +19,25 @@ Two files are outside that scan, and neither is a hole:
   wheel and sdist FILES to report artifact identity and build reproducibility. It
   runs at build time, ships in no wheel, and canonicalizes no proposal. The test
   below pins that exemption to that one filename so it cannot widen.
+
+**I1 — the module-path-scoped digest-grammar mask.** A7 records that the ratified
+``sha256:`` identity prefix and the C6 digest grammar
+``^sha256:[0-9a-f]{64}$`` collide with this scan's bare ``"sha256"`` hunt: D7 requires
+identity to carry that prefix and every digest-shaped field to be validated against
+that pattern, and both spellings contain the literal ``"sha256"`` this scan is built
+to catch. The mask below resolves the collision **narrowly**: exactly the two strings
+``"sha256:"`` and ``"^sha256:[0-9a-f]{64}$"``, and only inside
+``identity.py`` — the single module authorised to compute proposal identity (D2, D7).
+Every other file, including every other string, stays fully scanned. No definition
+name is exempted: the identity function names (``compute_advisory_identity``,
+``verify_advisory_identity``, and the three verifiers in ``verification.py``) are
+chosen to contain no ``SUSPECT_DEF_SUBSTRINGS`` member in the first place, so
+``SUSPECT_DEF_SUBSTRINGS`` itself is untouched.
 """
 from __future__ import annotations
 
 import ast
+import importlib
 import pathlib
 
 import pytest
@@ -63,11 +78,26 @@ PERMITTED_SUBSTRATE_CALLS = (
 )
 
 
-def _suspect_text(body):
-    """Suspect substrings in ``body``, with permitted substrate calls masked out."""
+#: I1. The single module authorised to spell the digest grammar as bare text, and the
+#: exact two strings the mask hides there and nowhere else. Pinned by name so the
+#: exemption cannot silently widen to a second file or a third string.
+AUTHORISED_IDENTITY_MODULE = "identity.py"
+IDENTITY_MODULE_MASKED_TEXT = (
+    "sha256:",
+    "^sha256:[0-9a-f]{64}$",
+)
+
+
+def _suspect_text(body, filename=None):
+    """Suspect substrings in ``body``, with permitted substrate calls masked out, and
+    (I1) the two ratified digest-grammar strings masked when — and only when —
+    ``filename`` is the single authorised identity module."""
     masked = body
     for call in sorted(PERMITTED_SUBSTRATE_CALLS, key=len, reverse=True):
         masked = masked.replace(call, "<permitted-substrate-call>")
+    if filename == AUTHORISED_IDENTITY_MODULE:
+        for literal in sorted(IDENTITY_MODULE_MASKED_TEXT, key=len, reverse=True):
+            masked = masked.replace(literal, "<identity-module-digest-grammar>")
     return [s for s in SUSPECT_TEXT if s in masked]
 
 #: Modules whose presence would mean identity is being computed locally.
@@ -577,8 +607,103 @@ def test_no_canonicalization_or_digest_function_is_defined(path):
 
 @pytest.mark.parametrize("path", list(_package_files()), ids=lambda p: p.name)
 def test_no_canonicalization_or_hashing_source_text(path):
-    found = _suspect_text(path.read_text(encoding="utf-8"))
+    found = _suspect_text(path.read_text(encoding="utf-8"), filename=path.name)
     assert not found, f"{path.name} contains {found}"
+
+
+# --------------------------------------------------------------------------- #
+# I1 — the module-path-scoped mask, and the five required mutation tests
+# --------------------------------------------------------------------------- #
+
+def test_the_masked_grammar_does_not_widen_to_another_module():
+    """(1) An arbitrary ``sha256:`` literal in a module OTHER than the authorised one
+    is still rejected: the mask is keyed on filename, not on the string alone."""
+    sample = 'DIGEST_PATTERN = r"^sha256:[0-9a-f]{64}$"\nADVISORY_PREFIX = "sha256:"\n'
+    assert _suspect_text(sample, filename="not_identity.py") == ["sha256"]
+    assert _suspect_text(sample, filename="identity.py") == []
+
+
+def test_a_class_scoped_definition_of_the_authorised_name_still_requires_the_substrate_call():
+    """(2) The authorised name defined at class scope earns no exemption of its own.
+
+    Even inside ``identity.py``, an ``advisory_digest`` assignment with no call into
+    the substrate is an unpermitted identity source (A5) whether it is written at
+    module scope or nested inside a class body naming one of the authorised
+    functions: the exemption in ``test_advisory_contract_shape.py`` is about what
+    computes the value, never about which scope or name surrounds the assignment.
+    """
+    shape = importlib.import_module("test_advisory_contract_shape")
+    sample = (
+        "class _Wrapper:\n"
+        "    def compute_advisory_identity(self, payload):\n"
+        "        self.advisory_digest = 'sha256:' + '0' * 64\n"
+        "        return self.advisory_digest\n"
+    )
+    offenders = shape._unpermitted_identity_sources(sample, filename="identity.py")
+    assert offenders, ("a class-scoped assignment naming an authorised function "
+                       "escaped the substrate-call requirement")
+
+
+def test_the_authorised_name_without_the_substrate_call_is_rejected():
+    """(3) Carrying one of the authorised names is not itself a pass: a module-level
+    ``compute_advisory_identity`` that assigns ``advisory_digest`` without calling the
+    substrate is still an unpermitted identity source, in the authorised module or
+    anywhere else."""
+    shape = importlib.import_module("test_advisory_contract_shape")
+    sample = (
+        "def compute_advisory_identity(payload):\n"
+        "    advisory_digest = 'sha256:' + '0' * 64\n"
+        "    return advisory_digest\n"
+    )
+    assert shape._unpermitted_identity_sources(sample, filename="identity.py")
+
+
+def test_the_authorised_module_may_not_import_hashlib():
+    """(4) The text mask is narrow: it hides two strings and nothing else. The
+    authorised module stays fully subject to the import scan, exactly like every
+    other file."""
+    sample = "import hashlib\nadvisory_digest = hashlib.sha256(payload).hexdigest()\n"
+    assert _import_offenders_for_source(sample, "identity.py")
+
+
+def _import_offenders_for_source(source, filename):
+    """``_import_offenders_for`` over in-memory ``source`` rather than a path on
+    disk, so a mutation sample can name itself ``identity.py`` without writing a real
+    file at that path."""
+    barred = FORBIDDEN_IMPORTS | SRC_ONLY_FORBIDDEN_IMPORTS
+    offenders = _forbidden_imports(source, barred, filename=filename)
+    return offenders + _dynamic_import_offenders(source, FORBIDDEN_IMPORTS,
+                                                 filename=filename)
+
+
+def test_a_locally_defined_canonical_sha256_hex_in_the_authorised_module_is_still_rejected():
+    """(5) The text mask never touches ``SUSPECT_DEF_SUBSTRINGS``: a local definition
+    shadowing the real substrate function's name is caught in the authorised module
+    exactly as anywhere else."""
+    sample = "def canonical_sha256_hex(payload):\n    return '0' * 64\n"
+    tree = ast.parse(sample, filename="identity.py")
+    offenders = [node.name for node in ast.walk(tree)
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+                and any(s in node.name.lower() for s in SUSPECT_DEF_SUBSTRINGS)]
+    assert offenders == ["canonical_sha256_hex"]
+
+
+#: I1's five mutation tests, named so none of them contains "digest" (I1's own rule,
+#: for the same reason the field name ``advisory_digest`` is an ``AnnAssign`` target
+#: rather than a definition and so is not scanned by ``SUSPECT_DEF_SUBSTRINGS``).
+_I1_MUTATION_TESTS = (
+    "test_the_masked_grammar_does_not_widen_to_another_module",
+    "test_a_class_scoped_definition_of_the_authorised_name_still_requires_the_substrate_call",
+    "test_the_authorised_name_without_the_substrate_call_is_rejected",
+    "test_the_authorised_module_may_not_import_hashlib",
+    "test_a_locally_defined_canonical_sha256_hex_in_the_authorised_module_is_still_rejected",
+)
+
+
+def test_the_five_i1_mutation_tests_are_present_and_unnamed_for_digest():
+    for name in _I1_MUTATION_TESTS:
+        assert name in globals() and callable(globals()[name]), name
+        assert "digest" not in name.lower(), name
 
 
 @pytest.mark.parametrize("path", list(_package_files()), ids=lambda p: p.name)

@@ -36,6 +36,20 @@ solely through a separately transported `AdvisoryCandidateSet` — is the **reje
 alternative**. Part D is written for the ratified nesting. See A3, D6, D7, D9, K.1 and
 the closing section.
 
+**OD-6 is resolved.** Ratified 2026-08-27, in three parts, against an internal
+inconsistency an independent implementation review found between B3, H1 and R-1b(iv).
+**(i)** The S1 no-selection ceiling is enforced by a construction-time validator on
+`AdvisoryCandidateSet.selected_candidate_id` (new C9), not by a refusal in
+`build_proposer_advisory`, and not by dropping B3's null requirement — both alternatives
+are recorded as rejected, with their costs, in C9. **(ii)** H2's exception surface gains
+a fourth class, `CrossContractViolationError`, for the Part E rules that compare fields
+across more than one contract instance and so cannot be decided by any single model's own
+validator. **(iii)** `ProposerProcessState`'s nine-member composition, its terminal
+members' shared wire values with `TerminalOutcome`, and R-4's value-based comparison are
+ratified as the specification's own text rather than left for an implementation to infer.
+See B3, C9, D6, the `ProposerProcessStateTransition` section, Part E's header note, H1,
+H2 and H3.
+
 ---
 
 ## Supersession
@@ -254,12 +268,26 @@ full in `S1_ENFORCEMENT.md`.
 candidate, independently recomputed by `build_proposer_advisory`.
 
 Because S1 cannot construct `DomainCheckCompletion.COMPLETE` (C7), readiness is `False`
-for every candidate S1 can construct. Therefore **S1 cannot emit `PROPOSAL`**, every S1
-authority-facing advisory has `selected_candidate_id = None`, and the only terminal
-outcomes S1 may emit are `NEED_EVIDENCE`, `ABSTAIN` and `ESCALATE`.
+for every candidate S1 can construct. Therefore **S1 cannot emit `PROPOSAL`**, and the
+only terminal outcomes S1 may emit are `NEED_EVIDENCE`, `ABSTAIN` and `ESCALATE`.
+
+**`[V]` OD-6(i), correcting a non-sequitur an independent review found here.** An
+earlier revision of this paragraph continued "…therefore every S1 authority-facing
+advisory has `selected_candidate_id = None`," offered as a consequence of the readiness
+argument just given. It is not one: R-2 conditions `PROPOSAL` on selection **and**
+readiness together, so barring readiness bars `PROPOSAL` specifically, but says nothing
+about a selection paired with `ABSTAIN` or `ESCALATE`, and `AdvisoryCandidateSet` was
+constructible in S1 with a non-null `selected_candidate_id` — S-1 and S-2 require only
+that the selection resolve and be eligible, and eligibility does not require readiness.
+**The null-selector ceiling is ratified separately, in OD-6(i) (C9): a non-null
+`AdvisoryCandidateSet.selected_candidate_id` is structurally unconstructible in S1**, on
+the same pattern C7 uses for `DomainCheckCompletion.COMPLETE`. That ceiling, not the
+readiness argument above, is why every S1 authority-facing advisory has
+`selected_candidate_id = None`.
 
 This is fail-closed and intended. A stage that authorises no domain check must not be
-able to reach the proposer's strongest classification.
+able to reach the proposer's strongest classification, and a stage that authorises no
+candidate selection must not be able to construct one.
 
 **Nesting changes nothing here.** OD-4(a) puts the candidate entries inside
 `ProposerAdvisory` and inside `P_unsigned`. It supplies no `DomainCheckCompletion`
@@ -609,6 +637,45 @@ carries its emptiness rule in a validator rather than as a string constraint at 
 
 The mutation obligation is I7.12.
 
+## C9 — Selection is structurally unconstructible in S1 (OD-6(i))
+
+`AdvisoryCandidateSet` carries an explicit validator that **rejects a non-null
+`selected_candidate_id` unconditionally**, raising a validation error. This is not a
+builder omission and not an unexercised code path: the value is unconstructible on
+every path, including `model_construct` followed by validation, and including direct
+construction by any caller who can import the name. It is the same pattern C7 uses for
+`DomainCheckCompletion.COMPLETE`.
+
+**Why the ceiling sits here rather than at the builder.** OD-6(i) considered three
+mutually exclusive placements and rejected two:
+
+* **Rejected — refuse at `build_proposer_advisory` only.** `AdvisoryCandidateSet` stays
+  permissive and the advisory builder raises on a non-null selector. This leaves a
+  public contract — `AdvisoryCandidateSet` with a selection — that is constructible but
+  unusable by any S1 builder: a dead end reachable through the public API. It would also
+  have required recasting H1's non-null-selector paragraph as S2-only by amendment, new
+  test coverage for the refusal, and an explicit statement that `build_advisory_revision`
+  inherits it — three amendment obligations this placement avoids entirely, because the
+  ceiling is enforced once, upstream, and both builders inherit it structurally.
+* **Rejected — derive faithfully and drop B3's null requirement where the set carries a
+  selection.** R-2 permits this (readiness, not selection, gates `PROPOSAL`), but it
+  would let S1 emit a `requested_review_destination_role_ref` for which no S1 contract
+  specifies a source, and would have required amending this ADR's ratified decision
+  record, not only the specification.
+* **Ratified — refuse at `AdvisoryCandidateSet` construction.** No dead-end object
+  exists: a caller who supplies a selection never obtains a constructed set to pass to a
+  builder in the first place. The refusal is a `pydantic.ValidationError`, inside H2's
+  declared exception surface, at the point the caller errs. `build_proposer_advisory` and
+  `build_advisory_revision` both inherit the ceiling with no separate builder-side check,
+  because neither can ever receive a set that violates it. **Cost, accepted:** S-1 and
+  S-2 (D6) are satisfied vacuously in S1 by construction, one level earlier than B3
+  already stated they were; the S2 transition removes this validator as an explicit,
+  reviewed act, rather than changing a builder.
+
+`selected_candidate_id` is defined as `str | None` now, rather than narrowed to a
+`Literal[None]`, so that the field is closed by a validator that names its own removal
+condition (the C7 pattern) rather than by a type that would have to be widened at S2.
+
 ---
 
 # Part D — Contracts
@@ -742,7 +809,7 @@ candidate content — which is R-1b.
 | `candidate_set_id` | `str` | yes | no | none | 1 | open | C5a | this package | no |
 | `case_ref` | `str` | yes | no | none | 1 | open | C5a | this package | no |
 | `candidates` | `tuple[CandidateAdvisory, ...]` | yes | no | none | 1..n | — | **rejects an empty sequence**; `candidate_id` unique across it; **one ratified canonical order — ascending by `candidate_id`**; the builder **rejects** out-of-order caller input rather than silently reordering it | this package | no |
-| `selected_candidate_id` | `str \| None` | yes (explicit) | yes | `None` | 0..1 | open | C5a when non-null; S-1 and S-2 below | this package | no |
+| `selected_candidate_id` | `str \| None` | yes (explicit) | yes | `None` | 0..1 | open | C5a when non-null; S-1 and S-2 below; **a non-null value is structurally unconstructible in S1 (C9, OD-6(i))** | this package | no |
 | `selection_reason_codes` | `list[str]` | yes | no | `[]` | 0..n | — | **C5d** — rejects any non-empty value | this package | no |
 
 **Locally decidable selection invariants**, both decidable from this contract alone:
@@ -789,8 +856,9 @@ become a de facto vocabulary before one is ratified.
 **not** an invariant. Declining to select among eligible candidates is `ABSTAIN`, which
 D4 ratifies. Forcing selection would convert an abstention into a recommendation.
 
-**Under B3, `selected_candidate_id` is `None` for every advisory S1 can construct**, so
-S-1 and S-2 are satisfied vacuously in S1 and become load-bearing at S2.
+**Under C9 (OD-6(i)), `selected_candidate_id` is `None` for every `AdvisoryCandidateSet`
+S1 can construct**, and therefore for every `ProposerAdvisory` derived from one, so S-1
+and S-2 are satisfied vacuously in S1 and become load-bearing at S2.
 
 ### `CandidateAdvisory` — nested public shape
 
@@ -1057,6 +1125,36 @@ reason C2 gives for `CandidateAdvisory`: it is a nested public shape, not a cont
 | `state` | `ProposerProcessState` | yes | no | none | enum membership |
 | `at` | `datetime` | yes | no | none | C4; caller-supplied |
 
+**`ProposerProcessState` is closed, nine members (OD-6(iii)):** `RECEIVED`,
+`VALIDATED`, `OBSERVING`, `RECONCILING`, `EVALUATING` — the five process states R-3's
+chain names before its terminal position — plus `PROPOSAL`, `NEED_EVIDENCE`, `ABSTAIN`,
+`ESCALATE` — the four terminal states the same chain names in its final position, which
+are exactly `TerminalOutcome`'s four members.
+
+**`[V]` OD-6(iii), ratifying what R-3 and R-4 entail but do not, by themselves,
+spell out.** R-3 (Part E) names all nine spellings in the chain
+`RECEIVED → VALIDATED → OBSERVING → RECONCILING → EVALUATING → {PROPOSAL, NEED_EVIDENCE,
+ABSTAIN, ESCALATE}`, and the `state` field above was already typed `ProposerProcessState`
+exactly, so the nine-member *membership* was already entailed and is not a new decision.
+What R-3 and R-4 left unstated, and what this amendment settles: **the four terminal
+members carry exactly `TerminalOutcome`'s wire values**, so
+`ProposerProcessState.PROPOSAL == TerminalOutcome.PROPOSAL` and the corresponding pair
+for `NEED_EVIDENCE`, `ABSTAIN` and `ESCALATE` compare equal and serialise identically —
+and **R-4's "equals" is value equality**: `terminal_outcome == state_transitions[-1].state`
+on the shared wire value, not equality of enum identity or member name. A record whose
+`terminal_outcome` disagrees with the terminal `ProposerProcessState` fails R-4 exactly
+when the two values differ; it does not fail merely because the two names come from
+different enum classes. `pydantic`'s `strict=True` still refuses to substitute one enum
+for the other at *validation* — a `ProposerProcessStateTransition.state` may not be
+assigned a `TerminalOutcome` member or vice versa — so the shared values do not weaken
+either field's own type constraint; they settle only what R-4 compares.
+
+**Ratification, not reconciliation.** `docs/S1_ENFORCEMENT.md` and this package's test
+suite previously recorded the cardinality and comparison basis as an open question this
+document had to settle before a test could decide it. This paragraph is that settlement,
+recorded here as the amendment requires; it is not a description of code already written
+reconciled backward into the specification.
+
 ### What the forward-only record does not represent (R-3, OD-5)
 
 R-3 makes `state_transitions` a **subsequence** of a single forward chain: no backward
@@ -1131,19 +1229,33 @@ E1.
 Each is a validation S1 must implement at construction. Those marked *(equation term)*
 also appear in Equation 1; they are listed here once as contract obligations.
 
+**`[V]` OD-6(ii): which exception a Part E rule's failure raises depends on whether it
+is decidable from one contract instance or requires more than one, and this line was
+missing from H2.** R-1a, R-2, R-3, R-4, and the local half of R-1b ((v), (vi), and the
+local half of (vii)) are each decidable from a single already-constructed model's own
+fields, are implemented as that model's own validator, and their failure is therefore a
+`pydantic.ValidationError` exactly as H2's first row already stated. **R-1b's remaining
+clauses ((i)–(iv), (viii), (ix)) and R-5, R-6, R-7, R-9 and R-10 are not**: each compares
+fields across two or more independently constructed contract instances that no single
+model's validator can see at once, so a builder function — not a model — is where the
+comparison happens. H2 previously had no exception type for that residual class and the
+implementation raised a bare `ValueError`, which is not one of H2's three declared
+classes. `CrossContractViolationError` is that fourth class, defined in H2 for exactly
+this residue.
+
 | Id | Rule | Prevents |
 | --- | --- | --- |
 | R-1a | **Selection binding — local (B6).** A `ProposerAdvisory` model validator enforces: if `selected_candidate_id is None`, then `recommended_disposition`, `requested_review_action` and `requested_review_destination_role_ref` are **all** `None`; if `selected_candidate_id is not None`, those three are **all** non-null. Decidable from this contract's own fields alone | a routing request standing next to no selection, and a selection with no routing — two failure modes that call for opposite responses |
-| R-1b | **Candidate and selection binding — cross-contract (B6, OD-4(a)).** `build_proposer_advisory` and `verify_advisory_selection` each resolve the referenced `AdvisoryCandidateSet` and enforce **correspondence of the candidates, not selector equality alone**: (i) `ProposerAdvisory.candidates` and `AdvisoryCandidateSet.candidates` are equal in **membership** — the same `candidate_id` set, no extra, no missing; (ii) equal in **order**, compared **element by element at each position** — for `i` in `0..n-1`, the element at position `i` of one sequence is compared with the element at position `i` of the other — after **both** sequences have independently been checked to satisfy the same ascending-`candidate_id` invariant (D6). The comparison is never a single equality between the two containers: `[V]` a `tuple` and a `list` of identical elements compare unequal in Python, and both sides are `tuple[CandidateAdvisory, ...]` precisely so that no implementation is tempted to rely on container equality across differing types. Lengths are compared first, so a shorter or longer sequence is a membership failure under (i) rather than a truncated positional walk; (iii) equal in **candidate content** — for each position, all ten `CandidateAdvisory` fields compare equal, so a disposition, an `is_eligible` Boolean, an `observation_refs` list, an `evaluated_at` or a free-text entry that differs is a mismatch; (iv) `ProposerAdvisory.selected_candidate_id == AdvisoryCandidateSet.selected_candidate_id`; (v) when that selector is non-null it identifies **exactly one** element of `ProposerAdvisory.candidates` **and exactly one** element of `AdvisoryCandidateSet.candidates`, and those two are the same candidate; (vi) `recommended_disposition` equals the **selected nested candidate's** `disposition`; (vii) `requested_review_action` equals the **selected nested candidate's** `requested_review_action` and is a member of `CognitiveRoleContract.permitted_review_actions`; (viii) `requested_review_destination_role_ref` is consistent with that candidate's routing; and (ix) tenant, case and candidate-set references are continuous. A failure is a rejection: the builder raises, the verifier returns `False` | an advisory whose carried candidates differ from the set it names, and an advisory whose routing contradicts, or invents, the candidate it claims to select |
+| R-1b | **Candidate and selection binding — cross-contract (B6, OD-4(a)).** `build_proposer_advisory` and `verify_advisory_selection` each resolve the referenced `AdvisoryCandidateSet` and enforce **correspondence of the candidates, not selector equality alone**: (i) `ProposerAdvisory.candidates` and `AdvisoryCandidateSet.candidates` are equal in **membership** — the same `candidate_id` set, no extra, no missing; (ii) equal in **order**, compared **element by element at each position** — for `i` in `0..n-1`, the element at position `i` of one sequence is compared with the element at position `i` of the other — after **both** sequences have independently been checked to satisfy the same ascending-`candidate_id` invariant (D6). The comparison is never a single equality between the two containers: `[V]` a `tuple` and a `list` of identical elements compare unequal in Python, and both sides are `tuple[CandidateAdvisory, ...]` precisely so that no implementation is tempted to rely on container equality across differing types. Lengths are compared first, so a shorter or longer sequence is a membership failure under (i) rather than a truncated positional walk; (iii) equal in **candidate content** — for each position, all ten `CandidateAdvisory` fields compare equal, so a disposition, an `is_eligible` Boolean, an `observation_refs` list, an `evaluated_at` or a free-text entry that differs is a mismatch; (iv) `ProposerAdvisory.selected_candidate_id == AdvisoryCandidateSet.selected_candidate_id`; (v) when that selector is non-null it identifies **exactly one** element of `ProposerAdvisory.candidates` **and exactly one** element of `AdvisoryCandidateSet.candidates`, and those two are the same candidate; (vi) `recommended_disposition` equals the **selected nested candidate's** `disposition`; (vii) `requested_review_action` equals the **selected nested candidate's** `requested_review_action` and is a member of `CognitiveRoleContract.permitted_review_actions`; (viii) `requested_review_destination_role_ref` is consistent with that candidate's routing; and (ix) tenant, case and candidate-set references are continuous. A failure is a rejection: the builder raises **`CrossContractViolationError` (H2, OD-6(ii)) for (i)–(iv), (viii) and (ix)**, and `pydantic.ValidationError` for the locally-decidable (v), (vi) and the local half of (vii); the verifier returns `False` for all of them | an advisory whose carried candidates differ from the set it names, and an advisory whose routing contradicts, or invents, the candidate it claims to select |
 | R-2 | **V13 (B3).** `terminal_outcome is TerminalOutcome.PROPOSAL` **if and only if** `selected_candidate_id is not None` **and** `evaluate_readiness(...) is True` for the resolved candidate, recomputed at construction | a "proposal" that proposes nothing, a selection presented as an abstention, and a proposal made without domain readiness |
 | R-3 | **Process ordering.** `state_transitions` is a subsequence of `RECEIVED → VALIDATED → OBSERVING → RECONCILING → EVALUATING → {PROPOSAL, NEED_EVIDENCE, ABSTAIN, ESCALATE}`: no backward transition, no repeat, at most one terminal state and only in final position, and `at` non-decreasing across the list | a fabricated or reordered process history, and — since no execution state exists in the enum — any representation of execution |
-| R-4 | `terminal_outcome` on the process record equals the terminal `ProposerProcessState` when one is present in `state_transitions` | a record whose narrative and outcome disagree |
-| R-5 | **Tenant scope.** `tenant_id` is identical across `AgentIdentityRef`, `CognitiveRoleContract`, `WorkMandate`, `BoundedContextEnvelope`, `AdvisoryCandidateSet`, `ProposerAdvisory` and **every** `ToolObservation` supplied to a builder | **cross-tenant acceptance** |
-| R-6 | **Case scope.** `case_ref` is identical across `WorkMandate`, `AdvisoryCandidateSet`, `ProposerAdvisory` and **every** `ToolObservation` supplied to a builder | **cross-case acceptance** |
-| R-7 | **Reference resolution, at construction and on replay.** Every `observation_refs` entry — on every nested candidate and on the advisory itself — resolves to **exactly one** supplied `ToolObservation.observation_id`, and the resolved observation satisfies tenant, case and context continuity. Enforced by `build_proposer_advisory` at construction **and independently re-established on replay** by `verify_observation_resolution`, which `verify_advisory_selection` invokes. It is **not** a builder-only rule; the replay algorithm is specified in E2 | a reference to evidence that was never supplied, evidence substituted after signing, and a reference that resolves ambiguously or not at all |
+| R-4 | `terminal_outcome` on the process record equals **(by value; OD-6(iii))** the terminal `ProposerProcessState` when one is present in `state_transitions` | a record whose narrative and outcome disagree |
+| R-5 | **Tenant scope.** `tenant_id` is identical across `AgentIdentityRef`, `CognitiveRoleContract`, `WorkMandate`, `BoundedContextEnvelope`, `AdvisoryCandidateSet`, `ProposerAdvisory` and **every** `ToolObservation` supplied to a builder. Cross-contract; raises `CrossContractViolationError` (H2, OD-6(ii)) | **cross-tenant acceptance** |
+| R-6 | **Case scope.** `case_ref` is identical across `WorkMandate`, `AdvisoryCandidateSet`, `ProposerAdvisory` and **every** `ToolObservation` supplied to a builder. Cross-contract; raises `CrossContractViolationError` (H2, OD-6(ii)) | **cross-case acceptance** |
+| R-7 | **Reference resolution, at construction and on replay.** Every `observation_refs` entry — on every nested candidate and on the advisory itself — resolves to **exactly one** supplied `ToolObservation.observation_id`, and the resolved observation satisfies tenant, case and context continuity. Enforced by `build_proposer_advisory` at construction **and independently re-established on replay** by `verify_observation_resolution`, which `verify_advisory_selection` invokes. It is **not** a builder-only rule; the replay algorithm is specified in E2. Cross-contract; the builder raises `CrossContractViolationError` (H2, OD-6(ii)), the replay verifiers return `False` | a reference to evidence that was never supplied, evidence substituted after signing, and a reference that resolves ambiguously or not at all |
 | R-8 | **Uniqueness.** `observation_id` unique across supplied observations; `candidate_id` unique across `candidates`; no duplicates in `observation_refs`, `candidate_ids`, `permitted_tool_scopes`, `permitted_candidate_dispositions`, `permitted_review_actions` or `allowed_source_scopes` | an identifier resolving ambiguously to two objects, and a list that overstates its breadth |
-| R-9 | **Envelope binding.** `BoundedContextEnvelope.mandate_id == WorkMandate.mandate_id` *(equation term)* | an envelope assembled for a different mandate |
-| R-10 | **Role binding.** `WorkMandate.assigned_role_contract_id == AgentIdentityRef.bound_role_contract_id == CognitiveRoleContract.role_contract_id` *(equation term)* | a mandate matched against an unrelated role or agent |
+| R-9 | **Envelope binding.** `BoundedContextEnvelope.mandate_id == WorkMandate.mandate_id` *(equation term)*. Cross-contract; raises `CrossContractViolationError` (H2, OD-6(ii)) | an envelope assembled for a different mandate |
+| R-10 | **Role binding.** `WorkMandate.assigned_role_contract_id == AgentIdentityRef.bound_role_contract_id == CognitiveRoleContract.role_contract_id` *(equation term)*. Cross-contract; raises `CrossContractViolationError` (H2, OD-6(ii)) | a mandate matched against an unrelated role or agent |
 | L-1 | **Lineage.** `parent_advisory_digest`, when non-null, is C6-shaped and is **not equal to** this advisory's own `advisory_digest` | an immediate self-referential lineage cycle |
 
 ## E1 — The two levels of selection enforcement, and what neither proves
@@ -1841,7 +1953,11 @@ Notes that are part of the ratified behaviour:
   correspondence, and rejects a mismatch. When the selector is non-null it must resolve
   to exactly one nested candidate and exactly one candidate in the referenced set, and
   the two dependent values must equal that **nested** candidate's `disposition` and
-  `requested_review_action`. Under B3 it derives `None` for all four in S1.
+  `requested_review_action`. Under B3 it derives `None` for all four in S1. **Under C9
+  (OD-6(i)), a candidate set carrying a non-null selector cannot be constructed in S1 and
+  therefore cannot reach either builder**, so this derivation is exercised, in S1, only
+  on the always-null case; no separate builder-side refusal is needed and none is
+  specified.
   It calls `verify_candidate_eligibility` and raises `EligibilityMismatchError` before
   constructing if any candidate's stored `is_eligible` differs from the recomputation.
   R-1a is additionally enforced by the model validator on every construction path,
@@ -1854,17 +1970,36 @@ Notes that are part of the ratified behaviour:
 
 ## H2 — Exception surface
 
-Exactly three classes of failure, and no others:
+**Exactly four classes of failure, and no others (OD-6(ii)):**
 
 | Failure | Type | Origin |
 | --- | --- | --- |
-| Contract violation — type, format, cardinality, closed vocabulary, any Part E validator | `pydantic.ValidationError` | pydantic |
+| Contract violation — type, format, cardinality, closed vocabulary, a Part E rule decidable from one contract instance's own fields | `pydantic.ValidationError` | pydantic |
+| A Part E rule that compares fields across two or more independently constructed contract instances — R-1b(i)–(iv), (viii), (ix), R-5, R-6, R-7, R-9, R-10 | `CrossContractViolationError` | **defined and exported by this package**, subclassing `ValueError` |
 | A stored `is_eligible` that does not match the recomputation | `EligibilityMismatchError` | **defined and exported by this package**, subclassing `ValueError` |
 | Canonicalisation fault | `ugence_jcs.JcsError` and its subclasses, re-raised unchanged | `ugence-jcs` |
 
-`EligibilityMismatchError` is the only exception this package defines. It exists because
-a recomputation mismatch is not a field-validation failure and must not be reported as
-one: the value is well-formed and the object is well-typed; what failed is provenance.
+`EligibilityMismatchError` and `CrossContractViolationError` are the only exceptions this
+package defines. Each exists for the same reason: the failure it reports is not a
+field-validation failure and must not be reported as one, because the value is
+well-formed and the object is well-typed on its own terms; what failed is provenance (for
+`EligibilityMismatchError`) or a relationship between two otherwise-valid objects (for
+`CrossContractViolationError`). `[V]` OD-6(ii) adds `CrossContractViolationError`
+because H2's original three-class table gave no exception type to the residue of Part E
+that a single model's validator structurally cannot decide — R-1b's cross-contract
+clauses and R-5, R-6, R-7, R-9 and R-10 each require two or more independently
+constructed instances in hand at once, which is a builder function's obligation, not a
+model's — and an implementation reporting that residue as a bare `ValueError` (a fourth,
+undeclared class in fact if not in name) would already have violated the closed "exactly
+three, and no others" text this amendment corrects to four. **Restructuring these checks
+into single-model validators to reach `pydantic.ValidationError` instead was considered
+and rejected**: several of them (R-5, R-6, R-7 in particular) are stated over an
+unbounded list of supplied `ToolObservation` instances a single contract cannot carry
+without becoming a second identity surface, and forcing a multi-instance comparison into
+one model's validator would either require constructing a throwaway aggregate model for
+the sole purpose of obtaining the right exception type, which asserts nothing true about
+the object being validated, or silently narrowing which instances a rule is checked
+against. A named, purpose-built exception class states plainly what actually failed.
 
 ## H3 — Public-API snapshot
 
@@ -1894,7 +2029,7 @@ below.
 **Verifiers (3):** `verify_candidate_eligibility`, `verify_advisory_selection`,
 `verify_observation_resolution`
 
-**Exceptions (1):** `EligibilityMismatchError`
+**Exceptions (2):** `EligibilityMismatchError`, `CrossContractViolationError` (OD-6(ii))
 
 **Constants (4):** `RESERVED_AUTHORITY_VOCABULARY` (existing),
 `ADVISORY_KIND = "ugence.agentic_proposer.advisory.v0"`,
@@ -2694,6 +2829,73 @@ re-verified when the first contract module lands.
 distinction, and what the forward-only record does not represent); Part J's deferral;
 K.7. Nothing in Part C or Part D changes.
 
+**OD-6 — B3, H1 and R-1b(iv) were mutually inconsistent; the inconsistency is resolved
+in three parts. RATIFIED 2026-08-27.**
+
+*Owner decision:* **resolved.** An independent review of implementation commit
+`6ef305fbe3ee0ff9960a7b52a1810a26f1e11953` found that B3 derived "every S1 advisory has
+`selected_candidate_id = None`" from `evaluate_readiness(...)` being `False`, but R-2
+conditions `PROPOSAL` on readiness **and** selection, not selection alone, and
+`AdvisoryCandidateSet` was constructible in S1 with a non-null selector — S-1 and S-2
+require only that it resolve and be eligible, and eligibility does not require
+readiness. B3's derivation was a non sequitur.
+
+**(i) Where the no-selection ceiling is enforced.** A non-null
+`AdvisoryCandidateSet.selected_candidate_id` is structurally unconstructible in S1 (new
+C9), on the same pattern C7 already uses for `DomainCheckCompletion.COMPLETE`, rather
+than being refused by `build_proposer_advisory`. No dead-end object exists;
+`build_proposer_advisory` and `build_advisory_revision` inherit the ceiling with no
+separate builder-side check; H1's derivation paragraph needs no amendment.
+
+**(ii) H2's exception surface.** H2 gains a fourth class, `CrossContractViolationError`
+(subclassing `ValueError`, on the same pattern as `EligibilityMismatchError`), for the
+Part E rules — R-1b(i)–(iv), (viii), (ix), and R-5, R-6, R-7, R-9, R-10 — that compare
+fields across more than one contract instance and so cannot be decided by any single
+model's own validator.
+
+**(iii) `ProposerProcessState`'s membership and R-4's comparison basis.** The nine
+members were already entailed by R-3's stated chain; what R-3 and R-4 left unstated —
+the four terminal members' wire values and R-4's comparison basis — is ratified here:
+the terminal four carry exactly `TerminalOutcome`'s wire values, and R-4's "equals" is
+value equality.
+
+**Rejected alternatives, for (i).** Refusing only at `build_proposer_advisory` (the
+implementation this decision replaces) leaves a public object — a set carrying a
+selection — that is constructible but unusable in S1, and would have required recasting
+H1's non-null-selector paragraph as S2-only, new test coverage, and an explicit
+statement that `build_advisory_revision` inherits the refusal. Deriving faithfully and
+dropping B3's null requirement is permitted by R-2, but lets S1 emit a
+`requested_review_destination_role_ref` with no specified source, and needs an
+amendment to the ADR's decision record, not only to this specification.
+
+**Rejected alternative, for (ii).** Restructuring the affected checks into single-model
+validators to reach `pydantic.ValidationError` instead: rejected because several of them
+(R-5, R-6, R-7) are stated over an unbounded list of supplied `ToolObservation`
+instances no single contract can carry without becoming a second identity surface, so
+reaching `ValidationError` this way would require a throwaway aggregate model
+constructed for the sole purpose of obtaining the right exception type.
+
+*Bears on contract shape:* **no.** No field is added, removed or retyped, and no
+cardinality changes. (i) narrows an already-declared field's constructibility on the C7
+pattern; (ii) adds an exported exception class; (iii) ratifies a previously unstated
+vocabulary/comparison-basis detail of an already-declared field and enum.
+
+*Enforcement:* `[V]` **implemented.** The C9 validator
+(`AdvisoryCandidateSet._selection_is_unconstructible`, `contracts.py`),
+`CrossContractViolationError` (`verification.py`, exported via `__init__.py` and
+`public_api.json`) at its three actual raise-statement sites in `identity.py` — the
+shared `_require_equal` helper (R-5, R-6, R-10) and two inline raises (R-9, R-7) —
+and the corresponding test coverage are recorded in
+`docs/architecture/ADR_UGENCE_AGENTIC_PROPOSER_MVP_READINESS.md`'s OD-6 row and
+guard-evidence paragraph and in `CHANGELOG.md`.
+
+*S1 production implementation:* the C9 validator, `CrossContractViolationError` and
+its three call sites are written and tested; this is what actually runs at `0.1.0`.
+
+*Where it is implemented in this document.* B3; new C9; D6 (`selected_candidate_id`'s
+Validation column); the `ProposerProcessStateTransition` section; Part E's header note
+and the R-1b/R-4/R-5/R-6/R-7/R-9/R-10 rows; H1; H2; H3.
+
 ---
 
 ## Ratification statement
@@ -2705,18 +2907,25 @@ participation.
 
 **OD-4 is resolved (a)**, and with it the question that had been open longest about
 contract shape. `ProposerAdvisory` carries its `CandidateAdvisory` entries, as ratified
-D7 says; Part D is written for that shape and no longer for an alternative. **Of the five
-owner decisions, OD-4 is the one that bears on contract shape**; OD-5 was ruled not to,
-and Part D is unchanged by it.
+D7 says; Part D is written for that shape and no longer for an alternative. **Of the six
+owner decisions, OD-4 is the one that bears on contract shape**; OD-5 and OD-6 were
+ruled not to, and Part D is unchanged by either.
 
-**All five owner decisions are resolved. No ruling is outstanding.** OD-1, OD-2 and
+**All six owner decisions are resolved. No ruling is outstanding.** OD-1, OD-2 and
 OD-3 are ratified 2026-08-25 and are recorded above with their riders and their
 enforcement designs; none changes a contract, a field type, a cardinality, a vocabulary
 or an equation term. **OD-5 is ratified 2026-08-26**: it changes no contract, field
 type, cardinality, vocabulary or equation term either. It states what S1 does not do with
 a reasoning strategy, preserves the four-way distinction, and defers the strategy
 permission concept and its vocabulary together to S2. `[R]` That vocabulary requires its
-own ruling and is not given one here.
+own ruling and is not given one here. **OD-6 is ratified 2026-08-27**: it adds a
+validation rule (C9), an exported exception class (H2), and a previously unstated
+vocabulary/comparison-basis detail (`ProposerProcessState`, R-4) — none of which is a
+contract field, type or cardinality change — resolving an inconsistency between B3, H1
+and R-1b(iv) that an independent implementation review found. `[V]` Its three parts
+are ratified as specification text and implemented against the contract module, with
+test coverage in `tests/test_s1_implementation_obligations.py`'s `OD-6` sections and
+`tests/test_process_ordering_obligation.py`.
 
 **The specification is frozen.** The status line at the head of this document reads
 `CONTRACT SPECIFICATION FROZEN FOR IMPLEMENTATION`. Freezing closes the contract

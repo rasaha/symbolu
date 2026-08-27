@@ -91,7 +91,7 @@ _RATIFICATION_HEADING_WORDS = ("ratified", "resolved", "owner decision", "decisi
 
 
 def test_there_is_exactly_one_owner_decision_record():
-    """The ADR's OD-1 – OD-5 table is the single **decision record**.
+    """The ADR's OD-1 – OD-6 table is the single **decision record**.
 
     That is a narrower claim than "one account", and the narrower claim is the true one.
     The specification carries its own full per-decision statement under its
@@ -110,16 +110,16 @@ def test_there_is_exactly_one_owner_decision_record():
     ``test_the_adr_and_the_specification_agree_on_every_owner_decision`` below; without
     it, narrowing this claim would trade a false sentence for an unguarded risk.
     """
-    assert "## Owner decisions OD-1 – OD-5 — all resolved" in _text(ADR)
+    assert "## Owner decisions OD-1 – OD-6 — all resolved" in _text(ADR)
     competing = []
     for path in DOCUMENTS:
         if path == ADR:
             continue
-        for heading in re.findall(r"^#{1,6}\s+(.*OD-[1-5].*)$", _text(path), re.M):
+        for heading in re.findall(r"^#{1,6}\s+(.*OD-[1-6].*)$", _text(path), re.M):
             if any(w in heading.lower() for w in _RATIFICATION_HEADING_WORDS):
                 competing.append(f"{path.name}: {heading}")
     assert not competing, (
-        f"a rival OD-1 – OD-5 ratification heading exists outside the ADR: {competing}")
+        f"a rival OD-1 – OD-6 ratification heading exists outside the ADR: {competing}")
 
 
 def test_the_rival_heading_scan_still_catches_a_rival_heading():
@@ -141,10 +141,11 @@ def test_the_rival_heading_scan_still_catches_a_rival_heading():
         assert offenders(rival), f"the scan no longer catches a rival heading: {rival}"
 
 
-#: The five decisions, and the facts both documents must state identically about each.
-#: OD-5 (2026-08-26) joins OD-1 – OD-4 (2026-08-25); the dates differ per decision and
-#: are compared per decision, so a fifth entry does not weaken the agreement check.
-OWNER_DECISIONS = (1, 2, 3, 4, 5)
+#: The six decisions, and the facts both documents must state identically about each.
+#: OD-5 (2026-08-26) and OD-6 (2026-08-27) join OD-1 – OD-4 (2026-08-25); the dates
+#: differ per decision and are compared per decision, so a sixth entry does not weaken
+#: the agreement check.
+OWNER_DECISIONS = (1, 2, 3, 4, 5, 6)
 _DATE = r"(\d{4}-\d{2}-\d{2})"
 
 
@@ -260,11 +261,11 @@ def _shape_bearing_decisions():
     Derived from the table rather than hard-coded, so the prose checks below follow the
     ruling instead of needing to be rewritten whenever one changes.
     """
-    rows = re.findall(r"\| \*\*OD-([1-5])\*\* — \*\*RATIFIED[^|]*\|[^|]*\|([^|]*)\|",
+    rows = re.findall(r"\| \*\*OD-([1-6])\*\* — \*\*RATIFIED[^|]*\|[^|]*\|([^|]*)\|",
                       _text(ADR))
     bears = {od: cell.strip().lower() for od, cell in rows}
-    assert set(bears) == {"1", "2", "3", "4", "5"}, (
-        f"the ADR decision table does not carry all five rows: {sorted(bears)}")
+    assert set(bears) == {"1", "2", "3", "4", "5", "6"}, (
+        f"the ADR decision table does not carry all six rows: {sorted(bears)}")
     return bears, {od for od, cell in bears.items() if cell.startswith("**yes")}
 
 
@@ -280,10 +281,10 @@ def test_exactly_od_4_is_recorded_as_bearing_on_contract_shape():
     downstream of a decision the table records as shape-neutral.
     """
     bears, bearing = _shape_bearing_decisions()
-    # OD-1 – OD-3 carry a bare ``no``; OD-5 carries an emphasised ``**no**`` with its
-    # reason, so the marker is stripped before comparing rather than each spelling being
-    # matched separately.
-    for od in ("1", "2", "3", "5"):
+    # OD-1 – OD-3 carry a bare ``no``; OD-5 and OD-6 carry an emphasised ``**no**`` with
+    # their reason, so the marker is stripped before comparing rather than each spelling
+    # being matched separately.
+    for od in ("1", "2", "3", "5", "6"):
         assert bears[od].lstrip("*").startswith("no"), (
             f"OD-{od} is recorded as bearing on contract shape: {bears[od]!r}")
     assert bears["4"].startswith("**yes"), (
@@ -440,11 +441,11 @@ def test_no_owner_decision_is_described_as_outstanding(path):
         assert phrase.lower() not in body.lower(), f"{path.name}: {phrase}"
 
 
-def test_the_five_owner_decisions_are_each_recorded_as_ratified():
+def test_the_six_owner_decisions_are_each_recorded_as_ratified():
     body = _text(ADR)
-    for od in ("OD-1", "OD-2", "OD-3", "OD-4", "OD-5"):
+    for od in ("OD-1", "OD-2", "OD-3", "OD-4", "OD-5", "OD-6"):
         assert re.search(rf"\*\*{od}\*\* — \*\*RATIFIED", body), od
-    assert "All five owner decisions are resolved" in _text(SPECIFICATION)
+    assert "All six owner decisions are resolved" in _text(SPECIFICATION)
 
 
 # --------------------------------------------------------------------------- #
@@ -1367,16 +1368,18 @@ def test_exercise_is_decided_by_a_registry_and_never_by_a_mention():
 
     R-4 is mentioned in ``test_process_ordering_obligation.py``, which states in terms
     that it covers none of R-4. Under a mention-based rule that made R-4 "exercised". It
-    counts as exercised now for a different and behavioural reason — a constructed case in
-    ``UNENFORCED`` — and this test asserts that reason rather than the outcome, so
-    deleting the case would fail here rather than pass on the mention.
+    counts as exercised now for a different and behavioural reason — a constructed case
+    in ``ENFORCED`` (R-4 is now locally decidable and enforced, per
+    ``ProposerProcessRecord``'s own validator) — and this test asserts that reason
+    rather than the outcome, so deleting the case would fail here rather than pass on
+    the mention.
     """
     mentions = _rule_mentions_under_tests()
     exercised = _rules_exercised_by_some_test()
 
     assert "test_process_ordering_obligation.py" in mentions["R-4"], (
         "precondition: the obligation module mentions R-4")
-    registry = importlib.import_module("test_unenforced_local_rules").UNENFORCED
+    registry = importlib.import_module("test_unenforced_local_rules").ENFORCED
     r4_cases = [entry for entry in registry if entry[0] == "R-4"]
     assert r4_cases, (
         "R-4 is exercised only by a constructed case; if that case is gone, R-4 belongs "
@@ -1397,10 +1400,14 @@ def test_exercise_is_decided_by_a_registry_and_never_by_a_mention():
 
 
 #: The row whose headline counts the constructed violations, so the number cannot drift
-#: away from the registry it describes.
+#: away from the registry it describes. Matches either wordform: ``representative
+#: shapes`` (while ``s1_specification_mirror.py`` built temporary duplicates) or
+#: ``declared contracts`` (now that it returns the real ones), and either
+#: singular/plural noun, since the count that matters is the captured numeral, not the
+#: fossilized prose around it.
 UNENFORCED_COUNT_ROW = re.compile(
-    r"^\| \*\*([A-Za-z-]+) locally decidable violations the representative shapes "
-    r"accept\*\* \|", re.M)
+    r"^\| \*\*([A-Za-z-]+) locally decidable violations? the "
+    r"(?:representative shapes|declared contracts) accepts?\*\* \|", re.M)
 
 #: Spelled numerals the row may use. Bounded rather than open: a row needing a number
 #: outside this range is a row that should be reworded rather than extended again. The
@@ -1409,7 +1416,7 @@ UNENFORCED_COUNT_ROW = re.compile(
 #: rule — and the range is deliberately left with headroom above the current count so a
 #: single added case is a one-line diff rather than a table edit.
 _NUMERALS = {
-    "Nineteen": 19, "Twenty": 20, "Twenty-one": 21, "Twenty-two": 22,
+    "One": 1, "Nineteen": 19, "Twenty": 20, "Twenty-one": 21, "Twenty-two": 22,
     "Twenty-three": 23, "Twenty-four": 24, "Twenty-five": 25, "Twenty-six": 26,
     "Twenty-seven": 27, "Twenty-eight": 28, "Twenty-nine": 29, "Thirty": 30,
     "Thirty-one": 31, "Thirty-two": 32, "Thirty-three": 33, "Thirty-four": 34,
