@@ -1147,11 +1147,23 @@ def _issue_with_bounds(bounds):
 
 @pytest.mark.adversarial
 def test_a_signed_bounds_key_that_is_not_a_sequence_is_refused():
-    """Guard 102 — ``verification.py:758``, ``not isinstance(raw, (list, tuple))``."""
+    """Guard 102 — ``verification.py:758``, ``not isinstance(raw, (list, tuple))``.
+
+    An **int**, not a dict or a string. Those two are iterable, so without this guard they
+    reach the entry-Mapping check below and are refused with the same
+    ``POLICY_BOUNDS_MALFORMED`` outcome — nothing measured. An int is not iterable at all:
+    ``enumerate(7)`` raises, and the routine's outermost handler classifies that as
+    ``VERIFICATION_UNAVAILABLE``.
+
+    The difference is the guard's whole authority, and it is not cosmetic. "This policy's
+    bounds are malformed" is a determination *about the policy*; "this routine could not
+    reach a determination" is an availability failure that invites a retry. Without this
+    guard a caller is told to retry a policy that will never become readable.
+    """
 
     from ugence_cloud_scaling_policy_authenticity import PolicyAuthenticityOutcome  # noqa: PLC0415
 
-    authority, record = _issue_with_bounds({"scale_up": 100})
+    authority, record = _issue_with_bounds(7)
     result = _verify_with(port_for(authority), record)
     assert result.refusal is not None
     assert result.refusal.outcome is PolicyAuthenticityOutcome.POLICY_BOUNDS_MALFORMED
@@ -1159,7 +1171,17 @@ def test_a_signed_bounds_key_that_is_not_a_sequence_is_refused():
 
 @pytest.mark.adversarial
 def test_a_signed_bound_entry_that_is_not_a_mapping_is_refused():
-    """Guard 104 — ``verification.py:772``, ``not isinstance(entry, Mapping)``."""
+    """Guard 104 — ``verification.py:772``, ``not isinstance(entry, Mapping)``.
+
+    Classified ``diagnostic-only``, and the isolation attempts are recorded because the
+    guard above it turned out *not* to be. Every non-Mapping entry reaches
+    ``POLICY_BOUNDS_MALFORMED`` one way or another: a short string trips the absent-field
+    check, a string containing all four field names trips the ``extra`` check on its
+    characters, and a list or tuple of exactly the four field names — which satisfies both —
+    reaches ``entry["action_type"]`` inside the deliberate ``except Exception`` backstop,
+    which re-raises as the same ``_BoundsShapeError``. No input separates it from its
+    successors.
+    """
 
     from ugence_cloud_scaling_policy_authenticity import PolicyAuthenticityOutcome  # noqa: PLC0415
 

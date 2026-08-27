@@ -6,9 +6,9 @@
 frozen digest are unmoved.
 
 With the artefact gone, the first honest sweep of this package reported **117 inventoried,
-61 killed, 56 survived**. Every survivor is now resolved: **101 SCORED, 16 EXCLUDED**.
+61 killed, 56 survived**. Every survivor is now resolved: **100 SCORED, 17 EXCLUDED**.
 
-### Why sixteen exclusions, against Phase 5A's five
+### Why seventeen exclusions, against Phase 5A's five
 
 Structural, not a difference in rigour. Phase 5A raises a distinct exception type per
 failure, so removing a guard usually changes the class a caller sees. This package refuses
@@ -30,6 +30,23 @@ impossible *by construction* rather than merely unsuccessful:
 
 Four more are `unscorable-by-single-checkout-fixture` (§9.2) and three are genuine
 equivalent mutants over this module's own frozen constants.
+
+### Two guards that read as diagnostic-only and decide whether a candidate verifies
+
+Both were reasoned into the exclusion pile before being measured, and both are the reason
+the "record a failed isolation attempt before excluding" rule exists.
+
+- **`verification.py:836`** — R-8's ratified-vocabulary check. Neutralised, a candidate does
+  not get a different refusal: it **VERIFIES**. An authority can sign a capacity bound under
+  an action type D-4 never ratified; a candidate carrying the same type then selects it. The
+  first attack forged only the candidate's action type and left the signed bound ratified,
+  which produced a selector miss with the same outcome and measured nothing.
+- **`verification.py:758`** — the bounds-sequence check, one line above a guard that looks
+  identical and *is* diagnostic-only. A dict or string is iterable and falls through to the
+  entry check with the same outcome; an **int** is not iterable at all, so without this
+  guard `enumerate(7)` raises and the outermost handler reports `VERIFICATION_UNAVAILABLE`.
+  That tells a caller to retry a policy that will never become readable, instead of telling
+  them the policy's bounds are malformed.
 
 ### Two findings worth more than the tests that found them
 
