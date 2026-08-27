@@ -133,19 +133,12 @@ PACKAGES = {
         ),
         exclusions={
             # --- identifiers.py: the D-4 drift assertions --------------------------------
-            ("identifiers.py", "ours != theirs"): (
-                "unscorable-by-single-checkout-fixture",
-                "Compares this package's ratified identifiers against Phase 4C's, which "
-                "live in a separately-versioned distribution admitted by an open-ended "
-                "`ugence-cloud-scaling-risk-integration>=0.1.0` pin. Under a resolution "
-                "that pin permits, the condition is true and the guard fires — so this is "
-                "not an equivalent mutant, and the earlier claim that it was is withdrawn. "
-                "It is unscorable only because the sweep fixture installs one checkout and "
-                "cannot vary the resolution. The test named below re-runs the assertion "
-                "against whatever is actually installed.",
-                "tests/test_guard_coverage.py::"
-                "test_the_ratified_identifiers_have_not_drifted_from_phase_4c",
-            ),
+            # The pair check one line above these is *not* here. It was excluded as
+            # unscorable-by-single-checkout-fixture until the fixture was asked to vary
+            # the resolution rather than assumed unable to: a `>=0.1.0` pin admits a
+            # 0.2.0 that renames a ratified identifier, and under one the guard is the
+            # difference between refusing to import and binding an unratified value.
+            # Scored since, and killed.
             ("identifiers.py", "controller_actions != CANONICAL_ACTION_TYPES"): (
                 "unreachable-behind-earlier-guard",
                 "Cannot observe an ActionKind drift, because the import that supplies its "
@@ -166,7 +159,7 @@ PACKAGES = {
                 "`if False:` is the same program on every path. The test below measures "
                 "the inequality.",
                 "tests/test_guard_coverage.py::"
-                "test_the_drift_guards_are_equivalent_mutants_because_their_conditions_are_false",
+                "test_the_in_tree_drift_assertions_hold",
             ),
             # --- reconciliation.py: diagnosis-only guards --------------------------------
             # Both are strict subsets of the guard immediately behind them, which carries

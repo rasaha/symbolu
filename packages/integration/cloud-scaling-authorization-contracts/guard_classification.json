@@ -1,8 +1,8 @@
 {
   "package": "authorization-contracts",
   "total": 114,
-  "scored": 109,
-  "excluded": 5,
+  "scored": 110,
+  "excluded": 4,
   "classification": {
     "1": {
       "status": "SCORED",
@@ -53,10 +53,7 @@
       "condition": "any((ch.isspace() and ch != ' ' for ch in text))"
     },
     "9": {
-      "status": "EXCLUDED",
-      "reason": "unscorable-by-single-checkout-fixture",
-      "detail": "Compares this package's ratified identifiers against Phase 4C's, which live in a separately-versioned distribution admitted by an open-ended `ugence-cloud-scaling-risk-integration>=0.1.0` pin. Under a resolution that pin permits, the condition is true and the guard fires \u2014 so this is not an equivalent mutant, and the earlier claim that it was is withdrawn. It is unscorable only because the sweep fixture installs one checkout and cannot vary the resolution. The test named below re-runs the assertion against whatever is actually installed.",
-      "evidence": "tests/test_guard_coverage.py::test_the_ratified_identifiers_have_not_drifted_from_phase_4c",
+      "status": "SCORED",
       "module": "identifiers.py",
       "line": 93,
       "condition": "ours != theirs"
@@ -74,7 +71,7 @@
       "status": "EXCLUDED",
       "reason": "equivalent-mutant",
       "detail": "A collision assertion between two frozen literals defined in this module, in this distribution. No dependency resolution can move either, so the condition is false in every program this package can be part of and `if False:` is the same program on every path. The test below measures the inequality.",
-      "evidence": "tests/test_guard_coverage.py::test_the_drift_guards_are_equivalent_mutants_because_their_conditions_are_false",
+      "evidence": "tests/test_guard_coverage.py::test_the_in_tree_drift_assertions_hold",
       "module": "identifiers.py",
       "line": 109,
       "condition": "PRODUCER_SIGNING_PURPOSE == PURPOSE_CAPACITY_ACTION"

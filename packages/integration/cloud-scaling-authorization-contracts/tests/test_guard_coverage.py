@@ -490,13 +490,25 @@ def test_the_ratified_identifiers_have_not_drifted_from_phase_4c():
     ids._assert_no_drift()
 
 
-def test_the_drift_guards_are_equivalent_mutants_because_their_conditions_are_false():
-    """Why guards 9, 10 and 11 are classified ``EXCLUDED`` rather than left as survivors.
+def test_the_in_tree_drift_assertions_hold():
+    """The test-time half of §9.3, and the measurement behind guard 11's exclusion.
 
-    The exclusion rests on a measurable claim, so the claim is measured here: each guard's
-    condition is False in-tree. A guard whose condition never holds cannot change behaviour
-    when it is removed. If any assertion below ever fails, the exclusion is void — and the
-    package will already have failed to import, which is the guard doing its job.
+    Each assertion below re-runs one import-time condition against what is actually
+    installed. All three are False in this tree, which is the package importing correctly
+    rather than a claim about any of them.
+
+    It carries a classification only for **guard 11**, whose operands are two frozen
+    literals defined in this module, in this distribution: no resolution can move either,
+    so ``if False:`` is the same program on every path and ``equivalent-mutant`` holds.
+    That argument is available precisely because nothing outside this distribution supplies
+    an operand.
+
+    It is **not** available for guard 9, and the earlier version of this test claimed
+    otherwise for all three. Guard 9's right operands come from Phase 4C, admitted by an
+    open-ended pin, so its condition being False here says only that one resolution agrees.
+    Measuring it needed a second resolution, which is
+    ``test_the_phase_4c_drift_guard_fires_under_a_second_permitted_resolution``; it is
+    SCORED and killed. Guard 10 is excluded on reachability, measured separately.
     """
 
     from ugence_cloud_scaling_controller.planning.candidates import ActionKind  # noqa: PLC0415
@@ -515,7 +527,8 @@ def test_the_drift_guards_are_equivalent_mutants_because_their_conditions_are_fa
 
     from ugence_cloud_scaling_authorization_contracts import identifiers as ids  # noqa: PLC0415
 
-    # Guard 9 — ``ours != theirs``, over all four ratified pairs.
+    # The four ratified pairs guard 9 compares. Agreement here is not why guard 9 is
+    # classified as it is — it is SCORED, and killed under a second resolution.
     assert ids.PURPOSE_CAPACITY_ACTION == PHASE4C_PURPOSE
     assert ids.DOMAIN_CLOUD_SCALING == PHASE4C_DOMAIN
     assert ids.SUBJECT_TYPE_CAPACITY_SUBJECT == PHASE4C_SUBJECT_TYPE

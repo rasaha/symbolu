@@ -23,17 +23,16 @@ its enclosing `if` — which is why this total is larger and neither number move
 
 ## Classification
 
-Every guard is classified: **109 `SCORED`** — the
+Every guard is classified: **110 `SCORED`** — the
 sweep neutralises it and the suite must fail — and
-**5 `EXCLUDED`**, each with a reason from a closed vocabulary and
+**4 `EXCLUDED`**, each with a reason from a closed vocabulary and
 a test that measures the reason. A guard is never excluded because it survived; a
 survivor with no prior declaration fails the sweep.
 
 | Module:line | Reason | Why | Measured by |
 |---|---|---|---|
-| `identifiers.py:93` | `unscorable-by-single-checkout-fixture` | Compares this package's ratified identifiers against Phase 4C's, which live in a separately-versioned distribution admitted by an open-ended `ugence-cloud-scaling-risk-integration>=0.1.0` pin. Under a resolution that pin permits, the condition is true and the guard fires — so this is not an equivalent mutant, and the earlier claim that it was is withdrawn. It is unscorable only because the sweep fixture installs one checkout and cannot vary the resolution. The test named below re-runs the assertion against whatever is actually installed. | `tests/test_guard_coverage.py::test_the_ratified_identifiers_have_not_drifted_from_phase_4c` |
 | `identifiers.py:100` | `unreachable-behind-earlier-guard` | Cannot observe an ActionKind drift, because the import that supplies its left operand fails first: reaching Phase 4C for `_PHASE4C_ACTION_TYPES` runs Phase 4C's own import-time ActionKind guard, which raises before this module finishes importing. Measured, not reasoned — the test below drifts the controller's enum in a subprocess and reads which guard's ImportError comes back. If it ever names this guard, this exclusion is void. | `tests/test_guard_coverage.py::test_the_action_kind_drift_guard_is_unreachable_behind_phase_4c` |
-| `identifiers.py:109` | `equivalent-mutant` | A collision assertion between two frozen literals defined in this module, in this distribution. No dependency resolution can move either, so the condition is false in every program this package can be part of and `if False:` is the same program on every path. The test below measures the inequality. | `tests/test_guard_coverage.py::test_the_drift_guards_are_equivalent_mutants_because_their_conditions_are_false` |
+| `identifiers.py:109` | `equivalent-mutant` | A collision assertion between two frozen literals defined in this module, in this distribution. No dependency resolution can move either, so the condition is false in every program this package can be part of and `if False:` is the same program on every path. The test below measures the inequality. | `tests/test_guard_coverage.py::test_the_in_tree_drift_assertions_hold` |
 | `reconciliation.py:388` | `diagnostic-only` | `None` is a strict subset of `not isinstance(d_decision_snapshot, Mapping)`, the guard on the next line, which raises ReconciliationError with the same MISSING_DECISION_SNAPSHOT reason. Removing this guard changes the message and nothing else. It is kept because the message is the better one for the commonest case. | `tests/test_guard_coverage.py::test_an_allow_family_decision_missing_a_binding_fact_is_refused` |
 | `reconciliation.py:538` | `diagnostic-only` | `None` is a strict subset of `not isinstance(value, datetime)` inside the `_require_datetime("expires_at", ..., MISSING_EXPIRY_FACT)` call on the next line, which raises ReconciliationError with the same MISSING_EXPIRY_FACT reason. Removing this guard changes the message and nothing else. | `tests/test_guard_coverage.py::test_an_allow_family_decision_missing_a_binding_fact_is_refused` |
 
@@ -57,7 +56,7 @@ survivor with no prior declaration fails the sweep.
 | 6 | `canonical.py:158` | raise | SCORED | — | `unicodedata.normalize('NFC', value) != value` |
 | 7 | `canonical.py:171` | raise | SCORED | — | `text != text.strip()` |
 | 8 | `canonical.py:176` | raise | SCORED | — | `any((ch.isspace() and ch != ' ' for ch in text))` |
-| 9 | `identifiers.py:93` | raise | EXCLUDED | — | `ours != theirs` |
+| 9 | `identifiers.py:93` | raise | SCORED | — | `ours != theirs` |
 | 10 | `identifiers.py:100` | raise | EXCLUDED | — | `controller_actions != CANONICAL_ACTION_TYPES` |
 | 11 | `identifiers.py:109` | raise | EXCLUDED | — | `PRODUCER_SIGNING_PURPOSE == PURPOSE_CAPACITY_ACTION` |
 | 12 | `target.py:101` | raise | SCORED | peripheral-28 | `type(value) is not int or value < 0` |

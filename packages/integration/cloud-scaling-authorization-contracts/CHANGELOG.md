@@ -1,5 +1,42 @@
 # Changelog — ugence-cloud-scaling-authorization-contracts
 
+## [Unreleased] — guard 9 is scored, not unscorable
+
+*No version bump and no production behaviour change.* The exclusion vocabulary's newest
+reason, `unscorable-by-single-checkout-fixture`, was applied to a guard that is scorable.
+
+Guard 9 (`identifiers.py:93`, `ours != theirs`) compares this package's ratified
+identifiers against Phase 4C's, which arrive from a separately-versioned distribution
+under an open-ended `ugence-cloud-scaling-risk-integration>=0.1.0` pin. The exclusion
+reasoned that the sweep fixture installs exactly one resolution and so cannot make the
+condition true. That is true of the fixture and irrelevant to the guard: a test is free to
+construct a second resolution, and a pin admitting any version at or above 0.1.0 admits a
+0.2.0 that renames a ratified identifier.
+
+So the test builds one — from the real Phase 4C source, not a stub, with the version
+bumped and `PURPOSE_CAPACITY_ACTION` renamed — and places it first on `PYTHONPATH`, where
+it *is* the installed Phase 4C. Under it:
+
+| | guard present | guard removed |
+|---|---|---|
+| drifted resolution | `ImportError`, naming the drifted identifier | imports cleanly |
+
+Removed, Phase 5A binds `cloud_scaling.capacity_action` into every candidate digest while
+Phase 4C ratifies `cloud_scaling.capacity_action.v2` — the identifier substitution the
+module docstring says fails closed. A refusal versus no refusal is a change to the typed
+refusal under §9.1, so the guard is authority-bearing, and the sweep kills it against the
+full suite.
+
+**The split is 110 `SCORED` / 4 `EXCLUDED`, not 109 / 5.** The inventory is still 114.
+
+The reason itself stands — two Phase 5B identifier guards still carry it — but it now has
+a bar to clear. "The fixture installs one resolution" is not a reason; "no second
+resolution the pin admits makes this condition true" is, and it has to be measured. The
+in-tree drift test that previously carried guard 9's exclusion said all three import-time
+guards were equivalent mutants because their conditions are False in this tree. For guard
+11, whose operands are two frozen literals in this distribution, that argument holds. For
+guard 9 it never did: agreement under one resolution says nothing about the others.
+
 ## [Unreleased] — 114 guards, and the carve-out that hid an untested one
 
 *No version bump and no production behaviour change.* An independent adversarial
