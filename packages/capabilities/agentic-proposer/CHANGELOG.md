@@ -1,5 +1,44 @@
 # Changelog — ugence-agentic-proposer
 
+## Unreleased — OD-6 ratified: a specification amendment, not yet implemented
+
+`docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md` and
+`docs/architecture/ADR_UGENCE_AGENTIC_PROPOSER_MVP_READINESS.md` are amended by OD-6,
+ratified 2026-08-27, resolving an inconsistency an independent review of the `0.1.0`
+implementation commit found between B3, H1 and R-1b(iv). This entry is documentation
+only: `src/`, `tests/`, `public_api.json` and `version.py` are unchanged, and the
+package remains `0.1.0` with the behaviour described below in effect until a follow-on
+implementation change lands.
+
+* **(i) The no-selection ceiling moves from the builder to the input.** New **C9**
+  makes a non-null `AdvisoryCandidateSet.selected_candidate_id` structurally
+  unconstructible in S1, on the same pattern C7 uses for
+  `DomainCheckCompletion.COMPLETE`, rather than relying on `build_proposer_advisory`
+  to refuse one. **Not yet implemented**: the shipped `0.1.0` behaviour is still the
+  builder-side refusal this replaces.
+* **(ii) H2 gains a fourth exception class, `CrossContractViolationError`,** for the
+  Part E rules — R-1b's cross-contract clauses and R-5, R-6, R-7, R-9, R-10 — that
+  compare fields across more than one contract instance and so cannot raise
+  `pydantic.ValidationError` from any single model's own validator. **Not yet
+  implemented**: the shipped `0.1.0` code raises a bare `ValueError` at those eight
+  sites in `identity.py`/`verification.py`, which is not one of H2's declared classes
+  either before or after this amendment until the follow-on change lands.
+* **(iii) `ProposerProcessState`'s nine-member composition and R-4's comparison basis
+  are ratified as specification text.** The shipped `0.1.0` enum and its value-based
+  R-4 comparison are unchanged by this — this amendment ratifies the design already in
+  `src/`, not a new one — but the previous `[I]`, "disclosed for ratification" status
+  below is superseded: it is now `[V]`, ratified.
+* **Known follow-on work, tracked and not yet done:** the C9 validator; defining
+  `CrossContractViolationError` and updating its eight raise sites; replacing
+  `tests/test_process_ordering_obligation.py`'s own text asserting the
+  `ProposerProcessState` cardinality and R-4 comparison basis are still open (OD-6(iii)
+  now closes both); and updating `test_documentation_consistency.py`'s
+  `test_there_is_exactly_one_owner_decision_record`, which still pins the literal
+  heading text `"## Owner decisions OD-1 – OD-5 — all resolved"` against an ADR now
+  titled `OD-1 – OD-6`. Per this repository's working agreement, tests are not edited
+  as part of a ratification commit; both are disclosed here rather than silently left
+  red.
+
 ## 0.1.0 — S1 contracts and equations implemented; the first public-API snapshot
 
 Implements `docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md` in full against `src/`
@@ -633,7 +672,7 @@ classification and the unchanged R-3 lifecycle, and found five defects. Document
 guards only.
 
 * **A rename left three dangling cross-references and a contradicted sentence.** Renaming
-  the ADR's table to *Owner decisions OD-1 – OD-5* left two references to the old heading,
+  the ADR's table to "Owner decisions OD-1 – OD-5" left two references to the old heading,
   a sentence crediting OD-4 with shape-bearing that OD-5 also has, and a
   three-statuses sentence still scoped to four. The suite was green over all four because every existing guard
   read the table rather than the prose around it. Two new scans close the class: italic
