@@ -1,0 +1,1046 @@
+{
+  "package": "policy-authenticity",
+  "total": 115,
+  "reconciliation": {},
+  "excluded": {
+    "except_arms": 2,
+    "boolean_subterms": 16
+  },
+  "guards": [
+    {
+      "index": 1,
+      "module": "canonical.py",
+      "line": 89,
+      "condition": "type(domain) is not str or not domain",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 2,
+      "module": "canonical.py",
+      "line": 111,
+      "condition": "not is_policy_digest(value)",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 3,
+      "module": "canonical.py",
+      "line": 130,
+      "condition": "not is_phase5a_digest(value)",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 4,
+      "module": "canonical.py",
+      "line": 146,
+      "condition": "type(value) is not str",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 5,
+      "module": "canonical.py",
+      "line": 151,
+      "condition": "not allow_empty and value == ''",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 6,
+      "module": "canonical.py",
+      "line": 153,
+      "condition": "unicodedata.normalize('NFC', value) != value",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 7,
+      "module": "canonical.py",
+      "line": 169,
+      "condition": "text != text.strip()",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 8,
+      "module": "canonical.py",
+      "line": 171,
+      "condition": "any((ch.isspace() and ch != ' ' for ch in text))",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 9,
+      "module": "canonical.py",
+      "line": 184,
+      "condition": "type(value) is not datetime",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 10,
+      "module": "canonical.py",
+      "line": 186,
+      "condition": "value.tzinfo is None or value.utcoffset() is None",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 11,
+      "module": "canonical.py",
+      "line": 202,
+      "condition": "type(value) is not expected",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 12,
+      "module": "identifiers.py",
+      "line": 186,
+      "condition": "VERIFICATION_PROFILE == POLICY_AUTHORITY_PROTOCOL_ID",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 13,
+      "module": "identifiers.py",
+      "line": 191,
+      "condition": "POLICY_AUTHENTICITY_DIGEST_DOMAIN == POLICY_BODY_DIGEST_DOMAIN",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 14,
+      "module": "identifiers.py",
+      "line": 196,
+      "condition": "len({POLICY_AUTHENTICITY_DIGEST_DOMAIN, POLICY_AUTHENTICITY_VERIFIED_FACTS_DOMAIN, POLICY_AUTHENTICITY_RECORDED_FACTS_DOMAIN}) != 3",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 15,
+      "module": "identifiers.py",
+      "line": 210,
+      "condition": "REQUIRED_KEY_ENTITLEMENT is FORBIDDEN_KEY_ENTITLEMENT",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 16,
+      "module": "identifiers.py",
+      "line": 224,
+      "condition": "CANONICAL_ACTION_TYPES != _RATIFIED_ACTION_TYPES",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 17,
+      "module": "resolution_port.py",
+      "line": 193,
+      "condition": "registry is None",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 18,
+      "module": "resolution_port.py",
+      "line": 195,
+      "condition": "signature_verifier is None",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 19,
+      "module": "resolution_port.py",
+      "line": 200,
+      "condition": "not isinstance(adapters, AdapterRegistry)",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 20,
+      "module": "resolution_port.py",
+      "line": 206,
+      "condition": "not hasattr(registry, attribute)",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 21,
+      "module": "resolution_port.py",
+      "line": 210,
+      "condition": "not hasattr(signature_verifier, 'verify')",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 22,
+      "module": "resolution_port.py",
+      "line": 354,
+      "condition": "REFERENCE_GRADE_PORTS and isinstance(port, REFERENCE_GRADE_PORTS)",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 23,
+      "module": "resolution_port.py",
+      "line": 359,
+      "condition": "getattr(port, 'is_production_authoritative', False) is not True",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 24,
+      "module": "verified.py",
+      "line": 279,
+      "condition": "smuggled",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 25,
+      "module": "verified.py",
+      "line": 296,
+      "condition": "not_a_field",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 26,
+      "module": "verified.py",
+      "line": 356,
+      "condition": "isinstance(value, bool) or type(value) is not int",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 27,
+      "module": "verified.py",
+      "line": 360,
+      "condition": "value < 0",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 28,
+      "module": "verified.py",
+      "line": 446,
+      "condition": "self.construction_token is not _VERIFICATION_TOKEN",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 29,
+      "module": "verified.py",
+      "line": 453,
+      "condition": "self.verification_profile != VERIFICATION_PROFILE",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 30,
+      "module": "verified.py",
+      "line": 457,
+      "condition": "self.verification_profile_version != VERIFICATION_PROFILE_VERSION",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 31,
+      "module": "verified.py",
+      "line": 461,
+      "condition": "self.policy_trust_anchor_owner != POLICY_TRUST_ANCHOR_OWNER",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 32,
+      "module": "verified.py",
+      "line": 466,
+      "condition": "self.authority_protocol_id != POLICY_AUTHORITY_PROTOCOL_ID",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 33,
+      "module": "verified.py",
+      "line": 471,
+      "condition": "self.authority_canonicalization_version != POLICY_AUTHORITY_CANONICALIZATION_VERSION",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 34,
+      "module": "verified.py",
+      "line": 476,
+      "condition": "self.signature_alg not in SUPPORTED_SIGNATURE_ALGORITHMS",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 35,
+      "module": "verified.py",
+      "line": 495,
+      "condition": "self.capacity_bounds_fact is not None",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 36,
+      "module": "verified.py",
+      "line": 496,
+      "condition": "type(self.capacity_bounds_fact) is not tuple",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 37,
+      "module": "verified.py",
+      "line": 501,
+      "condition": "not self.capacity_bounds_fact",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 38,
+      "module": "verified.py",
+      "line": 508,
+      "condition": "type(bound) is not VerifiedCapacityBound",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 39,
+      "module": "verified.py",
+      "line": 516,
+      "condition": "len(set(selectors)) != len(selectors)",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 40,
+      "module": "verified.py",
+      "line": 525,
+      "condition": "self.policy_content_digest != self.policy_body_digest",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 41,
+      "module": "verified.py",
+      "line": 534,
+      "condition": "self.artifact_digest != expected",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 42,
+      "module": "verified.py",
+      "line": 675,
+      "condition": "name in RECORDED_FACT_NAMES",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 43,
+      "module": "verified.py",
+      "line": 681,
+      "condition": "name not in VERIFIED_FACT_NAMES",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 44,
+      "module": "verified.py",
+      "line": 695,
+      "condition": "name not in RECORDED_FACT_NAMES",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 45,
+      "module": "verified.py",
+      "line": 737,
+      "condition": "type(value) is not VerifiedPolicyAuthenticity",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 46,
+      "module": "verified.py",
+      "line": 751,
+      "condition": "value.construction_token is not _VERIFICATION_TOKEN",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 47,
+      "module": "verified.py",
+      "line": 756,
+      "condition": "value.artifact_digest not in _MINTED_DIGESTS",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 48,
+      "module": "verified.py",
+      "line": 763,
+      "condition": "value.artifact_digest != value.digest()",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 49,
+      "module": "verified.py",
+      "line": 775,
+      "condition": "VERIFIED_FACT_NAMES & RECORDED_FACT_NAMES",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 50,
+      "module": "verified.py",
+      "line": 780,
+      "condition": "_PARTITIONED != _DECLARED",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 51,
+      "module": "verification.py",
+      "line": 152,
+      "condition": "type(self.outcome) is not _Outcome",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 52,
+      "module": "verification.py",
+      "line": 157,
+      "condition": "self.outcome is _Outcome.VERIFIED",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 53,
+      "module": "verification.py",
+      "line": 190,
+      "condition": "(self.verified_policy is None) == (self.refusal is None)",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 54,
+      "module": "verification.py",
+      "line": 195,
+      "condition": "self.verified_policy is not None",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 55,
+      "module": "verification.py",
+      "line": 196,
+      "condition": "type(self.verified_policy) is not VerifiedPolicyAuthenticity",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 56,
+      "module": "verification.py",
+      "line": 207,
+      "condition": "type(self.resolution) is not PolicyResolution",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 57,
+      "module": "verification.py",
+      "line": 214,
+      "condition": "self.refusal is not None and type(self.refusal) is not PolicyAuthenticityRefusal",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 58,
+      "module": "verification.py",
+      "line": 240,
+      "condition": "resolution.requested_coordinate != coordinate",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 59,
+      "module": "verification.py",
+      "line": 247,
+      "condition": "type(record) is not IssuedPolicyRecord or record.coordinate != coordinate",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 60,
+      "module": "verification.py",
+      "line": 252,
+      "condition": "record.policy_body_digest != artifact.policy_body_digest",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 61,
+      "module": "verification.py",
+      "line": 259,
+      "condition": "resolution.as_of != artifact.resolved_as_of_fact",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 62,
+      "module": "verification.py",
+      "line": 266,
+      "condition": "resolution.historical or resolution.implies_current_validity is not True",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 63,
+      "module": "verification.py",
+      "line": 310,
+      "condition": "resolution_port is None",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 64,
+      "module": "verification.py",
+      "line": 315,
+      "condition": "not hasattr(resolution_port, 'resolve_policy_version')",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 65,
+      "module": "verification.py",
+      "line": 321,
+      "condition": "not is_policy_digest(digest)",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 66,
+      "module": "verification.py",
+      "line": 412,
+      "condition": "type(coordinate) is not PolicyCoordinate",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "UNSUPPORTED_EXACT_TYPE"
+    },
+    {
+      "index": 67,
+      "module": "verification.py",
+      "line": 419,
+      "condition": "type(expected_reference_tenant_id) is not str",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "UNSUPPORTED_EXACT_TYPE"
+    },
+    {
+      "index": 68,
+      "module": "verification.py",
+      "line": 424,
+      "condition": "type(as_of) is not datetime or as_of.tzinfo is None or as_of.utcoffset() is None",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "UNSUPPORTED_EXACT_TYPE"
+    },
+    {
+      "index": 69,
+      "module": "verification.py",
+      "line": 430,
+      "condition": "candidate is not None and type(candidate) is not CapacityAuthorizationCandidate",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "UNSUPPORTED_EXACT_TYPE"
+    },
+    {
+      "index": 70,
+      "module": "verification.py",
+      "line": 440,
+      "condition": "expected_reference_tenant_id != coordinate.tenant_id",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "TENANT_EXPECTATION_MISMATCH"
+    },
+    {
+      "index": 71,
+      "module": "verification.py",
+      "line": 460,
+      "condition": "type(resolution) is not PolicyResolution",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "UNSUPPORTED_EXACT_TYPE"
+    },
+    {
+      "index": 72,
+      "module": "verification.py",
+      "line": 467,
+      "condition": "resolution.requested_coordinate != coordinate",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "RESOLUTION_ANSWERED_ANOTHER_QUESTION"
+    },
+    {
+      "index": 73,
+      "module": "verification.py",
+      "line": 472,
+      "condition": "resolution.as_of != instant",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "RESOLUTION_ANSWERED_ANOTHER_QUESTION"
+    },
+    {
+      "index": 74,
+      "module": "verification.py",
+      "line": 479,
+      "condition": "resolution.status is not PolicyResolutionStatus.RESOLVED",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 75,
+      "module": "verification.py",
+      "line": 487,
+      "condition": "resolution.historical",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "HISTORICAL_RESOLUTION_REFUSED"
+    },
+    {
+      "index": 76,
+      "module": "verification.py",
+      "line": 494,
+      "condition": "resolution.implies_current_validity is not True",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "HISTORICAL_RESOLUTION_REFUSED"
+    },
+    {
+      "index": 77,
+      "module": "verification.py",
+      "line": 502,
+      "condition": "type(record) is not IssuedPolicyRecord",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "RESOLUTION_MALFORMED"
+    },
+    {
+      "index": 78,
+      "module": "verification.py",
+      "line": 507,
+      "condition": "resolution.policy is None or record.policy is not resolution.policy",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "RESOLUTION_MALFORMED"
+    },
+    {
+      "index": 79,
+      "module": "verification.py",
+      "line": 512,
+      "condition": "record.coordinate != coordinate",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "RESOLUTION_MALFORMED"
+    },
+    {
+      "index": 80,
+      "module": "verification.py",
+      "line": 519,
+      "condition": "record.coordinate.content_digest != record.policy_body_digest",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "COORDINATE_DIGEST_UNBOUND"
+    },
+    {
+      "index": 81,
+      "module": "verification.py",
+      "line": 529,
+      "condition": "record.signature_alg not in SUPPORTED_SIGNATURE_ALGORITHMS",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "UNSUPPORTED_ALGORITHM"
+    },
+    {
+      "index": 82,
+      "module": "verification.py",
+      "line": 536,
+      "condition": "not is_policy_digest(record.policy_body_digest)",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "COORDINATE_MALFORMED"
+    },
+    {
+      "index": 83,
+      "module": "verification.py",
+      "line": 541,
+      "condition": "candidate is not None and (not is_phase5a_digest(candidate.candidate_digest))",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "COORDINATE_MALFORMED"
+    },
+    {
+      "index": 84,
+      "module": "verification.py",
+      "line": 551,
+      "condition": "candidate is not None",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "CANDIDATE_COORDINATE_MISMATCH"
+    },
+    {
+      "index": 85,
+      "module": "verification.py",
+      "line": 553,
+      "condition": "mismatch is not None",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "CANDIDATE_COORDINATE_MISMATCH"
+    },
+    {
+      "index": 86,
+      "module": "verification.py",
+      "line": 566,
+      "condition": "candidate is not None",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "CANDIDATE_CROSS_TENANT_POLICY"
+    },
+    {
+      "index": 87,
+      "module": "verification.py",
+      "line": 568,
+      "condition": "crossing is not None",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "CANDIDATE_CROSS_TENANT_POLICY"
+    },
+    {
+      "index": 88,
+      "module": "verification.py",
+      "line": 577,
+      "condition": "candidate is not None",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 89,
+      "module": "verification.py",
+      "line": 584,
+      "condition": "mistyped is not None",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 90,
+      "module": "verification.py",
+      "line": 588,
+      "condition": "staleness is not None",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 91,
+      "module": "verification.py",
+      "line": 604,
+      "condition": "reproduction is not None",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 92,
+      "module": "verification.py",
+      "line": 627,
+      "condition": "candidate is not None",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 93,
+      "module": "verification.py",
+      "line": 629,
+      "condition": "mismatch is not None",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 94,
+      "module": "verification.py",
+      "line": 685,
+      "condition": "missing",
+      "shape": "typed-refusal tuple",
+      "recorded_in": "",
+      "outcome": "POLICY_PROJECTION_ABSENT"
+    },
+    {
+      "index": 95,
+      "module": "verification.py",
+      "line": 692,
+      "condition": "type(adapter_id) is not str or type(policy_type) is not str",
+      "shape": "typed-refusal tuple",
+      "recorded_in": "",
+      "outcome": "POLICY_PROJECTION_ABSENT"
+    },
+    {
+      "index": 96,
+      "module": "verification.py",
+      "line": 697,
+      "condition": "not isinstance(projection, Mapping)",
+      "shape": "typed-refusal tuple",
+      "recorded_in": "",
+      "outcome": "POLICY_PROJECTION_ABSENT"
+    },
+    {
+      "index": 97,
+      "module": "verification.py",
+      "line": 706,
+      "condition": "adapter_id != record.adapter_id",
+      "shape": "typed-refusal tuple",
+      "recorded_in": "",
+      "outcome": "POLICY_PROJECTION_DIGEST_MISMATCH"
+    },
+    {
+      "index": 98,
+      "module": "verification.py",
+      "line": 712,
+      "condition": "policy_type != record.policy_type",
+      "shape": "typed-refusal tuple",
+      "recorded_in": "",
+      "outcome": "POLICY_PROJECTION_DIGEST_MISMATCH"
+    },
+    {
+      "index": 99,
+      "module": "verification.py",
+      "line": 728,
+      "condition": "reproduced != record.policy_body_digest",
+      "shape": "typed-refusal tuple",
+      "recorded_in": "",
+      "outcome": "POLICY_PROJECTION_DIGEST_MISMATCH"
+    },
+    {
+      "index": 100,
+      "module": "verification.py",
+      "line": 758,
+      "condition": "not isinstance(raw, (list, tuple))",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 101,
+      "module": "verification.py",
+      "line": 764,
+      "condition": "not raw",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 102,
+      "module": "verification.py",
+      "line": 772,
+      "condition": "not isinstance(entry, Mapping)",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 103,
+      "module": "verification.py",
+      "line": 775,
+      "condition": "absent",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 104,
+      "module": "verification.py",
+      "line": 778,
+      "condition": "extra",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 105,
+      "module": "verification.py",
+      "line": 824,
+      "condition": "not capacity_bounds",
+      "shape": "typed-refusal tuple",
+      "recorded_in": "",
+      "outcome": "CANDIDATE_POLICY_STATES_NO_BOUNDS"
+    },
+    {
+      "index": 106,
+      "module": "verification.py",
+      "line": 836,
+      "condition": "type(action_type) is not str or action_type not in CANONICAL_ACTION_TYPES",
+      "shape": "typed-refusal tuple",
+      "recorded_in": "",
+      "outcome": "CANDIDATE_BOUND_SELECTOR_MISS"
+    },
+    {
+      "index": 107,
+      "module": "verification.py",
+      "line": 852,
+      "condition": "not matches",
+      "shape": "typed-refusal tuple",
+      "recorded_in": "",
+      "outcome": "CANDIDATE_BOUND_SELECTOR_MISS"
+    },
+    {
+      "index": 108,
+      "module": "verification.py",
+      "line": 864,
+      "condition": "len(matches) > 1",
+      "shape": "typed-refusal tuple",
+      "recorded_in": "",
+      "outcome": "CANDIDATE_BOUND_SELECTOR_AMBIGUOUS"
+    },
+    {
+      "index": 109,
+      "module": "verification.py",
+      "line": 884,
+      "condition": "type(carried) is not int or isinstance(carried, bool)",
+      "shape": "typed-refusal tuple",
+      "recorded_in": "",
+      "outcome": "CANDIDATE_BOUND_EXCEEDED"
+    },
+    {
+      "index": 110,
+      "module": "verification.py",
+      "line": 890,
+      "condition": "carried > authenticated",
+      "shape": "typed-refusal tuple",
+      "recorded_in": "",
+      "outcome": "CANDIDATE_BOUND_EXCEEDED"
+    },
+    {
+      "index": 111,
+      "module": "verification.py",
+      "line": 1026,
+      "condition": "type(value) is not datetime",
+      "shape": "typed-refusal tuple",
+      "recorded_in": "",
+      "outcome": "CANDIDATE_FACT_NOT_EXACT_INSTANT"
+    },
+    {
+      "index": 112,
+      "module": "verification.py",
+      "line": 1053,
+      "condition": "instant < valid_from",
+      "shape": "typed-refusal tuple",
+      "recorded_in": "",
+      "outcome": "CANDIDATE_RECOMMENDATION_NOT_YET_VALID"
+    },
+    {
+      "index": 113,
+      "module": "verification.py",
+      "line": 1059,
+      "condition": "instant > valid_until",
+      "shape": "typed-refusal tuple",
+      "recorded_in": "",
+      "outcome": "CANDIDATE_RECOMMENDATION_EXPIRED"
+    },
+    {
+      "index": 114,
+      "module": "verification.py",
+      "line": 1067,
+      "condition": "instant > expires_at",
+      "shape": "typed-refusal tuple",
+      "recorded_in": "",
+      "outcome": "CANDIDATE_DECISION_EXPIRED"
+    },
+    {
+      "index": 115,
+      "module": "verification.py",
+      "line": 1076,
+      "condition": "instant < occurred_at",
+      "shape": "typed-refusal tuple",
+      "recorded_in": "",
+      "outcome": "CANDIDATE_FACT_NOT_YET_OCCURRED"
+    }
+  ]
+}

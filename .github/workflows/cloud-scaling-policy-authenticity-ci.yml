@@ -314,3 +314,59 @@ jobs:
           name: cloud-scaling-policy-authenticity-dist
           path: packages/integration/cloud-scaling-policy-authenticity/dist/*
           if-no-files-found: warn
+
+  guard-inventory:
+    name: Guard inventory is re-derivable
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Regenerate the inventory and prove it is unchanged
+        run: |
+          python scripts/cloud_scaling/guard_sweep.py policy-authenticity --inventory-only
+          git diff --exit-code -- \
+            packages/integration/cloud-scaling-policy-authenticity/GUARD_INVENTORY.md \
+            packages/integration/cloud-scaling-policy-authenticity/guard_inventory.json
+
+  guard-sweep:
+    name: Gate-removal mutation sweep (shard ${{ matrix.shard }} of 8)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install tooling + first-party packages (editable)
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest build numpy "cryptography>=41.0.7,<47.0.0" "PyNaCl>=1.5.0,<2.0.0"
+          pip install -e packages/risk_authority
+          pip install -e packages/trusted-evidence-authority
+          pip install -e packages/policy-authority
+          pip install -e packages/capabilities/cloud-scaling-controller
+          pip install -e packages/integration/cloud-scaling-risk-integration
+          pip install -e packages/integration/cloud-scaling-authorization-contracts
+          pip install -e packages/integration/cloud-scaling-policy-authenticity
+      - name: Sweep this shard
+        # 115 guards against a 191s suite is six wall-clock hours in one job. Eight shards
+        # puts each at roughly three quarters of an hour.
+        env:
+          UGENCE_RATCHET_BASE: ${{ github.event.pull_request.base.sha || github.sha }}
+        run: python scripts/cloud_scaling/guard_sweep.py policy-authenticity --shard ${{ matrix.shard }}/8
+      - name: The tracked tree was not mutated
+        run: git diff --exit-code
+        if: always()
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: policy-authenticity-guard-sweep-shard-${{ matrix.shard }}
+          path: /tmp/ugence-sweep-policy-authenticity/*.json
+          if-no-files-found: warn

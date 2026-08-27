@@ -229,3 +229,62 @@ jobs:
         run: python scripts/validate_terminology.py
       - name: Documentation-link validation
         run: python scripts/check_doc_links.py
+
+  guard-inventory:
+    name: Guard inventory is re-derivable and reconciles with 65 + 28
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Regenerate the inventory and prove it is unchanged
+        # Fast and deterministic — no suite runs here. This is the check that catches a guard
+        # added without a classification or removed without anyone noticing, which is the
+        # drift a sweep alone would not report until the next full run.
+        run: |
+          python scripts/cloud_scaling/guard_sweep.py authorization-contracts --inventory-only
+          git diff --exit-code -- \
+            packages/integration/cloud-scaling-authorization-contracts/GUARD_INVENTORY.md \
+            packages/integration/cloud-scaling-authorization-contracts/guard_inventory.json
+
+  guard-sweep:
+    name: Gate-removal mutation sweep (shard ${{ matrix.shard }} of 8)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install tooling + first-party packages (editable)
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest build numpy "cryptography>=41.0.7,<47.0.0" "PyNaCl>=1.5.0,<2.0.0"
+          pip install -e packages/risk_authority
+          pip install -e packages/trusted-evidence-authority
+          pip install -e packages/capabilities/cloud-scaling-controller
+          pip install -e packages/integration/cloud-scaling-risk-integration
+          pip install -e packages/integration/cloud-scaling-authorization-contracts
+      - name: Sweep this shard
+        # Sharded because it cannot be anything else: 109 guards against a 138s suite is four
+        # wall-clock hours in one job. Eight shards puts each at roughly half an hour, which
+        # is the same order as the producer-attestation sweep this generalises.
+        env:
+          UGENCE_RATCHET_BASE: ${{ github.event.pull_request.base.sha || github.sha }}
+        run: python scripts/cloud_scaling/guard_sweep.py authorization-contracts --shard ${{ matrix.shard }}/8
+      - name: The tracked tree was not mutated
+        # The sweep works in a disposable copy outside the repository. This is what proves it.
+        run: git diff --exit-code
+        if: always()
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: authorization-contracts-guard-sweep-shard-${{ matrix.shard }}
+          path: /tmp/ugence-sweep-authorization-contracts/*.json
+          if-no-files-found: warn
