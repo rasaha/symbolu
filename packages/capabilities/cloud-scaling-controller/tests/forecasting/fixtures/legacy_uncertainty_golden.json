@@ -1,0 +1,5009 @@
+{
+ "cases": [
+  {
+   "config": "cov80_min5",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -5.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": null,
+    "upper": 15.0
+   },
+   "point": 0.0,
+   "residuals": [
+    10.0,
+    -5.0,
+    15.0,
+    -5.0,
+    15.0
+   ],
+   "series": "step"
+  },
+  {
+   "config": "cov80_min5",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 25.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": null,
+    "upper": 45.0
+   },
+   "point": 30.0,
+   "residuals": [
+    10.0,
+    -5.0,
+    15.0,
+    -5.0,
+    15.0
+   ],
+   "series": "step"
+  },
+  {
+   "config": "cov80_min5",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -17.5,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": null,
+    "upper": 2.5
+   },
+   "point": -12.5,
+   "residuals": [
+    10.0,
+    -5.0,
+    15.0,
+    -5.0,
+    15.0
+   ],
+   "series": "step"
+  },
+  {
+   "config": "cov50_min2",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -5.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.5,
+    "unavailable_reason": null,
+    "upper": 15.0
+   },
+   "point": 0.0,
+   "residuals": [
+    10.0,
+    -5.0,
+    15.0,
+    -5.0,
+    15.0
+   ],
+   "series": "step"
+  },
+  {
+   "config": "cov50_min2",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 25.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.5,
+    "unavailable_reason": null,
+    "upper": 45.0
+   },
+   "point": 30.0,
+   "residuals": [
+    10.0,
+    -5.0,
+    15.0,
+    -5.0,
+    15.0
+   ],
+   "series": "step"
+  },
+  {
+   "config": "cov50_min2",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -17.5,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.5,
+    "unavailable_reason": null,
+    "upper": 2.5
+   },
+   "point": -12.5,
+   "residuals": [
+    10.0,
+    -5.0,
+    15.0,
+    -5.0,
+    15.0
+   ],
+   "series": "step"
+  },
+  {
+   "config": "cov95_min3",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -5.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.95,
+    "unavailable_reason": null,
+    "upper": 15.0
+   },
+   "point": 0.0,
+   "residuals": [
+    10.0,
+    -5.0,
+    15.0,
+    -5.0,
+    15.0
+   ],
+   "series": "step"
+  },
+  {
+   "config": "cov95_min3",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 25.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.95,
+    "unavailable_reason": null,
+    "upper": 45.0
+   },
+   "point": 30.0,
+   "residuals": [
+    10.0,
+    -5.0,
+    15.0,
+    -5.0,
+    15.0
+   ],
+   "series": "step"
+  },
+  {
+   "config": "cov95_min3",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -17.5,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.95,
+    "unavailable_reason": null,
+    "upper": 2.5
+   },
+   "point": -12.5,
+   "residuals": [
+    10.0,
+    -5.0,
+    15.0,
+    -5.0,
+    15.0
+   ],
+   "series": "step"
+  },
+  {
+   "config": "cov99_min1",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -5.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.99,
+    "unavailable_reason": null,
+    "upper": 15.0
+   },
+   "point": 0.0,
+   "residuals": [
+    10.0,
+    -5.0,
+    15.0,
+    -5.0,
+    15.0
+   ],
+   "series": "step"
+  },
+  {
+   "config": "cov99_min1",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 25.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.99,
+    "unavailable_reason": null,
+    "upper": 45.0
+   },
+   "point": 30.0,
+   "residuals": [
+    10.0,
+    -5.0,
+    15.0,
+    -5.0,
+    15.0
+   ],
+   "series": "step"
+  },
+  {
+   "config": "cov99_min1",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -17.5,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.99,
+    "unavailable_reason": null,
+    "upper": 2.5
+   },
+   "point": -12.5,
+   "residuals": [
+    10.0,
+    -5.0,
+    15.0,
+    -5.0,
+    15.0
+   ],
+   "series": "step"
+  },
+  {
+   "config": "none",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "none",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "uncertainty_method_none",
+    "upper": null
+   },
+   "point": 0.0,
+   "residuals": [
+    10.0,
+    -5.0,
+    15.0,
+    -5.0,
+    15.0
+   ],
+   "series": "step"
+  },
+  {
+   "config": "none",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "none",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "uncertainty_method_none",
+    "upper": null
+   },
+   "point": 30.0,
+   "residuals": [
+    10.0,
+    -5.0,
+    15.0,
+    -5.0,
+    15.0
+   ],
+   "series": "step"
+  },
+  {
+   "config": "none",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "none",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "uncertainty_method_none",
+    "upper": null
+   },
+   "point": -12.5,
+   "residuals": [
+    10.0,
+    -5.0,
+    15.0,
+    -5.0,
+    15.0
+   ],
+   "series": "step"
+  },
+  {
+   "config": "pointok",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 0.0,
+   "residuals": [
+    10.0,
+    -5.0,
+    15.0,
+    -5.0,
+    15.0
+   ],
+   "series": "step"
+  },
+  {
+   "config": "pointok",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 30.0,
+   "residuals": [
+    10.0,
+    -5.0,
+    15.0,
+    -5.0,
+    15.0
+   ],
+   "series": "step"
+  },
+  {
+   "config": "pointok",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": -12.5,
+   "residuals": [
+    10.0,
+    -5.0,
+    15.0,
+    -5.0,
+    15.0
+   ],
+   "series": "step"
+  },
+  {
+   "config": "cov80_min5",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 3,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 0.0,
+   "residuals": [
+    10.0,
+    -7.5,
+    8.0
+   ],
+   "series": "step"
+  },
+  {
+   "config": "cov80_min5",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 3,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 30.0,
+   "residuals": [
+    10.0,
+    -7.5,
+    8.0
+   ],
+   "series": "step"
+  },
+  {
+   "config": "cov80_min5",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 3,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": -12.5,
+   "residuals": [
+    10.0,
+    -7.5,
+    8.0
+   ],
+   "series": "step"
+  },
+  {
+   "config": "cov50_min2",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 3,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 0.25,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.5,
+    "unavailable_reason": null,
+    "upper": 9.0
+   },
+   "point": 0.0,
+   "residuals": [
+    10.0,
+    -7.5,
+    8.0
+   ],
+   "series": "step"
+  },
+  {
+   "config": "cov50_min2",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 3,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 30.25,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.5,
+    "unavailable_reason": null,
+    "upper": 39.0
+   },
+   "point": 30.0,
+   "residuals": [
+    10.0,
+    -7.5,
+    8.0
+   ],
+   "series": "step"
+  },
+  {
+   "config": "cov50_min2",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 3,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -12.25,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.5,
+    "unavailable_reason": null,
+    "upper": -3.5
+   },
+   "point": -12.5,
+   "residuals": [
+    10.0,
+    -7.5,
+    8.0
+   ],
+   "series": "step"
+  },
+  {
+   "config": "cov95_min3",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 3,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -6.725,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.95,
+    "unavailable_reason": null,
+    "upper": 9.9
+   },
+   "point": 0.0,
+   "residuals": [
+    10.0,
+    -7.5,
+    8.0
+   ],
+   "series": "step"
+  },
+  {
+   "config": "cov95_min3",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 3,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 23.275,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.95,
+    "unavailable_reason": null,
+    "upper": 39.9
+   },
+   "point": 30.0,
+   "residuals": [
+    10.0,
+    -7.5,
+    8.0
+   ],
+   "series": "step"
+  },
+  {
+   "config": "cov95_min3",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 3,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -19.225,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.95,
+    "unavailable_reason": null,
+    "upper": -2.5999999999999996
+   },
+   "point": -12.5,
+   "residuals": [
+    10.0,
+    -7.5,
+    8.0
+   ],
+   "series": "step"
+  },
+  {
+   "config": "cov99_min1",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 3,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -7.345,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.99,
+    "unavailable_reason": null,
+    "upper": 9.98
+   },
+   "point": 0.0,
+   "residuals": [
+    10.0,
+    -7.5,
+    8.0
+   ],
+   "series": "step"
+  },
+  {
+   "config": "cov99_min1",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 3,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 22.655,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.99,
+    "unavailable_reason": null,
+    "upper": 39.980000000000004
+   },
+   "point": 30.0,
+   "residuals": [
+    10.0,
+    -7.5,
+    8.0
+   ],
+   "series": "step"
+  },
+  {
+   "config": "cov99_min1",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 3,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -19.845,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.99,
+    "unavailable_reason": null,
+    "upper": -2.5199999999999996
+   },
+   "point": -12.5,
+   "residuals": [
+    10.0,
+    -7.5,
+    8.0
+   ],
+   "series": "step"
+  },
+  {
+   "config": "none",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "none",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "uncertainty_method_none",
+    "upper": null
+   },
+   "point": 0.0,
+   "residuals": [
+    10.0,
+    -7.5,
+    8.0
+   ],
+   "series": "step"
+  },
+  {
+   "config": "none",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "none",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "uncertainty_method_none",
+    "upper": null
+   },
+   "point": 30.0,
+   "residuals": [
+    10.0,
+    -7.5,
+    8.0
+   ],
+   "series": "step"
+  },
+  {
+   "config": "none",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "none",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "uncertainty_method_none",
+    "upper": null
+   },
+   "point": -12.5,
+   "residuals": [
+    10.0,
+    -7.5,
+    8.0
+   ],
+   "series": "step"
+  },
+  {
+   "config": "pointok",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 3,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 0.0,
+   "residuals": [
+    10.0,
+    -7.5,
+    8.0
+   ],
+   "series": "step"
+  },
+  {
+   "config": "pointok",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 3,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 30.0,
+   "residuals": [
+    10.0,
+    -7.5,
+    8.0
+   ],
+   "series": "step"
+  },
+  {
+   "config": "pointok",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 3,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": -12.5,
+   "residuals": [
+    10.0,
+    -7.5,
+    8.0
+   ],
+   "series": "step"
+  },
+  {
+   "config": "cov80_min5",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 1.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": null,
+    "upper": 1.0
+   },
+   "point": 0.0,
+   "residuals": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "series": "ramp"
+  },
+  {
+   "config": "cov80_min5",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 31.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": null,
+    "upper": 31.0
+   },
+   "point": 30.0,
+   "residuals": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "series": "ramp"
+  },
+  {
+   "config": "cov80_min5",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -11.5,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": null,
+    "upper": -11.5
+   },
+   "point": -12.5,
+   "residuals": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "series": "ramp"
+  },
+  {
+   "config": "cov50_min2",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 1.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.5,
+    "unavailable_reason": null,
+    "upper": 1.0
+   },
+   "point": 0.0,
+   "residuals": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "series": "ramp"
+  },
+  {
+   "config": "cov50_min2",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 31.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.5,
+    "unavailable_reason": null,
+    "upper": 31.0
+   },
+   "point": 30.0,
+   "residuals": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "series": "ramp"
+  },
+  {
+   "config": "cov50_min2",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -11.5,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.5,
+    "unavailable_reason": null,
+    "upper": -11.5
+   },
+   "point": -12.5,
+   "residuals": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "series": "ramp"
+  },
+  {
+   "config": "cov95_min3",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 1.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.95,
+    "unavailable_reason": null,
+    "upper": 1.0
+   },
+   "point": 0.0,
+   "residuals": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "series": "ramp"
+  },
+  {
+   "config": "cov95_min3",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 31.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.95,
+    "unavailable_reason": null,
+    "upper": 31.0
+   },
+   "point": 30.0,
+   "residuals": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "series": "ramp"
+  },
+  {
+   "config": "cov95_min3",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -11.5,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.95,
+    "unavailable_reason": null,
+    "upper": -11.5
+   },
+   "point": -12.5,
+   "residuals": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "series": "ramp"
+  },
+  {
+   "config": "cov99_min1",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 1.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.99,
+    "unavailable_reason": null,
+    "upper": 1.0
+   },
+   "point": 0.0,
+   "residuals": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "series": "ramp"
+  },
+  {
+   "config": "cov99_min1",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 31.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.99,
+    "unavailable_reason": null,
+    "upper": 31.0
+   },
+   "point": 30.0,
+   "residuals": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "series": "ramp"
+  },
+  {
+   "config": "cov99_min1",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -11.5,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.99,
+    "unavailable_reason": null,
+    "upper": -11.5
+   },
+   "point": -12.5,
+   "residuals": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "series": "ramp"
+  },
+  {
+   "config": "none",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "none",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "uncertainty_method_none",
+    "upper": null
+   },
+   "point": 0.0,
+   "residuals": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "series": "ramp"
+  },
+  {
+   "config": "none",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "none",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "uncertainty_method_none",
+    "upper": null
+   },
+   "point": 30.0,
+   "residuals": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "series": "ramp"
+  },
+  {
+   "config": "none",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "none",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "uncertainty_method_none",
+    "upper": null
+   },
+   "point": -12.5,
+   "residuals": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "series": "ramp"
+  },
+  {
+   "config": "pointok",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 0.0,
+   "residuals": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "series": "ramp"
+  },
+  {
+   "config": "pointok",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 30.0,
+   "residuals": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "series": "ramp"
+  },
+  {
+   "config": "pointok",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": -12.5,
+   "residuals": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "series": "ramp"
+  },
+  {
+   "config": "cov80_min5",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 0.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": null,
+    "upper": 0.0
+   },
+   "point": 0.0,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "ramp"
+  },
+  {
+   "config": "cov80_min5",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 30.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": null,
+    "upper": 30.0
+   },
+   "point": 30.0,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "ramp"
+  },
+  {
+   "config": "cov80_min5",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -12.5,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": null,
+    "upper": -12.5
+   },
+   "point": -12.5,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "ramp"
+  },
+  {
+   "config": "cov50_min2",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 0.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.5,
+    "unavailable_reason": null,
+    "upper": 0.0
+   },
+   "point": 0.0,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "ramp"
+  },
+  {
+   "config": "cov50_min2",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 30.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.5,
+    "unavailable_reason": null,
+    "upper": 30.0
+   },
+   "point": 30.0,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "ramp"
+  },
+  {
+   "config": "cov50_min2",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -12.5,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.5,
+    "unavailable_reason": null,
+    "upper": -12.5
+   },
+   "point": -12.5,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "ramp"
+  },
+  {
+   "config": "cov95_min3",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 0.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.95,
+    "unavailable_reason": null,
+    "upper": 0.0
+   },
+   "point": 0.0,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "ramp"
+  },
+  {
+   "config": "cov95_min3",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 30.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.95,
+    "unavailable_reason": null,
+    "upper": 30.0
+   },
+   "point": 30.0,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "ramp"
+  },
+  {
+   "config": "cov95_min3",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -12.5,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.95,
+    "unavailable_reason": null,
+    "upper": -12.5
+   },
+   "point": -12.5,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "ramp"
+  },
+  {
+   "config": "cov99_min1",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 0.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.99,
+    "unavailable_reason": null,
+    "upper": 0.0
+   },
+   "point": 0.0,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "ramp"
+  },
+  {
+   "config": "cov99_min1",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 30.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.99,
+    "unavailable_reason": null,
+    "upper": 30.0
+   },
+   "point": 30.0,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "ramp"
+  },
+  {
+   "config": "cov99_min1",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -12.5,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.99,
+    "unavailable_reason": null,
+    "upper": -12.5
+   },
+   "point": -12.5,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "ramp"
+  },
+  {
+   "config": "none",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "none",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "uncertainty_method_none",
+    "upper": null
+   },
+   "point": 0.0,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "ramp"
+  },
+  {
+   "config": "none",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "none",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "uncertainty_method_none",
+    "upper": null
+   },
+   "point": 30.0,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "ramp"
+  },
+  {
+   "config": "none",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "none",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "uncertainty_method_none",
+    "upper": null
+   },
+   "point": -12.5,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "ramp"
+  },
+  {
+   "config": "pointok",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 0.0,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "ramp"
+  },
+  {
+   "config": "pointok",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 30.0,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "ramp"
+  },
+  {
+   "config": "pointok",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": -12.5,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "ramp"
+  },
+  {
+   "config": "cov80_min5",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 8,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 0.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": null,
+    "upper": 0.0
+   },
+   "point": 0.0,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "flat"
+  },
+  {
+   "config": "cov80_min5",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 8,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 30.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": null,
+    "upper": 30.0
+   },
+   "point": 30.0,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "flat"
+  },
+  {
+   "config": "cov80_min5",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 8,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -12.5,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": null,
+    "upper": -12.5
+   },
+   "point": -12.5,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "flat"
+  },
+  {
+   "config": "cov50_min2",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 8,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 0.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.5,
+    "unavailable_reason": null,
+    "upper": 0.0
+   },
+   "point": 0.0,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "flat"
+  },
+  {
+   "config": "cov50_min2",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 8,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 30.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.5,
+    "unavailable_reason": null,
+    "upper": 30.0
+   },
+   "point": 30.0,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "flat"
+  },
+  {
+   "config": "cov50_min2",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 8,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -12.5,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.5,
+    "unavailable_reason": null,
+    "upper": -12.5
+   },
+   "point": -12.5,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "flat"
+  },
+  {
+   "config": "cov95_min3",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 8,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 0.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.95,
+    "unavailable_reason": null,
+    "upper": 0.0
+   },
+   "point": 0.0,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "flat"
+  },
+  {
+   "config": "cov95_min3",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 8,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 30.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.95,
+    "unavailable_reason": null,
+    "upper": 30.0
+   },
+   "point": 30.0,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "flat"
+  },
+  {
+   "config": "cov95_min3",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 8,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -12.5,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.95,
+    "unavailable_reason": null,
+    "upper": -12.5
+   },
+   "point": -12.5,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "flat"
+  },
+  {
+   "config": "cov99_min1",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 8,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 0.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.99,
+    "unavailable_reason": null,
+    "upper": 0.0
+   },
+   "point": 0.0,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "flat"
+  },
+  {
+   "config": "cov99_min1",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 8,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 30.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.99,
+    "unavailable_reason": null,
+    "upper": 30.0
+   },
+   "point": 30.0,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "flat"
+  },
+  {
+   "config": "cov99_min1",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 8,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -12.5,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.99,
+    "unavailable_reason": null,
+    "upper": -12.5
+   },
+   "point": -12.5,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "flat"
+  },
+  {
+   "config": "none",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "none",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "uncertainty_method_none",
+    "upper": null
+   },
+   "point": 0.0,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "flat"
+  },
+  {
+   "config": "none",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "none",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "uncertainty_method_none",
+    "upper": null
+   },
+   "point": 30.0,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "flat"
+  },
+  {
+   "config": "none",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "none",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "uncertainty_method_none",
+    "upper": null
+   },
+   "point": -12.5,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "flat"
+  },
+  {
+   "config": "pointok",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 8,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 0.0,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "flat"
+  },
+  {
+   "config": "pointok",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 8,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 30.0,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "flat"
+  },
+  {
+   "config": "pointok",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 8,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": -12.5,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "flat"
+  },
+  {
+   "config": "cov80_min5",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 6,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 0.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": null,
+    "upper": 0.0
+   },
+   "point": 0.0,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "flat"
+  },
+  {
+   "config": "cov80_min5",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 6,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 30.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": null,
+    "upper": 30.0
+   },
+   "point": 30.0,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "flat"
+  },
+  {
+   "config": "cov80_min5",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 6,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -12.5,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": null,
+    "upper": -12.5
+   },
+   "point": -12.5,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "flat"
+  },
+  {
+   "config": "cov50_min2",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 6,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 0.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.5,
+    "unavailable_reason": null,
+    "upper": 0.0
+   },
+   "point": 0.0,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "flat"
+  },
+  {
+   "config": "cov50_min2",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 6,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 30.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.5,
+    "unavailable_reason": null,
+    "upper": 30.0
+   },
+   "point": 30.0,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "flat"
+  },
+  {
+   "config": "cov50_min2",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 6,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -12.5,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.5,
+    "unavailable_reason": null,
+    "upper": -12.5
+   },
+   "point": -12.5,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "flat"
+  },
+  {
+   "config": "cov95_min3",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 6,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 0.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.95,
+    "unavailable_reason": null,
+    "upper": 0.0
+   },
+   "point": 0.0,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "flat"
+  },
+  {
+   "config": "cov95_min3",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 6,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 30.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.95,
+    "unavailable_reason": null,
+    "upper": 30.0
+   },
+   "point": 30.0,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "flat"
+  },
+  {
+   "config": "cov95_min3",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 6,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -12.5,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.95,
+    "unavailable_reason": null,
+    "upper": -12.5
+   },
+   "point": -12.5,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "flat"
+  },
+  {
+   "config": "cov99_min1",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 6,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 0.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.99,
+    "unavailable_reason": null,
+    "upper": 0.0
+   },
+   "point": 0.0,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "flat"
+  },
+  {
+   "config": "cov99_min1",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 6,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 30.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.99,
+    "unavailable_reason": null,
+    "upper": 30.0
+   },
+   "point": 30.0,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "flat"
+  },
+  {
+   "config": "cov99_min1",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 6,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -12.5,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.99,
+    "unavailable_reason": null,
+    "upper": -12.5
+   },
+   "point": -12.5,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "flat"
+  },
+  {
+   "config": "none",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "none",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "uncertainty_method_none",
+    "upper": null
+   },
+   "point": 0.0,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "flat"
+  },
+  {
+   "config": "none",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "none",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "uncertainty_method_none",
+    "upper": null
+   },
+   "point": 30.0,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "flat"
+  },
+  {
+   "config": "none",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "none",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "uncertainty_method_none",
+    "upper": null
+   },
+   "point": -12.5,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "flat"
+  },
+  {
+   "config": "pointok",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 6,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 0.0,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "flat"
+  },
+  {
+   "config": "pointok",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 6,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 30.0,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "flat"
+  },
+  {
+   "config": "pointok",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 6,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": -12.5,
+   "residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "series": "flat"
+  },
+  {
+   "config": "cov80_min5",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 9,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -6.25,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": null,
+    "upper": 5.3500000000000005
+   },
+   "point": 0.0,
+   "residuals": [
+    -2.5,
+    4.75,
+    -6.25,
+    3.75,
+    1.75,
+    -6.25,
+    7.75,
+    -4.5,
+    1.75
+   ],
+   "series": "noisy"
+  },
+  {
+   "config": "cov80_min5",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 9,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 23.75,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": null,
+    "upper": 35.35
+   },
+   "point": 30.0,
+   "residuals": [
+    -2.5,
+    4.75,
+    -6.25,
+    3.75,
+    1.75,
+    -6.25,
+    7.75,
+    -4.5,
+    1.75
+   ],
+   "series": "noisy"
+  },
+  {
+   "config": "cov80_min5",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 9,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -18.75,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": null,
+    "upper": -7.1499999999999995
+   },
+   "point": -12.5,
+   "residuals": [
+    -2.5,
+    4.75,
+    -6.25,
+    3.75,
+    1.75,
+    -6.25,
+    7.75,
+    -4.5,
+    1.75
+   ],
+   "series": "noisy"
+  },
+  {
+   "config": "cov50_min2",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 9,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -4.5,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.5,
+    "unavailable_reason": null,
+    "upper": 3.75
+   },
+   "point": 0.0,
+   "residuals": [
+    -2.5,
+    4.75,
+    -6.25,
+    3.75,
+    1.75,
+    -6.25,
+    7.75,
+    -4.5,
+    1.75
+   ],
+   "series": "noisy"
+  },
+  {
+   "config": "cov50_min2",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 9,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 25.5,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.5,
+    "unavailable_reason": null,
+    "upper": 33.75
+   },
+   "point": 30.0,
+   "residuals": [
+    -2.5,
+    4.75,
+    -6.25,
+    3.75,
+    1.75,
+    -6.25,
+    7.75,
+    -4.5,
+    1.75
+   ],
+   "series": "noisy"
+  },
+  {
+   "config": "cov50_min2",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 9,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -17.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.5,
+    "unavailable_reason": null,
+    "upper": -8.75
+   },
+   "point": -12.5,
+   "residuals": [
+    -2.5,
+    4.75,
+    -6.25,
+    3.75,
+    1.75,
+    -6.25,
+    7.75,
+    -4.5,
+    1.75
+   ],
+   "series": "noisy"
+  },
+  {
+   "config": "cov95_min3",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 9,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -6.25,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.95,
+    "unavailable_reason": null,
+    "upper": 7.1499999999999995
+   },
+   "point": 0.0,
+   "residuals": [
+    -2.5,
+    4.75,
+    -6.25,
+    3.75,
+    1.75,
+    -6.25,
+    7.75,
+    -4.5,
+    1.75
+   ],
+   "series": "noisy"
+  },
+  {
+   "config": "cov95_min3",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 9,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 23.75,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.95,
+    "unavailable_reason": null,
+    "upper": 37.15
+   },
+   "point": 30.0,
+   "residuals": [
+    -2.5,
+    4.75,
+    -6.25,
+    3.75,
+    1.75,
+    -6.25,
+    7.75,
+    -4.5,
+    1.75
+   ],
+   "series": "noisy"
+  },
+  {
+   "config": "cov95_min3",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 9,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -18.75,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.95,
+    "unavailable_reason": null,
+    "upper": -5.3500000000000005
+   },
+   "point": -12.5,
+   "residuals": [
+    -2.5,
+    4.75,
+    -6.25,
+    3.75,
+    1.75,
+    -6.25,
+    7.75,
+    -4.5,
+    1.75
+   ],
+   "series": "noisy"
+  },
+  {
+   "config": "cov99_min1",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 9,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -6.25,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.99,
+    "unavailable_reason": null,
+    "upper": 7.63
+   },
+   "point": 0.0,
+   "residuals": [
+    -2.5,
+    4.75,
+    -6.25,
+    3.75,
+    1.75,
+    -6.25,
+    7.75,
+    -4.5,
+    1.75
+   ],
+   "series": "noisy"
+  },
+  {
+   "config": "cov99_min1",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 9,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 23.75,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.99,
+    "unavailable_reason": null,
+    "upper": 37.63
+   },
+   "point": 30.0,
+   "residuals": [
+    -2.5,
+    4.75,
+    -6.25,
+    3.75,
+    1.75,
+    -6.25,
+    7.75,
+    -4.5,
+    1.75
+   ],
+   "series": "noisy"
+  },
+  {
+   "config": "cov99_min1",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 9,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -18.75,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.99,
+    "unavailable_reason": null,
+    "upper": -4.87
+   },
+   "point": -12.5,
+   "residuals": [
+    -2.5,
+    4.75,
+    -6.25,
+    3.75,
+    1.75,
+    -6.25,
+    7.75,
+    -4.5,
+    1.75
+   ],
+   "series": "noisy"
+  },
+  {
+   "config": "none",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "none",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "uncertainty_method_none",
+    "upper": null
+   },
+   "point": 0.0,
+   "residuals": [
+    -2.5,
+    4.75,
+    -6.25,
+    3.75,
+    1.75,
+    -6.25,
+    7.75,
+    -4.5,
+    1.75
+   ],
+   "series": "noisy"
+  },
+  {
+   "config": "none",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "none",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "uncertainty_method_none",
+    "upper": null
+   },
+   "point": 30.0,
+   "residuals": [
+    -2.5,
+    4.75,
+    -6.25,
+    3.75,
+    1.75,
+    -6.25,
+    7.75,
+    -4.5,
+    1.75
+   ],
+   "series": "noisy"
+  },
+  {
+   "config": "none",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "none",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "uncertainty_method_none",
+    "upper": null
+   },
+   "point": -12.5,
+   "residuals": [
+    -2.5,
+    4.75,
+    -6.25,
+    3.75,
+    1.75,
+    -6.25,
+    7.75,
+    -4.5,
+    1.75
+   ],
+   "series": "noisy"
+  },
+  {
+   "config": "pointok",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 9,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 0.0,
+   "residuals": [
+    -2.5,
+    4.75,
+    -6.25,
+    3.75,
+    1.75,
+    -6.25,
+    7.75,
+    -4.5,
+    1.75
+   ],
+   "series": "noisy"
+  },
+  {
+   "config": "pointok",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 9,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 30.0,
+   "residuals": [
+    -2.5,
+    4.75,
+    -6.25,
+    3.75,
+    1.75,
+    -6.25,
+    7.75,
+    -4.5,
+    1.75
+   ],
+   "series": "noisy"
+  },
+  {
+   "config": "pointok",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 9,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": -12.5,
+   "residuals": [
+    -2.5,
+    4.75,
+    -6.25,
+    3.75,
+    1.75,
+    -6.25,
+    7.75,
+    -4.5,
+    1.75
+   ],
+   "series": "noisy"
+  },
+  {
+   "config": "cov80_min5",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -5.496666666666667,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": null,
+    "upper": 3.942857142857144
+   },
+   "point": 0.0,
+   "residuals": [
+    -6.166666666666666,
+    2.625,
+    3.0,
+    -5.050000000000001,
+    5.357142857142858,
+    -1.5089285714285712,
+    0.7777777777777768
+   ],
+   "series": "noisy"
+  },
+  {
+   "config": "cov80_min5",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 24.503333333333334,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": null,
+    "upper": 33.94285714285714
+   },
+   "point": 30.0,
+   "residuals": [
+    -6.166666666666666,
+    2.625,
+    3.0,
+    -5.050000000000001,
+    5.357142857142858,
+    -1.5089285714285712,
+    0.7777777777777768
+   ],
+   "series": "noisy"
+  },
+  {
+   "config": "cov80_min5",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -17.996666666666666,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": null,
+    "upper": -8.557142857142857
+   },
+   "point": -12.5,
+   "residuals": [
+    -6.166666666666666,
+    2.625,
+    3.0,
+    -5.050000000000001,
+    5.357142857142858,
+    -1.5089285714285712,
+    0.7777777777777768
+   ],
+   "series": "noisy"
+  },
+  {
+   "config": "cov50_min2",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -3.279464285714286,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.5,
+    "unavailable_reason": null,
+    "upper": 2.8125
+   },
+   "point": 0.0,
+   "residuals": [
+    -6.166666666666666,
+    2.625,
+    3.0,
+    -5.050000000000001,
+    5.357142857142858,
+    -1.5089285714285712,
+    0.7777777777777768
+   ],
+   "series": "noisy"
+  },
+  {
+   "config": "cov50_min2",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 26.720535714285713,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.5,
+    "unavailable_reason": null,
+    "upper": 32.8125
+   },
+   "point": 30.0,
+   "residuals": [
+    -6.166666666666666,
+    2.625,
+    3.0,
+    -5.050000000000001,
+    5.357142857142858,
+    -1.5089285714285712,
+    0.7777777777777768
+   ],
+   "series": "noisy"
+  },
+  {
+   "config": "cov50_min2",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -15.779464285714287,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.5,
+    "unavailable_reason": null,
+    "upper": -9.6875
+   },
+   "point": -12.5,
+   "residuals": [
+    -6.166666666666666,
+    2.625,
+    3.0,
+    -5.050000000000001,
+    5.357142857142858,
+    -1.5089285714285712,
+    0.7777777777777768
+   ],
+   "series": "noisy"
+  },
+  {
+   "config": "cov95_min3",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -5.9991666666666665,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.95,
+    "unavailable_reason": null,
+    "upper": 5.003571428571428
+   },
+   "point": 0.0,
+   "residuals": [
+    -6.166666666666666,
+    2.625,
+    3.0,
+    -5.050000000000001,
+    5.357142857142858,
+    -1.5089285714285712,
+    0.7777777777777768
+   ],
+   "series": "noisy"
+  },
+  {
+   "config": "cov95_min3",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 24.000833333333333,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.95,
+    "unavailable_reason": null,
+    "upper": 35.003571428571426
+   },
+   "point": 30.0,
+   "residuals": [
+    -6.166666666666666,
+    2.625,
+    3.0,
+    -5.050000000000001,
+    5.357142857142858,
+    -1.5089285714285712,
+    0.7777777777777768
+   ],
+   "series": "noisy"
+  },
+  {
+   "config": "cov95_min3",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -18.499166666666667,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.95,
+    "unavailable_reason": null,
+    "upper": -7.496428571428572
+   },
+   "point": -12.5,
+   "residuals": [
+    -6.166666666666666,
+    2.625,
+    3.0,
+    -5.050000000000001,
+    5.357142857142858,
+    -1.5089285714285712,
+    0.7777777777777768
+   ],
+   "series": "noisy"
+  },
+  {
+   "config": "cov99_min1",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -6.133166666666666,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.99,
+    "unavailable_reason": null,
+    "upper": 5.286428571428571
+   },
+   "point": 0.0,
+   "residuals": [
+    -6.166666666666666,
+    2.625,
+    3.0,
+    -5.050000000000001,
+    5.357142857142858,
+    -1.5089285714285712,
+    0.7777777777777768
+   ],
+   "series": "noisy"
+  },
+  {
+   "config": "cov99_min1",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 23.866833333333332,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.99,
+    "unavailable_reason": null,
+    "upper": 35.28642857142857
+   },
+   "point": 30.0,
+   "residuals": [
+    -6.166666666666666,
+    2.625,
+    3.0,
+    -5.050000000000001,
+    5.357142857142858,
+    -1.5089285714285712,
+    0.7777777777777768
+   ],
+   "series": "noisy"
+  },
+  {
+   "config": "cov99_min1",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -18.633166666666668,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.99,
+    "unavailable_reason": null,
+    "upper": -7.213571428571429
+   },
+   "point": -12.5,
+   "residuals": [
+    -6.166666666666666,
+    2.625,
+    3.0,
+    -5.050000000000001,
+    5.357142857142858,
+    -1.5089285714285712,
+    0.7777777777777768
+   ],
+   "series": "noisy"
+  },
+  {
+   "config": "none",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "none",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "uncertainty_method_none",
+    "upper": null
+   },
+   "point": 0.0,
+   "residuals": [
+    -6.166666666666666,
+    2.625,
+    3.0,
+    -5.050000000000001,
+    5.357142857142858,
+    -1.5089285714285712,
+    0.7777777777777768
+   ],
+   "series": "noisy"
+  },
+  {
+   "config": "none",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "none",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "uncertainty_method_none",
+    "upper": null
+   },
+   "point": 30.0,
+   "residuals": [
+    -6.166666666666666,
+    2.625,
+    3.0,
+    -5.050000000000001,
+    5.357142857142858,
+    -1.5089285714285712,
+    0.7777777777777768
+   ],
+   "series": "noisy"
+  },
+  {
+   "config": "none",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "none",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "uncertainty_method_none",
+    "upper": null
+   },
+   "point": -12.5,
+   "residuals": [
+    -6.166666666666666,
+    2.625,
+    3.0,
+    -5.050000000000001,
+    5.357142857142858,
+    -1.5089285714285712,
+    0.7777777777777768
+   ],
+   "series": "noisy"
+  },
+  {
+   "config": "pointok",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 0.0,
+   "residuals": [
+    -6.166666666666666,
+    2.625,
+    3.0,
+    -5.050000000000001,
+    5.357142857142858,
+    -1.5089285714285712,
+    0.7777777777777768
+   ],
+   "series": "noisy"
+  },
+  {
+   "config": "pointok",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 30.0,
+   "residuals": [
+    -6.166666666666666,
+    2.625,
+    3.0,
+    -5.050000000000001,
+    5.357142857142858,
+    -1.5089285714285712,
+    0.7777777777777768
+   ],
+   "series": "noisy"
+  },
+  {
+   "config": "pointok",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": -12.5,
+   "residuals": [
+    -6.166666666666666,
+    2.625,
+    3.0,
+    -5.050000000000001,
+    5.357142857142858,
+    -1.5089285714285712,
+    0.7777777777777768
+   ],
+   "series": "noisy"
+  },
+  {
+   "config": "cov80_min5",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 3.5999999999999996,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": null,
+    "upper": 8.4
+   },
+   "point": 0.0,
+   "residuals": [
+    3.0,
+    4.0,
+    5.0,
+    6.0,
+    7.0,
+    8.0,
+    9.0
+   ],
+   "series": "biased"
+  },
+  {
+   "config": "cov80_min5",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 33.6,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": null,
+    "upper": 38.4
+   },
+   "point": 30.0,
+   "residuals": [
+    3.0,
+    4.0,
+    5.0,
+    6.0,
+    7.0,
+    8.0,
+    9.0
+   ],
+   "series": "biased"
+  },
+  {
+   "config": "cov80_min5",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -8.9,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": null,
+    "upper": -4.1
+   },
+   "point": -12.5,
+   "residuals": [
+    3.0,
+    4.0,
+    5.0,
+    6.0,
+    7.0,
+    8.0,
+    9.0
+   ],
+   "series": "biased"
+  },
+  {
+   "config": "cov50_min2",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 4.5,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.5,
+    "unavailable_reason": null,
+    "upper": 7.5
+   },
+   "point": 0.0,
+   "residuals": [
+    3.0,
+    4.0,
+    5.0,
+    6.0,
+    7.0,
+    8.0,
+    9.0
+   ],
+   "series": "biased"
+  },
+  {
+   "config": "cov50_min2",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 34.5,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.5,
+    "unavailable_reason": null,
+    "upper": 37.5
+   },
+   "point": 30.0,
+   "residuals": [
+    3.0,
+    4.0,
+    5.0,
+    6.0,
+    7.0,
+    8.0,
+    9.0
+   ],
+   "series": "biased"
+  },
+  {
+   "config": "cov50_min2",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -8.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.5,
+    "unavailable_reason": null,
+    "upper": -5.0
+   },
+   "point": -12.5,
+   "residuals": [
+    3.0,
+    4.0,
+    5.0,
+    6.0,
+    7.0,
+    8.0,
+    9.0
+   ],
+   "series": "biased"
+  },
+  {
+   "config": "cov95_min3",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 3.1500000000000004,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.95,
+    "unavailable_reason": null,
+    "upper": 8.85
+   },
+   "point": 0.0,
+   "residuals": [
+    3.0,
+    4.0,
+    5.0,
+    6.0,
+    7.0,
+    8.0,
+    9.0
+   ],
+   "series": "biased"
+  },
+  {
+   "config": "cov95_min3",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 33.15,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.95,
+    "unavailable_reason": null,
+    "upper": 38.85
+   },
+   "point": 30.0,
+   "residuals": [
+    3.0,
+    4.0,
+    5.0,
+    6.0,
+    7.0,
+    8.0,
+    9.0
+   ],
+   "series": "biased"
+  },
+  {
+   "config": "cov95_min3",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -9.35,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.95,
+    "unavailable_reason": null,
+    "upper": -3.6500000000000004
+   },
+   "point": -12.5,
+   "residuals": [
+    3.0,
+    4.0,
+    5.0,
+    6.0,
+    7.0,
+    8.0,
+    9.0
+   ],
+   "series": "biased"
+  },
+  {
+   "config": "cov99_min1",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 3.0300000000000002,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.99,
+    "unavailable_reason": null,
+    "upper": 8.969999999999999
+   },
+   "point": 0.0,
+   "residuals": [
+    3.0,
+    4.0,
+    5.0,
+    6.0,
+    7.0,
+    8.0,
+    9.0
+   ],
+   "series": "biased"
+  },
+  {
+   "config": "cov99_min1",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 33.03,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.99,
+    "unavailable_reason": null,
+    "upper": 38.97
+   },
+   "point": 30.0,
+   "residuals": [
+    3.0,
+    4.0,
+    5.0,
+    6.0,
+    7.0,
+    8.0,
+    9.0
+   ],
+   "series": "biased"
+  },
+  {
+   "config": "cov99_min1",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -9.469999999999999,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.99,
+    "unavailable_reason": null,
+    "upper": -3.530000000000001
+   },
+   "point": -12.5,
+   "residuals": [
+    3.0,
+    4.0,
+    5.0,
+    6.0,
+    7.0,
+    8.0,
+    9.0
+   ],
+   "series": "biased"
+  },
+  {
+   "config": "none",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "none",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "uncertainty_method_none",
+    "upper": null
+   },
+   "point": 0.0,
+   "residuals": [
+    3.0,
+    4.0,
+    5.0,
+    6.0,
+    7.0,
+    8.0,
+    9.0
+   ],
+   "series": "biased"
+  },
+  {
+   "config": "none",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "none",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "uncertainty_method_none",
+    "upper": null
+   },
+   "point": 30.0,
+   "residuals": [
+    3.0,
+    4.0,
+    5.0,
+    6.0,
+    7.0,
+    8.0,
+    9.0
+   ],
+   "series": "biased"
+  },
+  {
+   "config": "none",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "none",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "uncertainty_method_none",
+    "upper": null
+   },
+   "point": -12.5,
+   "residuals": [
+    3.0,
+    4.0,
+    5.0,
+    6.0,
+    7.0,
+    8.0,
+    9.0
+   ],
+   "series": "biased"
+  },
+  {
+   "config": "pointok",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 0.0,
+   "residuals": [
+    3.0,
+    4.0,
+    5.0,
+    6.0,
+    7.0,
+    8.0,
+    9.0
+   ],
+   "series": "biased"
+  },
+  {
+   "config": "pointok",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 30.0,
+   "residuals": [
+    3.0,
+    4.0,
+    5.0,
+    6.0,
+    7.0,
+    8.0,
+    9.0
+   ],
+   "series": "biased"
+  },
+  {
+   "config": "pointok",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 7,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": -12.5,
+   "residuals": [
+    3.0,
+    4.0,
+    5.0,
+    6.0,
+    7.0,
+    8.0,
+    9.0
+   ],
+   "series": "biased"
+  },
+  {
+   "config": "cov80_min5",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 1.9999999999999996,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": null,
+    "upper": 5.466666666666666
+   },
+   "point": 0.0,
+   "residuals": [
+    1.666666666666666,
+    2.5,
+    3.5,
+    4.666666666666664,
+    6.0
+   ],
+   "series": "biased"
+  },
+  {
+   "config": "cov80_min5",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 32.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": null,
+    "upper": 35.46666666666667
+   },
+   "point": 30.0,
+   "residuals": [
+    1.666666666666666,
+    2.5,
+    3.5,
+    4.666666666666664,
+    6.0
+   ],
+   "series": "biased"
+  },
+  {
+   "config": "cov80_min5",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -10.5,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": null,
+    "upper": -7.033333333333334
+   },
+   "point": -12.5,
+   "residuals": [
+    1.666666666666666,
+    2.5,
+    3.5,
+    4.666666666666664,
+    6.0
+   ],
+   "series": "biased"
+  },
+  {
+   "config": "cov50_min2",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 2.5,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.5,
+    "unavailable_reason": null,
+    "upper": 4.666666666666664
+   },
+   "point": 0.0,
+   "residuals": [
+    1.666666666666666,
+    2.5,
+    3.5,
+    4.666666666666664,
+    6.0
+   ],
+   "series": "biased"
+  },
+  {
+   "config": "cov50_min2",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 32.5,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.5,
+    "unavailable_reason": null,
+    "upper": 34.666666666666664
+   },
+   "point": 30.0,
+   "residuals": [
+    1.666666666666666,
+    2.5,
+    3.5,
+    4.666666666666664,
+    6.0
+   ],
+   "series": "biased"
+  },
+  {
+   "config": "cov50_min2",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -10.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.5,
+    "unavailable_reason": null,
+    "upper": -7.833333333333336
+   },
+   "point": -12.5,
+   "residuals": [
+    1.666666666666666,
+    2.5,
+    3.5,
+    4.666666666666664,
+    6.0
+   ],
+   "series": "biased"
+  },
+  {
+   "config": "cov95_min3",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 1.7499999999999996,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.95,
+    "unavailable_reason": null,
+    "upper": 5.866666666666666
+   },
+   "point": 0.0,
+   "residuals": [
+    1.666666666666666,
+    2.5,
+    3.5,
+    4.666666666666664,
+    6.0
+   ],
+   "series": "biased"
+  },
+  {
+   "config": "cov95_min3",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 31.75,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.95,
+    "unavailable_reason": null,
+    "upper": 35.86666666666667
+   },
+   "point": 30.0,
+   "residuals": [
+    1.666666666666666,
+    2.5,
+    3.5,
+    4.666666666666664,
+    6.0
+   ],
+   "series": "biased"
+  },
+  {
+   "config": "cov95_min3",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -10.75,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.95,
+    "unavailable_reason": null,
+    "upper": -6.633333333333334
+   },
+   "point": -12.5,
+   "residuals": [
+    1.666666666666666,
+    2.5,
+    3.5,
+    4.666666666666664,
+    6.0
+   ],
+   "series": "biased"
+  },
+  {
+   "config": "cov99_min1",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 1.6833333333333327,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.99,
+    "unavailable_reason": null,
+    "upper": 5.973333333333333
+   },
+   "point": 0.0,
+   "residuals": [
+    1.666666666666666,
+    2.5,
+    3.5,
+    4.666666666666664,
+    6.0
+   ],
+   "series": "biased"
+  },
+  {
+   "config": "cov99_min1",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 31.683333333333334,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.99,
+    "unavailable_reason": null,
+    "upper": 35.97333333333333
+   },
+   "point": 30.0,
+   "residuals": [
+    1.666666666666666,
+    2.5,
+    3.5,
+    4.666666666666664,
+    6.0
+   ],
+   "series": "biased"
+  },
+  {
+   "config": "cov99_min1",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -10.816666666666666,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.99,
+    "unavailable_reason": null,
+    "upper": -6.526666666666667
+   },
+   "point": -12.5,
+   "residuals": [
+    1.666666666666666,
+    2.5,
+    3.5,
+    4.666666666666664,
+    6.0
+   ],
+   "series": "biased"
+  },
+  {
+   "config": "none",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "none",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "uncertainty_method_none",
+    "upper": null
+   },
+   "point": 0.0,
+   "residuals": [
+    1.666666666666666,
+    2.5,
+    3.5,
+    4.666666666666664,
+    6.0
+   ],
+   "series": "biased"
+  },
+  {
+   "config": "none",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "none",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "uncertainty_method_none",
+    "upper": null
+   },
+   "point": 30.0,
+   "residuals": [
+    1.666666666666666,
+    2.5,
+    3.5,
+    4.666666666666664,
+    6.0
+   ],
+   "series": "biased"
+  },
+  {
+   "config": "none",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "none",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "uncertainty_method_none",
+    "upper": null
+   },
+   "point": -12.5,
+   "residuals": [
+    1.666666666666666,
+    2.5,
+    3.5,
+    4.666666666666664,
+    6.0
+   ],
+   "series": "biased"
+  },
+  {
+   "config": "pointok",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 0.0,
+   "residuals": [
+    1.666666666666666,
+    2.5,
+    3.5,
+    4.666666666666664,
+    6.0
+   ],
+   "series": "biased"
+  },
+  {
+   "config": "pointok",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 30.0,
+   "residuals": [
+    1.666666666666666,
+    2.5,
+    3.5,
+    4.666666666666664,
+    6.0
+   ],
+   "series": "biased"
+  },
+  {
+   "config": "pointok",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 5,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": -12.5,
+   "residuals": [
+    1.666666666666666,
+    2.5,
+    3.5,
+    4.666666666666664,
+    6.0
+   ],
+   "series": "biased"
+  },
+  {
+   "config": "cov80_min5",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 1,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 0.0,
+   "residuals": [
+    5.0
+   ],
+   "series": "twopoint"
+  },
+  {
+   "config": "cov80_min5",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 1,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 30.0,
+   "residuals": [
+    5.0
+   ],
+   "series": "twopoint"
+  },
+  {
+   "config": "cov80_min5",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 1,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": -12.5,
+   "residuals": [
+    5.0
+   ],
+   "series": "twopoint"
+  },
+  {
+   "config": "cov50_min2",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 1,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.5,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 0.0,
+   "residuals": [
+    5.0
+   ],
+   "series": "twopoint"
+  },
+  {
+   "config": "cov50_min2",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 1,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.5,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 30.0,
+   "residuals": [
+    5.0
+   ],
+   "series": "twopoint"
+  },
+  {
+   "config": "cov50_min2",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 1,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.5,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": -12.5,
+   "residuals": [
+    5.0
+   ],
+   "series": "twopoint"
+  },
+  {
+   "config": "cov95_min3",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 1,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.95,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 0.0,
+   "residuals": [
+    5.0
+   ],
+   "series": "twopoint"
+  },
+  {
+   "config": "cov95_min3",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 1,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.95,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 30.0,
+   "residuals": [
+    5.0
+   ],
+   "series": "twopoint"
+  },
+  {
+   "config": "cov95_min3",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 1,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.95,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": -12.5,
+   "residuals": [
+    5.0
+   ],
+   "series": "twopoint"
+  },
+  {
+   "config": "cov99_min1",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 1,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 5.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.99,
+    "unavailable_reason": null,
+    "upper": 5.0
+   },
+   "point": 0.0,
+   "residuals": [
+    5.0
+   ],
+   "series": "twopoint"
+  },
+  {
+   "config": "cov99_min1",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 1,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": 35.0,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.99,
+    "unavailable_reason": null,
+    "upper": 35.0
+   },
+   "point": 30.0,
+   "residuals": [
+    5.0
+   ],
+   "series": "twopoint"
+  },
+  {
+   "config": "cov99_min1",
+   "forecaster": "persistence",
+   "interval": {
+    "available": true,
+    "calibration_sample_count": 1,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": -7.5,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.99,
+    "unavailable_reason": null,
+    "upper": -7.5
+   },
+   "point": -12.5,
+   "residuals": [
+    5.0
+   ],
+   "series": "twopoint"
+  },
+  {
+   "config": "none",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "none",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "uncertainty_method_none",
+    "upper": null
+   },
+   "point": 0.0,
+   "residuals": [
+    5.0
+   ],
+   "series": "twopoint"
+  },
+  {
+   "config": "none",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "none",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "uncertainty_method_none",
+    "upper": null
+   },
+   "point": 30.0,
+   "residuals": [
+    5.0
+   ],
+   "series": "twopoint"
+  },
+  {
+   "config": "none",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "none",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "uncertainty_method_none",
+    "upper": null
+   },
+   "point": -12.5,
+   "residuals": [
+    5.0
+   ],
+   "series": "twopoint"
+  },
+  {
+   "config": "pointok",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 1,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 0.0,
+   "residuals": [
+    5.0
+   ],
+   "series": "twopoint"
+  },
+  {
+   "config": "pointok",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 1,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 30.0,
+   "residuals": [
+    5.0
+   ],
+   "series": "twopoint"
+  },
+  {
+   "config": "pointok",
+   "forecaster": "persistence",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 1,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": -12.5,
+   "residuals": [
+    5.0
+   ],
+   "series": "twopoint"
+  },
+  {
+   "config": "cov80_min5",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 0.0,
+   "residuals": [],
+   "series": "twopoint"
+  },
+  {
+   "config": "cov80_min5",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 30.0,
+   "residuals": [],
+   "series": "twopoint"
+  },
+  {
+   "config": "cov80_min5",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": -12.5,
+   "residuals": [],
+   "series": "twopoint"
+  },
+  {
+   "config": "cov50_min2",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.5,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 0.0,
+   "residuals": [],
+   "series": "twopoint"
+  },
+  {
+   "config": "cov50_min2",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.5,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 30.0,
+   "residuals": [],
+   "series": "twopoint"
+  },
+  {
+   "config": "cov50_min2",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.5,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": -12.5,
+   "residuals": [],
+   "series": "twopoint"
+  },
+  {
+   "config": "cov95_min3",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.95,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 0.0,
+   "residuals": [],
+   "series": "twopoint"
+  },
+  {
+   "config": "cov95_min3",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.95,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 30.0,
+   "residuals": [],
+   "series": "twopoint"
+  },
+  {
+   "config": "cov95_min3",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.95,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": -12.5,
+   "residuals": [],
+   "series": "twopoint"
+  },
+  {
+   "config": "cov99_min1",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.99,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 0.0,
+   "residuals": [],
+   "series": "twopoint"
+  },
+  {
+   "config": "cov99_min1",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.99,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 30.0,
+   "residuals": [],
+   "series": "twopoint"
+  },
+  {
+   "config": "cov99_min1",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.99,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": -12.5,
+   "residuals": [],
+   "series": "twopoint"
+  },
+  {
+   "config": "none",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "none",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "uncertainty_method_none",
+    "upper": null
+   },
+   "point": 0.0,
+   "residuals": [],
+   "series": "twopoint"
+  },
+  {
+   "config": "none",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "none",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "uncertainty_method_none",
+    "upper": null
+   },
+   "point": 30.0,
+   "residuals": [],
+   "series": "twopoint"
+  },
+  {
+   "config": "none",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "none",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "uncertainty_method_none",
+    "upper": null
+   },
+   "point": -12.5,
+   "residuals": [],
+   "series": "twopoint"
+  },
+  {
+   "config": "pointok",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 0.0,
+   "residuals": [],
+   "series": "twopoint"
+  },
+  {
+   "config": "pointok",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": 30.0,
+   "residuals": [],
+   "series": "twopoint"
+  },
+  {
+   "config": "pointok",
+   "forecaster": "linear_trend",
+   "interval": {
+    "available": false,
+    "calibration_sample_count": 0,
+    "calibration_window_id": "rolling-origin-v1",
+    "lower": null,
+    "method": "empirical_rolling_origin_residual",
+    "requested_coverage": 0.8,
+    "unavailable_reason": "insufficient_calibration_history",
+    "upper": null
+   },
+   "point": -12.5,
+   "residuals": [],
+   "series": "twopoint"
+  }
+ ],
+ "note": "Frozen compute_uncertainty outputs at commit 2baea64d, BEFORE the interval_from_residuals extraction. Exact equality required after it."
+}

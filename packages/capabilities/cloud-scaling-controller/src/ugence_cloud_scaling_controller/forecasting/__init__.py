@@ -90,6 +90,7 @@ from .uncertainty import (
     UncertaintyInterval,
     UncertaintyMethod,
     compute_uncertainty,
+    interval_from_residuals,
     rolling_origin_residuals,
 )
 from .forecast import (
@@ -144,7 +145,7 @@ __all__ = [
     "BaselineForecaster", "ForecasterError", "LinearTrendForecaster", "PersistenceForecaster",
     # uncertainty
     "UNCERTAINTY_CONFIG_SCHEMA_VERSION", "UncertaintyConfig", "UncertaintyError",
-    "UncertaintyInterval", "UncertaintyMethod", "compute_uncertainty", "rolling_origin_residuals",
+    "UncertaintyInterval", "UncertaintyMethod", "compute_uncertainty", "interval_from_residuals", "rolling_origin_residuals",
     # forecast contract
     "CAPACITY_FORECAST_SCHEMA_VERSION", "CapacityForecast", "ForecastError",
     # evidence + service

@@ -25,7 +25,7 @@ import math
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 from ..canonical.serialization import content_digest
 from .series import _as_utc
@@ -40,6 +40,10 @@ REASON_INSUFFICIENT_CALIBRATION = "insufficient_calibration_history"
 class UncertaintyMethod(str, Enum):
     NONE = "none"
     EMPIRICAL_ROLLING_ORIGIN_RESIDUAL = "empirical_rolling_origin_residual"
+    #: Residuals supplied by a caller-owned causal prequential bank rather than collected
+    #: in-window. The interval mathematics is identical; only the provenance differs, which
+    #: is why this is a distinct method value and not a flag.
+    EMPIRICAL_PREQUENTIAL_RESIDUAL_BANK = "empirical_prequential_residual_bank"
 
 
 class UncertaintyError(ValueError):
@@ -110,6 +114,10 @@ class UncertaintyInterval:
     upper: Optional[float] = None
     unavailable_reason: Optional[str] = None
     calibration_window_id: str = ""
+    #: Digest of the externally supplied calibration input, for bank-sourced intervals only.
+    #: ``None`` on the legacy in-window path, where it is omitted from the canonical payload
+    #: so historical digests are byte-identical.
+    calibration_input_digest: Optional[str] = None
 
     @property
     def insufficient_calibration(self) -> bool:
@@ -122,7 +130,7 @@ class UncertaintyInterval:
         return None
 
     def to_canonical_dict(self) -> Dict[str, Any]:
-        return {
+        payload: Dict[str, Any] = {
             "method": self.method,
             "requested_coverage": self.requested_coverage,
             "calibration_sample_count": self.calibration_sample_count,
@@ -132,6 +140,11 @@ class UncertaintyInterval:
             "unavailable_reason": self.unavailable_reason,
             "calibration_window_id": self.calibration_window_id,
         }
+        # Legacy payload preservation: the key appears ONLY for bank-sourced intervals, so
+        # every previously-computed evidence digest is unchanged.
+        if self.calibration_input_digest is not None:
+            payload["calibration_input_digest"] = self.calibration_input_digest
+        return payload
 
 
 def _quantile(sorted_xs: List[float], q: float) -> float:
@@ -192,11 +205,104 @@ def rolling_origin_residuals(
     return residuals
 
 
+def _finite_float(value: Any, what: str) -> float:
+    """Coerce ``value`` to a finite float or fail closed."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise UncertaintyError(f"{what} must be a real number")
+    v = float(value)
+    if not math.isfinite(v):
+        raise UncertaintyError(f"{what} must be finite")
+    return v
+
+
+def interval_from_residuals(
+    point: float,
+    residuals: Sequence[float],
+    config: UncertaintyConfig,
+    *,
+    calibration_input_digest: Optional[str] = None,
+) -> UncertaintyInterval:
+    """Build the canonical uncertainty interval from an ordered signed-residual collection.
+
+    This is the **single** definition of the interval mathematics. Both residual-production
+    paths delegate here and neither may reimplement it:
+
+    * the shipped in-window path — :func:`rolling_origin_residuals` then this function, which
+      is exactly what :func:`compute_uncertainty` does;
+    * the evaluation path — a caller-owned causal prequential residual bank supplies the
+      collection and its ``calibration_input_digest``.
+
+    ``residuals`` are **signed** (``actual - predicted``), in the representation produced by
+    :func:`rolling_origin_residuals`. Ordering of the input is irrelevant to the result — the
+    quantiles are taken over a sorted copy — but the caller's order is never mutated.
+
+    Malformed input (non-real, non-finite, or a non-``UncertaintyConfig``) fails closed with
+    :class:`UncertaintyError`. Too *few* residuals is not an error: it is the existing typed
+    ``unavailable`` contract, which the service turns into an abstention unless the config
+    explicitly permits point-only.
+    """
+    if not isinstance(config, UncertaintyConfig):
+        raise UncertaintyError("config must be an UncertaintyConfig")
+    if calibration_input_digest is not None and (
+        not isinstance(calibration_input_digest, str) or calibration_input_digest == ""
+    ):
+        raise UncertaintyError("calibration_input_digest must be a non-empty string or None")
+
+    if config.method is UncertaintyMethod.NONE:
+        return UncertaintyInterval(
+            method=config.method.value,
+            requested_coverage=config.requested_coverage,
+            calibration_sample_count=0,
+            available=False,
+            unavailable_reason=REASON_NOT_REQUESTED,
+            calibration_window_id=config.calibration_window_id,
+            calibration_input_digest=calibration_input_digest,
+        )
+
+    point_value = _finite_float(point, "point")
+    if isinstance(residuals, (str, bytes)):
+        raise UncertaintyError("residuals must be a sequence of real numbers")
+    values = [_finite_float(r, "residual") for r in residuals]
+    count = len(values)
+
+    if count < config.min_calibration_samples:
+        return UncertaintyInterval(
+            method=config.method.value,
+            requested_coverage=config.requested_coverage,
+            calibration_sample_count=count,
+            available=False,
+            unavailable_reason=REASON_INSUFFICIENT_CALIBRATION,
+            calibration_window_id=config.calibration_window_id,
+            calibration_input_digest=calibration_input_digest,
+        )
+
+    values.sort()
+    alpha = 1.0 - config.requested_coverage
+    lo_q = alpha / 2.0
+    hi_q = 1.0 - alpha / 2.0
+    lower_offset = _quantile(values, lo_q)
+    upper_offset = _quantile(values, hi_q)
+    return UncertaintyInterval(
+        method=config.method.value,
+        requested_coverage=config.requested_coverage,
+        calibration_sample_count=count,
+        available=True,
+        lower=point_value + lower_offset,
+        upper=point_value + upper_offset,
+        calibration_window_id=config.calibration_window_id,
+        calibration_input_digest=calibration_input_digest,
+    )
+
+
 def compute_uncertainty(
     window: ForecastInputWindow, forecaster: Any, point: float, config: UncertaintyConfig
 ) -> UncertaintyInterval:
     """Compute the empirical uncertainty interval around ``point`` (fail-open to a typed
-    'unavailable' contract, never a fabricated interval)."""
+    'unavailable' contract, never a fabricated interval).
+
+    Unchanged in signature and behaviour: it collects in-window rolling-origin residuals and
+    hands them to :func:`interval_from_residuals`, which owns the mathematics.
+    """
     if config.method is UncertaintyMethod.NONE:
         return UncertaintyInterval(
             method=config.method.value,
@@ -206,34 +312,16 @@ def compute_uncertainty(
             unavailable_reason=REASON_NOT_REQUESTED,
             calibration_window_id=config.calibration_window_id,
         )
-
-    residuals = rolling_origin_residuals(window, forecaster, config)
-    count = len(residuals)
-    if count < config.min_calibration_samples:
-        return UncertaintyInterval(
-            method=config.method.value,
-            requested_coverage=config.requested_coverage,
-            calibration_sample_count=count,
-            available=False,
-            unavailable_reason=REASON_INSUFFICIENT_CALIBRATION,
-            calibration_window_id=config.calibration_window_id,
+    if config.method is UncertaintyMethod.EMPIRICAL_PREQUENTIAL_RESIDUAL_BANK:
+        # The config demands caller-supplied bank residuals; this path collects its own.
+        # Fail closed rather than silently substituting a different calibration source.
+        raise UncertaintyError(
+            "method empirical_prequential_residual_bank requires supplied calibration; "
+            "compute_uncertainty collects in-window residuals only"
         )
 
-    residuals.sort()
-    alpha = 1.0 - config.requested_coverage
-    lo_q = alpha / 2.0
-    hi_q = 1.0 - alpha / 2.0
-    lower_offset = _quantile(residuals, lo_q)
-    upper_offset = _quantile(residuals, hi_q)
-    return UncertaintyInterval(
-        method=config.method.value,
-        requested_coverage=config.requested_coverage,
-        calibration_sample_count=count,
-        available=True,
-        lower=point + lower_offset,
-        upper=point + upper_offset,
-        calibration_window_id=config.calibration_window_id,
-    )
+    residuals = rolling_origin_residuals(window, forecaster, config)
+    return interval_from_residuals(point, residuals, config)
 
 
 __all__ = [
@@ -245,5 +333,6 @@ __all__ = [
     "UncertaintyConfig",
     "UncertaintyInterval",
     "rolling_origin_residuals",
+    "interval_from_residuals",
     "compute_uncertainty",
 ]
