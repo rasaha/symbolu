@@ -830,3 +830,293 @@ def test_the_fact_partition_is_total_and_disjoint():
     unpartitionable = {"artifact_digest", "construction_token"}
     declared = {f.name for f in dataclass_fields(v.VerifiedPolicyAuthenticity)} - unpartitionable
     assert (v.VERIFIED_FACT_NAMES | v.RECORDED_FACT_NAMES) == declared
+
+
+# --- verification.py: the result pair and the verifier's entry ------------------------
+
+
+@pytest.mark.adversarial
+def test_a_refusal_carrying_a_foreign_outcome_type_is_refused():
+    """Guard 52 — ``verification.py:152``, ``type(self.outcome) is not _Outcome``.
+
+    The outcome is the one field a consumer is entitled to branch on, so a look-alike
+    carrying the right ``.value`` would be read as a decision this package never made.
+    """
+
+    from ugence_cloud_scaling_policy_authenticity import (  # noqa: PLC0415
+        PolicyAuthenticityRefusal,
+    )
+
+    class LookAlikeOutcome:
+        value = "VERIFIED"
+
+    with pytest.raises(TypeError):
+        PolicyAuthenticityRefusal(outcome=LookAlikeOutcome(), detail="")
+
+
+@pytest.mark.adversarial
+def test_a_result_carrying_a_foreign_verified_artifact_type_is_refused():
+    """Guard 56 — ``verification.py:196``, the verified half's exact type.
+
+    Distinct from guard 46, which defends the *consumption* boundary; this defends the
+    result's own construction, before ``require_verified_policy_authenticity`` is reached.
+    """
+
+    authority, record = issued_bounds()
+    genuine = verifier_for(authority).verify(
+        coordinate=record.coordinate,
+        expected_reference_tenant_id=record.coordinate.tenant_id,
+        as_of=T_MID,
+    )
+
+    class LookAlikeArtifact:
+        def __init__(self, real):
+            for field in dataclasses.fields(real):
+                setattr(self, field.name, getattr(real, field.name))
+
+    with pytest.raises(TypeError):
+        PolicyAuthenticityResult(
+            verified_policy=LookAlikeArtifact(genuine.verified_policy),
+            resolution=genuine.resolution,
+        )
+
+
+@pytest.mark.adversarial
+def test_a_result_carrying_a_foreign_refusal_type_is_refused():
+    """Guard 58 — ``verification.py:214``, the refusing half's exact type."""
+
+    class LookAlikeRefusal:
+        outcome = "RESOLUTION_MALFORMED"
+        detail = ""
+
+    with pytest.raises(TypeError):
+        PolicyAuthenticityResult(refusal=LookAlikeRefusal())
+
+
+@pytest.mark.adversarial
+def test_a_result_pairing_two_genuine_halves_about_different_policies_is_refused():
+    """Guard 59 — ``verification.py:240``, the pair's coordinate agreement.
+
+    Both halves are individually genuine: a real determination for policy A and a real
+    resolution for policy B are each valid objects. A consumer reading the body out of
+    ``resolution`` while trusting the coordinate on ``verified_policy`` would then be reading
+    a body the proof does not cover. The pair is the thing that is wrong, and only this guard
+    looks at it.
+    """
+
+    authority, record = issued_bounds()
+    genuine = verifier_for(authority).verify(
+        coordinate=record.coordinate,
+        expected_reference_tenant_id=record.coordinate.tenant_id,
+        as_of=T_MID,
+    )
+    other_coordinate = dataclasses.replace(
+        genuine.resolution.requested_coordinate, policy_id="some.other-policy"
+    )
+    elsewhere = _bypass(genuine.resolution, requested_coordinate=other_coordinate)
+
+    with pytest.raises(VerifiedPolicyArtifactIntegrityError):
+        PolicyAuthenticityResult(
+            verified_policy=genuine.verified_policy, resolution=elsewhere
+        )
+
+
+def _bypass(obj, **overrides):
+    """A field-for-field copy with ``**overrides``, skipping ``__post_init__``."""
+
+    forged = object.__new__(type(obj))
+    for field in dataclasses.fields(obj):
+        object.__setattr__(forged, field.name, getattr(obj, field.name))
+    for name, value in overrides.items():
+        object.__setattr__(forged, name, value)
+    return forged
+
+
+@pytest.mark.adversarial
+def test_an_expected_tenant_id_that_is_not_exactly_a_str_is_refused():
+    """Guard 69 — ``verification.py:419``, the caller's tenant argument.
+
+    A refusal rather than a raise: this is inside the verify path, so the caller gets a typed
+    ``UNSUPPORTED_EXACT_TYPE`` outcome like any other input it declines to act on.
+    """
+
+    from ugence_cloud_scaling_policy_authenticity import PolicyAuthenticityOutcome  # noqa: PLC0415
+
+    authority, record = issued_bounds()
+    result = verifier_for(authority).verify(
+        coordinate=record.coordinate,
+        expected_reference_tenant_id=123,
+        as_of=T_MID,
+    )
+    assert result.refusal is not None
+    assert result.refusal.outcome is PolicyAuthenticityOutcome.UNSUPPORTED_EXACT_TYPE
+
+
+@pytest.mark.adversarial
+def test_a_verifier_built_without_a_resolution_port_is_refused():
+    """Guard 64 — ``verification.py:310``, ``resolution_port is None``.
+
+    There is no default port, no ambient policy registry and no permissive fallback.
+
+    Classified ``diagnostic-only``, and the isolation attempt is why: ``None`` cannot reach
+    this guard without also failing ``hasattr(port, 'resolve_policy_version')`` five lines
+    below, which raises the same ``PolicyAuthenticityConfigurationError``. No input isolates
+    it. The guard earns its place by telling a composition root that a port is *missing*
+    rather than that its port is the wrong shape.
+    """
+
+    with pytest.raises(PolicyAuthenticityConfigurationError):
+        PolicyAuthenticityVerifier(resolution_port=None)
+
+
+# --- verification.py: the resolution the authority returned ----------------------------
+#
+# Thirteen guards on the shape of a RESOLVED answer. Each is reached by taking a genuine,
+# signed, correct resolution and changing exactly one field of it — the shape of a
+# compromised or merely buggy composition-root component, and the reason this package
+# re-checks a resolution it did not construct.
+
+
+def _refusal_for(**rewrite):
+    """Verify a genuine bounds policy through a port that rewrites the answer."""
+
+    from ugence_cloud_scaling_policy_authenticity import PolicyAuthenticityOutcome  # noqa: PLC0415
+
+    authority, record = issued_bounds()
+    result = _verify_with(_RewritingPort(port_for(authority), rewrite), record)
+    assert result.refusal is not None, "the rewritten resolution was verified"
+    return result.refusal, PolicyAuthenticityOutcome
+
+
+@pytest.mark.adversarial
+def test_a_historical_resolution_is_refused():
+    """Guard 77 — ``verification.py:487``, ``resolution.historical``."""
+
+    refusal, outcomes = _refusal_for(historical=True)
+    assert refusal.outcome is outcomes.HISTORICAL_RESOLUTION_REFUSED
+
+
+@pytest.mark.invariant
+def test_the_current_validity_guard_is_unreachable_behind_the_historicity_guard():
+    """Why guard 78 — ``verification.py:494`` — is ``unreachable-behind-earlier-guard``.
+
+    ``is not True`` reads like a defence against a port returning a truthy non-``True``
+    value. It cannot be reached by one. Three facts close it, and each is asserted here
+    rather than argued:
+
+    * ``implies_current_validity`` is a read-only **property** of the Policy Authority's
+      ``PolicyResolution``, defined as ``resolved and not historical`` — a port cannot set
+      it to anything, truthy or otherwise;
+    * ``verification.py:460`` admits the resolution by **exact type**, so no subclass and no
+      duck-typed look-alike can override the property to return something else;
+    * both remaining ways to make it non-``True`` are already refused above it — a
+      non-RESOLVED status by the status gate, and ``historical`` by guard 77 on the previous
+      line, which carries the same ``HISTORICAL_RESOLUTION_REFUSED`` outcome.
+
+    If any of these three stops holding, the exclusion is void and this test fails.
+    """
+
+    from ugence_policy_authority.api import PolicyResolution  # noqa: PLC0415
+
+    from ugence_cloud_scaling_policy_authenticity import verification as v  # noqa: PLC0415
+
+    assert isinstance(
+        PolicyResolution.__dict__.get("implies_current_validity"), property
+    ), "implies_current_validity is no longer a read-only property; guard 78 may be reachable"
+    source = __import__("inspect").getsource(v._verify_resolution_shape) if hasattr(
+        v, "_verify_resolution_shape"
+    ) else __import__("inspect").getsource(v)
+    assert "type(resolution) is not PolicyResolution" in source, (
+        "the exact-type gate on the resolution is gone; a subclass could now override "
+        "implies_current_validity and guard 78 would be reachable"
+    )
+
+
+@pytest.mark.adversarial
+def test_a_resolution_arriving_without_its_issued_record_is_refused():
+    """Guard 79 — ``verification.py:502``, ``type(record) is not IssuedPolicyRecord``."""
+
+    class LookAlikeRecord:
+        pass
+
+    refusal, outcomes = _refusal_for(record=LookAlikeRecord())
+    assert refusal.outcome is outcomes.RESOLUTION_MALFORMED
+
+
+@pytest.mark.adversarial
+def test_a_resolution_not_returning_the_records_own_artifact_is_refused():
+    """Guard 80 — ``verification.py:507``, the record and resolution must agree on identity.
+
+    ``is not``, not ``!=``: two equal artifacts are still two objects, and the one the
+    signature was checked against is the one that must travel on.
+    """
+
+    refusal, outcomes = _refusal_for(policy=None)
+    assert refusal.outcome is outcomes.RESOLUTION_MALFORMED
+
+
+@pytest.mark.adversarial
+def test_a_record_naming_an_unadmitted_signature_algorithm_is_refused():
+    """Guard 83 — ``verification.py:529``, the record's algorithm against the closed set."""
+
+    def _rewrite(answer):
+        object.__setattr__(answer.record, "signature_alg", "rsa-md5")
+        return answer.record
+
+    refusal, outcomes = _refusal_for(record=_rewrite)
+    assert refusal.outcome is outcomes.UNSUPPORTED_ALGORITHM
+
+
+@pytest.mark.adversarial
+def test_a_record_whose_body_digest_is_malformed_is_refused():
+    """Guard 84 — ``verification.py:536``, ``not is_policy_digest(policy_body_digest)``."""
+
+    # Both sides, not just one. The R-3 gate seventeen lines above compares
+    # ``record.coordinate.content_digest`` against ``record.policy_body_digest``; changing
+    # only the digest trips *that* guard with COORDINATE_DIGEST_UNBOUND and never reaches
+    # this one. Making them equal-and-malformed is what isolates the shape check.
+    def _rewrite(answer):
+        record = answer.record
+        object.__setattr__(record, "policy_body_digest", "not-a-digest")
+        object.__setattr__(record.coordinate, "content_digest", "not-a-digest")
+        return record
+
+    refusal, outcomes = _refusal_for(record=_rewrite)
+    assert refusal.outcome is outcomes.COORDINATE_MALFORMED
+
+
+@pytest.mark.adversarial
+@pytest.mark.parametrize(
+    "field",
+    ["descriptor_adapter_id", "descriptor_policy_type", "descriptor_canonical_projection"],
+)
+def test_a_resolution_publishing_no_descriptor_projection_is_refused(field):
+    """Guard 96 — ``verification.py:685``, ``missing``.
+
+    Parametrised over all three published fields: the signed body digest cannot be
+    reproduced without the projection, and neither the policy type nor any bound inside the
+    body can be established. One case would leave the other two unexercised.
+    """
+
+    refusal, outcomes = _refusal_for(**{field: None})
+    assert refusal.outcome is outcomes.POLICY_PROJECTION_ABSENT
+
+
+@pytest.mark.adversarial
+def test_a_descriptor_projection_that_is_not_a_mapping_is_refused():
+    """Guard 98 — ``verification.py:697``, ``not isinstance(projection, Mapping)``."""
+
+    refusal, outcomes = _refusal_for(descriptor_canonical_projection=[("bounds", [])])
+    assert refusal.outcome is outcomes.POLICY_PROJECTION_ABSENT
+
+
+@pytest.mark.adversarial
+def test_a_descriptor_naming_another_adapter_than_the_records_is_refused():
+    """Guard 99 — ``verification.py:706``, ``adapter_id != record.adapter_id``.
+
+    The published identity must be the one the record was described by. A projection framed
+    under a different adapter id reproduces a digest nobody signed.
+    """
+
+    refusal, outcomes = _refusal_for(descriptor_adapter_id="ugence.some-other-adapter/v1")
+    assert refusal.outcome is outcomes.POLICY_PROJECTION_DIGEST_MISMATCH

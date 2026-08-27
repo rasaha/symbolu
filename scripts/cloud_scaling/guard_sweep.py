@@ -282,6 +282,16 @@ PACKAGES = {
                 "tests/test_guard_coverage.py::"
                 "test_a_resolution_port_built_without_a_signature_verifier_is_refused",
             ),
+            ("verification.py", "resolution_port is None"): (
+                "diagnostic-only",
+                "The same construction as the two resolution_port guards above: a None port "
+                "always fails `hasattr(port, 'resolve_policy_version')` five lines below, "
+                "with the same PolicyAuthenticityConfigurationError, so no input isolates "
+                "it. Kept because 'a port is required' is the more useful diagnosis than "
+                "'your port is the wrong shape'.",
+                "tests/test_guard_coverage.py::"
+                "test_a_verifier_built_without_a_resolution_port_is_refused",
+            ),
             ("verified.py", "name in RECORDED_FACT_NAMES"): (
                 "diagnostic-only",
                 "Measured: with the guard removed, both recorded names fall through to the "

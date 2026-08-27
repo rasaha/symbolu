@@ -15,9 +15,9 @@ This package records no prior inventory; this is the first one.
 
 ## Classification
 
-Every guard is classified: **106 `SCORED`** — the
+Every guard is classified: **105 `SCORED`** — the
 sweep neutralises it and the suite must fail — and
-**11 `EXCLUDED`**, each with a reason from a closed vocabulary and
+**12 `EXCLUDED`**, each with a reason from a closed vocabulary and
 a test that measures the reason. A guard is never excluded because it survived; a
 survivor with no prior declaration fails the sweep.
 
@@ -33,6 +33,7 @@ survivor with no prior declaration fails the sweep.
 | `verified.py:675` | `diagnostic-only` | Measured: with the guard removed, both recorded names fall through to the verified-fact lookup and raise the same VerifiedPolicyArtifactIntegrityError ('is not a fact of a verification artifact'). The guard changes the diagnosis from 'not a fact' to 'a recorded fact, not a verified one' — which is the difference between a typo and a category error, and is why it is kept. | `tests/test_guard_coverage.py::test_reading_a_recorded_fact_through_verified_fact_is_refused` |
 | `verified.py:775` | `equivalent-mutant` | A fact cannot be both verified and recorded. Both operands are frozen sets defined in this module, in this distribution, so the intersection is empty in every program this package can be part of. Kept because it is what makes a mis-classified new field fail at import rather than ship as a fact that is digest-covered and unattested. | `tests/test_guard_coverage.py::test_the_fact_partition_is_total_and_disjoint` |
 | `verified.py:780` | `equivalent-mutant` | Every declared field of the artifact must be classified verified or recorded. Both sides are read from this module — the two frozen sets and `dataclasses.fields(VerifiedPolicyAuthenticity)` — so the comparison cannot be made true by anything outside this distribution. | `tests/test_guard_coverage.py::test_the_fact_partition_is_total_and_disjoint` |
+| `verification.py:310` | `diagnostic-only` | The same construction as the two resolution_port guards above: a None port always fails `hasattr(port, 'resolve_policy_version')` five lines below, with the same PolicyAuthenticityConfigurationError, so no input isolates it. Kept because 'a port is required' is the more useful diagnosis than 'your port is the wrong shape'. | `tests/test_guard_coverage.py::test_a_verifier_built_without_a_resolution_port_is_refused` |
 | `verification.py:775` | `diagnostic-only` | Every input this guard refuses is refused identically without it. A bound missing a field reaches `entry[name]` nineteen lines below, inside a deliberate `except Exception` backstop that re-raises as the same `_BoundsShapeError` and therefore the same POLICY_BOUNDS_MALFORMED outcome; only the message changes, from "bounds[0] omits ['max_permitted_delta']" to "bounds[0]: 'max_permitted_delta'". Under ADR Phase 5 §9.1 the message is not the contract. The guard is kept because it names every absent field at once rather than the first one `entry[...]` happens to reach. | `tests/test_guard_coverage.py::test_a_signed_bound_this_profile_cannot_read_is_refused` |
 
 ## Not counted, and why
@@ -110,7 +111,7 @@ survivor with no prior declaration fails the sweep.
 | 61 | `verification.py:252` | raise | SCORED | — | `record.policy_body_digest != artifact.policy_body_digest` |
 | 62 | `verification.py:259` | raise | SCORED | — | `resolution.as_of != artifact.resolved_as_of_fact` |
 | 63 | `verification.py:266` | raise | SCORED | — | `resolution.historical or resolution.implies_current_validity is not True` |
-| 64 | `verification.py:310` | raise | SCORED | — | `resolution_port is None` |
+| 64 | `verification.py:310` | raise | EXCLUDED | — | `resolution_port is None` |
 | 65 | `verification.py:315` | raise | SCORED | — | `not hasattr(resolution_port, 'resolve_policy_version')` |
 | 66 | `verification.py:321` | raise | SCORED | — | `not is_policy_digest(digest)` |
 | 67 | `verification.py:327` | raising-helper call | SCORED | — | `production_mode` |

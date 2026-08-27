@@ -1,8 +1,8 @@
 {
   "package": "policy-authenticity",
   "total": 117,
-  "scored": 106,
-  "excluded": 11,
+  "scored": 105,
+  "excluded": 12,
   "classification": {
     "1": {
       "status": "SCORED",
@@ -413,7 +413,10 @@
       "condition": "resolution.historical or resolution.implies_current_validity is not True"
     },
     "64": {
-      "status": "SCORED",
+      "status": "EXCLUDED",
+      "reason": "diagnostic-only",
+      "detail": "The same construction as the two resolution_port guards above: a None port always fails `hasattr(port, 'resolve_policy_version')` five lines below, with the same PolicyAuthenticityConfigurationError, so no input isolates it. Kept because 'a port is required' is the more useful diagnosis than 'your port is the wrong shape'.",
+      "evidence": "tests/test_guard_coverage.py::test_a_verifier_built_without_a_resolution_port_is_refused",
       "module": "verification.py",
       "line": 310,
       "condition": "resolution_port is None"
