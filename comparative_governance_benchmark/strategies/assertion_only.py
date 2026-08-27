@@ -14,7 +14,7 @@ from governance_providers.api import (
     AssertionAssessmentIntegration, AssertionGovernanceRequest)
 
 from ..runners.common import run_case_flow, technical_valid
-from ..runners.determinism import make_id_factory
+from ..runners.determinism import make_clock, make_id_factory
 from ..runners.execution import build_execution_adapter, direct_dispatch
 from ..runners.dgm import build_services
 from ..schemas.result import NOT_APPLICABLE, NOT_PERFORMED, StrategyResult
@@ -112,7 +112,8 @@ class AssertionOnlyStrategy:
         pa = scenario.proposed_action
         adapter = build_execution_adapter(
             pa.action_type, scenario.execution,
-            id_factory=make_id_factory(scenario.scenario_id + ":execC"))
+            id_factory=make_id_factory(scenario.scenario_id + ":execC"),
+            clock=make_clock(scenario.scenario_id + ":execC"))
         r.dispatch_attempted = True
         r.dispatch_allowed = True
         cost["execution_attempts"] += 1
