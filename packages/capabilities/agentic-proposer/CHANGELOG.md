@@ -1,5 +1,102 @@
 # Changelog — ugence-agentic-proposer
 
+## 0.1.0 — S1 contracts and equations implemented; the first public-API snapshot
+
+Implements `docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md` in full against `src/`
+and moves the version to `0.1.0` in the same change that creates `public_api.json`
+and its drift test (`tests/test_public_api.py`), per I6 and I8. The specification
+itself is frozen and unedited; this release is the implementation of it.
+
+### Frozen at this version
+
+* **The eight canonical contracts** — `AgentIdentityRef`, `CognitiveRoleContract`,
+  `WorkMandate`, `BoundedContextEnvelope`, `ToolObservation`, `AdvisoryCandidateSet`,
+  `ProposerAdvisory`, `ProposerProcessRecord` — and the **two nested public shapes**
+  — `CandidateAdvisory`, `ProposerProcessStateTransition` — in `src/ugence_
+  agentic_proposer/contracts.py`, with every C1–C9 model rule: shared `frozen=True,
+  extra="forbid", strict=True` configuration; the C2 common fields; C4's
+  timezone-aware, UTC-normalising, microsecond-precision-`Z`-serialising datetime
+  validator/serializer pair on every `datetime` field; the exact C5a/C5b/C5c/C5d
+  classification of every `str`-valued field, declared per C8 as `Annotated[str,
+  StringConstraints(...)]` and never `Field(pattern=...)`; C6's digest-shaped-field
+  format grammar; and C7's unconditional rejection of
+  `DomainCheckCompletion.COMPLETE`.
+* **Seven new enums** — `ReviewAction`, `DomainCheckCompletion`,
+  `AgentLifecycleState`, `RoleActivationStatus`, `ToolOperationClass`,
+  `ToolObservationAdmissionStatus`, `ProposerProcessState` — added to
+  `vocabulary.py` alongside the three ratified D4 enums. `ProposerProcessState`'s
+  nine members (the five R-3 process states plus the four terminal outcomes, at
+  identical wire values to `TerminalOutcome`) discharge a gap the specification
+  itself records as open — no explicit membership table, and no stated basis for
+  R-4's cross-enum comparison — by direct entailment from R-3's own stated chain;
+  it is not a reconciliation of any stated rule. `[I]`, disclosed for ratification.
+* **The identity module** (`identity.py`, the single module I1 exempts from the D2
+  text scan for the `sha256:` prefix and the C6 grammar): `compute_advisory_
+  identity`, `verify_advisory_identity`, `build_proposer_advisory` and
+  `build_advisory_revision`, each following G1–G3 exactly — the frozen `P_unsigned`
+  projection, the private unexported `_UnsignedAdvisoryPayload`, and the one lawful
+  construction shape (explicit field pass-through, the substrate call inline in the
+  `advisory_digest=` keyword).
+* **Equations 1 and 2** (`equations.py`) — `evaluate_eligibility` and
+  `evaluate_readiness`, both `all((...))`-based total functions returning an actual
+  `bool`.
+* **The three verifiers and one exception** (`verification.py`) —
+  `verify_candidate_eligibility`, `verify_advisory_selection` (the independent
+  replay of R-1b and R-7), `verify_observation_resolution` (E2's algorithm), and
+  `EligibilityMismatchError`.
+* **The remaining three builders** (`builders.py`) — `build_candidate_advisory`,
+  `build_advisory_candidate_set`, `build_proposer_process_record`.
+* **R-1a through R-10 and L-1**, enforced exactly where Part E places each:
+  locally, on the contract itself, wherever one instance suffices (R-1a, the local
+  half of R-1b, R-3, R-4, R-8's locally-decidable clauses, S-1, S-2, L-1); in the
+  builders and verifiers wherever a second contract, a builder or a verifier is
+  required (R-2, R-5, R-6, R-7, R-9, R-10, the cross-contract half of R-1b).
+* **`public_api.json`** and `tests/test_public_api.py` — the full H3 surface (38
+  exported names: 8 contracts, 2 nested public shapes, 10 enums, 5 builders, 2
+  equation functions, 2 identity functions, 3 verifiers, 1 exception, 4 constants,
+  `__version__`), drift-tested against the installed package. No exported name
+  begins with `Proposal` or `Recommendation` (D7).
+* **I1** — the module-path-scoped mask for the `sha256:` prefix and the C6 pattern,
+  scoped to `identity.py` alone, with the five required mutation tests in
+  `tests/test_no_local_canonicalization.py`.
+* **I7's twelve test obligations**, in `tests/test_s1_implementation_obligations.py`
+  and (I7.9, I7.11) the now-armed pre-existing guards: the frozen-profile suite;
+  list-order significance; no bare number; no wall clock; naive-datetime rejection
+  and non-UTC normalisation; eligibility forgery; `COMPLETE` unconstructibility;
+  V13; R-3 process ordering; the installed `ugence-jcs` distribution check; the
+  rival-identity composition `test_advisory_contract_shape.py` now binds against
+  the real `ProposerAdvisory`/`CandidateAdvisory`; and the C8 declaration-form
+  mutation test.
+
+### Retired
+
+* **`tests/s1_specification_mirror.py`'s temporary representative shapes.**
+  `representative_shapes()` now returns the declared `src/` contracts directly
+  instead of building parallel duplicates. `ProposerProcessStateTransition.state`'s
+  `TerminalOutcome` placeholder is replaced with the real `ProposerProcessState`,
+  and the placeholder note is removed. The pinned registries — `FIELD_
+  CLASSIFICATION`, `CONTRACT_CARDINALITY`, `SELECTION_COUPLING`, the C5d entries —
+  are unchanged in content: they remain a hand-transcribed, independent mirror of
+  the specification, checked against the now-real declared surface rather than
+  against a stand-in for it.
+* **`tests/test_unenforced_local_rules.py`'s `UNENFORCED` registry**, from
+  forty-six entries to one (`S-2 (via R-1b)`, which remains a builder/verifier
+  obligation — see D9/E1). Every discharged entry moved to `ENFORCED` with a
+  construction the real contract now rejects, so the discharge history stays
+  legible rather than being silently deleted.
+* **`tests/test_process_ordering_obligation.py`'s skip-based obligation.** R-3 is
+  armed and enforced; the two tests that asserted the placeholder was still in
+  place are replaced with tests asserting the discharge.
+
+### Deferred (Part J) — unchanged by this release
+
+Candidate selection, a domain evaluator, a disposition-to-outcome mapping, the
+semantic auditor, storage, transport, service and authorisation surfaces, the
+three reason/check/audit-reference catalogues behind the five C5d fields, and the
+reasoning-strategy permission concept and its vocabulary (OD-5(iii)). None of these
+is implemented, specified beyond Part D/E's structural placeholders, or
+authorized by this release.
+
 ## 0.0.1 — unreleased (S0 skeleton; S1 enforcement guards)
 
 A version is declared only because the MVP readiness artifact

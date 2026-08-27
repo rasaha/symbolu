@@ -1,8 +1,12 @@
 """Single source of truth for the ugence-agentic-proposer distribution version.
 
-A version may be declared only because the MVP readiness artifact
-(``docs/architecture/ADR_UGENCE_AGENTIC_PROPOSER_MVP_READINESS.md``) exists and
-records the ratified owner decisions D1–D5. No public contract is frozen at this
-version: S0 is a skeleton carrying the ratified vocabulary and its boundary proofs.
+0.1.0 freezes the S1 public-API snapshot (I6, I8):
+``docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md``'s full H3 surface — the eight
+canonical contracts, the two nested public shapes, all ten ratified enums, the five
+builders, the two equation functions, the two identity functions, the three
+verifiers, the one exception this package defines, and the four ratified
+constants — is now the exported, drift-tested public API (``public_api.json``,
+``tests/test_public_api.py``). See ``CHANGELOG.md`` for what is frozen at this
+version and what remains deferred to S2 (Part J).
 """
-__version__ = "0.0.1"
+__version__ = "0.1.0"

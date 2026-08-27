@@ -1,6 +1,12 @@
-"""R-3 process ordering: an explicit, self-arming obligation — **not** coverage.
+"""R-3 process ordering: a self-arming obligation, now discharged.
 
-**Read this first: R-3 is not enforced anywhere in this package today.**
+**Read this first: the obligation below is discharged.** ``ProposerProcessState`` is
+declared in ``vocabulary.py``, ``ProposerProcessStateTransition.state`` is typed with
+it, and ``ProposerProcessRecord`` enforces R-3 and R-4. The skip this module was built
+around lifted the moment the enum landed; the historical account below — why the
+placeholder existed, exactly which R-3 clause it blocked, and what the mirror was and
+was not permitted to originate — is kept because it is the record of what was proved
+and when, not because anything here is still pending.
 
 R-3 requires ``ProposerProcessRecord.state_transitions`` to be a subsequence of
 
@@ -158,47 +164,42 @@ _UNARMED_REASON = (
 
 
 # --------------------------------------------------------------------------- #
-# Always runs: the placeholder boundary is real, documented, and unchanged
+# Always runs: the obligation is discharged — the placeholder is gone, and the
+# real ``ProposerProcessState`` enum stands in its place.
 # --------------------------------------------------------------------------- #
 
-def test_the_placeholder_is_still_a_placeholder_and_says_so():
-    """The substitution must stay explicit. If the mirror is edited to type the field
-    with something else, or the explanation is deleted, this fails rather than leaving a
-    silent departure from the specification in a module whose whole claim is that it
-    mirrors it."""
+def test_the_placeholder_has_been_discharged_not_merely_edited():
+    """The substitution is retired, not silently reworded. If a later change reverts
+    ``ProposerProcessStateTransition.state`` to ``TerminalOutcome`` — or to any type
+    other than ``ProposerProcessState`` — this fails rather than leaving a silent
+    departure from the specification in a module whose whole claim is that it mirrors
+    it."""
     source = spec.SPECIFICATION_MIRROR_SOURCE
-    doc = " ".join((spec.__doc__ or "").split())
-    assert "PLACEHOLDER" in source, (
-        "the placeholder comment at ProposerProcessStateTransition.state is gone; either "
-        "the enum was declared — in which case update this module — or the departure has "
-        "become silent")
-    for clause in (
-        "typed ``TerminalOutcome``, and the specification types it "
-        "``ProposerProcessState``",
-        "no probe here exercises R-3's ordering rule",
-    ):
-        assert " ".join(clause.split()) in doc, (
-            f"the mirror no longer documents the placeholder: {clause!r}")
-
-
-def test_the_placeholder_type_is_a_strict_subset_of_what_the_rule_needs():
-    """Why the placeholder cannot be used to fake coverage, demonstrated.
-
-    ``TerminalOutcome`` carries none of the five process states, so there is no way to
-    build a representative transition sequence R-3 could be evaluated against. A test
-    that tried would be asserting something about four terminal values, not about
-    ordering.
-    """
-    members = {member.name for member in ap.TerminalOutcome}
-    assert members == {"PROPOSAL", "NEED_EVIDENCE", "ABSTAIN", "ESCALATE"}
-    assert not members & set(RATIFIED_PROCESS_STATES), (
-        "TerminalOutcome now carries a process state; the placeholder analysis has "
-        "changed and this module must be re-read")
+    assert "state: TerminalOutcome" not in source, (
+        "ProposerProcessStateTransition.state is still typed TerminalOutcome "
+        "somewhere in the mirror; the discharge that replaced it with "
+        "ProposerProcessState is incomplete")
+    assert "PLACEHOLDER, documented" not in source, (
+        "the old placeholder comment survives in the mirror; the discharge that "
+        "replaced TerminalOutcome with ProposerProcessState should have removed it")
     transition = spec.representative_shapes()["ProposerProcessStateTransition"]
     annotation = transition.model_fields["state"].annotation
-    assert annotation is ap.TerminalOutcome, (
-        f"the placeholder type changed to {annotation!r} without this module being "
-        "updated")
+    assert annotation is ap.ProposerProcessState, (
+        f"ProposerProcessStateTransition.state is {annotation!r}, not the ratified "
+        "ProposerProcessState")
+
+
+def test_the_process_state_enum_is_a_proper_superset_of_the_terminal_outcomes():
+    """The completion this obligation discharges, checked structurally: every
+    ``TerminalOutcome`` member is a ``ProposerProcessState`` member of the same name
+    and the same wire value, which is what makes R-4's cross-enum comparison a plain
+    value comparison rather than an unstated one."""
+    terminal_names = {member.name for member in ap.TerminalOutcome}
+    assert terminal_names == {"PROPOSAL", "NEED_EVIDENCE", "ABSTAIN", "ESCALATE"}
+    process_state_names = {member.name for member in _ENUM}
+    assert terminal_names <= process_state_names
+    for name in terminal_names:
+        assert ap.TerminalOutcome[name].value == _ENUM[name].value
 
 
 def test_the_mirror_does_not_declare_the_enum_itself():
@@ -341,7 +342,7 @@ def _process_record_fixture(**overrides):
         "semantic_audit_refs": [],
         "terminal_outcome": ap.TerminalOutcome.ABSTAIN,
         "reason_codes": [],
-        "advisory_digest": "placeholder",
+        "advisory_digest": spec.PLACEHOLDER_DIGEST,
         "jcs_distribution_version": "0.2.0",
         "started_at": spec.FIXED_INSTANT,
         "completed_at": spec.FIXED_INSTANT,

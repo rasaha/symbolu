@@ -1367,16 +1367,18 @@ def test_exercise_is_decided_by_a_registry_and_never_by_a_mention():
 
     R-4 is mentioned in ``test_process_ordering_obligation.py``, which states in terms
     that it covers none of R-4. Under a mention-based rule that made R-4 "exercised". It
-    counts as exercised now for a different and behavioural reason — a constructed case in
-    ``UNENFORCED`` — and this test asserts that reason rather than the outcome, so
-    deleting the case would fail here rather than pass on the mention.
+    counts as exercised now for a different and behavioural reason — a constructed case
+    in ``ENFORCED`` (R-4 is now locally decidable and enforced, per
+    ``ProposerProcessRecord``'s own validator) — and this test asserts that reason
+    rather than the outcome, so deleting the case would fail here rather than pass on
+    the mention.
     """
     mentions = _rule_mentions_under_tests()
     exercised = _rules_exercised_by_some_test()
 
     assert "test_process_ordering_obligation.py" in mentions["R-4"], (
         "precondition: the obligation module mentions R-4")
-    registry = importlib.import_module("test_unenforced_local_rules").UNENFORCED
+    registry = importlib.import_module("test_unenforced_local_rules").ENFORCED
     r4_cases = [entry for entry in registry if entry[0] == "R-4"]
     assert r4_cases, (
         "R-4 is exercised only by a constructed case; if that case is gone, R-4 belongs "
@@ -1397,10 +1399,14 @@ def test_exercise_is_decided_by_a_registry_and_never_by_a_mention():
 
 
 #: The row whose headline counts the constructed violations, so the number cannot drift
-#: away from the registry it describes.
+#: away from the registry it describes. Matches either wordform: ``representative
+#: shapes`` (while ``s1_specification_mirror.py`` built temporary duplicates) or
+#: ``declared contracts`` (now that it returns the real ones), and either
+#: singular/plural noun, since the count that matters is the captured numeral, not the
+#: fossilized prose around it.
 UNENFORCED_COUNT_ROW = re.compile(
-    r"^\| \*\*([A-Za-z-]+) locally decidable violations the representative shapes "
-    r"accept\*\* \|", re.M)
+    r"^\| \*\*([A-Za-z-]+) locally decidable violations? the "
+    r"(?:representative shapes|declared contracts) accepts?\*\* \|", re.M)
 
 #: Spelled numerals the row may use. Bounded rather than open: a row needing a number
 #: outside this range is a row that should be reworded rather than extended again. The
@@ -1409,7 +1415,7 @@ UNENFORCED_COUNT_ROW = re.compile(
 #: rule — and the range is deliberately left with headroom above the current count so a
 #: single added case is a one-line diff rather than a table edit.
 _NUMERALS = {
-    "Nineteen": 19, "Twenty": 20, "Twenty-one": 21, "Twenty-two": 22,
+    "One": 1, "Nineteen": 19, "Twenty": 20, "Twenty-one": 21, "Twenty-two": 22,
     "Twenty-three": 23, "Twenty-four": 24, "Twenty-five": 25, "Twenty-six": 26,
     "Twenty-seven": 27, "Twenty-eight": 28, "Twenty-nine": 29, "Thirty": 30,
     "Thirty-one": 31, "Thirty-two": 32, "Thirty-three": 33, "Thirty-four": 34,

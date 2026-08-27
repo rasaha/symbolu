@@ -100,6 +100,44 @@ def test_source_declares_no_competing_policy_decision_point():
 
 
 def test_public_api_exports_only_the_vocabulary_and_version():
+    """I6. The S0 export pin, updated to the full H3 surface in the same change that
+    introduces the first contract (docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md,
+    Part H3)."""
     assert set(ap.__all__) == {
+        # Contracts (8)
+        "AgentIdentityRef", "CognitiveRoleContract", "WorkMandate",
+        "BoundedContextEnvelope", "ToolObservation", "AdvisoryCandidateSet",
+        "ProposerAdvisory", "ProposerProcessRecord",
+        # Nested public models (2)
+        "CandidateAdvisory", "ProposerProcessStateTransition",
+        # Enums (10)
         "TerminalOutcome", "CandidateDisposition", "SemanticAuditorFindingStatus",
-        "RESERVED_AUTHORITY_VOCABULARY", "__version__"}
+        "ReviewAction", "DomainCheckCompletion", "AgentLifecycleState",
+        "RoleActivationStatus", "ToolOperationClass", "ToolObservationAdmissionStatus",
+        "ProposerProcessState",
+        # Builders (5)
+        "build_candidate_advisory", "build_advisory_candidate_set",
+        "build_proposer_advisory", "build_advisory_revision",
+        "build_proposer_process_record",
+        # Equation functions (2)
+        "evaluate_eligibility", "evaluate_readiness",
+        # Identity functions (2)
+        "compute_advisory_identity", "verify_advisory_identity",
+        # Verifiers (3)
+        "verify_candidate_eligibility", "verify_advisory_selection",
+        "verify_observation_resolution",
+        # Exceptions (1)
+        "EligibilityMismatchError",
+        # Constants (4)
+        "RESERVED_AUTHORITY_VOCABULARY", "ADVISORY_KIND",
+        "ADVISORY_IDENTITY_SET_PATHS", "ADVISORY_IDENTITY_NFC_PATHS",
+        # Metadata (1)
+        "__version__",
+    }
+
+
+def test_no_exported_name_begins_with_proposal_or_recommendation():
+    """D7. No exported name may begin with ``Proposal`` or ``Recommendation``."""
+    offenders = [name for name in ap.__all__
+                if name.startswith(("Proposal", "Recommendation"))]
+    assert offenders == []

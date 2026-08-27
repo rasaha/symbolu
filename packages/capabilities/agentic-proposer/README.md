@@ -1,6 +1,6 @@
 # ugence-agentic-proposer
 
-Advisory proposal capability. **S0: skeleton.**
+Advisory proposal capability. **S1: contracts and equations implemented.**
 
 The Agentic Proposer proposes. It decides nothing.
 
@@ -24,7 +24,7 @@ proposal: the Agent Workforce Composer owns those.
 Owner decisions D1–D5 and the full boundary are recorded in
 [`docs/architecture/ADR_UGENCE_AGENTIC_PROPOSER_MVP_READINESS.md`](../../../docs/architecture/ADR_UGENCE_AGENTIC_PROPOSER_MVP_READINESS.md).
 
-## What S0 contains
+## What S0 contained
 
 The ratified D4 vocabulary and the boundary proofs that keep this a leaf. Nothing
 else.
@@ -48,24 +48,29 @@ normalization profile. Owner decisions OD-1 – OD-4, ratified 2026-08-25 after 
 refinements were audited against representative contract shapes, are all resolved; the
 guards enforcing them are in this package.
 
-The eight canonical contracts and Equations 1–4 are still **unimplemented**. They are no
-longer **undefined**: they were undefined when this section was first written, and
-nothing was inferred from D7 at that time; the gap was closed by an owner ratification,
-recorded literally in
+The eight canonical contracts and Equations 1–2 are now **implemented**, governed by
 [`docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md`](docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md)
 — every contract, every field, the frozen `P_unsigned` projection and every equation
 signature. That document is the authoritative S1 contract and equation specification,
 and the enforcement registries in `tests/` are exact mirrors of it: a test originates no
-contract field. Specification is not authorization: no contract module exists in `src/`,
-the version is unchanged, and production implementation remains separately gated on
-independent review. Owner decision OD-4 — whether the advisory carries its per-candidate
-entries or references them by id — is resolved by restoring the nesting ratified D7
-requires, so `ProposerAdvisory` carries a nested `candidates` sequence and retains
-`candidate_set_id` as the reference to the top-level `AdvisoryCandidateSet`.
-See also [`docs/S1_ENFORCEMENT.md`](docs/S1_ENFORCEMENT.md).
+contract field; where an implementation once had to satisfy a representative shape, the
+guards now bind to the declared contract classes in `src/` directly. Owner decision
+OD-4 — whether the advisory carries its per-candidate entries or references them by id
+— is resolved by restoring the nesting ratified D7 requires, so `ProposerAdvisory`
+carries a nested `candidates` sequence and retains `candidate_set_id` as the reference
+to the top-level `AdvisoryCandidateSet`. See also
+[`docs/S1_ENFORCEMENT.md`](docs/S1_ENFORCEMENT.md).
 
 ```python
 from ugence_agentic_proposer import (
+    AgentIdentityRef, CognitiveRoleContract, WorkMandate, BoundedContextEnvelope,
+    ToolObservation, AdvisoryCandidateSet, ProposerAdvisory, ProposerProcessRecord,
+    build_candidate_advisory, build_advisory_candidate_set, build_proposer_advisory,
+    build_advisory_revision, build_proposer_process_record,
+    evaluate_eligibility, evaluate_readiness,
+    compute_advisory_identity, verify_advisory_identity,
+    verify_candidate_eligibility, verify_advisory_selection, verify_observation_resolution,
+    EligibilityMismatchError,
     TerminalOutcome,               # PROPOSAL, NEED_EVIDENCE, ABSTAIN, ESCALATE
     CandidateDisposition,          # RECOMMEND_MATCHED_FOR_APPROVAL, RECOMMEND_WITHHOLD,
                                    # REQUEST_EVIDENCE, ESCALATE_EXCEPTION
@@ -73,15 +78,17 @@ from ugence_agentic_proposer import (
 )
 ```
 
-Every one of these is an advisory proposer classification. None is evidence
-admission, a business decision, an authorization, a clearance or execution
-permission.
+The full 38-name public surface (H3) is pinned in
+[`public_api.json`](public_api.json) and drift-tested by
+`tests/test_public_api.py`. Every one of the classification enums above is an
+advisory proposer classification. None is evidence admission, a business decision,
+an authorization, a clearance or execution permission.
 
-S0 implements **no** canonical contracts, **no** eligibility or readiness
-equations, **no** proposal identity, **no** invoice-domain checks, **no** reason
-codes, **no** read-only adapters, **no** model-assisted extraction, **no** semantic
-auditor and **no** HTTP endpoint. No public contract is frozen and no public-API
-snapshot exists.
+S1 implements the eight canonical contracts, Equations 1–2, and G1–G4 advisory
+identity through `ugence-jcs`, but still performs **no** candidate selection, **no**
+domain evaluator, **no** disposition-to-outcome mapping, **no** semantic auditor and
+**no** storage, transport or HTTP surface — all deferred to S2 (Part J of the
+specification).
 
 ## Reserved vocabulary
 
@@ -103,9 +110,11 @@ The only permitted implementation is a call into `ugence-jcs`. This package
 contains no canonicalization code of any kind — not in `src`, not in `tests`, not
 behind a feature flag, not as a fallback, not as a temporary helper — and
 `tests/test_no_local_canonicalization.py` enforces that by scanning the whole
-package. S0 implements no identity at all, so it imports nothing from `ugence-jcs`
-yet; the dependency is declared because it is the only substrate the capability may
-ever use for this.
+package, including the one module (`identity.py`) authorized to hold the digest
+literal and pattern it needs to state that rule. `identity.py` computes
+`ProposerAdvisory.advisory_digest` through a single call into `ugence-jcs` under the
+frozen, empty canonicalisation profile (`set_paths` and `nfc_paths` both empty) —
+nowhere else in the package touches identity computation.
 
 ## Dependencies
 
@@ -121,5 +130,8 @@ python -m pytest packages/capabilities/agentic-proposer/tests -q
 python packages/capabilities/agentic-proposer/verify_agentic_proposer_distribution.py
 ```
 
-Status: pre-alpha skeleton. Not pilot-validated, not production-certified. Nothing
-in this package has been exercised against a real workload.
+Status: S1 contracts and equations implemented, drift-tested against a pinned
+public-API snapshot. Not pilot-validated, not production-certified. Nothing in this
+package has been exercised against a real workload, and candidate selection, the
+domain evaluator, and the semantic auditor remain unimplemented (Part J, deferred to
+S2).

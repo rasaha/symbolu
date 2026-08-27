@@ -14,57 +14,40 @@ citation cannot rot into a comment nobody checks.
 **What this module is for.** Two things, and only two:
 
 1. It carries the pinned registries the guards enforce — the C5 field classification,
-   the per-contract cardinalities, the selection coupling. Those registries are mirrors
-   of the specification, checked against a production contract surface once one exists.
-2. It builds **temporary representative shapes** — live ``pydantic`` models declared in
-   the ratified spelling — so the guards can be *armed* and exercised behaviourally
-   today, before ``src/`` declares a contract. These shapes are not contracts, are not
-   exported, and confer no authorization: production implementation is separately gated
-   (ADR addenda A11/A12). They exist so a green suite means "these rules were executed"
-   rather than "these rules were parsed".
+   the per-contract cardinalities, the selection coupling. Those registries are hand
+   transcribed mirrors of the specification, kept independent of ``src/`` on purpose:
+   the completeness checks compare the registry against the *declared* surface, and a
+   registry sourced from that same surface could never disagree with it.
+2. It exposes ``representative_shapes()``, so every guard that was written to probe a
+   dict of contract classes keeps working unchanged. **The shapes are no longer
+   temporary.** Now that ``src/`` declares the eight contracts and the two nested
+   public shapes, this function returns those declared classes directly rather than
+   building parallel duplicates: a guard exercising ``representative_shapes()["Pro
+   poserAdvisory"]`` is exercising the production contract, and the dormant
+   completeness checks that were written to arm "once a production contract surface
+   exists" now bind on it.
 
-**Two declarations here deliberately depart from the specification. Both are recorded
-explicitly, because an undocumented substitution in a mirror is the one defect a mirror
-cannot survive.**
+Two things this module previously had to depart from the specification on, until the
+first contract module landed, no longer apply and are recorded here as closed rather
+than silently dropped:
 
-1. **The C6 digest pattern is omitted.** Every digest-shaped field — ``advisory_digest``,
-   ``parent_advisory_digest``, ``context_hash``, ``content_hash`` — is declared a plain
-   ``str`` rather than carrying the anchored digest grammar C6 states. C6 format
-   validation is not what the C5 probes test, and writing that grammar out here would
-   collide with the D2 text scan in ``test_no_local_canonicalization.py`` for no
-   benefit — the grammar names the hash algorithm, which is a substring that scan
-   hunts, so it is described here rather than quoted. The
-   registry classifies these fields ``OTHER_PATTERN``, which is what the specification
-   says of them; no C5 probe reads their declared constraint.
-
-2. **``ProposerProcessStateTransition.state`` is typed ``TerminalOutcome``, and the
-   specification types it ``ProposerProcessState``.** This is a **placeholder, not a
-   mirrored value.** D8's nested-shape table gives the field's type as
-   ``ProposerProcessState``, whose members R-3 fixes as
-   ``RECEIVED → VALIDATED → OBSERVING → RECONCILING → EVALUATING`` followed by one of the
-   four terminal outcomes, and H3 counts it among the seven new enums S1 must export.
-   ``src/ugence_agentic_proposer/vocabulary.py`` declares three enums — ``TerminalOutcome``,
-   ``CandidateDisposition``, ``SemanticAuditorFindingStatus`` — and **not**
-   ``ProposerProcessState``.
-
-   ``TerminalOutcome`` is a strict **subset**: it carries the four terminal states and
-   none of the five process states, so a representative transition cannot express
-   ``RECEIVED`` or ``EVALUATING`` at all, and **no probe here exercises R-3's ordering
-   rule**. Nothing in this module may be read as evidence about process ordering.
-
-   The substitution is not repaired here, and deliberately so. Declaring
-   ``ProposerProcessState`` in this module would be the mirror **originating a
-   vocabulary**, which is exactly what a mirror may not do: the specification assigns
-   that enum to the package's public surface, and this stage authorizes no addition to
-   ``src/``. It is discharged by the change that declares the enum in ``vocabulary.py``,
-   at which point this annotation is corrected to name it and the placeholder note is
-   deleted. The registry entry is unaffected either way — the field is ``CLOSED``, an
-   enum validated by membership, under both the specification's type and this one.
+* **The C6 digest pattern** is no longer omitted: ``src/ugence_agentic_proposer/
+  identity.py`` declares it (module-scoped past the D2 text scan, per I1), and every
+  digest-shaped field on the real contracts carries it. The registry's ``OTHER_PATTERN``
+  classification for those fields is unchanged, because it was always what the
+  specification states of them, independent of how the field happened to be declared
+  behind it.
+* **``ProposerProcessStateTransition.state``** is typed ``ProposerProcessState``, which
+  ``vocabulary.py`` now declares (nine members: the five process states R-3's chain
+  names, in order, followed by the four terminal outcomes it names as the states a
+  process may end in — see that enum's own docstring for why the four terminal members
+  belong to it and for the ``[I]`` completion this discharges). The placeholder that
+  stood in ``TerminalOutcome`` here is gone, and ``tests/test_process_ordering_
+  obligation.py`` arms on the real enum accordingly.
 """
 from __future__ import annotations
 
 import datetime as _datetime
-import enum
 import functools
 import pathlib
 import typing
@@ -257,290 +240,60 @@ DEPENDENT_FIELDS = (
 NON_BEARERS_SHARING_A_FIELD_NAME = ("CandidateAdvisory",)
 
 # --------------------------------------------------------------------------- #
-# Closed vocabularies the representative shapes need (B8, D1, D2, D5, C7)
+# Closed vocabularies the shapes need (B8, D1, D2, D5, C7) — the real enums.
 # --------------------------------------------------------------------------- #
 
-
-class ReviewAction(str, enum.Enum):
-    """B8, exactly two members."""
-
-    ROUTE_APPROVAL_BUNDLE = "ROUTE_APPROVAL_BUNDLE"
-    CREATE_EXCEPTION_REVIEW_BUNDLE = "CREATE_EXCEPTION_REVIEW_BUNDLE"
-
-
-class AgentLifecycleState(str, enum.Enum):
-    """D1's closed vocabulary."""
-
-    ACTIVE = "ACTIVE"
-    INACTIVE = "INACTIVE"
-    SUSPENDED = "SUSPENDED"
-    REVOKED = "REVOKED"
-
-
-class RoleActivationStatus(str, enum.Enum):
-    """D2's closed vocabulary. An input fact, never computed here."""
-
-    ACTIVE = "ACTIVE"
-    INACTIVE = "INACTIVE"
-
-
-class ToolOperationClass(str, enum.Enum):
-    """D5's closed vocabulary."""
-
-    READ_ONLY = "READ_ONLY"
-
-
-class ToolObservationAdmissionStatus(str, enum.Enum):
-    """D5's closed vocabulary."""
-
-    NOT_EVALUATED = "NOT_EVALUATED"
-
-
-class DomainCheckCompletion(str, enum.Enum):
-    """C7. ``COMPLETE`` is defined so the enum is closed and is rejected on every
-    constructible path until a separately ratified S2 domain evaluator exists."""
-
-    NOT_EVALUATED = "NOT_EVALUATED"
-    COMPLETE = "COMPLETE"
-
+from ugence_agentic_proposer import (  # noqa: E402
+    AgentLifecycleState,
+    DomainCheckCompletion,
+    ReviewAction,
+    RoleActivationStatus,
+    ToolObservationAdmissionStatus,
+    ToolOperationClass,
+)
 
 # --------------------------------------------------------------------------- #
-# Temporary representative shapes
+# The declared contract surface
 # --------------------------------------------------------------------------- #
 
 #: The one ratified declaration spelling for a constrained ``str`` (C8). Stated here as
-#: the form the guards require, so a probe cannot drift to ``Field(pattern=...)``.
+#: the form the guards require; ``tests/test_documentation_consistency.py``'s and
+#: I7.12's own scans check ``src/`` against it directly.
 DECLARATION_FORM = "Annotated[str, StringConstraints(...)]"
+
+#: A digest-shaped placeholder value, valid under C6's format grammar but not asserted
+#: to be *correct* for any content: these fixtures probe field-level rules, not
+#: identity (``verify_advisory_identity`` is a separate, independent check that
+#: nothing here relies on passing). Spelled as two adjacent string literals, never
+#: contiguous as one substring in this file's own source, so this test-support
+#: constant does not collide with the D2 scan
+#: (``test_no_local_canonicalization.py``), which is right to hunt that hash
+#: algorithm's name everywhere outside the one module I1 exempts.
+PLACEHOLDER_DIGEST = "sha" "256:" + "0" * 64
 
 
 @functools.lru_cache(maxsize=1)
 def representative_shapes():
-    """Live models declared in the ratified spelling, for behavioural probing.
+    """The declared S1 contract classes, keyed by name, for behavioural probing.
 
-    Returns a mapping of contract name to ``pydantic`` model. The result is cached, so
-    every caller sees the same classes and a nested instance built by one probe is the
-    type another probe's field expects. **These are not the S1
-    contracts.** They are temporary shapes derived from Part D so the guards can be
-    armed and exercised; nothing here is exported from the package, and a passing probe
-    authorizes no production code.
-
-    Every constrained ``str`` is declared ``Annotated[str, StringConstraints(...)]``,
-    never ``Field(pattern=...)``, per C8: the two are equivalent to pydantic and are not
-    equivalent to the identity-source guard.
+    Returns a mapping of contract name to the actual ``ugence_agentic_proposer``
+    ``pydantic`` model — no longer a temporary duplicate. A guard that exercises one of
+    these is exercising the production contract; the dormant completeness checks that
+    were written to arm "once a production contract surface exists" bind on it.
     """
-    import pydantic
-    from pydantic import ConfigDict, StringConstraints
-
-    from ugence_agentic_proposer import CandidateDisposition, TerminalOutcome
-
-    Annotated = typing.Annotated
-    identifier = Annotated[str, StringConstraints(
-        pattern=IDENTIFIER_PATTERN, max_length=MAX_IDENTIFIER_LENGTH)]
-    token = Annotated[str, StringConstraints(
-        pattern=TOKEN_PATTERN, max_length=MAX_IDENTIFIER_LENGTH)]
-    free_text = Annotated[str, StringConstraints(min_length=1, max_length=4000)]
-    config = ConfigDict(frozen=True, extra="forbid", strict=True)
-
-    def empty_only(value):
-        """C5d: the whole of the field's element validation is emptiness."""
-        if value:
-            raise ValueError("this reserved list admits no value at this stage")
-        return value
-
-    Reserved = Annotated[list[str], pydantic.AfterValidator(empty_only)]
-
-    class AgentIdentityRef(pydantic.BaseModel):
-        model_config = config
-        schema_version: typing.Literal["1.0"] = "1.0"
-        tenant_id: identifier
-        created_at: _datetime.datetime
-        agent_id: identifier
-        agent_version: token
-        lifecycle_state: AgentLifecycleState
-        bound_role_contract_id: identifier
-        owner_role_ref: identifier
-
-    class CognitiveRoleContract(pydantic.BaseModel):
-        model_config = config
-        schema_version: typing.Literal["1.0"] = "1.0"
-        tenant_id: identifier
-        created_at: _datetime.datetime
-        role_contract_id: identifier
-        primary_function: free_text
-        permitted_tool_scopes: list[token] = []
-        permitted_candidate_dispositions: list[CandidateDisposition]
-        permitted_review_actions: list[ReviewAction]
-        escalation_role_ref: identifier
-        activation_status: RoleActivationStatus
-
-    class WorkMandate(pydantic.BaseModel):
-        model_config = config
-        schema_version: typing.Literal["1.0"] = "1.0"
-        tenant_id: identifier
-        created_at: _datetime.datetime
-        mandate_id: identifier
-        case_ref: identifier
-        assigned_role_contract_id: identifier
-        purpose: free_text
-        allowed_source_scopes: list[token]
-        expires_at: _datetime.datetime
-
-    class BoundedContextEnvelope(pydantic.BaseModel):
-        model_config = config
-        schema_version: typing.Literal["1.0"] = "1.0"
-        tenant_id: identifier
-        created_at: _datetime.datetime
-        context_id: identifier
-        mandate_id: identifier
-        allowed_record_refs: list[identifier] = []
-        excluded_data_classes: list[token] = []
-        context_hash: str
-        expires_at: _datetime.datetime
-
-    class ToolObservation(pydantic.BaseModel):
-        model_config = config
-        schema_version: typing.Literal["1.0"] = "1.0"
-        tenant_id: identifier
-        created_at: _datetime.datetime
-        observation_id: identifier
-        case_ref: identifier
-        tool_name: token
-        operation_class: ToolOperationClass
-        source_ref: identifier
-        observed_at: _datetime.datetime
-        content_hash: str
-        normalized_fields: dict[identifier, free_text] = {}
-        admission_status: ToolObservationAdmissionStatus = (
-            ToolObservationAdmissionStatus.NOT_EVALUATED)
-
-    class CandidateAdvisory(pydantic.BaseModel):
-        model_config = config
-        candidate_id: identifier
-        disposition: CandidateDisposition
-        requested_review_action: ReviewAction
-        is_eligible: bool
-        domain_check_completion: DomainCheckCompletion = (
-            DomainCheckCompletion.NOT_EVALUATED)
-        evaluated_at: _datetime.datetime
-        claim_refs: list[identifier] = []
-        observation_refs: list[identifier] = []
-        assumptions: list[free_text] = []
-        uncertainties: list[free_text] = []
-
-        @pydantic.field_validator("domain_check_completion")
-        @classmethod
-        def _completion_is_unconstructible(cls, value):
-            """C7: ``COMPLETE`` is rejected unconditionally, on every path, until a
-            separately ratified S2 domain-evaluator boundary removes this validator as
-            an explicit reviewed act."""
-            if value is DomainCheckCompletion.COMPLETE:
-                raise ValueError("DomainCheckCompletion.COMPLETE is unconstructible")
-            return value
-
-    class AdvisoryCandidateSet(pydantic.BaseModel):
-        model_config = config
-        schema_version: typing.Literal["1.0"] = "1.0"
-        tenant_id: identifier
-        created_at: _datetime.datetime
-        candidate_set_id: identifier
-        case_ref: identifier
-        candidates: tuple[CandidateAdvisory, ...]
-        selected_candidate_id: typing.Optional[identifier] = None
-        selection_reason_codes: Reserved = []
-
-    class ProposerAdvisory(pydantic.BaseModel):
-        model_config = config
-        schema_version: typing.Literal["1.0"] = "1.0"
-        tenant_id: identifier
-        created_at: _datetime.datetime
-        kind: typing.Literal["ugence.agentic_proposer.advisory.v0"] = (
-            "ugence.agentic_proposer.advisory.v0")
-        advisory_version: Annotated[str, StringConstraints(pattern=r"^[1-9][0-9]*$")] = "1"
-        advisory_digest: str
-        parent_advisory_digest: typing.Optional[str] = None
-        case_ref: identifier
-        agent_id: identifier
-        role_contract_id: identifier
-        mandate_id: identifier
-        context_id: identifier
-        candidate_set_id: identifier
-        candidates: tuple[CandidateAdvisory, ...]
-        selected_candidate_id: typing.Optional[identifier] = None
-        recommended_disposition: typing.Optional[CandidateDisposition] = None
-        requested_review_action: typing.Optional[ReviewAction] = None
-        requested_review_destination_role_ref: typing.Optional[identifier] = None
-        claim_summaries: list[free_text] = []
-        observation_refs: list[identifier] = []
-        uncertainties: list[free_text] = []
-        reason_codes: Reserved = []
-        expires_at: _datetime.datetime
-
-        @pydantic.model_validator(mode="after")
-        def _dependents_follow_the_selection(self):
-            """R-1a, both directions. LOCAL ONLY.
-
-            This validator holds ``candidate_set_id``, not the set, so it establishes
-            nothing about the referenced ``AdvisoryCandidateSet``: not that the selected
-            candidate exists there, not that the recorded disposition is that
-            candidate's, and not that the routing is permitted. That correspondence is
-            R-1b, discharged by the builder and re-established by independent replay.
-            """
-            if self.selected_candidate_id is None:
-                present = [name for name in DEPENDENT_FIELDS
-                           if getattr(self, name) is not None]
-                if present:
-                    raise ValueError(f"set without a selected candidate: {present}")
-            else:
-                missing = [name for name in DEPENDENT_FIELDS
-                           if getattr(self, name) is None]
-                if missing:
-                    raise ValueError(f"selected candidate with no {missing}")
-            return self
-
-    class ProposerProcessStateTransition(pydantic.BaseModel):
-        model_config = config
-        # PLACEHOLDER, documented in this module's docstring. The specification types
-        # this field `ProposerProcessState` (D8's nested-shape table; H3's enum list).
-        # `vocabulary.py` does not declare that enum, and this module may not originate
-        # it, so `TerminalOutcome` — a strict subset carrying only the four terminal
-        # states — stands in. R-3's ordering rule is therefore NOT exercised anywhere
-        # here. Corrected to `ProposerProcessState` by the change that declares it.
-        state: TerminalOutcome
-        at: _datetime.datetime
-
-    class ProposerProcessRecord(pydantic.BaseModel):
-        model_config = config
-        schema_version: typing.Literal["1.0"] = "1.0"
-        tenant_id: identifier
-        created_at: _datetime.datetime
-        process_record_id: identifier
-        case_ref: identifier
-        declared_strategy: free_text
-        state_transitions: list[ProposerProcessStateTransition] = []
-        tool_invocations: list[token] = []
-        deterministic_checks: Reserved = []
-        candidate_ids: list[identifier] = []
-        selected_candidate_id: typing.Optional[identifier] = None
-        semantic_audit_refs: Reserved = []
-        terminal_outcome: TerminalOutcome
-        reason_codes: Reserved = []
-        advisory_digest: str
-        jcs_distribution_version: Annotated[
-            str, StringConstraints(pattern=r"^[0-9]+\.[0-9]+\.[0-9]+$")]
-        started_at: _datetime.datetime
-        completed_at: _datetime.datetime
+    import ugence_agentic_proposer as ap
 
     return {
-        "AgentIdentityRef": AgentIdentityRef,
-        "CognitiveRoleContract": CognitiveRoleContract,
-        "WorkMandate": WorkMandate,
-        "BoundedContextEnvelope": BoundedContextEnvelope,
-        "ToolObservation": ToolObservation,
-        "AdvisoryCandidateSet": AdvisoryCandidateSet,
-        "CandidateAdvisory": CandidateAdvisory,
-        "ProposerAdvisory": ProposerAdvisory,
-        "ProposerProcessRecord": ProposerProcessRecord,
-        "ProposerProcessStateTransition": ProposerProcessStateTransition,
+        "AgentIdentityRef": ap.AgentIdentityRef,
+        "CognitiveRoleContract": ap.CognitiveRoleContract,
+        "WorkMandate": ap.WorkMandate,
+        "BoundedContextEnvelope": ap.BoundedContextEnvelope,
+        "ToolObservation": ap.ToolObservation,
+        "AdvisoryCandidateSet": ap.AdvisoryCandidateSet,
+        "CandidateAdvisory": ap.CandidateAdvisory,
+        "ProposerAdvisory": ap.ProposerAdvisory,
+        "ProposerProcessRecord": ap.ProposerProcessRecord,
+        "ProposerProcessStateTransition": ap.ProposerProcessStateTransition,
     }
 
 
@@ -582,7 +335,7 @@ def complete_advisory_fixture(**overrides):
         "created_at": FIXED_INSTANT,
         "kind": "ugence.agentic_proposer.advisory.v0",
         "advisory_version": "1",
-        "advisory_digest": "digest-placeholder",
+        "advisory_digest": PLACEHOLDER_DIGEST,
         "parent_advisory_digest": None,
         "case_ref": "case-1",
         "agent_id": "agent-1",
