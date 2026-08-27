@@ -119,6 +119,11 @@ from .evaluation import (
     evaluate_forecast,
     unscored_record,
 )
+from .evaluation_forecasters import (
+    DAILY_PERIOD_SECONDS,
+    HarmonicPhaseForecaster,
+    SeasonalNaiveForecaster,
+)
 from .calibration import (
     CALIBRATION_RESIDUALS_SCHEMA_VERSION,
     CalibrationProvider,
@@ -172,6 +177,7 @@ __all__ = [
     "aggregate_evaluations", "evaluate_forecast", "unscored_record",
     # replay
     "ReplayError",
+    "DAILY_PERIOD_SECONDS", "HarmonicPhaseForecaster", "SeasonalNaiveForecaster",
     "CALIBRATION_RESIDUALS_SCHEMA_VERSION", "CalibrationProvider", "CalibrationResiduals",
     "validate_calibration", "DEFAULT_BANK_CAP", "PrequentialResidualBank",
     "ReplayCalibrationProvider", "ResidualEntry", "cutoff_sequence_digest",

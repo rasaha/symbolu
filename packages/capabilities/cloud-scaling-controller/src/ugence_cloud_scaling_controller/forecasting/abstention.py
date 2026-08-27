@@ -35,6 +35,12 @@ class AbstentionReason(str, Enum):
     INCONSISTENT_UNIT = "inconsistent_unit"
     INSUFFICIENT_CALIBRATION_HISTORY = "insufficient_calibration_history"
     FORECAST_OUTSIDE_DOMAIN = "forecast_outside_domain"
+    #: A periodic model's window does not span enough of its period to fit it — not enough
+    #: time. Distinct from PERIOD_NOT_RESOLVABLE so a decline stays attributable.
+    INSUFFICIENT_CYCLE_COVERAGE = "insufficient_cycle_coverage"
+    #: The period is spanned, but is not recoverable from these samples — gaps, missing phase
+    #: coverage, or a rank/conditioning failure in the fit. Not enough usable structure.
+    PERIOD_NOT_RESOLVABLE = "period_not_resolvable"
 
 
 __all__ = [

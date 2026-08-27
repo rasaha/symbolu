@@ -302,7 +302,10 @@ def _forecast_and_window(
     # --- point estimate ------------------------------------------------------------
     point = forecaster.point_estimate(window)
     if point is None:
-        return _abstain(AbstentionReason.INSUFFICIENT_HISTORY, window)
+        declined = forecaster.decline_reason(window)
+        if declined is not None and not isinstance(declined, AbstentionReason):
+            raise ForecastServiceError("decline_reason must return an AbstentionReason or None")
+        return _abstain(declined or AbstentionReason.INSUFFICIENT_HISTORY, window)
     if not math.isfinite(point):
         return _abstain(AbstentionReason.INVALID_MEASUREMENT, window)
 

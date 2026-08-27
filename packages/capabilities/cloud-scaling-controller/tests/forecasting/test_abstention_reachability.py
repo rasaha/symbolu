@@ -13,6 +13,8 @@ from ugence_cloud_scaling_controller.canonical import (
 from ugence_cloud_scaling_controller.forecasting import (
     AbstentionReason,
     AdmissionPolicy,
+    FeatureConfig,
+    HarmonicPhaseForecaster,
     CanonicalCapacitySeries,
     ForecastHorizon,
     ForecastTarget,
@@ -182,6 +184,59 @@ def test_invalid_measurement_via_nonfinite_forecaster():
     assert _reason(ev) is AbstentionReason.INVALID_MEASUREMENT
 
 
+def _periodic_states(periods=7, cadence=60.0, period=3600.0, drop=()):
+    """Deterministic multi-period CPU series for the periodic-model reachability cases."""
+    import math
+
+    states = []
+    n = int(periods * period / cadence) + 1
+    for i in range(n):
+        if i in drop:
+            continue
+        t = fx.T0 + timedelta(seconds=cadence * i)
+        phi = 2.0 * math.pi * ((t.timestamp() % period) / period)
+        states.append(fx.cpu_state(t, 50.0 + 10.0 * math.cos(phi) + 4.0 * math.sin(phi)))
+    return states
+
+
+def _periodic_evidence(states, forecaster):
+    series = CanonicalCapacitySeries.build(states)
+    return forecast_with_evidence(
+        series, ForecastTarget.CPU_UTILIZATION, states[-1].observed_at, H1, forecaster,
+        normalization_policy=NPOL,
+        feature_config=FeatureConfig(lookback_seconds=7 * 3600.0 + 600.0,
+                                     expected_cadence_seconds=60.0),
+        admission_policy=AdmissionPolicy(require_regular_cadence=False,
+                                         max_staleness_seconds=None),
+        uncertainty_config=NONE_UC,
+    )
+
+
+_SCALED_H = {
+    "period_seconds": 3600.0,
+    "min_cycle_span_seconds": 7 * 3600.0 - 60.0,
+    "phase_bins": 12,
+    "min_occupied_bins": 11,
+    "min_days_with_coverage": 6,
+    "lookback_days": 7,
+}
+
+
+def test_insufficient_cycle_coverage_is_reachable():
+    """A periodic model whose window does not span enough of its period."""
+    ev = _periodic_evidence(_periodic_states(periods=1), HarmonicPhaseForecaster(_SCALED_H))
+    assert ev.forecast.status == "abstained"
+    assert ev.forecast.abstention_reason is AbstentionReason.INSUFFICIENT_CYCLE_COVERAGE
+
+
+def test_period_not_resolvable_is_reachable():
+    """Span and phase coverage are fine; a scrape outage breaks the maximum-gap rule."""
+    states = _periodic_states(drop=tuple(range(200, 216)))
+    ev = _periodic_evidence(states, HarmonicPhaseForecaster(_SCALED_H))
+    assert ev.forecast.status == "abstained"
+    assert ev.forecast.abstention_reason is AbstentionReason.PERIOD_NOT_RESOLVABLE
+
+
 def test_every_abstention_reason_is_covered_by_this_module():
     # Guard: if a new AbstentionReason is added, force a reachability test for it.
     covered = {
@@ -193,5 +248,7 @@ def test_every_abstention_reason_is_covered_by_this_module():
         AbstentionReason.MISSING_NORMALIZATION_POLICY, AbstentionReason.INVALID_MEASUREMENT,
         AbstentionReason.INCONSISTENT_UNIT, AbstentionReason.INSUFFICIENT_CALIBRATION_HISTORY,
         AbstentionReason.FORECAST_OUTSIDE_DOMAIN,
+        AbstentionReason.INSUFFICIENT_CYCLE_COVERAGE,
+        AbstentionReason.PERIOD_NOT_RESOLVABLE,
     }
     assert covered == set(AbstentionReason), set(AbstentionReason) - covered

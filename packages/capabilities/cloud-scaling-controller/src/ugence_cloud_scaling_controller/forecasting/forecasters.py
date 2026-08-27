@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from ..canonical.serialization import content_digest
+from .abstention import AbstentionReason
 from .series import _as_utc
 from .targets import ForecastTarget
 from .window import ForecastHorizon, ForecastInputWindow
@@ -82,6 +83,15 @@ class BaselineForecaster:
         self, event_times: Sequence[datetime], values: Sequence[float], forecast_for: datetime
     ) -> Optional[float]:  # pragma: no cover - abstract
         raise NotImplementedError
+
+    def decline_reason(self, window: ForecastInputWindow) -> Optional["AbstentionReason"]:
+        """Typed reason this forecaster declined ``window``, or ``None`` for the default.
+
+        Pure and stateless: it re-derives the reason from the window rather than remembering
+        the last call, so it cannot disagree with a concurrent or repeated ``point_estimate``.
+        Returning ``None`` preserves the historical behaviour (``INSUFFICIENT_HISTORY``).
+        """
+        return None
 
     def point_estimate(self, window: ForecastInputWindow) -> Optional[float]:
         """Deterministic point estimate for ``window`` (``None`` if it cannot predict)."""
