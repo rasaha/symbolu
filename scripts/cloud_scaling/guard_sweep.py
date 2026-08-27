@@ -375,33 +375,6 @@ PACKAGES = {
                 "tests/test_guard_coverage.py::test_the_fact_partition_is_total_and_disjoint",
             ),
             # --- verification.py ---------------------------------------------------------
-            ("verification.py", "not isinstance(entry, Mapping)"): (
-                "diagnostic-only",
-                "Every non-Mapping entry reaches POLICY_BOUNDS_MALFORMED without it. Three "
-                "isolation attempts, all measured: a short string trips the absent-field "
-                "check; a string containing all four field names trips the `extra` check on "
-                "its characters; a list or tuple of exactly the four names satisfies both "
-                "and reaches `entry[\"action_type\"]` inside the deliberate `except "
-                "Exception` backstop, which re-raises as the same `_BoundsShapeError`. "
-                "Recorded in full because the guard directly above it — the sequence check — "
-                "looked identical and turned out to be authority-bearing.",
-                "tests/test_guard_coverage.py::"
-                "test_a_signed_bound_entry_that_is_not_a_mapping_is_refused",
-            ),
-            ("verification.py", "absent"): (
-                "diagnostic-only",
-                "Every input this guard refuses is refused identically without it. A bound "
-                "missing a field reaches `entry[name]` nineteen lines below, inside a "
-                "deliberate `except Exception` backstop that re-raises as the same "
-                "`_BoundsShapeError` and therefore the same POLICY_BOUNDS_MALFORMED "
-                "outcome; only the message changes, from \"bounds[0] omits "
-                "['max_permitted_delta']\" to \"bounds[0]: 'max_permitted_delta'\". Under "
-                "ADR Phase 5 §9.1 the message is not the contract. The guard is kept "
-                "because it names every absent field at once rather than the first one "
-                "`entry[...]` happens to reach.",
-                "tests/test_guard_coverage.py::"
-                "test_a_signed_bound_this_profile_cannot_read_is_refused",
-            ),
         },
     ),
 }

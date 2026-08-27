@@ -1,5 +1,44 @@
 # Changelog — ugence-cloud-scaling-policy-authenticity
 
+## [Unreleased] — two exclusions withdrawn; one was the last obstacle before a mint
+
+*No version bump and no behaviour change.* An independent adversarial audit refuted two of
+this package's seventeen exclusions. Both were recorded as **measurements** and both
+measurements were wrong, so they are withdrawn rather than reworded. Classification is now
+**102 SCORED / 15 EXCLUDED** of 117.
+
+### `verification.py:775` — not diagnostic-only; it is the last obstacle before a mint
+
+Recorded as changing only the message. Neutralised, the verifier does not produce a
+different refusal: it mints a **VERIFIED** artifact whose `capacity_bounds_fact` carries a
+delta ceiling no signature ever covered, and gate 16 then reconciles a candidate's carried
+delta against that fabricated ceiling. R-8, defeated through the one guard declared not to
+matter.
+
+The isolating input needs nothing exotic. A `Mapping` is not obliged to make `in` and `[...]`
+agree: a `collections.defaultdict` reports a missing key *absent*, so the canonical key set
+is unchanged and gate 14 still reproduces the signed body digest, while fabricating a value
+on subscript. The policy is genuinely issued and signed with a three-key bound; only the
+published projection lies — which is precisely the compromised-port threat this boundary
+re-checks for.
+
+### `verification.py:772` — a scalar entry moves the outcome
+
+Recorded as having no isolating input. All three recorded attempts were sequence-typed — a
+string, a string containing the four field names, a list of them — and every one lands on
+`POLICY_BOUNDS_MALFORMED`. A **scalar** does not: `"action_type" not in 5` raises
+`TypeError`, and that line sits *outside* the `except Exception` backstop, which wraps only
+the `VerifiedCapacityBound(...)` construction below. The outcome moves to
+`VERIFICATION_UNAVAILABLE` — an availability failure inviting a retry, in place of a
+determination about the policy.
+
+### What both failures have in common
+
+Each recorded a **universal** — "every non-Mapping entry", "no input separates it" — after
+testing a handful of cases from a single family. A failed isolation attempt is evidence
+about the inputs tried, never about the inputs not tried, and an exclusion that states
+otherwise is a claim the sweep cannot check. The two reasons are replaced by killing tests.
+
 ## [Unreleased] — 56 survivors, and why this package excludes more than Phase 5A
 
 *No version bump and no behaviour change.* The partition, the profile version and every

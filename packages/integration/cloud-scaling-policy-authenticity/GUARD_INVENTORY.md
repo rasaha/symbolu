@@ -15,9 +15,9 @@ This package records no prior inventory; this is the first one.
 
 ## Classification
 
-Every guard is classified: **100 `SCORED`** — the
+Every guard is classified: **102 `SCORED`** — the
 sweep neutralises it and the suite must fail — and
-**17 `EXCLUDED`**, each with a reason from a closed vocabulary and
+**15 `EXCLUDED`**, each with a reason from a closed vocabulary and
 a test that measures the reason. A guard is never excluded because it survived; a
 survivor with no prior declaration fails the sweep.
 
@@ -38,8 +38,6 @@ survivor with no prior declaration fails the sweep.
 | `verification.py:494` | `unreachable-behind-earlier-guard` | The mirror of the guard above. `implies_current_validity` is a read-only property of the authority's PolicyResolution, `verification.py:460` admits the resolution by exact type so no subclass can override it, and both ways to make it non-True are refused above: a non-RESOLVED status by the status gate and `historical` by the guard on the previous line. The two are a redundant pair defending one property, and neither single removal changes the typed refusal. | `tests/test_guard_coverage.py::test_the_current_validity_guard_is_unreachable_behind_the_historicity_guard` |
 | `verification.py:685` | `diagnostic-only` | Each of the three published descriptor fields is backed by a successor carrying the same POLICY_PROJECTION_ABSENT outcome: a None adapter id or policy type fails the exact-str check on the next line, and a None projection fails the Mapping check below that. `None` cannot pass either, so no isolating input exists. Kept because naming *which* fields are absent is what tells a port author what to publish. | `tests/test_guard_coverage.py::test_a_resolution_publishing_no_descriptor_projection_is_refused` |
 | `verification.py:706` | `diagnostic-only` | `adapter_id` is an input to the frame the body digest is reproduced from, so any value that trips this guard also fails the reproduction below it with the same POLICY_PROJECTION_DIGEST_MISMATCH outcome — there is no adapter id that disagrees with the record and still reframes to the signed digest. Kept because 'the projection names adapter X and the record names Y' is a diagnosis a port author can act on; 'the digest did not reproduce' is not. | `tests/test_guard_coverage.py::test_a_descriptor_naming_another_adapter_than_the_records_is_refused` |
-| `verification.py:772` | `diagnostic-only` | Every non-Mapping entry reaches POLICY_BOUNDS_MALFORMED without it. Three isolation attempts, all measured: a short string trips the absent-field check; a string containing all four field names trips the `extra` check on its characters; a list or tuple of exactly the four names satisfies both and reaches `entry["action_type"]` inside the deliberate `except Exception` backstop, which re-raises as the same `_BoundsShapeError`. Recorded in full because the guard directly above it — the sequence check — looked identical and turned out to be authority-bearing. | `tests/test_guard_coverage.py::test_a_signed_bound_entry_that_is_not_a_mapping_is_refused` |
-| `verification.py:775` | `diagnostic-only` | Every input this guard refuses is refused identically without it. A bound missing a field reaches `entry[name]` nineteen lines below, inside a deliberate `except Exception` backstop that re-raises as the same `_BoundsShapeError` and therefore the same POLICY_BOUNDS_MALFORMED outcome; only the message changes, from "bounds[0] omits ['max_permitted_delta']" to "bounds[0]: 'max_permitted_delta'". Under ADR Phase 5 §9.1 the message is not the contract. The guard is kept because it names every absent field at once rather than the first one `entry[...]` happens to reach. | `tests/test_guard_coverage.py::test_a_signed_bound_this_profile_cannot_read_is_refused` |
 
 ## Not counted, and why
 
@@ -156,8 +154,8 @@ survivor with no prior declaration fails the sweep.
 | 101 | `verification.py:728` | typed-refusal tuple | SCORED | — | `reproduced != record.policy_body_digest` |
 | 102 | `verification.py:758` | raise | SCORED | — | `not isinstance(raw, (list, tuple))` |
 | 103 | `verification.py:764` | raise | SCORED | — | `not raw` |
-| 104 | `verification.py:772` | raise | EXCLUDED | — | `not isinstance(entry, Mapping)` |
-| 105 | `verification.py:775` | raise | EXCLUDED | — | `absent` |
+| 104 | `verification.py:772` | raise | SCORED | — | `not isinstance(entry, Mapping)` |
+| 105 | `verification.py:775` | raise | SCORED | — | `absent` |
 | 106 | `verification.py:778` | raise | SCORED | — | `extra` |
 | 107 | `verification.py:824` | typed-refusal tuple | SCORED | — | `not capacity_bounds` |
 | 108 | `verification.py:836` | typed-refusal tuple | SCORED | — | `type(action_type) is not str or action_type not in CANONICAL_ACTION_TYPES` |

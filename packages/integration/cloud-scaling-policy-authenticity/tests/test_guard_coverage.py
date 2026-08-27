@@ -281,13 +281,20 @@ def test_a_descriptor_identity_that_is_not_a_pair_of_strings_is_refused():
 
 @pytest.mark.adversarial
 def test_a_signed_bound_this_profile_cannot_read_is_refused():
-    """Guard 105 — ``verification.py:775``, ``absent``.
+    """Guard 105 — ``verification.py:775``, ``absent``. **The last obstacle before a mint.**
 
-    Not reachable by rewriting the projection: gate 14 reproduces the signed body digest from
-    it, so a mutated projection is refused one gate earlier as unreproducible. What reaches
-    this guard is a bound that is **genuinely signed** and still unreadable — an authority
-    issuing a capacity-bounds policy under a schema this profile does not know, which is the
-    ordinary consequence of two distributions versioning independently.
+    A bound that is genuinely signed and still unreadable: an authority issuing capacity
+    bounds under a schema this profile does not know, which is the ordinary consequence of
+    two distributions versioning independently.
+
+    Neutralised, this guard does not produce a different refusal — the verifier mints a
+    **VERIFIED** artifact whose ``capacity_bounds_fact`` carries a delta ceiling no signature
+    ever covered, and gate 16 then reconciles a candidate against it. That is R-8 defeated
+    through a guard this branch had recorded as mattering only to the message.
+
+    The isolating input is in ``test_a_projection_entry_that_lies_about_its_own_keys...``
+    below; this test covers the plainer half, where the published projection is honest and
+    the signed bound is simply short a field.
 
     Refusing keeps "verified" meaning the routine evaluated everything it carries forward. A
     bound missing its delta ceiling is not a bound with an unlimited delta.
@@ -1173,22 +1180,27 @@ def test_a_signed_bounds_key_that_is_not_a_sequence_is_refused():
 def test_a_signed_bound_entry_that_is_not_a_mapping_is_refused():
     """Guard 104 — ``verification.py:772``, ``not isinstance(entry, Mapping)``.
 
-    Classified ``diagnostic-only``, and the isolation attempts are recorded because the
-    guard above it turned out *not* to be. Every non-Mapping entry reaches
-    ``POLICY_BOUNDS_MALFORMED`` one way or another: a short string trips the absent-field
-    check, a string containing all four field names trips the ``extra`` check on its
-    characters, and a list or tuple of exactly the four field names — which satisfies both —
-    reaches ``entry["action_type"]`` inside the deliberate ``except Exception`` backstop,
-    which re-raises as the same ``_BoundsShapeError``. No input separates it from its
-    successors.
+    A **scalar** entry, not a string or a sequence. This guard was classified
+    ``diagnostic-only`` on the recorded ground that no input separates it from its
+    successors; that claim was false, and it was false because all three isolation attempts
+    came from one family. A string trips the absent-field check, a string containing the four
+    field names trips the ``extra`` check on its characters, and a list of the four names
+    reaches ``entry["action_type"]`` inside the ``except Exception`` backstop — all
+    ``POLICY_BOUNDS_MALFORMED``.
+
+    A scalar does none of that. ``"action_type" not in 5`` raises ``TypeError``, and that
+    line sits *outside* the backstop, which wraps only the ``VerifiedCapacityBound(...)``
+    construction below. The outcome moves to ``VERIFICATION_UNAVAILABLE`` — an availability
+    failure inviting a retry, in place of a determination about the policy.
     """
 
     from ugence_cloud_scaling_policy_authenticity import PolicyAuthenticityOutcome  # noqa: PLC0415
 
-    authority, record = _issue_with_bounds(("not-a-bound",))
-    result = _verify_with(port_for(authority), record)
-    assert result.refusal is not None
-    assert result.refusal.outcome is PolicyAuthenticityOutcome.POLICY_BOUNDS_MALFORMED
+    for entry in (5, None, True):
+        authority, record = _issue_with_bounds((entry,))
+        result = _verify_with(port_for(authority), record)
+        assert result.refusal is not None, f"a bounds entry of {entry!r} was verified"
+        assert result.refusal.outcome is PolicyAuthenticityOutcome.POLICY_BOUNDS_MALFORMED
 
 
 @pytest.mark.adversarial
@@ -1276,3 +1288,67 @@ def test_a_candidate_ceiling_that_is_a_bool_is_refused(field):
     )
     assert result.refusal is not None
     assert result.refusal.outcome is PolicyAuthenticityOutcome.CANDIDATE_BOUND_EXCEEDED
+
+
+@pytest.mark.adversarial
+def test_a_projection_entry_that_lies_about_its_own_keys_cannot_mint_a_bound():
+    """Guard 105 — ``verification.py:775``, isolated. The reason it is SCORED, not excluded.
+
+    This guard was classified ``diagnostic-only`` on the recorded ground that removing it
+    only changes the message. That was wrong, and the attack that shows it needs nothing
+    exotic.
+
+    A ``Mapping`` is not obliged to make ``in`` and ``[...]`` agree. A
+    ``collections.defaultdict`` reports a missing key *absent* to ``in`` — so the canonical
+    key set is unchanged and gate 14 still reproduces the signed body digest — while
+    fabricating a value on subscript. The policy is genuinely issued and genuinely signed
+    with a three-key bound; only the published projection lies, which is exactly the
+    compromised-resolution-port threat this boundary re-checks for.
+
+    With the guard, the answer is ``POLICY_BOUNDS_MALFORMED``. Without it, the verifier mints
+    a VERIFIED artifact carrying ``max_permitted_delta=999999`` as an **attested** fact.
+    """
+
+    import collections  # noqa: PLC0415
+
+    from ugence_cloud_scaling_policy_authenticity import PolicyAuthenticityOutcome  # noqa: PLC0415
+    from _policy_fixtures import make_bounds_policy  # noqa: PLC0415
+
+    @dataclasses.dataclass(frozen=True)
+    class _BoundWithoutADeltaCeiling:
+        action_type: str
+        resource_class: str
+        max_permitted_magnitude: int
+
+    authority = bounds_authority()
+    record = authority.issue(
+        make_bounds_policy(
+            bounds=(
+                _BoundWithoutADeltaCeiling(
+                    action_type="scale_up",
+                    resource_class="deploy/checkout-api",
+                    max_permitted_magnitude=100,
+                ),
+            )
+        )
+    )
+
+    def _fabricate_on_subscript(answer):
+        projection = dict(answer.descriptor_canonical_projection)
+        entry = collections.defaultdict(lambda: 999_999, dict(projection["bounds"][0]))
+        projection["bounds"] = [entry, *projection["bounds"][1:]]
+        return projection
+
+    result = _verify_with(
+        _RewritingPort(
+            port_for(authority),
+            {"descriptor_canonical_projection": _fabricate_on_subscript},
+        ),
+        record,
+    )
+    assert result.verified_policy is None, (
+        "a bound ceiling no signature covered was minted as an attested fact: "
+        f"{getattr(result.verified_policy, 'capacity_bounds_fact', None)!r}"
+    )
+    assert result.refusal is not None
+    assert result.refusal.outcome is PolicyAuthenticityOutcome.POLICY_BOUNDS_MALFORMED
