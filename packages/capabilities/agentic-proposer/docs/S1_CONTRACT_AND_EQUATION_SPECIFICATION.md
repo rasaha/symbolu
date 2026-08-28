@@ -50,19 +50,23 @@ ratified as the specification's own text rather than left for an implementation 
 See B3, C9, D6, the `ProposerProcessStateTransition` section, Part E's header note, H1,
 H2 and H3.
 
-**OD-7 is ratified, not yet implemented.** Ratified 2026-08-27, in eight parts,
-scoping the S2 boundary that removes C7 and C9: a narrow injected domain-evaluator
-protocol this package does not implement; a new `DomainEvaluationOutcome` vocabulary
-kept separate from `DomainCheckCompletion`; an in-package deterministic selector whose
-substantive ranking criterion remains a separately ratified `[G]` gap; new
+**OD-7 is ratified, not yet implemented, and ratifies a boundary rather than a
+complete executable algorithm.** Ratified 2026-08-27, in eight parts, scoping the S2
+boundary that removes C7 and C9: a narrow injected domain-evaluator protocol this
+package does not implement; a new `DomainEvaluationOutcome` vocabulary kept separate
+from `DomainCheckCompletion`; an in-package deterministic selector; new C5b
 identity-bound fields on `CandidateAdvisory`, `AdvisoryCandidateSet` and
 `ProposerAdvisory` binding the evaluation profile, each candidate's result and the
 selector-policy identity into `P_unsigned`; two new replay functions; a fail-closed
-table; and a same-change-set requirement for removing C7 and C9. Unlike every prior
-owner decision, OD-7 **amends the frozen contract surface** rather than merely
-clarifying it, and — per its own transition controls — authorizes no change to `src/`,
-`public_api.json` or `version.py` until it is built and independently reviewed. See the
-Owner decisions section below for the full ruling.
+table; and a same-change-set requirement for removing C7 and C9. Two decisions OD-7
+does **not** resolve are tracked by name, not left as unlabelled gaps: **OD-8**, the
+selector's substantive ranking criterion, and **OD-9**, the `INCONCLUSIVE`/
+conflicting-evaluation mapping to a terminal outcome — both outstanding, both required
+before implementation. Unlike every prior owner decision, OD-7 **amends the frozen
+contract surface** rather than merely clarifying it, and — per its own transition
+controls — authorizes no change to `src/`, `public_api.json` or `version.py` until it
+is built and independently reviewed. See the Owner decisions section below for the
+full ruling.
 
 ---
 
@@ -2925,9 +2929,13 @@ D7 says; Part D is written for that shape and no longer for an alternative. **Of
 owner decisions, OD-4 is the one that bears on contract shape**; OD-5 and OD-6 were
 ruled not to, and Part D is unchanged by either.
 
-**All six owner decisions are resolved. No ruling is outstanding.** A seventh, OD-7,
-is ratified as well and is stated separately below, on its own explicitly different
-terms: it is not accompanied by implementation the way OD-1 – OD-6 are. OD-1,
+**All six owner decisions are resolved. No ruling is outstanding on any of them.** A
+seventh, OD-7, is ratified as well and is stated separately below, on its own
+explicitly different terms: it is not accompanied by implementation the way OD-1 –
+OD-6 are, and it is itself a boundary ratification, not a complete executable
+algorithm. `[G]` **Two rulings named inside OD-7 — OD-8 and OD-9 — are outstanding**,
+tracked by those names in OD-7's own entry rather than left as unlabelled gaps within
+it; "no ruling is outstanding" above is a statement about OD-1 – OD-6 only. OD-1,
 OD-2 and OD-3 are ratified 2026-08-25 and are recorded above with their riders and
 their enforcement designs; none changes a contract, a field type, a cardinality, a
 vocabulary or an equation term. **OD-5 is ratified 2026-08-26**: it changes no
@@ -2997,21 +3005,43 @@ already-identity-bound public content — the one candidate under evaluation, it
 referenced `ToolObservation`s, the `WorkMandate` and `BoundedContextEnvelope` in force,
 and the profile identity/version the caller is requesting evaluation under — so the
 evaluator receives no hidden state. `DomainEvaluationResponse` carries the outcome
-(part 3) and echoes back the profile identity/version it actually evaluated under, so
-the orchestrator can detect a provider that silently evaluated under a different
-profile than the one requested.
+(part 3) and echoes back **both** the profile identity/version it actually evaluated
+under **and** the `candidate_id` it actually evaluated, on the same reasoning in both
+cases: so the orchestrator can detect a provider that silently evaluated under a
+different profile than the one requested, or a different candidate than the one
+requested, rather than trusting the provider's own bookkeeping for either.
 
-**(3) `DomainCheckCompletion` continues to mean only that evaluation ran; it does not
-encode the result.** `COMPLETE` means every check the applicable versioned
-domain-evaluation profile requires ran and produced a determinate result; it says
-nothing about whether the candidate passed. This is unchanged from C7's own wording
-and is not overloaded by this ruling. The *result* — SATISFIED, NOT_SATISFIED or
-INCONCLUSIVE — is carried by a new, separate closed vocabulary,
+**(3) `DomainCheckCompletion` continues to gate only whether evaluation ran; it does
+not encode the result — and its substantive reading is stated here for the first
+time, not carried over from C7's own wording.** C7 itself says only that `COMPLETE`
+closes the enum and makes Equation 2 total; it does not say what "evaluation having
+run" consists of. **OD-7 supplies that reading**: `COMPLETE` means every check the
+applicable versioned domain-evaluation profile requires reached a *per-check*
+determinate reading — none left pending, none erroring, none timed out — regardless
+of whether those readings, taken together, resolve to a clean pass or fail. The
+*result* of aggregating those per-check readings — `SATISFIED`, `NOT_SATISFIED` or
+`INCONCLUSIVE` — is carried by a new, separate closed vocabulary,
 `DomainEvaluationOutcome`, on a new field, `CandidateAdvisory.domain_evaluation_
 outcome: Optional[DomainEvaluationOutcome] = None`, coupled to `domain_check_
 completion` by a new validator on the same terms R-1a already couples fields: present
 if and only if `domain_check_completion is COMPLETE`, absent if and only if it is
 `NOT_EVALUATED`.
+
+`[I]` **Why `INCONCLUSIVE` is reachable under that coupling, not excluded by it.**
+`COMPLETE`'s "determinate result" is a claim about *process* — every check ran to a
+recorded per-check conclusion — not a claim about *substance*, that those conclusions
+agree with one another. `INCONCLUSIVE` is itself one of `DomainEvaluationOutcome`'s
+three closed members: recording it is a determinate act — the aggregation logic
+reached a definite, recorded answer, *the checks do not converge*, rather than
+leaving anything unresolved — even though the answer it records is an absence of
+convergence. A profile whose checks all ran and each individually resolved, but whose
+aggregation rule cannot state a clean `SATISFIED` or `NOT_SATISFIED` across them, is
+`COMPLETE` (nothing is still pending or broken) **and** reports `INCONCLUSIVE` (the
+aggregate reading is stated ambiguity) at the same time. If `COMPLETE` instead meant
+*the aggregate is itself unambiguous*, `INCONCLUSIVE` could never be stored — which
+would be exactly the `DomainCheckCompletion` overload the Rejected Alternatives list
+below already forbids, reintroduced through the coupling rule rather than through the
+field's own type.
 
 `DomainEvaluationOutcome` deliberately does **not** reuse `INDETERMINATE`: D4 reserves
 that spelling to exactly two authority-adjacent positions (`TerminalOutcome`,
@@ -3029,18 +3059,20 @@ candidate generation and explanation remain permitted upstream of selection (unc
 from S1); an LLM may not populate `selected_candidate_id` directly, and model-assisted
 selection is out of scope of OD-7 and requires its own separate ratification.
 
-`[G]` **What this ruling does not resolve.** The *substantive* ranking criterion — what
-makes one eligible, `SATISFIED` candidate preferable to another when more than one
-qualifies — is a business decision this ruling does not make, and this amendment does
-not invent one on the owner's behalf. What OD-7 fixes is the structure around that gap:
-once the (separately ratified) ranking criterion identifies a unique candidate, that
-candidate is selected; if the criterion leaves more than one candidate tied, the
-deterministic tie-break is ascending `candidate_id` order — the same ordering
-convention D6 already fixes for `candidates` itself — and if, after tie-break, more
-than one candidate remains indistinguishable, no selection is made and the run is
-directed to `ESCALATE` (part 7) rather than choosing arbitrarily. The ranking criterion
-itself must be ratified before implementation; this amendment cannot be implemented
-against `src/` until it is.
+`[G]` **OD-8 (outstanding): the selector's substantive ranking criterion.** What makes
+one eligible, `SATISFIED` candidate preferable to another when more than one qualifies
+is a business decision this ruling does not make, and this amendment does not invent
+one on the owner's behalf; it is named **OD-8** so it is tracked as an outstanding
+decision rather than left as an unlabelled gap. What OD-7 fixes is the structure
+around OD-8's absence: once OD-8 is ratified and identifies a unique candidate, that
+candidate is selected. `[V]` The deterministic tie-break for whatever OD-8 leaves tied
+is ascending `candidate_id` order — the same ordering convention D6 already fixes for
+`candidates` itself — and `_check_candidate_sequence` already requires `candidate_id`
+to be unique within a set and the sequence to be supplied in that exact ascending
+order, so this tie-break operates over a **total order on already-distinct keys** and
+is therefore always decisive: it cannot itself leave more than one candidate
+standing, whatever OD-8 eventually says. **OD-8 must be ratified before
+implementation**; this amendment cannot be implemented against `src/` until it is.
 
 **(5) Identity and replay: this is not a zero-contract-shape transition.**
 `P_unsigned` must bind the domain-evaluation profile identity actually used, each
@@ -3054,9 +3086,19 @@ Field ownership (all `Optional`, all coupled by new validators on the terms stat
 | Contract | New field | Coupled to |
 | --- | --- | --- |
 | `CandidateAdvisory` | `domain_evaluation_outcome: Optional[DomainEvaluationOutcome]` | `domain_check_completion is COMPLETE` (part 3) |
-| `AdvisoryCandidateSet` | `domain_evaluation_profile_id: Optional[Identifier]`, `domain_evaluation_profile_version: Optional[Token]` | present iff any nested candidate's `domain_check_completion is COMPLETE`; a set-level fact, not a selection-dependent one |
-| `AdvisoryCandidateSet` | `selection_policy_id: Optional[Identifier]`, `selection_policy_version: Optional[Token]` | present iff `selected_candidate_id` is not `None`, on the R-1a pattern, scoped to this bearer alone (OD-3's lesson: scoped by bearer and name, never by name alone) |
+| `AdvisoryCandidateSet` | `domain_evaluation_profile_id: Optional[Token]`, `domain_evaluation_profile_version: Optional[Token]` | present iff any nested candidate's `domain_check_completion is COMPLETE`; a set-level fact, not a selection-dependent one |
+| `AdvisoryCandidateSet` | `selection_policy_id: Optional[Token]`, `selection_policy_version: Optional[Token]` | present iff `selected_candidate_id` is not `None`, on the R-1a pattern, scoped to this bearer alone (OD-3's lesson: scoped by bearer and name, never by name alone) |
 | `ProposerAdvisory` | the same four `AdvisoryCandidateSet` fields, mirrored | reachable inside `P_unsigned` only because they are `ProposerAdvisory`'s own fields; R-1b gains two correspondence clauses requiring the mirrored values to equal `AdvisoryCandidateSet`'s |
+
+`[I]` **C5 classification.** All four of `domain_evaluation_profile_id`,
+`domain_evaluation_profile_version`, `selection_policy_id` and
+`selection_policy_version` are **C5b**: each is a vocabulary term matched by
+equality — the profile pair against an independently supplied expected profile, the
+policy pair against this package's own ratified selector identity (both below) — not
+an opaque handle carried and compared whole, so all four take the `Token` pattern,
+not `Identifier`. Once implemented, the C5b roster (currently `agent_version`,
+`tool_name`, and each element of `allowed_source_scopes`, `excluded_data_classes`,
+`permitted_tool_scopes` and `tool_invocations`) grows by these four.
 
 `CandidateAdvisory`'s cardinality moves from the ratified 10 to 11; `AdvisoryCandidateSet`'s
 from 8 to 12; `ProposerAdvisory`'s from 23 to 27. None of these numbers is pinned by any
@@ -3071,30 +3113,99 @@ document forbidding it, which would make the eventual selection incomparable acr
 candidates. If the owner intends multiple profiles within one set, that is a further
 ruling this amendment does not make.
 
-Two new replay functions, both recomputing from stored content only, both returning
-`False` rather than raising (H1's pattern):
+Two new replay functions, both recomputing from stored content only:
 
-* `verify_domain_evaluation(*, provider, candidate_set, mandate, context, observations)
-  -> bool` — for every candidate whose `domain_check_completion is COMPLETE`, re-issues
-  the same `DomainEvaluationRequest` the builder would have issued and checks the
-  response's outcome equals the stored `domain_evaluation_outcome`, and its echoed
-  profile identity equals the stored one.
+* `verify_domain_evaluation(*, provider, candidate_set, mandate, context, observations,
+  expected_profile_id, expected_profile_version) -> bool` — **not** a self-check
+  against the candidate set's own recorded profile: `expected_profile_id` and
+  `expected_profile_version` are supplied by the caller from a source outside the
+  advisory under test (the profile currently configured or ratified for this case),
+  precisely so the function cannot be satisfied merely by a provider echoing back
+  whatever profile identity a tampered `AdvisoryCandidateSet` happens to record. For
+  every candidate whose `domain_check_completion is COMPLETE`, it (a) checks the
+  stored `domain_evaluation_profile_id`/`version` equal `expected_profile_id`/
+  `expected_profile_version`; (b) re-issues a `DomainEvaluationRequest` carrying the
+  *expected* profile and the candidate's own `candidate_id` to `provider`; and (c)
+  checks the response's echoed profile identity, its echoed `candidate_id` (part 2),
+  and its outcome equal, respectively, the expected profile, the candidate under
+  test, and the stored `domain_evaluation_outcome`. `[G]` **Disclosed ceiling**: this
+  proves the recorded profile matches what was independently expected and that
+  invoking `provider` again under that profile reproduces the stored outcome; it does
+  **not** and cannot prove the *original* evaluation was correct if `provider` is
+  non-deterministic or its behaviour has since changed under an unchanged version
+  label — the same class of ceiling C9's docstring already discloses for
+  `model_construct`, stated here for a different mechanism.
 * `verify_deterministic_selection(*, candidate_set) -> bool` — recomputes the selector
   against the candidate set's own eligible-and-`SATISFIED` members and the ratified
-  tie-break, and checks the result equals `selected_candidate_id`; this is what
-  `verify_advisory_selection`'s existing structural correspondence check does **not**
-  do today (it checks the two selectors *agree with each other*, not that either is the
-  selector's own lawful output), so `verify_advisory_selection` gains a call to this
-  function rather than being replaced by it.
+  tie-break, checks the result equals `selected_candidate_id`, **and** checks the
+  stored `selection_policy_id`/`selection_policy_version` equal this package's own
+  ratified selector identity/version constants — so a `selected_candidate_id` that
+  happens to match the recomputation but is *labelled* as coming from a different,
+  unratified policy still fails replay. This is what `verify_advisory_selection`'s
+  existing structural correspondence check does **not** do today (it checks the two
+  selectors *agree with each other*, not that either is the ratified selector's own
+  lawful output), so `verify_advisory_selection` gains a call to this function rather
+  than being replaced by it.
+
+**Malformed input, a provider exception, and missing evidence are three different
+things, and OD-7 does not let them collapse.**
+
+* **Malformed input** — a `candidate_set` or `advisory` that bypasses the
+  construction-time coupling validators above via `model_construct` or
+  `model_copy(update=...)`, the same disclosed bypass C7 and C9 already state: both
+  replay functions return `False`, never raise, on H1's unchanged terms.
+* **A provider exception raised during replay** (inside `verify_domain_evaluation`'s
+  own call to `provider.evaluate(...)`): caught internally and treated as a
+  verification failure — the function returns `False` and does **not** propagate the
+  exception — so a read-only auditor calling a verifier never needs exception
+  handling, exactly as H1 requires of every verifier.
+* **A provider exception raised during the original build** (inside
+  `build_proposer_advisory` or `build_advisory_revision`'s own call to the provider):
+  caught and re-raised as `DomainEvaluationProviderError` (H2), so a caller catches one
+  named exception family for every OD-7 construction-time failure rather than an
+  arbitrary third-party type — builders raise, verifiers report, H1's own distinction,
+  applied here.
+* **Missing evidence needed to assemble a `DomainEvaluationRequest`** (an
+  `observation_refs` entry that does not resolve): detected by the same
+  `_resolve_references` replay E2 already uses, **before** the provider is ever
+  called. It **warns**, via `warnings.warn` naming the failing reference, on the same
+  terms E2 already does — it does not raise and does not return a bare `False` from
+  either new replay function, because it is not either function's concern. The
+  builder does not call the provider at all in this case, and the run is directed to
+  `NEED_EVIDENCE` (part 7's first row): this is an orchestration decision, not a
+  return value.
 
 **(6) Required execution order**, an orchestration requirement rather than a contract
 field: candidate construction -> Equation 1 eligibility -> domain evaluation ->
 domain-result verification -> deterministic selection -> Equation 2 readiness ->
-advisory construction. Selection must not be attempted until every candidate it would
-consider has a verified, `COMPLETE` domain evaluation; Equation 2 readiness is
-evaluated only after selection. This is a builder-sequencing obligation, enforced when
-implemented by an ordering test on the S2 construction entrypoint, on the same style
-R-3 enforces process ordering today — no new contract field encodes it.
+advisory construction. `[I]` **"Candidate construction" here names an internal,
+pre-contract representation, not the frozen `CandidateAdvisory` instance.**
+`CandidateAdvisory` is frozen (C1); nothing in this package mutates a constructed
+instance, and OD-7 creates no exception to that. The actual `CandidateAdvisory`
+object — the one carrying `domain_evaluation_outcome` — is instantiated exactly once,
+with every field already known, only *after* domain evaluation and its verification
+complete for that candidate, on the same G2 discipline `ProposerAdvisory` itself
+already follows: constructed in one expression, never assembled incrementally. What
+precedes that single construction — eligibility, the request sent to `provider`, the
+response received — operates over plain, non-contract data assembled from the
+candidate's other already-known values, not over a `CandidateAdvisory` missing one
+field and later completed. Selection must not be attempted until every candidate it
+would consider has a verified, `COMPLETE` domain evaluation on its own
+already-constructed `CandidateAdvisory`; Equation 2 readiness is evaluated only after
+selection. This is a builder-sequencing obligation, enforced when implemented by an
+ordering test on the S2 construction entrypoint, on the same style R-3 enforces
+process ordering today — no new contract field encodes it.
+
+`[V]` **Equation 2 requires no amended term.** `evaluate_readiness`'s `domain_checks_
+complete` term (`candidate.domain_check_completion is DomainCheckCompletion.
+COMPLETE`) is unchanged and needs no addition, because under the order above
+`evaluate_readiness` is only ever invoked *after* selection, and only against the one
+candidate selection actually chose — which the selector (part 4) already requires to
+be `is_eligible is True` and `domain_evaluation_outcome is SATISFIED`, and
+`SATISFIED` is coupled (part 3) to `domain_check_completion is COMPLETE`.
+`domain_checks_complete` is therefore trivially `True` for the only candidate
+Equation 2 is ever asked about, and `domain_evaluation_outcome` itself never needs to
+appear in Equation 2's own term. Part F is not amended by this ruling.
 
 **(7) Fail-closed behavior.** None of the following may fall through to a silently
 chosen candidate:
@@ -3102,10 +3213,22 @@ chosen candidate:
 | Condition | Outcome |
 | --- | --- |
 | Missing evidence, or the evaluator is unavailable | no selection; `NEED_EVIDENCE` |
-| Evaluation outcome is `INCONCLUSIVE`, or evaluators disagree | no selection; `[G]` deterministic mapping to `ABSTAIN` or `ESCALATE` not yet ratified — required before implementation |
+| Evaluation outcome is `INCONCLUSIVE` | no selection; `[G]` **OD-9 (outstanding)**: the deterministic mapping to `ABSTAIN` or `ESCALATE` is not yet ratified — required before implementation |
 | No candidate is both eligible and `SATISFIED` | no selection |
-| An unresolved tie survives the ratified ranking criterion and the `candidate_id` tie-break | no selection; `ESCALATE` |
-| The provider's echoed profile, its result, or the selector-policy identity cannot be verified | refuse construction |
+| The provider's echoed profile, its echoed `candidate_id`, its result, or the selector-policy identity cannot be verified | refuse construction |
+
+`[I]` **Two rows an earlier draft of this table carried, and why they are gone.** That
+draft also listed "an unresolved tie survives the ratified ranking criterion and the
+`candidate_id` tie-break" as an `ESCALATE` trigger, and listed "evaluators disagree"
+alongside `INCONCLUSIVE`. Neither survives: part 4 already shows the `candidate_id`
+tie-break is a total order over already-unique keys and so is always decisive — a
+tie surviving it is not a live case under the ratified structure, so it is not
+restated here as a trigger, only as the reasoning in part 4. "Evaluators disagree"
+presupposes more than one evaluator; OD-7 ratifies exactly one injected `provider`
+returning one outcome per candidate, and multi-provider evaluation is not ratified by
+it (Rejected Alternatives, below) — so the row above states only the single-provider
+case, `INCONCLUSIVE`, which already covers a provider's own internal non-convergence
+across a profile's checks.
 
 `[G]` The exact disposition-to-terminal-outcome mapping beyond the row above remains
 separately ratified where it is not already fixed by R-2 and R-4.
@@ -3121,6 +3244,13 @@ with no bound evaluation result to check it against. The coupling validators in 
 fail-closed role; that handover is the reason the two removals and the new machinery
 must land together.
 
+**OD-7 ratifies a boundary, not a complete executable algorithm.** The contracts,
+vocabulary, protocol, identity bindings and fail-closed structure above are ratified;
+**OD-8** (the selector's substantive ranking criterion, part 4) and **OD-9** (the
+`INCONCLUSIVE`/conflicting-evaluation mapping to a terminal outcome, part 7) are not,
+remain outstanding, and are tracked by those names from this point on rather than as
+unlabelled gaps. Implementation cannot proceed without both.
+
 *Bears on contract shape:* **yes.** Unlike OD-1 – OD-3, OD-5 and OD-6, OD-7 adds fields
 to three contracts (part 5's table) and is the second of the seven owner decisions,
 after OD-4, to do so. Unlike OD-4, OD-7 amends a specification this document has
@@ -3132,9 +3262,11 @@ for every other decision in this section.
 `INCONCLUSIVE`.
 
 *New exception (H2 gains a fifth class):* `DomainEvaluationProviderError(ValueError)` —
-raised when a provider's echoed profile identity, its returned outcome, or the recorded
-selector-policy identity cannot be verified against what the request or the ratified
-policy actually specifies; not a field-validation failure, on the same grounds
+raised when a provider's echoed profile identity, its echoed `candidate_id`, its
+returned outcome, or the recorded selector-policy identity cannot be verified against
+what the request or the ratified policy actually specifies, or when `provider` itself
+raises during the original build (part 5's malformed-input/exception/missing-evidence
+subsection); not a field-validation failure, on the same grounds
 `EligibilityMismatchError` and `CrossContractViolationError` are not.
 
 *New call-boundary shapes (not top-level contracts, no identity role):*
@@ -3142,11 +3274,12 @@ policy actually specifies; not a field-validation failure, on the same grounds
 `DomainEvaluationResponse`.
 
 *New or changed functions (documentation only; none exists in `src/` and none is added
-to `public_api.json` by this amendment):* `verify_domain_evaluation`,
-`verify_deterministic_selection`; `build_proposer_advisory` and `build_advisory_
-revision` gain required keyword parameters for the injected `provider` and the
-selection inputs; `verify_advisory_selection` gains an internal call to `verify_
-deterministic_selection`.
+to `public_api.json` by this amendment):* `verify_domain_evaluation` (taking
+`expected_profile_id`/`expected_profile_version` as caller-supplied parameters, part
+5), `verify_deterministic_selection`; `build_proposer_advisory` and `build_advisory_
+revision` gain required keyword parameters for the injected `provider`, the expected
+profile identity, and the selection inputs; `verify_advisory_selection` gains an
+internal call to `verify_deterministic_selection`.
 
 **Rejected alternatives.**
 
@@ -3174,7 +3307,7 @@ deterministic_selection`.
   concern or within its authority.
 * *Choosing a substantive ranking criterion for the selector in this amendment* —
   rejected: it is a business decision the owner's ruling does not make, and inventing
-  one here would misrepresent an unratified choice as settled (part 4's `[G]`).
+  one here would misrepresent an unratified choice as settled (OD-8, part 4).
 
 *Public-API consequences (not yet applied).* `public_api.json` stays at its current
 39-name snapshot and `version.py` stays `0.1.0` until this amendment is implemented and
@@ -3195,11 +3328,18 @@ ratified decision from production authorization elsewhere in this document.
   alone, on OD-3's lesson.
 * **I8.3** — R-1b's two new correspondence clauses are replayed by `verify_advisory_
   selection` and fail on a mirrored field that diverges from `AdvisoryCandidateSet`'s.
-* **I8.4** — `verify_domain_evaluation` returns `False` against a provider stub proving
-  the true recomputation, when the stored outcome or profile identity is tampered.
+* **I8.4** — `verify_domain_evaluation` returns `False` when the stored
+  `domain_evaluation_profile_id`/`version` diverges from an independently supplied
+  `expected_profile_id`/`expected_profile_version`, and separately when re-invoking a
+  provider stub under the expected profile does not reproduce the stored outcome or
+  the stored `candidate_id`; the test states explicitly that this does **not**
+  establish the original evaluation's correctness under a non-deterministic or
+  since-changed provider (part 5's disclosed ceiling).
 * **I8.5** — `verify_deterministic_selection` returns `False` on a `selected_candidate_
   id` not produced by the ratified selector (including a hand-constructed one that
-  happens to satisfy R-1b's structural correspondence).
+  happens to satisfy R-1b's structural correspondence), and separately on a
+  `selection_policy_id`/`version` naming a policy other than this package's own
+  ratified selector identity even when the recomputed selection matches.
 * **I8.6** — one test per row of part 7's fail-closed table.
 * **I8.7** — a same-change-set discipline check: C7 and C9 are removed only in a commit
   that also introduces every field, vocabulary member and replay function this
@@ -3208,6 +3348,13 @@ ratified decision from production authorization elsewhere in this document.
 * **I8.8** — `DomainEvaluationOutcome`'s members are asserted disjoint from `RESERVED_
   AUTHORITY_VOCABULARY` and from `SemanticAuditorFindingStatus`'s ratified
   `INDETERMINATE` position.
+* **I8.9** — a provider stub that raises during `verify_domain_evaluation`'s own
+  replay call is confirmed to produce `False`, not a propagated exception; a provider
+  stub that raises during a builder's original call is confirmed to surface as
+  `DomainEvaluationProviderError`, not the provider's own exception type; and a
+  fixture with an unresolved `observation_refs` entry is confirmed to warn (not raise,
+  not silently return `False` from either new replay function) and to route the build
+  to `NEED_EVIDENCE` without invoking `provider` at all.
 
 *Enforcement:* `[G]` **not yet implemented.** No guard exists in
 `packages/capabilities/agentic-proposer/tests/`; C7 and C9 remain active and
@@ -3216,11 +3363,15 @@ unmodified; nothing in this entry authorizes a change to `src/`, `public_api.jso
 
 *Where it would be implemented in this document, once ratified further and built:* C7
 and C9's own sections (a migration note); D6 (`CandidateAdvisory` and
-`AdvisoryCandidateSet`'s new fields); D7 (`ProposerAdvisory`'s mirrored fields); Part F
-(a domain-evaluation and selection equation, if one is warranted, alongside Equations
-1–2); Part H (the two new replay functions, the fifth exception class, H3's snapshot);
-Part J (this item replaces the "domain evaluator" and "candidate selection" bullets'
-deferral with a boundary).
+`AdvisoryCandidateSet`'s new fields); D7 (`ProposerAdvisory`'s mirrored fields); C5
+(the classification registry, extending the C5b roster by the four fields part 5
+names); Part F (no new equation term — part 6 states why Equation 2 needs none); Part
+G — specifically `identity.py`'s private `_UnsignedAdvisoryPayload` mirror, which
+G2's equivalence obligation requires to carry the same fields, defaults, validators
+and serializers `ProposerAdvisory` does, so the four mirrored fields (part 5) must be
+added there too, or the two models drift apart; Part H (the two new replay functions,
+the fifth exception class, H3's snapshot); Part J (this item replaces the "domain
+evaluator" and "candidate selection" bullets' deferral with a boundary).
 
 **The specification is frozen.** The status line at the head of this document reads
 `CONTRACT SPECIFICATION FROZEN FOR IMPLEMENTATION`. Freezing closes the contract
