@@ -3008,9 +3008,10 @@ bear on contract shape: `CandidateAdvisory`, `AdvisoryCandidateSet` and
 unmodified; **no production or behavioural guard exercises the unimplemented OD-7
 selection surface** anywhere in `packages/capabilities/agentic-proposer/tests/` —
 `[V]` the **documentation-consistency guards** in
-`tests/test_documentation_consistency.py` pin the ratified OD-7 amendment and the
-OD-8/OD-9/OD-10 meanings, and those are **not production enforcement** and prove
-nothing about the future implementation; `public_api.json` and `version.py` are
+`tests/test_documentation_consistency.py` pin the OD-8/OD-9/OD-10 meanings and the
+OD-7 statements those rulings amended — part 5's replay rule and part 7's fail-closed
+table — and nothing else in OD-7; those guards are **not production enforcement** and
+prove nothing about the future implementation; `public_api.json` and `version.py` are
 untouched by this ratification. The three-status discipline this section states for OD-1 – OD-6 — a
 decision is ratified; a named guard implements it; S1 production implementation is a
 separate, later authorization — applies to OD-7 exactly as written: the first status

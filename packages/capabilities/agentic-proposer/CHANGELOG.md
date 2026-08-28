@@ -7,10 +7,11 @@ Ratified 2026-08-28. **Documentation only.** No `src/` module, `public_api.json`
 `0.1.0`; the substantive platform-freeze digest is unchanged. The one test file
 touched is `tests/test_documentation_consistency.py`: **no production or behavioural
 guard exercises the unimplemented OD-7 selection surface**, and the
-**documentation-consistency guards** added here pin the ratified OD-7 amendment and
-the OD-8/OD-9/OD-10 meanings against a silent revert to the pre-ruling prose. Those
-guards are **not production enforcement** and prove nothing about the future
-implementation. Implementation of the OD-7 surface remains gated on OD-7 part 8.
+**documentation-consistency guards** added here pin the OD-8/OD-9/OD-10 meanings and
+the OD-7 statements those rulings amended — part 5's replay rule and part 7's
+fail-closed table — against a silent revert to the pre-ruling prose, and nothing else
+in OD-7. Those guards are **not production enforcement** and prove nothing about the
+future implementation. Implementation of the OD-7 surface remains gated on OD-7 part 8.
 
 * **OD-8 — selection-policy v1 is fail-closed uniqueness.** The selector selects only
   when **exactly one** candidate is both `is_eligible is True` and
