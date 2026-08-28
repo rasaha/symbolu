@@ -215,7 +215,7 @@ Authority governs when a recommendation may become a binding business decision
 
 `[G]` **The Agent Constitution does not exist.** This is already recorded as a residual
 limitation of the Agentic Proposer
-(`packages/capabilities/agentic-proposer/docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md:2604-2607`)
+(`packages/capabilities/agentic-proposer/docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md:2612-2614`)
 and as an open architectural dependency in the readiness ADR
 (`docs/architecture/ADR_UGENCE_AGENTIC_PROPOSER_MVP_READINESS.md:105`). Any hypothesis
 that assigns role-level compute ceilings to an Agent Constitution assigns them to
@@ -270,7 +270,7 @@ is recorded.
    not confer authority.** `[V]` Of `CandidateAdvisory`'s fields only `is_eligible` is
    package-computed, and every other field — `candidate_id` included — "enters through
    caller-supplied builder parameters, so ranking on any of them would let the caller
-   steer selection" (`.../S1_CONTRACT_AND_EQUATION_SPECIFICATION.md:3143-3151`).
+   steer selection" (`.../S1_CONTRACT_AND_EQUATION_SPECIFICATION.md:3151-3159`).
    **RCG constraint:** no caller-supplied field may become a cost, difficulty, merit or
    escalation signal.
 
@@ -286,7 +286,7 @@ is recorded.
    not state this in these words, so it is recorded as inference from two verified
    facts: the caller-provenance rule in (1), and `[V]` the explicit refusal to rank on
    `uncertainties` because doing so "would additionally punish honest disclosure"
-   (`:3149-3151`). **RCG constraint:** a model's expressed confidence, difficulty or
+   (`:3157-3159`). **RCG constraint:** a model's expressed confidence, difficulty or
    desire for more computation is at most an input to a deterministic control that
    evaluates it against an authoritative policy. It never authorizes anything.
 
@@ -294,22 +294,22 @@ is recorded.
    `[V]` A criterion needing "a scoring service, a per-tenant policy table, a model
    call, wall-clock time, or any datum not carried by `AdvisoryCandidateSet` — would be
    unreplayable by the very function OD-7 ratifies to replay it, and is therefore
-   excluded" (`:3160-3170`); and identity "binds referenced identifiers, not referenced
-   contents" (`:2525-2560`). **RCG constraint:** hidden external state — a routing
+   excluded" (`:3172-3178`); and identity "binds referenced identifiers, not referenced
+   contents" (`:2533-2534`). **RCG constraint:** hidden external state — a routing
    table, a live price list, a provider's internal fallback — is not replayable by
    inclusion in a record that merely names it.
 
 5. **Numeric budget representation requires deliberate canonicalisation decisions.**
    `[V]` As in §5: `BareNumberError` on `int`/`float`, `UnsupportedTypeError` on
-   `Decimal` (`canon.py:86-93`), and the ratified consequence that "any numeric rank
-   must be a canonical decimal *string*" (`:3155-3159`). **RCG constraint:** casual use
+   `Decimal` (`canon.py:113`), and the ratified consequence that "any numeric rank
+   must be a canonical decimal *string*" (`:3164-3167`). **RCG constraint:** casual use
    of floating-point budget values in any identity-bearing artifact is excluded by the
    substrate, not by preference.
 
 6. **Candidate-set membership and upstream omission remain disclosed ceilings.** `[V]`
    Part K records that identity does not bind the bodies behind referenced identifiers,
    and that replay "establishes correspondence to the *referenced artifact*; it does not
-   make the advisory digest bind the observation *content*" (`:2525-2585`). **RCG
+   make the advisory digest bind the observation *content*" (`:2565-2568`). **RCG
    constraint:** compute governance must not be presented as proving that all possible
    candidates or all relevant evidence were supplied. Reducing candidate count for cost
    makes this ceiling *more* consequential, not less.
@@ -317,14 +317,14 @@ is recorded.
 7. **Authority for one responsibility does not transfer to another.** `[V]` The
    `DomainEvaluationProvider` "is authoritative **only** for the domain-evaluation
    responsibility OD-7 ratifies; it does **not** acquire business-preference authority"
-   (`:3160-3162`). **RCG constraint:** domain-evaluation authority confers no budget,
+   (`:3168-3170`). **RCG constraint:** domain-evaluation authority confers no budget,
    routing, model-tier or business-preference authority, and neither does any other
    single-responsibility provider.
 
 8. **Caller-supplied fields must not be repurposed as trusted signals.** `[V]` The
    ratified statement is explicit: "Timestamps, identifiers, dispositions, review
    actions, reference counts, assumption counts and uncertainty counts **must not** be
-   repurposed as merit proxies" (`:3143-3148`). `[I]` The extension from *merit* to
+   repurposed as merit proxies" (`:3151-3153`). `[I]` The extension from *merit* to
    *cost, difficulty and escalation* is inference, on identical provenance grounds, and
    is recorded as such rather than as a ratified rule.
 
@@ -484,9 +484,10 @@ overwrites the pre-call estimate, and it is NOT an invoice"
 (`.../token_accounting.py:16-21`), and the Agent Runtime marks a conservatively charged
 reservation as *not* an actual measurement (`.../budgets.py:129-133`).
 
-An agent or model **may request** additional compute and **must not authorize** it.
-Actual usage must come from runtime or provider measurement, never from model
-self-report. `[R]` A future audit record should be able to compare authorized against
+`[I]` An agent or model **may request** additional compute and **must not authorize**
+it; actual usage must come from runtime or provider measurement, never from model
+self-report. This restates §6 finding 3, which is inference-grade and awaits its own
+ratification — it is not a ratified rule of this repository. `[R]` A future audit record should be able to compare authorized against
 consumed compute; **its contract shape and identity placement are not decided here.**
 
 ### 10.1 — Budget-exhaustion behaviour: options, not a choice
@@ -506,7 +507,7 @@ in-contract destination on a no-selection run: R-1a leaves
 (`packages/capabilities/agentic-proposer/src/ugence_agentic_proposer/contracts.py:602-618`),
 and while `CognitiveRoleContract.escalation_role_ref` exists (`contracts.py:294`), `[G]`
 no ratified rule connects it to a terminal `ESCALATE`
-(`.../S1_CONTRACT_AND_EQUATION_SPECIFICATION.md:3405-3415`). `[I]` An RCG exhaustion
+(`.../S1_CONTRACT_AND_EQUATION_SPECIFICATION.md:3413-3422`). `[I]` An RCG exhaustion
 outcome of `ESCALATE` would therefore need the same severity-and-destination authority
 that OD-9 found missing.
 
@@ -530,7 +531,8 @@ Recorded as questions. `[R]` unless a ratified artifact already answers them.
 7. May provider-reported token counts be trusted directly, or must the runtime
    reconcile them? `[R]` — `[V]` the existing record already keeps a
    `usage_availability` state and the identity of the adapter that parsed the provider's
-   numbers (`.../token_accounting.py:284-304`), which is the shape reconciliation would
+   numbers (`.../token_accounting.py:432-466` and `:284-304` respectively), which is
+   the shape reconciliation would
    need but is not itself reconciliation.
 8. How are model and routing-policy versions identified without embedding unstable
    vendor names? `[R]`
