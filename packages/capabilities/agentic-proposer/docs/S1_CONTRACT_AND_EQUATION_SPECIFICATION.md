@@ -1849,8 +1849,8 @@ pass-through merely because it carries a default, and twelve of the twenty-three
 | --- | --- |
 | **Inherited from the parent unchanged** — the ratified continuity fields | `tenant_id`, `case_ref`, `agent_id`, `role_contract_id`, `mandate_id`, `context_id` |
 | **Computed by the builder** | `advisory_version` (incremented, B7), `parent_advisory_digest` (`= parent.advisory_digest`), `advisory_digest` (Equation 3), `kind` and `schema_version` (literals) |
-| **Derived from the supplied `AdvisoryCandidateSet` under R-1b** | `candidate_set_id`, `candidates`, `selected_candidate_id`, `recommended_disposition`, `requested_review_action`, `requested_review_destination_role_ref` |
-| **Required of the caller, explicitly** | `claim_summaries`, `observation_refs`, `uncertainties`, `created_at`, `expires_at`; and `reason_codes` is C5d-empty and takes no caller value |
+| **Derived from the supplied `AdvisoryCandidateSet` under R-1b** | `candidate_set_id`, `candidates`, `selected_candidate_id`, `recommended_disposition`, `requested_review_action`; and, since OD-7 part 5, the mirrored `domain_evaluation_profile_id`, `domain_evaluation_profile_version`, `selection_policy_id` and `selection_policy_version` |
+| **Required of the caller, explicitly** | `claim_summaries`, `observation_refs`, `uncertainties`, `created_at`, `expires_at`, `requested_review_destination_role_ref` (see H1: no contract states a source for it, so it is a caller-supplied selection input, checked for joint presence with the selection rather than derived), the injected `provider` and the expected profile identity; and `reason_codes` is C5d-empty and takes no caller value |
 
 **`claim_summaries`, `observation_refs` and `uncertainties` are required keyword
 parameters and are not inherited from the parent.** This is the correction the
@@ -1934,6 +1934,9 @@ def build_candidate_advisory(
     assumptions: list[str],
     uncertainties: list[str],
     evaluated_at: datetime,
+    provider: DomainEvaluationProvider,
+    profile_id: str,
+    profile_version: str,
 ) -> CandidateAdvisory: ...
 
 
@@ -1945,6 +1948,8 @@ def build_advisory_candidate_set(
     created_at: datetime,
     candidates: tuple[CandidateAdvisory, ...],
     selected_candidate_id: str | None,
+    domain_evaluation_profile_id: str | None,
+    domain_evaluation_profile_version: str | None,
 ) -> AdvisoryCandidateSet: ...
 
 
@@ -1964,6 +1969,10 @@ def build_proposer_advisory(
     observation_refs: list[str],
     uncertainties: list[str],
     expires_at: datetime,
+    provider: DomainEvaluationProvider,
+    expected_profile_id: str,
+    expected_profile_version: str,
+    requested_review_destination_role_ref: str | None,
 ) -> ProposerAdvisory: ...
 
 
@@ -1981,6 +1990,10 @@ def build_advisory_revision(
     uncertainties: list[str],
     created_at: datetime,
     expires_at: datetime,
+    provider: DomainEvaluationProvider,
+    expected_profile_id: str,
+    expected_profile_version: str,
+    requested_review_destination_role_ref: str | None,
 ) -> ProposerAdvisory: ...
 
 
@@ -2035,6 +2048,34 @@ def verify_observation_resolution(
 ) -> bool: ...
 ```
 
+`[I]` **Why `build_candidate_advisory` and `build_advisory_candidate_set` gain
+parameters, when OD-7's own "new or changed functions" list names only the two advisory
+builders.** `[V]` That list is accurate about what it names and is **not** exhaustive
+about the rest of H1: it is a summary of the ruling's novel surface, not a closed
+enumeration of every signature the ruling touches. Each of the four additions here is
+**entailed** by a ratified field plus a ratified prohibition, not chosen:
+
+* `provider`, `profile_id` and `profile_version` on `build_candidate_advisory`. Part 5
+  makes `domain_evaluation_outcome` a `CandidateAdvisory` field; part 6 requires the
+  instance to be constructed **exactly once**, after evaluation, with every field
+  already known; and part 2 bars this package from importing, discovering, loading or
+  embedding any evaluator. The only remaining way for the builder that constructs a
+  `CandidateAdvisory` to obtain the outcome is to be handed the provider and the
+  profile it is evaluating under.
+* `domain_evaluation_profile_id` and `domain_evaluation_profile_version` on
+  `build_advisory_candidate_set`. Part 5 makes the pair a **set-level** field, present
+  if and only if some nested candidate is `COMPLETE`. This is the only builder for
+  `AdvisoryCandidateSet`, so a pair it could not accept would be a required field with
+  no lawful producer.
+
+`[V]` The selector-policy pair is deliberately **not** a parameter of that builder: it
+names this package's own ratified selector, so accepting it from a caller would let a
+caller label a selection with a policy that did not make it. The builder stamps it from
+this package's own constants when a selection is present. `[R]` What is **not**
+ratified, and is not claimed here, is the parameters' spelling — their names, and the
+choice of two scalars over one pair object — which is an implementation shape inside
+the entailment rather than part of it.
+
 `verify_advisory_selection` is the independent replay of R-1b **and R-7**. It is a
 **separate function from `verify_advisory_identity`** because the two answer different
 questions: identity asks whether the stored bytes are the ones that were signed,
@@ -2056,8 +2097,20 @@ than to R-1b. It returns `False` and reports the failing references; it does not
 
 Notes that are part of the ratified behaviour:
 
-* `build_candidate_advisory` takes no `is_eligible` and no `domain_check_completion`.
-  It computes the first and leaves the second at its `NOT_EVALUATED` default.
+* `build_candidate_advisory` takes no `is_eligible`, no `domain_check_completion` and
+  no `domain_evaluation_outcome`. It computes the first from Equation 1 and **derives
+  the other two from the injected provider's verified answer** (OD-7 parts 2, 3 and 6):
+  it resolves the candidate's `observation_refs`, issues one
+  `DomainEvaluationRequest` under the supplied profile, checks the response's echoed
+  profile and `candidate_id`, and constructs the candidate once with
+  `domain_check_completion=COMPLETE` and the returned outcome. `[V]` **The pre-OD-7
+  statement that it "leaves `domain_check_completion` at its `NOT_EVALUATED` default"
+  no longer describes the ordinary path.** That default survives in exactly one case,
+  and it is the one part 7's first row names: an `observation_refs` entry that does not
+  resolve. There the provider is **not called at all**, `_resolve_references` warns
+  naming the failing reference, and the candidate is constructed `NOT_EVALUATED` with no
+  outcome — which keeps it out of every qualifying pool. Directing that run to
+  `NEED_EVIDENCE` is the caller's orchestration decision, not a return value.
 * `build_proposer_advisory` and `build_advisory_revision` **derive** the nested
   `candidates` sequence from the supplied `AdvisoryCandidateSet` under R-1b rather than
   accepting it, **on the same terms as the four selection fields**. Neither builder takes
@@ -2068,9 +2121,22 @@ Notes that are part of the ratified behaviour:
   accepted, and out-of-order input to `build_advisory_candidate_set` is rejected there
   rather than reordered here.
 * `build_proposer_advisory` **derives** `selected_candidate_id`,
-  `recommended_disposition`, `requested_review_action` and
-  `requested_review_destination_role_ref` from the candidate set under R-1b rather than
-  accepting them, so the two cannot disagree. It resolves the set, checks
+  `recommended_disposition` and `requested_review_action` from the candidate set under
+  R-1b rather than accepting them, so the two cannot disagree.
+  `requested_review_destination_role_ref` is **not** among the derived three, and the
+  pre-OD-7 wording that listed it there is corrected here: `[I]` under C9 all four were
+  `None` on every constructible path, so nothing distinguished a field derived from the
+  set from one that merely had no other value; with a selection reachable, the
+  distinction bites. `[V]` No contract in this specification states a source for it —
+  C9's own rejected-alternative note says so in terms, which is one of the two grounds
+  on which deriving faithfully was rejected there — and OD-7's amended builder
+  paragraph names "the selection inputs" among the required keyword parameters both
+  advisory builders gain. It is therefore **caller-supplied**, and the builder checks
+  only what R-1a and R-1b(viii) let it check: that it is present exactly when a
+  selection is, and absent exactly when one is not. Inventing it from
+  `CognitiveRoleContract.escalation_role_ref` or `AgentIdentityRef.owner_role_ref` was
+  rejected: both mean something else, and either would be this package choosing a
+  referral destination the owner has not ratified. It resolves the set, checks
   correspondence, and rejects a mismatch. When the selector is non-null it must resolve
   to exactly one nested candidate and exactly one candidate in the referenced set, and
   the two dependent values must equal that **nested** candidate's `disposition` and
@@ -2084,9 +2150,7 @@ Notes that are part of the ratified behaviour:
   `DomainEvaluationProviderError` if either fails (part 7, row 2); they mirror the four
   evaluation/policy fields from the set; and where a selection is derived they recompute
   Equation 2 for the resolved candidate, which is the recomputation B3 assigns to
-  `build_proposer_advisory`. `requested_review_destination_role_ref` is a
-  caller-supplied selection input, because no contract in this specification states a
-  source for it; the builder checks only that it is present exactly when a selection is.
+  `build_proposer_advisory`.
   It calls `verify_candidate_eligibility` and raises `EligibilityMismatchError` before
   constructing if any candidate's stored `is_eligible` differs from the recomputation.
   R-1a is additionally enforced by the model validator on every construction path,

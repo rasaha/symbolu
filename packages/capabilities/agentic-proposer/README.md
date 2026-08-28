@@ -141,7 +141,11 @@ python packages/capabilities/agentic-proposer/verify_agentic_proposer_distributi
 ```
 
 Status: S1 contracts and equations implemented, drift-tested against a pinned
-public-API snapshot. Not pilot-validated, not production-certified. Nothing in this
-package has been exercised against a real workload, and candidate selection, the
-domain evaluator, and the semantic auditor remain unimplemented (Part J, deferred to
-S2).
+public-API snapshot; at `0.2.0`, candidate selection under selection-policy v1 and the
+**injected** `DomainEvaluationProvider` boundary shipped with it (OD-7 through OD-10).
+Not pilot-validated, not production-certified. Nothing in this package has been
+exercised against a real workload. What remains absent: **concrete domain evaluators**
+(the provider is supplied by the caller and this package embeds none), **substantive
+multi-candidate ranking** (deferred to a future ruling; more than one qualifying
+candidate produces no selection and `ABSTAIN`), and the **semantic auditor** (Part J,
+deferred).
