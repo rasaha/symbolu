@@ -115,7 +115,7 @@ def test_there_is_exactly_one_owner_decision_record():
     for path in DOCUMENTS:
         if path == ADR:
             continue
-        for heading in re.findall(r"^#{1,6}\s+(.*OD-[1-6].*)$", _text(path), re.M):
+        for heading in re.findall(r"^#{1,6}\s+(.*OD-[1-6]\b.*)$", _text(path), re.M):
             if any(w in heading.lower() for w in _RATIFICATION_HEADING_WORDS):
                 competing.append(f"{path.name}: {heading}")
     assert not competing, (
@@ -1449,3 +1449,197 @@ def test_the_unenforced_row_counts_what_the_registry_actually_carries():
         f"the row says {spelled} ({_NUMERALS[spelled]}) locally decidable violations; "
         f"the registry carries {len(registry)}")
 
+
+
+# --------------------------------------------------------------------------- #
+# OD-8 / OD-9 / OD-10 — the ratified selection and no-selection meanings (2026-08-28)
+# --------------------------------------------------------------------------- #
+#
+# These guard the four meanings the owner's ruling fixed, each of which a later edit
+# could plausibly undo by reverting to the pre-ruling phrasing. They are document
+# checks, not runtime assertions: no selector exists yet, so what can drift is the
+# prose that the eventual implementation will be written from.
+#
+# Scope, stated exactly: each asserts the presence of a ratified statement, or the
+# absence of the specific withdrawn one it replaces. None of them proves the documents
+# say nothing else contradictory — that is the same ceiling the strategy-authority
+# scan discloses above, and it is not narrowed here.
+
+
+def test_od8_ratifies_fail_closed_uniqueness_not_an_outstanding_ranking_criterion():
+    """OD-8 is decided. The pre-ruling text called it outstanding; a revert to that
+    wording, or to any 'ranking criterion is not ratified' phrasing, fails here."""
+    spec = _text(SPECIFICATION)
+    assert "OD-8 — RATIFIED: selection-policy v1 is fail-closed uniqueness" in spec
+    assert "exactly one** candidate is both" in spec
+    assert "OD-8 (outstanding)" not in spec, (
+        "OD-8 is ratified 2026-08-28; the outstanding-marker wording is withdrawn")
+    assert "OD-8 must be ratified before" not in spec
+
+
+def test_od8_bars_repurposing_existing_fields_as_merit_proxies():
+    """The non-repurposing bar is the substance of OD-8's second half. Losing it would
+    let an implementer rank on caller-supplied fields, which is exactly what the
+    ruling forbids."""
+    spec = _text(SPECIFICATION)
+    assert "must not** be repurposed as merit proxies" in spec
+    for field in ("uncertainties", "evaluated_at", "candidate_id"):
+        assert field in spec
+
+
+#: The three live assertions of tie-break decisiveness that stood before OD-8, one per
+#: site. The phrase "always decisive" itself still occurs — quoted in the correction and
+#: negated in the ADR — so the bare phrase cannot be the check: withdrawing a claim means
+#: naming it. These are the predicate forms that assert it rather than retire it.
+_WITHDRAWN_TIE_BREAK_PREDICATES = (
+    "is therefore always decisive",
+    "and so is always decisive",
+    "always decisive on its own",
+)
+
+#: The fourth site, and the one a review found still live after the first three were
+#: corrected: part 5's description of ``verify_deterministic_selection`` told an
+#: implementer the verifier "recomputes the selector ... and the ratified tie-break".
+#: That is an instruction, not a decisiveness claim, so none of the predicates above
+#: reached it — and it would have produced a `candidate_id` fallback contradicting row 4
+#: of the fail-closed table. Checked on whitespace-collapsed text because the
+#: specification wrapped the phrase across two lines. Two anchors from the stale
+#: sentence, both absent from the CHANGELOG's quotation of the withdrawn phrase: as with
+#: "always decisive" above, naming a withdrawn instruction must not trip the check that
+#: withdrew it.
+_WITHDRAWN_REPLAY_TIE_BREAK = (
+    "members and the ratified tie-break",
+    "and the ratified tie-break, checks",
+)
+
+
+def test_the_candidate_id_tie_break_is_not_asserted_as_always_decisive():
+    """OD-8's tie-break correction. Under fail-closed uniqueness the tie-break is
+    unexercised, so no document may assert it resolves a substantive preference, and
+    none may instruct the replay function to recompute it.
+
+    Scope: this catches a revert to any of the four phrasings that carried the claim,
+    not every sentence that could express it.
+    """
+    for path in (SPECIFICATION, ADR, CHANGELOG):
+        body = _text(path)
+        for predicate in _WITHDRAWN_TIE_BREAK_PREDICATES:
+            assert predicate not in body, (
+                f"{path.name}: {predicate!r} asserts the tie-break decisiveness OD-8 "
+                f"withdrew")
+        flat_body = _normalised(path)
+        for instruction in _WITHDRAWN_REPLAY_TIE_BREAK:
+            assert instruction not in flat_body, (
+                f"{path.name}: {instruction!r} instructs the replay function to "
+                f"recompute a tie-break selection-policy v1 does not apply")
+    spec = _text(SPECIFICATION)
+    assert "deliberately\nunexercised" in spec or "deliberately unexercised" in spec
+    assert "Tie-break correction to OD-7" in spec
+    # The positive rule that replaced it. A deletion of the stale phrase alone would
+    # leave the replay function's selection semantics unstated, which is the same gap
+    # by another route.
+    flat = _normalised(SPECIFICATION)
+    assert "Selection-policy v1 does not apply the `candidate_id` tie-break" in flat, (
+        "part 5 must state that selection-policy v1 applies no `candidate_id` "
+        "tie-break")
+    assert "`selected_candidate_id` must be `None`" in flat, (
+        "part 5 must state that a zero- or multi-qualifier pool replays to a null "
+        "selector")
+
+
+def test_od9_maps_inconclusive_to_abstain_per_candidate_not_run_wide():
+    """OD-9 and its mixed-set scope — the ambiguity the ruling resolved. The run-wide
+    reading is the one an implementer is most likely to restore by accident."""
+    spec = _text(SPECIFICATION)
+    assert "OD-9 — `INCONCLUSIVE` maps to `ABSTAIN`" in spec
+    assert "does **not** poison the candidate set" in spec
+    assert "OD-9 (outstanding)" not in spec, (
+        "OD-9 is ratified 2026-08-28; the outstanding-marker wording is withdrawn")
+
+
+def test_od10_covers_the_residual_completed_no_selection_run():
+    """OD-10 exists so a completed run cannot fall through the fail-closed table with
+    no ratified outcome. Both the ruling and its exclusion of the OD-7 rows matter."""
+    spec = _text(SPECIFICATION)
+    assert "OD-10 — the residual completed no-selection outcome" in spec
+    assert "does **not** cover missing evidence" in spec
+
+
+def test_the_fail_closed_table_carries_six_ordered_non_overlapping_rows():
+    """The table is the operative statement of S2 MVP outcome order. A row silently
+    dropped, or the ordering guarantee removed, is the drift this catches."""
+    spec = _text(SPECIFICATION)
+    assert "The rows are evaluated in the order given and do not overlap" in spec
+    for row in ("| 1 |", "| 2 |", "| 3 |", "| 4 |", "| 5 |", "| 6 |"):
+        assert row in spec, f"fail-closed table is missing row {row}"
+    assert "**OD-8**" in spec and "**OD-9**" in spec and "**OD-10**" in spec
+
+
+#: Live assertions that OD-8 or OD-9 is still unratified, in every phrasing the
+#: documents have actually used. The list is by phrasing rather than by concept because
+#: that is what a guard over prose can honestly check — see the module docstring's
+#: statement of what the document scans do and do not cover.
+#:
+#: The CHANGELOG is in scope. An earlier version of this guard checked only the
+#: specification and the ADR, and only the single phrasing "remain outstanding"; a
+#: superseded CHANGELOG entry asserting "OD-8 and OD-9 are outstanding" therefore
+#: survived the OD-8/OD-9/OD-10 ratification uncaught. Both holes are closed here.
+_WITHDRAWN_OUTSTANDING_CLAIMS = (
+    "OD-8 and OD-9 remain outstanding",
+    "OD-8 and OD-9 are outstanding",
+    "**OD-8** and is outstanding",
+    "**OD-9** and is outstanding",
+    "OD-8 (outstanding)",
+    "OD-9 (outstanding)",
+)
+
+
+def test_no_owner_decision_is_recorded_as_outstanding():
+    """After 2026-08-28 the outstanding set is empty; what remains is a *deferral*
+    (substantive multi-candidate ranking), which is a different status and must not be
+    relabelled as an outstanding ruling.
+
+    Superseded CHANGELOG entries are in scope: an entry may record what was true when
+    it was written, but not assert in the present tense that a ratified decision is
+    still open, because the file is read top to bottom as one pending release.
+    """
+    for path in (SPECIFICATION, ADR, CHANGELOG):
+        body = _text(path)
+        for claim in _WITHDRAWN_OUTSTANDING_CLAIMS:
+            assert claim not in body, (
+                f"{path.name}: {claim!r} asserts an outstanding status that the "
+                f"2026-08-28 ruling closed")
+    assert "substantive multi-candidate ranking" in _text(SPECIFICATION).lower() or (
+        "Substantive multi-candidate ranking" in _text(SPECIFICATION))
+
+
+#: The unqualified guard-status claim. It was true of OD-7 while nothing in this
+#: package's tests mentioned the amendment; it stopped being true the moment the
+#: documentation-consistency guards above were added, and a review found all four sites
+#: still carrying it. What the documents may say is which *surface* has no guard.
+_UNQUALIFIED_NO_GUARD = re.compile(r"no guard exists", re.I)
+
+#: The distinction that replaced it, in the one wording all three documents use.
+_BEHAVIOURAL_GUARD_CLAIM = ("no production or behavioural guard exercises the "
+                            "unimplemented")
+_DOCUMENTATION_GUARD_DISCLAIMER = "not production enforcement"
+
+
+@pytest.mark.parametrize("path", (SPECIFICATION, ADR, CHANGELOG), ids=lambda p: p.name)
+def test_guard_status_distinguishes_behavioural_from_documentation_guards(path):
+    """The three-status discipline turns on what a guard is, and this package now holds
+    two kinds. A bare "no guard exists" collapses them and is false while the
+    documentation-consistency guards stand; a bare "guards exist" would overclaim the
+    other way, which is why the disclaimer is required alongside the claim.
+    """
+    flat = _normalised(path)
+    assert not _UNQUALIFIED_NO_GUARD.search(flat), (
+        f"{path.name}: an unqualified 'no guard exists' is false while the "
+        f"documentation-consistency guards in this module stand; name the surface "
+        f"that has none")
+    assert _BEHAVIOURAL_GUARD_CLAIM in flat.lower(), (
+        f"{path.name}: must state that no production or behavioural guard exercises "
+        f"the unimplemented OD-7 selection surface")
+    assert _DOCUMENTATION_GUARD_DISCLAIMER in flat.lower(), (
+        f"{path.name}: must state that the documentation-consistency guards are not "
+        f"production enforcement")
