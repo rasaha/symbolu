@@ -2514,6 +2514,14 @@ Each item below is deliberately absent and is not a gap.
   unusable in any outcome or disposition field (D6).
 * **Storage, transport, service and authorisation surfaces.** None is specified,
   authorised or implied.
+* **Compute, cost and model-capability governance.** No contract in Part D carries a
+  compute budget, a token or call ceiling, a model capability class or a cost value, and
+  none is implied by any field here. An exploratory, non-ratified scoping of that
+  cross-cutting concern is recorded in
+  [`ROADMAP_UGENCE_REASONING_COMPUTE_GOVERNANCE.md`](../../../../docs/architecture/ROADMAP_UGENCE_REASONING_COMPUTE_GOVERNANCE.md).
+  That document ratifies nothing, adds nothing to this specification, and authorises no
+  implementation; C3 would in any case bar a bare numeric budget from every contract in
+  this family.
 
 ---
 

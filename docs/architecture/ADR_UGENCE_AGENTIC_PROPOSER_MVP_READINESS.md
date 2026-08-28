@@ -1144,3 +1144,15 @@ which are implementation work rather than owner questions.
 The `[R]` markers elsewhere in this artifact are implementation obligations for S1, not
 unratified decisions.
 
+---
+
+## Related exploratory roadmap
+
+A cross-cutting concern adjacent to this capability — how the cost, extent and
+escalation of probabilistic model computation might be governed — is scoped, without
+any ruling, in
+[`ROADMAP_UGENCE_REASONING_COMPUTE_GOVERNANCE.md`](ROADMAP_UGENCE_REASONING_COMPUTE_GOVERNANCE.md).
+It is marked *EXPLORATORY ROADMAP — NOT RATIFIED — NO IMPLEMENTATION AUTHORIZED*, it
+records no decision and amends nothing in this artifact, and it does not assign the
+concern to the Agentic Proposer. It is linked here only so that the question has one
+recorded home rather than accumulating inside a frozen specification.
