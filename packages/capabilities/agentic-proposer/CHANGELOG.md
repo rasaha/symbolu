@@ -90,11 +90,14 @@ additional disclosed ceilings on replay.
   `domain_check_completion`.
 * **(4) Selection is a deterministic, versioned, in-package function**, considering
   only eligible, `SATISFIED` candidates. The substantive ranking criterion is named
-  **OD-8** and is outstanding — not ratified by OD-7, and not invented by this
-  amendment. The ascending-`candidate_id` tie-break is a total order over already
-  -unique keys (`_check_candidate_sequence`) and is therefore always decisive on its
-  own; the fail-closed table no longer lists a tie surviving it, because that case is
-  structurally unreachable given the ratified structure, not merely unlikely.
+  **OD-8** and was outstanding at the time of this entry — not ratified by OD-7, and
+  not invented by that amendment. **Superseded by the OD-8/OD-9/OD-10 entry above
+  (ratified 2026-08-28):** OD-8 is now ratified as selection-policy v1, fail-closed
+  uniqueness. The ascending-`candidate_id` tie-break is a total order over already
+  -unique keys (`_check_candidate_sequence`); this entry originally inferred from that
+  totality that the tie-break must settle any tie by itself, and **that inference is
+  withdrawn by OD-8's tie-break correction** — under v1 the tie-break is deliberately
+  unexercised, because more than one qualifying candidate produces no selection.
 * **(5) `P_unsigned` gains identity-bound fields — this is not a zero-contract-shape
   transition.** One field on `CandidateAdvisory`; four **C5b** (`Token`-typed) fields
   each on `AdvisoryCandidateSet` and, mirrored, `ProposerAdvisory`, binding the
@@ -134,15 +137,19 @@ additional disclosed ceilings on replay.
   fail-closed table covers missing evidence, an `INCONCLUSIVE` outcome, no eligible
   candidate, and an unverifiable provider or policy; "evaluators disagree" is
   withdrawn as presupposing unratified multi-provider evaluation. The
-  `INCONCLUSIVE`-to-terminal-outcome mapping is named **OD-9** and is outstanding.
+  `INCONCLUSIVE`-to-terminal-outcome mapping is named **OD-9** and was outstanding at
+  the time of this entry; **superseded by the entry above** — OD-9 is ratified
+  2026-08-28 as an unconditional, per-candidate mapping to `ABSTAIN`.
 * **(8) C7 and C9 must be removed together, in the same change set** that also
   introduces every OD-7 field, vocabulary member, protocol and replay function; neither
   validator may be removed in isolation.
 
-**OD-8 and OD-9 are outstanding, tracked by name, not implementation detail left for
-later.** OD-7 ratifies the boundary above; it does not ratify the selector's ranking
-criterion or the `INCONCLUSIVE` mapping, and both must be ratified before any of this
-is implemented.
+**OD-8 and OD-9 were outstanding when this entry was written, tracked by name rather
+than left as implementation detail.** OD-7 ratified the boundary above; it did not
+ratify the selector's ranking criterion or the `INCONCLUSIVE` mapping. **Both are
+ratified as of 2026-08-28 — see the OD-8/OD-9/OD-10 entry at the top of this file,
+which also adds OD-10 and corrects OD-7's tie-break statement.** Implementation of the
+OD-7 surface remains gated on OD-7 part 8.
 
 Full ruling, field-ownership table, C5 classification, new vocabulary, exception
 class, replay-function signatures, rejected alternatives and prospective `I8.1`–

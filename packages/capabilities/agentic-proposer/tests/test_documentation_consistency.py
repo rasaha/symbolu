@@ -1505,7 +1505,7 @@ def test_the_candidate_id_tie_break_is_not_asserted_as_always_decisive():
     Scope: this catches a revert to any of the three phrasings that carried the claim,
     not every sentence that could express it.
     """
-    for path in (SPECIFICATION, ADR):
+    for path in (SPECIFICATION, ADR, CHANGELOG):
         body = _text(path)
         for predicate in _WITHDRAWN_TIE_BREAK_PREDICATES:
             assert predicate not in body, (
@@ -1544,12 +1544,39 @@ def test_the_fail_closed_table_carries_six_ordered_non_overlapping_rows():
     assert "**OD-8**" in spec and "**OD-9**" in spec and "**OD-10**" in spec
 
 
+#: Live assertions that OD-8 or OD-9 is still unratified, in every phrasing the
+#: documents have actually used. The list is by phrasing rather than by concept because
+#: that is what a guard over prose can honestly check — see the module docstring's
+#: statement of what the document scans do and do not cover.
+#:
+#: The CHANGELOG is in scope. An earlier version of this guard checked only the
+#: specification and the ADR, and only the single phrasing "remain outstanding"; a
+#: superseded CHANGELOG entry asserting "OD-8 and OD-9 are outstanding" therefore
+#: survived the OD-8/OD-9/OD-10 ratification uncaught. Both holes are closed here.
+_WITHDRAWN_OUTSTANDING_CLAIMS = (
+    "OD-8 and OD-9 remain outstanding",
+    "OD-8 and OD-9 are outstanding",
+    "**OD-8** and is outstanding",
+    "**OD-9** and is outstanding",
+    "OD-8 (outstanding)",
+    "OD-9 (outstanding)",
+)
+
+
 def test_no_owner_decision_is_recorded_as_outstanding():
     """After 2026-08-28 the outstanding set is empty; what remains is a *deferral*
     (substantive multi-candidate ranking), which is a different status and must not be
-    relabelled as an outstanding ruling."""
-    for path in (SPECIFICATION, ADR):
+    relabelled as an outstanding ruling.
+
+    Superseded CHANGELOG entries are in scope: an entry may record what was true when
+    it was written, but not assert in the present tense that a ratified decision is
+    still open, because the file is read top to bottom as one pending release.
+    """
+    for path in (SPECIFICATION, ADR, CHANGELOG):
         body = _text(path)
-        assert "OD-8 and OD-9 remain outstanding" not in body, path.name
+        for claim in _WITHDRAWN_OUTSTANDING_CLAIMS:
+            assert claim not in body, (
+                f"{path.name}: {claim!r} asserts an outstanding status that the "
+                f"2026-08-28 ruling closed")
     assert "substantive multi-candidate ranking" in _text(SPECIFICATION).lower() or (
         "Substantive multi-candidate ranking" in _text(SPECIFICATION))
