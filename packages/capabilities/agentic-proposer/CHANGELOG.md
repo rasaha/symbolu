@@ -10,8 +10,16 @@ algorithm.** **This is a documentation-only entry.** No `src/` module, test,
 `public_api.json` or `version.py` is changed by it, and none may be until the
 amendment is built and has passed an independent consistency review, per OD-7's own
 transition controls. C7 and C9 remain active and unmodified; package stays `0.1.0`.
-This entry supersedes the original OD-7 entry above it in git history, correcting
-seven points an independent review found in that first draft.
+This entry supersedes the earlier OD-7 entries it replaces in git history. It carries
+two rounds of correction: seven points a first independent review found in the
+original draft, and four more a second independent review found after that — the
+Equation 2 term below (the material one), a status sentence in the specification that
+still read as though nothing were outstanding, a Part J bullet that contradicted
+OD-7's own contract-shape ruling, and a false claim that the affected cardinality
+numbers were unpinned when three existing tests pin them. Three further clarifications
+were adopted in the same pass: a ratified computability constraint on OD-8, an honest
+restatement of what the provider echo does and does not defend against, and four
+additional disclosed ceilings on replay.
 
 * **(1)–(2) A narrow injected boundary, not an embedded evaluator.** Domain evaluation
   and candidate selection are separate responsibilities in one ordered boundary. The
@@ -57,8 +65,17 @@ seven points an independent review found in that first draft.
   construction" in that order names an internal, pre-contract representation, and the
   actual frozen instance is built exactly once, after evaluation, on the same
   one-expression G2 discipline `ProposerAdvisory` already follows — never assembled
-  incrementally. Equation 2 needs no amended term, because it runs only after
-  selection and only against the one, already-`SATISFIED` selected candidate. The
+  incrementally. **Equation 2 gains a seventh term** — `DomainEvaluationSatisfied`
+  (`candidate.domain_evaluation_outcome is DomainEvaluationOutcome.SATISFIED`) —
+  amending Part F. An earlier draft of this entry claimed no term was needed, on the
+  ground that Equation 2 runs only after selection and only against the
+  already-`SATISFIED` selected candidate. That is withdrawn: `evaluate_readiness` is
+  an exported public symbol with no caller in `src/`, so the call order cannot be
+  imposed on a consumer, and with C7 removed a candidate carrying `COMPLETE` plus
+  `NOT_SATISFIED` would satisfy R-2's condition for `terminal_outcome=PROPOSAL` under
+  V13 — letting the strongest classification be reached for a candidate domain
+  evaluation rejected. The term is inert in S1 and lands with the rest of the OD-7
+  surface. The
   fail-closed table covers missing evidence, an `INCONCLUSIVE` outcome, no eligible
   candidate, and an unverifiable provider or policy; "evaluators disagree" is
   withdrawn as presupposing unratified multi-provider evaluation. The
@@ -74,7 +91,7 @@ is implemented.
 
 Full ruling, field-ownership table, C5 classification, new vocabulary, exception
 class, replay-function signatures, rejected alternatives and prospective `I8.1`–
-`I8.9` enforcement obligations are in the specification's `OD-7` entry.
+`I8.11` enforcement obligations are in the specification's `OD-7` entry.
 
 ## Unreleased — I7.13–I7.16 test coverage completed
 
