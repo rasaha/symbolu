@@ -26,8 +26,8 @@ ratified 2026-08-27 and is recorded in the same table. **OD-7**, scoping the S2
 domain-evaluation and candidate-selection boundary that removes C7 and C9, was also
 ratified 2026-08-27 and is recorded as an additional row in the same table — it is the
 first owner decision ratified without also being implemented, and C7 and C9 remain
-active until it is. **No owner
-decision remains open, so S1 is unblocked on ratification grounds** — and on
+active until it is. **OD-1 through OD-7 are decided. OD-8 and OD-9 remain
+outstanding. S1 is unblocked on ratification grounds** — and on
 ratification grounds only.
 **One** thing still gates S1 code, and it is not a ruling: the Part I implementation
 obligations in the contract specification are undischarged. A11's review-and-merge
@@ -608,7 +608,7 @@ below but **not yet implemented** — it amends the frozen S1 surface rather tha
 reconciling it, and its own transition controls forbid removing C7 or C9 outside the
 single change set that also builds everything else it specifies.
 
-**No ruling is outstanding on any of the seven — whether each has been *decided*.**
+**OD-1 through OD-7 are decided. OD-8 and OD-9 remain outstanding.**
 Whether OD-7 has been *implemented* is a different question, answered below, and is
 **no**. `[G]` **OD-8 and OD-9, named inside OD-7's own entry, are a third question and
 are themselves outstanding** — OD-7 decided its boundary, not the selector's ranking
