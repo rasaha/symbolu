@@ -2,10 +2,15 @@
 
 ## Unreleased — OD-8, OD-9 and OD-10 ratified; OD-7 tie-break corrected
 
-Ratified 2026-08-28. **Documentation only.** No `src/` module, test, `public_api.json`
-or `version.py` is changed; C7 and C9 remain active and unmodified; the package stays
-`0.1.0`; the substantive platform-freeze digest is unchanged. Implementation of the
-OD-7 surface remains gated on OD-7 part 8.
+Ratified 2026-08-28. **Documentation only.** No `src/` module, `public_api.json` or
+`version.py` is changed; C7 and C9 remain active and unmodified; the package stays
+`0.1.0`; the substantive platform-freeze digest is unchanged. The one test file
+touched is `tests/test_documentation_consistency.py`: **no production or behavioural
+guard exercises the unimplemented OD-7 selection surface**, and the
+**documentation-consistency guards** added here pin the ratified OD-7 amendment and
+the OD-8/OD-9/OD-10 meanings against a silent revert to the pre-ruling prose. Those
+guards are **not production enforcement** and prove nothing about the future
+implementation. Implementation of the OD-7 surface remains gated on OD-7 part 8.
 
 * **OD-8 — selection-policy v1 is fail-closed uniqueness.** The selector selects only
   when **exactly one** candidate is both `is_eligible is True` and
@@ -29,6 +34,18 @@ OD-7 surface remains gated on OD-7 part 8.
   a substitute for a missing criterion, and is deliberately unexercised under v1. The
   underlying uniqueness and ordering facts are unchanged; what is withdrawn is the
   inference that totality alone licenses resolving a preference the owner never made.
+* **`verify_deterministic_selection`'s replay rule is restated for selection-policy
+  v1.** OD-7's part-5 description had the verifier recompute the selector "and the
+  ratified tie-break", which survived the tie-break correction as a stale instruction
+  an implementer would have built a `candidate_id` fallback from — contradicting row 4
+  of the fail-closed table. Corrected: the verifier recomputes the qualifying pool
+  solely from the eligible-and-`SATISFIED` members; when exactly one candidate
+  qualifies the stored `selected_candidate_id` must equal that candidate's identifier;
+  when zero or more than one qualify it must be `None`; selection-policy v1 applies no
+  `candidate_id` tie-break, and a future version may activate one only after a
+  separately ratified substantive criterion establishes the remaining candidates are
+  equally preferable and lawfully selectable. The selector-policy identity check is
+  unchanged.
 * **OD-9 — `INCONCLUSIVE` maps unconditionally to `ABSTAIN`.** `ESCALATE` was not
   chosen: no authoritative, replayable severity condition is ratified, and a
   no-selection run carries no referral destination under R-1a.

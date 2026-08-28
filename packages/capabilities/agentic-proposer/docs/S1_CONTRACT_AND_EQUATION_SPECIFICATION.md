@@ -3005,9 +3005,13 @@ implementation.** It resolves the S2 domain-evaluation and candidate-selection
 boundary in eight parts (above), and — unlike OD-1 – OD-3, OD-5 and OD-6 — it **does**
 bear on contract shape: `CandidateAdvisory`, `AdvisoryCandidateSet` and
 `ProposerAdvisory` each gain fields once it is built. `[G]` C7 and C9 remain active and
-unmodified; no guard exists for OD-7 anywhere in `packages/capabilities/agentic-
-proposer/tests/`; `public_api.json` and `version.py` are untouched by this
-ratification. The three-status discipline this section states for OD-1 – OD-6 — a
+unmodified; **no production or behavioural guard exercises the unimplemented OD-7
+selection surface** anywhere in `packages/capabilities/agentic-proposer/tests/` —
+`[V]` the **documentation-consistency guards** in
+`tests/test_documentation_consistency.py` pin the ratified OD-7 amendment and the
+OD-8/OD-9/OD-10 meanings, and those are **not production enforcement** and prove
+nothing about the future implementation; `public_api.json` and `version.py` are
+untouched by this ratification. The three-status discipline this section states for OD-1 – OD-6 — a
 decision is ratified; a named guard implements it; S1 production implementation is a
 separate, later authorization — applies to OD-7 exactly as written: the first status
 is now true of it, and the other two remain open until OD-7's own transition controls
@@ -3277,9 +3281,17 @@ Two new replay functions, both recomputing from stored content only:
     "does re-running agree with what was stored", which is a different question from
     "was the stored answer right". The provider remains the sole authority on domain
     substance, and OD-7 does not change that.
-* `verify_deterministic_selection(*, candidate_set) -> bool` — recomputes the selector
-  against the candidate set's own eligible-and-`SATISFIED` members and the ratified
-  tie-break, checks the result equals `selected_candidate_id`, **and** checks the
+* `verify_deterministic_selection(*, candidate_set) -> bool` — `[R]` recomputes the
+  **qualifying pool** solely from the candidate set's own members that are
+  `is_eligible is True` **and** carry `domain_evaluation_outcome is SATISFIED`, then
+  checks the stored selector against **selection-policy v1** (OD-8, part 4): when the
+  qualifying pool holds **exactly one** candidate, `selected_candidate_id` must equal
+  that candidate's identifier; when the qualifying pool holds **zero or more than one**
+  candidate, `selected_candidate_id` must be `None`. **Selection-policy v1 does not
+  apply the `candidate_id` tie-break**, so the verifier neither computes nor consults
+  it; a future policy version may activate a tie-break only after a separately ratified
+  substantive criterion establishes that the remaining candidates are equally preferable
+  and lawfully selectable. It **also** checks that the
   stored `selection_policy_id`/`selection_policy_version` equal this package's own
   ratified selector identity/version constants — so a `selected_candidate_id` that
   happens to match the recomputation but is *labelled* as coming from a different,
@@ -3601,10 +3613,18 @@ ratified decision from production authorization elsewhere in this document.
   completed run falls through without a ratified outcome. It is what makes OD-10 do
   its job rather than merely exist.
 
-*Enforcement:* `[G]` **not yet implemented.** No guard exists in
-`packages/capabilities/agentic-proposer/tests/`; C7 and C9 remain active and
-unmodified; nothing in this entry authorizes a change to `src/`, `public_api.json` or
-`version.py`, and none is made by it.
+*Enforcement:* `[G]` **not yet implemented.** **No production or behavioural guard
+exercises the unimplemented OD-7 selection surface** in
+`packages/capabilities/agentic-proposer/tests/`; every obligation above (`I8.1` –
+`I8.15`) is prospective and awaits the change set part 8 requires. `[V]` What does
+exist there are the **documentation-consistency guards** in
+`tests/test_documentation_consistency.py`, which pin this amendment's ratified
+statements — OD-7's boundary and the OD-8/OD-9/OD-10 meanings — against a silent
+revert to the pre-ruling prose. Those are **not production enforcement**: they check
+what these documents say, not what any selector does, and they prove nothing about the
+future implementation. C7 and C9 remain active and unmodified; nothing in this entry
+authorizes a change to `src/`, `public_api.json` or `version.py`, and none is made by
+it.
 
 *Where it would be implemented in this document, once ratified further and built:* C7
 and C9's own sections (a migration note); D6 (`CandidateAdvisory` and
