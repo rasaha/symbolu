@@ -8,9 +8,27 @@ from __future__ import annotations
 
 import ugence_jcs
 
-from .contracts import AdvisoryCandidateSet, CandidateAdvisory, ProposerProcessRecord
+from .contracts import (
+    SELECTION_POLICY_ID,
+    SELECTION_POLICY_VERSION,
+    AdvisoryCandidateSet,
+    CandidateAdvisory,
+    DomainEvaluationProvider,
+    ProposerProcessRecord,
+)
 from .equations import evaluate_eligibility
-from .vocabulary import CandidateDisposition, ReviewAction, TerminalOutcome
+from .verification import (
+    DomainEvaluationProviderError,
+    _echo_is_correlated,
+    _evaluation_request,
+    _resolve_references,
+)
+from .vocabulary import (
+    CandidateDisposition,
+    DomainCheckCompletion,
+    ReviewAction,
+    TerminalOutcome,
+)
 
 __all__ = [
     "build_candidate_advisory",
@@ -34,26 +52,80 @@ def build_candidate_advisory(
     assumptions: list[str],
     uncertainties: list[str],
     evaluated_at,
+    provider: DomainEvaluationProvider,
+    profile_id: str,
+    profile_version: str,
 ) -> CandidateAdvisory:
-    """H1. Takes no ``is_eligible`` and no ``domain_check_completion`` parameter: it
-    computes Equation 1 and passes the computed Boolean **directly** as the
-    ``is_eligible=`` keyword, in the same expression that computes it, and leaves
-    ``domain_check_completion`` at its ``NOT_EVALUATED`` default (G4)."""
+    """H1, as amended by OD-7. Takes no ``is_eligible``, no ``domain_check_completion``
+    and no ``domain_evaluation_outcome`` parameter: it computes the first from
+    Equation 1 and derives the other two from the injected provider's verified answer.
+
+    **OD-7 part 6's required execution order, realised here for one candidate:**
+    Equation 1 eligibility -> domain evaluation -> domain-result verification -> a
+    single construction. ``CandidateAdvisory`` is frozen (C1) and is instantiated
+    exactly once, with every field already known; nothing here builds an instance
+    missing a field and completes it later. What precedes that one construction
+    operates over plain, non-contract data.
+
+    **Missing evidence is not an evaluation failure.** When an ``observation_refs``
+    entry does not resolve, the same ``_resolve_references`` replay E2 already uses
+    warns, naming the failing reference — and the provider is **not called at all**.
+    The candidate is constructed ``NOT_EVALUATED`` with no outcome, which keeps it out
+    of every qualifying pool; directing the run to ``NEED_EVIDENCE`` (part 7's first
+    row) is the caller's orchestration decision, not a return value here.
+
+    **A provider exception is re-raised as ``DomainEvaluationProviderError``** so a
+    caller catches one named family for every OD-7 construction-time failure rather
+    than an arbitrary third-party type. So is an echo that does not correlate with the
+    request: builders raise, verifiers report.
+    """
+    is_eligible = evaluate_eligibility(
+        identity=identity,
+        role=role,
+        mandate=mandate,
+        context=context,
+        observations=observations,
+        disposition=disposition,
+        requested_review_action=requested_review_action,
+        referenced_observation_ids=list(observation_refs),
+        evaluated_at=evaluated_at,
+    )
+
+    completion = DomainCheckCompletion.NOT_EVALUATED
+    outcome = None
+    # E2's own algorithm, over this candidate's references only. Restricting the
+    # supplied collection to what this candidate actually references keeps E2's
+    # "supplied but unreferenced" report meaningful at the level it is made: a
+    # sibling candidate's evidence is not this candidate's unreferenced extra.
+    referenced = [o for o in observations
+                  if o.observation_id in set(observation_refs)]
+    if _resolve_references(
+            required=list(observation_refs), tenant_id=mandate.tenant_id,
+            case_ref=mandate.case_ref, context=context, observations=referenced):
+        request = _evaluation_request(
+            candidate_id=candidate_id, profile_id=profile_id,
+            profile_version=profile_version, observation_refs=observation_refs,
+            mandate=mandate, context=context, observations=observations)
+        try:
+            response = provider.evaluate(request=request)
+        except Exception as exc:  # noqa: BLE001 — one named family for the caller.
+            raise DomainEvaluationProviderError(
+                f"the injected domain-evaluation provider raised while evaluating "
+                f"candidate {candidate_id!r}") from exc
+        if response is None or not _echo_is_correlated(response, request):
+            raise DomainEvaluationProviderError(
+                "the provider's echoed profile identity or candidate_id does not "
+                f"correspond to the request issued for candidate {candidate_id!r}")
+        completion = DomainCheckCompletion.COMPLETE
+        outcome = response.outcome
+
     return CandidateAdvisory(
         candidate_id=candidate_id,
         disposition=disposition,
         requested_review_action=requested_review_action,
-        is_eligible=evaluate_eligibility(
-            identity=identity,
-            role=role,
-            mandate=mandate,
-            context=context,
-            observations=observations,
-            disposition=disposition,
-            requested_review_action=requested_review_action,
-            referenced_observation_ids=list(observation_refs),
-            evaluated_at=evaluated_at,
-        ),
+        is_eligible=is_eligible,
+        domain_check_completion=completion,
+        domain_evaluation_outcome=outcome,
         evaluated_at=evaluated_at,
         claim_refs=list(claim_refs),
         observation_refs=list(observation_refs),
@@ -70,10 +142,26 @@ def build_advisory_candidate_set(
     created_at,
     candidates: tuple,
     selected_candidate_id: "str | None",
+    domain_evaluation_profile_id: "str | None",
+    domain_evaluation_profile_version: "str | None",
 ) -> AdvisoryCandidateSet:
-    """H1. ``candidates`` must already be in the ratified ascending-``candidate_id``
-    order (D6): this builder rejects out-of-order input rather than reordering it,
-    which the model's own validator enforces."""
+    """H1, as amended by OD-7 part 5. ``candidates`` must already be in the ratified
+    ascending-``candidate_id`` order (D6): this builder rejects out-of-order input
+    rather than reordering it, which the model's own validator enforces.
+
+    ``selected_candidate_id`` remains a caller parameter and is **checked, never
+    trusted**: the model recomputes selection-policy v1 over these candidates and
+    rejects any selector the ratified policy did not produce. That is what replaced
+    C9 — a non-null selection is no longer unconstructible, it is constructible exactly
+    when the policy produces it.
+
+    The selector-policy identity is **not** a parameter. It names this package's own
+    ratified selector, so accepting it from the caller would let a caller label a
+    selection with a policy that did not make it. It is stamped here, from this
+    package's own constants, whenever a selection is present, and is left ``None``
+    whenever one is not.
+    """
+    selects = selected_candidate_id is not None
     return AdvisoryCandidateSet(
         schema_version="1.0",
         tenant_id=tenant_id,
@@ -81,7 +169,11 @@ def build_advisory_candidate_set(
         candidate_set_id=candidate_set_id,
         case_ref=case_ref,
         candidates=tuple(candidates),
+        domain_evaluation_profile_id=domain_evaluation_profile_id,
+        domain_evaluation_profile_version=domain_evaluation_profile_version,
         selected_candidate_id=selected_candidate_id,
+        selection_policy_id=SELECTION_POLICY_ID if selects else None,
+        selection_policy_version=SELECTION_POLICY_VERSION if selects else None,
         selection_reason_codes=[],
     )
 
@@ -115,8 +207,14 @@ def build_proposer_process_record(
     started_at,
     completed_at,
 ) -> ProposerProcessRecord:
-    """H1. Enforces R-2, R-3 and R-4 through the model's own validators. Under B3, a
-    ``PROPOSAL`` terminal outcome is unreachable in S1 and is rejected there.
+    """H1. Enforces R-2, R-3 and R-4 through the model's own validators.
+
+    R-2's locally decidable half — ``PROPOSAL`` requires a selection — is enforced by
+    the record's own validator. Its other conjunct, ``evaluate_readiness(...) is True``
+    for the resolved candidate, needs contracts this record does not carry and is
+    recomputed by ``build_proposer_advisory``, which is where B3 states V13 recomputes
+    it. ``PROPOSAL`` is no longer refused outright: with C7 removed it is reachable
+    exactly when R-2's two conjuncts hold.
 
     Built through ``model_validate`` over a plain field mapping rather than a
     keyword-argument call. ``ProposerProcessRecord.advisory_digest`` is a foreign key

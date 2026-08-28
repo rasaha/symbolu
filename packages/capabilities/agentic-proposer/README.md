@@ -78,18 +78,27 @@ from ugence_agentic_proposer import (
 )
 ```
 
-The full 39-name public surface (H3 plus OD-6(ii)'s `CrossContractViolationError`)
+The full 46-name public surface (H3 as amended by OD-7, plus OD-6(ii)'s
+`CrossContractViolationError`)
 is pinned in
 [`public_api.json`](public_api.json) and drift-tested by
 `tests/test_public_api.py`. Every one of the classification enums above is an
 advisory proposer classification. None is evidence admission, a business decision,
 an authorization, a clearance or execution permission.
 
-S1 implements the eight canonical contracts, Equations 1–2, and G1–G4 advisory
-identity through `ugence-jcs`, but still performs **no** candidate selection, **no**
-domain evaluator, **no** disposition-to-outcome mapping, **no** semantic auditor and
-**no** storage, transport or HTTP surface — all deferred to S2 (Part J of the
-specification).
+S1 implements the eight canonical contracts, Equations 1–2, and G1–G4 advisory identity
+through `ugence-jcs`. At `0.2.0`, OD-7/OD-8/OD-9/OD-10 add the S2 domain-evaluation and
+candidate-selection boundary: an **injected** `DomainEvaluationProvider` protocol, a
+deterministic in-package selector under selection-policy v1 (fail-closed uniqueness),
+identity-bound evaluation-profile and selector-policy fields, and two replay functions.
+
+What this package still does **not** do, and does not intend to at this stage: it ships
+**no concrete domain evaluator** (the provider is injected by the caller and computes
+nothing here), **no substantive multi-candidate ranking** (deferred to a future ruling;
+more than one qualifying candidate produces no selection and `ABSTAIN`), **no**
+multi-provider evaluation, **no** semantic auditor, and **no** networking, storage,
+service discovery, plugin loading, transport or HTTP surface — all deferred (Part J of
+the specification).
 
 ## Reserved vocabulary
 

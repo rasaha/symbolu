@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import ast
 import pathlib
+import re
 import unicodedata
 from datetime import datetime, timedelta, timezone
 
@@ -62,24 +63,35 @@ def _full_advisory_scenario():
         operation_class=ap.ToolOperationClass.READ_ONLY, source_ref="record-1",
         observed_at=FIXED_INSTANT, content_hash=spec.PLACEHOLDER_DIGEST,
         normalized_fields={"vendor.name": "Acme Corp"})
+    provider = spec.StubDomainEvaluationProvider()
     candidate = ap.build_candidate_advisory(
         candidate_id="cand-1", identity=identity, role=role, mandate=mandate,
         context=context, observations=[observation],
         disposition=ap.CandidateDisposition.RECOMMEND_WITHHOLD,
         requested_review_action=ap.ReviewAction.ROUTE_APPROVAL_BUNDLE,
         observation_refs=["obs-1"], claim_refs=[], assumptions=[], uncertainties=[],
-        evaluated_at=FIXED_INSTANT)
+        evaluated_at=FIXED_INSTANT, provider=provider,
+        profile_id=spec.PROFILE_ID, profile_version=spec.PROFILE_VERSION)
+    # Under selection-policy v1 a set holding exactly one eligible, SATISFIED
+    # candidate MUST select it (OD-7 part 7, row 3). The always-null shape C9 forced
+    # in S1 is no longer the lawful one for a set like this.
     candidate_set = ap.build_advisory_candidate_set(
         candidate_set_id="set-1", tenant_id="tenant-1", case_ref="case-1",
-        created_at=FIXED_INSTANT, candidates=(candidate,), selected_candidate_id=None)
+        created_at=FIXED_INSTANT, candidates=(candidate,),
+        selected_candidate_id="cand-1",
+        domain_evaluation_profile_id=spec.PROFILE_ID,
+        domain_evaluation_profile_version=spec.PROFILE_VERSION)
     advisory = ap.build_proposer_advisory(
         tenant_id="tenant-1", case_ref="case-1", created_at=FIXED_INSTANT,
         identity=identity, role=role, mandate=mandate, context=context,
         observations=[observation], candidate_set=candidate_set,
         parent_advisory_digest=None, claim_summaries=["reconciled against ledger"],
-        observation_refs=[], uncertainties=[], expires_at=later)
+        observation_refs=[], uncertainties=[], expires_at=later,
+        provider=provider, expected_profile_id=spec.PROFILE_ID,
+        expected_profile_version=spec.PROFILE_VERSION,
+        requested_review_destination_role_ref="role-approver")
     return dict(identity=identity, role=role, mandate=mandate, context=context,
-               observation=observation, candidate=candidate,
+               observation=observation, candidate=candidate, provider=provider,
                candidate_set=candidate_set, advisory=advisory)
 
 
@@ -216,7 +228,9 @@ def test_i7_2_an_out_of_order_candidate_sequence_is_rejected_not_reordered(scena
         ap.build_advisory_candidate_set(
             candidate_set_id="set-2", tenant_id="tenant-1", case_ref="case-1",
             created_at=FIXED_INSTANT, candidates=(candidate_b, candidate_a),
-            selected_candidate_id=None)
+            selected_candidate_id=None,
+            domain_evaluation_profile_id=spec.PROFILE_ID,
+            domain_evaluation_profile_version=spec.PROFILE_VERSION)
 
 
 # --------------------------------------------------------------------------- #
@@ -380,30 +394,47 @@ def test_i7_6_build_proposer_advisory_raises_eligibility_mismatch_error(scenario
             mandate=scenario["mandate"], context=scenario["context"],
             observations=[scenario["observation"]], candidate_set=forged_set,
             parent_advisory_digest=None, claim_summaries=[], observation_refs=[],
-            uncertainties=[], expires_at=scenario["mandate"].expires_at)
+            uncertainties=[], expires_at=scenario["mandate"].expires_at,
+            provider=scenario["provider"], expected_profile_id=spec.PROFILE_ID,
+            expected_profile_version=spec.PROFILE_VERSION,
+            requested_review_destination_role_ref=None)
     assert issubclass(ap.EligibilityMismatchError, ValueError)
 
 
 # --------------------------------------------------------------------------- #
-# I7.7 — COMPLETE unconstructibility
+# I7.7 — what replaced C7's structural ceiling (OD-7 part 3, part 6)
+#
+# C7 rejected ``COMPLETE`` unconditionally, which is what made every candidate this
+# package could build unready. C7 is gone. What stands in its place is the
+# completion/outcome coupling and Equation 2's seventh term, and I7.7 is discharged
+# against those rather than against a refusal that no longer exists.
 # --------------------------------------------------------------------------- #
 
-def test_i7_7_complete_is_unconstructible_by_direct_construction():
-    """Intentional and fail-closed: pending a separately ratified S2 domain
-    evaluator, no candidate this package builds can ever be COMPLETE."""
+def test_i7_7_complete_without_an_outcome_is_unconstructible():
+    """The coupling's first direction. ``COMPLETE`` is now constructible — but not
+    with no bound evaluation result to check it against, which is precisely the state
+    OD-7 part 8 says removing C7 alone would have allowed."""
     with pytest.raises(pydantic.ValidationError):
         ap.CandidateAdvisory(**{
             **spec.complete_candidate(), "domain_check_completion":
-            ap.DomainCheckCompletion.COMPLETE})
+            ap.DomainCheckCompletion.COMPLETE, "domain_evaluation_outcome": None})
 
 
-def test_i7_7_complete_is_unconstructible_by_model_validate():
+def test_i7_7_an_outcome_without_complete_is_unconstructible():
+    """The coupling's second direction: a result with no completed evaluation behind
+    it."""
     with pytest.raises(pydantic.ValidationError):
         ap.CandidateAdvisory.model_validate({
-            **spec.complete_candidate(), "domain_check_completion": "COMPLETE"})
+            **spec.complete_candidate(),
+            "domain_check_completion": "NOT_EVALUATED",
+            "domain_evaluation_outcome": "SATISFIED"})
 
 
-def test_i7_7_complete_is_unconstructible_by_model_construct_then_validate():
+def test_i7_7_the_coupling_survives_model_construct_then_validate():
+    """``model_construct`` bypasses every validator; a subsequent revalidation catches
+    the bypassed state, because the coupling is a real validator rather than merely
+    absent from ``model_construct``'s own path. The same disclosed ceiling C7 and C9
+    each stated of themselves."""
     forged = ap.CandidateAdvisory.model_construct(**{
         **spec.complete_candidate(), "domain_check_completion":
         ap.DomainCheckCompletion.COMPLETE})
@@ -411,9 +442,26 @@ def test_i7_7_complete_is_unconstructible_by_model_construct_then_validate():
         ap.CandidateAdvisory.model_validate(forged.model_dump())
 
 
-def test_i7_7_evaluate_readiness_is_false_for_every_constructible_candidate(scenario):
+def test_i7_7_a_lawfully_evaluated_candidate_is_ready(scenario):
+    """The direction C7 made untestable. A candidate that is eligible, ``COMPLETE``
+    and ``SATISFIED``, with matching lineage, is ready — which is R-2's condition for
+    ``terminal_outcome=PROPOSAL``, reachable for the first time here."""
+    assert scenario["candidate"].domain_check_completion is (
+        ap.DomainCheckCompletion.COMPLETE)
+    assert scenario["candidate"].domain_evaluation_outcome is (
+        ap.DomainEvaluationOutcome.SATISFIED)
     assert ap.evaluate_readiness(
         candidate=scenario["candidate"], identity=scenario["identity"],
+        role=scenario["role"], mandate=scenario["mandate"],
+        context=scenario["context"]) is True
+
+
+def test_i7_7_an_unevaluated_candidate_is_still_unready(scenario):
+    """The fail-closed direction is unchanged: no evaluation, no readiness."""
+    unevaluated = ap.CandidateAdvisory(**{
+        **spec.complete_candidate(), "is_eligible": True})
+    assert ap.evaluate_readiness(
+        candidate=unevaluated, identity=scenario["identity"],
         role=scenario["role"], mandate=scenario["mandate"],
         context=scenario["context"]) is False
 
@@ -422,7 +470,10 @@ def test_i7_7_evaluate_readiness_is_false_for_every_constructible_candidate(scen
 # I7.8 — V13
 # --------------------------------------------------------------------------- #
 
-def test_i7_8_proposal_terminal_outcome_is_unreachable_via_the_builder(scenario):
+def test_i7_8_proposal_without_a_selection_is_refused_by_the_builder(scenario):
+    """V13's surviving locally decidable half (R-2). The S1 form of this test asserted
+    that ``PROPOSAL`` was unreachable at all; with C7 gone it is reachable, and what
+    remains refused is a proposal that proposes nothing."""
     with pytest.raises(pydantic.ValidationError):
         ap.build_proposer_process_record(
             process_record_id="rec-1", tenant_id="tenant-1", case_ref="case-1",
@@ -433,12 +484,28 @@ def test_i7_8_proposal_terminal_outcome_is_unreachable_via_the_builder(scenario)
             started_at=FIXED_INSTANT, completed_at=FIXED_INSTANT)
 
 
-def test_i7_8_selected_candidate_id_is_none_on_every_builder_produced_advisory(scenario):
+def test_i7_8_a_lawful_selection_is_carried_with_all_three_dependents(scenario):
+    """The S1 form of this test asserted a null selector on every builder-produced
+    advisory, which was C9's ceiling rather than a property of the builder. With C9
+    gone the builder carries the selection selection-policy v1 produced, and R-1a's
+    joint-presence coupling holds on the non-null branch for the first time."""
     advisory = scenario["advisory"]
-    assert advisory.selected_candidate_id is None
-    assert advisory.recommended_disposition is None
-    assert advisory.requested_review_action is None
-    assert advisory.requested_review_destination_role_ref is None
+    assert advisory.selected_candidate_id == "cand-1"
+    assert advisory.recommended_disposition is (
+        ap.CandidateDisposition.RECOMMEND_WITHHOLD)
+    assert advisory.requested_review_action is ap.ReviewAction.ROUTE_APPROVAL_BUNDLE
+    assert advisory.requested_review_destination_role_ref == "role-approver"
+
+
+def test_i7_8_the_selection_is_mirrored_into_the_advisorys_own_policy_identity(scenario):
+    """OD-7 part 5: the selector-policy identity is inside ``P_unsigned`` because it is
+    the advisory's own field, and it equals the set's (R-1b's new clauses)."""
+    advisory, candidate_set = scenario["advisory"], scenario["candidate_set"]
+    for name in ("domain_evaluation_profile_id", "domain_evaluation_profile_version",
+                 "selection_policy_id", "selection_policy_version"):
+        assert getattr(advisory, name) == getattr(candidate_set, name) is not None
+    projection = advisory.model_dump(mode="json", exclude={"advisory_digest"})
+    assert projection["selection_policy_version"] == "v1"
 
 
 # --------------------------------------------------------------------------- #
@@ -747,8 +814,14 @@ def test_i7_14_an_empty_refs_candidate_cannot_vacuously_pass_a_dangling_referenc
         candidate_id="cand-b", disposition=ap.CandidateDisposition.RECOMMEND_WITHHOLD,
         requested_review_action=ap.ReviewAction.ROUTE_APPROVAL_BUNDLE, is_eligible=True,
         evaluated_at=FIXED_INSTANT, observation_refs=["obs-missing"])
+    # Neither replacement candidate is evaluated, so the qualifying pool is empty and
+    # selection-policy v1 selects nothing; the selection fields go with it.
     advisory = _revalidated(
-        scenario["advisory"], candidates=(empty_refs_candidate, dangling_candidate))
+        scenario["advisory"], candidates=(empty_refs_candidate, dangling_candidate),
+        domain_evaluation_profile_id=None, domain_evaluation_profile_version=None,
+        selected_candidate_id=None, selection_policy_id=None,
+        selection_policy_version=None, recommended_disposition=None,
+        requested_review_action=None, requested_review_destination_role_ref=None)
     with pytest.warns(UserWarning, match="dangling"):
         result = ap.verify_observation_resolution(
             advisory=advisory, context=scenario["context"], observations=[])
@@ -775,7 +848,10 @@ def _revision_kwargs(scenario, **overrides):
         mandate=scenario["mandate"], context=scenario["context"],
         observations=[scenario["observation"]], claim_summaries=["revised claim"],
         observation_refs=["obs-1"], uncertainties=["revised uncertainty"],
-        created_at=FIXED_INSTANT, expires_at=scenario["mandate"].expires_at)
+        created_at=FIXED_INSTANT, expires_at=scenario["mandate"].expires_at,
+        provider=scenario["provider"], expected_profile_id=spec.PROFILE_ID,
+        expected_profile_version=spec.PROFILE_VERSION,
+        requested_review_destination_role_ref="role-approver")
     kwargs.update(overrides)
     return kwargs
 
@@ -866,85 +942,114 @@ def test_i7_16_the_construction_calls_keyword_set_equals_the_full_field_set():
 
 
 # --------------------------------------------------------------------------- #
-# OD-6(i) — C9: a non-null selection is structurally unconstructible
+# OD-6(i)/OD-7 part 8 — what replaced C9
+#
+# C9 made every non-null ``selected_candidate_id`` unconstructible. It is gone, and
+# what stands in its place is narrower and stronger: a selection is constructible
+# exactly when selection-policy v1 produces it, carries this package's own ratified
+# policy identity, and resolves to an eligible member (S-1, S-2). These tests
+# discharge that handover — the reason OD-7 part 8 requires the removal and the
+# replacement to land in one change set.
 # --------------------------------------------------------------------------- #
 
-def test_od6_i_advisorycandidateset_rejects_a_non_null_selection_by_direct_construction(
+def test_c9s_replacement_refuses_a_selection_the_ratified_policy_did_not_produce(
         scenario):
-    """Positive. The same shape S-1/S-2 would have resolved and accepted is refused
-    outright by C9 before either ever runs."""
+    """The case C9 refused outright. A caller hand-supplying a selector the policy did
+    not produce is still refused — now because the recomputation disagrees, not
+    because every selector is barred."""
+    unevaluated = ap.CandidateAdvisory(**{
+        **spec.complete_candidate(candidate_id="cand-9"), "is_eligible": True})
     with pytest.raises(pydantic.ValidationError):
         ap.AdvisoryCandidateSet(
             schema_version="1.0", tenant_id="tenant-1", created_at=FIXED_INSTANT,
             candidate_set_id="set-1", case_ref="case-1",
-            candidates=(scenario["candidate"],),
-            selected_candidate_id=scenario["candidate"].candidate_id,
-            selection_reason_codes=[])
+            candidates=(unevaluated,), selected_candidate_id="cand-9",
+            selection_policy_id="agentic_proposer.deterministic_selection",
+            selection_policy_version="v1", selection_reason_codes=[])
 
 
-def test_od6_i_advisorycandidateset_accepts_the_always_null_case(scenario):
-    """Negative control: C9 refuses only a non-null selector. The always-null shape
-    every builder in this package actually produces remains constructible."""
+def test_c9s_replacement_accepts_the_selection_the_ratified_policy_does_produce(
+        scenario):
+    """The direction C9 made untestable: the lawful non-null shape is constructible."""
+    built = scenario["candidate_set"]
+    assert built.selected_candidate_id == "cand-1"
+    assert built.selection_policy_id == "agentic_proposer.deterministic_selection"
+    assert built.selection_policy_version == "v1"
+
+
+def test_c9s_replacement_still_accepts_the_always_null_case(scenario):
+    """Negative control. A set whose qualifying pool is empty selects nothing, and
+    carries neither policy field."""
+    unevaluated = ap.CandidateAdvisory(**{
+        **spec.complete_candidate(candidate_id="cand-9"), "is_eligible": True})
     built = ap.AdvisoryCandidateSet(
         schema_version="1.0", tenant_id="tenant-1", created_at=FIXED_INSTANT,
-        candidate_set_id="set-1", case_ref="case-1",
-        candidates=(scenario["candidate"],), selected_candidate_id=None,
-        selection_reason_codes=[])
+        candidate_set_id="set-1", case_ref="case-1", candidates=(unevaluated,),
+        selected_candidate_id=None, selection_reason_codes=[])
     assert built.selected_candidate_id is None
+    assert built.selection_policy_id is None
+    assert built.selection_policy_version is None
 
 
-def test_od6_i_c9_rejects_by_model_validate(scenario):
-    fields = dict(
-        schema_version="1.0", tenant_id="tenant-1", created_at=FIXED_INSTANT,
-        candidate_set_id="set-1", case_ref="case-1",
-        candidates=(scenario["candidate"],),
-        selected_candidate_id=scenario["candidate"].candidate_id,
-        selection_reason_codes=[])
+def test_c9s_replacement_refuses_a_foreign_policy_label_on_a_correct_selection(
+        scenario):
+    """I8.5's second half at construction: the recomputed selection matches, and the
+    label names a policy this package did not ratify. Refused."""
+    fields = {name: getattr(scenario["candidate_set"], name)
+              for name in ap.AdvisoryCandidateSet.model_fields}
+    fields["selection_policy_id"] = "someone.elses.policy"
     with pytest.raises(pydantic.ValidationError):
         ap.AdvisoryCandidateSet.model_validate(fields)
 
 
-def test_od6_i_model_construct_bypasses_c9_but_a_later_validate_still_catches_it(
+def test_c9s_replacement_refuses_a_selection_with_no_policy_identity(scenario):
+    """The coupling's other direction: a selection with no policy identity at all."""
+    fields = {name: getattr(scenario["candidate_set"], name)
+              for name in ap.AdvisoryCandidateSet.model_fields}
+    fields["selection_policy_id"] = None
+    fields["selection_policy_version"] = None
+    with pytest.raises(pydantic.ValidationError):
+        ap.AdvisoryCandidateSet.model_validate(fields)
+
+
+def test_model_construct_bypasses_the_replacement_but_a_later_validate_catches_it(
         scenario):
-    """The disclosed ceiling, on the same terms C7's own docstring states for
-    ``DomainCheckCompletion.COMPLETE``: ``model_construct`` alone bypasses every
-    validator, C9 included, and this package neither claims nor attempts to close
-    that pydantic primitive. A subsequent revalidation does catch it, because C9 is a
-    real validator, not merely absent from ``model_construct``'s own bypass path."""
+    """The disclosed ceiling, unchanged from what C7 and C9 each stated of themselves:
+    ``model_construct`` alone bypasses every validator, and this package neither
+    claims nor attempts to close that pydantic primitive. A subsequent revalidation
+    does catch it."""
+    unevaluated = ap.CandidateAdvisory(**{
+        **spec.complete_candidate(candidate_id="cand-9"), "is_eligible": True})
     forged = ap.AdvisoryCandidateSet.model_construct(
         schema_version="1.0", tenant_id="tenant-1", created_at=FIXED_INSTANT,
-        candidate_set_id="set-1", case_ref="case-1",
-        candidates=(scenario["candidate"],),
-        selected_candidate_id=scenario["candidate"].candidate_id,
-        selection_reason_codes=[])
-    assert forged.selected_candidate_id == scenario["candidate"].candidate_id
+        candidate_set_id="set-1", case_ref="case-1", candidates=(unevaluated,),
+        selected_candidate_id="cand-9", selection_reason_codes=[])
+    assert forged.selected_candidate_id == "cand-9"
     with pytest.raises(pydantic.ValidationError):
         ap.AdvisoryCandidateSet.model_validate(dict(forged))
 
 
-def test_od6_i_model_copy_update_also_bypasses_c9_a_second_disclosed_ceiling(scenario):
-    """``model_copy(update=...)`` never re-runs validation either, on a frozen model
-    or otherwise. This is pydantic's own documented behaviour, not a gap in C9's
-    validator, and is disclosed here rather than papered over with an unsupported
-    ``__setattr__``- or ``model_copy``-level interception this package does not add
-    anywhere else in its contracts."""
+def test_model_copy_update_also_bypasses_the_replacement_a_second_ceiling(scenario):
+    """``model_copy(update=...)`` never re-runs validation either, on a frozen model or
+    otherwise. Pydantic's own documented behaviour, disclosed rather than papered over
+    with an unsupported interception this package adds nowhere else."""
     copied = scenario["candidate_set"].model_copy(
-        update={"selected_candidate_id": scenario["candidate"].candidate_id})
-    assert copied.selected_candidate_id == scenario["candidate"].candidate_id
+        update={"selected_candidate_id": "cand-not-real"})
+    assert copied.selected_candidate_id == "cand-not-real"
+    assert ap.verify_deterministic_selection(candidate_set=copied) is False
 
 
-def test_od6_i_removing_the_validator_would_let_the_forbidden_set_through(scenario):
-    """Mutation control. A twin model declaring the identical
-    ``selected_candidate_id`` field but omitting C9's validator accepts exactly what
+def test_removing_the_recomputation_would_let_the_forbidden_selection_through(
+        scenario):
+    """Mutation control, on the same shape the C9 version used. A twin model declaring
+    the identical fields but omitting the recomputation accepts exactly what
     ``AdvisoryCandidateSet`` rejects — proving the validator, and not the field's
-    ``str | None`` type, is what blocks a non-null selector. If C9 were ever deleted
-    from ``contracts.py``, the positive test above would start passing on the real
-    class too, which is how this mutation would actually be caught in the suite."""
+    ``str | None`` type, is what blocks an unproduced selector."""
     from typing import Optional
 
     from ugence_agentic_proposer import contracts as c
 
-    class _AdvisoryCandidateSetWithoutC9(pydantic.BaseModel):
+    class _AdvisoryCandidateSetWithoutTheRecomputation(pydantic.BaseModel):
         model_config = c._MODEL_CONFIG
         schema_version: str = "1.0"
         tenant_id: c.Identifier
@@ -952,61 +1057,80 @@ def test_od6_i_removing_the_validator_would_let_the_forbidden_set_through(scenar
         candidate_set_id: c.Identifier
         case_ref: c.Identifier
         candidates: tuple
+        domain_evaluation_profile_id: Optional[c.Token] = None
+        domain_evaluation_profile_version: Optional[c.Token] = None
         selected_candidate_id: Optional[c.Identifier] = None
+        selection_policy_id: Optional[c.Token] = None
+        selection_policy_version: Optional[c.Token] = None
         selection_reason_codes: c.Reserved = []
 
+    unevaluated = ap.CandidateAdvisory(**{
+        **spec.complete_candidate(candidate_id="cand-9"), "is_eligible": True})
     with pytest.raises(pydantic.ValidationError):
         ap.AdvisoryCandidateSet(
             schema_version="1.0", tenant_id="tenant-1", created_at=FIXED_INSTANT,
-            candidate_set_id="set-1", case_ref="case-1",
-            candidates=(scenario["candidate"],),
-            selected_candidate_id=scenario["candidate"].candidate_id,
+            candidate_set_id="set-1", case_ref="case-1", candidates=(unevaluated,),
+            selected_candidate_id="cand-9",
+            selection_policy_id=c.SELECTION_POLICY_ID,
+            selection_policy_version=c.SELECTION_POLICY_VERSION,
             selection_reason_codes=[])
 
-    twin = _AdvisoryCandidateSetWithoutC9(
-        tenant_id="tenant-1", created_at=FIXED_INSTANT,
-        candidate_set_id="set-1", case_ref="case-1",
-        candidates=(scenario["candidate"],),
-        selected_candidate_id=scenario["candidate"].candidate_id)
-    assert twin.selected_candidate_id == scenario["candidate"].candidate_id
+    twin = _AdvisoryCandidateSetWithoutTheRecomputation(
+        tenant_id="tenant-1", created_at=FIXED_INSTANT, candidate_set_id="set-1",
+        case_ref="case-1", candidates=(unevaluated,),
+        selected_candidate_id="cand-9")
+    assert twin.selected_candidate_id == "cand-9"
 
 
-def test_od6_i_build_proposer_advisory_inherits_c9_with_no_separate_check(scenario):
-    """``build_proposer_advisory`` no longer refuses a non-null selector itself
-    (that check was removed from ``identity.py`` under OD-6(i)): it cannot receive
-    one, because no valid ``AdvisoryCandidateSet`` can carry one. Confirmed here by
-    the only route that could still reach the builder with an illegal value — a
-    ``model_construct``-forged set — and showing the builder still produces a
-    correctly null-selected advisory rather than leaking the forged value: the
-    payload's four selection-dependent fields are derived, never copied from the
-    input, so a bypassed input cannot propagate harm even though it can exist."""
-    forged_set = ap.AdvisoryCandidateSet.model_construct(
-        schema_version="1.0", tenant_id="tenant-1", created_at=FIXED_INSTANT,
-        candidate_set_id="set-1", case_ref="case-1",
-        candidates=(scenario["candidate"],),
-        selected_candidate_id=scenario["candidate"].candidate_id,
-        selection_reason_codes=[])
-    advisory = ap.build_proposer_advisory(
-        tenant_id="tenant-1", case_ref="case-1", created_at=FIXED_INSTANT,
-        identity=scenario["identity"], role=scenario["role"],
-        mandate=scenario["mandate"], context=scenario["context"],
-        observations=[scenario["observation"]], candidate_set=forged_set,
-        parent_advisory_digest=None, claim_summaries=[], observation_refs=[],
-        uncertainties=[], expires_at=scenario["mandate"].expires_at)
-    assert advisory.selected_candidate_id is None
-    assert advisory.recommended_disposition is None
-    assert advisory.requested_review_action is None
-    assert advisory.requested_review_destination_role_ref is None
+def test_build_proposer_advisory_refuses_a_forged_set_rather_than_leaking_it(scenario):
+    """The only route that can still reach the builder with an unlawful selection is a
+    ``model_construct``-forged set. Under C9 the builder derived ``None`` regardless;
+    now that it derives faithfully, it must refuse rather than carry the forged value
+    into ``P_unsigned``. ``verify_deterministic_selection`` is what catches it."""
+    forged_set = scenario["candidate_set"].model_copy(
+        update={"selected_candidate_id": "cand-not-real"})
+    with pytest.raises(ap.DomainEvaluationProviderError):
+        ap.build_proposer_advisory(
+            tenant_id="tenant-1", case_ref="case-1", created_at=FIXED_INSTANT,
+            identity=scenario["identity"], role=scenario["role"],
+            mandate=scenario["mandate"], context=scenario["context"],
+            observations=[scenario["observation"]], candidate_set=forged_set,
+            parent_advisory_digest=None, claim_summaries=[], observation_refs=[],
+            uncertainties=[], expires_at=scenario["mandate"].expires_at,
+            provider=scenario["provider"], expected_profile_id=spec.PROFILE_ID,
+            expected_profile_version=spec.PROFILE_VERSION,
+            requested_review_destination_role_ref="role-approver")
 
 
-def test_od6_i_no_separate_refusal_remains_in_construct_advisory_source():
-    """Static confirmation that the removed check is actually gone from source, not
-    merely unreachable: a reviewer reading ``identity.py`` should not find a second,
-    now-dead copy of C9's rule sitting beside the real one."""
+def test_no_separate_refusal_remains_in_construct_advisory_source():
+    """Static confirmation that C9's pre-OD-6(i) builder-side refusal text never came
+    back: a reviewer reading ``identity.py`` should not find a second, now-dead copy
+    of a selection ceiling sitting beside the real machinery."""
     source = (SRC / "identity.py").read_text(encoding="utf-8")
     assert "cannot derive an advisory from a" not in source, (
-        "the pre-OD-6(i) builder-side refusal text is still present in identity.py; "
-        "it should have been removed when C9 took over the ceiling")
+        "the pre-OD-6(i) builder-side refusal text is present in identity.py")
+
+
+def test_c7_and_c9_are_gone_from_source_together(scenario):
+    """I8.7's same-change-set discipline, as far as one runtime test can reach it.
+
+    I8.7 is explicitly a review-time obligation that no single runtime test can
+    enforce alone. What *is* mechanically checkable is the pair: neither ceiling's
+    refusal remains in ``contracts.py``, and every replacement the amendment names is
+    present. A commit removing one ceiling without the replacement surface fails here.
+    """
+    source = (SRC / "contracts.py").read_text(encoding="utf-8")
+    assert "DomainCheckCompletion.COMPLETE is unconstructible in S1" not in source
+    assert "must be None in S1 (C9" not in source
+    for replacement in (
+            "domain_evaluation_outcome", "domain_evaluation_profile_id",
+            "selection_policy_id", "check_deterministic_selection",
+            "selection_policy_v1", "qualifying_pool", "DomainEvaluationProvider",
+            "DomainEvaluationRequest", "DomainEvaluationResponse"):
+        assert replacement in source, replacement
+    assert ap.DomainEvaluationOutcome is not None
+    assert ap.verify_domain_evaluation is not None
+    assert ap.verify_deterministic_selection is not None
 
 
 # --------------------------------------------------------------------------- #
@@ -1025,7 +1149,10 @@ def _od6_ii_call(**overrides):
             observations=[scenario["observation"]],
             candidate_set=scenario["candidate_set"], parent_advisory_digest=None,
             claim_summaries=[], observation_refs=[], uncertainties=[],
-            expires_at=scenario["mandate"].expires_at)
+            expires_at=scenario["mandate"].expires_at,
+            provider=scenario["provider"], expected_profile_id=spec.PROFILE_ID,
+            expected_profile_version=spec.PROFILE_VERSION,
+            requested_review_destination_role_ref="role-approver")
         kwargs.update(overrides)
         return ap.build_proposer_advisory(**kwargs)
     return call
@@ -1113,31 +1240,48 @@ def test_od6_ii_build_advisory_revisions_own_continuity_checks_stay_plain_valuee
             mandate=scenario["mandate"], context=scenario["context"],
             observations=[scenario["observation"]], claim_summaries=[],
             observation_refs=[], uncertainties=[], created_at=FIXED_INSTANT,
-            expires_at=scenario["mandate"].expires_at)
+            expires_at=scenario["mandate"].expires_at,
+            provider=scenario["provider"], expected_profile_id=spec.PROFILE_ID,
+            expected_profile_version=spec.PROFILE_VERSION,
+            requested_review_destination_role_ref="role-approver")
     assert not isinstance(excinfo.value, ap.CrossContractViolationError)
     assert not isinstance(excinfo.value, pydantic.ValidationError)
+
+
+#: The one R-1b clause that acquired a builder raise site when OD-7 made selection
+#: reachable. R-1b(vii)'s **non-local half** — the selected candidate's
+#: ``requested_review_action`` must be a member of ``CognitiveRoleContract.permitted_
+#: review_actions`` — compares the advisory against a separately supplied role, so it
+#: is not decidable from the advisory alone and H2 leaves it to
+#: ``CrossContractViolationError``. Under C9 no selection existed, so the clause was
+#: unreachable and the builder needed no raise site for it; it is reachable now.
+_R1B_CLAUSE_WITH_A_RAISE_SITE = "R-1b(vii)"
 
 
 def test_od6_ii_r1b_cross_contract_clauses_hold_by_construction_not_by_a_raise():
     """What OD-6's own ADR text says conceptually — that R-1b's cross-contract
     clauses fall under the same exception class — is not the same as a raise site
-    existing for them in the builder. It does not: the advisory's nested
-    ``candidates`` and its four selection-dependent fields are derived directly from
-    ``candidate_set`` rather than separately supplied and compared, so R-1b(i)-(iv),
-    (viii) and (ix) hold by construction on every path ``build_proposer_advisory``
-    and ``build_advisory_revision`` support. This is confirmed structurally rather
-    than asserted in prose: neither builder's source raises
-    ``CrossContractViolationError`` while also mentioning R-1b."""
+    existing for them in the builder. For R-1b(i)-(iv), (viii) and (ix) there still is
+    none: the advisory's nested ``candidates`` and its selection-dependent fields are
+    derived directly from ``candidate_set`` rather than separately supplied and
+    compared, so those clauses hold by construction on every path
+    ``build_proposer_advisory`` and ``build_advisory_revision`` support.
+
+    Exactly one clause is exempt, and it is named rather than left implicit: see
+    ``_R1B_CLAUSE_WITH_A_RAISE_SITE``. Pinning the exemption by equality is the point —
+    a second clause acquiring a raise site fails here rather than being absorbed.
+    """
     source = (SRC / "identity.py").read_text(encoding="utf-8")
     tree = ast.parse(source, filename="identity.py")
+    named = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Raise) and node.exc is not None:
             text = ast.unparse(node.exc)
-            if "CrossContractViolationError" in text:
-                assert "R-1b" not in text, (
-                    "a CrossContractViolationError raise site in identity.py names "
-                    "R-1b; R-1b's cross-contract clauses hold by construction and "
-                    "have no raise site of their own")
+            if "CrossContractViolationError" in text and "R-1b" in text:
+                named.update(re.findall(r"R-1b\(?[ivx]*\)?", text))
+    assert named == {_R1B_CLAUSE_WITH_A_RAISE_SITE}, (
+        f"CrossContractViolationError raise sites in identity.py name {sorted(named)}; "
+        f"only {_R1B_CLAUSE_WITH_A_RAISE_SITE} is ratified to have one")
 
 
 # --------------------------------------------------------------------------- #

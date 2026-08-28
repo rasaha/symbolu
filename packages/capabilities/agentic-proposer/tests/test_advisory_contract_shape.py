@@ -773,7 +773,8 @@ def test_the_candidate_set_reference_is_retained_alongside_the_nesting(graph):
     """OD-4(a) retains ``candidate_set_id``; it does not replace it with the nesting.
     Twenty-three fields, not twenty-two."""
     assert "candidate_set_id" in graph["ProposerAdvisory"].model_fields
-    assert len(graph["ProposerAdvisory"].model_fields) == 23
+    # OD-7 part 5 moved this from 23 to 27 (I8.11).
+    assert len(graph["ProposerAdvisory"].model_fields) == 27
     assert "AdvisoryCandidateSet" in spec.TOP_LEVEL_CONTRACTS
 
 

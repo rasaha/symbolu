@@ -1,9 +1,13 @@
-"""Part H — verifiers, and the two exceptions this package defines (H2, OD-6(ii)).
+"""Part H — verifiers, and the three exceptions this package defines (H2, OD-6(ii),
+OD-7).
 
 Independent replay: each verifier recomputes from stored content, consults no cache
 and no side table, and returns ``False`` rather than raising, "on the same terms" as
 one another (H1). The **builder** raises; the **verifier** reports, so a read-only
-auditor can inspect stored content without exception handling.
+auditor can inspect stored content without exception handling. OD-7's two new replay
+functions keep that discipline exactly: a provider exception raised inside
+``verify_domain_evaluation``'s own call is caught and reported as ``False``, so a
+read-only auditor calling a verifier still never needs exception handling.
 """
 from __future__ import annotations
 
@@ -18,17 +22,31 @@ if typing.TYPE_CHECKING:
         AgentIdentityRef,
         BoundedContextEnvelope,
         CognitiveRoleContract,
+        DomainEvaluationProvider,
         ProposerAdvisory,
         ToolObservation,
         WorkMandate,
     )
 
+#: OD-7 part 5's two R-1b correspondence clauses, and the mirrored fields they govern.
+#: Scoped to ``ProposerAdvisory`` and ``AdvisoryCandidateSet`` together, never to a
+#: field name alone (OD-3's lesson).
+MIRRORED_EVALUATION_FIELDS = (
+    "domain_evaluation_profile_id",
+    "domain_evaluation_profile_version",
+    "selection_policy_id",
+    "selection_policy_version",
+)
+
 __all__ = [
     "EligibilityMismatchError",
     "CrossContractViolationError",
+    "DomainEvaluationProviderError",
     "verify_candidate_eligibility",
     "verify_advisory_selection",
     "verify_observation_resolution",
+    "verify_domain_evaluation",
+    "verify_deterministic_selection",
 ]
 
 
@@ -57,6 +75,26 @@ class CrossContractViolationError(ValueError):
     independent replay that reports a violation of them — including one produced by
     a hand-constructed or tampered object outside the builder's own path — by
     returning ``False``, on the same terms H1 states for every verifier.
+    """
+
+
+class DomainEvaluationProviderError(ValueError):
+    """H2's fifth class (OD-7). Raised when a provider's echoed profile identity, its
+    echoed ``candidate_id``, its returned outcome, or the recorded selector-policy
+    identity cannot be verified against what the request or the ratified policy
+    actually specifies — or when ``provider`` itself raises during the original build.
+
+    Not a field-validation failure, on the same grounds ``EligibilityMismatchError`` and
+    ``CrossContractViolationError`` are not: every object involved is well-formed and
+    well-typed on its own terms. What failed is that the provider's answer does not
+    correspond to the question, or that a stored selection names a policy this package
+    did not ratify.
+
+    It exists so that a caller catches **one** named exception family for every OD-7
+    construction-time failure rather than an arbitrary third-party type. Builders raise;
+    verifiers report — H1's own distinction, applied here: a provider exception raised
+    inside a *verifier's* replay call is caught and reported as ``False``, never
+    re-raised as this class.
     """
 
 
@@ -209,6 +247,22 @@ def verify_advisory_selection(
     if advisory.selected_candidate_id != candidate_set.selected_candidate_id:
         return False
 
+    # R-1b's two new correspondence clauses (OD-7 part 5): each mirrored field on the
+    # advisory equals the separately transported set's. The advisory's copy is inside
+    # ``P_unsigned``; the set's is not, so a divergence here is exactly the case the
+    # mirroring exists to make detectable.
+    for name in MIRRORED_EVALUATION_FIELDS:
+        if getattr(advisory, name) != getattr(candidate_set, name):
+            return False
+
+    # OD-7 part 5: what this function's structural correspondence check does NOT do on
+    # its own. Above, the two selectors are checked to agree WITH EACH OTHER; neither
+    # of those checks establishes that either selector is the ratified selector's own
+    # lawful output. ``verify_deterministic_selection`` is what establishes that, so it
+    # is called here rather than replacing this function.
+    if not verify_deterministic_selection(candidate_set=candidate_set):
+        return False
+
     if advisory.selected_candidate_id is not None:
         # R-1b(v): the selector resolves to exactly one element of each sequence, and
         # the two are the same candidate.
@@ -237,3 +291,228 @@ def verify_advisory_selection(
         return False
 
     return True
+
+
+# --------------------------------------------------------------------------- #
+# OD-7 — the domain-evaluation boundary: request assembly, the provider call, and
+# the two new replay functions
+# --------------------------------------------------------------------------- #
+
+
+def _evaluation_request(
+    *,
+    candidate_id: str,
+    profile_id: str,
+    profile_version: str,
+    observation_refs,
+    mandate: WorkMandate,
+    context: BoundedContextEnvelope,
+    observations: list[ToolObservation],
+):
+    """OD-7 part 2. Assemble the request from already-identity-bound public content
+    only: the candidate under evaluation, its referenced observations, the mandate and
+    context in force, and the profile evaluation is requested under.
+
+    Shared by the builder (construction) and by ``verify_domain_evaluation`` (replay),
+    so the two cannot assemble different questions and compare the answers.
+    """
+    from . import contracts as c
+
+    wanted = set(observation_refs)
+    return c.DomainEvaluationRequest(
+        candidate_id=candidate_id,
+        profile_id=profile_id,
+        profile_version=profile_version,
+        mandate=mandate,
+        context=context,
+        observations=tuple(o for o in observations if o.observation_id in wanted),
+    )
+
+
+def _echo_is_correlated(response, request) -> bool:
+    """OD-7 part 2's request/response correlation check, stated once.
+
+    It catches a provider that mixed up concurrent or batched requests, answered under
+    a stale profile, returned a cached result for a different candidate, or was wired
+    up wrongly. It is **not** a defence against a dishonest provider: one that wishes to
+    mislead echoes back what it was handed while evaluating something else.
+    """
+    return (response.candidate_id == request.candidate_id
+            and response.profile_id == request.profile_id
+            and response.profile_version == request.profile_version)
+
+
+def verify_domain_evaluation(
+    *,
+    provider: DomainEvaluationProvider,
+    candidate_set: AdvisoryCandidateSet,
+    mandate: WorkMandate,
+    context: BoundedContextEnvelope,
+    observations: list[ToolObservation],
+    expected_profile_id: str,
+    expected_profile_version: str,
+) -> bool:
+    """OD-7 part 5. Replay of every completed domain evaluation the set records.
+
+    **Not a self-check against the set's own recorded profile.** ``expected_profile_id``
+    and ``expected_profile_version`` are supplied by the caller from a source outside
+    the advisory under test — the profile currently configured or ratified for this
+    case — precisely so this function cannot be satisfied merely by a provider echoing
+    back whatever profile identity a tampered ``AdvisoryCandidateSet`` happens to
+    record.
+
+    For every candidate whose ``domain_check_completion is COMPLETE`` it (a) checks the
+    stored profile pair equals the expected pair; (b) re-issues a request carrying the
+    **expected** profile and the candidate's own ``candidate_id``; and (c) checks the
+    response's echoed profile, its echoed ``candidate_id`` and its outcome equal,
+    respectively, the expected profile, the candidate under test, and the stored
+    ``domain_evaluation_outcome``.
+
+    ``[G]`` **Disclosed ceiling.** This proves the recorded profile matches what was
+    independently expected and that invoking ``provider`` again under that profile
+    reproduces the stored outcome. It does **not** and cannot prove the *original*
+    evaluation was correct if ``provider`` is non-deterministic or its behaviour has
+    since changed under an unchanged version label. Four further limits, each a
+    consequence of what replay operates on:
+
+    * **Candidate suppression is invisible.** Replay iterates the candidates the set
+      *contains*. A candidate never added leaves no trace in ``P_unsigned`` and no
+      verifier can report its absence.
+    * **A profile label is not a profile.** The pair is compared by equality. Two
+      providers, or one provider before and after an unversioned change to its own
+      rules, can present the same label; replay then confirms agreement between two
+      things that share a name and nothing more.
+    * **There is no selector-policy registry** — see ``verify_deterministic_selection``.
+    * **Replay proves reproducibility, never authority.** Every check here answers
+      "does re-running agree with what was stored", which is a different question from
+      "was the stored answer right". The provider remains the sole authority on domain
+      substance.
+
+    Returns ``False`` and never raises, on H1's unchanged terms — including for a
+    malformed set that bypassed the construction-time couplings via ``model_construct``
+    or ``model_copy(update=...)``, and including a provider that raises during this
+    function's own replay call.
+    """
+    from .contracts import DomainCheckCompletion
+
+    for candidate in candidate_set.candidates:
+        if candidate.domain_check_completion is not DomainCheckCompletion.COMPLETE:
+            continue
+        if (candidate_set.domain_evaluation_profile_id != expected_profile_id
+                or candidate_set.domain_evaluation_profile_version
+                != expected_profile_version):
+            return False
+        try:
+            request = _evaluation_request(
+                candidate_id=candidate.candidate_id,
+                profile_id=expected_profile_id,
+                profile_version=expected_profile_version,
+                observation_refs=candidate.observation_refs,
+                mandate=mandate, context=context, observations=observations)
+            response = provider.evaluate(request=request)
+        except Exception:  # noqa: BLE001 — a verifier reports; it does not propagate.
+            return False
+        if response is None or not _echo_is_correlated(response, request):
+            return False
+        if response.outcome is not candidate.domain_evaluation_outcome:
+            return False
+    return True
+
+
+def verify_deterministic_selection(*, candidate_set: AdvisoryCandidateSet) -> bool:
+    """OD-8. Replay of selection-policy v1 over the candidate set's own members.
+
+    Recomputes the **qualifying pool** — members that are ``is_eligible is True``
+    **and** carry ``domain_evaluation_outcome is SATISFIED`` — and checks the stored
+    selector against selection-policy v1: exactly one qualifying candidate requires
+    ``selected_candidate_id`` to equal that candidate's identifier; zero or more than
+    one requires it to be ``None``. **Selection-policy v1 does not apply the
+    ``candidate_id`` tie-break**, so this function neither computes nor consults it.
+
+    It **also** checks the stored ``selection_policy_id``/``selection_policy_version``
+    equal this package's own ratified selector identity, so a ``selected_candidate_id``
+    that happens to match the recomputation but is *labelled* as coming from a
+    different, unratified policy still fails replay.
+
+    ``[G]`` **Disclosed ceiling: there is no selector-policy registry.** Comparing the
+    stored label against this package's own constants detects a foreign or stale label;
+    it does not and cannot establish that the named policy *is* the logic that produced
+    the stored selection on some other installation, because no registry maps a policy
+    identity to its ratified definition. Within one installation at one version this is
+    sound; across versions it degrades to a label comparison.
+
+    Returns ``False`` and never raises, including for a set that bypassed the
+    construction-time validators.
+    """
+    from . import contracts as c
+
+    try:
+        expected = c.selection_policy_v1(candidate_set.candidates)
+        stored = candidate_set.selected_candidate_id
+        if stored != expected:
+            return False
+        if stored is None:
+            return all(getattr(candidate_set, name) is None
+                       for name in c.SELECTION_POLICY_FIELDS)
+        return (candidate_set.selection_policy_id == c.SELECTION_POLICY_ID
+                and candidate_set.selection_policy_version
+                == c.SELECTION_POLICY_VERSION)
+    except Exception:  # noqa: BLE001 — a verifier reports; it does not propagate.
+        return False
+
+
+# --------------------------------------------------------------------------- #
+# OD-7 part 7 — the fail-closed table, as one ordered, non-overlapping function
+# --------------------------------------------------------------------------- #
+
+#: The ratified outcome of each row, keyed by row number. Row 2 refuses construction
+#: outright and so carries no terminal outcome; every other row names one.
+FAIL_CLOSED_ROWS = {
+    1: "NEED_EVIDENCE",
+    2: None,
+    3: "PROPOSAL",
+    4: "ABSTAIN",
+    5: "ABSTAIN",
+    6: "ABSTAIN",
+}
+
+
+def classify_fail_closed_row(
+    *,
+    evidence_resolved: bool,
+    evaluator_available: bool,
+    verification_passed: bool,
+    candidates,
+):
+    """OD-7 part 7, evaluated in the ratified order. Returns ``(row, selected_id)``.
+
+    Every condition below is stated on the **qualifying pool** (OD-7 part 4) — never on
+    the presence of an individual non-qualifying candidate. The first matching row
+    governs, the rows do not overlap, and exactly one row matches any completed run, so
+    no completed run falls through without a ratified outcome (OD-10, I8.15).
+
+    ``[R]`` **OD-9's per-candidate scope is load-bearing here.** A set holding one
+    eligible, ``SATISFIED`` candidate alongside any number of ``INCONCLUSIVE`` or
+    ``NOT_SATISFIED`` ones matches row 3 and **selects the qualifying one**. There is no
+    run-wide reading of ``INCONCLUSIVE`` in this function or anywhere else in this
+    package: rows 5 and 6 are reached only when the qualifying pool is *empty*.
+
+    Row 2 returns no terminal outcome: it refuses construction. That is a builder
+    obligation (``DomainEvaluationProviderError``), not a value to record.
+    """
+    from . import contracts as c
+    from .vocabulary import DomainEvaluationOutcome
+
+    if not evidence_resolved or not evaluator_available:
+        return 1, None
+    if not verification_passed:
+        return 2, None
+    pool = c.qualifying_pool(candidates)
+    if len(pool) == 1:
+        return 3, pool[0].candidate_id
+    if len(pool) > 1:
+        return 4, None
+    if any(candidate.domain_evaluation_outcome is DomainEvaluationOutcome.INCONCLUSIVE
+           for candidate in candidates):
+        return 5, None
+    return 6, None

@@ -32,6 +32,13 @@ alongside the three D4 enums above: ``ReviewAction`` (B8), ``DomainCheckCompleti
 and ``ToolObservationAdmissionStatus`` (D5), and ``ProposerProcessState`` (D8, R-3).
 Each is a closed membership vocabulary for a contract field; none is an authority
 claim, and none grants, clears, admits evidence or decides anything.
+
+OD-7 (part 3) adds an eighth, ``DomainEvaluationOutcome``. It carries the *result* of a
+domain evaluation, which ``DomainCheckCompletion`` deliberately does not encode: the
+latter still states only whether every check the applicable profile requires reached a
+determinate per-check reading. ``DomainEvaluationOutcome`` is not an authority claim
+either — it is the injected evaluator's advisory reading of one candidate against one
+versioned profile, and it grants, clears, admits and decides nothing.
 """
 from __future__ import annotations
 
@@ -49,6 +56,7 @@ __all__ = [
     "ToolOperationClass",
     "ToolObservationAdmissionStatus",
     "ProposerProcessState",
+    "DomainEvaluationOutcome",
 ]
 
 
@@ -126,16 +134,51 @@ class ReviewAction(str, Enum):
 
 
 class DomainCheckCompletion(str, Enum):
-    """C7. ``COMPLETE`` is defined so the enum is closed and Equation 2 is total.
+    """C7, as amended by OD-7 part 3. ``COMPLETE`` closes the enum and makes Equation 2
+    total, and it gates **only whether evaluation ran** — never what it concluded.
 
-    It is structurally unconstructible on every path in this package: a validator on
-    ``CandidateAdvisory.domain_check_completion`` rejects ``COMPLETE`` unconditionally
-    until a separately ratified S2 domain-evaluator boundary removes that validator as
-    an explicit, reviewed act.
+    OD-7 supplies the substantive reading C7 itself never stated: ``COMPLETE`` means
+    every check the applicable versioned domain-evaluation profile requires reached a
+    *per-check* determinate reading — none left pending, none erroring, none timed
+    out — regardless of whether those readings, taken together, resolve to a clean pass
+    or fail. The aggregate result is carried separately by ``DomainEvaluationOutcome``,
+    which is why ``COMPLETE`` and ``INCONCLUSIVE`` are compatible rather than
+    contradictory.
+
+    C7's own S1 ceiling — a validator rejecting ``COMPLETE`` unconditionally — is
+    **removed**, in the single change set that added ``DomainEvaluationOutcome``, the
+    ``CandidateAdvisory.domain_evaluation_outcome`` field and its coupling validator,
+    the ``AdvisoryCandidateSet``/``ProposerAdvisory`` profile and selector-policy
+    fields, the ``DomainEvaluationProvider`` boundary, the two replay functions and
+    Equation 2's seventh term (OD-7 part 8). The coupling validator and those replay
+    functions are what took over C7's fail-closed role.
     """
 
     NOT_EVALUATED = "NOT_EVALUATED"
     COMPLETE = "COMPLETE"
+
+
+class DomainEvaluationOutcome(str, Enum):
+    """OD-7 part 3. The *result* of a completed domain evaluation, for one candidate,
+    under one versioned profile. Never an authorization, a clearance or a decision.
+
+    ``INDETERMINATE`` is deliberately **not** reused: D4 reserves that spelling to two
+    authority-adjacent positions and ratifies it in exactly one non-authority position
+    (``SemanticAuditorFindingStatus``). A third position was not ratified, so
+    ``INCONCLUSIVE`` is used instead; ``tests/test_vocabulary.py`` pins that the two
+    spellings never collide (I8.8).
+    """
+
+    #: Every check the profile requires ran, and the aggregation resolves to a pass.
+    SATISFIED = "SATISFIED"
+    #: Every check ran, and the aggregation resolves to a fail.
+    NOT_SATISFIED = "NOT_SATISFIED"
+    #: Every check ran and each individually resolved, and the profile's aggregation
+    #: rule states, definitely, that they do not converge. Recording this is a
+    #: determinate act about *process*; the answer it records is an absence of
+    #: substantive convergence. It is compatible with ``DomainCheckCompletion.COMPLETE``
+    #: for exactly that reason (OD-7 part 3).
+    INCONCLUSIVE = "INCONCLUSIVE"
 
 
 class AgentLifecycleState(str, Enum):

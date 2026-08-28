@@ -33,11 +33,15 @@ from datetime import datetime
 
 import ugence_jcs
 
+from .equations import evaluate_readiness
 from .verification import (
     CrossContractViolationError,
+    DomainEvaluationProviderError,
     EligibilityMismatchError,
     _resolve_references,
     verify_candidate_eligibility,
+    verify_deterministic_selection,
+    verify_domain_evaluation,
 )
 
 if typing.TYPE_CHECKING:
@@ -46,6 +50,7 @@ if typing.TYPE_CHECKING:
         AgentIdentityRef,
         BoundedContextEnvelope,
         CognitiveRoleContract,
+        DomainEvaluationProvider,
         ProposerAdvisory,
         ToolObservation,
         WorkMandate,
@@ -110,7 +115,16 @@ def _unsigned_advisory_payload_model():
         candidates: Annotated[
             tuple[c.CandidateAdvisory, ...], AfterValidator(c._check_candidate_sequence)
         ]
+        # OD-7 part 5's four mirrored fields. G2's equivalence obligation requires this
+        # private payload to carry the same fields, defaults, validators and
+        # serializers ``ProposerAdvisory`` does; omitting them here would put four
+        # fields inside the advisory and outside ``P_unsigned``, and the two models
+        # would drift apart at exactly the point identity is computed.
+        domain_evaluation_profile_id: Optional[c.Token] = None
+        domain_evaluation_profile_version: Optional[c.Token] = None
         selected_candidate_id: Optional[c.Identifier] = None
+        selection_policy_id: Optional[c.Token] = None
+        selection_policy_version: Optional[c.Token] = None
         recommended_disposition: Optional[c.CandidateDisposition] = None
         requested_review_action: Optional[c.ReviewAction] = None
         requested_review_destination_role_ref: Optional[c.Identifier] = None
@@ -126,6 +140,9 @@ def _unsigned_advisory_payload_model():
         def _selection_coupling_and_correspondence(self):
             c.check_selection_coupling(self)
             c.check_local_selection_correspondence(self)
+            c.check_evaluation_profile_coupling(self)
+            c.check_selection_policy_coupling(self)
+            c.check_deterministic_selection(self)
             return self
 
         @field_validator("created_at", "expires_at", mode="after")
@@ -183,18 +200,26 @@ def build_proposer_advisory(
     observation_refs: list[str],
     uncertainties: list[str],
     expires_at: datetime,
+    provider: "DomainEvaluationProvider",
+    expected_profile_id: str,
+    expected_profile_version: str,
+    requested_review_destination_role_ref: "str | None",
 ) -> "ProposerAdvisory":
-    """H1. Validates its inputs, derives the nested ``candidates`` sequence and the
-    four selection-dependent fields from ``candidate_set`` under R-1b, and constructs
-    the advisory in one expression with the substrate call inline in the
+    """H1, as amended by OD-7. Validates its inputs, replays the domain evaluation and
+    the deterministic selection, derives the nested ``candidates`` sequence, the four
+    selection-dependent fields and the four mirrored evaluation/policy fields from
+    ``candidate_set`` under R-1b, recomputes Equation 2 for any selection, and
+    constructs the advisory in one expression with the substrate call inline in the
     ``advisory_digest=`` keyword (G2).
 
-    **S1 selects nothing (Part J).** Under C9 (OD-6(i)), a candidate set carrying a
-    non-null selector cannot be constructed in S1 and therefore cannot reach this
-    builder, so this derivation is exercised, in S1, only on the always-null case; no
-    separate refusal is written here. This is what makes ``selected_candidate_id``
-    (and its three dependents) ``None`` on every advisory this builder produces
-    (V13, B3).
+    **This builder now selects (OD-7 part 8).** C9 made a non-null selector
+    unconstructible on ``AdvisoryCandidateSet``, so the derivation was exercised only
+    on the always-null case. With C9 removed, a lawful selection reaches here and is
+    carried through — but only after ``verify_domain_evaluation`` and
+    ``verify_deterministic_selection`` both pass against an **independently supplied**
+    expected profile (part 7, row 2: verification failure refuses construction), and
+    only if Equation 2 recomputes ``True`` for the resolved candidate. That
+    recomputation is V13 as B3 states it: independently recomputed here, not assumed.
     """
     return _construct_advisory(
         tenant_id=tenant_id, case_ref=case_ref, created_at=created_at,
@@ -203,6 +228,9 @@ def build_proposer_advisory(
         advisory_version="1", parent_advisory_digest=parent_advisory_digest,
         claim_summaries=claim_summaries, observation_refs=observation_refs,
         uncertainties=uncertainties, expires_at=expires_at,
+        provider=provider, expected_profile_id=expected_profile_id,
+        expected_profile_version=expected_profile_version,
+        requested_review_destination_role_ref=requested_review_destination_role_ref,
     )
 
 
@@ -223,6 +251,10 @@ def _construct_advisory(
     observation_refs: list[str],
     uncertainties: list[str],
     expires_at: datetime,
+    provider: "DomainEvaluationProvider",
+    expected_profile_id: str,
+    expected_profile_version: str,
+    requested_review_destination_role_ref: "str | None",
 ) -> "ProposerAdvisory":
     """The G2 construction shape, shared by ``build_proposer_advisory`` (``advisory_
     version="1"``, no parent) and ``build_advisory_revision`` (an incremented
@@ -246,11 +278,6 @@ def _construct_advisory(
     _require_equal("the bound role contract", mandate.assigned_role_contract_id,
                     identity.bound_role_contract_id, role.role_contract_id)
 
-    # No separate refusal of a non-null candidate_set.selected_candidate_id is
-    # written here (OD-6(i)): C9 makes that unconstructible on AdvisoryCandidateSet
-    # itself, so no validly constructed candidate_set can ever carry one, and this
-    # builder cannot receive a lawfully constructed violating set.
-
     if not verify_candidate_eligibility(
             candidate_set=candidate_set, identity=identity, role=role,
             mandate=mandate, context=context, observations=observations):
@@ -268,6 +295,68 @@ def _construct_advisory(
             "an observation_refs entry does not resolve to exactly one supplied "
             "ToolObservation, or fails tenant/case/context continuity (R-7)")
 
+    # OD-7 part 7, row 2: the provider's echoed profile, its echoed candidate_id, its
+    # result, or the selector-policy identity cannot be verified -> refuse construction.
+    # The expected profile is supplied by the caller from a source OUTSIDE the advisory
+    # under test, so this cannot be satisfied by a provider echoing back whatever a
+    # tampered candidate set happens to record.
+    if not verify_domain_evaluation(
+            provider=provider, candidate_set=candidate_set, mandate=mandate,
+            context=context, observations=observations,
+            expected_profile_id=expected_profile_id,
+            expected_profile_version=expected_profile_version):
+        raise DomainEvaluationProviderError(
+            "the recorded domain evaluation does not replay against the expected "
+            "profile: the stored profile identity, the provider's echoed profile or "
+            "candidate_id, or the stored outcome could not be verified (OD-7 part 7, "
+            "row 2)")
+
+    if not verify_deterministic_selection(candidate_set=candidate_set):
+        raise DomainEvaluationProviderError(
+            "the recorded selection is not selection-policy v1's own output over this "
+            "candidate set, or is labelled as coming from a policy this package did "
+            "not ratify (OD-8; OD-7 part 7, row 2)")
+
+    # R-1b: derive the selection-dependent fields from the set rather than accepting
+    # them, so the two cannot disagree.
+    selected_candidate_id = candidate_set.selected_candidate_id
+    recommended_disposition = None
+    requested_review_action = None
+    destination_role_ref = None
+    if selected_candidate_id is not None:
+        selected = [candidate for candidate in candidate_set.candidates
+                    if candidate.candidate_id == selected_candidate_id][0]
+        recommended_disposition = selected.disposition
+        requested_review_action = selected.requested_review_action
+        if requested_review_action not in role.permitted_review_actions:
+            raise CrossContractViolationError(
+                "the selected candidate's requested_review_action is not a member of "
+                "CognitiveRoleContract.permitted_review_actions (R-1b(vii))")
+        # R-1a requires all three dependents non-null alongside a selection, and no
+        # contract in this specification states a source for the destination role
+        # reference. It is therefore a caller-supplied selection input — one of the
+        # "selection inputs" OD-7 adds to this builder — checked for joint presence
+        # here rather than invented from a role field that means something else.
+        if requested_review_destination_role_ref is None:
+            raise CrossContractViolationError(
+                "a selection requires requested_review_destination_role_ref (R-1a); "
+                "no contract specifies a source for it, so the caller must supply it")
+        destination_role_ref = requested_review_destination_role_ref
+        # V13 / B3 / R-2, recomputed here rather than assumed. Under selection-policy
+        # v1 the resolved candidate is eligible and SATISFIED, so Equation 2 turns on
+        # its remaining terms; a candidate that fails any of them must not be carried
+        # into an advisory a PROPOSAL record could then reference.
+        if evaluate_readiness(candidate=selected, identity=identity, role=role,
+                              mandate=mandate, context=context) is not True:
+            raise CrossContractViolationError(
+                "the selected candidate is not ready: evaluate_readiness(...) is not "
+                "True, so R-2's condition for terminal_outcome=PROPOSAL does not hold "
+                "(V13, B3)")
+    elif requested_review_destination_role_ref is not None:
+        raise CrossContractViolationError(
+            "requested_review_destination_role_ref was supplied for a run that selects "
+            "no candidate; R-1a requires all three dependents absent")
+
     payload = _unsigned_advisory_payload_model()(
         schema_version="1.0",
         tenant_id=tenant_id,
@@ -282,10 +371,15 @@ def _construct_advisory(
         context_id=context.context_id,
         candidate_set_id=candidate_set.candidate_set_id,
         candidates=candidate_set.candidates,
-        selected_candidate_id=None,
-        recommended_disposition=None,
-        requested_review_action=None,
-        requested_review_destination_role_ref=None,
+        domain_evaluation_profile_id=candidate_set.domain_evaluation_profile_id,
+        domain_evaluation_profile_version=(
+            candidate_set.domain_evaluation_profile_version),
+        selected_candidate_id=selected_candidate_id,
+        selection_policy_id=candidate_set.selection_policy_id,
+        selection_policy_version=candidate_set.selection_policy_version,
+        recommended_disposition=recommended_disposition,
+        requested_review_action=requested_review_action,
+        requested_review_destination_role_ref=destination_role_ref,
         claim_summaries=list(claim_summaries),
         observation_refs=list(observation_refs),
         uncertainties=list(uncertainties),
@@ -309,7 +403,11 @@ def _construct_advisory(
         context_id=payload.context_id,
         candidate_set_id=payload.candidate_set_id,
         candidates=payload.candidates,
+        domain_evaluation_profile_id=payload.domain_evaluation_profile_id,
+        domain_evaluation_profile_version=payload.domain_evaluation_profile_version,
         selected_candidate_id=payload.selected_candidate_id,
+        selection_policy_id=payload.selection_policy_id,
+        selection_policy_version=payload.selection_policy_version,
         recommended_disposition=payload.recommended_disposition,
         requested_review_action=payload.requested_review_action,
         requested_review_destination_role_ref=(
@@ -338,6 +436,10 @@ def build_advisory_revision(
     uncertainties: list[str],
     created_at: datetime,
     expires_at: datetime,
+    provider: "DomainEvaluationProvider",
+    expected_profile_id: str,
+    expected_profile_version: str,
+    requested_review_destination_role_ref: "str | None",
 ) -> "ProposerAdvisory":
     """G3. A revision is a newly asserted identity-bearing advisory: ``claim_
     summaries``, ``observation_refs`` and ``uncertainties`` are required keyword
@@ -375,4 +477,8 @@ def build_advisory_revision(
         observation_refs=observation_refs,
         uncertainties=uncertainties,
         expires_at=expires_at,
+        provider=provider,
+        expected_profile_id=expected_profile_id,
+        expected_profile_version=expected_profile_version,
+        requested_review_destination_role_ref=requested_review_destination_role_ref,
     )

@@ -2,7 +2,7 @@
 
 **Read this first: this module has changed roles.** It was written while
 ``tests/s1_specification_mirror.py`` returned temporary representative shapes that
-declared only two validators — C7's unconditional rejection of
+declared only two validators — C7's (now removed) unconditional rejection of
 ``DomainCheckCompletion.COMPLETE`` and R-1a's selector/dependent coupling — so that the
 asymmetry between "considered and deferred" and "missed" would be visible rather than
 silent. ``representative_shapes()`` now returns the declared ``src/`` contracts (I5,
@@ -10,7 +10,9 @@ I7), which implement every locally decidable rule stated in Part D and Part E ex
 one. This module is now split accordingly:
 
 * **``UNENFORCED``** carries what remains genuinely undecidable from a single instance
-  — today, exactly one entry, ``S-2 (via R-1b)`` (see below for why it stays out).
+  — **today, nothing**. Its last entry, ``S-2 (via R-1b)``, became locally decidable
+  when OD-7 replaced C9 with a selection-policy recomputation that reads the advisory's
+  own nested candidates, and it moved to ``ENFORCED`` rather than being deleted.
 * **``ENFORCED``** carries every rule that **is** locally decidable and **is** enforced,
   each paired with a construction the contract must reject. This is the discharge record
   for what used to be a long ``UNENFORCED`` list: every case that once lived there and
@@ -25,16 +27,14 @@ collection.
 **The rule admits entailed consequences, and says so.** Where a rule stated of one
 contract lands on another because a ratified clause carries it there, and the resulting
 obligation is still decidable from one instance, the consequence belongs here and is
-labelled with the clause that carries it. ``S-2 (via R-1b)`` is the one entry that relies
-on this: R-1b(iii) requires the advisory's nested ``candidates`` to equal the referenced
-``AdvisoryCandidateSet``'s in content, and R-1b(iv) requires the selectors to be equal,
-so S-2 (itself stated of ``AdvisoryCandidateSet``) lands on ``ProposerAdvisory`` as a
-consequence — but only once both R-1b clauses are checked against the **referenced set**,
-which no single ``ProposerAdvisory`` instance carries. It is not double-counted: S-2
-stated directly of ``AdvisoryCandidateSet`` is decidable from that one instance and is
-enforced there (see ``ENFORCED``); ``S-2 (via R-1b)`` names the separate, still-open
-question of whether an advisory's *carried* copy of a candidate remains eligible, which
-only the builder and ``verify_advisory_selection`` can answer.
+labelled with the clause that carries it. ``S-2 (via R-1b)`` is the entry that relies on
+this. It was the module's one ``UNENFORCED`` case for as long as an advisory's *carried*
+copy of a candidate could only be re-checked against the referenced set — which no
+single ``ProposerAdvisory`` instance carries. OD-7 changed what one instance is enough
+to decide, not what R-1b says: selection-policy v1 recomputes the qualifying pool from
+the advisory's own nested candidates, so an advisory selecting an ineligible one is
+refused locally. The case is in ``ENFORCED`` now, and it is not double-counted with S-2
+stated directly of ``AdvisoryCandidateSet``, which is a separate constructed case there.
 
 Absent from both registries, and why — stated here rather than left to be inferred from
 silence:
@@ -251,15 +251,14 @@ def _selection(selected, **overrides):
     return fixture
 
 
-#: The one rule that remains genuinely undecidable from a single instance (see the
-#: module docstring for why ``S-2 (via R-1b)`` cannot fold into ``S-2`` itself, which
-#: **is** enforced and lives in ``ENFORCED`` below).
-_STATED_CASES = (
-    ("S-2 (via R-1b)",
-     "ProposerAdvisory selected nested candidate has is_eligible False",
-     lambda: _advisory(candidates=(_candidate("a-1", is_eligible=False),),
-                       **_selection("a-1"))),
-)
+#: **Empty since OD-7.** ``S-2 (via R-1b)`` was the last entry, and it is now locally
+#: decidable on ``ProposerAdvisory`` for a reason that did not exist while C9 stood:
+#: selection-policy v1 recomputes the qualifying pool from the advisory's **own** nested
+#: candidates, and an ineligible candidate is not in it, so an advisory selecting one is
+#: refused by the advisory's own validator rather than only by the builder and the
+#: verifier. The case moved to ``ENFORCED`` rather than being deleted, which is this
+#: module's own discharge discipline.
+_STATED_CASES = ()
 
 
 #: Every ``datetime`` field Part D declares, contract by contract, in the order the
@@ -385,10 +384,30 @@ def test_the_c4_cases_cover_every_datetime_field_the_shapes_declare():
 #: ``UNENFORCED`` (or was original to this module); the discharge history is in
 #: ``docs/S1_ENFORCEMENT.md``.
 ENFORCED = (
-    ("C7", "DomainCheckCompletion.COMPLETE on a candidate",
+    # C7's unconditional refusal of ``COMPLETE`` is gone (OD-7 part 8). What is
+    # enforced in its place, and constructed here, is the coupling that replaced it:
+    # ``COMPLETE`` with no bound result, and a result with no completed evaluation.
+    ("OD-7 part 3", "COMPLETE with no domain_evaluation_outcome",
      lambda: _shapes()["CandidateAdvisory"](**{
          **spec.complete_candidate(),
          "domain_check_completion": spec.DomainCheckCompletion.COMPLETE})),
+    ("OD-7 part 3", "a domain_evaluation_outcome with no COMPLETE",
+     lambda: _shapes()["CandidateAdvisory"](**{
+         **spec.qualifying_candidate(),
+         "domain_check_completion": spec.DomainCheckCompletion.NOT_EVALUATED})),
+    # C9's unconditional refusal of a non-null selector is gone too. What replaced it:
+    # a selector selection-policy v1 did not produce, and a policy label this package
+    # did not ratify.
+    ("OD-8", "a selector selection-policy v1 did not produce",
+     lambda: _advisory(**_selection("cand-1"))),
+    ("OD-8", "a lawful selection labelled with an unratified policy",
+     lambda: _shapes()["ProposerAdvisory"](**spec.selecting_advisory_fixture(
+         selection_policy_id="someone.elses.policy",
+         **_selection("cand-1")))),
+    ("S-2 (via R-1b)",
+     "ProposerAdvisory selected nested candidate has is_eligible False",
+     lambda: _advisory(candidates=(_candidate("a-1", is_eligible=False),),
+                       **_selection("a-1"))),
     ("R-1a", "a selector with none of its three dependents",
      lambda: _advisory(selected_candidate_id="cand-1")),
     ("R-1a", "a dependent with no selector",
@@ -504,9 +523,8 @@ def test_the_rules_the_mirror_does_declare_still_reject(rule, description, const
     """The other side of the asymmetry, so this module is discriminating rather than a
     list of things that happen not to raise.
 
-    C7 and R-1a **are** declared, and they reject. If they did not, every case in
-    ``UNENFORCED`` would be unremarkable and this module would prove nothing about the
-    mirror.
+    OD-7 part 3's coupling, OD-8's selection recomputation and R-1a **are** declared,
+    and they reject. If they did not, this module would prove nothing about the mirror.
     """
     pydantic = pytest.importorskip("pydantic")
     with pytest.raises(pydantic.ValidationError):

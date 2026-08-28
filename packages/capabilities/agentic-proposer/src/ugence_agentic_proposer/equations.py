@@ -24,6 +24,7 @@ from .vocabulary import (
     AgentLifecycleState,
     CandidateDisposition,
     DomainCheckCompletion,
+    DomainEvaluationOutcome,
     ReviewAction,
     RoleActivationStatus,
     ToolOperationClass,
@@ -92,10 +93,24 @@ def evaluate_readiness(
     mandate: WorkMandate,
     context: BoundedContextEnvelope,
 ) -> bool:
-    """Equation 2. Returns ``False`` for every candidate this package can construct,
-    because C7 makes ``DomainCheckCompletion.COMPLETE`` unconstructible. That is
-    intended and fail-closed pending a separately ratified S2 domain evaluator; it is
-    what makes B3 bite."""
+    """Equation 2, in its ratified seven-term form (OD-7 part 6 added the seventh).
+
+    The seventh term, ``DomainEvaluationSatisfied``, is what replaced C7's structural
+    closure of R-2/V13's ``PROPOSAL`` path. C7 made ``DomainCheckCompletion.COMPLETE``
+    unconstructible, so this function returned ``False`` for every candidate this
+    package could build. With C7 removed, ``domain_checks_complete`` alone would return
+    ``True`` for a candidate whose evaluation *ran* and *failed* — ``COMPLETE`` with
+    ``NOT_SATISFIED`` or ``INCONCLUSIVE`` — which is R-2's condition for
+    ``terminal_outcome=PROPOSAL``, and would be one term compensating for a substantive
+    result it does not carry, against Part F's own **No term compensates for another**
+    rule.
+
+    Relying on the documented call order instead was rejected: this is an exported
+    function with no caller in ``src/``, so "invoked only after selection" is a
+    convention this package states and cannot enforce against a consumer calling it
+    directly. C7 performed that closure structurally, and its removal hands the closure
+    to a term, not to a convention.
+    """
     eligible = candidate.is_eligible is True
 
     required_fields_present = True  # guaranteed by successful pydantic construction
@@ -114,7 +129,13 @@ def evaluate_readiness(
         and context.mandate_id == mandate.mandate_id
     )
 
+    #: Whether evaluation RAN — never what it concluded (OD-7 part 3).
     domain_checks_complete = candidate.domain_check_completion is DomainCheckCompletion.COMPLETE
 
+    #: What it CONCLUDED. Separate term, separate field, separate vocabulary.
+    domain_evaluation_satisfied = (
+        candidate.domain_evaluation_outcome is DomainEvaluationOutcome.SATISFIED)
+
     return all((eligible, required_fields_present, observation_refs_present,
-                uncertainty_disclosed, lineage_complete, domain_checks_complete))
+                uncertainty_disclosed, lineage_complete, domain_checks_complete,
+                domain_evaluation_satisfied))

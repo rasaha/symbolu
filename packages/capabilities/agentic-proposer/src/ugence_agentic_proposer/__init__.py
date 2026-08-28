@@ -8,11 +8,15 @@ D1-D10 and the ratification addenda are recorded in
 contract and equation specification is
 ``docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md``.
 
-This package now exports the full H3 public surface: the eight canonical contracts,
-the two nested public shapes, all ten ratified enums, the five builders, the two
-equation functions, the two identity functions, the three verifiers, the two
+This package exports the full H3 public surface as amended by OD-7: the eight
+canonical contracts, the two nested public shapes, the three OD-7 call-boundary shapes
+(``DomainEvaluationRequest``, ``DomainEvaluationResponse`` and the
+``DomainEvaluationProvider`` protocol — none of them a contract, none stored,
+transported or identity-bearing), all eleven ratified enums, the five builders, the two
+equation functions, the two identity functions, the five verifiers, the three
 exceptions this package defines (OD-6(ii) added ``CrossContractViolationError``
-alongside ``EligibilityMismatchError``), and the four ratified constants.
+alongside ``EligibilityMismatchError``; OD-7 added ``DomainEvaluationProviderError``),
+and the four ratified constants — forty-six names at 0.2.0.
 
 Proposal identity is computed only by a call into ``ugence_jcs``, inside the single
 authorised identity module (``identity.py``). This package contains no
@@ -34,6 +38,9 @@ from .contracts import (
     BoundedContextEnvelope,
     CandidateAdvisory,
     CognitiveRoleContract,
+    DomainEvaluationProvider,
+    DomainEvaluationRequest,
+    DomainEvaluationResponse,
     ProposerAdvisory,
     ProposerProcessRecord,
     ProposerProcessStateTransition,
@@ -51,9 +58,12 @@ from .identity import (
 )
 from .verification import (
     CrossContractViolationError,
+    DomainEvaluationProviderError,
     EligibilityMismatchError,
     verify_advisory_selection,
     verify_candidate_eligibility,
+    verify_deterministic_selection,
+    verify_domain_evaluation,
     verify_observation_resolution,
 )
 from .version import __version__
@@ -62,6 +72,7 @@ from .vocabulary import (
     AgentLifecycleState,
     CandidateDisposition,
     DomainCheckCompletion,
+    DomainEvaluationOutcome,
     ProposerProcessState,
     ReviewAction,
     RoleActivationStatus,
@@ -84,7 +95,12 @@ __all__ = [
     # Nested public models (2)
     "CandidateAdvisory",
     "ProposerProcessStateTransition",
-    # Enums (10)
+    # OD-7 call-boundary shapes (2) and the injected-evaluator protocol (1). Not
+    # contracts: no C2 common field, no identity role, never stored or transported.
+    "DomainEvaluationRequest",
+    "DomainEvaluationResponse",
+    "DomainEvaluationProvider",
+    # Enums (11)
     "TerminalOutcome",
     "CandidateDisposition",
     "SemanticAuditorFindingStatus",
@@ -95,6 +111,7 @@ __all__ = [
     "ToolOperationClass",
     "ToolObservationAdmissionStatus",
     "ProposerProcessState",
+    "DomainEvaluationOutcome",
     # Builders (5)
     "build_candidate_advisory",
     "build_advisory_candidate_set",
@@ -107,13 +124,16 @@ __all__ = [
     # Identity functions (2)
     "compute_advisory_identity",
     "verify_advisory_identity",
-    # Verifiers (3)
+    # Verifiers (5)
     "verify_candidate_eligibility",
     "verify_advisory_selection",
     "verify_observation_resolution",
-    # Exceptions (2)
+    "verify_domain_evaluation",
+    "verify_deterministic_selection",
+    # Exceptions (3)
     "EligibilityMismatchError",
     "CrossContractViolationError",
+    "DomainEvaluationProviderError",
     # Constants (4)
     "RESERVED_AUTHORITY_VOCABULARY",
     "ADVISORY_KIND",

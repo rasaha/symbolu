@@ -7,16 +7,20 @@ Eight top-level contracts — ``AgentIdentityRef``, ``CognitiveRoleContract``,
 nested public shapes exported for typing and never transported alone —
 ``CandidateAdvisory``, ``ProposerProcessStateTransition``.
 
+Three further call-boundary shapes OD-7 part 2 adds — ``DomainEvaluationRequest``,
+``DomainEvaluationResponse`` and the ``DomainEvaluationProvider`` protocol — are
+declared here too. None of them is a contract: none carries a C2 common field, none is
+stored, transported or reachable from ``P_unsigned``, and none has an identity role.
+
 This module declares the models and the validations that are locally decidable from
 one instance of one contract: C1 (model configuration), C2 (common fields), C4
-(timestamps), C5 (field classification), C6 (digest-shaped field format), C7
-(``DomainCheckCompletion.COMPLETE`` is unconstructible), C9 (OD-6(i):
-``AdvisoryCandidateSet.selected_candidate_id`` is unconstructible when non-null),
-R-1a (selection coupling, local), the local half of R-1b ((v), (vi), and the local
-half of (vii)), R-3 and R-4 (process ordering and outcome agreement), R-8's
+(timestamps), C5 (field classification), C6 (digest-shaped field format), OD-7 part 3's
+completion/outcome coupling and part 5's two ``AdvisoryCandidateSet`` couplings (which
+replaced C7 and C9 in the same change set), selection-policy v1 (OD-8), R-1a (selection
+coupling, local), the local half of R-1b ((v), (vi), and the local half of (vii)), R-2's
+locally decidable half, R-3 and R-4 (process ordering and outcome agreement), R-8's
 locally-decidable no-duplicates clauses, S-1 and S-2 (selection resolution and
-eligibility — vacuous under C9), L-1 (lineage), and the D3/D2 non-empty-list
-requirements.
+eligibility), L-1 (lineage), and the D3/D2 non-empty-list requirements.
 
 What this module does **not** decide: R-2, R-5, R-6, R-7, R-9, R-10, and the
 cross-contract halves of R-1b. Those require a second contract, a builder or a
@@ -31,7 +35,7 @@ from __future__ import annotations
 
 import unicodedata
 from datetime import datetime, timezone
-from typing import Annotated, Literal, Optional
+from typing import Annotated, Literal, Optional, Protocol, runtime_checkable
 
 from pydantic import (
     AfterValidator,
@@ -48,6 +52,7 @@ from .vocabulary import (
     AgentLifecycleState,
     CandidateDisposition,
     DomainCheckCompletion,
+    DomainEvaluationOutcome,
     ProposerProcessState,
     ReviewAction,
     RoleActivationStatus,
@@ -67,6 +72,9 @@ __all__ = [
     "ProposerAdvisory",
     "ProposerProcessRecord",
     "ProposerProcessStateTransition",
+    "DomainEvaluationRequest",
+    "DomainEvaluationResponse",
+    "DomainEvaluationProvider",
     "ADVISORY_KIND",
 ]
 
@@ -417,15 +425,149 @@ class ToolObservation(BaseModel):
 
 
 # --------------------------------------------------------------------------- #
+# OD-7 part 4 / OD-8 — selection-policy v1, stated once and shared by the model
+# validator (construction) and ``verify_deterministic_selection`` (replay), so the
+# two cannot drift apart. Both the policy identity and the policy logic live here;
+# neither is caller-supplied, and neither reads anything outside the candidate set.
+# --------------------------------------------------------------------------- #
+
+#: This package's own ratified selector identity. Not a caller input and not a
+#: registry lookup: ``verify_deterministic_selection`` compares a stored label against
+#: these constants, which detects a foreign or stale label and nothing more (OD-7
+#: part 5's third disclosed ceiling).
+#: Deliberately outside the ``ugence.agentic_proposer.`` kind namespace: this is a
+#: selector-policy identity, not a contract kind, and D7 admits exactly one kind
+#: at one version (``tests/test_advisory_contract_shape.py`` pins that).
+SELECTION_POLICY_ID = "agentic_proposer.deterministic_selection"
+SELECTION_POLICY_VERSION = "v1"
+
+SELECTION_POLICY_FIELDS = ("selection_policy_id", "selection_policy_version")
+DOMAIN_EVALUATION_PROFILE_FIELDS = (
+    "domain_evaluation_profile_id",
+    "domain_evaluation_profile_version",
+)
+
+
+def qualifying_pool(candidates) -> list:
+    """OD-7 part 4. The candidates a selector may consider: ``is_eligible is True``
+    **and** ``domain_evaluation_outcome is SATISFIED``.
+
+    `[R]` OD-9's per-candidate scope is this function's whole shape. A candidate
+    carrying ``NOT_SATISFIED`` or ``INCONCLUSIVE`` is filtered out **and nothing
+    more**: it does not poison the set and does not prevent a different eligible,
+    ``SATISFIED`` candidate from being selected. There is no run-wide reading of
+    ``INCONCLUSIVE`` anywhere in this package.
+    """
+    return [candidate for candidate in candidates
+            if candidate.is_eligible is True
+            and candidate.domain_evaluation_outcome is DomainEvaluationOutcome.SATISFIED]
+
+
+def selection_policy_v1(candidates) -> "str | None":
+    """OD-8, selection-policy v1: fail-closed uniqueness.
+
+    Exactly one candidate in the qualifying pool selects that candidate; zero or more
+    than one selects nothing. **No tie-break is applied.** ``candidate_id`` ordering is
+    total over distinct keys and is deliberately left unexercised here: under OD-8's
+    tie-break correction it may resolve a tie only after a separately ratified
+    substantive criterion has established that the tied candidates are equally
+    preferable, and no such criterion exists.
+
+    This function reads exactly two fields — ``is_eligible`` and
+    ``domain_evaluation_outcome``, both package-computed or provider-produced and
+    replay-verified. It reads no timestamp, no identifier, no disposition, no review
+    action and no list length, because OD-8 bars every one of those from being
+    repurposed as a merit proxy.
+    """
+    pool = qualifying_pool(candidates)
+    if len(pool) == 1:
+        return pool[0].candidate_id
+    return None
+
+
+def check_evaluation_profile_coupling(model) -> None:
+    """OD-7 part 5. The evaluation-profile identity pair is present if and only if some
+    nested candidate carries ``domain_check_completion is COMPLETE``. A set-level fact:
+    one proposer run evaluates every candidate for one case under one profile.
+
+    Scoped to its bearer and its name together, never to the name alone (OD-3's
+    lesson): shared with ``ProposerAdvisory`` and with ``identity.py``'s private
+    ``_UnsignedAdvisoryPayload`` because those three carry the mirrored pair, and
+    declared on nothing else.
+    """
+    any_complete = any(
+        candidate.domain_check_completion is DomainCheckCompletion.COMPLETE
+        for candidate in model.candidates)
+    present = [name for name in DOMAIN_EVALUATION_PROFILE_FIELDS
+               if getattr(model, name) is not None]
+    if any_complete and len(present) != len(DOMAIN_EVALUATION_PROFILE_FIELDS):
+        raise ValueError(
+            "a candidate carries domain_check_completion=COMPLETE, so "
+            f"{list(DOMAIN_EVALUATION_PROFILE_FIELDS)} must all be present (OD-7 "
+            "part 5)")
+    if not any_complete and present:
+        raise ValueError(
+            f"no candidate is COMPLETE, so {present} must be absent (OD-7 part 5)")
+
+
+def check_selection_policy_coupling(model) -> None:
+    """OD-7 part 5. The selector-policy identity pair is present if and only if
+    ``selected_candidate_id`` is not ``None``, on the R-1a pattern, and when present it
+    must name **this package's own ratified selector**.
+
+    A label naming some other policy is refused at construction rather than merely
+    reported at replay: a stored selection whose provenance is an unratified policy is
+    exactly what C9 existed to keep unconstructible.
+    """
+    if model.selected_candidate_id is None:
+        present = [name for name in SELECTION_POLICY_FIELDS
+                   if getattr(model, name) is not None]
+        if present:
+            raise ValueError(
+                f"no candidate is selected, so {present} must be absent (OD-7 part 5)")
+        return
+    missing = [name for name in SELECTION_POLICY_FIELDS
+               if getattr(model, name) is None]
+    if missing:
+        raise ValueError(
+            f"a candidate is selected, so {missing} must be present (OD-7 part 5)")
+    if (model.selection_policy_id != SELECTION_POLICY_ID
+            or model.selection_policy_version != SELECTION_POLICY_VERSION):
+        raise ValueError(
+            "selection_policy_id/selection_policy_version must name this package's "
+            f"own ratified selector ({SELECTION_POLICY_ID}/{SELECTION_POLICY_VERSION}), "
+            "not an unratified policy (OD-7 part 5)")
+
+
+def check_deterministic_selection(model) -> None:
+    """OD-8, at construction: the stored selector must be selection-policy v1's own
+    output over this set's members.
+
+    This is the structural half of what took over from C9. C9 made every non-null
+    selection unconstructible; what replaces it is narrower and stronger — a non-null
+    selection is constructible exactly when the ratified policy produces it, and a
+    hand-supplied selector that the policy did not produce is refused.
+    """
+    expected = selection_policy_v1(model.candidates)
+    if model.selected_candidate_id != expected:
+        raise ValueError(
+            "selected_candidate_id does not match selection-policy v1's own "
+            f"recomputation over this set (expected {expected!r}, stored "
+            f"{model.selected_candidate_id!r}); under OD-8 a qualifying pool of zero "
+            "or of more than one candidate selects nothing")
+
+
+# --------------------------------------------------------------------------- #
 # D6 — CandidateAdvisory (nested public shape) and AdvisoryCandidateSet
 # --------------------------------------------------------------------------- #
 
 
 class CandidateAdvisory(BaseModel):
-    """D6's nested public shape. Ten fields, no C2 common field (C2), and a standing
-    prohibition (D6): no field of this model may be a member of ``RIVAL_IDENTITY_
-    FIELDS``, and no ``ToolObservation`` may be nested inside it. ``advisory_digest``
-    is the sole identity field, borne only by ``ProposerAdvisory``.
+    """D6's nested public shape. Eleven fields (OD-7 part 5 added the eleventh), no C2
+    common field (C2), and a standing prohibition (D6): no field of this model may be a
+    member of ``RIVAL_IDENTITY_FIELDS``, and no ``ToolObservation`` may be nested inside
+    it. ``advisory_digest`` is the sole identity field, borne only by
+    ``ProposerAdvisory``.
     """
 
     model_config = _MODEL_CONFIG
@@ -439,7 +581,12 @@ class CandidateAdvisory(BaseModel):
     #: Package-computed (Equation 1). No caller-supplied value is accepted anywhere in
     #: this package's builders (G4).
     is_eligible: bool
+    #: OD-7 part 3: gates only whether evaluation ran. It does not encode the result.
     domain_check_completion: DomainCheckCompletion = DomainCheckCompletion.NOT_EVALUATED
+    #: OD-7 part 3. The *result* of the evaluation, provider-produced and replayed by
+    #: ``verify_domain_evaluation``. Coupled to ``domain_check_completion`` below on the
+    #: same terms R-1a already couples fields: present iff ``COMPLETE``.
+    domain_evaluation_outcome: Optional[DomainEvaluationOutcome] = None
     #: Caller-supplied, package-recorded. Equation 1 reads it in its expiry terms.
     evaluated_at: datetime
     claim_refs: list[Identifier] = []
@@ -450,17 +597,35 @@ class CandidateAdvisory(BaseModel):
     assumptions: list[str] = []
     uncertainties: list[str] = []
 
-    @field_validator("domain_check_completion", mode="after")
-    @classmethod
-    def _completion_is_unconstructible(cls, value):
-        """C7. ``COMPLETE`` is rejected unconditionally, on every path, including
-        ``model_construct`` followed by validation and direct construction by any
-        caller who can import the name. It becomes constructible only through a
-        separately ratified S2 domain-evaluator boundary that removes this validator
-        as an explicit, reviewed act."""
-        if value is DomainCheckCompletion.COMPLETE:
-            raise ValueError("DomainCheckCompletion.COMPLETE is unconstructible in S1")
-        return value
+    @model_validator(mode="after")
+    def _completion_and_outcome_are_coupled(self):
+        """OD-7 part 3, both directions. ``domain_evaluation_outcome`` is present if and
+        only if ``domain_check_completion is COMPLETE``, and absent if and only if it is
+        ``NOT_EVALUATED``.
+
+        This validator, together with ``AdvisoryCandidateSet``'s two couplings, the
+        selection-policy check and the two replay functions, is what took over C7's and
+        C9's fail-closed role when both were removed (OD-7 part 8). C7's unconditional
+        refusal of ``COMPLETE`` is gone: a candidate may now carry a completed
+        evaluation, but it may not carry one with no bound result to check it against,
+        nor a result with no completed evaluation behind it.
+
+        Disclosed ceiling, unchanged from what C7 and C9 stated of themselves:
+        ``model_construct`` alone bypasses every pydantic validator, this one included,
+        and so does ``model_copy(update=...)``. Neither is a construction path this
+        package's builders use or accept, and both are caught by a subsequent
+        ``model_validate``; no attempt is made here to defeat pydantic's own primitives.
+        """
+        if self.domain_check_completion is DomainCheckCompletion.COMPLETE:
+            if self.domain_evaluation_outcome is None:
+                raise ValueError(
+                    "domain_check_completion is COMPLETE but no "
+                    "domain_evaluation_outcome is recorded (OD-7 part 3)")
+        elif self.domain_evaluation_outcome is not None:
+            raise ValueError(
+                "domain_evaluation_outcome is recorded but domain_check_completion is "
+                "not COMPLETE (OD-7 part 3)")
+        return self
 
     @field_validator("evaluated_at", mode="after")
     @classmethod
@@ -488,43 +653,41 @@ class AdvisoryCandidateSet(BaseModel):
     candidates: Annotated[
         tuple[CandidateAdvisory, ...], AfterValidator(_check_candidate_sequence)
     ]
+    #: OD-7 part 5. C5b, a vocabulary term matched by equality against an independently
+    #: supplied expected profile — not an opaque handle — so it takes the ``Token``
+    #: pattern rather than ``Identifier``. Held once per set, never per candidate: one
+    #: run evaluates every candidate for one case under one profile.
+    domain_evaluation_profile_id: Optional[Token] = None
+    domain_evaluation_profile_version: Optional[Token] = None
     selected_candidate_id: Optional[Identifier] = None
+    #: OD-7 part 5. C5b, matched by equality against this package's own ratified
+    #: selector identity. Present iff ``selected_candidate_id`` is, on the R-1a pattern,
+    #: scoped to this bearer and ``ProposerAdvisory`` alone.
+    selection_policy_id: Optional[Token] = None
+    selection_policy_version: Optional[Token] = None
     #: C5d — the reason-code catalogue is out of scope at this stage (Part J).
     selection_reason_codes: Reserved = []
 
-    @field_validator("selected_candidate_id", mode="after")
-    @classmethod
-    def _selection_is_unconstructible(cls, value):
-        """C9 (OD-6(i)). A non-null ``selected_candidate_id`` is rejected
-        unconditionally, on every path, including ``model_construct`` followed by
-        validation and direct construction by any caller who can import the name —
-        the same pattern C7 uses for ``DomainCheckCompletion.COMPLETE``. It becomes
-        constructible only through a separately ratified S2 transition that removes
-        this validator as an explicit, reviewed act.
-
-        Disclosed ceiling, on the same terms C7's docstring states for its own field:
-        ``model_construct`` alone (with no subsequent validation) bypasses every
-        pydantic validator, this one included, and so does ``model_copy(update=...)``,
-        which never re-runs validation either. Neither is a construction path this
-        package's builders use or accept from a caller; both are standing pydantic
-        primitives, not something a validator can close from the outside, and no
-        attempt is made here to defeat them by other means.
+    @model_validator(mode="after")
+    def _domain_evaluation_and_selection_policy_couplings(self):
+        """OD-7 part 5's two ``AdvisoryCandidateSet`` couplings, and OD-8's policy
+        recomputation. Together with ``CandidateAdvisory``'s completion/outcome
+        coupling and the two replay functions, these are what took over C9's
+        fail-closed role when C9 was removed in the same change set (OD-7 part 8).
         """
-        if value is not None:
-            raise ValueError(
-                "AdvisoryCandidateSet.selected_candidate_id must be None in S1 (C9, "
-                "OD-6(i)): a non-null selection is structurally unconstructible until "
-                "a separately ratified S2 transition removes this validator")
-        return value
+        check_evaluation_profile_coupling(self)
+        check_selection_policy_coupling(self)
+        check_deterministic_selection(self)
+        return self
 
     @model_validator(mode="after")
     def _s1_and_s2_selection_resolution(self):
-        """S-1 and S-2: locally decidable selection invariants. Both are satisfied
-        vacuously in S1: C9 above already makes ``selected_candidate_id`` ``None`` on
-        every ``AdvisoryCandidateSet`` this package can construct, so the non-null
-        branch below can never execute here. It is preserved rather than deleted so
-        that the rule is stated once and is already in place, unedited, for the
-        separately reviewed S2 transition that removes C9."""
+        """S-1 and S-2: locally decidable selection invariants. No longer vacuous —
+        C9 made ``selected_candidate_id`` ``None`` on every constructible set, and with
+        C9 removed a lawful selection reaches this branch. S-2's eligibility
+        requirement is implied by selection-policy v1's qualifying pool and is checked
+        here as well, on B2's terms: the two are independent statements of the rule and
+        a defect in either is caught by the other."""
         if self.selected_candidate_id is not None:
             matches = [c for c in self.candidates
                        if c.candidate_id == self.selected_candidate_id]
@@ -545,6 +708,92 @@ class AdvisoryCandidateSet(BaseModel):
     @field_serializer("created_at")
     def _serialize_datetimes(self, value):
         return _serialize_z(value)
+
+
+# --------------------------------------------------------------------------- #
+# OD-7 part 2 — the domain-evaluator boundary: two call shapes and one protocol
+#
+# None of the three is a contract. Neither shape carries a C2 common field, neither
+# has an identity role, and neither is ever stored, transported or included in
+# ``P_unsigned`` — only the outcome the response carries is bound, and it is bound as
+# ``CandidateAdvisory.domain_evaluation_outcome``, a field of a contract.
+#
+# A concrete business-domain evaluator lives OUTSIDE this package and is supplied by
+# the caller as an already-constructed object satisfying the protocol. This package
+# imports, discovers, loads and embeds no particular evaluator, and this boundary
+# authorizes no network, storage, service-discovery or plugin-loading mechanism of any
+# kind: the injected object is a plain in-process callable, nothing more.
+# --------------------------------------------------------------------------- #
+
+
+class DomainEvaluationRequest(BaseModel):
+    """OD-7 part 2. Assembled solely from already-identity-bound public content — the
+    one candidate under evaluation, its referenced ``ToolObservation``s, the
+    ``WorkMandate`` and ``BoundedContextEnvelope`` in force, and the profile
+    identity/version evaluation is being requested under — so the evaluator receives no
+    hidden state.
+
+    ``candidate_id`` rather than a ``CandidateAdvisory``: under part 6 the actual
+    ``CandidateAdvisory`` is instantiated exactly once, with every field already known,
+    only *after* evaluation and its verification complete. What precedes that single
+    construction operates over the candidate's other already-known values, not over a
+    frozen instance missing one field and later completed. Replay, where the instance
+    does exist, re-issues a request carrying that instance's own ``candidate_id``, so
+    both directions use one shape.
+    """
+
+    model_config = _MODEL_CONFIG
+
+    candidate_id: Identifier
+    profile_id: Token
+    profile_version: Token
+    mandate: WorkMandate
+    context: BoundedContextEnvelope
+    observations: tuple[ToolObservation, ...] = ()
+
+
+class DomainEvaluationResponse(BaseModel):
+    """OD-7 part 2. Carries the outcome, and echoes back **both** the profile
+    identity/version actually evaluated under **and** the ``candidate_id`` actually
+    evaluated.
+
+    `[I]` **What the echo is, and what it is not.** It is a request/response
+    correlation check: it catches a provider that mixed up concurrent or batched
+    requests, answered under a stale profile, returned a cached result for a different
+    candidate, or was wired up wrongly. It is **not** a defence against a dishonest
+    provider and must not be described as one — a provider that wishes to mislead
+    echoes back what it was handed while evaluating something else, and nothing in this
+    boundary can detect that. `[G]` The provider is trusted for the substance of what
+    it returns; the echo constrains only that the substance is labelled with the
+    request it answers.
+    """
+
+    model_config = _MODEL_CONFIG
+
+    candidate_id: Identifier
+    profile_id: Token
+    profile_version: Token
+    outcome: DomainEvaluationOutcome
+
+
+@runtime_checkable
+class DomainEvaluationProvider(Protocol):
+    """OD-7 part 2. The narrow injected protocol, and the whole of the evaluator
+    boundary this package owns.
+
+    Agentic Proposer owns the protocol, the input and output shapes, orchestration (the
+    call) and verification (the replay). It owns no evaluator. Selection must never
+    determine, influence or retroactively complete domain evaluation: the two are
+    decided by different code, on different inputs, and neither reads the other's
+    not-yet-settled state (part 1).
+
+    The provider is authoritative **only** for the domain-evaluation responsibility
+    OD-7 ratifies. It acquires no business-preference authority, and no ranking input:
+    substantive multi-candidate ranking is deferred and needs its own ruling (OD-8).
+    """
+
+    def evaluate(self, *, request: DomainEvaluationRequest) -> DomainEvaluationResponse:
+        ...
 
 
 # --------------------------------------------------------------------------- #
@@ -588,7 +837,16 @@ class ProposerAdvisory(BaseModel):
     candidates: Annotated[
         tuple[CandidateAdvisory, ...], AfterValidator(_check_candidate_sequence)
     ]
+    #: OD-7 part 5, mirrored from ``AdvisoryCandidateSet``. These four are reachable
+    #: inside ``P_unsigned`` only because they are ``ProposerAdvisory``'s own fields;
+    #: recording them on ``ProposerProcessRecord`` instead was rejected by the ruling,
+    #: because that record sits outside ``P_unsigned``. R-1b gained two correspondence
+    #: clauses requiring each mirrored value to equal the set's.
+    domain_evaluation_profile_id: Optional[Token] = None
+    domain_evaluation_profile_version: Optional[Token] = None
     selected_candidate_id: Optional[Identifier] = None
+    selection_policy_id: Optional[Token] = None
+    selection_policy_version: Optional[Token] = None
     recommended_disposition: Optional[CandidateDisposition] = None
     requested_review_action: Optional[ReviewAction] = None
     requested_review_destination_role_ref: Optional[Identifier] = None
@@ -617,6 +875,9 @@ class ProposerAdvisory(BaseModel):
             if missing:
                 raise ValueError(f"selected candidate with no {missing}")
         check_local_selection_correspondence(self)
+        check_evaluation_profile_coupling(self)
+        check_selection_policy_coupling(self)
+        check_deterministic_selection(self)
         return self
 
     @model_validator(mode="after")
@@ -744,23 +1005,32 @@ class ProposerProcessRecord(BaseModel):
     started_at: datetime
     completed_at: datetime
 
-    @field_validator("terminal_outcome", mode="after")
-    @classmethod
-    def _proposal_is_unreachable_in_s1(cls, value):
-        """V13 (B3, R-2). Because C7 makes ``DomainCheckCompletion.COMPLETE``
-        unconstructible, ``evaluate_readiness`` is ``False`` for every candidate this
-        package can construct, so ``PROPOSAL`` can never satisfy R-2's readiness
-        condition. This is fail-closed and intended: a stage that authorises no domain
-        check must not be able to reach the proposer's strongest classification. It
-        becomes constructible only when a separately ratified S2 domain-evaluator
-        boundary supplies a producer for ``COMPLETE``."""
-        if value is TerminalOutcome.PROPOSAL:
+    @model_validator(mode="after")
+    def _proposal_requires_a_selection(self):
+        """V13, R-2's locally decidable half. ``terminal_outcome is PROPOSAL`` requires
+        ``selected_candidate_id is not None``.
+
+        **This is no longer a blanket refusal of ``PROPOSAL``.** The S1 form of V13
+        rejected the value outright, which it could do only because C7 made
+        ``DomainCheckCompletion.COMPLETE`` — and so ``evaluate_readiness`` — reachable
+        by nothing. With C7 removed, R-2 is enforced as ratified: **recomputed**, not
+        assumed. R-2's other conjunct, ``evaluate_readiness(...) is True`` for the
+        resolved candidate, needs the candidate, the identity, the role, the mandate and
+        the context, none of which this record carries and none of which a single
+        model's validator can resolve from an identifier (E1's own argument about
+        R-1a). It is recomputed by ``build_proposer_advisory`` — exactly where B3 says
+        V13 recomputes it — which refuses to construct an advisory whose derived
+        selection is not ready, and by ``verify_deterministic_selection``, which refuses
+        a selection selection-policy v1 did not produce. A record naming an advisory
+        digest therefore cannot claim ``PROPOSAL`` over an unready candidate without the
+        advisory it references having been refused first.
+        """
+        if (self.terminal_outcome is TerminalOutcome.PROPOSAL
+                and self.selected_candidate_id is None):
             raise ValueError(
-                "terminal_outcome=PROPOSAL is unreachable in S1 (V13, B3, R-2): "
-                "PROPOSAL requires evaluate_readiness(...) is True, and "
-                "DomainCheckCompletion.COMPLETE is unconstructible until a "
-                "separately ratified S2 domain evaluator exists")
-        return value
+                "terminal_outcome=PROPOSAL requires a selected_candidate_id (V13, "
+                "R-2): a proposal that proposes nothing is exactly what R-2 forbids")
+        return self
 
     @model_validator(mode="after")
     def _process_ordering_and_outcome_agreement(self):

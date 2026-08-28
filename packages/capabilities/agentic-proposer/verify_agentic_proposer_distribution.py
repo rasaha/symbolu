@@ -12,9 +12,12 @@ outside the repository:
   3. build the ``ugence-jcs`` dependency wheel from the sibling package into a local
      wheelhouse, clean-install this wheel against it and, with no ``/symbolu`` on
      ``sys.path``: read the version, exercise the ratified D4 vocabulary, assert
-     the public surface is exactly the full H3 surface (``public_api.json``),
-     build a complete advisory end to end through the real installed ``ugence-jcs``
-     dependency and verify its identity, and assert that importing the public API
+     the public surface is exactly the full H3 surface as amended by OD-7
+     (``public_api.json``), build a complete advisory end to end — including a
+     domain evaluation through a locally declared stub provider and the ratified
+     deterministic selection — through the real installed ``ugence-jcs`` dependency,
+     verify its identity and replay both, confirm a drifted provider refuses
+     construction, and assert that importing the public API
      loads none of the forbidden capability, legacy-framework, network or
      model-SDK modules — the same boundary the source-tree suite proves statically;
   4. report wheel reproducibility honestly.
@@ -48,7 +51,7 @@ import sys
 from datetime import datetime, timezone
 import ugence_agentic_proposer as ap
 
-assert ap.__version__ == "0.1.0", ap.__version__
+assert ap.__version__ == "0.2.0", ap.__version__
 assert "site-packages" in ap.__file__, ap.__file__
 assert not any("/symbolu" in p for p in sys.path), sys.path
 
@@ -69,33 +72,37 @@ assert not {m.value for m in ap.CandidateDisposition} & reserved
 assert "INDETERMINATE" in reserved
 assert ap.SemanticAuditorFindingStatus.INDETERMINATE.value == "INDETERMINATE"
 
-# The public surface is exactly the full H3 surface plus OD-6(ii)'s addition (I6,
-# I8): 8 contracts, 2 nested public shapes, 10 enums, 5 builders, 2 equation
-# functions, 2 identity functions, 3 verifiers, 2 exceptions, 4 constants,
-# __version__ = 39 names.
+# The public surface is exactly the full H3 surface as amended by OD-7 (I6, I8):
+# 8 contracts, 2 nested public shapes, 2 call-boundary shapes, 1 injected-evaluator
+# protocol, 11 enums, 5 builders, 2 equation functions, 2 identity functions,
+# 5 verifiers, 3 exceptions, 4 constants, __version__ = 46 names. The thirty-nine
+# 0.1.0 froze are all still here; 0.2.0 removes none of them.
 EXPECTED_SURFACE = {
     "AgentIdentityRef", "CognitiveRoleContract", "WorkMandate",
     "BoundedContextEnvelope", "ToolObservation", "AdvisoryCandidateSet",
     "ProposerAdvisory", "ProposerProcessRecord",
     "CandidateAdvisory", "ProposerProcessStateTransition",
+    "DomainEvaluationRequest", "DomainEvaluationResponse", "DomainEvaluationProvider",
     "TerminalOutcome", "CandidateDisposition", "SemanticAuditorFindingStatus",
     "ReviewAction", "DomainCheckCompletion", "AgentLifecycleState",
     "RoleActivationStatus", "ToolOperationClass", "ToolObservationAdmissionStatus",
-    "ProposerProcessState",
+    "ProposerProcessState", "DomainEvaluationOutcome",
     "build_candidate_advisory", "build_advisory_candidate_set",
     "build_proposer_advisory", "build_advisory_revision",
     "build_proposer_process_record",
     "evaluate_eligibility", "evaluate_readiness",
     "compute_advisory_identity", "verify_advisory_identity",
     "verify_candidate_eligibility", "verify_advisory_selection",
-    "verify_observation_resolution",
+    "verify_observation_resolution", "verify_domain_evaluation",
+    "verify_deterministic_selection",
     "EligibilityMismatchError", "CrossContractViolationError",
+    "DomainEvaluationProviderError",
     "RESERVED_AUTHORITY_VOCABULARY", "ADVISORY_KIND",
     "ADVISORY_IDENTITY_SET_PATHS", "ADVISORY_IDENTITY_NFC_PATHS",
     "__version__",
 }
 assert set(ap.__all__) == EXPECTED_SURFACE, ap.__all__
-assert len(EXPECTED_SURFACE) == 39
+assert len(EXPECTED_SURFACE) == 46
 assert not any(n.startswith(("Proposal", "Recommendation")) for n in ap.__all__)
 
 # --- a complete advisory, built end to end through the installed ugence-jcs wheel ---
@@ -124,24 +131,76 @@ observation = ap.ToolObservation(
     case_ref="c", tool_name="tool", operation_class=ap.ToolOperationClass.READ_ONLY,
     source_ref="rec", observed_at=NOW, content_hash="sha256:" + "0" * 64,
     normalized_fields={})
+# OD-7's injected evaluator: a stub declared here, in the clean interpreter, because
+# no evaluator ships in this wheel and none may. It satisfies the exported protocol
+# and computes nothing about any business domain — which is the boundary working.
+class _Stub:
+    def evaluate(self, *, request):
+        return ap.DomainEvaluationResponse(
+            candidate_id=request.candidate_id,
+            profile_id=request.profile_id,
+            profile_version=request.profile_version,
+            outcome=ap.DomainEvaluationOutcome.SATISFIED)
+
+
+provider = _Stub()
+assert isinstance(provider, ap.DomainEvaluationProvider)
 candidate = ap.build_candidate_advisory(
     candidate_id="cand", identity=identity, role=role, mandate=mandate,
     context=context, observations=[observation],
     disposition=ap.CandidateDisposition.RECOMMEND_WITHHOLD,
     requested_review_action=ap.ReviewAction.ROUTE_APPROVAL_BUNDLE,
     observation_refs=[], claim_refs=[], assumptions=[], uncertainties=[],
-    evaluated_at=NOW)
+    evaluated_at=NOW, provider=provider, profile_id="profile.v0",
+    profile_version="1.0.0")
 assert candidate.is_eligible is True
+assert candidate.domain_check_completion is ap.DomainCheckCompletion.COMPLETE
+assert candidate.domain_evaluation_outcome is ap.DomainEvaluationOutcome.SATISFIED
+# Selection-policy v1: exactly one qualifying candidate, so it is selected (OD-8).
 candidate_set = ap.build_advisory_candidate_set(
     candidate_set_id="set", tenant_id="t", case_ref="c", created_at=NOW,
-    candidates=(candidate,), selected_candidate_id=None)
+    candidates=(candidate,), selected_candidate_id="cand",
+    domain_evaluation_profile_id="profile.v0",
+    domain_evaluation_profile_version="1.0.0")
 advisory = ap.build_proposer_advisory(
     tenant_id="t", case_ref="c", created_at=NOW, identity=identity, role=role,
     mandate=mandate, context=context, observations=[observation],
     candidate_set=candidate_set, parent_advisory_digest=None, claim_summaries=[],
-    observation_refs=[], uncertainties=[], expires_at=LATER)
+    observation_refs=[], uncertainties=[], expires_at=LATER, provider=provider,
+    expected_profile_id="profile.v0", expected_profile_version="1.0.0",
+    requested_review_destination_role_ref="role-approver")
 assert ap.verify_advisory_identity(advisory=advisory) is True
-assert advisory.selected_candidate_id is None
+assert advisory.selected_candidate_id == "cand"
+assert ap.verify_advisory_selection(
+    advisory=advisory, candidate_set=candidate_set, role=role, context=context,
+    observations=[observation]) is True
+assert ap.verify_deterministic_selection(candidate_set=candidate_set) is True
+assert ap.verify_domain_evaluation(
+    provider=provider, candidate_set=candidate_set, mandate=mandate, context=context,
+    observations=[observation], expected_profile_id="profile.v0",
+    expected_profile_version="1.0.0") is True
+# The fail-closed direction, in the same clean interpreter: a provider that no longer
+# reproduces the stored outcome refuses construction (OD-7 part 7, row 2).
+class _Drifted:
+    def evaluate(self, *, request):
+        return ap.DomainEvaluationResponse(
+            candidate_id=request.candidate_id, profile_id=request.profile_id,
+            profile_version=request.profile_version,
+            outcome=ap.DomainEvaluationOutcome.NOT_SATISFIED)
+
+
+try:
+    ap.build_proposer_advisory(
+        tenant_id="t", case_ref="c", created_at=NOW, identity=identity, role=role,
+        mandate=mandate, context=context, observations=[observation],
+        candidate_set=candidate_set, parent_advisory_digest=None, claim_summaries=[],
+        observation_refs=[], uncertainties=[], expires_at=LATER, provider=_Drifted(),
+        expected_profile_id="profile.v0", expected_profile_version="1.0.0",
+        requested_review_destination_role_ref="role-approver")
+except ap.DomainEvaluationProviderError:
+    pass
+else:
+    raise AssertionError("a drifted provider did not refuse construction")
 
 # --- leaf boundary, observed at runtime in a clean interpreter ---
 # OD-2: *defining* a pydantic BaseModel loads `socket` via pydantic-core's schema
@@ -251,8 +310,8 @@ def main() -> int:
         for i in (1, 2):  # two SEPARATE processes
             res = _run([str(py), "-c", CLEAN_INSTALL_CHECK], capture_output=True, text=True)
             line = [l for l in res.stdout.splitlines() if l.startswith("S1_OK:")][0]
-            print(f"  process {i}: full H3 surface + advisory identity + leaf "
-                 f"boundary OK ({line[6:]})")
+            print(f"  process {i}: full H3 surface + domain evaluation + selection "
+                 f"+ advisory identity + leaf boundary OK ({line[6:]})")
 
         print("== reproducibility ==")
         dist2 = work / "dist2"

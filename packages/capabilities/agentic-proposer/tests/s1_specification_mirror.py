@@ -162,12 +162,24 @@ FIELD_CLASSIFICATION = {
     "AdvisoryCandidateSet": {
         "schema_version": CLOSED, "tenant_id": C5A, "created_at": NON_STRING,
         "candidate_set_id": C5A, "case_ref": C5A, "candidates": STRUCTURED,
-        "selected_candidate_id": C5A, "selection_reason_codes": C5D,
+        # OD-7 part 5's four additions. All four are C5b: each is a vocabulary term
+        # matched by equality — the profile pair against an independently supplied
+        # expected profile, the policy pair against this package's own ratified
+        # selector identity — not an opaque handle carried and compared whole.
+        "domain_evaluation_profile_id": C5B,
+        "domain_evaluation_profile_version": C5B,
+        "selected_candidate_id": C5A,
+        "selection_policy_id": C5B, "selection_policy_version": C5B,
+        "selection_reason_codes": C5D,
     },
     "CandidateAdvisory": {
         "candidate_id": C5A, "disposition": CLOSED,
         "requested_review_action": CLOSED, "is_eligible": NON_STRING,
-        "domain_check_completion": CLOSED, "evaluated_at": NON_STRING,
+        "domain_check_completion": CLOSED,
+        # OD-7 part 3. A closed vocabulary, validated by membership, coupled to
+        # ``domain_check_completion`` rather than patterned.
+        "domain_evaluation_outcome": CLOSED,
+        "evaluated_at": NON_STRING,
         "claim_refs": C5A, "observation_refs": C5A,
         "assumptions": C5C, "uncertainties": C5C,
     },
@@ -177,7 +189,12 @@ FIELD_CLASSIFICATION = {
         "advisory_digest": OTHER_PATTERN, "parent_advisory_digest": OTHER_PATTERN,
         "case_ref": C5A, "agent_id": C5A, "role_contract_id": C5A,
         "mandate_id": C5A, "context_id": C5A, "candidate_set_id": C5A,
-        "candidates": STRUCTURED, "selected_candidate_id": C5A,
+        "candidates": STRUCTURED,
+        # OD-7 part 5's four mirrored fields, same classification as on the set.
+        "domain_evaluation_profile_id": C5B,
+        "domain_evaluation_profile_version": C5B,
+        "selected_candidate_id": C5A,
+        "selection_policy_id": C5B, "selection_policy_version": C5B,
         "recommended_disposition": CLOSED, "requested_review_action": CLOSED,
         "requested_review_destination_role_ref": C5A,
         "claim_summaries": C5C, "observation_refs": C5A, "uncertainties": C5C,
@@ -215,9 +232,11 @@ CONTRACT_CARDINALITY = {
     "WorkMandate": 9,
     "BoundedContextEnvelope": 9,
     "ToolObservation": 12,
-    "AdvisoryCandidateSet": 8,
-    "CandidateAdvisory": 10,
-    "ProposerAdvisory": 23,
+    # OD-7 part 5 moved these three: 8 -> 12, 10 -> 11 and 23 -> 27 (I8.11). The
+    # amendment's own arithmetic, re-verified against ``src/`` once implemented.
+    "AdvisoryCandidateSet": 12,
+    "CandidateAdvisory": 11,
+    "ProposerAdvisory": 27,
     "ProposerProcessRecord": 18,
     "ProposerProcessStateTransition": 2,
 }
@@ -297,6 +316,62 @@ def representative_shapes():
     }
 
 
+# --------------------------------------------------------------------------- #
+# OD-7 — test support for the injected domain-evaluator boundary
+#
+# This is a STUB, and it is test support, not a domain evaluator. It computes nothing
+# about any business domain: it returns whatever outcome the test asked for. That is
+# the whole point of the boundary OD-7 ratifies — a concrete evaluator lives outside
+# this package, and this package's guards can therefore exercise orchestration and
+# replay without any domain logic being present anywhere in the repository.
+# --------------------------------------------------------------------------- #
+
+#: The profile identity the fixtures evaluate under. A C5b token, compared by equality.
+PROFILE_ID = "invoice.reconciliation"
+PROFILE_VERSION = "2026.1"
+
+
+class StubDomainEvaluationProvider:
+    """A ``DomainEvaluationProvider`` whose answers a test dictates.
+
+    ``outcomes`` maps ``candidate_id`` to the outcome to return; ``default`` covers
+    every candidate not named. ``raises``, when set, is raised instead of answering —
+    the case OD-7 requires to surface as ``DomainEvaluationProviderError`` from a
+    builder and as ``False`` from a verifier. The three ``echo_*`` overrides break the
+    request/response correlation deliberately, which is the only way to exercise the
+    echo check: a correct provider cannot produce that state.
+
+    ``calls`` records every request received, so a guard can assert the provider was
+    **not** invoked — I8.9's missing-evidence obligation turns on exactly that.
+    """
+
+    def __init__(self, *, outcomes=None, default=None, raises=None,
+                 echo_candidate_id=None, echo_profile_id=None,
+                 echo_profile_version=None):
+        from ugence_agentic_proposer import DomainEvaluationOutcome
+
+        self.outcomes = dict(outcomes or {})
+        self.default = default if default is not None else DomainEvaluationOutcome.SATISFIED
+        self.raises = raises
+        self.echo_candidate_id = echo_candidate_id
+        self.echo_profile_id = echo_profile_id
+        self.echo_profile_version = echo_profile_version
+        self.calls = []
+
+    def evaluate(self, *, request):
+        from ugence_agentic_proposer import DomainEvaluationResponse
+
+        self.calls.append(request)
+        if self.raises is not None:
+            raise self.raises
+        return DomainEvaluationResponse(
+            candidate_id=self.echo_candidate_id or request.candidate_id,
+            profile_id=self.echo_profile_id or request.profile_id,
+            profile_version=self.echo_profile_version or request.profile_version,
+            outcome=self.outcomes.get(request.candidate_id, self.default),
+        )
+
+
 #: A timezone-aware instant, caller-supplied. No module here reads a wall clock (C4).
 FIXED_INSTANT = _datetime.datetime(2026, 1, 1, 12, 0, 0,
                                    tzinfo=_datetime.timezone.utc)
@@ -312,6 +387,7 @@ def complete_candidate(candidate_id="cand-1"):
         "requested_review_action": ReviewAction.ROUTE_APPROVAL_BUNDLE,
         "is_eligible": False,
         "domain_check_completion": DomainCheckCompletion.NOT_EVALUATED,
+        "domain_evaluation_outcome": None,
         "evaluated_at": FIXED_INSTANT,
         "claim_refs": [],
         "observation_refs": [],
@@ -320,12 +396,50 @@ def complete_candidate(candidate_id="cand-1"):
     }
 
 
+def qualifying_candidate(candidate_id="cand-1"):
+    """A ``CandidateAdvisory`` field mapping the ratified selector's **qualifying pool**
+    admits (OD-7 part 4): ``is_eligible is True`` and ``domain_evaluation_outcome is
+    SATISFIED``, with the coupled ``domain_check_completion is COMPLETE``.
+
+    Under C9 no such fixture could be selected, so every selection probe ran against a
+    shape the ratified policy would refuse. It is supplied here so a probe of the
+    coupling is not silently a probe of the policy.
+    """
+    from ugence_agentic_proposer import DomainEvaluationOutcome
+
+    return {
+        **complete_candidate(candidate_id),
+        "is_eligible": True,
+        "domain_check_completion": DomainCheckCompletion.COMPLETE,
+        "domain_evaluation_outcome": DomainEvaluationOutcome.SATISFIED,
+    }
+
+
+def selecting_advisory_fixture(**overrides):
+    """``complete_advisory_fixture`` carrying one qualifying candidate, the selection
+    selection-policy v1 produces over it, and the four OD-7 part 5 fields the
+    couplings then require."""
+    shapes = representative_shapes()
+    from ugence_agentic_proposer import contracts as _c
+
+    fixture = complete_advisory_fixture(
+        candidates=(shapes["CandidateAdvisory"](**qualifying_candidate()),),
+        domain_evaluation_profile_id=PROFILE_ID,
+        domain_evaluation_profile_version=PROFILE_VERSION,
+        selected_candidate_id="cand-1",
+        selection_policy_id=_c.SELECTION_POLICY_ID,
+        selection_policy_version=_c.SELECTION_POLICY_VERSION,
+    )
+    fixture.update(overrides)
+    return fixture
+
+
 def complete_advisory_fixture(**overrides):
     """Every required ``ProposerAdvisory`` field, with a lawful value for each.
 
     A coupling probe run against a partial fixture proves nothing: the construction
     would fail on a missing required field whatever the coupling did, and the test would
-    pass for the wrong reason. This supplies all twenty-three fields so that the only
+    pass for the wrong reason. This supplies all twenty-seven fields so that the only
     thing a rejection can be about is the rule under probe.
     """
     shapes = representative_shapes()
@@ -344,7 +458,11 @@ def complete_advisory_fixture(**overrides):
         "context_id": "context-1",
         "candidate_set_id": "set-1",
         "candidates": (shapes["CandidateAdvisory"](**complete_candidate()),),
+        "domain_evaluation_profile_id": None,
+        "domain_evaluation_profile_version": None,
         "selected_candidate_id": None,
+        "selection_policy_id": None,
+        "selection_policy_version": None,
         "recommended_disposition": None,
         "requested_review_action": None,
         "requested_review_destination_role_ref": None,

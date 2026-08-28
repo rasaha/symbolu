@@ -1416,7 +1416,7 @@ UNENFORCED_COUNT_ROW = re.compile(
 #: rule — and the range is deliberately left with headroom above the current count so a
 #: single added case is a one-line diff rather than a table edit.
 _NUMERALS = {
-    "One": 1, "Nineteen": 19, "Twenty": 20, "Twenty-one": 21, "Twenty-two": 22,
+    "Zero": 0, "One": 1, "Nineteen": 19, "Twenty": 20, "Twenty-one": 21, "Twenty-two": 22,
     "Twenty-three": 23, "Twenty-four": 24, "Twenty-five": 25, "Twenty-six": 26,
     "Twenty-seven": 27, "Twenty-eight": 28, "Twenty-nine": 29, "Thirty": 30,
     "Thirty-one": 31, "Thirty-two": 32, "Thirty-three": 33, "Thirty-four": 34,
@@ -1615,31 +1615,74 @@ def test_no_owner_decision_is_recorded_as_outstanding():
 
 #: The unqualified guard-status claim. It was true of OD-7 while nothing in this
 #: package's tests mentioned the amendment; it stopped being true the moment the
-#: documentation-consistency guards above were added, and a review found all four sites
-#: still carrying it. What the documents may say is which *surface* has no guard.
+#: documentation-consistency guards were added, and a review found all four sites still
+#: carrying it. What the documents may say is which *surface* has which kind of guard.
 _UNQUALIFIED_NO_GUARD = re.compile(r"no guard exists", re.I)
 
-#: The distinction that replaced it, in the one wording all three documents use.
-_BEHAVIOURAL_GUARD_CLAIM = ("no production or behavioural guard exercises the "
-                            "unimplemented")
+#: The claim that was required while OD-7 was ratified and unimplemented. It is now
+#: **false**, and must not reappear in the present tense: production and behavioural
+#: guards do exercise the OD-7 selection surface. Historical entries may narrate what
+#: was true when they were written, which is why the check below is anchored on the
+#: **present-tense** form these documents actually used.
+_WITHDRAWN_NO_BEHAVIOURAL_GUARD_CLAIM = (
+    "no production or behavioural guard exercises the unimplemented")
+
+#: What replaced it, in the one wording all three documents use.
+_BEHAVIOURAL_GUARD_CLAIM = ("production and behavioural guards exercise the "
+                            "od-7 selection surface")
 _DOCUMENTATION_GUARD_DISCLAIMER = "not production enforcement"
+
+#: The module that carries those guards. Named in the documents and checked to exist,
+#: so the claim above cannot be made about a file nobody wrote.
+_BEHAVIOURAL_GUARD_MODULE = PKG_ROOT / "tests" / "test_od7_domain_evaluation_boundary.py"
 
 
 @pytest.mark.parametrize("path", (SPECIFICATION, ADR, CHANGELOG), ids=lambda p: p.name)
 def test_guard_status_distinguishes_behavioural_from_documentation_guards(path):
-    """The three-status discipline turns on what a guard is, and this package now holds
-    two kinds. A bare "no guard exists" collapses them and is false while the
-    documentation-consistency guards stand; a bare "guards exist" would overclaim the
-    other way, which is why the disclaimer is required alongside the claim.
+    """The three-status discipline turns on what a guard is, and this package holds two
+    kinds. A bare "no guard exists" collapses them; so would dropping the disclaimer
+    that the documentation-consistency guards are not production enforcement, which
+    stays true — they check what these documents say, not what any selector does.
+
+    What changed with the OD-7 implementation is which claim is the honest one. While
+    the amendment was unimplemented the documents were required to state that **no**
+    production or behavioural guard exercised its selection surface. That statement is
+    now false, and this guard refuses it in the present tense while requiring the claim
+    that replaced it, together with the module that makes it true.
     """
     flat = _normalised(path)
     assert not _UNQUALIFIED_NO_GUARD.search(flat), (
         f"{path.name}: an unqualified 'no guard exists' is false while the "
         f"documentation-consistency guards in this module stand; name the surface "
         f"that has none")
-    assert _BEHAVIOURAL_GUARD_CLAIM in flat.lower(), (
-        f"{path.name}: must state that no production or behavioural guard exercises "
-        f"the unimplemented OD-7 selection surface")
-    assert _DOCUMENTATION_GUARD_DISCLAIMER in flat.lower(), (
+    lowered = flat.lower()
+    assert _WITHDRAWN_NO_BEHAVIOURAL_GUARD_CLAIM not in lowered, (
+        f"{path.name}: asserts that no production or behavioural guard exercises the "
+        f"OD-7 selection surface; {_BEHAVIOURAL_GUARD_MODULE.name} does")
+    assert _BEHAVIOURAL_GUARD_CLAIM in lowered, (
+        f"{path.name}: must state that production and behavioural guards exercise the "
+        f"OD-7 selection surface")
+    assert _DOCUMENTATION_GUARD_DISCLAIMER in lowered, (
         f"{path.name}: must state that the documentation-consistency guards are not "
         f"production enforcement")
+    assert _BEHAVIOURAL_GUARD_MODULE.is_file(), (
+        "the documents claim a behavioural guard module that does not exist")
+
+
+@pytest.mark.parametrize("path", (SPECIFICATION, ADR, CHANGELOG), ids=lambda p: p.name)
+def test_no_document_claims_the_od7_surface_is_unimplemented(path):
+    """The status claims the implementation falsified, refused by wording rather than
+    by inference. Each of these was true and required while OD-7 stood ratified and
+    unbuilt; each is false now, and a document reverting to one would send an
+    implementer to build what already exists.
+    """
+    lowered = _normalised(path).lower()
+    for claim in (
+            "od-7 is ratified, not yet implemented",
+            "ratified 2026-08-27; not yet implemented",
+            "c7 and c9 remain active",
+            "i8.15`) is prospective",
+            "public-api consequences (not yet applied)",
+    ):
+        assert claim not in lowered, (
+            f"{path.name}: {claim!r} states an OD-7 status the implementation closed")
