@@ -86,10 +86,10 @@ object is missing.
 | **Policy Authority** | `[V]` Implemented | The single platform-wide issuer/signer/verifier/revoker of policy **versions** for any registered family (`packages/policy-authority/README.md:1-10`) | `[G]` No compute-policy family is registered |
 | **Risk Authority / Action Clearance** | `[V]` Implemented | Scoped, time-bound, revocable runtime authority enforced at the point of action (`packages/risk_authority/README.md:1-20`); clearance "may never create authority, broaden authorization, replace ActionGate, dispatch execution" (`packages/capabilities/action-clearance/README.md:1-12`) | Anything about compute magnitude |
 | **Runtime / Execution Assurance** | `[V]` Implemented (reference-grade) | "RA-7 observes and assesses. RA-6 owns authority consequences" (`RA7_RUNTIME_ASSURANCE_AS_BUILT.md:1-9`); RA-8 correlates post-effect and emits a neutral reassessment signal (`RA8_EXECUTION_ASSURANCE_AS_BUILT.md:10-19`) | Authority consequences of its own |
-| **Agentic Proposer** | `[V]` Implemented | Structure, identity, validation and replay of proposals; C7 (`.../src/ugence_agentic_proposer/contracts.py:456-462`) and C9 (`:495-515`) active | `[V]` No compute, cost, budget, tier or cache concept anywhere in its `src/` |
+| **Agentic Proposer** | `[V]` Implemented | Structure, identity, validation and replay of proposals; C7 (`.../src/ugence_agentic_proposer/contracts.py:456-462`) and C9 (`:495-515`) active | `[V]` No contract field, vocabulary member or exported public-API symbol expresses reasoning compute, cost, budget, model capability tier or probabilistic model-result reuse |
 | **Invocation compute envelope** | `[G]` **Does not exist** | — | The root gap. Every ruling below is downstream of it |
 | **Agent Constitution** | `[G]` **Does not exist** | — | `ADR_UGENCE_AGENTIC_PROPOSER_MVP_READINESS.md:103-107`; `S1_CONTRACT_AND_EQUATION_SPECIFICATION.md:2612-2614` |
-| **Pricing authority; cache/result reuse; tool-call meter** | `[G]` **None exists** | — | Bound `RCG-D9` and `RCG-D10` |
+| **Pricing authority; model-result reuse; tool-call meter** | `[G]` **None exists** | — | Bound `RCG-D9` and `RCG-D10`. `[V]` Not a claim that no caching exists: general-purpose caches with freshness and revocation semantics do exist (`packages/integration/risk-authority-status-runtime/src/ugence_risk_authority_status_runtime/cache.py:1-13`) — precedent for a future design, not model-result reuse |
 
 ### 2.2 — Structural constraints the rulings inherit
 
@@ -317,11 +317,31 @@ separately ratified.
 `[R]` No cache key, TTL, freshness period, identity placement or equivalence rule is
 ratified.
 
-`[G]` No cache, cache key, TTL or invalidation mechanism exists anywhere in the
-repository; a repository-wide search for result-reuse, cache-key and response-cache
-capabilities returns none. `[I]` The dominant hazard is authority drift — a result reused
-under a mandate since revoked — which is live rather than theoretical because revocation
-is a first-class Risk Authority concept (`packages/risk_authority/README.md:1-20`).
+`[G]` **No cache or reuse mechanism for probabilistic model outputs exists**, and no
+ratified cache key, freshness rule, invalidation rule, equivalence rule or reuse
+authority exists for probabilistic model results.
+
+`[V]` This is **not** a claim that the repository contains no caching. General-purpose
+caches with freshness, invalidation or revocation semantics do exist elsewhere — most
+directly `AuthorityStatusCache`, a bounded-stale authority-status cache carrying `as_of`
+freshness metadata and revocation state, whose reads fail closed until the first
+successful sync
+(`packages/integration/risk-authority-status-runtime/src/ugence_risk_authority_status_runtime/cache.py:1-13`,
+`:32`); also a decision TTL mapped to `expires_at`
+(`packages/capabilities/model-selection/src/ugence_model_selection/authority.py:212-214`)
+and a cached dependency graph invalidated on any registration or edge change
+(`packages/runtime/agent-runtime/src/ugence_agent_runtime/orchestration/portfolio.py:150`).
+`[I]` These are **architectural precedent a future model-result reuse design would have
+to examine** — they are where freshness, invalidation and revocation semantics already
+work in this repository — and they are **not** evidence that model-result reuse is
+implemented, authorized or in scope. This paragraph records existing prior art; it is
+not an owner ruling and imposes no obligation. The ruling is unchanged and stated above:
+`RCG-D9` authorizes no model-result caching or reuse.
+
+`[I]` The dominant hazard is authority drift — a result reused under a mandate since
+revoked — which is live rather than theoretical because revocation is a first-class Risk
+Authority concept (`packages/risk_authority/README.md:1-20`), and because the precedent
+above is itself bounded-stale rather than instantaneously revoked.
 
 ### RCG-D10 — Reuse the existing measurement chain
 
@@ -391,10 +411,17 @@ Reasoning Compute Governance:
 - does **not** replace Risk Authority, ActionGate, Policy Authority, an Agent
   Constitution, Context Minimization, Model Authority, Agent Runtime or Runtime
   Assurance, and would depend on them;
-- is **not** part of the Agentic Proposer public API — `[V]` no symbol, field or module
-  in `packages/capabilities/agentic-proposer/src/` relates to compute, cost, budget,
-  capability tier or caching, and the authorized public surface is pinned by
-  `packages/capabilities/agentic-proposer/public_api.json`;
+- is **not** part of the Agentic Proposer public API — `[V]` **no Agentic Proposer
+  contract field, vocabulary member or exported public-API symbol expresses reasoning
+  compute, cost, budget, model capability tier or probabilistic model-result reuse**, and
+  the authorized public surface is pinned by
+  `packages/capabilities/agentic-proposer/public_api.json`. `[V]` Two constructs in that
+  package carry a colliding *name* and neither is a counterexample: the exported
+  `compute_advisory_identity` (`.../src/ugence_agentic_proposer/identity.py:143`) computes
+  a digest and is unrelated to reasoning compute, and the private
+  `@functools.lru_cache(maxsize=1)` on `_unsigned_advisory_payload_model` (`:29`, `:75`)
+  is implementation-level memoization of a model class — not model-output caching, not a
+  reuse authority, and not an RCG public surface;
 - has **no** ratified field, contract shape, vocabulary, budget value, model tier, cache
   rule or record shape. `RCG-D1` – `RCG-D10` rule on **boundary and authority only.**
 
@@ -412,7 +439,7 @@ Reasoning Compute Governance:
 | No pricing authority; no billed-compute representation | Currency-denominated ceilings are unbuildable (`token_accounting.py:27-31`) |
 | No tool-call counting and no tool-call ceiling | `RCG-D3` and `RCG-D10` assign the responsibility; nothing implements it |
 | No candidate-count or repair-specific ceiling | `RCG-D3` defers both to separately reviewed design |
-| No cache, cache key, TTL or invalidation anywhere | `RCG-D9` authorizes none |
+| No reuse mechanism for probabilistic model outputs, and no ratified cache key, freshness, invalidation, equivalence or reuse-authority rule for them | `RCG-D9` authorizes none. `[V]` General-purpose caching with freshness and revocation semantics exists elsewhere (`.../ugence_risk_authority_status_runtime/cache.py:1-13`) and is precedent, not model-result reuse |
 | No equivalence authority beyond a caller-supplied oracle | Semantic-equivalence reuse remains excluded |
 | No provider reconciliation of reported counts | `RCG-D10` keeps the quantities separate; reconciliation is future work |
 | No baseline measurement for any cost hypothesis | No saving is claimed or measured by this ADR |

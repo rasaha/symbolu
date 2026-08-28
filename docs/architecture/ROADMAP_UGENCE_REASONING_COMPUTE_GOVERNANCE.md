@@ -720,8 +720,11 @@ including the two named beneath this table — are unchanged by it.
 take in isolation: the **Agent Constitution does not exist** (§4.5), and **no component
 holds an invocation-level compute envelope** for any authority to bind to. `[V]` **Both
 survive the 2026-08-28 ratification unchanged**, and the ADR records them, together with
-the absence of a pricing authority, a tool-call meter and any cache mechanism, as
-residual gaps rather than as resolved by any ruling.
+the absence of a pricing authority, a tool-call meter and any reuse mechanism for
+probabilistic model outputs, as residual gaps rather than as resolved by any ruling.
+`[V]` That last gap is specific to model-result reuse: general-purpose caching with
+freshness and revocation semantics does exist elsewhere in the repository, and the ADR
+records it as precedent a future design must examine rather than as reuse already built.
 
 ---
 
