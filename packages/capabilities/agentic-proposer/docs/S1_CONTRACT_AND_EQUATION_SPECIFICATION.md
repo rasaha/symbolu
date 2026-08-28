@@ -1529,8 +1529,19 @@ states, not one it can impose on a consumer who imports the function and calls i
 directly. Once C7 is removed, a candidate carrying `domain_check_completion is
 COMPLETE`, `domain_evaluation_outcome is NOT_SATISFIED` (or `INCONCLUSIVE`),
 `is_eligible is True` and matching lineage would make `evaluate_readiness` return
-`True` — which is exactly R-2's condition for `terminal_outcome=PROPOSAL`, enforced by
-V13 (`contracts.py:747-763`). Leaving the outcome out of the equation would therefore
+`True` — which is exactly R-2's condition for `terminal_outcome=PROPOSAL`.
+
+`[V]` **Precisely when that becomes reachable.** V13 as currently implemented
+(`contracts.py:747-763`) is a **blanket** refusal of `PROPOSAL`, not a recomputation:
+it rejects the value unconditionally and never calls `evaluate_readiness` — the only
+occurrence of that name in `contracts.py` is inside its error message. It can be
+blanket precisely because C7 makes `COMPLETE` unconstructible, which its own docstring
+says. R-2 (Part E) is the ratified rule V13 stands in for, and it requires readiness to
+be **recomputed at construction**. So the exposure does not open on C7's removal alone;
+it opens in the same change set, when V13 is reimplemented to enforce R-2 as ratified
+against candidates that can now carry `COMPLETE`. Since OD-7's transition controls
+(part 8) require exactly that to happen together, the distinction changes when the hole
+appears, not whether: leaving the outcome out of the equation would therefore
 let the proposer's strongest classification be reached for a candidate its own domain
 evaluation rejected, and would make `DomainChecksComplete` silently stand in for a
 substantive result it does not carry — the precise failure the **No term compensates
@@ -3300,8 +3311,12 @@ repository contradicts it.** `evaluate_readiness` is an exported public symbol
 cannot enforce against a consumer calling the function directly. With C7 removed, a
 candidate carrying `COMPLETE`, `NOT_SATISFIED` (or `INCONCLUSIVE`), `is_eligible is
 True` and matching lineage would return `True` from Equation 2 — R-2's condition for
-`terminal_outcome=PROPOSAL` under V13 (`contracts.py:747-763`) — letting the
-strongest classification be reached for a candidate domain evaluation rejected, with
+`terminal_outcome=PROPOSAL`. `[V]` Today's V13 (`contracts.py:747-763`) is a blanket
+refusal of `PROPOSAL` that never calls `evaluate_readiness`, which it can be only
+because C7 makes `COMPLETE` unconstructible; the exposure therefore opens not on C7's
+removal alone but when V13 is reimplemented to enforce R-2's recomputation as
+ratified — which part 8 requires to happen in the same change set. The effect is the
+strongest classification reached for a candidate domain evaluation rejected, with
 `domain_checks_complete` compensating for a substantive result it does not carry,
 against Part F's own **No term compensates for another** rule.
 
@@ -3474,7 +3489,11 @@ ratified decision from production authorization elsewhere in this document.
   six-term equation that omits the new term, which must fail. The test states that
   this is what replaces C7's structural closure of R-2/V13's `PROPOSAL` path, and a
   companion assertion confirms `terminal_outcome=PROPOSAL` is unreachable for a
-  `NOT_SATISFIED` or `INCONCLUSIVE` candidate once C7 is gone.
+  `NOT_SATISFIED` or `INCONCLUSIVE` candidate once C7 is gone **and V13 recomputes
+  readiness per R-2** rather than refusing `PROPOSAL` outright as it does today. That
+  companion assertion is therefore meaningful only against the reimplemented V13; a
+  test written against today's blanket refusal would pass for the wrong reason and
+  must not be mistaken for coverage of this obligation.
 * **I8.11** — the `CONTRACT_CARDINALITY` pins named in part 5 (`AdvisoryCandidateSet`
   8 -> 12, `CandidateAdvisory` 10 -> 11, `ProposerAdvisory` 23 -> 27) are updated in
   `tests/s1_specification_mirror.py` in the same change set, together with the

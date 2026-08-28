@@ -71,10 +71,14 @@ additional disclosed ceilings on replay.
   ground that Equation 2 runs only after selection and only against the
   already-`SATISFIED` selected candidate. That is withdrawn: `evaluate_readiness` is
   an exported public symbol with no caller in `src/`, so the call order cannot be
-  imposed on a consumer, and with C7 removed a candidate carrying `COMPLETE` plus
-  `NOT_SATISFIED` would satisfy R-2's condition for `terminal_outcome=PROPOSAL` under
-  V13 — letting the strongest classification be reached for a candidate domain
-  evaluation rejected. The term is inert in S1 and lands with the rest of the OD-7
+  imposed on a consumer, and a candidate carrying `COMPLETE` plus `NOT_SATISFIED`
+  would satisfy R-2's condition for `terminal_outcome=PROPOSAL` — letting the
+  strongest classification be reached for a candidate domain evaluation rejected.
+  Precisely: today's V13 is a blanket refusal of `PROPOSAL` that never calls
+  `evaluate_readiness`, which it can be only because C7 makes `COMPLETE`
+  unconstructible, so the exposure opens not on C7's removal alone but when V13 is
+  reimplemented to enforce R-2's recomputation — which part 8 requires to land in the
+  same change set. The term is inert in S1 and lands with the rest of the OD-7
   surface. The
   fail-closed table covers missing evidence, an `INCONCLUSIVE` outcome, no eligible
   candidate, and an unverifiable provider or policy; "evaluators disagree" is
