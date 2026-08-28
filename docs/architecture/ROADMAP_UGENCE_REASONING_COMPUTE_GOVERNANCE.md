@@ -2,6 +2,15 @@
 
 **Status: EXPLORATORY ROADMAP — NOT RATIFIED — NO IMPLEMENTATION AUTHORIZED.**
 
+> **RCG-0 has since been ruled on, elsewhere.** The ten decisions this document records
+> as open in §15 were ratified on 2026-08-28 in
+> [`ADR_UGENCE_REASONING_COMPUTE_GOVERNANCE_RCG0_SCOPING.md`](ADR_UGENCE_REASONING_COMPUTE_GOVERNANCE_RCG0_SCOPING.md),
+> which is the sole authority for them. That ADR is **documentation only** and
+> **authorizes no implementation**; it fixes no field, contract shape, vocabulary,
+> budget value, model tier, cache rule or record shape, and it leaves C7, C9 and OD-7
+> through OD-10 unchanged. **This document itself remains exploratory and still ratifies
+> nothing**: where its analysis and the ADR differ, the ADR governs.
+
 Nothing in this document is an owner ruling, a contract, a vocabulary, a default, a
 schedule or a development commitment. No field name, enum member, budget value, model
 tier, cache rule, terminal outcome or ownership assignment below is ratified. The
@@ -139,6 +148,10 @@ observable condition a *later* request in the same run may name a more capable c
 `[G]` RCG must not re-implement model authorization; if it exists at all, it plausibly
 consumes Model Authority rather than replacing it. That boundary is unresolved.
 
+`[V]` **Ruled 2026-08-28** (RCG-D1, RCG-D3, [`ADR_UGENCE_REASONING_COMPUTE_GOVERNANCE_RCG0_SCOPING.md`](ADR_UGENCE_REASONING_COMPUTE_GOVERNANCE_RCG0_SCOPING.md)): RCG is a minimal capability that
+owns neither model eligibility nor routing; Model Authority continues to decide
+per-request eligibility, and every initial or escalation request is evaluated by it.
+
 ### 4.2 — Agent Runtime budgets (`packages/runtime/agent-runtime/`)
 
 `[V]` A generic reserve-before-execute budget coordinator already exists over
@@ -192,6 +205,10 @@ define a second, competing usage record. Whether the metering record belongs to 
 Minimization at all — it arrived there because minimization needed to *prove* what it
 saved, not because measurement is minimization's job — is itself unresolved and is a
 plausible early RCG-0 finding.
+
+`[V]` **Ruled 2026-08-28** (RCG-D10, [`ADR_UGENCE_REASONING_COMPUTE_GOVERNANCE_RCG0_SCOPING.md`](ADR_UGENCE_REASONING_COMPUTE_GOVERNANCE_RCG0_SCOPING.md)): the existing chain is reused and RCG adds
+no competing usage ledger. The placement question is recorded as accepted rather than
+reconciled; no re-homing is authorized.
 
 ### 4.4 — Context Minimization proper
 
@@ -332,6 +349,12 @@ is recorded.
 design. Findings 3 and 8 are recorded as inference-grade constraints pending their own
 ratification.
 
+`[V]` **Ruled 2026-08-28** ([`ADR_UGENCE_REASONING_COMPUTE_GOVERNANCE_RCG0_SCOPING.md`](ADR_UGENCE_REASONING_COMPUTE_GOVERNANCE_RCG0_SCOPING.md)): standing principles 2 and 7 ratify both as **RCG
+constraints** — a model, agent or caller may request compute but never authorize it, and
+caller-supplied confidence, difficulty, uncertainty or priority is not authoritative
+merely because it is structured or digest-bound. `[V]` That ratification binds RCG; it
+adds no rule to the Agentic Proposer specification, which is unchanged.
+
 ---
 
 ## 7 — Preliminary responsibility hypothesis, and where it conflicts with the repository
@@ -354,6 +377,17 @@ in a capability whose stated job is minimization, not measurement. Second, the
 invocation-envelope issuer is named twice and implemented nowhere. Resolving either by
 assertion in this document would be the ratification this task excludes.
 
+`[V]` **Both were resolved on 2026-08-28** in [`ADR_UGENCE_REASONING_COMPUTE_GOVERNANCE_RCG0_SCOPING.md`](ADR_UGENCE_REASONING_COMPUTE_GOVERNANCE_RCG0_SCOPING.md), which supersedes this table. The
+envelope issuer is settled by RCG-D2 — Policy Authority issues and versions the
+organizational compute-policy family, the RCG control-plane capability deterministically
+derives the invocation envelope within it and may only narrow it, and **Decision
+Authority does not issue compute envelopes**. Metering is settled by RCG-D10 — Agent
+Runtime observes attempts, the CM–Runtime bridge normalizes provider usage, Context
+Minimization records the separated measures, and the audit/evidence boundary will hold
+the authorized-versus-consumed comparison. `[G]` Neither ruling is implemented, and the
+gaps beneath them — no registered compute-policy family, no envelope, no tool-call
+counting, no pricing authority — are unchanged.
+
 `[I]` **The whole capability is explicitly not assigned to the Agentic Proposer** merely
 because model reasoning occurs upstream of a proposal. On the repository evidence the
 responsibility is split across at least four components, and the Proposer holds the one
@@ -366,6 +400,14 @@ role — *subject of the envelope* — that carries no authority at all.
 **Illustrative only. These are not field names, and no unit, default or type is
 selected.** For each: what it limits · who might authorize it · what might enforce it ·
 how usage might be measured · what might happen at the limit.
+
+`[V]` **The three cross-cutting columns were ruled on 2026-08-28** in [`ADR_UGENCE_REASONING_COMPUTE_GOVERNANCE_RCG0_SCOPING.md`](ADR_UGENCE_REASONING_COMPUTE_GOVERNANCE_RCG0_SCOPING.md) and the
+`unresolved` cells below are superseded for them: authorization is layered under RCG-D2,
+enforcement falls to Agent Runtime and Model Authority under RCG-D3, and the terminal
+behaviour at an exhausted envelope is fail-closed `ABSTAIN` under RCG-D8. `[R]` What
+remains unratified, and is what the rows still record, is every **dimension-specific**
+question: no dimension below is ratified as a governed limit, and no field name, unit,
+cardinality, bound or default is chosen for any of them.
 
 | Dimension | Limits | Possible authorizer | Possible enforcer | Possible measurement | At the limit |
 | --- | --- | --- | --- | --- | --- |
@@ -466,7 +508,11 @@ under a mandate that has since been revoked.
 **9.10 Early fail-closed termination.** Stop probabilistic work when authority is
 absent, required evidence is absent, the request is structurally invalid, a
 deterministic refusal already applies, or the authorized envelope is exhausted. `[R]`
-The terminal outcomes remain subject to separate ratification (§10).
+The terminal outcomes remain subject to separate ratification (§10). `[V]` **Ruled
+2026-08-28** (RCG-D8, [`ADR_UGENCE_REASONING_COMPUTE_GOVERNANCE_RCG0_SCOPING.md`](ADR_UGENCE_REASONING_COMPUTE_GOVERNANCE_RCG0_SCOPING.md)): the default terminal behaviour on an exhausted envelope is
+`ABSTAIN`; deterministic processing may complete only if it consumes no further governed
+probabilistic resources; exhaustion is never automatically `NEED_EVIDENCE`; and no
+automatic compute escalation is authorized.
 
 ---
 
@@ -490,7 +536,17 @@ self-report. This restates §6 finding 3, which is inference-grade and awaits it
 ratification — it is not a ratified rule of this repository. `[R]` A future audit record should be able to compare authorized against
 consumed compute; **its contract shape and identity placement are not decided here.**
 
+`[V]` **Partly ruled 2026-08-28** in [`ADR_UGENCE_REASONING_COMPUTE_GOVERNANCE_RCG0_SCOPING.md`](ADR_UGENCE_REASONING_COMPUTE_GOVERNANCE_RCG0_SCOPING.md): standing principle 2 ratifies the
+request/authorize separation as an RCG constraint, and RCG-D7 places compute
+authorization and consumption in records **outside** the proposal identity projection,
+linked by identifier. `[R]` The **contract shape** of that audit record is still not
+decided, and no field, encoding or record shape is ratified.
+
 ### 10.1 — Budget-exhaustion behaviour: options, not a choice
+
+`[V]` **A choice was since made.** RCG-D8 ([`ADR_UGENCE_REASONING_COMPUTE_GOVERNANCE_RCG0_SCOPING.md`](ADR_UGENCE_REASONING_COMPUTE_GOVERNANCE_RCG0_SCOPING.md)) ratifies fail-closed `ABSTAIN` as the
+default and excludes a terminal `ESCALATE` for the reason recorded below. The options
+below are retained as the analysis that ruling rests on.
 
 Possible outcomes, recorded without selection: terminate and `ABSTAIN`; request
 additional authority; `ESCALATE`; return `NEED_EVIDENCE` **only** when the actual cause
@@ -516,6 +572,12 @@ that OD-9 found missing.
 ## 11 — Identity, provenance and replay: the open questions
 
 Recorded as questions. `[R]` unless a ratified artifact already answers them.
+
+`[V]` **Questions 1, 2, 5 and 8 were answered on 2026-08-28** by RCG-D2, RCG-D4, RCG-D7
+and RCG-D5 respectively, and question 4 by RCG-D7's ruling that no compute magnitude or
+authorization token enters `P_unsigned`, all in [`ADR_UGENCE_REASONING_COMPUTE_GOVERNANCE_RCG0_SCOPING.md`](ADR_UGENCE_REASONING_COMPUTE_GOVERNANCE_RCG0_SCOPING.md). `[G]` Questions 3, 6 and 7 —
+which policy identity governs, how usage is attested, and whether provider counts are
+reconciled — remain open, and questions 9 and 10 remain bounded by §6 findings 4 and 6.
 
 1. What authoritative object issues an invocation budget? `[R]`
 2. Is the budget role-level, mandate-level, invocation-level, or layered? `[R]`
@@ -616,6 +678,13 @@ baselines; safety and authority regression testing; go/no-go criteria for enforc
 `[I]` RCG-0 is the only phase this document supports starting. Every later phase depends
 on rulings that do not exist.
 
+`[V]` **RCG-0 is complete.** Its architectural scoping and owner-decision brief were
+delivered and the register below was ratified on 2026-08-28 in
+[`ADR_UGENCE_REASONING_COMPUTE_GOVERNANCE_RCG0_SCOPING.md`](ADR_UGENCE_REASONING_COMPUTE_GOVERNANCE_RCG0_SCOPING.md).
+`[R]` That ratification is documentation only: **no later phase is authorized to start**,
+and RCG-6's shadow pilot in particular remains unimplemented and unauthorized. Each later
+phase still requires its own separately reviewed and separately ratified milestone.
+
 ---
 
 ## 15 — Owner-decision register
@@ -626,22 +695,36 @@ the Agentic Proposer readiness ADR's own record
 has been given to extend it for a different capability. The `RCG-D` prefix below is a
 local label for this document only and confers nothing.
 
+`[V]` **All ten were ratified on 2026-08-28** in
+[`ADR_UGENCE_REASONING_COMPUTE_GOVERNANCE_RCG0_SCOPING.md`](ADR_UGENCE_REASONING_COMPUTE_GOVERNANCE_RCG0_SCOPING.md),
+which is the sole authority for the rulings and records them in full. The Status column
+below therefore reads **Ruled**, and the Decision column is retained as the question each
+ruling answered, not as an open item. `[R]` Being ruled is not being built: the ADR is
+documentation only and authorizes no implementation, and the `[G]` gaps it records —
+including the two named beneath this table — are unchanged by it.
+
 | # | Decision | Status |
 | --- | --- | --- |
-| RCG-D1 | **Owning capability.** Does RCG exist as a capability at all, and if so where — a new package, an extension of Agent Runtime, or a policy family under an existing authority? | `[R]` |
-| RCG-D2 | **Compute-authorizing authority.** What object issues an invocation compute envelope, and under whose signature? §7 names two candidates and implements neither. | `[R]` / `[G]` |
-| RCG-D3 | **Enforcement component.** Which component enforces which dimension, and specifically whether Agent Runtime's existing coordinator (§4.2) is configured rather than duplicated. | `[R]` |
-| RCG-D4 | **Budget scope.** Role, mandate, invocation, or layered — and how layers compose when they disagree. | `[R]` |
-| RCG-D5 | **Capability-tier vocabulary.** Whether versioned capability classes or organization-controlled routing profiles exist at all, and their relationship to Model Authority's existing per-request decision. No vendor name may be a normative value. | `[R]` |
-| RCG-D6 | **Budget representation and canonicalisation.** Typed string encoding, cardinality and comparison rules, given that the substrate admits no numeric type (§5). | `[R]` |
-| RCG-D7 | **Identity and provenance placement.** Whether any compute value enters an identity projection, and what proves who issued it (§6 finding 2). | `[R]` |
-| RCG-D8 | **Exhaustion and escalation behaviour.** Which terminal outcome follows an exhausted envelope, given that `ESCALATE` has no ratified destination today (§10.1). | `[R]` / `[G]` |
-| RCG-D9 | **Cache/reuse authority and freshness.** Whether reuse is permitted, keyed on what, invalidated by what, and authorized by whom. | `[R]` / `[G]` |
-| RCG-D10 | **Usage attestation and audit record.** Who owns the metering record, whether provider counts are reconciled, and where the authorized-versus-consumed comparison lives — noting that today's record sits in Context Minimization (§4.3) and the runtime's budget has no telemetry (§4.2). | `[R]` / `[G]` |
+| RCG-D1 | **Owning capability.** Does RCG exist as a capability at all, and if so where — a new package, an extension of Agent Runtime, or a policy family under an existing authority? | **Ruled — minimal cross-cutting capability** |
+| RCG-D2 | **Compute-authorizing authority.** What object issues an invocation compute envelope, and under whose signature? §7 names two candidates and implements neither. | **Ruled — layered; Policy Authority family + RCG-derived envelope** |
+| RCG-D3 | **Enforcement component.** Which component enforces which dimension, and specifically whether Agent Runtime's existing coordinator (§4.2) is configured rather than duplicated. | **Ruled — existing components reused, not duplicated** |
+| RCG-D4 | **Budget scope.** Role, mandate, invocation, or layered — and how layers compose when they disagree. | **Ruled — layered, minimum-wins, non-compensatory** |
+| RCG-D5 | **Capability-tier vocabulary.** Whether versioned capability classes or organization-controlled routing profiles exist at all, and their relationship to Model Authority's existing per-request decision. No vendor name may be a normative value. | **Ruled — versioned routing-policy profiles** |
+| RCG-D6 | **Budget representation and canonicalisation.** Typed string encoding, cardinality and comparison rules, given that the substrate admits no numeric type (§5). | **Ruled — opaque token in identity; canonical decimal string in the usage record** |
+| RCG-D7 | **Identity and provenance placement.** Whether any compute value enters an identity projection, and what proves who issued it (§6 finding 2). | **Ruled — separate authorization and usage records** |
+| RCG-D8 | **Exhaustion and escalation behaviour.** Which terminal outcome follows an exhausted envelope, given that `ESCALATE` has no ratified destination today (§10.1). | **Ruled — fail-closed `ABSTAIN`** |
+| RCG-D9 | **Cache/reuse authority and freshness.** Whether reuse is permitted, keyed on what, invalidated by what, and authorized by whom. | **Ruled — no cache or reuse in scope** |
+| RCG-D10 | **Usage attestation and audit record.** Who owns the metering record, whether provider counts are reconciled, and where the authorized-versus-consumed comparison lives — noting that today's record sits in Context Minimization (§4.3) and the runtime's budget has no telemetry (§4.2). | **Ruled — existing measurement chain reused** |
 
 `[G]` Two structural gaps sit underneath the register and are not decisions anyone can
 take in isolation: the **Agent Constitution does not exist** (§4.5), and **no component
-holds an invocation-level compute envelope** for any authority to bind to.
+holds an invocation-level compute envelope** for any authority to bind to. `[V]` **Both
+survive the 2026-08-28 ratification unchanged**, and the ADR records them, together with
+the absence of a pricing authority, a tool-call meter and any reuse mechanism for
+probabilistic model outputs, as residual gaps rather than as resolved by any ruling.
+`[V]` That last gap is specific to model-result reuse: general-purpose caching with
+freshness and revocation semantics does exist elsewhere in the repository, and the ADR
+records it as precedent a future design must examine rather than as reuse already built.
 
 ---
 
@@ -650,3 +733,7 @@ holds an invocation-level compute envelope** for any authority to bind to.
 Documentation only. It adds this file and two non-normative pointers to it. It adds no
 field, no vocabulary, no default, no test, no gate and no runtime behaviour, and it
 neither authorizes nor blocks any implementation.
+
+`[V]` **Amended 2026-08-28** with the ratification pointers in the status block, §14 and
+§15 above. That amendment adds no field, vocabulary, default, test, gate or runtime
+behaviour either, and authorizes no implementation.

@@ -1156,3 +1156,12 @@ It is marked *EXPLORATORY ROADMAP — NOT RATIFIED — NO IMPLEMENTATION AUTHORI
 records no decision and amends nothing in this artifact, and it does not assign the
 concern to the Agentic Proposer. It is linked here only so that the question has one
 recorded home rather than accumulating inside a frozen specification.
+
+That roadmap's own ten-item register was subsequently ratified, on 2026-08-28, in
+[`ADR_UGENCE_REASONING_COMPUTE_GOVERNANCE_RCG0_SCOPING.md`](ADR_UGENCE_REASONING_COMPUTE_GOVERNANCE_RCG0_SCOPING.md).
+That ADR is documentation only, authorizes no implementation, adds no field, contract
+shape or vocabulary anywhere, and **changes nothing in this artifact**: C7 and C9 remain
+active and unmodified, and OD-7, OD-8, OD-9 and OD-10 are neither implemented nor
+reopened by it. It rules that compute authorization and consumption stay **outside** the
+proposal identity projection, and it continues not to assign the concern to the Agentic
+Proposer.
