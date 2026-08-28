@@ -379,7 +379,7 @@ is not authorization to write production code, and this ADR does not claim it is
 
 ## 9. Independent-review evidence
 
-`[V]` The scoping analysis these rulings answer was produced as a working deliberative
+`[I]` The scoping analysis these rulings answer was produced as a working deliberative
 artifact and was **independently reviewed read-only against this repository at baseline
 `80dcdce48821c563bfe41ced45d915a16e0908c1`**, under an artifact-identity check binding
 the review to exact content. The review reported **no blockers** and returned the verdict
