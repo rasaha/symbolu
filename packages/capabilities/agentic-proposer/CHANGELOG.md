@@ -1,5 +1,56 @@
 # Changelog — ugence-agentic-proposer
 
+## Unreleased — OD-8, OD-9 and OD-10 ratified; OD-7 tie-break corrected
+
+Ratified 2026-08-28. **Documentation only.** No `src/` module, test, `public_api.json`
+or `version.py` is changed; C7 and C9 remain active and unmodified; the package stays
+`0.1.0`; the substantive platform-freeze digest is unchanged. Implementation of the
+OD-7 surface remains gated on OD-7 part 8.
+
+* **OD-8 — selection-policy v1 is fail-closed uniqueness.** The selector selects only
+  when **exactly one** candidate is both `is_eligible is True` and
+  `domain_evaluation_outcome is SATISFIED`. More than one qualifying candidate
+  produces **no selection** and terminates `ABSTAIN`.
+* **OD-8 — no field may be repurposed as a merit proxy.** Timestamps, identifiers,
+  dispositions, review actions, and reference/assumption/uncertainty counts are all
+  barred. The ground is provenance: only `is_eligible` is package-computed and only
+  `domain_evaluation_outcome` will be provider-produced; every other candidate field
+  is caller-supplied, so ranking on one would let the caller steer selection.
+* **Substantive multi-candidate ranking is deferred**, not outstanding. A future
+  ruling must name the business objective, the authoritative producer, a
+  deterministic non-floating-point representation (the canonicalisation substrate
+  rejects `int`, `float` and `Decimal`, so any numeric rank must be a canonical
+  decimal string), the identity binding, and a replay path no untrusted caller can
+  steer. The `DomainEvaluationProvider` gains no business-preference authority.
+* **OD-7 tie-break correction.** OD-7's statement that ascending `candidate_id` is
+  "always decisive" over whatever OD-8 leaves tied was too broad and conflicted with
+  fail-closed uniqueness. Corrected: the tie-break applies only after a ratified
+  substantive policy establishes the tied candidates are equally preferable, never as
+  a substitute for a missing criterion, and is deliberately unexercised under v1. The
+  underlying uniqueness and ordering facts are unchanged; what is withdrawn is the
+  inference that totality alone licenses resolving a preference the owner never made.
+* **OD-9 — `INCONCLUSIVE` maps unconditionally to `ABSTAIN`.** `ESCALATE` was not
+  chosen: no authoritative, replayable severity condition is ratified, and a
+  no-selection run carries no referral destination under R-1a.
+* **OD-9 mixed-set scope — the ambiguity in merged OD-7 is resolved.** OD-7's part-4
+  filtering language and its fail-closed table row could be read as disagreeing on a
+  set holding both a qualifying and an `INCONCLUSIVE` candidate. Ratified reading:
+  `INCONCLUSIVE` is **per candidate** and does not poison the set — such a set
+  **selects the qualifying candidate**. The mapping applies only when the qualifying
+  pool is empty and at least one evaluated candidate is `INCONCLUSIVE`.
+* **OD-10 — residual completed no-selection outcome.** A completed run with an empty
+  qualifying pool and no `INCONCLUSIVE` candidate terminates `ABSTAIN`. Missing
+  evidence, evaluator unavailability and verification failure keep their OD-7
+  behaviour.
+* **The fail-closed table is now six ordered, non-overlapping rows**, stated on the
+  qualifying pool rather than on the presence of any individual candidate, with
+  exactly one row matching any completed run.
+* **New prospective obligations `I8.12`–`I8.15`**: selection-policy v1 including a
+  mutation test against a `candidate_id` fallback; the non-repurposing bar; the
+  mixed-set case that distinguishes the ratified reading from the run-wide one; and
+  table totality and disjointness. Documentation-consistency guards are added so
+  these ratified meanings cannot drift back.
+
 ## Unreleased — OD-7 ratified, not yet implemented (amended)
 
 `docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md` and
@@ -95,7 +146,7 @@ is implemented.
 
 Full ruling, field-ownership table, C5 classification, new vocabulary, exception
 class, replay-function signatures, rejected alternatives and prospective `I8.1`–
-`I8.11` enforcement obligations are in the specification's `OD-7` entry.
+`I8.15` enforcement obligations are in the specification's `OD-7` entry.
 
 ## Unreleased — I7.13–I7.16 test coverage completed
 

@@ -115,7 +115,7 @@ def test_there_is_exactly_one_owner_decision_record():
     for path in DOCUMENTS:
         if path == ADR:
             continue
-        for heading in re.findall(r"^#{1,6}\s+(.*OD-[1-6].*)$", _text(path), re.M):
+        for heading in re.findall(r"^#{1,6}\s+(.*OD-[1-6]\b.*)$", _text(path), re.M):
             if any(w in heading.lower() for w in _RATIFICATION_HEADING_WORDS):
                 competing.append(f"{path.name}: {heading}")
     assert not competing, (
@@ -1449,3 +1449,107 @@ def test_the_unenforced_row_counts_what_the_registry_actually_carries():
         f"the row says {spelled} ({_NUMERALS[spelled]}) locally decidable violations; "
         f"the registry carries {len(registry)}")
 
+
+
+# --------------------------------------------------------------------------- #
+# OD-8 / OD-9 / OD-10 — the ratified selection and no-selection meanings (2026-08-28)
+# --------------------------------------------------------------------------- #
+#
+# These guard the four meanings the owner's ruling fixed, each of which a later edit
+# could plausibly undo by reverting to the pre-ruling phrasing. They are document
+# checks, not runtime assertions: no selector exists yet, so what can drift is the
+# prose that the eventual implementation will be written from.
+#
+# Scope, stated exactly: each asserts the presence of a ratified statement, or the
+# absence of the specific withdrawn one it replaces. None of them proves the documents
+# say nothing else contradictory — that is the same ceiling the strategy-authority
+# scan discloses above, and it is not narrowed here.
+
+
+def test_od8_ratifies_fail_closed_uniqueness_not_an_outstanding_ranking_criterion():
+    """OD-8 is decided. The pre-ruling text called it outstanding; a revert to that
+    wording, or to any 'ranking criterion is not ratified' phrasing, fails here."""
+    spec = _text(SPECIFICATION)
+    assert "OD-8 — RATIFIED: selection-policy v1 is fail-closed uniqueness" in spec
+    assert "exactly one** candidate is both" in spec
+    assert "OD-8 (outstanding)" not in spec, (
+        "OD-8 is ratified 2026-08-28; the outstanding-marker wording is withdrawn")
+    assert "OD-8 must be ratified before" not in spec
+
+
+def test_od8_bars_repurposing_existing_fields_as_merit_proxies():
+    """The non-repurposing bar is the substance of OD-8's second half. Losing it would
+    let an implementer rank on caller-supplied fields, which is exactly what the
+    ruling forbids."""
+    spec = _text(SPECIFICATION)
+    assert "must not** be repurposed as merit proxies" in spec
+    for field in ("uncertainties", "evaluated_at", "candidate_id"):
+        assert field in spec
+
+
+#: The three live assertions of tie-break decisiveness that stood before OD-8, one per
+#: site. The phrase "always decisive" itself still occurs — quoted in the correction and
+#: negated in the ADR — so the bare phrase cannot be the check: withdrawing a claim means
+#: naming it. These are the predicate forms that assert it rather than retire it.
+_WITHDRAWN_TIE_BREAK_PREDICATES = (
+    "is therefore always decisive",
+    "and so is always decisive",
+    "always decisive on its own",
+)
+
+
+def test_the_candidate_id_tie_break_is_not_asserted_as_always_decisive():
+    """OD-8's tie-break correction. Under fail-closed uniqueness the tie-break is
+    unexercised, so no document may assert it resolves a substantive preference.
+
+    Scope: this catches a revert to any of the three phrasings that carried the claim,
+    not every sentence that could express it.
+    """
+    for path in (SPECIFICATION, ADR):
+        body = _text(path)
+        for predicate in _WITHDRAWN_TIE_BREAK_PREDICATES:
+            assert predicate not in body, (
+                f"{path.name}: {predicate!r} asserts the tie-break decisiveness OD-8 "
+                f"withdrew")
+    spec = _text(SPECIFICATION)
+    assert "deliberately\nunexercised" in spec or "deliberately unexercised" in spec
+    assert "Tie-break correction to OD-7" in spec
+
+
+def test_od9_maps_inconclusive_to_abstain_per_candidate_not_run_wide():
+    """OD-9 and its mixed-set scope — the ambiguity the ruling resolved. The run-wide
+    reading is the one an implementer is most likely to restore by accident."""
+    spec = _text(SPECIFICATION)
+    assert "OD-9 — `INCONCLUSIVE` maps to `ABSTAIN`" in spec
+    assert "does **not** poison the candidate set" in spec
+    assert "OD-9 (outstanding)" not in spec, (
+        "OD-9 is ratified 2026-08-28; the outstanding-marker wording is withdrawn")
+
+
+def test_od10_covers_the_residual_completed_no_selection_run():
+    """OD-10 exists so a completed run cannot fall through the fail-closed table with
+    no ratified outcome. Both the ruling and its exclusion of the OD-7 rows matter."""
+    spec = _text(SPECIFICATION)
+    assert "OD-10 — the residual completed no-selection outcome" in spec
+    assert "does **not** cover missing evidence" in spec
+
+
+def test_the_fail_closed_table_carries_six_ordered_non_overlapping_rows():
+    """The table is the operative statement of S2 MVP outcome order. A row silently
+    dropped, or the ordering guarantee removed, is the drift this catches."""
+    spec = _text(SPECIFICATION)
+    assert "The rows are evaluated in the order given and do not overlap" in spec
+    for row in ("| 1 |", "| 2 |", "| 3 |", "| 4 |", "| 5 |", "| 6 |"):
+        assert row in spec, f"fail-closed table is missing row {row}"
+    assert "**OD-8**" in spec and "**OD-9**" in spec and "**OD-10**" in spec
+
+
+def test_no_owner_decision_is_recorded_as_outstanding():
+    """After 2026-08-28 the outstanding set is empty; what remains is a *deferral*
+    (substantive multi-candidate ranking), which is a different status and must not be
+    relabelled as an outstanding ruling."""
+    for path in (SPECIFICATION, ADR):
+        body = _text(path)
+        assert "OD-8 and OD-9 remain outstanding" not in body, path.name
+    assert "substantive multi-candidate ranking" in _text(SPECIFICATION).lower() or (
+        "Substantive multi-candidate ranking" in _text(SPECIFICATION))

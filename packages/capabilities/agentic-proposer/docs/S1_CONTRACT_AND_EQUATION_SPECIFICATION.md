@@ -59,10 +59,12 @@ identity-bound fields on `CandidateAdvisory`, `AdvisoryCandidateSet` and
 `ProposerAdvisory` binding the evaluation profile, each candidate's result and the
 selector-policy identity into `P_unsigned`; two new replay functions; a fail-closed
 table; and a same-change-set requirement for removing C7 and C9. Two decisions OD-7
-does **not** resolve are tracked by name, not left as unlabelled gaps: **OD-8**, the
-selector's substantive ranking criterion, and **OD-9**, the `INCONCLUSIVE`/
-conflicting-evaluation mapping to a terminal outcome — both outstanding, both required
-before implementation. Unlike every prior owner decision, OD-7 **amends the frozen
+did **not** resolve, **OD-8** (the selector's substantive ranking criterion) and
+**OD-9** (the `INCONCLUSIVE`-to-terminal-outcome mapping), together with **OD-10** (the
+residual completed no-selection outcome), are **ratified 2026-08-28** and recorded in
+part 4 and part 7 below; OD-8 also narrowly corrects OD-7's `candidate_id` tie-break
+statement. Substantive multi-candidate ranking remains deferred to a separate future
+ruling, and implementation of the whole OD-7 surface remains gated on part 8. Unlike every prior owner decision, OD-7 **amends the frozen
 contract surface** rather than merely clarifying it, and — per its own transition
 controls — authorizes no change to `src/`, `public_api.json` or `version.py` until it
 is built and independently reviewed. See the Owner decisions section below for the
@@ -2480,8 +2482,8 @@ Each item below is deliberately absent and is not a gap.
   to `AdvisoryCandidateSet` and, mirrored, to `ProposerAdvisory`, so selection arrives
   at S2 as a contract change **and** a behaviour change. What survives is the weaker
   and still-true claim that S-1, S-2, R-1a and R-1b themselves need no amendment. See
-  OD-7 parts 4 and 5 below; OD-8, the substantive ranking criterion, remains
-  outstanding.
+  OD-7 parts 4 and 5 below; OD-8 is ratified as selection-policy v1
+  (fail-closed uniqueness), with substantive multi-candidate ranking deferred.
 * **Three catalogues, not one.** `reason_codes` (on both bearers) and
   `selection_reason_codes` await a **reason-code catalogue**; `deterministic_checks`
   awaits a **catalogue of the checks a producer may name**; `semantic_audit_refs` awaits
@@ -2975,13 +2977,14 @@ D7 says; Part D is written for that shape and no longer for an alternative. **Of
 owner decisions, OD-4 is the one that bears on contract shape**; OD-5 and OD-6 were
 ruled not to, and Part D is unchanged by either.
 
-**All six owner decisions are resolved, and so is OD-7: OD-1 through OD-7 are decided.
-OD-8 and OD-9 remain outstanding.** OD-7 is
+**All six owner decisions are resolved, and so are OD-7 through OD-10: OD-1 through
+OD-10 are decided. No owner decision is outstanding; substantive multi-candidate
+ranking is deferred to a future ruling that does not yet have a number.** OD-7 is
 stated separately below, on its own explicitly different terms: it is not accompanied
 by implementation the way OD-1 – OD-6 are, and it is itself a boundary ratification,
-not a complete executable algorithm. `[G]` **OD-8 and OD-9, named inside OD-7's own
-entry, are outstanding rulings**, tracked by those names there rather than left as
-unlabelled gaps within it. OD-1,
+not a complete executable algorithm. `[R]` **OD-8, OD-9 and OD-10 are ratified
+2026-08-28** and are recorded inside OD-7's own entry, in part 4 and part 7; like
+OD-7 they are ratified and **not implemented**. OD-1,
 OD-2 and OD-3 are ratified 2026-08-25 and are recorded above with their riders and
 their enforcement designs; none changes a contract, a field type, a cardinality, a
 vocabulary or an equation term. **OD-5 is ratified 2026-08-26**: it changes no
@@ -3108,40 +3111,76 @@ asserted never to collide by a boundary test (I8.8, below).
 
 **(4) Candidate selection, for the S2 MVP, is a deterministic, versioned, in-package
 function — not an injected provider.** The selector considers only candidates that are
-`is_eligible is True` **and** carry `domain_evaluation_outcome is SATISFIED`; it
-consumes no state outside the candidate set's own fields; it selects at most one
-candidate; and it selects none when no unique lawful candidate exists. Model-assisted
+`is_eligible is True` **and** carry `domain_evaluation_outcome is SATISFIED` — call
+these the **qualifying pool** — ; it consumes no state outside the candidate set's own
+fields; it selects at most one candidate; and it selects none when no unique lawful
+candidate exists.
+
+`[R]` **Per-candidate scope (OD-9).** `domain_evaluation_outcome` is evaluated **per
+candidate** and does **not** poison the candidate set. A candidate carrying
+`NOT_SATISFIED` or `INCONCLUSIVE` is **filtered out of the qualifying pool, and
+nothing more**: it does not prevent selection of a different candidate that is
+eligible and `SATISFIED`. A set containing exactly one qualifying candidate alongside
+any number of `INCONCLUSIVE` or `NOT_SATISFIED` candidates therefore **selects that
+one candidate**. The fail-closed conditions below are conditions on the **qualifying
+pool**, never on the presence of any individual non-qualifying candidate. Model-assisted
 candidate generation and explanation remain permitted upstream of selection (unchanged
 from S1); an LLM may not populate `selected_candidate_id` directly, and model-assisted
 selection is out of scope of OD-7 and requires its own separate ratification.
 
-`[G]` **OD-8 (outstanding): the selector's substantive ranking criterion.** What makes
-one eligible, `SATISFIED` candidate preferable to another when more than one qualifies
-is a business decision this ruling does not make, and this amendment does not invent
-one on the owner's behalf; it is named **OD-8** so it is tracked as an outstanding
-decision rather than left as an unlabelled gap. What OD-7 fixes is the structure
-around OD-8's absence: once OD-8 is ratified and identifies a unique candidate, that
-candidate is selected. `[V]` The deterministic tie-break for whatever OD-8 leaves tied
-is ascending `candidate_id` order — the same ordering convention D6 already fixes for
-`candidates` itself — and `_check_candidate_sequence` already requires `candidate_id`
-to be unique within a set and the sequence to be supplied in that exact ascending
-order, so this tie-break operates over a **total order on already-distinct keys** and
-is therefore always decisive: it cannot itself leave more than one candidate
-standing, whatever OD-8 eventually says. **OD-8 must be ratified before
-implementation**; this amendment cannot be implemented against `src/` until it is.
+**OD-8 — RATIFIED: selection-policy v1 is fail-closed uniqueness.** `[R]` The selector
+automatically selects a candidate **only when exactly one** candidate is both
+`is_eligible is True` and `domain_evaluation_outcome is SATISFIED`. When **more than
+one** candidate qualifies, selection-policy v1 makes **no selection** and the run
+terminates `ABSTAIN` — consistent with S-1's already-ratified reading that declining
+to select among eligible candidates is `ABSTAIN`, not a forced recommendation.
 
-`[R]` **One constraint on OD-8 *is* ratified here, though its content is not:
-whatever criterion OD-8 names must be computable from the candidate set's own
-fields.** This follows from what OD-7 has already fixed rather than adding a new
-requirement: part 4 states the selector "consumes no state outside the candidate set's
-own fields", and `verify_deterministic_selection(*, candidate_set)` takes the set as
-its only argument, so a criterion needing anything else — a scoring service, a
-per-tenant policy table, a model call, wall-clock time, or any datum not carried by
-`AdvisoryCandidateSet` — would be unreplayable by the very function OD-7 ratifies to
-replay it, and is therefore already excluded. Stating it explicitly keeps OD-8's
-eventual ruling from being drafted against a wider space than OD-7 left open. `[G]`
-Which of the admissible criteria to adopt remains entirely OD-8's, and nothing here
-narrows it further.
+`[R]` **No existing candidate field is ratified as a substantive measure of
+preference.** Timestamps, identifiers, dispositions, review actions, reference counts,
+assumption counts and uncertainty counts **must not** be repurposed as merit proxies.
+`[I]` The reason is provenance, not expressiveness: of `CandidateAdvisory`'s fields
+only `is_eligible` is package-computed and replay-verified, and only
+`domain_evaluation_outcome` will be provider-produced and replay-verified. Every other
+field — `candidate_id` included — enters through caller-supplied builder parameters,
+so ranking on any of them would let the caller steer selection; ranking on fewer
+`uncertainties` would additionally punish honest disclosure.
+
+`[G]` **Substantive multi-candidate ranking remains deferred**, and no new ranking
+field is introduced by this ruling. It requires a separate ruling identifying: the
+business objective defining candidate merit; the authority entitled to produce the
+ranking input; its deterministic, **non-floating-point** representation (`[V]` the
+canonicalisation substrate raises `BareNumberError` on any `int` or `float` and
+`UnsupportedTypeError` on `Decimal`, so any numeric rank must be a canonical decimal
+*string*); its provenance and identity binding; and how replay verifies it without
+allowing an untrusted caller to steer selection. `[R]` The `DomainEvaluationProvider`
+is authoritative **only** for the domain-evaluation responsibility OD-7 ratifies; it
+does **not** acquire business-preference authority through this or the OD-8 ruling.
+
+`[R]` **Ratified constraint on any future criterion: it must be computable from the
+candidate set's own fields.** Part 4 states the selector "consumes no state outside
+the candidate set's own fields", and `verify_deterministic_selection(*, candidate_set)`
+takes the set as its only argument, so a criterion needing anything else — a scoring
+service, a per-tenant policy table, a model call, wall-clock time, or any datum not
+carried by `AdvisoryCandidateSet` — would be unreplayable by the very function OD-7
+ratifies to replay it, and is therefore excluded.
+
+`[R]` **Tie-break correction to OD-7.** An earlier statement of part 4 held that
+ascending `candidate_id` is "always decisive" over whatever OD-8 leaves tied. That is
+**too broad and conflicts with fail-closed uniqueness**, and is corrected here as a
+change to ratified selection semantics, not an implementation detail. The corrected
+rule, in four parts: (i) `candidate_id` may break a tie **only after** a ratified
+substantive selection policy has established that the tied candidates are equally
+preferable and lawfully selectable; (ii) `candidate_id` **must not** substitute for a
+missing substantive preference criterion; (iii) under selection-policy v1 more than one
+qualifying candidate produces **no selection**, so the tie-break is **deliberately
+unexercised**; (iv) a future selection-policy version may activate it only after that
+version's substantive ranking criterion and authoritative inputs are separately
+ratified. `[V]` The underlying mechanical fact is unchanged and still holds —
+`_check_candidate_sequence` (`contracts.py:169-177`, mirrored on the `P_unsigned`
+payload at `identity.py:111`) requires `candidate_id` to be unique within a set and
+supplied in ascending order, so the ordering *is* total over distinct keys. What is
+withdrawn is the inference that totality alone licenses using it to resolve a
+substantive preference the owner has not ratified.
 
 **(5) Identity and replay: this is not a zero-contract-shape transition.**
 `P_unsigned` must bind the domain-evaluation profile identity actually used, each
@@ -3335,20 +3374,52 @@ to a convention.
 **(7) Fail-closed behavior.** None of the following may fall through to a silently
 chosen candidate:
 
-| Condition | Outcome |
-| --- | --- |
-| Missing evidence, or the evaluator is unavailable | no selection; `NEED_EVIDENCE` |
-| Evaluation outcome is `INCONCLUSIVE` | no selection; `[G]` **OD-9 (outstanding)**: the deterministic mapping to `ABSTAIN` or `ESCALATE` is not yet ratified — required before implementation |
-| No candidate is both eligible and `SATISFIED` | no selection |
-| The provider's echoed profile, its echoed `candidate_id`, its result, or the selector-policy identity cannot be verified | refuse construction |
+`[R]` **The rows are evaluated in the order given and do not overlap.** Each condition
+is stated on the **qualifying pool** (part 4) — candidates that are `is_eligible is
+True` **and** `domain_evaluation_outcome is SATISFIED` — never on the presence of an
+individual non-qualifying candidate. The first matching row governs; exactly one row
+matches any completed run.
+
+| # | Condition | Outcome |
+| --- | --- | --- |
+| 1 | Missing evidence, or the evaluator is unavailable | no selection; `NEED_EVIDENCE` |
+| 2 | The provider's echoed profile, its echoed `candidate_id`, its result, or the selector-policy identity cannot be verified | refuse construction |
+| 3 | **Exactly one** candidate in the qualifying pool | **select it** |
+| 4 | **More than one** candidate in the qualifying pool | no selection; `ABSTAIN` — **OD-8**, selection-policy v1 fail-closed uniqueness; the `candidate_id` tie-break is deliberately unexercised |
+| 5 | Qualifying pool **empty**, and at least one evaluated candidate is `INCONCLUSIVE` | no selection; `ABSTAIN` — **OD-9** |
+| 6 | Qualifying pool **empty**, and **no** candidate is `INCONCLUSIVE` (e.g. every evaluated candidate is `NOT_SATISFIED`, or none is eligible) | no selection; `ABSTAIN` — **OD-10** |
+
+`[R]` **OD-9 — `INCONCLUSIVE` maps to `ABSTAIN`** (row 5), unconditionally for the S2
+MVP. `ESCALATE` is **not** selected, on two grounds the repository supports: no
+authoritative, replayable severity or escalation condition is ratified, so any
+conditional mapping would rest on a caller-supplied input; and `[V]` no ratified rule
+connects this outcome to an effective referral destination — under R-1a a no-selection
+run carries `requested_review_destination_role_ref = None` (`contracts.py:602-618`),
+so a terminal `ESCALATE` here would assert a referral with no in-contract destination.
+`CognitiveRoleContract.escalation_role_ref` (`contracts.py:294`) exists but `[G]` no
+ratified rule connects it to a terminal `ESCALATE`. A later ruling may revisit this
+once a severity authority exists; nothing here forecloses that.
+
+`[R]` **OD-10 — the residual completed no-selection outcome** (row 6). When domain
+evaluation has **completed**, no candidate is both eligible and `SATISFIED`, and no
+candidate is `INCONCLUSIVE`, the selector makes no selection and the terminal outcome
+is `ABSTAIN`. This covers every evaluated candidate being `NOT_SATISFIED`, and no
+candidate being eligible. It does **not** cover missing evidence, evaluator
+unavailability or verification failure, whose OD-7 behaviour (rows 1 and 2) is
+unchanged. OD-10 exists so that a completed run cannot fall through the table with no
+ratified outcome.
 
 `[I]` **Two rows an earlier draft of this table carried, and why they are gone.** That
 draft also listed "an unresolved tie survives the ratified ranking criterion and the
 `candidate_id` tie-break" as an `ESCALATE` trigger, and listed "evaluators disagree"
-alongside `INCONCLUSIVE`. Neither survives: part 4 already shows the `candidate_id`
-tie-break is a total order over already-unique keys and so is always decisive — a
-tie surviving it is not a live case under the ratified structure, so it is not
-restated here as a trigger, only as the reasoning in part 4. "Evaluators disagree"
+alongside `INCONCLUSIVE`. Neither survives, though the first is now gone for a
+**different reason than the one originally given**. `[R]` The original reasoning — that
+the `candidate_id` tie-break is always decisive, so no tie can survive it — is
+**withdrawn by OD-8's tie-break correction** (part 4): totality over distinct keys is
+still a fact, but it no longer licenses resolving a substantive preference, and under
+selection-policy v1 the tie-break is deliberately unexercised. The row is absent under
+OD-8 because more than one qualifying candidate is not an escalation trigger at all:
+it is row 4 above, no selection and `ABSTAIN`. "Evaluators disagree"
 presupposes more than one evaluator; OD-7 ratifies exactly one injected `provider`
 returning one outcome per candidate, and multi-provider evaluation is not ratified by
 it (Rejected Alternatives, below) — so the row above states only the single-provider
@@ -3370,11 +3441,14 @@ fail-closed role; that handover is the reason the two removals and the new machi
 must land together.
 
 **OD-7 ratifies a boundary, not a complete executable algorithm.** The contracts,
-vocabulary, protocol, identity bindings and fail-closed structure above are ratified;
-**OD-8** (the selector's substantive ranking criterion, part 4) and **OD-9** (the
-`INCONCLUSIVE`/conflicting-evaluation mapping to a terminal outcome, part 7) are not,
-remain outstanding, and are tracked by those names from this point on rather than as
-unlabelled gaps. Implementation cannot proceed without both.
+vocabulary, protocol, identity bindings and fail-closed structure above are ratified.
+`[R]` **OD-8** (selection-policy v1, part 4), **OD-9** (`INCONCLUSIVE` to `ABSTAIN`,
+part 7) and **OD-10** (the residual completed no-selection outcome, part 7) are
+**ratified 2026-08-28** and are recorded in those parts. What remains deferred is
+**substantive multi-candidate ranking**, which OD-8 declines to invent and which needs
+its own ruling naming a business objective, an authoritative producer, a
+non-floating-point representation, an identity binding, and a replay path no untrusted
+caller can steer. Implementation of the OD-7 surface remains gated on part 8.
 
 *Bears on contract shape:* **yes.** Unlike OD-1 – OD-3, OD-5 and OD-6, OD-7 adds fields
 to three contracts (part 5's table) and is the second of the seven owner decisions,
@@ -3431,8 +3505,10 @@ internal call to `verify_deterministic_selection`.
   plain injected callable and nothing about its own implementation is this package's
   concern or within its authority.
 * *Choosing a substantive ranking criterion for the selector in this amendment* —
-  rejected: it is a business decision the owner's ruling does not make, and inventing
-  one here would misrepresent an unratified choice as settled (OD-8, part 4).
+  rejected, and still rejected under OD-8: it is a business decision the owner's
+  ruling does not make, and inventing one would misrepresent an unratified choice as
+  settled. OD-8 instead ratifies fail-closed uniqueness (part 4), under which more
+  than one qualifying candidate produces no selection and `ABSTAIN`.
 
 *Public-API consequences (not yet applied).* `public_api.json` stays at its current
 39-name snapshot and `version.py` stays `0.1.0` until this amendment is implemented and
@@ -3501,6 +3577,29 @@ ratified decision from production authorization elsewhere in this document.
   `tests/test_selection_dependent_fields.py`. These are existing guards that will fail
   on the field additions; updating them is part of the change set, not a repair after
   it.
+* **I8.12** — **OD-8 selection-policy v1.** The selector selects iff the qualifying
+  pool holds **exactly one** candidate; a two-qualifier set produces no selection and
+  `ABSTAIN`, and a zero-qualifier set produces no selection. Mutation-tested against a
+  selector that falls back to ascending `candidate_id` on a two-qualifier set, which
+  must fail. A companion assertion pins that the tie-break is **unexercised** under
+  v1: no code path may resolve a multi-qualifier set to a selection.
+* **I8.13** — **OD-8 non-repurposing.** No merit ordering is computed from
+  `evaluated_at`, `candidate_id`, `disposition`, `requested_review_action`, or the
+  lengths of `claim_refs`, `observation_refs`, `assumptions` or `uncertainties`.
+  Enforced structurally where possible (the v1 selector reads only `is_eligible` and
+  `domain_evaluation_outcome`) and, for the prose, by the documentation-consistency
+  guard, which must refuse a claim that any of those fields ranks candidates.
+* **I8.14** — **OD-9 / OD-10 per-candidate scope.** A set holding one eligible,
+  `SATISFIED` candidate **plus** an `INCONCLUSIVE` candidate **selects the qualifying
+  one** — the case that distinguishes the ratified reading from the run-wide one, and
+  the one an implementer is most likely to get backwards. Separately: a zero-qualifier
+  set with an `INCONCLUSIVE` candidate terminates `ABSTAIN` under OD-9, and a
+  zero-qualifier set with none terminates `ABSTAIN` under OD-10.
+* **I8.15** — **Fail-closed table totality and disjointness.** I8.6 already requires
+  one test per row; this adds the property the rows must hold *together* — over a
+  completed run, exactly one row matches, the rows are mutually exclusive, and no
+  completed run falls through without a ratified outcome. It is what makes OD-10 do
+  its job rather than merely exist.
 
 *Enforcement:* `[G]` **not yet implemented.** No guard exists in
 `packages/capabilities/agentic-proposer/tests/`; C7 and C9 remain active and
