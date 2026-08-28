@@ -2071,10 +2071,21 @@ enumeration of every signature the ruling touches. Each of the four additions he
 `[V]` The selector-policy pair is deliberately **not** a parameter of that builder: it
 names this package's own ratified selector, so accepting it from a caller would let a
 caller label a selection with a policy that did not make it. The builder stamps it from
-this package's own constants when a selection is present. `[R]` What is **not**
-ratified, and is not claimed here, is the parameters' spelling — their names, and the
-choice of two scalars over one pair object — which is an implementation shape inside
-the entailment rather than part of it.
+this package's own constants when a selection is present.
+
+`[V]` **The exact signatures above are owner-ratified for 0.2.0 (A13).** What was
+previously marked `[R]` here — the parameters' spelling, their names, their documented
+order, and the choice of two scalar profile parameters over one pair object — is
+**resolved**, together with the injected `provider` parameter and the decision not to
+accept caller-supplied selector-policy identity parameters. They are compatibility
+decisions for this version, not an implementation shape a later change may vary freely.
+The ruling ratifies the **callable shape already implemented and documented** and
+nothing else: it authorizes no additional field, protocol, behaviour or public symbol,
+and it does not authorize substantive ranking, a concrete evaluator, networking,
+storage, service discovery, plugin loading or multi-provider evaluation. The entailment
+reasoning above is unchanged by it; what changes is that the shape is no longer an open
+question. See `docs/architecture/ADR_UGENCE_AGENTIC_PROPOSER_MVP_READINESS.md`'s **A13**
+for the declaration.
 
 `verify_advisory_selection` is the independent replay of R-1b **and R-7**. It is a
 **separate function from `verify_advisory_identity`** because the two answer different

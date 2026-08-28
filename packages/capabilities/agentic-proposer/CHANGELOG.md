@@ -76,6 +76,14 @@ carrying one removal without the replacement surface was committed.
 * **H2 gains a fifth class**, `DomainEvaluationProviderError`, so a caller catches one
   named family for every OD-7 construction-time failure. Builders raise; verifiers
   report: a provider exception inside a verifier's own replay call returns `False`.
+* **The exact H1 builder signatures are owner-ratified for this version (A13).** OD-7
+  entailed that a builder constructing one of the new bearers in a single expression
+  must be handed the provider and the profile; what it did not fix was the spelling.
+  All four builders' keyword-only parameter names, their documented order, the injected
+  `provider` parameter, the two scalar profile parameters (rather than a pair object),
+  and the decision not to accept caller-supplied selector-policy identity parameters are
+  now compatibility decisions rather than an open `[R]`. Documentation only: `src/` and
+  H1 already matched exactly, which is the condition the declaration was given on.
 * **`S-2 (via R-1b)` is now enforced locally** and moved from
   `tests/test_unenforced_local_rules.py`'s `UNENFORCED` registry to `ENFORCED`, leaving
   the former empty. Selection-policy v1 recomputes the qualifying pool from the

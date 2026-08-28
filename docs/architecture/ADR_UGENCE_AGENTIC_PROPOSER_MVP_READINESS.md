@@ -1082,6 +1082,42 @@ read as more than it is:
 platform-freeze artifact is changed by this declaration. The version stays `0.0.1` and
 the substantive freeze digest is unchanged.
 
+### A13 — The 0.2.0 builder signatures are ratified
+
+**Declared by the owner on 2026-08-28**, against the signatures recorded in the S1
+contract and equation specification's **H1** at commit `0bc76af4`.
+
+**What is ratified.** The exact H1 builder signatures, as the Agentic Proposer `0.2.0`
+public callable surface: all four builders; their exact keyword-only parameter names;
+their documented parameter order; the injected `provider` parameter; the domain-
+evaluation profile identity and version represented as **two scalar parameters** rather
+than as a new pair object; and the decision **not** to accept caller-supplied
+selector-policy identity parameters, which stay stamped by this package from its own
+ratified constants.
+
+**Why this needed a declaration.** OD-7 entails that a builder constructing one of the
+new bearers in a single expression must be handed the provider and the profile — H1
+records that derivation, and the owner agrees with it. What the entailment did not fix
+was the *spelling*: the parameter names, their order, and the scalar-versus-pair choice
+were implementation shape inside the entailment, and H1 carried them as `[R]`. They are
+`[V]` now: compatibility decisions for this version.
+
+**What this declaration does *not* do.** It ratifies only the callable shape already
+implemented and documented. It authorizes **no** additional field, protocol, behaviour
+or public symbol, and specifically no substantive multi-candidate ranking, no concrete
+evaluator, no networking, storage, service discovery or plugin loading, and no
+multi-provider evaluation. It changes nothing in
+`ROADMAP_UGENCE_REASONING_COMPUTE_GOVERNANCE.md` or its RCG-0 scoping ADR. It is not a
+new owner decision: OD-1 through OD-10 remain the decision record, and no OD is added,
+renumbered or reopened.
+
+`[V]` **No production-code change is required or made by it.** `src/` and H1 already
+matched exactly — parameter for parameter and in order — before the declaration, which
+is the condition on which it was given; this section records status, not a change. No
+`src/` module, test, `public_api.json`, `version.py` or platform-freeze artifact moves,
+the exported surface stays at forty-six names, and the substantive freeze digest is
+unchanged.
+
 ### Owner decisions, and what actually gates S1
 
 A1–A8 close every question the contract specification's *equations, vocabularies and
