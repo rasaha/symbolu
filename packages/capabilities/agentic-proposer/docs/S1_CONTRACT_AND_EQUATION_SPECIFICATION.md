@@ -3619,9 +3619,10 @@ exercises the unimplemented OD-7 selection surface** in
 `packages/capabilities/agentic-proposer/tests/`; every obligation above (`I8.1` –
 `I8.15`) is prospective and awaits the change set part 8 requires. `[V]` What does
 exist there are the **documentation-consistency guards** in
-`tests/test_documentation_consistency.py`, which pin this amendment's ratified
-statements — OD-7's boundary and the OD-8/OD-9/OD-10 meanings — against a silent
-revert to the pre-ruling prose. Those are **not production enforcement**: they check
+`tests/test_documentation_consistency.py`, which pin the OD-8/OD-9/OD-10 meanings and
+the OD-7 statements those rulings amended — part 5's replay rule and part 7's
+fail-closed table — against a silent revert to the pre-ruling prose, and nothing else
+in OD-7. Those are **not production enforcement**: they check
 what these documents say, not what any selector does, and they prove nothing about the
 future implementation. C7 and C9 remain active and unmodified; nothing in this entry
 authorizes a change to `src/`, `public_api.json` or `version.py`, and none is made by
