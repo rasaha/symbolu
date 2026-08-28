@@ -750,11 +750,14 @@ def test_the_registry_carries_exactly_the_stated_cardinality(contract, cardinali
         f"{len(FIELD_CLASSIFICATION[contract])}")
 
 
-def test_the_advisory_carries_the_twenty_three_ratified_fields():
-    """OD-4(a): twenty-three, because ``candidates`` is added and ``candidate_set_id``
-    is retained alongside it rather than replaced by it."""
+def test_the_advisory_carries_the_twenty_seven_ratified_fields():
+    """OD-4(a) took this to twenty-three, because ``candidates`` is added and
+    ``candidate_set_id`` is retained alongside it rather than replaced by it. OD-7
+    part 5 took it to twenty-seven, mirroring the evaluation-profile and
+    selector-policy pairs from ``AdvisoryCandidateSet`` so both are reachable inside
+    ``P_unsigned`` (I8.11)."""
     fields = FIELD_CLASSIFICATION["ProposerAdvisory"]
-    assert len(fields) == 23
+    assert len(fields) == 27
     assert fields["candidates"] == STRUCTURED
     assert fields["candidate_set_id"] == C5A
     assert fields["selected_candidate_id"] == C5A
@@ -1102,10 +1105,13 @@ def test_every_registered_category_is_covered_by_one_sweep_or_the_other():
     """The denominator, asserted. No registered class may fall between the two sweeps.
 
     For a patterned entry, the candidate reclassifications are the other eight registered
-    classes plus the unregistered sentinel — **nine**, and 47 x 9 = 423. Seven of the
+    classes plus the unregistered sentinel — **nine**, and 55 x 9 = 495. Seven of the
     eight registered ones are weakenings and, with the sentinel, make the sweep above's
-    47 x 8 = 376; the ninth candidate, the sibling patterned class, is a narrowing and
-    makes the sibling test's 47. 376 + 47 = 423, so nothing is unexplained.
+    55 x 8 = 440; the ninth candidate, the sibling patterned class, is a narrowing and
+    makes the sibling test's 55. 440 + 55 = 495, so nothing is unexplained.
+
+    The entry count moved from 47 to 55 with OD-7 part 5's eight new C5b fields — four
+    on ``AdvisoryCandidateSet`` and their four mirrors on ``ProposerAdvisory``.
     Self-reclassification is the tenth candidate and is not a mutation, so it stands
     outside the 423 rather than inside it.
     """
@@ -1118,7 +1124,7 @@ def test_every_registered_category_is_covered_by_one_sweep_or_the_other():
             f"{sorted(narrowings)}")
     entries = len(C5A_ENTRIES + C5B_ENTRIES)
     applicable = entries * len(WEAKENING_CATEGORIES)
-    assert applicable == 47 * 8 == 376, (
+    assert applicable == 55 * 8 == 440, (
         f"the weakening sweep's applicable count changed to {applicable}; if that is "
         "intended, update the count recorded in the enforcement documentation")
     # The denominator itself, so the two sweeps are shown to exhaust it rather than
@@ -1127,7 +1133,7 @@ def test_every_registered_category_is_covered_by_one_sweep_or_the_other():
     # not a mutation and is not among them.
     candidates_per_entry = (len(CLASSES) - 1) + 1
     narrowing_cases = entries * 1
-    assert applicable + narrowing_cases == entries * candidates_per_entry == 423, (
+    assert applicable + narrowing_cases == entries * candidates_per_entry == 495, (
         f"{applicable} weakening cases + {narrowing_cases} narrowing cases do not "
         f"exhaust the {entries} x {candidates_per_entry} candidate reclassifications")
 

@@ -15,6 +15,7 @@ import enum
 import inspect
 import json
 import pathlib
+import typing
 
 import pydantic
 
@@ -34,6 +35,11 @@ def _kind(obj) -> str:
             return "exception"
         if issubclass(obj, pydantic.BaseModel):
             return "model"
+        # OD-7's injected-evaluator boundary is a ``typing.Protocol``. Recorded as its
+        # own kind rather than folded into "class": a protocol declares a shape the
+        # caller satisfies, and a snapshot that called it a class would not say that.
+        if getattr(obj, "_is_protocol", False) or typing.Protocol in obj.__bases__:
+            return "protocol"
         return "class"
     if inspect.isfunction(obj):
         return "function"
@@ -54,6 +60,10 @@ def _actual_surface() -> dict:
         entry: dict = {"kind": kind}
         if kind == "enum":
             entry["values"] = [m.value for m in obj]
+        elif kind == "protocol":
+            entry["methods"] = sorted(
+                name for name in getattr(obj, "__protocol_attrs__", ())
+                if not name.startswith("_"))
         elif kind == "model":
             entry["fields"] = list(obj.model_fields)
         elif kind == "constant":
@@ -85,6 +95,7 @@ def test_every_h3_category_is_present_in_the_snapshot():
     """H3's own headline counts, checked against the snapshot rather than trusted."""
     documented = json.loads(_PUBLIC_API_JSON.read_text())["symbols"]
     models = {n for n, e in documented.items() if e["kind"] == "model"}
+    protocols = {n for n, e in documented.items() if e["kind"] == "protocol"}
     enums = {n for n, e in documented.items() if e["kind"] == "enum"}
     functions = {n for n, e in documented.items() if e["kind"] == "function"}
     exceptions = {n for n, e in documented.items() if e["kind"] == "exception"}
@@ -95,19 +106,39 @@ def test_every_h3_category_is_present_in_the_snapshot():
                 "BoundedContextEnvelope", "ToolObservation", "AdvisoryCandidateSet",
                 "ProposerAdvisory", "ProposerProcessRecord"}
     nested = {"CandidateAdvisory", "ProposerProcessStateTransition"}
-    assert contracts | nested == models
-    assert len(enums) == 10
+    # OD-7's two call-boundary shapes are pydantic models and appear as such; they are
+    # not contracts, which is why they are named separately here rather than folded in.
+    boundary_shapes = {"DomainEvaluationRequest", "DomainEvaluationResponse"}
+    assert contracts | nested | boundary_shapes == models
+    assert protocols == {"DomainEvaluationProvider"}
+    assert len(enums) == 11
     builders = {"build_candidate_advisory", "build_advisory_candidate_set",
                "build_proposer_advisory", "build_advisory_revision",
                "build_proposer_process_record"}
     equations = {"evaluate_eligibility", "evaluate_readiness"}
     identity_functions = {"compute_advisory_identity", "verify_advisory_identity"}
     verifiers = {"verify_candidate_eligibility", "verify_advisory_selection",
-                "verify_observation_resolution"}
+                "verify_observation_resolution", "verify_domain_evaluation",
+                "verify_deterministic_selection"}
     assert builders | equations | identity_functions | verifiers == functions
-    assert exceptions == {"EligibilityMismatchError", "CrossContractViolationError"}
+    assert exceptions == {"EligibilityMismatchError", "CrossContractViolationError",
+                          "DomainEvaluationProviderError"}
     assert constants == {"RESERVED_AUTHORITY_VOCABULARY", "ADVISORY_KIND",
                          "ADVISORY_IDENTITY_SET_PATHS", "ADVISORY_IDENTITY_NFC_PATHS"}
+
+
+def test_the_snapshot_carries_exactly_the_forty_six_authorized_names():
+    """OD-7's public-API consequence, executed. Thirty-nine names were frozen at 0.1.0;
+    seven were authorized by the amendment and are added here, none removed."""
+    documented = json.loads(_PUBLIC_API_JSON.read_text())
+    assert documented["package_version"] == "0.2.0"
+    assert len(documented["symbols"]) == 46
+    added = {"DomainEvaluationOutcome", "DomainEvaluationProvider",
+             "DomainEvaluationRequest", "DomainEvaluationResponse",
+             "DomainEvaluationProviderError", "verify_domain_evaluation",
+             "verify_deterministic_selection"}
+    assert added <= set(documented["symbols"])
+    assert len(set(documented["symbols"]) - added) == 39
 
 
 def test_py_typed_marker_present():

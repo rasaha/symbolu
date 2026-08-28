@@ -1,17 +1,136 @@
 # Changelog — ugence-agentic-proposer
 
+## 0.2.0 — OD-7, OD-8, OD-9 and OD-10 implemented; C7 and C9 removed with their replacements
+
+The additive S2 public-surface release. `[V]` **Production and behavioural guards
+exercise the OD-7 selection surface**, in
+`tests/test_od7_domain_evaluation_boundary.py`, which discharges `I8.1` – `I8.15`. The
+**documentation-consistency guards** in `tests/test_documentation_consistency.py` are
+unchanged in kind and are still **not production enforcement**: they check what these
+documents say, not what any selector does, which is why the behavioural module stands
+beside them rather than replacing them.
+
+**One atomic change set, as OD-7 part 8 requires.** C7's unconditional refusal of
+`DomainCheckCompletion.COMPLETE` and C9's unconditional refusal of a non-null
+`AdvisoryCandidateSet.selected_candidate_id` are **removed only alongside** every
+replacement field, coupling validator, vocabulary member, protocol, identity mirror,
+equation term, replay function, selector behaviour, exception and test obligation the
+amendment specifies. Neither was removed as an isolated edit, and no intermediate state
+carrying one removal without the replacement surface was committed.
+
+### Implemented
+
+* **OD-7 part 2 — the injected evaluator boundary.** `DomainEvaluationProvider` (a
+  `typing.Protocol`), `DomainEvaluationRequest` and `DomainEvaluationResponse`. None is
+  a contract: no C2 common field, no identity role, never stored, transported or
+  included in `P_unsigned`. The response echoes back both the profile identity/version
+  and the `candidate_id` it evaluated — a **request/response correlation check**, not a
+  defence against a dishonest provider, and documented as such.
+* **OD-7 part 3 — `DomainEvaluationOutcome`** (`SATISFIED`, `NOT_SATISFIED`,
+  `INCONCLUSIVE`), on a new `CandidateAdvisory.domain_evaluation_outcome` field coupled
+  to `domain_check_completion` in both directions. `INCONCLUSIVE` is reachable under the
+  coupling, not excluded by it. `INDETERMINATE` is deliberately not reused, and the two
+  spellings are asserted never to collide.
+* **OD-7 part 5 — identity binding.** `AdvisoryCandidateSet` gains
+  `domain_evaluation_profile_id`/`_version` and `selection_policy_id`/`_version`, all
+  **C5b**; `ProposerAdvisory` mirrors the four, which is what puts them inside
+  `P_unsigned`, and `identity.py`'s private `_UnsignedAdvisoryPayload` carries them too
+  under G2's equivalence obligation. R-1b gains two correspondence clauses. Cardinality:
+  `AdvisoryCandidateSet` 8 → 12, `CandidateAdvisory` 10 → 11, `ProposerAdvisory` 23 → 27,
+  re-verified against `src/`.
+* **OD-7 part 5 — two replay functions.** `verify_domain_evaluation` takes
+  `expected_profile_id`/`_version` from **outside** the advisory under test, so it
+  cannot be satisfied by a provider echoing back a tampered set's own label;
+  `verify_deterministic_selection` recomputes the qualifying pool and checks the stored
+  selector-policy identity against this package's own ratified constants.
+  `verify_advisory_selection` gains a call to the second. Four disclosed ceilings —
+  candidate suppression is invisible, a profile label is not a profile, there is no
+  selector-policy registry, and replay proves reproducibility rather than authority —
+  are asserted in the tests, not only stated in prose.
+* **OD-7 part 6 — Equation 2 now has seven terms.** `DomainEvaluationSatisfied` joins
+  the six. It is what replaced C7's structural closure of R-2/V13's `PROPOSAL` path, and
+  it is exercised directly against `evaluate_readiness` as an exported function and
+  mutation-tested against the six-term form, which must fail.
+* **V13 reimplemented to recompute R-2 rather than refuse `PROPOSAL` outright.**
+  `ProposerProcessRecord` enforces R-2's locally decidable half — `PROPOSAL` requires a
+  selection — and `build_proposer_advisory` recomputes Equation 2 for the resolved
+  candidate, which is where B3 assigns that recomputation.
+* **OD-8 — selection-policy v1 is fail-closed uniqueness.** Implemented in-package as a
+  deterministic, versioned function reading exactly `is_eligible` and
+  `domain_evaluation_outcome`. Exactly one qualifying candidate is selected; zero or
+  more than one selects nothing. **The `candidate_id` tie-break is deliberately
+  unexercised**, and no code path resolves a multi-qualifier set to a selection.
+* **OD-9 remains per candidate.** A candidate carrying `INCONCLUSIVE` or
+  `NOT_SATISFIED` is filtered out of the qualifying pool **and nothing more**: a set
+  holding one qualifying candidate beside any number of them selects that one. There is
+  no run-wide interpretation of `INCONCLUSIVE` anywhere in the implementation.
+* **OD-10 — the residual completed no-selection outcome** is reached, not merely
+  declared: the fail-closed table's six rows are implemented as one ordered,
+  non-overlapping classification, and its totality and disjointness are property-tested.
+* **The public surface moves from 39 to 46 names**, adding exactly the seven this
+  amendment authorized — `DomainEvaluationOutcome`, `DomainEvaluationProvider`,
+  `DomainEvaluationRequest`, `DomainEvaluationResponse`, `DomainEvaluationProviderError`,
+  `verify_domain_evaluation`, `verify_deterministic_selection` — and removing none.
+  `version.py` moves `0.1.0` → `0.2.0`. `public_api.json` was regenerated only after the
+  exported code and its tests existed.
+* **H2 gains a fifth class**, `DomainEvaluationProviderError`, so a caller catches one
+  named family for every OD-7 construction-time failure. Builders raise; verifiers
+  report: a provider exception inside a verifier's own replay call returns `False`.
+* **The exact H1 builder signatures are owner-ratified for this version (A13).** OD-7
+  entailed that a builder constructing one of the new bearers in a single expression
+  must be handed the provider and the profile; what it did not fix was the spelling.
+  All four builders' keyword-only parameter names, their documented order, the injected
+  `provider` parameter, the two scalar profile parameters (rather than a pair object),
+  and the decision not to accept caller-supplied selector-policy identity parameters are
+  now compatibility decisions rather than an open `[R]`. Documentation only: `src/` and
+  H1 already matched exactly, which is the condition the declaration was given on.
+* **`S-2 (via R-1b)` is now enforced locally** and moved from
+  `tests/test_unenforced_local_rules.py`'s `UNENFORCED` registry to `ENFORCED`, leaving
+  the former empty. Selection-policy v1 recomputes the qualifying pool from the
+  advisory's **own** nested candidates, so an advisory selecting an ineligible candidate
+  is refused by the advisory's own validator rather than only by the builder and the
+  verifier.
+
+### Deliberately still absent — not gaps
+
+* **Substantive multi-candidate ranking.** No merit criterion is invented. A future
+  ruling must name the business objective, the authoritative producer, a deterministic
+  non-floating-point representation, the identity binding, and a replay path no
+  untrusted caller can steer.
+* **Concrete domain evaluators.** The boundary ships; no evaluator does. Nothing is
+  imported, discovered, loaded or embedded, and the only providers in the tests are
+  stubs that compute nothing about any business domain.
+* **Multi-provider evaluation.** OD-7 ratifies exactly one injected provider returning
+  one outcome per candidate.
+* **Networking, storage, service discovery and plugin loading.** Barred outright by
+  OD-7 part 2; the injected object is a plain in-process callable, and a guard asserts
+  no module in `src/` imports a mechanism for reaching one.
+
+### Verified
+
+`pytest packages/capabilities/agentic-proposer -q` passes in full;
+`python packages/capabilities/agentic-proposer/verify_agentic_proposer_distribution.py`
+reports `AGENTIC_PROPOSER_S1_DISTRIBUTION_VERIFIED`, including a wheel build, an
+isolated clean-room install and an end-to-end advisory built through an injected stub;
+`scripts/check_doc_links.py` and `scripts/validate_terminology.py` pass; the
+platform-freeze substantive digest is unchanged at
+`d993093570bb8ee132d4ab58406a14dd8c9b774b9de2c6d7ac45d3dfd3fac036`.
+
 ## Unreleased — OD-8, OD-9 and OD-10 ratified; OD-7 tie-break corrected
 
-Ratified 2026-08-28. **Documentation only.** No `src/` module, `public_api.json` or
-`version.py` is changed; C7 and C9 remain active and unmodified; the package stays
-`0.1.0`; the substantive platform-freeze digest is unchanged. The one test file
-touched is `tests/test_documentation_consistency.py`: **no production or behavioural
-guard exercises the unimplemented OD-7 selection surface**, and the
-**documentation-consistency guards** added here pin the OD-8/OD-9/OD-10 meanings and
-the OD-7 statements those rulings amended — part 5's replay rule and part 7's
+**Superseded by 0.2.0, which implements all three rulings.** The rulings below are
+unchanged; only the status this entry recorded has moved on.
+
+Ratified 2026-08-28. **Documentation only, as of this entry.** No `src/` module,
+`public_api.json` or `version.py` was changed by it; C7 and C9 were still active and
+unmodified; the package was still `0.1.0`; the substantive platform-freeze digest was
+unchanged. The one test file touched was `tests/test_documentation_consistency.py`: at
+that point no production or behavioural guard exercised the OD-7 selection surface, and
+the **documentation-consistency guards** added there pin the OD-8/OD-9/OD-10 meanings
+and the OD-7 statements those rulings amended — part 5's replay rule and part 7's
 fail-closed table — against a silent revert to the pre-ruling prose, and nothing else
-in OD-7. Those guards are **not production enforcement** and prove nothing about the
-future implementation. Implementation of the OD-7 surface remains gated on OD-7 part 8.
+in OD-7. Those guards are **not production enforcement** and proved nothing about the
+implementation that has since landed.
 
 * **OD-8 — selection-policy v1 is fail-closed uniqueness.** The selector selects only
   when **exactly one** candidate is both `is_eligible is True` and
@@ -69,16 +188,17 @@ future implementation. Implementation of the OD-7 surface remains gated on OD-7 
   table totality and disjointness. Documentation-consistency guards are added so
   these ratified meanings cannot drift back.
 
-## Unreleased — OD-7 ratified, not yet implemented (amended)
+## Unreleased — OD-7 ratified (amended); implemented at 0.2.0
 
 `docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md` and
 `docs/architecture/ADR_UGENCE_AGENTIC_PROPOSER_MVP_READINESS.md` are amended by OD-7,
 ratified 2026-08-27, scoping the S2 domain-evaluation and candidate-selection
 boundary that removes C7 and C9 — **a boundary, not a complete executable
-algorithm.** **This is a documentation-only entry.** No `src/` module, test,
-`public_api.json` or `version.py` is changed by it, and none may be until the
-amendment is built and has passed an independent consistency review, per OD-7's own
-transition controls. C7 and C9 remain active and unmodified; package stays `0.1.0`.
+algorithm.** **Superseded by 0.2.0, which implements the ruling below; the ruling
+itself is unchanged.** **This was a documentation-only entry.** No `src/` module, test,
+`public_api.json` or `version.py` was changed by it, and none could be until the
+amendment was built, per OD-7's own transition controls. As of this entry C7 and C9 were
+still active and unmodified and the package was still `0.1.0`.
 This entry supersedes the earlier OD-7 entries it replaces in git history. It carries
 two rounds of correction: seven points a first independent review found in the
 original draft, and four more a second independent review found after that — the
@@ -217,8 +337,10 @@ that was already correct.
 OD-6, ratified 2026-08-27, resolving an inconsistency an independent review of the
 `0.1.0` implementation commit found between B3, H1 and R-1b(iv). All three parts are
 now implemented against `src/` and covered by tests, in the same commit sequence as
-this entry. Package stays `0.1.0`; `public_api.json` is regenerated for the one added
-export.
+this entry. Package stayed `0.1.0` at that point; `public_api.json` was regenerated for
+the one added export. `[V]` **(i)'s C9 validator was subsequently removed by OD-7 part 8
+at `0.2.0`**, in the change set that supplied its replacement; (ii) and (iii) are
+unaffected.
 
 * **(i) The no-selection ceiling moves from the builder to the input.** New **C9**
   (`AdvisoryCandidateSet._selection_is_unconstructible`, `contracts.py`) makes a

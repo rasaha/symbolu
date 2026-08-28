@@ -638,13 +638,16 @@ def test_the_local_rule_is_not_a_correspondence_claim():
 #
 # The probes above run against a four-field reference model. That model states the rule
 # executably, which is worth having, but it is not the bearer: it declares four fields
-# where ``ProposerAdvisory`` declares twenty-three, so a rejection there says nothing
+# where ``ProposerAdvisory`` declares twenty-seven, so a rejection there says nothing
 # about whether the rule survives on a contract carrying every required field, a nested
 # candidate sequence, and a frozen, strict, extra-forbidding model config.
 #
 # Everything below constructs the representative ``ProposerAdvisory`` from a complete
-# valid fixture — all twenty-three fields supplied with lawful values — and varies only
-# the selector and its dependents. A probe run against a partial fixture would pass for
+# valid fixture — all twenty-seven fields supplied with lawful values — and varies only
+# the selector and its dependents. Where a probe needs a NON-NULL selector it uses the
+# fixture whose one candidate the ratified selector actually qualifies: under C9 the
+# selector was unconstructible, so those probes ran against a shape selection-policy v1
+# would now refuse, and a rejection would be the policy's rather than the coupling's. A probe run against a partial fixture would pass for
 # the wrong reason: construction would fail on a missing required field whatever the
 # coupling did.
 
@@ -661,7 +664,7 @@ def test_the_complete_fixture_supplies_every_required_field(bearer):
     it never exercised."""
     fixture = spec.complete_advisory_fixture()
     assert set(fixture) == set(bearer.model_fields)
-    assert len(fixture) == spec.CONTRACT_CARDINALITY[SELECTION_BEARER] == 23
+    assert len(fixture) == spec.CONTRACT_CARDINALITY[SELECTION_BEARER] == 27
     advisory = bearer(**fixture)
     assert advisory.selected_candidate_id is None
     assert len(advisory.candidates) == 1
@@ -706,8 +709,7 @@ def test_selector_non_null_with_all_dependents_non_null_passes_locally(bearer):
     whether the routing is permitted by the role. R-1b is what checks those, in the
     builder and in the independent replay verifier.
     """
-    advisory = bearer(**spec.complete_advisory_fixture(
-        selected_candidate_id="cand-1", **_all_dependents()))
+    advisory = bearer(**spec.selecting_advisory_fixture(**_all_dependents()))
     assert advisory.selected_candidate_id == "cand-1"
     assert all(getattr(advisory, name) is not None for name in DEPENDENT_FIELDS)
 
@@ -721,8 +723,7 @@ def test_selector_non_null_with_any_null_dependent_fails_on_the_bearer(bearer, o
               if name != omitted}
     values[omitted] = None
     with pytest.raises(pydantic.ValidationError) as excinfo:
-        bearer(**spec.complete_advisory_fixture(
-            selected_candidate_id="cand-1", **values))
+        bearer(**spec.selecting_advisory_fixture(**values))
     assert omitted in str(excinfo.value)
 
 

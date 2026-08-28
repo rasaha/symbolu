@@ -1,7 +1,7 @@
 {
   "distribution": "ugence-agentic-proposer",
   "namespace": "ugence_agentic_proposer",
-  "package_version": "0.1.0",
+  "package_version": "0.2.0",
   "note": "Machine-readable snapshot of the curated public API (ugence_agentic_proposer.__all__). Generated from the installed package; tests/test_public_api.py asserts this file equals the actual package surface. Regenerate when the curated API changes, which for this package means a ratified amendment to docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md.",
   "symbols": {
     "ADVISORY_IDENTITY_NFC_PATHS": {
@@ -25,7 +25,11 @@
         "candidate_set_id",
         "case_ref",
         "candidates",
+        "domain_evaluation_profile_id",
+        "domain_evaluation_profile_version",
         "selected_candidate_id",
+        "selection_policy_id",
+        "selection_policy_version",
         "selection_reason_codes"
       ]
     },
@@ -73,6 +77,7 @@
         "requested_review_action",
         "is_eligible",
         "domain_check_completion",
+        "domain_evaluation_outcome",
         "evaluated_at",
         "claim_refs",
         "observation_refs",
@@ -114,6 +119,41 @@
         "COMPLETE"
       ]
     },
+    "DomainEvaluationOutcome": {
+      "kind": "enum",
+      "values": [
+        "SATISFIED",
+        "NOT_SATISFIED",
+        "INCONCLUSIVE"
+      ]
+    },
+    "DomainEvaluationProvider": {
+      "kind": "protocol",
+      "methods": []
+    },
+    "DomainEvaluationProviderError": {
+      "kind": "exception"
+    },
+    "DomainEvaluationRequest": {
+      "kind": "model",
+      "fields": [
+        "candidate_id",
+        "profile_id",
+        "profile_version",
+        "mandate",
+        "context",
+        "observations"
+      ]
+    },
+    "DomainEvaluationResponse": {
+      "kind": "model",
+      "fields": [
+        "candidate_id",
+        "profile_id",
+        "profile_version",
+        "outcome"
+      ]
+    },
     "EligibilityMismatchError": {
       "kind": "exception"
     },
@@ -134,7 +174,11 @@
         "context_id",
         "candidate_set_id",
         "candidates",
+        "domain_evaluation_profile_id",
+        "domain_evaluation_profile_version",
         "selected_candidate_id",
+        "selection_policy_id",
+        "selection_policy_version",
         "recommended_disposition",
         "requested_review_action",
         "requested_review_destination_role_ref",
@@ -282,7 +326,7 @@
     },
     "__version__": {
       "kind": "constant",
-      "value": "0.1.0"
+      "value": "0.2.0"
     },
     "build_advisory_candidate_set": {
       "kind": "function"
@@ -315,6 +359,12 @@
       "kind": "function"
     },
     "verify_candidate_eligibility": {
+      "kind": "function"
+    },
+    "verify_deterministic_selection": {
+      "kind": "function"
+    },
+    "verify_domain_evaluation": {
       "kind": "function"
     },
     "verify_observation_resolution": {
