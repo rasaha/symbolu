@@ -18,6 +18,7 @@ HORIZONS = (1, 4, 12)  # 15 / 60 / 180 minutes
 STAT_GAMMAS = (0.9, 0.98, 0.995)
 HARM_PERIODS = (4, 8, 16, 32, 48, 96)  # 1,2,4,8,12,24 h — intraday+daily only
 N_RETRIEVAL_ANOM = 4
+LOOKBACK_V2 = 288  # 72 h (Spike Retrieval 2)
 FEAT = 6
 
 
@@ -150,3 +151,37 @@ def query_features(t_idx: np.ndarray) -> np.ndarray:
     th = 2 * math.pi * (t_idx % BINS_PER_DAY) / BINS_PER_DAY
     return np.stack([np.cos(th), np.sin(th), np.ones(len(t_idx))],
                     axis=-1).astype(np.float32)
+
+
+def retrieval_tracks_v2(minutes: np.ndarray, bins: np.ndarray,
+                        seas_med: np.ndarray) -> dict:
+    """Spike Retrieval 2 ingredients: signed anomaly scores (surge vs drought)
+    alongside the unchanged recency stats."""
+    base = retrieval_tracks(minutes, bins, seas_med)
+    bod = base["bod"]
+    signed = (base["lb"] - seas_med[:, bod]).astype(np.float32)
+    return {**base, "signed": signed}
+
+
+def retrieval_tokens_v2(tracks: dict, f_idx: np.ndarray,
+                        t_idx: np.ndarray) -> np.ndarray:
+    """[B, 6, 6]: 2 unchanged recency tokens + 4 redesigned anomaly tokens
+    (top-4 by |signed score| in a 288-bin lookback, time-ordered, with
+    time-since-previous-anomaly and the last inter-anomaly gap)."""
+    B = len(f_idx)
+    out = np.zeros((B, 2 + N_RETRIEVAL_ANOM, FEAT), np.float32)
+    rec, lb, signed = tracks["rec"], tracks["lb"], tracks["signed"]
+    for b, (f, t) in enumerate(zip(f_idx, t_idx)):
+        for j, tb in enumerate((t - 1, t - 2)):
+            out[b, j] = [rec[f, tb, 0], rec[f, tb, 1], rec[f, tb, 2],
+                         rec[f, tb, 3], -(j + 1) / 4.0, 1.0]
+        w0 = max(t - LOOKBACK_V2, 0)
+        window = np.abs(signed[f, w0:t])
+        top = np.sort(np.argsort(window)[::-1][:N_RETRIEVAL_ANOM]) + w0
+        last_gap = (top[-1] - top[-2]) / BINS_PER_DAY if len(top) >= 2 else 3.0
+        for j, tb in enumerate(top):
+            prev_gap = ((tb - top[j - 1]) / BINS_PER_DAY if j > 0 else 3.0)
+            out[b, 2 + j] = [lb[f, tb], signed[f, tb],
+                             (tb - t) / BINS_PER_DAY, prev_gap, last_gap,
+                             rec[f, tb, 1]]
+    return out

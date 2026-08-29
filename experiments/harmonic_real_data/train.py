@@ -45,7 +45,22 @@ def dev_eval(model, data):
     return sum(losses) / (data.n_func * len(DEV_T))
 
 
-def train_one(data, arm, seed, model_dir):
+def spike_query_pairs(data):
+    """(f, t) train pairs whose 180-min target window contains a train spike
+    (train bins + frozen train seasonal medians only)."""
+    med_count = np.expm1(data.seas_med)
+    T = data.bins.shape[1]
+    bod = np.arange(T) % 96
+    spike = data.bins >= np.maximum(3 * med_count[:, bod], 10)
+    pairs = []
+    for f in range(data.n_func):
+        for t in range(TRAIN_T[0], TRAIN_T[1] + 1):
+            if spike[f, t:t + 12].any():
+                pairs.append((f, t))
+    return np.array(pairs)
+
+
+def train_one(data, arm, seed, model_dir, spike_pairs=None):
     torch.manual_seed(seed)
     np.random.seed(seed)
     model = build_matched(arm, verbose=(seed == 0))
@@ -57,6 +72,10 @@ def train_one(data, arm, seed, model_dir):
         rng = np.random.default_rng(1_000_000 * seed + step)
         f_idx = rng.integers(0, data.n_func, BATCH)
         t_idx = rng.integers(TRAIN_T[0], TRAIN_T[1] + 1, BATCH)
+        if spike_pairs is not None:  # Spike Retrieval 2: 50% spike-upweighted
+            k = BATCH // 2
+            pick = spike_pairs[rng.integers(0, len(spike_pairs), k)]
+            f_idx[:k], t_idx[:k] = pick[:, 0], pick[:, 1]
         toks, q, y = data.tokens(arm, f_idx, t_idx)
         loss = TF.mse_loss(model(toks, q), y)
         opt.zero_grad()
@@ -78,13 +97,16 @@ def train_one(data, arm, seed, model_dir):
             "params": model.n_params(), "curve": curve}
 
 
-def main(npz_path, model_dir, suffix=""):
+def main(npz_path, model_dir, suffix="", v2=""):
     Path(model_dir).mkdir(parents=True, exist_ok=True)
     RESULTS.mkdir(exist_ok=True)
     torch.set_num_threads(4)
-    data = Assembled(npz_path)
+    data = Assembled(npz_path, retrieval_v2=bool(v2))
+    spike_pairs = spike_query_pairs(data) if v2 else None
+    if v2:
+        print(f"spike-upweighted training: {len(spike_pairs)} spike pairs", flush=True)
     print("assembled tracks", flush=True)
-    recs = [train_one(data, arm, seed, model_dir)
+    recs = [train_one(data, arm, seed, model_dir, spike_pairs)
             for arm in READER_ARMS for seed in SEEDS]
     out = RESULTS / f"dev_metrics{suffix}.json"
     out.write_text(json.dumps(recs, indent=1))
@@ -92,4 +114,4 @@ def main(npz_path, model_dir, suffix=""):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2], *(sys.argv[3:4]))
+    main(sys.argv[1], sys.argv[2], *(sys.argv[3:5]))

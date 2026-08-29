@@ -67,8 +67,8 @@ def compare(nmse_a, nmse_b, h):
     return win, float((med_b - med_a) / med_b), int(m.sum())
 
 
-def main(npz_path, model_dir, suffix=""):
-    data = Assembled(npz_path)
+def main(npz_path, model_dir, suffix="", v2=""):
+    data = Assembled(npz_path, retrieval_v2=bool(v2))
     targets = data.targets[:, HELD_T]                     # [F, 94, 3]
     include = np.stack([data.targets[:, HELD_T, h].var(axis=1) >= VAR_FLOOR
                         for h in range(3)], axis=1)      # [F, 3]
@@ -158,4 +158,4 @@ def main(npz_path, model_dir, suffix=""):
 
 if __name__ == "__main__":
     torch.set_num_threads(4)
-    main(sys.argv[1], sys.argv[2], *(sys.argv[3:4]))
+    main(sys.argv[1], sys.argv[2], *(sys.argv[3:5]))
