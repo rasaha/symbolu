@@ -154,18 +154,28 @@ That is an accommodation of the guard, not a defeat of it: nothing about the rol
 projection escapes here — no field is re-declared and no semantics duplicated —
 one class is looked up and handed straight back to the proposer's own builder.
 
-Two things keep the exemption honest, and both are enforced:
+**Owner rider: the exemption is strictly test-tree-only.** Four guards in
+`tests/test_import_boundary.py` enforce that, and each answers a different
+question, because no one of them answers all three:
 
-- `tests/test_import_boundary.py` asserts the **shipped `src/` tree never
-  receives, names or touches a role at all**, so the exemption cannot widen from
-  the test tree into source;
-- a companion test asserts the exemption is actually being exercised, so it
-  cannot stand unused after the reason for it has gone.
+| Guard | What it establishes |
+|---|---|
+| The source imports exactly `ReasoningStrategy`, `StrategyPolicyRequest` and `StrategyPolicyResponse` from the proposer, and never by star-import | It **cannot construct** a role, nor type-check one: it cannot name the type |
+| Every parameter the source declares is a closed, enumerated set | It **cannot handle** a role — which a name scan cannot establish, since a role could arrive through a parameter called anything |
+| No defined name, referenced name, attribute or message literal in the source contains `role` | It never **names** one |
+| The fixture module still performs the lookup | The exemption is **actually exercised**, so it cannot stand unused after its reason has gone |
+
+Both of the first two were mutation-tested when they were written — a parameter
+added to the resolver and the role contract imported into the source each make
+the corresponding guard fail — so they are known to bite rather than assumed to.
 
 `[G]` Recorded for whoever reads this next: a raw-text scan is weaker than it
 looks — string assembly steps around it, and that is now demonstrated in-tree.
-Whether to strengthen the proposer's scan is a question for the proposer's own
-change set. It is **not** authorized here.
+
+`[R]` **Any strengthening of the Agentic Proposer's raw-text scan is deferred to a
+separately authorized Agentic Proposer change set and is not authorized here.**
+That includes `S2B-PF-G=B`'s `0.3.1` boundary hardening, which authorizes the
+resolver-boundary change and nothing adjacent to it.
 
 ## Tests
 

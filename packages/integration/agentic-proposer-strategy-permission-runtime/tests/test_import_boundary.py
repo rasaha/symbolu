@@ -254,20 +254,99 @@ def test_the_distribution_name_is_not_a_shared_contract_name():
 # --------------------------------------------------------------------------- #
 
 
-def test_the_shipped_source_never_receives_names_or_touches_a_role():
-    """The exemption is the test tree's alone, and cannot widen into ``src/``.
+#: Every parameter the shipped source declares, across every function and method.
+#: A closed allowlist, because "handles a role" is not a question a name scan can
+#: answer on its own: a role could arrive through a parameter called anything.
+SRC_PARAMETERS = {
+    "self",
+    # the resolver's own construction and call surface
+    "reference_map",
+    "registry",
+    "signature_verifier",
+    "adapters",
+    "approval_verifier",
+    "request",
+    "coordinate",
+    "policy",
+    # error and validation plumbing
+    "message",
+    "reason",
+    "name",
+    "value",
+}
 
-    The ratified end-to-end proof must construct a role, because the proposer's
-    own builder and its replay both take one. The proposer's repository-wide scan
-    reads raw file text and refuses the role-projection substrings everywhere
-    outside that capability, and editing the proposer is barred — so the fixture
-    module looks the class up by an assembled name.
+#: Everything the shipped source may take from the Agentic Proposer. The role
+#: contract is deliberately not here, and cannot be added without this failing.
+PROPOSER_IMPORTS = {
+    "ReasoningStrategy",
+    "StrategyPolicyRequest",
+    "StrategyPolicyResponse",
+}
 
-    That is an accommodation, not a licence. `[V]` The design's own reasoning for
-    why it costs nothing is that *this distribution never receives a role*: the
-    resolver is handed a ``StrategyPolicyRequest``, never an identity. This test
-    is what makes that claim measured rather than asserted, so a later change
-    cannot quietly carry the exemption from ``tests/`` into shipped source.
+
+def _src_parameters() -> set:
+    found = set()
+    for module in MODULES:
+        tree = ast.parse(module.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                args = node.args
+                for arg in (*args.posonlyargs, *args.args, *args.kwonlyargs):
+                    found.add(arg.arg)
+                if args.vararg:
+                    found.add("*" + args.vararg.arg)
+                if args.kwarg:
+                    found.add("**" + args.kwarg.arg)
+    return found
+
+
+def test_the_shipped_source_cannot_construct_a_role_because_it_cannot_name_the_type():
+    """Owner rider on `ROLE_LOOKUP=A`: the exemption is strictly test-tree-only.
+
+    The **construct** half. To build a role contract, or to type-check one, this
+    source would have to import the type. It imports exactly three names from the
+    Agentic Proposer — the vocabulary and the two ratified request/response shapes
+    — and the role contract is not among them. A star-import would defeat that, so
+    star-imports are refused here too.
+
+    `[R]` Whether to strengthen the Agentic Proposer's own raw-text scan is
+    deferred to a separately authorized Agentic Proposer change set, and is **not
+    authorized here**.
+    """
+
+    imported = set()
+    for module in MODULES:
+        tree = ast.parse(module.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module:
+                if node.module.split(".")[0] != "ugence_agentic_proposer":
+                    continue
+                for alias in node.names:
+                    assert alias.name != "*", f"{module.name} star-imports the proposer"
+                    imported.add(alias.name)
+    assert imported == PROPOSER_IMPORTS, sorted(imported)
+
+
+def test_the_shipped_source_cannot_handle_a_role_because_no_parameter_could_carry_one():
+    """The **handle** half, and the one a name scan cannot answer.
+
+    A role object could arrive through a parameter called anything at all, so the
+    parameter set is closed rather than filtered: every parameter the shipped
+    source declares is enumerated, and adding one fails this test until someone
+    states what it carries. The resolver's only entry point additionally refuses
+    anything that is not exactly a ``StrategyPolicyRequest``, so the sole
+    caller-facing value is a shape that carries no identity at all.
+    """
+
+    declared = _src_parameters()
+    assert declared == SRC_PARAMETERS, {
+        "unexpected": sorted(declared - SRC_PARAMETERS),
+        "vanished": sorted(SRC_PARAMETERS - declared),
+    }
+
+
+def test_the_shipped_source_never_names_a_role_anywhere():
+    """The name scan, kept as the third and weakest of the three.
 
     Scanned over defined names, parameters, referenced names, attribute accesses
     and message literals — not comments or docstrings, which name the boundary in
