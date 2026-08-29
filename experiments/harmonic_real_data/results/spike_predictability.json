@@ -1,0 +1,14 @@
+{
+ "cohort1": {
+  "n_train_spikes": 5762,
+  "frac_same_bin_of_day": 0.7131,
+  "frac_repeating_interval": 0.718,
+  "frac_either": 0.8143
+ },
+ "cohort2": {
+  "n_train_spikes": 7840,
+  "frac_same_bin_of_day": 0.7709,
+  "frac_repeating_interval": 0.7906,
+  "frac_either": 0.8648
+ }
+}
