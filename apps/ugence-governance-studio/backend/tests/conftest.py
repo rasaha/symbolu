@@ -1,6 +1,9 @@
 """Shared test fixtures."""
 from __future__ import annotations
 
+import os
+import sys
+
 import pytest
 from starlette.testclient import TestClient
 
@@ -8,12 +11,11 @@ from ugence_governance_studio_api import create_app
 from ugence_governance_studio_api.scenarios.catalog import ScenarioCatalog
 from ugence_governance_studio_api.settings import ApiSettings
 
-SCENARIOS = (
-    "procurement",
-    "customer_support",
-    "cybersecurity_success",
-    "cybersecurity_no_feasible_team",
-)
+# Make this directory importable so the test modules can reach ``_support`` by
+# its unique module name, mirroring the P3A suite's ``_loader`` pattern.
+_TESTS = os.path.dirname(os.path.abspath(__file__))
+if _TESTS not in sys.path:
+    sys.path.insert(0, _TESTS)
 
 
 @pytest.fixture()
@@ -29,8 +31,3 @@ def client(settings) -> TestClient:
 @pytest.fixture()
 def catalog() -> ScenarioCatalog:
     return ScenarioCatalog()
-
-
-def result_of(response):
-    body = response.json()
-    return body["result"]
