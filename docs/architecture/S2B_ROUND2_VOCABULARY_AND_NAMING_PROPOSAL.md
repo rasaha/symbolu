@@ -20,10 +20,17 @@
 `c870298feb3f076125c0a30b881ff9d98c4e171e`, atop default-branch head
 `90696d16ed8e9b9942252fe297c44bc3d16393a1`.
 
-**Governed by, and reopening none of:** `S2B-D1` – `S2B-D8` and rider `R1`
-(the S2-B scoping ADR); the owner declaration `S2B-S1-Q1` – `S2B-S1-Q13` of 2026-08-29
-(the first-slice ratification ADR); OD-1 … OD-10 and A11–A13; P-1 … P-11;
-RCG-D1 … RCG-D10.
+**Governed by:** `S2B-D1` – `S2B-D8` and rider `R1` (the S2-B scoping ADR); the owner
+declaration `S2B-S1-Q1` – `S2B-S1-Q13` of 2026-08-29 (the first-slice ratification ADR);
+OD-1 … OD-10 and A11–A13; P-1 … P-11; RCG-D1 … RCG-D10.
+
+**Reopening none of them, with one declared exception.** `[R]` Ballot item `R2-Q8` puts a
+**sixth replay check** to the owner, and `S2B-S1-Q11=A` ratified the replay function as
+"checking in order" **five** named checks
+(`ADR_UGENCE_S2B_FIRST_SLICE_RATIFICATION.md:146-150`). A sixth check makes it a different
+function, so **`R2-Q8=A` amends `S2B-S1-Q11=A`** and is put to the owner as an amendment,
+not as an addition alongside it. `R2-Q8=B` amends nothing. No other ruling in any document
+listed above is reopened by any item on this ballot.
 
 **Evidence labels.** `[V]` verified against this repository at the cited `file:line`;
 `[I]` architectural inference; `[R]` requires ratification; `[G]` an unresolved gap.
@@ -116,7 +123,7 @@ members partition the outputs of the **two** ratified advisory-construction path
 package already has (`[V]` `build_proposer_advisory` at `identity.py:187` and
 `build_advisory_revision` at `:425`): `build_advisory_revision` yields `REVISED_ADVISORY`,
 and `build_proposer_advisory` yields the other two according to candidate count. The
-mapping is two-to-three, not one-to-one. Two things follow.
+mapping is two-to-three, not one-to-one. Three things follow.
 `[R]` **First: permission governs the token, not the shape — and an earlier draft of this
 proposal was wrong to say otherwise.** It claimed a role permitted only
 `SINGLE_CANDIDATE_UNREVISED` would be "in effect barred from `build_advisory_revision` and
@@ -148,13 +155,20 @@ implementer; it needs its own ratification, which is what `R2-Q8` puts to the ow
 `[R]` **Third, and disclosed because it is a cost the owner would otherwise meet later:
 the three members tile every lawful advisory, so no fourth member can simply be added.**
 Any later member — including `STAGED_DECOMPOSITION`, which A.2 and Part E call admissible
-once observable stages exist — would necessarily overlap one of the three, and
-`S2B-D3=A`'s exactly-one-strategy rule would then have no lawful answer. Admitting a fourth
-would require **either** redefining the three **or** the composition ruling `S2B-D3=A`
-expressly deferred (`ADR:123-127`). `[I]` This bites on both horns of `R2-Q8`: under
-`Q8 = B` a later member is a redefinition of an already-ratified vocabulary; under
-`Q8 = A` it is that **and** a change to a ratified replay check, since the derived-shape
-comparison would have to yield the new member too.
+once observable stages exist — would necessarily overlap one of the three. `[I]` **The two
+horns block it differently, and an earlier draft of this proposal gave the wrong mechanism
+for one of them.**
+
+* Under **`Q8 = B`** nothing compares a declaration to a shape, so an overlapping fourth
+  member leaves `S2B-D3=A` **satisfiable** — the producer simply declares one of the members
+  it matches. What blocks simple addition is narrower: `R2-Q1=A` would have ratified the
+  three as **disjoint and exhaustive**, and a fourth contradicts that ratified property. The
+  fix is a redefinition of the vocabulary, not a composition ruling.
+* Under **`Q8 = A`** the derived-shape comparison must yield exactly one token, so an
+  overlap has no answer and the check itself breaks. That is where `S2B-D3=A`'s
+  exactly-one-strategy rule bites, and where the composition ruling `S2B-D3=A` expressly
+  deferred (`ADR:123-127`) would be needed — **on top of** the redefinition and a change to
+  a ratified replay check.
 
 `[I]` This is not a defect of these three members; it is what criterion (i) permits **while
 no component records observable reasoning stages** (`ADR:346-347`). A vocabulary of
@@ -303,10 +317,12 @@ observable-procedure conformance replay and any producer of observable reasoning
 adapter; a strategy-policy registry; any binding to Reasoning Compute Governance; and the
 Agent Constitution. Plus `STAGED_DECOMPOSITION`, admissible only if observable stages ever
 exist — and `[R]` **not admissible by simple addition even then**: the three proposed members
-tile every lawful advisory, so a fourth would overlap one of them and leave `S2B-D3=A` with
-no lawful answer. Admitting it would require redefining the three, or the composition ruling
-`S2B-D3=A` deferred (`ADR:123-127`), or both — and, under `R2-Q8=A`, a change to a ratified
-replay check as well.
+tile every lawful advisory, so a fourth would overlap one of them. Under `R2-Q8=B` that
+contradicts the disjoint-and-exhaustive property `R2-Q1=A` would have ratified, and the fix
+is a redefinition of the vocabulary. Under `R2-Q8=A` it additionally leaves the derived-shape
+comparison with no unique answer, which is where `S2B-D3=A` bites and where the composition
+ruling it deferred (`ADR:123-127`) would also be required, alongside a change to a ratified
+replay check.
 
 ---
 
@@ -314,8 +330,11 @@ replay check as well.
 
 ```
 S2-B Round 2 ratification — vocabulary members and names.
-Governed by S2B-D1..D8, rider R1, and S2B-S1-Q1..Q13 (2026-08-29). Do not
-reopen any of it. Letters only, one line per item. Every recommendation is A.
+Governed by S2B-D1..D8, rider R1, and S2B-S1-Q1..Q13 (2026-08-29). Reopen
+none of it, with ONE declared exception: R2-Q8=A amends S2B-S1-Q11=A's
+ratified five-check replay list, and says so in terms. Every other item
+leaves all prior rulings intact. Letters only, one line per item. Every
+recommendation is A.
 Each item states the rule PUT TO THE VOTE; none of it is in force until
 answered.
 
@@ -389,20 +408,34 @@ R2-Q7  Character of this vocabulary — read with Q8, which is where the
        correspondence to the artifact is unverified unless Q8 = A.
        A = accept the vocabulary on those terms [recommended]
        B = defer the whole vocabulary until a producer of observable reasoning
-           stages exists, leaving the S2-B gate closed indefinitely
+           stages exists; §8's sixth gate item stays open until then
 
-R2-Q8  Shape-correspondence check — a SEPARATE ratification, because Q11=A's
-       check list is closed and no implementer may add to it. Because every
-       member is defined by artifact shape, a verifier could derive the shape
-       from the advisory and compare it to the declared token, turning the
-       declaration from an unverified assertion into a replayable one.
-       A = ratify a sixth replay check: the declared token equals the token
-           the advisory's own shape yields, replay returning False on mismatch
-           [recommended]
-       B = no such check; the declaration stays an assertion whose
-           correspondence to the artifact nothing verifies
-       Note: A makes any FUTURE member a breaking change, since the three
-       members already tile every lawful advisory — see Q7's note and Part E.
+R2-Q8  Shape-correspondence check. THIS ITEM AMENDS A RATIFIED RULING, and
+       is the only item on this ballot that does. Q11=A ratified the replay
+       function as "checking in order" FIVE named checks (ratification
+       ADR:146-150); a sixth makes it a different function, so A is an
+       AMENDMENT of Q11=A, not an addition beside it. Because every member is
+       defined by artifact shape, a verifier could derive the shape from the
+       advisory and compare it to the declared token, turning the declaration
+       from an unverified assertion into a replayable one.
+       A = amend Q11=A to add a sixth check: the declared token equals the
+           token the advisory's own shape yields, replay returning False on
+           mismatch [recommended]
+       B = no such check; Q11=A stands unamended and the declaration stays an
+           assertion whose correspondence to the artifact nothing verifies
+       What A does NOT do: it does not reopen S2B-D8=B's operative ruling. The
+       check reads no stage records and stays within D8=B's four inputs. But it
+       DOES discharge early, for these three members only, part of what D8=B
+       named a later stage, and that is disclosed rather than glossed.
+       Nor does it amend Q10=A: that rider is about rider R1's field equality,
+       which still proves nothing about private reasoning (ratification
+       ADR:140-142). A adds a different check over two observable facts.
+       The cost of A, conceded: the token becomes fully determined by the
+       advisory — a pure commitment carrying no information a verifier could
+       not recompute. The value is that it is then a commitment that can FAIL.
+       A also makes any FUTURE member a breaking change to a ratified check,
+       since the three members already tile every lawful advisory — see Q7 and
+       Part E.
 ```
 
 ---
@@ -463,19 +496,33 @@ assertions.
 7. GATE. Is it TRUE that ratifying this opens §8's gate? Check each of the six
    items against ADR_UGENCE_S2B_FIRST_SLICE_RATIFICATION.md, and say plainly
    if the proposal overstates its own consequence.
-8. R2-Q7 AND DERIVABILITY. The proposal concedes that every member is defined
-   by artifact shape, so a declaration is derivable from the advisory and the
-   members partition the outputs of two existing construction paths. Test that concession
-   hard: is it true, is it complete, and does a derivable vocabulary still
-   satisfy S2B-D2=A and do useful work under S2B-D1=A — or does it reduce
-   "reasoning strategy permission" to permission over construction paths? Is
-   R2-Q7=B (defer until observable stages exist) the better answer, and does the
-   ballot present that choice fairly?
-9. FALSE REPOSITORY CLAIMS. Mechanically check every file:line citation.
-   Report each that does not resolve or supports a weaker claim than made.
-   Note that this revision fixed two blockers and seven findings from a prior
-   review; check the fixes did not introduce new inaccuracies, which is the
-   failure mode that has recurred in this document's history.
+8. R2-Q7 AND DERIVABILITY. Every member is defined by artifact shape, so a
+   declaration is derivable — but the proposal states that NOTHING RATIFIED
+   derives it and compares: Q11=A's list is closed at five checks and tests
+   membership only (ratification ADR:146-150), D5=A tests membership only
+   (ADR:145-147), D8=B defers procedure-conformance replay (ADR:216-218), and
+   ADR:303-306 disclaims that rider R1's equality proves the declared procedure
+   was executed. Verify that narrow statement, and sweep the WHOLE file for any
+   passage still implying a policy constrains which SHAPES a role may produce.
+   Then judge: does a vocabulary whose declaration nothing verifies do useful
+   work under S2B-D1=A, or is R2-Q7=B the better answer?
+9. R2-Q8, WHICH AMENDS A RATIFIED RULING. Q8=A adds a sixth replay check and is
+   framed as an AMENDMENT of S2B-S1-Q11=A. Test three things. (a) Is the
+   amendment framing correct and complete — does Q8=A touch any ratified ruling
+   besides Q11=A, in particular Q10=A (ratification ADR:140-142) or D8=B? (b) Is
+   the claim that it does not reopen D8=B's operative ruling sound, given the
+   check reads no stage records and stays within D8=B's four inputs — or is a
+   shape-correspondence check simply the conformance replay D8=B deferred? (c)
+   Under Q8=A the token is fully determined by the advisory; the proposal
+   concedes it then carries no information and argues its value is that it can
+   FAIL. Is that a real value or a rationalization — and if Q8=A makes the field
+   redundant while Q8=B leaves it unverified, is the vocabulary worth having on
+   either branch? Answer (b) and (c) as blockers if they go against the
+   proposal.
+10. FALSE REPOSITORY CLAIMS. Mechanically check every file:line citation.
+    Report each that does not resolve or supports a weaker claim than made.
+    Every correction round in this document's history has introduced or left a
+    defect; assume this one did too until you have checked.
 
 Return: the identity-gate result; a blocker list with file:line and the ruling
 violated; a non-blocking list; and one verdict — SOUND,
