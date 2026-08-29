@@ -1,0 +1,139 @@
+{
+  "distribution": "ugence-agentic-proposer-strategy-permission-policy",
+  "namespace": "ugence_agentic_proposer_strategy_permission_policy",
+  "package_version": "0.1.0",
+  "policy_family": "agentic_proposer.strategy_permission",
+  "adapter_id": "ugence.agentic-proposer.strategy-permission/v1",
+  "policy_type": "StrategyPermissionPolicy",
+  "vocabulary_version": "ugence.agentic-proposer.reasoning-strategy/v1",
+  "note": "Machine-readable snapshot of the curated public API (ugence_agentic_proposer_strategy_permission_policy.__all__). Generated from the installed package; tests/test_public_api.py asserts this file equals the actual package surface, including dataclass field ORDER and the exact value of every string constant. This distribution is a POLICY FAMILY and an adapter: it supplies an issuable, digest-bound artifact and registers it with the shared Ugence Policy Authority from outside that authority's own distribution. It resolves nothing, signs nothing, holds no registry and no reference mapping, reads no clock, opens no socket, touches no storage and loads no plugin. It authorizes no runtime action and grants no compute: consequential execution remains with Risk Authority, ActionGate and Decision Authority. adapter_id, policy_family, policy_type and vocabulary_version are IDENTITY, not configuration - each is framed into a body digest, a coordinate, or both, so moving one moves every issued policy's digest. vocabulary_version is a value fixed by owner ruling. permitted_strategies is non-empty, duplicate-free and stored in ascending codepoint order, rejected if unsorted and never silently reordered; every member is the exact string value of a ReasoningStrategy member imported from ugence-agentic-proposer, which is the single source of truth for the three ratified spellings. Constructing any artifact here is NOT authenticity - only the authority's resolve_policy produces an authority-evaluated resolution, and this distribution never calls it.",
+  "constants": {
+    "ACTIVE_LIFECYCLE_STATE": "APPROVED_ACTIVE",
+    "LIFECYCLE_APPROVED_ACTIVE": "APPROVED_ACTIVE",
+    "LIFECYCLE_DRAFT": "DRAFT",
+    "LIFECYCLE_SUPERSEDED": "SUPERSEDED",
+    "LIFECYCLE_WITHDRAWN": "WITHDRAWN",
+    "PLACEHOLDER_CONTENT_DIGEST": "0000000000000000000000000000000000000000000000000000000000000000",
+    "POLICY_SCOPE_GLOBAL": "GLOBAL",
+    "POLICY_SCOPE_TENANT": "TENANT",
+    "STRATEGY_PERMISSION_ADAPTER_ID": "ugence.agentic-proposer.strategy-permission/v1",
+    "STRATEGY_PERMISSION_POLICY_FAMILY": "agentic_proposer.strategy_permission",
+    "STRATEGY_PERMISSION_POLICY_TYPE": "StrategyPermissionPolicy",
+    "STRATEGY_VOCABULARY_VERSION": "ugence.agentic-proposer.reasoning-strategy/v1"
+  },
+  "symbols": {
+    "ACTIVE_LIFECYCLE_STATE": {
+      "kind": "str_constant",
+      "value": "APPROVED_ACTIVE"
+    },
+    "ADMITTED_LIFECYCLE_STATES": {
+      "kind": "frozenset_constant",
+      "values": [
+        "APPROVED_ACTIVE",
+        "DRAFT",
+        "SUPERSEDED",
+        "WITHDRAWN"
+      ]
+    },
+    "ADMITTED_POLICY_SCOPES": {
+      "kind": "frozenset_constant",
+      "values": [
+        "GLOBAL",
+        "TENANT"
+      ]
+    },
+    "ADMITTED_STRATEGY_TOKENS": {
+      "kind": "frozenset_constant",
+      "values": [
+        "MULTI_CANDIDATE_UNREVISED",
+        "REVISED_ADVISORY",
+        "SINGLE_CANDIDATE_UNREVISED"
+      ]
+    },
+    "LIFECYCLE_APPROVED_ACTIVE": {
+      "kind": "str_constant",
+      "value": "APPROVED_ACTIVE"
+    },
+    "LIFECYCLE_DRAFT": {
+      "kind": "str_constant",
+      "value": "DRAFT"
+    },
+    "LIFECYCLE_SUPERSEDED": {
+      "kind": "str_constant",
+      "value": "SUPERSEDED"
+    },
+    "LIFECYCLE_WITHDRAWN": {
+      "kind": "str_constant",
+      "value": "WITHDRAWN"
+    },
+    "PLACEHOLDER_CONTENT_DIGEST": {
+      "kind": "str_constant",
+      "value": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "POLICY_SCOPE_GLOBAL": {
+      "kind": "str_constant",
+      "value": "GLOBAL"
+    },
+    "POLICY_SCOPE_TENANT": {
+      "kind": "str_constant",
+      "value": "TENANT"
+    },
+    "STRATEGY_PERMISSION_ADAPTER_ID": {
+      "kind": "str_constant",
+      "value": "ugence.agentic-proposer.strategy-permission/v1"
+    },
+    "STRATEGY_PERMISSION_POLICY_FAMILY": {
+      "kind": "str_constant",
+      "value": "agentic_proposer.strategy_permission"
+    },
+    "STRATEGY_PERMISSION_POLICY_TYPE": {
+      "kind": "str_constant",
+      "value": "StrategyPermissionPolicy"
+    },
+    "STRATEGY_VOCABULARY_VERSION": {
+      "kind": "str_constant",
+      "value": "ugence.agentic-proposer.reasoning-strategy/v1"
+    },
+    "StrategyPermissionDuplicateError": {
+      "kind": "exception"
+    },
+    "StrategyPermissionFieldError": {
+      "kind": "exception"
+    },
+    "StrategyPermissionOrderingError": {
+      "kind": "exception"
+    },
+    "StrategyPermissionPolicy": {
+      "kind": "dataclass",
+      "fields": [
+        "metadata",
+        "strategy_policy_ref",
+        "permitted_strategies",
+        "vocabulary_version"
+      ]
+    },
+    "StrategyPermissionPolicyError": {
+      "kind": "exception"
+    },
+    "StrategyPermissionPolicyFamilyAdapter": {
+      "kind": "class"
+    },
+    "StrategyPermissionPolicyMetadata": {
+      "kind": "dataclass",
+      "fields": [
+        "policy_id",
+        "version",
+        "content_digest",
+        "scope",
+        "lifecycle_state",
+        "tenant_id",
+        "supersedes_ref",
+        "effective_from",
+        "effective_to"
+      ]
+    },
+    "strategy_permission_coordinate": {
+      "kind": "function"
+    }
+  }
+}

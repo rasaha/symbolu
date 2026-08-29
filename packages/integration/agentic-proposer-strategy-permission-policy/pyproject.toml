@@ -1,0 +1,70 @@
+# The Agentic Proposer strategy-permission policy family — the shared Policy
+# Authority's THIRD policy family, and the SECOND registered from OUTSIDE the
+# authority's own distribution.
+#
+# The authority ratified that a new family is added by registering a new adapter
+# with no core change. This distribution exercises that claim across a package
+# boundary, for the family that Reasoning Strategy Permission was ratified
+# without.
+#
+# Exactly two first-party dependencies and no third-party runtime dependency of
+# its own:
+#
+#   * ugence-policy-authority — reached through its public api module only. Every
+#     ...core / ...adapters module is internal, and a repository-wide scan in the
+#     authority's own suite enforces that.
+#   * ugence-agentic-proposer — for ReasoningStrategy alone, as the SINGLE SOURCE
+#     OF TRUTH for the three ratified spellings. Re-declaring them here would
+#     create a fork that a skipped test is all that stands between. The
+#     dependency direction is one-way: the Agentic Proposer imports nothing new,
+#     and its own suite bars it from importing the authority at all.
+#
+# There is deliberately NO dependency on:
+#
+#   * any shared contract distribution — this is a leaf family, not a contract
+#     package, and the proposer's reverse-dependency guard exists because a
+#     contract package that depended on a capability could re-export it.
+#   * ugence-uvi-policy-contracts — a strategy-permission family must not depend
+#     on UVI's envelope types. (They still arrive transitively through the
+#     authority's own declared requirement; nothing here imports them, and a test
+#     asserts that.)
+#   * the Risk Authority, ActionGate, Decision Authority or the Agent Runtime —
+#     consequential execution stays with them, and a declarative artifact must
+#     never drag an execution authority in behind it.
+#
+# Build:  python -m build packages/integration/agentic-proposer-strategy-permission-policy
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-agentic-proposer-strategy-permission-policy"
+dynamic = ["version"]
+description = "Agentic Proposer strategy-permission policy family and Policy Authority adapter — issuable, signable, digest-bound reasoning-strategy permission."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["ugence", "agentic-proposer", "policy", "strategy", "permission", "adapter"]
+dependencies = [
+    "ugence-policy-authority>=0.1.0",
+    "ugence-agentic-proposer>=0.3.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+dev = ["pytest>=7.0", "build>=1.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_agentic_proposer_strategy_permission_policy.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_agentic_proposer_strategy_permission_policy*"]
+
+[tool.setuptools.package-data]
+ugence_agentic_proposer_strategy_permission_policy = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
