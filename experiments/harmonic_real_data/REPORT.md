@@ -124,3 +124,41 @@ seasonal-naive on real cloud demand — **replicated across two disjoint
 cohorts** under one-shot held-out discipline. Still PROVISIONALLY SUPPORTED
 (one trace, 14 days, micro-scale readers); no Phase, semantic-understanding,
 production-readiness, or cross-dataset claims.
+
+## Spike Retrieval 2 (PREREGISTRATION_SPIKE_RETRIEVAL2.md) — S2-GATE: **FAILED
+in both cohorts; the spike-retrieval question closes**
+
+Motivating diagnostic (train days only, committed first): 81–86% of
+train-period spikes show recurrence structure within 72 h
+(`results/spike_predictability.json`) — the information exists.
+
+The three ratified changes (spike-upweighted training for all arms, signed
+anomaly tokens with time-since-previous and last inter-anomaly gap, 72 h
+lookback; 6-token budget unchanged) were implemented, frozen at 7cb5e4bf, and
+evaluated once per cohort. Result: harmonic+retrieval vs harmonic on spike
+queries — Cohort 1 win 0.31–0.59 with RI −0.28 to +0.11; Cohort 2 win
+0.36–0.54 with RI −0.34 to −0.02. **Every gated cell misses the unchanged
+thresholds (win ≥ 0.55 AND RI ≥ 0.03 per seed); most are negative.**
+
+Informational observations, gating nothing: stats+retrieval vs stats was
+mixed-positive in Cohort 1 (win up to 0.79) but negative in Cohort 2 —
+seed- and cohort-unstable. Spike-upweighted training also degraded overall
+(uniform-query) accuracy for all arms relative to the original runs (e.g.,
+harmonic reader 60-min median nMSE 0.398 → 0.477 in Cohort 1); per the
+preregistration H-GATE is settled on the original runs and none of this
+re-litigates it.
+
+**Reading.** The diagnostic says the recurrence signal exists; two design
+generations say a 6-token retrieval feeding a ~69K-parameter reader cannot
+convert it into spike-query forecast gains — and the upweighting change
+bought spike emphasis at a real cost to overall accuracy without delivering
+the spike win. Per the frozen outcome clause: raw-evidence retrieval for
+spikes is **NOT SUPPORTED at tested scale under this design family**, any
+further attempt requires new ratification, and the held-out days are spent
+for the spike question. The honest suspects for a future, differently-shaped
+attempt (larger readers, richer retrieval interfaces, or explicit
+point-process modeling of spike timing) are recorded here without being
+started.
+
+**Final gate ledger for this experiment:** V ✓ (both cohorts) · H ✓ (both
+cohorts, settled) · S ✗ (v1, both cohorts) · S2 ✗ (both cohorts, closed).
