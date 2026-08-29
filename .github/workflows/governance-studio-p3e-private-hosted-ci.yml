@@ -153,22 +153,25 @@ jobs:
     needs: application
     env:
       IMAGE: governance-studio-private-hosted:ci
-      # Runtime evidence is written OUTSIDE the checkout, to a fresh directory keyed by
-      # run id and attempt, so a committed or stale file can never be hashed as this
-      # run's evidence. Reference records live in reference-evidence/ and are not read.
-      EVIDENCE_DIR: ${{ runner.temp }}/p3e-evidence-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.11" }
 
       - name: evidence-dir-init
+        # Runtime evidence is written OUTSIDE the checkout, to a fresh directory keyed by
+        # run id and attempt, so a committed or stale file can never be hashed as this run's
+        # evidence. Reference records live in reference-evidence/ and are never read.
+        # EVIDENCE_DIR is exported here rather than in job-level env: the runner context is
+        # not available there, and RUNNER_TEMP is only defined as a shell variable.
         # Must be empty at creation: a pre-populated directory is a failure, not a base.
         run: |
-          if [ -e "$EVIDENCE_DIR" ]; then echo "FAIL evidence dir already exists: $EVIDENCE_DIR"; exit 1; fi
-          mkdir -p "$EVIDENCE_DIR"
-          [ -z "$(ls -A "$EVIDENCE_DIR")" ] || { echo "FAIL evidence dir not empty"; exit 1; }
-          echo "evidence dir initialised empty: $EVIDENCE_DIR"
+          DIR="$RUNNER_TEMP/p3e-evidence-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          if [ -e "$DIR" ]; then echo "FAIL evidence dir already exists: $DIR"; exit 1; fi
+          mkdir -p "$DIR"
+          [ -z "$(ls -A "$DIR")" ] || { echo "FAIL evidence dir not empty"; exit 1; }
+          echo "EVIDENCE_DIR=$DIR" >> "$GITHUB_ENV"
+          echo "evidence dir initialised empty: $DIR"
 
       - name: install-e2e-driver-deps
         run: pip install -e packages/tooling/policy-workflow-compiler -e packages/capabilities/agent-workforce-composer -e apps/ugence-governance-studio/backend -e deployment/governance-studio
