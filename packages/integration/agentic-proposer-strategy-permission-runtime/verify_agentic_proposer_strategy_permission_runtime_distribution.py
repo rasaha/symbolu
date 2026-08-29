@@ -31,7 +31,10 @@ separate, clearly marked step, read from packaging metadata rather than listed
 here; the clean-venv installation names the **exact built wheel path** and runs
 under ``--no-index`` with ``PIP_NO_INDEX=1`` and a sanitized environment; and
 every first-party distribution is constrained to, and then asserted at, the exact
-version built. A negative control removes one required first-party wheel and
+version built. Building and vendoring may both use a network — ``python -m build``
+installs its backend into a PEP 517 isolated environment — but neither can
+introduce a first-party distribution, and the stray check fails if one appears
+that was not built here. A negative control removes one required first-party wheel and
 proves the installation **refuses** rather than substituting — verifying
 offline resolution positively from pip's own verbose log, not by the absence of
 an index marker, since pip's not-found error is identical either way.
@@ -397,10 +400,28 @@ def _negative_control(findlinks: Path, target: Path, victim: Path) -> None:
             f"{victim.name} removed from the wheelhouse; resolution is not "
             "offline-and-local, and an index or ambient environment supplied it"
         )
-        assert (
-            "no matching distribution" in combined
-            or "could not find a version" in combined
-        ), combined[-2000:]
+        failure_lines = "\n".join(
+            line for line in combined.splitlines()
+            if "no matching distribution" in line or "could not find a version" in line
+        )
+        assert failure_lines, combined[-2000:]
+
+        # Tie the refusal to the wheel that was REMOVED. Without this the control
+        # would pass on any resolution failure whatsoever — a typo in the target
+        # path, a corrupt wheelhouse, a missing third-party dependency — and would
+        # stop being evidence about substitution at all.
+        #
+        # Scanned over the FAILURE LINES, not the whole log: at -vv pip narrates
+        # every project it considers, so the victim's name appears in the transcript
+        # of a healthy resolution too. Checking the whole log passes when some other
+        # package is what actually went missing, which is exactly the false
+        # reassurance this assertion exists to prevent.
+        victim_name, _ = _wheel_identity(victim)
+        assert victim_name in failure_lines, (
+            f"the refusal does not name {victim_name!r}, so it is some other "
+            f"resolution failure and not the removal this control performed: "
+            f"{failure_lines or combined[-2000:]}"
+        )
 
         # What the verbose log establishes: the attempt was offline. pip announces
         # that it is ignoring the index and names the directory it searched; when
@@ -450,7 +471,14 @@ def main() -> int:
     assert f"{NAMESPACE}/py.typed" in names, "wheel is missing py.typed"
     print(f"      wheel contains only {NAMESPACE}/ (+ py.typed) + dist-info")
 
-    print("[3/7] vendor third-party dependencies — the ONLY step that may use a network")
+    # TWO steps may use a network, not one. This is the obvious one; step 1 is the
+    # other, because ``python -m build`` creates a PEP 517 isolated environment and
+    # installs the build backend into it from an index. Neither can introduce a
+    # FIRST-PARTY distribution: every ugence-* wheel is built from source above,
+    # and the stray check below fails if one appears that was not. What must be
+    # offline is the clean-venv INSTALL, and step 4 is where that is enforced.
+    print("[3/7] vendor third-party dependencies into the wheelhouse "
+          "(a networked step, as is step 1's build isolation)")
     requirements = _third_party_requirements()
     print(f"      third-party requirements, read from packaging metadata: {requirements}")
     if requirements:

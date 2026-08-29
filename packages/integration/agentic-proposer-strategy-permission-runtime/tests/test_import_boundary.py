@@ -293,6 +293,12 @@ SRC_PARAMETER_BINDINGS = {
 
 #: Everything the shipped source may take from the Agentic Proposer. The role
 #: contract is deliberately not here, and cannot be added without this failing.
+#:
+#: These are ``from ugence_agentic_proposer import ...`` names. A PLAIN
+#: ``import ugence_agentic_proposer`` is collected too, as the module path
+#: itself — it would put the whole proposer surface within attribute reach,
+#: including the role contract, without naming anything here. The source uses no
+#: such import, so the set stays these three; adding one fails this guard.
 PROPOSER_IMPORTS = {
     "ReasoningStrategy",
     "StrategyPolicyRequest",
@@ -346,10 +352,13 @@ def test_the_shipped_source_cannot_construct_a_role_because_it_cannot_name_the_t
     """Owner rider on `ROLE_LOOKUP=A`: the exemption is strictly test-tree-only.
 
     The **construct** half. To build a role contract, or to type-check one, this
-    source would have to import the type. It imports exactly three names from the
-    Agentic Proposer — the vocabulary and the two ratified request/response shapes
-    — and the role contract is not among them. A star-import would defeat that, so
-    star-imports are refused here too.
+    source would have to reach the type — and there are three ways to reach it,
+    all closed here. It may ``from ugence_agentic_proposer import`` exactly three
+    names, and the role contract is not among them. A **star-import** would defeat
+    that by name, so star-imports are refused. A **plain module import** would
+    defeat it by attribute — ``import ugence_agentic_proposer`` puts the whole
+    surface within ``.`` reach without naming anything — so plain imports of the
+    proposer are collected into the same closed set and fail it.
 
     `[R]` Whether to strengthen the Agentic Proposer's own raw-text scan is
     deferred to a separately authorized Agentic Proposer change set, and is **not
@@ -366,6 +375,13 @@ def test_the_shipped_source_cannot_construct_a_role_because_it_cannot_name_the_t
                 for alias in node.names:
                     assert alias.name != "*", f"{module.name} star-imports the proposer"
                     imported.add(alias.name)
+            elif isinstance(node, ast.Import):
+                for alias in node.names:
+                    # The module path, not the binding: `import x as y` and
+                    # `import x` reach the same surface, and the alias is the
+                    # author's choice while the path is the fact.
+                    if alias.name.split(".")[0] == "ugence_agentic_proposer":
+                        imported.add(alias.name)
     assert imported == PROPOSER_IMPORTS, sorted(imported)
 
 
