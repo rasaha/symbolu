@@ -343,13 +343,23 @@ upstream, giving the same refusal with and without the guard under test. Reachin
 drifting the controller, Phase 4C and Phase 5A together — a coordinated release the pins
 admit. A second resolution has to reach the guard, not merely exist.
 
-**`unreachable-behind-earlier-guard` carries the same bar, for the same reason.**
+**The bar is a property of the boundary, not of the reason.** Stated once, for every
+member of the vocabulary:
 
-That reason was previously allowed to rest on measured evidence of *which guard fires
-first*, in this distribution or an upstream one. Across a distribution boundary that is the
-identical mistake §9.2 forbids above, wearing different clothes: which guard fires first is
-a fact about the resolution that happens to be installed, and an upstream release is free to
-stop refusing. Two exclusions were withdrawn on exactly that, both measured:
+> **No exclusion reason may be claimed across a distribution boundary on evidence about one
+> installation.** Where a guard's deciding operand is defined in a separately versioned
+> distribution under an open-ended pin, the claim required is that *no resolution the
+> declared constraint permits* makes the guard authority-bearing. Nothing observed of the
+> installed release establishes that. Where every deciding operand is defined in the
+> distribution that declares the guard, the same observation is a property of the program
+> and the reason stands on it.
+
+Each reason had been allowed to rest on something weaker, and each was withdrawn on the same
+measurement. `unreachable-behind-earlier-guard` rested on measured evidence of *which guard
+fires first*, in this distribution or an upstream one. Across a boundary that is the
+identical mistake, wearing different clothes: which guard fires first is a fact about the
+resolution that happens to be installed, and an upstream release is free to stop refusing.
+Two exclusions were withdrawn on exactly that, both measured:
 
 * Phase 5A's `identifiers.py:100` hid behind Phase 4C's import-time check, in
   `ugence-cloud-scaling-risk-integration` under `>=0.1.0`. Under a 0.2.0 that no longer
@@ -360,18 +370,38 @@ stop refusing. Two exclusions were withdrawn on exactly that, both measured:
   `>=0.1.0`. Under a 0.2.0 returning a truthy non-`True`, the guard refuses
   `HISTORICAL_RESOLUTION_REFUSED` where removing it refuses `INVARIANT_VIOLATION`.
 
-So, ratified: when the earlier guard is in the **same distribution**, "it fires first" is a
-property of the program and the reason stands on that evidence. When the earlier guard is in
-a **separately versioned distribution under an open-ended pin**, the claim required is the
-one §9.2 already demands — that *no resolution the declared constraint permits* makes this
-guard reachable — and "the installed release refuses first" does not establish it.
+`diagnostic-only` rested on the narrowest-looking claim of the three, and failed the bar
+just as squarely. The reason says a successor guard refuses with the same outcome, so
+removing this one costs a message and no authority. Where the successor's decision is made
+upstream, that is a claim about the installed release. Both withdrawals were measured
+against a Policy Authority 0.2.0 built from real source under `>=0.1.0`:
 
-Neither reason survived its own bar. `unscorable-by-single-checkout-fixture` went nought for
-five and `unreachable-behind-earlier-guard` nought for two; both stay in the closed
-vocabulary, because a guard could genuinely qualify, and neither currently holds a guard in
-either package. Of the thirteen exclusions that remain, every one is `diagnostic-only` or
-`equivalent-mutant`, and every operand that decides them is defined in the distribution that
-declares the guard — re-checked against this rule when it was ratified.
+* `verification.py:487` (`resolution.historical`). The successor is redundant only *because*
+  `implies_current_validity` carries the historicity term (`core/records.py:334`). Under a
+  0.2.0 where the property is `return self.resolved`, the successor goes silent on a genuine
+  revocation: the guard refuses `HISTORICAL_RESOLUTION_REFUSED`, removing it refuses
+  `INVARIANT_VIOLATION` — an internal-integrity report for an ordinary, expected answer.
+* `verification.py:706` (`adapter_id != record.adapter_id`). The digest below it reproduces
+  the same mismatch only while the authority's frame *binds* adapter identity
+  (`core/canonical.py:212`). Under a 0.2.0 whose frame drops the adapter term, a projection
+  naming another adapter reproduces the correct digest, and this guard is the last thing in
+  the way: removing it turns `POLICY_PROJECTION_DIGEST_MISMATCH` into `VERIFIED`. Not a
+  changed refusal — a mint.
+
+The alternative was to ratify a narrower `diagnostic-only` bar that accepts installed-release
+evidence. It was rejected. It would have carved out most of the surviving exclusions
+immediately after retiring the same asymmetry for `unreachable-behind-earlier-guard`, and the
+guard-99 measurement shows what the carve-out would license: not a lost diagnosis, a mint.
+
+No reason survived the bar on the evidence it had been resting on:
+`unscorable-by-single-checkout-fixture` nought for five, `unreachable-behind-earlier-guard`
+nought for two, `diagnostic-only` nought for two of two attacked across a boundary. All stay
+in the closed vocabulary, because a guard could genuinely qualify. Of the eleven exclusions
+that remain, every one is `diagnostic-only` or `equivalent-mutant`, and each was re-checked
+against the rule above when it was ratified: every operand deciding them is either defined in
+the distribution that declares the guard, or fixed by the Python language itself — `None`
+cannot satisfy an `isinstance`, a `hasattr`, or an exact string comparison, whichever release
+supplies the type.
 
 ### §9.3 Drift assertions run at import *and* at test time
 

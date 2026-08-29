@@ -1004,6 +1004,251 @@ def _refusal_for(**rewrite):
 
 
 @pytest.mark.adversarial
+def test_the_historicity_guard_fires_when_the_authority_drops_the_historicity_term(
+    tmp_path,
+):
+    """Guard 77 — ``verification.py:487``, ``resolution.historical``.
+
+    Excluded as ``diagnostic-only``: removing it leaves ``implies_current_validity`` False
+    on the next line, refusing with the same outcome. True of the installed Policy
+    Authority, where the property is ``resolved and not historical`` — and that property is
+    upstream's, under ``>=0.1.0``. The successor is only redundant *because* the property
+    carries the historicity term. A 0.2.0 that drops it — ``return self.resolved``, a
+    plausible simplification once historicity is modelled on the answer itself — makes the
+    successor silent on a genuinely historical answer.
+
+    Measured against a real revocation, resolved at an instant before it:
+
+    ==========================  =======================================
+    undrifted 0.1.0             refused HISTORICAL_RESOLUTION_REFUSED
+    0.2.0, guard present        refused HISTORICAL_RESOLUTION_REFUSED
+    0.2.0, guard neutralised    refused INVARIANT_VIOLATION
+    ==========================  =======================================
+
+    A changed typed pair, so the guard is authority-bearing under §9.1. Removing it does not
+    lose a message; it loses the clean refusal and reaches the artifact-pairing invariant at
+    ``verification.py:266`` instead, which reports an internal integrity failure for what is
+    an ordinary, expected, refusable answer.
+    """
+
+    outcomes = _verify_a_historical_answer(tmp_path, neutralise_guard=False)
+    assert outcomes["undrifted"] == "REFUSED HISTORICAL_RESOLUTION_REFUSED", (
+        f"the control did not refuse as expected: {outcomes['undrifted']}"
+    )
+    assert outcomes["drifted"] == "REFUSED HISTORICAL_RESOLUTION_REFUSED", (
+        f"a historical answer was not refused by this guard: {outcomes['drifted']}"
+    )
+
+
+@pytest.mark.invariant
+def test_removing_the_historicity_guard_changes_the_refusal(tmp_path):
+    """The other half of guard 77: what removing it costs."""
+
+    outcomes = _verify_a_historical_answer(tmp_path, neutralise_guard=True)
+    assert outcomes["drifted"] == "REFUSED INVARIANT_VIOLATION", (
+        "removing the guard no longer changes the typed refusal; if this matches the "
+        f"guarded outcome the diagnostic-only argument is back in play: {outcomes['drifted']}"
+    )
+
+
+@pytest.mark.adversarial
+def test_the_adapter_identity_guard_fires_when_the_frame_stops_binding_the_adapter(
+    tmp_path,
+):
+    """Guard 99 — ``verification.py:706``, ``adapter_id != record.adapter_id``.
+
+    Excluded as ``diagnostic-only``: any adapter id that trips this guard also fails the
+    digest reproduction below it, with the same outcome, because the adapter id is an input
+    to the frame that digest is taken over. That is true only while the authority's frame
+    *binds* adapter identity — ``framed_body_bytes`` puts ``"adapter": adapter_id`` in the
+    framed mapping, and that mapping is upstream's, under ``>=0.1.0``.
+
+    A 0.2.0 that stops binding it — moving adapter identity out of the frame and onto the
+    record, say — makes the reproduced digest independent of the adapter. A projection
+    naming a different adapter then reproduces the *correct* digest, and this guard is the
+    only thing left between that projection and a verified artifact.
+
+    ==========================  ===========================================
+    undrifted 0.1.0             refused POLICY_PROJECTION_DIGEST_MISMATCH
+    0.2.0, guard present        refused POLICY_PROJECTION_DIGEST_MISMATCH
+    0.2.0, guard neutralised    **VERIFIED**
+    ==========================  ===========================================
+
+    Not a changed refusal: a mint. Under a resolution the pin admits, removing this guard
+    lets a descriptor that names one adapter be verified against a record that names
+    another — the disagreement the comment above it says must not pass.
+    """
+
+    outcomes = _verify_a_reframed_adapter(tmp_path, neutralise_guard=False)
+    assert outcomes["undrifted"] == "REFUSED POLICY_PROJECTION_DIGEST_MISMATCH", (
+        f"the control did not refuse as expected: {outcomes['undrifted']}"
+    )
+    assert outcomes["drifted"] == "REFUSED POLICY_PROJECTION_DIGEST_MISMATCH", (
+        f"a projection naming another adapter was not refused: {outcomes['drifted']}"
+    )
+
+
+@pytest.mark.invariant
+def test_removing_the_adapter_identity_guard_mints(tmp_path):
+    """The other half of guard 99, and the reason it is the more serious of the two."""
+
+    outcomes = _verify_a_reframed_adapter(tmp_path, neutralise_guard=True)
+    assert outcomes["drifted"] == "VERIFIED", (
+        "removing the guard no longer mints; if it now refuses, the reproduction below it "
+        f"is binding the adapter again and this measurement is stale: {outcomes['drifted']}"
+    )
+
+
+#: Source of the probe the guard-77 measurements run: a real revocation, resolved before it.
+HISTORICAL_ANSWER_PROBE = (
+    "import sys\n"
+    "sys.path.insert(0, PKG_TESTS)\n"
+    "from _policy_fixtures import issued, revoke, T_MID, T_TO, ONE_SECOND\n"
+    "from test_historical_refusal import HistoricalAllowingPort\n"
+    "from ugence_cloud_scaling_policy_authenticity import PolicyAuthenticityVerifier\n"
+    "authority, record = issued()\n"
+    "revoke(authority, record, revoked_at=T_TO - ONE_SECOND)\n"
+    "port = HistoricalAllowingPort(authority=authority)\n"
+    "result = PolicyAuthenticityVerifier(resolution_port=port).verify(\n"
+    "    coordinate=record.coordinate,\n"
+    "    expected_reference_tenant_id=record.coordinate.tenant_id,\n"
+    "    as_of=T_MID,\n"
+    ")\n"
+    "print('VERIFIED' if result.refusal is None\n"
+    "      else 'REFUSED ' + result.refusal.outcome.name)\n"
+)
+
+#: Source of the probe the guard-99 measurements run.
+REFRAMED_ADAPTER_PROBE = (
+    "import sys\n"
+    "sys.path.insert(0, PKG_TESTS)\n"
+    "from _policy_fixtures import issued_bounds, port_for\n"
+    "from test_guard_coverage import _RewritingPort, _verify_with\n"
+    "authority, record = issued_bounds()\n"
+    "result = _verify_with(\n"
+    "    _RewritingPort(port_for(authority),\n"
+    "                   {'descriptor_adapter_id': 'ugence.some-other-adapter/v1'}),\n"
+    "    record,\n"
+    ")\n"
+    "print('VERIFIED' if result.refusal is None\n"
+    "      else 'REFUSED ' + result.refusal.outcome.name)\n"
+)
+
+
+def _verify_a_historical_answer(tmp_path, *, neutralise_guard):
+    """Guard 77 under a 0.2.0 whose `implies_current_validity` drops the historicity term."""
+
+    return _measure_under_a_drifted_authority(
+        tmp_path,
+        edits=(
+            (
+                "core/records.py",
+                "        return self.resolved and not self.historical",
+                "        return self.resolved",
+            ),
+        ),
+        guard="if resolution.historical:",
+        neutralise_guard=neutralise_guard,
+        probe=HISTORICAL_ANSWER_PROBE,
+    )
+
+
+def _verify_a_reframed_adapter(tmp_path, *, neutralise_guard):
+    """Guard 99 under a 0.2.0 whose framed body digest stops binding adapter identity."""
+
+    return _measure_under_a_drifted_authority(
+        tmp_path,
+        edits=(("core/canonical.py", '            "adapter": adapter_id,\n', ""),),
+        guard="if adapter_id != record.adapter_id:",
+        neutralise_guard=neutralise_guard,
+        probe=REFRAMED_ADAPTER_PROBE,
+    )
+
+
+def _measure_under_a_drifted_authority(
+    tmp_path, *, edits, guard, neutralise_guard, probe
+):
+    """Run the same verification against 0.1.0 and against a drifted 0.2.0.
+
+    The 0.2.0 is the real Policy Authority source with the named edits applied, so what is
+    measured is a distribution the ``>=0.1.0`` pin admits rather than a stub standing in for
+    one. Each edit is asserted to match exactly once, so an upstream rename fails the test
+    instead of quietly producing an undrifted copy.
+    """
+
+    import os  # noqa: PLC0415
+    import shutil  # noqa: PLC0415
+    import subprocess  # noqa: PLC0415
+    import sys  # noqa: PLC0415
+    from pathlib import Path  # noqa: PLC0415
+
+    declared = os.environ.get("UGENCE_REPO_ROOT")
+    repo = Path(declared).resolve() if declared else Path(__file__).resolve().parents[4]
+    here = Path(__file__).resolve().parent
+
+    authority = tmp_path / "policy-authority-0.2.0" / "ugence_policy_authority"
+    shutil.copytree(
+        repo / "packages/policy-authority/src/ugence_policy_authority",
+        authority,
+        ignore=shutil.ignore_patterns("__pycache__"),
+    )
+    init = authority / "__init__.py"
+    init.write_text(
+        init.read_text(encoding="utf-8").replace(
+            '__version__ = "0.1.0"', '__version__ = "0.2.0"'
+        ),
+        encoding="utf-8",
+    )
+    for relative, old, new in edits:
+        path = authority / relative
+        body = path.read_text(encoding="utf-8")
+        assert body.count(old) == 1, (
+            f"{relative}: expected exactly one {old!r}; the drift this resolution "
+            "introduces may not have been introduced at all"
+        )
+        path.write_text(body.replace(old, new), encoding="utf-8")
+
+    package = tmp_path / "phase5b" / "ugence_cloud_scaling_policy_authenticity"
+    shutil.copytree(
+        here.parent / "src" / "ugence_cloud_scaling_policy_authenticity",
+        package,
+        ignore=shutil.ignore_patterns("__pycache__"),
+    )
+    if neutralise_guard:
+        path = package / "verification.py"
+        lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+        marked = [i for i, line in enumerate(lines) if line.strip() == guard]
+        assert len(marked) == 1, f"{guard!r} is not uniquely located: {marked}"
+        indent = " " * (len(lines[marked[0]]) - len(lines[marked[0]].lstrip()))
+        lines[marked[0]] = f"{indent}if False:  # neutralised, as the sweep would\n"
+        path.write_text("".join(lines), encoding="utf-8")
+
+    script = tmp_path / "drifted_authority_probe.py"
+    script.write_text(f"PKG_TESTS = {str(here)!r}\n" + probe, encoding="utf-8")
+
+    def _run(roots):
+        result = subprocess.run(
+            [sys.executable, str(script)],
+            capture_output=True,
+            text=True,
+            timeout=300,
+            env={
+                **os.environ,
+                "PYTHONPATH": os.pathsep.join([*roots, *(p for p in sys.path if p)]),
+                "UGENCE_REPO_ROOT": str(repo),
+            },
+        )
+        output = result.stdout.strip().splitlines()
+        assert output, f"the probe printed nothing: {result.stderr[-600:]}"
+        return output[-1]
+
+    return {
+        "undrifted": _run([str(package.parent)]),
+        "drifted": _run([str(package.parent), str(authority.parent)]),
+    }
+
+
+@pytest.mark.adversarial
 def test_a_historical_resolution_is_refused():
     """Guard 77 — ``verification.py:487``, ``resolution.historical``."""
 

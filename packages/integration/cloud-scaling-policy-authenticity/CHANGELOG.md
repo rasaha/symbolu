@@ -1,5 +1,50 @@
 # Changelog — ugence-cloud-scaling-policy-authenticity
 
+## [Unreleased] — `diagnostic-only` fails across a distribution boundary too
+
+*No version bump and no production behaviour change.*
+
+### Guards 77 and 99 are scored
+
+Both were excluded as `diagnostic-only`: a successor refuses with the same outcome, so
+removing them costs a message and no authority. Both successors decide on operands the
+Policy Authority owns, under an open-ended `>=0.1.0` — which makes each exclusion a claim
+about the installed release, exactly what §9.2 already refused to accept for
+`equivalent-mutant` and `unreachable-behind-earlier-guard`. Measured against 0.2.0s built
+from real upstream source:
+
+| | guard 77 — `verification.py:487` | guard 99 — `verification.py:706` |
+|---|---|---|
+| the drift | `implies_current_validity` → `return self.resolved` (`core/records.py:334`) | the frame drops `"adapter"` (`core/canonical.py:212`) |
+| undrifted 0.1.0 | refused `HISTORICAL_RESOLUTION_REFUSED` | refused `POLICY_PROJECTION_DIGEST_MISMATCH` |
+| drifted, guard present | refused `HISTORICAL_RESOLUTION_REFUSED` | refused `POLICY_PROJECTION_DIGEST_MISMATCH` |
+| drifted, guard neutralised | refused `INVARIANT_VIOLATION` | **`VERIFIED`** |
+
+Guard 99 is the serious one: under a resolution the pin admits, removing it lets a
+descriptor naming one adapter be verified against a record naming another — a mint, not a
+lost diagnosis. Guard 77 loses the clean refusal and reaches the artifact-pairing invariant
+at `verification.py:266` instead, reporting an internal integrity failure for an ordinary,
+expected, refusable answer.
+
+Four tests replace the two exclusions' measuring tests, in the guard-78 pattern: each guard
+gets one test that it fires under the drifted resolution and one that removing it changes
+the answer, so a failure says which half broke.
+
+### The rule, rather than a third case
+
+The alternative was to ratify a narrower `diagnostic-only` bar that accepts
+installed-release evidence. Rejected: it would have carved out most of the surviving
+exclusions immediately after retiring the same asymmetry for
+`unreachable-behind-earlier-guard`, and guard 99 shows what it would license. ADR Phase 5
+§9.2 now states one rule for every member of the vocabulary — no exclusion reason may be
+claimed across a distribution boundary on evidence about one installation — and its false
+closing sentence ("every operand that decides them is defined in the distribution that
+declares the guard") is corrected: the eleven remaining exclusions rest either on
+same-distribution operands or on Python-language facts.
+
+**The split is 111 `SCORED` / 8 `EXCLUDED`,** over an unchanged inventory of 119.
+
+
 ## [Unreleased] — two decision points were in no inventory, and one more exclusion was false
 
 *No version bump and no production behaviour change.*
@@ -152,16 +197,27 @@ narrow the *message* while sharing one `PolicyAuthenticityOutcome` with the guar
 next line. ADR Phase 5 §9.1 ratifies the outcome as the contract and the message as prose,
 so those guards change no authorization answer and are `diagnostic-only`.
 
-Every one of them was attacked for isolation first, and each attempt is recorded as
-impossible *by construction* rather than merely unsuccessful:
+Every one of them was attacked for isolation first, and each attempt was recorded as
+impossible *by construction* rather than merely unsuccessful. Two of the four claims below
+were not:
 
-- a historical resolution cannot also imply current validity — the attribute is a read-only
-  property equal to `resolved and not historical`;
+- ~~a historical resolution cannot also imply current validity — the attribute is a
+  read-only property equal to `resolved and not historical`~~. **Withdrawn.** That property
+  is the Policy Authority's, under `>=0.1.0`; a 0.2.0 dropping the historicity term makes
+  the successor silent. Guard 77 is `SCORED` — see *Guards 77 and 99 are scored* above;
 - `None` cannot pass an exact-`str` check or a `Mapping` check, so a missing descriptor
   field always trips its successor;
-- an adapter id that disagrees with the record cannot reframe to the signed body digest,
-  because the adapter id is an input to the frame;
+- ~~an adapter id that disagrees with the record cannot reframe to the signed body digest,
+  because the adapter id is an input to the frame~~. **Withdrawn.** The frame is the Policy
+  Authority's; a 0.2.0 that stops binding the adapter makes the reproduction independent of
+  it and removing the guard **mints**. Guard 99 is `SCORED`;
 - a `None` registry, verifier or port never satisfies the `hasattr` behind it.
+
+The two surviving claims are facts about the Python language — `None` satisfies no
+`isinstance`, `hasattr` or exact string comparison, whichever release supplies the type.
+The two withdrawn ones were facts about the installed Policy Authority, offered as facts
+about the program. ADR Phase 5 §9.2 now states the distinction as one rule for every
+exclusion reason.
 
 Four more are `unscorable-by-single-checkout-fixture` (§9.2) and three are genuine
 equivalent mutants over this module's own frozen constants.

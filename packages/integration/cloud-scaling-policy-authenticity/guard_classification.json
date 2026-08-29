@@ -1,8 +1,8 @@
 {
   "package": "policy-authenticity",
   "total": 119,
-  "scored": 109,
-  "excluded": 10,
+  "scored": 111,
+  "excluded": 8,
   "classification": {
     "1": {
       "status": "SCORED",
@@ -482,10 +482,7 @@
       "condition": "resolution.status is not PolicyResolutionStatus.RESOLVED"
     },
     "77": {
-      "status": "EXCLUDED",
-      "reason": "diagnostic-only",
-      "detail": "Removing it leaves `implies_current_validity` \u2014 a read-only property equal to `resolved and not historical` \u2014 False on the next line, refusing with the same HISTORICAL_RESOLUTION_REFUSED outcome. Isolation would need a resolution that is historical *and* implies current validity, which the property makes impossible. Kept for the better message: 'this describes an instant before a verified revocation'.",
-      "evidence": "tests/test_guard_coverage.py::test_a_historical_resolution_is_refused",
+      "status": "SCORED",
       "module": "verification.py",
       "line": 487,
       "condition": "resolution.historical"
@@ -620,10 +617,7 @@
       "condition": "not isinstance(projection, Mapping)"
     },
     "99": {
-      "status": "EXCLUDED",
-      "reason": "diagnostic-only",
-      "detail": "`adapter_id` is an input to the frame the body digest is reproduced from, so any value that trips this guard also fails the reproduction below it with the same POLICY_PROJECTION_DIGEST_MISMATCH outcome \u2014 there is no adapter id that disagrees with the record and still reframes to the signed digest. Kept because 'the projection names adapter X and the record names Y' is a diagnosis a port author can act on; 'the digest did not reproduce' is not.",
-      "evidence": "tests/test_guard_coverage.py::test_a_descriptor_naming_another_adapter_than_the_records_is_refused",
+      "status": "SCORED",
       "module": "verification.py",
       "line": 706,
       "condition": "adapter_id != record.adapter_id"
