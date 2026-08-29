@@ -67,7 +67,7 @@ def compare(nmse_a, nmse_b, h):
     return win, float((med_b - med_a) / med_b), int(m.sum())
 
 
-def main(npz_path, model_dir):
+def main(npz_path, model_dir, suffix=""):
     data = Assembled(npz_path)
     targets = data.targets[:, HELD_T]                     # [F, 94, 3]
     include = np.stack([data.targets[:, HELD_T, h].var(axis=1) >= VAR_FLOOR
@@ -148,7 +148,7 @@ def main(npz_path, model_dir):
     out = {"median_nmse": table, "gates": gates, "coverage": coverage,
            "n_queries_per_function": int(len(HELD_T))}
     RESULTS.mkdir(exist_ok=True)
-    (RESULTS / "heldout.json").write_text(json.dumps(out, indent=1))
+    (RESULTS / f"heldout{suffix}.json").write_text(json.dumps(out, indent=1))
     print(json.dumps(table, indent=1))
     print("V:", gates["V"]["pass"], "H:", gates["H"]["pass"], "S:", gates["S"]["pass"])
     print("V rows:", v_rows)
@@ -158,4 +158,4 @@ def main(npz_path, model_dir):
 
 if __name__ == "__main__":
     torch.set_num_threads(4)
-    main(sys.argv[1], sys.argv[2])
+    main(sys.argv[1], sys.argv[2], *(sys.argv[3:4]))

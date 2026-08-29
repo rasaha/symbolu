@@ -78,7 +78,7 @@ def train_one(data, arm, seed, model_dir):
             "params": model.n_params(), "curve": curve}
 
 
-def main(npz_path, model_dir):
+def main(npz_path, model_dir, suffix=""):
     Path(model_dir).mkdir(parents=True, exist_ok=True)
     RESULTS.mkdir(exist_ok=True)
     torch.set_num_threads(4)
@@ -86,9 +86,10 @@ def main(npz_path, model_dir):
     print("assembled tracks", flush=True)
     recs = [train_one(data, arm, seed, model_dir)
             for arm in READER_ARMS for seed in SEEDS]
-    (RESULTS / "dev_metrics.json").write_text(json.dumps(recs, indent=1))
-    print("wrote results/dev_metrics.json", flush=True)
+    out = RESULTS / f"dev_metrics{suffix}.json"
+    out.write_text(json.dumps(recs, indent=1))
+    print(f"wrote {out}", flush=True)
 
 
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2])
+    main(sys.argv[1], sys.argv[2], *(sys.argv[3:4]))

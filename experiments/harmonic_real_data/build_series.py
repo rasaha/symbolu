@@ -17,9 +17,9 @@ import pandas as pd
 MIN_PER_DAY = 1440
 
 
-def main(data_dir: str, out_npz: str):
+def main(data_dir: str, out_npz: str, frozen_name="frozen_functions.json"):
     t0 = time.time()
-    frozen = json.loads((Path(__file__).parent / "frozen_functions.json").read_text())
+    frozen = json.loads((Path(__file__).parent / frozen_name).read_text())
     keys = [(f["HashOwner"], f["HashApp"], f["HashFunction"])
             for f in frozen["functions"]]
     pos = {k: i for i, k in enumerate(keys)}
@@ -42,4 +42,4 @@ def main(data_dir: str, out_npz: str):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2])
+    main(sys.argv[1], sys.argv[2], *(sys.argv[3:4]))

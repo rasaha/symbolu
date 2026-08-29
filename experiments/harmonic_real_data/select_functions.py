@@ -4,7 +4,10 @@ Reads ONLY d01-d08 invocation files, applies the frozen eligibility rule,
 freezes the 200-function cohort, and writes frozen_functions.json. Run and
 committed before the development or held-out periods are used for anything.
 
-Usage: python -m experiments.harmonic_real_data.select_functions <data_dir>
+Usage: python -m experiments.harmonic_real_data.select_functions <data_dir> \
+           [out_name] [exclude_json]
+Cohort 2 (PREREGISTRATION_COHORT2.md): pass frozen_functions_cohort2.json and
+frozen_functions.json to exclude Cohort 1; the rule itself is unchanged.
 """
 from __future__ import annotations
 
@@ -26,7 +29,7 @@ MIN_CV = 0.10
 N_COHORT, N_QUINTILES, PER_QUINTILE = 200, 5, 40
 
 
-def main(data_dir: str):
+def main(data_dir: str, out_name="frozen_functions.json", exclude_json=None):
     t0 = time.time()
     idx: dict[tuple, int] = {}
     bins_list: list[np.ndarray] = []
@@ -59,6 +62,13 @@ def main(data_dir: str):
             & (std / np.maximum(mean, 1e-9) >= MIN_CV))
     elig_i = np.flatnonzero(elig)
     print(f"eligible: {len(elig_i)} of {len(keys)}", flush=True)
+    if exclude_json:
+        prior = json.loads((Path(__file__).parent / exclude_json).read_text())
+        excl = {(f["HashOwner"], f["HashApp"], f["HashFunction"])
+                for f in prior["functions"]}
+        elig_i = np.array([i for i in elig_i if keys[i] not in excl])
+        print(f"after excluding {len(excl)} prior-cohort functions: {len(elig_i)}",
+              flush=True)
 
     total = bins[elig_i].sum(axis=1)
     order = np.argsort(total, kind="stable")
@@ -74,10 +84,10 @@ def main(data_dir: str):
                        "HashFunction": keys[i][2],
                        "train_total": int(bins[i].sum())} for i in cohort],
     }
-    p = Path(__file__).parent / "frozen_functions.json"
+    p = Path(__file__).parent / out_name
     p.write_text(json.dumps(out, indent=1))
     print(f"wrote {p} ({time.time() - t0:.0f}s)", flush=True)
 
 
 if __name__ == "__main__":
-    main(sys.argv[1])
+    main(sys.argv[1], *(sys.argv[2:4]))
