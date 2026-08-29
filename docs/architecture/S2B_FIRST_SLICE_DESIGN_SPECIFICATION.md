@@ -705,7 +705,11 @@ Q10 R1 semantics. Record's declared_strategy derived from the proposal-bound
     A = ratify as stated, including the advisory_digest derivation and the
         digest-equality check [recommended]
     B = R1's declaration equality only; no advisory_digest derivation, no
-        digest-equality check in the replay function
+        digest-equality check in the replay function. B is incompatible with
+        Q5 = A, which derives advisory_digest from the advisory parameter and
+        removes the caller-supplied digest: choosing B here requires Q5 = C or
+        a restated record-builder signature, and strikes the digest half of
+        Q11's fifth check.
 
 Q11 Replay function. One NEW exported function, returns bool, never raises,
     taking exactly D8=B's four inputs, checking in order: policy identity+version
@@ -724,7 +728,8 @@ Q13 Implementation gate. §8 requires vocabulary, normalization, contract shape,
     builder signatures, public surface and package version all ratified first.
     A = ratifying Q1-Q12 satisfies the gate EXCEPT the vocabulary members, which
         must still arrive with the field per OD-5(iii); code may not begin until
-        they do [recommended]
+        they do. A presumes ratifying answers above; any deferral (e.g. Q1 = C
+        or Q5 = B) leaves the corresponding gate item unsatisfied [recommended]
     B = the gate is fully satisfied by Q1-Q12
 ```
 
