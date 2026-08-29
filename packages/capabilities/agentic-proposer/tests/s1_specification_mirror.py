@@ -208,9 +208,17 @@ FIELD_CLASSIFICATION = {
         "strategy_policy_id": C5B, "strategy_policy_version": C5B,
         # `S2B-R2-Q5=A` types this as the ``ReasoningStrategy`` enum, so it is
         # validated by **membership, not by a string pattern** — which is what CLOSED
-        # records. `S2B-S1-Q3=A` had classified the record's counterpart C5b under the
-        # pre-enum design; the later ruling supersedes the representation, and a C5b
-        # entry here would demand the TOKEN_PATTERN an enum field cannot carry.
+        # records.
+        #
+        # `[V]` **CLOSED is the registry's representation slot, and it does NOT
+        # supersede `S2B-S1-Q3=A`'s C5b classification.** C5b is *defined* as "a
+        # vocabulary term matched by equality against an allowlist", so the enum is
+        # C5b's **natural closed realization rather than a narrower class**; the
+        # question `S2B-R2-Q5=A` settled was representation, not classification, which
+        # is why `S2B-S1-Q3=A` never reached it. Both rulings stand. This registry
+        # nonetheless records CLOSED because its own scheme is mechanical: a C5b entry
+        # demands the TOKEN_PATTERN string constraint, which an enum field cannot carry
+        # and must not acquire.
         "declared_strategy": CLOSED,
         "recommended_disposition": CLOSED, "requested_review_action": CLOSED,
         "requested_review_destination_role_ref": C5A,
@@ -221,8 +229,9 @@ FIELD_CLASSIFICATION = {
         "schema_version": CLOSED, "tenant_id": C5A, "created_at": NON_STRING,
         "process_record_id": C5A, "case_ref": C5A,
         # Retyped from C5c to the ``ReasoningStrategy`` enum (`S2B-S1-Q3=A` narrowed
-        # it, `S2B-R2-Q5=A` settled the representation), so both sides of rider `R1`'s
-        # equality now carry the same class — CLOSED, on the reasoning recorded beside
+        # the classification to C5b, `S2B-R2-Q5=A` settled the representation as the
+        # enum), so both sides of rider `R1`'s equality now carry the same class —
+        # registered CLOSED, on the reasoning recorded beside
         # ``ProposerAdvisory.declared_strategy`` above.
         "declared_strategy": CLOSED,
         "state_transitions": STRUCTURED, "tool_invocations": C5B,

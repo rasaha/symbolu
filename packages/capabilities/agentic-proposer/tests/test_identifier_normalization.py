@@ -683,15 +683,24 @@ def test_the_declared_strategy_fields_are_closed_not_free_text():
     never by a string pattern — and both sides of rider `R1`'s equality therefore carry
     the same class, which is what `S2B-S1-Q3=A` set out to achieve.
 
-    `[V]` **CLOSED rather than C5b, and that is forced rather than chosen.**
-    `S2B-S1-Q3=A` classified the record's field C5b under the design that preceded
-    `S2B-R2-Q5=A`; the later ruling settled the representation as the enum. In this
-    registry's own scheme a C5b entry demands the ``TOKEN_PATTERN`` string constraint,
-    which an enum-typed field cannot carry and must not acquire — so CLOSED is the only
-    classification consistent with the ratified typing. `[V]` The rulings themselves
-    record that the two are not equivalent: a stored space-free value passes a C5b
-    ``Token`` and fails the enum, and A was taken in exchange for catching a non-member
-    at construction rather than at replay.
+    `[V]` **CLOSED is the registry's representation slot; it does not supersede
+    `S2B-S1-Q3=A`'s C5b classification, and must not be read as doing so.** C5b is
+    *defined* as "a vocabulary term matched by equality against an allowlist", so the
+    enum is **C5b's natural closed realization rather than a narrower class** — the
+    question `S2B-R2-Q5=A` settled was representation, not classification, which is
+    precisely why `S2B-S1-Q3=A` never reached it. Both rulings stand unamended.
+
+    `[V]` This registry records CLOSED anyway because its own scheme is **mechanical**:
+    a C5b entry demands the ``TOKEN_PATTERN`` string constraint (``PATTERN_FOR``,
+    enforced by ``test_a_classified_field_carries_its_category_pattern``), which an
+    enum-typed field cannot carry and must not acquire. CLOSED is therefore the only
+    registration consistent with the ratified typing, and it matches every other
+    enum-typed field in the registry.
+
+    `[V]` The two representations are not equivalent, and the ruling weighed that: a
+    stored space-free value passes a C5b ``Token`` and fails the enum, so A invalidates
+    strictly more stored records — accepted in exchange for catching a non-member at
+    construction rather than at replay.
     """
     for contract in ("ProposerAdvisory", "ProposerProcessRecord"):
         assert _classify(contract, "declared_strategy") == CLOSED, contract
