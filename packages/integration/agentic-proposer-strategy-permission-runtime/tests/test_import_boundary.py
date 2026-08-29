@@ -247,3 +247,80 @@ def test_the_distribution_name_is_not_a_shared_contract_name():
     pyproject = (DIST_ROOT / "pyproject.toml").read_text(encoding="utf-8")
     assert 'name = "ugence-agentic-proposer-strategy-permission-runtime"' in pyproject
     assert "contract" not in "ugence-agentic-proposer-strategy-permission-runtime"
+
+
+# --------------------------------------------------------------------------- #
+# The role-lookup exemption is confined to the test tree — owner ruling ROLE_LOOKUP=A
+# --------------------------------------------------------------------------- #
+
+
+def test_the_shipped_source_never_receives_names_or_touches_a_role():
+    """The exemption is the test tree's alone, and cannot widen into ``src/``.
+
+    The ratified end-to-end proof must construct a role, because the proposer's
+    own builder and its replay both take one. The proposer's repository-wide scan
+    reads raw file text and refuses the role-projection substrings everywhere
+    outside that capability, and editing the proposer is barred — so the fixture
+    module looks the class up by an assembled name.
+
+    That is an accommodation, not a licence. `[V]` The design's own reasoning for
+    why it costs nothing is that *this distribution never receives a role*: the
+    resolver is handed a ``StrategyPolicyRequest``, never an identity. This test
+    is what makes that claim measured rather than asserted, so a later change
+    cannot quietly carry the exemption from ``tests/`` into shipped source.
+
+    Scanned over defined names, parameters, referenced names, attribute accesses
+    and message literals — not comments or docstrings, which name the boundary in
+    order to state it.
+    """
+
+    offenders = []
+    for module in MODULES:
+        tree = ast.parse(module.read_text(encoding="utf-8"))
+        docstrings = set()
+        for node in ast.walk(tree):
+            body = getattr(node, "body", None)
+            if isinstance(body, list) and body:
+                first = body[0]
+                if (
+                    isinstance(first, ast.Expr)
+                    and isinstance(first.value, ast.Constant)
+                    and isinstance(first.value.value, str)
+                ):
+                    docstrings.add(id(first.value))
+        for node in ast.walk(tree):
+            found = None
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                found = node.name
+            elif isinstance(node, ast.arg):
+                found = node.arg
+            elif isinstance(node, ast.Name):
+                found = node.id
+            elif isinstance(node, ast.Attribute):
+                found = node.attr
+            elif (
+                isinstance(node, ast.Constant)
+                and isinstance(node.value, str)
+                and id(node) not in docstrings
+            ):
+                found = node.value
+            if found and "role" in found.lower():
+                offenders.append(f"{module.name}: {found!r}")
+    assert not offenders, (
+        "the shipped source names a role; the exemption is the test tree's alone: "
+        f"{offenders}"
+    )
+
+
+def test_the_exemption_is_actually_exercised_where_it_is_claimed():
+    """A confinement rule proves nothing if nothing is confined.
+
+    If the fixture module ever stops constructing a role, this test fails and the
+    exemption above should be withdrawn rather than left standing unused.
+    """
+
+    fixtures = (DIST_ROOT / "tests" / "_permission_runtime_fixtures.py").read_text(
+        encoding="utf-8"
+    )
+    assert '_ROLE_CONTRACT = getattr(ap, "Cognitive" + "Role' in fixtures
+    assert "role=role" in fixtures

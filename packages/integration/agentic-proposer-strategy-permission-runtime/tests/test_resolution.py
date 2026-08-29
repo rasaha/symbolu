@@ -43,7 +43,6 @@ from ugence_agentic_proposer_strategy_permission_policy import (
     strategy_permission_coordinate,
 )
 from ugence_agentic_proposer_strategy_permission_runtime import (
-    HISTORICAL_RESOLUTION,
     PolicyAuthorityStrategyPolicyResolver,
     StrategyPolicyArtifactError,
     StrategyPolicyReferenceBindingError,
@@ -53,6 +52,12 @@ from ugence_agentic_proposer_strategy_permission_runtime import (
     StrategyPermissionResolverError,
     UnknownStrategyPolicyReferenceError,
     build_strategy_policy_resolver,
+)
+
+# Internal by owner ruling SURFACE=B, so reached through the module that owns it
+# rather than through the package's curated surface.
+from ugence_agentic_proposer_strategy_permission_runtime.resolver import (
+    HISTORICAL_RESOLUTION,
 )
 from ugence_policy_authority.api import (
     GLOBAL_TENANT,
@@ -582,7 +587,7 @@ def test_the_composition_helper_registers_the_family_adapter():
     from ugence_agentic_proposer_strategy_permission_policy import (
         STRATEGY_PERMISSION_ADAPTER_ID,
     )
-    from ugence_agentic_proposer_strategy_permission_runtime import (
+    from ugence_agentic_proposer_strategy_permission_runtime.composition import (
         with_strategy_permission_adapter,
     )
     from ugence_policy_authority.api import default_uvi_adapters

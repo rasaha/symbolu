@@ -292,7 +292,13 @@ def test_no_source_name_claims_compute_or_provisioning(module):
 
 
 def test_the_exported_surface_is_exactly_the_ratified_shape():
-    """One resolver, one error family, and composition. Nothing else."""
+    """The resolver, its error family, and **one** composition helper. Nothing else.
+
+    §8's delta table is what `S2B-PF-BASE` ratified, and its runtime row names
+    exactly those three things — a composition helper in the singular, where the
+    same table uses plurals for the family package's categories, and no constant
+    anywhere in any row.
+    """
 
     exported = set(runtime.__all__)
     assert "PolicyAuthorityStrategyPolicyResolver" in exported
@@ -306,11 +312,40 @@ def test_the_exported_surface_is_exactly_the_ratified_shape():
     assert exported == {
         "__version__",
         "PolicyAuthorityStrategyPolicyResolver",
-        "HISTORICAL_RESOLUTION",
         "build_strategy_policy_resolver",
-        "with_strategy_permission_adapter",
         *errors,
     }
+    helpers = exported - errors - {"__version__", "PolicyAuthorityStrategyPolicyResolver"}
+    assert helpers == {"build_strategy_policy_resolver"}, helpers
+
+
+@pytest.mark.parametrize(
+    "name", ["with_strategy_permission_adapter", "HISTORICAL_RESOLUTION"]
+)
+def test_the_two_demoted_names_are_internal_and_not_re_exported(name):
+    """Owner ruling `SURFACE=B`: internal, and reachable only through their modules.
+
+    Left as package attributes they would sit outside ``__all__`` while still
+    looking like surface — the "enough to look supported, not enough to be"
+    shape this work refuses elsewhere. So they are not re-exported at all.
+    """
+
+    assert name not in runtime.__all__
+    assert not hasattr(runtime, name), f"{name} is still re-exported from the package"
+
+
+def test_the_demoted_names_still_exist_where_they_belong():
+    """Demoted, not deleted: the behaviour they name is unchanged."""
+
+    from ugence_agentic_proposer_strategy_permission_runtime.composition import (
+        with_strategy_permission_adapter,
+    )
+    from ugence_agentic_proposer_strategy_permission_runtime.resolver import (
+        HISTORICAL_RESOLUTION,
+    )
+
+    assert callable(with_strategy_permission_adapter)
+    assert HISTORICAL_RESOLUTION is not None
 
 
 def test_no_exported_name_asserts_its_own_trustworthiness():

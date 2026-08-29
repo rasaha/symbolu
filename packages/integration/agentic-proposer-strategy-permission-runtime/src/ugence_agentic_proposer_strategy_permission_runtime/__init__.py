@@ -39,10 +39,7 @@ reference echo is a correlation check rather than a defence.
 
 from __future__ import annotations
 
-from .composition import (
-    build_strategy_policy_resolver,
-    with_strategy_permission_adapter,
-)
+from .composition import build_strategy_policy_resolver
 from .errors import (
     StrategyPermissionResolverError,
     StrategyPolicyArtifactError,
@@ -52,17 +49,24 @@ from .errors import (
     StrategyPolicyVocabularyError,
     UnknownStrategyPolicyReferenceError,
 )
-from .resolver import HISTORICAL_RESOLUTION, PolicyAuthorityStrategyPolicyResolver
+from .resolver import PolicyAuthorityStrategyPolicyResolver
 from .version import __version__
 
+#: The curated public surface, exactly as ratified: the resolver, its error
+#: family, and one composition helper.
+#:
+#: `with_strategy_permission_adapter` and `HISTORICAL_RESOLUTION` were exported here
+#: in an earlier draft and are **internal** by owner ruling `SURFACE=B`. Neither is
+#: re-exported from this module; each lives in the module that owns it, and
+#: `build_strategy_policy_resolver` is the supported way to reach the first. The
+#: ratified surface is §8's delta table, which names one composition helper and no
+#: constant.
 __all__ = [
     "__version__",
     # The resolver
     "PolicyAuthorityStrategyPolicyResolver",
-    "HISTORICAL_RESOLUTION",
     # Composition
     "build_strategy_policy_resolver",
-    "with_strategy_permission_adapter",
     # Errors
     "StrategyPermissionResolverError",
     "UnknownStrategyPolicyReferenceError",

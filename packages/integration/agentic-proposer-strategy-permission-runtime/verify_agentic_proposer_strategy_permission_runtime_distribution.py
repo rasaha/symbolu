@@ -128,7 +128,13 @@ signer = Ed25519PolicySigner(
 key_ring = PolicyKeyRing(
     [signer.verification_key(entitlements=(KeyEntitlement.ISSUE_POLICY,))])
 registry = InMemoryPolicyRegistry()
-adapters = runtime.with_strategy_permission_adapter(None)
+# Internal by owner ruling SURFACE=B: reached through its owning module, never
+# through the package's curated surface.
+from ugence_agentic_proposer_strategy_permission_runtime.composition import (
+    with_strategy_permission_adapter,
+)
+
+adapters = with_strategy_permission_adapter(None)
 assert family.STRATEGY_PERMISSION_ADAPTER_ID in {a.adapter_id for a in adapters.adapters}
 
 issue_policy(

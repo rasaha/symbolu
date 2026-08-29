@@ -51,9 +51,11 @@ which remain with Risk Authority, ActionGate and Decision Authority.
   authority's reasons are reserved authority terms under the uppercased-substring
   rule, so interpolating one into a message would emit reserved vocabulary
   without anyone choosing to.
-- **Two composition helpers** — one that registers the family adapter
-  idempotently, and one that builds a resolver whose registry certainly carries
-  it. Neither supplies a default for any injected trust dependency.
+- **One composition helper**, `build_strategy_policy_resolver`, which builds a
+  resolver whose adapter registry certainly carries the family adapter. It
+  supplies no default for any injected trust dependency. The idempotent
+  adapter-registration function it uses is **internal**, per the owner ruling
+  recorded in the README.
 - **Distribution verification** for this package and for the family package:
   clean-venv build, install and exercise, on the existing `verify_*` pattern.
 - **CI wiring** covering both distributions' suites, both distribution

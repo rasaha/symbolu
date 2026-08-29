@@ -127,6 +127,46 @@ root's to choose. The helper supplies none of them and no default for any of
 them: an unconfigured deployment must fail to construct, never quietly resolve
 against nobody's approval.
 
+## Owner rulings recorded against this package
+
+Two questions were put to the owner during review of the change set that
+introduced this distribution, and answered `SURFACE=B ROLE_LOOKUP=A`.
+
+**`SURFACE=B` — the curated surface is exactly the ratified three.** An earlier
+draft also exported `with_strategy_permission_adapter` and
+`HISTORICAL_RESOLUTION`. The ratified surface is §8's delta table, whose runtime
+row names the resolver, its error family and **a** composition helper — singular,
+where the same table uses plurals for the family package's categories — and no
+constant in any row. Both names are now internal: not in `__all__`, and not
+re-exported from the package at all, since a name sitting outside `__all__` while
+still resolving on the package would look like surface without being it. Each
+lives in the module that owns it, and `build_strategy_policy_resolver` is the
+supported way to reach the first. No behaviour changed.
+
+**`ROLE_LOOKUP=A` — the role lookup is an acknowledged, test-tree-only
+exemption.** The ratified end-to-end proof must construct a role contract,
+because the proposer's own builder and its replay both take one; the proposer's
+repository-wide scan reads raw file text and refuses the role-projection
+substrings everywhere outside that capability; and editing the proposer is barred.
+The fixture module therefore looks the class up by an assembled name.
+
+That is an accommodation of the guard, not a defeat of it: nothing about the role
+projection escapes here — no field is re-declared and no semantics duplicated —
+one class is looked up and handed straight back to the proposer's own builder.
+
+Two things keep the exemption honest, and both are enforced:
+
+- `tests/test_import_boundary.py` asserts the **shipped `src/` tree never
+  receives, names or touches a role at all**, so the exemption cannot widen from
+  the test tree into source;
+- a companion test asserts the exemption is actually being exercised, so it
+  cannot stand unused after the reason for it has gone.
+
+`[G]` Recorded for whoever reads this next: a raw-text scan is weaker than it
+looks — string assembly steps around it, and that is now demonstrated in-tree.
+Whether to strengthen the proposer's scan is a question for the proposer's own
+change set. It is **not** authorized here.
+
 ## Tests
 
 ```
