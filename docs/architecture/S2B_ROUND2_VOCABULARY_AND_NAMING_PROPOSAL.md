@@ -139,15 +139,40 @@ R1 equality "does not prove that the declared procedure was executed" — which,
 shape-defined members, **is** precisely the declaration-to-shape correspondence the withdrawn
 claim assumed.
 
-`[I]` So the actual ratified effect is narrower and must be stated as such: a policy governs
-**which token a role may declare**. A producer permitted only `SINGLE_CANDIDATE_UNREVISED`
-may declare that token and construct a five-candidate advisory, and **every** ratified check
-still passes — membership holds, and the record and advisory agree on the token. Nothing
-ratified detects the mismatch. `[V]` Under `ADR:189-191` replay, not construction, is the
-guarantee, so a rule the builder alone might apply is not a guarantee at all.
+`[I]` So the effect **on the five ratified checks alone** is narrower and must be stated as
+such: a policy governs **which token a role may declare**. A producer permitted only
+`SINGLE_CANDIDATE_UNREVISED` may declare that token and construct a five-candidate advisory,
+and **every** ratified check still passes — membership holds, and the record and advisory
+agree on the token. Nothing ratified detects the mismatch. `[V]` Under `ADR:189-191` replay,
+not construction, is the guarantee, so a rule the builder alone might apply is not a
+guarantee at all.
+
+`[I]` **The composition, which changes what a sixth check is worth.** The narrow statement
+above is conditional on the ratified five, and `R2-Q8=A` would add a sixth. Compose them:
+
+* `[V]` `Q11=A` check four establishes **declared token ∈ permitted set**
+  (`ADR_UGENCE_S2B_FIRST_SLICE_RATIFICATION.md:146-150`);
+* `[R]` `R2-Q8=A` check six would establish **declared token = shape-derived token**;
+* therefore, together, **shape-derived token ∈ permitted set**.
+
+`[I]` That conjunction is the point. Under `R2-Q7=A` **with** `R2-Q8=A`, what a policy
+governs is the **replay-verifiable shape of the advisory**, not merely what its producer may
+say. The declared token stays informationally redundant — a verifier could have computed it
+— but it is a **digest-bound commitment**, and its conjunction with the membership check
+yields enforceable shape governance that neither check delivers alone. `[I]` This is the
+argument the withdrawn claim was reaching for and stated without warrant: the governance is
+real, but it is a consequence of **two** checks, one of which is not yet ratified, and it is
+established at **replay**, never by construction.
+
+`[R]` **The limits are unchanged by the composition, and must not be read as widened.** It
+proves nothing about private reasoning; it does not prove a declared procedure was
+*executed*; and it establishes no observable-stage conformance beyond what the advisory's own
+shape shows (`ADR:303-311`; `S2B-D8=B`'s later stage remains deferred, `ADR:216-218`). What
+it establishes is that the artifact a role produced has a shape its policy permits.
 
 `[I]` **Second: the declaration adds no information a verifier could not recompute.** That
-remains true, and it is what makes the gap above repairable in principle — a verifier
+remains true under either answer to `R2-Q8`, and it is what makes the composition above
+possible at all — a verifier
 *could* derive the shape and compare. But deriving-and-comparing is a **new check**, and
 `Q11=A`'s list is ratified and closed. It cannot be added to the replay function by an
 implementer; it needs its own ratification, which is what `R2-Q8` puts to the owner.
@@ -406,8 +431,21 @@ R2-Q7  Character of this vocabulary — read with Q8, which is where the
        governs WHICH TOKEN A ROLE MAY DECLARE and nothing more — a role
        permitted only SINGLE_CANDIDATE_UNREVISED may declare it and construct
        a five-candidate advisory with every check passing. That is the honest
-       value of A: a governed, digest-bound, replayable declaration whose
-       correspondence to the artifact is unverified unless Q8 = A.
+       value of A ON THE RATIFIED FIVE ALONE: a governed, digest-bound,
+       replayable declaration whose correspondence to the artifact is
+       unverified unless Q8 = A.
+       WITH Q8 = A the picture changes. Check four (declared IN permitted set)
+       and check six (declared = shape-derived token) compose to put the
+       SHAPE-DERIVED token in the permitted set, so A+A governs the
+       replay-verifiable shape of the advisory, not only what a producer may
+       say. The token stays redundant; the conjunction is what is enforceable.
+       Still disclosed, on every branch: Q8 = B leaves the declaration
+       unverified; Q7 = B defers the vocabulary entirely; Q8 = A carries the
+       future cost that any fourth member becomes a change to a ratified
+       check; and the three members' disjoint-and-exhaustive tiling remains
+       necessary either way, since the shape-derived token must be unique.
+       None of this proves private reasoning, execution of a declared
+       procedure, or observable-stage conformance.
        A = accept the vocabulary on those terms [recommended]
        B = defer the whole vocabulary until a producer of observable reasoning
            stages exists; §8's sixth gate item stays open until then
@@ -438,9 +476,21 @@ R2-Q8  Shape-correspondence check. THIS ITEM AMENDS A RATIFIED RULING, and
        structural semantics — replay returns False, no disposition, no reserved
        authority term — are exactly D5=A's ratified result. Q11=A is therefore
        the whole of the amendment perimeter.
-       The cost of A, conceded: the token becomes fully determined by the
-       advisory — a pure commitment carrying no information a verifier could
-       not recompute. The value is that it is then a commitment that can FAIL.
+       WHAT A ACTUALLY BUYS, composed from the two checks:
+         Q11=A check four   : declared token IN permitted set
+         R2-Q8=A check six  : declared token = shape-derived token
+         therefore, jointly : shape-derived token IN permitted set
+       So Q7=A with Q8=A governs the REPLAY-VERIFIABLE SHAPE of the advisory,
+       not merely what its producer may declare. Neither check delivers that
+       alone; the conjunction does.
+       The cost of A, conceded and unchanged: the token is fully determined by
+       the advisory and carries no information a verifier could not recompute.
+       It is a digest-bound commitment, and the conjunction above is what makes
+       that redundancy worth ratifying rather than merely harmless.
+       The limits are NOT widened by the composition: it proves nothing about
+       private reasoning, does not prove a declared procedure was executed, and
+       establishes no observable-stage conformance beyond what the advisory's
+       own shape shows (ADR:303-311; D8=B's later stage stays deferred).
        A also makes any FUTURE member a breaking change to a ratified check,
        since the three members already tile every lawful advisory — see Q7 and
        Part E.
