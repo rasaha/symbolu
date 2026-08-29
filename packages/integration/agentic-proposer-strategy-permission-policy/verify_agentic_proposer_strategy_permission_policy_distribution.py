@@ -32,7 +32,9 @@ here; the clean-venv installation names the **exact built wheel path** and runs
 under ``--no-index`` with ``PIP_NO_INDEX=1`` and a sanitized environment; and
 every first-party distribution is constrained to, and then asserted at, the exact
 version built. A negative control removes one required first-party wheel and
-proves the installation **refuses** rather than substituting.
+proves the installation **refuses** rather than substituting — verifying
+offline resolution positively from pip's own verbose log, not by the absence of
+an index marker, since pip's not-found error is identical either way.
 
 The permissive approval verifier below exists only inside this script, for the
 same reason the authority's own permissive verifiers exist only under ``tests/``:
@@ -293,13 +295,6 @@ def _run(cmd, capture=False, **kw):
     return subprocess.run(cmd, check=True, **kw)
 
 
-def _latest(path: Path, pattern: str) -> Path:
-    files = sorted(path.glob(pattern))
-    if not files:
-        raise FileNotFoundError(f"no {pattern} in {path}")
-    return files[-1]
-
-
 def _foreign_members(wheel: Path) -> set:
     with zipfile.ZipFile(wheel) as z:
         tops = {n.split("/", 1)[0] for n in z.namelist() if "/" in n}
@@ -370,12 +365,20 @@ def _negative_control(findlinks: Path, target: Path, victim: Path) -> None:
         venv.create(env_dir, with_pip=True, clear=True, system_site_packages=False)
         py = env_dir / "bin" / "python"
 
+        # ``-vv`` rather than quiet, because the offline claim has to be verified
+        # POSITIVELY. pip's not-found error is word-for-word identical with and
+        # without an index configured, and pip's own "Ignoring indexes:" line
+        # contains the string "pypi.org" — so scanning the output for the absence
+        # of an index marker establishes nothing, and would even misfire on a
+        # correctly offline run. At -vv pip states what it actually did.
         result = _run(
-            [str(py), "-m", "pip", "install", "--no-index",
+            [str(py), "-m", "pip", "install", "-vv", "--no-index",
              "--find-links", str(crippled), str(target)],
             capture=True, env=_isolated_env(), cwd=str(td),
         )
         combined = (result.stdout + result.stderr).lower()
+
+        # What the return code establishes: the install refused.
         assert result.returncode != 0, (
             "the installation SUCCEEDED with "
             f"{victim.name} removed from the wheelhouse; resolution is not "
@@ -385,9 +388,25 @@ def _negative_control(findlinks: Path, target: Path, victim: Path) -> None:
             "no matching distribution" in combined
             or "could not find a version" in combined
         ), combined[-2000:]
-        for reached in ("pypi.org", "files.pythonhosted.org", "downloading http"):
-            assert reached not in combined, f"pip reached an index: {reached}"
-        print(f"      refused as intended, with no index contacted ({victim.name})")
+
+        # What the verbose log establishes: the attempt was offline. pip announces
+        # that it is ignoring the index and names the directory it searched; when
+        # an index IS consulted it logs the lookup and the connection, so the
+        # absence of THOSE markers is meaningful in a way "pypi.org" was not.
+        assert "ignoring indexes" in combined, combined[-3000:]
+        assert str(crippled).lower() in combined, combined[-3000:]
+        for consulted in (
+            "found index url",
+            "fetching project page",
+            "starting new https connection",
+            "getting page http",
+        ):
+            assert consulted not in combined, f"pip consulted an index: {consulted}"
+
+        print(
+            f"      refused as intended ({victim.name} removed); pip reported "
+            "ignoring the index and searched only the wheelhouse"
+        )
 
 
 def main() -> int:
@@ -450,7 +469,6 @@ def main() -> int:
             "--constraint", str(pins),
             str(target),
         ]
-        assert "--no-index" in install, install
         assert install[-1].endswith(".whl") and Path(install[-1]).is_file(), install[-1]
         _run(install, env=_isolated_env())
 

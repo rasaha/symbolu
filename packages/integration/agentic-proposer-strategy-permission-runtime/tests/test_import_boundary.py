@@ -254,25 +254,41 @@ def test_the_distribution_name_is_not_a_shared_contract_name():
 # --------------------------------------------------------------------------- #
 
 
-#: Every parameter the shipped source declares, across every function and method.
-#: A closed allowlist, because "handles a role" is not a question a name scan can
-#: answer on its own: a role could arrive through a parameter called anything.
-SRC_PARAMETERS = {
-    "self",
-    # the resolver's own construction and call surface
-    "reference_map",
-    "registry",
-    "signature_verifier",
-    "adapters",
-    "approval_verifier",
-    "request",
-    "coordinate",
-    "policy",
-    # error and validation plumbing
-    "message",
-    "reason",
-    "name",
-    "value",
+#: Every ``(module, scope, parameter)`` the shipped source declares.
+#:
+#: Keyed by SCOPE, not by bare name. A flat set of names would let a *new*
+#: function reusing an existing parameter name — another ``policy``, another
+#: ``request`` — pass unnoticed, which is precisely the case this guard exists to
+#: catch. Lambda arguments are included too: they are parameters, and an earlier
+#: draft of this guard collected only ``def`` arguments and missed them entirely.
+SRC_PARAMETER_BINDINGS = {
+    ("composition.py", "build_strategy_policy_resolver", "adapters"),
+    ("composition.py", "build_strategy_policy_resolver", "approval_verifier"),
+    ("composition.py", "build_strategy_policy_resolver", "reference_map"),
+    ("composition.py", "build_strategy_policy_resolver", "registry"),
+    ("composition.py", "build_strategy_policy_resolver", "signature_verifier"),
+    ("composition.py", "with_strategy_permission_adapter", "adapters"),
+    ("errors.py", "StrategyPolicyUnresolvedError.__init__", "message"),
+    ("errors.py", "StrategyPolicyUnresolvedError.__init__", "reason"),
+    ("errors.py", "StrategyPolicyUnresolvedError.__init__", "self"),
+    ("resolver.py", "PolicyAuthorityStrategyPolicyResolver.__delattr__", "name"),
+    ("resolver.py", "PolicyAuthorityStrategyPolicyResolver.__delattr__", "self"),
+    ("resolver.py", "PolicyAuthorityStrategyPolicyResolver.__init__", "adapters"),
+    ("resolver.py", "PolicyAuthorityStrategyPolicyResolver.__init__", "approval_verifier"),
+    ("resolver.py", "PolicyAuthorityStrategyPolicyResolver.__init__", "reference_map"),
+    ("resolver.py", "PolicyAuthorityStrategyPolicyResolver.__init__", "registry"),
+    ("resolver.py", "PolicyAuthorityStrategyPolicyResolver.__init__", "self"),
+    ("resolver.py", "PolicyAuthorityStrategyPolicyResolver.__init__", "signature_verifier"),
+    ("resolver.py", "PolicyAuthorityStrategyPolicyResolver.__setattr__", "name"),
+    ("resolver.py", "PolicyAuthorityStrategyPolicyResolver.__setattr__", "self"),
+    ("resolver.py", "PolicyAuthorityStrategyPolicyResolver.__setattr__", "value"),
+    ("resolver.py", "PolicyAuthorityStrategyPolicyResolver._expected_tenant", "coordinate"),
+    ("resolver.py", "PolicyAuthorityStrategyPolicyResolver._expected_tenant", "request"),
+    ("resolver.py", "PolicyAuthorityStrategyPolicyResolver._permitted", "policy"),
+    ("resolver.py", "PolicyAuthorityStrategyPolicyResolver.reference_map", "self"),
+    ("resolver.py", "PolicyAuthorityStrategyPolicyResolver.resolve", "request"),
+    ("resolver.py", "PolicyAuthorityStrategyPolicyResolver.resolve", "self"),
+    ("resolver.py", "_copy_reference_map", "reference_map"),
 }
 
 #: Everything the shipped source may take from the Agentic Proposer. The role
@@ -284,19 +300,45 @@ PROPOSER_IMPORTS = {
 }
 
 
-def _src_parameters() -> set:
+def _iter_scoped_callables(node, prefix=""):
+    """Every function, method and lambda in ``node``, with its dotted scope name.
+
+    Recursive rather than ``ast.walk``, because the scope path is what makes the
+    allowlist bite: ``walk`` flattens the tree and loses the enclosing name.
+    """
+
+    for child in ast.iter_child_nodes(node):
+        if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            name = f"{prefix}{child.name}"
+            yield name, child
+            yield from _iter_scoped_callables(child, prefix=f"{name}.")
+        elif isinstance(child, ast.ClassDef):
+            yield from _iter_scoped_callables(child, prefix=f"{prefix}{child.name}.")
+        elif isinstance(child, ast.Lambda):
+            name = f"{prefix}<lambda>"
+            yield name, child
+            yield from _iter_scoped_callables(child, prefix=f"{name}.")
+        else:
+            yield from _iter_scoped_callables(child, prefix=prefix)
+
+
+def _parameter_names(node) -> list:
+    args = node.args
+    names = [a.arg for a in (*args.posonlyargs, *args.args, *args.kwonlyargs)]
+    if args.vararg:
+        names.append("*" + args.vararg.arg)
+    if args.kwarg:
+        names.append("**" + args.kwarg.arg)
+    return names
+
+
+def _src_parameter_bindings() -> set:
     found = set()
     for module in MODULES:
         tree = ast.parse(module.read_text(encoding="utf-8"))
-        for node in ast.walk(tree):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                args = node.args
-                for arg in (*args.posonlyargs, *args.args, *args.kwonlyargs):
-                    found.add(arg.arg)
-                if args.vararg:
-                    found.add("*" + args.vararg.arg)
-                if args.kwarg:
-                    found.add("**" + args.kwarg.arg)
+        for scope, node in _iter_scoped_callables(tree):
+            for name in _parameter_names(node):
+                found.add((module.name, scope, name))
     return found
 
 
@@ -331,17 +373,20 @@ def test_the_shipped_source_cannot_handle_a_role_because_no_parameter_could_carr
     """The **handle** half, and the one a name scan cannot answer.
 
     A role object could arrive through a parameter called anything at all, so the
-    parameter set is closed rather than filtered: every parameter the shipped
-    source declares is enumerated, and adding one fails this test until someone
-    states what it carries. The resolver's only entry point additionally refuses
-    anything that is not exactly a ``StrategyPolicyRequest``, so the sole
-    caller-facing value is a shape that carries no identity at all.
+    parameter set is closed rather than filtered. It is keyed by ``(module, scope,
+    parameter)``: a bare-name set would let a NEW function reusing an existing
+    name slip through, and lambda arguments are collected too. Adding any
+    parameter anywhere fails this test until someone states what it carries.
+
+    The resolver's only entry point additionally refuses anything that is not
+    exactly a ``StrategyPolicyRequest``, so the sole caller-facing value is a
+    shape that carries no identity at all.
     """
 
-    declared = _src_parameters()
-    assert declared == SRC_PARAMETERS, {
-        "unexpected": sorted(declared - SRC_PARAMETERS),
-        "vanished": sorted(SRC_PARAMETERS - declared),
+    declared = _src_parameter_bindings()
+    assert declared == SRC_PARAMETER_BINDINGS, {
+        "unexpected": sorted(declared - SRC_PARAMETER_BINDINGS),
+        "vanished": sorted(SRC_PARAMETER_BINDINGS - declared),
     }
 
 
