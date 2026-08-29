@@ -24,10 +24,10 @@ from .collectors import ARMS
 from .reader import build_matched
 from .signals import CUTOFFS, FAMILIES, FORECAST_FAMILIES, make_batch
 
-STEPS = 800
+STEPS = 4000  # Amendment 1 (Sweep 1 ran at 800; see PREREGISTRATION_AMENDMENT_1.md)
 BATCH_STREAMS = 24
 LR = 2e-3
-EVAL_EVERY = 100
+EVAL_EVERY = 250
 VAL_STREAMS = 300
 TEST_STREAMS = 750  # ~150 per family per split
 EVENT_LOSS_W = 0.5
