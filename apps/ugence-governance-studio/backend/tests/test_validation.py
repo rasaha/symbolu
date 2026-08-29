@@ -1,7 +1,7 @@
 """Request validation + error mapping tests (§18, §21, §28)."""
 from __future__ import annotations
 
-from tests.conftest import result_of
+from _support import result_of
 
 
 def test_malformed_json(client):
