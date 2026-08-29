@@ -56,7 +56,7 @@ ordinary use.
 describe **what the artifacts must show**, never what happened inside the producer. `[V]`
 The specification is explicit that a linear record is compatible with internal iteration:
 "the absence of repeated or branching transitions in a conformant record is not evidence
-that no internal iteration or branching occurred" (`S1:1245`). No member may therefore be
+that no internal iteration or branching occurred" (`S1:1244-1246`). No member may therefore be
 worded as a claim about private process, and each below is defined by its observable
 trace.
 
@@ -64,9 +64,9 @@ trace.
 
 | Member (spelling proposed, not settled) | What it would denote | Evidencing basis |
 |---|---|---|
-| `SINGLE_PASS` | the advisory carries exactly one candidate and is not a revision | `[V]` `candidates` is `1..n` and inside `P_unsigned` (`S1:1043`); `parent_advisory_digest` participates in identity **including when null** (`S1:1036`) |
-| `PARALLEL_CANDIDATE_COMPARISON` | two or more candidates are carried into one advisory and reduced by the ratified selector | `[V]` the same `candidates` field; the selector and its policy identity are digest-bound (OD-8; OD-7 part 5) |
-| `SUCCESSIVE_REVISION` | at least one revision advisory is bound to its parent by digest | `[V]` `build_advisory_revision` sets `parent_advisory_digest = parent.advisory_digest` and increments `advisory_version` (`S1:1836-1837`; B7 at `S1:377-386`) |
+| `SINGLE_CANDIDATE_UNREVISED` | the advisory carries exactly one candidate and binds no parent | `[V]` `candidates` is `1..n` and inside `P_unsigned` (`S1:1043`); `parent_advisory_digest` participates in identity **including when null** (`S1:1036`) |
+| `MULTI_CANDIDATE_UNREVISED` | the advisory carries two or more candidates, binds no parent, and its selector is the ratified one | `[V]` the same `candidates` field; the selector and its policy identity are digest-bound (OD-8; OD-7 part 5) |
+| `REVISED_ADVISORY` | the advisory binds a parent by digest, at any candidate count | `[V]` `build_advisory_revision` sets `parent_advisory_digest = parent.advisory_digest` and increments `advisory_version` (`S1:1836-1837`; B7 at `S1:377-386`) |
 
 Three members, no default member, no escape member — satisfying `S2B-S1-Q1`'s shape rules
 with one member to spare.
@@ -79,9 +79,40 @@ orchestration procedure rather than an unobservable model disposition or a capab
 **CHOSEN** — these three members, their spellings, and the decision to define each by the
 artifact evidence rather than by producer behaviour.
 
-`[R]` **What each would not claim.** `SINGLE_PASS` would **not** claim that only one
-candidate was ever considered: a producer that generated five and carried one forward
-yields an identical artifact, and `S1:1245` states that the record cannot tell. It would
+`[R]` **The spellings name artifact shape, not processing.** An earlier draft of this
+proposal used `SINGLE_PASS`, `PARALLEL_CANDIDATE_COMPARISON` and `SUCCESSIVE_REVISION`.
+Those were withdrawn: "pass" and "parallel" assert *processing* — a step count and a
+concurrency — that no artifact evidences, which is precisely the wording A.0 forbids and
+which `S1:1244-1246` says a conformant record cannot support. The definitions were always
+safe; the tokens were not, and a wire value is the thing an auditor reads.
+
+`[R]` **The three are disjoint and exhaustive over the two observable axes.** Candidate
+count (one / two-or-more) and parent binding (absent / present) give four cells;
+`REVISED_ADVISORY` takes both parent-present cells, and the other two split parent-absent.
+`[I]` Disjointness is not cosmetic: `S2B-D3=A` ratifies **exactly one primary strategy per
+invocation** (`ADR:123-125`), so an advisory satisfying two members at once would have no
+lawful declaration and no ratified rule to break the tie. The earlier spellings had exactly
+that defect — a revision carrying two candidates satisfied two of them.
+
+`[R]` **The consequence, stated plainly, because it decides whether this vocabulary is
+wanted at all.** Because every member is defined by observable artifact shape, a
+declaration under this vocabulary is **derivable from the advisory itself**, and the
+members map one-to-one onto construction paths this package already has. Two things follow.
+A role permitted only `SINGLE_CANDIDATE_UNREVISED` is, in effect, barred from
+`build_advisory_revision` and from multi-candidate advisories — permission becomes a
+statement about which ratified construction paths a role may use. And the declaration adds
+no information a verifier could not recompute, so its value is *governance* (a role may
+only produce shapes its policy permits) rather than *disclosure*.
+
+`[I]` This is not a defect of these three members; it is what criterion (i) permits **while
+no component records observable reasoning stages** (`ADR:346-347`). A vocabulary of
+genuinely non-derivable procedures needs that recorder first. The owner should decide
+whether a derivable vocabulary is worth ratifying now or whether the concept waits — which
+is why `R2-Q7` exists.
+
+`[R]` **What each would not claim.** `SINGLE_CANDIDATE_UNREVISED` would **not** claim that
+only one candidate was ever considered: a producer that generated five and carried one forward
+yields an identical artifact, and `S1:1244-1246` states that the record cannot tell. It would
 claim that the advisory carries one. The same shape of limit applies to the other two.
 
 ### A.2 Rejected candidates — recorded, because an implementer would reach for them
@@ -89,7 +120,7 @@ claim that the advisory carries one. The same shape of limit applies to the othe
 | Rejected | Why |
 |---|---|
 | `STAGED_DECOMPOSITION` | fails (i) **today**: `[G]` no field records stages or sub-questions, and R-3's forward-only chain cannot represent them (`S1:1231-1259`). Admissible later only if a producer of observable stages exists — the same gap that blocks `S2B-D8`'s conformance stage (`ADR:346-347`) |
-| `SELF_CRITIQUE` / `REFLECTION` | fails (i) as private model behaviour, which `S2B-D2=A` bars as an "unobservable model disposition" (`ADR:113-116`); and if made observable it becomes **verification**, an OD-5 exclusion (`S1:1173`) |
+| `SELF_CRITIQUE` / `REFLECTION` | fails (i) as private model behaviour, which `S2B-D2=A` bars as an "unobservable model disposition" (`ADR:113-116`). `[I]` This ground alone is sufficient. An earlier draft added that an observable self-critique "becomes verification"; that is withdrawn as loose — OD-5's *verification* is the contract mechanism, Equation 4 and the `verify_*` surface (`S1:1177-1178`), which a self-critique pass is not |
 | `TOOL_AUGMENTED` / `EVIDENCE_GATHERING` | is **evidence collection**, an OD-5 exclusion by name (`S1:1173-1189`) |
 | `EXTENDED_REASONING` / `HIGH_EFFORT` | fails (iii): a model capability tier (`ADR:115-116`) and a compute claim, which would create the binding to Reasoning Compute Governance that S2-B forbids (`ADR:256-257`; RCG-D5) |
 
@@ -133,11 +164,17 @@ must be equal.
 | 2 | `StrategyPolicyResolver` | protocol |
 | 3 | `StrategyPolicyRequest` | call-boundary shape (not a contract) |
 | 4 | `StrategyPolicyResponse` | call-boundary shape (not a contract) |
-| 5 | `verify_strategy_permission` | function — `[V]` the `verify_*` convention, five existing |
+| 5 | `verify_strategy_permission` | function — `[V]` the `verify_*` convention, **six** existing names in `public_api.json` |
 
-**On `Resolver` rather than `Provider`.** `[V]` The tight precedent is
-`DomainEvaluationProvider` (`contracts.py:780`), and symmetry argues for
-`StrategyPermissionProvider`. Recommended **against**: a "permission provider" reads as
+**On `Resolver` rather than `Provider`.** `[V]` **The decisive evidence is that the owner
+has already ratified the word.** `S2B-S1-Q6=A` names "the **resolver** protocol, the
+**resolver** request shape, the **resolver** response shape"
+(`ADR_UGENCE_S2B_FIRST_SLICE_RATIFICATION.md:105-107`), and `S2B-S1-Q9=A` ratifies
+`resolve(*, request) -> response` (`:127-132`). A `Provider` spelling would fight ratified
+language, so this is a narrower choice than an earlier draft of this proposal presented it
+as. `[V]` The tight precedent is `DomainEvaluationProvider` (`contracts.py:780`), and
+symmetry would argue for `StrategyPermissionProvider`. Recommended **against** on a second,
+independent ground: a "permission provider" reads as
 something that *grants* permission, and `S2B-D7=A` is emphatic that the declared strategy
 is "bound as an assertion, never as an authorization" (`ADR:197-198`), with five identities
 held distinct (`ADR:206-208`). `Resolver` names what the collaborator does — resolve a
@@ -148,14 +185,28 @@ symmetry against authority connotation.
 
 `[V]` `S2B-S1-Q3=A` narrowed `ProposerProcessRecord.declared_strategy` from C5c to C5b. It
 did not settle whether the field would become the **closed enum** or a C5b `Token`
-constrained separately. A closed enum is *narrower* than C5b, so this sits just outside
-what that ruling covers.
+constrained separately. `[V]` C5b is *defined* as "a vocabulary term matched by equality
+against an allowlist" (`S1:507-509`), so the enum is C5b's natural closed realization rather
+than a narrower class — the open question is **representation**, not classification, which
+is why `S2B-S1-Q3=A` did not reach it.
 
-`[R]` **Disclosed cost, either way.** Any S1-era process record carrying free-text
-`declared_strategy` would fail validation under both options — the enum would reject it,
-and the C5b `Token` would reject any spelling containing a space. `[I]` This is the same
-class of cost OD-5 weighed when it rejected reserving the field early (`S1:2678-2682`), and
-it should be ruled on rather than discovered at migration.
+`[R]` **The two options do not cost the same, and an earlier draft of this proposal was
+wrong to say they did.** `[V]` The field is `Annotated[str, StringConstraints(min_length=1)]`
+today (`contracts.py:989`), and the C5b pattern admits any space-free token
+(`contracts.py:92`): a stored value of `exploratory` or `draft-then-revise` **passes**
+option B and **fails** option A, which admits only ratified members. So option A invalidates
+strictly more stored records than option B.
+
+`[I]` The real trade-off is therefore not migration cost but **where a non-member is
+caught**. Under A the record refuses it at construction. Under B the record accepts it while
+the advisory's field refuses it, so a mismatched pair is caught by rider R1's equality at
+**replay** instead — later, and by a verifier returning `False` rather than by a validator
+raising. `[I]` Option A is the fail-closed reading and is recommended on that ground, not on
+a migration-cost ground.
+
+`[R]` **A also retypes the advisory's field**, not only the record's: the advisory field is
+new, so it takes whatever representation is ratified here. B.3's question is which
+representation **both** fields take.
 
 ---
 
@@ -166,6 +217,10 @@ This round would add **no** field and **no** public name beyond what `S2B-S1-Q2=
 unsigned payload 29, `ProposerProcessRecord` 18, `AdvisoryCandidateSet` 12,
 `CandidateAdvisory` 11; public surface 51. It supplies the spellings for movements already
 counted and ratified.
+
+`[V]` `AdvisoryCandidateSet` 12 is stated by `S2B-S1-Q2=A`; `CandidateAdvisory` 11 is **not**
+named in that ruling and is quoted here from the tree (`contracts.py:565`), where it is
+unchanged and untouched by this round.
 
 ---
 
@@ -208,9 +263,11 @@ reopen any of it. Letters only, one line per item. Every recommendation is A.
 Each item states the rule PUT TO THE VOTE; none of it is in force until
 answered.
 
-R2-Q1  Members. Ratify exactly three: SINGLE_PASS,
-       PARALLEL_CANDIDATE_COMPARISON, SUCCESSIVE_REVISION — each defined by
-       what the artifacts show, never by private producer behaviour.
+R2-Q1  Members. Ratify exactly three: SINGLE_CANDIDATE_UNREVISED,
+       MULTI_CANDIDATE_UNREVISED, REVISED_ADVISORY — each named for artifact
+       shape, never for processing, and disjoint over the two observable axes
+       (candidate count; parent binding) so that D3=A's one-strategy-per-
+       invocation rule always has exactly one lawful answer.
        A = ratify all three as stated [recommended]
        B = ratify a subset (name it)
        C = reject; require different members (name them)
@@ -237,18 +294,37 @@ R2-Q4  Public names. ReasoningStrategy, StrategyPolicyResolver,
            DomainEvaluationProvider precedent, accepting that "provider of
            permission" may read as granting
 
-R2-Q5  Record field type — not settled by S2B-S1-Q3. Either option invalidates
-       any stored S1-era record carrying free-text declared_strategy.
-       A = type BOTH declared_strategy fields as the ReasoningStrategy enum
-           [recommended]
-       B = enum on the advisory, C5b Token on the process record
+R2-Q5  Representation of BOTH declared_strategy fields — not settled by
+       S2B-S1-Q3, which fixed the class and not the realization. The options do
+       NOT cost the same: a stored space-free value like `exploratory` passes B
+       and fails A, so A invalidates strictly more stored records. The real
+       difference is where a non-member is caught — A at construction, B only
+       at replay via R1's equality.
+       A = the ReasoningStrategy enum on both fields; fail-closed at
+           construction [recommended]
+       B = enum on the advisory, C5b Token on the process record; non-members
+           stay constructible on the record and are caught at replay
 
 R2-Q6  Gate. With R2-Q1..Q5 ratified, §8's sixth item (the vocabulary) is
        satisfied in full and the implementation gate OPENS — subject to the
        standing fact that no strategy-permission policy family is registered
        with Policy Authority, which blocks execution regardless.
        A = the gate opens on this ratification [recommended]
-       B = the gate stays closed pending the policy family's registration
+       B = the gate stays closed pending the policy family's registration.
+       Note: Q6 presumes Q7 = A. If Q7 = B, no vocabulary is ratified, the
+       sixth gate item stays open, and Q6 does not arise.
+
+R2-Q7  Character of this vocabulary. Every proposed member is defined by
+       observable artifact shape, so a declaration is DERIVABLE from the
+       advisory and the members map one-to-one onto existing construction
+       paths: a role's permitted set becomes a statement about which ratified
+       paths it may use, and the declaration adds no information a verifier
+       could not recompute. This is what criterion (i) permits while no
+       component records observable reasoning stages (ADR:346-347).
+       A = accept a derivable vocabulary now; its value is governance, not
+           disclosure [recommended]
+       B = defer the whole vocabulary until a producer of observable reasoning
+           stages exists, leaving the S2-B gate closed indefinitely
 ```
 
 ---
@@ -287,7 +363,10 @@ assertions.
    recorded rejections correctly reasoned, and is any of them in fact
    admissible on the criteria as ratified?
 3. PRIVATE-REASONING CLAIMS. Does any member's wording assert something about
-   producer-internal process? Test SINGLE_PASS specifically against S1:1245.
+   producer-internal process? The three tokens name artifact shape
+   (SINGLE_CANDIDATE_UNREVISED, MULTI_CANDIDATE_UNREVISED, REVISED_ADVISORY);
+   test each against S1:1244-1246, and check the disjointness claim against
+   D3=A.
 4. NAMES. Check every proposed name against: D7's Proposal/Recommendation bar;
    RESERVED_AUTHORITY_VOCABULARY; the C5b pattern at contracts.py:92; the 46
    names in public_api.json; and the repository's own enum, field and verify_*
