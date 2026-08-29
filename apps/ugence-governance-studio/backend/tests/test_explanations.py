@@ -1,7 +1,7 @@
 """Explanation endpoint tests (§13, §28)."""
 from __future__ import annotations
 
-from tests.conftest import result_of
+from _support import result_of
 
 
 def test_eligibility_explanation(client):

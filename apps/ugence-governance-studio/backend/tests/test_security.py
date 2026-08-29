@@ -7,7 +7,7 @@ import pytest
 
 from starlette.testclient import TestClient
 
-from tests.conftest import result_of
+from _support import result_of
 from ugence_governance_studio_api import create_app
 from ugence_governance_studio_api.settings import ApiSettings
 

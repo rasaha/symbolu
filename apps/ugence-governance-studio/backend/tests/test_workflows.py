@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from tests.conftest import SCENARIOS, result_of
+from _support import SCENARIOS, result_of
 from ugence_governance_studio_api.scenarios.catalog import ScenarioCatalog
 
 
