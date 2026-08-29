@@ -15,6 +15,14 @@
 > The S2-B §8 implementation gate is **closed** and this document does not open it. Only
 > a ratification can, and none has been given for anything below.
 
+> **RATIFIED 2026-08-29 — see
+> [`ADR_UGENCE_S2B_ROUND2_VOCABULARY_RATIFICATION.md`](ADR_UGENCE_S2B_ROUND2_VOCABULARY_RATIFICATION.md).**
+> The owner answered the Part F ballot `R2-Q1=A … R2-Q8=A` against this file as it stood at
+> commit `646dc116a68da2780ce1d5f13380eeba5dd34de7`. That ADR, not this document, is the
+> ratification record. `R2-Q8=A` **amends** `S2B-S1-Q11=A`. With `R2-Q1=A` the §8
+> implementation gate is **open**; execution remains blocked while no strategy-permission
+> policy family is registered with Policy Authority.
+
 **Date:** 2026-08-29.
 **Baseline inspected:** branch `claude/s2b-reasoning-strategy-permission-zbc9rw` at
 `c870298feb3f076125c0a30b881ff9d98c4e171e`, atop default-branch head

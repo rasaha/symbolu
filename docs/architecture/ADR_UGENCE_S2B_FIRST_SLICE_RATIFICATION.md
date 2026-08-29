@@ -143,6 +143,12 @@ executed (`ADR_UGENCE_S2B_REASONING_STRATEGY_PERMISSION_SCOPING.md:303-306`).
 
 ### `S2B-S1-Q11` — Replay function `[R]`
 
+> `[R]` **AMENDED 2026-08-29 by `S2B-R2-Q8=A`**
+> ([`ADR_UGENCE_S2B_ROUND2_VOCABULARY_RATIFICATION.md`](ADR_UGENCE_S2B_ROUND2_VOCABULARY_RATIFICATION.md)).
+> A **sixth** check is added: the declared token equals the token the advisory's own shape
+> yields, replay returning `False` on mismatch. The five checks below stand unchanged and in
+> order; the list is no longer closed at five. No other part of this declaration is amended.
+
 **Ruled: A.** One **new** exported function, returning `bool`, never raising, taking exactly
 `S2B-D8=B`'s four inputs, checking in order: policy identity and version match; the role's
 reference resolves to the same policy; the permitted set is non-empty; the declared strategy
@@ -212,6 +218,13 @@ Governance.**
 ---
 
 ## 5. Implementation gate — still closed
+
+> `[R]` **SUPERSEDED 2026-08-29.** The vocabulary's members were ratified by `S2B-R2-Q1=A`,
+> and `S2B-R2-Q6=A` records that all six §8 gate items are satisfied. **The gate is now
+> open** — see
+> [`ADR_UGENCE_S2B_ROUND2_VOCABULARY_RATIFICATION.md`](ADR_UGENCE_S2B_ROUND2_VOCABULARY_RATIFICATION.md)
+> §5. The section below records the position as it stood on that date and is retained as
+> history, not as current status.
 
 `[R]` **No S2-B code may begin.** Per `S2B-S1-Q13=A`, five of the §8 gate's six items are
 satisfied by this declaration — normalization profile, contract shape, builder signatures,
