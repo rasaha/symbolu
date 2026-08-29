@@ -82,7 +82,7 @@
     "blockers": [
       {
         "id": "action_resolution_failure",
-        "status": "PIN_CHANGED_AWAITING_CONFIRMATION",
+        "status": "CLEARED_BY_PIN_CHANGE",
         "independent_of": "container-registry egress denial; this blocker is separate and neither causes nor is caused by it",
         "symptom": "the container job failed at action resolution in about two seconds, before any step ran: \"Unable to resolve action `aquasecurity/trivy-action@0.28.0`, unable to find version `0.28.0`\"",
         "root_cause": "the workflow pinned the ref `0.28.0` while the upstream tag is `v0.28.0`. The version existed; the ref did not. Because resolution happens before the first step, the job could never start regardless of container runtime or registry access.",
@@ -101,9 +101,54 @@
         ],
         "clearance_rule": "this blocker becomes CLEARED_BY_PIN_CHANGE only after a new workflow run successfully resolves and starts the action. The pin change alone does not clear it.",
         "scope_limit": "clearing action resolution establishes only that the action resolves and starts. It does NOT establish that Trivy's executable, its vulnerability databases, or any other runtime dependency are reachable from this environment; a failure of those is a separate blocker to be recorded separately.",
-        "recorded_on": "2026-08-29"
+        "recorded_on": "2026-08-29",
+        "clearance": {
+          "status": "CLEARED_BY_PIN_CHANGE",
+          "cleared_on": "2026-08-29",
+          "confirming_run": "https://github.com/rasaha/symbolu/actions/runs/33268204975 (job 99142110301, 2026-08-29T18:26:46Z)",
+          "confirming_evidence": "the run logged \"Download action repository 'aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25'\" and the job then ran for 26 seconds through five steps, versus about 2 seconds and zero steps before the pin change",
+          "scope_limit": "this confirms only that the action resolves and the job starts. The run never reached the container-vulnerability-scan step, so whether Trivy's executable or its vulnerability databases are reachable from this environment REMAINS UNKNOWN and untested."
+        }
+      },
+      {
+        "id": "base_image_digest_drift",
+        "status": "OPEN_ESCALATED_TO_OWNER",
+        "discovered_on": "2026-08-29",
+        "discovered_by_run": "https://github.com/rasaha/symbolu/actions/runs/33268204975 (job 99142110301, 2026-08-29T18:26:46Z)",
+        "symptom": "base-image-digest-verification failed: the live index digests resolved from the registry differ from the ratified pins",
+        "observed": [
+          {
+            "ref": "docker.io/library/node:22-bookworm-slim",
+            "pinned": "sha256:f32b81066cde10a75dbac96646099533316d94bac4150c55da1636e1f0ffdc46",
+            "live": "sha256:83f487e0a63425e5b4d146fb5e5be574bcbe1b7b843d3ebafdd95eaf7767a7e5"
+          },
+          {
+            "ref": "docker.io/library/python:3.11-slim-bookworm",
+            "pinned": "sha256:b18992999dbe963a45a8a4da40ac2b1975be1a776d939d098c647482bcad5cba",
+            "live": "sha256:0bee7276f83efd4a1ee05bbbf4281d95ed28e079220a9457f25a93e3f1e3c31b"
+          }
+        ],
+        "cause": "the upstream tags are mutable and have been repointed to newer images since the pins were recorded. The pins are stale, not wrong.",
+        "action_taken": "NONE - halted. The ratified stop condition MUST_HALT_ON_DIGEST_MISMATCH in BASE_IMAGE_MIRROR_DECISION.json forbids re-pinning to a resolved digest and requires halting, executing no gate, marking nothing passed, and escalating to the owner. That is what happened; the control behaved as designed on its first live encounter.",
+        "owner_decision_required": "re-ratify the base-image digests to the current upstream values, or direct that the existing pins be sourced from the approved internal mirror instead"
       }
-    ]
+    ],
+    "egress_scope_correction": {
+      "finding": "The container-registry egress denial recorded in this file is a property of the agent sandbox environment where the P3E work was done, NOT of GitHub Actions CI.",
+      "evidence": "in https://github.com/rasaha/symbolu/actions/runs/33268204975 (job 99142110301, 2026-08-29T18:26:46Z) the resolve_base_images step reached the registry and resolved both images successfully; the failure was a digest mismatch, not a 403",
+      "consequence": "statements implying the gates cannot execute anywhere because of egress policy are too broad. In CI the registry is reachable; what blocks the gates there is the stale pins recorded above.",
+      "recorded_on": "2026-08-29"
+    }
   },
-  "gate_execution_state_unchanged": "every gate in not_executed remains NOT_EXECUTED; a P3E-CTR gate is marked executed only when its own gate step completes with its required evidence"
+  "gate_execution_state_unchanged": "every container gate remains NOT_EXECUTED: the run halted at base-image-digest-verification, so no gate step completed and no evidence obligation was satisfied by it",
+  "evidence_integrity_findings": [
+    {
+      "id": "evidence_manifest_hashes_committed_artifacts",
+      "status": "OPEN_REPORTED",
+      "finding": "The evidence-manifest step hashes files under deployment/governance-studio/artifacts/ without checking that this run produced them. Seven such files are committed to the repository, so in https://github.com/rasaha/symbolu/actions/runs/33268204975 (job 99142110301, 2026-08-29T18:26:46Z) the manifest reported non-null vuln_report_sha256 and secret_scan_sha256 even though the container-vulnerability-scan and image-layer-secret-scan steps never ran.",
+      "risk": "a manifest can present stale committed artifacts as evidence of a run that did not produce them, which would let an incomplete run look evidenced",
+      "relation_to_gate_family": "bears directly on the mandatory evidence obligations ratified in CONTAINER_GATE_FAMILY.json; satisfying an obligation must mean the run produced the artifact",
+      "action_taken": "NONE - reported for owner decision; no gate or obligation definition changed"
+    }
+  ]
 }
