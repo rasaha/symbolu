@@ -19,14 +19,24 @@ replay, or plan comparison. All of that comes from the installed
 
 | Stage | Deliverable | Status |
 |---|---|---|
-| **P3A** | Architecture, contract freeze, credible demo fixtures, frozen expected outputs, narratives, regression tests | **this stage** |
-| P3B | Deterministic demo API (thin orchestration over AWC) | later |
-| P3C | Eligibility Explorer frontend | later |
-| P3D | Composition, replay and what-if explorer | later |
-| P3E | Private deployment | later |
+| P3A | Architecture, contract freeze, credible demo fixtures, frozen expected outputs, narratives, regression tests | delivered |
+| P3B | Deterministic demo API (thin orchestration over AWC) | delivered |
+| P3C | Eligibility Explorer frontend | delivered |
+| P3D | Composition, replay and what-if explorer | delivered |
+| P3E | Private hosted deployment (single container, HTTPS, deployment-local access control) | delivered |
+| P3F | Controlled private pilot operations | next |
 
-P3A adds **no web server and no UI**. See `docs/ARCHITECTURE.md` for the intended
-end-state and `docs/DEMO_SCRIPT.md` for the per-scenario narratives.
+The studio is therefore runnable end to end: `backend/` serves the frozen
+`governance_studio.api.v1` contract over HTTP and `frontend/` is the twelve-screen
+planning explorer that consumes it. See `docs/ARCHITECTURE.md` for the layering,
+`docs/DEMO_SCRIPT.md` for the per-scenario narratives, `frontend/README.md` and
+`backend/README.md` to run each half, and `docs/p3e/` for the deployment runbooks.
+
+Delivered means built, tested and merged — not pilot validated and not production
+certified. The OCI image build, run and vulnerability scan are CI-gated and are
+reported `NOT_EXECUTED` wherever no container runtime and registry access are
+available; see `docs/p3e/LIMITATIONS.md`. P3F is described in
+`docs/p3e/NEXT_PHASES.md`.
 
 ## Layout
 
@@ -35,8 +45,11 @@ apps/ugence-governance-studio/
 ├── README.md
 ├── docs/
 │   ├── ARCHITECTURE.md      # Browser → frontend → demo API → AWC package
-│   └── DEMO_SCRIPT.md       # per-scenario presenter narrative
-├── contracts/               # (P3B) frozen OpenAPI contract lives here
+│   ├── DEMO_SCRIPT.md       # per-scenario presenter narrative
+│   └── p3e/                 # private-hosted deployment + operator runbooks
+├── contracts/               # frozen OpenAPI contract (governance_studio.api.v1)
+├── backend/                 # deterministic demo API over the AWC package (P3B)
+├── frontend/                # planning explorer SPA (P3C/P3D)
 ├── demo_data/               # 4 scenarios × 10 input fixtures (real AWC schemas)
 │   ├── procurement/
 │   ├── customer_support/
@@ -46,7 +59,7 @@ apps/ugence-governance-studio/
 ├── scripts/
 │   ├── scenario_authoring.py   # builds scenarios from AWC public schema classes
 │   └── generate_fixtures.py    # serializes fixtures + freezes expected outputs
-└── tests/                   # schema, determinism, demonstration, boundary, manifest
+└── tests/                   # P3A: schema, determinism, demonstration, boundary, manifest
 ```
 
 ## Regenerate the fixtures

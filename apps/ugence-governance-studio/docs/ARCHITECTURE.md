@@ -6,7 +6,7 @@
 Browser
    │  HTTPS
    ▼
-Thin web frontend            (Next.js + React + TypeScript — P3C/P3D)
+Thin web frontend            (Vite + React 18 + TypeScript — P3C/P3D)
    │  HTTP, JSON envelopes
    ▼
 Deterministic demo API       (Python — P3B)

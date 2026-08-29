@@ -1,7 +1,7 @@
 """Determinism + canonical serialization tests (§19, §28)."""
 from __future__ import annotations
 
-from tests.conftest import SCENARIOS, result_of
+from _support import SCENARIOS, result_of
 from ugence_governance_studio_api.serialization.canonical import canonical_bytes, canonical_digest
 
 

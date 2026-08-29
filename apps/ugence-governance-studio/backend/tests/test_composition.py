@@ -1,7 +1,7 @@
 """Composition + permission + fallback API tests (§12, §13, §28)."""
 from __future__ import annotations
 
-from tests.conftest import result_of
+from _support import result_of
 
 
 def test_complete_team(client):
