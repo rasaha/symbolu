@@ -649,19 +649,24 @@ def test_an_identifier_field_is_classified_c5a(contract, field):
 
 @pytest.mark.parametrize("contract,field", [
     ("WorkMandate", "purpose"), ("CognitiveRoleContract", "primary_function"),
-    ("ProposerProcessRecord", "declared_strategy"),
     ("ProposerAdvisory", "claim_summaries"), ("CandidateAdvisory", "uncertainties"),
     ("CandidateAdvisory", "assumptions"),
 ])
 def test_a_free_text_field_is_classified_c5c_and_has_no_grammar(contract, field):
-    """OD-1 and O-4 together: descriptive fields take no ASCII grammar of any kind."""
+    """OD-1 and O-4 together: descriptive fields take no ASCII grammar of any kind.
+
+    ``ProposerProcessRecord.declared_strategy`` **left this set** in the S2-B change
+    set: `S2B-S1-Q3=A` narrowed it out of C5c and `S2B-R2-Q5=A` typed it as the closed
+    ``ReasoningStrategy`` vocabulary, so it is validated by membership rather than by
+    the absence of a grammar. ``test_the_declared_strategy_fields_are_closed_not_free_
+    text`` below is what now covers it, in the direction that matters.
+    """
     assert _classify(contract, field) == C5C
     assert C5C not in PATTERN_FOR, "free text must have no required pattern"
 
 
 @pytest.mark.parametrize("contract,field", [
     ("WorkMandate", "purpose"), ("CognitiveRoleContract", "primary_function"),
-    ("ProposerProcessRecord", "declared_strategy"),
 ])
 def test_free_text_admits_what_the_ascii_grammar_would_reject(contract, field):
     """Demonstrated, not asserted. A purpose written in a language the identifier
@@ -670,6 +675,43 @@ def test_free_text_admits_what_the_ascii_grammar_would_reject(contract, field):
     for value in ("Rechnungsprüfung für März", "発注書の照合", "reconcile invoice #42"):
         assert re.fullmatch(IDENTIFIER_PATTERN, value) is None
         assert re.fullmatch(TOKEN_PATTERN, value) is None
+
+
+def test_the_declared_strategy_fields_are_closed_not_free_text():
+    """`S2B-R2-Q5=A`. **Both** ``declared_strategy`` fields are typed as the
+    ``ReasoningStrategy`` enum, so both are registered CLOSED — validated by membership,
+    never by a string pattern — and both sides of rider `R1`'s equality therefore carry
+    the same class, which is what `S2B-S1-Q3=A` set out to achieve.
+
+    `[V]` **CLOSED is the registry's representation slot; it does not supersede
+    `S2B-S1-Q3=A`'s C5b classification, and must not be read as doing so.** C5b is
+    *defined* as "a vocabulary term matched by equality against an allowlist", so the
+    enum is **C5b's natural closed realization rather than a narrower class** — the
+    question `S2B-R2-Q5=A` settled was representation, not classification, which is
+    precisely why `S2B-S1-Q3=A` never reached it. Both rulings stand unamended.
+
+    `[V]` This registry records CLOSED anyway because its own scheme is **mechanical**:
+    a C5b entry demands the ``TOKEN_PATTERN`` string constraint (``PATTERN_FOR``,
+    enforced by ``test_a_classified_field_carries_its_category_pattern``), which an
+    enum-typed field cannot carry and must not acquire. CLOSED is therefore the only
+    registration consistent with the ratified typing, and it matches every other
+    enum-typed field in the registry.
+
+    `[V]` The two representations are not equivalent, and the ruling weighed that: a
+    stored space-free value passes a C5b ``Token`` and fails the enum, so A invalidates
+    strictly more stored records — accepted in exchange for catching a non-member at
+    construction rather than at replay.
+    """
+    for contract in ("ProposerAdvisory", "ProposerProcessRecord"):
+        assert _classify(contract, "declared_strategy") == CLOSED, contract
+        annotation = spec.representative_shapes()[contract].model_fields[
+            "declared_strategy"].annotation
+        assert annotation is ap.ReasoningStrategy, contract
+    # The role bears a C5a **reference**, not a token and not the permitted set.
+    assert _classify("CognitiveRoleContract", "strategy_policy_ref") == C5A
+    # The stamped policy pair is C5b: matched by equality at replay.
+    for field in ("strategy_policy_id", "strategy_policy_version"):
+        assert _classify("ProposerAdvisory", field) == C5B
 
 
 def test_the_token_pattern_differs_from_the_identifier_pattern_exactly_by_the_separator():
@@ -750,17 +792,22 @@ def test_the_registry_carries_exactly_the_stated_cardinality(contract, cardinali
         f"{len(FIELD_CLASSIFICATION[contract])}")
 
 
-def test_the_advisory_carries_the_twenty_seven_ratified_fields():
+def test_the_advisory_carries_the_thirty_ratified_fields():
     """OD-4(a) took this to twenty-three, because ``candidates`` is added and
     ``candidate_set_id`` is retained alongside it rather than replaced by it. OD-7
     part 5 took it to twenty-seven, mirroring the evaluation-profile and
     selector-policy pairs from ``AdvisoryCandidateSet`` so both are reachable inside
-    ``P_unsigned`` (I8.11)."""
+    ``P_unsigned`` (I8.11). `S2B-S1-Q2=A` took it to **thirty**, adding the governing
+    strategy policy's identity and version and one scalar declared-strategy assertion —
+    all three identity-participating, which is `S2B-D6=B1`'s proposal-bound guarantee."""
     fields = FIELD_CLASSIFICATION["ProposerAdvisory"]
-    assert len(fields) == 27
+    assert len(fields) == 30
     assert fields["candidates"] == STRUCTURED
     assert fields["candidate_set_id"] == C5A
     assert fields["selected_candidate_id"] == C5A
+    assert fields["strategy_policy_id"] == C5B
+    assert fields["strategy_policy_version"] == C5B
+    assert fields["declared_strategy"] == CLOSED
 
 
 def test_the_candidate_set_stays_top_level_and_carries_the_same_container():
@@ -1105,15 +1152,20 @@ def test_every_registered_category_is_covered_by_one_sweep_or_the_other():
     """The denominator, asserted. No registered class may fall between the two sweeps.
 
     For a patterned entry, the candidate reclassifications are the other eight registered
-    classes plus the unregistered sentinel — **nine**, and 55 x 9 = 495. Seven of the
+    classes plus the unregistered sentinel — **nine**, and 58 x 9 = 522. Seven of the
     eight registered ones are weakenings and, with the sentinel, make the sweep above's
-    55 x 8 = 440; the ninth candidate, the sibling patterned class, is a narrowing and
-    makes the sibling test's 55. 440 + 55 = 495, so nothing is unexplained.
+    58 x 8 = 464; the ninth candidate, the sibling patterned class, is a narrowing and
+    makes the sibling test's 58. 464 + 58 = 522, so nothing is unexplained.
 
     The entry count moved from 47 to 55 with OD-7 part 5's eight new C5b fields — four
-    on ``AdvisoryCandidateSet`` and their four mirrors on ``ProposerAdvisory``.
+    on ``AdvisoryCandidateSet`` and their four mirrors on ``ProposerAdvisory`` — and
+    from 55 to **58** with S2-B's three new patterned fields:
+    ``CognitiveRoleContract.strategy_policy_ref`` (C5a, the policy reference) and
+    ``ProposerAdvisory.strategy_policy_id``/``_version`` (C5b, the stamped pair). The
+    advisory's ``declared_strategy`` adds no entry here: it is CLOSED, so it is
+    validated by membership and falls outside the patterned sweeps by construction.
     Self-reclassification is the tenth candidate and is not a mutation, so it stands
-    outside the 423 rather than inside it.
+    outside the count rather than inside it.
     """
     for original in PATTERNED_CATEGORIES:
         others = set(CLASSES) - {original}
@@ -1124,7 +1176,7 @@ def test_every_registered_category_is_covered_by_one_sweep_or_the_other():
             f"{sorted(narrowings)}")
     entries = len(C5A_ENTRIES + C5B_ENTRIES)
     applicable = entries * len(WEAKENING_CATEGORIES)
-    assert applicable == 55 * 8 == 440, (
+    assert applicable == 58 * 8 == 464, (
         f"the weakening sweep's applicable count changed to {applicable}; if that is "
         "intended, update the count recorded in the enforcement documentation")
     # The denominator itself, so the two sweeps are shown to exhaust it rather than
@@ -1133,7 +1185,7 @@ def test_every_registered_category_is_covered_by_one_sweep_or_the_other():
     # not a mutation and is not among them.
     candidates_per_entry = (len(CLASSES) - 1) + 1
     narrowing_cases = entries * 1
-    assert applicable + narrowing_cases == entries * candidates_per_entry == 495, (
+    assert applicable + narrowing_cases == entries * candidates_per_entry == 522, (
         f"{applicable} weakening cases + {narrowing_cases} narrowing cases do not "
         f"exhaust the {entries} x {candidates_per_entry} candidate reclassifications")
 

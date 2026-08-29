@@ -1,5 +1,151 @@
 # Changelog — ugence-agentic-proposer
 
+## 0.3.0 — S2-B Reasoning Strategy Permission
+
+The S2-B first slice. `[R]` Authorized by the `§8` implementation gate, which **opened**
+when `S2B-R2-Q6=A` recorded all six of its items ratified
+(`docs/architecture/ADR_UGENCE_S2B_ROUND2_VOCABULARY_RATIFICATION.md` `§5`). It
+implements exactly what
+[`ADR_UGENCE_S2B_REASONING_STRATEGY_PERMISSION_SCOPING.md`](../../../docs/architecture/ADR_UGENCE_S2B_REASONING_STRATEGY_PERMISSION_SCOPING.md)
+(`S2B-D1` – `S2B-D8`, rider `R1`),
+[`ADR_UGENCE_S2B_FIRST_SLICE_RATIFICATION.md`](../../../docs/architecture/ADR_UGENCE_S2B_FIRST_SLICE_RATIFICATION.md)
+(`S2B-S1-Q1` – `Q13`) and
+[`ADR_UGENCE_S2B_ROUND2_VOCABULARY_RATIFICATION.md`](../../../docs/architecture/ADR_UGENCE_S2B_ROUND2_VOCABULARY_RATIFICATION.md)
+(`S2B-R2-Q1` – `Q8`) ratified — and nothing adjacent.
+
+**One atomic change set** (`S2B-S1-Q7=A`, on the I8 ordering OD-7 part 8 established).
+The vocabulary, the fields, the resolver boundary, the builder signatures, the replay
+function, the guards, `public_api.json` and `version.py` land together; nothing landed
+ahead of anything else.
+
+### Implemented
+
+* **`S2B-R2-Q1=A` — the closed `ReasoningStrategy` vocabulary.** Exactly three members,
+  defined over **two observable axes and nothing else** — candidate count, and parent
+  binding: `SINGLE_CANDIDATE_UNREVISED` (exactly one candidate, binds no parent),
+  `MULTI_CANDIDATE_UNREVISED` (two or more, binds no parent) and `REVISED_ADVISORY`
+  (binds a parent, at any candidate count). Each is named for **artifact shape, never
+  for processing**. **No default member, no escape member, and no member carries a
+  condition on the selector** — under OD-8 a lawful multi-candidate advisory may carry a
+  null selector, and a selector condition would leave it matching no member. `[R]` Four
+  candidates are recorded rejected and inadmissible without a new ruling
+  (`S2B-R2-Q2=A`): `STAGED_DECOMPOSITION`, `SELF_CRITIQUE`/`REFLECTION`,
+  `TOOL_AUGMENTED`, `EXTENDED_REASONING`.
+* **`S2B-D6=B1` / `S2B-S1-Q2=A` / `S2B-R2-Q3=A` — the four new fields.**
+  `CognitiveRoleContract` gains `strategy_policy_ref` (C5a, a **reference only** to an
+  externally issued policy; the role does not carry the permitted set as role data).
+  `ProposerAdvisory` gains `strategy_policy_id`, `strategy_policy_version` and
+  `declared_strategy` — **required, non-nullable and identity-participating**, so the
+  advisory digest binds the declaration, which is the proposal-bound guarantee `D6=B1`
+  chose over the weak linked-record shape. `identity.py`'s private
+  `_UnsignedAdvisoryPayload` mirrors the three under G2's equivalence obligation.
+  Cardinality: `CognitiveRoleContract` 10 → 11, `ProposerAdvisory` 27 → 30, the private
+  payload 26 → 29; `ProposerProcessRecord` stays 18, `AdvisoryCandidateSet` stays 12 and
+  `CandidateAdvisory` stays 11.
+* **`S2B-S1-Q3=A` / `S2B-R2-Q5=A` — `ProposerProcessRecord.declared_strategy` retyped**
+  from S1's C5c opaque string to the `ReasoningStrategy` enum, **fail-closed at
+  construction**. `[V]` The options were not equivalent: a stored space-free value
+  passes a C5b `Token` and fails the enum, so this invalidates strictly more stored
+  records, which the ruling accepts in exchange for catching a non-member at
+  construction rather than at replay.
+* **`S2B-S1-Q9=A` — the resolver boundary.** `StrategyPolicyResolver`, a
+  `runtime_checkable` Protocol this package **owns and does not implement**, with one
+  keyword-only `resolve(*, request) -> response`. `StrategyPolicyRequest` carries the
+  reference, tenant, case and a **caller-supplied** `as_of`; `StrategyPolicyResponse`
+  carries the policy identity, the version **as a string** (C3), the permitted set and
+  an **echo of the reference**, correlation-checked before use. **No `verified`
+  boolean** — a resolver asserting its own trustworthiness establishes nothing, and
+  verifying the issuer and signature through Policy Authority is a separate call outside
+  this boundary. No networking, storage, service discovery or plugin loading; no
+  concrete resolver imported.
+* **`S2B-D7=A` — provenance discipline.** The policy identity and version are
+  **package-stamped from the resolver response**, never caller parameters, on OD-7 part
+  5's selector-policy precedent. The declared strategy is supplied by the producer and
+  bound as an **assertion, never as an authorization**.
+* **`S2B-S1-Q5=A` — builder signatures.** `build_proposer_advisory` and
+  `build_advisory_revision` each gain **exactly two** keyword-only parameters — the
+  injected resolver and the producer's declared strategy — and **neither gains a
+  policy-identity or version parameter**. `build_proposer_process_record` **replaces**
+  `declared_strategy` and `advisory_digest` with one `advisory` parameter and derives
+  both (rider `R1`). `[R]` That last change sits **outside** A13's enumeration of four
+  builders; A13 stands intact for its four.
+* **`S2B-S1-Q12=A` — construction order.** Resolution and the permission test occur
+  **before** the OD-7 evaluation sequence, so an unpermitted run **never reaches the
+  injected domain evaluator**. Then eligibility → domain evaluation → verification →
+  selection → readiness, unchanged. A resolver stub that records whether the provider
+  was reached proves it.
+* **`S2B-S1-Q11=A` as amended by `S2B-R2-Q8=A` — `verify_strategy_permission`.** Returns
+  `bool`, **never raises**, takes exactly `S2B-D8=B`'s four inputs, and checks in order:
+  policy identity and version match; the role's reference resolves to the same policy;
+  the permitted set is non-empty; the declared strategy is a member; the record's
+  declaration **and** `advisory_digest` match the advisory; and — the **sixth** check
+  the amendment adds — the declared token equals the token the advisory's own shape
+  yields. Each of the six is proven to fail independently.
+* **`S2B-S1-Q6=A` / `S2B-R2-Q4=A` — public surface 46 → 51**, `version.py` `0.2.0` →
+  `0.3.0`, in this change set and not before.
+
+### What the sixth check establishes, and what it does not
+
+`[R]` Check four gives *declared token ∈ permitted set*; the sixth gives *declared token
+= shape-derived token*; jointly, **shape-derived token ∈ permitted set**. What a policy
+governs is therefore the **replay-verifiable shape of the advisory**, not merely what its
+producer may declare. Neither check delivers that alone, and it is established at
+**replay, never by construction**.
+
+`[R]` **The limits are not widened, and must never be described as widened.** This
+establishes **nothing** about private reasoning; it does **not** prove that a declared
+procedure was *executed*; and it establishes **no** observable-stage conformance beyond
+what the advisory's own shape shows. `[R]` For these three members only it discharges
+early part of what `S2B-D8=B` named a later stage — disclosed, not glossed.
+
+`[R]` **Rider `R1`'s equality proves correspondence between two observable fields only** —
+that the record and the advisory name the same declared strategy. It never proves
+conformance with private reasoning, and never proves the declared procedure was executed.
+
+`[R]` **Digest membership proves integrity after construction, never provenance.**
+
+### Failure semantics
+
+`[R]` **`S2B-D5=A`: a permission failure is structural.** Construction produces no
+identity-bearing artifact and replay returns `False` — **without emitting any authority
+disposition**. This capability emits **no denial and no reserved authority term**, and
+`ABSTAIN` is never a denial. `[R]` Which component maps a structural permission failure
+to an operational outcome — abstention, hold, escalation or referral — is deliberately
+outside this scope and is **not ruled**, so nothing here maps one.
+
+`[R]` **`S2B-S1-Q8=A`: no new exception type.** The refusal is discharged by the existing
+H2 surface — `pydantic.ValidationError` for a value failing its own field constraint, and
+`CrossContractViolationError` for a rule comparing independently constructed instances.
+**H2 stays at five classes.**
+
+### Known blocker, disclosed and not fixed here
+
+`[G]` **No strategy-permission policy family is registered with Policy Authority**, so
+Reasoning Strategy Permission **cannot execute end to end**. This is a standing fact
+recorded by `S2B-R2-Q6=A` itself and is **not a gate item**. Implementation proceeds
+against a **stubbed resolver**, on the `DomainEvaluationProvider` precedent, because the
+protocol is injected and this package implements no resolver. No family, adapter or
+registration was invented to get past it.
+
+### Not authorized, and not implemented
+
+Strategy composition or ordering (`S2B-D3=A`); mandate-level narrowing or
+per-invocation authorization (`S2B-D4=A`); required strategies; any mapping of a
+permission failure to an operational outcome (`S2B-D5=A` leaves it unruled); conformance
+replay beyond the sixth check (`S2B-D8=B`); registration of a policy family; a
+strategy-policy registry; any binding to Reasoning Compute Governance; and a fourth
+vocabulary member. `[R]` The three members **tile every lawful advisory**, so no fourth
+can simply be added: any later member would overlap one of the three and leave the
+shape-derived comparison with no unique answer.
+
+### Unchanged from S2-A
+
+Nothing here changes `SATISFIED`/`NOT_SATISFIED`/`INCONCLUSIVE`, fail-closed selection
+uniqueness, candidate merit ranking (still deferred), the `candidate_id` tie-break (still
+inactive), or Equation 1 or 2. The C6 canonicalization profile stays frozen —
+`set_paths` and `nfc_paths` remain `frozenset()` — and membership stays **exact codepoint
+equality** with no normalizer, casefolding, trimming or splitting (`S2B-S1-Q4=A`).
+
 ## 0.2.0 — OD-7, OD-8, OD-9 and OD-10 implemented; C7 and C9 removed with their replacements
 
 The additive S2 public-surface release. `[V]` **Production and behavioural guards

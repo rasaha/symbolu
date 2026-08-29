@@ -73,6 +73,49 @@ obligation, and `src/`, `public_api.json` (39 -> 46 names) and `version.py`
 (`0.1.0` -> `0.2.0`) were changed in that same change set and no earlier. See the
 Owner decisions section below for the full ruling.
 
+**S2-B Reasoning Strategy Permission is ratified and implemented, at `0.3.0`.** Ratified
+2026-08-28/29 across three ADRs — the architectural scoping (`S2B-D1` – `S2B-D8`, rider
+`R1`), the first-slice declaration (`S2B-S1-Q1` – `S2B-S1-Q13`) and the Round 2
+vocabulary and naming declaration (`S2B-R2-Q1` – `S2B-R2-Q8`) — and implemented in the
+single change set `S2B-S1-Q7=A` requires. Like OD-7, it **amends the frozen contract
+surface** rather than merely clarifying it, and this document is updated to record what
+it amended:
+
+* a closed three-member `ReasoningStrategy` vocabulary (`S2B-R2-Q1=A`), the vocabulary
+  OD-5(iii) deferred, declared together with the fields that carry it as that ruling
+  requires;
+* `CognitiveRoleContract` **10 -> 11** — a **reference only** to an externally issued
+  Policy Authority strategy-permission policy (`S2B-D1=A`);
+* `ProposerAdvisory` **27 -> 30** — the governing policy identity, its version, and one
+  scalar declared-strategy assertion, all required, non-nullable and
+  identity-participating, which is `S2B-D6=B1`'s **proposal-bound** guarantee;
+* `ProposerProcessRecord` **stays 18**, its `declared_strategy` **retyped** to the
+  ratified enum (`S2B-S1-Q3=A`, `S2B-R2-Q5=A`); `AdvisoryCandidateSet` stays 12 and
+  `CandidateAdvisory` stays 11;
+* an injected `StrategyPolicyResolver` protocol this package **owns and does not
+  implement**, with its two call shapes (`S2B-S1-Q9=A`);
+* three changed builder signatures (`S2B-S1-Q5=A`) and a ratified construction order
+  (`S2B-S1-Q12=A`);
+* `verify_strategy_permission`, a **six-check** proposal-bound replay (`S2B-S1-Q11=A` as
+  amended by `S2B-R2-Q8=A`).
+
+`[V]` `S2B-S1-Q7=A`'s transition control is satisfied on the I8 ordering OD-7 part 8
+established: `src/`, `public_api.json` (46 -> 51 names) and `version.py`
+(`0.2.0` -> `0.3.0`) moved in that same change set and no earlier.
+
+`[R]` **What S2-B does not claim, anywhere in this document.** That a model's private
+reasoning becomes deterministic; that a declared strategy proves the model internally
+followed it; that Ugence can inspect, reconstruct, preserve or replay private
+chain-of-thought; that the declared procedure was *executed*; or that permission to use
+a strategy authorizes additional compute, tools, evidence access or consequential
+execution. A permission failure is **structural** — no artifact is constructed, replay
+returns `False` — and **no authority disposition and no reserved authority term is
+emitted**; mapping such a failure to an operational outcome is deliberately **not
+ruled**. `[G]` **No concrete `StrategyPolicyResolver` and no Policy Authority
+strategy-permission policy family is implemented or registered**, so S2-B **cannot
+execute end to end**; the protocol is injected, on the `DomainEvaluationProvider`
+precedent.
+
 ---
 
 ## Supersession
@@ -393,7 +436,9 @@ Exactly `ROUTE_APPROVAL_BUNDLE` and `CREATE_EXCEPTION_REVIEW_BUNDLE`.
 
 Identifier and reference fields match `^[A-Za-z0-9][A-Za-z0-9._:/-]*$`. This applies
 **only** to identifiers and references — never to `purpose`, `claim_summaries`,
-`assumptions`, `uncertainties`, `declared_strategy` or any other human-readable text.
+`assumptions`, `uncertainties` or any other human-readable text. (`declared_strategy`
+was named here until S2-B retyped it to the closed `ReasoningStrategy` enum; it is no
+longer human-readable free text on either bearer.)
 Fields that are neither — closed symbolic tokens and scope names — carry their own
 canonical token pattern and are **not** silently treated as free text. The full
 classification — three semantic categories plus the mechanical C5d — is C5.
@@ -525,6 +570,26 @@ supplied expected profile, the policy pair against this package's own ratified s
 identity — rather than carried and compared whole, which is what makes them C5b and not
 C5a.
 
+`[V]` **Since S2-B (`S2B-R2-Q3=A`, `S2B-S1-Q2=A`):** `strategy_policy_id` and
+`strategy_policy_version` on `ProposerAdvisory`, on exactly the same grounds — each is
+matched by equality against the resolved policy's own identity during
+`verify_strategy_permission`, not carried and compared whole. `ProposerAdvisory.
+declared_strategy` and `ProposerProcessRecord.declared_strategy` are **C5b as well**,
+realised as the closed `ReasoningStrategy` enum: C5b is *defined* as a vocabulary term
+matched by equality against an allowlist, so a closed enum is C5b's **natural closed
+realization rather than a narrower class**. `S2B-S1-Q3=A` narrowed the record's field
+from C5c to C5b and `S2B-R2-Q5=A` settled the **representation** as the enum; neither
+ruling supersedes the other, and the representation is what makes the field fail-closed
+at construction. `[I]` A pinned test registry that classifies mechanically by declared
+string constraint will record an enum-typed field under its own enum category rather
+than under C5b, because a C5b entry demands the C5b pattern and an enum field carries no
+string constraint at all; that is a property of such a registry's scheme, not a
+reclassification of the field.
+
+`[R]` `CognitiveRoleContract.strategy_policy_ref` is **C5a, not C5b**: it is an opaque
+handle minted by an external issuer, carried and compared whole and never split or
+normalised, which is precisely the C5a/C5b distinction this section draws.
+
 ### C5c — Human-readable free text
 
 **A C5c field admits no pattern or regex constraint of any kind.** Not the C5a pattern,
@@ -544,18 +609,25 @@ scanning; this is that rule stated as a positive constraint on declaration.
 The only constraints a C5c field may carry are non-pattern ones — length, NFC, non-empty
 — and each is given explicitly in its contract table.
 
-**C5c fields:** `purpose`, `primary_function`, `declared_strategy`, each element of
+**C5c fields:** `purpose`, `primary_function`, each element of
 `claim_summaries`, `assumptions` and `uncertainties`, and each **value** of
 `normalized_fields` (its *keys* are C5a). `[I]` A normalised field value is content a
 tool reported; this package neither matches nor routes on it, and `ToolObservation` is
 not reachable from `P_unsigned` (D9), so the B9 hazard does not reach it and no pattern
 may be imposed on it.
 
-`[I]` `primary_function` and `declared_strategy` are described as opaque and compared
-for equality only, which is the C5b shape — but neither is reachable from
-`P_unsigned` (D9), so the NFC hazard that motivates B9 does not apply to them, and the
-less restrictive classification cannot reject a lawful value. Recorded as owner
-decision **OD-1** in the closing section.
+`[I]` `primary_function` is described as opaque and compared for equality only, which is
+the C5b shape — but it is not reachable from `P_unsigned` (D9), so the NFC hazard that
+motivates B9 does not apply to it, and the less restrictive classification cannot reject
+a lawful value. Recorded as owner decision **OD-1** in the closing section.
+
+`[V]` **`declared_strategy` left this class in the S2-B change set.** OD-1 classified it
+C5c here on the reasoning above; `S2B-S1-Q3=A` narrowed it to C5b so that both sides of
+rider `R1`'s equality carry the same class, and `S2B-R2-Q5=A` realised that as the closed
+`ReasoningStrategy` enum. `[R]` OD-1's rider is **not** engaged by the change: the
+advisory's declared-strategy assertion is a **new field**, not this one made
+identity-participating by reclassification. OD-1's C5c ruling for `primary_function`
+stands untouched.
 
 ### C5d — Structurally empty reserved list
 
@@ -778,8 +850,9 @@ validates it and never sets or changes it.
 
 ## D2 — `CognitiveRoleContract`
 
-**Cardinality: 10 fields** — the seven below plus the three C2 common fields (`schema_version`, `tenant_id`, `created_at`). Stated in D1's form so that I5's pinned registry can be checked
-for completeness by exact membership.
+**Cardinality: 11 fields** — the eight below plus the three C2 common fields (`schema_version`, `tenant_id`, `created_at`). Stated in D1's form so that I5's pinned registry can be checked
+for completeness by exact membership. `[V]` S2-B took this from 10 to 11 by adding
+`strategy_policy_ref` (`S2B-S1-Q2=A`, `S2B-R2-Q3=A`).
 
 D1 and D8: a proposer-local **v0** projection, never re-exported to any shared contract
 package, carrying no constitution-derived attribute, exposing no role lifecycle verb.
@@ -793,6 +866,20 @@ package, carrying no constitution-derived attribute, exposing no role lifecycle 
 | `permitted_review_actions` | `list[ReviewAction]` | yes | no | none | 1..n | **closed, B8** | enum membership; **rejects an empty list**; no duplicates | external role owner | no |
 | `escalation_role_ref` | `str` | yes | no | none | 1 | open | C5a | external role owner | no |
 | `activation_status` | `RoleActivationStatus` | yes | no | none | 1 | **closed**: `ACTIVE`, `INACTIVE` | enum membership | external role owner — **input fact, never computed** (D1) | no |
+| `strategy_policy_ref` | `str` | yes | **no** | none | 1 | open | C5a; a **reference only** to an externally issued, signed, versioned and revocable Policy Authority strategy-permission policy (`S2B-D1=A`) | external policy issuer | no |
+
+`[R]` **`strategy_policy_ref` bears a reference and never the permitted set.**
+`S2B-D1=A` rules that the permitted set is **not role data**: it is resolved at call time
+from the externally issued policy, through the injected `StrategyPolicyResolver`, and no
+contract in this specification declares it. `[R]` Under the `S2B-D1` rider a reference to
+such a policy is **not a constitution-derived attribute**, so it sits inside D8's existing
+containment bounds and adds no role lifecycle verb — D2's own two standing constraints are
+untouched. `[V]` It is **required and non-nullable**, as the ratified contract-shape table
+records, which is also every other field of this contract's shape.
+
+`[R]` **This is not `permitted_reasoning_strategies`.** OD-5(iii) named that concept and
+declared no field for it; S2-B still declares none. What arrived is a reference to the
+authority that holds the set, which is a different thing from the set.
 
 `CandidateDisposition` is imported unchanged from
 `src/ugence_agentic_proposer/vocabulary.py`; it is not redefined.
@@ -1007,13 +1094,15 @@ identity field; identity is computed only through `ugence_jcs`; the eight barred
 `workflow_id`, `instance_id`, `task_id`) appear at no nesting depth; no exported name
 begins with `Proposal` or `Recommendation`.
 
-**Cardinality: 27 fields** — the twenty-four below plus the three C2 common fields
+**Cardinality: 30 fields** — the twenty-seven below plus the three C2 common fields
 (`schema_version`, `tenant_id`, `created_at`). Stated in D1's form so that I5's pinned
 registry can be checked for completeness by exact membership. `[I]` OD-4(a) took the
 count to twenty-three by adding `candidates`, with `candidate_set_id` retained alongside
 it rather than replaced by it; OD-7 part 5 took it to twenty-seven by mirroring
 `AdvisoryCandidateSet`'s evaluation-profile and selector-policy pairs, which is what
-puts them inside `P_unsigned`.
+puts them inside `P_unsigned`; `S2B-D6=B1` took it to **thirty** by binding the governing
+strategy-policy identity, its version and one scalar declared-strategy assertion into that
+same projection.
 
 **This contract carries its candidates and references every other input by identifier.**
 
@@ -1046,6 +1135,9 @@ R-1b binds the nested sequence to that set's `candidates`.
 | `selected_candidate_id` | `str \| None` | yes (explicit) | yes | `None` | 0..1 | open | C5a when non-null; **R-1a** (local), **R-1b** (cross-contract); selection-policy v1 (OD-8) | this package | yes |
 | `selection_policy_id` | `str \| None` | yes (explicit) | yes | `None` | 0..1 | open | C5b when non-null; present iff `selected_candidate_id` is; mirrored; **R-1b** correspondence | this package | yes |
 | `selection_policy_version` | `str \| None` | yes (explicit) | yes | `None` | 0..1 | open | C5b when non-null; mirrored; **R-1b** correspondence | this package | yes |
+| `strategy_policy_id` | `str` | yes | **no** | none | 1 | open | C5b; **package-stamped** from the injected resolver's correlated response, never a caller parameter (`S2B-D7=A`) | this package, from the resolved policy | **yes** |
+| `strategy_policy_version` | `str` | yes | **no** | none | 1 | open | C5b; a **string**, never a number (C3); package-stamped on the same terms | this package, from the resolved policy | **yes** |
+| `declared_strategy` | `ReasoningStrategy` | yes | **no** | none | 1 | **closed, `S2B-R2-Q1=A`** | enum membership, fail-closed at construction (`S2B-R2-Q5=A`); permitted-set membership tested **before** construction; shape correspondence tested at **replay** only | this package, **on the producer's word** | **yes** |
 | `recommended_disposition` | `CandidateDisposition \| None` | yes (explicit) | yes | `None` | 0..1 | closed, D4 | R-1a, R-1b (B6) | this package | yes |
 | `requested_review_action` | `ReviewAction \| None` | yes (explicit) | yes | `None` | 0..1 | closed, B8 | R-1a, R-1b (B6) | this package | yes |
 | `requested_review_destination_role_ref` | `str \| None` | yes (explicit) | yes | `None` | 0..1 | open | C5a when non-null; R-1a, R-1b (B6) | this package | yes |
@@ -1075,6 +1167,40 @@ not named `operation`, `fingerprint`, `provider_id`, `arguments`, `idempotency_k
 `workflow_id`, `instance_id` or `task_id`, each of which would bind the advisory to an
 execution the proposer does not authorise.
 
+### The three S2-B strategy fields — bound as an assertion, never as an authorization
+
+`[R]` **`S2B-D6=B1` chose the proposal-bound shape.** The governing strategy-policy
+identity and version, and **one direct scalar** declared-strategy assertion, are bound
+into the identity projection. The rejected alternative was the weak linked-record
+guarantee, under which the proposal digest would not bind the declaration and a proposal
+would remain digest-valid with its declaration **absent, replaced or never produced**.
+That is why all three are required, non-nullable and identity-participating rather than
+recorded on `ProposerProcessRecord`, which sits outside `P_unsigned` (D9).
+
+`[R]` **`S2B-D7=A` — provenance discipline.** The policy identity and version are
+**package-stamped from an independently resolved policy**; no builder accepts them as
+caller-supplied parameters. This follows OD-7 part 5's selector-policy precedent exactly:
+accepting them from a caller would let a caller label an advisory with a policy that did
+not govern it. **The declared strategy is supplied by the producer and bound as an
+assertion, never as an authorization.** `[R]` A caller-supplied value is not
+authoritative merely because it is structured or digest-bound.
+
+`[R]` **Digest membership proves integrity after construction, never provenance.**
+Inclusion in the identity projection establishes that a value was not altered afterwards;
+it does not establish that the proper authority issued it. Independently verifying the
+policy's issuer and signature through Policy Authority resolution is a **separate call**
+the digest does not supply.
+
+`[R]` **Five identities remain distinct** and must not be collapsed: the issuing policy;
+the strategy vocabulary or profile version; the declared strategy; observable-execution
+evidence; and the resulting proposal.
+
+`[R]` **What binding the declaration does not establish.** It does not make a model's
+private reasoning deterministic, does not prove the model internally followed the token
+declared, does not prove the declared procedure was **executed**, and authorizes no
+additional compute, tools, evidence access or consequential execution. See
+`verify_strategy_permission` under H1 for what replay does and does not establish.
+
 `terminal_outcome` is **not** a field of `ProposerAdvisory`. It is recorded on
 `ProposerProcessRecord` (D8), which is the audit artifact, and it is constrained there
 by R-2. `[I]` Placing it on the advisory would put the proposer's conclusion into the
@@ -1085,7 +1211,8 @@ the run ended*.
 ## D8 — `ProposerProcessRecord`
 
 **Cardinality: 18 fields** — the fifteen below plus the three C2 common fields (`schema_version`, `tenant_id`, `created_at`). Stated in D1's form so that I5's pinned registry can be checked
-for completeness by exact membership.
+for completeness by exact membership. `[V]` **Unchanged by S2-B at eighteen**: rider `R1`
+**retains** `declared_strategy` and **retypes** it; it adds no field.
 
 A non-identity-bearing audit record. It is **not** referenced by `ProposerAdvisory` and
 is not reachable from `P_unsigned`, so nothing in it can alter an advisory identity.
@@ -1094,7 +1221,7 @@ is not reachable from `P_unsigned`, so nothing in it can alter an advisory ident
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `process_record_id` | `str` | yes | no | none | 1 | open | C5a | this package | no |
 | `case_ref` | `str` | yes | no | none | 1 | open | C5a | this package | no |
-| `declared_strategy` | `str` | yes | no | none | 1 | open | **C5c**; non-empty; **opaque, not an enum** (OD-1) | this package | no |
+| `declared_strategy` | `ReasoningStrategy` | yes | no | none | 1 | **closed, `S2B-R2-Q1=A`** | enum membership, fail-closed at construction (`S2B-R2-Q5=A`); **derived** from the advisory at construction and subject to **exact equality at replay** (rider `R1`) | this package, **derived** | no |
 | `state_transitions` | `list[ProposerProcessStateTransition]` | yes | no | `[]` | 0..n | — | R-3 | this package | no |
 | `tool_invocations` | `list[str]` | yes | no | `[]` | 0..n | open | each C5b | this package | no |
 | `deterministic_checks` | `list[str]` | yes | no | `[]` | 0..n | — | **C5d** — rejects any non-empty value | this package | no |
@@ -1121,6 +1248,31 @@ text check is the weaker of the two available assertions.
 
 ### `declared_strategy` — an assertion, and only an assertion (OD-5)
 
+> `[R]` **AMENDED by S2-B.** The four properties below were the S1 position and are
+> **retained as the record of it**. Two of them no longer describe the current surface,
+> and the difference is exactly what S2-B was ratified to change:
+>
+> * The **third** property ("S1 neither selects, validates nor cryptographically binds a
+>   reasoning strategy") is **superseded**. S2-B validates the declaration against a
+>   permitted set resolved from an externally issued policy, and binds a declaration into
+>   `P_unsigned` — though it binds `ProposerAdvisory.declared_strategy`, a **new field on
+>   a different bearer**, not this one.
+> * The **fourth** ("Strategy selection and enforcement are S2… deferred in whole") is
+>   **discharged, not deferred**, by `S2B-D1` – `S2B-D8` and their two declarations.
+> * The **first** ("metadata outside `P_unsigned`") **still holds of this field**:
+>   `ProposerProcessRecord` remains unreachable from `ProposerAdvisory` (D9), which is
+>   precisely what makes rider `R1`'s equality a comparison across two independently
+>   transported artifacts rather than a field against itself.
+> * The **second** ("declaration does not establish conformance") **still holds**, and
+>   `S2B-R2-Q8=A` narrows it only in the one disclosed way recorded below. Nothing about
+>   private reasoning changed.
+>
+> `[R]` **Rider `R1` retains this field, derives it** from the proposal-bound declaration
+> at construction, and requires **exact equality during replay**. `[R]` That equality
+> proves correspondence between **two observable fields** — that the record and the
+> advisory name the same declared strategy. It never proves conformance with private
+> reasoning, and never proves that the declared procedure was executed.
+
 The field carries **the method the process record asserts was used**. Four properties
 hold together, and dropping any one of them makes the field read as more than it is:
 
@@ -1142,9 +1294,19 @@ hold together, and dropping any one of them makes the field read as more than it
   correspondence between a declaration and a role's permitted set is an S2 obligation and
   is recorded here as a boundary, not as a rule this stage enforces.
 
-`[I]` OD-1 classifies `declared_strategy` C5c, which is consistent with all of this and
-is a separate matter: C5c is why the field carries no pattern, and the four properties
-above are why it carries no authority.
+`[I]` OD-1 classified `declared_strategy` C5c, which was consistent with all of the above
+and was a separate matter: C5c is why the field carried no pattern, and the four
+properties above are why it carried no authority.
+
+`[V]` **The classification moved with S2-B.** `S2B-S1-Q3=A` narrowed the field from C5c
+to C5b so that both sides of rider `R1`'s equality carry the same class, and
+`S2B-R2-Q5=A` settled the **representation** as the closed `ReasoningStrategy` enum —
+C5b's natural closed realization rather than a narrower class. `[R]` OD-1's rider is
+**not** engaged: the advisory's declared-strategy assertion is a new field, not this one
+made identity-participating by reclassification. `[V]` The two representations do not cost
+the same, and the ruling weighed it: a stored space-free value passes a C5b `Token` and
+**fails** the enum, so the enum invalidates strictly more stored records — accepted in
+exchange for catching a non-member at construction rather than at replay.
 
 ### The four-way distinction (OD-5)
 
@@ -1155,7 +1317,7 @@ single contract table shows all four:
 | | Where it lives | What it is | Who asserts it |
 | --- | --- | --- | --- |
 | `primary_function` | `CognitiveRoleContract` (D2) | the role's **organizational purpose** — what the role is *for* | external role owner |
-| a role's **permitted reasoning strategies** | **nowhere in S1 — an S2 concept** (Part J) | the **methods the role may select among** when it works | external role owner, at S2 |
+| a role's **permitted reasoning strategies** | **still no field, on any contract** — held by an externally issued Policy Authority policy and resolved at call time; `CognitiveRoleContract.strategy_policy_ref` (D2) bears only a **reference** to it (`S2B-D1=A`) | the **methods the role may select among** when it works | external policy issuer, never this package |
 | `declared_strategy` | `ProposerProcessRecord` (D8) | the **method the process record asserts was used** on this occasion | this package, on the producer's word |
 | `terminal_outcome` | `ProposerProcessRecord` (D8) | the **terminal outcome** the work reached | this package, structurally constrained by R-2 and R-4 |
 
@@ -1164,11 +1326,28 @@ about what happened. The third is a claim about what happened and not a permissi
 under the preceding subsection not evidence either. The fourth is where the work ended
 and says nothing about how it got there.
 
-`[V]` **Only three of the four are S1 fields.** The second is named here as a *concept*,
-so that the distinction can be stated whole and so that an implementer does not read
-`primary_function` or `declared_strategy` as carrying the permission. **S1 declares no
-field for it**, `CognitiveRoleContract`'s cardinality is unchanged at 10, and the concept
-arrives at S2 with the vocabulary that gives it content (Part J, OD-5(iii)).
+`[V]` **Only three of the four are fields.** The second is named here as a *concept*, so
+that the distinction can be stated whole and so that an implementer does not read
+`primary_function`, `declared_strategy` or `strategy_policy_ref` as carrying the
+permission. `[V]` **No contract declares the permitted set**, then or now: S1 declared no
+field for it at cardinality 10, and S2-B added a **reference** rather than the set,
+taking `CognitiveRoleContract` to 11. `[R]` A reference to the authority that holds a set
+is a different thing from the set, and `S2B-D1=A` keeps them apart deliberately — the
+permitted set arrives from the resolver, never from role data.
+
+`[V]` **The concept arrived at S2 with the vocabulary that gives it content, as OD-5(iii)
+required.** `S2B-R2-Q1=A` ratified the three members in the same act that declared the
+fields carrying them; `S2B-S1-Q1=A` had already fixed the admission criteria — closed,
+externally evidenceable, not a contract mechanism or an outcome, provider-neutral, with
+**no default member and no escape member**.
+
+`[R]` **Eight concepts are held apart** by `S2B-D1` – `S2B-D8`, and this four-way table
+is the S1 subset of them. The four the S2-B scoping ADR adds are: a **required** strategy
+(whether policy may compel a procedure — **not ruled**); a **strategy request** (what an
+agent or model asks permission to use); a **strategy authorization** (the permission
+independently issued by governance); and **conformance evidence** (what deterministic
+replay can establish from observable records). `[R]` A model, agent, caller or proposer
+may **request or declare**; **none may authorize.**
 
 **What is *not* a reasoning strategy.** Evidence collection, verification, and
 abstention or escalation are named here because each is regularly mistaken for one:
@@ -1185,8 +1364,67 @@ specified, enforced and — for the third — closed by a ratified vocabulary. T
 of them as a method the role selects would recast a mechanism this stage enforces, or an
 outcome this stage constrains, as a matter of permitted method, and would make a role's
 freedom to *abstain* look like a choice of approach rather than the structural rule R-2
-makes it. `[R]` The point is recorded for whoever ratifies the S2 vocabulary: none of the
-three belongs in it.
+makes it. `[R]` The point was recorded for whoever ratified the S2 vocabulary: none of
+the three belongs in it.
+
+`[V]` **The ratified vocabulary honours that exclusion.** `S2B-R2-Q1=A`'s three members
+are defined over **artifact shape only** — candidate count and parent binding — so none
+of them names evidence collection, verification, abstention or escalation. `[V]`
+`S2B-R2-Q2=A` additionally records four candidates as **rejected and inadmissible without
+a new ruling**: `STAGED_DECOMPOSITION` (no observable stages exist), `SELF_CRITIQUE` /
+`REFLECTION` (private model behaviour), `TOOL_AUGMENTED` (evidence collection — this
+section's own first exclusion, by name) and `EXTENDED_REASONING` (a model capability tier
+barred by `S2B-D2=A`, and a compute claim).
+
+### `ReasoningStrategy` — the ratified strategy vocabulary (`S2B-R2-Q1=A`)
+
+The closed vocabulary OD-5(iii) deferred, declared here together with the fields that
+carry it — `ProposerAdvisory.declared_strategy` (D7) and
+`ProposerProcessRecord.declared_strategy` (D8) — as that ruling requires. `(str, Enum)`,
+values equal to member names.
+
+**Exactly three members, defined over two observable axes and nothing else** — candidate
+count, and parent binding:
+
+| Member | Definition |
+| --- | --- |
+| `SINGLE_CANDIDATE_UNREVISED` | exactly one candidate, binds no parent |
+| `MULTI_CANDIDATE_UNREVISED` | two or more candidates, binds no parent |
+| `REVISED_ADVISORY` | binds a parent, at any candidate count |
+
+`[R]` Each is named for **artifact shape, never for processing**. Together they are
+**disjoint and exhaustive** over every lawful `ProposerAdvisory` — `candidates` rejects
+an empty sequence — so `S2B-D3=A`'s one-strategy-per-invocation rule always has exactly
+one lawful answer, and the token is **derivable from the advisory's own shape**.
+
+`[R]` **No member carries a condition on the selector.** `[V]` Under OD-8 selection-policy
+v1 more than one qualifying candidate produces no selection, so a lawful multi-candidate
+advisory may carry a null `selected_candidate_id`; a selector condition would leave it
+matching no member.
+
+`[R]` **No default member and no escape member** (`S2B-S1-Q1=A`): no `OTHER`,
+`UNSPECIFIED` or `NONE`. A producer that cannot name one of these three has not produced
+a lawful advisory.
+
+`[R]` **Membership is exact codepoint equality** (`S2B-S1-Q4=A`) between two
+C5b-constrained ASCII values, carried in the implementation by enum identity. **No
+normalizer, no casefolding, no trimming, no splitting.** C6's profile is untouched:
+`set_paths` and `nfc_paths` stay `frozenset()`.
+
+`[R]` **Disclosed forward cost.** The three members **tile every lawful advisory**, so no
+fourth can simply be added: any later member — including `STAGED_DECOMPOSITION`,
+admissible only if observable stages ever exist — would overlap one of the three,
+contradict the disjoint-and-exhaustive property, and leave the shape-derived comparison
+with no unique answer. Admitting one would require **either** a redefinition restoring the
+tiling **or** the composition ruling `S2B-D3=A` deferred — and, on either route, a change
+to the ratified sixth replay check. The owner acknowledged this cost in ratifying
+`S2B-R2-Q8=A`.
+
+`[R]` **Not an authority claim.** No member is a member of `RESERVED_AUTHORITY_VOCABULARY`,
+none is a terminal outcome or a candidate disposition, and none grants, clears, admits
+evidence or decides anything. A member denotes an **externally observable orchestration
+procedure** (`S2B-D2=A`) — not an unobservable model disposition, and **not a model
+capability tier**.
 
 ### `ProposerProcessStateTransition` — nested public shape
 
@@ -1254,8 +1492,10 @@ and does not describe an execution, and no other field in D8 carries control flo
 `[I]` This is also why R-3's bar on *any* representation of execution state is not
 weakened by OD-5. Reasoning strategies are **method labels that operate within** the
 R-3 lifecycle; they do not add states to it, reorder it, branch it or make it
-re-entrant. A ratified strategy vocabulary would change what a role may declare, and
-would change nothing about `ProposerProcessState`, R-3 or R-4.
+re-entrant. `[V]` The ratified vocabulary bears this out: `S2B-R2-Q1=A` changed what a
+role may declare and changed **nothing** about `ProposerProcessState`, R-3 or R-4 — no
+state was added, reordered, branched or made re-entrant, and no member of
+`ReasoningStrategy` is a process state.
 
 ## D9 — Identity scope, stated once
 
@@ -1678,6 +1918,15 @@ into the `advisory_digest=` keyword. The construction is therefore:
    `_UnsignedAdvisoryPayload` — not exported — declaring exactly the fields of
    `ProposerAdvisory` **except** `advisory_digest`, with identical types, defaults,
    validators and serializers. Call the validated instance `payload`.
+
+   `[V]` **Cardinality: 29** — `ProposerAdvisory`'s thirty minus `advisory_digest`. The
+   count is stated so the equivalence is checkable by exact membership, but the
+   obligation is the **equality**, not the number: the payload's field set must equal
+   `set(ProposerAdvisory.model_fields) - {"advisory_digest"}` exactly. `[I]` OD-7 part 5
+   took it from 22 to 26 and `S2B-D6=B1` from 26 to 29; on each occasion, omitting the
+   new fields here would have placed them inside the advisory and **outside**
+   `P_unsigned`, which for S2-B is precisely the weak linked-record shape `S2B-D6=B1`
+   rejected. That is why the mirror is an obligation rather than a convenience.
 2. It computes the canonicalisation input:
    `p_unsigned = payload.model_dump(mode="json", exclude_none=False)`.
    **This is the only thing `p_unsigned` is for.** It is the JSON-mode projection G1
@@ -1702,7 +1951,14 @@ into the `advisory_digest=` keyword. The construction is therefore:
        context_id=payload.context_id,
        candidate_set_id=payload.candidate_set_id,
        candidates=payload.candidates,
+       domain_evaluation_profile_id=payload.domain_evaluation_profile_id,
+       domain_evaluation_profile_version=payload.domain_evaluation_profile_version,
        selected_candidate_id=payload.selected_candidate_id,
+       selection_policy_id=payload.selection_policy_id,
+       selection_policy_version=payload.selection_policy_version,
+       strategy_policy_id=payload.strategy_policy_id,
+       strategy_policy_version=payload.strategy_policy_version,
+       declared_strategy=payload.declared_strategy,
        recommended_disposition=payload.recommended_disposition,
        requested_review_action=payload.requested_review_action,
        requested_review_destination_role_ref=payload.requested_review_destination_role_ref,
@@ -1716,16 +1972,20 @@ into the `advisory_digest=` keyword. The construction is therefore:
    )
    ```
 
-   The twenty-two pass-through keywords are the twenty-two D7 fields other than
-   `advisory_digest`; `advisory_digest` is the twenty-third and is the one computed
+   The **twenty-nine** pass-through keywords are the twenty-nine D7 fields other than
+   `advisory_digest`; `advisory_digest` is the **thirtieth** and is the one computed
    here. **Explicit field pass-through is the normative spelling**, and the reason is
    given below: no `model_dump()` of any mode is a lawful constructor input for this
-   model.
+   model. `[V]` The block above is stated at the current field set: it gained OD-7 part
+   5's four mirrored evaluation and selector-policy fields and `S2B-D6=B1`'s three
+   strategy fields, and I7.16's structural test is what requires it to keep pace.
 
    **The keyword set must equal the field set exactly, and this is checked
-   structurally.** `[V]` Twelve of the twenty-three fields are declared with a default —
+   structurally.** `[V]` **Sixteen of the thirty** fields are declared with a default —
    `schema_version`, `kind`, `advisory_version`, `parent_advisory_digest`,
-   `selected_candidate_id`, `recommended_disposition`, `requested_review_action`,
+   `domain_evaluation_profile_id`, `domain_evaluation_profile_version`,
+   `selected_candidate_id`, `selection_policy_id`, `selection_policy_version`,
+   `recommended_disposition`, `requested_review_action`,
    `requested_review_destination_role_ref`, `claim_summaries`, `observation_refs`,
    `uncertainties` and `reason_codes` — so omitting one from this call **can be silently
    well-formed**: construction succeeds and the field takes its default. That is the
@@ -1733,16 +1993,30 @@ into the `advisory_digest=` keyword. The construction is therefore:
    it is why I7.16 requires a structural test that the call's keyword set equals
    `set(ProposerAdvisory.model_fields)` exactly.
 
-   `[V]` **The hazard is five of the twelve, not all twelve**, and the three-way split is
-   worth stating because it shows what is and is not already caught. Verified on a
-   representative payload carrying a selection, omitting each defaulted keyword in turn
-   from an advisory whose model validator implements R-1a:
+   `[V]` **`S2B-D6=B1`'s three fields are not in that defaulted set.** All three are
+   required and non-nullable, so omitting one from this call raises rather than passing a
+   default silently — the strongest of the three outcomes tabulated below, and a direct
+   consequence of the ruling having made them required.
+
+   `[V]` **The hazard is still five, now of sixteen**, and the three-way split is worth
+   stating because it shows what is and is not already caught. Re-verified at the current
+   field set on a representative payload carrying a selection **and a non-default value in
+   every defaulted field** — a revision, so `advisory_version` and
+   `parent_advisory_digest` both differ from their defaults — omitting each defaulted
+   keyword in turn from an advisory whose model validator implements R-1a:
 
    | Omitted field | Outcome |
    | --- | --- |
-   | `advisory_version`, `parent_advisory_digest`, `claim_summaries`, `observation_refs`, `uncertainties` | **constructs silently, digest fails to verify** — the real hazard, five fields |
-   | `selected_candidate_id`, `recommended_disposition`, `requested_review_action`, `requested_review_destination_role_ref` | **`ValidationError`** — R-1a fires, because omitting one breaks the joint-presence coupling. Not silent |
+   | `advisory_version`, `parent_advisory_digest`, `claim_summaries`, `observation_refs`, `uncertainties` | **constructs silently, digest fails to verify** — the real hazard, five fields, unchanged by OD-7 and S2-B |
+   | `domain_evaluation_profile_id`, `domain_evaluation_profile_version`, `selected_candidate_id`, `selection_policy_id`, `selection_policy_version`, `recommended_disposition`, `requested_review_action`, `requested_review_destination_role_ref` | **`ValidationError`** — R-1a and OD-7 part 5's two couplings fire, because omitting one breaks a joint-presence rule. Not silent. `[V]` OD-7 took this row from four fields to eight |
    | `kind`, `schema_version`, `reason_codes` | constructs, **digest still verifies** — each admits only its default (`kind` and `schema_version` are `Literal`s, `reason_codes` is C5d-empty), so no other value could have been passed |
+
+   `[V]` **The three `S2B-D6=B1` fields appear in no row above**, because none of them is
+   defaulted: `strategy_policy_id`, `strategy_policy_version` and `declared_strategy` are
+   required and non-nullable, so omitting one raises rather than defaulting silently.
+   `[I]` The hazard this table describes is a property of the **defaulted** partition, not
+   of the field count, which is why I7.16 states its obligation over the field set rather
+   than over any written list.
 
    `[I]` R-1a is therefore load-bearing here in a way E1 does not claim for it: it is a
    selection-coupling rule, and catching four omissions from the construction call is an
@@ -1843,7 +2117,7 @@ that function and never surfaces as a field, so C3 is not weakened.
 There are four, and no field falls outside them. `[I]` The table below is a completeness
 statement about the *sources*; the corresponding completeness statement about the
 *construction call* is G2's, enforced by I7.16 — a field may not be omitted from the
-pass-through merely because it carries a default, and twelve of the twenty-three do.
+pass-through merely because it carries a default, and sixteen of the thirty do.
 
 | Source | Fields |
 | --- | --- |
@@ -1973,6 +2247,8 @@ def build_proposer_advisory(
     expected_profile_id: str,
     expected_profile_version: str,
     requested_review_destination_role_ref: str | None,
+    strategy_policy_resolver: StrategyPolicyResolver,
+    declared_strategy: ReasoningStrategy,
 ) -> ProposerAdvisory: ...
 
 
@@ -1994,6 +2270,8 @@ def build_advisory_revision(
     expected_profile_id: str,
     expected_profile_version: str,
     requested_review_destination_role_ref: str | None,
+    strategy_policy_resolver: StrategyPolicyResolver,
+    declared_strategy: ReasoningStrategy,
 ) -> ProposerAdvisory: ...
 
 
@@ -2003,13 +2281,12 @@ def build_proposer_process_record(
     tenant_id: str,
     case_ref: str,
     created_at: datetime,
-    declared_strategy: str,
+    advisory: ProposerAdvisory,
     state_transitions: list[ProposerProcessStateTransition],
     tool_invocations: list[str],
     candidate_ids: list[str],
     selected_candidate_id: str | None,
     terminal_outcome: TerminalOutcome,
-    advisory_digest: str,
     started_at: datetime,
     completed_at: datetime,
 ) -> ProposerProcessRecord: ...
@@ -2045,6 +2322,39 @@ def verify_observation_resolution(
     advisory: ProposerAdvisory,
     context: BoundedContextEnvelope,
     observations: list[ToolObservation],
+) -> bool: ...
+
+
+# S2-B (`S2B-S1-Q9=A`) — the injected strategy-policy boundary. Two call shapes and one
+# protocol, on exactly OD-7's terms: none is a contract, none carries a C2 common field,
+# none has an identity role, and none is ever stored, transported or reachable from
+# `P_unsigned`. This package OWNS the protocol and IMPLEMENTS NO RESOLVER.
+class StrategyPolicyRequest(BaseModel):
+    strategy_policy_ref: str      # C5a, the role contract's own reference
+    tenant_id: str
+    case_ref: str
+    as_of: datetime               # CALLER-SUPPLIED; no src module reads a wall clock (C4)
+
+
+class StrategyPolicyResponse(BaseModel):
+    strategy_policy_id: str       # C5b
+    strategy_policy_version: str  # C5b, a STRING, never a number (C3)
+    permitted_strategies: tuple[ReasoningStrategy, ...]   # may be empty; see below
+    strategy_policy_ref: str      # echo of the request's reference; correlation-checked
+    # NO `verified` boolean, and none is ratified.
+
+
+@runtime_checkable
+class StrategyPolicyResolver(Protocol):
+    def resolve(self, *, request: StrategyPolicyRequest) -> StrategyPolicyResponse: ...
+
+
+def verify_strategy_permission(
+    *,
+    advisory: ProposerAdvisory,
+    policy: StrategyPolicyResponse,
+    role: CognitiveRoleContract,
+    process_record: ProposerProcessRecord,
 ) -> bool: ...
 ```
 
@@ -2086,6 +2396,101 @@ storage, service discovery, plugin loading or multi-provider evaluation. The ent
 reasoning above is unchanged by it; what changes is that the shape is no longer an open
 question. See `docs/architecture/ADR_UGENCE_AGENTIC_PROPOSER_MVP_READINESS.md`'s **A13**
 for the declaration.
+
+`[V]` **A13 stands intact for its four, and S2-B changed three signatures beyond it.**
+`S2B-S1-Q5=A` gives `build_proposer_advisory` and `build_advisory_revision` **exactly two
+new keyword-only parameters each** — the injected resolver and the producer's declared
+strategy — and **neither gains a policy-identity or version parameter**, because
+`S2B-D7=A` package-stamps both from the resolved policy on OD-7 part 5's own precedent.
+`[V]` The change to `build_proposer_process_record` sits **outside** A13's enumeration:
+A13 names the four builders carrying provider and profile parameters, and the record
+builder is the fifth. A13 is therefore neither superseded nor extended by it.
+
+`[R]` **Rider `R1` — the record builder loses two parameters and gains one.**
+`declared_strategy` and `advisory_digest` are **replaced by a single `advisory`
+parameter** and **both derived from it**. `[I]` Derivation prevents divergence at
+construction: a caller cannot hand this builder a declaration or a digest reference that
+disagrees with the advisory the record is about, because it hands over the advisory
+instead. `[R]` Derivation is **defence in depth, not the guarantee** — the two artifacts
+are transported independently, so the guarantee is the replay equality below, across two
+separately received objects.
+
+`[R]` **Construction order is ratified, not an implementer's choice** (`S2B-S1-Q12=A`).
+Resolution and the permission test occur **before** the OD-7 evaluation sequence, so an
+unpermitted run **never reaches the injected domain evaluator**; the OD-7 part 6 order —
+eligibility, domain evaluation, verification, selection, readiness — is unchanged behind
+it. `[I]` This is externally observable, which is why it required a ruling.
+
+`[R]` **A permission failure raises no new exception type** (`S2B-S1-Q8=A`). H2 stays at
+**five classes**: `pydantic.ValidationError` for a value failing its own field constraint
+— a `declared_strategy` that is not a `ReasoningStrategy` member is refused there — and
+`CrossContractViolationError` for a rule comparing independently constructed instances,
+which is what each permission check is. `[R]` Construction produces **no
+identity-bearing artifact** and emits **no authority disposition**.
+
+### `verify_strategy_permission` — six checks, and what they establish
+
+`S2B-D8=B`'s **proposal-bound** replay, over exactly its four ratified inputs: the
+`ProposerAdvisory`, the resolved and signature-verified policy version, the
+`CognitiveRoleContract`, and the `ProposerProcessRecord` for rider `R1`'s equality check.
+It reads **no stage record** and issues no resolver call. It returns `bool`, **never
+raises** — the builder raises, the verifier reports, on H1's unchanged terms — and emits
+**no disposition and no reserved authority term**.
+
+**Six checks, in the ratified order.** The first five are `S2B-S1-Q11=A`; the sixth is
+`S2B-R2-Q8=A`'s amendment, which the owner expressly approved **as an amendment to that
+ruling**, leaving the five standing unchanged and in order:
+
+1. the policy identity and version match the advisory's stamped pair;
+2. the role's reference resolves to the same policy;
+3. the permitted set is non-empty;
+4. the declared strategy is a member of it;
+5. the record's declaration **and** its `advisory_digest` match the advisory (rider `R1`);
+6. the declared token equals the token the advisory's **own shape** yields.
+
+`[R]` **What the conjunction establishes.** Check 4 gives *declared token ∈ permitted
+set*; check 6 gives *declared token = shape-derived token*; therefore, jointly,
+**shape-derived token ∈ permitted set**. What a policy governs is thus the
+**replay-verifiable shape of the advisory**, not merely what its producer may declare.
+Neither check delivers this alone. The declared token remains **informationally
+redundant** — a verifier could compute it — but it is a **digest-bound commitment**, and
+the conjunction is what is enforceable. `[R]` It is established at **replay, never by
+construction**.
+
+`[R]` **The limits are not widened, and must never be described as widened.** This
+establishes **nothing** about private reasoning; it does **not** prove that a declared
+procedure was *executed*; and it establishes **no** observable-stage conformance beyond
+what the advisory's own shape shows. `[R]` For these three members **only**, it
+discharges early part of what `S2B-D8=B` named a later stage — disclosed, not glossed.
+**Observable-procedure conformance replay in general remains deferred**, and `[G]` is
+blocked regardless: no component records observable reasoning stages.
+
+`[R]` **The amendment perimeter is `S2B-S1-Q11=A` and nothing else.** `S2B-D8=B` is not
+reopened — the sixth check reads no stage record and stays within its four inputs.
+`S2B-S1-Q10=A` is not amended — rider `R1`'s field equality still proves correspondence
+between two observable fields and nothing more. `S2B-D5=A` is not amended — its final
+triggering condition was already "replay cannot establish correspondence", which absorbs
+a declaration-to-shape mismatch, and the sixth check's structural semantics are exactly
+its ratified result.
+
+**What replay can never establish**, whatever these six checks return: hidden model
+state; private chain-of-thought; undocumented provider-side routing or fallback; whether
+a model internally used a technique a provider names; external facts not carried across
+the replay boundary; or whether omitted stages, evidence or candidates never existed.
+
+`[G]` **Disclosed ceiling on the echo.** `StrategyPolicyResponse.strategy_policy_ref` is
+correlation-checked before use, on the same terms and with the same limit as OD-7's
+evaluator echo: it catches a resolver that mixed up concurrent requests, answered under a
+stale reference or was wired up wrongly. It is **not** a defence against a dishonest
+resolver. `[R]` Nor does anything here verify the policy's **issuer or signature** —
+that is a separate Policy Authority call outside this boundary, which is why
+`S2B-S1-Q9=A` ratifies **no `verified` boolean** a resolver could set to assert its own
+trustworthiness.
+
+`[I]` **`permitted_strategies` may be empty, and the shape admits an empty set on
+purpose.** Check 3 exists to report exactly that state; a non-empty validator on the
+response would move a ratified replay check into construction and put it out of reach of
+the replay it was ratified as.
 
 `verify_advisory_selection` is the independent replay of R-1b **and R-7**. It is a
 **separate function from `verify_advisory_identity`** because the two answer different
@@ -2178,7 +2583,12 @@ Notes that are part of the ratified behaviour:
 
 ## H2 — Exception surface
 
-**Exactly five classes of failure, and no others (OD-6(ii), OD-7):**
+**Exactly five classes of failure, and no others (OD-6(ii), OD-7).** `[V]` **S2-B adds
+none** (`S2B-S1-Q8=A`): its construction refusals are discharged by the two existing
+classes below — `pydantic.ValidationError` where a value fails its own field constraint,
+`CrossContractViolationError` where a rule compares independently constructed instances
+(the role contract, the resolver's response and the producer's declaration are three such
+things, and no one of them is malformed on its own). The table is unchanged:
 
 | Failure | Type | Origin |
 | --- | --- | --- |
@@ -2216,7 +2626,11 @@ against. A named, purpose-built exception class states plainly what actually fai
 The complete exported surface, as amended by OD-7. Recorded here as specification; **no
 `public_api.json` is created by this document**, and none could exist until S1 was
 implemented and separately authorised. `[V]` It exists now and covers every item below:
-forty-six names, the thirty-nine 0.1.0 froze plus OD-7's seven, at `0.2.0`.
+**fifty-one names** — the thirty-nine `0.1.0` froze, plus OD-7's seven at `0.2.0`, plus
+S2-B's five at `0.3.0` — at `0.3.0`. `[V]` `S2B-S1-Q6=A` with `S2B-R2-Q4=A` authorizes
+**exactly five** additions and **no removals and no renames**: `ReasoningStrategy`,
+`StrategyPolicyResolver`, `StrategyPolicyRequest`, `StrategyPolicyResponse` and
+`verify_strategy_permission`.
 
 **Contracts (8):** `AgentIdentityRef`, `CognitiveRoleContract`, `WorkMandate`,
 `BoundedContextEnvelope`, `ToolObservation`, `AdvisoryCandidateSet`, `ProposerAdvisory`,
@@ -2229,10 +2643,19 @@ forty-six names, the thirty-nine 0.1.0 froze plus OD-7's seven, at `0.2.0`.
 is a contract: none carries a C2 common field, none is stored, transported or reachable
 from `P_unsigned`, and none has an identity role.
 
-**Enums (11):** `TerminalOutcome`, `CandidateDisposition`, `SemanticAuditorFindingStatus`
+**Call-boundary shapes and the injected-resolver protocol (3, `S2B-S1-Q9=A`):**
+`StrategyPolicyRequest`, `StrategyPolicyResponse`, `StrategyPolicyResolver`. On exactly
+the same terms: none is a contract, none carries a C2 common field, none is stored,
+transported or reachable from `P_unsigned`, and none has an identity role. `[R]` This
+package **owns the protocol and implements no resolver**; `S2B-D1=A` excludes Agentic
+Proposer as an issuer, together with Agent Runtime, Model Authority, Decision Authority
+and Risk Authority.
+
+**Enums (12):** `TerminalOutcome`, `CandidateDisposition`, `SemanticAuditorFindingStatus`
 (three existing, D4); `ReviewAction`, `DomainCheckCompletion`, `AgentLifecycleState`,
 `RoleActivationStatus`, `ToolOperationClass`, `ToolObservationAdmissionStatus`,
-`ProposerProcessState` (seven new); `DomainEvaluationOutcome` (OD-7 part 3)
+`ProposerProcessState` (seven new); `DomainEvaluationOutcome` (OD-7 part 3);
+`ReasoningStrategy` (`S2B-R2-Q1=A`)
 
 **Builders (5):** `build_candidate_advisory`, `build_advisory_candidate_set`,
 `build_proposer_advisory`, `build_advisory_revision`, `build_proposer_process_record`
@@ -2241,9 +2664,10 @@ from `P_unsigned`, and none has an identity role.
 
 **Identity functions (2):** `compute_advisory_identity`, `verify_advisory_identity`
 
-**Verifiers (5):** `verify_candidate_eligibility`, `verify_advisory_selection`,
+**Verifiers (6):** `verify_candidate_eligibility`, `verify_advisory_selection`,
 `verify_observation_resolution`; `verify_domain_evaluation`,
-`verify_deterministic_selection` (OD-7 part 5)
+`verify_deterministic_selection` (OD-7 part 5); `verify_strategy_permission`
+(`S2B-S1-Q11=A` as amended by `S2B-R2-Q8=A`)
 
 **Exceptions (3):** `EligibilityMismatchError`, `CrossContractViolationError` (OD-6(ii)),
 `DomainEvaluationProviderError` (OD-7)
@@ -2376,7 +2800,7 @@ temporary representative shapes rather than a declared contract module.
    narrowed to fewer fields without failing.
 
    `[V]` **Enforcement is behavioural first.** The guard constructs the bearer from a
-   complete valid fixture supplying all twenty-three required fields and exercises the
+   complete valid fixture supplying all thirty fields and exercises the
    four coupling cases as live validation outcomes, keeps
    `CandidateAdvisory.requested_review_action` required and non-null, and proves the
    bearer-scoped rule does not reach a class merely sharing the field name. Static AST
@@ -2600,7 +3024,7 @@ introduces the first contract, to the full H3 surface, and not before.
     call — and not the builder's result, because the result is exactly what cannot
     distinguish an omission from a default.
 
-    `[V]` It is required because omission can be silent: twelve of the twenty-three
+    `[V]` It is required because omission can be silent: sixteen of the thirty
     fields are declared with a default, and for **five** of them — `advisory_version`,
     `parent_advisory_digest`, `claim_summaries`, `observation_refs` and `uncertainties` —
     dropping one from the pass-through constructs successfully, silently carries the
@@ -2612,8 +3036,11 @@ introduces the first contract, to the full H3 surface, and not before.
     set and not of the rule.
 
     `[I]` The obligation is stated over the *field set*, not over a written list of
-    twenty-three names, so that adding a twenty-fourth field to `ProposerAdvisory`
-    fails this test until the pass-through is updated. A newly added defaulted
+    names, so that adding a thirty-first field to `ProposerAdvisory`
+    fails this test until the pass-through is updated. `[V]` It has now done so twice —
+    OD-7 part 5 took the set to twenty-seven and `S2B-D6=B1` to thirty — and on both
+    occasions the pass-through was updated in the same change set, which is the
+    behaviour this wording was chosen to force. A newly added defaulted
     identity-participating field is precisely the case that would otherwise enter
     `P_unsigned` through the payload while never being passed to the constructor.
 
@@ -2624,11 +3051,15 @@ in H3. The version moves to `0.1.0` only after the public-API snapshot and its d
 test exist, and `CHANGELOG.md` must record what is frozen at it. Neither happens in this
 document.
 
-`[V]` **Both moves have since been made, in the order this section requires.** The
+`[V]` **All three moves have since been made, in the order this section requires.** The
 snapshot and its drift test landed with the S1 contracts at `0.1.0` (39 names). OD-7's
 amendment then took the surface to 46 names and the version to `0.2.0`, in the single
 change set that implemented it — not before, and not as a snapshot regenerated ahead of
-the code and tests it describes. `CHANGELOG.md` records what each version carries.
+the code and tests it describes. `[V]` **S2-B took the surface to 51 names and the version
+to `0.3.0`** on the same ordering, which `S2B-S1-Q7=A` ratified by name: the version moves
+"in the **same change set** as the fields, vocabulary, protocol, replay function and
+tests — never ahead of them, on the I8 ordering OD-7 part 8 already established."
+`CHANGELOG.md` records what each version carries.
 
 ---
 
@@ -2671,18 +3102,28 @@ Each item below is deliberately absent and is not a gap.
   vocabulary before its own catalogue is ratified. A content class attaches to each only
   when **that** catalogue is ratified.
 * **The reasoning-strategy permission concept and its vocabulary — deferred together
-  (OD-5(iii)).** `permitted_reasoning_strategies` is **not an S1 field**. No contract in
-  Part D declares it, `CognitiveRoleContract`'s cardinality is unchanged at 10, and the
-  C5d roster is unchanged at five. The concept and the vocabulary that would give it
-  content arrive together at S2, so that the field is declared once, in its ratified
-  form, against a vocabulary that already exists. `[I]` Reserving it here was considered
-  and **rejected by the owner**: a reserved empty-only list would have had to be retyped
-  and have its default removed to reach that form, so reserving would not have spared a
-  schema change, while it would have made every S1-era role contract carry the one value
-  the ratified form must refuse. Selection of a strategy, validation of a declared one
-  against a role's permitted set, and any binding of either into an identity are **S2's
-  in whole**; S1 does none of them. `[R]` No member, spelling, bound or default of the
-  eventual vocabulary is ratified, and none is ratified by this deferral.
+  (OD-5(iii)). `[V]` DISCHARGED by S2-B; retained as the record of the deferral and of
+  what it correctly predicted.** The concept and the vocabulary did arrive together, as
+  OD-5(iii) required: `S2B-R2-Q1=A` ratified the three members in the same act that
+  declared the fields carrying them. `[V]` **`permitted_reasoning_strategies` is still
+  not a field of any contract**, and that did not change — `S2B-D1=A` places the permitted
+  set in an externally issued Policy Authority policy, resolved at call time, and gives
+  `CognitiveRoleContract` a **reference** to it (`strategy_policy_ref`), taking that
+  contract's cardinality from 10 to 11. The C5d roster is unchanged at five. `[I]` The
+  owner's reason for rejecting a reserved list here was borne out exactly: the ratified
+  form is a required, non-nullable C5a reference, which a reserved empty-only list could
+  not have become without being retyped and having its default removed. `[V]` "Selection
+  of a strategy, validation of a declared one against a role's permitted set, and any
+  binding of either into an identity are S2's in whole; S1 does none of them" is
+  **discharged, not still pending**: `S2B-D6=B1` binds the declaration into
+  `P_unsigned`, and `verify_strategy_permission` validates it against the resolved
+  permitted set. `[R]` What remains deferred and is **not** ratified by any of this:
+  strategy **composition** or ordering (`S2B-D3=A`), **mandate-level** narrowing or
+  per-invocation authorization (`S2B-D4=A`), **required** strategies, a fourth vocabulary
+  member, a strategy-policy **registry**, and registration of the policy family itself.
+  `[G]` **No strategy-permission policy family is registered with Policy Authority**, so
+  the mechanism cannot **execute** end to end; the resolver is injected and this package
+  implements none.
 * **A disposition-to-outcome mapping.** None is ratified. R-2 constrains
   `terminal_outcome` structurally and computes nothing.
 * **The semantic auditor.** `SemanticAuditorFindingStatus` remains defined and
@@ -2810,6 +3251,20 @@ mistakes their absence for coverage.
      Not locally decidable at S1: no S1 contract carries a permitted set, so there is
      nothing here to check a declaration against (Part J).
 
+     `[V]` **Narrowed by S2-B, and only in a disclosed way.** `S2B-D6=B1` binds a
+     declaration into `P_unsigned` — `ProposerAdvisory.declared_strategy`, a new field on
+     a different bearer — and `verify_strategy_permission` checks it against a permitted
+     set resolved from an externally issued policy, so the second and third sentences no
+     longer hold of the advisory's declaration. `[R]` **The first still holds of the work
+     itself.** `S2B-R2-Q8=A`'s sixth check compares the declared token against the token
+     the **advisory's own shape** yields; it compares nothing against the process. A
+     producer whose declaration matches its artifact's shape while its work followed
+     another method is still well-formed under every rule here, and no ruling in S2-B
+     claims otherwise: the declared procedure is **not** proven to have been executed,
+     and no observable-stage conformance is established beyond what the artifact shows.
+     `[G]` That remains blocked at root: no component records observable reasoning
+     stages.
+
 ---
 
 ## Owner decisions
@@ -2819,7 +3274,10 @@ cardinality, vocabulary or equation term; all three are about guards and depende
 OD-4 did change contract shape, and its resolution is recorded below and implemented
 throughout Part D. OD-5, ratified 2026-08-26, does **not** bear on contract shape: it
 defers the strategy permission concept and its vocabulary together to S2, so no field is
-added and `CognitiveRoleContract`'s cardinality is unchanged at 10.
+added and `CognitiveRoleContract`'s cardinality is unchanged at 10. `[V]` **That is the
+position as OD-5 left it, and S2-B has since discharged the deferral**: the concept and
+its vocabulary arrived together as OD-5(iii) required, and `CognitiveRoleContract` is now
+**11** — a policy *reference*, never the permitted set (D2, Part J).
 
 **Each of OD-1 – OD-3 therefore carries three distinct statuses**, and a reader must not
 collapse them. A ratified decision is not an implemented guard, and an implemented guard
@@ -3863,3 +4321,11 @@ independently reviewed alongside the specification it enforces — is discharged
 review happened and the freeze records it. What is left is to arm that enforcement
 against a real contract module, which is the Part I obligation above and is work, not
 permission.
+
+`[V]` **The freeze has since been amended twice, each time by a ratified owner decision
+and never by an implementation.** OD-7 amended the frozen surface at `0.2.0`; S2-B
+amended it at `0.3.0`. In both cases the amendment was ratified **before** any code was
+written, and the surface, the version and the guards moved in one change set. `[R]`
+"Frozen" therefore means *closed to change except by ratification* — it has never meant
+*unchanged*, and this document is maintained to state the ratified surface as it stands
+rather than as it was first frozen.

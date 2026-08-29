@@ -14,6 +14,7 @@ from .contracts import (
     AdvisoryCandidateSet,
     CandidateAdvisory,
     DomainEvaluationProvider,
+    ProposerAdvisory,
     ProposerProcessRecord,
 )
 from .equations import evaluate_eligibility
@@ -197,17 +198,36 @@ def build_proposer_process_record(
     tenant_id: str,
     case_ref: str,
     created_at,
-    declared_strategy: str,
+    advisory: ProposerAdvisory,
     state_transitions: list,
     tool_invocations: list[str],
     candidate_ids: list[str],
     selected_candidate_id: "str | None",
     terminal_outcome: TerminalOutcome,
-    advisory_digest: str,
     started_at,
     completed_at,
 ) -> ProposerProcessRecord:
-    """H1. Enforces R-2, R-3 and R-4 through the model's own validators.
+    """H1, as amended by S2-B rider `R1` (`S2B-S1-Q5=A`, `S2B-S1-Q10=A`). Enforces
+    R-2, R-3 and R-4 through the model's own validators.
+
+    **``declared_strategy`` and ``advisory_digest`` are no longer parameters.** Both
+    are replaced by the single ``advisory`` parameter and **derived from it**. `[I]`
+    Derivation is what prevents divergence at construction: a caller cannot hand this
+    builder a declaration or a digest reference that disagrees with the advisory the
+    record is about, because it hands over the advisory instead and this builder reads
+    both values off it.
+
+    `[R]` Derivation is **defence in depth, not the guarantee.** The two artifacts are
+    transported independently, so the guarantee is ``verify_strategy_permission``'s
+    fifth check, which re-establishes the same equality at replay across two
+    separately received objects. `[R]` And that equality proves correspondence between
+    **two observable fields** only — that the record and the advisory name the same
+    declared strategy. It never proves conformance with private reasoning, and never
+    proves that the declared procedure was executed.
+
+    `[R]` This change sits **outside** A13's enumeration of four builders: A13 names the
+    four carrying provider and profile parameters, and this is the fifth. A13 stands
+    intact for its four.
 
     R-2's locally decidable half — ``PROPOSAL`` requires a selection — is enforced by
     the record's own validator. Its other conjunct, ``evaluate_readiness(...) is True``
@@ -233,7 +253,8 @@ def build_proposer_process_record(
         "created_at": created_at,
         "process_record_id": process_record_id,
         "case_ref": case_ref,
-        "declared_strategy": declared_strategy,
+        # Rider `R1`: derived from the proposal-bound declaration, never supplied.
+        "declared_strategy": advisory.declared_strategy,
         "state_transitions": list(state_transitions),
         "tool_invocations": list(tool_invocations),
         "deterministic_checks": [],
@@ -242,7 +263,13 @@ def build_proposer_process_record(
         "semantic_audit_refs": [],
         "terminal_outcome": terminal_outcome,
         "reason_codes": [],
-        "advisory_digest": advisory_digest,
+        # Rider `R1`: derived from the advisory this record is about. Still a foreign
+        # key (D8), not an identity computation, and not reachable from either
+        # advisory type (A3) — which is why it stays in a plain field mapping rather
+        # than becoming an ``advisory_digest=`` keyword the identity-source guard
+        # would read as an unpermitted identity source on a field where no identity
+        # is being computed at all.
+        "advisory_digest": advisory.advisory_digest,
         "jcs_distribution_version": _resolve_installed_substrate_version(),
         "started_at": started_at,
         "completed_at": completed_at,

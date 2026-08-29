@@ -103,8 +103,8 @@ def test_public_api_exports_only_the_vocabulary_and_version():
     """I6. The S0 export pin, updated to the full H3 surface in the same change that
     introduced the first contract, and again to H3 **as amended by OD-7** in the same
     change set that implements it (docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md,
-    Part H3). Forty-six names: the thirty-nine 0.1.0 froze, none removed, plus OD-7's
-    seven."""
+    Part H3). Fifty-one names: the thirty-nine 0.1.0 froze, none removed, plus OD-7's
+    seven at 0.2.0 and S2-B's five at 0.3.0 (`S2B-S1-Q6=A`, `S2B-R2-Q4=A`)."""
     assert set(ap.__all__) == {
         # Contracts (8)
         "AgentIdentityRef", "CognitiveRoleContract", "WorkMandate",
@@ -115,11 +115,13 @@ def test_public_api_exports_only_the_vocabulary_and_version():
         # OD-7 call-boundary shapes (2) and the injected-evaluator protocol (1)
         "DomainEvaluationRequest", "DomainEvaluationResponse",
         "DomainEvaluationProvider",
-        # Enums (11)
+        # S2-B call-boundary shapes (2) and the injected-resolver protocol (1)
+        "StrategyPolicyRequest", "StrategyPolicyResponse", "StrategyPolicyResolver",
+        # Enums (12)
         "TerminalOutcome", "CandidateDisposition", "SemanticAuditorFindingStatus",
         "ReviewAction", "DomainCheckCompletion", "AgentLifecycleState",
         "RoleActivationStatus", "ToolOperationClass", "ToolObservationAdmissionStatus",
-        "ProposerProcessState", "DomainEvaluationOutcome",
+        "ProposerProcessState", "DomainEvaluationOutcome", "ReasoningStrategy",
         # Builders (5)
         "build_candidate_advisory", "build_advisory_candidate_set",
         "build_proposer_advisory", "build_advisory_revision",
@@ -128,10 +130,10 @@ def test_public_api_exports_only_the_vocabulary_and_version():
         "evaluate_eligibility", "evaluate_readiness",
         # Identity functions (2)
         "compute_advisory_identity", "verify_advisory_identity",
-        # Verifiers (5)
+        # Verifiers (6)
         "verify_candidate_eligibility", "verify_advisory_selection",
         "verify_observation_resolution", "verify_domain_evaluation",
-        "verify_deterministic_selection",
+        "verify_deterministic_selection", "verify_strategy_permission",
         # Exceptions (3)
         "EligibilityMismatchError", "CrossContractViolationError",
         "DomainEvaluationProviderError",

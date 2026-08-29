@@ -56,7 +56,8 @@ def _world():
         permitted_tool_scopes=["invoice.read"],
         permitted_candidate_dispositions=[ap.CandidateDisposition.RECOMMEND_WITHHOLD],
         permitted_review_actions=[ap.ReviewAction.ROUTE_APPROVAL_BUNDLE],
-        escalation_role_ref="role-2", activation_status=ap.RoleActivationStatus.ACTIVE)
+        escalation_role_ref="role-2", activation_status=ap.RoleActivationStatus.ACTIVE,
+        strategy_policy_ref=spec.STRATEGY_POLICY_REF)
     mandate = ap.WorkMandate(
         schema_version="1.0", tenant_id="tenant-1", created_at=FIXED_INSTANT,
         mandate_id="mandate-1", case_ref="case-1", assigned_role_contract_id="role-1",
@@ -107,7 +108,16 @@ def _set(candidates, *, selected=None, profile=True):
             spec.PROFILE_VERSION if (any_complete and profile) else None))
 
 
-def _advisory(world, candidate_set, *, provider=None, destination="role-approver"):
+def _advisory(world, candidate_set, *, provider=None, destination="role-approver",
+              strategy_policy_resolver=None, declared_strategy=None):
+    """``declared_strategy`` defaults to the member this advisory's own shape yields —
+    no parent here, so it turns on the candidate count (`S2B-R2-Q1=A`). A test that
+    wants a mismatch passes one explicitly."""
+    if declared_strategy is None:
+        declared_strategy = (
+            ap.ReasoningStrategy.SINGLE_CANDIDATE_UNREVISED
+            if len(candidate_set.candidates) == 1
+            else ap.ReasoningStrategy.MULTI_CANDIDATE_UNREVISED)
     return ap.build_proposer_advisory(
         tenant_id="tenant-1", case_ref="case-1", created_at=FIXED_INSTANT,
         identity=world["identity"], role=world["role"], mandate=world["mandate"],
@@ -118,7 +128,10 @@ def _advisory(world, candidate_set, *, provider=None, destination="role-approver
         expected_profile_id=spec.PROFILE_ID,
         expected_profile_version=spec.PROFILE_VERSION,
         requested_review_destination_role_ref=(
-            destination if candidate_set.selected_candidate_id is not None else None))
+            destination if candidate_set.selected_candidate_id is not None else None),
+        strategy_policy_resolver=(
+            strategy_policy_resolver or spec.StubStrategyPolicyResolver()),
+        declared_strategy=declared_strategy)
 
 
 # --------------------------------------------------------------------------- #
@@ -641,14 +654,20 @@ def test_i8_10_proposal_is_unreachable_for_an_unsatisfied_candidate(world, outco
     """
     candidate_set = _set([_candidate("cand-1", outcome=outcome)], selected=None)
     assert candidate_set.selected_candidate_id is None
+    # Under rider `R1` the record derives its digest reference and its declaration
+    # from a real advisory rather than taking either as a parameter, so this builds
+    # the advisory the record would be about. The provider is told to reproduce the
+    # candidate's own stored outcome, which is what OD-7 part 5's replay requires.
+    advisory = _advisory(
+        world, candidate_set,
+        provider=spec.StubDomainEvaluationProvider(default=outcome))
     with pytest.raises(pydantic.ValidationError):
         ap.build_proposer_process_record(
             process_record_id="rec-1", tenant_id="tenant-1", case_ref="case-1",
-            created_at=FIXED_INSTANT, declared_strategy="reconcile and propose",
+            created_at=FIXED_INSTANT, advisory=advisory,
             state_transitions=[], tool_invocations=[], candidate_ids=["cand-1"],
             selected_candidate_id=candidate_set.selected_candidate_id,
             terminal_outcome=ap.TerminalOutcome.PROPOSAL,
-            advisory_digest=spec.PLACEHOLDER_DIGEST,
             started_at=FIXED_INSTANT, completed_at=FIXED_INSTANT)
 
 
@@ -660,11 +679,10 @@ def test_i8_10_v13_no_longer_refuses_proposal_outright(world):
     advisory = _advisory(world, candidate_set)
     record = ap.build_proposer_process_record(
         process_record_id="rec-1", tenant_id="tenant-1", case_ref="case-1",
-        created_at=FIXED_INSTANT, declared_strategy="reconcile and propose",
+        created_at=FIXED_INSTANT, advisory=advisory,
         state_transitions=[], tool_invocations=[], candidate_ids=["cand-1"],
         selected_candidate_id="cand-1",
         terminal_outcome=ap.TerminalOutcome.PROPOSAL,
-        advisory_digest=advisory.advisory_digest,
         started_at=FIXED_INSTANT, completed_at=FIXED_INSTANT)
     assert record.terminal_outcome is ap.TerminalOutcome.PROPOSAL
 
@@ -712,7 +730,7 @@ def test_i8_10_build_proposer_advisory_recomputes_readiness_rather_than_assuming
 
 
 @pytest.mark.parametrize("contract,expected", [
-    ("AdvisoryCandidateSet", 12), ("CandidateAdvisory", 11), ("ProposerAdvisory", 27)])
+    ("AdvisoryCandidateSet", 12), ("CandidateAdvisory", 11), ("ProposerAdvisory", 30)])
 def test_i8_11_the_moved_cardinalities_agree_with_src(contract, expected):
     """The amendment's own arithmetic — 8 -> 12, 10 -> 11, 23 -> 27 — re-verified
     against ``src/`` rather than trusted, exactly as OD-4's cardinality claims were.

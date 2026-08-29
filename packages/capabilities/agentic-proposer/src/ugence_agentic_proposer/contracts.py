@@ -9,8 +9,11 @@ nested public shapes exported for typing and never transported alone —
 
 Three further call-boundary shapes OD-7 part 2 adds — ``DomainEvaluationRequest``,
 ``DomainEvaluationResponse`` and the ``DomainEvaluationProvider`` protocol — are
-declared here too. None of them is a contract: none carries a C2 common field, none is
-stored, transported or reachable from ``P_unsigned``, and none has an identity role.
+declared here too, and S2-B adds three more on exactly the same terms —
+``StrategyPolicyRequest``, ``StrategyPolicyResponse`` and the
+``StrategyPolicyResolver`` protocol (`S2B-S1-Q9=A`). None of the six is a contract:
+none carries a C2 common field, none is stored, transported or reachable from
+``P_unsigned``, and none has an identity role.
 
 This module declares the models and the validations that are locally decidable from
 one instance of one contract: C1 (model configuration), C2 (common fields), C4
@@ -54,6 +57,7 @@ from .vocabulary import (
     DomainCheckCompletion,
     DomainEvaluationOutcome,
     ProposerProcessState,
+    ReasoningStrategy,
     ReviewAction,
     RoleActivationStatus,
     TerminalOutcome,
@@ -75,6 +79,9 @@ __all__ = [
     "DomainEvaluationRequest",
     "DomainEvaluationResponse",
     "DomainEvaluationProvider",
+    "StrategyPolicyRequest",
+    "StrategyPolicyResponse",
+    "StrategyPolicyResolver",
     "ADVISORY_KIND",
 ]
 
@@ -301,6 +308,18 @@ class CognitiveRoleContract(BaseModel):
     ]
     escalation_role_ref: Identifier
     activation_status: RoleActivationStatus
+    #: `S2B-D1=A` / `S2B-S1-Q2=A` / `S2B-R2-Q3=A`. A **reference only** to an
+    #: externally issued, signed, versioned and revocable Policy Authority
+    #: strategy-permission policy. C5a: an opaque handle minted by that issuer,
+    #: carried and compared whole, never split or normalised.
+    #:
+    #: `[R]` The role does **not** carry the permitted set as role data. Resolving
+    #: this reference to a policy — and so to a permitted set — is the injected
+    #: ``StrategyPolicyResolver``'s responsibility, and this package implements no
+    #: resolver. `[R]` Under the D1 rider this is **not** a constitution-derived
+    #: attribute, so it sits inside D8's existing containment bounds and adds no role
+    #: lifecycle verb.
+    strategy_policy_ref: Identifier
 
     @field_validator("created_at", mode="after")
     @classmethod
@@ -797,6 +816,118 @@ class DomainEvaluationProvider(Protocol):
 
 
 # --------------------------------------------------------------------------- #
+# S2-B (`S2B-S1-Q9=A`, `S2B-R2-Q4=A`) — the strategy-policy resolver boundary: two
+# call shapes and one protocol.
+#
+# None of the three is a contract, on exactly the terms OD-7's evaluator boundary
+# established: no C2 common field, no identity role, never stored, transported or
+# included in ``P_unsigned``. Only the *values the response carries* are bound, and
+# they are bound as ``ProposerAdvisory`` fields — fields of a contract.
+#
+# `[R]` **This package OWNS the protocol and does NOT implement it.** The governing
+# strategy-permission policy is issued by Policy Authority — the single platform-wide
+# issuer/verifier of signed, versioned, revocable policy families (P-1 … P-11) — and
+# resolved by an object the caller supplies already constructed. `[R]` Agentic
+# Proposer is expressly **excluded as an issuer** (`S2B-D1=A`), together with Agent
+# Runtime, Model Authority, Decision Authority and Risk Authority: a capability's
+# authority for one responsibility does not transfer to another.
+#
+# This boundary authorizes **no** networking, storage, service discovery or
+# plugin-loading mechanism of any kind, and imports no concrete resolver. The
+# injected object is a plain in-process callable, nothing more.
+#
+# `[G]` **Disclosed, and not this package's to fix: no strategy-permission policy
+# family is registered with Policy Authority**, so nothing here can EXECUTE end to
+# end today. That blocks execution, not implementation — the protocol is injected, on
+# the ``DomainEvaluationProvider`` precedent.
+# --------------------------------------------------------------------------- #
+
+
+class StrategyPolicyRequest(BaseModel):
+    """`S2B-S1-Q9=A`. What this package asks the resolver.
+
+    ``as_of`` is **caller-supplied**, never a wall clock (C4): no module in ``src``
+    reads the current time, and a resolution instant chosen inside this package would
+    make the same stored artifacts resolve differently on different days with nothing
+    recording why. The builders pass the advisory's own caller-supplied ``created_at``,
+    so the policy consulted is the one in force at the instant the advisory asserts.
+    """
+
+    model_config = _MODEL_CONFIG
+
+    #: C5a. The role contract's ``strategy_policy_ref``, carried whole.
+    strategy_policy_ref: Identifier
+    tenant_id: Identifier
+    case_ref: Identifier
+    as_of: datetime
+
+    @field_validator("as_of", mode="after")
+    @classmethod
+    def _validate_datetimes(cls, value):
+        return _require_aware_utc(value)
+
+    @field_serializer("as_of")
+    def _serialize_datetimes(self, value):
+        return _serialize_z(value)
+
+
+class StrategyPolicyResponse(BaseModel):
+    """`S2B-S1-Q9=A`. What the resolver answers: the resolved policy's identity, its
+    version **as a string**, the permitted set, and an **echo of the reference**.
+
+    `[R]` **The version is a string** (C5b ``Token``), never a number. C3 bars every
+    numeric type from this contract family at any depth, and this shape's values are
+    stamped straight onto ``ProposerAdvisory``.
+
+    `[R]` **There is no ``verified`` boolean, and none is ratified.** A boolean a
+    resolver sets is the resolver asserting its own trustworthiness, which establishes
+    nothing: independently verifying the policy's issuer and signature through Policy
+    Authority resolution is a **separate call**, outside this boundary, that neither
+    this shape nor any digest supplies.
+
+    `[R]` **``permitted_strategies`` may be empty, and an empty set is constructible
+    here on purpose.** ``verify_strategy_permission``'s third check exists to report
+    exactly that state, and a non-empty validator would move a replay check into
+    construction and put it out of reach of the replay it was ratified as.
+
+    **The echo is a correlation check, not a defence against a dishonest resolver** —
+    the same limit OD-7's evaluator echo carries and for the same reason. It catches a
+    resolver that mixed up concurrent requests, answered under a stale reference or was
+    wired up wrongly. A resolver that wishes to mislead echoes back what it was handed
+    while resolving something else, and nothing in this boundary can detect that.
+    """
+
+    model_config = _MODEL_CONFIG
+
+    #: C5b — matched by equality against the advisory's stamped value at replay.
+    strategy_policy_id: Token
+    #: C5b, and a **string** (C3).
+    strategy_policy_version: Token
+    #: The strategies this policy permits the role to declare. Order is not
+    #: significant: this shape enters no digest, and membership is the only operation
+    #: performed on it (`S2B-S1-Q4=A`: exact codepoint equality, here carried by enum
+    #: identity — no normalizer, no casefolding, no trimming, no splitting).
+    permitted_strategies: tuple[ReasoningStrategy, ...] = ()
+    #: The echo of ``StrategyPolicyRequest.strategy_policy_ref``.
+    strategy_policy_ref: Identifier
+
+
+@runtime_checkable
+class StrategyPolicyResolver(Protocol):
+    """`S2B-S1-Q9=A`. The narrow injected protocol, and the whole of the
+    strategy-policy boundary this package owns.
+
+    Agentic Proposer owns the protocol, the input and output shapes, the call and the
+    replay. It owns **no policy**, issues none, registers none, and holds no registry
+    mapping a policy identity to its definition. `[R]` A model, agent, caller or
+    proposer may **request or declare**; **none may authorize.**
+    """
+
+    def resolve(self, *, request: StrategyPolicyRequest) -> StrategyPolicyResponse:
+        ...
+
+
+# --------------------------------------------------------------------------- #
 # D7 — ProposerAdvisory
 # --------------------------------------------------------------------------- #
 
@@ -847,6 +978,25 @@ class ProposerAdvisory(BaseModel):
     selected_candidate_id: Optional[Identifier] = None
     selection_policy_id: Optional[Token] = None
     selection_policy_version: Optional[Token] = None
+    #: `S2B-D6=B1` with `S2B-S1-Q2=A`, `S2B-R2-Q3=A` and `S2B-R2-Q5=A`. The three
+    #: S2-B fields: the governing strategy policy's identity and version, and one
+    #: direct scalar declared-strategy assertion. All three are **required,
+    #: non-nullable and identity-participating** — they are inside ``P_unsigned``, and
+    #: that is the whole of what `D6=B1` chose over the weak linked-record shape: the
+    #: advisory digest binds the declaration, so a digest-valid advisory cannot have
+    #: its declaration absent, replaced or never produced.
+    #:
+    #: `[R]` **The first two are package-stamped** from the injected resolver's
+    #: response and are **never** builder parameters (`S2B-D7=A`), on OD-7 part 5's
+    #: selector-policy precedent: accepting them from a caller would let a caller
+    #: label an advisory with a policy that did not govern it.
+    #:
+    #: `[R]` **``declared_strategy`` is the producer's assertion**, bound as an
+    #: assertion and never as an authorization. Digest membership proves integrity
+    #: after construction, never provenance.
+    strategy_policy_id: Token
+    strategy_policy_version: Token
+    declared_strategy: ReasoningStrategy
     recommended_disposition: Optional[CandidateDisposition] = None
     requested_review_action: Optional[ReviewAction] = None
     requested_review_destination_role_ref: Optional[Identifier] = None
@@ -900,6 +1050,40 @@ class ProposerAdvisory(BaseModel):
     @field_serializer("created_at", "expires_at")
     def _serialize_datetimes(self, value):
         return _serialize_z(value)
+
+
+# --------------------------------------------------------------------------- #
+# `S2B-R2-Q1=A` / `S2B-R2-Q8=A` — the strategy a lawful advisory's own shape yields.
+#
+# Stated once, here, and read only by ``verify_strategy_permission``'s sixth check.
+# It is deliberately NOT consulted at construction: `S2B-R2-Q8=A` establishes the
+# declared-token/shape-derived-token equality **at replay, never by construction**, so
+# the declaration stays the producer's own digest-bound commitment rather than a value
+# this package computes and then compares against itself.
+#
+# It is not exported. `S2B-S1-Q6=A` and `S2B-R2-Q4=A` authorize exactly five new
+# public names, and this is not one of them.
+# --------------------------------------------------------------------------- #
+
+
+def shape_derived_strategy(advisory) -> ReasoningStrategy:
+    """The single member the two observable axes `S2B-R2-Q1=A` names — parent binding,
+    then candidate count — yield for this advisory.
+
+    The three members are **disjoint and exhaustive** over every lawful advisory
+    (``candidates`` rejects an empty sequence), so this is total: every constructible
+    ``ProposerAdvisory`` yields exactly one member and no fall-through exists.
+
+    `[R]` **No member carries a condition on the selector**, so this reads neither
+    ``selected_candidate_id`` nor any selection-dependent field: under OD-8 a lawful
+    multi-candidate advisory may carry a null selector, and a selector condition would
+    leave it matching no member.
+    """
+    if advisory.parent_advisory_digest is not None:
+        return ReasoningStrategy.REVISED_ADVISORY
+    if len(advisory.candidates) == 1:
+        return ReasoningStrategy.SINGLE_CANDIDATE_UNREVISED
+    return ReasoningStrategy.MULTI_CANDIDATE_UNREVISED
 
 
 # --------------------------------------------------------------------------- #
@@ -984,9 +1168,22 @@ class ProposerProcessRecord(BaseModel):
 
     process_record_id: Identifier
     case_ref: Identifier
-    #: C5c, non-empty, opaque, not an enum (OD-1). Metadata outside P_unsigned: it
-    #: states what the producer asserts was used, and establishes no conformance.
-    declared_strategy: Annotated[str, StringConstraints(min_length=1)]
+    #: `S2B-D6` rider `R1`, with `S2B-S1-Q3=A` and `S2B-R2-Q5=A`. **Retyped** from
+    #: S1's C5c opaque string to the closed ``ReasoningStrategy`` vocabulary, so the
+    #: field is **fail-closed at construction**: a non-member is refused here rather
+    #: than surviving to replay. `[V]` The options were not equivalent — a stored
+    #: space-free value passes a C5b ``Token`` and fails the enum — and the ruling
+    #: accepts that strictly larger invalidation of stored records in exchange.
+    #:
+    #: Still metadata outside ``P_unsigned``: this record is not referenced by
+    #: ``ProposerAdvisory`` and is not reachable from it (D9), so no value here can
+    #: change an advisory identity. Under rider `R1` it is **derived** from the
+    #: proposal-bound declaration at construction and subjected to exact equality at
+    #: replay. `[R]` That equality proves correspondence between **two observable
+    #: fields** — that the record and the advisory name the same declared strategy. It
+    #: never proves conformance with private reasoning, and never proves that the
+    #: declared procedure was executed.
+    declared_strategy: ReasoningStrategy
     state_transitions: list[ProposerProcessStateTransition] = []
     tool_invocations: list[Token] = []
     #: C5d — awaits a catalogue of the checks a producer may name (Part J).
