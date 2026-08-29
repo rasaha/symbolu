@@ -1,7 +1,7 @@
 {
   "schema": "p3e-container-gate-definition.v1",
   "title": "Canonical P3E container gate definition",
-  "status": "PUBLISHED_2_DEFINED_HISTORICAL_15_UNDEFINED_HISTORICAL",
+  "status": "RETIRED_SUPERSEDED",
   "owner": "rasaha",
   "owner_confirmed_on": "2026-08-29",
   "published_on": "2026-08-29",
@@ -493,10 +493,24 @@
       "Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_COMPLETION_LIVE_STATE.md"
     ]
   },
-  "historical_family_note": "This file is the register of the historical C-family. Every gate in it remains NOT_EXECUTED. Because fifteen of the seventeen are undefined and unrecoverable, a replacement family derived from the container job's actual steps is PROPOSED - not ratified - in CONTAINER_GATE_FAMILY_PROPOSAL.json. That proposal asserts no correspondence to any identifier in this file.",
-  "proposed_replacement_family": {
+  "historical_family_note": "This file is the immutable register of the retired historical C-family. Every gate in it remains NOT_EXECUTED. Active gating is defined by the ratified P3E-CTR family, which asserts no correspondence to any identifier here.",
+  "retirement": {
+    "status": "RETIRED_SUPERSEDED",
+    "retired_by": "rasaha",
+    "retired_on": "2026-08-29",
+    "superseded_by": {
+      "family": "P3E-CTR",
+      "file": "docs/audits/ugence_governance_studio_p3e/CONTAINER_GATE_FAMILY_PROPOSAL.json",
+      "status": "RATIFIED"
+    },
+    "register_preservation": "IMMUTABLE - this file remains the historical register. Retirement removes the family from active use; it does not delete, rewrite or reinterpret any entry. C2 and C4 stay DEFINED_HISTORICAL_GATE, C5-C19 stay UNDEFINED_HISTORICAL_GATE, and every historical execution status stays NOT_EXECUTED.",
+    "correspondence_to_the_ratified_family": "NONE ASSERTED. No historical C identifier maps to or is equated with any P3E-CTR identifier, in either direction.",
+    "what_ratification_of_the_successor_means": "The successor family's ratification defines requirements only. It executes no gate and passes no gate, in either family."
+  },
+  "superseded_by": {
     "file": "docs/audits/ugence_governance_studio_p3e/CONTAINER_GATE_FAMILY_PROPOSAL.json",
-    "status": "PROPOSED_AWAITING_OWNER_RATIFICATION",
+    "family": "P3E-CTR",
+    "status": "RATIFIED",
     "correspondence_to_this_family": "none asserted"
   }
 }
