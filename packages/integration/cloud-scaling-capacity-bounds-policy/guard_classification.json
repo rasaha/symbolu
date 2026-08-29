@@ -1,0 +1,230 @@
+{
+  "package": "capacity-bounds-policy",
+  "total": 37,
+  "scored": 37,
+  "excluded": 0,
+  "classification": {
+    "1": {
+      "status": "SCORED",
+      "module": "policy.py",
+      "line": 64,
+      "condition": "not isinstance(value, str)"
+    },
+    "2": {
+      "status": "SCORED",
+      "module": "policy.py",
+      "line": 68,
+      "condition": "not allow_empty and (not value.strip())"
+    },
+    "3": {
+      "status": "SCORED",
+      "module": "policy.py",
+      "line": 76,
+      "condition": "not isinstance(value, str) or len(value) != 64 or any((c not in _HEX for c in value))"
+    },
+    "4": {
+      "status": "SCORED",
+      "module": "policy.py",
+      "line": 92,
+      "condition": "isinstance(value, bool) or not isinstance(value, int)"
+    },
+    "5": {
+      "status": "SCORED",
+      "module": "policy.py",
+      "line": 97,
+      "condition": "value < 0"
+    },
+    "6": {
+      "status": "SCORED",
+      "module": "policy.py",
+      "line": 105,
+      "condition": "not isinstance(value, datetime)"
+    },
+    "7": {
+      "status": "SCORED",
+      "module": "policy.py",
+      "line": 109,
+      "condition": "value.tzinfo is None or value.tzinfo.utcoffset(value) is None"
+    },
+    "8": {
+      "status": "SCORED",
+      "module": "policy.py",
+      "line": 133,
+      "condition": "_require_token(self.action_type, 'CapacityBound.action_type')"
+    },
+    "9": {
+      "status": "SCORED",
+      "module": "policy.py",
+      "line": 134,
+      "condition": "_require_token(self.resource_class, 'CapacityBound.resource_class', allow_empty=True)"
+    },
+    "10": {
+      "status": "SCORED",
+      "module": "policy.py",
+      "line": 135,
+      "condition": "_require_bound_magnitude(self.max_permitted_magnitude, 'CapacityBound.max_permitted_magnitude')"
+    },
+    "11": {
+      "status": "SCORED",
+      "module": "policy.py",
+      "line": 138,
+      "condition": "_require_bound_magnitude(self.max_permitted_delta, 'CapacityBound.max_permitted_delta')"
+    },
+    "12": {
+      "status": "SCORED",
+      "module": "policy.py",
+      "line": 141,
+      "condition": "self.max_permitted_delta > self.max_permitted_magnitude"
+    },
+    "13": {
+      "status": "SCORED",
+      "module": "policy.py",
+      "line": 177,
+      "condition": "_require_token(self.policy_id, 'CapacityBoundsPolicyMetadata.policy_id')"
+    },
+    "14": {
+      "status": "SCORED",
+      "module": "policy.py",
+      "line": 178,
+      "condition": "_require_token(self.version, 'CapacityBoundsPolicyMetadata.version')"
+    },
+    "15": {
+      "status": "SCORED",
+      "module": "policy.py",
+      "line": 179,
+      "condition": "_require_digest(self.content_digest, 'CapacityBoundsPolicyMetadata.content_digest')"
+    },
+    "16": {
+      "status": "SCORED",
+      "module": "policy.py",
+      "line": 182,
+      "condition": "_require_token(self.scope, 'CapacityBoundsPolicyMetadata.scope')"
+    },
+    "17": {
+      "status": "SCORED",
+      "module": "policy.py",
+      "line": 183,
+      "condition": "self.scope not in SUPPORTED_POLICY_SCOPES"
+    },
+    "18": {
+      "status": "SCORED",
+      "module": "policy.py",
+      "line": 188,
+      "condition": "_require_token(self.lifecycle_state, 'CapacityBoundsPolicyMetadata.lifecycle_state')"
+    },
+    "19": {
+      "status": "SCORED",
+      "module": "policy.py",
+      "line": 191,
+      "condition": "self.lifecycle_state not in SUPPORTED_LIFECYCLE_STATES"
+    },
+    "20": {
+      "status": "SCORED",
+      "module": "policy.py",
+      "line": 197,
+      "condition": "_require_token(self.tenant_id, 'CapacityBoundsPolicyMetadata.tenant_id', allow_empty=True)"
+    },
+    "21": {
+      "status": "SCORED",
+      "module": "policy.py",
+      "line": 200,
+      "condition": "_require_token(self.supersedes_ref, 'CapacityBoundsPolicyMetadata.supersedes_ref', allow_empty=True)"
+    },
+    "22": {
+      "status": "SCORED",
+      "module": "policy.py",
+      "line": 209,
+      "condition": "self.scope == POLICY_SCOPE_GLOBAL and self.tenant_id != ''"
+    },
+    "23": {
+      "status": "SCORED",
+      "module": "policy.py",
+      "line": 214,
+      "condition": "self.scope == POLICY_SCOPE_TENANT and (not self.tenant_id.strip())"
+    },
+    "24": {
+      "status": "SCORED",
+      "module": "policy.py",
+      "line": 222,
+      "condition": "value is not None"
+    },
+    "25": {
+      "status": "SCORED",
+      "module": "policy.py",
+      "line": 223,
+      "condition": "_require_tzaware(value, f'CapacityBoundsPolicyMetadata.{name}')"
+    },
+    "26": {
+      "status": "SCORED",
+      "module": "policy.py",
+      "line": 224,
+      "condition": "self.effective_from is not None and self.effective_to is not None and (self.effective_to <= self.effective_from)"
+    },
+    "27": {
+      "status": "SCORED",
+      "module": "policy.py",
+      "line": 254,
+      "condition": "not isinstance(self.metadata, CapacityBoundsPolicyMetadata)"
+    },
+    "28": {
+      "status": "SCORED",
+      "module": "policy.py",
+      "line": 259,
+      "condition": "not isinstance(self.bounds, tuple)"
+    },
+    "29": {
+      "status": "SCORED",
+      "module": "policy.py",
+      "line": 265,
+      "condition": "not self.bounds"
+    },
+    "30": {
+      "status": "SCORED",
+      "module": "policy.py",
+      "line": 271,
+      "condition": "type(bound) is not CapacityBound"
+    },
+    "31": {
+      "status": "SCORED",
+      "module": "policy.py",
+      "line": 280,
+      "condition": "bound.selector in seen"
+    },
+    "32": {
+      "status": "SCORED",
+      "module": "policy.py",
+      "line": 298,
+      "condition": "_require_token(action_type, 'bound_for(action_type)')"
+    },
+    "33": {
+      "status": "SCORED",
+      "module": "policy.py",
+      "line": 299,
+      "condition": "_require_token(resource_class, 'bound_for(resource_class)', allow_empty=True)"
+    },
+    "34": {
+      "status": "SCORED",
+      "module": "adapter.py",
+      "line": 60,
+      "condition": "not isinstance(metadata, CapacityBoundsPolicyMetadata)"
+    },
+    "35": {
+      "status": "SCORED",
+      "module": "adapter.py",
+      "line": 101,
+      "condition": "type(artifact) is not CapacityBoundsPolicy"
+    },
+    "36": {
+      "status": "SCORED",
+      "module": "adapter.py",
+      "line": 110,
+      "condition": "not isinstance(metadata, CapacityBoundsPolicyMetadata)"
+    },
+    "37": {
+      "status": "SCORED",
+      "module": "adapter.py",
+      "line": 150,
+      "condition": "not isinstance(metadata, dict) or 'content_digest' not in metadata"
+    }
+  }
+}

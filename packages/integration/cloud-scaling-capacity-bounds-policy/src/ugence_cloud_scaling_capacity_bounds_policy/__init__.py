@@ -42,6 +42,9 @@ from .errors import (
     CapacityBoundsFieldError,
     CapacityBoundsOrderingError,
     CapacityBoundsPolicyError,
+    CapacityBoundsRejectionReason,
+    rejection_reason_of,
+    with_rejection_reason,
 )
 from .identifiers import (
     ACTIVE_LIFECYCLE_STATE,
@@ -93,4 +96,7 @@ __all__ = [
     "CapacityBoundsFieldError",
     "CapacityBoundsOrderingError",
     "CapacityBoundsDuplicateError",
+    "CapacityBoundsRejectionReason",
+    "rejection_reason_of",
+    "with_rejection_reason",
 ]

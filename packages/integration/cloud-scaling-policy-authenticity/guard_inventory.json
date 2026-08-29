@@ -12,6 +12,7 @@
       "module": "canonical.py",
       "line": 89,
       "condition": "type(domain) is not str or not domain",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -21,6 +22,7 @@
       "module": "canonical.py",
       "line": 111,
       "condition": "not is_policy_digest(value)",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -30,6 +32,7 @@
       "module": "canonical.py",
       "line": 130,
       "condition": "not is_phase5a_digest(value)",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -39,6 +42,7 @@
       "module": "canonical.py",
       "line": 146,
       "condition": "type(value) is not str",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -48,6 +52,7 @@
       "module": "canonical.py",
       "line": 151,
       "condition": "not allow_empty and value == ''",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -57,6 +62,7 @@
       "module": "canonical.py",
       "line": 153,
       "condition": "unicodedata.normalize('NFC', value) != value",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -66,6 +72,7 @@
       "module": "canonical.py",
       "line": 169,
       "condition": "text != text.strip()",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -75,6 +82,7 @@
       "module": "canonical.py",
       "line": 171,
       "condition": "any((ch.isspace() and ch != ' ' for ch in text))",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -84,6 +92,7 @@
       "module": "canonical.py",
       "line": 184,
       "condition": "type(value) is not datetime",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -93,6 +102,7 @@
       "module": "canonical.py",
       "line": 186,
       "condition": "value.tzinfo is None or value.utcoffset() is None",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -102,6 +112,7 @@
       "module": "canonical.py",
       "line": 202,
       "condition": "type(value) is not expected",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -111,6 +122,7 @@
       "module": "identifiers.py",
       "line": 186,
       "condition": "VERIFICATION_PROFILE == POLICY_AUTHORITY_PROTOCOL_ID",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -120,6 +132,7 @@
       "module": "identifiers.py",
       "line": 191,
       "condition": "POLICY_AUTHENTICITY_DIGEST_DOMAIN == POLICY_BODY_DIGEST_DOMAIN",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -129,6 +142,7 @@
       "module": "identifiers.py",
       "line": 196,
       "condition": "len({POLICY_AUTHENTICITY_DIGEST_DOMAIN, POLICY_AUTHENTICITY_VERIFIED_FACTS_DOMAIN, POLICY_AUTHENTICITY_RECORDED_FACTS_DOMAIN}) != 3",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -138,6 +152,7 @@
       "module": "identifiers.py",
       "line": 210,
       "condition": "REQUIRED_KEY_ENTITLEMENT is FORBIDDEN_KEY_ENTITLEMENT",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -147,6 +162,7 @@
       "module": "identifiers.py",
       "line": 224,
       "condition": "CANONICAL_ACTION_TYPES != _RATIFIED_ACTION_TYPES",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -156,6 +172,7 @@
       "module": "resolution_port.py",
       "line": 193,
       "condition": "registry is None",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -165,6 +182,7 @@
       "module": "resolution_port.py",
       "line": 195,
       "condition": "signature_verifier is None",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -174,6 +192,7 @@
       "module": "resolution_port.py",
       "line": 200,
       "condition": "not isinstance(adapters, AdapterRegistry)",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -183,6 +202,7 @@
       "module": "resolution_port.py",
       "line": 206,
       "condition": "not hasattr(registry, attribute)",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -192,6 +212,7 @@
       "module": "resolution_port.py",
       "line": 210,
       "condition": "not hasattr(signature_verifier, 'verify')",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -201,6 +222,7 @@
       "module": "resolution_port.py",
       "line": 354,
       "condition": "REFERENCE_GRADE_PORTS and isinstance(port, REFERENCE_GRADE_PORTS)",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -210,6 +232,7 @@
       "module": "resolution_port.py",
       "line": 359,
       "condition": "getattr(port, 'is_production_authoritative', False) is not True",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -219,6 +242,7 @@
       "module": "verified.py",
       "line": 279,
       "condition": "smuggled",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -228,6 +252,7 @@
       "module": "verified.py",
       "line": 296,
       "condition": "not_a_field",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -237,6 +262,7 @@
       "module": "verified.py",
       "line": 356,
       "condition": "isinstance(value, bool) or type(value) is not int",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -246,6 +272,7 @@
       "module": "verified.py",
       "line": 360,
       "condition": "value < 0",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -255,6 +282,7 @@
       "module": "verified.py",
       "line": 446,
       "condition": "self.construction_token is not _VERIFICATION_TOKEN",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -264,6 +292,7 @@
       "module": "verified.py",
       "line": 453,
       "condition": "self.verification_profile != VERIFICATION_PROFILE",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -273,6 +302,7 @@
       "module": "verified.py",
       "line": 457,
       "condition": "self.verification_profile_version != VERIFICATION_PROFILE_VERSION",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -282,6 +312,7 @@
       "module": "verified.py",
       "line": 461,
       "condition": "self.policy_trust_anchor_owner != POLICY_TRUST_ANCHOR_OWNER",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -291,6 +322,7 @@
       "module": "verified.py",
       "line": 466,
       "condition": "self.authority_protocol_id != POLICY_AUTHORITY_PROTOCOL_ID",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -300,6 +332,7 @@
       "module": "verified.py",
       "line": 471,
       "condition": "self.authority_canonicalization_version != POLICY_AUTHORITY_CANONICALIZATION_VERSION",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -309,6 +342,7 @@
       "module": "verified.py",
       "line": 476,
       "condition": "self.signature_alg not in SUPPORTED_SIGNATURE_ALGORITHMS",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -318,6 +352,7 @@
       "module": "verified.py",
       "line": 488,
       "condition": "self.candidate_digest_fact is not None",
+      "kind": "if",
       "shape": "raising-helper call",
       "recorded_in": "",
       "outcome": ""
@@ -327,6 +362,7 @@
       "module": "verified.py",
       "line": 495,
       "condition": "self.capacity_bounds_fact is not None",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -336,6 +372,7 @@
       "module": "verified.py",
       "line": 496,
       "condition": "type(self.capacity_bounds_fact) is not tuple",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -345,6 +382,7 @@
       "module": "verified.py",
       "line": 501,
       "condition": "not self.capacity_bounds_fact",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -354,6 +392,7 @@
       "module": "verified.py",
       "line": 508,
       "condition": "type(bound) is not VerifiedCapacityBound",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -363,6 +402,7 @@
       "module": "verified.py",
       "line": 516,
       "condition": "len(set(selectors)) != len(selectors)",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -372,6 +412,7 @@
       "module": "verified.py",
       "line": 525,
       "condition": "self.policy_content_digest != self.policy_body_digest",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -381,6 +422,7 @@
       "module": "verified.py",
       "line": 534,
       "condition": "self.artifact_digest != expected",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -390,6 +432,7 @@
       "module": "verified.py",
       "line": 675,
       "condition": "name in RECORDED_FACT_NAMES",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -399,6 +442,7 @@
       "module": "verified.py",
       "line": 681,
       "condition": "name not in VERIFIED_FACT_NAMES",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -408,6 +452,7 @@
       "module": "verified.py",
       "line": 695,
       "condition": "name not in RECORDED_FACT_NAMES",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -417,6 +462,7 @@
       "module": "verified.py",
       "line": 737,
       "condition": "type(value) is not VerifiedPolicyAuthenticity",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -426,6 +472,7 @@
       "module": "verified.py",
       "line": 751,
       "condition": "value.construction_token is not _VERIFICATION_TOKEN",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -435,6 +482,7 @@
       "module": "verified.py",
       "line": 756,
       "condition": "value.artifact_digest not in _MINTED_DIGESTS",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -444,6 +492,7 @@
       "module": "verified.py",
       "line": 763,
       "condition": "value.artifact_digest != value.digest()",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -453,6 +502,7 @@
       "module": "verified.py",
       "line": 775,
       "condition": "VERIFIED_FACT_NAMES & RECORDED_FACT_NAMES",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -462,6 +512,7 @@
       "module": "verified.py",
       "line": 780,
       "condition": "_PARTITIONED != _DECLARED",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -471,6 +522,7 @@
       "module": "verification.py",
       "line": 152,
       "condition": "type(self.outcome) is not _Outcome",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -480,6 +532,7 @@
       "module": "verification.py",
       "line": 157,
       "condition": "self.outcome is _Outcome.VERIFIED",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -489,6 +542,7 @@
       "module": "verification.py",
       "line": 190,
       "condition": "(self.verified_policy is None) == (self.refusal is None)",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -498,6 +552,7 @@
       "module": "verification.py",
       "line": 195,
       "condition": "self.verified_policy is not None",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -507,6 +562,7 @@
       "module": "verification.py",
       "line": 196,
       "condition": "type(self.verified_policy) is not VerifiedPolicyAuthenticity",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -516,6 +572,7 @@
       "module": "verification.py",
       "line": 207,
       "condition": "type(self.resolution) is not PolicyResolution",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -525,6 +582,7 @@
       "module": "verification.py",
       "line": 214,
       "condition": "self.refusal is not None and type(self.refusal) is not PolicyAuthenticityRefusal",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -534,6 +592,7 @@
       "module": "verification.py",
       "line": 240,
       "condition": "resolution.requested_coordinate != coordinate",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -543,6 +602,7 @@
       "module": "verification.py",
       "line": 247,
       "condition": "type(record) is not IssuedPolicyRecord or record.coordinate != coordinate",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -552,6 +612,7 @@
       "module": "verification.py",
       "line": 252,
       "condition": "record.policy_body_digest != artifact.policy_body_digest",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -561,6 +622,7 @@
       "module": "verification.py",
       "line": 259,
       "condition": "resolution.as_of != artifact.resolved_as_of_fact",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -570,6 +632,7 @@
       "module": "verification.py",
       "line": 266,
       "condition": "resolution.historical or resolution.implies_current_validity is not True",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -579,6 +642,7 @@
       "module": "verification.py",
       "line": 310,
       "condition": "resolution_port is None",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -588,6 +652,7 @@
       "module": "verification.py",
       "line": 315,
       "condition": "not hasattr(resolution_port, 'resolve_policy_version')",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -597,6 +662,7 @@
       "module": "verification.py",
       "line": 321,
       "condition": "not is_policy_digest(digest)",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -606,6 +672,7 @@
       "module": "verification.py",
       "line": 327,
       "condition": "production_mode",
+      "kind": "if",
       "shape": "raising-helper call",
       "recorded_in": "",
       "outcome": ""
@@ -615,6 +682,7 @@
       "module": "verification.py",
       "line": 412,
       "condition": "type(coordinate) is not PolicyCoordinate",
+      "kind": "if",
       "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "UNSUPPORTED_EXACT_TYPE"
@@ -624,6 +692,7 @@
       "module": "verification.py",
       "line": 419,
       "condition": "type(expected_reference_tenant_id) is not str",
+      "kind": "if",
       "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "UNSUPPORTED_EXACT_TYPE"
@@ -633,6 +702,7 @@
       "module": "verification.py",
       "line": 424,
       "condition": "type(as_of) is not datetime or as_of.tzinfo is None or as_of.utcoffset() is None",
+      "kind": "if",
       "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "UNSUPPORTED_EXACT_TYPE"
@@ -642,6 +712,7 @@
       "module": "verification.py",
       "line": 430,
       "condition": "candidate is not None and type(candidate) is not CapacityAuthorizationCandidate",
+      "kind": "if",
       "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "UNSUPPORTED_EXACT_TYPE"
@@ -651,6 +722,7 @@
       "module": "verification.py",
       "line": 440,
       "condition": "expected_reference_tenant_id != coordinate.tenant_id",
+      "kind": "if",
       "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "TENANT_EXPECTATION_MISMATCH"
@@ -660,6 +732,7 @@
       "module": "verification.py",
       "line": 460,
       "condition": "type(resolution) is not PolicyResolution",
+      "kind": "if",
       "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "UNSUPPORTED_EXACT_TYPE"
@@ -669,6 +742,7 @@
       "module": "verification.py",
       "line": 467,
       "condition": "resolution.requested_coordinate != coordinate",
+      "kind": "if",
       "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "RESOLUTION_ANSWERED_ANOTHER_QUESTION"
@@ -678,6 +752,7 @@
       "module": "verification.py",
       "line": 472,
       "condition": "resolution.as_of != instant",
+      "kind": "if",
       "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "RESOLUTION_ANSWERED_ANOTHER_QUESTION"
@@ -687,6 +762,7 @@
       "module": "verification.py",
       "line": 479,
       "condition": "resolution.status is not PolicyResolutionStatus.RESOLVED",
+      "kind": "if",
       "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": ""
@@ -696,6 +772,7 @@
       "module": "verification.py",
       "line": 487,
       "condition": "resolution.historical",
+      "kind": "if",
       "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "HISTORICAL_RESOLUTION_REFUSED"
@@ -705,6 +782,7 @@
       "module": "verification.py",
       "line": 494,
       "condition": "resolution.implies_current_validity is not True",
+      "kind": "if",
       "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "HISTORICAL_RESOLUTION_REFUSED"
@@ -714,6 +792,7 @@
       "module": "verification.py",
       "line": 502,
       "condition": "type(record) is not IssuedPolicyRecord",
+      "kind": "if",
       "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "RESOLUTION_MALFORMED"
@@ -723,6 +802,7 @@
       "module": "verification.py",
       "line": 507,
       "condition": "resolution.policy is None or record.policy is not resolution.policy",
+      "kind": "if",
       "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "RESOLUTION_MALFORMED"
@@ -732,6 +812,7 @@
       "module": "verification.py",
       "line": 512,
       "condition": "record.coordinate != coordinate",
+      "kind": "if",
       "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "RESOLUTION_MALFORMED"
@@ -741,6 +822,7 @@
       "module": "verification.py",
       "line": 519,
       "condition": "record.coordinate.content_digest != record.policy_body_digest",
+      "kind": "if",
       "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "COORDINATE_DIGEST_UNBOUND"
@@ -750,6 +832,7 @@
       "module": "verification.py",
       "line": 529,
       "condition": "record.signature_alg not in SUPPORTED_SIGNATURE_ALGORITHMS",
+      "kind": "if",
       "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "UNSUPPORTED_ALGORITHM"
@@ -759,6 +842,7 @@
       "module": "verification.py",
       "line": 536,
       "condition": "not is_policy_digest(record.policy_body_digest)",
+      "kind": "if",
       "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "COORDINATE_MALFORMED"
@@ -768,6 +852,7 @@
       "module": "verification.py",
       "line": 541,
       "condition": "candidate is not None and (not is_phase5a_digest(candidate.candidate_digest))",
+      "kind": "if",
       "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "COORDINATE_MALFORMED"
@@ -777,6 +862,7 @@
       "module": "verification.py",
       "line": 551,
       "condition": "candidate is not None",
+      "kind": "if",
       "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "CANDIDATE_COORDINATE_MISMATCH"
@@ -786,6 +872,7 @@
       "module": "verification.py",
       "line": 553,
       "condition": "mismatch is not None",
+      "kind": "if",
       "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "CANDIDATE_COORDINATE_MISMATCH"
@@ -795,6 +882,7 @@
       "module": "verification.py",
       "line": 566,
       "condition": "candidate is not None",
+      "kind": "if",
       "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "CANDIDATE_CROSS_TENANT_POLICY"
@@ -804,6 +892,7 @@
       "module": "verification.py",
       "line": 568,
       "condition": "crossing is not None",
+      "kind": "if",
       "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "CANDIDATE_CROSS_TENANT_POLICY"
@@ -813,6 +902,7 @@
       "module": "verification.py",
       "line": 577,
       "condition": "candidate is not None",
+      "kind": "if",
       "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": ""
@@ -822,6 +912,7 @@
       "module": "verification.py",
       "line": 584,
       "condition": "mistyped is not None",
+      "kind": "if",
       "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": ""
@@ -831,6 +922,7 @@
       "module": "verification.py",
       "line": 588,
       "condition": "staleness is not None",
+      "kind": "if",
       "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": ""
@@ -840,6 +932,7 @@
       "module": "verification.py",
       "line": 604,
       "condition": "reproduction is not None",
+      "kind": "if",
       "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": ""
@@ -849,6 +942,7 @@
       "module": "verification.py",
       "line": 627,
       "condition": "candidate is not None",
+      "kind": "if",
       "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": ""
@@ -858,6 +952,7 @@
       "module": "verification.py",
       "line": 629,
       "condition": "mismatch is not None",
+      "kind": "if",
       "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": ""
@@ -867,6 +962,7 @@
       "module": "verification.py",
       "line": 685,
       "condition": "missing",
+      "kind": "if",
       "shape": "typed-refusal tuple",
       "recorded_in": "",
       "outcome": "POLICY_PROJECTION_ABSENT"
@@ -876,6 +972,7 @@
       "module": "verification.py",
       "line": 692,
       "condition": "type(adapter_id) is not str or type(policy_type) is not str",
+      "kind": "if",
       "shape": "typed-refusal tuple",
       "recorded_in": "",
       "outcome": "POLICY_PROJECTION_ABSENT"
@@ -885,6 +982,7 @@
       "module": "verification.py",
       "line": 697,
       "condition": "not isinstance(projection, Mapping)",
+      "kind": "if",
       "shape": "typed-refusal tuple",
       "recorded_in": "",
       "outcome": "POLICY_PROJECTION_ABSENT"
@@ -894,6 +992,7 @@
       "module": "verification.py",
       "line": 706,
       "condition": "adapter_id != record.adapter_id",
+      "kind": "if",
       "shape": "typed-refusal tuple",
       "recorded_in": "",
       "outcome": "POLICY_PROJECTION_DIGEST_MISMATCH"
@@ -903,6 +1002,7 @@
       "module": "verification.py",
       "line": 712,
       "condition": "policy_type != record.policy_type",
+      "kind": "if",
       "shape": "typed-refusal tuple",
       "recorded_in": "",
       "outcome": "POLICY_PROJECTION_DIGEST_MISMATCH"
@@ -912,6 +1012,7 @@
       "module": "verification.py",
       "line": 728,
       "condition": "reproduced != record.policy_body_digest",
+      "kind": "if",
       "shape": "typed-refusal tuple",
       "recorded_in": "",
       "outcome": "POLICY_PROJECTION_DIGEST_MISMATCH"
@@ -921,6 +1022,7 @@
       "module": "verification.py",
       "line": 758,
       "condition": "not isinstance(raw, (list, tuple))",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -930,6 +1032,7 @@
       "module": "verification.py",
       "line": 764,
       "condition": "not raw",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -939,6 +1042,7 @@
       "module": "verification.py",
       "line": 772,
       "condition": "not isinstance(entry, Mapping)",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -948,6 +1052,7 @@
       "module": "verification.py",
       "line": 775,
       "condition": "absent",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -957,6 +1062,7 @@
       "module": "verification.py",
       "line": 778,
       "condition": "extra",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -966,6 +1072,7 @@
       "module": "verification.py",
       "line": 824,
       "condition": "not capacity_bounds",
+      "kind": "if",
       "shape": "typed-refusal tuple",
       "recorded_in": "",
       "outcome": "CANDIDATE_POLICY_STATES_NO_BOUNDS"
@@ -975,6 +1082,7 @@
       "module": "verification.py",
       "line": 836,
       "condition": "type(action_type) is not str or action_type not in CANONICAL_ACTION_TYPES",
+      "kind": "if",
       "shape": "typed-refusal tuple",
       "recorded_in": "",
       "outcome": "CANDIDATE_BOUND_SELECTOR_MISS"
@@ -984,6 +1092,7 @@
       "module": "verification.py",
       "line": 852,
       "condition": "not matches",
+      "kind": "if",
       "shape": "typed-refusal tuple",
       "recorded_in": "",
       "outcome": "CANDIDATE_BOUND_SELECTOR_MISS"
@@ -993,6 +1102,7 @@
       "module": "verification.py",
       "line": 864,
       "condition": "len(matches) > 1",
+      "kind": "if",
       "shape": "typed-refusal tuple",
       "recorded_in": "",
       "outcome": "CANDIDATE_BOUND_SELECTOR_AMBIGUOUS"
@@ -1002,6 +1112,7 @@
       "module": "verification.py",
       "line": 884,
       "condition": "type(carried) is not int or isinstance(carried, bool)",
+      "kind": "if",
       "shape": "typed-refusal tuple",
       "recorded_in": "",
       "outcome": "CANDIDATE_BOUND_EXCEEDED"
@@ -1011,6 +1122,7 @@
       "module": "verification.py",
       "line": 890,
       "condition": "carried > authenticated",
+      "kind": "if",
       "shape": "typed-refusal tuple",
       "recorded_in": "",
       "outcome": "CANDIDATE_BOUND_EXCEEDED"
@@ -1020,6 +1132,7 @@
       "module": "verification.py",
       "line": 1026,
       "condition": "type(value) is not datetime",
+      "kind": "if",
       "shape": "typed-refusal tuple",
       "recorded_in": "",
       "outcome": "CANDIDATE_FACT_NOT_EXACT_INSTANT"
@@ -1029,6 +1142,7 @@
       "module": "verification.py",
       "line": 1053,
       "condition": "instant < valid_from",
+      "kind": "if",
       "shape": "typed-refusal tuple",
       "recorded_in": "",
       "outcome": "CANDIDATE_RECOMMENDATION_NOT_YET_VALID"
@@ -1038,6 +1152,7 @@
       "module": "verification.py",
       "line": 1059,
       "condition": "instant > valid_until",
+      "kind": "if",
       "shape": "typed-refusal tuple",
       "recorded_in": "",
       "outcome": "CANDIDATE_RECOMMENDATION_EXPIRED"
@@ -1047,6 +1162,7 @@
       "module": "verification.py",
       "line": 1067,
       "condition": "instant > expires_at",
+      "kind": "if",
       "shape": "typed-refusal tuple",
       "recorded_in": "",
       "outcome": "CANDIDATE_DECISION_EXPIRED"
@@ -1056,6 +1172,7 @@
       "module": "verification.py",
       "line": 1076,
       "condition": "instant < occurred_at",
+      "kind": "if",
       "shape": "typed-refusal tuple",
       "recorded_in": "",
       "outcome": "CANDIDATE_FACT_NOT_YET_OCCURRED"
@@ -1065,6 +1182,7 @@
       "module": "verification.py",
       "line": 1101,
       "condition": "isinstance(exc, _PackageError)",
+      "kind": "outcome-selection",
       "shape": "outcome selection",
       "recorded_in": "",
       "outcome": "getattr(exc, 'outcome', None) or none"
@@ -1074,6 +1192,7 @@
       "module": "verification.py",
       "line": 1102,
       "condition": "type(outcome) is not _Outcome or outcome is _Outcome.VERIFIED",
+      "kind": "if",
       "shape": "returned outcome",
       "recorded_in": "",
       "outcome": "VERIFICATION_UNAVAILABLE"

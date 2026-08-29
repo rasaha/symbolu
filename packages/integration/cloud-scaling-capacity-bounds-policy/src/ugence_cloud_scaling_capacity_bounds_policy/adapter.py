@@ -36,6 +36,10 @@ from ugence_policy_authority.api import (
     to_canonical_obj,
 )
 
+from .errors import (
+    CapacityBoundsRejectionReason as Reason,
+    with_rejection_reason,
+)
 from .identifiers import (
     ACTIVE_LIFECYCLE_STATE,
     CAPACITY_BOUNDS_ADAPTER_ID,
@@ -54,8 +58,11 @@ def capacity_bounds_coordinate(metadata: object) -> PolicyCoordinate:
     """Map this family's metadata envelope onto a family-neutral coordinate."""
 
     if not isinstance(metadata, CapacityBoundsPolicyMetadata):
-        raise PolicyAuthorityRequestError(
-            "capacity_bounds_coordinate requires a CapacityBoundsPolicyMetadata"
+        raise with_rejection_reason(
+            PolicyAuthorityRequestError(
+                "capacity_bounds_coordinate requires a CapacityBoundsPolicyMetadata"
+            ),
+            Reason.COORDINATE_INPUT_TYPE_MISMATCH,
         )
     return PolicyCoordinate(
         policy_family=CAPACITY_BOUNDS_POLICY_FAMILY,
@@ -92,14 +99,20 @@ class CapacityBoundsPolicyFamilyAdapter:
     # ------------------------------------------------------------------
     def describe(self, artifact: object) -> PolicyArtifactDescriptor:
         if type(artifact) is not CapacityBoundsPolicy:
-            raise UnsupportedPolicyArtifactError(
-                f"{type(artifact).__name__!r} is not a CapacityBoundsPolicy"
+            raise with_rejection_reason(
+                UnsupportedPolicyArtifactError(
+                    f"{type(artifact).__name__!r} is not a CapacityBoundsPolicy"
+                ),
+                Reason.ARTIFACT_TYPE_MISMATCH,
             )
 
         metadata = getattr(artifact, "metadata", None)
         if not isinstance(metadata, CapacityBoundsPolicyMetadata):
-            raise UnsupportedPolicyArtifactError(
-                "CapacityBoundsPolicy must carry a CapacityBoundsPolicyMetadata envelope"
+            raise with_rejection_reason(
+                UnsupportedPolicyArtifactError(
+                    "CapacityBoundsPolicy must carry a CapacityBoundsPolicyMetadata envelope"
+                ),
+                Reason.METADATA_ENVELOPE_MISSING,
             )
 
         projection = self._canonical_projection(artifact)
@@ -135,9 +148,12 @@ class CapacityBoundsPolicyFamilyAdapter:
         body = to_canonical_obj(artifact, path="$")
         metadata = body.get("metadata") if isinstance(body, dict) else None
         if not isinstance(metadata, dict) or "content_digest" not in metadata:
-            raise UnsupportedPolicyArtifactError(
-                "a capacity-bounds policy must carry a metadata envelope with a "
-                "content_digest declaration"
+            raise with_rejection_reason(
+                UnsupportedPolicyArtifactError(
+                    "a capacity-bounds policy must carry a metadata envelope with a "
+                    "content_digest declaration"
+                ),
+                Reason.PROJECTION_DIGEST_DECLARATION_MISSING,
             )
         body = dict(body)
         body["metadata"] = {k: v for k, v in metadata.items() if k != "content_digest"}
