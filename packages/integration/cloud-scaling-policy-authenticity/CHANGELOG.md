@@ -1,5 +1,309 @@
 # Changelog — ugence-cloud-scaling-policy-authenticity
 
+## [Unreleased] — `diagnostic-only` fails across a distribution boundary too
+
+*No version bump and no production behaviour change.*
+
+### Guards 77 and 99 are scored
+
+Both were excluded as `diagnostic-only`: a successor refuses with the same outcome, so
+removing them costs a message and no authority. Both successors decide on operands the
+Policy Authority owns, under an open-ended `>=0.1.0` — which makes each exclusion a claim
+about the installed release, exactly what §9.2 already refused to accept for
+`equivalent-mutant` and `unreachable-behind-earlier-guard`. Measured against 0.2.0s built
+from real upstream source:
+
+| | guard 77 — `verification.py:487` | guard 99 — `verification.py:706` |
+|---|---|---|
+| the drift | `implies_current_validity` → `return self.resolved` (`core/records.py:334`) | the frame drops `"adapter"` (`core/canonical.py:212`) |
+| undrifted 0.1.0 | refused `HISTORICAL_RESOLUTION_REFUSED` | refused `POLICY_PROJECTION_DIGEST_MISMATCH` |
+| drifted, guard present | refused `HISTORICAL_RESOLUTION_REFUSED` | refused `POLICY_PROJECTION_DIGEST_MISMATCH` |
+| drifted, guard neutralised | refused `INVARIANT_VIOLATION` | **`VERIFIED`** |
+
+Guard 99 is the serious one: under a resolution the pin admits, removing it lets a
+descriptor naming one adapter be verified against a record naming another — a mint, not a
+lost diagnosis. Guard 77 loses the clean refusal and reaches the artifact-pairing invariant
+at `verification.py:266` instead, reporting an internal integrity failure for an ordinary,
+expected, refusable answer.
+
+Four tests replace the two exclusions' measuring tests, in the guard-78 pattern: each guard
+gets one test that it fires under the drifted resolution and one that removing it changes
+the answer, so a failure says which half broke.
+
+### The rule, rather than a third case
+
+The alternative was to ratify a narrower `diagnostic-only` bar that accepts
+installed-release evidence. Rejected: it would have carved out most of the surviving
+exclusions immediately after retiring the same asymmetry for
+`unreachable-behind-earlier-guard`, and guard 99 shows what it would license. ADR Phase 5
+§9.2 now states one rule for every member of the vocabulary — no exclusion reason may be
+claimed across a distribution boundary on evidence about one installation — and its false
+closing sentence ("every operand that decides them is defined in the distribution that
+declares the guard") is corrected: the eleven remaining exclusions rest either on
+same-distribution operands or on Python-language facts.
+
+**The split is 111 `SCORED` / 8 `EXCLUDED`,** over an unchanged inventory of 119.
+
+
+## [Unreleased] — two decision points were in no inventory, and one more exclusion was false
+
+*No version bump and no production behaviour change.*
+
+### `_terminal_outcome` decides two things, and neither was counted
+
+`verification.py:1101` and `:1102` are authority-bearing and were in neither inventory. The
+shape rules were written from this package's *gate* idioms — `raise`, `_refuse(...)`, a bare
+outcome tuple — and could see neither an `if` that returns an outcome member directly nor a
+conditional expression that decides whether an outcome is read at all. The suite was killing
+both the whole time, so this is a denominator defect, not a coverage one: the total was
+short by two and `test_guard_inventory.py` pinned the short number.
+
+Measured, neutralising each:
+
+| | `:1101` collapsed to `else` | `:1102` neutralised |
+|---|---|---|
+| typed `COORDINATE_MALFORMED` | → `VERIFICATION_UNAVAILABLE` | preserved |
+| typed `INVARIANT_VIOLATION` | → `VERIFICATION_UNAVAILABLE` | preserved |
+| stdlib `ValueError` | unchanged | → `None` |
+| forged `.outcome = VERIFIED` | unchanged | → **`VERIFIED`** |
+
+`:1102` is the more serious: without it an exception carrying an attacker-influenced
+`outcome` attribute becomes a success, which is the one thing the routine's own docstring
+says can never happen. `:1101` flattens every typed refusal to "the check could not run"
+when the check ran and refused.
+
+**The inventory is 119, not 117**, and the two new shapes are pinned by condition.
+
+### Guard 78 is scored, not unreachable
+
+`verification.py:494` was excluded as `unreachable-behind-earlier-guard`. Its operand is a
+property of the Policy Authority's `PolicyResolution` — `core/records.py:334`, a separate
+distribution under `>=0.1.0`. `is not True` reads like a defence against a truthy
+non-`True`, and it is one: a 0.2.0 returning an `int` flag rather than the `bool` singleton
+passes the status and historicity gates and arrives here as `1`.
+
+| | result |
+|---|---|
+| undrifted 0.1.0 | **VERIFIED** |
+| drifted 0.2.0, guard present | refused `HISTORICAL_RESOLUTION_REFUSED` |
+| drifted 0.2.0, guard neutralised | refused `INVARIANT_VIOLATION` |
+
+A changed typed pair. The neutralised case is worse than it looks: the pairing invariant at
+`verification.py:266` catches it instead, reporting an internal integrity failure where the
+guard would have given the caller the specific refusal.
+
+The exclusion's measuring test asserted only that the attribute is a property and that the
+exact-type gate exists — both still true under the drifted resolution, so it would have gone
+on passing. It is replaced by two tests that measure the guard.
+
+**The split is 109 `SCORED` / 10 `EXCLUDED`.**
+
+
+## [Unreleased] — four exclusions withdrawn; the reason that held them is empty
+
+*No version bump and no production behaviour change.* Phase 5A's guard 9 disproved the
+rationale shared by every guard carrying `unscorable-by-single-checkout-fixture`: the
+fixture installs one dependency resolution, but a test can construct another. The four
+this package carried were re-measured under that instrument and all four are scorable.
+
+| Guard | Condition | Upstream, constraint | Drift the second resolution applies | Present | Removed |
+|---|---|---|---|---|---|
+| 12 `identifiers.py:186` | `VERIFICATION_PROFILE == …PROTOCOL_ID` | `ugence-policy-authority>=0.1.0` | protocol renamed onto this package's profile | `AssertionError` | imports; profile and protocol are one string |
+| 13 `identifiers.py:191` | `…DIGEST_DOMAIN == POLICY_BODY_DIGEST_DOMAIN` | same | policy-body domain adopts the artifact domain | `AssertionError` | imports; one tag serves both frames |
+| 15 `identifiers.py:210` | `REQUIRED… is FORBIDDEN_KEY_ENTITLEMENT` | same | `REVOKE_POLICY = "ISSUE_POLICY"` | `AssertionError` | imports; the two are one member |
+| 16 `identifiers.py:224` | `CANONICAL_ACTION_TYPES != _RATIFIED_…` | `…authorization-contracts>=0.1.0` | the chain ratifies a fifth action type | `ImportError` | imports; gate 16 selects by five |
+
+Each resolution is built from the real upstream source, not a stub, with every edit
+asserted to match exactly once so an upstream rename fails the test rather than quietly
+producing an undrifted copy.
+
+Full-suite sweep: **4 guards, 4 killed, 0 survived, 0 unscored**, baseline 476 collected.
+**The split is 106 `SCORED` / 11 `EXCLUDED`, not 102 / 15.** The inventory is still 117.
+
+### Two of these were load-bearing in ways the exclusion obscured
+
+Guard 15's operands are *both* upstream's — the case where a single-resolution fixture is
+least entitled to conclude anything. Python's `Enum` makes equal values aliases, so a
+release merging the two entitlements collapses them to one member and the `is` comparison
+goes true. Without the guard, D-5B0B-4's stated reason for choosing the Policy Authority's
+key ring over a TEV trust anchor — that entitlement granularity is expressible — is gone,
+and a revoke-only key satisfies the issuing requirement. The module docstring says this
+cannot happen because there is no parameter to divert; there is no parameter, and this
+guard is why that is enough.
+
+Guard 16's first attack measured nothing, and the test records why: adding a fifth
+`ActionKind` to the controller alone is refused by Phase 5A's drift guard one package
+upstream, producing the identical `ImportError` with and without guard 16. Only a
+coordinated drift across the controller, Phase 4C and Phase 5A reaches this guard.
+
+Guard 14 (`identifiers.py:196`) keeps `equivalent-mutant` and was not inferred from the
+others: all three of its operands are frozen literals in this distribution, so no
+resolution can move any of them.
+
+
+## [Unreleased] — two exclusions withdrawn; one was the last obstacle before a mint
+
+*No version bump and no behaviour change.* An independent adversarial audit refuted two of
+this package's seventeen exclusions. Both were recorded as **measurements** and both
+measurements were wrong, so they are withdrawn rather than reworded. Classification is now
+**102 SCORED / 15 EXCLUDED** of 117.
+
+### `verification.py:775` — not diagnostic-only; it is the last obstacle before a mint
+
+Recorded as changing only the message. Neutralised, the verifier does not produce a
+different refusal: it mints a **VERIFIED** artifact whose `capacity_bounds_fact` carries a
+delta ceiling no signature ever covered, and gate 16 then reconciles a candidate's carried
+delta against that fabricated ceiling. R-8, defeated through the one guard declared not to
+matter.
+
+The isolating input needs nothing exotic. A `Mapping` is not obliged to make `in` and `[...]`
+agree: a `collections.defaultdict` reports a missing key *absent*, so the canonical key set
+is unchanged and gate 14 still reproduces the signed body digest, while fabricating a value
+on subscript. The policy is genuinely issued and signed with a three-key bound; only the
+published projection lies — which is precisely the compromised-port threat this boundary
+re-checks for.
+
+### `verification.py:772` — a scalar entry moves the outcome
+
+Recorded as having no isolating input. All three recorded attempts were sequence-typed — a
+string, a string containing the four field names, a list of them — and every one lands on
+`POLICY_BOUNDS_MALFORMED`. A **scalar** does not: `"action_type" not in 5` raises
+`TypeError`, and that line sits *outside* the `except Exception` backstop, which wraps only
+the `VerifiedCapacityBound(...)` construction below. The outcome moves to
+`VERIFICATION_UNAVAILABLE` — an availability failure inviting a retry, in place of a
+determination about the policy.
+
+### What both failures have in common
+
+Each recorded a **universal** — "every non-Mapping entry", "no input separates it" — after
+testing a handful of cases from a single family. A failed isolation attempt is evidence
+about the inputs tried, never about the inputs not tried, and an exclusion that states
+otherwise is a claim the sweep cannot check. The two reasons are replaced by killing tests.
+
+## [Unreleased] — 56 survivors, and why this package excludes more than Phase 5A
+
+*No version bump and no behaviour change.* The partition, the profile version and every
+frozen digest are unmoved.
+
+With the artefact gone, the first honest sweep of this package reported **117 inventoried,
+61 killed, 56 survived**. Every survivor is now resolved: **100 SCORED, 17 EXCLUDED**.
+
+### Why seventeen exclusions, against Phase 5A's five
+
+Structural, not a difference in rigour. Phase 5A raises a distinct exception type per
+failure, so removing a guard usually changes the class a caller sees. This package refuses
+through a **coarse outcome vocabulary with fine-grained guards behind it**: several guards
+narrow the *message* while sharing one `PolicyAuthenticityOutcome` with the guard on the
+next line. ADR Phase 5 §9.1 ratifies the outcome as the contract and the message as prose,
+so those guards change no authorization answer and are `diagnostic-only`.
+
+Every one of them was attacked for isolation first, and each attempt was recorded as
+impossible *by construction* rather than merely unsuccessful. Two of the four claims below
+were not:
+
+- ~~a historical resolution cannot also imply current validity — the attribute is a
+  read-only property equal to `resolved and not historical`~~. **Withdrawn.** That property
+  is the Policy Authority's, under `>=0.1.0`; a 0.2.0 dropping the historicity term makes
+  the successor silent. Guard 77 is `SCORED` — see *Guards 77 and 99 are scored* above;
+- `None` cannot pass an exact-`str` check or a `Mapping` check, so a missing descriptor
+  field always trips its successor;
+- ~~an adapter id that disagrees with the record cannot reframe to the signed body digest,
+  because the adapter id is an input to the frame~~. **Withdrawn.** The frame is the Policy
+  Authority's; a 0.2.0 that stops binding the adapter makes the reproduction independent of
+  it and removing the guard **mints**. Guard 99 is `SCORED`;
+- a `None` registry, verifier or port never satisfies the `hasattr` behind it.
+
+The two surviving claims are facts about the Python language — `None` satisfies no
+`isinstance`, `hasattr` or exact string comparison, whichever release supplies the type.
+The two withdrawn ones were facts about the installed Policy Authority, offered as facts
+about the program. ADR Phase 5 §9.2 now states the distinction as one rule for every
+exclusion reason.
+
+Four more are `unscorable-by-single-checkout-fixture` (§9.2) and three are genuine
+equivalent mutants over this module's own frozen constants.
+
+### Two guards that read as diagnostic-only and decide whether a candidate verifies
+
+Both were reasoned into the exclusion pile before being measured, and both are the reason
+the "record a failed isolation attempt before excluding" rule exists.
+
+- **`verification.py:836`** — R-8's ratified-vocabulary check. Neutralised, a candidate does
+  not get a different refusal: it **VERIFIES**. An authority can sign a capacity bound under
+  an action type D-4 never ratified; a candidate carrying the same type then selects it. The
+  first attack forged only the candidate's action type and left the signed bound ratified,
+  which produced a selector miss with the same outcome and measured nothing.
+- **`verification.py:758`** — the bounds-sequence check, one line above a guard that looks
+  identical and *is* diagnostic-only. A dict or string is iterable and falls through to the
+  entry check with the same outcome; an **int** is not iterable at all, so without this
+  guard `enumerate(7)` raises and the outermost handler reports `VERIFICATION_UNAVAILABLE`.
+  That tells a caller to retry a policy that will never become readable, instead of telling
+  them the policy's bounds are malformed.
+
+### Two findings worth more than the tests that found them
+
+- **`canonical.py` had never been reached at all.** All ten of its guards survived. These
+  are the admission primitives every field in the package passes through; the suite
+  exercised the artifacts they protect and never the helpers themselves, so any of them
+  could have been deleted without a test failing.
+- **R-8's ceiling-typing guard has an unreachable loop position.** It checks four carried
+  values, and `requested_delta` is a derived *property* of `ExecutionTargetScope`
+  (`requested_magnitude - magnitude_before`) with no setter — always an `int` by
+  construction. The other three are covered and the fourth is recorded as unreachable, so a
+  later reader does not read its absence as an oversight. The `bool` case the guard names
+  explicitly is not pedantry: `True > 1` is `False`, so a boolean ceiling would compare as
+  satisfied against any authenticated bound above 1.
+
+## [Unreleased] — the 115/115 result was an artefact, and is withdrawn
+
+*No version bump and no behaviour change.* The partition, the profile version and every
+frozen digest are unmoved. What moves is a claim.
+
+### Withdrawn
+
+The previous entry reported **all 115 guards killed, no survivors**. That result is void.
+The sweep copies the package to a disposable directory, which was named `package`; this
+package's own `test_phase5a_untouched.py` asserts `here.name ==
+"cloud-scaling-policy-authenticity"`, so that test failed in **every** run of the sweep —
+baseline and mutant alike. A mutant counted as killed whenever any test failed, so every
+guard was credited with a kill it had not earned. The copy was not a faithful stand-in for
+the package, and the sweep measured the copy.
+
+It was found by the audit-mandated change that refuses a baseline which is not green, which
+is exactly the failure that change exists to catch. The engine now also names the copy after
+the package, and counts only failures the baseline did not already have.
+
+### Added
+
+- Two guards a raise-only reading missed, now inventoried: `verification.py:327`
+  (`require_production_resolution_port`) and `verified.py:488` (`require_phase5a_digest`).
+  Each is an `if` whose entire body is a call to an admission helper. The inventory is
+  **117**, and a raise-only reading of this package would miss 47 of them.
+
+## [Unreleased] — the sweep is measured, and every guard is classified
+
+*No version bump and no behaviour change.* Coverage and CI only; the partition, the profile
+version and every frozen digest are unmoved.
+
+The first complete CI mutation sweep of this package neutralised all **115** authority-
+bearing guards and ran the whole suite against each. **All 115 died. No survivors, none
+unscored** — so every guard is classified `SCORED`, and this package declares no exclusion
+at all.
+
+That total depends on this package's own definition of a refusal. Phase 5A refuses by
+`raise`; this package also refuses by *returning* `_refuse(outcome, detail)` at a gate and
+`(_Outcome.X, "…")` from the helper that decided it. A raise-only inventory misses 17 real
+gates here, gate 13's exact-type instant check and all six R-8 bound-reconciliation branches
+among them — the gates most recently added. Each of those seven appears individually in the
+aggregated result, and each was killed.
+
+### Added
+
+- `guard_classification.json` (generated, tracked) — all 115 guards, each `SCORED`.
+- The same six blocking aggregate conditions as the Phase 5A workflow: inventory drift, an
+  unclassified guard, an invalid or orphaned exclusion, a `SCORED` guard that survived, a
+  stale exclusion, a missing shard, a duplicated result, and a shard that collected a
+  different population.
+
 ## [0.8.0] — gate 13 re-checks the six carried instants by exact type
 
 **No partition change and no profile bump.** `VERIFICATION_PROFILE_VERSION` stays `v4` and

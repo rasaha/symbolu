@@ -314,3 +314,96 @@ jobs:
           name: cloud-scaling-policy-authenticity-dist
           path: packages/integration/cloud-scaling-policy-authenticity/dist/*
           if-no-files-found: warn
+
+  guard-inventory:
+    name: Guard inventory is re-derivable
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Regenerate the inventory and prove it is unchanged
+        run: |
+          python scripts/cloud_scaling/guard_sweep.py policy-authenticity --inventory-only
+          git diff --exit-code -- \
+            packages/integration/cloud-scaling-policy-authenticity/GUARD_INVENTORY.md \
+            packages/integration/cloud-scaling-policy-authenticity/guard_inventory.json \
+            packages/integration/cloud-scaling-policy-authenticity/guard_classification.json
+
+      - name: The sweep's own enforcement machinery is measured, not assumed
+        # The message-only rule was inert for this PR's whole history: the detector read a
+        # tbstyle-rendered explanation under --tb=no and matched nothing, so every mutant
+        # looked type-killed. These tests run the generated plugin itself against a suite
+        # built to fail in each shape, so a detector that stops seeing source fails here
+        # rather than silently passing every guard.
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+          python -m pytest scripts/cloud_scaling/tests -q
+  guard-sweep:
+    name: Gate-removal mutation sweep (shard ${{ matrix.shard }} of 8)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install tooling + first-party packages (editable)
+        run: |
+          python -m pip install --upgrade pip
+          # `pytest numpy`, exactly what this workflow's other jobs install: D-5B0B-4 ruled
+          # this package has no cryptography or PyNaCl dependency, and $FIRST_PARTY already
+          # carries the install order. A hand-written list omitted uvi-policy-contracts,
+          # which `policy-authority` requires, and failed every shard in 25 seconds.
+          pip install pytest numpy
+          for pkg in $FIRST_PARTY; do pip install -e "$pkg"; done
+      - name: Sweep this shard
+        # 115 guards against a 191s suite is six wall-clock hours in one job. Eight shards
+        # puts each at roughly three quarters of an hour.
+        env:
+          UGENCE_RATCHET_BASE: ${{ github.event.pull_request.base.sha || github.sha }}
+        run: python scripts/cloud_scaling/guard_sweep.py policy-authenticity --shard ${{ matrix.shard }}/8
+      - name: The tracked tree was not mutated
+        run: git diff --exit-code
+        if: always()
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: policy-authenticity-guard-sweep-shard-${{ matrix.shard }}
+          path: /tmp/ugence-sweep-policy-authenticity/*.json
+          if-no-files-found: warn
+
+  guard-sweep-aggregate:
+    name: Every inventoried guard produced exactly one result
+    runs-on: ubuntu-latest
+    needs: guard-sweep
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: policy-authenticity-guard-sweep-shard-*
+          merge-multiple: true
+          path: shards
+      - name: Prove the sweep was total and non-overlapping
+        # Three separate claims, each measured against the real inventory rather than the
+        # shard arithmetic: every index belongs to one shard, every index produced exactly
+        # one terminal result, and every shard measured the same collected population. A
+        # shard that never ran produces no duplicate either, so absence is checked directly.
+        run: python scripts/cloud_scaling/guard_sweep.py policy-authenticity --aggregate shards --shards 8
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: policy-authenticity-guard-sweep-aggregate
+          path: packages/integration/cloud-scaling-policy-authenticity/guard_sweep_aggregate.json
+          if-no-files-found: warn

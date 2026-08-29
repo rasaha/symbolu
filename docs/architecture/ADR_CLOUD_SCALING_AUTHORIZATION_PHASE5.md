@@ -245,3 +245,205 @@ The Risk Authority illustrative canonicalization fixture
 replaced or reinterpreted. It is an **RA canonicalization fixture using the older
 illustrative subject-type value**, and it is **not the production Phase 4C adapter-output
 fixture**. No Phase 5A digest is expected to equal it, and a test asserts they are distinct.
+
+## §9. Guard coverage: what is authority-bearing, and what a refusal is
+
+Phase 5A and Phase 5B are both swept in CI by gate removal: each `if` guard is neutralised
+to `if False:` in a disposable copy and the whole suite is run against the result. The sweep
+is only as meaningful as the two definitions it rests on, and both were being decided
+case-by-case inside a script. They are ratified here.
+
+### §9.1 A guard is authority-bearing when removing it changes the typed refusal
+
+**The typed refusal is the ordered pair `(exception class, AuthorizationCandidateRejectionReason)`.**
+The message is prose written for a human reading a log. It is deliberately *not* part of the
+contract: no consumer may branch on it, it may be reworded without a version bump, and a
+test that asserts a substring of it is asserting something this package does not promise.
+
+A guard is **authority-bearing** when there is at least one constructible input for which
+neutralising it changes that pair — including changing it to *no refusal at all*. A guard
+for which no such input exists is **diagnostic-only**: it chooses which of two identical
+verdicts is reported, and removing it costs a clearer message and nothing else.
+
+Two consequences, both deliberate:
+
+* Changing the *reason* is enough. A refusal that reports `SUBJECT_DIGEST_MISMATCH` where
+  the contract says `CONTEXT_DIGEST_MISMATCH` is a wrong answer, not a cosmetic one, because
+  the reason is what a caller is entitled to act on.
+* Failing closed is not sufficient. A guard whose removal still refuses, with the same class
+  and the same reason, has not been shown to carry authority — and a suite that only asks
+  "was something refused?" cannot tell the two cases apart.
+
+**A guard refuses whether or not it also converts.** An `if` whose body calls an admission
+helper is a guard, and it stays a guard when the call's result is bound.
+
+An earlier revision of this section said otherwise: an `if` that *binds* a helper's result
+was a normalisation branch, separated from a gate by whether the call was a statement or an
+assignment, and `issued_at = _parse_ts(issued_at)` was named as the site that separation
+excluded. Three claims carried that carve-out and all three were measured false at
+`attestation.py:261`:
+
+| claimed | measured |
+|---|---|
+| neutralising it produces no refusal to compare | it produces a typed `MALFORMED_CANONICAL_FIELD` |
+| it changes what the suite can collect at all | collection is 407 either way |
+| it is therefore neither a kill nor a survival | it survived the entire suite |
+
+The carve-out was not describing a conversion. It was reasoning added to explain away an
+`UNSCORED` result, and it hid a line no test executed: nothing rebuilt an attestation from a
+canonical wire mapping, so the parse that lets `issued_at` cross the wire as a string and
+arrive as a `datetime` had never run. The site is inventoried, and killed by a test that
+round-trips an attestation through its canonical form.
+
+The rule that replaces it is the one the sweep implements: **a body that can reach a refusal
+makes the `if` a guard**, and binding a value on the way there does not change that.
+
+A diagnostic-only guard is not a defect and is not to be deleted. It is excluded from
+*scoring*, with the subsumption that makes it diagnostic-only recorded and measured.
+
+### §9.2 `equivalent-mutant` may not be claimed across a distribution boundary
+
+A guard is an **equivalent mutant** when its condition is false in every program the package
+can be part of, so `if False:` is the same program on every path, for every input. That is a
+claim about the program, and it may only be made when every operand is fixed by **the same
+distribution as the guard**.
+
+It may **not** be claimed for a guard comparing against a value imported from a separately
+versioned distribution admitted by an open-ended pin. This package depends on
+`ugence-cloud-scaling-controller>=0.4.0`, `ugence-risk-authority>=0.5.0` and
+`ugence-cloud-scaling-risk-integration>=0.1.0`. Under a resolution any of those pins permits,
+such a condition can be true — which is precisely why the drift guard exists. That the
+condition is false in the checkout under test is a property of the installation, not of the
+program, and calling it an equivalent mutant asserts the guard is pointless when it is in
+fact the only thing standing between a permitted resolution and an unratified identifier
+bound into a candidate digest.
+
+Such guards were classified `unscorable-by-single-checkout-fixture`: real, reachable, and
+beyond what a fixture installing one resolution can measure. **That last clause was wrong,
+and the reason has since been emptied.**
+
+The *fixture* installs one resolution. A *test* is free to construct another: an
+open-ended pin admits later versions, so the test copies the real upstream source, applies
+the drift the guard names, bumps the version, and puts it first on `PYTHONPATH`, where it
+is the installed distribution for that process. Every guard the reason was ever applied to
+— one in Phase 5A, four in Phase 5B — was measured that way and killed. Nought for five.
+
+The reason stays in the closed vocabulary, because a guard could genuinely qualify, but it
+now carries a bar that matches its name only when earned:
+
+> `unscorable-by-single-checkout-fixture` requires evidence that **no resolution the
+> declared constraint permits** makes the condition authority-relevant. "The fixture
+> installs one resolution" is a fact about the fixture and is not sufficient. Where the
+> constraint is open-ended and the operand is upstream's to move, the expected outcome is a
+> constructed second resolution and a scored guard.
+
+Constructing one is not always a single edit. Phase 5B's action-type guard sits behind
+Phase 5A's own drift guards: moving the controller's enum alone is refused one package
+upstream, giving the same refusal with and without the guard under test. Reaching it meant
+drifting the controller, Phase 4C and Phase 5A together — a coordinated release the pins
+admit. A second resolution has to reach the guard, not merely exist.
+
+**The bar is a property of the boundary, not of the reason.** Stated once, for every
+member of the vocabulary:
+
+> **No exclusion reason may be claimed across a distribution boundary on evidence about one
+> installation.** Where a guard's deciding operand is defined in a separately versioned
+> distribution under an open-ended pin, the claim required is that *no resolution the
+> declared constraint permits* makes the guard authority-bearing. Nothing observed of the
+> installed release establishes that. Where every deciding operand is defined in the
+> distribution that declares the guard, the same observation is a property of the program
+> and the reason stands on it.
+
+Each reason had been allowed to rest on something weaker, and each was withdrawn on the same
+measurement. `unreachable-behind-earlier-guard` rested on measured evidence of *which guard
+fires first*, in this distribution or an upstream one. Across a boundary that is the
+identical mistake, wearing different clothes: which guard fires first is a fact about the
+resolution that happens to be installed, and an upstream release is free to stop refusing.
+Two exclusions were withdrawn on exactly that, both measured:
+
+* Phase 5A's `identifiers.py:100` hid behind Phase 4C's import-time check, in
+  `ugence-cloud-scaling-risk-integration` under `>=0.1.0`. Under a 0.2.0 that no longer
+  refuses there, Phase 5A's own guard is the one that answers; removed, Phase 5A imports and
+  binds a four-member action vocabulary against a controller ratifying five.
+* Phase 5B's `verification.py:494` hid behind two gates said to make its condition
+  unreachable. Its operand is a property of the Policy Authority's `PolicyResolution`, under
+  `>=0.1.0`. Under a 0.2.0 returning a truthy non-`True`, the guard refuses
+  `HISTORICAL_RESOLUTION_REFUSED` where removing it refuses `INVARIANT_VIOLATION`.
+
+`diagnostic-only` rested on the narrowest-looking claim of the three, and failed the bar
+just as squarely. The reason says a successor guard refuses with the same outcome, so
+removing this one costs a message and no authority. Where the successor's decision is made
+upstream, that is a claim about the installed release. Both withdrawals were measured
+against a Policy Authority 0.2.0 built from real source under `>=0.1.0`:
+
+* `verification.py:487` (`resolution.historical`). The successor is redundant only *because*
+  `implies_current_validity` carries the historicity term (`core/records.py:334`). Under a
+  0.2.0 where the property is `return self.resolved`, the successor goes silent on a genuine
+  revocation: the guard refuses `HISTORICAL_RESOLUTION_REFUSED`, removing it refuses
+  `INVARIANT_VIOLATION` — an internal-integrity report for an ordinary, expected answer.
+* `verification.py:706` (`adapter_id != record.adapter_id`). The digest below it reproduces
+  the same mismatch only while the authority's frame *binds* adapter identity
+  (`core/canonical.py:212`). Under a 0.2.0 whose frame drops the adapter term, a projection
+  naming another adapter reproduces the correct digest, and this guard is the last thing in
+  the way: removing it turns `POLICY_PROJECTION_DIGEST_MISMATCH` into `VERIFIED`. Not a
+  changed refusal — a mint.
+
+The alternative was to ratify a narrower `diagnostic-only` bar that accepts installed-release
+evidence. It was rejected. It would have carved out most of the surviving exclusions
+immediately after retiring the same asymmetry for `unreachable-behind-earlier-guard`, and the
+guard-99 measurement shows what the carve-out would license: not a lost diagnosis, a mint.
+
+No reason survived the bar on the evidence it had been resting on:
+`unscorable-by-single-checkout-fixture` nought for five, `unreachable-behind-earlier-guard`
+nought for two, `diagnostic-only` nought for two of two attacked across a boundary. All stay
+in the closed vocabulary, because a guard could genuinely qualify. Of the eleven exclusions
+that remain, every one is `diagnostic-only` or `equivalent-mutant`, and each was re-checked
+against the rule above when it was ratified: every operand deciding them is either defined in
+the distribution that declares the guard, or fixed by the Python language itself — `None`
+cannot satisfy an `isinstance`, a `hasattr`, or an exact string comparison, whichever release
+supplies the type.
+
+### §9.3 Drift assertions run at import *and* at test time
+
+The ratified identifiers are asserted against their Phase 4C originals when
+`identifiers.py` is imported, and again as an explicit test. Import-time alone is green in
+any process that imports a stale wheel, an editable install pointing at an older checkout,
+or a resolution that satisfied Phase 4C from elsewhere. `identifiers._assert_no_drift` cites
+this section for that requirement; it is recorded here so the citation resolves.
+### §9.4 Conditional expressions are decision points, and collapse to their `else`
+
+§9.1 makes the outcome the contract. A conditional expression can decide one, and `if False:`
+cannot reach it, so both the class and its operator are ratified here rather than left to the
+sweep to imply.
+
+**The class.** A conditional expression is a decision point when it decides a typed outcome.
+Two shapes qualify:
+
+* it **chooses between two outcomes** — `reason = FORGED_TRUST_STATE if forged else
+  UNKNOWN_FIELD` decides which reason a caller may act on, exactly as an `if` would;
+* it **decides whether an outcome is read at all** — `getattr(exc, "outcome", None) if
+  isinstance(exc, _PackageError) else None`. Collapsed, every typed outcome flattens to one
+  fallback: measured, `COORDINATE_MALFORMED` and `INVARIANT_VIOLATION` both become
+  `VERIFICATION_UNAVAILABLE`, which tells a caller the check could not run when it ran and
+  refused.
+
+**The operator.** The expression is replaced by its `else` branch. That is the
+authority-weakening direction in both shapes, and the direction matters: a mutation that
+made the guard *stricter* would be caught by any test asserting the ordinary path and would
+prove nothing about the guard.
+
+* Choosing between outcomes, the `else` is the branch taken when the specific condition does
+  *not* hold — the general, weaker answer. Collapsing to it reports the general reason where
+  the specific one was owed, which is the defect the guard prevents.
+* Gating the read, the `else` is the branch that declines to read the outcome, so collapsing
+  discards the typed answer.
+
+**When the specific reason sits in the `else` instead.** Nothing forces an author to write
+the weaker branch second, and `A if not cond else B` inverts it. The operator is defined by
+authority, not by position: collapse to whichever branch is the **more permissive** — the one
+reporting the more general outcome, or the one declining to read an outcome at all. Where the
+two branches are equally specific and neither is more permissive, the expression is not a
+decision point under this section; it is a naming choice, and is not inventoried. A guard
+whose direction cannot be decided by that rule must be recorded as `[R]` and ratified
+explicitly rather than swept under whichever branch happens to be second.
+

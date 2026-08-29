@@ -1,5 +1,13 @@
 # Canonical 49-guard mutation sweep — Cloud Scaling Phase 5A
 
+> **Superseded for coverage purposes by `GUARD_INVENTORY.md` and
+> `guard_classification.json`.** That pair is generated from source, reconciled against the
+> recorded 65 + 28, and enforced in CI over **114** guards; the 49 below are a subset,
+> measured at a head whose line numbers have since moved. This document is kept because it
+> records *classifications*, and three of them are refuted by measurement — which is worth
+> more as a correction than as a deletion. See "Three classifications this document got
+> wrong" below.
+
 Deterministic inventory: 87 raw `raise` sites -> 85 loose guards -> 81 strict guards ->
 **49 canonical in-scope guards** (`reconciliation.py` then `candidate.py`, source order).
 Anchors hold: guard 11 = `reconciliation.py:226 p_tenant != d_tenant`, guard 13 =
@@ -81,3 +89,97 @@ neutralised, and every one of them still refused: **no surviving guard admits a 
 invalid candidate.** Three (guards 2, 18, 20) fail closed with an untyped `AttributeError`
 rather than a typed rejection — disclosed as a robustness observation, not a lapse, since
 no candidate is constructed in any of them.
+
+
+## Three classifications this document got wrong
+
+Every survivor above was attacked "directly through the public builder". That is the flaw:
+`reconcile_phase4` is exported in `__all__` and is a public entry point of its own, and a
+caller reaching it does not pass through `ExecutionTargetScope` or the candidate builder at
+all. Three survivors classified as needing no coverage admit their attack outright on that
+path, measured with only the named guard removed:
+
+| Here | Now | This document said | Measured on the `reconcile_phase4` path |
+|---|---|---|---|
+| 1 | 44 | *unreachable defence in depth — the same magnitudes are validated by ExecutionTargetScope* | **ADMITTED.** A self-consistent projection carrying `magnitude_before=-1` reconciles with no refusal. No scope is involved. |
+| 10 | 54 | *sibling-backed — guard 6 compares the same `p_context_digest`* | **Not interchangeable.** Guard 6/50 re-derives from the **request**; guard 10/54 digests the projection's **own** `context` object. A projection with a genuine request and a swapped context passes the first and fails only the second. |
+| 17 | 61 | *unreachable defence in depth — ExecutionTargetScope refuses a non-canonical action* | **ADMITTED.** A fully re-derived projection naming `scale_sideways` reconciles with no refusal. |
+
+The remaining thirteen classifications are accurate about what they claim — the guard's
+removal still fails closed, via a sibling or an untyped attribute access. They were wrong
+only in what was concluded from it: a guard whose removal changes the *reason* a refusal is
+given is not covered by a test that only checks that some refusal happened. This package
+has since ratified the typed refusal as part of the contract, so all thirteen are now
+scored rather than excluded.
+
+The summary sentence above — *"no surviving guard admits a new invalid candidate"* — holds
+for the builder path it was measured on and does not hold for the reconciler path.
+
+## The current sweep, and what each surviving guard turned out to be
+
+The 49 guards above are a subset of the current inventory, measured at a head whose line
+numbers have moved. The current sweep covers **114**, and its verdicts are read against the
+definition ratified in ADR Phase 5 §9.1: the typed refusal is the pair
+`(exception class, AuthorizationCandidateRejectionReason)`, and the message is prose.
+
+Under that definition a guard earns its place only if removing it changes the pair. Three
+outcomes are possible, and collapsing them into the word *killed* is what the earlier
+document did:
+
+| Outcome with the guard removed | Guards | What it means |
+|---|---|---|
+| **ADMITTED** — no refusal at all | 7 | the guard is the only thing between the attack and a reconciled fact |
+| **UNTYPED** — an `AttributeError` or `KeyError` | 5 | it fails closed, but outside the typed contract, so no caller can act on it |
+| **CHANGED REASON** — a refusal carrying a different `AuthorizationCandidateRejectionReason` | 14 | a wrong answer, not a cosmetic one |
+| **SAME PAIR** — same class, same reason, different message | 2 | diagnostic-only: excluded from scoring, kept for the better message |
+
+Per guard:
+
+| # | Module:line | Outcome |
+|---|---|---|
+| 1 | `canonical.py:82` | ADMITTED |
+| 7 | `canonical.py:171` | ADMITTED |
+| 12 | `target.py:101` | CHANGED REASON |
+| 15 | `target.py:168` | ADMITTED |
+| 18 | `target.py:268` | CHANGED REASON |
+| 24 | `target.py:436` | CHANGED REASON |
+| 26 | `target.py:453` | UNTYPED |
+| 28 | `target.py:562` | ADMITTED |
+| 29 | `target.py:572` | ADMITTED |
+| 31 | `target.py:659` | CHANGED REASON |
+| 37 | `attestation.py:133` | CHANGED REASON |
+| 40 | `attestation.py:234` | CHANGED REASON |
+| 42 | `attestation.py:250` | UNTYPED |
+| 43 | `attestation.py:255` | UNTYPED |
+| 44 | `reconciliation.py:122` | ADMITTED |
+| 50 | `reconciliation.py:283` | CHANGED REASON |
+| 54 | `reconciliation.py:303` | CHANGED REASON |
+| 61 | `reconciliation.py:364` | ADMITTED |
+| 62 | `reconciliation.py:371` | UNTYPED |
+| 64 | `reconciliation.py:381` | UNTYPED |
+| 65 | `reconciliation.py:388` | SAME PAIR — diagnostic-only |
+| 66 | `reconciliation.py:393` | CHANGED REASON |
+| 67 | `reconciliation.py:398` | CHANGED REASON |
+| 69 | `reconciliation.py:414` | CHANGED REASON |
+| 72 | `reconciliation.py:444` | CHANGED REASON |
+| 75 | `reconciliation.py:468` | CHANGED REASON |
+| 77 | `reconciliation.py:481` | CHANGED REASON |
+| 81 | `reconciliation.py:538` | SAME PAIR — diagnostic-only |
+
+### Two guards that looked diagnostic-only and were not
+
+Guards 50 and 54 sit one after the other, and guard 75 has two halves. Under their first
+attacks, removing 50 left 54 refusing with the *same* reason, and removing 75 left the
+references-equality comparison refusing with the same reason — so both read as diagnostic-
+only. Both were under-attacked, not diagnostic-only:
+
+* **guard 50** — re-derive the *request* around a forged context and leave the projection's
+  own `context` and `context_digest` genuine. Guard 54 is silent, because those two still
+  agree, and only guard 50 consults the request's copy.
+* **guard 75** — its `isinstance` half. A **list** with identical contents passes the
+  equality comparison, because `tuple(list) == tuple(tuple)`; only this guard stands
+  between a mutable references container and the reconciled facts.
+
+The lesson is the one this repository keeps relearning: a guard has two halves, and an
+attack that exercises one says nothing about the other. A survivor is a question about the
+attack before it is a question about the guard.

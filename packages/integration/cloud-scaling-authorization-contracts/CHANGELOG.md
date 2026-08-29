@@ -1,5 +1,221 @@
 # Changelog — ugence-cloud-scaling-authorization-contracts
 
+## [Unreleased] — the enforcement was inert, and two more exclusions were false
+
+*No version bump and no production behaviour change.* A final audit found five
+merge-blocking defects. All five are corrected here; the two that touch this package are
+below, and the rest are in ADR Phase 5 §9 and the sweep.
+
+### §9.1's message rule was never enforced
+
+The sweep refuses to score a kill whose only failing assertion read a message. That check
+never fired. It read `item.repr_failure(...)`, which renders under the configured tbstyle,
+and the sweep runs pytest with `--tb=no` — under which what comes back is pytest's rewritten
+*explanation*, never the source. No message idiom appears literally in
+`where 'actual' = str(Boom('actual'))`, so nothing matched and `killed_only_by_message` was
+False for every mutant in both packages, for this PR's whole history.
+
+Three defects, one behind the other:
+
+| defect | correction |
+|---|---|
+| the detector read a tbstyle-rendered explanation | it reads `excinfo.traceback[-1].statement`, which is source and ignores tbstyle, so `--tb=no` keeps its log-size benefit |
+| it scored the whole displayed frame, so one `pytest.raises` anywhere above suppressed every finding below | it scores the **failing statement alone** — which is the case the rule exists for: the type assertion passed, the message assertion is what failed |
+| its vocabulary was `.detail` and `str(excinfo.value)`; this package writes neither | the vocabulary is `str(<name>.value)`, `.detail` and `.args[`, and a test measures it against what both suites actually write — 48 message assertions here, all `str(exc.value)` |
+
+`scripts/cloud_scaling/tests/` runs the **generated plugin itself** against a suite built to
+fail in each shape: a plain message assertion, one inside a helper, a parameterised one, one
+adjacent to a *passing* outcome assertion, a `.detail` read, and three negative controls.
+Both packages' CI runs it.
+
+### Guard 10 is scored, not unreachable
+
+`identifiers.py:100` was excluded as `unreachable-behind-earlier-guard`: Phase 4C's
+import-time check answers first. It does — in this installation. That check lives in
+`ugence-cloud-scaling-risk-integration`, a separate distribution under `>=0.1.0`, so "which
+guard fires first" is a fact about the resolution installed, not about the program.
+
+Measured against a 0.2.0 that no longer refuses there, paired with a controller ratifying a
+fifth `ActionKind`:
+
+| | result |
+|---|---|
+| undrifted | imports; both vocabularies agree |
+| drifted, guard present | `ImportError` — *Phase 5A fails closed* |
+| drifted, guard neutralised | imports, binding four action types against a controller ratifying five |
+
+**The split is 111 `SCORED` / 3 `EXCLUDED`, not 110 / 4.** The inventory is still 114.
+
+
+## [Unreleased] — guard 9 is scored, not unscorable
+
+*No version bump and no production behaviour change.* The exclusion vocabulary's newest
+reason, `unscorable-by-single-checkout-fixture`, was applied to a guard that is scorable.
+
+Guard 9 (`identifiers.py:93`, `ours != theirs`) compares this package's ratified
+identifiers against Phase 4C's, which arrive from a separately-versioned distribution
+under an open-ended `ugence-cloud-scaling-risk-integration>=0.1.0` pin. The exclusion
+reasoned that the sweep fixture installs exactly one resolution and so cannot make the
+condition true. That is true of the fixture and irrelevant to the guard: a test is free to
+construct a second resolution, and a pin admitting any version at or above 0.1.0 admits a
+0.2.0 that renames a ratified identifier.
+
+So the test builds one — from the real Phase 4C source, not a stub, with the version
+bumped and `PURPOSE_CAPACITY_ACTION` renamed — and places it first on `PYTHONPATH`, where
+it *is* the installed Phase 4C. Under it:
+
+| | guard present | guard removed |
+|---|---|---|
+| drifted resolution | `ImportError`, naming the drifted identifier | imports cleanly |
+
+Removed, Phase 5A binds `cloud_scaling.capacity_action` into every candidate digest while
+Phase 4C ratifies `cloud_scaling.capacity_action.v2` — the identifier substitution the
+module docstring says fails closed. A refusal versus no refusal is a change to the typed
+refusal under §9.1, so the guard is authority-bearing, and the sweep kills it against the
+full suite.
+
+**The split is 110 `SCORED` / 4 `EXCLUDED`, not 109 / 5.** The inventory is still 114.
+
+The reason itself stands — two Phase 5B identifier guards still carry it — but it now has
+a bar to clear. "The fixture installs one resolution" is not a reason; "no second
+resolution the pin admits makes this condition true" is, and it has to be measured. The
+in-tree drift test that previously carried guard 9's exclusion said all three import-time
+guards were equivalent mutants because their conditions are False in this tree. For guard
+11, whose operands are two frozen literals in this distribution, that argument holds. For
+guard 9 it never did: agreement under one resolution says nothing about the others.
+
+## [Unreleased] — 114 guards, and the carve-out that hid an untested one
+
+*No version bump and no production behaviour change.* An independent adversarial
+audit of the sweep found two of this package's definitions wrong. Both are corrected
+by measurement rather than by argument.
+
+### The conversion carve-out is withdrawn
+
+§9.1 excluded an `if` whose body *binds* a raising helper's result, on the stated
+grounds that neutralising it produces no refusal to compare and changes what the suite
+can collect. For the single site it excluded — `attestation.py:261`,
+`if isinstance(issued_at, str): issued_at = _parse_ts(issued_at)` — all three claims
+are false. Neutralised, it produces a typed `MALFORMED_CANONICAL_FIELD` refusal, the
+collected population is identical, and the mutant survives the entire suite.
+
+The carve-out was not describing a conversion. It was reasoning added to explain away
+an `UNSCORED` result, and it hid a line nothing executed: no test built an attestation
+from a canonical wire mapping, so the parse that lets `issued_at` cross the wire as a
+string and arrive as a `datetime` had never run. That round trip — serialize, transmit,
+rebuild — is what a real consumer does, and it now has a test.
+
+### Conditional expressions that select an outcome are decision points
+
+Four sites choose between two `AuthorizationCandidateRejectionReason` members with a
+ternary: `FORGED_TRUST_STATE` vs `UNKNOWN_FIELD` in three deserializers, and
+`MISSING_ACCOUNT_BINDING` vs `MALFORMED_CANONICAL_FIELD` in a fifth. §9.1 makes the
+reason the contract, so these decide it as surely as any `if` — but an `ast.If`-only
+shape rule cannot see them, and `if False:` cannot reach them.
+
+They get a second operator: collapse the conditional to its `else` branch, which is the
+more permissive half and therefore exactly the defect the guard prevents. All four are
+killed by assertions that already existed, which is the point — they were load-bearing
+and unmeasured, not untested.
+
+**The inventory is 114, not 109.** The recorded 65 + 28 are unchanged and still
+reconcile, because both are defined over a narrower shape than this inventory.
+
+## [Unreleased] — the definitions the sweep rests on, ratified
+
+*No version bump and no production behaviour change.* An independent adversarial audit of
+the first sweep found that its two load-bearing definitions were being decided case by case
+inside a script. Both are now ratified in ADR Phase 5 §9, and the classification is redone
+under them.
+
+### Ratified
+
+- **The typed refusal is `(exception class, AuthorizationCandidateRejectionReason)`.** The
+  message is prose: no consumer may branch on it and no test may assert it. A guard is
+  authority-bearing when removing it changes that pair for some constructible input —
+  including changing it to no refusal at all. Every coverage test now asserts the reason
+  rather than a message substring.
+- **`equivalent-mutant` may not be claimed across a distribution boundary.** A guard
+  comparing against a value from a separately-versioned distribution admitted by an
+  open-ended pin can be true under a resolution that pin permits, so its falsity is a
+  property of the installation and not of the program.
+
+### Fixed
+
+- Guards 65 and 81 are `diagnostic-only`, not scored. Each is a strict subset of the guard
+  behind it, which carries the *same* reason — `None` ⊂ `not isinstance(..., Mapping)` and
+  `None` ⊂ `not isinstance(..., datetime)`. They were only ever killed by an assertion on
+  the message, which the ratification says is not the contract.
+- Guard 9's `equivalent-mutant` claim is withdrawn: it compares against Phase 4C across an
+  open-ended `>=0.1.0` pin. Reclassified `unscorable-by-single-checkout-fixture`.
+- Guard 10's reason is corrected to `unreachable-behind-earlier-guard`, with evidence that
+  measures unreachability rather than falsity: a subprocess drifts the controller's enum and
+  reads which guard's `ImportError` comes back. It is Phase 4C's, every time.
+- Guards 50 and 75 survived once the tests stopped asserting messages — and were then shown
+  to be authority-bearing after all, by sharper attacks. Both are scored, and
+  `GUARD_SWEEP.md` records why the first attacks missed.
+
+### Fixed — the sweep engine
+
+- **A red baseline is refused.** This is the one that mattered: the copy was named
+  `package`, Phase 5B's suite asserts its own directory name, and that test therefore failed
+  in *every* run of that package's sweep. Since a mutant counted as killed whenever any test
+  failed, **all 115 Phase 5B guards were reported killed regardless of the mutation.** The
+  copy now keeps the package's directory name, the baseline must be green, and a kill counts
+  only failures the baseline did not already have.
+- An `if` whose body *binds* the result of a raising helper is a conversion, not a guard,
+  and is not inventoried; an `if` whose body *calls* one is. That adds `verification.py:327`
+  and `verified.py:488` to Phase 5B, which a raise-only reading missed.
+- An exclusion whose `(module, condition)` key matches more than one guard is refused rather
+  than silently applied to all of them — `target.py` carries three guards reading exactly
+  `not isinstance(data, Mapping)`.
+- A guard the sweep could not score is a blocking failure, not a line in a report.
+- "eleven real Phase 5B gates" was written from the gates this work had touched rather than
+  counted. The report computes the figure now; at this commit it is 47 of 117.
+
+## [Unreleased] — the sweep is measured, and every guard is classified
+
+*No version bump.* No production behaviour changes here: this is coverage, classification
+and the CI that enforces both.
+
+The first complete CI mutation sweep of this package neutralised all **109** authority-
+bearing guards and ran the whole suite against each. **78 died; 31 survived.** A survivor
+is not a guard the suite tests weakly — it is a guard the suite never reached, so removing
+it changed nothing any test could see.
+
+### Added
+
+- `tests/test_guard_coverage.py` — 31 tests reaching 28 of the 31 survivors through the
+  public surface each defends. Each asserts the specific typed refusal that guard alone
+  produces, so a test that merely observed "something was refused" cannot stand in for it.
+- `guard_classification.json` (generated, tracked) — every one of the 109 guards
+  classified `SCORED` or `EXCLUDED`. Exclusions are declared in the engine, keyed by
+  `(module, condition)` rather than by line so a shifted line cannot silently re-point one
+  at a different guard, and each must name a reason from a closed four-item vocabulary and
+  a test that measures the reason.
+- Six blocking CI conditions on the aggregate: inventory drift, an unclassified guard, an
+  invalid or orphaned exclusion, a `SCORED` guard that survived, an `EXCLUDED` guard that
+  was in fact killed, a missing shard, a duplicated result, and a shard that collected a
+  different population.
+- The test-time half of the D-4 drift assertion (ADR Phase 5 §9), which was missing.
+  Import-time alone is green in any process that imports a stale wheel.
+
+### Measured
+
+- Of the 28 newly-covered guards, **7 ADMIT their attack outright** when removed — the
+  boundary produces no refusal at all — **5 fail closed through an untyped `AttributeError`
+  or `KeyError`**, and 16 refuse with another guard's reason. `GUARD_SWEEP.md` records
+  which is which, per guard, with the mutant's actual output.
+- Three classifications in the earlier 49-guard `GUARD_SWEEP.md` are refuted. All three
+  rest on attacks routed through the candidate builder; `reconcile_phase4` is exported in
+  `__all__` and is a public entry point of its own, and on that path two of the three
+  guards admit their attack with no refusal. The document is corrected in place rather
+  than deleted.
+- Guards 9, 10 and 11 (`identifiers.py`) are `EXCLUDED` as equivalent mutants: each
+  compares two frozen constants that are equal in-tree, so `if False:` is the same program
+  on every path. The claim is not asserted — a test measures that each condition is False,
+  and the exclusion is void the moment it stops being.
+
 ## [Unreleased] — every value is admitted before it is compared
 
 *No version bump.* `cloud-scaling-policy-authenticity` pins Phase 5A's version literal in
