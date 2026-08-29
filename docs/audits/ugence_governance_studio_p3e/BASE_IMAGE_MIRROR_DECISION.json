@@ -1,0 +1,75 @@
+{
+  "decision": "approved_internal_registry_mirror",
+  "phase": "governance_studio_p3f",
+  "status": "RATIFIED_PENDING_MIRROR_COORDINATES",
+  "rationale": "Organization egress policy denies all container-registry blob CDNs (403 on CONNECT to production.cloudfront.docker.com and pkg-containers.githubusercontent.com), so the P3E Dockerfile's digest-pinned base images cannot be pulled and gates C2 and C4-C19 have never executed. P3F obtains the same images through an approved internal registry mirror rather than by relaxing egress policy or by substituting a different image.",
+  "rejected_alternatives": [
+    {"option": "allowlist the upstream registry blob CDNs for CI", "reason": "widens organization egress policy; not the ratified route"},
+    {"option": "run the container job on a runner with direct registry access", "reason": "moves the trust boundary outside the approved environment; not the ratified route"},
+    {"option": "substitute a different or FROM-scratch base image", "reason": "PROHIBITED - would invalidate the P3E supply-chain evidence"}
+  ],
+  "authoritative_digests": {
+    "note": "These upstream multi-arch INDEX digests are the ratified reference and are NOT changed by this decision. They remain exactly as pinned in deployment/governance-studio/base-images.json and in the Dockerfile FROM lines. The mirror is a transport, not a new source of truth.",
+    "platform": "linux/amd64",
+    "images": [
+      {
+        "upstream_ref": "docker.io/library/node:22-bookworm-slim",
+        "manifest_digest": "sha256:f32b81066cde10a75dbac96646099533316d94bac4150c55da1636e1f0ffdc46",
+        "amd64_manifest_digest": "sha256:0f65470961851f2354dc8e560853e2f428ea928436135fc7e35780ab100c7e00",
+        "dockerfile_stages": ["frontend"]
+      },
+      {
+        "upstream_ref": "docker.io/library/python:3.11-slim-bookworm",
+        "manifest_digest": "sha256:b18992999dbe963a45a8a4da40ac2b1975be1a776d939d098c647482bcad5cba",
+        "amd64_manifest_digest": "sha256:28255a3ace7eb4c48bc1b57b90af29e1bc82b4fd6c60614a8e3dce61b87ff941",
+        "dockerfile_stages": ["backend", "runtime"]
+      }
+    ],
+    "distinct_images": 2,
+    "dockerfile_from_stages": 3
+  },
+  "mirror": {
+    "registry_host": null,
+    "repository_prefix": null,
+    "credential_mechanism": "normal CI secret mechanism (GitHub Actions repository/organization secrets); no credential is committed to the repository, printed in logs, or baked into any image layer",
+    "coordinates_provided": false,
+    "credentials_provided": false
+  },
+  "stop_condition": {
+    "rule": "MUST_HALT_ON_DIGEST_MISMATCH",
+    "check": "for each image, the manifest digest resolved from the mirror must equal the ratified upstream manifest_digest above, byte for byte",
+    "on_mismatch": "halt the container job, execute no gate, mark nothing passed, and escalate to the owner; do not re-pin base-images.json or the Dockerfile to the mirrored digest",
+    "rationale": "a differing digest means the mirrored image is not the ratified image; accepting it would silently substitute the base image this decision exists to prevent"
+  },
+  "prohibited": [
+    "substituting any base image",
+    "altering the upstream digests recorded above or in deployment/governance-studio/base-images.json",
+    "re-pinning the Dockerfile to a mirror-specific digest",
+    "marking any container gate passed without a real build",
+    "reporting a NOT_EXECUTED gate as passed, skipped, waived, or not applicable"
+  ],
+  "gates_unblocked_when_mirror_available": {
+    "note": "Gate identifiers are carried forward exactly as recorded in the P3E audit; this decision does not redefine them. The two P3E records differ on whether C16-image and C17-image are listed, so both spellings are retained here and reconciled when the gates actually execute.",
+    "container_runtime_capability_record": ["C2", "C4", "C5", "C6", "C7", "C8", "C9", "C10", "C11", "C12", "C13", "C14", "C15", "C16-image", "C17-image", "C18", "C19"],
+    "container_completion_record": ["C2", "C4", "C5", "C6", "C7", "C8", "C9", "C10", "C11", "C12", "C13", "C14", "C15", "C18", "C19"],
+    "current_state": "NOT_EXECUTED"
+  },
+  "execution_preconditions": [
+    "mirror registry host and repository prefix recorded in this file",
+    "pull credentials available to CI through the normal secret mechanism",
+    "a container runtime (daemon + buildx) available to the job",
+    "mirrored manifest digests verified equal to the ratified upstream digests"
+  ],
+  "on_execution_update": [
+    "docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.json",
+    "docs/audits/ugence_governance_studio_p3e/CONTAINER_COMPLETION_LIVE_STATE.json",
+    "apps/ugence-governance-studio/docs/p3e/LIMITATIONS.md"
+  ],
+  "unchanged_by_this_decision": {
+    "openapi_sha256": "dc309eab216e1a4c2f63f286887a4ef218a96ac34f8fa8614bff176db7c36656",
+    "platform_freeze_digest": "d993093570bb8ee132d4ab58406a14dd8c9b774b9de2c6d7ac45d3dfd3fac036",
+    "base_images_json": "deployment/governance-studio/base-images.json",
+    "dockerfile": "deployment/governance-studio/Dockerfile"
+  },
+  "verification_of_this_record": "digests above were read from deployment/governance-studio/base-images.json and confirmed against the three Dockerfile FROM lines on 2026-08-29"
+}
