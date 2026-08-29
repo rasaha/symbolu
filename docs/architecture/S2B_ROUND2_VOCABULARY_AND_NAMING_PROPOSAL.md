@@ -66,7 +66,7 @@ trace.
 |---|---|---|
 | `SINGLE_CANDIDATE_UNREVISED` | the advisory carries exactly one candidate and binds no parent | `[V]` `candidates` is `1..n` and inside `P_unsigned` (`S1:1043`); `parent_advisory_digest` participates in identity **including when null** (`S1:1036`) |
 | `MULTI_CANDIDATE_UNREVISED` | the advisory carries two or more candidates and binds no parent | `[V]` the same `candidates` field. `[I]` The definition is **two-axis only**: it says nothing about the selector, because under OD-8 selection-policy v1 "more than one qualifying candidate produces no selection and `ABSTAIN`" (`S1:2653-2654`), so a lawful multi-candidate advisory may carry a **null** selector. An earlier draft added "and its selector is the ratified one" as a third condition, which left exactly that advisory matching no member |
-| `REVISED_ADVISORY` | the advisory binds a parent by digest, at any candidate count | `[V]` `build_advisory_revision` sets `parent_advisory_digest = parent.advisory_digest` and increments `advisory_version` (`S1:1836-1837`; B7 at `S1:377-386`) |
+| `REVISED_ADVISORY` | the advisory binds a parent, at any candidate count | `[V]` `build_advisory_revision` sets `parent_advisory_digest = parent.advisory_digest` and increments `advisory_version` (`S1:1836-1837`; B7 at `S1:377-386`) |
 
 Three members, no default member, no escape member — satisfying `S2B-S1-Q1`'s shape rules
 with one member to spare.
@@ -78,7 +78,7 @@ mechanisms and neither of its outcomes: it is not evidence collection (`ToolObse
 `S1:1178-1179`), and not abstention or escalation, which are `TerminalOutcome` members
 constrained by R-2 and R-4 (`S1:1173-1189`). `[V]` It is a **producer-chosen construction
 path** — `build_advisory_revision` is called or it is not, and G3 makes the resulting parent
-binding and version increment observable (`S1:1836-1837`) — which is what `S2B-D2=A` means
+binding and version increment observable (`S1:1836-1837`). `[I]` That is what `S2B-D2=A` means
 by an orchestration procedure. The same argument holds for the other two, which differ only
 in candidate count on the same path.
 
@@ -117,11 +117,44 @@ package already has (`[V]` `build_proposer_advisory` at `identity.py:187` and
 `build_advisory_revision` at `:425`): `build_advisory_revision` yields `REVISED_ADVISORY`,
 and `build_proposer_advisory` yields the other two according to candidate count. The
 mapping is two-to-three, not one-to-one. Two things follow.
-A role permitted only `SINGLE_CANDIDATE_UNREVISED` is, in effect, barred from
-`build_advisory_revision` and from multi-candidate advisories — permission becomes a
-statement about which ratified construction paths a role may use. And the declaration adds
-no information a verifier could not recompute, so its value is *governance* (a role may
-only produce shapes its policy permits) rather than *disclosure*.
+`[R]` **First: permission governs the token, not the shape — and an earlier draft of this
+proposal was wrong to say otherwise.** It claimed a role permitted only
+`SINGLE_CANDIDATE_UNREVISED` would be "in effect barred from `build_advisory_revision` and
+from multi-candidate advisories", and that such a role "may only produce shapes its policy
+permits". `[V]` **No ratified check delivers that.** `S2B-S1-Q11=A`'s replay checks are a
+closed list — policy identity and version, the role's reference, a non-empty permitted set,
+**membership** of the declared strategy, and rider R1's record-to-advisory equality
+(`ADR_UGENCE_S2B_FIRST_SLICE_RATIFICATION.md:146-150`) — and **none of them compares the
+declared token against the advisory's actual shape**. `[V]` `S2B-D5=A`'s triggering
+conditions test membership on the same terms (`ADR:145-147`). `[V]` `S2B-D8=B` expressly
+defers procedure-conformance replay (`ADR:216-218`). `[V]` And `ADR:303-306` states that the
+R1 equality "does not prove that the declared procedure was executed" — which, for
+shape-defined members, **is** precisely the declaration-to-shape correspondence the withdrawn
+claim assumed.
+
+`[I]` So the actual ratified effect is narrower and must be stated as such: a policy governs
+**which token a role may declare**. A producer permitted only `SINGLE_CANDIDATE_UNREVISED`
+may declare that token and construct a five-candidate advisory, and **every** ratified check
+still passes — membership holds, and the record and advisory agree on the token. Nothing
+ratified detects the mismatch. `[V]` Under `ADR:189-191` replay, not construction, is the
+guarantee, so a rule the builder alone might apply is not a guarantee at all.
+
+`[I]` **Second: the declaration adds no information a verifier could not recompute.** That
+remains true, and it is what makes the gap above repairable in principle — a verifier
+*could* derive the shape and compare. But deriving-and-comparing is a **new check**, and
+`Q11=A`'s list is ratified and closed. It cannot be added to the replay function by an
+implementer; it needs its own ratification, which is what `R2-Q8` puts to the owner.
+
+`[R]` **Third, and disclosed because it is a cost the owner would otherwise meet later:
+the three members tile every lawful advisory, so no fourth member can simply be added.**
+Any later member — including `STAGED_DECOMPOSITION`, which A.2 and Part E call admissible
+once observable stages exist — would necessarily overlap one of the three, and
+`S2B-D3=A`'s exactly-one-strategy rule would then have no lawful answer. Admitting a fourth
+would require **either** redefining the three **or** the composition ruling `S2B-D3=A`
+expressly deferred (`ADR:123-127`). `[I]` This bites on both horns of `R2-Q8`: under
+`Q8 = B` a later member is a redefinition of an already-ratified vocabulary; under
+`Q8 = A` it is that **and** a change to a ratified replay check, since the derived-shape
+comparison would have to yield the new member too.
 
 `[I]` This is not a defect of these three members; it is what criterion (i) permits **while
 no component records observable reasoning stages** (`ADR:346-347`). A vocabulary of
@@ -269,7 +302,11 @@ observable-procedure conformance replay and any producer of observable reasoning
 (`S2B-D8`); registration of the strategy-permission policy family and its Policy Authority
 adapter; a strategy-policy registry; any binding to Reasoning Compute Governance; and the
 Agent Constitution. Plus `STAGED_DECOMPOSITION`, admissible only if observable stages ever
-exist.
+exist — and `[R]` **not admissible by simple addition even then**: the three proposed members
+tile every lawful advisory, so a fourth would overlap one of them and leave `S2B-D3=A` with
+no lawful answer. Admitting it would require redefining the three, or the composition ruling
+`S2B-D3=A` deferred (`ADR:123-127`), or both — and, under `R2-Q8=A`, a change to a ratified
+replay check as well.
 
 ---
 
@@ -339,17 +376,33 @@ R2-Q6  Gate. With R2-Q1..Q5 ratified, §8's sixth item (the vocabulary) is
        Note: Q6 presumes Q7 = A. If Q7 = B, no vocabulary is ratified, the
        sixth gate item stays open, and Q6 does not arise.
 
-R2-Q7  Character of this vocabulary. Every proposed member is defined by
-       observable artifact shape, so a declaration is DERIVABLE from the
-       advisory and the members partition the outputs of two existing construction
-       paths: a role's permitted set becomes a statement about which ratified
-       paths it may use, and the declaration adds no information a verifier
-       could not recompute. This is what criterion (i) permits while no
-       component records observable reasoning stages (ADR:346-347).
-       A = accept a derivable vocabulary now; its value is governance, not
-           disclosure [recommended]
+R2-Q7  Character of this vocabulary — read with Q8, which is where the
+       missing half sits. Every member is defined by observable artifact
+       shape, so a declaration is DERIVABLE from the advisory. But NOTHING
+       RATIFIED DERIVES IT AND COMPARES: Q11=A's replay list is closed and
+       checks membership only, D5=A tests membership only, and D8=B defers
+       procedure-conformance replay. So on the ratified checks alone, a policy
+       governs WHICH TOKEN A ROLE MAY DECLARE and nothing more — a role
+       permitted only SINGLE_CANDIDATE_UNREVISED may declare it and construct
+       a five-candidate advisory with every check passing. That is the honest
+       value of A: a governed, digest-bound, replayable declaration whose
+       correspondence to the artifact is unverified unless Q8 = A.
+       A = accept the vocabulary on those terms [recommended]
        B = defer the whole vocabulary until a producer of observable reasoning
            stages exists, leaving the S2-B gate closed indefinitely
+
+R2-Q8  Shape-correspondence check — a SEPARATE ratification, because Q11=A's
+       check list is closed and no implementer may add to it. Because every
+       member is defined by artifact shape, a verifier could derive the shape
+       from the advisory and compare it to the declared token, turning the
+       declaration from an unverified assertion into a replayable one.
+       A = ratify a sixth replay check: the declared token equals the token
+           the advisory's own shape yields, replay returning False on mismatch
+           [recommended]
+       B = no such check; the declaration stays an assertion whose
+           correspondence to the artifact nothing verifies
+       Note: A makes any FUTURE member a breaking change, since the three
+       members already tile every lawful advisory — see Q7's note and Part E.
 ```
 
 ---
