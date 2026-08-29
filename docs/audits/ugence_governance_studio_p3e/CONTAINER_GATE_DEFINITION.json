@@ -1,7 +1,7 @@
 {
   "schema": "p3e-container-gate-definition.v1",
   "title": "Canonical P3E container gate definition",
-  "status": "PUBLISHED_WITH_UNKNOWN_DEFINITIONS",
+  "status": "PUBLISHED_2_DEFINED_15_UNKNOWN",
   "owner": "rasaha",
   "owner_confirmed_on": "2026-08-29",
   "published_on": "2026-08-29",
@@ -42,17 +42,25 @@
     "permitted_evidence_sources": [
       ".github/workflows/governance-studio-p3e-private-hosted-ci.yml",
       "deployment/governance-studio/tests/",
-      "deployment/governance-studio/ci/ verification scripts"
+      "deployment/governance-studio/ci/ verification scripts",
+      "Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/ (tracked markdown twins of the P3E audit records; added to the permitted set by owner decision, rasaha, 2026-08-29)"
     ],
-    "finding": "None of the permitted sources contains any C-prefixed gate identifier. A case-insensitive search for C-identifiers across the workflow, the deployment test suite and the CI scripts returns no match, so no source associates any identifier with any step or test.",
+    "finding": "The workflow, the deployment tests and the CI scripts contain no C-prefixed gate identifier at all. Gate definitions exist only in the markdown twins of the P3E audit records, and they define two gates individually and the rest only as a group.",
     "corroborating_finding": "verify_container.sh annotates its checks with section markers of a 'P3E completion' specification (sections 4, 6, 7, 8, 10, 11, 13). That specification is not present in the repository, and section numbers are a different numbering scheme from the C identifiers; they are recorded here as a lead, not as a mapping.",
     "counting_check": "the container job carries 13 named steps, of which 12 predate the pin-conformance guard added alongside this definition, and two of those are setup rather than verification (install-e2e-driver-deps and the checkout/setup actions). That is fewer named steps than the 17 gate identifiers, so no positional or one-to-one correspondence can be derived either.",
-    "consequence": "every gate's requirement, workflow step and supporting test is recorded as UNKNOWN. No mapping was invented."
+    "consequence": "C2 and C4 are DEFINED from the audit records. C5-C19 receive only a group property and remain individually UNKNOWN. No mapping was invented.",
+    "correction_2026_08_29": "An earlier version of this file stated that no permitted source contained any C-prefixed identifier and that the gates were 'defined nowhere'. That was true of docs/, apps/, deployment/ and .github/, but false of the repository: the tracked Project_documentation/ mirror was not searched and does define C2 and C4. The claim is withdrawn and replaced by the findings below.",
+    "completion_specification": {
+      "status": "ABSENT_FROM_REPOSITORY",
+      "evidence": "verify_container.sh, packaged_e2e.py and several deployment modules cite sections of a 'P3E completion' specification (sections 2-9 in the audit records; 4, 6, 7, 8, 10, 11, 13 in verify_container.sh; 20, 21, 25 in test_container_artifacts.py). A full sweep of the repository - including all 22 files mentioning P3E and the whole Project_documentation tree - finds no document containing that specification.",
+      "consequence": "the per-gate requirements it would supply are unavailable; do not repeat this search without a new source outside the repository",
+      "searched_on": "2026-08-29"
+    }
   },
   "gates": {
     "C2": {
-      "definition_status": "UNKNOWN",
-      "requirement": null,
+      "definition_status": "DEFINED",
+      "requirement": "digest-pinned base images",
       "workflow_step": null,
       "supporting_test_or_script": null,
       "requires_container_runtime": true,
@@ -67,11 +75,18 @@
         "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
         "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
       },
-      "unknown_reason": "no artifact in the permitted evidence sources associates this identifier with any workflow step, test, or requirement"
+      "definition_source": "Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:37",
+      "definition_quote": "**C2** (digest-pinned base images), **C4** (image build), and every gate that requires a **built/running image** (**C5-C19**) cannot execute here.",
+      "candidate_workflow_step": {
+        "step": "base-image-digest-verification",
+        "basis": "INFERRED_BY_NAME_AND_PURPOSE_MATCH - not asserted by any source",
+        "asserted": false
+      },
+      "corroborating_evidence": "Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:41 groups C2 with C15 and C18 as 'no real distro base to pin or scan', consistent with C2 being the pinning gate"
     },
     "C4": {
-      "definition_status": "UNKNOWN",
-      "requirement": null,
+      "definition_status": "DEFINED",
+      "requirement": "image build",
       "workflow_step": null,
       "supporting_test_or_script": null,
       "requires_container_runtime": true,
@@ -86,7 +101,13 @@
         "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
         "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
       },
-      "unknown_reason": "no artifact in the permitted evidence sources associates this identifier with any workflow step, test, or requirement"
+      "definition_source": "Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:37",
+      "definition_quote": "**C2** (digest-pinned base images), **C4** (image build), and every gate that requires a **built/running image** (**C5-C19**) cannot execute here.",
+      "candidate_workflow_step": {
+        "step": "container-build",
+        "basis": "INFERRED_BY_NAME_AND_PURPOSE_MATCH - not asserted by any source",
+        "asserted": false
+      }
     },
     "C5": {
       "definition_status": "UNKNOWN",
@@ -105,7 +126,8 @@
         "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
         "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
       },
-      "unknown_reason": "no artifact in the permitted evidence sources associates this identifier with any workflow step, test, or requirement"
+      "unknown_reason": "no source states what this gate individually verifies; only the C5-C19 group property above is established",
+      "group_property": "member of C5-C19, defined collectively at Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:38 as 'every gate that requires a built/running image'. That is a group property, not this gate's individual requirement."
     },
     "C6": {
       "definition_status": "UNKNOWN",
@@ -124,7 +146,8 @@
         "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
         "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
       },
-      "unknown_reason": "no artifact in the permitted evidence sources associates this identifier with any workflow step, test, or requirement"
+      "unknown_reason": "no source states what this gate individually verifies; only the C5-C19 group property above is established",
+      "group_property": "member of C5-C19, defined collectively at Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:38 as 'every gate that requires a built/running image'. That is a group property, not this gate's individual requirement."
     },
     "C7": {
       "definition_status": "UNKNOWN",
@@ -143,7 +166,8 @@
         "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
         "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
       },
-      "unknown_reason": "no artifact in the permitted evidence sources associates this identifier with any workflow step, test, or requirement"
+      "unknown_reason": "no source states what this gate individually verifies; only the C5-C19 group property above is established",
+      "group_property": "member of C5-C19, defined collectively at Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:38 as 'every gate that requires a built/running image'. That is a group property, not this gate's individual requirement."
     },
     "C8": {
       "definition_status": "UNKNOWN",
@@ -162,7 +186,8 @@
         "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
         "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
       },
-      "unknown_reason": "no artifact in the permitted evidence sources associates this identifier with any workflow step, test, or requirement"
+      "unknown_reason": "no source states what this gate individually verifies; only the C5-C19 group property above is established",
+      "group_property": "member of C5-C19, defined collectively at Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:38 as 'every gate that requires a built/running image'. That is a group property, not this gate's individual requirement."
     },
     "C9": {
       "definition_status": "UNKNOWN",
@@ -181,7 +206,8 @@
         "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
         "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
       },
-      "unknown_reason": "no artifact in the permitted evidence sources associates this identifier with any workflow step, test, or requirement"
+      "unknown_reason": "no source states what this gate individually verifies; only the C5-C19 group property above is established",
+      "group_property": "member of C5-C19, defined collectively at Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:38 as 'every gate that requires a built/running image'. That is a group property, not this gate's individual requirement."
     },
     "C10": {
       "definition_status": "UNKNOWN",
@@ -200,7 +226,8 @@
         "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
         "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
       },
-      "unknown_reason": "no artifact in the permitted evidence sources associates this identifier with any workflow step, test, or requirement"
+      "unknown_reason": "no source states what this gate individually verifies; only the C5-C19 group property above is established",
+      "group_property": "member of C5-C19, defined collectively at Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:38 as 'every gate that requires a built/running image'. That is a group property, not this gate's individual requirement."
     },
     "C11": {
       "definition_status": "UNKNOWN",
@@ -219,7 +246,8 @@
         "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
         "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
       },
-      "unknown_reason": "no artifact in the permitted evidence sources associates this identifier with any workflow step, test, or requirement"
+      "unknown_reason": "no source states what this gate individually verifies; only the C5-C19 group property above is established",
+      "group_property": "member of C5-C19, defined collectively at Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:38 as 'every gate that requires a built/running image'. That is a group property, not this gate's individual requirement."
     },
     "C12": {
       "definition_status": "UNKNOWN",
@@ -238,7 +266,8 @@
         "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
         "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
       },
-      "unknown_reason": "no artifact in the permitted evidence sources associates this identifier with any workflow step, test, or requirement"
+      "unknown_reason": "no source states what this gate individually verifies; only the C5-C19 group property above is established",
+      "group_property": "member of C5-C19, defined collectively at Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:38 as 'every gate that requires a built/running image'. That is a group property, not this gate's individual requirement."
     },
     "C13": {
       "definition_status": "UNKNOWN",
@@ -257,7 +286,8 @@
         "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
         "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
       },
-      "unknown_reason": "no artifact in the permitted evidence sources associates this identifier with any workflow step, test, or requirement"
+      "unknown_reason": "no source states what this gate individually verifies; only the C5-C19 group property above is established",
+      "group_property": "member of C5-C19, defined collectively at Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:38 as 'every gate that requires a built/running image'. That is a group property, not this gate's individual requirement."
     },
     "C14": {
       "definition_status": "UNKNOWN",
@@ -276,7 +306,8 @@
         "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
         "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
       },
-      "unknown_reason": "no artifact in the permitted evidence sources associates this identifier with any workflow step, test, or requirement"
+      "unknown_reason": "no source states what this gate individually verifies; only the C5-C19 group property above is established",
+      "group_property": "member of C5-C19, defined collectively at Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:38 as 'every gate that requires a built/running image'. That is a group property, not this gate's individual requirement."
     },
     "C15": {
       "definition_status": "UNKNOWN",
@@ -295,7 +326,9 @@
         "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
         "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
       },
-      "unknown_reason": "no artifact in the permitted evidence sources associates this identifier with any workflow step, test, or requirement"
+      "unknown_reason": "no source states what this gate individually verifies; only the C5-C19 group property above is established",
+      "group_property": "member of C5-C19, defined collectively at Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:38 as 'every gate that requires a built/running image'. That is a group property, not this gate's individual requirement.",
+      "corroborating_evidence": "Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:41 names C2, C15 and C18 together as gates a scratch image 'could not satisfy (no real distro base to pin or scan)', so C15 and C18 relate to pinning or scanning. The sentence does not say which is which, so neither is resolved individually."
     },
     "C16": {
       "definition_status": "UNKNOWN",
@@ -314,7 +347,8 @@
         "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
         "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
       },
-      "unknown_reason": "no artifact in the permitted evidence sources associates this identifier with any workflow step, test, or requirement"
+      "unknown_reason": "no source states what this gate individually verifies; only the C5-C19 group property above is established",
+      "group_property": "member of C5-C19, defined collectively at Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:38 as 'every gate that requires a built/running image'. That is a group property, not this gate's individual requirement."
     },
     "C17": {
       "definition_status": "UNKNOWN",
@@ -333,7 +367,8 @@
         "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
         "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
       },
-      "unknown_reason": "no artifact in the permitted evidence sources associates this identifier with any workflow step, test, or requirement"
+      "unknown_reason": "no source states what this gate individually verifies; only the C5-C19 group property above is established",
+      "group_property": "member of C5-C19, defined collectively at Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:38 as 'every gate that requires a built/running image'. That is a group property, not this gate's individual requirement."
     },
     "C18": {
       "definition_status": "UNKNOWN",
@@ -352,7 +387,9 @@
         "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
         "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
       },
-      "unknown_reason": "no artifact in the permitted evidence sources associates this identifier with any workflow step, test, or requirement"
+      "unknown_reason": "no source states what this gate individually verifies; only the C5-C19 group property above is established",
+      "group_property": "member of C5-C19, defined collectively at Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:38 as 'every gate that requires a built/running image'. That is a group property, not this gate's individual requirement.",
+      "corroborating_evidence": "Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:41 names C2, C15 and C18 together as gates a scratch image 'could not satisfy (no real distro base to pin or scan)', so C15 and C18 relate to pinning or scanning. The sentence does not say which is which, so neither is resolved individually."
     },
     "C19": {
       "definition_status": "UNKNOWN",
@@ -371,7 +408,8 @@
         "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
         "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
       },
-      "unknown_reason": "no artifact in the permitted evidence sources associates this identifier with any workflow step, test, or requirement"
+      "unknown_reason": "no source states what this gate individually verifies; only the C5-C19 group property above is established",
+      "group_property": "member of C5-C19, defined collectively at Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:38 as 'every gate that requires a built/running image'. That is a group property, not this gate's individual requirement."
     }
   },
   "unassigned_candidate_evidence": {
@@ -432,5 +470,12 @@
   "closes": {
     "record": "docs/audits/ugence_governance_studio_p3e/BASE_IMAGE_MIRROR_DECISION.json",
     "block": "gate_identifier_discrepancy"
+  },
+  "related_records": {
+    "note": "markdown twins of the two JSON audit records; the source of the gate definitions above. They express gate sets as ranges (C4-C19) rather than identifier lists, so they are not machine-validated by verify_gate_identifiers.py, which checks the JSON records.",
+    "files": [
+      "Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md",
+      "Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_COMPLETION_LIVE_STATE.md"
+    ]
   }
 }

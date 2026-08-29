@@ -98,8 +98,6 @@
     "owner": "rasaha",
     "escalated_on": "2026-08-29",
     "finding": "Original finding (2026-08-29, now resolved): The two P3E records disagree on the blocked-gate list: CONTAINER_RUNTIME_CAPABILITY.json includes C16-image and C17-image, CONTAINER_COMPLETION_LIVE_STATE.json does not. The discrepancy could not be resolved against a canonical P3E gate definition because no such definition exists.",
-    "search_performed": "grep for the gate identifiers across docs/, apps/ugence-governance-studio/, deployment/ and .github/ in the working tree; git log --all -S and --grep over history, scoped to the governance-studio paths (the only hits are the commit that introduced the two audit records and this ratification commit; pickaxe hits elsewhere in the repository belong to unrelated cloud-scaling work); and the bodies and comment threads of the originating pull requests #1323 and #1325, which are empty of any gate definition. Within the governance studio the identifiers C2 and C4-C19 appear only in the two audit records named above and in this file; they are defined nowhere.",
-    "root_gap": "Original gap, partially remaining: the P3E container gate set was recorded by identifier without ever being defined, so no artifact in the repository states what C2 or C4 through C19 actually verify, nor whether C16 and C17 have distinct image and non-image variants The identifier set is now canonical; what each gate verifies is still UNKNOWN and owned by rasaha.",
     "lists_as_recorded": {
       "note": "reproduced verbatim for traceability; neither is asserted correct",
       "container_runtime_capability_record": [
@@ -150,11 +148,15 @@
         "docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.json",
         "docs/audits/ugence_governance_studio_p3e/CONTAINER_COMPLETION_LIVE_STATE.json"
       ],
-      "definition_status_of_every_gate": "UNKNOWN - no permitted evidence source associates any identifier with a workflow step, test or requirement, so no mapping was invented; the definition records what is establishable and marks the rest UNKNOWN",
+      "definition_status_of_every_gate": "2 DEFINED (C2, C4) and 15 UNKNOWN, per the canonical definition. No mapping was invented; the fifteen carry only the recorded C5-C19 group property.",
       "execution_state_unchanged": "every canonical gate remains NOT_EXECUTED",
       "automated_validation": "deployment/governance-studio/ci/verify_gate_identifiers.py, run as the gate-identifier-conformance step of the application job and covered by deployment/governance-studio/tests/test_gate_identifiers.py"
     },
-    "superseded_note": "The identifier discrepancy is closed. The separate, still-open question of what each gate actually verifies is carried in the canonical definition as per-gate UNKNOWN status, owned by rasaha."
+    "superseded_note": "The identifier discrepancy is closed. The separate, still-open question of what each gate actually verifies is carried in the canonical definition as per-gate UNKNOWN status, owned by rasaha.",
+    "correction_2026_08_29": "The search_performed and root_gap statements below were recorded before the tracked Project_documentation/ mirror was searched. They are corrected here: the gate identifiers are NOT defined nowhere. C2 (digest-pinned base images) and C4 (image build) are defined in Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:37, which also defines C5-C19 collectively as 'every gate that requires a built/running image'. The superseded wording is retained below for traceability.",
+    "search_performed_superseded": "grep for the gate identifiers across docs/, apps/ugence-governance-studio/, deployment/ and .github/ in the working tree; git log --all -S and --grep over history, scoped to the governance-studio paths (the only hits are the commit that introduced the two audit records and this ratification commit; pickaxe hits elsewhere in the repository belong to unrelated cloud-scaling work); and the bodies and comment threads of the originating pull requests #1323 and #1325, which are empty of any gate definition. Within the governance studio the identifiers C2 and C4-C19 appear only in the two audit records named above and in this file; they are defined nowhere.",
+    "root_gap_superseded": "Original gap, partially remaining: the P3E container gate set was recorded by identifier without ever being defined, so no artifact in the repository states what C2 or C4 through C19 actually verify, nor whether C16 and C17 have distinct image and non-image variants The identifier set is now canonical; what each gate verifies is still UNKNOWN and owned by rasaha.",
+    "root_gap": "C2 and C4 are defined; C5-C19 are defined only as a group, so what each of those fifteen gates individually verifies remains unstated. The 'P3E completion' specification that the code comments cite by section number is absent from the repository."
   },
   "execution_preconditions": [
     "the canonical gate definition is published (done) and every gate a run claims to execute has a definition_status of DEFINED in it; gates still marked UNKNOWN cannot be reported as passed, because a run cannot establish what it verified",

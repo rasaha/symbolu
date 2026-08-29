@@ -75,6 +75,37 @@ def test_every_gate_records_the_required_fields(definition):
         assert body["definition_status"] in {"DEFINED", "UNKNOWN"}
 
 
+def test_defined_gates_cite_a_source_and_assert_no_invented_mapping(definition):
+    """C2 and C4 are DEFINED from the audit records; nothing else is."""
+    defined = {g for g, b in definition["gates"].items()
+               if b["definition_status"] == "DEFINED"}
+    assert defined == {"C2", "C4"}
+    for gate in sorted(defined):
+        body = definition["gates"][gate]
+        assert body["requirement"], gate
+        assert body["definition_source"], gate
+        assert body["definition_quote"], gate
+        # a name-matched candidate step is a lead, never an asserted mapping
+        assert body["workflow_step"] is None, gate
+        assert body["candidate_workflow_step"]["asserted"] is False, gate
+
+
+def test_group_defined_gates_carry_only_the_group_property(definition):
+    """C5-C19 are defined collectively, never individually."""
+    for i in range(5, 20):
+        body = definition["gates"][f"C{i}"]
+        assert body["definition_status"] == "UNKNOWN", f"C{i}"
+        assert "group_property" in body, f"C{i}"
+        assert body["requirement"] is None, f"C{i}"
+
+
+def test_completion_specification_is_recorded_absent(definition):
+    """The negative is recorded so the search is not repeated."""
+    spec = definition["reconstruction_method"]["completion_specification"]
+    assert spec["status"] == "ABSENT_FROM_REPOSITORY"
+    assert spec["searched_on"]
+
+
 def test_unknown_gates_assert_no_requirement_or_mapping(definition):
     """An UNKNOWN gate must not carry an invented requirement or mapping."""
     for gate, body in definition["gates"].items():
