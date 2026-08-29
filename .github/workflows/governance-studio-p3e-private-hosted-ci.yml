@@ -235,7 +235,7 @@ jobs:
 
       - name: container-vulnerability-scan
         # pinned Trivy action; blocking on HIGH/CRITICAL, JSON evidence
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: governance-studio-private-hosted:ci
           severity: HIGH,CRITICAL
