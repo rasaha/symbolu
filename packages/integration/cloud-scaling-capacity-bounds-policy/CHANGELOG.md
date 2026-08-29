@@ -20,6 +20,13 @@ phase numbering; each entry names the phase that produced it.
   either half.
 - **`tests/test_rejection_reasons.py`** — one refusal per published member, so no
   member is unreachable and no two guards on the same path are indistinguishable.
+- **`tests/test_helper_admission_sites.py`** — one test per D-GC-4 helper-admission
+  call site, closing the ten the family's first scored sweep left surviving. Each
+  builds a control with only the named field corrected (so the refusal cannot be
+  attributed to another call site), asserts the input is malformed in the intended
+  way, and asserts the typed pair. Measured: each test kills its own site's call
+  deletion and no other's — a clean diagonal across all ten. The family is now
+  37 of 37 sites killed, none excluded.
 
 ### Unchanged on purpose
 
