@@ -9,7 +9,7 @@
     "note": "the proposal numbered twelve gates including four evidence steps; the ratified family renumbers, so a P3E-CTR identifier in the proposal does not necessarily denote the same gate here. Only this ratified file is authoritative."
   },
   "what_ratification_means": "Ratification defines requirements only. It does NOT execute any gate, mark any gate passed, or assert that any gate has ever run. Every gate below is NOT_EXECUTED.",
-  "gate_count": 12,
+  "gate_count": 13,
   "gates": {
     "P3E-CTR-01": {
       "requirement": "base-images.json and every Dockerfile FROM pin equal the owner-ratified digests in BASE_IMAGE_MIRROR_DECISION.json",
@@ -204,6 +204,39 @@
       "non_compensatory": false,
       "evidence_required_before_passed": "this gate's step exits zero in a run whose container build succeeded from the ratified digests, with its log or uploaded artifact retained, and every mandatory evidence obligation attached to it satisfied",
       "execution_state": "NOT_EXECUTED"
+    },
+    "P3E-CTR-13": {
+      "requirement": "the container terminates before binding any network listener when its startup integrity checks fail: missing certificate, missing key, certificate/key mismatch, missing credentials, or malformed password hash",
+      "gate_kind": "verification",
+      "workflow_step": "container-runtime-verification",
+      "workflow": ".github/workflows/governance-studio-p3e-private-hosted-ci.yml",
+      "workflow_job": "container",
+      "script_section": "\u00a711 startup-failure negatives",
+      "required_cases": [
+        "missing certificate",
+        "missing key",
+        "certificate/key mismatch",
+        "missing credentials",
+        "malformed password hash"
+      ],
+      "case_requirement": "each case must terminate before network binding; a container that binds and then errors does not satisfy this gate",
+      "supporting_test_or_script": [
+        "deployment/governance-studio/ci/verify_container.sh (section 11)",
+        "deployment/governance-studio/tests/test_startup_integrity.py"
+      ],
+      "claim_distinction": {
+        "this_gate_claims": "the built, running container fails closed before binding, verified against real `docker run` invocations of the image",
+        "in_process_coverage_claims": "deployment/governance-studio/tests/test_startup_integrity.py verifies the same fail-closed properties in-process against the ASGI application, without a container",
+        "why_distinct": "in-process coverage cannot observe image packaging, entrypoint behaviour or actual port binding, so it corroborates this gate but does not discharge it"
+      },
+      "requires_container_runtime": true,
+      "requires_registry_access": true,
+      "non_compensatory": true,
+      "runtime_split_note": "sixth gate mapped to the container-runtime-verification step, appended by owner ruling without renumbering P3E-CTR-01 through P3E-CTR-12",
+      "evidence_required_before_passed": "this gate's section exits zero in a run whose container build succeeded from the ratified digests, with its log or uploaded artifact retained, and every mandatory evidence obligation attached to it satisfied",
+      "execution_state": "NOT_EXECUTED",
+      "ratified_by": "rasaha",
+      "ratified_on": "2026-08-29"
     }
   },
   "evidence_obligations": {
@@ -221,12 +254,18 @@
       "image-sbom": {
         "mandatory": true,
         "attached_to": [
-          "P3E-CTR-11",
-          "P3E-CTR-03"
+          "P3E-CTR-11"
         ],
-        "attachment": "vulnerability scanning and image provenance",
-        "attachment_note": "the owner ruling names 'image provenance' as a role rather than a gate. It is attached to P3E-CTR-03 (container build), the gate that produces the image whose provenance the SBOM attests. Confirm or redirect this attachment.",
-        "produces": "deployment/governance-studio/artifacts/sbom.image.cdx.json"
+        "attachment": "vulnerability scanning",
+        "produces": "deployment/governance-studio/artifacts/sbom.image.cdx.json",
+        "family_evidence_role": {
+          "role": "IMAGE_PROVENANCE",
+          "sufficiency": "CONTRIBUTORY_NOT_SUFFICIENT",
+          "establishes_provenance": false,
+          "rationale": "An SBOM inventories image contents. It does not independently establish source commit, builder identity or trusted-build provenance, so it may contribute to a provenance claim but can never satisfy one on its own.",
+          "owner_ruling": "rasaha, 2026-08-29: the earlier attachment to P3E-CTR-03 is removed and no substitute gate attachment is invented."
+        },
+        "previous_attachment_withdrawn": "P3E-CTR-03 (container build) - withdrawn by owner ruling; not replaced by another gate attachment"
       },
       "evidence-manifest": {
         "mandatory": true,
@@ -248,9 +287,10 @@
       "P3E-CTR-07",
       "P3E-CTR-08",
       "P3E-CTR-09",
-      "P3E-CTR-10"
+      "P3E-CTR-10",
+      "P3E-CTR-13"
     ],
-    "statement": "these five gates are non-compensatory: each must pass on its own, and success in any of them never offsets, substitutes for, or mitigates failure in another"
+    "statement": "these gates are non-compensatory: each must pass on its own, and success in any of them never offsets, substitutes for, or mitigates failure in another"
   },
   "relationship_to_the_historical_C_family": {
     "correspondence_asserted": false,
@@ -264,15 +304,12 @@
     },
     "register": "docs/audits/ugence_governance_studio_p3e/CONTAINER_GATE_DEFINITION.json"
   },
-  "unassigned_residue": {
-    "finding": "verify_container.sh also performs a section 11 block of startup-failure negative tests (missing certificate, missing key, cert/key mismatch, missing credentials, malformed password hash - the service must fail before binding). That block is not covered by any of the five ratified runtime gates.",
-    "status": "UNASSIGNED - flagged for the owner, deliberately not folded into a ratified gate",
-    "static_coverage_today": "deployment/governance-studio/tests/test_startup_integrity.py covers the same fail-closed properties in-process"
-  },
   "prohibited_without_further_ratification": [
     "treating any P3E-CTR identifier as equivalent to any historical C identifier",
     "marking any gate in either family passed",
     "reporting a run with unsatisfied mandatory evidence obligations as complete",
     "compensating a failed runtime gate with a passing sibling"
-  ]
+  ],
+  "amendment_2026_08_29": "Owner ruling: P3E-CTR-13 (fail-closed startup integrity) appended as a thirteenth non-compensatory gate covering verify_container.sh \u00a711, which the original five-way runtime split left unassigned. Identifiers P3E-CTR-01 through P3E-CTR-12 are unchanged. The image-sbom obligation's attachment to P3E-CTR-03 is withdrawn; the SBOM stays attached to P3E-CTR-11 and carries the family-level IMAGE_PROVENANCE role marked CONTRIBUTORY_NOT_SUFFICIENT.",
+  "unassigned_residue_resolved": "the \u00a711 startup-failure negatives previously recorded as unassigned are now ratified as P3E-CTR-13"
 }

@@ -500,17 +500,19 @@
     "retired_on": "2026-08-29",
     "superseded_by": {
       "family": "P3E-CTR",
-      "file": "docs/audits/ugence_governance_studio_p3e/CONTAINER_GATE_FAMILY_PROPOSAL.json",
-      "status": "RATIFIED"
+      "file": "docs/audits/ugence_governance_studio_p3e/CONTAINER_GATE_FAMILY.json",
+      "status": "RATIFIED",
+      "gate_count": 13
     },
     "register_preservation": "IMMUTABLE - this file remains the historical register. Retirement removes the family from active use; it does not delete, rewrite or reinterpret any entry. C2 and C4 stay DEFINED_HISTORICAL_GATE, C5-C19 stay UNDEFINED_HISTORICAL_GATE, and every historical execution status stays NOT_EXECUTED.",
     "correspondence_to_the_ratified_family": "NONE ASSERTED. No historical C identifier maps to or is equated with any P3E-CTR identifier, in either direction.",
     "what_ratification_of_the_successor_means": "The successor family's ratification defines requirements only. It executes no gate and passes no gate, in either family."
   },
   "superseded_by": {
-    "file": "docs/audits/ugence_governance_studio_p3e/CONTAINER_GATE_FAMILY_PROPOSAL.json",
+    "file": "docs/audits/ugence_governance_studio_p3e/CONTAINER_GATE_FAMILY.json",
     "family": "P3E-CTR",
     "status": "RATIFIED",
-    "correspondence_to_this_family": "none asserted"
+    "correspondence_to_this_family": "none asserted",
+    "gate_count": 13
   }
 }

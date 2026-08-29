@@ -108,21 +108,26 @@ def test_pull_request_history_search_is_recorded_negative(definition):
     assert s["searched_on"] and s["findings"]
 
 
-RATIFIED_IDS = [f"P3E-CTR-{i:02d}" for i in range(1, 13)]
+RATIFIED_IDS = [f"P3E-CTR-{i:02d}" for i in range(1, 14)]
+# the original five-way split of the positive runtime path, plus the appended §11 gate
 RUNTIME_SPLIT = ["P3E-CTR-06", "P3E-CTR-07", "P3E-CTR-08", "P3E-CTR-09", "P3E-CTR-10"]
+NON_COMPENSATORY = RUNTIME_SPLIT + ["P3E-CTR-13"]
+RUNTIME_GATES = RUNTIME_SPLIT + ["P3E-CTR-13"]
+STARTUP_CASES = {"missing certificate", "missing key", "certificate/key mismatch",
+                 "missing credentials", "malformed password hash"}
 OBLIGATIONS = {"runtime-package-inventory", "image-sbom", "evidence-manifest", "upload-evidence"}
 
 
 @pytest.fixture(scope="module")
 def family():
-    return json.load(open(os.path.join(AUDIT, "CONTAINER_GATE_FAMILY_PROPOSAL.json"),
+    return json.load(open(os.path.join(AUDIT, "CONTAINER_GATE_FAMILY.json"),
                           encoding="utf-8"))
 
 
 def test_ratified_family_has_exactly_the_twelve_identities(family):
     assert family["status"] == "RATIFIED"
     assert list(family["gates"]) == RATIFIED_IDS
-    assert family["gate_count"] == 12
+    assert family["gate_count"] == 13
     steps = [b["workflow_step"] for b in family["gates"].values()]
     # the four evidence steps are NOT gates
     assert OBLIGATIONS.isdisjoint(set(steps))
@@ -142,27 +147,86 @@ def test_four_evidence_obligations_are_mandatory_and_not_gates(family):
         assert body["mandatory"] is True, name
         assert name not in family["gates"], name
     assert ob["runtime-package-inventory"]["attached_to"] == ["P3E-CTR-04"]
-    assert "P3E-CTR-11" in ob["image-sbom"]["attached_to"]
+    assert ob["image-sbom"]["attached_to"] == ["P3E-CTR-11"]
     assert ob["evidence-manifest"]["attached_to"] == "FAMILY_COMPLETION"
     assert ob["upload-evidence"]["attached_to"] == "FAMILY_COMPLETION"
     # missing evidence makes a run incomplete, it does not create a gate
     assert "INCOMPLETE" in family["evidence_obligations"]["rule"]
 
 
-def test_runtime_verification_is_split_five_ways_non_compensatory(family):
-    split = [g for g, b in family["gates"].items()
-             if b["workflow_step"] == "container-runtime-verification"]
-    assert split == RUNTIME_SPLIT
-    assert len(split) == 5
-    sections = {family["gates"][g]["script_section"] for g in split}
-    assert len(sections) == 5, "each runtime gate must cover a distinct script section"
-    for g in split:
-        assert family["gates"][g]["non_compensatory"] is True, g
-    assert family["non_compensatory_rule"]["applies_to"] == RUNTIME_SPLIT
-    # no gate outside the split is marked non-compensatory
+def test_runtime_verification_gates_are_distinct_and_non_compensatory(family):
+    runtime = [g for g, b in family["gates"].items()
+               if b["workflow_step"] == "container-runtime-verification"]
+    assert runtime == RUNTIME_GATES
+    # the original positive-path split is exactly five, unchanged
+    assert [g for g in runtime if g != "P3E-CTR-13"] == RUNTIME_SPLIT
+    sections = {family["gates"][g]["script_section"] for g in runtime}
+    assert len(sections) == len(runtime), "each runtime gate must cover a distinct section"
+    assert family["non_compensatory_rule"]["applies_to"] == NON_COMPENSATORY
     for g, b in family["gates"].items():
-        if g not in RUNTIME_SPLIT:
-            assert b["non_compensatory"] is False, g
+        assert b["non_compensatory"] is (g in NON_COMPENSATORY), g
+
+
+def test_exactly_thirteen_canonical_gates(family):
+    assert len(family["gates"]) == 13
+    assert list(family["gates"]) == RATIFIED_IDS
+
+
+def test_existing_identifiers_were_not_renumbered(family):
+    """Appending P3E-CTR-13 must not disturb 01-12."""
+    expected = {
+        "P3E-CTR-01": "ratified-pin-conformance",
+        "P3E-CTR-02": "base-image-digest-verification",
+        "P3E-CTR-03": "container-build",
+        "P3E-CTR-04": "image-inspection",
+        "P3E-CTR-05": "image-layer-secret-scan",
+        "P3E-CTR-06": "container-runtime-verification",
+        "P3E-CTR-07": "container-runtime-verification",
+        "P3E-CTR-08": "container-runtime-verification",
+        "P3E-CTR-09": "container-runtime-verification",
+        "P3E-CTR-10": "container-runtime-verification",
+        "P3E-CTR-11": "container-vulnerability-scan",
+        "P3E-CTR-12": "clean-checkout-reproducibility",
+    }
+    for gid, step in expected.items():
+        assert family["gates"][gid]["workflow_step"] == step, gid
+
+
+def test_startup_integrity_gate_is_complete_and_uniquely_mapped(family):
+    g = family["gates"]["P3E-CTR-13"]
+    assert g["non_compensatory"] is True
+    assert g["requires_container_runtime"] is True
+    assert g["script_section"] == "§11 startup-failure negatives"
+    # uniquely mapped: no other gate claims §11
+    others = [k for k, b in family["gates"].items()
+              if k != "P3E-CTR-13" and b.get("script_section") == g["script_section"]]
+    assert others == []
+    assert set(g["required_cases"]) == STARTUP_CASES
+    assert "before network binding" in g["case_requirement"]
+    # the running-container claim is distinguished from in-process coverage
+    cd = g["claim_distinction"]
+    assert "running container" in cd["this_gate_claims"]
+    assert "test_startup_integrity.py" in cd["in_process_coverage_claims"]
+    assert "does not discharge" in cd["why_distinct"]
+
+
+def test_sbom_is_not_attached_to_the_build_gate(family):
+    sbom = family["evidence_obligations"]["obligations"]["image-sbom"]
+    assert "P3E-CTR-03" not in sbom["attached_to"]
+    assert sbom["attached_to"] == ["P3E-CTR-11"]
+
+
+def test_sbom_provenance_role_can_never_read_as_sufficient(family):
+    sbom = family["evidence_obligations"]["obligations"]["image-sbom"]
+    role = sbom["family_evidence_role"]
+    assert role["role"] == "IMAGE_PROVENANCE"
+    assert role["sufficiency"] == "CONTRIBUTORY_NOT_SUFFICIENT"
+    assert role["establishes_provenance"] is False
+    # no field anywhere in the obligation may claim sufficiency
+    blob = json.dumps(sbom).lower()
+    for claim in ("sufficient provenance", '"sufficiency": "sufficient"',
+                  "establishes provenance", "trusted-build provenance established"):
+        assert claim not in blob, claim
 
 
 def test_ratification_defines_requirements_and_executes_nothing(family, definition):
@@ -204,7 +268,7 @@ def test_ratified_family_is_not_referenced_by_any_ci_step():
     """A defined requirement set must not be silently enforced as a CI gate."""
     wf = open(os.path.join(REPO, ".github", "workflows",
                            "governance-studio-p3e-private-hosted-ci.yml"), encoding="utf-8").read()
-    assert "CONTAINER_GATE_FAMILY_PROPOSAL" not in wf
+    assert "CONTAINER_GATE_FAMILY" not in wf
 
 
 def test_completion_specification_is_recorded_absent(definition):
