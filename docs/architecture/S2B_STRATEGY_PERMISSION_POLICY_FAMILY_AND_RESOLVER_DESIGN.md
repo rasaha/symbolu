@@ -123,9 +123,16 @@ no signature field, so the projection is structurally incapable of depending on 
 `approving_authority_id`, `approval_ref`, `approval_digest`, `issuing_authority_id`,
 `key_id`, `signature_alg`, `issued_at` — framed with `AUTHORITY_PROTOCOL_ID` and
 `CANONICALIZATION_VERSION`. `policy_body_digest` is `framed_body_digest(adapter_id,
-policy_type, projection)`, so **every field in §1.3 except `metadata.content_digest`** is
-transitively signed, including `permitted_strategies`, `strategy_policy_ref`,
-`vocabulary_version`, the lifecycle label and the effective period.
+policy_type, projection)`.
+
+`[I]` **Conditional on the §1.4 projection**, therefore, every field in §1.3 except
+`metadata.content_digest` is transitively signed — including `permitted_strategies`,
+`strategy_policy_ref`, `vocabulary_version`, the lifecycle label and the effective period.
+That is an inference about a projection this document proposes, not a repository fact: the
+authority signs whatever the adapter projects, so the coverage claim holds exactly as far as
+§1.4 is implemented as written. A projection that dropped or flattened a field would narrow
+what is signed without any authority-side check noticing, which is why §9.2 recomputes the
+framed digest independently rather than trusting the adapter's own output.
 
 ### 1.6 Coordinate and version handling
 
@@ -181,11 +188,18 @@ independent bars:
    `ugence_uvi_policy_contracts`;
 2. `test_the_declared_distribution_dependencies_match_the_imports` — declared dependencies
    must equal exactly `{"ugence-uvi-policy-contracts"}`;
-3. `PROHIBITED` includes `pydantic` outright, and `ugence-agentic-proposer` declares
-   `pydantic>=2` as a runtime dependency.
+3. `test_no_prohibited_imports` — `PROHIBITED` includes `pydantic` outright, and
+   `ugence-agentic-proposer` declares `pydantic>=2` as a runtime dependency.
 
 `[I]` A strategy-permission adapter inside the authority that imported `ReasoningStrategy`
-would fail all three. The adapter therefore lives **outside** the authority distribution —
+**fails bars 1 and 2**. `[V]` It does **not** fail bar 3 on that import alone: the scan
+collects **import roots** from each module's AST, so it would see `ugence_agentic_proposer`
+and never `pydantic`, which arrives transitively at runtime rather than as an import
+statement in authority source. Bar 3 bites only on a **direct** `pydantic` import. Two
+independent bars are decisive, and the conclusion is unchanged; the third is a weaker
+backstop than the first draft of this section implied.
+
+The adapter therefore lives **outside** the authority distribution —
 which is the ratified additive path anyway (`P-9`: a second family is added by registering a
 second adapter, with no core change), and is already exercised across a real package boundary
 by the capacity-bounds package `[V]`.
@@ -236,7 +250,7 @@ must not become a runtime component).
 |---|---|
 | A Policy Authority integration adapter **inside** `packages/policy-authority/` | **Rejected `[V]`** — fails the declared-dependency equality test and the stdlib-only import test; also makes the authority a runtime resolver. |
 | An Agent Runtime integration | **Rejected for now `[I]`** — architecturally possible (the bar is one-way), but it places a proposer-specific resolver inside a capability that owns different authority and is untouched by S2-B. It also widens the change set well past the blocker. |
-| An existing integration package | **Rejected `[V]`** — all eleven are cloud-scaling- or risk-authority-scoped; none has a plausible claim to proposer strategy permission, and reusing one would mis-own it. |
+| An existing integration package | **Rejected `[I]`** — each of the eleven is scoped to a named pair of capabilities it integrates (cloud scaling, risk authority, and context minimization with agent runtime). None integrates the Agentic Proposer with anything, so none has a plausible claim to proposer strategy permission, and reusing one would mis-own it. |
 | **A new narrowly scoped integration package (recommended)** | **Accepted `[I]`** — the capacity-bounds precedent, one level up: the family package is the artifact side, the resolver package is the runtime side. |
 
 ### Recommended ownership and dependency direction `[R]`
@@ -310,12 +324,18 @@ which reference it answers to.
 ### 5.3 `tenant_id`, `case_ref`, `as_of`
 
 * **`tenant_id`** — used twice. First, as part of the mapping key, so one tenant's reference
-  can never resolve another tenant's coordinate. Second, `resolve_policy` is called with
-  `expected_reference_tenant_id=coordinate.tenant_id`, but only after the resolver has
-  independently established that either (`scope == TENANT` and
-  `coordinate.tenant_id == request.tenant_id`) or (`scope == GLOBAL` and
-  `coordinate.tenant_id == GLOBAL_TENANT`). `[I]` Without that prior check the authority's own
-  tenant comparison is vacuous for a GLOBAL coordinate. `[V]` `expected_reference_tenant_id`
+  can never resolve another tenant's coordinate. Second, it supplies the value passed as
+  `resolve_policy(expected_reference_tenant_id=…)`, which must be **derived from the request,
+  never read off the coordinate**: `[V]` the authority's check is
+  `coordinate.tenant_id != expected_reference_tenant_id` (`core/resolution.py:149`), so
+  passing `coordinate.tenant_id` makes that comparison **vacuous for every coordinate** —
+  not merely for a `GLOBAL` one, as an earlier draft of this section said. The resolver
+  therefore passes `request.tenant_id` when the configured coordinate's scope is `TENANT`,
+  and `GLOBAL_TENANT` (the canonical empty component) when it is `GLOBAL` — in both branches
+  a value the coordinate did not supply, so the authority's comparison independently
+  re-establishes the binding. The resolver additionally pre-checks scope/tenant agreement
+  itself and fails closed on disagreement, so the two checks are redundant rather than
+  co-dependent. `[V]` `expected_reference_tenant_id`
   checks the *reference's declared tenant identity*, never caller entitlement — this resolver
   performs no caller authorization and claims none.
 * **`case_ref`** — `[R]` **correlation and audit context only. It never affects policy
@@ -348,9 +368,18 @@ returned.
 | Signed `strategy_policy_ref` ≠ request ref (§5.2) | resolver post-check | raise `StrategyPolicyReferenceBindingError` |
 | A stored token is not a `ReasoningStrategy` member | resolver post-check | raise `StrategyPolicyVocabularyError` |
 
-`[R]` **An approval re-verifier is required at resolution**, not optional: without one, an
-approval withdrawn after issuance still resolves, since the issuance signature merely proves
-the approval was bound at issuance time `[V]`.
+`[V]` **Three `PolicyResolutionReason` members are deliberately not given their own rows**:
+`TENANT_SCOPE_MISMATCH` (the resolver's own pre-check refuses first, so the authority's
+reason is reachable only if the pre-check is wrong), `ARTIFACT_NOT_CANONICALIZABLE` and
+`SUPERSESSION_REFERENCE_UNSUPPORTED`. None is unhandled: the **only-`RESOLVED`** rule above
+covers the whole enum by construction — anything that is not `RESOLVED` raises — and the
+table enumerates the reasons worth naming separately, not the reasons that are handled.
+
+`[R]` **Approval re-verification at resolution is OD-E and remains open.** Under the
+recommended **OD-E=A** the resolver always supplies an approval verifier, because without one
+an approval withdrawn after issuance still resolves: `[V]` the issuance signature proves only
+that the approval was bound **at issuance time**. Under **OD-E=B** that is accepted, and the
+`APPROVAL_PROOF_INVALID` row above becomes unreachable.
 
 ---
 
@@ -390,6 +419,22 @@ against `RESERVED_AUTHORITY_VOCABULARY`, `TerminalOutcome` and `CandidateDisposi
 same scan the S2-B implementation already applies to its own refusal messages `[V]`.
 Mapping a structural permission failure to an operational outcome remains **unruled and
 unowned** `[V]` (`S2B-D5=A`), and nothing here maps one.
+
+**A collision the scan makes real, disclosed rather than discovered later.** `[V]`
+`RESERVED_AUTHORITY_VOCABULARY` contains **`EXPIRED`**, **`UNSUPPORTED`** and **`SUPPORTED`**
+(`vocabulary.py:123-134`), and the scan **uppercases the message and tests substring
+containment** (`tests/test_s2b_strategy_permission.py:491-499`). Two Policy Authority
+resolution reasons therefore collide with it directly: `EXPIRED` is a reserved term verbatim,
+and `SUPERSESSION_REFERENCE_UNSUPPORTED` contains both `UNSUPPORTED` and `SUPPORTED`.
+
+`[R]` **The rule this forces:** a `PolicyResolutionReason` token may appear **only in the
+exception's `reason` attribute**, never in a message template, a docstring rendered into a
+message, or an f-string interpolation of the reason into prose. A caller that wants the
+authority's reason reads the attribute. `[I]` This costs nothing operationally — the reason
+is machine-readable where a consumer wants it — and it keeps the resolver's messages clear of
+the reserved vocabulary without renaming anything the authority owns. `[R]` The guard in
+§9.11 must scan message templates with the **same uppercased-substring rule**, or it will not
+catch the collision it exists to prevent.
 
 ### 7.2 Proposer boundary (existing, unchanged)
 
@@ -437,6 +482,33 @@ ratified no new exception type, so there is no other already-authorized mechanis
 adapter/resolver work only.** `[R]` The single item that would cross into compatibility is
 OD-G option B.
 
+### 8.1 Prose in Agentic Proposer that this work makes stale `[G]`
+
+Two `[G]` notes inside the proposer assert, as present-tense fact, that no strategy-permission
+policy family is registered:
+
+* `[V]` `src/ugence_agentic_proposer/version.py:12-13` — "Execution remains blocked, and this
+  release does not unblock it: no strategy-permission policy family is registered with Policy
+  Authority";
+* `[V]` `src/ugence_agentic_proposer/contracts.py:839-842` — "Disclosed, and not this
+  package's to fix: no strategy-permission policy family is registered with Policy Authority",
+  so "nothing here can EXECUTE end to end today".
+
+Both become **false the moment the family package exists**, and `[V]` **no test pins either
+string**, so nothing fails and nothing announces the drift. They cannot be reconciled without
+editing Agentic Proposer source, which §8 otherwise says need not change — a real tension, not
+a wording problem, and it is disclosed here rather than resolved by quietly widening the
+change set.
+
+`[I]` The narrowest honest reading is that both statements remain **true of the `0.3.0`
+release they describe**: `version.py`'s note is scoped to that release by its own words, and
+the `CHANGELOG` entry is historical record that should not be rewritten. `contracts.py`'s
+comment is the weaker case — it is written in the present tense about the package, not about a
+release. `[R]` Whether to leave both (accepting stale prose in a shipped module), or to correct
+`contracts.py` in a documentation-only patch release, is an owner call that this document does
+**not** put on the ballot, because it arises only *after* the family lands and its answer
+changes nothing about the design. It is recorded here so it is not discovered as a surprise.
+
 ---
 
 ## 9. End-to-end proof
@@ -483,7 +555,11 @@ genuine issuance, real Ed25519 signing, the real registry and real resolution `[
 11. **No compute authorization and no execution authority.** Assert: neither new package exports
     any budget, quota, token-count, tier or provider name; no name gives lifecycle or
     authorization authority; no `TerminalOutcome`, `CandidateDisposition` or reserved authority
-    term appears in any exception name or message; no networking, storage, service-discovery or
+    term appears in any exception name or message template — scanned **uppercased, as a
+    substring**, matching the existing guard `[V]`, so that the §7.1 collisions (`EXPIRED`;
+    `SUPERSESSION_REFERENCE_UNSUPPORTED` containing `UNSUPPORTED` and `SUPPORTED`) are actually
+    caught; a companion assertion that every `PolicyResolutionReason` token reaches a caller
+    only through the `reason` attribute; no networking, storage, service-discovery or
     plugin-loading import; and no module reads a clock.
 
 **Where enforcement stops, and what remains unprovable** `[G]`: private model reasoning and
@@ -505,7 +581,7 @@ permission failure, which is deliberately unruled.
 | 3 | **Runtime package**: resolver, failure taxonomy, composition helper, packaging, tests §9.3–§9.7 and §9.11 | 2 | **One atomic change set** |
 | 4 | **End-to-end proof against Agentic Proposer** (§9.8–§9.10) | 3 | Lands with step 3 — it is what proves the blocker closed |
 | 5 | **Distribution verification** for both packages (clean-venv build/install/exercise scripts on the existing `verify_*_distribution.py` pattern) plus CI wiring | 2, 3 | May land with its own package |
-| 6 | **Documentation reconciliation**: the new ADR supersedes the standing `[G]` "no strategy-permission policy family is registered" | 3, 4 | Independent, **after** the code — never ahead of it, on the I8/OD-7 part 8 ordering |
+| 6 | **Documentation reconciliation**: the new ADR supersedes the standing `[G]` "no strategy-permission policy family is registered". `[G]` Note that the two in-proposer statements at `version.py:12-13` and `contracts.py:839-842` are **not** reachable from here — see §8.1; correcting either means editing Agentic Proposer source, and no test pins them, so nothing will flag the drift | 3, 4 | Independent, **after** the code — never ahead of it, on the I8/OD-7 part 8 ordering |
 | 7 | *(Only if OD-G = B)* Agentic Proposer `0.3.1`: widen the resolver-boundary guard | separate ruling | **Separate change set, never bundled** |
 
 **Independently implementable:** step 2 (the family can be registered and issued against with
@@ -537,7 +613,7 @@ correlation only. Agentic Proposer and Policy Authority are untouched.
 | `…-strategy-permission-runtime` | — | `0.1.0` | **new**: `PolicyAuthorityStrategyPolicyResolver`, `StrategyPermissionResolverError` + 6 subclasses, one composition helper |
 | `CognitiveRoleContract` / `ProposerAdvisory` / `ProposerProcessRecord` | 11 / 30 / 18 fields | unchanged | **none** |
 
-### Owner-decision register (eight, mutually exclusive)
+### Owner-decision register (eight; options within each are mutually exclusive)
 
 | # | Decision | A (recommended) | B |
 |---|---|---|---|
@@ -549,6 +625,24 @@ correlation only. Agentic Proposer and Policy Authority are untouched.
 | OD-F | `vocabulary_version` field in the artifact | Yes | No |
 | OD-G | `0.3.0` alien-response `AttributeError` | Leave as garbage-input behaviour | Wrap as `CrossContractViolationError` in a separate Agentic Proposer `0.3.1` change set |
 | OD-H | Family package ships `public_api.json` | Yes | No, following the capacity-bounds precedent |
+
+**Coupling between decisions, disclosed.** `[I]` The eight are **independently answerable** —
+every one of the 2⁸ combinations yields a buildable design — but they are **not mutually
+independent in motivation**, and an earlier draft's "mutually exclusive" overstated it. Two
+couplings matter when voting:
+
+* **OD-C is motivated by OD-D=A.** The signed `strategy_policy_ref` exists to turn the
+  injected mapping from an authority into a lookup hint. Under **OD-D=B** the reference is
+  itself the structured coordinate, so the signed field becomes **largely redundant** — it
+  would restate what the caller already supplied, catching only a coordinate that resolves to
+  a policy claiming a different reference. `[R]` `OD-C=A` with `OD-D=B` is defensible but buys
+  much less; `OD-C=B` with `OD-D=A` leaves the reference-to-policy binding as unsigned
+  deployment state, which §5.2 records as the gap it was written to close.
+* **OD-E=B makes one §5.4 row unreachable.** Without an approval verifier at resolution, the
+  `APPROVAL_PROOF_INVALID` row never fires, and the §9.1 approval test narrows to issuance
+  only. Nothing else changes.
+
+`[R]` No other pair interacts. OD-A, OD-B, OD-F, OD-G and OD-H stand alone.
 
 ---
 
