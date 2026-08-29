@@ -15,22 +15,43 @@ contract it actually consumes.
 
 from __future__ import annotations
 
+import os
 import pathlib
 import sys
 
 HERE = pathlib.Path(__file__).resolve().parent
-# packages/integration/cloud-scaling-risk-integration -> packages/integration -> packages -> repo
-REPO = HERE.parents[2]
-CONTROLLER = REPO / "packages" / "capabilities" / "cloud-scaling-controller"
 
-_SRC_PATHS = (
-    HERE / "src",
-    CONTROLLER / "src",
-    REPO / "packages" / "risk_authority" / "src",
-    # Genuine Phase-3 recommendation builders (tests only).
-    CONTROLLER / "tests",
-    CONTROLLER / "tests" / "planning",
-)
+
+def find_repo_root() -> "pathlib.Path | None":
+    """Locate the monorepo root without counting directory levels, or ``None``.
+
+    ``UGENCE_REPO_ROOT`` overrides the search; otherwise walk upward for marker
+    directories. ``None`` means there is no checkout — the ordinary case for a
+    consumer running from an extracted sdist against installed distributions.
+    """
+
+    injected = os.environ.get("UGENCE_REPO_ROOT")
+    if injected:
+        return pathlib.Path(injected).resolve()
+    for candidate in (HERE, *HERE.parents):
+        if (candidate / "packages" / "capabilities" / "cloud-scaling-controller").is_dir() and (
+            candidate / "packages" / "integration"
+        ).is_dir():
+            return candidate
+    return None
+
+
+REPO = find_repo_root()
+_SRC_PATHS: tuple = (HERE / "src",)
+if REPO is not None:
+    CONTROLLER = REPO / "packages" / "capabilities" / "cloud-scaling-controller"
+    _SRC_PATHS += (
+        CONTROLLER / "src",
+        REPO / "packages" / "risk_authority" / "src",
+        # Genuine Phase-3 recommendation builders (tests only).
+        CONTROLLER / "tests",
+        CONTROLLER / "tests" / "planning",
+    )
 
 for _p in _SRC_PATHS:
     sp = str(_p)
