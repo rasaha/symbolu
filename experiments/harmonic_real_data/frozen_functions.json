@@ -1,0 +1,1208 @@
+{
+ "eligibility": {
+  "n_seen": 64137,
+  "n_eligible": 4378
+ },
+ "functions": [
+  {
+   "HashOwner": "708e182e9952a63e4e1cc9cc8f65592a7340de53c777339dcce9af46bd7a27b4",
+   "HashApp": "54e9f5892895e4f1759063a976c9b25f021cd12e0528d912899d47dbe12dd864",
+   "HashFunction": "001f97df126bdb18db59ded95ab2829327aca0c8bc362b1efe1e9213a3f4e04a",
+   "train_total": 2050
+  },
+  {
+   "HashOwner": "aa3206db3186208dcbf025973fba8b76746cbcefc791e7a6001fbbe1a9f211d7",
+   "HashApp": "4522fec8d08187a36321825a05c4a6551f29ac6b065716f1f4714629f3b587f5",
+   "HashFunction": "002b06df52158fa094b5a3a17641f487c124fac5b20e2b16589aff53073505ca",
+   "train_total": 2773
+  },
+  {
+   "HashOwner": "568ebc03dc27a5f6df543bd7bc64d7753a623aa37ecce99fc5851b8563e019fd",
+   "HashApp": "b8254620e57947434461bef73eb2caa56deee54980e57093c93f8229ac9d1a25",
+   "HashFunction": "00947af8aeb370e1cce648f2ecdb2aa012288ea709442146ca312a7d83a6411f",
+   "train_total": 1825
+  },
+  {
+   "HashOwner": "55096430a628047efe30a29a963e9140933b1425ecf196a718e0138d3c35a204",
+   "HashApp": "7c9b796049589e994f64a7c5c119bc0de27769bc1a9f4e127fd5a836224edebe",
+   "HashFunction": "0099dd67d3960ce832fac08642a919fb13f2ad21c894b369c6a12f598b4917c0",
+   "train_total": 2827
+  },
+  {
+   "HashOwner": "e057946d20192852c21cb673a7f11b45b5a2158d724443eeb1e34009a364ea28",
+   "HashApp": "5bc761e1604d8854f8f984c677fe467752aee36b73e7f1959eb6e72a7bf4177d",
+   "HashFunction": "01366f7f29d1c9762a8ca1a28f77a65cc248ec3a0c2c7e89bbcad2cb7a8a470c",
+   "train_total": 2288
+  },
+  {
+   "HashOwner": "a77ae34f081ab9cef114cf288e65f95b783044eef4bfd6353dae8b166d7ecfad",
+   "HashApp": "2ce44f9b9da7a5b43cf9710886f17e8ae9700de816b6aa2e2c300de6f6129fd7",
+   "HashFunction": "0182d94320ca05b0a9dd991420aa252e3bf06950f035571cefd41cd2a6a2aabd",
+   "train_total": 1818
+  },
+  {
+   "HashOwner": "7af3bb5406d302f25079af17d1bbab50a16aaf2de266dbff34ef73bc2146b437",
+   "HashApp": "66247ea5468a16e0b3ff96fe812864421eabce25c4990be3aa30a3c29a07fc63",
+   "HashFunction": "033d21f8ab9ca3dc860428ef6c31bd608e1aba8397f0bf00a5743cf06de0f30c",
+   "train_total": 2644
+  },
+  {
+   "HashOwner": "38146c5b055fe108100ed23eddfaf6ed847e890d2d88bbf80a70828a8c610d1d",
+   "HashApp": "3e2b4483c577749a5dc4f4d95292541dd1063d0d5ef1147a8aacd6629fd2fc1d",
+   "HashFunction": "03775aa1f23ee8b75ac8d1362f6f85359a5b43b4ae1a0c966dc9065d7af3f343",
+   "train_total": 3338
+  },
+  {
+   "HashOwner": "8b8e61a1a3101e0a764ab1f7d1e7e8e9745200dd8d15cba37571965081c62cf0",
+   "HashApp": "f3592bc7389aae1c95ce7bf8875d32ab1e5f6a7a27df4c0692d85750b9199766",
+   "HashFunction": "041a6e11c122d3fcfc0b50f8afc713e75fbfc06daa307adbfc52367192dde626",
+   "train_total": 2522
+  },
+  {
+   "HashOwner": "159e335d489fb17bbd6def391f80c355dc382aafbbf60596f33c195e493b0e9a",
+   "HashApp": "9b23e981f8a2d32d6b75f6f81c3499bf5a2b84c7c592eb6fb341be085394a6fb",
+   "HashFunction": "04701d6c7600c95636c758add456e38c1e44d070ed2a64109f15d4fdcb20803b",
+   "train_total": 3478
+  },
+  {
+   "HashOwner": "7e2531c7692e69c8aa1802fdcbcf81bc2db18c88af29acc9c81767294084269d",
+   "HashApp": "48cd56d447054a5049b85d6d7a02bde3bab3bfda3061e4a941f45778bbb96bcc",
+   "HashFunction": "052889616d5fb71e3f19a480375706dc6242daa3b9a62995fae0203296b1656c",
+   "train_total": 1714
+  },
+  {
+   "HashOwner": "93cf1032d5853cf896a8f98b1b4d050d1772b5390130d7e2a643121cd3b21ca0",
+   "HashApp": "f719c59e77451542fb97b54711130141108e0fd1f2c414bf60a830a61de04d8c",
+   "HashFunction": "0537664c06b69c7ee950fc5bfaee41c914c1dc1943f9959a980cd048e83c9092",
+   "train_total": 1793
+  },
+  {
+   "HashOwner": "318dc364f49306b964eddbc9eca8d18655f242a19120e9c89b8b6136f1317d87",
+   "HashApp": "d876b8e9e8bdeaaf5a7353b18f140e06e715a556a169d23d1b816b573fb490aa",
+   "HashFunction": "05b41795a0fcaa1400082cc555f5c4237efc0e21c8c8808b13af8a4a51370328",
+   "train_total": 2567
+  },
+  {
+   "HashOwner": "57eea4895d6e0b5e6e8030b19d6c474073dcf73e4b0eccd83d48e7bc2a04048f",
+   "HashApp": "11602c74e33353d39ef18d3c1fcf2766dc727087a02be49f92fb673f3c876787",
+   "HashFunction": "05edb96ab9781d14c22d849b78b2301c7de10fd3fb1feb0c84348019bd6fadd9",
+   "train_total": 1978
+  },
+  {
+   "HashOwner": "b8939a83b57e381ba3bc9a414774eedbcb91021f49a14bf102f1c5fecda6146b",
+   "HashApp": "481e439ed93eb195793ba4af8d5118ee6078c41f1371823f5f85e2e30f2fff7c",
+   "HashFunction": "06100f4420231a7295170f38f689adb4ffa9074d6515211bba9665728065df45",
+   "train_total": 3424
+  },
+  {
+   "HashOwner": "f73c3bb4228118e0f378553b08745ee60e86ae8b7812d4d2757f0759f9b2ffd9",
+   "HashApp": "af5ddf88ae5024bda1eefed5989c8ee40dcd573bdc26f4116e0baca06bc387ed",
+   "HashFunction": "0672136ae022215a994a62aa7b519b5b85d536ac60bbac2eea70a403f3dff121",
+   "train_total": 3434
+  },
+  {
+   "HashOwner": "990b99f62013928df778e079331476152e3a8a7cb1ffda6295abd2ea38bf9a8f",
+   "HashApp": "3f6670ce48cdf5c168e5e2aa8f4bca9756b7c525ddc9f0a1c56fc3dab81d74d1",
+   "HashFunction": "0687cbae91d2b712703f712e7096e594b6949b78af0542603cf66050b2363364",
+   "train_total": 2205
+  },
+  {
+   "HashOwner": "8cefdd584b42e50419c073cb7a5043e9fd4ac99ca13c026a5984c967549e98c2",
+   "HashApp": "1de22e7fd319e0d6288d038f9b23194e13994472567286ce2148cc2d9e78c32d",
+   "HashFunction": "0699cb5636f952fb5fefe6f0d935074de57105cfdb49edf632009c9584ca0a7e",
+   "train_total": 1905
+  },
+  {
+   "HashOwner": "f6eba33b1d74e7fd3868a3d6123f997de6cd23226d49b8bb0680d9836e789f2e",
+   "HashApp": "758a78c4f7768539467df6ba348b0def15bf7fda25fe65881c558f996ecac6f9",
+   "HashFunction": "06b74f44b87dcb9fb97a485707a533f218f13018394673dfaeb392b086424cca",
+   "train_total": 2657
+  },
+  {
+   "HashOwner": "694a8ce8f0dd2dcbe9d58d5fd61873ab2849631b64a17793e247a65f98d2bae0",
+   "HashApp": "94d660aa07905b189acb15771c45b71f21b1677f05201eabfd0dc1c24edacf2c",
+   "HashFunction": "0735a9894a052e3efff20c3cf054663064717d9ea4c08e849372b50827c08a04",
+   "train_total": 2210
+  },
+  {
+   "HashOwner": "8fd53fe1aa335f31c8f41f014794badfdbd31def02b17adb839a589de00afb46",
+   "HashApp": "482c670c7f8a07107b3c1b1ff02dcf9d1785e9db43cf41d057dc7c7c04ea02c1",
+   "HashFunction": "074007f6328f2e04e5ab685f6473d52a6b9fe925ff404947aa8ceeed7d3319b7",
+   "train_total": 2781
+  },
+  {
+   "HashOwner": "611d0baa20577158d9a4427185491783d318d1846f498296cda2f17f60c33ff4",
+   "HashApp": "473c4725fc4680e094ee5b8438f66f0e8b9e3d6e1b90de0b69a9a1e671168794",
+   "HashFunction": "078a05d92e960b42dd5910d6e50ab8a0e617c321cee37ad2b4216ba1a5e21855",
+   "train_total": 2034
+  },
+  {
+   "HashOwner": "71091aad6b2c3478e13e173128dfe5e1702e34f0a75b9b52c5b7871c60a66aa8",
+   "HashApp": "3a03850124e0fe4ee4a9745bd3d19d4064e0e20c0ad3cc7af4b8858bc73d2a93",
+   "HashFunction": "07de14b585c788a2e56af500f57a93e4e2a485ddc2d1baa9b1db692c61c8d63c",
+   "train_total": 1661
+  },
+  {
+   "HashOwner": "4b53ebbdae83be809876696e45167fe312171b86b14dc5d09c6f7e1287caa325",
+   "HashApp": "e2fb07f036abf782f34ea297d2a8f620a11c45242f367f5637a850cde0bb04aa",
+   "HashFunction": "0865792e9c3bea1a47e45cc46c0965da3d24c6e35fba680072d70bd14b332939",
+   "train_total": 1621
+  },
+  {
+   "HashOwner": "b5d57db7de832e6c67280602486b03c64c8b58c9ed24e09a328e13086fca7727",
+   "HashApp": "260f6870a9c1edc3c30f946c27c6d5990c0014b09baafbf87660c7ecba1287b6",
+   "HashFunction": "089f89181925567deb51fa638ca283b2cca823f8d7e1a84aa0bbbfcad1645156",
+   "train_total": 2737
+  },
+  {
+   "HashOwner": "a76f5fadbeb63d746a8dd8a93edb88d317535483c34603d41f3778f4735a81a6",
+   "HashApp": "e6325bd00d308fbd7c51e7824a08c10ca5992a209e58c39c3f89d88d7023f645",
+   "HashFunction": "09613d7119676824ddd4f7fb39cfbb580b50f6a7153fc3516e5ba3ec1e1b220b",
+   "train_total": 2609
+  },
+  {
+   "HashOwner": "2f565ecdacb965c9af1e89c824ba1af6c5176ce702a83b8a5259bf1c51bf733e",
+   "HashApp": "f42387b15e1c9e6bb628f12c1c1c6246327020089421072330cb0ce74a03d5ea",
+   "HashFunction": "099305d7932f3b5efe7dd9d300742e0123ff7f50ec225a886f8517a6ac0bdeb0",
+   "train_total": 2332
+  },
+  {
+   "HashOwner": "04bb60c95da530712a42e9cca1bd2feb8de65bf45d8cb4e4c61ecf2f94ab4c9f",
+   "HashApp": "7f51b21f462393356f868f5625c2590f93794df2ff96938a8904eb30dac41e04",
+   "HashFunction": "0998bc367e0255bff1a69c3521afae637636a78b4c361df9128bf104f504d153",
+   "train_total": 3551
+  },
+  {
+   "HashOwner": "b077d7d6fc01fa973aef59efbe4ca0611e15a1112a65855a7cc5f82d97bfe0c8",
+   "HashApp": "0b80301fa019e009b442ca0d575cfc8533f81464826eafcd23e15b58560fa530",
+   "HashFunction": "0a276f04bfc82977788a8026f5710ee009e6a1a1c15a19133c6778b9d7de4e6c",
+   "train_total": 1799
+  },
+  {
+   "HashOwner": "e015e88cfa15059743812d68b9378194c6f4c72de9eddf486bacbe9483804543",
+   "HashApp": "6beb815fd46afcf0c49c871b6b42fa6c23a15da84995af769974f9d9189e9e14",
+   "HashFunction": "0a2ee1bfbbf67f84756ef43e4d8aaaeb4861262b105a2d73c5f64e3fe26638ba",
+   "train_total": 2235
+  },
+  {
+   "HashOwner": "a5b41e1818cc03a8ca332e48fc8f8c0ba2b18c76bc5ba5e37476212a11ce2d29",
+   "HashApp": "a367c08c942117efa1a424f81387dcfa3e01ff5bf493607575d105206eb84e9b",
+   "HashFunction": "0a7582d197fb389e38bba926641786b17a343aa84f0ec3adb47d31aa95f91a3a",
+   "train_total": 2795
+  },
+  {
+   "HashOwner": "89651a9b6305b1c5c6e1a9e00b62a2aeb81b7482528e746fa1250a1804e7a54b",
+   "HashApp": "716b3f11a192c5b116fbb3bcc426c6bdd54e8912e720c797cbb0b58a30c8768a",
+   "HashFunction": "0abfe93ebfdc721d1fec7c30adfa23afd4329cea65b38e132892dbeba67869cf",
+   "train_total": 2206
+  },
+  {
+   "HashOwner": "b9f8f1a18d715b306a9c140f74664a6eff79123272dc41b5b41820ce51e8e76c",
+   "HashApp": "e2a1350dc7549bbdb331bbf08ff7186ea8c93b644f6a82cf45f3f1a00b122e34",
+   "HashFunction": "0ac691a7d094c104ac4c3d242ce138473413c5c3214016a854ef2576ca9ff7c3",
+   "train_total": 2565
+  },
+  {
+   "HashOwner": "89ce009bd0c1c2e8e3b59c775ace89457d7383b0b8ea87a011eb8dbc7f2c554f",
+   "HashApp": "b16f5bb87a1820bce2977d73089a49fb3a9513046b700044c8750acf0a3d67d3",
+   "HashFunction": "0ae388d14f4505d3870aa947f0d57bfd77c78aa1ed27a84b5cc045b4bfe84803",
+   "train_total": 1998
+  },
+  {
+   "HashOwner": "5f3f45272b09e7800ae42d3132b13921d08739149331e2ecc4f068179a8e86f2",
+   "HashApp": "b1704fc545b45c1e926d4846eaa385dbfa940a22bf46e358bcf719e3a7ad43a7",
+   "HashFunction": "0b2b8eaa0271a3111b9d2689f3b7f0882c6cf241bb579dbf87e65c54e8713e52",
+   "train_total": 2644
+  },
+  {
+   "HashOwner": "79c1d8f53e7774086ef35529d5832877b5b0a064a1ce5247ad3a6c56e6ef1711",
+   "HashApp": "e37dc035ee69658b0ee978a610a1ca2e8f3f4f865cdc8002530f6c1d700f0cfe",
+   "HashFunction": "0b61d16b4523695339fa0268f5d69d1141d889ba36b1e8278057afc0c83e785e",
+   "train_total": 3035
+  },
+  {
+   "HashOwner": "a62be3bc4e5c782f5c97fde580a9e0332651f6db2a1739ed7e71830743354707",
+   "HashApp": "4190599837c4857589bb7a7c80c6ee96b73dbdf8c5d8f80aea3bfdc6421895a7",
+   "HashFunction": "0b9918cb77c9851cbfa169d3b7adf66d40e16dc4ecad1cee4d6c175916bf8c42",
+   "train_total": 2721
+  },
+  {
+   "HashOwner": "fc032f255b4637fca734cc41bd4f72cbb4bab507da576da146757e39b5d533a1",
+   "HashApp": "80af25a8c4a6b6ccabc94a3d563538526fe6c5d55b9d1e72800e0f1546bccffa",
+   "HashFunction": "0bfb02f41bf4600ccbe062202cb958707a2006d910c86171663851a03bdd8209",
+   "train_total": 2321
+  },
+  {
+   "HashOwner": "db75f8e8058cee143ac576237f101618b3d6e3c7f1064c46e0f72b529770375d",
+   "HashApp": "b9d693693a780c56d096c29ec063a0ae0959caae2db2e92180f37a044f59449a",
+   "HashFunction": "0c795d13c20688ad015baac7c547eaba08ebb52918dd30d5839f404748be1a81",
+   "train_total": 2252
+  },
+  {
+   "HashOwner": "feb7a7a05bc6c8125127beb2cd15a26a7f562fd3bf69e7ea83f34416e772f52a",
+   "HashApp": "5f1a2d18785e1e486012d022279bd1a2f6ee08c371e535e42f7a0101381c1f7c",
+   "HashFunction": "0d0860aeed55202b2263d1205fc700b4bcbcaec20556470661cec4ff4dcc54d3",
+   "train_total": 1583
+  },
+  {
+   "HashOwner": "cef4993b78f59cd9bdd77c5dd3dc3581a2ce893c8c5381822f75e141db1289f2",
+   "HashApp": "72e4e64960e3e29a6658f9eb4926857408ce53b60e4b598394e2cd328078bb87",
+   "HashFunction": "003adf0f4f58c7fbea77b6483e913840c5650673c458e05a72e6b042b57c7dcb",
+   "train_total": 8991
+  },
+  {
+   "HashOwner": "5f90b920881c509d44d49599577baf8ae15575e2ea5a92e9500e9d49d0d5fff9",
+   "HashApp": "eab7da4fdb1a6b365fae628f65e52dbee0a5b676a7fe7b61cb1874937bd971c8",
+   "HashFunction": "0088e3c28dce2d9ca30aac1030500474bf8c5a5235e38899d500bef919a596b7",
+   "train_total": 5796
+  },
+  {
+   "HashOwner": "56c9511c2561535aae0e9fb0b6172a96614e09b8f097c70618673e3226a93532",
+   "HashApp": "09581547639c31f302a77b596c2de52f67069caf0a0b39d59062eeb43ce95643",
+   "HashFunction": "01ea71298e7fbc17510c6b996f59320a7d2f7ed8ea815bf7a2eb737a04652f27",
+   "train_total": 5418
+  },
+  {
+   "HashOwner": "9600d8ea0d18856a6f1fa5672306ef55afac8b5e32e956579ab0f1a8c347bf4b",
+   "HashApp": "2beb6577637e789e406bed0a58368432fcded49acbfa9e756f1ca13915d14729",
+   "HashFunction": "01f65dd05a15f004abb4de89494170ca45315b9e9531f73df43f70c29876198b",
+   "train_total": 5717
+  },
+  {
+   "HashOwner": "72ff69c04fdca7747edcb79a7e2130ef9fcda3be1facc371614e678053b44415",
+   "HashApp": "73c0b04d46fd4f9f68723a4f0bb993f32efd450a6a98ab705f8f9d9aad1f1aca",
+   "HashFunction": "0261e083c9e73831aa315487d77bc6c7c0095c91776dc77fcb8e44daeeb58a33",
+   "train_total": 8119
+  },
+  {
+   "HashOwner": "98133c4612c4dfafee083b32d5a31cbd3ea9426d46e6cd37ec4754a40d43c682",
+   "HashApp": "2c0c802240640d10e337eb9a57fa906377888a3a034be3d5e18ab9fb4962d115",
+   "HashFunction": "027ce61dd68fb94c52b0b19b45d548a549bdeb46239f7e108b3ab565b14dacb5",
+   "train_total": 8486
+  },
+  {
+   "HashOwner": "9814e53dce14cbea7ab7351978b11f9a7d3f9ee3a6f7b6f9d11a0b1b49fbb45e",
+   "HashApp": "bdc780b6cb08efaa9c56dd82852b01ea318a9fe886e465c128f2b96566326184",
+   "HashFunction": "02a31f74f1fc5270a51c2ff3472b90dc922fe360aee212258e79391f5d46effd",
+   "train_total": 9070
+  },
+  {
+   "HashOwner": "8fd53fe1aa335f31c8f41f014794badfdbd31def02b17adb839a589de00afb46",
+   "HashApp": "c08b6642fc23fdfe0241eb4c48b5ab476b30b932a84fa848f01610f4dc3ae03e",
+   "HashFunction": "03f78a7ca6778ac70a151e194e7722266624bf4167ab375ea5b28ff9d5f7674f",
+   "train_total": 5428
+  },
+  {
+   "HashOwner": "a8e656726c5b26cbce0aa29e3cc219aaec73ac3d37fd87475bf0177b3ab01ca8",
+   "HashApp": "fc9e68df3a60f32976a17755415f8bf4a6e6d32d4e52b94bc170c183f432eea7",
+   "HashFunction": "0404ca7d41e68c881d4a894dc39dd2104dccdecce5a357477aa5a6e2f84015ae",
+   "train_total": 5714
+  },
+  {
+   "HashOwner": "2f565ecdacb965c9af1e89c824ba1af6c5176ce702a83b8a5259bf1c51bf733e",
+   "HashApp": "f42387b15e1c9e6bb628f12c1c1c6246327020089421072330cb0ce74a03d5ea",
+   "HashFunction": "0409320fb89c4f052c2162246b20cdbcd53fe25336c1ecdf278dce170579b5cc",
+   "train_total": 3761
+  },
+  {
+   "HashOwner": "ed292b7835ed4023acec2c2cb4011462c43083934f25cb64109b302aa44b9475",
+   "HashApp": "9871c893785620615fa79cdae96a98132b10f119df43efc8179fa660832f95ba",
+   "HashFunction": "0467ded11c617ee405b22297c7d0d05dc95cdd08984e56bd3bd5344b21cc2708",
+   "train_total": 7990
+  },
+  {
+   "HashOwner": "8fd53fe1aa335f31c8f41f014794badfdbd31def02b17adb839a589de00afb46",
+   "HashApp": "8e9ad308d49938e55e63eb3ab5f1f0c6d45874e7634d5d0d1f88da5ecfbb7457",
+   "HashFunction": "04a453528d73013fb1f8ba4a1b46925a5eee6987ca9aa3429afd14018220680d",
+   "train_total": 5427
+  },
+  {
+   "HashOwner": "5f90b920881c509d44d49599577baf8ae15575e2ea5a92e9500e9d49d0d5fff9",
+   "HashApp": "016795f16e16c1e5d75066f84dd6274ee13f4e193f6d436bf557c792ee084c8b",
+   "HashFunction": "0520e4129e948eba97fa647d814197f953e5003f5dd27ae052afc9e8833a57c1",
+   "train_total": 5391
+  },
+  {
+   "HashOwner": "b406772ce79ade20251ee28228504d03d09fc8f7a72b608c20ca34f622d6e470",
+   "HashApp": "ddf129423e8957a37438afaa0784b8b96127a14ea48787418cca5740733fb961",
+   "HashFunction": "05af4da28bcf6716b35a4863b893d08fd9ceeeff3ec7f9ba711b77f70a5a68e5",
+   "train_total": 8539
+  },
+  {
+   "HashOwner": "20286f110cbdc8eb6c9d2cd08d0652764cb6a21d118206b5c338ebade1276118",
+   "HashApp": "122e20313f6fc9f9b3d9d9ae6d59b98f436c891925205b9aa0d3824468c193d8",
+   "HashFunction": "05ebe0f1fe2aa4b6b8f66733e02630cdb259f11072600adc7262d7cb5abe1f80",
+   "train_total": 6065
+  },
+  {
+   "HashOwner": "4c4084400b636cef78bc47a4b4fec09113af3d2a2776b35efb7b8d333d82dbaf",
+   "HashApp": "9b4ba9fda6f685d8a855e7bc6ddcb01fc4162d4e5a8d65199a48875af248da37",
+   "HashFunction": "063ac74f03df5cfedc1a3b3c34bab4bce458f0fbaa5c1aae9bea33c30b3dd356",
+   "train_total": 8947
+  },
+  {
+   "HashOwner": "22587fc8278bd889e9e96cbc44aafab27b5caceb385d0318cb8e83fbbc5b79b8",
+   "HashApp": "0e529c2b4f058abfb2aab607bbdd49a2b623e761b2da1347ccd546718fe7c483",
+   "HashFunction": "066248fd2df377588c9a7227b088ed2def447e7b6f77c7386d97b2614a4922ef",
+   "train_total": 3890
+  },
+  {
+   "HashOwner": "c55bee4307d16771ec942325320a4f697168871624d9aa5510c12eac75031d07",
+   "HashApp": "5a3a848158cb942a67f7efd3e7bc1db66fb7273d85556e09ea58151594ab1b6e",
+   "HashFunction": "06aaeac2920c6c380c8c87fa86c3cb595e930253e91d4d3531ef74236009d5ee",
+   "train_total": 7051
+  },
+  {
+   "HashOwner": "017ae1cc0dfd30ca88624150f3a983008e9baa24355fefeb18e4ab1ea2c98747",
+   "HashApp": "104c55850dd76dd7572e455e2fef524b95b08f4894cc4fc6cc9b18b1e3ee9f02",
+   "HashFunction": "06de6287d35f3a80bf7f8bef91e0aa08393c8ff9020ecdd93e4181ba7fa35f33",
+   "train_total": 3747
+  },
+  {
+   "HashOwner": "7dfcb8ded81822d4498d4466a66d1c50bce48152032866d51944ecaecddd081d",
+   "HashApp": "1d2cc14459ef2d8f96b0aa5b8b949cecdaf2a8701c6ab754660ccfe09af90d66",
+   "HashFunction": "0771e6d5a454f4866d6bdab0f8b2113df37ed566309853c6516954c56f893b3c",
+   "train_total": 5755
+  },
+  {
+   "HashOwner": "0732063a5ac204cd8eec2b4f43f0566f105c727275ddd0e366152e2337cf8d2c",
+   "HashApp": "02c33687c95cfe6b6fd8c0408b8820705afa960a6639eac528685edf5720cef2",
+   "HashFunction": "07a29f7f12e8522048fbbd1ebb8c5e92ed4e05cc16ad9cc13d2e6a7d4107069b",
+   "train_total": 4255
+  },
+  {
+   "HashOwner": "4c4084400b636cef78bc47a4b4fec09113af3d2a2776b35efb7b8d333d82dbaf",
+   "HashApp": "9b4ba9fda6f685d8a855e7bc6ddcb01fc4162d4e5a8d65199a48875af248da37",
+   "HashFunction": "07aa17feba106b4a1e5a5b41f5018dda8679bd1e338649e87ca637631ea332cd",
+   "train_total": 4361
+  },
+  {
+   "HashOwner": "30a876e80855f9f46187a876eb5d2d39a93fb3d1b9f31eb7d3b2859ee5a90ab1",
+   "HashApp": "8f044447f82ae4606a5762193ff61b14dbf25e24a816197e01a73fd8eba1a93e",
+   "HashFunction": "07db80b44a1aef82fd7443b39817ecbcc989d6b20b377f3657d111d9dfdfe8d3",
+   "train_total": 5463
+  },
+  {
+   "HashOwner": "95638bf7c9afb904d42840c157d37331546ed40880bfa6b1c121c59c430234d9",
+   "HashApp": "a53dec843c4f19ef289c68b3ccd38a2abbf7fb50168cabdc4bb4a9d39149c784",
+   "HashFunction": "096fd3baf5c37ff1d7332fc37fc8e763ba44a10d06e988fdbb9004cd86f35245",
+   "train_total": 7398
+  },
+  {
+   "HashOwner": "c81138310053a7e286d0443bfbce634b121c91f35de1600a83e27194cdf45689",
+   "HashApp": "946e466b5f305a047301f5cf67044b24adc1c40cb50ad3bbed1a52abebda1f96",
+   "HashFunction": "09d16140bc3a008c1b9d9cbe4913117a000731cddf6980f552741059237d3d24",
+   "train_total": 3761
+  },
+  {
+   "HashOwner": "d6f68241000393304e44d16fac6799770a657bfdb2932510fd2d7d92ba95c525",
+   "HashApp": "1b506a3574cb348bdd384a794c752c8f539e4b081be699d01b7a2c655f443956",
+   "HashFunction": "09d9412d9cb3043b806323d9c27a9b501b734cc7b7fd126eaeabd03aca91837b",
+   "train_total": 4661
+  },
+  {
+   "HashOwner": "04bb60c95da530712a42e9cca1bd2feb8de65bf45d8cb4e4c61ecf2f94ab4c9f",
+   "HashApp": "34e87231e3d4c93ada081253e7966463d1a8d9c1e60f9e454c5cb8d8e29accf0",
+   "HashFunction": "09e9005256820292f7e03ea422439a2f333f6c0d7ea131d9e49a9e4f52f7fa70",
+   "train_total": 3871
+  },
+  {
+   "HashOwner": "f5fb9cfc14ca91819989c466491e42e7f1287faf70f5b4b53f1841f8d85fe2ea",
+   "HashApp": "4be7fede09eb163ee34a608d6c06aa2da52154e85e3b7dff600824b3bd4594a1",
+   "HashFunction": "09e96a17236be868860025be5e8c71192b723398ffeb10c5ea129768b4e7b04b",
+   "train_total": 5929
+  },
+  {
+   "HashOwner": "e97bae2b97aba6fe9e83ff9812fdaf99e1952336b8b9a62d01ad6a493d84290b",
+   "HashApp": "2ae05790403db5a881182300371d1f8c486d66008b652100fcea5f4ce3e4c829",
+   "HashFunction": "0a344b34e2dca92262c2eb7ed4a438f333dd08c6028a229f72aaffd84335377d",
+   "train_total": 8893
+  },
+  {
+   "HashOwner": "a1d2950a826677b5acc09c7508284629dc23250f2a3f84de4c996bd6afdf919c",
+   "HashApp": "92dfaec2d41ea9e05eb19e95d9446eeebaa9fa59ee1d0c53676d686353fdecba",
+   "HashFunction": "0ad440bccf05960360c4118fbf93a854a3c11949cbb987a050ebb44eaf746ca6",
+   "train_total": 9032
+  },
+  {
+   "HashOwner": "d5a9743fc499f0638f307c626c81769d76679a61a8c382e72800d9d524b3bba2",
+   "HashApp": "83f2a31a0a19b5a3d8adddc6ed57de4dd8e0d967e0aed647e9c3b31119d5d855",
+   "HashFunction": "0af1cc9a96c27bb5614be8c202bb6ee47662e3c929700c1ac7152704a14f8975",
+   "train_total": 5764
+  },
+  {
+   "HashOwner": "a14a58da142e85b4213842d0a8780abf1d577858abba0c6d2cb81752275fa955",
+   "HashApp": "930255acd820e4cad8b536cce71a3ab14df9a61427ba134e0d2f49668dc59582",
+   "HashFunction": "0bbdc93ce0e544116697389921614f27e4818e47e333874341cb6de854d12d52",
+   "train_total": 4464
+  },
+  {
+   "HashOwner": "05ef99638aba0457983db3fb3729f3a120f2a0228ec05b818e63690922fd6360",
+   "HashApp": "ccc76f23f045c70891bb5e0177bfd846aa86382f41db8f18223cc980d080a7fa",
+   "HashFunction": "0bd320b95c1053f1a1ad69c4f3fec73a234cf9dc3bf16fc1f35d0889078749ab",
+   "train_total": 5944
+  },
+  {
+   "HashOwner": "3f53a257d940f87841f484fbd7fc2b70f50879ca1aedaec4f08b4ab197fc246f",
+   "HashApp": "f1d48e3e0380e9a6ca95ae4235fae6cbe88fc2ade6bba51843d4ce9bda22c89b",
+   "HashFunction": "0c374ebc1d06cfee98264b1a5b6a46a90a3fddfdc789011e8df51652ddf01c38",
+   "train_total": 4404
+  },
+  {
+   "HashOwner": "77a3fe62c535a9c6339c3e68445d2d90701686dee67f799a9c6a642cb64b5408",
+   "HashApp": "d95dc4e99b955efccc18b19aa2175db1a0774b657e2f14a6a75e0228c9c6306e",
+   "HashFunction": "0c527449995d0923aa2928e14e03f866b1c337a2c20ffa9788ada99f410f66c9",
+   "train_total": 7187
+  },
+  {
+   "HashOwner": "14f473bbc7e14a8de8a0e1f885dc345ba3656a60eb8262013cc36498bdb6ba92",
+   "HashApp": "1436e229dd37cffa370e6e5312412608ec94afc9e3eac234b8b41e930a778e0c",
+   "HashFunction": "0c5b3f1a0a8a8320964daa1b0488f3323bc1d4d9deaa0b41ccdf07082fc3c9c1",
+   "train_total": 3787
+  },
+  {
+   "HashOwner": "a3f69785e5f91c256c04ee837029ae518fd806cb5751e48f2f08451864e4cd51",
+   "HashApp": "abec24082f5ebc208b6a8905e7c4aa24ee6eca164fffe20dd7227a2f21f2ca14",
+   "HashFunction": "0cb74242bc220e0d86ea0c9d9a79c0e363b33ee8bcb68868e01ec0d2d361a3af",
+   "train_total": 7603
+  },
+  {
+   "HashOwner": "cab4536b6f941cb760aaac841b7519440eb4b9043ea356dedf01813b6929343f",
+   "HashApp": "e593dfd5a2c472da66d07bd2e19fb6c8ca035acdcd37678e002ad536d531cab7",
+   "HashFunction": "0cba39971f788d30e0c4cb4108f4be57e22954ac969f5d85e2b01558b64840bc",
+   "train_total": 8534
+  },
+  {
+   "HashOwner": "dd09fd65748330ccd01a25936265ccc94009fe9183838720c44296a0d251d223",
+   "HashApp": "fccc250b9d3ca69cf020e3f5b6628bbbbeac6677bf782df759a1a4eac2749c00",
+   "HashFunction": "0cffd92ce8d59a42762b97913067a750eb99336dda457b796abaa57e23a873cf",
+   "train_total": 7709
+  },
+  {
+   "HashOwner": "899e98f0ed9b32a9e290a6f5cdd8d1e2089fb8ea48b40377296381b9ed993ffe",
+   "HashApp": "fb7cb77425b7a25f8167d730b9e8a4ec14229df8b5a8690b911ffb69cd344606",
+   "HashFunction": "0d441fbe4f17b7efe88adc2305b1878982266eed85959551b3a7424bad9a8c30",
+   "train_total": 4822
+  },
+  {
+   "HashOwner": "9b0367c538d90794434c04f28b0bcf21a1eec1e18b2e99c1826742ce9863a2b2",
+   "HashApp": "b6fccdc013c4a73b301d7bc9404e65a02ad5c7612448ca33b5dde9f10f7072e7",
+   "HashFunction": "001fa2bbe639b021ff046c36d40e43bbfdea5604cb5be04150ad3b7b2bfeac3d",
+   "train_total": 15617
+  },
+  {
+   "HashOwner": "5752ccb823dfeb67368d997d74236952a097063c3f3e81bba9b9c06e2099f255",
+   "HashApp": "e06889f57b16a37751c62f72ff0ad423d92a12ea7834cc25dd1b791656ae4011",
+   "HashFunction": "002778fb39643f1a7eaa3bfd6827669a1e6bef9c7ae4d07be9a1db6b3ebea49e",
+   "train_total": 17380
+  },
+  {
+   "HashOwner": "486e10ac87f2c7495ab672094483c49e935e6f7e19b2b9b7157be7f9f949244c",
+   "HashApp": "e54bd3dbaf445d709ddbf9c0f8543ad936040ea6173ca949a253a3010f153f81",
+   "HashFunction": "0053345fed1d23792641471ee6c502540c5eb95831aca9b58b665161178b0187",
+   "train_total": 21234
+  },
+  {
+   "HashOwner": "4a7dbdc6929f01d82ba33e1c1219897e43b55741fd1e669c7359471a6a8dcf60",
+   "HashApp": "4d2a4b653dcab09d6bf9e2ebd8b1615af965c18df666c401a4e8f1dcda74c3d1",
+   "HashFunction": "008efb55de3b1b8797aa619de48c97a2b2ee4f8c4555e7daebb1d472247deaaa",
+   "train_total": 16438
+  },
+  {
+   "HashOwner": "71091aad6b2c3478e13e173128dfe5e1702e34f0a75b9b52c5b7871c60a66aa8",
+   "HashApp": "1659ad008507f6bccd186629fbc143db8c2abfdcb93bc00feeaaa3817f517be7",
+   "HashFunction": "00cb9082c304e21aa7cb1b8c464d9d947c957e718d45bbd57467e824b69dc744",
+   "train_total": 11073
+  },
+  {
+   "HashOwner": "486e10ac87f2c7495ab672094483c49e935e6f7e19b2b9b7157be7f9f949244c",
+   "HashApp": "babcd4ca963e4de0ed72c4f9dbe99ff7c893f42ac0218c1ccec18b801738132d",
+   "HashFunction": "01a0e48c05d3f5c540e8fc81d0743c218ded562a09d6a8594328188e5ea06ecf",
+   "train_total": 13658
+  },
+  {
+   "HashOwner": "486e10ac87f2c7495ab672094483c49e935e6f7e19b2b9b7157be7f9f949244c",
+   "HashApp": "c93be0ac608e60747f6feba1d01b76fc0268a866e0f37cd02bae4c1299aef2d0",
+   "HashFunction": "01d59e23969b913f5dc51a16f5f230de97f4ade661287b71eaa4b914e6726375",
+   "train_total": 22205
+  },
+  {
+   "HashOwner": "486e10ac87f2c7495ab672094483c49e935e6f7e19b2b9b7157be7f9f949244c",
+   "HashApp": "a0540a2e219e89a32baf991a12cdb30785e017182aff2d8f9b28ff580b14eb26",
+   "HashFunction": "01ddc4443852398a46d81497127ed67e4063b71880e9b239d08514c0d087d0a9",
+   "train_total": 12194
+  },
+  {
+   "HashOwner": "51363659d4b26ee2cefe9a0781d7c40f1d9b9a7333294f0c62d1721ed4a76f5c",
+   "HashApp": "de7ed8c4b0fdeedaea81526dc2f83f0e4a27d02731049ea591f98668a9a6e7c6",
+   "HashFunction": "01e1797fd624d90383448fb88ca4bf248191bf6cf770e696568e479c4fb5bd74",
+   "train_total": 18298
+  },
+  {
+   "HashOwner": "bf8f06d145a06dfeb9d27d6ec5cf7c9418f8dc53a55dd216485e1c24d509ea2e",
+   "HashApp": "8ec87dec03430dedd9b13e1fd3879e322c29feddd2c075f264af46e156f89851",
+   "HashFunction": "01e9aafc2d7341c8f376680ae803c596cc80b64585a93e44a3c4672867acb124",
+   "train_total": 17860
+  },
+  {
+   "HashOwner": "70e87308aa60be8ce017a7f2f10422f648903169160ffcc6c3bbc9572b7365c6",
+   "HashApp": "401b1bf395589c1ecd6b232071c72129e833440f77a38be49d1687c76f7a2dfa",
+   "HashFunction": "025f28f81e839a9e8b94f2135965084cce7baafef913312aa22931ef74686318",
+   "train_total": 10512
+  },
+  {
+   "HashOwner": "f09536b910e082b868d3dfbbcf4713969a0143ffaf8f43c832572d99dea84b8e",
+   "HashApp": "6f5a38bbfe81abbbf41ad1ae06e00e8c280171a6a4ca6ff1719688e0ef1e7a1f",
+   "HashFunction": "035f64937ea2bd9575bc28cfaa7297b55ab544dfc128dc5e020432b2f8275821",
+   "train_total": 13490
+  },
+  {
+   "HashOwner": "240f56422d9e8c2106c7f6a6e9fe19e764c87c651087d621a066b0e39cda4366",
+   "HashApp": "be2c6d13cc525c2c7b38015b20f5dc0f92a9158e1007236b9f3767f687179314",
+   "HashFunction": "03ad3dce0e3cd01edd8b648ce12cb4d7be86cc9738b98e148f31ca41ebf14ed5",
+   "train_total": 17213
+  },
+  {
+   "HashOwner": "80c12238173b7eaf4e10eb06bc3d04421bd757ffa4565123b4951c8d01173048",
+   "HashApp": "9cfb898440be50f5eebd3e373fe9fca2006bda775e019a52cf953abb9c514880",
+   "HashFunction": "03b04ce43ef0dba2882b61b0b68398af123ae6d306ca8c27ea6196d8c6172b52",
+   "train_total": 11254
+  },
+  {
+   "HashOwner": "4b04b469c1b44299977e2f46cde4388bca9fe7b9a47c8a7ffee01eefc59490d7",
+   "HashApp": "445bb939149014b8849ffe75ec4ae02d181c6d90042a720b61469c7837824556",
+   "HashFunction": "0411cbfb73258e0567d40c3dae05b542debfba0cdaac3ffd389e43cdf964ff33",
+   "train_total": 14509
+  },
+  {
+   "HashOwner": "af925451afe259cecf434bb3df2a992d25527d762d8575375490c6953a707916",
+   "HashApp": "81fc62d8fa7ab305ad6e7160e046dda41011cdd82c2ad5e44b4e3d6021ebcc97",
+   "HashFunction": "04147154d8c4ccbb9595a4d0c1ddabd754f824d1e9949784ffa916743e616f93",
+   "train_total": 11014
+  },
+  {
+   "HashOwner": "501fce95316d38d5bad6eaa6c951fc0f6dcd46e1b9de8153777c563f5c21960a",
+   "HashApp": "55463eb5a3f09bb03b036d36090cf966c0e1156725dbcb2154d17e53c4348826",
+   "HashFunction": "0537aca18fae70f6da60249c99a15ac79fb551bed288e21c1a37a4973b0f6408",
+   "train_total": 11113
+  },
+  {
+   "HashOwner": "e3364bbe26ad2d89e81a4e6b310d341f2184f051b6bb77b13168c551d3913b6f",
+   "HashApp": "3a6b705426e1b4e6010b43ac65f72ab41d8e0a75d9579c00bbc225c1cd13b273",
+   "HashFunction": "0549e94f5870ac7a4a7474970d140bc42231da2336e7467e7732f899bc25be62",
+   "train_total": 13207
+  },
+  {
+   "HashOwner": "9a812208d53b34a898d2424a9dcc7d25d2c9928c1ce47934565f7f6976184441",
+   "HashApp": "e2803dff13c2369d98aae95e5ffb7cbd57fb464cee69eccfe53c2e4f1375c9d8",
+   "HashFunction": "05c7296187d09136801e21617967259b5eb9087d3698e827b3d671815a4428d1",
+   "train_total": 22776
+  },
+  {
+   "HashOwner": "aa7bc7da303b1c5f9bd4bd1229951ff4a612bad2a597ef24fb86848ae6ed102a",
+   "HashApp": "688f7b01352568c34d1f62c81925df7851e038775bf2908a1c9ae4e1236c4945",
+   "HashFunction": "065d12cf01ef476e1aeb233acf5eb02336209cc5e89a9d1aef6a1c8bd974cf18",
+   "train_total": 14468
+  },
+  {
+   "HashOwner": "e7ac865136b253779724fcf08d6f3af6d1a577906a869d89955e023461d1713f",
+   "HashApp": "cb497aaf1d05d5cfd3c1de88d7683a35a8815064dcaa59257a960f1fb7b41e0e",
+   "HashFunction": "06b6cda840b02092c177bcc2914f72312d4f162e544e3921ab7fcec5794d9859",
+   "train_total": 20956
+  },
+  {
+   "HashOwner": "c55bee4307d16771ec942325320a4f697168871624d9aa5510c12eac75031d07",
+   "HashApp": "5a3a848158cb942a67f7efd3e7bc1db66fb7273d85556e09ea58151594ab1b6e",
+   "HashFunction": "06c8c21004b902873d518aeda1995e8dd1182b35fe1474b487d4ff37442cbd84",
+   "train_total": 12443
+  },
+  {
+   "HashOwner": "f9948c791f1f87b5b7c456130b19acd2e9b34355b076da76267aec39900ea255",
+   "HashApp": "e9366bd4b0177c5bd94cb24a80283a59576427e801224244451be4bcb7f68e42",
+   "HashFunction": "070752f4ef4e52dd873e36be9760d7e4962beae25bae3299fda1dc3da1478478",
+   "train_total": 11141
+  },
+  {
+   "HashOwner": "f015557a3e7fee44417d61741e6239874f7f8b23604abab9faca0ff836e7eaa4",
+   "HashApp": "e5f50182c113cd6fd41d65d65a3f08e2346fedcbbe6c9c23be854adec72440dd",
+   "HashFunction": "0850f5ab3ab3d1a048e6417219f2b95c721713d8203187e46fa44b41f3ad19cc",
+   "train_total": 22769
+  },
+  {
+   "HashOwner": "e2cad3a1421c1f7e79d0c998179a908863c227fec707e2d3dfb7ebb19f017299",
+   "HashApp": "0f75d146806afea4417d494249fbc925bd2a901c57827958f645c283cd2631ff",
+   "HashFunction": "086fd696427e1d9e7d3fc7ebf2b0a73179dd082174a7d9c53cf04f047d2c02ac",
+   "train_total": 20172
+  },
+  {
+   "HashOwner": "0d5565a83b1167082c93e9a695ce1402546532f9ce058ac441570b799b1074d8",
+   "HashApp": "eb0afab328ea2e81f1011930c66d746a1d4f6fb7c7529f755ceede286afa6007",
+   "HashFunction": "087a854a487de0f9304d3ea6aa3d419c4e5401b34b90148a1d85a5c044ce3608",
+   "train_total": 14898
+  },
+  {
+   "HashOwner": "4156fdfbeef24f6bc7f1e230a2b372bbfaaf8f8be1820609072a2f35ffae9d8a",
+   "HashApp": "8ef0f19283c105c4d9ac49c379207e9785eb049f9e9349fb1568499e3c953ceb",
+   "HashFunction": "0897888244001b0639bdeef527032694e5c5e73507a5bc48801d376939c913c4",
+   "train_total": 12320
+  },
+  {
+   "HashOwner": "6bd08649c733f129703e8370a27b3a8cc0fb402c400ea745fbf3e8af79d6beff",
+   "HashApp": "eabe82bd3c7a8c623fac14bd25f0b24c68d0fe0dfff3d784490a4bbcbc10c06c",
+   "HashFunction": "08b33721d50c24c761f185f54a7cf242d8faf48d0b994b3bd653c5ecf36c4578",
+   "train_total": 24206
+  },
+  {
+   "HashOwner": "a125c8a834fc07e598cf9262605af81635253fd20e72b9b57bbf94829f3e84d8",
+   "HashApp": "69c938347c6ce4b82bdddb660855cd5d142538e7cf2f8bebee3fa3facb707823",
+   "HashFunction": "0901e58a92410bffd04e0e8344b3530e2f1ddb5afb61b6b3afaaf1886a110c12",
+   "train_total": 10917
+  },
+  {
+   "HashOwner": "3e4df4be44e100424bb64d7bcebf6c05a7f007ec22a331570c10869293e2a346",
+   "HashApp": "9e3df95350f330051bcafbc86f149d0fb734e15f0b224c02a4b6074d702a1b6c",
+   "HashFunction": "0a6aa3569923e89a5d460eede579f516fc867438cc8d4d996363e7b53b616b6e",
+   "train_total": 11410
+  },
+  {
+   "HashOwner": "9600d8ea0d18856a6f1fa5672306ef55afac8b5e32e956579ab0f1a8c347bf4b",
+   "HashApp": "b77a8527a0c110c998ff057c762cf362fb73117a9d42c30f0019d36fdbabe640",
+   "HashFunction": "0aa04af665671ff07233af999a76a9c1b3a49be735b76fe93177ae521074a740",
+   "train_total": 11632
+  },
+  {
+   "HashOwner": "5eb37a8498ef96083fed4768abf9cfd44925cc76a065df6a6767ed1e3030749d",
+   "HashApp": "d5d6a538a6b9c3cc6312ab0f1f9b73caef5dfa704dce7e2060a3e186bd657a11",
+   "HashFunction": "0abef798da5b91a56e86c36b84538792e999e4db46ac53719a4cfc4f2db89177",
+   "train_total": 14197
+  },
+  {
+   "HashOwner": "137493fb32226d38ddc453c03463c1774721c7a8a1f76dbf15299041d3242318",
+   "HashApp": "01172b277db96c95b2bb4c226637e5da10b235d0f5c964dc11419e9373d475c1",
+   "HashFunction": "0ae4e5a0771a13550c2738efb39cf275f5be31a433a0878a2007642d1720b386",
+   "train_total": 13388
+  },
+  {
+   "HashOwner": "c6b4281f6aff00a0359c86316ac7ecc1e2e44a25eb6f8369d96801f7eec84fb5",
+   "HashApp": "3f4d6666c33cc4aaad0525958bd2e352ab1e9c84eb33aadb16a667f8f85d8c5a",
+   "HashFunction": "0ae55b58284583914b7a2744f25fb3c5ed5840556aa87f7549b0a428e74bc347",
+   "train_total": 17887
+  },
+  {
+   "HashOwner": "486e10ac87f2c7495ab672094483c49e935e6f7e19b2b9b7157be7f9f949244c",
+   "HashApp": "d1e9db11154e03478e6376b2f95510f9767034b798fead543a05f2bdabaf8908",
+   "HashFunction": "0afef0fdc4a9cf49677e51c1afc06c6b939c5427b1ec1cd495dd525f1d29755b",
+   "train_total": 22626
+  },
+  {
+   "HashOwner": "72bec1932840ceabd043aaa4f9f46984eb8fa3ffde7b9a601d7aa33b540e4abf",
+   "HashApp": "0fcaf0a8069293f5dcf9aa487b82b68d2a0facc54829ebd6c03513c10349e5e1",
+   "HashFunction": "0b104399cbdd3eb73fe7c0e724acc5c95457cade9665c447d13ba8efdfc5329f",
+   "train_total": 13689
+  },
+  {
+   "HashOwner": "a5b41e1818cc03a8ca332e48fc8f8c0ba2b18c76bc5ba5e37476212a11ce2d29",
+   "HashApp": "d0fe57b2c9a9ae6872c28cabf64988e368b10e7daa124b585a902f9e8abaf83a",
+   "HashFunction": "0b5ae901e9603e4c84a566b2a2e0c581f422a0473cbe5d7ceef26d065e7153ae",
+   "train_total": 19325
+  },
+  {
+   "HashOwner": "f015557a3e7fee44417d61741e6239874f7f8b23604abab9faca0ff836e7eaa4",
+   "HashApp": "dd645a14f7b19a573f9838035c21518c831f8491e9a01877692c30ee770b8527",
+   "HashFunction": "0b957be6d2625ddc53a2becfea3974b10b4f3bd057393975cb34a612719d1eed",
+   "train_total": 18397
+  },
+  {
+   "HashOwner": "a376a9099a14f6f442caf6c710c7d9aed17247992ddd6890700085a897521206",
+   "HashApp": "0353ab23e5c30610429f1b27e499ba8060a8e3def908c7dad7eb0b052ce7b871",
+   "HashFunction": "0bbbcf9cf94f5ec40d2e44931dc8c6e4ee65cab02a47c7a09123de7e1d9bf9fb",
+   "train_total": 20481
+  },
+  {
+   "HashOwner": "3791ec2a27d7baa2d81aabc28f3f334be27e217143c2895bf3765730d580eb8d",
+   "HashApp": "643f1b8d7d7dd3ebee71708fc07fa6dc3f1916b992931bed6462955e0a74a86e",
+   "HashFunction": "0c27acfaa91e7194295192606f84b085748d6f2ced8f7499a0685f7156ca65a5",
+   "train_total": 19405
+  },
+  {
+   "HashOwner": "e1e12cf8037ee443310acc44c9ae859f4100709b2a981e398e698c85e46e890a",
+   "HashApp": "9e3789341b50489934905b584e30a96d04508110530153efb9ee25c32337d5db",
+   "HashFunction": "0068ed3ccb2e8030e56a8a369dda032008ad9dcbdb615fdae626c289a9f62a5c",
+   "train_total": 78225
+  },
+  {
+   "HashOwner": "89099619345f8593ce2795c3e5842af7b82ddccdf66c50cc92d7bcc839e30898",
+   "HashApp": "042cf426467ff01ac89971424ab8d359ea443e28053efdbffed6ec8f3be50bad",
+   "HashFunction": "0097eb6afbd6f67729db522b7283c7528e3a3c6a032e9eb741ec8d30845ca208",
+   "train_total": 27899
+  },
+  {
+   "HashOwner": "769dc60cf9d8b93bd2c41d29db1bf96b75bc4338a45489207d1ff910dd141c6d",
+   "HashApp": "dd734865704de98cecca26eced114356ccc3f90647254aa4282b9be1dfc63ad6",
+   "HashFunction": "00ef8b434f9f6971ea9772fc3817a90b3dc404fa95c05171849bb3cb4310d0b2",
+   "train_total": 111043
+  },
+  {
+   "HashOwner": "ace6758a1d07e23965b510930cb32d174b45c5dfe6f709c5ab70f5582669dcfc",
+   "HashApp": "21c3c9e44dbae4ea3a8caddaff94e0b8bd18397419fc8f89a2245e03c2f80351",
+   "HashFunction": "010d1725278a582dccbc24d6c9798d976c1e7a1df0bb5acb459e6e3902da0520",
+   "train_total": 38479
+  },
+  {
+   "HashOwner": "c81138310053a7e286d0443bfbce634b121c91f35de1600a83e27194cdf45689",
+   "HashApp": "946e466b5f305a047301f5cf67044b24adc1c40cb50ad3bbed1a52abebda1f96",
+   "HashFunction": "01cb4c827eb3adb0c8c8eeb40445156772079b6df96dac38583c723a012389a2",
+   "train_total": 40414
+  },
+  {
+   "HashOwner": "cf586ba4dcffb96b9edac636ec501d4d6f9f05990a2ace94ae280c26347bb7e3",
+   "HashApp": "579edf5e8bb3e06f1a3c0c20f5eb7ccfac7deaade7af68d7bf1664383744d894",
+   "HashFunction": "020eac935067f137ff37e6f0ecc77604641c8e8091a257f0bfc7586f6c0dc85c",
+   "train_total": 87802
+  },
+  {
+   "HashOwner": "6e56ade0b600c291e78df81dacc3538cdf0a8e45c16bcae1be8d05d1df570f40",
+   "HashApp": "c4af8eb43c9e02f71d4f4bbf367774167afcac3348c7e1177d71dd6024ca3394",
+   "HashFunction": "02255d534e430776dbdcd72d31533a2b1031dcc9317094a6a8bfac40c7b474cd",
+   "train_total": 122688
+  },
+  {
+   "HashOwner": "0d5565a83b1167082c93e9a695ce1402546532f9ce058ac441570b799b1074d8",
+   "HashApp": "02592e4a0aa1fef25dc0d75675a2f0de72e0ff229dd95594a181ef04f9e40b9d",
+   "HashFunction": "024ef8e1b335c94d878feaee29ed24785c0a1a4f302051eda57ebda76254f26d",
+   "train_total": 35620
+  },
+  {
+   "HashOwner": "1b89d342ad26e1c52a56c3e819ec301ca39630e12930a3440798d908d582dbb1",
+   "HashApp": "353d0177524e5500e982d9daf8aefa5cf40e0e1f5cb35c2d9efd992d9a615778",
+   "HashFunction": "02e31103d3fc3b657e22f0e7a05308212bfc9c0efb8ff1bf83523a750df2dd12",
+   "train_total": 55325
+  },
+  {
+   "HashOwner": "7584929b976faeef827e4831ea76af5198bd9ccc15eba8618fc770f8c30f68bf",
+   "HashApp": "62e2ba6fea36040fdd0c2e83dc06cc0c52db80202567c35bbaf331743ffa18aa",
+   "HashFunction": "033a42b79ad35bd65d7fa1e62912714111a32cb8c48328066e8e11aacc154b2d",
+   "train_total": 76996
+  },
+  {
+   "HashOwner": "b087b70077601a607f7f2179d8bafc9919379ecebd6cee7ab18ff1596a6eb4cb",
+   "HashApp": "c4de41ec3ef7e1fc6eea65e5f5fbcbce964b1320260a247669fb26271024ac40",
+   "HashFunction": "03737f76bcaf2751547ccb87f3398771e1a80ec59c2638100ddb90c86e54d0c9",
+   "train_total": 50105
+  },
+  {
+   "HashOwner": "9600d8ea0d18856a6f1fa5672306ef55afac8b5e32e956579ab0f1a8c347bf4b",
+   "HashApp": "2beb6577637e789e406bed0a58368432fcded49acbfa9e756f1ca13915d14729",
+   "HashFunction": "03934bd48191cd30b005414295a25c37e9028a575023005451ae12515825c180",
+   "train_total": 66713
+  },
+  {
+   "HashOwner": "4a7dbdc6929f01d82ba33e1c1219897e43b55741fd1e669c7359471a6a8dcf60",
+   "HashApp": "4d2a4b653dcab09d6bf9e2ebd8b1615af965c18df666c401a4e8f1dcda74c3d1",
+   "HashFunction": "03967be3a0ee8dc9275b9ea3c82c2796704a8dd90c48051c1d6a614518b6a14e",
+   "train_total": 68926
+  },
+  {
+   "HashOwner": "3fe0dbc8e84ef890583812a28d386edd5b18e6761359b8c6fe60eb0b87eed60c",
+   "HashApp": "793b566c445d35997d39a08ebfd487f047f736ca655058dfcbddca23e8a52b29",
+   "HashFunction": "03ab418d71c1c104dd8e8b926114bacff8a853f4104045bbd33a4e9ec7ef8229",
+   "train_total": 86591
+  },
+  {
+   "HashOwner": "6fb6d496b10b0b6dfbb72f41e76d7efa4095df70ebe5d9b3c9a90446599a55c7",
+   "HashApp": "e4a7846bcb1aa2d267b14402c4f9e65986bb1ca6edc364371f3eb3ff40c90c9b",
+   "HashFunction": "03c9088367b74c514277c24ca16df22f1d5590a7eac4c8850e4d859a43008de8",
+   "train_total": 43029
+  },
+  {
+   "HashOwner": "70da9c80cbaef4aa1ec3450fcebbc26de9efec4ce118996bd04265d7a8167527",
+   "HashApp": "64d629d79a42a817aef9e4a5d7184c3e2d53b3625750953f6cc13b2d4a52e141",
+   "HashFunction": "03e5b3526dbb9a07e251902fe204212a77da4e24679f37c4f0df81c34c92caac",
+   "train_total": 40549
+  },
+  {
+   "HashOwner": "c1f4130540132053a328df2f8cdd343011303af652ca88dc0be4d09bfb05d5fe",
+   "HashApp": "fb6cf3027f6db7e7289cfa72859c539113bbd5b8047a40b29b801c03750c9aca",
+   "HashFunction": "0423fca6e2673a0e699c5e2ea39e9fb7b50b9f558aaff6b8ae76ceaea6dcaccf",
+   "train_total": 87192
+  },
+  {
+   "HashOwner": "1c5909c9017da0cf0fe655d41cc47ad2a15c6a95bdec7b7373453611b2df7dff",
+   "HashApp": "4749e29ce313c2a84f5145e1e46f18a9c0e29da7a42ca7ca8594ae8f3fccb391",
+   "HashFunction": "045bd8c27a7482ebf3fb9b1f4f09c8c3aff8a460496a8e26c6d31002abbf8110",
+   "train_total": 34493
+  },
+  {
+   "HashOwner": "c1f4130540132053a328df2f8cdd343011303af652ca88dc0be4d09bfb05d5fe",
+   "HashApp": "90be04214c70a6f30f704472539a7eb4cb326fec288a3e4abd15b1fdb8cff7a7",
+   "HashFunction": "046ffc6b5bde296d94028e4d8ec650742d4b049f5befdf9d5b90d2f97e997b3d",
+   "train_total": 112508
+  },
+  {
+   "HashOwner": "4a1b18d7c79ed294f4dfbec01fc736d9c79f925a52b1db8d653a5cc6f0a2019f",
+   "HashApp": "a367fff9504410b2a7232211317f8bdbfc143fe53e9165ad686a514e9fe718bc",
+   "HashFunction": "04a81223b8cca45989894f29009799c1beffe1fe8a15bf22729a2dd8af0a8387",
+   "train_total": 45958
+  },
+  {
+   "HashOwner": "6d222977ba3e7b2211f78dfc18b7eb79bab7853c38a1d146774003d7700badd8",
+   "HashApp": "f3b59153d6b1ecc2e2741c236a1ca6c64ae6f7dd9963fafc39f93de096805615",
+   "HashFunction": "04db13dec383e4d03ba6d4b95d2a95718a9788f5a36ddb29cd4f884db67351aa",
+   "train_total": 37874
+  },
+  {
+   "HashOwner": "3ba1858467e872a28681f99450dc1b690152be6dc3bc0f86f29f6aa8f012e9c3",
+   "HashApp": "32ba147070d107e987c53955cad82f5ad38b0fc1a3071d85b7c8bfa77836295d",
+   "HashFunction": "050d4d4e7939e201bb8553a3472b8e57d84300bcf899627d180ad9c14a86274e",
+   "train_total": 47704
+  },
+  {
+   "HashOwner": "e0fe477c01ac71cf9452af224d1ae0000604ef72bb538e126fce4ea5a960b8b6",
+   "HashApp": "bb37e05d8119eab921974ab06a8ea7a33ee7f9d7cb05587902ada1d869bff88a",
+   "HashFunction": "0533d1cd0ba44d166a0567b8595b497a3eb917fb06e74cea43c5292d222c8dc9",
+   "train_total": 93119
+  },
+  {
+   "HashOwner": "710c5bac43705eb08b3434a2d00984a77710c6c19208a73ec62f8680d98a11b2",
+   "HashApp": "61891cb9e5b925c59a7a2693b3b5d042dc4ebe283c75d68c8c8839c5221160cc",
+   "HashFunction": "05e4ae3f73e1afcd91b33150cf315315c006411570805f735ec75e4fe7ac385a",
+   "train_total": 35964
+  },
+  {
+   "HashOwner": "1648345b1e4cd7d284f9dc8def0ad52928071c007a98752bc877040d3f27cb46",
+   "HashApp": "24faf44317333e3ee5528188ee068d91cc35919edb736f12a719627f1d459748",
+   "HashFunction": "071ec3a4ed32d90b129a2f32ce2d5c38a7ed2f3a3a5caa8555cb1b7bb59ea54a",
+   "train_total": 34944
+  },
+  {
+   "HashOwner": "0732063a5ac204cd8eec2b4f43f0566f105c727275ddd0e366152e2337cf8d2c",
+   "HashApp": "02c33687c95cfe6b6fd8c0408b8820705afa960a6639eac528685edf5720cef2",
+   "HashFunction": "073a42ca2a95d9c57d5a28f05d9bef8e53e47e7e0eefd479a98a8b6df16d5552",
+   "train_total": 78866
+  },
+  {
+   "HashOwner": "0ab1b2ee92418b2d95548313c3659d744c5bcd25eb2a8c36add928f2d8635b3d",
+   "HashApp": "f7d8b3e79b57f13d0a2b4232f83cf62b5b930095451c767edb558497afba3723",
+   "HashFunction": "075acb4d1db1885d395576de68f707d64c4f8d5001d58e0b84619b17a36e7210",
+   "train_total": 70214
+  },
+  {
+   "HashOwner": "355b20b5792a604249d2a13747c82c7ee89b22058be2188d1d6c93d8c902bf91",
+   "HashApp": "567612ff030ff8bb8d7d48a96f680216d592aecaa07c0e8d75d580107a4bd3a7",
+   "HashFunction": "075cf70a8a53d15b56ad8a16a6c9d8237156baee448000b15b1d582cbeb59c98",
+   "train_total": 29014
+  },
+  {
+   "HashOwner": "beffcb131cf469b6a80acbde674d93256a770c33f7bf30b988317a3d62e54390",
+   "HashApp": "66eee53faea54639586f40528adaea2d39ad5a942a808e2066e604e013e0f427",
+   "HashFunction": "07c02c1b1c4167fa195b916a5ea8df068c4ad301a46809ddd0f06d2b4a97d276",
+   "train_total": 36678
+  },
+  {
+   "HashOwner": "708e182e9952a63e4e1cc9cc8f65592a7340de53c777339dcce9af46bd7a27b4",
+   "HashApp": "391df4185f2a0b8afabcd43c51af91303ae19fb5d14384b6ac1db6d206131d1c",
+   "HashFunction": "083f1ae97684fa29f73fb79ab732e82cc630f11f2c73bb843c88218c4f13634c",
+   "train_total": 36909
+  },
+  {
+   "HashOwner": "f2abacf62c7ed264819eb436d693733fceb8bab9e7ed0b3cb06e7b90c00fd417",
+   "HashApp": "6424beaf2057b99bae531c35a028e190d57cc73efee5f10c871cd94e60d336ae",
+   "HashFunction": "086a489e0b5eb130c5fc3b585b14aadaa56b08ef9040eeb98e625045a733a105",
+   "train_total": 128418
+  },
+  {
+   "HashOwner": "ac0b5fa6a8e1dc8ca0e551fccab8999f75c0daf3eccbc8578d3c36ea347fd46a",
+   "HashApp": "63eda6ced7ab55a761cae0d1c4225a248cf5db62e84a590ce23a3a08e8f49a7b",
+   "HashFunction": "087be719f638d4c1823296090afeb77879f228c8f4575f335de7d6d8549dbe66",
+   "train_total": 83353
+  },
+  {
+   "HashOwner": "18460d921fc1fb67f37bf3727fa21191aa0ebe38a094c5f43f9cb90791b6c204",
+   "HashApp": "d1eb6114e2e91db3ad7ea139291cd63ef1416f4fbe7852aca10e354002e504f7",
+   "HashFunction": "089b96790ad7dab359ec0414cbb03b90f4215b33fc107d46a49b51f9341bc418",
+   "train_total": 48773
+  },
+  {
+   "HashOwner": "9a812208d53b34a898d2424a9dcc7d25d2c9928c1ce47934565f7f6976184441",
+   "HashApp": "e2803dff13c2369d98aae95e5ffb7cbd57fb464cee69eccfe53c2e4f1375c9d8",
+   "HashFunction": "08e559a5e4a960aa3df16829a12706e2daf26e7b3339e2f526803068dcabdc09",
+   "train_total": 117980
+  },
+  {
+   "HashOwner": "75bd1a8a6ca36d73a630f57de8258a4c30b8305dec3901c0814e713cbca5b987",
+   "HashApp": "0d1010e0348bc85d160733087849cee125ffb508d600fd2e62d81d35d26bfb01",
+   "HashFunction": "090d0114c667493259ebec7ca04adc7c37913b964af577ec1f74ac19e124d551",
+   "train_total": 139606
+  },
+  {
+   "HashOwner": "6d655c7bd1955704bb9c9126e9a20633a1a932c1fff81017de2a37cc81d06fc6",
+   "HashApp": "9210f72e311d842242fe19d564a24490382495f78b933a7b00ed34efb73caca6",
+   "HashFunction": "0aa85c8ca1daada5c69c72f6c1d12ce3367827c2697521952066aa9150600323",
+   "train_total": 74857
+  },
+  {
+   "HashOwner": "45914080a23f471123420c55ce9c768098538a5b4e095afb113a4a9e21d28faf",
+   "HashApp": "0ea3f8541daedd9248210085d32f20f9bd098802036af0141e1f5d20ac271a5e",
+   "HashFunction": "0ab6355f1261a44696077a66d276510158135ce864e4fe4244ec2fe386799e81",
+   "train_total": 115981
+  },
+  {
+   "HashOwner": "0543445fe66afb6a5d0f4ee641535a23aa1bcdb3bfe19180379e199d4779204f",
+   "HashApp": "7b2af4670587c323401a45d0481a9a86d5124085abb70bee74dac2b7ba3ea018",
+   "HashFunction": "0b1e52e4991a0d33fbce9bb30e403c8cabbf9e29304362da3197f8b92558b68f",
+   "train_total": 43950
+  },
+  {
+   "HashOwner": "80897201353e1a3fd38499c17f4a65ee580f172c2e7ffe517105ed2e9a267f93",
+   "HashApp": "00aa7562074da476eaa98def04a17f86f34707056e1085c3c99a962887372967",
+   "HashFunction": "0b5b2ae723495b140f1e74e22b43f203d0c33ede4f1896d3ecd08ea7698a6d59",
+   "train_total": 136772
+  },
+  {
+   "HashOwner": "f3e7b875c68e536b7fb3c6c57869e9c80047632387dfc4be63add9251439d3e3",
+   "HashApp": "1e584ad214609b56a8c04c2ac1bac72c5cdfcf1e3e3b1ec76373245edbdf9382",
+   "HashFunction": "0bbf3ed03a8bd9360b056421dc63bf3ad0a12f34f158a23ed762fe78256fa4c8",
+   "train_total": 30495
+  },
+  {
+   "HashOwner": "d536ba89bd38a852dc4f91fcd84db155461a2a0ea9263f731c6d4357cf197814",
+   "HashApp": "8cf907fc4ceffe36c91e1e2a845ec73b4a3821ad0bc0795bc6c2b81f8671c350",
+   "HashFunction": "001b49279bcee7d125a97b05270bfef90bd1e95312b78e2db639f0a531bd3543",
+   "train_total": 3885918
+  },
+  {
+   "HashOwner": "4413032be253c8f307830f7510411a6ce4cec6d248e3d9ac152a325fdc131593",
+   "HashApp": "6f91f10356b823a3e38392ec0520ac2825eea8d78b7ed3bdcba0901206956967",
+   "HashFunction": "00468a0e65448aa8fd203fb75b58222287407db64d3708e67d8bc09c99770291",
+   "train_total": 637036
+  },
+  {
+   "HashOwner": "0898f2f4b2a1749ceaae785cf3bc5d4a3fc63594c1fcb3f9f5663d01a777c93c",
+   "HashApp": "f1514ec7fd0a9068a8c398f39428d85fe7b29e239aecb050e7bab750ef7b7af9",
+   "HashFunction": "0090326fced7728419b589c8c6c2cad5b05d75553813b47938fae26ba0b2b393",
+   "train_total": 873786
+  },
+  {
+   "HashOwner": "e0489b9d3b36ea127cfa33ed4ce53d5983619b58b80a6c67e4e3efeb9fa5e0a4",
+   "HashApp": "c8e847c58790f857d7d80c4cb448cfab077fea9b60d4c71a540008e0437cf8d8",
+   "HashFunction": "01b4b41ad136cf905cf6813f924e81191ce70d202b62bd8235a7ce40b4a76932",
+   "train_total": 2270748
+  },
+  {
+   "HashOwner": "401ce8490a8e1b18c859dded23b457813b901dc506966ea3b4cbec2e764ca0b7",
+   "HashApp": "365f154f100853aa290ad0bde1132ba853294dd1828168d1a0055f8d82a6b159",
+   "HashFunction": "01f168c5b136e70fd2bedb60838a82e9f03a88952f4b47ba05cf2e19533f351d",
+   "train_total": 391958
+  },
+  {
+   "HashOwner": "ae07b858b3297e915f030fb9042f0ae2a1456f85721f012578b8693a28d1fad7",
+   "HashApp": "496fbd1b77cfe210c43918c3a9b82e0bc25fb28d887f33a2254aa743b49ddff9",
+   "HashFunction": "030489b22ad9f363bd635fd5685a0f4f79ed0c0aa12c0a696aebdeed66ba6d45",
+   "train_total": 419299
+  },
+  {
+   "HashOwner": "c051c49327892681e2dd8c2972b7fb46e24df44261a88fabcda7e823cfd58d39",
+   "HashApp": "2ed92d2f5c78d82290c4c8b360a4ace1a503ec7418fc141102aa1c6aaacc18b4",
+   "HashFunction": "034a73bd15cca1dc080637ce79929248f18c5bba323591e9ea013858079946dd",
+   "train_total": 220363
+  },
+  {
+   "HashOwner": "b3d979cc8c65870ffe93dd3b31f3238c71ef4c0c2422f7ed175747f6419f3c50",
+   "HashApp": "4928673ce0df7b404bbc573deff52ac458cb5b1a111a63781dd141ca8371c2c4",
+   "HashFunction": "0356097951841cbcb54ad669f4f1a3ef11f9a29b951f1d716c4a0336ab68ecc7",
+   "train_total": 1050609
+  },
+  {
+   "HashOwner": "4c458525a2934e9813f39ee730c3b6fbbdf997a68fa39c2a89fa688698937da3",
+   "HashApp": "cbd113287f97b31ce4c3b13de7abcd09f6e898bceb7565840482775cf0a21d44",
+   "HashFunction": "037731996ce536ba9094c39ac6a5b142239db3982ff46ee7ae42677fd2f0c045",
+   "train_total": 310894
+  },
+  {
+   "HashOwner": "89099619345f8593ce2795c3e5842af7b82ddccdf66c50cc92d7bcc839e30898",
+   "HashApp": "042cf426467ff01ac89971424ab8d359ea443e28053efdbffed6ec8f3be50bad",
+   "HashFunction": "03c423baf0f87eb88ce7c9fbc8b8c26dfb93b903a62066b2920cb6946cce58cf",
+   "train_total": 315808
+  },
+  {
+   "HashOwner": "71fdddeeefacf46139a7341958aeb6871197069911fe163c80eaf893f2b3d9c8",
+   "HashApp": "4c3c782033b92c336f1811157da48517b781d6821add9ff302deccc7febc39c0",
+   "HashFunction": "05603ffb06481a805680ecd1cb8de0775213429a597a27cc0d391a37a0367fc2",
+   "train_total": 158665
+  },
+  {
+   "HashOwner": "6c20ec111a446b8e852bbb425f461379654048cd69c87766f8c23b374d4e4757",
+   "HashApp": "b129c3a0f90fb0cd841d0fa9bfe6a2ed388fa76da84d1a5a31e93541146bcf64",
+   "HashFunction": "057499edfce65f4e16e48037d6904b92cf0822355c9a76630fea0eecbdf3479a",
+   "train_total": 404449
+  },
+  {
+   "HashOwner": "3bb8050b6ce0281f9ce7a0b8acd7487fd0756fe7e6cc7f9d04141c3ea9722c23",
+   "HashApp": "7d11da16e56bf9f1bf7b2384f707d5433d47be63f473025f350870295f7c5fe7",
+   "HashFunction": "05788c55bbb1063c998983f95790446c53fda29cfb0e0b9033b0dba8e91ac14d",
+   "train_total": 698414
+  },
+  {
+   "HashOwner": "0bc4d37b750c5454fb4594d8e543b7ef58760c88e04f7fe864bd66dd73a285f8",
+   "HashApp": "b9626a5562beb358defc1d35317ca152c5d143919eb426bf77601393dadd42f9",
+   "HashFunction": "05aed21c749138a712c901a4e7113230306b3b3e2ec055b73f6ba40e78b870ec",
+   "train_total": 2622102
+  },
+  {
+   "HashOwner": "6e26c53b7170b7c83c402b34330e926b059a4f723b53f3152f0ce3d242744fcc",
+   "HashApp": "708561100545cd6ca36ea9d731e44640db8e9242d05554f01275568e33e6184e",
+   "HashFunction": "05e20afcfa20a7ccb7529b7167637c3de39516761a6df1b17776b92305c4ca03",
+   "train_total": 272217
+  },
+  {
+   "HashOwner": "5e13f80fcf3d256a5643c4ab6cb93dbefaae0354a8aa62032192330cf36dc4d8",
+   "HashApp": "8e5d601c74a3701867347f3cd3e1bbf7e68e1cc3d94a7d7cab0ba6e8bee5821d",
+   "HashFunction": "05e9ee4d287ffd772e2c46cb3e8f3eb375265d060ad14cc365c9b0d54f0eee7e",
+   "train_total": 154783
+  },
+  {
+   "HashOwner": "72ff69c04fdca7747edcb79a7e2130ef9fcda3be1facc371614e678053b44415",
+   "HashApp": "73c0b04d46fd4f9f68723a4f0bb993f32efd450a6a98ab705f8f9d9aad1f1aca",
+   "HashFunction": "067db9e34208d72cb693c8c199dfb3fdd7a0d11e29bc6285aeb702ddea18ff7e",
+   "train_total": 3046829
+  },
+  {
+   "HashOwner": "b81aa51551c1e4dade90b03eedefe1022212c97c2de7cf308c84a087ba64af4e",
+   "HashApp": "c5396a34cc9faddc3e27f4212d311965a016bd1bbf0c1d727988c9d321740d0d",
+   "HashFunction": "06b3bf665f5a7f680cb80e5a64f71e0da9a19047a80f494c706d4ea5aa27a134",
+   "train_total": 14089426
+  },
+  {
+   "HashOwner": "5b24d0f3994c5b281bc492ff67fa3cceab5e47eee71e482cde211cf03f095d04",
+   "HashApp": "b89c0b6aa358c5adeb1c8ed1d25c88d7f07ff02013223f2c2ef7d135078b4501",
+   "HashFunction": "07202135bfa1d5c721bbba30682f8bd9026efef7af55b04e1a4a93ddbc53d452",
+   "train_total": 1071626
+  },
+  {
+   "HashOwner": "9600d8ea0d18856a6f1fa5672306ef55afac8b5e32e956579ab0f1a8c347bf4b",
+   "HashApp": "b77a8527a0c110c998ff057c762cf362fb73117a9d42c30f0019d36fdbabe640",
+   "HashFunction": "07495fb4dcfec0daebf0f41a4d5e04267f93dd3e326b6484ebef6f958ed7a598",
+   "train_total": 534098
+  },
+  {
+   "HashOwner": "e5cfc5ca41ef0c98505cc2a3835ad1a1715906e51ace3cdba5728f06a660abcc",
+   "HashApp": "74b4d491fb79d093156b876688586fa774ab38fe9558160b9822f4782e823242",
+   "HashFunction": "076c1b2effca757264929b87ba491cfa9005a06bb7b81de4b33fd60eb0421788",
+   "train_total": 1161213
+  },
+  {
+   "HashOwner": "8920676cbfe1c73e6ccb56675e7776c3795192e960fea256b77e4e75401a0f2b",
+   "HashApp": "63ee29ad1dab1170f076ace9d7676ea65fc701f11d3b164011c1b421f2322888",
+   "HashFunction": "07cbff1ae225244f3c6bb9ed4bc1375fa762be6e097b3b62b862dc41ef3380ce",
+   "train_total": 812559
+  },
+  {
+   "HashOwner": "92418a0236e2b990d9ea2cca0700df3eeab9e884057de739dd3c9ef31517f4eb",
+   "HashApp": "51d95feedd471a801c2f49f755fd3aeb39f2c20857e5b08806a1cb9d0e05574e",
+   "HashFunction": "07d17ef2e6cbeebe6b6e2ffb39ff64477bce1d9268a331c2b80d5c615b6b7105",
+   "train_total": 212024
+  },
+  {
+   "HashOwner": "0eab803033840d822b86a9001ea867f6925a25114822b9ab58b3f624eabe8555",
+   "HashApp": "9e469fcd68396d1f2e8ed603da339fab53a7e0870d342094967e0cc8028de53f",
+   "HashFunction": "07dd21ddcfb3cffecb5eeb04de71d3e6c4d67bfc27ff1ba4f2df96a543546166",
+   "train_total": 490831
+  },
+  {
+   "HashOwner": "c10c54d5f852eafe82a3142370c7bc1c787fd09eaf05295b000c314e956171a3",
+   "HashApp": "e503c36e2adc14e18cbc4f41e540f1479156e7a4998a157ef340aebe4c2f8afd",
+   "HashFunction": "082870481c93d7724977cad14362bce48eb69842b9c6017aab1f47a360f4094a",
+   "train_total": 274022
+  },
+  {
+   "HashOwner": "5bbd0ed78133e6f4b39fa039a31f51041a45c8cf638394095e668c429812e4bc",
+   "HashApp": "6cee05233797a4c3605a4f7504da2ccfc0180a09625d13326eb41ec2878dcd97",
+   "HashFunction": "082c4aa1664cc4079be69b7e2212dc6fc22d3e3c7b7e785bb261a6657e2523c8",
+   "train_total": 460930
+  },
+  {
+   "HashOwner": "e0489b9d3b36ea127cfa33ed4ce53d5983619b58b80a6c67e4e3efeb9fa5e0a4",
+   "HashApp": "d99469d3fdf7804e3530e80c8a8c0a621f4c571b6342f105a4f69ec64be96f17",
+   "HashFunction": "0848d620f913a291af5516653ae49305334be9e62aad6cac1b24f8272bef2da4",
+   "train_total": 849410
+  },
+  {
+   "HashOwner": "ea9e9135ae5a615c650f6ed60346562c26ad53aca51e8b557f640ccb85951c22",
+   "HashApp": "668a30dc7b461600b3c6e1c8f488c6a61f14fb9733506b0b943995e738099d47",
+   "HashFunction": "0849c78cb833e6d22519bfafa0a51ac55db065b0ffa10e3ad68eb954b06596eb",
+   "train_total": 299527
+  },
+  {
+   "HashOwner": "e01302c7d542427ce06b3634ad526caec84efeb6229da187bdacb76fe8c0cca9",
+   "HashApp": "33fe3deb029c50d55a33489059339356df43b5078d2ea955572022b644c9caaa",
+   "HashFunction": "08f1f04279dfaef5a218be01b28a8bf1b3ccd110c81076c823eb6eba97baa1bd",
+   "train_total": 792853
+  },
+  {
+   "HashOwner": "1cf21fbbf887a27b74364408336962f3cdb9f03bb49085cfc19b368d3d17e720",
+   "HashApp": "bb78001f9633d71854cdc401fec17d20056a9869f549587b34729af800cf6d45",
+   "HashFunction": "092a09c2b274437cacc47579598007d841832357369735c3c770b2ba6dca3454",
+   "train_total": 15263928
+  },
+  {
+   "HashOwner": "0f330a53c3924c71f3a198e1d69c7eda44bb64e92e9b6f5e5e76c3ac47f01f51",
+   "HashApp": "65d90e93c75f777a3fb7370d00aa153b85c9bdc749bd2f02682a3c907edd52fb",
+   "HashFunction": "093c2fb2a1b82c1c06dd93c00ee6289ab348aeecef85beb837c40f331a158b9d",
+   "train_total": 387384
+  },
+  {
+   "HashOwner": "ef7fc71df7dd5d3fcdcef29d9c521c9deb673a274dc767064114bff218fae1bf",
+   "HashApp": "3e93324f33f8060d11f8cfaa55e0fc1b86f182abbc1768541692025444f96a7c",
+   "HashFunction": "096d04270888c86c3698b47942b1ccd5fcede77987562931d4177f7e95160639",
+   "train_total": 2220760
+  },
+  {
+   "HashOwner": "e018d41ac2b11fb02f623aae4fc4bcc137b1e9d0d2010eca5c886a55a575c9b4",
+   "HashApp": "d3c3f9b47ae2852bfc7653f6e3a84ce9fe4d21ff8849ca0026fd6153bcba98f9",
+   "HashFunction": "0982ddb65ba600ecc4a098848abd58d28c2cc7edc52ed3879a33c285d159c9b4",
+   "train_total": 159269
+  },
+  {
+   "HashOwner": "b45d98083160cefd80291c90d4ed7597c61ecd67ac7c8cadf77fab1b3ecd2d98",
+   "HashApp": "3b33b8827341a697c7b24ed970cea24f7b67d1569f9f738cf4aab1b07978f517",
+   "HashFunction": "0a0cfaed2adac932229c5de33296a845a1e71b854833440e0552c858dad256d0",
+   "train_total": 272066
+  },
+  {
+   "HashOwner": "7aefbb6e125dbb9ad9835e435e269d56ecefa063383256f0c380dfff92a712b1",
+   "HashApp": "22036a46c1657a364d1a91da75b4051d0049dff1e5e222ccb024ea6f3d1ffaff",
+   "HashFunction": "0a94364e14b645e7dab4b1b6e04644c991a5babdceb2121c00b8a8c985923bd2",
+   "train_total": 184442
+  },
+  {
+   "HashOwner": "736a7584ad423a7a0c98ee7c062c52691b4c4d3f813adaa34357884f7fb9f729",
+   "HashApp": "009f72f7ae1bc39581c27a9bc53c34ef59d6694bdd09147181251c3ea43caea7",
+   "HashFunction": "0ac2bba85d41212c738939478d6c143a6dcc6b104dc3cb5d7c910a12cc1d1f66",
+   "train_total": 2660690
+  },
+  {
+   "HashOwner": "b5d15f23f7d57a2feb7b50437bcf8fd35faf4ce038fa72699404bad3e81a7250",
+   "HashApp": "2a33694e8d6cd5acdab870b5297968eec5918723788dd3b0abf13e421d2fa456",
+   "HashFunction": "0ae3bb3e0b0353563576befc8fd4549912995de9f069183fe0b20bce13d7cd57",
+   "train_total": 9205263
+  },
+  {
+   "HashOwner": "58a6030cfef335563229836fa8e31b07ed08dc7395ce1c06049c05fcbd51f267",
+   "HashApp": "883cf4dd91739027b47385291cbc762460b26abbfdd5caad336d578263fbb3b5",
+   "HashFunction": "0affafe05ecaf365c7ff5af7b20eecaab7438ca37e544242522af9858a1468e0",
+   "train_total": 265133
+  },
+  {
+   "HashOwner": "6f8af10e93d8e8e8caf1fce8d3ee39d50f8c33abb787f2266b6751a1efbdf4f2",
+   "HashApp": "4f7b55769a5784f66b20a029b2e5d48eb8786e530d06e75399eaec0703442902",
+   "HashFunction": "0b104201b2555d9eea01adaf120f401db50cdc0df2bc3457fcbce2a7d9948e28",
+   "train_total": 1179583
+  },
+  {
+   "HashOwner": "1e82fe99a8f5334179df931033e5d91fb38bbb5cc0553516e5264b7a3d3cd94f",
+   "HashApp": "482892868cd2ae0dd144842b47c7e94dbbe5d1efd8a4cb5d076a64750446cc79",
+   "HashFunction": "0b29bbce12777712de0e4062c382a40a35c9d58fe429c309a7a2af577729822d",
+   "train_total": 316407
+  }
+ ]
+}
