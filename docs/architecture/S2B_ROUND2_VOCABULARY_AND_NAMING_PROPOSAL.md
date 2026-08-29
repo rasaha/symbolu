@@ -375,14 +375,29 @@ assertions.
 5. SCOPE. Does this round add any field, name, or commitment beyond what
    S2B-S1-Q2=A and S2B-S1-Q6=A already ratified? The claimed counts are
    11 / 30 / 29 / 18 / 12 / 11 and a public surface of 51 — re-derive them.
-6. R2-Q5. Is the record field's retyping genuinely outside what S2B-S1-Q3=A
-   settled, or is the proposal manufacturing a question? Is the disclosed
-   migration cost complete?
+6. R2-Q5. A prior review found the earlier cost claim FALSE — it said both
+   options invalidate any stored free-text declared_strategy, when a space-free
+   value passes the C5b pattern and so survives option B. Verify the CORRECTED
+   claim: that A invalidates strictly more than B, and that the real difference
+   is where a non-member is caught (construction under A, replay via rider R1's
+   equality under B). Is that now accurate and complete? Is the representation
+   question genuinely outside what S2B-S1-Q3=A settled, or manufactured?
 7. GATE. Is it TRUE that ratifying this opens §8's gate? Check each of the six
    items against ADR_UGENCE_S2B_FIRST_SLICE_RATIFICATION.md, and say plainly
    if the proposal overstates its own consequence.
-8. FALSE REPOSITORY CLAIMS. Mechanically check every file:line citation.
+8. R2-Q7 AND DERIVABILITY. The proposal concedes that every member is defined
+   by artifact shape, so a declaration is derivable from the advisory and the
+   members map one-to-one onto existing construction paths. Test that concession
+   hard: is it true, is it complete, and does a derivable vocabulary still
+   satisfy S2B-D2=A and do useful work under S2B-D1=A — or does it reduce
+   "reasoning strategy permission" to permission over construction paths? Is
+   R2-Q7=B (defer until observable stages exist) the better answer, and does the
+   ballot present that choice fairly?
+9. FALSE REPOSITORY CLAIMS. Mechanically check every file:line citation.
    Report each that does not resolve or supports a weaker claim than made.
+   Note that this revision fixed two blockers and seven findings from a prior
+   review; check the fixes did not introduce new inaccuracies, which is the
+   failure mode that has recurred in this document's history.
 
 Return: the identity-gate result; a blocker list with file:line and the ruling
 violated; a non-blocking list; and one verdict — SOUND,
