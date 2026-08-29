@@ -1,0 +1,47 @@
+{
+  "hec": {
+    "res": 5.0,
+    "mag": 0.6,
+    "ang": 9.9,
+    "env": 0.35,
+    "cus": 99.0,
+    "refractory": 16
+  },
+  "stat": {
+    "z": 3.0,
+    "cusum": 4.0,
+    "refractory": 16
+  },
+  "train_metrics": {
+    "hec": {
+      "recalls": {
+        "periodic_deviation": 0.7676767676767676,
+        "phase_shift": 0.7821782178217822,
+        "regime_change": 0.7978723404255319,
+        "quasi_periodic_event": 0.9362549800796812,
+        "rare_aperiodic": 0.9097744360902256
+      },
+      "macro_recall": 0.8387513484187977,
+      "min_recall": 0.7676767676767676,
+      "rare_recall": 0.9097744360902256,
+      "reduction": 110.37642105263158,
+      "precision": 0.4766315789473684,
+      "events_per_stream": 37.109375
+    },
+    "stat": {
+      "recalls": {
+        "periodic_deviation": 0.3787878787878788,
+        "phase_shift": 0.42574257425742573,
+        "regime_change": 0.1702127659574468,
+        "quasi_periodic_event": 0.9030544488711819,
+        "rare_aperiodic": 0.8571428571428571
+      },
+      "macro_recall": 0.546988105003358,
+      "min_recall": 0.1702127659574468,
+      "rare_recall": 0.8571428571428571,
+      "reduction": 118.13609734114466,
+      "precision": 0.4182063992789545,
+      "events_per_stream": 34.671875
+    }
+  }
+}

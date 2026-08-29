@@ -1,0 +1,89 @@
+{
+  "frozen": {
+    "hec": {
+      "res": 5.0,
+      "mag": 0.6,
+      "ang": 9.9,
+      "env": 0.35,
+      "cus": 99.0,
+      "refractory": 16
+    },
+    "stat": {
+      "z": 3.0,
+      "cusum": 4.0,
+      "refractory": 16
+    },
+    "train_metrics": {
+      "hec": {
+        "recalls": {
+          "periodic_deviation": 0.7676767676767676,
+          "phase_shift": 0.7821782178217822,
+          "regime_change": 0.7978723404255319,
+          "quasi_periodic_event": 0.9362549800796812,
+          "rare_aperiodic": 0.9097744360902256
+        },
+        "macro_recall": 0.8387513484187977,
+        "min_recall": 0.7676767676767676,
+        "rare_recall": 0.9097744360902256,
+        "reduction": 110.37642105263158,
+        "precision": 0.4766315789473684,
+        "events_per_stream": 37.109375
+      },
+      "stat": {
+        "recalls": {
+          "periodic_deviation": 0.3787878787878788,
+          "phase_shift": 0.42574257425742573,
+          "regime_change": 0.1702127659574468,
+          "quasi_periodic_event": 0.9030544488711819,
+          "rare_aperiodic": 0.8571428571428571
+        },
+        "macro_recall": 0.546988105003358,
+        "min_recall": 0.1702127659574468,
+        "rare_recall": 0.8571428571428571,
+        "reduction": 118.13609734114466,
+        "precision": 0.4182063992789545,
+        "events_per_stream": 34.671875
+      }
+    }
+  },
+  "held_out": {
+    "hec": {
+      "recalls": {
+        "periodic_deviation": 0.6992084432717678,
+        "phase_shift": 0.7526881720430108,
+        "regime_change": 0.815,
+        "quasi_periodic_event": 0.9261437908496732,
+        "rare_aperiodic": 0.9285714285714286
+      },
+      "macro_recall": 0.8243223669471762,
+      "min_recall": 0.6992084432717678,
+      "rare_recall": 0.9285714285714286,
+      "reduction": 112.77436007743601,
+      "precision": 0.47730694773069476,
+      "events_per_stream": 36.3203125
+    },
+    "stat": {
+      "recalls": {
+        "periodic_deviation": 0.41424802110817943,
+        "phase_shift": 0.34408602150537637,
+        "regime_change": 0.115,
+        "quasi_periodic_event": 0.8895424836601307,
+        "rare_aperiodic": 0.8928571428571429
+      },
+      "macro_recall": 0.531146733826166,
+      "min_recall": 0.115,
+      "rare_recall": 0.8928571428571429,
+      "reduction": 124.91970455086967,
+      "precision": 0.43602573266619016,
+      "events_per_stream": 32.7890625
+    }
+  },
+  "e_gate": {
+    "rare_recall": false,
+    "macro_recall": false,
+    "min_recall": false,
+    "reduction": true,
+    "pass": false
+  },
+  "wall_seconds": 82.4
+}
