@@ -1,12 +1,19 @@
 # ADR — Cloud Scaling guard coverage: doctrine across packages that disclaim authority
 
-**Status:** proposed — awaiting owner ratification.
+**Status:** **RATIFIED — D-GC-1…D-GC-7 ratified as written by the owner, 2026-08-29.**
 
-Nothing here is ratified. No operator, mint-site extension or detector change described
-below exists in `scripts/cloud_scaling/guard_sweep.py`; every ruling is a recommendation
-carrying `[R]` until the owner rules. Measurements were taken in a read-only audit at
-`447221b9b5279813fe35fb7096062ee9b58485ec` and re-verified here against the working tip
-`b0ea7cf3`; §8 lists what did not survive re-verification.
+The owner also ruled the two questions this document scheduled for the same ratification:
+§3's separate recommendation is ratified — `capacity-bounds-policy` gains a
+`CapacityBoundsRejectionReason` enum before its first scored sweep — and §7.2's flag loops
+are each inventoried as one static guard site with recorded semantic multiplicity 7, the
+suite required to exercise every member of `_AUTHORITY_FLAGS`, not unrolled into seven
+scored sites. Every `[R]` in §2–§6 is discharged by this ratification. No operator,
+mint-site extension or detector change described below exists yet in
+`scripts/cloud_scaling/guard_sweep.py`: ratification authorizes the implementation, it does
+not assert it. Measurements were taken in a read-only audit at
+`447221b9b5279813fe35fb7096062ee9b58485ec` and re-verified against `b0ea7cf3`; §8 lists
+what did not survive re-verification, and every `[G]` not re-measured at ratification
+stays `[G]`.
 
 ## §1. What this ADR does to Phase 5 §9
 
@@ -102,11 +109,11 @@ same typed outcome for every input reaching this one — and "shares an exceptio
 others" is not that showing. Until a reason vocabulary exists, bounds guards are scored under
 the within-class criterion in §6.
 
-*Recommendation, requiring an owner ruling:* give `capacity-bounds-policy` a
-`CapacityBoundsRejectionReason` enum before its first scored sweep, so its pair stops being
-degenerate. The alternative — sweeping it against a singleton pair — is measurable but
-reports "something was refused", which §9.1 says explicitly cannot distinguish a carried
-authority from a fail-closed accident. `[R]`
+*Recommendation, ratified by the owner at ratification (2026-08-29):* give
+`capacity-bounds-policy` a `CapacityBoundsRejectionReason` enum before its first scored
+sweep, so its pair stops being degenerate. The alternative — sweeping it against a singleton
+pair — is measurable but reports "something was refused", which §9.1 says explicitly cannot
+distinguish a carried authority from a fail-closed accident.
 
 ## §4. Three decision classes the engine does not model
 
@@ -273,35 +280,40 @@ Both full sweeps reported zero message-only kills `[G: not re-run]`. Under the c
 above that number is not reassurance for bounds — it is what a detector reports when it is
 measuring the wrong axis.
 
-## §7. Recorded, not ruled
+## §7. Recorded at proposal — §7.1 fixed and §7.2 ruled at ratification
 
-### §7.1 Prerequisite defect — blocking any `risk-integration` sweep `[V]`
+### §7.1 Prerequisite defect — blocked any `risk-integration` sweep; fixed at `b5b07bca` `[V]`
 
-`packages/integration/cloud-scaling-risk-integration/conftest.py:23` sets
-`REPO = HERE.parents[2]` and never reads `UGENCE_REPO_ROOT`; the bounds conftest honours it
-`[V: capacity-bounds-policy/conftest.py:27]`. The engine's `prepare_copy`
+`packages/integration/cloud-scaling-risk-integration/conftest.py:23` (as proposed, at
+`332535dc`) set `REPO = HERE.parents[2]` and never read `UGENCE_REPO_ROOT`; the bounds
+conftest honours it `[V: capacity-bounds-policy/conftest.py:27]`. The engine's `prepare_copy`
 `[V: guard_sweep.py:924]` copies the package root to `_workdir` — `/tmp/ugence-sweep-<key>/<dir>`
 `[V: guard_sweep.py:795–807]` — where `HERE.parents[2]` resolves to `/`. The controller path
-and `tests/planning` then fail their `.exists()` guard, are never added to `sys.path`, and
-`ph_helpers` — imported by `tests/conftest.py` and four test modules — is unreachable
+and `tests/planning` then failed their `.exists()` guard, were never added to `sys.path`, and
+`ph_helpers` — imported by `tests/conftest.py` and four test modules — was unreachable
 `[V: path resolution computed directly; ph_helpers lives at
 packages/capabilities/cloud-scaling-controller/tests/planning/ph_helpers.py]`.
 
 Under the unmodified engine the audit reports bounds scoring 90 collected while risk returns
 `scored=False`, `ImportError … import ph_helpers`, baseline unscorable, every mutant
-`UNSCORED`. The 90 is confirmed `[V]`; the risk failure is confirmed by construction `[V]`
-and not by execution here [G: the suite is separately unrunnable in this container — the controller import needs `numpy`,
-which is absent]. **This blocks any risk-integration sweep and is not
-fixed by this ADR.**
+`UNSCORED`. The 90 is confirmed `[V]`; the risk failure is now also confirmed by execution —
+in a `_workdir`-shaped copy outside the repository the old conftest fails collection with
+`ModuleNotFoundError: No module named 'ph_helpers'` even with `UGENCE_REPO_ROOT` set
+`[V: reproduced at ratification]`. **Fixed at `b5b07bca`**, which replaces the
+level-counting with the bounds conftest's marker-walk-plus-override convention; the same
+copy then collects all 287 tests with `UGENCE_REPO_ROOT` set `[V: measured]`. This ADR
+still implements no sweep of the package.
 
-### §7.2 Deferred residual — flag-loop granularity
+### §7.2 Flag-loop granularity — ruled at ratification
 
 `outcomes.py:118` and `projection.py:127` are each a single `if` inside
 `for flag in _AUTHORITY_FLAGS:` [V: both read as `for flag in _AUTHORITY_FLAGS:` / `if getattr(self, flag) is not False:` / `raise`]. One mutation therefore neutralises seven
 non-executability invariants together, and a kill shows only that at least one of the seven
-is tested. Whether the sweep should unroll the loop into seven scored sites is **deferred**,
-with the Cloud Scaling architecture owner named as the decision holder at the same
-ratification that settles §2–§6.
+is tested. **Ruled by the owner at ratification (2026-08-29): each loop is inventoried as
+one static guard site with recorded semantic multiplicity 7, not unrolled into seven scored
+sites, and the suite must exercise every member of `_AUTHORITY_FLAGS`** — the
+discrimination burden falls on the tests, per §6's within-class criterion, not on the
+inventory count.
 
 ### §7.3 Pre-declared exclusion candidates `[V]`
 
@@ -314,8 +326,9 @@ against a value imported from a separately versioned distribution.
 
 Measured full sweeps: 3.38 min (23 guards, 8.80 s/mutant, 17 killed / 6 survived) and
 7.54 min (74 guards, 6.12 s/mutant, 41 killed / 33 survived); one shard each. Suites are 90
-and 287 tests, green and stable across two clean runs. The 90 is confirmed `[V]`; the 287 is
-not `[G]`.
+and 287 tests, green and stable across two clean runs. The 90 is confirmed `[V]`; the 287
+is measured at ratification — 287 collected, 287 passed in 6.82s at `b5b07bca` `[V]`. The
+timings and kill counts remain `[G]`.
 
 ### §7.5 Reconciliation — where the gaps actually are `[V]`
 
@@ -343,7 +356,9 @@ silently restated, per this repository's evidence rule.
 3. `[G]` **`outcomes.py:145` is not an `else`-arm refusal.** It is an `elif`, and the terminal
    `else` at 159 holds only inventoried `if` guards. D-GC-5's class has one member, not two.
    This is the one correction that changes a ruling's scope.
-4. `[G]` The `risk-integration` suite size (287) could not be collected in this container.
+4. The `risk-integration` suite size is measured at ratification: 287 collected and 287
+   passed at `b5b07bca`, matching the audit's 287 `[V]`. (It was `[G]` when proposed — the
+   container that wrote this ADR lacked `numpy`, so the suite could not be collected.)
 5. `[G]` No mutation run was reproduced: the D-GC-3 result (7 killed / 1 survived at
    adapter.py:222), the D-GC-4 result (11 / 18), the mint counts (8 and 5), the two sweep
    timings, and the zero message-only kills are all cited to the audit at `447221b9`. Every
@@ -352,5 +367,6 @@ silently restated, per this repository's evidence rule.
    `[V]`.
 
 The seven rulings stand or fall on the structural claims, which reproduce. The mutation
-results are corroboration, and a ratifying owner should treat them as such until a sweep runs
-against a `risk-integration` whose conftest is fixed (§7.1).
+results are corroboration, and the ratifying owner treated them as such: the conftest is
+fixed (§7.1, `b5b07bca`), and the first post-ratification sweep of `risk-integration` will
+convert them to measurements or corrections.
