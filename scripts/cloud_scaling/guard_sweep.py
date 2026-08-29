@@ -476,13 +476,44 @@ def _statement_span(node) -> tuple:
     return (node.lineno, node.col_offset, node.end_lineno, node.end_col_offset)
 
 
-def _helper_admission_sites(tree, helpers: frozenset) -> list:
+def _module_level_raising_helpers(config: PackageConfig, helpers: frozenset) -> frozenset:
+    """The raising set, narrowed to names actually bound as module-level functions here.
+
+    ``_raising_helpers`` keys its fixpoint on ``node.name`` alone, so it merges every
+    function *and method* in the package that shares a name. That is tolerable for the
+    shape label it was written for, and unsafe for selecting a site to delete: an audit
+    produced a working false positive on ``out.append(r)`` — a package defining a raising
+    ``Ledger.append`` puts ``append`` in the set, and ``list.append`` then matches it.
+    Deleting that call changes what the program *computes*, so the suite fails and the
+    engine scores a kill the guard never earned, inflating both halves of the ratio.
+
+    Two conditions together close it, and both are necessary. The call target must be a
+    bare ``ast.Name`` — which excludes every method call, the whole class the audit
+    demonstrated — and that name must be defined as a module-level function in one of this
+    package's own modules, which excludes a bare name that only ever names a method.
+    """
+
+    names = set()
+    for path in sorted(config.src.glob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in tree.body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if node.name in helpers:
+                    names.add(node.name)
+    return frozenset(names)
+
+
+def _helper_admission_sites(tree, module_level_helpers: frozenset) -> list:
     """Statement-level calls to a raising helper — guard-coverage ADR §4.2 (D-GC-4).
 
     The class is decidable from the AST with no judgement: an ``ast.Expr`` whose call
-    target is a name in the engine's existing transitive raising set. A call whose result
-    is *bound* is an ``ast.Assign`` and is deliberately not in this class — deleting it
-    would change what the program computes rather than only what it refuses.
+    target is a bare name resolving to a module-level function in this package's
+    transitive raising set. A call whose result is *bound* is an ``ast.Assign`` and is
+    deliberately not in this class — deleting it would change what the program computes
+    rather than only what it refuses. See ``_module_level_raising_helpers`` for why a bare
+    ``ast.Name`` is required rather than any call whose name matches: an attribute call
+    such as ``out.append(r)`` is not a guard even when the package happens to define a
+    raising method of that name.
 
     Why this is a decision point distinct from the helper's own ``if``: neutralising the
     helper's internal guard proves the check works, not that it is applied at this site.
@@ -494,9 +525,10 @@ def _helper_admission_sites(tree, helpers: frozenset) -> list:
     for node in ast.walk(tree):
         if not isinstance(node, ast.Expr) or not isinstance(node.value, ast.Call):
             continue
-        call = node.value
-        name = getattr(call.func, "id", None) or getattr(call.func, "attr", None)
-        if name in helpers:
+        func = node.value.func
+        # A bare name only. ``getattr(func, "attr", None)`` used to be a fallback here,
+        # which is exactly what admitted method calls.
+        if isinstance(func, ast.Name) and func.id in module_level_helpers:
             sites.append(node)
     return sites
 
@@ -510,6 +542,16 @@ def _else_arm_sites(tree, config: PackageConfig, helpers: frozenset) -> list:
 
     ``elif`` chains are excluded: an ``elif`` is an ``If`` of its own and is already
     inventoried on the ``if`` layer with its own condition.
+
+    **Known limitation, latent in both swept packages.** A nested ``if/else`` inside an
+    ``else`` yields two rows whose spans nest, because the outer arm's body *reaches* the
+    inner refusal. Mutating the outer one deletes the inner dispatch with it, so one
+    refusal is counted and killed twice — denominator inflation, never a false kill. The
+    class has no such member here: ``capacity-bounds-policy`` has zero ``else-arm`` rows,
+    and the one member the ADR found in ``risk-integration`` (``authenticity.py:432``) is
+    a bare ``else: raise``. Narrowing the class to arms that refuse *directly* would fix
+    it, but that narrows a ratified definition, so it is recorded for the owner rather
+    than decided here.
     """
 
     sites = []
@@ -691,6 +733,7 @@ def inventory(config: PackageConfig) -> list:
         name: (scope, count) for name, scope, count in config.recorded
     }
     helpers = _raising_helpers(config)
+    module_level_helpers = _module_level_raising_helpers(config, helpers)
     for module in config.module_order:
         path = config.src / module
         source = path.read_text(encoding="utf-8")
@@ -707,7 +750,7 @@ def inventory(config: PackageConfig) -> list:
         # The two additive decision classes, each enabled per package rather than
         # engine-wide — see ``PackageConfig.decision_classes`` for why.
         if "helper-admission" in config.decision_classes:
-            for node in _helper_admission_sites(tree, helpers):
+            for node in _helper_admission_sites(tree, module_level_helpers):
                 found.append((node.lineno, node, "helper-admission call"))
         if "else-arm" in config.decision_classes:
             for node in _else_arm_sites(tree, config, helpers):
@@ -1100,7 +1143,26 @@ def pytest_configure(config):
         # A method is reached through exactly one attribute — its class — so there is no
         # second binding to chase. Set on the class the name resolved through, which is
         # the class the tests instantiate.
-        setattr(holder, attribute, counting)
+        #
+        # The descriptor has to be put back the way it was found. ``getattr`` on a class
+        # unwraps ``staticmethod``/``classmethod``, so writing the plain wrapper back
+        # re-introduces an implicit first argument and every call raises TypeError. That
+        # fails loudly — the baseline goes red and ``require_green`` voids the whole sweep
+        # rather than manufacturing a kill — but it voids a sweep that should have run.
+        # ``adapter.py``'s ``_canonical_projection`` is a staticmethod, so this is the
+        # next mint site in the very package this was written for.
+        import inspect
+
+        declared = inspect.getattr_static(holder, attribute)
+        if isinstance(declared, staticmethod):
+            setattr(holder, attribute, staticmethod(counting))
+        elif isinstance(declared, classmethod):
+            # ``original`` is already bound to the class, so the wrapper must not receive
+            # it a second time; it is re-wrapped as a staticmethod to keep the call shape
+            # callers use while counting exactly once.
+            setattr(holder, attribute, staticmethod(counting))
+        else:
+            setattr(holder, attribute, counting)
         return
 
     for bound in list(sys.modules.values()):

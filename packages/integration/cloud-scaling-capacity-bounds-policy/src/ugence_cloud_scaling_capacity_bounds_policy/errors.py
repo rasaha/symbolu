@@ -18,9 +18,17 @@ The reason travels on the exception rather than in its message, because a messag
 prose a caller may not act on. Refusals raised under a *foreign* type — the shared
 authority's ``UnsupportedPolicyArtifactError`` and ``PolicyAuthorityRequestError``,
 which the adapter must keep raising because the authority's contract names them —
-carry the same attribute, attached by :func:`with_rejection_reason`. So
-``error.reason`` answers the same question at every refusal site in this package,
-whoever defined the class.
+carry the same attribute, attached by :func:`with_rejection_reason`.
+
+**Scope of that claim, stated exactly.** Every refusal *this package raises* carries a
+reason — all 22 of them. It does not follow that every exception escaping this package
+carries one, and an audit produced the counterexample: a non-NFC ``action_type`` is
+admitted by :func:`_require_token`, and the shared authority then refuses it inside
+``to_canonical_obj`` with a ``PolicyCanonicalizationError`` that this package never
+raised and cannot annotate. ``rejection_reason_of`` returns ``None`` there, which is the
+honest answer — the decision was not this family's. A caller that must distinguish
+"this family refused" from "something refused" should test for ``None``, not assume it
+away.
 """
 
 from __future__ import annotations
@@ -42,11 +50,16 @@ __all__ = [
 class CapacityBoundsRejectionReason(Enum):
     """Why this family refused — the finest-grained discriminator it publishes.
 
-    One member per *decision*, not per field: two guards share a member only when no
-    input can distinguish what they decided. ``FIELD_NOT_A_STRING`` covers every
-    token-shaped field because one helper makes that decision once for all of them;
-    ``SCOPE_UNSUPPORTED`` and ``LIFECYCLE_STATE_UNSUPPORTED`` are separate because
-    they are separate decisions over separate domains.
+    One member per *decision a helper makes*, not per call site and not per field.
+    ``FIELD_NOT_A_STRING`` covers every token-shaped field because one helper,
+    :func:`_require_token`, makes that decision once for all of them — ten call sites
+    share it, and an input can certainly tell those ten apart. Discriminating *which call
+    site* refused is deliberately not this vocabulary's job: that is what the sweep's
+    D-GC-4 helper-admission class measures, one scored site per call, which is why the
+    two mechanisms are complementary rather than redundant. What a member does promise is
+    that two *distinct decisions* never share one: ``SCOPE_UNSUPPORTED`` and
+    ``LIFECYCLE_STATE_UNSUPPORTED`` are separate because they are separate decisions over
+    separate domains.
 
     Values are stable lowercase tokens: they are a published vocabulary, so a rename
     is a deliberate act, and they are not framed into any digest.
@@ -99,6 +112,18 @@ class CapacityBoundsPolicyError(Exception):
         super().__init__(message)
         self.reason = reason
 
+    def __reduce__(self):
+        """Keep the refusal picklable despite the keyword-only ``reason``.
+
+        ``BaseException.__reduce__`` replays ``args`` *positionally*, so the default
+        would call ``__init__(message)`` with no reason and raise ``TypeError`` — turning
+        a refusal that crossed a process boundary into a crash. A refusal that cannot be
+        carried out of a worker is a refusal a caller cannot act on, so the rebuild is
+        explicit rather than inherited.
+        """
+
+        return (_rebuild_refusal, (type(self), self.args, self.reason))
+
 
 class CapacityBoundsFieldError(CapacityBoundsPolicyError):
     """A field is absent, of the wrong exact type, or outside its admitted domain."""
@@ -110,6 +135,12 @@ class CapacityBoundsOrderingError(CapacityBoundsPolicyError):
 
 class CapacityBoundsDuplicateError(CapacityBoundsPolicyError):
     """Two bounds claim the same selector, so the applicable bound is ambiguous."""
+
+
+def _rebuild_refusal(cls, args, reason):
+    """Module-level so ``pickle`` can find it; see ``CapacityBoundsPolicyError.__reduce__``."""
+
+    return cls(*args, reason=reason)
 
 
 _E = TypeVar("_E", bound=BaseException)

@@ -12,8 +12,9 @@ phase numbering; each entry names the phase that produced it.
   three leaf error classes, zero enums, and fifteen guards raising one
   `CapacityBoundsFieldError`, so a suite asserting that class could only show that
   *something* refused. The owner ratified that this family gains a reason enum
-  before its first scored guard sweep, and this is it. Every refusal in the package
-  now carries `reason`, including the four raised under the shared authority's own
+  before its first scored guard sweep, and this is it. Every refusal the package
+  *raises* now carries `reason` — all 22 — including the four raised under the shared
+  authority's own
   `UnsupportedPolicyArtifactError` / `PolicyAuthorityRequestError` — those keep the
   authority's classes, which are its contract with an adapter, and carry the reason
   as an attribute attached by `with_rejection_reason`. `rejection_reason_of` reads

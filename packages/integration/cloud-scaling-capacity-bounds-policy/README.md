@@ -32,7 +32,8 @@ signing, the real registry and real resolution.
 
 ## Refusal is a pair
 
-Every refusal names both an exception class and a `CapacityBoundsRejectionReason`.
+Every refusal this package **raises** names both an exception class and a
+`CapacityBoundsRejectionReason`.
 The class alone was not enough: fifteen guards raise `CapacityBoundsFieldError`, so
 `pytest.raises(CapacityBoundsFieldError)` is satisfied by any of them firing and
 shows that the program refused, not that *this* guard decided the refusal. The
@@ -55,6 +56,11 @@ The adapter's four refusals keep the shared authority's own exception classes �
 those are the authority's contract with an adapter — and carry the reason as an
 attribute. `rejection_reason_of` reads either half, so a caller never has to know
 which side of the boundary refused it.
+
+It returns `None` for an exception this package did not raise. The authority refuses on
+its own account too — a non-NFC string reaches `to_canonical_obj` and is refused there,
+by a decision this family never made and cannot annotate. `None` is the honest answer to
+"which of my reasons was this", not a gap in the threading.
 
 ## What it deliberately does not do
 

@@ -305,3 +305,141 @@ def test_a_message_read_is_still_not_a_typed_read(statement):
     """Recalibration widened the typed half; it must not have swallowed the other one."""
 
     assert not _type_reads().search(statement)
+
+
+# --- regressions found by adversarial audit -----------------------------------------
+
+AUDIT_SHAPES = '''
+class Refused(Exception):
+    pass
+
+
+class Ledger:
+    def append(self, row):
+        if row is None:
+            raise Refused("no row")
+
+
+def _require(value):
+    if value is None:
+        raise Refused("required")
+
+
+def collect(rows, logger):
+    out = []
+    _require(rows)
+    for r in rows:
+        out.append(r)
+    logger.append("collected")
+    return sum(out)
+'''
+
+
+def test_a_method_call_is_not_a_helper_admission_site(tmp_path, monkeypatch):
+    """The audit's false positive: `list.append` scored KILLED as if it were a guard.
+
+    A package defining a raising `Ledger.append` puts the bare name `append` into
+    `_raising_helpers`, which keys its fixpoint on `node.name` alone. The selector used to
+    fall back to `getattr(func, "attr", None)`, so `out.append(r)` matched. Deleting that
+    call changes what the program *computes*, the suite fails, and the engine credits a
+    kill the guard never earned — inflating numerator and denominator together, silently,
+    because a false-positive row looks exactly like a real one in the inventory.
+    """
+
+    src = tmp_path / "pkg" / "src" / "synthetic"
+    src.mkdir(parents=True)
+    (src / "shapes.py").write_text(AUDIT_SHAPES.lstrip("\n"), encoding="utf-8")
+    monkeypatch.setattr(guard_sweep, "REPO", tmp_path)
+    config = guard_sweep.PackageConfig(
+        key="synthetic",
+        package_dir="pkg",
+        dist_name="synthetic",
+        mint_site="",
+        module_order=("shapes.py",),
+        refusal_calls=frozenset(),
+        tuple_refusals=False,
+        recorded=(),
+        decision_classes=frozenset({"helper-admission"}),
+    )
+    admissions = [
+        g for g in guard_sweep.inventory(config) if g.kind == "helper-admission"
+    ]
+    assert [g.condition for g in admissions] == ["_require(rows)"], (
+        "only the bare module-level call qualifies; `out.append(r)` and "
+        "`logger.append(...)` are method calls on objects this package does not define"
+    )
+
+
+def test_the_raising_set_is_narrowed_to_module_level_functions():
+    """`append` stays in the raw raising set; it must not survive the narrowing."""
+
+    import ast as _ast
+
+    src_dir = REPO / "packages" / "integration" / "cloud-scaling-capacity-bounds-policy"
+    config = guard_sweep.PACKAGES["capacity-bounds-policy"]
+    raw = guard_sweep._raising_helpers(config)
+    narrowed = guard_sweep._module_level_raising_helpers(config, raw)
+    assert narrowed <= raw
+    # Every narrowed name really is a module-level def in this package.
+    module_level = set()
+    for path in sorted(config.src.glob("*.py")):
+        for node in _ast.parse(path.read_text(encoding="utf-8")).body:
+            if isinstance(node, (_ast.FunctionDef, _ast.AsyncFunctionDef)):
+                module_level.add(node.name)
+    assert narrowed <= module_level
+    assert "__post_init__" in raw and "__post_init__" not in narrowed, (
+        "a method that raises stays in the raw set and must not be selectable"
+    )
+    assert src_dir.is_dir()
+
+
+@pytest.mark.parametrize("kind", ["staticmethod", "classmethod", "plain"])
+def test_the_mint_counter_puts_the_descriptor_back(tmp_path, kind):
+    """`getattr` on a class unwraps staticmethod/classmethod; writing back a plain
+    function re-introduces an implicit first argument and every call raises TypeError.
+
+    That fails loudly rather than manufacturing a kill — a red baseline voids the sweep —
+    but it voids a sweep that should have run, and `adapter.py`'s `_canonical_projection`
+    is a staticmethod, so it is the next mint site in the package this was written for.
+    """
+
+    decorator = "" if kind == "plain" else f"    @{kind}\n"
+    first = {"plain": "self", "classmethod": "cls", "staticmethod": ""}[kind]
+    signature = f"({first}, value)" if first else "(value)"
+    shapes = f'''
+class Minter:
+{decorator}    def describe{signature}:
+        return {{"described": value}}
+'''
+    body = '''
+from _mint_shapes import Minter
+
+def test_it_mints_three_times():
+    minter = Minter()
+    for value in ("a", "b", "c"):
+        assert minter.describe(value)["described"] == value
+'''
+    (tmp_path / "_ugence_mint_counter.py").write_text(_plugin_source(), encoding="utf-8")
+    (tmp_path / "_mint_shapes.py").write_text(shapes.lstrip("\n"), encoding="utf-8")
+    tests = tmp_path / "tests"
+    tests.mkdir()
+    (tests / "test_mint.py").write_text(body, encoding="utf-8")
+    out = tmp_path / ".ugence-mints"
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", "tests", "-q", "-p", "no:cacheprovider",
+         "-p", "_ugence_mint_counter", "--tb=short"],
+        cwd=str(tmp_path),
+        capture_output=True,
+        text=True,
+        timeout=300,
+        env={
+            **os.environ,
+            "PYTHONPATH": str(tmp_path),
+            "UGENCE_MINT_SITE": "_mint_shapes:Minter.describe",
+            "UGENCE_MINT_OUT": str(out),
+        },
+    )
+    assert result.returncode == 0, (
+        f"the patched {kind} broke the program under test:\n{result.stdout[-2000:]}"
+    )
+    assert json.loads(out.read_text(encoding="utf-8"))["mints"] == 3
