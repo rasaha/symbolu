@@ -87,7 +87,10 @@ def test_no_module_imports_a_forbidden_neighbour(module):
 @pytest.mark.parametrize("module", MODULES, ids=lambda p: p.name)
 def test_every_import_is_stdlib_or_the_one_declared_dependency(module):
     declared = {"ugence_policy_authority"}
-    stdlib = {"__future__", "dataclasses", "datetime", "typing"}
+    # ``enum`` joined this set with CapacityBoundsRejectionReason: the
+    # guard-coverage ADR §3 requires this family to publish a reason vocabulary,
+    # and an Enum is stdlib.
+    stdlib = {"__future__", "dataclasses", "datetime", "enum", "typing"}
     roots = _imported_roots(module)
     unexpected = roots - declared - stdlib
     assert not unexpected, f"{module.name} imports {sorted(unexpected)}"

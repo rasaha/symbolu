@@ -1,10 +1,19 @@
 #!/usr/bin/env python3
 """Guard inventory and gate-removal mutation sweep for the Cloud Scaling packages.
 
-One engine, three configurations. `cloud-scaling-producer-attestation` already had a sweep
-of its own; this generalises the method to `cloud-scaling-authorization-contracts` and
+One engine, a configuration per package. `cloud-scaling-producer-attestation` already had a
+sweep of its own; this generalises the method to `cloud-scaling-authorization-contracts` and
 `cloud-scaling-policy-authenticity`, which had none — their guard inventories had never been
-swept in CI at all.
+swept in CI at all — and, since the guard-coverage ADR, to
+`cloud-scaling-capacity-bounds-policy`, a package that carries no authority but does carry a
+fail-closed admission invariant, which is exactly the thing a sweep can measure (ADR §2).
+
+**Not every decision point is an `if`.** The guard-coverage ADR ratified two additive
+classes the engine could not see in either direction — absent from the numerator *and* from
+the disclosed denominator: a statement-level call to a raising helper (§4.2, deleted rather
+than disabled) and a terminal `else` that refuses (§4.3, replaced by `pass`). Each is opted
+into per package through `PackageConfig.decision_classes`, because enabling one changes what
+a package's checked-in inventory counts.
 
 Two things this had to get right that a copy of the existing script would have got wrong.
 
@@ -76,6 +85,26 @@ class PackageConfig:
     #: line number: a line shifts every time anything above it changes, and an exclusion
     #: that silently re-points at a different guard is worse than no exclusion at all.
     exclusions: dict = field(default_factory=dict)
+    #: Decision classes beyond the ``if``/``IfExp`` layer that this package inventories.
+    #: ``"helper-admission"`` (guard-coverage ADR §4.2, D-GC-4) and ``"else-arm"`` (§4.3,
+    #: D-GC-5). Opt-in per package rather than global, because the guard-coverage ADR §1
+    #: states that nothing in it reclassifies a guard in ``authorization-contracts`` or
+    #: ``policy-authenticity`` — those two keep every count and index §9 already settles
+    #: for them, and switching a class on for them would renumber their checked-in
+    #: inventories and re-open their sweeps under a different denominator. Enabling a
+    #: class for a package is therefore a ratified decision, recorded here.
+    decision_classes: frozenset = frozenset()
+    #: Names this package uses for its reason vocabulary, read for the inventory's
+    #: ``outcome`` column in addition to the two engine-wide ones. A package that
+    #: publishes ``CapacityBoundsRejectionReason`` and imports it as ``Reason`` names it
+    #: here rather than being read as having no typed outcome at all.
+    reason_vocabularies: frozenset = frozenset()
+    #: Mints this package performs that ``mint_site`` does **not** cover, each with the
+    #: reason it is not covered. Guard-coverage ADR §5 accepts partial mint coverage and
+    #: requires the uncovered mint to be *named* in the inventory: an undisclosed partial
+    #: count is worse than a disclosed one, because a reader cannot tell which question
+    #: the number answers.
+    uncovered_mints: tuple = ()
 
     @property
     def src(self) -> Path:
@@ -175,6 +204,42 @@ PACKAGES = {
                 "test_an_allow_family_decision_missing_a_binding_fact_is_refused",
             ),
         },
+    ),
+    "capacity-bounds-policy": PackageConfig(
+        key="capacity-bounds-policy",
+        package_dir="packages/integration/cloud-scaling-capacity-bounds-policy",
+        dist_name="ugence_cloud_scaling_capacity_bounds_policy",
+        # A method, reachable only since guard-coverage ADR §5 widened ``mint_site`` to
+        # ``module:Class.method``. This is the family's true mint: ``describe`` returns the
+        # ``PolicyArtifactDescriptor`` the shared authority signs and registers. The only
+        # module-level candidate, ``capacity_bounds_coordinate``, returns a *coordinate* —
+        # counting it would report a number that answers a different question, so §5
+        # rejects it as a mint site rather than settling for the reachable one.
+        mint_site="ugence_cloud_scaling_capacity_bounds_policy.adapter:"
+                  "CapacityBoundsPolicyFamilyAdapter.describe",
+        module_order=(
+            "identifiers.py",
+            "errors.py",
+            "policy.py",
+            "adapter.py",
+        ),
+        # This family refuses by raising, always. It publishes no ``_refuse`` gate and no
+        # outcome tuple, so both Phase 5B shapes are off.
+        refusal_calls=frozenset(),
+        tuple_refusals=False,
+        # Its reason vocabulary, imported as ``Reason`` at every refusal site, so the
+        # inventory's outcome column names which decision each guard made rather than
+        # reporting a package with no typed outcome at all.
+        reason_vocabularies=frozenset({"CapacityBoundsRejectionReason", "Reason"}),
+        # Both additive classes are enabled here and nowhere else: guard-coverage ADR §4.2
+        # measures 14 helper-admission call sites in this package, all in ``policy.py``,
+        # and §4.3's class has no member here. An empty class is still enabled — a class
+        # that is off cannot report that it found nothing.
+        decision_classes=frozenset({"helper-admission", "else-arm"}),
+        # Fully covered: this family's only mint is ``describe``, and it is wrapped.
+        uncovered_mints=(),
+        recorded=(),
+        exclusions={},
     ),
     "policy-authenticity": PackageConfig(
         key="policy-authenticity",
@@ -313,6 +378,13 @@ class Guard:
     #: outcomes, neutralised by collapsing it to its ``else`` branch. The `if False:`
     #: operator cannot touch one, which is why they were invisible until an audit
     #: measured that they decide the reason a caller is entitled to act on.
+    #: "helper-admission" — a statement-level call to a raising helper, neutralised by
+    #: deleting the call (guard-coverage ADR §4.2). Neutralising the helper's own ``if``
+    #: proves the check works; it does not prove the check is *applied here*, and one
+    #: covering test of the helper masks every other call site.
+    #: "else-arm" — the terminal ``else`` of a dispatch whose body refuses, neutralised
+    #: by replacing that body with ``pass`` (guard-coverage ADR §4.3). An ``else`` has no
+    #: header to rewrite, so ``if False:`` cannot reach it.
     kind: str = "if"
     span: tuple = ()
     recorded_in: str = ""
@@ -322,14 +394,30 @@ class Guard:
     killed_by: list = field(default_factory=list)
 
 
-def _outcome_names(node) -> list:
-    """The typed outcomes this guard's body can produce, for the report's own reading."""
+#: The vocabularies every package is read as publishing. A package that names its own
+#: adds it through ``PackageConfig.reason_vocabularies`` — this set is not widened by
+#: hand, because a name added here silently changes what every package's inventory says
+#: its guards decide.
+_BASE_REASON_VOCABULARIES = frozenset({"_Outcome", "_Reason", "Reason"})
 
+
+def _reason_vocabularies(config: PackageConfig) -> frozenset:
+    return _BASE_REASON_VOCABULARIES | config.reason_vocabularies
+
+
+def _outcome_names(body, config: PackageConfig) -> list:
+    """The typed outcomes this guard's body can produce, for the report's own reading.
+
+    Reads a *body* rather than a node so an ``else`` arm — which has no node of its own —
+    is read exactly as an ``if`` body is.
+    """
+
+    vocabularies = _reason_vocabularies(config)
     names = []
-    for statement in node.body:
+    for statement in body:
         for inner in ast.walk(statement):
             if isinstance(inner, ast.Attribute) and isinstance(inner.value, ast.Name):
-                if inner.value.id in {"_Outcome", "_Reason", "Reason"}:
+                if inner.value.id in vocabularies:
                     names.append(inner.attr)
     return sorted(set(names))
 
@@ -374,8 +462,133 @@ def _raising_helpers(config: PackageConfig) -> frozenset:
     return frozenset(raising)
 
 
-def _refusal_shape(node, config: PackageConfig) -> str:
-    """How this guard refuses, or ``""`` when it does not.
+def _is_elif(node) -> bool:
+    """An ``elif`` is an ``If`` in its parent's ``orelse`` at the parent's own column."""
+
+    return (
+        len(node.orelse) == 1
+        and isinstance(node.orelse[0], ast.If)
+        and node.orelse[0].col_offset == node.col_offset
+    )
+
+
+def _statement_span(node) -> tuple:
+    return (node.lineno, node.col_offset, node.end_lineno, node.end_col_offset)
+
+
+def _module_level_raising_helpers(config: PackageConfig, helpers: frozenset) -> frozenset:
+    """The raising set, narrowed to names actually bound as module-level functions here.
+
+    ``_raising_helpers`` keys its fixpoint on ``node.name`` alone, so it merges every
+    function *and method* in the package that shares a name. That is tolerable for the
+    shape label it was written for, and unsafe for selecting a site to delete: an audit
+    produced a working false positive on ``out.append(r)`` — a package defining a raising
+    ``Ledger.append`` puts ``append`` in the set, and ``list.append`` then matches it.
+    Deleting that call changes what the program *computes*, so the suite fails and the
+    engine scores a kill the guard never earned, inflating both halves of the ratio.
+
+    Two conditions together close it, and both are necessary. The call target must be a
+    bare ``ast.Name`` — which excludes every method call, the whole class the audit
+    demonstrated — and that name must be defined as a module-level function in one of this
+    package's own modules, which excludes a bare name that only ever names a method.
+    """
+
+    names = set()
+    for path in sorted(config.src.glob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in tree.body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if node.name in helpers:
+                    names.add(node.name)
+    return frozenset(names)
+
+
+def _helper_admission_sites(tree, module_level_helpers: frozenset) -> list:
+    """Statement-level calls to a raising helper — guard-coverage ADR §4.2 (D-GC-4).
+
+    The class is decidable from the AST with no judgement: an ``ast.Expr`` whose call
+    target is a bare name resolving to a module-level function in this package's
+    transitive raising set. A call whose result is *bound* is an ``ast.Assign`` and is
+    deliberately not in this class — deleting it would change what the program computes
+    rather than only what it refuses. See ``_module_level_raising_helpers`` for why a bare
+    ``ast.Name`` is required rather than any call whose name matches: an attribute call
+    such as ``out.append(r)`` is not a guard even when the package happens to define a
+    raising method of that name.
+
+    Why this is a decision point distinct from the helper's own ``if``: neutralising the
+    helper's internal guard proves the check works, not that it is applied at this site.
+    A dropped call admits the artifact without ever checking it, and no ``if False:``
+    reaches a site that has no ``if`` header.
+    """
+
+    sites = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Expr) or not isinstance(node.value, ast.Call):
+            continue
+        func = node.value.func
+        # A bare name only. ``getattr(func, "attr", None)`` used to be a fallback here,
+        # which is exactly what admitted method calls.
+        if isinstance(func, ast.Name) and func.id in module_level_helpers:
+            sites.append(node)
+    return sites
+
+
+def _else_arm_sites(tree, config: PackageConfig, helpers: frozenset) -> list:
+    """Terminal ``else`` arms whose body refuses — guard-coverage ADR §4.3 (D-GC-5).
+
+    An implementation-only extension of §9.1, not a new class: "a body that can reach a
+    refusal makes the ``if`` a guard", and a terminal ``else`` is the last arm of that
+    same ``if``. Only the operator was missing, because an ``else`` has no header.
+
+    ``elif`` chains are excluded: an ``elif`` is an ``If`` of its own and is already
+    inventoried on the ``if`` layer with its own condition.
+
+    **Known limitation, latent in both swept packages.** A nested ``if/else`` inside an
+    ``else`` yields two rows whose spans nest, because the outer arm's body *reaches* the
+    inner refusal. Mutating the outer one deletes the inner dispatch with it, so one
+    refusal is counted and killed twice — denominator inflation, never a false kill. The
+    class has no such member here: ``capacity-bounds-policy`` has zero ``else-arm`` rows,
+    and the one member the ADR found in ``risk-integration`` (``authenticity.py:432``) is
+    a bare ``else: raise``. Narrowing the class to arms that refuse *directly* would fix
+    it, but that narrows a ratified definition, so it is recorded for the owner rather
+    than decided here.
+    """
+
+    sites = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.If) or not node.orelse or _is_elif(node):
+            continue
+        if _refusal_shape_of(node.orelse, config, helpers):
+            sites.append(node)
+    return sites
+
+
+def _else_lineno(lines, node) -> int:
+    """The ``else:`` line itself, not the first line of its body.
+
+    Found by walking back from the body rather than assuming ``body[0].lineno - 1``: a
+    comment between ``else:`` and the first statement is ordinary, and an inventory row
+    that points a reader at a comment is a row they cannot check.
+    """
+
+    for probe in range(node.orelse[0].lineno - 1, node.lineno - 1, -1):
+        if lines[probe - 1].lstrip().startswith("else"):
+            return probe
+    return node.orelse[0].lineno
+
+
+def _refusal_shape(node, config: PackageConfig, helpers=None) -> str:
+    """How this guard refuses, or ``""`` when it does not."""
+
+    return _refusal_shape_of(node.body, config, helpers)
+
+
+def _refusal_shape_of(body, config: PackageConfig, helpers=None) -> str:
+    """How this *body* refuses, or ``""`` when it does not.
+
+    Defined over a body rather than an ``if`` node so the same definition of refusal
+    applies to an ``else`` arm, which has no node of its own (guard-coverage ADR §4.3:
+    a terminal ``else`` is the last arm of the same ``if``, not a new class).
 
     The shape is reported per guard rather than collapsed, because it is the thing that
     differs between the two packages and the thing a copied definition gets wrong.
@@ -386,8 +599,11 @@ def _refusal_shape(node, config: PackageConfig) -> str:
     tuple_return = False
     outcome_return = False
     helper_call = False
-    helpers = _raising_helpers(config)
-    for statement in node.body:
+    # Computed once by the caller where there is one: ``_raising_helpers`` re-parses
+    # every module in the package, and calling it per candidate node made the inventory
+    # quadratic in the size of the source.
+    helpers = _raising_helpers(config) if helpers is None else helpers
+    for statement in body:
         for inner in ast.walk(statement):
             if isinstance(inner, ast.Raise):
                 raises = True
@@ -516,6 +732,8 @@ def inventory(config: PackageConfig) -> list:
     recorded_scope = {
         name: (scope, count) for name, scope, count in config.recorded
     }
+    helpers = _raising_helpers(config)
+    module_level_helpers = _module_level_raising_helpers(config, helpers)
     for module in config.module_order:
         path = config.src / module
         source = path.read_text(encoding="utf-8")
@@ -524,12 +742,20 @@ def inventory(config: PackageConfig) -> list:
         found = []
         for node in ast.walk(tree):
             if isinstance(node, ast.If):
-                shape = _refusal_shape(node, config)
+                shape = _refusal_shape(node, config, helpers)
                 if shape:
-                    found.append((node, shape))
+                    found.append((node.lineno, node, shape))
             elif isinstance(node, ast.IfExp) and _selects_an_outcome(node):
-                found.append((node, "outcome selection"))
-        for node, shape in sorted(found, key=lambda pair: pair[0].lineno):
+                found.append((node.lineno, node, "outcome selection"))
+        # The two additive decision classes, each enabled per package rather than
+        # engine-wide — see ``PackageConfig.decision_classes`` for why.
+        if "helper-admission" in config.decision_classes:
+            for node in _helper_admission_sites(tree, module_level_helpers):
+                found.append((node.lineno, node, "helper-admission call"))
+        if "else-arm" in config.decision_classes:
+            for node in _else_arm_sites(tree, config, helpers):
+                found.append((_else_lineno(lines, node), node, "else-arm refusal"))
+        for lineno, node, shape in sorted(found, key=lambda row: (row[0], row[2])):
             index += 1
             if shape == "outcome selection":
                 guards.append(
@@ -553,6 +779,50 @@ def inventory(config: PackageConfig) -> list:
                     )
                 )
                 continue
+            if shape == "helper-admission call":
+                guards.append(
+                    Guard(
+                        index=index,
+                        module=module,
+                        lineno=lineno,
+                        # The call text, not a condition: this decision point has no
+                        # test. It is still the stable exclusion key, for the same
+                        # reason a condition is — it survives every line shift above it.
+                        condition=ast.unparse(node.value),
+                        header_end=lineno,
+                        is_elif=False,
+                        shape=shape,
+                        recorded_in="",
+                        outcome=", ".join(_outcome_names([node], config)),
+                        kind="helper-admission",
+                        span=_statement_span(node),
+                    )
+                )
+                continue
+            if shape == "else-arm refusal":
+                guards.append(
+                    Guard(
+                        index=index,
+                        module=module,
+                        lineno=lineno,
+                        # Qualified by the dispatch it terminates, so the key cannot
+                        # collide with the ``if`` guard that owns the same test.
+                        condition=f"else of: {ast.unparse(node.test)}",
+                        header_end=lineno,
+                        is_elif=False,
+                        shape=_refusal_shape_of(node.orelse, config, helpers),
+                        recorded_in="",
+                        outcome=", ".join(_outcome_names(node.orelse, config)),
+                        kind="else-arm",
+                        span=(
+                            node.orelse[0].lineno,
+                            node.orelse[0].col_offset,
+                            node.orelse[-1].end_lineno,
+                            node.orelse[-1].end_col_offset,
+                        ),
+                    )
+                )
+                continue
             header = lines[node.lineno - 1].lstrip()
             recorded_in = ""
             for name, (scope, _count) in recorded_scope.items():
@@ -568,7 +838,7 @@ def inventory(config: PackageConfig) -> list:
                     is_elif=header.startswith("elif"),
                     shape=shape,
                     recorded_in=recorded_in,
-                    outcome=", ".join(_outcome_names(node)),
+                    outcome=", ".join(_outcome_names(node.body, config)),
                 )
             )
     return guards
@@ -602,6 +872,7 @@ def excluded(config: PackageConfig) -> dict:
 
     except_arms = 0
     boolean_subterms = 0
+    helpers = _raising_helpers(config)
     for module in config.module_order:
         tree = ast.parse((config.src / module).read_text(encoding="utf-8"))
         for node in ast.walk(tree):
@@ -612,7 +883,7 @@ def excluded(config: PackageConfig) -> dict:
                     for inner in ast.walk(statement)
                 ):
                     except_arms += 1
-            elif isinstance(node, ast.If) and _refusal_shape(node, config):
+            elif isinstance(node, ast.If) and _refusal_shape(node, config, helpers):
                 if isinstance(node.test, ast.BoolOp):
                     boolean_subterms += len(node.test.values) - 1
     return {"except_arms": except_arms, "boolean_subterms": boolean_subterms}
@@ -630,31 +901,49 @@ def _span_text(lines, span) -> str:
     return first + middle + last
 
 
+def _replace_span(path: Path, span: tuple, replacement: str) -> None:
+    """Overwrite exactly one node's source span, leaving every other byte untouched."""
+
+    lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+    start_line, start_col, end_line, end_col = span
+    prefix = "".join(lines[: start_line - 1]) + lines[start_line - 1][:start_col]
+    suffix = lines[end_line - 1][end_col:] + "".join(lines[end_line:])
+    path.write_text(prefix + replacement + suffix, encoding="utf-8")
+
+
 def mutate(config: PackageConfig, guard: Guard, workdir: Path) -> None:
     """Neutralise exactly this guard in the copy.
 
-    Two operators, one per kind. A statement guard has its ``if`` header rewritten to
-    ``if False:``. A decision point that is a conditional *expression* cannot be reached that
-    way — there is no header to rewrite — so it is collapsed to its ``else`` branch, which
-    removes the choice while leaving the program syntactically whole. Collapsing to the
-    ``else`` is deliberate: the ``if`` branch is the more specific diagnosis, and losing it
-    is exactly the defect the guard exists to prevent.
+    One operator per kind, each chosen so the mutation is *authority-weakening* — it
+    admits something the guard refused — rather than merely different:
+
+    * ``if`` — the header is rewritten to ``if False:``.
+    * ``outcome-selection`` — a conditional *expression* has no header to rewrite, so it
+      is collapsed to its ``else`` branch. That is deliberate: the ``if`` branch is the
+      more specific diagnosis, and losing it is the defect the guard exists to prevent.
+    * ``helper-admission`` — the call statement is replaced by ``pass``. Deleting a call
+      whose only effect is to raise is exactly the weakening direction; the artifact is
+      then admitted without ever being checked (guard-coverage ADR §4.2).
+    * ``else-arm`` — the ``else`` body is replaced by ``pass``, so an exact-type dispatch
+      falls through silently instead of refusing: an unrecognised type is admitted rather
+      than rejected (guard-coverage ADR §4.3).
     """
 
     path = workdir / "src" / config.dist_name / guard.module
     if guard.kind == "outcome-selection":
-        source = path.read_text(encoding="utf-8")
-        lines = source.splitlines(keepends=True)
-        start_line, start_col, end_line, end_col = guard.span
-        prefix = "".join(lines[: start_line - 1]) + lines[start_line - 1][:start_col]
-        suffix = lines[end_line - 1][end_col:] + "".join(lines[end_line:])
+        lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
         # The ``else`` branch read back from the source, never reconstructed from the
         # inventory, so a rename cannot silently substitute a different member. Parenthesised
         # because a multi-line conditional carries its continuation indentation with it.
         expression = ast.parse("(" + _span_text(lines, guard.span) + ")", mode="eval")
-        path.write_text(
-            prefix + ast.unparse(expression.body.orelse) + suffix, encoding="utf-8"
-        )
+        _replace_span(path, guard.span, ast.unparse(expression.body.orelse))
+        return
+
+    if guard.kind in {"helper-admission", "else-arm"}:
+        # ``pass`` rather than deletion: an ``else:`` or a suite whose only statement was
+        # removed is a SyntaxError, and a mutant that cannot parse is scored UNSCORED —
+        # which reports nothing about the guard.
+        _replace_span(path, guard.span, "pass")
         return
 
     lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
@@ -811,6 +1100,18 @@ def _workdir(config: PackageConfig) -> Path:
 #: already bound — not just on its defining module — because a test that did
 #: ``from pkg import build_x`` holds its own reference, and patching one name would count
 #: nothing. Written into the copy rather than the package: the tracked tree is never touched.
+#:
+#: ``UGENCE_MINT_SITE`` accepts ``module:function`` and, since guard-coverage ADR §5
+#: (D-GC-6), ``module:Class.method``. That is a strict widening — an existing
+#: ``module:function`` value keeps its meaning exactly — and it exists because a package's
+#: true mint is not always module-level: ``capacity-bounds-policy`` mints its
+#: ``PolicyArtifactDescriptor`` in ``CapacityBoundsPolicyFamilyAdapter.describe``, and its
+#: only module-level candidate returns a *coordinate*, which answers a different question.
+#: An inline class construction is deliberately still not wrappable by name: §5 rules that
+#: wrapping one would break ``isinstance`` and the dataclass path, so a mint counter that
+#: changed the program under test would be measuring the instrumentation. Where that leaves
+#: a mint uncovered the package names it in ``uncovered_mints`` and the inventory discloses
+#: it.
 _MINT_PLUGIN = '''
 import atexit
 import os
@@ -823,9 +1124,13 @@ _COUNT = [0]
 def pytest_configure(config):
     import importlib
 
-    module_name, function_name = os.environ["UGENCE_MINT_SITE"].split(":")
+    module_name, target = os.environ["UGENCE_MINT_SITE"].split(":")
     module = importlib.import_module(module_name)
-    original = getattr(module, function_name)
+
+    # ``Class.method`` resolves by a second getattr; a bare name keeps its old meaning.
+    owner, _, attribute = target.rpartition(".")
+    holder = getattr(module, owner) if owner else module
+    original = getattr(holder, attribute)
 
     def counting(*args, **kwargs):
         result = original(*args, **kwargs)
@@ -833,6 +1138,33 @@ def pytest_configure(config):
         return result
 
     counting.__wrapped__ = original
+
+    if owner:
+        # A method is reached through exactly one attribute — its class — so there is no
+        # second binding to chase. Set on the class the name resolved through, which is
+        # the class the tests instantiate.
+        #
+        # The descriptor has to be put back the way it was found. ``getattr`` on a class
+        # unwraps ``staticmethod``/``classmethod``, so writing the plain wrapper back
+        # re-introduces an implicit first argument and every call raises TypeError. That
+        # fails loudly — the baseline goes red and ``require_green`` voids the whole sweep
+        # rather than manufacturing a kill — but it voids a sweep that should have run.
+        # ``adapter.py``'s ``_canonical_projection`` is a staticmethod, so this is the
+        # next mint site in the very package this was written for.
+        import inspect
+
+        declared = inspect.getattr_static(holder, attribute)
+        if isinstance(declared, staticmethod):
+            setattr(holder, attribute, staticmethod(counting))
+        elif isinstance(declared, classmethod):
+            # ``original`` is already bound to the class, so the wrapper must not receive
+            # it a second time; it is re-wrapped as a staticmethod to keep the call shape
+            # callers use while counting exactly once.
+            setattr(holder, attribute, staticmethod(counting))
+        else:
+            setattr(holder, attribute, counting)
+        return
+
     for bound in list(sys.modules.values()):
         if bound is None:
             continue
@@ -859,8 +1191,15 @@ _MESSAGE_READS = _re.compile(r"str\(\s*\w+(\.value)?\s*\)|\.detail\b|\.args\[")
 #: An assertion that reads the typed half of the refusal. `pytest.raises` counts: a
 #: statement that both raises-checks and message-checks has asserted the exception class,
 #: so its failure is not attributable to the message alone.
+#:
+#: Recalibrated per guard-coverage ADR §6 (D-GC-7). `\.reason\b` required a *literal*
+#: `.reason`, so every qualified accessor a real package publishes missed it —
+#: `.rejection_reason`, `.abstention_reason` and `.status` all read the typed half and
+#: were all classified message-only. The error over-flagged rather than under-flagged, so
+#: nothing unsafe shipped behind it, but it misreported which contract the suite tests.
 _TYPE_READS = _re.compile(
-    r"\.reason\b|\.outcome\b|isinstance\s*\(|pytest\.raises\s*\(|\btype\s*\("
+    r"\.\w*reason\b|\.\w*status\b|\.outcome\b|isinstance\s*\(|"
+    r"pytest\.raises\s*\(|\btype\s*\("
 )
 
 
@@ -951,13 +1290,51 @@ def write_inventory(
         "Generated by `scripts/cloud_scaling/guard_sweep.py --inventory-only`. Do not edit by",
         "hand: CI regenerates this and fails on any difference.",
         "",
-        f"**{len(guards)} authority-bearing guards.** A guard is an `if` whose body can reach a",
-        "refusal. What counts as a refusal differs by package and is recorded per guard below:",
-        "Phase 5A raises; Phase 5B also returns `_refuse(...)` at a gate and `(_Outcome.X, …)`",
-        "from the helper that decided it. Applying one package's definition to the other is not",
-        f"a stylistic choice — a raise-only reading of this package would miss "
+        f"**{len(guards)} outcome-bearing guards.** A guard is a decision point whose body can",
+        "reach a refusal. What counts as a refusal differs by package and is recorded per guard",
+        "below: Phase 5A raises; Phase 5B also returns `_refuse(...)` at a gate and",
+        "`(_Outcome.X, …)` from the helper that decided it. Applying one package's definition to",
+        "another is not a stylistic choice — a raise-only reading of this package would miss",
         f"{sum(1 for g in guards if g.shape != 'raise')} of the guards below.",
         "",
+    ]
+    if config.decision_classes:
+        counts = {
+            kind: sum(1 for g in guards if g.kind == kind)
+            for kind in sorted(config.decision_classes)
+        }
+        lines += [
+            "Beyond the `if`/conditional-expression layer this package also inventories the",
+            "decision classes the guard-coverage ADR ratified, each with its own operator:",
+            "",
+        ]
+        described = {
+            "helper-admission": (
+                "statement-level calls to a raising helper, neutralised by deleting the call "
+                "(ADR §4.2). Neutralising the helper's own `if` proves the check works, not "
+                "that it is applied here"
+            ),
+            "else-arm": (
+                "terminal `else` arms that refuse, neutralised by replacing the arm with "
+                "`pass` (ADR §4.3). An `else` has no header, so `if False:` cannot reach it"
+            ),
+        }
+        for kind, count in counts.items():
+            lines.append(f"* **{count} `{kind}`** — {described.get(kind, '')}.")
+        lines.append("")
+    if config.uncovered_mints:
+        lines += [
+            "## Mint coverage, and what it does not cover",
+            "",
+            f"The mint counter wraps `{config.mint_site}`. Coverage is **partial**, and the",
+            "uncovered mints are named here rather than left for a reader to notice — an",
+            "undisclosed partial count is worse than a disclosed one (ADR §5):",
+            "",
+        ]
+        for site, why in config.uncovered_mints:
+            lines.append(f"* `{site}` — {why}")
+        lines.append("")
+    lines += [
         "## Reconciliation with the recorded inventories",
         "",
     ]
@@ -1015,8 +1392,8 @@ def write_inventory(
         "",
         "## Every guard",
         "",
-        "| # | Module:line | Shape | Class | Recorded in | Condition |",
-        "|---|---|---|---|---|---|",
+        "| # | Module:line | Kind | Shape | Class | Recorded in | Condition |",
+        "|---|---|---|---|---|---|---|",
     ]
     for g in guards:
         condition = g.condition.replace("|", "\\|")
@@ -1024,7 +1401,7 @@ def write_inventory(
             condition = condition[:75] + "…"
         status = verdict["classified"][g.index]["status"]
         lines.append(
-            f"| {g.index} | `{g.module}:{g.lineno}` | {g.shape} | {status} | "
+            f"| {g.index} | `{g.module}:{g.lineno}` | {g.kind} | {g.shape} | {status} | "
             f"{g.recorded_in or '—'} | `{condition}` |"
         )
     lines.append("")
@@ -1215,6 +1592,7 @@ def main() -> int:
                     "module": g.module,
                     "line": g.lineno,
                     "condition": g.condition,
+                    "kind": g.kind,
                     "shape": g.shape,
                     "recorded_in": g.recorded_in,
                     "outcome": g.outcome,
@@ -1386,6 +1764,7 @@ def main() -> int:
                 "module": guard.module,
                 "line": guard.lineno,
                 "condition": guard.condition,
+                "kind": guard.kind,
                 "shape": guard.shape,
                 "recorded_in": guard.recorded_in,
                 "scored": outcome["scored"],

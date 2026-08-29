@@ -31,6 +31,7 @@
       "module": "canonical.py",
       "line": 82,
       "condition": "not isinstance(snapshot, Mapping)",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": "MALFORMED_CANONICAL_FIELD"
@@ -40,6 +41,7 @@
       "module": "canonical.py",
       "line": 103,
       "condition": "not is_canonical_digest(value)",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": "MALFORMED_CANONICAL_FIELD"
@@ -49,6 +51,7 @@
       "module": "canonical.py",
       "line": 126,
       "condition": "not is_policy_authority_digest(value)",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": "MALFORMED_CANONICAL_FIELD"
@@ -58,6 +61,7 @@
       "module": "canonical.py",
       "line": 149,
       "condition": "type(value) is not str",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": "MALFORMED_CANONICAL_FIELD"
@@ -67,6 +71,7 @@
       "module": "canonical.py",
       "line": 154,
       "condition": "not allow_empty and value == ''",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": "MALFORMED_CANONICAL_FIELD"
@@ -76,6 +81,7 @@
       "module": "canonical.py",
       "line": 158,
       "condition": "unicodedata.normalize('NFC', value) != value",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": "NON_CANONICAL_IDENTIFIER"
@@ -85,6 +91,7 @@
       "module": "canonical.py",
       "line": 171,
       "condition": "text != text.strip()",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": "NON_CANONICAL_IDENTIFIER"
@@ -94,6 +101,7 @@
       "module": "canonical.py",
       "line": 176,
       "condition": "any((ch.isspace() and ch != ' ' for ch in text))",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": "NON_CANONICAL_IDENTIFIER"
@@ -103,6 +111,7 @@
       "module": "identifiers.py",
       "line": 93,
       "condition": "ours != theirs",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -112,6 +121,7 @@
       "module": "identifiers.py",
       "line": 100,
       "condition": "controller_actions != CANONICAL_ACTION_TYPES",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -121,6 +131,7 @@
       "module": "identifiers.py",
       "line": 109,
       "condition": "PRODUCER_SIGNING_PURPOSE == PURPOSE_CAPACITY_ACTION",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": ""
@@ -130,6 +141,7 @@
       "module": "target.py",
       "line": 101,
       "condition": "type(value) is not int or value < 0",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "peripheral-28",
       "outcome": "MALFORMED_CANONICAL_FIELD"
@@ -139,6 +151,7 @@
       "module": "target.py",
       "line": 152,
       "condition": "self.schema_version != EXECUTION_TARGET_SCOPE_SCHEMA_VERSION",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "peripheral-28",
       "outcome": "UNSUPPORTED_SCHEMA_VERSION"
@@ -148,6 +161,7 @@
       "module": "target.py",
       "line": 160,
       "condition": "self.account_id is None or self.account_id == ''",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "peripheral-28",
       "outcome": "MISSING_ACCOUNT_BINDING"
@@ -157,6 +171,7 @@
       "module": "target.py",
       "line": 168,
       "condition": "action not in CANONICAL_ACTION_TYPES",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "peripheral-28",
       "outcome": "ACTION_SUBSTITUTION"
@@ -166,6 +181,7 @@
       "module": "target.py",
       "line": 188,
       "condition": "self.requested_magnitude > self.max_permitted_magnitude",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "peripheral-28",
       "outcome": "REQUESTED_MAGNITUDE_ABOVE_MAXIMUM"
@@ -175,6 +191,7 @@
       "module": "target.py",
       "line": 194,
       "condition": "self.requested_delta > self.max_permitted_delta",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "peripheral-28",
       "outcome": "DELTA_ABOVE_MAXIMUM"
@@ -184,6 +201,7 @@
       "module": "target.py",
       "line": 268,
       "condition": "not isinstance(data, Mapping)",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "peripheral-28",
       "outcome": "UNSUPPORTED_EXACT_TYPE"
@@ -193,6 +211,7 @@
       "module": "target.py",
       "line": 275,
       "condition": "unknown",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "peripheral-28",
       "outcome": "UNKNOWN_FIELD"
@@ -202,6 +221,7 @@
       "module": "target.py",
       "line": 281,
       "condition": "missing",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": "MALFORMED_CANONICAL_FIELD, MISSING_ACCOUNT_BINDING"
@@ -211,6 +231,7 @@
       "module": "target.py",
       "line": 283,
       "condition": "'account_id' in missing",
+      "kind": "outcome-selection",
       "shape": "outcome selection",
       "recorded_in": "",
       "outcome": "MALFORMED_CANONICAL_FIELD, MISSING_ACCOUNT_BINDING"
@@ -220,6 +241,7 @@
       "module": "target.py",
       "line": 337,
       "condition": "self.schema_version != POLICY_TARGET_BINDING_SCHEMA_VERSION",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "peripheral-28",
       "outcome": "UNSUPPORTED_SCHEMA_VERSION"
@@ -229,6 +251,7 @@
       "module": "target.py",
       "line": 363,
       "condition": "type(value) is not int or value < 0",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "peripheral-28",
       "outcome": "MALFORMED_CANONICAL_FIELD"
@@ -238,6 +261,7 @@
       "module": "target.py",
       "line": 371,
       "condition": "self.binding_digest != expected",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "peripheral-28",
       "outcome": "MALFORMED_POLICY_TARGET_BINDING"
@@ -247,6 +271,7 @@
       "module": "target.py",
       "line": 436,
       "condition": "not isinstance(data, Mapping)",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "peripheral-28",
       "outcome": "UNSUPPORTED_EXACT_TYPE"
@@ -256,6 +281,7 @@
       "module": "target.py",
       "line": 443,
       "condition": "unknown",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": "FORGED_TRUST_STATE, UNKNOWN_FIELD"
@@ -265,6 +291,7 @@
       "module": "target.py",
       "line": 445,
       "condition": "{'trust_state', 'verified', 'trusted', 'authentic'} & unknown",
+      "kind": "outcome-selection",
       "shape": "outcome selection",
       "recorded_in": "",
       "outcome": "FORGED_TRUST_STATE, UNKNOWN_FIELD"
@@ -274,6 +301,7 @@
       "module": "target.py",
       "line": 453,
       "condition": "missing",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "peripheral-28",
       "outcome": "MALFORMED_CANONICAL_FIELD"
@@ -283,6 +311,7 @@
       "module": "target.py",
       "line": 545,
       "condition": "self.schema_version != POLICY_TARGET_BINDING_V2_SCHEMA_VERSION",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "peripheral-28",
       "outcome": "UNSUPPORTED_SCHEMA_VERSION"
@@ -292,6 +321,7 @@
       "module": "target.py",
       "line": 562,
       "condition": "tenant != tenant.strip()",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "peripheral-28",
       "outcome": "NON_CANONICAL_IDENTIFIER"
@@ -301,6 +331,7 @@
       "module": "target.py",
       "line": 572,
       "condition": "self.policy_content_digest != self.policy_body_digest",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "peripheral-28",
       "outcome": "MALFORMED_POLICY_COORDINATE_BINDING"
@@ -310,6 +341,7 @@
       "module": "target.py",
       "line": 581,
       "condition": "self.binding_digest != expected",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "peripheral-28",
       "outcome": "MALFORMED_POLICY_COORDINATE_BINDING"
@@ -319,6 +351,7 @@
       "module": "target.py",
       "line": 659,
       "condition": "not isinstance(data, Mapping)",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "peripheral-28",
       "outcome": "UNSUPPORTED_EXACT_TYPE"
@@ -328,6 +361,7 @@
       "module": "target.py",
       "line": 666,
       "condition": "unknown",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": "FORGED_TRUST_STATE, UNKNOWN_FIELD"
@@ -337,6 +371,7 @@
       "module": "target.py",
       "line": 668,
       "condition": "{'trust_state', 'verified', 'trusted', 'authentic', 'resolved'} & unknown",
+      "kind": "outcome-selection",
       "shape": "outcome selection",
       "recorded_in": "",
       "outcome": "FORGED_TRUST_STATE, UNKNOWN_FIELD"
@@ -346,6 +381,7 @@
       "module": "target.py",
       "line": 676,
       "condition": "missing",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "peripheral-28",
       "outcome": "MALFORMED_POLICY_COORDINATE_BINDING"
@@ -355,6 +391,7 @@
       "module": "attestation.py",
       "line": 63,
       "condition": "not isinstance(value, datetime)",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "peripheral-28",
       "outcome": "MALFORMED_CANONICAL_FIELD"
@@ -364,6 +401,7 @@
       "module": "attestation.py",
       "line": 67,
       "condition": "value.tzinfo is None or value.utcoffset() is None",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "peripheral-28",
       "outcome": "MALFORMED_CANONICAL_FIELD"
@@ -373,6 +411,7 @@
       "module": "attestation.py",
       "line": 119,
       "condition": "self.schema_version != PRODUCER_ATTESTATION_SCHEMA_VERSION",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "peripheral-28",
       "outcome": "UNSUPPORTED_SCHEMA_VERSION"
@@ -382,6 +421,7 @@
       "module": "attestation.py",
       "line": 133,
       "condition": "algorithm not in SUPPORTED_SIGNATURE_ALGORITHMS",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "peripheral-28",
       "outcome": "MALFORMED_PRODUCER_ATTESTATION"
@@ -391,6 +431,7 @@
       "module": "attestation.py",
       "line": 142,
       "condition": "purpose not in SUPPORTED_PRODUCER_SIGNING_PURPOSES",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "peripheral-28",
       "outcome": "UNSUPPORTED_SIGNING_PURPOSE"
@@ -400,6 +441,7 @@
       "module": "attestation.py",
       "line": 155,
       "condition": "self.signing_payload_digest != expected",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "peripheral-28",
       "outcome": "PRODUCER_ATTESTATION_CONTENT_MISMATCH"
@@ -409,6 +451,7 @@
       "module": "attestation.py",
       "line": 234,
       "condition": "type(data) is not dict and (not isinstance(data, Mapping))",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "peripheral-28",
       "outcome": "UNSUPPORTED_EXACT_TYPE"
@@ -418,6 +461,7 @@
       "module": "attestation.py",
       "line": 240,
       "condition": "unknown",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": "FORGED_TRUST_STATE, UNKNOWN_FIELD"
@@ -427,6 +471,7 @@
       "module": "attestation.py",
       "line": 242,
       "condition": "{'trust_state', 'verified', 'trusted', 'authentic'} & unknown",
+      "kind": "outcome-selection",
       "shape": "outcome selection",
       "recorded_in": "",
       "outcome": "FORGED_TRUST_STATE, UNKNOWN_FIELD"
@@ -436,6 +481,7 @@
       "module": "attestation.py",
       "line": 250,
       "condition": "missing",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "peripheral-28",
       "outcome": "MALFORMED_CANONICAL_FIELD"
@@ -445,6 +491,7 @@
       "module": "attestation.py",
       "line": 255,
       "condition": "'schema_version' not in data",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "peripheral-28",
       "outcome": "UNSUPPORTED_SCHEMA_VERSION"
@@ -454,6 +501,7 @@
       "module": "attestation.py",
       "line": 261,
       "condition": "isinstance(issued_at, str)",
+      "kind": "if",
       "shape": "raising-helper call",
       "recorded_in": "",
       "outcome": ""
@@ -463,6 +511,7 @@
       "module": "reconciliation.py",
       "line": 122,
       "condition": "type(value) is not int or value < 0",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "PROJECTION_RECONCILIATION_FAILED"
@@ -472,6 +521,7 @@
       "module": "reconciliation.py",
       "line": 144,
       "condition": "type(value) is not datetime",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": ""
@@ -481,6 +531,7 @@
       "module": "reconciliation.py",
       "line": 146,
       "condition": "value.tzinfo is None or value.utcoffset() is None",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": ""
@@ -490,6 +541,7 @@
       "module": "reconciliation.py",
       "line": 185,
       "condition": "type(value) is not str",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "DECISION_INSTANT_NOT_BOUND"
@@ -499,6 +551,7 @@
       "module": "reconciliation.py",
       "line": 219,
       "condition": "type(projection) is not CapacityRiskSubjectProjection",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "UNSUPPORTED_EXACT_TYPE"
@@ -508,6 +561,7 @@
       "module": "reconciliation.py",
       "line": 225,
       "condition": "type(decision) is not SubjectRiskDecision",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "UNSUPPORTED_EXACT_TYPE"
@@ -517,6 +571,7 @@
       "module": "reconciliation.py",
       "line": 283,
       "condition": "validation.context_digest != p_context_digest",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "CONTEXT_DIGEST_MISMATCH"
@@ -526,6 +581,7 @@
       "module": "reconciliation.py",
       "line": 288,
       "condition": "validation.subject_digest != p_subject_digest",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "SUBJECT_DIGEST_MISMATCH"
@@ -535,6 +591,7 @@
       "module": "reconciliation.py",
       "line": 293,
       "condition": "validation.recommendation_digest != p_recommendation_digest",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "RECOMMENDATION_MISMATCH"
@@ -544,6 +601,7 @@
       "module": "reconciliation.py",
       "line": 298,
       "condition": "p_request.digest() != p_request_digest",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "REQUEST_DIGEST_MISMATCH"
@@ -553,6 +611,7 @@
       "module": "reconciliation.py",
       "line": 303,
       "condition": "p_context.digest() != p_context_digest",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "CONTEXT_DIGEST_MISMATCH"
@@ -562,6 +621,7 @@
       "module": "reconciliation.py",
       "line": 322,
       "condition": "require_canonical_identifier('projection.tenant_id', p_tenant) != d_tenant",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "TENANT_MISMATCH"
@@ -571,6 +631,7 @@
       "module": "reconciliation.py",
       "line": 331,
       "condition": "p_request_digest != d_request_digest",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "REQUEST_DIGEST_MISMATCH"
@@ -580,6 +641,7 @@
       "module": "reconciliation.py",
       "line": 337,
       "condition": "p_subject_digest != d_subject_digest",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "SUBJECT_MISMATCH"
@@ -589,6 +651,7 @@
       "module": "reconciliation.py",
       "line": 344,
       "condition": "p_request.subject_type != SUBJECT_TYPE_CAPACITY_SUBJECT",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "D4_IDENTIFIER_MISMATCH"
@@ -598,6 +661,7 @@
       "module": "reconciliation.py",
       "line": 350,
       "condition": "p_request.requested_purpose != PURPOSE_CAPACITY_ACTION",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "D4_IDENTIFIER_MISMATCH"
@@ -607,6 +671,7 @@
       "module": "reconciliation.py",
       "line": 356,
       "condition": "p_request.requested_domain != DOMAIN_CLOUD_SCALING",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "D4_IDENTIFIER_MISMATCH"
@@ -616,6 +681,7 @@
       "module": "reconciliation.py",
       "line": 364,
       "condition": "action_type not in CANONICAL_ACTION_TYPES",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "ACTION_SUBSTITUTION"
@@ -625,6 +691,7 @@
       "module": "reconciliation.py",
       "line": 371,
       "condition": "not isinstance(d_disposition, SubjectRiskDisposition)",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "UNSUPPORTED_EXACT_TYPE"
@@ -634,6 +701,7 @@
       "module": "reconciliation.py",
       "line": 375,
       "condition": "d_disposition not in ALLOW_FAMILY_DISPOSITIONS",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "DECISION_NOT_ALLOW_FAMILY"
@@ -643,6 +711,7 @@
       "module": "reconciliation.py",
       "line": 381,
       "condition": "d_risk_outcome is None",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "MISSING_BINDING_DECISION"
@@ -652,6 +721,7 @@
       "module": "reconciliation.py",
       "line": 388,
       "condition": "d_decision_snapshot is None",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "MISSING_DECISION_SNAPSHOT"
@@ -661,6 +731,7 @@
       "module": "reconciliation.py",
       "line": 393,
       "condition": "not isinstance(d_decision_snapshot, Mapping)",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "MISSING_DECISION_SNAPSHOT"
@@ -670,6 +741,7 @@
       "module": "reconciliation.py",
       "line": 398,
       "condition": "d_decision_digest is None",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "MISSING_BINDING_DECISION"
@@ -679,6 +751,7 @@
       "module": "reconciliation.py",
       "line": 407,
       "condition": "recomputed != d_decision_digest",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "DECISION_DIGEST_MISMATCH"
@@ -688,6 +761,7 @@
       "module": "reconciliation.py",
       "line": 414,
       "condition": "decision_id is None",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "MISSING_BINDING_DECISION"
@@ -697,6 +771,7 @@
       "module": "reconciliation.py",
       "line": 429,
       "condition": "snapshot_tenant != p_tenant",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "TENANT_MISMATCH"
@@ -706,6 +781,7 @@
       "module": "reconciliation.py",
       "line": 436,
       "condition": "snapshot_domain != DOMAIN_CLOUD_SCALING",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "D4_IDENTIFIER_MISMATCH"
@@ -715,6 +791,7 @@
       "module": "reconciliation.py",
       "line": 444,
       "condition": "not p_idempotency_key",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "IDEMPOTENCY_KEY_MISMATCH"
@@ -724,6 +801,7 @@
       "module": "reconciliation.py",
       "line": 449,
       "condition": "not d_idempotency_key",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "IDEMPOTENCY_KEY_MISMATCH"
@@ -733,6 +811,7 @@
       "module": "reconciliation.py",
       "line": 461,
       "condition": "p_idempotency_key != d_idempotency_key",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "IDEMPOTENCY_KEY_MISMATCH"
@@ -742,6 +821,7 @@
       "module": "reconciliation.py",
       "line": 468,
       "condition": "not isinstance(p_evidence_references, tuple) or not p_evidence_references",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "INVALID_EVIDENCE_BINDING"
@@ -751,6 +831,7 @@
       "module": "reconciliation.py",
       "line": 475,
       "condition": "tuple(p_request.evidence_references) != tuple(p_evidence_references)",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "INVALID_EVIDENCE_BINDING"
@@ -760,6 +841,7 @@
       "module": "reconciliation.py",
       "line": 481,
       "condition": "not evidence_snapshot_digest",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "INVALID_EVIDENCE_BINDING"
@@ -769,6 +851,7 @@
       "module": "reconciliation.py",
       "line": 510,
       "condition": "snapshot_evaluated_at is None",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "DECISION_INSTANT_NOT_BOUND"
@@ -778,6 +861,7 @@
       "module": "reconciliation.py",
       "line": 520,
       "condition": "snapshot_expires_at is None",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "MISSING_EXPIRY_FACT"
@@ -787,6 +871,7 @@
       "module": "reconciliation.py",
       "line": 525,
       "condition": "snapshot_issued_at is None",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "DECISION_INSTANT_NOT_BOUND"
@@ -796,6 +881,7 @@
       "module": "reconciliation.py",
       "line": 538,
       "condition": "d_expires_at is None",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "MISSING_EXPIRY_FACT"
@@ -805,6 +891,7 @@
       "module": "reconciliation.py",
       "line": 545,
       "condition": "to_canonical_obj(decision_evaluated_at) != to_canonical_obj(snapshot_evaluated_at)",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "DECISION_INSTANT_NOT_BOUND"
@@ -814,6 +901,7 @@
       "module": "reconciliation.py",
       "line": 560,
       "condition": "to_canonical_obj(decision_expires_at) != to_canonical_obj(bound_expires_at)",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "DECISION_INSTANT_NOT_BOUND"
@@ -823,6 +911,7 @@
       "module": "reconciliation.py",
       "line": 577,
       "condition": "subject_valid_from > bound_evaluated_at",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "DECISION_INSTANT_NOT_BOUND"
@@ -832,6 +921,7 @@
       "module": "reconciliation.py",
       "line": 584,
       "condition": "bound_evaluated_at > bound_issued_at",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "DECISION_INSTANT_NOT_BOUND"
@@ -841,6 +931,7 @@
       "module": "candidate.py",
       "line": 248,
       "condition": "self.schema_version != AUTHORIZATION_CANDIDATE_SCHEMA_VERSION",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "UNSUPPORTED_SCHEMA_VERSION"
@@ -850,6 +941,7 @@
       "module": "candidate.py",
       "line": 288,
       "condition": "type(value) is not expected",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "UNSUPPORTED_EXACT_TYPE"
@@ -859,6 +951,7 @@
       "module": "candidate.py",
       "line": 296,
       "condition": "self.candidate_digest != expected_digest",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "CANDIDATE_DIGEST_FAILURE"
@@ -868,6 +961,7 @@
       "module": "candidate.py",
       "line": 403,
       "condition": "type(value) is not datetime",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "MALFORMED_CANONICAL_FIELD"
@@ -877,6 +971,7 @@
       "module": "candidate.py",
       "line": 408,
       "condition": "value.tzinfo is None or value.utcoffset() is None",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "MALFORMED_CANONICAL_FIELD"
@@ -886,6 +981,7 @@
       "module": "candidate.py",
       "line": 457,
       "condition": "value is None",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "",
       "outcome": "MISSING_POLICY_COORDINATE_BINDING, MISSING_POLICY_TARGET_BINDING, MISSING_PRODUCER_ATTESTATION, TARGET_SUBSTITUTION"
@@ -895,6 +991,7 @@
       "module": "candidate.py",
       "line": 465,
       "condition": "type(value) is not expected",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "UNSUPPORTED_EXACT_TYPE"
@@ -904,6 +1001,7 @@
       "module": "candidate.py",
       "line": 516,
       "condition": "a_recommendation_digest != facts.recommendation_digest",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "PRODUCER_ATTESTATION_CONTENT_MISMATCH"
@@ -913,6 +1011,7 @@
       "module": "candidate.py",
       "line": 550,
       "condition": "not subject_from <= subject_asserted <= subject_until",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "SUBJECT_TEMPORAL_ORDERING"
@@ -922,6 +1021,7 @@
       "module": "candidate.py",
       "line": 558,
       "condition": "decision_at > decision_until",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "DECISION_TEMPORAL_ORDERING"
@@ -931,6 +1031,7 @@
       "module": "candidate.py",
       "line": 565,
       "condition": "not subject_asserted <= attested_at <= subject_until",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "ATTESTATION_TEMPORAL_ORDERING"
@@ -940,6 +1041,7 @@
       "module": "candidate.py",
       "line": 576,
       "condition": "s_tenant != facts.tenant_id",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "TENANT_MISMATCH"
@@ -949,6 +1051,7 @@
       "module": "candidate.py",
       "line": 580,
       "condition": "not s_account",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "MISSING_ACCOUNT_BINDING"
@@ -958,6 +1061,7 @@
       "module": "candidate.py",
       "line": 585,
       "condition": "s_action_type != facts.action_type",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "ACTION_SUBSTITUTION"
@@ -967,6 +1071,7 @@
       "module": "candidate.py",
       "line": 591,
       "condition": "s_magnitude_before != facts.magnitude_before",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "TARGET_SUBSTITUTION"
@@ -976,6 +1081,7 @@
       "module": "candidate.py",
       "line": 596,
       "condition": "s_requested_magnitude != facts.magnitude_after",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "TARGET_SUBSTITUTION"
@@ -985,6 +1091,7 @@
       "module": "candidate.py",
       "line": 611,
       "condition": "scope_value != projected_value",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": ""
@@ -994,6 +1101,7 @@
       "module": "candidate.py",
       "line": 619,
       "condition": "b_target_scope_digest != s_digest",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "POLICY_TARGET_CONTENT_MISMATCH"
@@ -1003,6 +1111,7 @@
       "module": "candidate.py",
       "line": 624,
       "condition": "b_max_magnitude != s_max_magnitude or b_max_delta != s_max_delta",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "POLICY_TARGET_CONTENT_MISMATCH"
@@ -1012,6 +1121,7 @@
       "module": "candidate.py",
       "line": 649,
       "condition": "c_policy_id != b_policy_id or c_policy_version != b_policy_version",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "POLICY_COORDINATE_CONTENT_MISMATCH"
@@ -1021,6 +1131,7 @@
       "module": "candidate.py",
       "line": 657,
       "condition": "c_target_scope_digest != s_digest",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "POLICY_COORDINATE_CONTENT_MISMATCH"
@@ -1030,6 +1141,7 @@
       "module": "candidate.py",
       "line": 669,
       "condition": "c_policy_scope == POLICY_SCOPE_TENANT and c_policy_tenant_id != facts.tenant_id",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "CROSS_TENANT_POLICY_BINDING"
@@ -1039,6 +1151,7 @@
       "module": "candidate.py",
       "line": 682,
       "condition": "s_requested_magnitude > b_max_magnitude",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "REQUESTED_MAGNITUDE_ABOVE_MAXIMUM"
@@ -1048,6 +1161,7 @@
       "module": "candidate.py",
       "line": 688,
       "condition": "facts.requested_delta > b_max_delta",
+      "kind": "if",
       "shape": "raise",
       "recorded_in": "canonical-65",
       "outcome": "DELTA_ABOVE_MAXIMUM"

@@ -1,0 +1,381 @@
+{
+  "package": "capacity-bounds-policy",
+  "total": 37,
+  "reconciliation": {},
+  "excluded": {
+    "except_arms": 0,
+    "boolean_subterms": 10
+  },
+  "guards": [
+    {
+      "index": 1,
+      "module": "policy.py",
+      "line": 64,
+      "condition": "not isinstance(value, str)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": "FIELD_NOT_A_STRING"
+    },
+    {
+      "index": 2,
+      "module": "policy.py",
+      "line": 68,
+      "condition": "not allow_empty and (not value.strip())",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": "FIELD_EMPTY"
+    },
+    {
+      "index": 3,
+      "module": "policy.py",
+      "line": 76,
+      "condition": "not isinstance(value, str) or len(value) != 64 or any((c not in _HEX for c in value))",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": "CONTENT_DIGEST_MALFORMED"
+    },
+    {
+      "index": 4,
+      "module": "policy.py",
+      "line": 92,
+      "condition": "isinstance(value, bool) or not isinstance(value, int)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": "MAGNITUDE_NOT_AN_INT"
+    },
+    {
+      "index": 5,
+      "module": "policy.py",
+      "line": 97,
+      "condition": "value < 0",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": "MAGNITUDE_NEGATIVE"
+    },
+    {
+      "index": 6,
+      "module": "policy.py",
+      "line": 105,
+      "condition": "not isinstance(value, datetime)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": "TIMESTAMP_NOT_A_DATETIME"
+    },
+    {
+      "index": 7,
+      "module": "policy.py",
+      "line": 109,
+      "condition": "value.tzinfo is None or value.tzinfo.utcoffset(value) is None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": "TIMESTAMP_NAIVE"
+    },
+    {
+      "index": 8,
+      "module": "policy.py",
+      "line": 133,
+      "condition": "_require_token(self.action_type, 'CapacityBound.action_type')",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 9,
+      "module": "policy.py",
+      "line": 134,
+      "condition": "_require_token(self.resource_class, 'CapacityBound.resource_class', allow_empty=True)",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 10,
+      "module": "policy.py",
+      "line": 135,
+      "condition": "_require_bound_magnitude(self.max_permitted_magnitude, 'CapacityBound.max_permitted_magnitude')",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 11,
+      "module": "policy.py",
+      "line": 138,
+      "condition": "_require_bound_magnitude(self.max_permitted_delta, 'CapacityBound.max_permitted_delta')",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 12,
+      "module": "policy.py",
+      "line": 141,
+      "condition": "self.max_permitted_delta > self.max_permitted_magnitude",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": "BOUND_ORDERING_INCOHERENT"
+    },
+    {
+      "index": 13,
+      "module": "policy.py",
+      "line": 177,
+      "condition": "_require_token(self.policy_id, 'CapacityBoundsPolicyMetadata.policy_id')",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 14,
+      "module": "policy.py",
+      "line": 178,
+      "condition": "_require_token(self.version, 'CapacityBoundsPolicyMetadata.version')",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 15,
+      "module": "policy.py",
+      "line": 179,
+      "condition": "_require_digest(self.content_digest, 'CapacityBoundsPolicyMetadata.content_digest')",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 16,
+      "module": "policy.py",
+      "line": 182,
+      "condition": "_require_token(self.scope, 'CapacityBoundsPolicyMetadata.scope')",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 17,
+      "module": "policy.py",
+      "line": 183,
+      "condition": "self.scope not in SUPPORTED_POLICY_SCOPES",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": "SCOPE_UNSUPPORTED"
+    },
+    {
+      "index": 18,
+      "module": "policy.py",
+      "line": 188,
+      "condition": "_require_token(self.lifecycle_state, 'CapacityBoundsPolicyMetadata.lifecycle_state')",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 19,
+      "module": "policy.py",
+      "line": 191,
+      "condition": "self.lifecycle_state not in SUPPORTED_LIFECYCLE_STATES",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": "LIFECYCLE_STATE_UNSUPPORTED"
+    },
+    {
+      "index": 20,
+      "module": "policy.py",
+      "line": 197,
+      "condition": "_require_token(self.tenant_id, 'CapacityBoundsPolicyMetadata.tenant_id', allow_empty=True)",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 21,
+      "module": "policy.py",
+      "line": 200,
+      "condition": "_require_token(self.supersedes_ref, 'CapacityBoundsPolicyMetadata.supersedes_ref', allow_empty=True)",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 22,
+      "module": "policy.py",
+      "line": 209,
+      "condition": "self.scope == POLICY_SCOPE_GLOBAL and self.tenant_id != ''",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": "GLOBAL_SCOPE_CARRIES_TENANT"
+    },
+    {
+      "index": 23,
+      "module": "policy.py",
+      "line": 214,
+      "condition": "self.scope == POLICY_SCOPE_TENANT and (not self.tenant_id.strip())",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": "TENANT_SCOPE_NAMES_NO_TENANT"
+    },
+    {
+      "index": 24,
+      "module": "policy.py",
+      "line": 222,
+      "condition": "value is not None",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 25,
+      "module": "policy.py",
+      "line": 223,
+      "condition": "_require_tzaware(value, f'CapacityBoundsPolicyMetadata.{name}')",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 26,
+      "module": "policy.py",
+      "line": 224,
+      "condition": "self.effective_from is not None and self.effective_to is not None and (self.effective_to <= self.effective_from)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": "EFFECTIVE_INTERVAL_EMPTY"
+    },
+    {
+      "index": 27,
+      "module": "policy.py",
+      "line": 254,
+      "condition": "not isinstance(self.metadata, CapacityBoundsPolicyMetadata)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": "METADATA_TYPE_MISMATCH"
+    },
+    {
+      "index": 28,
+      "module": "policy.py",
+      "line": 259,
+      "condition": "not isinstance(self.bounds, tuple)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": "BOUNDS_NOT_A_TUPLE"
+    },
+    {
+      "index": 29,
+      "module": "policy.py",
+      "line": 265,
+      "condition": "not self.bounds",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": "BOUNDS_EMPTY"
+    },
+    {
+      "index": 30,
+      "module": "policy.py",
+      "line": 271,
+      "condition": "type(bound) is not CapacityBound",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": "BOUND_TYPE_MISMATCH"
+    },
+    {
+      "index": 31,
+      "module": "policy.py",
+      "line": 280,
+      "condition": "bound.selector in seen",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": "DUPLICATE_SELECTOR"
+    },
+    {
+      "index": 32,
+      "module": "policy.py",
+      "line": 298,
+      "condition": "_require_token(action_type, 'bound_for(action_type)')",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 33,
+      "module": "policy.py",
+      "line": 299,
+      "condition": "_require_token(resource_class, 'bound_for(resource_class)', allow_empty=True)",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 34,
+      "module": "adapter.py",
+      "line": 60,
+      "condition": "not isinstance(metadata, CapacityBoundsPolicyMetadata)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": "COORDINATE_INPUT_TYPE_MISMATCH"
+    },
+    {
+      "index": 35,
+      "module": "adapter.py",
+      "line": 101,
+      "condition": "type(artifact) is not CapacityBoundsPolicy",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": "ARTIFACT_TYPE_MISMATCH"
+    },
+    {
+      "index": 36,
+      "module": "adapter.py",
+      "line": 110,
+      "condition": "not isinstance(metadata, CapacityBoundsPolicyMetadata)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": "METADATA_ENVELOPE_MISSING"
+    },
+    {
+      "index": 37,
+      "module": "adapter.py",
+      "line": 150,
+      "condition": "not isinstance(metadata, dict) or 'content_digest' not in metadata",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": "PROJECTION_DIGEST_DECLARATION_MISSING"
+    }
+  ]
+}

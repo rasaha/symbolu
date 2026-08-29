@@ -35,6 +35,7 @@ from .errors import (
     CapacityBoundsDuplicateError,
     CapacityBoundsFieldError,
     CapacityBoundsOrderingError,
+    CapacityBoundsRejectionReason as Reason,
 )
 from .identifiers import (
     CAPACITY_BOUNDS_POLICY_FAMILY,
@@ -61,16 +62,21 @@ PLACEHOLDER_CONTENT_DIGEST = "0" * 64
 
 def _require_token(value: object, name: str, *, allow_empty: bool = False) -> str:
     if not isinstance(value, str):
-        raise CapacityBoundsFieldError(f"{name} must be a string")
+        raise CapacityBoundsFieldError(
+            f"{name} must be a string", reason=Reason.FIELD_NOT_A_STRING
+        )
     if not allow_empty and not value.strip():
-        raise CapacityBoundsFieldError(f"{name} must be a non-empty string")
+        raise CapacityBoundsFieldError(
+            f"{name} must be a non-empty string", reason=Reason.FIELD_EMPTY
+        )
     return value
 
 
 def _require_digest(value: object, name: str) -> str:
     if not isinstance(value, str) or len(value) != 64 or any(c not in _HEX for c in value):
         raise CapacityBoundsFieldError(
-            f"{name} must be a lowercase 64-char sha-256 hex digest"
+            f"{name} must be a lowercase 64-char sha-256 hex digest",
+            reason=Reason.CONTENT_DIGEST_MALFORMED,
         )
     return value
 
@@ -84,18 +90,26 @@ def _require_bound_magnitude(value: object, name: str) -> int:
     """
 
     if isinstance(value, bool) or not isinstance(value, int):
-        raise CapacityBoundsFieldError(f"{name} must be an int (bool is not an int here)")
+        raise CapacityBoundsFieldError(
+            f"{name} must be an int (bool is not an int here)",
+            reason=Reason.MAGNITUDE_NOT_AN_INT,
+        )
     if value < 0:
-        raise CapacityBoundsFieldError(f"{name} must be >= 0, got {value}")
+        raise CapacityBoundsFieldError(
+            f"{name} must be >= 0, got {value}", reason=Reason.MAGNITUDE_NEGATIVE
+        )
     return value
 
 
 def _require_tzaware(value: object, name: str) -> datetime:
     if not isinstance(value, datetime):
-        raise CapacityBoundsFieldError(f"{name} must be a datetime")
+        raise CapacityBoundsFieldError(
+            f"{name} must be a datetime", reason=Reason.TIMESTAMP_NOT_A_DATETIME
+        )
     if value.tzinfo is None or value.tzinfo.utcoffset(value) is None:
         raise CapacityBoundsFieldError(
-            f"{name} must be timezone-aware; a naive datetime is never assumed to be UTC"
+            f"{name} must be timezone-aware; a naive datetime is never assumed to be UTC",
+            reason=Reason.TIMESTAMP_NAIVE,
         )
     return value
 
@@ -128,7 +142,8 @@ class CapacityBound:
             raise CapacityBoundsOrderingError(
                 f"max_permitted_delta {self.max_permitted_delta} exceeds "
                 f"max_permitted_magnitude {self.max_permitted_magnitude}: a change larger "
-                "than the largest permitted result cannot be reached under this bound"
+                "than the largest permitted result cannot be reached under this bound",
+                reason=Reason.BOUND_ORDERING_INCOHERENT,
             )
 
     @property
@@ -167,7 +182,8 @@ class CapacityBoundsPolicyMetadata:
         _require_token(self.scope, "CapacityBoundsPolicyMetadata.scope")
         if self.scope not in SUPPORTED_POLICY_SCOPES:
             raise CapacityBoundsFieldError(
-                f"scope {self.scope!r} is not one of {sorted(SUPPORTED_POLICY_SCOPES)}"
+                f"scope {self.scope!r} is not one of {sorted(SUPPORTED_POLICY_SCOPES)}",
+                reason=Reason.SCOPE_UNSUPPORTED,
             )
         _require_token(
             self.lifecycle_state, "CapacityBoundsPolicyMetadata.lifecycle_state"
@@ -175,7 +191,8 @@ class CapacityBoundsPolicyMetadata:
         if self.lifecycle_state not in SUPPORTED_LIFECYCLE_STATES:
             raise CapacityBoundsFieldError(
                 f"lifecycle_state {self.lifecycle_state!r} is not one of "
-                f"{sorted(SUPPORTED_LIFECYCLE_STATES)}"
+                f"{sorted(SUPPORTED_LIFECYCLE_STATES)}",
+                reason=Reason.LIFECYCLE_STATE_UNSUPPORTED,
             )
         _require_token(
             self.tenant_id, "CapacityBoundsPolicyMetadata.tenant_id", allow_empty=True
@@ -191,11 +208,13 @@ class CapacityBoundsPolicyMetadata:
         # named no tenant would resolve for the global tenant instead.
         if self.scope == POLICY_SCOPE_GLOBAL and self.tenant_id != "":
             raise CapacityBoundsFieldError(
-                "a GLOBAL-scope policy must carry the canonical empty tenant component"
+                "a GLOBAL-scope policy must carry the canonical empty tenant component",
+                reason=Reason.GLOBAL_SCOPE_CARRIES_TENANT,
             )
         if self.scope == POLICY_SCOPE_TENANT and not self.tenant_id.strip():
             raise CapacityBoundsFieldError(
-                "a TENANT-scope policy must name a non-empty tenant"
+                "a TENANT-scope policy must name a non-empty tenant",
+                reason=Reason.TENANT_SCOPE_NAMES_NO_TENANT,
             )
 
         for name in ("effective_from", "effective_to"):
@@ -209,7 +228,8 @@ class CapacityBoundsPolicyMetadata:
         ):
             raise CapacityBoundsOrderingError(
                 "effective_to must be strictly after effective_from; the interval is "
-                "half-open [from, to) and an empty one can never admit a resolution"
+                "half-open [from, to) and an empty one can never admit a resolution",
+                reason=Reason.EFFECTIVE_INTERVAL_EMPTY,
             )
 
     @property
@@ -233,21 +253,26 @@ class CapacityBoundsPolicy:
     def __post_init__(self) -> None:
         if not isinstance(self.metadata, CapacityBoundsPolicyMetadata):
             raise CapacityBoundsFieldError(
-                "CapacityBoundsPolicy.metadata must be a CapacityBoundsPolicyMetadata"
+                "CapacityBoundsPolicy.metadata must be a CapacityBoundsPolicyMetadata",
+                reason=Reason.METADATA_TYPE_MISMATCH,
             )
         if not isinstance(self.bounds, tuple):
             raise CapacityBoundsFieldError(
                 "CapacityBoundsPolicy.bounds must be a tuple — a list is mutable and this "
-                "artifact is digested"
+                "artifact is digested",
+                reason=Reason.BOUNDS_NOT_A_TUPLE,
             )
         if not self.bounds:
             raise CapacityBoundsFieldError(
-                "CapacityBoundsPolicy.bounds must carry at least one bound"
+                "CapacityBoundsPolicy.bounds must carry at least one bound",
+                reason=Reason.BOUNDS_EMPTY,
             )
         for index, bound in enumerate(self.bounds):
             if type(bound) is not CapacityBound:
                 raise CapacityBoundsFieldError(
-                    f"CapacityBoundsPolicy.bounds[{index}] must be exactly a CapacityBound"
+                    f"CapacityBoundsPolicy.bounds[{index}] must be exactly a "
+                    "CapacityBound",
+                    reason=Reason.BOUND_TYPE_MISMATCH,
                 )
 
         seen: set = set()
@@ -255,7 +280,8 @@ class CapacityBoundsPolicy:
             if bound.selector in seen:
                 raise CapacityBoundsDuplicateError(
                     f"two bounds claim selector {bound.selector!r}; the applicable bound "
-                    "must be unambiguous by construction"
+                    "must be unambiguous by construction",
+                    reason=Reason.DUPLICATE_SELECTOR,
                 )
             seen.add(bound.selector)
 

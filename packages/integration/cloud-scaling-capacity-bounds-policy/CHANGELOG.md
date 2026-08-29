@@ -3,6 +3,39 @@
 All notable changes to this distribution. This package follows the Cloud Scaling
 phase numbering; each entry names the phase that produced it.
 
+## Unreleased — guard-coverage doctrine, §3 ruling
+
+### Added
+
+- **`CapacityBoundsRejectionReason`** — the reason vocabulary this family did not
+  publish. The guard-coverage ADR §3 measured the typed refusal degenerate here:
+  three leaf error classes, zero enums, and fifteen guards raising one
+  `CapacityBoundsFieldError`, so a suite asserting that class could only show that
+  *something* refused. The owner ratified that this family gains a reason enum
+  before its first scored guard sweep, and this is it. Every refusal the package
+  *raises* now carries `reason` — all 22 — including the four raised under the shared
+  authority's own
+  `UnsupportedPolicyArtifactError` / `PolicyAuthorityRequestError` — those keep the
+  authority's classes, which are its contract with an adapter, and carry the reason
+  as an attribute attached by `with_rejection_reason`. `rejection_reason_of` reads
+  either half.
+- **`tests/test_rejection_reasons.py`** — one refusal per published member, so no
+  member is unreachable and no two guards on the same path are indistinguishable.
+- **`tests/test_helper_admission_sites.py`** — one test per D-GC-4 helper-admission
+  call site, closing the ten the family's first scored sweep left surviving. Each
+  builds a control with only the named field corrected (so the refusal cannot be
+  attributed to another call site), asserts the input is malformed in the intended
+  way, and asserts the typed pair. Measured: each test kills its own site's call
+  deletion and no other's — a clean diagonal across all ten. The family is now
+  37 of 37 sites killed, none excluded.
+
+### Unchanged on purpose
+
+- **Which inputs refuse.** Every guard fires on exactly the inputs it fired on
+  before and raises exactly the class it raised before. `CapacityBoundsPolicyError`
+  now *requires* a reason rather than defaulting one: a refusal that names no reason
+  is the defect §3 ruled against, and a default would let one back in silently.
+
 ## 0.1.0 — Cloud Scaling Phase 5B-3 (R-8 subphase): the capacity-bounds family
 
 First release. Makes a capacity bound **issuable** for the first time, and stops
