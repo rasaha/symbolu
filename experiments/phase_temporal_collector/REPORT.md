@@ -107,3 +107,83 @@ task-progression discipline (owner ratification before further implementation).
 No claim here reverses the closed `experiments/phase_lc` semantic-retrieval
 verdict, and no capability is described as implemented beyond what these 36
 runs measured.
+
+## Sweep 3 (Amendment 2: dense supervision, causal F, horizon fix, arm G) — G0 PASSES
+
+Owner-ratified as the final sweep (no further budget-only increases). Raw
+results: `results/sweep3_amendment2/`. All 21 runs (7 arms × 3 seeds, 4000
+steps) completed with no errors; parameters matched to <0.13%
+(~74.4–74.5K); gated metric E kept its frozen definition (mean nMSE, 4
+forecast families × {in_dist, held_out}, at cutoffs {128, 192, 240}).
+
+**G0 passed.** RI(F vs B) = **+0.62** (gate: ≥ +0.15). Dense per-position
+supervision and multi-frequency time features fixed the validity problem: F
+(E=0.166) is now the best arm by a wide margin, and the benchmark is valid for
+the first time across three sweeps.
+
+**G1 passed.** Harmonic (C) beats stats (B): RI = **+0.54**, 3/3 seeds; gap
+closure = **0.87** (closes 87% of the distance from B to F); memory = 7.9% of
+F's (38 vs 480 floats). All three G1 thresholds cleared with room to spare.
+
+**G2′ (Phase mechanism) failed.** Phase beat the matched real recurrence D
+(RI +0.17, 3/3 seeds) but lost to harmonic C (RI −0.60, 0/3 seeds) and to the
+oscillator G (RI −0.24, 0/3 seeds). Two of three required comparisons failed.
+
+**G3 (oscillator utility) failed.** Osc beat real recurrence D (RI +0.33,
+3/3 seeds) but lost to harmonic C (RI −0.29, 0/3 seeds).
+
+E(arm) at Sweep 3 (mean nMSE, lower is better): current 0.787 · stats 0.442 ·
+**harmonic 0.203** · real_rec 0.392 · phase 0.325 · osc 0.263 · raw_quad 0.166.
+
+**Outcome classification (per Amendment 2's frozen table): G0 passes, C best
+→ pursue the classical collector.** Neither the original Phase mechanism nor
+the learned complex oscillator overtakes the fixed-clock harmonic collector at
+this compute scale; harmonic closes most of the way to the valid raw-history
+ceiling at a fraction of its memory.
+
+**A notable informational finding.** Osc's in-distribution periodic nMSE
+(0.061) is the best of any arm, even beating raw_quad (0.116) — but its
+held-out-frequency periodic nMSE (0.506) is far worse than harmonic's (0.174)
+or even raw_quad's (0.314), and its held-out rare-event AUC collapses to 0.624
+(vs harmonic 0.960). This is consistent with the owner's stated caveat before
+the run: a learned oscillator's frequencies are fit to the training
+distribution and need not generalize to unseen periods, while harmonic's
+*fixed*, un-learned clock bank does not have that failure mode. This is very
+likely *why* C beats G on the gated metric, not an unrelated observation.
+
+## Final verdict
+
+**Practical temporal collection: PROVISIONALLY SUPPORTED at micro scale
+(G1 passed).** Fixed-clock harmonic accumulators materially and consistently
+improve a quadratic reader's forecasts over ordinary statistical summaries, at
+a small fraction of raw-history memory, closing most of the gap to full
+attention over history — on synthetic periodic/drifting/phase-shifting/
+irregular signals, 3 seeds, held-out frequencies.
+
+**The learned Phase mechanism (reference_equations.md §2–§5, at collector
+scale): NOT SUPPORTED at micro scale (G2′ failed).** It underperforms the
+fixed-clock harmonic collector on this task. It does beat a matched real
+(non-rotating) linear recurrence, so content-derived rotation carries some
+value over no rotation at all — just not over a fixed external clock.
+
+**The learned complex oscillator (diagonal-SSM style, arm G): NOT SUPPORTED
+as a temporal collector at micro scale (G3 failed)**, for the same reason —
+loses to the fixed clock — with an informational finding that its failure mode
+is specifically poor generalization to held-out frequencies. This is an SSM
+architecture result, not a Phase result, per Amendment 2's naming discipline.
+
+**What this experiment does and does not establish.** It supports investing
+further in classical, fixed-frequency harmonic feature collectors — not in
+scaling the learned-rotation (Phase) or learned-oscillator mechanisms — as the
+temporal-collector half of the ChatGPT-proposed architecture, at this compute
+scale and on these synthetic families. It does not reverse the closed
+`experiments/phase_lc` semantic-retrieval verdict, does not test real acoustic
+or varṇa-aligned signals, and does not extend past CPU micro scale (no
+verdict here exceeds PROVISIONALLY SUPPORTED). No capability is claimed beyond
+what these 57 runs (18 + 18 + 21) measured.
+
+Per the owner's ratification, this closes the sweep sequence: no further
+budget-only increases are authorized. A GPU-scale replication of this exact
+protocol (Amendment 2 architecture, held-out and extrapolation splits
+retained) is the natural next experiment if further investment is warranted;
+that decision is left to the owner.
