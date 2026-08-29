@@ -39,6 +39,20 @@ jobs:
           cache: "npm"
           cache-dependency-path: apps/ugence-governance-studio/frontend/package-lock.json
 
+      # Two stdlib-only static conformance checks, deliberately ahead of install so a
+      # violation fails fast. ratified-pin-conformance is ALSO the first step of the
+      # container job; it is repeated here because the container job only runs where a
+      # container runtime and registry access exist, so this job is the one that
+      # actually guards every push.
+      - name: ratified-pin-conformance
+        run: python deployment/governance-studio/ci/verify_ratified_pins.py
+
+      - name: gate-identifier-conformance
+        # The P3E audit records must reference only the canonical container-gate
+        # identifiers published in CONTAINER_GATE_DEFINITION.json (or a declared
+        # deprecated alias, and only inside a field that quotes a superseded list).
+        run: python deployment/governance-studio/ci/verify_gate_identifiers.py
+
       - name: install
         run: |
           pip install "pydantic>=2" "fastapi>=0.110" "uvicorn>=0.27" "starlette>=0.36" httpx pytest pip-audit

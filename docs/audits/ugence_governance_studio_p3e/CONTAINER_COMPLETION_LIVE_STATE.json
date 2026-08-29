@@ -2,18 +2,79 @@
   "phase": "governance_studio_p3e_container_completion",
   "default_branch": "claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF",
   "default_tip": "e496a67978245e57bb9dcbfab2387a3af18781b4",
-  "pr_1325": {"state": "open", "merged": false, "draft": false,
-              "head_branch": "claude/governance-studio-p3e-private-hosted",
-              "starting_head": "8f4faa332016514d9dc2f2fd10c36f03523f5fd3"},
+  "pr_1325": {
+    "state": "open",
+    "merged": false,
+    "draft": false,
+    "head_branch": "claude/governance-studio-p3e-private-hosted",
+    "starting_head": "8f4faa332016514d9dc2f2fd10c36f03523f5fd3"
+  },
   "pr_1323_merged": true,
   "later_p3e_pr_exists": false,
   "branch_strategy": "push corrections to same branch; no second PR",
-  "resource_gate": {"docker_daemon_running": true, "buildx": true, "compose": true,
-                    "scratch_build_works": true, "base_image_pull": "FORBIDDEN_403",
-                    "manifest_inspect": "FORBIDDEN_403", "container_gates_executable": false},
-  "executed_this_pass": ["argon2id", "pip-audit", "npm-audit", "base-images-manifest", "doc-corrections"],
-  "not_executed": ["C2", "C4", "C5", "C6", "C7", "C8", "C9", "C10", "C11", "C12", "C13", "C14", "C15", "C18", "C19"],
-  "frozen": {"openapi_sha256": "dc309eab216e1a4c2f63f286887a4ef218a96ac34f8fa8614bff176db7c36656",
-             "platform_digest": "d993093570bb8ee132d4ab58406a14dd8c9b774b9de2c6d7ac45d3dfd3fac036",
-             "synthetic_bundle": "c0e5ac73048824f07543f38f67a445cd289ff481f26505c3446bc7609e4dfcdc"}
+  "resource_gate": {
+    "docker_daemon_running": true,
+    "buildx": true,
+    "compose": true,
+    "scratch_build_works": true,
+    "base_image_pull": "FORBIDDEN_403",
+    "manifest_inspect": "FORBIDDEN_403",
+    "container_gates_executable": false
+  },
+  "executed_this_pass": [
+    "argon2id",
+    "pip-audit",
+    "npm-audit",
+    "base-images-manifest",
+    "doc-corrections"
+  ],
+  "not_executed": [
+    "C2",
+    "C4",
+    "C5",
+    "C6",
+    "C7",
+    "C8",
+    "C9",
+    "C10",
+    "C11",
+    "C12",
+    "C13",
+    "C14",
+    "C15",
+    "C16",
+    "C17",
+    "C18",
+    "C19"
+  ],
+  "frozen": {
+    "openapi_sha256": "dc309eab216e1a4c2f63f286887a4ef218a96ac34f8fa8614bff176db7c36656",
+    "platform_digest": "d993093570bb8ee132d4ab58406a14dd8c9b774b9de2c6d7ac45d3dfd3fac036",
+    "synthetic_bundle": "c0e5ac73048824f07543f38f67a445cd289ff481f26505c3446bc7609e4dfcdc"
+  },
+  "gate_definition": "docs/audits/ugence_governance_studio_p3e/CONTAINER_GATE_DEFINITION.json",
+  "gate_identifier_reconciliation": {
+    "note": "Reconciled to the canonical identifier set in CONTAINER_GATE_DEFINITION.json on 2026-08-29. C16-image and C17-image were deprecated, noncanonical aliases of C16 and C17 by owner decision (rasaha) and are not distinct additional gates.",
+    "previous_not_executed": [
+      "C2",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8",
+      "C9",
+      "C10",
+      "C11",
+      "C12",
+      "C13",
+      "C14",
+      "C15",
+      "C18",
+      "C19"
+    ],
+    "change": "completed to the full canonical set; C16 and C17 were absent from this record while CONTAINER_RUNTIME_CAPABILITY.json recorded them (as C16-image and C17-image) among the blocked gates",
+    "basis_for_adding_C16_C17": "this record's own resource_gate.container_gates_executable is false, so no container gate executed in this pass; every canonical gate is therefore NOT_EXECUTED, C16 and C17 included",
+    "gate_count_before": 15,
+    "gate_count_after": 17
+  }
 }

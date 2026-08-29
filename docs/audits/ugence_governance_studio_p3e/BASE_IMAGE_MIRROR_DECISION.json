@@ -4,9 +4,18 @@
   "status": "RATIFIED_PENDING_MIRROR_COORDINATES",
   "rationale": "Organization egress policy denies all container-registry blob CDNs (403 on CONNECT to production.cloudfront.docker.com and pkg-containers.githubusercontent.com), so the P3E Dockerfile's digest-pinned base images cannot be pulled and gates C2 and C4-C19 have never executed. P3F obtains the same images through an approved internal registry mirror rather than by relaxing egress policy or by substituting a different image.",
   "rejected_alternatives": [
-    {"option": "allowlist the upstream registry blob CDNs for CI", "reason": "widens organization egress policy; not the ratified route"},
-    {"option": "run the container job on a runner with direct registry access", "reason": "moves the trust boundary outside the approved environment; not the ratified route"},
-    {"option": "substitute a different or FROM-scratch base image", "reason": "PROHIBITED - would invalidate the P3E supply-chain evidence"}
+    {
+      "option": "allowlist the upstream registry blob CDNs for CI",
+      "reason": "widens organization egress policy; not the ratified route"
+    },
+    {
+      "option": "run the container job on a runner with direct registry access",
+      "reason": "moves the trust boundary outside the approved environment; not the ratified route"
+    },
+    {
+      "option": "substitute a different or FROM-scratch base image",
+      "reason": "PROHIBITED - would invalidate the P3E supply-chain evidence"
+    }
   ],
   "authoritative_digests": {
     "note": "These upstream multi-arch INDEX digests are the ratified reference and are NOT changed by this decision. They remain exactly as pinned in deployment/governance-studio/base-images.json and in the Dockerfile FROM lines. The mirror is a transport, not a new source of truth.",
@@ -16,13 +25,18 @@
         "upstream_ref": "docker.io/library/node:22-bookworm-slim",
         "manifest_digest": "sha256:f32b81066cde10a75dbac96646099533316d94bac4150c55da1636e1f0ffdc46",
         "amd64_manifest_digest": "sha256:0f65470961851f2354dc8e560853e2f428ea928436135fc7e35780ab100c7e00",
-        "dockerfile_stages": ["frontend"]
+        "dockerfile_stages": [
+          "frontend"
+        ]
       },
       {
         "upstream_ref": "docker.io/library/python:3.11-slim-bookworm",
         "manifest_digest": "sha256:b18992999dbe963a45a8a4da40ac2b1975be1a776d939d098c647482bcad5cba",
         "amd64_manifest_digest": "sha256:28255a3ace7eb4c48bc1b57b90af29e1bc82b4fd6c60614a8e3dce61b87ff941",
-        "dockerfile_stages": ["backend", "runtime"]
+        "dockerfile_stages": [
+          "backend",
+          "runtime"
+        ]
       }
     ],
     "distinct_images": 2,
@@ -31,14 +45,21 @@
   "enforcement": {
     "status": "OPERATIVE",
     "step": "ratified-pin-conformance",
-    "job": "container",
+    "job": [
+      "application",
+      "container"
+    ],
     "workflow": ".github/workflows/governance-studio-p3e-private-hosted-ci.yml",
     "script": "deployment/governance-studio/ci/verify_ratified_pins.py",
     "blocking": true,
     "asserts": "every digest in deployment/governance-studio/base-images.json and every Dockerfile FROM pin equals the corresponding authoritative_digests entry in this record, every Dockerfile FROM is digest-pinned, and the per-image Dockerfile stage lists match",
     "consequence": "a re-pin or an image substitution cannot land without editing this ratification record, which requires owner re-ratification",
-    "runs_before": ["base-image-digest-verification", "container-build"],
-    "known_coverage_limit": "this step lives in the container job, which only runs where a container runtime and mirror access exist; while the mirror is unavailable the job does not run, so the guard does not execute on such pushes. Mirroring the step into the always-running application job would close that window and is recommended to the owner; it is not done here because it was outside the authorized scope of this change."
+    "runs_before": [
+      "install (application job)",
+      "base-image-digest-verification",
+      "container-build"
+    ],
+    "known_coverage_limit": "CLOSED by owner decision (rasaha, 2026-08-29): the check now also runs in the always-running application job, so it guards every push, and is retained as the first step of the container job."
   },
   "mirror": {
     "registry_host": null,
@@ -73,26 +94,70 @@
     "reporting a NOT_EXECUTED gate as passed, skipped, waived, or not applicable"
   ],
   "gate_identifier_discrepancy": {
-    "status": "OWNER_ESCALATED_GAP",
+    "status": "RESOLVED",
     "owner": "rasaha",
     "escalated_on": "2026-08-29",
-    "finding": "The two P3E records disagree on the blocked-gate list: CONTAINER_RUNTIME_CAPABILITY.json includes C16-image and C17-image, CONTAINER_COMPLETION_LIVE_STATE.json does not. The discrepancy could not be resolved against a canonical P3E gate definition because no such definition exists.",
+    "finding": "Original finding (2026-08-29, now resolved): The two P3E records disagree on the blocked-gate list: CONTAINER_RUNTIME_CAPABILITY.json includes C16-image and C17-image, CONTAINER_COMPLETION_LIVE_STATE.json does not. The discrepancy could not be resolved against a canonical P3E gate definition because no such definition exists.",
     "search_performed": "grep for the gate identifiers across docs/, apps/ugence-governance-studio/, deployment/ and .github/ in the working tree; git log --all -S and --grep over history, scoped to the governance-studio paths (the only hits are the commit that introduced the two audit records and this ratification commit; pickaxe hits elsewhere in the repository belong to unrelated cloud-scaling work); and the bodies and comment threads of the originating pull requests #1323 and #1325, which are empty of any gate definition. Within the governance studio the identifiers C2 and C4-C19 appear only in the two audit records named above and in this file; they are defined nowhere.",
-    "root_gap": "the P3E container gate set was recorded by identifier without ever being defined, so no artifact in the repository states what C2 or C4 through C19 actually verify, nor whether C16 and C17 have distinct image and non-image variants",
-    "owner_decision_required": [
-      "publish a canonical P3E container gate definition mapping every identifier C2 and C4-C19 to the check it names, including whether C16-image and C17-image are distinct gates or a spelling of C16 and C17",
-      "then reconcile CONTAINER_RUNTIME_CAPABILITY.json and CONTAINER_COMPLETION_LIVE_STATE.json against it"
-    ],
-    "not_deferred_to_execution": "This is recorded as an open gap owned by rasaha, not as work to be resolved at gate-execution time. Executing gates against an undefined identifier set cannot establish which gates ran.",
+    "root_gap": "Original gap, partially remaining: the P3E container gate set was recorded by identifier without ever being defined, so no artifact in the repository states what C2 or C4 through C19 actually verify, nor whether C16 and C17 have distinct image and non-image variants The identifier set is now canonical; what each gate verifies is still UNKNOWN and owned by rasaha.",
     "lists_as_recorded": {
       "note": "reproduced verbatim for traceability; neither is asserted correct",
-      "container_runtime_capability_record": ["C2", "C4", "C5", "C6", "C7", "C8", "C9", "C10", "C11", "C12", "C13", "C14", "C15", "C16-image", "C17-image", "C18", "C19"],
-      "container_completion_record": ["C2", "C4", "C5", "C6", "C7", "C8", "C9", "C10", "C11", "C12", "C13", "C14", "C15", "C18", "C19"]
+      "container_runtime_capability_record": [
+        "C2",
+        "C4",
+        "C5",
+        "C6",
+        "C7",
+        "C8",
+        "C9",
+        "C10",
+        "C11",
+        "C12",
+        "C13",
+        "C14",
+        "C15",
+        "C16-image",
+        "C17-image",
+        "C18",
+        "C19"
+      ],
+      "container_completion_record": [
+        "C2",
+        "C4",
+        "C5",
+        "C6",
+        "C7",
+        "C8",
+        "C9",
+        "C10",
+        "C11",
+        "C12",
+        "C13",
+        "C14",
+        "C15",
+        "C18",
+        "C19"
+      ]
     },
-    "current_gate_state": "NOT_EXECUTED"
+    "current_gate_state": "NOT_EXECUTED",
+    "resolved_on": "2026-08-29",
+    "canonical_definition": "docs/audits/ugence_governance_studio_p3e/CONTAINER_GATE_DEFINITION.json",
+    "resolution": {
+      "owner_confirmed": "rasaha confirmed as owner of the P3E container-gate definition",
+      "alias_decision": "C16-image and C17-image are deprecated, noncanonical aliases of C16 and C17; they are not distinct additional gates",
+      "canonical_set": "exactly C2 and C4-C19 (17 identifiers), published in the definition above",
+      "records_reconciled": [
+        "docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.json",
+        "docs/audits/ugence_governance_studio_p3e/CONTAINER_COMPLETION_LIVE_STATE.json"
+      ],
+      "definition_status_of_every_gate": "UNKNOWN - no permitted evidence source associates any identifier with a workflow step, test or requirement, so no mapping was invented; the definition records what is establishable and marks the rest UNKNOWN",
+      "execution_state_unchanged": "every canonical gate remains NOT_EXECUTED",
+      "automated_validation": "deployment/governance-studio/ci/verify_gate_identifiers.py, run as the gate-identifier-conformance step of the application job and covered by deployment/governance-studio/tests/test_gate_identifiers.py"
+    },
+    "superseded_note": "The identifier discrepancy is closed. The separate, still-open question of what each gate actually verifies is carried in the canonical definition as per-gate UNKNOWN status, owned by rasaha."
   },
   "execution_preconditions": [
-    "the gate_identifier_discrepancy above is closed by the owner, so the gates that execute can be named against a canonical definition",
+    "the canonical gate definition is published (done) and every gate a run claims to execute has a definition_status of DEFINED in it; gates still marked UNKNOWN cannot be reported as passed, because a run cannot establish what it verified",
     "mirror registry host and repository prefix recorded in this file",
     "pull credentials available to CI through the normal secret mechanism, which does not yet exist and must be built",
     "a container runtime (daemon + buildx) available to the job",
@@ -110,5 +175,10 @@
     "base_images_json": "deployment/governance-studio/base-images.json",
     "dockerfile": "deployment/governance-studio/Dockerfile"
   },
-  "verification_of_this_record": "digests above were read from deployment/governance-studio/base-images.json and confirmed against the three Dockerfile FROM lines on 2026-08-29; the ratified-pin-conformance guard was exercised against ten drift scenarios (base-images.json re-pin, Dockerfile re-pin, unpinned FROM, substituted image, extra unratified image, dropped ratified image, tampered amd64 child digest, tampered record digest, altered stage list, and the conforming tree) and blocks all nine drift cases while passing the current tree"
+  "verification_of_this_record": "digests above were read from deployment/governance-studio/base-images.json and confirmed against the three Dockerfile FROM lines on 2026-08-29; the ratified-pin-conformance guard was exercised against ten drift scenarios (base-images.json re-pin, Dockerfile re-pin, unpinned FROM, substituted image, extra unratified image, dropped ratified image, tampered amd64 child digest, tampered record digest, altered stage list, and the conforming tree) and blocks all nine drift cases while passing the current tree",
+  "validation": {
+    "gate_identifiers": "deployment/governance-studio/ci/verify_gate_identifiers.py",
+    "ratified_pins": "deployment/governance-studio/ci/verify_ratified_pins.py",
+    "tests": "deployment/governance-studio/tests/test_gate_identifiers.py"
+  }
 }

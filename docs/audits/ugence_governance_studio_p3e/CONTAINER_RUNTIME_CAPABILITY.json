@@ -1,17 +1,80 @@
 {
   "check": "governance_studio_p3e_container_runtime_capability",
   "docker_client_version": "29.3.1",
-  "docker_daemon": {"startable": true, "running": true, "socket": "/var/run/docker.sock", "server_version": "29.3.1", "storage_driver": "overlayfs"},
+  "docker_daemon": {
+    "startable": true,
+    "running": true,
+    "socket": "/var/run/docker.sock",
+    "server_version": "29.3.1",
+    "storage_driver": "overlayfs"
+  },
   "buildx_version": "0.31.1",
   "compose_version": "5.1.1",
   "scratch_build_works": true,
-  "base_image_pull": {"result": "FORBIDDEN_403", "hosts_denied": ["production.cloudfront.docker.com", "pkg-containers.githubusercontent.com"]},
-  "manifest_inspect": {"result": "FORBIDDEN_403"},
+  "base_image_pull": {
+    "result": "FORBIDDEN_403",
+    "hosts_denied": [
+      "production.cloudfront.docker.com",
+      "pkg-containers.githubusercontent.com"
+    ]
+  },
+  "manifest_inspect": {
+    "result": "FORBIDDEN_403"
+  },
   "pypi_npm_allowlisted": true,
   "argon2_cffi_installable": true,
   "missing_capability": "organization egress policy denies all container-registry blob CDNs (403 on CONNECT); base images cannot be pulled and base digests cannot be resolved/pinned",
   "container_gates_executable": false,
-  "blocked_gates": ["C2", "C4", "C5", "C6", "C7", "C8", "C9", "C10", "C11", "C12", "C13", "C14", "C15", "C16-image", "C17-image", "C18", "C19"],
-  "executable_this_pass": ["argon2id_password_hardening", "source_python_audit", "npm_production_audit", "application_regression"],
-  "policy_note": "proxy README: 403/407 policy denials must be reported, not retried or bypassed; no FROM-scratch substitute image was fabricated"
+  "blocked_gates": [
+    "C2",
+    "C4",
+    "C5",
+    "C6",
+    "C7",
+    "C8",
+    "C9",
+    "C10",
+    "C11",
+    "C12",
+    "C13",
+    "C14",
+    "C15",
+    "C16",
+    "C17",
+    "C18",
+    "C19"
+  ],
+  "executable_this_pass": [
+    "argon2id_password_hardening",
+    "source_python_audit",
+    "npm_production_audit",
+    "application_regression"
+  ],
+  "policy_note": "proxy README: 403/407 policy denials must be reported, not retried or bypassed; no FROM-scratch substitute image was fabricated",
+  "gate_definition": "docs/audits/ugence_governance_studio_p3e/CONTAINER_GATE_DEFINITION.json",
+  "gate_identifier_reconciliation": {
+    "note": "Reconciled to the canonical identifier set in CONTAINER_GATE_DEFINITION.json on 2026-08-29. C16-image and C17-image were deprecated, noncanonical aliases of C16 and C17 by owner decision (rasaha) and are not distinct additional gates.",
+    "previous_blocked_gates": [
+      "C2",
+      "C4",
+      "C5",
+      "C6",
+      "C7",
+      "C8",
+      "C9",
+      "C10",
+      "C11",
+      "C12",
+      "C13",
+      "C14",
+      "C15",
+      "C16-image",
+      "C17-image",
+      "C18",
+      "C19"
+    ],
+    "change": "C16-image -> C16, C17-image -> C17; no gate added or removed",
+    "gate_count_before": 17,
+    "gate_count_after": 17
+  }
 }

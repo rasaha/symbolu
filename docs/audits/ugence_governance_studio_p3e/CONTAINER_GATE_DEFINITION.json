@@ -1,0 +1,436 @@
+{
+  "schema": "p3e-container-gate-definition.v1",
+  "title": "Canonical P3E container gate definition",
+  "status": "PUBLISHED_WITH_UNKNOWN_DEFINITIONS",
+  "owner": "rasaha",
+  "owner_confirmed_on": "2026-08-29",
+  "published_on": "2026-08-29",
+  "purpose": "Establish the canonical identifier set for the P3E container gates and record, per gate, what can be established from evidence. This file defines gates only; it records no execution result. Gate execution state lives in CONTAINER_RUNTIME_CAPABILITY.json and CONTAINER_COMPLETION_LIVE_STATE.json.",
+  "scope": "exactly C2 and C4 through C19 (17 identifiers). C1 and C3 are deliberately out of scope: neither appears in any P3E record.",
+  "canonical_identifiers": [
+    "C2",
+    "C4",
+    "C5",
+    "C6",
+    "C7",
+    "C8",
+    "C9",
+    "C10",
+    "C11",
+    "C12",
+    "C13",
+    "C14",
+    "C15",
+    "C16",
+    "C17",
+    "C18",
+    "C19"
+  ],
+  "canonical_identifier_count": 17,
+  "deprecated_aliases": {
+    "C16-image": {
+      "canonical": "C16",
+      "status": "DEPRECATED_NONCANONICAL_ALIAS"
+    },
+    "C17-image": {
+      "canonical": "C17",
+      "status": "DEPRECATED_NONCANONICAL_ALIAS"
+    }
+  },
+  "alias_basis": "owner decision by rasaha on 2026-08-29: C16-image and C17-image are deprecated, noncanonical aliases of C16 and C17 and are not distinct additional gates. This is a ratified decision, not a reconstruction from evidence.",
+  "reconstruction_method": {
+    "permitted_evidence_sources": [
+      ".github/workflows/governance-studio-p3e-private-hosted-ci.yml",
+      "deployment/governance-studio/tests/",
+      "deployment/governance-studio/ci/ verification scripts"
+    ],
+    "finding": "None of the permitted sources contains any C-prefixed gate identifier. A case-insensitive search for C-identifiers across the workflow, the deployment test suite and the CI scripts returns no match, so no source associates any identifier with any step or test.",
+    "corroborating_finding": "verify_container.sh annotates its checks with section markers of a 'P3E completion' specification (sections 4, 6, 7, 8, 10, 11, 13). That specification is not present in the repository, and section numbers are a different numbering scheme from the C identifiers; they are recorded here as a lead, not as a mapping.",
+    "counting_check": "the container job carries 13 named steps, of which 12 predate the pin-conformance guard added alongside this definition, and two of those are setup rather than verification (install-e2e-driver-deps and the checkout/setup actions). That is fewer named steps than the 17 gate identifiers, so no positional or one-to-one correspondence can be derived either.",
+    "consequence": "every gate's requirement, workflow step and supporting test is recorded as UNKNOWN. No mapping was invented."
+  },
+  "gates": {
+    "C2": {
+      "definition_status": "UNKNOWN",
+      "requirement": null,
+      "workflow_step": null,
+      "supporting_test_or_script": null,
+      "requires_container_runtime": true,
+      "requires_container_runtime_basis": "recorded under blocked_gates in CONTAINER_RUNTIME_CAPABILITY.json, whose container_gates_executable is false; that record attributes the blockage to registry access, so each listed gate depends on an image that cannot be built without a container runtime",
+      "evidence_required_before_passed": {
+        "floor_applies_to_all_gates": true,
+        "floor": [
+          "a real 'docker buildx build' of deployment/governance-studio/Dockerfile at its ratified base-image digests completed in the container job",
+          "the blocking ratified-pin-conformance and base-image-digest-verification steps passed in the same run",
+          "the gate's own step exited zero in that run, with its log or uploaded artifact retained"
+        ],
+        "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
+        "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
+      },
+      "unknown_reason": "no artifact in the permitted evidence sources associates this identifier with any workflow step, test, or requirement"
+    },
+    "C4": {
+      "definition_status": "UNKNOWN",
+      "requirement": null,
+      "workflow_step": null,
+      "supporting_test_or_script": null,
+      "requires_container_runtime": true,
+      "requires_container_runtime_basis": "recorded under blocked_gates in CONTAINER_RUNTIME_CAPABILITY.json, whose container_gates_executable is false; that record attributes the blockage to registry access, so each listed gate depends on an image that cannot be built without a container runtime",
+      "evidence_required_before_passed": {
+        "floor_applies_to_all_gates": true,
+        "floor": [
+          "a real 'docker buildx build' of deployment/governance-studio/Dockerfile at its ratified base-image digests completed in the container job",
+          "the blocking ratified-pin-conformance and base-image-digest-verification steps passed in the same run",
+          "the gate's own step exited zero in that run, with its log or uploaded artifact retained"
+        ],
+        "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
+        "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
+      },
+      "unknown_reason": "no artifact in the permitted evidence sources associates this identifier with any workflow step, test, or requirement"
+    },
+    "C5": {
+      "definition_status": "UNKNOWN",
+      "requirement": null,
+      "workflow_step": null,
+      "supporting_test_or_script": null,
+      "requires_container_runtime": true,
+      "requires_container_runtime_basis": "recorded under blocked_gates in CONTAINER_RUNTIME_CAPABILITY.json, whose container_gates_executable is false; that record attributes the blockage to registry access, so each listed gate depends on an image that cannot be built without a container runtime",
+      "evidence_required_before_passed": {
+        "floor_applies_to_all_gates": true,
+        "floor": [
+          "a real 'docker buildx build' of deployment/governance-studio/Dockerfile at its ratified base-image digests completed in the container job",
+          "the blocking ratified-pin-conformance and base-image-digest-verification steps passed in the same run",
+          "the gate's own step exited zero in that run, with its log or uploaded artifact retained"
+        ],
+        "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
+        "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
+      },
+      "unknown_reason": "no artifact in the permitted evidence sources associates this identifier with any workflow step, test, or requirement"
+    },
+    "C6": {
+      "definition_status": "UNKNOWN",
+      "requirement": null,
+      "workflow_step": null,
+      "supporting_test_or_script": null,
+      "requires_container_runtime": true,
+      "requires_container_runtime_basis": "recorded under blocked_gates in CONTAINER_RUNTIME_CAPABILITY.json, whose container_gates_executable is false; that record attributes the blockage to registry access, so each listed gate depends on an image that cannot be built without a container runtime",
+      "evidence_required_before_passed": {
+        "floor_applies_to_all_gates": true,
+        "floor": [
+          "a real 'docker buildx build' of deployment/governance-studio/Dockerfile at its ratified base-image digests completed in the container job",
+          "the blocking ratified-pin-conformance and base-image-digest-verification steps passed in the same run",
+          "the gate's own step exited zero in that run, with its log or uploaded artifact retained"
+        ],
+        "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
+        "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
+      },
+      "unknown_reason": "no artifact in the permitted evidence sources associates this identifier with any workflow step, test, or requirement"
+    },
+    "C7": {
+      "definition_status": "UNKNOWN",
+      "requirement": null,
+      "workflow_step": null,
+      "supporting_test_or_script": null,
+      "requires_container_runtime": true,
+      "requires_container_runtime_basis": "recorded under blocked_gates in CONTAINER_RUNTIME_CAPABILITY.json, whose container_gates_executable is false; that record attributes the blockage to registry access, so each listed gate depends on an image that cannot be built without a container runtime",
+      "evidence_required_before_passed": {
+        "floor_applies_to_all_gates": true,
+        "floor": [
+          "a real 'docker buildx build' of deployment/governance-studio/Dockerfile at its ratified base-image digests completed in the container job",
+          "the blocking ratified-pin-conformance and base-image-digest-verification steps passed in the same run",
+          "the gate's own step exited zero in that run, with its log or uploaded artifact retained"
+        ],
+        "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
+        "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
+      },
+      "unknown_reason": "no artifact in the permitted evidence sources associates this identifier with any workflow step, test, or requirement"
+    },
+    "C8": {
+      "definition_status": "UNKNOWN",
+      "requirement": null,
+      "workflow_step": null,
+      "supporting_test_or_script": null,
+      "requires_container_runtime": true,
+      "requires_container_runtime_basis": "recorded under blocked_gates in CONTAINER_RUNTIME_CAPABILITY.json, whose container_gates_executable is false; that record attributes the blockage to registry access, so each listed gate depends on an image that cannot be built without a container runtime",
+      "evidence_required_before_passed": {
+        "floor_applies_to_all_gates": true,
+        "floor": [
+          "a real 'docker buildx build' of deployment/governance-studio/Dockerfile at its ratified base-image digests completed in the container job",
+          "the blocking ratified-pin-conformance and base-image-digest-verification steps passed in the same run",
+          "the gate's own step exited zero in that run, with its log or uploaded artifact retained"
+        ],
+        "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
+        "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
+      },
+      "unknown_reason": "no artifact in the permitted evidence sources associates this identifier with any workflow step, test, or requirement"
+    },
+    "C9": {
+      "definition_status": "UNKNOWN",
+      "requirement": null,
+      "workflow_step": null,
+      "supporting_test_or_script": null,
+      "requires_container_runtime": true,
+      "requires_container_runtime_basis": "recorded under blocked_gates in CONTAINER_RUNTIME_CAPABILITY.json, whose container_gates_executable is false; that record attributes the blockage to registry access, so each listed gate depends on an image that cannot be built without a container runtime",
+      "evidence_required_before_passed": {
+        "floor_applies_to_all_gates": true,
+        "floor": [
+          "a real 'docker buildx build' of deployment/governance-studio/Dockerfile at its ratified base-image digests completed in the container job",
+          "the blocking ratified-pin-conformance and base-image-digest-verification steps passed in the same run",
+          "the gate's own step exited zero in that run, with its log or uploaded artifact retained"
+        ],
+        "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
+        "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
+      },
+      "unknown_reason": "no artifact in the permitted evidence sources associates this identifier with any workflow step, test, or requirement"
+    },
+    "C10": {
+      "definition_status": "UNKNOWN",
+      "requirement": null,
+      "workflow_step": null,
+      "supporting_test_or_script": null,
+      "requires_container_runtime": true,
+      "requires_container_runtime_basis": "recorded under blocked_gates in CONTAINER_RUNTIME_CAPABILITY.json, whose container_gates_executable is false; that record attributes the blockage to registry access, so each listed gate depends on an image that cannot be built without a container runtime",
+      "evidence_required_before_passed": {
+        "floor_applies_to_all_gates": true,
+        "floor": [
+          "a real 'docker buildx build' of deployment/governance-studio/Dockerfile at its ratified base-image digests completed in the container job",
+          "the blocking ratified-pin-conformance and base-image-digest-verification steps passed in the same run",
+          "the gate's own step exited zero in that run, with its log or uploaded artifact retained"
+        ],
+        "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
+        "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
+      },
+      "unknown_reason": "no artifact in the permitted evidence sources associates this identifier with any workflow step, test, or requirement"
+    },
+    "C11": {
+      "definition_status": "UNKNOWN",
+      "requirement": null,
+      "workflow_step": null,
+      "supporting_test_or_script": null,
+      "requires_container_runtime": true,
+      "requires_container_runtime_basis": "recorded under blocked_gates in CONTAINER_RUNTIME_CAPABILITY.json, whose container_gates_executable is false; that record attributes the blockage to registry access, so each listed gate depends on an image that cannot be built without a container runtime",
+      "evidence_required_before_passed": {
+        "floor_applies_to_all_gates": true,
+        "floor": [
+          "a real 'docker buildx build' of deployment/governance-studio/Dockerfile at its ratified base-image digests completed in the container job",
+          "the blocking ratified-pin-conformance and base-image-digest-verification steps passed in the same run",
+          "the gate's own step exited zero in that run, with its log or uploaded artifact retained"
+        ],
+        "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
+        "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
+      },
+      "unknown_reason": "no artifact in the permitted evidence sources associates this identifier with any workflow step, test, or requirement"
+    },
+    "C12": {
+      "definition_status": "UNKNOWN",
+      "requirement": null,
+      "workflow_step": null,
+      "supporting_test_or_script": null,
+      "requires_container_runtime": true,
+      "requires_container_runtime_basis": "recorded under blocked_gates in CONTAINER_RUNTIME_CAPABILITY.json, whose container_gates_executable is false; that record attributes the blockage to registry access, so each listed gate depends on an image that cannot be built without a container runtime",
+      "evidence_required_before_passed": {
+        "floor_applies_to_all_gates": true,
+        "floor": [
+          "a real 'docker buildx build' of deployment/governance-studio/Dockerfile at its ratified base-image digests completed in the container job",
+          "the blocking ratified-pin-conformance and base-image-digest-verification steps passed in the same run",
+          "the gate's own step exited zero in that run, with its log or uploaded artifact retained"
+        ],
+        "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
+        "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
+      },
+      "unknown_reason": "no artifact in the permitted evidence sources associates this identifier with any workflow step, test, or requirement"
+    },
+    "C13": {
+      "definition_status": "UNKNOWN",
+      "requirement": null,
+      "workflow_step": null,
+      "supporting_test_or_script": null,
+      "requires_container_runtime": true,
+      "requires_container_runtime_basis": "recorded under blocked_gates in CONTAINER_RUNTIME_CAPABILITY.json, whose container_gates_executable is false; that record attributes the blockage to registry access, so each listed gate depends on an image that cannot be built without a container runtime",
+      "evidence_required_before_passed": {
+        "floor_applies_to_all_gates": true,
+        "floor": [
+          "a real 'docker buildx build' of deployment/governance-studio/Dockerfile at its ratified base-image digests completed in the container job",
+          "the blocking ratified-pin-conformance and base-image-digest-verification steps passed in the same run",
+          "the gate's own step exited zero in that run, with its log or uploaded artifact retained"
+        ],
+        "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
+        "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
+      },
+      "unknown_reason": "no artifact in the permitted evidence sources associates this identifier with any workflow step, test, or requirement"
+    },
+    "C14": {
+      "definition_status": "UNKNOWN",
+      "requirement": null,
+      "workflow_step": null,
+      "supporting_test_or_script": null,
+      "requires_container_runtime": true,
+      "requires_container_runtime_basis": "recorded under blocked_gates in CONTAINER_RUNTIME_CAPABILITY.json, whose container_gates_executable is false; that record attributes the blockage to registry access, so each listed gate depends on an image that cannot be built without a container runtime",
+      "evidence_required_before_passed": {
+        "floor_applies_to_all_gates": true,
+        "floor": [
+          "a real 'docker buildx build' of deployment/governance-studio/Dockerfile at its ratified base-image digests completed in the container job",
+          "the blocking ratified-pin-conformance and base-image-digest-verification steps passed in the same run",
+          "the gate's own step exited zero in that run, with its log or uploaded artifact retained"
+        ],
+        "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
+        "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
+      },
+      "unknown_reason": "no artifact in the permitted evidence sources associates this identifier with any workflow step, test, or requirement"
+    },
+    "C15": {
+      "definition_status": "UNKNOWN",
+      "requirement": null,
+      "workflow_step": null,
+      "supporting_test_or_script": null,
+      "requires_container_runtime": true,
+      "requires_container_runtime_basis": "recorded under blocked_gates in CONTAINER_RUNTIME_CAPABILITY.json, whose container_gates_executable is false; that record attributes the blockage to registry access, so each listed gate depends on an image that cannot be built without a container runtime",
+      "evidence_required_before_passed": {
+        "floor_applies_to_all_gates": true,
+        "floor": [
+          "a real 'docker buildx build' of deployment/governance-studio/Dockerfile at its ratified base-image digests completed in the container job",
+          "the blocking ratified-pin-conformance and base-image-digest-verification steps passed in the same run",
+          "the gate's own step exited zero in that run, with its log or uploaded artifact retained"
+        ],
+        "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
+        "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
+      },
+      "unknown_reason": "no artifact in the permitted evidence sources associates this identifier with any workflow step, test, or requirement"
+    },
+    "C16": {
+      "definition_status": "UNKNOWN",
+      "requirement": null,
+      "workflow_step": null,
+      "supporting_test_or_script": null,
+      "requires_container_runtime": true,
+      "requires_container_runtime_basis": "recorded under blocked_gates in CONTAINER_RUNTIME_CAPABILITY.json, whose container_gates_executable is false; that record attributes the blockage to registry access, so each listed gate depends on an image that cannot be built without a container runtime",
+      "evidence_required_before_passed": {
+        "floor_applies_to_all_gates": true,
+        "floor": [
+          "a real 'docker buildx build' of deployment/governance-studio/Dockerfile at its ratified base-image digests completed in the container job",
+          "the blocking ratified-pin-conformance and base-image-digest-verification steps passed in the same run",
+          "the gate's own step exited zero in that run, with its log or uploaded artifact retained"
+        ],
+        "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
+        "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
+      },
+      "unknown_reason": "no artifact in the permitted evidence sources associates this identifier with any workflow step, test, or requirement"
+    },
+    "C17": {
+      "definition_status": "UNKNOWN",
+      "requirement": null,
+      "workflow_step": null,
+      "supporting_test_or_script": null,
+      "requires_container_runtime": true,
+      "requires_container_runtime_basis": "recorded under blocked_gates in CONTAINER_RUNTIME_CAPABILITY.json, whose container_gates_executable is false; that record attributes the blockage to registry access, so each listed gate depends on an image that cannot be built without a container runtime",
+      "evidence_required_before_passed": {
+        "floor_applies_to_all_gates": true,
+        "floor": [
+          "a real 'docker buildx build' of deployment/governance-studio/Dockerfile at its ratified base-image digests completed in the container job",
+          "the blocking ratified-pin-conformance and base-image-digest-verification steps passed in the same run",
+          "the gate's own step exited zero in that run, with its log or uploaded artifact retained"
+        ],
+        "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
+        "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
+      },
+      "unknown_reason": "no artifact in the permitted evidence sources associates this identifier with any workflow step, test, or requirement"
+    },
+    "C18": {
+      "definition_status": "UNKNOWN",
+      "requirement": null,
+      "workflow_step": null,
+      "supporting_test_or_script": null,
+      "requires_container_runtime": true,
+      "requires_container_runtime_basis": "recorded under blocked_gates in CONTAINER_RUNTIME_CAPABILITY.json, whose container_gates_executable is false; that record attributes the blockage to registry access, so each listed gate depends on an image that cannot be built without a container runtime",
+      "evidence_required_before_passed": {
+        "floor_applies_to_all_gates": true,
+        "floor": [
+          "a real 'docker buildx build' of deployment/governance-studio/Dockerfile at its ratified base-image digests completed in the container job",
+          "the blocking ratified-pin-conformance and base-image-digest-verification steps passed in the same run",
+          "the gate's own step exited zero in that run, with its log or uploaded artifact retained"
+        ],
+        "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
+        "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
+      },
+      "unknown_reason": "no artifact in the permitted evidence sources associates this identifier with any workflow step, test, or requirement"
+    },
+    "C19": {
+      "definition_status": "UNKNOWN",
+      "requirement": null,
+      "workflow_step": null,
+      "supporting_test_or_script": null,
+      "requires_container_runtime": true,
+      "requires_container_runtime_basis": "recorded under blocked_gates in CONTAINER_RUNTIME_CAPABILITY.json, whose container_gates_executable is false; that record attributes the blockage to registry access, so each listed gate depends on an image that cannot be built without a container runtime",
+      "evidence_required_before_passed": {
+        "floor_applies_to_all_gates": true,
+        "floor": [
+          "a real 'docker buildx build' of deployment/governance-studio/Dockerfile at its ratified base-image digests completed in the container job",
+          "the blocking ratified-pin-conformance and base-image-digest-verification steps passed in the same run",
+          "the gate's own step exited zero in that run, with its log or uploaded artifact retained"
+        ],
+        "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
+        "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
+      },
+      "unknown_reason": "no artifact in the permitted evidence sources associates this identifier with any workflow step, test, or requirement"
+    }
+  },
+  "unassigned_candidate_evidence": {
+    "note": "Raw material for whoever defines these gates. NOTHING here is assigned to a gate identifier; the lists are inventories, not mappings, and must not be read as one.",
+    "container_job_steps": [
+      "install-e2e-driver-deps",
+      "ratified-pin-conformance",
+      "base-image-digest-verification",
+      "container-build",
+      "image-inspection",
+      "runtime-package-inventory",
+      "image-layer-secret-scan",
+      "container-runtime-verification",
+      "image-sbom",
+      "container-vulnerability-scan",
+      "evidence-manifest",
+      "clean-checkout-reproducibility",
+      "upload-evidence"
+    ],
+    "deployment_test_files": {
+      "deployment/governance-studio/tests/test_authentication.py": 9,
+      "deployment/governance-studio/tests/test_container_artifacts.py": 11,
+      "deployment/governance-studio/tests/test_egress.py": 2,
+      "deployment/governance-studio/tests/test_governance_boundary.py": 6,
+      "deployment/governance-studio/tests/test_https_tls.py": 4,
+      "deployment/governance-studio/tests/test_logging.py": 3,
+      "deployment/governance-studio/tests/test_middleware.py": 12,
+      "deployment/governance-studio/tests/test_packaged_e2e.py": 6,
+      "deployment/governance-studio/tests/test_passwords.py": 10,
+      "deployment/governance-studio/tests/test_startup_integrity.py": 16,
+      "deployment/governance-studio/tests/test_synthetic_boundary.py": 9
+    },
+    "deployment_test_count": 88,
+    "verification_scripts": [
+      "deployment/governance-studio/ci/packaged_e2e.py",
+      "deployment/governance-studio/ci/resolve_base_images.py",
+      "deployment/governance-studio/ci/scan_image_layers.py",
+      "deployment/governance-studio/ci/verify_container.sh",
+      "deployment/governance-studio/ci/verify_ratified_pins.py"
+    ]
+  },
+  "separation_of_concerns": {
+    "this_file": "gate definitions only - no gate carries an execution state here",
+    "execution_results": [
+      "docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.json",
+      "docs/audits/ugence_governance_studio_p3e/CONTAINER_COMPLETION_LIVE_STATE.json"
+    ],
+    "current_execution_state_of_every_gate": "NOT_EXECUTED (as recorded in the files above; restated here for the reader, not asserted by this file)"
+  },
+  "validation": {
+    "script": "deployment/governance-studio/ci/verify_gate_identifiers.py",
+    "asserts": "both audit records reference only canonical identifiers from this file; a deprecated alias anywhere is a failure, naming its canonical replacement",
+    "test": "deployment/governance-studio/tests/test_gate_identifiers.py",
+    "workflow_steps": [
+      "application/gate-identifier-conformance"
+    ]
+  },
+  "closes": {
+    "record": "docs/audits/ugence_governance_studio_p3e/BASE_IMAGE_MIRROR_DECISION.json",
+    "block": "gate_identifier_discrepancy"
+  }
+}
