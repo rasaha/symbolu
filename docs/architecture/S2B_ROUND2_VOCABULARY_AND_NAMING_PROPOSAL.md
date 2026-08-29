@@ -166,9 +166,11 @@ for one of them.**
   fix is a redefinition of the vocabulary, not a composition ruling.
 * Under **`Q8 = A`** the derived-shape comparison must yield exactly one token, so an
   overlap has no answer and the check itself breaks. That is where `S2B-D3=A`'s
-  exactly-one-strategy rule bites, and where the composition ruling `S2B-D3=A` expressly
-  deferred (`ADR:123-127`) would be needed — **on top of** the redefinition and a change to
-  a ratified replay check.
+  exactly-one-strategy rule bites, and the fix is one of **two** routes, not both:
+  **either** redefine the three to restore a disjoint-and-exhaustive tiling, **or** retain
+  the overlap and take the composition ruling `S2B-D3=A` expressly deferred
+  (`ADR:123-127`). On either route the ratified sixth check must change too, since it
+  would have to yield the new member.
 
 `[I]` This is not a defect of these three members; it is what criterion (i) permits **while
 no component records observable reasoning stages** (`ADR:346-347`). A vocabulary of
@@ -320,9 +322,9 @@ exist — and `[R]` **not admissible by simple addition even then**: the three p
 tile every lawful advisory, so a fourth would overlap one of them. Under `R2-Q8=B` that
 contradicts the disjoint-and-exhaustive property `R2-Q1=A` would have ratified, and the fix
 is a redefinition of the vocabulary. Under `R2-Q8=A` it additionally leaves the derived-shape
-comparison with no unique answer, which is where `S2B-D3=A` bites and where the composition
-ruling it deferred (`ADR:123-127`) would also be required, alongside a change to a ratified
-replay check.
+comparison with no unique answer, which is where `S2B-D3=A` bites: the fix is **either** a
+redefinition restoring the tiling **or** the composition ruling `S2B-D3=A` deferred
+(`ADR:123-127`) — and, on either route, a change to the ratified sixth check.
 
 ---
 
@@ -430,6 +432,12 @@ R2-Q8  Shape-correspondence check. THIS ITEM AMENDS A RATIFIED RULING, and
        Nor does it amend Q10=A: that rider is about rider R1's field equality,
        which still proves nothing about private reasoning (ratification
        ADR:140-142). A adds a different check over two observable facts.
+       Nor does it amend S2B-D5=A: that ruling's final triggering condition is
+       already "or replay cannot establish correspondence" (ADR:145-147), which
+       absorbs a declaration-to-shape mismatch, and the sixth check's
+       structural semantics — replay returns False, no disposition, no reserved
+       authority term — are exactly D5=A's ratified result. Q11=A is therefore
+       the whole of the amendment perimeter.
        The cost of A, conceded: the token becomes fully determined by the
        advisory — a pure commitment carrying no information a verifier could
        not recompute. The value is that it is then a commitment that can FAIL.
