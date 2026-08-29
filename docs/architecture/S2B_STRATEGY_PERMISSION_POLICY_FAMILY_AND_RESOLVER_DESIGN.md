@@ -192,12 +192,24 @@ independent bars:
    `ugence-agentic-proposer` declares `pydantic>=2` as a runtime dependency.
 
 `[I]` A strategy-permission adapter inside the authority that imported `ReasoningStrategy`
-**fails bars 1 and 2**. `[V]` It does **not** fail bar 3 on that import alone: the scan
-collects **import roots** from each module's AST, so it would see `ugence_agentic_proposer`
-and never `pydantic`, which arrives transitively at runtime rather than as an import
-statement in authority source. Bar 3 bites only on a **direct** `pydantic` import. Two
-independent bars are decisive, and the conclusion is unchanged; the third is a weaker
-backstop than the first draft of this section implied.
+**fails bar 1 unconditionally** — bar 1 scans the imports themselves, so the import is the
+violation, whatever the packaging says.
+
+The other two are conditional, and neither carries the conclusion on its own. `[V]` **Bar 2**
+(`packages/policy-authority/tests/packaging/test_dependency_boundary.py:125-126`) asserts only
+that the **declared** dependencies equal `{"ugence-uvi-policy-contracts"}`, reading the
+`dependencies` block of `pyproject.toml`. It therefore bites only once the new dependency is
+**declared** — an adapter that imported `ugence_agentic_proposer` without declaring it would
+pass bar 2 while violating the boundary, and would be caught by bar 1 alone. `[V]` **Bar 3**
+does not fire on that import at all: the scan collects **import roots** from each module's
+AST, so it would see `ugence_agentic_proposer` and never `pydantic`, which arrives
+transitively at runtime rather than as an import statement in authority source. Bar 3 bites
+only on a **direct** `pydantic` import.
+
+`[I]` **The conclusion rests on bar 1**, with bar 2 as a second catch in the ordinary case
+where the dependency is declared honestly and bar 3 as a weaker backstop still. That is a
+narrower foundation than the first draft of this section implied, and narrower than the
+correction that replaced it also implied; it is stated at its true strength here.
 
 The adapter therefore lives **outside** the authority distribution —
 which is the ratified additive path anyway (`P-9`: a second family is added by registering a
@@ -494,11 +506,24 @@ policy family is registered:
   package's to fix: no strategy-permission policy family is registered with Policy Authority",
   so "nothing here can EXECUTE end to end today".
 
-Both become **false the moment the family package exists**, and `[V]` **no test pins either
-string**, so nothing fails and nothing announces the drift. They cannot be reconciled without
-editing Agentic Proposer source, which §8 otherwise says need not change — a real tension, not
-a wording problem, and it is disclosed here rather than resolved by quietly widening the
-change set.
+`[V]` **The same present-tense prose also appears twice in the proposer's own test tree**, and
+goes stale identically:
+
+* `tests/test_s2b_strategy_permission.py:26` — "no strategy-permission policy family is
+  registered with Policy Authority, which is why every resolver here is a **stub**";
+* `tests/s1_specification_mirror.py:427` — "no strategy-permission family is registered there
+  today, which blocks execution end to end".
+
+`[V]` Both are **prose inside test modules** — a docstring and a comment — not assertions.
+That is consistent with, and does not weaken, the finding below: **no test pins any of the
+four strings**, so none of them fails when the fact changes. It does mean the reconciliation
+surface is four sites in two packages, not two sites in one.
+
+All four become **false the moment the family package exists**, and because nothing asserts
+them, nothing fails and nothing announces the drift. They cannot be reconciled without editing
+Agentic Proposer source, which §8 otherwise says need not change — a real tension, not a
+wording problem, and it is disclosed here rather than resolved by quietly widening the change
+set.
 
 `[I]` The narrowest honest reading is that both statements remain **true of the `0.3.0`
 release they describe**: `version.py`'s note is scoped to that release by its own words, and
@@ -642,7 +667,10 @@ couplings matter when voting:
   `APPROVAL_PROOF_INVALID` row never fires, and the §9.1 approval test narrows to issuance
   only. Nothing else changes.
 
-`[R]` No other pair interacts. OD-A, OD-B, OD-F, OD-G and OD-H stand alone.
+`[R]` No other pair interacts. `[I]` One presupposition rather than an interaction: **OD-H's
+wording assumes OD-A=A** — it asks whether *the family package* ships a `public_api.json`, so
+under **OD-A=B** the question retargets to the single combined distribution, unchanged in
+substance. OD-B, OD-F and OD-G stand alone.
 
 ---
 
@@ -742,5 +770,5 @@ file:line in the repository.
 
 **READY_FOR_OWNER_RATIFICATION**
 
-Baseline verified in full; no repository contradiction found; eight mutually exclusive owner
-decisions are open and none is settled here.
+Baseline verified in full; no repository contradiction found; eight owner decisions, options
+mutually exclusive within each, are open and none is settled here.
