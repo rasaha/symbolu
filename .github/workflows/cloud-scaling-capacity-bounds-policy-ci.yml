@@ -248,14 +248,19 @@ jobs:
       - name: Prove the sweep was total, and block on every way it can be incomplete
         # A single shard still has to prove totality: a job that died halfway produces no
         # duplicate either, so absence is checked directly against the real inventory
-        # rather than inferred from the shard arithmetic. The aggregator fails on each of
-        # — a shard that never reported, a site with no result, a site swept twice, a site
-        # in the wrong shard, shards disagreeing on the collected baseline, a site with no
-        # classification, an exclusion naming no guard, an exclusion with a reason outside
-        # the closed vocabulary, an exclusion whose key matches more than one guard, a
-        # guard classified SCORED that survived, a guard classified EXCLUDED that was in
-        # fact killed, a kill attributable only to a message assertion, and a site the
-        # sweep could not score at all.
+        # rather than inferred from the shard arithmetic. Measured at `--shards 1`, the
+        # aggregator exits non-zero on each of — a shard that never reported, a site with
+        # no result, a site swept twice, a site with no classification, an exclusion naming
+        # no guard, an exclusion with a reason outside the closed vocabulary, an exclusion
+        # whose key matches more than one guard, a guard classified SCORED that survived, a
+        # guard classified EXCLUDED that was in fact killed, a kill attributable only to a
+        # message assertion, and a site the sweep could not score at all.
+        #
+        # Two of the aggregator's checks are **vacuous at n=1** and are not claimed here:
+        # `misassigned_guards` is always empty because `shard_of(i, 1)` is 1 for every i,
+        # and `baseline_agrees` is trivially true over a single baseline value. The step
+        # below pins the baseline population instead, so a sweep run against a suite that
+        # collected the wrong number of tests fails rather than passing unnoticed.
         run: |
           python scripts/cloud_scaling/guard_sweep.py capacity-bounds-policy \
             --aggregate shards --shards 1
@@ -287,6 +292,13 @@ jobs:
               f"baselines={report['baselines']}"
           )
           problems = []
+          # The baseline population, pinned because `baseline_agrees` cannot check it at
+          # n=1. A sweep whose baseline collected a different number of tests is measuring
+          # a different suite, and every other check above would still pass.
+          if report["baselines"] != {"1": 130}:
+              problems.append(
+                  f"baseline collected {report['baselines']}, expected {{'1': 130}}"
+              )
           if report["inventory_total"] != 37:
               problems.append(f"inventory is {report['inventory_total']}, not 37")
           if len(report["killed"]) != report["inventory_total"]:

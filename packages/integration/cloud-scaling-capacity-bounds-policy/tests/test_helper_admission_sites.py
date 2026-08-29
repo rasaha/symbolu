@@ -21,10 +21,14 @@ than take it on trust:
    valid fails here rather than passing for the wrong reason;
 3. **the typed refusal**, asserted as the pair — class *and*
    `CapacityBoundsRejectionReason` — never the message;
-4. **a docstring naming what the mutant does** when this one call is deleted. Seven sites
-   admit the artifact outright; three (`scope`, `lifecycle_state`, and the two that share
-   the `bound_for` lookup) reach a later guard that refuses under a *different* reason,
-   which is why the assertion is on the reason and not on the class.
+4. **a docstring naming what the mutant does** when this one call is deleted. Measured:
+   **eight sites admit** — six construct the artifact with the unchecked field in it, and
+   the two `bound_for` sites answer the malformed query, one with `None` and one with the
+   action type's default bound. The remaining **two**, `scope` and `lifecycle_state`, fall
+   through to their membership guards and still refuse, but under a *different*
+   `CapacityBoundsRejectionReason`. Those two are why the assertion is on the pair rather
+   than the class: measured, removing the reason half from `_assert_refused_because` lets
+   their mutants survive, while the other eight still die on the class alone.
 
 Nothing here asserts a message, and nothing depends on a second call to the same helper:
 in every case the site under test is the first refusal the input can reach.
