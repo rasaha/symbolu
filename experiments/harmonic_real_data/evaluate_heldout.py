@@ -100,7 +100,7 @@ def main(npz_path, model_dir):
         rows = []
         for s in SEEDS:
             a = table[(arm_a, s)]
-            b = table[other] if isinstance(other, str) else table[(other, s)]
+            b = table[other] if other in BASELINES else table[(other, s)]
             rows.append(compare(a, b, h))
         return rows
 
@@ -142,8 +142,8 @@ def main(npz_path, model_dir):
         table[arm] = meds.mean(axis=0).tolist()
     coverage = {"functions_included_per_horizon": include.sum(axis=0).tolist(),
                 "spike_functions_per_horizon":
-                    [int(np.sum([~np.isnan(spike_nmse[("harmonic_reader", 0)][:, h])
-                                 for h in (h,)])) for h in range(3)]}
+                    [int((~np.isnan(spike_nmse[("harmonic_reader", 0)][:, h])).sum())
+                     for h in range(3)]}
 
     out = {"median_nmse": table, "gates": gates, "coverage": coverage,
            "n_queries_per_function": int(len(HELD_T))}

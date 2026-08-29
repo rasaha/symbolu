@@ -44,7 +44,7 @@ def baseline_preds(bins: np.ndarray) -> dict:
     pers = np.full((F, BINS, 3), np.nan, np.float32)
     seas = np.full((F, BINS, 3), np.nan, np.float32)
     for hi, H in enumerate(HORIZONS):
-        for t in range(BINS_PER_DAY, BINS - max(HORIZONS)):
+        for t in range(BINS_PER_DAY, BINS - max(HORIZONS) + 1):
             pers[:, t, hi] = np.log1p(csum[:, t] - csum[:, t - H])
             s = t - BINS_PER_DAY
             seas[:, t, hi] = np.log1p(csum[:, s + H] - csum[:, s])
