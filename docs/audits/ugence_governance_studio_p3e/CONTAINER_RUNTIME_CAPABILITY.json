@@ -114,7 +114,13 @@
       "statement": "tag movement does not authorize a re-pin; the ratified digests stay authoritative and are to be sourced from the approved internal mirror when provisioned",
       "observed_digests_recorded_as": "UNAPPROVED_OBSERVATION_ONLY candidates in BASE_IMAGE_MIRROR_DECISION.json",
       "consequence": "the container job stays red at base-image-digest-verification until the mirror serves the ratified digests. That halt is the ratified MUST_HALT_ON_DIGEST_MISMATCH control working, not a defect.",
-      "future_change": "only via the controlled base-image refresh recorded in the ratification record"
+      "future_change": "only via the controlled base-image refresh recorded in the ratification record",
+      "ci_confirmation": {
+        "confirmed_by_run": "https://github.com/rasaha/symbolu/actions/runs/33269251316 (container job 99144840292, commit f42c4012)",
+        "container_job_step_outcomes": "checkout, setup-python, evidence-dir-init, install-e2e-driver-deps and ratified-pin-conformance all succeeded; base-image-digest-verification FAILED; every downstream gate step was skipped; evidence-manifest and upload-evidence succeeded under if: always()",
+        "conclusion": "the sole failure in the container job is the ratified digest-mismatch halt. No other blocker remains: action resolution succeeded, and no gate step failed on its own merits.",
+        "gate_consequence": "every P3E-CTR gate remains NOT_EXECUTED; the run's evidence manifest is INCOMPLETE and no evidence obligation is satisfied"
+      }
     },
     "6_evidence_manifest_flaw": {
       "condition": "the evidence-manifest step hashed files from a repository directory holding seven committed records, several stating result NOT_EXECUTED, so a run that scanned nothing reported non-null scan hashes",
@@ -128,7 +134,16 @@
         "deployment/governance-studio/artifacts/ is git-ignored so run output cannot be committed"
       ],
       "tests": "deployment/governance-studio/tests/test_evidence_manifest.py - ten tests, including negatives for committed records, pre-populated directories, and failed and skipped producers",
-      "obligations_unaffected": "no evidence obligation is marked complete by this correction"
+      "obligations_unaffected": "no evidence obligation is marked complete by this correction",
+      "ci_confirmation": {
+        "confirmed_by_run": "https://github.com/rasaha/symbolu/actions/runs/33269251316 (container job 99144840292, commit f42c4012)",
+        "evidence_dir_used": "/home/runner/work/_temp/p3e-evidence-33269251316-1 (RUNNER_TEMP, keyed by run id and attempt, outside the checkout)",
+        "observed": [
+          "every producer step was skipped, and every manifest entry came back sha256 null with status NOT_PRODUCED_THIS_RUN - in the equivalent earlier run the same scenario reported non-null vuln_report_sha256 and secret_scan_sha256 from committed records",
+          "the uploaded evidence artifact contained 1 file, the manifest itself, against 8 in the earlier run where seven committed records were swept up as evidence"
+        ],
+        "conclusion": "the flaw is corrected in CI, not only under test"
+      }
     }
   }
 }
