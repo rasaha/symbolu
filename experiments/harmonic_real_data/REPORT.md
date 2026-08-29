@@ -87,3 +87,40 @@ one 200-function cohort, 4 held-out days, micro-scale readers (~69K params).
 The natural strengthening steps — a larger cohort, additional traces, and a
 redesigned spike-retrieval mechanism under a new preregistration — are owner
 decisions and are not begun here.
+
+## Cohort 2 — strict disjoint replication (PREREGISTRATION_COHORT2.md)
+
+Owner-ratified replication on a second 200-function cohort (identical
+eligibility rule, Cohort 1 excluded, 4,178 remaining eligible), with every
+frozen definition, budget, and gate unchanged; development closed at commit
+3d63060a before Cohort 2's single held-out evaluation.
+
+**Cohort 2 results, reported separately (frozen order):**
+
+- **V-GATE: PASS** (win 0.71–0.77, RI 0.22–0.30, 3/3 seeds).
+- **H-GATE: PASS — the replication succeeds.** All 18 preregistered
+  comparisons clear again: harmonic reader vs stats reader (win 0.70–0.82,
+  RI 0.10–0.30), vs persistence (win 0.77–0.81, RI 0.14–0.45), vs daily
+  seasonal-naive (win 0.61–0.81, RI 0.35–0.56), at both 60 and 180 min, 3/3
+  seeds.
+- **S-GATE: FAIL again** (win 0.46–0.61, RI −0.11 to +0.07) — the 6-token
+  retrieval's null result on spikes also replicates.
+
+Cohort 2 median nMSE (15/60/180 min): persistence 0.603/0.510/0.988 ·
+seasonal-naive 1.141/0.926/0.839 · stats reader 0.516/0.504/0.734 ·
+**harmonic reader 0.513/0.428/0.542** · stats+retrieval 0.497/0.496/0.716 ·
+harmonic+retrieval 0.475/0.429/0.541. Coverage: 168/162/159 of 200 functions
+per horizon.
+
+**Aggregation (after separate reporting; `results/aggregate_cohorts.json`):**
+pooled per-function win fractions over the ~320–340-function union are
+0.75–0.82 for the harmonic reader vs stats reader and vs persistence at both
+gated horizons, and 0.61–0.64 vs seasonal-naive at 180 min — consistent with
+each cohort individually.
+
+**Updated standing conclusion 1:** continuous fixed-harmonic summaries
+improve a quadratic reader over ordinary statistics, persistence, and daily
+seasonal-naive on real cloud demand — **replicated across two disjoint
+cohorts** under one-shot held-out discipline. Still PROVISIONALLY SUPPORTED
+(one trace, 14 days, micro-scale readers); no Phase, semantic-understanding,
+production-readiness, or cross-dataset claims.

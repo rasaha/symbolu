@@ -1,0 +1,123 @@
+{
+ "note": "pooled win fractions weighted by per-cohort n; medians reported per cohort",
+ "vs_stats_reader_h4": [
+  {
+   "pooled_win": 0.789,
+   "ri_c1": 0.185,
+   "ri_c2": 0.101,
+   "n": 331
+  },
+  {
+   "pooled_win": 0.764,
+   "ri_c1": 0.237,
+   "ri_c2": 0.133,
+   "n": 331
+  },
+  {
+   "pooled_win": 0.776,
+   "ri_c1": 0.182,
+   "ri_c2": 0.217,
+   "n": 331
+  }
+ ],
+ "vs_stats_reader_h12": [
+  {
+   "pooled_win": 0.784,
+   "ri_c1": 0.242,
+   "ri_c2": 0.295,
+   "n": 324
+  },
+  {
+   "pooled_win": 0.765,
+   "ri_c1": 0.235,
+   "ri_c2": 0.221,
+   "n": 324
+  },
+  {
+   "pooled_win": 0.796,
+   "ri_c1": 0.191,
+   "ri_c2": 0.264,
+   "n": 324
+  }
+ ],
+ "vs_persistence_h4": [
+  {
+   "pooled_win": 0.752,
+   "ri_c1": 0.316,
+   "ri_c2": 0.142,
+   "n": 331
+  },
+  {
+   "pooled_win": 0.77,
+   "ri_c1": 0.328,
+   "ri_c2": 0.138,
+   "n": 331
+  },
+  {
+   "pooled_win": 0.789,
+   "ri_c1": 0.321,
+   "ri_c2": 0.204,
+   "n": 331
+  }
+ ],
+ "vs_persistence_h12": [
+  {
+   "pooled_win": 0.787,
+   "ri_c1": 0.52,
+   "ri_c2": 0.448,
+   "n": 324
+  },
+  {
+   "pooled_win": 0.784,
+   "ri_c1": 0.522,
+   "ri_c2": 0.451,
+   "n": 324
+  },
+  {
+   "pooled_win": 0.802,
+   "ri_c1": 0.524,
+   "ri_c2": 0.454,
+   "n": 324
+  }
+ ],
+ "vs_seasonal_naive_h4": [
+  {
+   "pooled_win": 0.776,
+   "ri_c1": 0.535,
+   "ri_c2": 0.528,
+   "n": 331
+  },
+  {
+   "pooled_win": 0.764,
+   "ri_c1": 0.543,
+   "ri_c2": 0.525,
+   "n": 331
+  },
+  {
+   "pooled_win": 0.816,
+   "ri_c1": 0.539,
+   "ri_c2": 0.561,
+   "n": 331
+  }
+ ],
+ "vs_seasonal_naive_h12": [
+  {
+   "pooled_win": 0.611,
+   "ri_c1": 0.361,
+   "ri_c2": 0.35,
+   "n": 324
+  },
+  {
+   "pooled_win": 0.636,
+   "ri_c1": 0.364,
+   "ri_c2": 0.354,
+   "n": 324
+  },
+  {
+   "pooled_win": 0.623,
+   "ri_c1": 0.367,
+   "ri_c2": 0.358,
+   "n": 324
+  }
+ ]
+}
