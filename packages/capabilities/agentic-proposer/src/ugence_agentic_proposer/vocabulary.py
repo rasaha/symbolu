@@ -33,6 +33,14 @@ and ``ToolObservationAdmissionStatus`` (D5), and ``ProposerProcessState`` (D8, R
 Each is a closed membership vocabulary for a contract field; none is an authority
 claim, and none grants, clears, admits evidence or decides anything.
 
+S2-B adds a ninth, ``ReasoningStrategy`` (`S2B-R2-Q1=A`). It is the closed strategy
+vocabulary OD-5(iii) deferred, declared here together with the fields that carry it, as
+that ruling requires. It is not an authority claim either: a member names the
+**externally observable shape of the advisory produced**, never a model disposition, a
+capability tier or a permission. A role's permission to declare a member is issued
+elsewhere, by Policy Authority, and this package resolves it through an injected
+protocol it does not implement.
+
 OD-7 (part 3) adds an eighth, ``DomainEvaluationOutcome``. It carries the *result* of a
 domain evaluation, which ``DomainCheckCompletion`` deliberately does not encode: the
 latter still states only whether every check the applicable profile requires reached a
@@ -57,6 +65,7 @@ __all__ = [
     "ToolObservationAdmissionStatus",
     "ProposerProcessState",
     "DomainEvaluationOutcome",
+    "ReasoningStrategy",
 ]
 
 
@@ -244,3 +253,49 @@ class ProposerProcessState(str, Enum):
     NEED_EVIDENCE = "NEED_EVIDENCE"
     ABSTAIN = "ABSTAIN"
     ESCALATE = "ESCALATE"
+
+
+class ReasoningStrategy(str, Enum):
+    """`S2B-R2-Q1=A`. The closed strategy vocabulary, defined over **two observable
+    axes and nothing else** — candidate count, and parent binding.
+
+    Every member is named for **artifact shape, never for processing**. Together the
+    three are **disjoint and exhaustive** over every lawful ``ProposerAdvisory``, so
+    ``S2B-D3=A``'s one-strategy-per-invocation rule always has exactly one lawful
+    answer, and the declared token is therefore derivable from the advisory's own
+    shape. ``verify_strategy_permission``'s sixth check (`S2B-R2-Q8=A`, amending
+    `S2B-S1-Q11=A`) is what establishes that correspondence — at **replay**, never by
+    construction.
+
+    `[R]` **No member carries a condition on the selector.** Under OD-8
+    selection-policy v1 more than one qualifying candidate produces no selection, so a
+    lawful multi-candidate advisory may carry a null selector; a selector condition
+    would leave it matching no member.
+
+    `[R]` **There is no default member and no escape member** (`S2B-S1-Q1=A`): no
+    ``OTHER``, ``UNSPECIFIED`` or ``NONE``. A producer that cannot name one of these
+    three has not produced a lawful advisory.
+
+    `[R]` **Four candidates are recorded as rejected and inadmissible without a new
+    ruling** (`S2B-R2-Q2=A`): ``STAGED_DECOMPOSITION`` (no observable stages exist),
+    ``SELF_CRITIQUE``/``REFLECTION`` (private model behaviour), ``TOOL_AUGMENTED``
+    (evidence collection, an OD-5 exclusion by name) and ``EXTENDED_REASONING`` (a
+    model capability tier barred by ``S2B-D2=A``, and a compute claim).
+
+    `[R]` **Disclosed forward cost** (`S2B-R2-Q4`, §4 of the Round 2 ADR): the three
+    members tile every lawful advisory, so **no fourth can simply be added** — any
+    later member would overlap one of these three and leave the shape-derived
+    comparison with no unique answer.
+
+    **What a member never claims.** That a model's private reasoning became
+    deterministic; that the token proves the model internally followed anything; that
+    the declared procedure was *executed*; or that any observable stage conformed. The
+    S2-B scoping ADR's §6 is the standard, and none of it is widened here.
+    """
+
+    #: Exactly one candidate, binds no parent.
+    SINGLE_CANDIDATE_UNREVISED = "SINGLE_CANDIDATE_UNREVISED"
+    #: Two or more candidates, binds no parent.
+    MULTI_CANDIDATE_UNREVISED = "MULTI_CANDIDATE_UNREVISED"
+    #: Binds a parent, at any candidate count.
+    REVISED_ADVISORY = "REVISED_ADVISORY"

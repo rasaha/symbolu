@@ -18,6 +18,19 @@ exceptions this package defines (OD-6(ii) added ``CrossContractViolationError``
 alongside ``EligibilityMismatchError``; OD-7 added ``DomainEvaluationProviderError``),
 and the four ratified constants — forty-six names at 0.2.0.
 
+S2-B adds five at ``0.3.0``, taking the curated surface to fifty-one: the closed
+``ReasoningStrategy`` vocabulary, the ``StrategyPolicyResolver`` protocol this package
+owns and does not implement, its ``StrategyPolicyRequest`` and
+``StrategyPolicyResponse`` call shapes, and ``verify_strategy_permission``. Reasoning
+Strategy Permission asks **which declared reasoning procedure a role is permitted to
+use**; it is advisory on the same terms as everything else here. `[R]` It does **not**
+claim that a model's private reasoning becomes deterministic, that a declared strategy
+proves the model internally followed it, that Ugence can inspect or replay private
+chain-of-thought, that a declared procedure was executed, or that permission to use a
+strategy authorizes additional compute, tools, evidence access or consequential
+execution. A permission failure is **structural**: no artifact is constructed, replay
+returns ``False``, and **no disposition and no reserved authority term is emitted**.
+
 Proposal identity is computed only by a call into ``ugence_jcs``, inside the single
 authorised identity module (``identity.py``). This package contains no
 canonicalization code of any kind anywhere else — not in ``src``, not in ``tests``,
@@ -44,6 +57,9 @@ from .contracts import (
     ProposerAdvisory,
     ProposerProcessRecord,
     ProposerProcessStateTransition,
+    StrategyPolicyRequest,
+    StrategyPolicyResolver,
+    StrategyPolicyResponse,
     ToolObservation,
     WorkMandate,
 )
@@ -65,6 +81,7 @@ from .verification import (
     verify_deterministic_selection,
     verify_domain_evaluation,
     verify_observation_resolution,
+    verify_strategy_permission,
 )
 from .version import __version__
 from .vocabulary import (
@@ -74,6 +91,7 @@ from .vocabulary import (
     DomainCheckCompletion,
     DomainEvaluationOutcome,
     ProposerProcessState,
+    ReasoningStrategy,
     ReviewAction,
     RoleActivationStatus,
     SemanticAuditorFindingStatus,
@@ -100,7 +118,14 @@ __all__ = [
     "DomainEvaluationRequest",
     "DomainEvaluationResponse",
     "DomainEvaluationProvider",
-    # Enums (11)
+    # S2-B strategy-policy call-boundary shapes (2) and the injected-resolver protocol
+    # (1). Not contracts, on exactly OD-7's terms: no C2 common field, no identity
+    # role, never stored or transported. This package OWNS the protocol and implements
+    # no resolver (S2B-D1=A excludes it as an issuer).
+    "StrategyPolicyRequest",
+    "StrategyPolicyResponse",
+    "StrategyPolicyResolver",
+    # Enums (12)
     "TerminalOutcome",
     "CandidateDisposition",
     "SemanticAuditorFindingStatus",
@@ -112,6 +137,7 @@ __all__ = [
     "ToolObservationAdmissionStatus",
     "ProposerProcessState",
     "DomainEvaluationOutcome",
+    "ReasoningStrategy",
     # Builders (5)
     "build_candidate_advisory",
     "build_advisory_candidate_set",
@@ -124,12 +150,13 @@ __all__ = [
     # Identity functions (2)
     "compute_advisory_identity",
     "verify_advisory_identity",
-    # Verifiers (5)
+    # Verifiers (6)
     "verify_candidate_eligibility",
     "verify_advisory_selection",
     "verify_observation_resolution",
     "verify_domain_evaluation",
     "verify_deterministic_selection",
+    "verify_strategy_permission",
     # Exceptions (3)
     "EligibilityMismatchError",
     "CrossContractViolationError",

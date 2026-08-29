@@ -24,6 +24,8 @@ if typing.TYPE_CHECKING:
         CognitiveRoleContract,
         DomainEvaluationProvider,
         ProposerAdvisory,
+        ProposerProcessRecord,
+        StrategyPolicyResponse,
         ToolObservation,
         WorkMandate,
     )
@@ -47,6 +49,7 @@ __all__ = [
     "verify_observation_resolution",
     "verify_domain_evaluation",
     "verify_deterministic_selection",
+    "verify_strategy_permission",
 ]
 
 
@@ -516,3 +519,118 @@ def classify_fail_closed_row(
            for candidate in candidates):
         return 5, None
     return 6, None
+
+
+# --------------------------------------------------------------------------- #
+# S2-B — proposal-bound strategy-permission replay (`S2B-D8=B`, `S2B-S1-Q11=A` as
+# amended by `S2B-R2-Q8=A`)
+# --------------------------------------------------------------------------- #
+
+
+def verify_strategy_permission(
+    *,
+    advisory: ProposerAdvisory,
+    policy: StrategyPolicyResponse,
+    role: CognitiveRoleContract,
+    process_record: ProposerProcessRecord,
+) -> bool:
+    """`S2B-D8=B`'s **proposal-bound** replay, over exactly its four ratified inputs:
+    the ``ProposerAdvisory``, the resolved and signature-verified policy version, the
+    ``CognitiveRoleContract``, and the ``ProposerProcessRecord`` for rider `R1`'s
+    equality check. It reads no stage record and issues no resolver call.
+
+    **Six checks, in the ratified order.** The first five are `S2B-S1-Q11=A`; the sixth
+    is `S2B-R2-Q8=A`'s amendment, which the owner expressly approved as an amendment to
+    that ruling, leaving the five standing unchanged and in order:
+
+    1. the policy identity and version match the advisory's stamped pair;
+    2. the role's reference resolves to the same policy;
+    3. the permitted set is non-empty;
+    4. the declared strategy is a member of it;
+    5. the record's declaration **and** its ``advisory_digest`` match the advisory;
+    6. the declared token equals the token the advisory's **own shape** yields.
+
+    **What the conjunction establishes, and only this.** Check 4 gives *declared token
+    ∈ permitted set*; check 6 gives *declared token = shape-derived token*; jointly,
+    therefore, **shape-derived token ∈ permitted set**. `[R]` What a policy governs is
+    thus the **replay-verifiable shape of the advisory**, not merely what its producer
+    may declare. Neither check delivers that alone. The declared token remains
+    informationally redundant — a verifier could compute it — but it is a
+    **digest-bound commitment**, and the conjunction is what is enforceable. `[R]` It
+    is established at **replay**, never by construction.
+
+    **The limits are not widened, and must never be described as widened.** This
+    establishes **nothing** about private reasoning; it does **not** prove that a
+    declared procedure was *executed*; and it establishes **no** observable-stage
+    conformance beyond what the advisory's own shape shows. `[R]` For these three
+    members only, it discharges early part of what `S2B-D8=B` named a later stage —
+    disclosed, not glossed. Observable-procedure conformance replay in general remains
+    deferred, and `[G]` is blocked regardless: no component records observable
+    reasoning stages.
+
+    **What replay can never establish**, whatever these six checks return: hidden model
+    state; private chain-of-thought; undocumented provider-side routing or fallback;
+    whether a model internally used a technique a provider names; external facts not
+    carried across the replay boundary; or whether omitted stages, evidence or
+    candidates never existed.
+
+    `[R]` **Digest membership proves integrity after construction, never provenance.**
+    Inclusion in the identity projection establishes that a value was not altered
+    afterwards; it does not establish that the proper authority issued it. Verifying
+    the policy's issuer and signature through Policy Authority resolution is a
+    **separate call** this function's inputs do not supply and this digest cannot.
+
+    **Structural, and silent about outcomes.** Returns ``bool`` and **never raises**,
+    on H1's unchanged terms — a read-only auditor needs no exception handling, and that
+    includes an artifact that bypassed its own validators via ``model_construct`` or
+    ``model_copy(update=...)``. `[R]` It emits **no disposition and no reserved
+    authority term**: ``False`` is not a denial, and this capability maps a permission
+    failure to no operational outcome, that mapping being deliberately unruled
+    (`S2B-D5=A`).
+    """
+    from . import contracts as c
+
+    try:
+        # 1. The policy identity and version match the pair the advisory binds. The
+        #    version is compared as a string (C3 bars every numeric type here).
+        if policy.strategy_policy_id != advisory.strategy_policy_id:
+            return False
+        if policy.strategy_policy_version != advisory.strategy_policy_version:
+            return False
+
+        # 2. The role's reference resolves to the same policy. The response's echo of
+        #    the reference it was resolved under is what makes this decidable from the
+        #    four ratified inputs without a second resolver call.
+        if role.strategy_policy_ref != policy.strategy_policy_ref:
+            return False
+
+        # 3. The permitted set is non-empty. A policy permitting nothing permits this
+        #    declaration too, and reporting that is exactly why the response shape
+        #    admits an empty set rather than refusing one at construction.
+        if not policy.permitted_strategies:
+            return False
+
+        # 4. The declared strategy is a member. Exact codepoint equality
+        #    (`S2B-S1-Q4=A`), carried by enum identity: no normalizer, no casefolding,
+        #    no trimming, no splitting.
+        if advisory.declared_strategy not in policy.permitted_strategies:
+            return False
+
+        # 5. Rider `R1`: the record's declaration AND its advisory_digest match the
+        #    advisory. The digest half is what stops the declaration half being
+        #    satisfied by a record that corresponds to some *other* advisory.
+        if process_record.declared_strategy != advisory.declared_strategy:
+            return False
+        if process_record.advisory_digest != advisory.advisory_digest:
+            return False
+
+        # 6. `S2B-R2-Q8=A`. The declared token equals the token the advisory's own
+        #    shape yields. This is the check that turns "what the producer may declare"
+        #    into "the shape a policy governs" — and it is the whole of the amendment's
+        #    perimeter: `S2B-D8=B`, `S2B-S1-Q10=A` and `S2B-D5=A` are not amended.
+        if advisory.declared_strategy is not c.shape_derived_strategy(advisory):
+            return False
+
+        return True
+    except Exception:  # noqa: BLE001 — a verifier reports; it does not propagate.
+        return False

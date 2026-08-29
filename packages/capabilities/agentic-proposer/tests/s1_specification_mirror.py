@@ -139,6 +139,11 @@ FIELD_CLASSIFICATION = {
         "permitted_tool_scopes": C5B, "permitted_candidate_dispositions": CLOSED,
         "permitted_review_actions": CLOSED, "escalation_role_ref": C5A,
         "activation_status": CLOSED,
+        # S2-B (`S2B-S1-Q2=A`, `S2B-R2-Q3=A`): a **C5a policy reference only**. An
+        # opaque handle minted by Policy Authority, carried and compared whole — not a
+        # C5b vocabulary term, and emphatically not the permitted set itself, which
+        # `S2B-D1=A` keeps out of role data entirely.
+        "strategy_policy_ref": C5A,
     },
     "WorkMandate": {
         "schema_version": CLOSED, "tenant_id": C5A, "created_at": NON_STRING,
@@ -195,6 +200,18 @@ FIELD_CLASSIFICATION = {
         "domain_evaluation_profile_version": C5B,
         "selected_candidate_id": C5A,
         "selection_policy_id": C5B, "selection_policy_version": C5B,
+        # S2-B (`S2B-D6=B1`). The policy pair is C5b on exactly the grounds the four
+        # OD-7 fields above are: each is a vocabulary term matched by equality — here
+        # against the resolved policy's own identity at replay — rather than an opaque
+        # handle carried and compared whole. The role's ``strategy_policy_ref`` is the
+        # opaque handle, and it is C5a; these two are what the resolver answers with.
+        "strategy_policy_id": C5B, "strategy_policy_version": C5B,
+        # `S2B-R2-Q5=A` types this as the ``ReasoningStrategy`` enum, so it is
+        # validated by **membership, not by a string pattern** — which is what CLOSED
+        # records. `S2B-S1-Q3=A` had classified the record's counterpart C5b under the
+        # pre-enum design; the later ruling supersedes the representation, and a C5b
+        # entry here would demand the TOKEN_PATTERN an enum field cannot carry.
+        "declared_strategy": CLOSED,
         "recommended_disposition": CLOSED, "requested_review_action": CLOSED,
         "requested_review_destination_role_ref": C5A,
         "claim_summaries": C5C, "observation_refs": C5A, "uncertainties": C5C,
@@ -202,7 +219,12 @@ FIELD_CLASSIFICATION = {
     },
     "ProposerProcessRecord": {
         "schema_version": CLOSED, "tenant_id": C5A, "created_at": NON_STRING,
-        "process_record_id": C5A, "case_ref": C5A, "declared_strategy": C5C,
+        "process_record_id": C5A, "case_ref": C5A,
+        # Retyped from C5c to the ``ReasoningStrategy`` enum (`S2B-S1-Q3=A` narrowed
+        # it, `S2B-R2-Q5=A` settled the representation), so both sides of rider `R1`'s
+        # equality now carry the same class — CLOSED, on the reasoning recorded beside
+        # ``ProposerAdvisory.declared_strategy`` above.
+        "declared_strategy": CLOSED,
         "state_transitions": STRUCTURED, "tool_invocations": C5B,
         "deterministic_checks": C5D, "candidate_ids": C5A,
         "selected_candidate_id": C5A, "semantic_audit_refs": C5D,
@@ -228,7 +250,8 @@ NESTED_PUBLIC_SHAPES = ("CandidateAdvisory", "ProposerProcessStateTransition")
 #: implicit.
 CONTRACT_CARDINALITY = {
     "AgentIdentityRef": 8,
-    "CognitiveRoleContract": 10,
+    # S2-B `S2B-S1-Q2=A`: 10 -> 11, the added field being a C5a policy reference only.
+    "CognitiveRoleContract": 11,
     "WorkMandate": 9,
     "BoundedContextEnvelope": 9,
     "ToolObservation": 12,
@@ -236,7 +259,12 @@ CONTRACT_CARDINALITY = {
     # amendment's own arithmetic, re-verified against ``src/`` once implemented.
     "AdvisoryCandidateSet": 12,
     "CandidateAdvisory": 11,
-    "ProposerAdvisory": 27,
+    # S2-B `S2B-S1-Q2=A` took this 27 -> 30: the governing policy identity, the policy
+    # version and one scalar declared-strategy assertion, all identity-participating.
+    # `AdvisoryCandidateSet` stays 12, `CandidateAdvisory` stays 11 and
+    # `ProposerProcessRecord` stays 18 — its ``declared_strategy`` is **retyped**, not
+    # added to.
+    "ProposerAdvisory": 30,
     "ProposerProcessRecord": 18,
     "ProposerProcessStateTransition": 2,
 }
@@ -265,6 +293,7 @@ NON_BEARERS_SHARING_A_FIELD_NAME = ("CandidateAdvisory",)
 from ugence_agentic_proposer import (  # noqa: E402
     AgentLifecycleState,
     DomainCheckCompletion,
+    ReasoningStrategy,
     ReviewAction,
     RoleActivationStatus,
     ToolObservationAdmissionStatus,
@@ -347,7 +376,7 @@ class StubDomainEvaluationProvider:
 
     def __init__(self, *, outcomes=None, default=None, raises=None,
                  echo_candidate_id=None, echo_profile_id=None,
-                 echo_profile_version=None):
+                 echo_profile_version=None, log=None):
         from ugence_agentic_proposer import DomainEvaluationOutcome
 
         self.outcomes = dict(outcomes or {})
@@ -357,11 +386,18 @@ class StubDomainEvaluationProvider:
         self.echo_profile_id = echo_profile_id
         self.echo_profile_version = echo_profile_version
         self.calls = []
+        #: An optional shared list this stub and ``StubStrategyPolicyResolver`` both
+        #: append to, so a guard can read the ORDER in which the two injected
+        #: boundaries were reached. `S2B-S1-Q12=A` is a rule about order, and a guard
+        #: that could only see *whether* the provider ran would not test it.
+        self.log = log
 
     def evaluate(self, *, request):
         from ugence_agentic_proposer import DomainEvaluationResponse
 
         self.calls.append(request)
+        if self.log is not None:
+            self.log.append("provider")
         if self.raises is not None:
             raise self.raises
         return DomainEvaluationResponse(
@@ -370,6 +406,89 @@ class StubDomainEvaluationProvider:
             profile_version=self.echo_profile_version or request.profile_version,
             outcome=self.outcomes.get(request.candidate_id, self.default),
         )
+
+
+# --------------------------------------------------------------------------- #
+# S2-B — test support for the injected strategy-policy resolver boundary
+#
+# This is a STUB, and it is test support, not a policy. It issues nothing, signs
+# nothing and verifies nothing: it returns whatever permitted set the test asked for.
+# That is the whole point of the boundary `S2B-D1=A` ratifies — the governing policy is
+# issued by Policy Authority, OUTSIDE this package, and `[G]` **no strategy-permission
+# family is registered there today**, which blocks execution end to end. The protocol
+# is injected, so these guards can still exercise resolution, the permission test, the
+# construction order and the replay without any policy authority being present anywhere
+# in the repository. This is the ``StubDomainEvaluationProvider`` precedent exactly.
+# --------------------------------------------------------------------------- #
+
+#: The policy identity the fixtures resolve to. C5b tokens, compared by equality.
+STRATEGY_POLICY_ID = "ugence.strategy_permission.reconciliation"
+#: A **string** (C3 bars every numeric type in this contract family, at any depth).
+STRATEGY_POLICY_VERSION = "v1"
+#: The reference the role contract bears — C5a, an opaque externally minted handle.
+STRATEGY_POLICY_REF = "policy-authority/strategy-permission/reconciliation"
+
+
+class StubStrategyPolicyResolver:
+    """A ``StrategyPolicyResolver`` whose answers a test dictates.
+
+    ``permitted`` is the set returned; it defaults to all three members and may be
+    empty, which is the state ``verify_strategy_permission``'s third check reports.
+    ``raises``, when set, is raised instead of answering. The three ``echo_*``/override
+    hooks break the correlation or divert the stamped identity deliberately, which is
+    the only way to exercise those checks: a correct resolver cannot produce that state.
+
+    ``calls`` records every request received, so a guard can assert both **that** the
+    resolver was reached and **in what order** relative to the domain provider —
+    `S2B-S1-Q12=A`'s construction order turns on exactly that.
+    """
+
+    def __init__(self, *, permitted=None, policy_id=None, policy_version=None,
+                 raises=None, echo_ref=None, returns=None, log=None):
+        from ugence_agentic_proposer import ReasoningStrategy
+
+        self.permitted = (tuple(ReasoningStrategy) if permitted is None
+                          else tuple(permitted))
+        self.policy_id = policy_id or STRATEGY_POLICY_ID
+        self.policy_version = policy_version or STRATEGY_POLICY_VERSION
+        self.raises = raises
+        self.echo_ref = echo_ref
+        self.returns = returns
+        self.calls = []
+        #: An optional shared list both stubs append to, so a guard can read the
+        #: ORDER in which the two boundaries were reached rather than only whether.
+        self.log = log
+
+    def resolve(self, *, request):
+        from ugence_agentic_proposer import StrategyPolicyResponse
+
+        self.calls.append(request)
+        if self.log is not None:
+            self.log.append("resolver")
+        if self.raises is not None:
+            raise self.raises
+        if self.returns is not None:
+            return self.returns
+        return StrategyPolicyResponse(
+            strategy_policy_id=self.policy_id,
+            strategy_policy_version=self.policy_version,
+            permitted_strategies=self.permitted,
+            strategy_policy_ref=self.echo_ref or request.strategy_policy_ref,
+        )
+
+
+def strategy_policy_response(**overrides):
+    """The lawful ``StrategyPolicyResponse`` the fixtures resolve to, for replay."""
+    from ugence_agentic_proposer import ReasoningStrategy, StrategyPolicyResponse
+
+    fields = {
+        "strategy_policy_id": STRATEGY_POLICY_ID,
+        "strategy_policy_version": STRATEGY_POLICY_VERSION,
+        "permitted_strategies": tuple(ReasoningStrategy),
+        "strategy_policy_ref": STRATEGY_POLICY_REF,
+    }
+    fields.update(overrides)
+    return StrategyPolicyResponse(**fields)
 
 
 #: A timezone-aware instant, caller-supplied. No module here reads a wall clock (C4).
@@ -439,8 +558,12 @@ def complete_advisory_fixture(**overrides):
 
     A coupling probe run against a partial fixture proves nothing: the construction
     would fail on a missing required field whatever the coupling did, and the test would
-    pass for the wrong reason. This supplies all twenty-seven fields so that the only
-    thing a rejection can be about is the rule under probe.
+    pass for the wrong reason. This supplies all thirty fields so that the only thing a
+    rejection can be about is the rule under probe.
+
+    ``declared_strategy`` defaults to the member this fixture's own shape yields — one
+    candidate, no parent — so an advisory built from it satisfies
+    ``verify_strategy_permission``'s sixth check unless a test varies it deliberately.
     """
     shapes = representative_shapes()
     fixture = {
@@ -463,6 +586,9 @@ def complete_advisory_fixture(**overrides):
         "selected_candidate_id": None,
         "selection_policy_id": None,
         "selection_policy_version": None,
+        "strategy_policy_id": STRATEGY_POLICY_ID,
+        "strategy_policy_version": STRATEGY_POLICY_VERSION,
+        "declared_strategy": ReasoningStrategy.SINGLE_CANDIDATE_UNREVISED,
         "recommended_disposition": None,
         "requested_review_action": None,
         "requested_review_destination_role_ref": None,

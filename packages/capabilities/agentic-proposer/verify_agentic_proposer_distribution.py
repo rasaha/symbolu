@@ -51,7 +51,7 @@ import sys
 from datetime import datetime, timezone
 import ugence_agentic_proposer as ap
 
-assert ap.__version__ == "0.2.0", ap.__version__
+assert ap.__version__ == "0.3.0", ap.__version__
 assert "site-packages" in ap.__file__, ap.__file__
 assert not any("/symbolu" in p for p in sys.path), sys.path
 
@@ -72,21 +72,23 @@ assert not {m.value for m in ap.CandidateDisposition} & reserved
 assert "INDETERMINATE" in reserved
 assert ap.SemanticAuditorFindingStatus.INDETERMINATE.value == "INDETERMINATE"
 
-# The public surface is exactly the full H3 surface as amended by OD-7 (I6, I8):
-# 8 contracts, 2 nested public shapes, 2 call-boundary shapes, 1 injected-evaluator
-# protocol, 11 enums, 5 builders, 2 equation functions, 2 identity functions,
-# 5 verifiers, 3 exceptions, 4 constants, __version__ = 46 names. The thirty-nine
-# 0.1.0 froze are all still here; 0.2.0 removes none of them.
+# The public surface is exactly the full H3 surface as amended by OD-7 and by S2-B
+# (I6, I8): 8 contracts, 2 nested public shapes, 4 call-boundary shapes, 2 injected
+# protocols, 12 enums, 5 builders, 2 equation functions, 2 identity functions,
+# 6 verifiers, 3 exceptions, 4 constants, __version__ = 51 names. The thirty-nine
+# 0.1.0 froze are all still here; neither 0.2.0 nor 0.3.0 removes any of them
+# (`S2B-S1-Q6=A`: no removals, no renames).
 EXPECTED_SURFACE = {
     "AgentIdentityRef", "CognitiveRoleContract", "WorkMandate",
     "BoundedContextEnvelope", "ToolObservation", "AdvisoryCandidateSet",
     "ProposerAdvisory", "ProposerProcessRecord",
     "CandidateAdvisory", "ProposerProcessStateTransition",
     "DomainEvaluationRequest", "DomainEvaluationResponse", "DomainEvaluationProvider",
+    "StrategyPolicyRequest", "StrategyPolicyResponse", "StrategyPolicyResolver",
     "TerminalOutcome", "CandidateDisposition", "SemanticAuditorFindingStatus",
     "ReviewAction", "DomainCheckCompletion", "AgentLifecycleState",
     "RoleActivationStatus", "ToolOperationClass", "ToolObservationAdmissionStatus",
-    "ProposerProcessState", "DomainEvaluationOutcome",
+    "ProposerProcessState", "DomainEvaluationOutcome", "ReasoningStrategy",
     "build_candidate_advisory", "build_advisory_candidate_set",
     "build_proposer_advisory", "build_advisory_revision",
     "build_proposer_process_record",
@@ -94,7 +96,7 @@ EXPECTED_SURFACE = {
     "compute_advisory_identity", "verify_advisory_identity",
     "verify_candidate_eligibility", "verify_advisory_selection",
     "verify_observation_resolution", "verify_domain_evaluation",
-    "verify_deterministic_selection",
+    "verify_deterministic_selection", "verify_strategy_permission",
     "EligibilityMismatchError", "CrossContractViolationError",
     "DomainEvaluationProviderError",
     "RESERVED_AUTHORITY_VOCABULARY", "ADVISORY_KIND",
@@ -102,7 +104,7 @@ EXPECTED_SURFACE = {
     "__version__",
 }
 assert set(ap.__all__) == EXPECTED_SURFACE, ap.__all__
-assert len(EXPECTED_SURFACE) == 46
+assert len(EXPECTED_SURFACE) == 51
 assert not any(n.startswith(("Proposal", "Recommendation")) for n in ap.__all__)
 
 # --- a complete advisory, built end to end through the installed ugence-jcs wheel ---
@@ -117,7 +119,8 @@ role = ap.CognitiveRoleContract(
     primary_function="reconcile", permitted_tool_scopes=["tool"],
     permitted_candidate_dispositions=[ap.CandidateDisposition.RECOMMEND_WITHHOLD],
     permitted_review_actions=[ap.ReviewAction.ROUTE_APPROVAL_BUNDLE],
-    escalation_role_ref="r2", activation_status=ap.RoleActivationStatus.ACTIVE)
+    escalation_role_ref="r2", activation_status=ap.RoleActivationStatus.ACTIVE,
+    strategy_policy_ref="policy-authority/strategy-permission/v0")
 mandate = ap.WorkMandate(
     schema_version="1.0", tenant_id="t", created_at=NOW, mandate_id="m",
     case_ref="c", assigned_role_contract_id="r", purpose="reconcile",
@@ -145,6 +148,22 @@ class _Stub:
 
 provider = _Stub()
 assert isinstance(provider, ap.DomainEvaluationProvider)
+# S2-B's injected resolver: a stub declared here, in the clean interpreter, for exactly
+# the reason the evaluator stub is. No strategy policy ships in this wheel and none may
+# — `S2B-D1=A` excludes this capability as an issuer — and no strategy-permission family
+# is registered with Policy Authority at all, which blocks execution end to end. The
+# protocol being injected is what lets the wheel still prove itself.
+class _PolicyStub:
+    def resolve(self, *, request):
+        return ap.StrategyPolicyResponse(
+            strategy_policy_id="ugence.strategy_permission.v0",
+            strategy_policy_version="v1",
+            permitted_strategies=tuple(ap.ReasoningStrategy),
+            strategy_policy_ref=request.strategy_policy_ref)
+
+
+resolver = _PolicyStub()
+assert isinstance(resolver, ap.StrategyPolicyResolver)
 candidate = ap.build_candidate_advisory(
     candidate_id="cand", identity=identity, role=role, mandate=mandate,
     context=context, observations=[observation],
@@ -168,7 +187,9 @@ advisory = ap.build_proposer_advisory(
     candidate_set=candidate_set, parent_advisory_digest=None, claim_summaries=[],
     observation_refs=[], uncertainties=[], expires_at=LATER, provider=provider,
     expected_profile_id="profile.v0", expected_profile_version="1.0.0",
-    requested_review_destination_role_ref="role-approver")
+    requested_review_destination_role_ref="role-approver",
+    strategy_policy_resolver=resolver,
+    declared_strategy=ap.ReasoningStrategy.SINGLE_CANDIDATE_UNREVISED)
 assert ap.verify_advisory_identity(advisory=advisory) is True
 assert advisory.selected_candidate_id == "cand"
 assert ap.verify_advisory_selection(
@@ -196,11 +217,68 @@ try:
         candidate_set=candidate_set, parent_advisory_digest=None, claim_summaries=[],
         observation_refs=[], uncertainties=[], expires_at=LATER, provider=_Drifted(),
         expected_profile_id="profile.v0", expected_profile_version="1.0.0",
-        requested_review_destination_role_ref="role-approver")
+        requested_review_destination_role_ref="role-approver",
+        strategy_policy_resolver=resolver,
+        declared_strategy=ap.ReasoningStrategy.SINGLE_CANDIDATE_UNREVISED)
 except ap.DomainEvaluationProviderError:
     pass
 else:
     raise AssertionError("a drifted provider did not refuse construction")
+
+# --- S2-B: the strategy-permission replay, in the same clean interpreter ---
+# The advisory binds its governing policy identity, its version and the declared
+# strategy (`S2B-D6=B1`), and the process record derives its declaration and its digest
+# reference from that advisory (rider `R1`). Replay then re-establishes both across two
+# independently held artifacts.
+assert advisory.strategy_policy_id == "ugence.strategy_permission.v0"
+assert advisory.strategy_policy_version == "v1"
+assert advisory.declared_strategy is ap.ReasoningStrategy.SINGLE_CANDIDATE_UNREVISED
+record = ap.build_proposer_process_record(
+    process_record_id="rec", tenant_id="t", case_ref="c", created_at=NOW,
+    advisory=advisory, state_transitions=[], tool_invocations=[],
+    candidate_ids=["cand"], selected_candidate_id="cand",
+    terminal_outcome=ap.TerminalOutcome.PROPOSAL, started_at=NOW, completed_at=NOW)
+assert record.declared_strategy is advisory.declared_strategy
+assert record.advisory_digest == advisory.advisory_digest
+policy = ap.StrategyPolicyResponse(
+    strategy_policy_id="ugence.strategy_permission.v0", strategy_policy_version="v1",
+    permitted_strategies=tuple(ap.ReasoningStrategy),
+    strategy_policy_ref="policy-authority/strategy-permission/v0")
+assert ap.verify_strategy_permission(
+    advisory=advisory, policy=policy, role=role, process_record=record) is True
+# The fail-closed direction: a policy permitting nothing. Replay returns False and
+# raises nothing — `S2B-D5=A`'s structural result, with no disposition emitted.
+assert ap.verify_strategy_permission(
+    advisory=advisory,
+    policy=ap.StrategyPolicyResponse(
+        strategy_policy_id="ugence.strategy_permission.v0",
+        strategy_policy_version="v1", permitted_strategies=(),
+        strategy_policy_ref="policy-authority/strategy-permission/v0"),
+    role=role, process_record=record) is False
+# And construction refuses when the resolver permits nothing (`S2B-D5=A`): no
+# identity-bearing artifact is produced, through an existing H2 class (`Q8=A`).
+class _PermitsNothing:
+    def resolve(self, *, request):
+        return ap.StrategyPolicyResponse(
+            strategy_policy_id="ugence.strategy_permission.v0",
+            strategy_policy_version="v1", permitted_strategies=(),
+            strategy_policy_ref=request.strategy_policy_ref)
+
+
+try:
+    ap.build_proposer_advisory(
+        tenant_id="t", case_ref="c", created_at=NOW, identity=identity, role=role,
+        mandate=mandate, context=context, observations=[observation],
+        candidate_set=candidate_set, parent_advisory_digest=None, claim_summaries=[],
+        observation_refs=[], uncertainties=[], expires_at=LATER, provider=provider,
+        expected_profile_id="profile.v0", expected_profile_version="1.0.0",
+        requested_review_destination_role_ref="role-approver",
+        strategy_policy_resolver=_PermitsNothing(),
+        declared_strategy=ap.ReasoningStrategy.SINGLE_CANDIDATE_UNREVISED)
+except ap.CrossContractViolationError:
+    pass
+else:
+    raise AssertionError("an unpermitted declaration did not refuse construction")
 
 # --- leaf boundary, observed at runtime in a clean interpreter ---
 # OD-2: *defining* a pydantic BaseModel loads `socket` via pydantic-core's schema

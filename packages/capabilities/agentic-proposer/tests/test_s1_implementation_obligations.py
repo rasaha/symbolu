@@ -45,7 +45,8 @@ def _full_advisory_scenario():
         permitted_tool_scopes=["invoice.read"],
         permitted_candidate_dispositions=[ap.CandidateDisposition.RECOMMEND_WITHHOLD],
         permitted_review_actions=[ap.ReviewAction.ROUTE_APPROVAL_BUNDLE],
-        escalation_role_ref="role-2", activation_status=ap.RoleActivationStatus.ACTIVE)
+        escalation_role_ref="role-2", activation_status=ap.RoleActivationStatus.ACTIVE,
+        strategy_policy_ref=spec.STRATEGY_POLICY_REF)
     later = FIXED_INSTANT + timedelta(days=365)
     mandate = ap.WorkMandate(
         schema_version="1.0", tenant_id="tenant-1", created_at=FIXED_INSTANT,
@@ -64,6 +65,7 @@ def _full_advisory_scenario():
         observed_at=FIXED_INSTANT, content_hash=spec.PLACEHOLDER_DIGEST,
         normalized_fields={"vendor.name": "Acme Corp"})
     provider = spec.StubDomainEvaluationProvider()
+    strategy_policy_resolver = spec.StubStrategyPolicyResolver()
     candidate = ap.build_candidate_advisory(
         candidate_id="cand-1", identity=identity, role=role, mandate=mandate,
         context=context, observations=[observation],
@@ -89,10 +91,16 @@ def _full_advisory_scenario():
         observation_refs=[], uncertainties=[], expires_at=later,
         provider=provider, expected_profile_id=spec.PROFILE_ID,
         expected_profile_version=spec.PROFILE_VERSION,
-        requested_review_destination_role_ref="role-approver")
+        requested_review_destination_role_ref="role-approver",
+        strategy_policy_resolver=strategy_policy_resolver,
+        # One candidate, no parent — the member this advisory's own shape yields, so
+        # ``verify_strategy_permission``'s sixth check passes on the lawful scenario.
+        declared_strategy=ap.ReasoningStrategy.SINGLE_CANDIDATE_UNREVISED)
     return dict(identity=identity, role=role, mandate=mandate, context=context,
                observation=observation, candidate=candidate, provider=provider,
-               candidate_set=candidate_set, advisory=advisory)
+               candidate_set=candidate_set, advisory=advisory,
+               strategy_policy_resolver=strategy_policy_resolver,
+               strategy_policy=spec.strategy_policy_response())
 
 
 @pytest.fixture(scope="module")
@@ -397,7 +405,9 @@ def test_i7_6_build_proposer_advisory_raises_eligibility_mismatch_error(scenario
             uncertainties=[], expires_at=scenario["mandate"].expires_at,
             provider=scenario["provider"], expected_profile_id=spec.PROFILE_ID,
             expected_profile_version=spec.PROFILE_VERSION,
-            requested_review_destination_role_ref=None)
+            requested_review_destination_role_ref=None,
+            strategy_policy_resolver=scenario["strategy_policy_resolver"],
+            declared_strategy=ap.ReasoningStrategy.SINGLE_CANDIDATE_UNREVISED)
     assert issubclass(ap.EligibilityMismatchError, ValueError)
 
 
@@ -477,10 +487,9 @@ def test_i7_8_proposal_without_a_selection_is_refused_by_the_builder(scenario):
     with pytest.raises(pydantic.ValidationError):
         ap.build_proposer_process_record(
             process_record_id="rec-1", tenant_id="tenant-1", case_ref="case-1",
-            created_at=FIXED_INSTANT, declared_strategy="reconcile and propose",
+            created_at=FIXED_INSTANT, advisory=scenario["advisory"],
             state_transitions=[], tool_invocations=[], candidate_ids=["cand-1"],
             selected_candidate_id=None, terminal_outcome=ap.TerminalOutcome.PROPOSAL,
-            advisory_digest=scenario["advisory"].advisory_digest,
             started_at=FIXED_INSTANT, completed_at=FIXED_INSTANT)
 
 
@@ -516,7 +525,10 @@ def _record_fixture(**overrides):
     fixture = dict(
         schema_version="1.0", tenant_id="tenant-1", created_at=FIXED_INSTANT,
         process_record_id="rec-1", case_ref="case-1",
-        declared_strategy="reconcile and propose", state_transitions=[],
+        # `S2B-R2-Q5=A` retyped this to the closed vocabulary, fail-closed at
+        # construction: the S1 free-text value this fixture used is no longer lawful.
+        declared_strategy=ap.ReasoningStrategy.SINGLE_CANDIDATE_UNREVISED,
+        state_transitions=[],
         tool_invocations=[], deterministic_checks=[], candidate_ids=[],
         selected_candidate_id=None, semantic_audit_refs=[],
         terminal_outcome=ap.TerminalOutcome.ABSTAIN, reason_codes=[],
@@ -586,10 +598,9 @@ def test_i7_10_the_process_record_states_the_resolved_distribution_version(scena
     import ugence_jcs
     record = ap.build_proposer_process_record(
         process_record_id="rec-1", tenant_id="tenant-1", case_ref="case-1",
-        created_at=FIXED_INSTANT, declared_strategy="reconcile and propose",
+        created_at=FIXED_INSTANT, advisory=scenario["advisory"],
         state_transitions=[], tool_invocations=[], candidate_ids=["cand-1"],
         selected_candidate_id=None, terminal_outcome=ap.TerminalOutcome.ABSTAIN,
-        advisory_digest=scenario["advisory"].advisory_digest,
         started_at=FIXED_INSTANT, completed_at=FIXED_INSTANT)
     assert record.jcs_distribution_version == ugence_jcs.__version__
 
@@ -851,7 +862,11 @@ def _revision_kwargs(scenario, **overrides):
         created_at=FIXED_INSTANT, expires_at=scenario["mandate"].expires_at,
         provider=scenario["provider"], expected_profile_id=spec.PROFILE_ID,
         expected_profile_version=spec.PROFILE_VERSION,
-        requested_review_destination_role_ref="role-approver")
+        requested_review_destination_role_ref="role-approver",
+        strategy_policy_resolver=scenario["strategy_policy_resolver"],
+        # A revision binds a parent, so REVISED_ADVISORY is the member its own
+        # shape yields at any candidate count (`S2B-R2-Q1=A`).
+        declared_strategy=ap.ReasoningStrategy.REVISED_ADVISORY)
     kwargs.update(overrides)
     return kwargs
 
@@ -1099,7 +1114,9 @@ def test_build_proposer_advisory_refuses_a_forged_set_rather_than_leaking_it(sce
             uncertainties=[], expires_at=scenario["mandate"].expires_at,
             provider=scenario["provider"], expected_profile_id=spec.PROFILE_ID,
             expected_profile_version=spec.PROFILE_VERSION,
-            requested_review_destination_role_ref="role-approver")
+            requested_review_destination_role_ref="role-approver",
+            strategy_policy_resolver=scenario["strategy_policy_resolver"],
+            declared_strategy=ap.ReasoningStrategy.SINGLE_CANDIDATE_UNREVISED)
 
 
 def test_no_separate_refusal_remains_in_construct_advisory_source():
@@ -1152,7 +1169,9 @@ def _od6_ii_call(**overrides):
             expires_at=scenario["mandate"].expires_at,
             provider=scenario["provider"], expected_profile_id=spec.PROFILE_ID,
             expected_profile_version=spec.PROFILE_VERSION,
-            requested_review_destination_role_ref="role-approver")
+            requested_review_destination_role_ref="role-approver",
+            strategy_policy_resolver=scenario["strategy_policy_resolver"],
+            declared_strategy=ap.ReasoningStrategy.SINGLE_CANDIDATE_UNREVISED)
         kwargs.update(overrides)
         return ap.build_proposer_advisory(**kwargs)
     return call
@@ -1243,7 +1262,9 @@ def test_od6_ii_build_advisory_revisions_own_continuity_checks_stay_plain_valuee
             expires_at=scenario["mandate"].expires_at,
             provider=scenario["provider"], expected_profile_id=spec.PROFILE_ID,
             expected_profile_version=spec.PROFILE_VERSION,
-            requested_review_destination_role_ref="role-approver")
+            requested_review_destination_role_ref="role-approver",
+            strategy_policy_resolver=scenario["strategy_policy_resolver"],
+            declared_strategy=ap.ReasoningStrategy.REVISED_ADVISORY)
     assert not isinstance(excinfo.value, ap.CrossContractViolationError)
     assert not isinstance(excinfo.value, pydantic.ValidationError)
 

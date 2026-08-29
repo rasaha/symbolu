@@ -52,9 +52,11 @@ if typing.TYPE_CHECKING:
         CognitiveRoleContract,
         DomainEvaluationProvider,
         ProposerAdvisory,
+        StrategyPolicyResolver,
         ToolObservation,
         WorkMandate,
     )
+    from .vocabulary import ReasoningStrategy
 
 __all__ = [
     "ADVISORY_IDENTITY_SET_PATHS",
@@ -125,6 +127,15 @@ def _unsigned_advisory_payload_model():
         selected_candidate_id: Optional[c.Identifier] = None
         selection_policy_id: Optional[c.Token] = None
         selection_policy_version: Optional[c.Token] = None
+        # `S2B-D6=B1`'s three fields. G2's equivalence obligation requires this
+        # private payload to carry the same fields, defaults, validators and
+        # serializers ``ProposerAdvisory`` does; omitting them here would put the
+        # governing policy identity, its version and the declared strategy inside the
+        # advisory and OUTSIDE ``P_unsigned`` — which is precisely the weak
+        # linked-record guarantee `S2B-D6=B1` rejected.
+        strategy_policy_id: c.Token
+        strategy_policy_version: c.Token
+        declared_strategy: c.ReasoningStrategy
         recommended_disposition: Optional[c.CandidateDisposition] = None
         requested_review_action: Optional[c.ReviewAction] = None
         requested_review_destination_role_ref: Optional[c.Identifier] = None
@@ -204,8 +215,11 @@ def build_proposer_advisory(
     expected_profile_id: str,
     expected_profile_version: str,
     requested_review_destination_role_ref: "str | None",
+    strategy_policy_resolver: "StrategyPolicyResolver",
+    declared_strategy: "ReasoningStrategy",
 ) -> "ProposerAdvisory":
-    """H1, as amended by OD-7. Validates its inputs, replays the domain evaluation and
+    """H1, as amended by OD-7 and by S2-B (`S2B-S1-Q5=A`). Validates its inputs, tests
+    strategy permission, replays the domain evaluation and
     the deterministic selection, derives the nested ``candidates`` sequence, the four
     selection-dependent fields and the four mirrored evaluation/policy fields from
     ``candidate_set`` under R-1b, recomputes Equation 2 for any selection, and
@@ -231,7 +245,87 @@ def build_proposer_advisory(
         provider=provider, expected_profile_id=expected_profile_id,
         expected_profile_version=expected_profile_version,
         requested_review_destination_role_ref=requested_review_destination_role_ref,
+        strategy_policy_resolver=strategy_policy_resolver,
+        declared_strategy=declared_strategy,
     )
+
+
+def _resolve_strategy_policy(
+    *,
+    resolver: "StrategyPolicyResolver",
+    role: "CognitiveRoleContract",
+    tenant_id: str,
+    case_ref: str,
+    as_of: datetime,
+):
+    """`S2B-S1-Q9=A` with `S2B-D7=A`. Resolve the role's strategy-policy reference
+    through the **injected** resolver and correlation-check the echo before any value
+    from the response is used.
+
+    `[R]` **The policy identity and version are package-stamped from this response**,
+    never accepted as builder parameters. This is OD-7 part 5's selector-policy
+    precedent exactly: accepting them from a caller would let a caller label an
+    advisory with a policy that did not govern it, and a caller-supplied value is not
+    authoritative merely because it is structured or digest-bound.
+
+    `[G]` **Disclosed ceiling, and it is the same one OD-7's evaluator echo carries.**
+    The echo is a request/response correlation check — it catches a resolver that mixed
+    up concurrent requests, answered under a stale reference or was wired up wrongly.
+    It is **not** a defence against a dishonest resolver. `[R]` Nor does anything here
+    verify the policy's issuer or signature: that is a separate Policy Authority call
+    outside this boundary, and `S2B-S1-Q9=A` ratifies **no ``verified`` boolean** a
+    resolver could set to assert its own trustworthiness.
+    """
+    from . import contracts as c
+
+    request = c.StrategyPolicyRequest(
+        strategy_policy_ref=role.strategy_policy_ref,
+        tenant_id=tenant_id,
+        case_ref=case_ref,
+        as_of=as_of,
+    )
+    try:
+        response = resolver.resolve(request=request)
+    except Exception as exc:  # noqa: BLE001 — H2 stays at five classes (`Q8=A`).
+        raise CrossContractViolationError(
+            "the injected strategy-policy resolver raised while resolving "
+            f"{role.strategy_policy_ref!r}; the role's governing policy could not be "
+            "established, so no advisory is constructed (S2B-D5=A)") from exc
+    if response is None:
+        raise CrossContractViolationError(
+            "the injected strategy-policy resolver returned nothing for "
+            f"{role.strategy_policy_ref!r}")
+    if response.strategy_policy_ref != request.strategy_policy_ref:
+        raise CrossContractViolationError(
+            "the resolver's echoed strategy_policy_ref does not correspond to the "
+            f"request issued for {role.strategy_policy_ref!r}")
+    return response
+
+
+def _require_declaration_is_permitted(*, policy, declared_strategy) -> None:
+    """`S2B-D5=A`'s two remaining triggering conditions, at construction: the permitted
+    set is empty, or the declared strategy is not a member of it.
+
+    Membership is **exact codepoint equality** (`S2B-S1-Q4=A`), carried here by enum
+    identity: both sides are ``ReasoningStrategy`` members. There is **no normalizer,
+    no casefolding, no trimming and no splitting** anywhere on this path.
+
+    `[R]` **The shape-correspondence check is deliberately absent here.**
+    `S2B-R2-Q8=A` adds it as ``verify_strategy_permission``'s **sixth** check and
+    establishes it **at replay, never by construction** — so the declaration stays the
+    producer's own digest-bound commitment rather than a value this package derives and
+    then compares against itself.
+    """
+    if not policy.permitted_strategies:
+        raise CrossContractViolationError(
+            f"the resolved strategy policy {policy.strategy_policy_id!r} at version "
+            f"{policy.strategy_policy_version!r} permits no strategy; the role may "
+            "declare none, so no advisory is constructed (S2B-D5=A)")
+    if declared_strategy not in policy.permitted_strategies:
+        raise CrossContractViolationError(
+            f"the declared strategy {declared_strategy!r} is not a member of the "
+            f"permitted set of strategy policy {policy.strategy_policy_id!r} at "
+            f"version {policy.strategy_policy_version!r} (S2B-D5=A)")
 
 
 def _construct_advisory(
@@ -255,6 +349,8 @@ def _construct_advisory(
     expected_profile_id: str,
     expected_profile_version: str,
     requested_review_destination_role_ref: "str | None",
+    strategy_policy_resolver: "StrategyPolicyResolver",
+    declared_strategy: "ReasoningStrategy",
 ) -> "ProposerAdvisory":
     """The G2 construction shape, shared by ``build_proposer_advisory`` (``advisory_
     version="1"``, no parent) and ``build_advisory_revision`` (an incremented
@@ -277,6 +373,34 @@ def _construct_advisory(
             "(R-9)")
     _require_equal("the bound role contract", mandate.assigned_role_contract_id,
                     identity.bound_role_contract_id, role.role_contract_id)
+
+    # ----------------------------------------------------------------------- #
+    # `S2B-S1-Q12=A` — construction order. Resolution and the permission test occur
+    # HERE: **before** the OD-7 evaluation sequence (eligibility -> domain evaluation
+    # -> verification -> selection -> readiness), so an unpermitted run **never
+    # reaches the injected domain evaluator**. That is externally observable, which is
+    # why it required an owner ruling rather than an implementer's choice.
+    #
+    # `S2B-D5=A` — the result of a permission failure is **structural**: construction
+    # produces no identity-bearing artifact. **No authority disposition is emitted and
+    # none is ratified.** This package emits no denial, and no reserved authority term;
+    # ``ABSTAIN`` is never a denial. `[R]` Which component maps a structural permission
+    # failure to an operational outcome — abstention, hold, escalation or referral — is
+    # deliberately outside this scope and is not ruled, so nothing here maps one.
+    #
+    # `S2B-S1-Q8=A` — **no new exception type.** The refusal is discharged by the
+    # existing H2 surface, which stays at five classes: ``pydantic.ValidationError``
+    # for a value failing its own field constraint (a ``declared_strategy`` that is not
+    # a ``ReasoningStrategy`` member is refused there, by the parameter's own type),
+    # and ``CrossContractViolationError`` for a rule comparing independently
+    # constructed instances — which is what each check below is: the role contract, the
+    # resolver's response and the producer's declaration are three independently
+    # produced things, and no one of them is malformed on its own.
+    strategy_policy = _resolve_strategy_policy(
+        resolver=strategy_policy_resolver, role=role, tenant_id=tenant_id,
+        case_ref=case_ref, as_of=created_at)
+    _require_declaration_is_permitted(
+        policy=strategy_policy, declared_strategy=declared_strategy)
 
     if not verify_candidate_eligibility(
             candidate_set=candidate_set, identity=identity, role=role,
@@ -377,6 +501,12 @@ def _construct_advisory(
         selected_candidate_id=selected_candidate_id,
         selection_policy_id=candidate_set.selection_policy_id,
         selection_policy_version=candidate_set.selection_policy_version,
+        # `S2B-D7=A`: stamped from the independently resolved policy, never from a
+        # caller parameter. ``declared_strategy`` is the producer's own assertion,
+        # bound into ``P_unsigned`` as an assertion and never as an authorization.
+        strategy_policy_id=strategy_policy.strategy_policy_id,
+        strategy_policy_version=strategy_policy.strategy_policy_version,
+        declared_strategy=declared_strategy,
         recommended_disposition=recommended_disposition,
         requested_review_action=requested_review_action,
         requested_review_destination_role_ref=destination_role_ref,
@@ -408,6 +538,9 @@ def _construct_advisory(
         selected_candidate_id=payload.selected_candidate_id,
         selection_policy_id=payload.selection_policy_id,
         selection_policy_version=payload.selection_policy_version,
+        strategy_policy_id=payload.strategy_policy_id,
+        strategy_policy_version=payload.strategy_policy_version,
+        declared_strategy=payload.declared_strategy,
         recommended_disposition=payload.recommended_disposition,
         requested_review_action=payload.requested_review_action,
         requested_review_destination_role_ref=(
@@ -440,6 +573,8 @@ def build_advisory_revision(
     expected_profile_id: str,
     expected_profile_version: str,
     requested_review_destination_role_ref: "str | None",
+    strategy_policy_resolver: "StrategyPolicyResolver",
+    declared_strategy: "ReasoningStrategy",
 ) -> "ProposerAdvisory":
     """G3. A revision is a newly asserted identity-bearing advisory: ``claim_
     summaries``, ``observation_refs`` and ``uncertainties`` are required keyword
@@ -481,4 +616,6 @@ def build_advisory_revision(
         expected_profile_id=expected_profile_id,
         expected_profile_version=expected_profile_version,
         requested_review_destination_role_ref=requested_review_destination_role_ref,
+        strategy_policy_resolver=strategy_policy_resolver,
+        declared_strategy=declared_strategy,
     )

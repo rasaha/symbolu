@@ -70,15 +70,18 @@ from ugence_agentic_proposer import (
     evaluate_eligibility, evaluate_readiness,
     compute_advisory_identity, verify_advisory_identity,
     verify_candidate_eligibility, verify_advisory_selection, verify_observation_resolution,
+    verify_strategy_permission,
     EligibilityMismatchError, CrossContractViolationError,
     TerminalOutcome,               # PROPOSAL, NEED_EVIDENCE, ABSTAIN, ESCALATE
     CandidateDisposition,          # RECOMMEND_MATCHED_FOR_APPROVAL, RECOMMEND_WITHHOLD,
                                    # REQUEST_EVIDENCE, ESCALATE_EXCEPTION
     SemanticAuditorFindingStatus,  # CONSISTENT, INCONSISTENT, INDETERMINATE, CONFLICTING
+    ReasoningStrategy,             # SINGLE_CANDIDATE_UNREVISED, MULTI_CANDIDATE_UNREVISED,
+                                   # REVISED_ADVISORY
 )
 ```
 
-The full 46-name public surface (H3 as amended by OD-7, plus OD-6(ii)'s
+The full 51-name public surface (H3 as amended by OD-7 and by S2-B, plus OD-6(ii)'s
 `CrossContractViolationError`)
 is pinned in
 [`public_api.json`](public_api.json) and drift-tested by
@@ -92,11 +95,29 @@ candidate-selection boundary: an **injected** `DomainEvaluationProvider` protoco
 deterministic in-package selector under selection-policy v1 (fail-closed uniqueness),
 identity-bound evaluation-profile and selector-policy fields, and two replay functions.
 
+At `0.3.0`, S2-B adds **Reasoning Strategy Permission**: a closed three-member
+`ReasoningStrategy` vocabulary defined over two observable axes (candidate count and
+parent binding), an **injected** `StrategyPolicyResolver` protocol this package owns and
+does not implement, the governing policy identity/version and one declared-strategy
+assertion bound **inside** the advisory digest, and `verify_strategy_permission` — a
+six-check replay that returns `bool` and never raises.
+
+What that does **not** claim, and must never be described as claiming: that a model's
+private reasoning became deterministic; that a declared strategy proves the model
+internally followed it; that Ugence can inspect or replay private chain-of-thought; that
+the declared procedure was *executed*; or that permission to use a strategy authorizes
+additional compute, tools, evidence access or consequential execution. A permission
+failure is **structural** — no artifact is constructed, replay returns `False` — and
+**no denial and no reserved authority term is emitted**. Mapping such a failure to an
+operational outcome is deliberately unruled and is not done here.
+
 What this package still does **not** do, and does not intend to at this stage: it ships
 **no concrete domain evaluator** (the provider is injected by the caller and computes
 nothing here), **no substantive multi-candidate ranking** (deferred to a future ruling;
 more than one qualifying candidate produces no selection and `ABSTAIN`), **no**
-multi-provider evaluation, **no** semantic auditor, and **no** networking, storage,
+multi-provider evaluation, **no** semantic auditor, and **no strategy-permission policy**
+(the resolver is injected too, and no such family is registered with Policy Authority,
+which blocks S2-B execution end to end), **no** networking, storage,
 service discovery, plugin loading, transport or HTTP surface — all deferred (Part J of
 the specification).
 
@@ -142,10 +163,14 @@ python packages/capabilities/agentic-proposer/verify_agentic_proposer_distributi
 
 Status: S1 contracts and equations implemented, drift-tested against a pinned
 public-API snapshot; at `0.2.0`, candidate selection under selection-policy v1 and the
-**injected** `DomainEvaluationProvider` boundary shipped with it (OD-7 through OD-10).
+**injected** `DomainEvaluationProvider` boundary shipped with it (OD-7 through OD-10);
+at `0.3.0`, Reasoning Strategy Permission and the **injected** `StrategyPolicyResolver`
+boundary (S2-B).
 Not pilot-validated, not production-certified. Nothing in this package has been
 exercised against a real workload. What remains absent: **concrete domain evaluators**
 (the provider is supplied by the caller and this package embeds none), **substantive
 multi-candidate ranking** (deferred to a future ruling; more than one qualifying
-candidate produces no selection and `ABSTAIN`), and the **semantic auditor** (Part J,
-deferred).
+candidate produces no selection and `ABSTAIN`), the **semantic auditor** (Part J,
+deferred), and any **registered strategy-permission policy family** — S2-B is
+implemented and tested against a stubbed resolver, and cannot execute end to end until
+Policy Authority carries such a family.

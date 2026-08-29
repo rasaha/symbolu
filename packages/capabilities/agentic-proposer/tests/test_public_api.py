@@ -106,12 +106,17 @@ def test_every_h3_category_is_present_in_the_snapshot():
                 "BoundedContextEnvelope", "ToolObservation", "AdvisoryCandidateSet",
                 "ProposerAdvisory", "ProposerProcessRecord"}
     nested = {"CandidateAdvisory", "ProposerProcessStateTransition"}
-    # OD-7's two call-boundary shapes are pydantic models and appear as such; they are
-    # not contracts, which is why they are named separately here rather than folded in.
-    boundary_shapes = {"DomainEvaluationRequest", "DomainEvaluationResponse"}
+    # OD-7's two call-boundary shapes, and S2-B's two, are pydantic models and appear
+    # as such; none is a contract, which is why they are named separately here rather
+    # than folded in. Neither pair carries a C2 common field, has an identity role, or
+    # is ever stored, transported or reachable from ``P_unsigned``.
+    boundary_shapes = {"DomainEvaluationRequest", "DomainEvaluationResponse",
+                       "StrategyPolicyRequest", "StrategyPolicyResponse"}
     assert contracts | nested | boundary_shapes == models
-    assert protocols == {"DomainEvaluationProvider"}
-    assert len(enums) == 11
+    # Two injected protocols this package OWNS and does not implement: the domain
+    # evaluator (OD-7 part 2) and the strategy-policy resolver (`S2B-S1-Q9=A`).
+    assert protocols == {"DomainEvaluationProvider", "StrategyPolicyResolver"}
+    assert len(enums) == 12
     builders = {"build_candidate_advisory", "build_advisory_candidate_set",
                "build_proposer_advisory", "build_advisory_revision",
                "build_proposer_process_record"}
@@ -119,7 +124,7 @@ def test_every_h3_category_is_present_in_the_snapshot():
     identity_functions = {"compute_advisory_identity", "verify_advisory_identity"}
     verifiers = {"verify_candidate_eligibility", "verify_advisory_selection",
                 "verify_observation_resolution", "verify_domain_evaluation",
-                "verify_deterministic_selection"}
+                "verify_deterministic_selection", "verify_strategy_permission"}
     assert builders | equations | identity_functions | verifiers == functions
     assert exceptions == {"EligibilityMismatchError", "CrossContractViolationError",
                           "DomainEvaluationProviderError"}
@@ -127,18 +132,30 @@ def test_every_h3_category_is_present_in_the_snapshot():
                          "ADVISORY_IDENTITY_SET_PATHS", "ADVISORY_IDENTITY_NFC_PATHS"}
 
 
-def test_the_snapshot_carries_exactly_the_forty_six_authorized_names():
-    """OD-7's public-API consequence, executed. Thirty-nine names were frozen at 0.1.0;
-    seven were authorized by the amendment and are added here, none removed."""
+def test_the_snapshot_carries_exactly_the_fifty_one_authorized_names():
+    """S2-B's public-API consequence, executed (`S2B-S1-Q6=A` with `S2B-R2-Q4=A`).
+
+    Thirty-nine names were frozen at ``0.1.0``; OD-7 authorized seven more at
+    ``0.2.0``; S2-B authorizes **exactly five** at ``0.3.0`` — the strategy vocabulary,
+    the resolver protocol, the resolver request shape, the resolver response shape and
+    the replay function. **No removals, no renames**, which this asserts by requiring
+    the residue to be exactly the forty-six that came before.
+    """
     documented = json.loads(_PUBLIC_API_JSON.read_text())
-    assert documented["package_version"] == "0.2.0"
-    assert len(documented["symbols"]) == 46
-    added = {"DomainEvaluationOutcome", "DomainEvaluationProvider",
-             "DomainEvaluationRequest", "DomainEvaluationResponse",
-             "DomainEvaluationProviderError", "verify_domain_evaluation",
-             "verify_deterministic_selection"}
-    assert added <= set(documented["symbols"])
-    assert len(set(documented["symbols"]) - added) == 39
+    assert documented["package_version"] == "0.3.0"
+    assert len(documented["symbols"]) == 51
+    od7_added = {"DomainEvaluationOutcome", "DomainEvaluationProvider",
+                 "DomainEvaluationRequest", "DomainEvaluationResponse",
+                 "DomainEvaluationProviderError", "verify_domain_evaluation",
+                 "verify_deterministic_selection"}
+    s2b_added = {"ReasoningStrategy", "StrategyPolicyResolver",
+                 "StrategyPolicyRequest", "StrategyPolicyResponse",
+                 "verify_strategy_permission"}
+    assert len(s2b_added) == 5, "S2-B authorizes exactly five names, and no more"
+    assert od7_added <= set(documented["symbols"])
+    assert s2b_added <= set(documented["symbols"])
+    assert len(set(documented["symbols"]) - s2b_added) == 46
+    assert len(set(documented["symbols"]) - s2b_added - od7_added) == 39
 
 
 def test_py_typed_marker_present():

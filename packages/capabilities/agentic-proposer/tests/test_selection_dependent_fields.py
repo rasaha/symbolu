@@ -638,12 +638,12 @@ def test_the_local_rule_is_not_a_correspondence_claim():
 #
 # The probes above run against a four-field reference model. That model states the rule
 # executably, which is worth having, but it is not the bearer: it declares four fields
-# where ``ProposerAdvisory`` declares twenty-seven, so a rejection there says nothing
+# where ``ProposerAdvisory`` declares thirty, so a rejection there says nothing
 # about whether the rule survives on a contract carrying every required field, a nested
 # candidate sequence, and a frozen, strict, extra-forbidding model config.
 #
 # Everything below constructs the representative ``ProposerAdvisory`` from a complete
-# valid fixture — all twenty-seven fields supplied with lawful values — and varies only
+# valid fixture — all thirty fields supplied with lawful values — and varies only
 # the selector and its dependents. Where a probe needs a NON-NULL selector it uses the
 # fixture whose one candidate the ratified selector actually qualifies: under C9 the
 # selector was unconstructible, so those probes ran against a shape selection-policy v1
@@ -664,7 +664,7 @@ def test_the_complete_fixture_supplies_every_required_field(bearer):
     it never exercised."""
     fixture = spec.complete_advisory_fixture()
     assert set(fixture) == set(bearer.model_fields)
-    assert len(fixture) == spec.CONTRACT_CARDINALITY[SELECTION_BEARER] == 27
+    assert len(fixture) == spec.CONTRACT_CARDINALITY[SELECTION_BEARER] == 30
     advisory = bearer(**fixture)
     assert advisory.selected_candidate_id is None
     assert len(advisory.candidates) == 1
