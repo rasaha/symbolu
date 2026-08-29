@@ -19,6 +19,13 @@
 > specification, ADR, `public_api.json`, `version.py`, package metadata, CI workflow or
 > platform-freeze artifact. It adds one documentation file and nothing else.
 
+> **RATIFIED 2026-08-29 — see
+> [`ADR_UGENCE_S2B_FIRST_SLICE_RATIFICATION.md`](ADR_UGENCE_S2B_FIRST_SLICE_RATIFICATION.md).**
+> The owner answered the §7 ballot `Q1=A … Q13=A` against this file as it stood at commit
+> `e6003a2a2cadf42926c34828b30c2f2de3aad967`. That ADR, not this document, is the
+> ratification record; this document remains the proposal the ballot was drawn from, and
+> the §8 implementation gate remains **closed** pending the strategy vocabulary's members.
+
 **Date:** 2026-08-29.
 **Baseline inspected:** default branch `claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF`,
 head `90696d16ed8e9b9942252fe297c44bc3d16393a1` (merge of PR #1501).
