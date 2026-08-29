@@ -146,6 +146,17 @@ jobs:
       - name: install-e2e-driver-deps
         run: pip install -e packages/tooling/policy-workflow-compiler -e packages/capabilities/agent-workforce-composer -e apps/ugence-governance-studio/backend -e deployment/governance-studio
 
+      - name: ratified-pin-conformance
+        # BLOCKING, and deliberately ahead of every other container step. Asserts
+        # base-images.json == Dockerfile == the owner-ratified supply decision in
+        # docs/audits/ugence_governance_studio_p3e/BASE_IMAGE_MIRROR_DECISION.json.
+        # Combined with base-image-digest-verification below (live registry ==
+        # base-images.json), this makes the ratified digest the transitive
+        # authority for what is actually built: a re-pin or a substituted image
+        # cannot land without editing the ratification record, which requires
+        # owner re-ratification.
+        run: python deployment/governance-studio/ci/verify_ratified_pins.py
+
       - name: base-image-digest-verification
         run: |
           python deployment/governance-studio/ci/resolve_base_images.py \
