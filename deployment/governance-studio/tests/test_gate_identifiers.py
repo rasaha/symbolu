@@ -72,13 +72,14 @@ def test_every_gate_records_the_required_fields(definition):
     }
     for gate, body in definition["gates"].items():
         assert required <= set(body), f"{gate} is missing {required - set(body)}"
-        assert body["definition_status"] in {"DEFINED", "UNKNOWN"}
+        assert body["definition_status"] in {
+            "DEFINED_HISTORICAL_GATE", "UNDEFINED_HISTORICAL_GATE"}
 
 
 def test_defined_gates_cite_a_source_and_assert_no_invented_mapping(definition):
     """C2 and C4 are DEFINED from the audit records; nothing else is."""
     defined = {g for g, b in definition["gates"].items()
-               if b["definition_status"] == "DEFINED"}
+               if b["definition_status"] == "DEFINED_HISTORICAL_GATE"}
     assert defined == {"C2", "C4"}
     for gate in sorted(defined):
         body = definition["gates"][gate]
@@ -94,9 +95,39 @@ def test_group_defined_gates_carry_only_the_group_property(definition):
     """C5-C19 are defined collectively, never individually."""
     for i in range(5, 20):
         body = definition["gates"][f"C{i}"]
-        assert body["definition_status"] == "UNKNOWN", f"C{i}"
+        assert body["definition_status"] == "UNDEFINED_HISTORICAL_GATE", f"C{i}"
         assert "group_property" in body, f"C{i}"
         assert body["requirement"] is None, f"C{i}"
+
+
+def test_pull_request_history_search_is_recorded_negative(definition):
+    """The PR-history search is recorded so it is not repeated."""
+    s = definition["reconstruction_method"]["pull_request_history_search"]
+    assert s["status"] == "NEGATIVE"
+    assert s["searched_on"] and s["findings"]
+
+
+def test_replacement_family_asserts_no_correspondence():
+    """The proposed family must never imply a mapping onto the C identifiers."""
+    import json as _json
+    proposal = _json.load(open(
+        os.path.join(AUDIT, "CONTAINER_GATE_FAMILY_PROPOSAL.json"), encoding="utf-8"))
+    rel = proposal["relationship_to_the_historical_C_family"]
+    assert rel["correspondence_asserted"] is False
+    assert proposal["status"] == "PROPOSED_AWAITING_OWNER_RATIFICATION"
+    assert proposal["nature"].startswith("DOCUMENTATION_ONLY")
+    # no proposed gate may name a C identifier
+    import re as _re
+    for gid, body in proposal["gates"].items():
+        assert gid.startswith("P3E-CTR-"), gid
+        assert not _re.search(r"\bC\d+\b", _json.dumps(body)), gid
+
+
+def test_proposal_is_not_referenced_by_any_ci_step():
+    """A proposal must not be enforced as though ratified."""
+    wf = open(os.path.join(REPO, ".github", "workflows",
+                           "governance-studio-p3e-private-hosted-ci.yml"), encoding="utf-8").read()
+    assert "CONTAINER_GATE_FAMILY_PROPOSAL" not in wf
 
 
 def test_completion_specification_is_recorded_absent(definition):
@@ -109,7 +140,7 @@ def test_completion_specification_is_recorded_absent(definition):
 def test_unknown_gates_assert_no_requirement_or_mapping(definition):
     """An UNKNOWN gate must not carry an invented requirement or mapping."""
     for gate, body in definition["gates"].items():
-        if body["definition_status"] == "UNKNOWN":
+        if body["definition_status"] == "UNDEFINED_HISTORICAL_GATE":
             assert body["requirement"] is None, gate
             assert body["workflow_step"] is None, gate
             assert body["supporting_test_or_script"] is None, gate

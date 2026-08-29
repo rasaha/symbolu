@@ -1,0 +1,226 @@
+{
+  "schema": "p3e-container-gate-family-proposal.v1",
+  "title": "Proposed canonical P3E container gate family (P3E-CTR)",
+  "status": "PROPOSED_AWAITING_OWNER_RATIFICATION",
+  "proposed_to": "rasaha",
+  "proposed_on": "2026-08-29",
+  "nature": "DOCUMENTATION_ONLY - this file proposes identifiers and mappings. It ratifies nothing, changes no workflow, executes no gate, and is not referenced by any CI step.",
+  "why": "The historical C-family is unusable as a gate register: C2 and C4 are defined, C5 through C19 were recorded as identifiers without ever being defined, and the specification that would define them does not exist. Rather than guess at fifteen historical meanings, this proposes a new family derived from what the container job actually does.",
+  "relationship_to_the_historical_C_family": {
+    "correspondence_asserted": false,
+    "statement": "NO correspondence between any P3E-CTR identifier and any C identifier is asserted, implied or intended. The two families are independent. In particular, do not read P3E-CTR-01 as C2, or the ordering of this family as the ordering of C5-C19. Any future correspondence must be established by owner ratification against evidence, not by position, count or name similarity.",
+    "historical_family_disposition": "C2 and C4 remain defined historical gates; C5-C19 remain UNDEFINED_HISTORICAL_GATE; every historical gate remains NOT_EXECUTED. This proposal does not retire them.",
+    "note_on_identifier_reuse": "C identifiers are phase-local in this repository and have been reused with unrelated meanings: PR #1323 uses C2-C5 for P3D frontend gates (controlled what-if, contrast classification, tracked-source integrity, decoder plan states), which are unrelated to the P3E container gates in PR #1325. The new prefix avoids repeating that collision."
+  },
+  "identifier_scheme": {
+    "prefix": "P3E-CTR-",
+    "format": "P3E-CTR-NN",
+    "count": 12,
+    "basis": "one identifier per named verification or evidence step of the container job, in workflow order, excluding checkout, setup and dependency-install steps"
+  },
+  "gates": {
+    "P3E-CTR-01": {
+      "proposed_requirement": "base-images.json and every Dockerfile FROM pin equal the owner-ratified digests in BASE_IMAGE_MIRROR_DECISION.json",
+      "gate_kind": "verification",
+      "workflow_step": "ratified-pin-conformance",
+      "workflow": ".github/workflows/governance-studio-p3e-private-hosted-ci.yml",
+      "workflow_job": "container",
+      "step_index_in_job": 1,
+      "supporting_test_or_script": [
+        "deployment/governance-studio/ci/verify_ratified_pins.py",
+        "deployment/governance-studio/tests/test_gate_identifiers.py::test_ratified_pin_conformance_holds_on_the_committed_tree"
+      ],
+      "requires_container_runtime": false,
+      "requires_registry_access": false,
+      "derivation": "read directly from this step's own command or `uses` in the workflow",
+      "evidence_required_before_passed": "this step exits zero in a run whose container-build succeeded from the ratified digests, with its log or uploaded artifact retained",
+      "execution_state": "NOT_PROPOSED_FOR_EXECUTION - this family is a proposal and no gate in it has run"
+    },
+    "P3E-CTR-02": {
+      "proposed_requirement": "each pinned base image resolves live to its pinned index digest, is pinned in the Dockerfile, and matches the declared platform",
+      "gate_kind": "verification",
+      "workflow_step": "base-image-digest-verification",
+      "workflow": ".github/workflows/governance-studio-p3e-private-hosted-ci.yml",
+      "workflow_job": "container",
+      "step_index_in_job": 2,
+      "supporting_test_or_script": [
+        "deployment/governance-studio/ci/resolve_base_images.py"
+      ],
+      "requires_container_runtime": false,
+      "requires_registry_access": true,
+      "derivation": "read directly from this step's own command or `uses` in the workflow",
+      "evidence_required_before_passed": "this step exits zero in a run whose container-build succeeded from the ratified digests, with its log or uploaded artifact retained",
+      "execution_state": "NOT_PROPOSED_FOR_EXECUTION - this family is a proposal and no gate in it has run"
+    },
+    "P3E-CTR-03": {
+      "proposed_requirement": "the image builds from the pinned Dockerfile for linux/amd64",
+      "gate_kind": "verification",
+      "workflow_step": "container-build",
+      "workflow": ".github/workflows/governance-studio-p3e-private-hosted-ci.yml",
+      "workflow_job": "container",
+      "step_index_in_job": 3,
+      "supporting_test_or_script": [],
+      "requires_container_runtime": true,
+      "requires_registry_access": true,
+      "derivation": "read directly from this step's own command or `uses` in the workflow",
+      "evidence_required_before_passed": "this step exits zero in a run whose container-build succeeded from the ratified digests, with its log or uploaded artifact retained",
+      "execution_state": "NOT_PROPOSED_FOR_EXECUTION - this family is a proposal and no gate in it has run"
+    },
+    "P3E-CTR-04": {
+      "proposed_requirement": "the built image runs as 10001:10001, exposes only 8443/tcp, and contains no npm, node or compiler",
+      "gate_kind": "verification",
+      "workflow_step": "image-inspection",
+      "workflow": ".github/workflows/governance-studio-p3e-private-hosted-ci.yml",
+      "workflow_job": "container",
+      "step_index_in_job": 4,
+      "supporting_test_or_script": [
+        "deployment/governance-studio/tests/test_container_artifacts.py (static equivalent on the Dockerfile)"
+      ],
+      "requires_container_runtime": true,
+      "requires_registry_access": true,
+      "derivation": "read directly from this step's own command or `uses` in the workflow",
+      "evidence_required_before_passed": "this step exits zero in a run whose container-build succeeded from the ratified digests, with its log or uploaded artifact retained",
+      "execution_state": "NOT_PROPOSED_FOR_EXECUTION - this family is a proposal and no gate in it has run"
+    },
+    "P3E-CTR-05": {
+      "proposed_requirement": "the runtime image's installed package set is captured as evidence",
+      "gate_kind": "evidence_production",
+      "workflow_step": "runtime-package-inventory",
+      "workflow": ".github/workflows/governance-studio-p3e-private-hosted-ci.yml",
+      "workflow_job": "container",
+      "step_index_in_job": 5,
+      "supporting_test_or_script": [],
+      "requires_container_runtime": true,
+      "requires_registry_access": true,
+      "derivation": "read directly from this step's own command or `uses` in the workflow",
+      "evidence_required_before_passed": "this step exits zero in a run whose container-build succeeded from the ratified digests, with its log or uploaded artifact retained",
+      "execution_state": "NOT_PROPOSED_FOR_EXECUTION - this family is a proposal and no gate in it has run"
+    },
+    "P3E-CTR-06": {
+      "proposed_requirement": "no credential, private key or token appears in image history or per-layer content",
+      "gate_kind": "verification",
+      "workflow_step": "image-layer-secret-scan",
+      "workflow": ".github/workflows/governance-studio-p3e-private-hosted-ci.yml",
+      "workflow_job": "container",
+      "step_index_in_job": 6,
+      "supporting_test_or_script": [
+        "deployment/governance-studio/ci/scan_image_layers.py"
+      ],
+      "requires_container_runtime": true,
+      "requires_registry_access": true,
+      "derivation": "read directly from this step's own command or `uses` in the workflow",
+      "evidence_required_before_passed": "this step exits zero in a run whose container-build succeeded from the ratified digests, with its log or uploaded artifact retained",
+      "execution_state": "NOT_PROPOSED_FOR_EXECUTION - this family is a proposal and no gate in it has run"
+    },
+    "P3E-CTR-07": {
+      "proposed_requirement": "the running container enforces hardening, TLS policy, authentication and cooldown, packaged four-scenario E2E, and no external egress",
+      "gate_kind": "verification",
+      "workflow_step": "container-runtime-verification",
+      "workflow": ".github/workflows/governance-studio-p3e-private-hosted-ci.yml",
+      "workflow_job": "container",
+      "step_index_in_job": 7,
+      "supporting_test_or_script": [
+        "deployment/governance-studio/ci/verify_container.sh",
+        "deployment/governance-studio/ci/packaged_e2e.py",
+        "deployment/governance-studio/tests/test_https_tls.py",
+        "deployment/governance-studio/tests/test_authentication.py",
+        "deployment/governance-studio/tests/test_middleware.py",
+        "deployment/governance-studio/tests/test_egress.py",
+        "deployment/governance-studio/tests/test_logging.py",
+        "deployment/governance-studio/tests/test_startup_integrity.py",
+        "deployment/governance-studio/tests/test_packaged_e2e.py"
+      ],
+      "requires_container_runtime": true,
+      "requires_registry_access": true,
+      "derivation": "read directly from this step's own command or `uses` in the workflow",
+      "evidence_required_before_passed": "this step exits zero in a run whose container-build succeeded from the ratified digests, with its log or uploaded artifact retained",
+      "execution_state": "NOT_PROPOSED_FOR_EXECUTION - this family is a proposal and no gate in it has run"
+    },
+    "P3E-CTR-08": {
+      "proposed_requirement": "a CycloneDX SBOM is produced for the built image",
+      "gate_kind": "evidence_production",
+      "workflow_step": "image-sbom",
+      "workflow": ".github/workflows/governance-studio-p3e-private-hosted-ci.yml",
+      "workflow_job": "container",
+      "step_index_in_job": 8,
+      "supporting_test_or_script": [
+        "anchore/sbom-action@v0.17.9"
+      ],
+      "requires_container_runtime": true,
+      "requires_registry_access": true,
+      "derivation": "read directly from this step's own command or `uses` in the workflow",
+      "evidence_required_before_passed": "this step exits zero in a run whose container-build succeeded from the ratified digests, with its log or uploaded artifact retained",
+      "execution_state": "NOT_PROPOSED_FOR_EXECUTION - this family is a proposal and no gate in it has run"
+    },
+    "P3E-CTR-09": {
+      "proposed_requirement": "the built image carries no HIGH or CRITICAL vulnerability",
+      "gate_kind": "verification",
+      "workflow_step": "container-vulnerability-scan",
+      "workflow": ".github/workflows/governance-studio-p3e-private-hosted-ci.yml",
+      "workflow_job": "container",
+      "step_index_in_job": 9,
+      "supporting_test_or_script": [
+        "aquasecurity/trivy-action@0.28.0"
+      ],
+      "requires_container_runtime": true,
+      "requires_registry_access": true,
+      "derivation": "read directly from this step's own command or `uses` in the workflow",
+      "evidence_required_before_passed": "this step exits zero in a run whose container-build succeeded from the ratified digests, with its log or uploaded artifact retained",
+      "execution_state": "NOT_PROPOSED_FOR_EXECUTION - this family is a proposal and no gate in it has run"
+    },
+    "P3E-CTR-10": {
+      "proposed_requirement": "the run's evidence artifacts are hashed into a manifest",
+      "gate_kind": "evidence_production",
+      "workflow_step": "evidence-manifest",
+      "workflow": ".github/workflows/governance-studio-p3e-private-hosted-ci.yml",
+      "workflow_job": "container",
+      "step_index_in_job": 10,
+      "supporting_test_or_script": [],
+      "requires_container_runtime": true,
+      "requires_registry_access": true,
+      "derivation": "read directly from this step's own command or `uses` in the workflow",
+      "evidence_required_before_passed": "this step exits zero in a run whose container-build succeeded from the ratified digests, with its log or uploaded artifact retained",
+      "execution_state": "NOT_PROPOSED_FOR_EXECUTION - this family is a proposal and no gate in it has run"
+    },
+    "P3E-CTR-11": {
+      "proposed_requirement": "the image rebuilds from a clean git archive of HEAD",
+      "gate_kind": "verification",
+      "workflow_step": "clean-checkout-reproducibility",
+      "workflow": ".github/workflows/governance-studio-p3e-private-hosted-ci.yml",
+      "workflow_job": "container",
+      "step_index_in_job": 11,
+      "supporting_test_or_script": [],
+      "requires_container_runtime": true,
+      "requires_registry_access": true,
+      "derivation": "read directly from this step's own command or `uses` in the workflow",
+      "evidence_required_before_passed": "this step exits zero in a run whose container-build succeeded from the ratified digests, with its log or uploaded artifact retained",
+      "execution_state": "NOT_PROPOSED_FOR_EXECUTION - this family is a proposal and no gate in it has run"
+    },
+    "P3E-CTR-12": {
+      "proposed_requirement": "the evidence artifacts are uploaded for retention",
+      "gate_kind": "evidence_production",
+      "workflow_step": "upload-evidence",
+      "workflow": ".github/workflows/governance-studio-p3e-private-hosted-ci.yml",
+      "workflow_job": "container",
+      "step_index_in_job": 12,
+      "supporting_test_or_script": [
+        "actions/upload-artifact@v4"
+      ],
+      "requires_container_runtime": true,
+      "requires_registry_access": true,
+      "derivation": "read directly from this step's own command or `uses` in the workflow",
+      "evidence_required_before_passed": "this step exits zero in a run whose container-build succeeded from the ratified digests, with its log or uploaded artifact retained",
+      "execution_state": "NOT_PROPOSED_FOR_EXECUTION - this family is a proposal and no gate in it has run"
+    }
+  },
+  "open_questions_for_the_owner": [
+    "Should evidence_production steps (runtime-package-inventory, image-sbom, evidence-manifest, upload-evidence) be gates at all, or evidence obligations attached to gates?",
+    "Should container-runtime-verification remain one gate, or be split into the distinct properties verify_container.sh checks (hardening, TLS, authentication, packaged E2E, egress)?",
+    "Should the historical C-family be formally retired once this family is ratified, or retained indefinitely as a closed historical register?"
+  ],
+  "prohibited_without_further_ratification": [
+    "treating any P3E-CTR identifier as equivalent to any C identifier",
+    "marking any gate in either family passed",
+    "referencing this proposal from a CI step as though it were ratified"
+  ]
+}
