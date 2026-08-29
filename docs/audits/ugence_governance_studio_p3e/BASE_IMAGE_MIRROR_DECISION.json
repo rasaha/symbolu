@@ -40,7 +40,31 @@
       }
     ],
     "distinct_images": 2,
-    "dockerfile_from_stages": 3
+    "dockerfile_from_stages": 3,
+    "ruling_2026_08_29": {
+      "decision": "HOLD_EXISTING_RATIFIED_DIGESTS",
+      "ruled_by": "rasaha",
+      "ruled_on": "2026-08-29",
+      "statement": "Upstream tag movement does not authorize a re-pin. The digests recorded above remain authoritative and are to be sourced from the approved internal mirror once it is provisioned.",
+      "explicit_non_finding": "The ratified digests are NOT invalid, superseded or compromised. A mutable tag moving to a newer image says nothing about the image these digests name; it is the expected behaviour of a mutable tag and precisely why the pins are by digest.",
+      "consequence": "base-image-digest-verification will continue to fail against live tag resolution until the mirror serves the ratified digests. That failure is the ratified MUST_HALT_ON_DIGEST_MISMATCH control operating as designed, not a defect to be silenced."
+    },
+    "unapproved_candidates": {
+      "status": "UNAPPROVED_OBSERVATION_ONLY",
+      "note": "Digests observed when the mutable tags were resolved in CI on 2026-08-29. Recorded for traceability only. They are NOT approved, NOT a replacement, and must not be pinned anywhere without the controlled refresh below.",
+      "observed_on": "2026-08-29",
+      "observed_by_run": "https://github.com/rasaha/symbolu/actions/runs/33268204975",
+      "candidates": [
+        {
+          "upstream_ref": "docker.io/library/node:22-bookworm-slim",
+          "observed_index_digest": "sha256:83f487e0a63425e5b4d146fb5e5be574bcbe1b7b843d3ebafdd95eaf7767a7e5"
+        },
+        {
+          "upstream_ref": "docker.io/library/python:3.11-slim-bookworm",
+          "observed_index_digest": "sha256:0bee7276f83efd4a1ee05bbbf4281d95ed28e079220a9457f25a93e3f1e3c31b"
+        }
+      ]
+    }
   },
   "enforcement": {
     "status": "OPERATIVE",
@@ -182,5 +206,18 @@
     "gate_identifiers": "deployment/governance-studio/ci/verify_gate_identifiers.py",
     "ratified_pins": "deployment/governance-studio/ci/verify_ratified_pins.py",
     "tests": "deployment/governance-studio/tests/test_gate_identifiers.py"
+  },
+  "controlled_base_image_refresh": {
+    "status": "REQUIRED_FOR_ANY_FUTURE_RE_RATIFICATION",
+    "rule": "Any change to the ratified digests must be a separate, controlled base-image refresh. It may not ride along with unrelated work, and it may not be performed to make a red check green.",
+    "required_evidence": [
+      "official-image source and manifest provenance",
+      "platform-specific child digest",
+      "image configuration and package changes relative to the outgoing image",
+      "vulnerability and secret-scan results for the incoming image",
+      "compatibility with the Governance Studio build and runtime",
+      "owner approval recorded BEFORE this record, base-images.json or the Dockerfile is changed"
+    ],
+    "ordering": "the ratification record is edited first; only then may base-images.json and the Dockerfile follow, so the pin-conformance guard never passes over an unratified digest"
   }
 }
