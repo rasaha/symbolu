@@ -542,24 +542,14 @@ def test_the_in_tree_drift_assertions_hold():
     assert ids.PRODUCER_SIGNING_PURPOSE != ids.PURPOSE_CAPACITY_ACTION
 
 
-#: Source of the drift probe run by the guard-10 reachability measurement below.
-PROBE_SOURCE = (
-    "import enum, sys\n"
-    "import ugence_cloud_scaling_controller.planning.candidates as candidates\n"
-    "class Drifted(enum.Enum):\n"
-    "    NO_CHANGE = 'no_change'\n"
-    "    SCALE_UP = 'scale_up'\n"
-    "    SCALE_DOWN = 'scale_down'\n"
-    "    COORDINATED = 'coordinated'\n"
-    "    SIDEWAYS = 'scale_sideways'\n"
-    "candidates.ActionKind = Drifted\n"
-    "for name in list(sys.modules):\n"
-    "    if name.startswith(('ugence_cloud_scaling_risk_integration',\n"
-    "                        'ugence_cloud_scaling_authorization_contracts')):\n"
-    "        del sys.modules[name]\n"
+#: Source of the probe the guard-10 measurement below runs. It reports which guard answered,
+#: so a refusal from a guard upstream of this one cannot be read as this one firing.
+ACTION_VOCABULARY_PROBE = (
     "try:\n"
-    "    import ugence_cloud_scaling_authorization_contracts.identifiers\n"
-    "    print('NO-IMPORT-ERROR')\n"
+    "    import ugence_cloud_scaling_authorization_contracts.identifiers as ids\n"
+    "    from ugence_cloud_scaling_controller.planning.candidates import ActionKind\n"
+    "    print('NO-IMPORT-ERROR ratified=' + repr(sorted(ids.CANONICAL_ACTION_TYPES))\n"
+    "          + ' controller=' + repr(sorted(k.value for k in ActionKind)))\n"
     "except ImportError as exc:\n"
     "    print('IMPORT-ERROR ' + str(exc))\n"
 )
@@ -620,45 +610,96 @@ def test_evidence_references_that_are_not_a_tuple_are_refused(projection, decisi
     assert excinfo.value.reason is _Reason.INVALID_EVIDENCE_BINDING
 
 
-def test_the_action_kind_drift_guard_is_unreachable_behind_phase_4c(tmp_path):
-    """Why guard 10 is ``unreachable-behind-earlier-guard``, not an equivalent mutant.
+def test_the_action_kind_guard_fires_when_phase_4c_stops_refusing(tmp_path):
+    """Guard 10 — ``identifiers.py:100``, ``controller_actions != CANONICAL_ACTION_TYPES``.
 
-    Guard 10 asks whether the controller's ``ActionKind`` value set equals this package's
-    ratified set. It can never observe a drift — and the reason is not that the condition
-    happens to be False today. It is that the *import supplying its left operand fails
-    first*: ``identifiers.py`` reaches Phase 4C for ``_PHASE4C_ACTION_TYPES``, and Phase
-    4C's own import-time guard compares ``ActionKind`` against its ratified set and raises
-    before this module finishes importing.
+    Excluded as ``unreachable-behind-earlier-guard`` on the evidence that Phase 4C's own
+    import-time check answers first. It does — *in this installation*. The earlier guard
+    lives in ``ugence-cloud-scaling-risk-integration``, a **separate distribution** under an
+    open-ended ``>=0.1.0`` pin, so "which guard fires first" is a fact about the resolution
+    that happens to be installed, not about the program. ADR Phase 5 §9.2 already forbids
+    exactly that reasoning for ``equivalent-mutant``; it now forbids it here too.
 
-    That is a claim about reachability, so it is measured rather than asserted: the
-    controller's enum is genuinely drifted and the resulting ``ImportError`` is read. If it
-    ever names guard 10, guard 10 is reachable and its exclusion is void.
+    The second resolution is a 0.2.0 that no longer refuses at import — a plausible
+    relaxation, since that check duplicates one its consumers also make — paired with a
+    controller ratifying a fifth ``ActionKind``. Phase 4C's ratified set is left untouched,
+    so Phase 5A's *pair* check cannot be the one that answers and this guard is isolated.
 
-    In a subprocess, not under a monkeypatch, because the measurement has to re-run
-    module-level import code — doing that in-process would leave a drifted Phase 4C in
-    ``sys.modules`` for every test that follows.
+    Present, Phase 5A refuses to import. Removed, it imports and binds a four-member
+    vocabulary while the controller ratifies five — every candidate digest then carries an
+    action vocabulary the controller has already moved past, which is the substitution the
+    module docstring says fails closed.
     """
 
     import os  # noqa: PLC0415
+    import shutil  # noqa: PLC0415
     import subprocess  # noqa: PLC0415
     import sys  # noqa: PLC0415
+    from pathlib import Path  # noqa: PLC0415
 
-    probe = tmp_path / "drift_probe.py"
-    probe.write_text(PROBE_SOURCE, encoding="utf-8")
+    declared = os.environ.get("UGENCE_REPO_ROOT")
+    repo = Path(declared).resolve() if declared else Path(__file__).resolve().parents[4]
+
+    def _edit(path, old_text, new_text):
+        body = path.read_text(encoding="utf-8")
+        assert body.count(old_text) == 1, (
+            f"{path.name}: expected exactly one {old_text!r}; the drift this resolution "
+            "introduces may not have been introduced at all"
+        )
+        path.write_text(body.replace(old_text, new_text), encoding="utf-8")
+
+    chain = tmp_path / "chain-0.2.0"
+    chain.mkdir()
+
+    controller = chain / "ugence_cloud_scaling_controller"
+    shutil.copytree(
+        repo / "packages/capabilities/cloud-scaling-controller/src"
+        / "ugence_cloud_scaling_controller",
+        controller,
+        ignore=shutil.ignore_patterns("__pycache__"),
+    )
+    _edit(
+        controller / "planning/candidates.py",
+        '    COORDINATED = "coordinated"',
+        '    COORDINATED = "coordinated"\n    SIDEWAYS = "scale_sideways"',
+    )
+
+    phase4c = chain / "ugence_cloud_scaling_risk_integration"
+    shutil.copytree(
+        repo / "packages/integration/cloud-scaling-risk-integration/src"
+        / "ugence_cloud_scaling_risk_integration",
+        phase4c,
+        ignore=shutil.ignore_patterns("__pycache__"),
+    )
+    _edit(phase4c / "version.py", '__version__ = "0.1.0"', '__version__ = "0.2.0"')
+    _edit(
+        phase4c / "identifiers.py",
+        "if _CONTROLLER_ACTION_TYPES != CANONICAL_ACTION_TYPES:",
+        "if False:  # a 0.2.0 that no longer refuses here",
+    )
+
+    probe = tmp_path / "action_vocabulary_probe.py"
+    probe.write_text(ACTION_VOCABULARY_PROBE, encoding="utf-8")
     result = subprocess.run(
         [sys.executable, str(probe)],
         capture_output=True,
         text=True,
         timeout=300,
-        env={**os.environ, "PYTHONPATH": os.pathsep.join(p for p in sys.path if p)},
+        env={
+            **os.environ,
+            "PYTHONPATH": os.pathsep.join(
+                [str(chain), *(p for p in sys.path if p)]
+            ),
+        },
     )
     output = result.stdout.strip()
     assert output.startswith("IMPORT-ERROR"), (
-        f"a drifted ActionKind did not fail the import: {output!r} {result.stderr[-400:]!r}"
+        "Phase 5A imported against a controller ratifying an action type it does not know, "
+        f"and bound the shorter vocabulary anyway: {output!r} {result.stderr[-400:]!r}"
     )
-    assert "Phase 4C fails closed" in output, (
-        "the drift was caught by some guard other than Phase 4C's import-time check; if "
-        f"this names guard 10, guard 10 is reachable and its exclusion is void: {output!r}"
+    assert "Phase 5A fails closed" in output, (
+        "the refusal came from a guard upstream of this one, which measures nothing about "
+        f"this one: {output!r}"
     )
 
 

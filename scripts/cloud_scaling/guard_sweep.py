@@ -139,18 +139,6 @@ PACKAGES = {
             # 0.2.0 that renames a ratified identifier, and under one the guard is the
             # difference between refusing to import and binding an unratified value.
             # Scored since, and killed.
-            ("identifiers.py", "controller_actions != CANONICAL_ACTION_TYPES"): (
-                "unreachable-behind-earlier-guard",
-                "Cannot observe an ActionKind drift, because the import that supplies its "
-                "left operand fails first: reaching Phase 4C for `_PHASE4C_ACTION_TYPES` "
-                "runs Phase 4C's own import-time ActionKind guard, which raises before "
-                "this module finishes importing. Measured, not reasoned — the test below "
-                "drifts the controller's enum in a subprocess and reads which guard's "
-                "ImportError comes back. If it ever names this guard, this exclusion is "
-                "void.",
-                "tests/test_guard_coverage.py::"
-                "test_the_action_kind_drift_guard_is_unreachable_behind_phase_4c",
-            ),
             ("identifiers.py", "PRODUCER_SIGNING_PURPOSE == PURPOSE_CAPACITY_ACTION"): (
                 "equivalent-mutant",
                 "A collision assertion between two frozen literals defined in this module, "
@@ -262,18 +250,6 @@ PACKAGES = {
                 "property makes impossible. Kept for the better message: 'this describes an "
                 "instant before a verified revocation'.",
                 "tests/test_guard_coverage.py::test_a_historical_resolution_is_refused",
-            ),
-            ("verification.py", "resolution.implies_current_validity is not True"): (
-                "unreachable-behind-earlier-guard",
-                "The mirror of the guard above. `implies_current_validity` is a read-only "
-                "property of the authority's PolicyResolution, `verification.py:460` admits "
-                "the resolution by exact type so no subclass can override it, and both ways "
-                "to make it non-True are refused above: a non-RESOLVED status by the status "
-                "gate and `historical` by the guard on the previous line. The two are a "
-                "redundant pair defending one property, and neither single removal changes "
-                "the typed refusal.",
-                "tests/test_guard_coverage.py::"
-                "test_the_current_validity_guard_is_unreachable_behind_the_historicity_guard",
             ),
             ("verification.py", "missing"): (
                 "diagnostic-only",
@@ -430,6 +406,7 @@ def _refusal_shape(node, config: PackageConfig) -> str:
     raises = False
     call = False
     tuple_return = False
+    outcome_return = False
     helper_call = False
     helpers = _raising_helpers(config)
     for statement in node.body:
@@ -459,38 +436,94 @@ def _refusal_shape(node, config: PackageConfig) -> str:
                         base = value.elts[0].value
                         if isinstance(base, ast.Name) and base.id in {"_Outcome", "_Reason"}:
                             tuple_return = True
+                elif _outcome_member(value):
+                    # `return _Outcome.VERIFICATION_UNAVAILABLE` — a refusal that names its
+                    # outcome directly rather than through `_refuse` or a tuple. The shape
+                    # rules were written from the two packages' *gate* idioms and could not
+                    # see it, which left `_terminal_outcome`'s own decision points outside
+                    # both inventories while the suite was killing them.
+                    outcome_return = True
     if raises:
         return "raise"
     if call:
         return "typed-refusal call"
     if tuple_return:
         return "typed-refusal tuple"
+    if outcome_return:
+        return "returned outcome"
     if helper_call:
         return "raising-helper call"
     return ""
 
 
-def _selects_an_outcome(node) -> bool:
-    """A conditional expression choosing between two *different* typed outcomes.
-
-    ``reason = A if cond else B`` decides which reason a caller is entitled to act on, which
-    §9.1 makes part of the contract. It is a decision point by that definition even though no
-    ``if`` statement is involved, and the ``if False:`` operator cannot reach it — so it is
-    collapsed to its ``else`` branch instead.
-    """
-
-    def _outcome_attr(value):
-        return (
-            isinstance(value, ast.Attribute)
-            and isinstance(value.value, ast.Name)
-            and value.value.id in {"_Outcome", "_Reason", "Reason"}
-        )
+def _outcome_member(value) -> bool:
+    """``_Outcome.X`` / ``_Reason.X`` — a named member of a typed refusal vocabulary."""
 
     return (
-        _outcome_attr(node.body)
-        and _outcome_attr(node.orelse)
+        isinstance(value, ast.Attribute)
+        and isinstance(value.value, ast.Name)
+        and value.value.id in {"_Outcome", "_Reason", "Reason"}
+    )
+
+
+def _reads_an_outcome(value) -> bool:
+    """An expression that reads an outcome *off an object* rather than naming one.
+
+    ``getattr(exc, "outcome", None)`` and ``exc.outcome`` both qualify. This is the half of
+    a conditional expression that decides whether a typed outcome is consulted at all.
+    """
+
+    if isinstance(value, ast.Attribute) and value.attr in {"outcome", "reason"}:
+        return True
+    if isinstance(value, ast.Call):
+        name = getattr(value.func, "id", None)
+        if name == "getattr" and len(value.args) >= 2:
+            key = value.args[1]
+            return isinstance(key, ast.Constant) and key.value in {"outcome", "reason"}
+    return False
+
+
+def _selects_an_outcome(node) -> bool:
+    """A conditional expression that decides a typed outcome.
+
+    Two shapes qualify, and both are decision points under §9.1 even though no ``if``
+    statement is involved:
+
+    * **choosing between two outcomes** — ``reason = A if cond else B`` decides which reason
+      a caller is entitled to act on;
+    * **deciding whether an outcome is read at all** — ``getattr(exc, "outcome", None) if
+      isinstance(exc, _PackageError) else None``. Collapsed to its ``else``, every typed
+      outcome flattens to one fallback: measured, a ``COORDINATE_MALFORMED`` and an
+      ``INVARIANT_VIOLATION`` both become ``VERIFICATION_UNAVAILABLE``, telling a caller the
+      check could not run when it ran and refused.
+
+    The ``if False:`` operator cannot reach either, so both are collapsed to the ``else``
+    branch instead — see ADR Phase 5 §9.4 for why that is the authority-weakening direction.
+    """
+
+    chooses_between = (
+        _outcome_member(node.body)
+        and _outcome_member(node.orelse)
         and node.body.attr != node.orelse.attr
     )
+    gates_the_read = (
+        _reads_an_outcome(node.body)
+        and isinstance(node.orelse, ast.Constant)
+        and node.orelse.value is None
+    )
+    return chooses_between or gates_the_read
+
+
+def _selection_outcome(node) -> str:
+    """What a conditional-expression decision point decides, for the inventory row.
+
+    Two shapes reach here: one names both outcomes it chooses between, the other names the
+    outcome it decides whether to read at all.
+    """
+
+    if _outcome_member(node.body) and _outcome_member(node.orelse):
+        return ", ".join(sorted({node.body.attr, node.orelse.attr}))
+    return f"{ast.unparse(node.body)} or none"
 
 
 def _raise_alone(node) -> bool:
@@ -531,9 +564,7 @@ def inventory(config: PackageConfig) -> list:
                         is_elif=False,
                         shape=shape,
                         recorded_in="",
-                        outcome=", ".join(
-                            sorted({node.body.attr, node.orelse.attr})
-                        ),
+                        outcome=_selection_outcome(node),
                         kind="outcome-selection",
                         span=(
                             node.lineno,
@@ -757,7 +788,7 @@ def run_suite(
                 f"last lines: {tail}"
             ),
             "collected": collected,
-            "failed": re.findall(r"^FAILED (\S+)", output, re.M),
+            "failed": _noticed(output),
         }
     return {
         "scored": True,
@@ -765,8 +796,22 @@ def run_suite(
         "message_only_failures": message_only,
         "why": "",
         "collected": collected,
-        "failed": re.findall(r"^FAILED (\S+)", output, re.M),
+        "failed": _noticed(output),
     }
+
+
+def _noticed(output: str) -> list:
+    """Every test the suite reported as not passing — failures **and** errors.
+
+    This read only ``^FAILED`` lines. A mutant that turns tests into setup or teardown
+    ``ERROR``s therefore produced no noticed failures and was scored ``SURVIVED``. For a
+    ``SCORED`` guard that is merely pessimistic — a survivor is a coverage defect that gets
+    investigated. For an ``EXCLUDED`` one it is unsafe in the direction that matters: the
+    stale-exclusion check asks whether an excluded guard was in fact killed, and a kill that
+    only ever showed up as an ERROR would never contradict the exclusion.
+    """
+
+    return re.findall(r"^(?:FAILED|ERROR) (\S+)", output, re.M)
 
 
 def _workdir(config: PackageConfig) -> Path:
@@ -822,31 +867,64 @@ def pytest_configure(config):
                 setattr(bound, name, counting)
 
 
+import re as _re
+
 _MESSAGE_ONLY = []
 _ANY_FAILURE = []
 
 
+#: An assertion that reads the refusal's prose. `str(<name>.value)` is the pytest.raises
+#: idiom, `.detail` the outcome-tuple one, `.args[` the bare-exception one. All three are
+#: message reads under ADR Phase 5 §9.1.
+_MESSAGE_READS = _re.compile(r"str\(\s*\w+(\.value)?\s*\)|\.detail\b|\.args\[")
+
+#: An assertion that reads the typed half of the refusal. `pytest.raises` counts: a
+#: statement that both raises-checks and message-checks has asserted the exception class,
+#: so its failure is not attributable to the message alone.
+_TYPE_READS = _re.compile(
+    r"\.reason\b|\.outcome\b|isinstance\s*\(|pytest\.raises\s*\(|\btype\s*\("
+)
+
+
+def _failing_statement(call):
+    """The source of the statement that actually failed, independent of ``--tb=no``.
+
+    ``item.repr_failure`` renders under the configured tbstyle, and under ``--tb=no`` what
+    comes back is pytest's *rewritten explanation* — `assert 'a' in 'b'` with its `where`
+    lines — never the source. No message idiom appears literally in that text, so a detector
+    reading it matches nothing and every mutant looks type-killed. The traceback entry's
+    ``statement`` is the source itself and does not depend on tbstyle, so ``--tb=no`` keeps
+    its log-size benefit and the detector still sees what the test wrote.
+
+    The last entry is the frame the assertion is in, which is the right frame even when the
+    assertion lives in a helper the test called.
+    """
+
+    try:
+        return str(call.excinfo.traceback[-1].statement)
+    except Exception:  # noqa: BLE001
+        return ""
+
+
 def pytest_runtest_makereport(item, call):
-    """Record, per failing test, whether the assertion that failed reads a *message*.
+    """Record, per failing test, whether the assertion that failed reads only a *message*.
 
     §9.1 makes the typed refusal the contract and the message prose. A guard whose kill is
     attributable only to a message assertion has not been shown to carry authority — it is a
-    diagnostic-only guard being scored. The source line of the failing assertion is the only
-    place that distinction survives, so it is captured here rather than inferred later.
+    diagnostic-only guard being scored.
+
+    The judgement is made on the **failing statement alone**, not the displayed frame. A
+    frame contains the whole test: scoring on it means one `with pytest.raises(...)` line
+    anywhere above suppresses every message-only finding below it, which is exactly the
+    case this rule exists to catch — the type assertion passed and the message assertion is
+    what failed.
     """
 
     if call.when != "call" or call.excinfo is None:
         return
-    source = ""
-    try:
-        entry = item.repr_failure(call.excinfo).reprtraceback.reprentries[-1]
-        source = chr(10).join(entry.lines)
-    except Exception:  # noqa: BLE001 - a report shape we do not recognise is not message-only
-        source = ""
     _ANY_FAILURE.append(item.nodeid)
-    reads_a_message = ".detail" in source or "str(excinfo.value)" in source
-    reads_a_type = " is " in source or "pytest.raises" in source or ".outcome" in source
-    if reads_a_message and not reads_a_type:
+    statement = _failing_statement(call)
+    if _MESSAGE_READS.search(statement) and not _TYPE_READS.search(statement):
         _MESSAGE_ONLY.append(item.nodeid)
 
 

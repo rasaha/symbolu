@@ -249,6 +249,16 @@ jobs:
             packages/integration/cloud-scaling-authorization-contracts/guard_inventory.json \
             packages/integration/cloud-scaling-authorization-contracts/guard_classification.json
 
+      - name: The sweep's own enforcement machinery is measured, not assumed
+        # The message-only rule was inert for this PR's whole history: the detector read a
+        # tbstyle-rendered explanation under --tb=no and matched nothing, so every mutant
+        # looked type-killed. These tests run the generated plugin itself against a suite
+        # built to fail in each shape, so a detector that stops seeing source fails here
+        # rather than silently passing every guard.
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+          python -m pytest scripts/cloud_scaling/tests -q
   guard-sweep:
     name: Gate-removal mutation sweep (shard ${{ matrix.shard }} of 8)
     runs-on: ubuntu-latest

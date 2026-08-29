@@ -1,5 +1,59 @@
 # Changelog — ugence-cloud-scaling-policy-authenticity
 
+## [Unreleased] — two decision points were in no inventory, and one more exclusion was false
+
+*No version bump and no production behaviour change.*
+
+### `_terminal_outcome` decides two things, and neither was counted
+
+`verification.py:1101` and `:1102` are authority-bearing and were in neither inventory. The
+shape rules were written from this package's *gate* idioms — `raise`, `_refuse(...)`, a bare
+outcome tuple — and could see neither an `if` that returns an outcome member directly nor a
+conditional expression that decides whether an outcome is read at all. The suite was killing
+both the whole time, so this is a denominator defect, not a coverage one: the total was
+short by two and `test_guard_inventory.py` pinned the short number.
+
+Measured, neutralising each:
+
+| | `:1101` collapsed to `else` | `:1102` neutralised |
+|---|---|---|
+| typed `COORDINATE_MALFORMED` | → `VERIFICATION_UNAVAILABLE` | preserved |
+| typed `INVARIANT_VIOLATION` | → `VERIFICATION_UNAVAILABLE` | preserved |
+| stdlib `ValueError` | unchanged | → `None` |
+| forged `.outcome = VERIFIED` | unchanged | → **`VERIFIED`** |
+
+`:1102` is the more serious: without it an exception carrying an attacker-influenced
+`outcome` attribute becomes a success, which is the one thing the routine's own docstring
+says can never happen. `:1101` flattens every typed refusal to "the check could not run"
+when the check ran and refused.
+
+**The inventory is 119, not 117**, and the two new shapes are pinned by condition.
+
+### Guard 78 is scored, not unreachable
+
+`verification.py:494` was excluded as `unreachable-behind-earlier-guard`. Its operand is a
+property of the Policy Authority's `PolicyResolution` — `core/records.py:334`, a separate
+distribution under `>=0.1.0`. `is not True` reads like a defence against a truthy
+non-`True`, and it is one: a 0.2.0 returning an `int` flag rather than the `bool` singleton
+passes the status and historicity gates and arrives here as `1`.
+
+| | result |
+|---|---|
+| undrifted 0.1.0 | **VERIFIED** |
+| drifted 0.2.0, guard present | refused `HISTORICAL_RESOLUTION_REFUSED` |
+| drifted 0.2.0, guard neutralised | refused `INVARIANT_VIOLATION` |
+
+A changed typed pair. The neutralised case is worse than it looks: the pairing invariant at
+`verification.py:266` catches it instead, reporting an internal integrity failure where the
+guard would have given the caller the specific refusal.
+
+The exclusion's measuring test asserted only that the attribute is a property and that the
+exact-type gate exists — both still true under the drifted resolution, so it would have gone
+on passing. It is replaced by two tests that measure the guard.
+
+**The split is 109 `SCORED` / 10 `EXCLUDED`.**
+
+
 ## [Unreleased] — four exclusions withdrawn; the reason that held them is empty
 
 *No version bump and no production behaviour change.* Phase 5A's guard 9 disproved the

@@ -1,8 +1,8 @@
 {
   "package": "policy-authenticity",
-  "total": 117,
-  "scored": 106,
-  "excluded": 11,
+  "total": 119,
+  "scored": 109,
+  "excluded": 10,
   "classification": {
     "1": {
       "status": "SCORED",
@@ -491,10 +491,7 @@
       "condition": "resolution.historical"
     },
     "78": {
-      "status": "EXCLUDED",
-      "reason": "unreachable-behind-earlier-guard",
-      "detail": "The mirror of the guard above. `implies_current_validity` is a read-only property of the authority's PolicyResolution, `verification.py:460` admits the resolution by exact type so no subclass can override it, and both ways to make it non-True are refused above: a non-RESOLVED status by the status gate and `historical` by the guard on the previous line. The two are a redundant pair defending one property, and neither single removal changes the typed refusal.",
-      "evidence": "tests/test_guard_coverage.py::test_the_current_validity_guard_is_unreachable_behind_the_historicity_guard",
+      "status": "SCORED",
       "module": "verification.py",
       "line": 494,
       "condition": "resolution.implies_current_validity is not True"
@@ -738,6 +735,18 @@
       "module": "verification.py",
       "line": 1076,
       "condition": "instant < occurred_at"
+    },
+    "118": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 1101,
+      "condition": "isinstance(exc, _PackageError)"
+    },
+    "119": {
+      "status": "SCORED",
+      "module": "verification.py",
+      "line": 1102,
+      "condition": "type(outcome) is not _Outcome or outcome is _Outcome.VERIFIED"
     }
   }
 }

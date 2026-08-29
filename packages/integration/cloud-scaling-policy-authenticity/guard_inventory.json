@@ -1,10 +1,10 @@
 {
   "package": "policy-authenticity",
-  "total": 117,
+  "total": 119,
   "reconciliation": {},
   "excluded": {
     "except_arms": 2,
-    "boolean_subterms": 16
+    "boolean_subterms": 17
   },
   "guards": [
     {
@@ -1059,6 +1059,24 @@
       "shape": "typed-refusal tuple",
       "recorded_in": "",
       "outcome": "CANDIDATE_FACT_NOT_YET_OCCURRED"
+    },
+    {
+      "index": 118,
+      "module": "verification.py",
+      "line": 1101,
+      "condition": "isinstance(exc, _PackageError)",
+      "shape": "outcome selection",
+      "recorded_in": "",
+      "outcome": "getattr(exc, 'outcome', None) or none"
+    },
+    {
+      "index": 119,
+      "module": "verification.py",
+      "line": 1102,
+      "condition": "type(outcome) is not _Outcome or outcome is _Outcome.VERIFIED",
+      "shape": "returned outcome",
+      "recorded_in": "",
+      "outcome": "VERIFICATION_UNAVAILABLE"
     }
   ]
 }

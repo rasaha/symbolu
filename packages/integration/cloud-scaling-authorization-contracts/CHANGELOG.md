@@ -1,5 +1,52 @@
 # Changelog — ugence-cloud-scaling-authorization-contracts
 
+## [Unreleased] — the enforcement was inert, and two more exclusions were false
+
+*No version bump and no production behaviour change.* A final audit found five
+merge-blocking defects. All five are corrected here; the two that touch this package are
+below, and the rest are in ADR Phase 5 §9 and the sweep.
+
+### §9.1's message rule was never enforced
+
+The sweep refuses to score a kill whose only failing assertion read a message. That check
+never fired. It read `item.repr_failure(...)`, which renders under the configured tbstyle,
+and the sweep runs pytest with `--tb=no` — under which what comes back is pytest's rewritten
+*explanation*, never the source. No message idiom appears literally in
+`where 'actual' = str(Boom('actual'))`, so nothing matched and `killed_only_by_message` was
+False for every mutant in both packages, for this PR's whole history.
+
+Three defects, one behind the other:
+
+| defect | correction |
+|---|---|
+| the detector read a tbstyle-rendered explanation | it reads `excinfo.traceback[-1].statement`, which is source and ignores tbstyle, so `--tb=no` keeps its log-size benefit |
+| it scored the whole displayed frame, so one `pytest.raises` anywhere above suppressed every finding below | it scores the **failing statement alone** — which is the case the rule exists for: the type assertion passed, the message assertion is what failed |
+| its vocabulary was `.detail` and `str(excinfo.value)`; this package writes neither | the vocabulary is `str(<name>.value)`, `.detail` and `.args[`, and a test measures it against what both suites actually write — 48 message assertions here, all `str(exc.value)` |
+
+`scripts/cloud_scaling/tests/` runs the **generated plugin itself** against a suite built to
+fail in each shape: a plain message assertion, one inside a helper, a parameterised one, one
+adjacent to a *passing* outcome assertion, a `.detail` read, and three negative controls.
+Both packages' CI runs it.
+
+### Guard 10 is scored, not unreachable
+
+`identifiers.py:100` was excluded as `unreachable-behind-earlier-guard`: Phase 4C's
+import-time check answers first. It does — in this installation. That check lives in
+`ugence-cloud-scaling-risk-integration`, a separate distribution under `>=0.1.0`, so "which
+guard fires first" is a fact about the resolution installed, not about the program.
+
+Measured against a 0.2.0 that no longer refuses there, paired with a controller ratifying a
+fifth `ActionKind`:
+
+| | result |
+|---|---|
+| undrifted | imports; both vocabularies agree |
+| drifted, guard present | `ImportError` — *Phase 5A fails closed* |
+| drifted, guard neutralised | imports, binding four action types against a controller ratifying five |
+
+**The split is 111 `SCORED` / 3 `EXCLUDED`, not 110 / 4.** The inventory is still 114.
+
+
 ## [Unreleased] — guard 9 is scored, not unscorable
 
 *No version bump and no production behaviour change.* The exclusion vocabulary's newest

@@ -42,7 +42,7 @@ def guards():
 def test_the_inventory_is_the_size_the_checked_in_report_records(guards):
     """A drifted denominator is the failure mode a sweep cannot see from inside itself."""
 
-    assert len(guards) == 117
+    assert len(guards) == 119
 
 
 @pytest.mark.invariant
@@ -58,17 +58,23 @@ def test_every_guard_belongs_to_exactly_one_shard(guards):
 
 
 @pytest.mark.invariant
-def test_all_four_refusal_shapes_are_inventoried(guards):
-    """Phase 5B refuses four ways, and a definition that knows one of them is not enough.
+def test_every_refusal_shape_is_inventoried(guards):
+    """Phase 5B refuses six ways, and a definition that knows one of them is not enough.
 
     The raise-only reading this package could have inherited from the Phase 5A sweep misses
-    every one of the other three — 47 of the 117 guards below, including gate 13's
-    exact-type instant check and all six R-8 bound-reconciliation branches.
+    every one of the others — 49 of the 119 guards below, including gate 13's exact-type
+    instant check and all six R-8 bound-reconciliation branches.
 
-    ``raising-helper call`` is the fourth, and it was added after an audit found two guards
-    no shape recognised: an ``if`` whose entire body is a call to an admission helper, with
-    no ``raise`` and no ``return`` of its own. An ``if`` that *binds* such a call's result is
-    a conversion rather than a guard and is deliberately not counted — see ADR Phase 5 §9.1.
+    ``raising-helper call`` was added after an audit found two guards no shape recognised:
+    an ``if`` whose entire body is a call to an admission helper, with no ``raise`` and no
+    ``return`` of its own. An ``if`` that *binds* such a call's result is a guard too — the
+    conversion carve-out that said otherwise is withdrawn (ADR Phase 5 §9.1).
+
+    ``returned outcome`` and ``outcome selection`` were added after a later audit found the
+    two decision points in ``_terminal_outcome`` in neither inventory while the suite was
+    killing them. Both are pinned by condition below: neutralised, the first turns a forged
+    ``outcome`` attribute into ``VERIFIED``, and the second flattens every typed outcome to
+    ``VERIFICATION_UNAVAILABLE``.
     """
 
     shapes = {g.shape for g in guards}
@@ -77,14 +83,25 @@ def test_all_four_refusal_shapes_are_inventoried(guards):
         "typed-refusal call",
         "typed-refusal tuple",
         "raising-helper call",
+        "returned outcome",
+        "outcome selection",
     }
     assert sum(1 for g in guards if g.shape == "typed-refusal tuple") == 17
-    assert sum(1 for g in guards if g.shape != "raise") == 47
-    # The two the widened shape found, pinned by condition so a renumber cannot hide them.
+    assert sum(1 for g in guards if g.shape != "raise") == 49
+    # Pinned by condition so a renumber cannot hide them.
     helper_calls = {(g.module, g.condition) for g in guards if g.shape == "raising-helper call"}
     assert helper_calls == {
         ("verified.py", "self.candidate_digest_fact is not None"),
         ("verification.py", "production_mode"),
+    }
+    terminal = {
+        (g.module, g.lineno, g.shape)
+        for g in guards
+        if g.shape in {"returned outcome", "outcome selection"}
+    }
+    assert terminal == {
+        ("verification.py", 1101, "outcome selection"),
+        ("verification.py", 1102, "returned outcome"),
     }
 
 

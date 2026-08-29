@@ -1,8 +1,8 @@
 {
   "package": "authorization-contracts",
   "total": 114,
-  "scored": 110,
-  "excluded": 4,
+  "scored": 111,
+  "excluded": 3,
   "classification": {
     "1": {
       "status": "SCORED",
@@ -59,10 +59,7 @@
       "condition": "ours != theirs"
     },
     "10": {
-      "status": "EXCLUDED",
-      "reason": "unreachable-behind-earlier-guard",
-      "detail": "Cannot observe an ActionKind drift, because the import that supplies its left operand fails first: reaching Phase 4C for `_PHASE4C_ACTION_TYPES` runs Phase 4C's own import-time ActionKind guard, which raises before this module finishes importing. Measured, not reasoned \u2014 the test below drifts the controller's enum in a subprocess and reads which guard's ImportError comes back. If it ever names this guard, this exclusion is void.",
-      "evidence": "tests/test_guard_coverage.py::test_the_action_kind_drift_guard_is_unreachable_behind_phase_4c",
+      "status": "SCORED",
       "module": "identifiers.py",
       "line": 100,
       "condition": "controller_actions != CANONICAL_ACTION_TYPES"

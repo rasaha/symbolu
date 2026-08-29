@@ -274,13 +274,29 @@ Two consequences, both deliberate:
   and the same reason, has not been shown to carry authority — and a suite that only asks
   "was something refused?" cannot tell the two cases apart.
 
-**A guard refuses; it does not convert.** An `if` whose body *calls* an admission helper is
-a guard — the helper is called for its refusal and its return value is discarded. An `if`
-whose body *binds* the result of such a call is a normalisation branch, not a gate:
-`issued_at = _parse_ts(issued_at)` calls the same kind of helper for its value. The two are
-separated by whether the call is a statement or an assignment, and only the first is
-inventoried. Neutralising a conversion does not produce a refusal to compare — it changes
-what the suite can collect at all, which is neither a kill nor a survival.
+**A guard refuses whether or not it also converts.** An `if` whose body calls an admission
+helper is a guard, and it stays a guard when the call's result is bound.
+
+An earlier revision of this section said otherwise: an `if` that *binds* a helper's result
+was a normalisation branch, separated from a gate by whether the call was a statement or an
+assignment, and `issued_at = _parse_ts(issued_at)` was named as the site that separation
+excluded. Three claims carried that carve-out and all three were measured false at
+`attestation.py:261`:
+
+| claimed | measured |
+|---|---|
+| neutralising it produces no refusal to compare | it produces a typed `MALFORMED_CANONICAL_FIELD` |
+| it changes what the suite can collect at all | collection is 407 either way |
+| it is therefore neither a kill nor a survival | it survived the entire suite |
+
+The carve-out was not describing a conversion. It was reasoning added to explain away an
+`UNSCORED` result, and it hid a line no test executed: nothing rebuilt an attestation from a
+canonical wire mapping, so the parse that lets `issued_at` cross the wire as a string and
+arrive as a `datetime` had never run. The site is inventoried, and killed by a test that
+round-trips an attestation through its canonical form.
+
+The rule that replaces it is the one the sweep implements: **a body that can reach a refusal
+makes the `if` a guard**, and binding a value on the way there does not change that.
 
 A diagnostic-only guard is not a defect and is not to be deleted. It is excluded from
 *scoring*, with the subsumption that makes it diagnostic-only recorded and measured.
@@ -327,10 +343,35 @@ upstream, giving the same refusal with and without the guard under test. Reachin
 drifting the controller, Phase 4C and Phase 5A together — a coordinated release the pins
 admit. A second resolution has to reach the guard, not merely exist.
 
-A guard made unreachable by an **earlier** guard, in this distribution or an upstream one, is
-a separate case (`unreachable-behind-earlier-guard`) and requires evidence that measures the
-unreachability — which guard actually fires first — rather than evidence that the condition
-is currently false.
+**`unreachable-behind-earlier-guard` carries the same bar, for the same reason.**
+
+That reason was previously allowed to rest on measured evidence of *which guard fires
+first*, in this distribution or an upstream one. Across a distribution boundary that is the
+identical mistake §9.2 forbids above, wearing different clothes: which guard fires first is
+a fact about the resolution that happens to be installed, and an upstream release is free to
+stop refusing. Two exclusions were withdrawn on exactly that, both measured:
+
+* Phase 5A's `identifiers.py:100` hid behind Phase 4C's import-time check, in
+  `ugence-cloud-scaling-risk-integration` under `>=0.1.0`. Under a 0.2.0 that no longer
+  refuses there, Phase 5A's own guard is the one that answers; removed, Phase 5A imports and
+  binds a four-member action vocabulary against a controller ratifying five.
+* Phase 5B's `verification.py:494` hid behind two gates said to make its condition
+  unreachable. Its operand is a property of the Policy Authority's `PolicyResolution`, under
+  `>=0.1.0`. Under a 0.2.0 returning a truthy non-`True`, the guard refuses
+  `HISTORICAL_RESOLUTION_REFUSED` where removing it refuses `INVARIANT_VIOLATION`.
+
+So, ratified: when the earlier guard is in the **same distribution**, "it fires first" is a
+property of the program and the reason stands on that evidence. When the earlier guard is in
+a **separately versioned distribution under an open-ended pin**, the claim required is the
+one §9.2 already demands — that *no resolution the declared constraint permits* makes this
+guard reachable — and "the installed release refuses first" does not establish it.
+
+Neither reason survived its own bar. `unscorable-by-single-checkout-fixture` went nought for
+five and `unreachable-behind-earlier-guard` nought for two; both stay in the closed
+vocabulary, because a guard could genuinely qualify, and neither currently holds a guard in
+either package. Of the thirteen exclusions that remain, every one is `diagnostic-only` or
+`equivalent-mutant`, and every operand that decides them is defined in the distribution that
+declares the guard — re-checked against this rule when it was ratified.
 
 ### §9.3 Drift assertions run at import *and* at test time
 
@@ -339,3 +380,40 @@ The ratified identifiers are asserted against their Phase 4C originals when
 any process that imports a stale wheel, an editable install pointing at an older checkout,
 or a resolution that satisfied Phase 4C from elsewhere. `identifiers._assert_no_drift` cites
 this section for that requirement; it is recorded here so the citation resolves.
+### §9.4 Conditional expressions are decision points, and collapse to their `else`
+
+§9.1 makes the outcome the contract. A conditional expression can decide one, and `if False:`
+cannot reach it, so both the class and its operator are ratified here rather than left to the
+sweep to imply.
+
+**The class.** A conditional expression is a decision point when it decides a typed outcome.
+Two shapes qualify:
+
+* it **chooses between two outcomes** — `reason = FORGED_TRUST_STATE if forged else
+  UNKNOWN_FIELD` decides which reason a caller may act on, exactly as an `if` would;
+* it **decides whether an outcome is read at all** — `getattr(exc, "outcome", None) if
+  isinstance(exc, _PackageError) else None`. Collapsed, every typed outcome flattens to one
+  fallback: measured, `COORDINATE_MALFORMED` and `INVARIANT_VIOLATION` both become
+  `VERIFICATION_UNAVAILABLE`, which tells a caller the check could not run when it ran and
+  refused.
+
+**The operator.** The expression is replaced by its `else` branch. That is the
+authority-weakening direction in both shapes, and the direction matters: a mutation that
+made the guard *stricter* would be caught by any test asserting the ordinary path and would
+prove nothing about the guard.
+
+* Choosing between outcomes, the `else` is the branch taken when the specific condition does
+  *not* hold — the general, weaker answer. Collapsing to it reports the general reason where
+  the specific one was owed, which is the defect the guard prevents.
+* Gating the read, the `else` is the branch that declines to read the outcome, so collapsing
+  discards the typed answer.
+
+**When the specific reason sits in the `else` instead.** Nothing forces an author to write
+the weaker branch second, and `A if not cond else B` inverts it. The operator is defined by
+authority, not by position: collapse to whichever branch is the **more permissive** — the one
+reporting the more general outcome, or the one declining to read an outcome at all. Where the
+two branches are equally specific and neither is more permissive, the expression is not a
+decision point under this section; it is a naming choice, and is not inventoried. A guard
+whose direction cannot be decided by that rule must be recorded as `[R]` and ratified
+explicitly rather than swept under whichever branch happens to be second.
+

@@ -1011,40 +1011,170 @@ def test_a_historical_resolution_is_refused():
     assert refusal.outcome is outcomes.HISTORICAL_RESOLUTION_REFUSED
 
 
-@pytest.mark.invariant
-def test_the_current_validity_guard_is_unreachable_behind_the_historicity_guard():
-    """Why guard 78 — ``verification.py:494`` — is ``unreachable-behind-earlier-guard``.
+@pytest.mark.adversarial
+def test_the_current_validity_guard_fires_when_the_authority_returns_a_truthy_flag(
+    tmp_path,
+):
+    """Guard 78 — ``verification.py:494``, ``implies_current_validity is not True``.
 
-    ``is not True`` reads like a defence against a port returning a truthy non-``True``
-    value. It cannot be reached by one. Three facts close it, and each is asserted here
-    rather than argued:
+    Excluded as ``unreachable-behind-earlier-guard``: the property is ``resolved and not
+    historical``, both halves are gated above, so nothing can reach a resolution that is
+    non-historical, resolved, and still not ``True``. Every step of that is true of the
+    *installed* Policy Authority — and the property is defined in it
+    (``core/records.py:334``), a separate distribution under an open-ended ``>=0.1.0`` pin.
+    The exclusion was a statement about one resolution, which is precisely what ADR Phase 5
+    §9.2 refuses to accept for ``equivalent-mutant`` and now refuses here too.
 
-    * ``implies_current_validity`` is a read-only **property** of the Policy Authority's
-      ``PolicyResolution``, defined as ``resolved and not historical`` — a port cannot set
-      it to anything, truthy or otherwise;
-    * ``verification.py:460`` admits the resolution by **exact type**, so no subclass and no
-      duck-typed look-alike can override the property to return something else;
-    * both remaining ways to make it non-``True`` are already refused above it — a
-      non-RESOLVED status by the status gate, and ``historical`` by guard 77 on the previous
-      line, which carries the same ``HISTORICAL_RESOLUTION_REFUSED`` outcome.
+    ``is not True`` reads like a defence against a truthy non-``True``, and it is one. A
+    0.2.0 that returns an ``int`` flag rather than the ``bool`` singleton — an ordinary
+    refactor, and the property is annotated ``-> bool`` only by convention — passes the
+    status gate and the historicity gate and arrives here as ``1``.
 
-    If any of these three stops holding, the exclusion is void and this test fails.
+    Measured against a resolution built from the real Policy Authority source:
+
+    ==========================  ==========================================
+    undrifted 0.1.0             VERIFIED
+    0.2.0, guard present        refused HISTORICAL_RESOLUTION_REFUSED
+    0.2.0, guard neutralised    refused INVARIANT_VIOLATION
+    ==========================  ==========================================
+
+    A changed typed pair, so the guard is authority-bearing under §9.1. The neutralised case
+    is the worse of the two: the pairing invariant at ``verification.py:266`` catches it
+    instead, which reports an internal integrity failure where the guard would have given a
+    caller the specific, actionable refusal.
     """
 
-    from ugence_policy_authority.api import PolicyResolution  # noqa: PLC0415
-
-    from ugence_cloud_scaling_policy_authenticity import verification as v  # noqa: PLC0415
-
-    assert isinstance(
-        PolicyResolution.__dict__.get("implies_current_validity"), property
-    ), "implies_current_validity is no longer a read-only property; guard 78 may be reachable"
-    source = __import__("inspect").getsource(v._verify_resolution_shape) if hasattr(
-        v, "_verify_resolution_shape"
-    ) else __import__("inspect").getsource(v)
-    assert "type(resolution) is not PolicyResolution" in source, (
-        "the exact-type gate on the resolution is gone; a subclass could now override "
-        "implies_current_validity and guard 78 would be reachable"
+    outcomes = _verify_under_a_drifted_validity_flag(tmp_path, neutralise_guard=False)
+    assert outcomes["undrifted"] == "VERIFIED", (
+        "the control did not verify, so the drifted runs prove nothing about this guard: "
+        f"{outcomes['undrifted']}"
     )
+    assert outcomes["drifted"] == "REFUSED HISTORICAL_RESOLUTION_REFUSED", (
+        "a resolution whose implies_current_validity is truthy but not True was not refused "
+        f"by this guard: {outcomes['drifted']}"
+    )
+
+
+@pytest.mark.invariant
+def test_removing_the_current_validity_guard_changes_the_refusal(tmp_path):
+    """The other half of guard 78: what the guard is worth.
+
+    Kept separate so a failure says which half broke — that the guard fires, or that
+    removing it matters.
+    """
+
+    outcomes = _verify_under_a_drifted_validity_flag(tmp_path, neutralise_guard=True)
+    assert outcomes["drifted"] == "REFUSED INVARIANT_VIOLATION", (
+        "removing the guard no longer changes the typed refusal; if this now matches the "
+        f"guarded outcome the exclusion argument is back in play: {outcomes['drifted']}"
+    )
+
+
+#: Source of the probe both guard-78 measurements run.
+VALIDITY_FLAG_PROBE = (
+    "import sys\n"
+    "sys.path.insert(0, PKG_TESTS)\n"
+    "from _policy_fixtures import issued_bounds, port_for, T_MID\n"
+    "from ugence_cloud_scaling_policy_authenticity import PolicyAuthenticityVerifier\n"
+    "authority, record = issued_bounds()\n"
+    "result = PolicyAuthenticityVerifier(resolution_port=port_for(authority)).verify(\n"
+    "    coordinate=record.coordinate,\n"
+    "    expected_reference_tenant_id=record.coordinate.tenant_id,\n"
+    "    as_of=T_MID,\n"
+    ")\n"
+    "print('VERIFIED' if result.refusal is None\n"
+    "      else 'REFUSED ' + result.refusal.outcome.name)\n"
+)
+
+
+def _verify_under_a_drifted_validity_flag(tmp_path, *, neutralise_guard):
+    """Run a genuine verification twice: against 0.1.0, and against a drifted 0.2.0.
+
+    The 0.2.0 is the real Policy Authority source with one edit — the property returns an
+    ``int`` — so what is measured is a distribution the pin admits, not a stub standing in
+    for one.
+    """
+
+    import os  # noqa: PLC0415
+    import shutil  # noqa: PLC0415
+    import subprocess  # noqa: PLC0415
+    import sys  # noqa: PLC0415
+    from pathlib import Path  # noqa: PLC0415
+
+    declared = os.environ.get("UGENCE_REPO_ROOT")
+    repo = Path(declared).resolve() if declared else Path(__file__).resolve().parents[4]
+    here = Path(__file__).resolve().parent
+
+    authority = tmp_path / "policy-authority-0.2.0" / "ugence_policy_authority"
+    shutil.copytree(
+        repo / "packages/policy-authority/src/ugence_policy_authority",
+        authority,
+        ignore=shutil.ignore_patterns("__pycache__"),
+    )
+    init = authority / "__init__.py"
+    init.write_text(
+        init.read_text(encoding="utf-8").replace(
+            '__version__ = "0.1.0"', '__version__ = "0.2.0"'
+        ),
+        encoding="utf-8",
+    )
+    records = authority / "core/records.py"
+    body = records.read_text(encoding="utf-8")
+    ratified = "        return self.resolved and not self.historical"
+    assert body.count(ratified) == 1, (
+        "implies_current_validity is no longer spelled as expected upstream, so this "
+        "resolution may not introduce the drift it claims to"
+    )
+    records.write_text(
+        body.replace(ratified, "        return int(self.resolved and not self.historical)"),
+        encoding="utf-8",
+    )
+
+    package = tmp_path / "phase5b" / "ugence_cloud_scaling_policy_authenticity"
+    shutil.copytree(
+        here.parent / "src" / "ugence_cloud_scaling_policy_authenticity",
+        package,
+        ignore=shutil.ignore_patterns("__pycache__"),
+    )
+    if neutralise_guard:
+        path = package / "verification.py"
+        lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+        marked = [
+            i for i, line in enumerate(lines)
+            if line.strip() == "if resolution.implies_current_validity is not True:"
+        ]
+        assert len(marked) == 1, f"guard 78 is not where this test expects it: {marked}"
+        indent = " " * (len(lines[marked[0]]) - len(lines[marked[0]].lstrip()))
+        lines[marked[0]] = f"{indent}if False:  # neutralised, as the sweep would\n"
+        path.write_text("".join(lines), encoding="utf-8")
+
+    probe = tmp_path / "validity_flag_probe.py"
+    probe.write_text(
+        f"PKG_TESTS = {str(here)!r}\n" + VALIDITY_FLAG_PROBE, encoding="utf-8"
+    )
+
+    def _run(roots):
+        result = subprocess.run(
+            [sys.executable, str(probe)],
+            capture_output=True,
+            text=True,
+            timeout=300,
+            env={
+                **os.environ,
+                "PYTHONPATH": os.pathsep.join(
+                    [*roots, *(p for p in sys.path if p)]
+                ),
+                "UGENCE_REPO_ROOT": str(repo),
+            },
+        )
+        output = result.stdout.strip().splitlines()
+        assert output, f"the probe printed nothing: {result.stderr[-600:]}"
+        return output[-1]
+
+    return {
+        "undrifted": _run([str(package.parent)]),
+        "drifted": _run([str(package.parent), str(authority.parent)]),
+    }
 
 
 @pytest.mark.adversarial
