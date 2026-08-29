@@ -218,9 +218,11 @@ implicit; the explicit bar on case-insensitive comparison.
 ratified normalization profile for identity-participating text, and adding a path would
 reopen C6's freeze for values that cannot be non-NFC in the first place.
 *(b) Normalize at the boundary "defensively"* — a normalizer would be a second place at
-which membership is decided, and B2's standing rule refuses a rule only one side checks
-(ADR:189-191; the "only one side checks" phrasing is the S1 specification's, at
-`S1_CONTRACT_AND_EQUATION_SPECIFICATION.md:2100`).
+which membership is decided, and B2's standing rule refuses a rule only the builder
+checks — "construction is defence-in-depth and independent replay is the guarantee, and
+an evidence reference that only the builder ever checked is exactly the shape B2
+refuses" (`S1_CONTRACT_AND_EQUATION_SPECIFICATION.md:1409-1411`; ADR:189-191 states the
+same standing rule).
 
 **What it does not authorize.** Any normalization of a policy body — that is Policy
 Authority's canonicalization (`ADR_UGENCE_POLICY_AUTHORITY.md:363`). Any pattern on a C5c
@@ -275,7 +277,7 @@ and echo correlation is what would stop a resolver answering about a different p
 **What it does not authorize.** Multi-resolver resolution. Any networking, storage,
 service discovery or plugin loading (OD-7 part 2's bar, carried across). Any exported name
 beginning with `Proposal` or `Recommendation` (D7,
-`S1_CONTRACT_AND_EQUATION_SPECIFICATION.md:2262-2265`).
+`S1_CONTRACT_AND_EQUATION_SPECIFICATION.md:2260-2261`).
 
 **Guard or test obligation.** The `public_api.json` drift test by equality; the AST test
 that the construction call's keyword set equals `set(ProposerAdvisory.model_fields)`
@@ -320,7 +322,7 @@ case of a provider raising during the original build (`:2188`). The argument for
 symmetry and a caller catching one named family. The arguments against are that H2 is
 written closed — "exactly five classes of failure, and no others" (`:2181`) — and that a
 name of the `StrategyPermissionError` shape risks reading as a **denial**, which the
-capability must never emit (ADR:151-153;
+capability must never emit (ADR:149-152;
 `ADR_UGENCE_AGENTIC_PROPOSER_MVP_READINESS.md:240-247,263-278`). `[R]` A genuine owner
 choice.
 
@@ -402,10 +404,13 @@ signature, and no strategy-policy registry exists — the same disclosed ceiling
 - **Derivation.** `build_proposer_process_record` would accept no `declared_strategy`. It
   would assign `record.declared_strategy` from the supplied advisory's declared-strategy
   field, and `record.advisory_digest` from the same object. This is the "derived, never
-  accepted" move H1 already makes for the nested `candidates` sequence and the three
-  selection-dependent fields (`S1_CONTRACT_AND_EQUATION_SPECIFICATION.md:2140-2160`), one
-  step beyond `build_advisory_candidate_set`'s "checked, never trusted"
-  (`builders.py:151-156`).
+  accepted" move H1 already makes for the nested `candidates` sequence and for
+  `selected_candidate_id`, `recommended_disposition` and `requested_review_action`
+  (`S1_CONTRACT_AND_EQUATION_SPECIFICATION.md:2125-2136`). `[V]` That derived triple is
+  **not** OD-3's three selection-dependent fields:
+  `requested_review_destination_role_ref` is selection-coupled but **caller-supplied**,
+  and H1 excludes it from the derivation (`:2137-2145`). One step beyond
+  `build_advisory_candidate_set`'s "checked, never trusted" (`builders.py:151-156`).
 - **Equality at replay.** Inside the S2B-D8=B function (Proposal 8):
   `record.declared_strategy == advisory.<declared-strategy field>`, exact codepoint
   equality under Proposal 3, plus `record.advisory_digest == advisory.advisory_digest` so
@@ -547,8 +552,8 @@ independently of A13 — A13 covers four builders and stands intact for them
 7. construct the private payload (29 fields under Proposal 2) → `p_unsigned` → the single
    `ProposerAdvisory` expression with the substrate call inline in the `advisory_digest=`
    keyword (G2, `identity.py:392-421`);
-8. `build_proposer_process_record` **derives** `declared_strategy` and `advisory_digest`
-   from that advisory (rider R1).
+8. `build_proposer_process_record` **would derive** `declared_strategy` and
+   `advisory_digest` from that advisory (rider R1).
 
 `[I]` **Steps 2–5 would precede step 6 by choice, not entailment.** The reason: a
 permission failure yields no artifact, so placing the permission test first would stop an
@@ -668,7 +673,8 @@ Q6  Public surface. 46 -> 51: vocabulary, resolver protocol, resolver request,
     resolver response, replay function. No removals.
     A = 51 as stated [recommended]
     B = 48 — vocabulary, protocol, replay function only; resolver returns a
-        plain tuple (loses echo correlation)
+        plain tuple (loses echo correlation). B leaves Q9 with no response
+        shape to ratify: answer Q9 = n/a if you choose B here.
 
 Q7  Package version.
     A = 0.3.0, moved in the same change set as fields, vocabulary, protocol,
@@ -693,7 +699,13 @@ Q10 R1 semantics. Record's declared_strategy derived from the proposal-bound
     declaration at construction; exact equality re-established at replay, which
     proves correspondence between two observable fields ONLY — never conformance
     with private reasoning and never that the declared procedure was executed.
-    A = ratify as stated [recommended]
+    Rider R1 already ratifies retention, derivation and equality; what is open is
+    Proposal 7's addition of deriving advisory_digest from the same advisory and
+    checking it at replay.
+    A = ratify as stated, including the advisory_digest derivation and the
+        digest-equality check [recommended]
+    B = R1's declaration equality only; no advisory_digest derivation, no
+        digest-equality check in the replay function
 
 Q11 Replay function. One NEW exported function, returns bool, never raises,
     taking exactly D8=B's four inputs, checking in order: policy identity+version
