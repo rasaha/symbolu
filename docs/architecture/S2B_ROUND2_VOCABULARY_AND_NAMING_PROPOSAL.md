@@ -259,11 +259,21 @@ R2-Q6  Gate. With R2-Q1..Q5 ratified, §8's sixth item (the vocabulary) is
 Independent review, read-only. Repository rasaha/symbolu. Modify nothing: no
 branch, no commit, no push, no PR.
 
-ARTIFACT. docs/architecture/S2B_ROUND2_VOCABULARY_AND_NAMING_PROPOSAL.md on
-branch claude/s2b-reasoning-strategy-permission-zbc9rw. Verify the commit
-hash, SHA-256 and line count you are given against the file before reviewing,
-and report the result; if they differ, report ARTIFACT_IDENTITY_MISMATCH with
-the computed values and stop. Verify everything against the tree at
+ARTIFACT. docs/architecture/S2B_ROUND2_VOCABULARY_AND_NAMING_PROPOSAL.md, in
+repository rasaha/symbolu, on branch
+claude/s2b-reasoning-strategy-permission-zbc9rw, at commit <COMMIT> —
+SHA-256 <SHA256>, <LINES> lines.
+
+Those three values are supplied WITH this prompt and are deliberately not
+written into the file: no file can contain the hash of itself or of the commit
+that carries it. Whoever hands you this prompt must fill them in; if any of the
+three still reads as a placeholder, say so and stop rather than reviewing an
+unpinned artifact.
+
+Fetch that exact commit, compute all three yourself, and report the result
+before reviewing anything. If any differs, report ARTIFACT_IDENTITY_MISMATCH
+with the computed values and stop — do not review a different revision, and do
+not review a working copy. Verify every claim against the repository tree at
 90696d16ed8e9b9942252fe297c44bc3d16393a1, never against the proposal's own
 assertions.
 
