@@ -87,7 +87,7 @@ declaration carry no information); **no escape member** (`OTHER`, `UNSPECIFIED`,
 **no default member**.
 
 **ENTAILED** — closedness (a C5b value is "matched by equality against an allowlist",
-`S1_CONTRACT_AND_EQUATION_SPECIFICATION.md:506-508`); the three exclusions (OD-5); provider
+`S1_CONTRACT_AND_EQUATION_SPECIFICATION.md:508-509`); the three exclusions (OD-5); provider
 neutrality (RCG-D5); joint arrival with the field (OD-5(iii),
 `ADR_UGENCE_AGENTIC_PROPOSER_MVP_READINESS.md:638`; ADR:58-59).
 
@@ -103,7 +103,7 @@ S2B-D5=A's trigger conditions require (ADR:147) and would let a producer mint a
 "permitted" strategy.
 *(c) Reserve the field now as a C5d empty-only list and populate it later* — already
 considered and **rejected by the owner** under OD-5
-(`S1_CONTRACT_AND_EQUATION_SPECIFICATION.md:2661-2668`).
+(`S1_CONTRACT_AND_EQUATION_SPECIFICATION.md:2678-2682`).
 
 **What it does not authorize.** Any member. Any spelling. Any *required* strategy (S2B-D3
 and ADR §4 leave "required" unruled). Any composition of strategies (S2B-D3=A,
@@ -149,9 +149,9 @@ silently; they would land outside the "silent five".
 
 **On the record's `declared_strategy` class.** `[V]` It is C5c today
 (`packages/capabilities/agentic-proposer/src/ugence_agentic_proposer/contracts.py:989`;
-`S1_CONTRACT_AND_EQUATION_SPECIFICATION.md:1102`), under OD-1. `[V]` **OD-1's own text
+`S1_CONTRACT_AND_EQUATION_SPECIFICATION.md:1097`), under OD-1. `[V]` **OD-1's own text
 pre-authorizes narrowing it to C5b while it stays outside `P_unsigned`** — "a narrowing
-needing no new ratification" (`ADR_UGENCE_AGENTIC_PROPOSER_MVP_READINESS.md:638`, OD-1
+needing no new ratification" (`ADR_UGENCE_AGENTIC_PROPOSER_MVP_READINESS.md:633`, OD-1
 row). **Recommended: take that narrowing**, so both operands of rider R1's equality carry
 the same class. `[R]` OD-1's rider bars making *that* field identity-participating by
 reclassifying it in passing — the advisory field proposed here would be a **new** field,
@@ -163,12 +163,12 @@ ADR:162-165; S2B-D3=A is what makes the declaration a scalar, ADR:128-130);
 package-stamping of the pair (S2B-D7=A, ADR:195-198); C5b for the pair, on the exact
 precedent that `selection_policy_id`/`selection_policy_version` and the domain-evaluation
 profile pair are C5b because they are matched by equality
-(`S1_CONTRACT_AND_EQUATION_SPECIFICATION.md:517-527`); C3 compliance, every value being a
+(`S1_CONTRACT_AND_EQUATION_SPECIFICATION.md:518-526`); C3 compliance, every value being a
 string including the version (`:449-456`); C6 unchanged, three ASCII scalars adding no set
 path, no NFC path and no order significance (`:597-622`).
 
 **CHOSEN** — C5b for the declared-strategy assertion (it would be the operand of a
-membership test, which is C5b's defining criterion, `:509-516`); C5a rather than C5b for
+membership test, which is C5b's defining criterion, `:511-513`); C5a rather than C5b for
 the role-contract reference (it would be carried and compared whole, not split); taking
 OD-1's pre-authorized narrowing.
 
@@ -206,9 +206,9 @@ namespace stripping.
 
 **ENTAILED** — C5b is ASCII and therefore NFC-invariant, which is exactly why the
 specification records that both classes satisfy B9
-(`S1_CONTRACT_AND_EQUATION_SPECIFICATION.md:522-527`); C6 freezes the profile and states
-that the identity function normalises nothing (`:610-613`); C5b excludes `/` precisely to
-remove the invitation to split a value before comparing it (`:511-516`).
+(`S1_CONTRACT_AND_EQUATION_SPECIFICATION.md:515-516`); C6 freezes the profile and states
+that the identity function normalises nothing (`:604-609`, `:617-618`); C5b excludes `/`
+precisely to remove the invitation to split a value before comparing it (`:512-515`).
 
 **CHOSEN** — writing the null profile down as a ratified rule rather than leaving it
 implicit; the explicit bar on case-insensitive comparison.
@@ -219,7 +219,8 @@ ratified normalization profile for identity-participating text, and adding a pat
 reopen C6's freeze for values that cannot be non-NFC in the first place.
 *(b) Normalize at the boundary "defensively"* — a normalizer would be a second place at
 which membership is decided, and B2's standing rule refuses a rule only one side checks
-(ADR:189-191).
+(ADR:189-191; the "only one side checks" phrasing is the S1 specification's, at
+`S1_CONTRACT_AND_EQUATION_SPECIFICATION.md:2100`).
 
 **What it does not authorize.** Any normalization of a policy body — that is Policy
 Authority's canonicalization (`ADR_UGENCE_POLICY_AUTHORITY.md:363`). Any pattern on a C5c
@@ -315,7 +316,7 @@ the version number.
 
 **Alternative the owner may prefer.** A **fourth package-defined exception** for resolver
 failure, on the `DomainEvaluationProviderError` precedent, which exists for the analogous
-case of a provider raising during the original build (`:2189`). The argument for it is
+case of a provider raising during the original build (`:2188`). The argument for it is
 symmetry and a caller catching one named family. The arguments against are that H2 is
 written closed — "exactly five classes of failure, and no others" (`:2181`) — and that a
 name of the `StrategyPermissionError` shape risks reading as a **denial**, which the
@@ -437,7 +438,7 @@ it (`:1231-1259`).
 
 **Guard or test obligation.** A construction test that a forged record (`model_construct`
 with a divergent value) is rejected by the replay, on the I7.6 eligibility-forgery
-precedent (`:2519-2521`); a signature test that no `declared_strategy` parameter exists.
+precedent (`:2525-2527`); a signature test that no `declared_strategy` parameter exists.
 **Enforcement stops** at the two fields: a producer that declares one method and performs
 another would still yield a well-formed record — `[V]` the specification says so in terms
 (`:1131-1136`).
@@ -475,7 +476,7 @@ It would check, in order, returning `False` and warning on the first failure (th
 It would emit **no disposition and no reserved authority term**, and a caller acting on an
 advisory would have to call `verify_advisory_identity` as well — identity and
 correspondence answer different questions
-(`S1_CONTRACT_AND_EQUATION_SPECIFICATION.md:2166-2172`).
+(`S1_CONTRACT_AND_EQUATION_SPECIFICATION.md:2090-2094`).
 
 **ENTAILED** — the four inputs and the `False` return (S2B-D8=B, S2B-D5=A); that signature
 verification is an *input* rather than a step (ADR:212-213, :294-296).
@@ -486,7 +487,7 @@ digest-equality addition.
 **Alternative considered and rejected.** *Extend `verify_advisory_selection`* — its
 `False` would then be ambiguous between a selection failure and a permission failure,
 which is precisely the reason `verify_observation_resolution` was split out as a
-separately named function (`:2174-2177`).
+separately named function (`:2104-2107`).
 
 **What it does not authorize.** Observable-procedure conformance replay — `[R]` a named
 later stage, outside this scope, and `[G]` blocked today because no component records
@@ -622,6 +623,7 @@ docs/architecture/ADR_UGENCE_S2B_REASONING_STRATEGY_PERMISSION_SCOPING.md
 (S2B-D1..D8, rider R1, §8 gate) — do not reopen any of it.
 
 Answer with letters only; one line per item. Recommendation in [brackets].
+Each item states the rule PUT TO THE VOTE; none of it is in force until answered.
 
 Q1  Vocabulary admission. Ratify a CLOSED vocabulary admitting members only by
     three criteria — externally evidenceable; not a contract mechanism or an
