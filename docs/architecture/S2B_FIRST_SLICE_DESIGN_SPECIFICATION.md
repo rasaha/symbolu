@@ -23,8 +23,17 @@
 > [`ADR_UGENCE_S2B_FIRST_SLICE_RATIFICATION.md`](ADR_UGENCE_S2B_FIRST_SLICE_RATIFICATION.md).**
 > The owner answered the §7 ballot `Q1=A … Q13=A` against this file as it stood at commit
 > `e6003a2a2cadf42926c34828b30c2f2de3aad967`. That ADR, not this document, is the
-> ratification record; this document remains the proposal the ballot was drawn from, and
-> the §8 implementation gate remains **closed** pending the strategy vocabulary's members.
+> ratification record; this document remains the proposal the ballot was drawn from.
+>
+> **Gate status superseded 2026-08-29.** This banner originally read that the §8
+> implementation gate remained closed pending the strategy vocabulary's members. Those
+> members were ratified the same day by `S2B-R2-Q1=A`, and `S2B-R2-Q6=A` records all six
+> gate items satisfied — see
+> [`ADR_UGENCE_S2B_ROUND2_VOCABULARY_RATIFICATION.md`](ADR_UGENCE_S2B_ROUND2_VOCABULARY_RATIFICATION.md)
+> §5. **The gate is open.** Execution remains blocked while no strategy-permission policy
+> family is registered with Policy Authority, which is not a gate item. Note also that
+> `S2B-R2-Q8=A` **amends** `S2B-S1-Q11=A`, whose ruling this document's Proposal 8
+> describes in its pre-amendment form.
 
 **Date:** 2026-08-29.
 **Baseline inspected:** default branch `claude/setup-symbolu-monorepo-014vhNMAoVW2Ys5RBBr3bKDF`,

@@ -12,8 +12,9 @@
 > [`ADR_UGENCE_S2B_FIRST_SLICE_RATIFICATION.md`](ADR_UGENCE_S2B_FIRST_SLICE_RATIFICATION.md)
 > differ, **those ADRs govern**.
 >
-> The S2-B §8 implementation gate is **closed** and this document does not open it. Only
-> a ratification can, and none has been given for anything below.
+> The S2-B §8 implementation gate was **closed** when this proposal was written, and the
+> document does not itself open it — only a ratification can. `[V]` One was given on
+> 2026-08-29: see the RATIFIED banner below. **The gate is now open.**
 
 > **RATIFIED 2026-08-29 — see
 > [`ADR_UGENCE_S2B_ROUND2_VOCABULARY_RATIFICATION.md`](ADR_UGENCE_S2B_ROUND2_VOCABULARY_RATIFICATION.md).**

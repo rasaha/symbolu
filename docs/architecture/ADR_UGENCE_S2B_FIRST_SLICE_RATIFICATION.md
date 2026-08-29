@@ -3,7 +3,11 @@
 **Status:** **Accepted (ratified owner declaration) — documentation only.**
 This ADR records the owner's answers to the thirteen questions put by the S2-B first-slice
 design specification. **No implementation is authorized by this ADR, and none exists.**
-The S2-B implementation gate remains **closed** — see §5.
+The S2-B implementation gate remained **closed** when this declaration was made — see §5,
+which is marked **superseded**: `S2B-R2-Q1=A` ratified the vocabulary's members later the
+same day and `S2B-R2-Q6=A` records all six §8 items satisfied, so **the gate is now open**
+([`ADR_UGENCE_S2B_ROUND2_VOCABULARY_RATIFICATION.md`](ADR_UGENCE_S2B_ROUND2_VOCABULARY_RATIFICATION.md)).
+`S2B-S1-Q11=A` below is **amended** by `S2B-R2-Q8=A`.
 
 **Date:** 2026-08-29.
 
