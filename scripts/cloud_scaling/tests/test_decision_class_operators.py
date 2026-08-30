@@ -3,12 +3,13 @@
 Three of the four operators the ADR ratified cannot be checked by running the sweep over
 the packages in the tree:
 
-* **D-GC-5 (else-arm)** was ratified on a count of one member across the two candidate
-  packages. Measured once ``risk-integration`` was configured, it has **two** —
-  ``authenticity.py:432`` and ``outcomes.py:159`` — because the engine implements §4.3's
-  operative *reach* test while §8 item 3 excludes the second site under a direct-refusal
-  reading. The divergence is disclosed in ``_else_arm_sites`` and recorded for the owner;
-  the operator itself is exercised here on a synthetic arm either way.
+* **D-GC-5 (else-arm)** has exactly one member across the two candidate packages, and it
+  lives in ``risk-integration``. Implementing the class first found a second under §9.1's
+  reach language — ``outcomes.py:159``, a row whose span contained three separately
+  inventoried guards — and the owner ruled on 2026-08-30 that the class is **direct
+  refusals only**, matching §8 item 3. The narrowing is measured here, not assumed: one
+  synthetic arm refuses directly and qualifies, another reaches a refusal only through a
+  nested ``if`` and must not.
 * **D-GC-4 (helper-admission)** has 14 members in ``capacity-bounds-policy``, but the
   sweep measures the *suite*, not the mutation: a mutation that silently did nothing would
   report ten survivors just as convincingly as a correct one. These tests assert the
@@ -70,6 +71,16 @@ def dispatch(value):
         return "number"
     else:
         raise Refused("unsupported type")
+
+
+def reached(value, flag):
+    if value is None:
+        return "none"
+    else:
+        # Refuses only through a nested dispatch, so the arm itself does not refuse.
+        if flag:
+            raise Refused("flagged")
+        return "kept"
 
 
 _FLAGS = ("alpha", "beta", "gamma")
@@ -282,6 +293,27 @@ def test_a_terminal_else_that_refuses_is_inventoried_and_an_elif_is_not(
     assert len(arms) == 1, "the ``elif`` is already inventoried on the ``if`` layer"
     assert arms[0].condition == "else of: isinstance(value, int)"
     assert arms[0].shape == "raise"
+
+
+def test_an_else_that_only_reaches_a_refusal_through_a_nested_if_is_not_a_member(
+    tmp_path, monkeypatch
+):
+    """D-GC-5 is direct refusals only — ruled by the owner, 2026-08-30.
+
+    ``reached``'s ``else`` arm can reach a ``raise``, but only through an ``if`` that is
+    already inventoried on its own layer. Admitting it would produce a row whose mutation
+    span contains that inner guard, so one refusal would be counted and killed twice. The
+    reach reading found exactly one such row in ``risk-integration``, ``outcomes.py:159``,
+    and this is the test that keeps it out.
+    """
+
+    config = _synthetic_config(
+        tmp_path, monkeypatch, decision_classes=frozenset({"else-arm"})
+    )
+    arms = [g for g in guard_sweep.inventory(config) if g.kind == "else-arm"]
+    assert [a.condition for a in arms] == ["else of: isinstance(value, int)"], (
+        "the arm of `reached` reaches a refusal but does not itself refuse"
+    )
 
 
 def test_the_else_row_points_at_the_else_line_not_its_body(tmp_path, monkeypatch):

@@ -128,13 +128,15 @@ class PackageConfig:
     #: mutated, no mutation is a no-op, and which member each arm was collapsed to is
     #: read back from the source rather than assumed.
     #:
-    #: Be exact about what the alternate does. The sentinel carries §4.1's weakening
-    #: direction — a *general* reason where a specific one was owed. The alternate does
-    #: not: for the arms that already produce the sentinel it substitutes a different
-    #: *specific* reason, which is a lateral swap. It is still only visible to a test that
-    #: reads the reason, so it measures the same contract; but "authority-weakening" is
-    #: true of the sentinel and not of the alternate, and a pair is not the single fixed
-    #: member §4.1 names. Recorded for the owner rather than asserted as ratified.
+    #: **Ratified by the owner, 2026-08-30**, on exactly this reading: each ``except`` arm
+    #: must be changed to a deterministic, *different* rejection reason, and the pair is
+    #: what makes that possible without a no-op. The ruling states what the operator
+    #: measures — whether the suite distinguishes typed reasons — rather than resting it
+    #: on the word "weakening", which is the honest framing: the sentinel carries §4.1's
+    #: general-for-specific direction, while for the two arms that already produce it the
+    #: alternate substitutes a different *specific* reason, a lateral swap. Both are
+    #: invisible to a suite that only asks whether something was rejected, which is the
+    #: contract under test either way.
     #:
     #: A vocabulary with no entry here has no operator, so an arm naming only members of
     #: such a vocabulary is *not* silently mis-mutated into a different enum's member: it
@@ -931,35 +933,55 @@ def _else_arm_sites(tree, config: PackageConfig, helpers: frozenset) -> list:
     ``elif`` chains are excluded: an ``elif`` is an ``If`` of its own and is already
     inventoried on the ``if`` layer with its own condition.
 
-    **Known limitation, and it is no longer latent.** A nested ``if/else`` inside an
-    ``else`` yields two rows whose spans nest, because the outer arm's body *reaches* the
-    inner refusal. Mutating the outer one deletes the inner dispatch with it, so one
-    refusal is counted and killed twice — denominator inflation, never a false kill.
+    **Direct refusal only — ruled by the owner, 2026-08-30.** An arm qualifies when its
+    *own* statements refuse. An arm that merely *contains* a nested ``if`` which refuses
+    does not, even though §9.1's reach language would admit it.
 
-    ``capacity-bounds-policy`` still has zero ``else-arm`` rows. ``risk-integration`` has
-    **two**, and the second is exactly this case: ``outcomes.py:159``, whose mutation span
-    ``(160,12)-(171,17)`` contains guards ``outcomes.py:160``, ``164`` and ``168``, all
-    separately inventoried. Measured, its mutant is killed by the same two tests that kill
-    ``outcomes.py:160`` and ``164`` — a row that inflates numerator and denominator
-    together and carries no information of its own.
+    The ruling settled a real conflict rather than a stylistic one. Under the reach
+    reading this package had two members, and the second was ``outcomes.py:159``, whose
+    mutation span ``(160,12)-(171,17)`` contains guards ``outcomes.py:160``, ``164`` and
+    ``168`` — all separately inventoried. Measured before the narrowing, its mutant was
+    killed by the same two tests that kill 160 and 164: a row that inflated numerator and
+    denominator together and measured nothing the three inner rows did not already
+    measure. §8 item 3 named that exact site as not a member; the owner ruled with §8.3,
+    so the reach reading is narrowed here and the class has one member, as ratified.
 
-    That puts the engine and the ADR in conflict, and the conflict is the owner's to
-    settle rather than this function's. §4.3's operative text is a *reach* test — "a body
-    that can reach a refusal makes the ``if`` a guard" — and under it this site qualifies.
-    §8 item 3 is a later and more specific ruling that names this exact site as **not** a
-    member and calls it "the one correction that changes a ruling's scope". Narrowing the
-    class to arms that refuse *directly* would satisfy §8.3 and yield one member, but it
-    narrows a ratified definition. So the reach reading ships, the divergence is disclosed
-    here and in the generated inventory, and the choice is recorded for the owner.
+    ``elif`` chains stay excluded for the same reason they always were, and the nesting
+    limitation this docstring used to record is closed rather than disclosed: an arm whose
+    refusal is reached only through a nested dispatch is now outside the class, so no two
+    rows can have nesting spans.
     """
 
     sites = []
     for node in ast.walk(tree):
         if not isinstance(node, ast.If) or not node.orelse or _is_elif(node):
             continue
-        if _refusal_shape_of(node.orelse, config, helpers):
+        if _refusal_shape_of(_direct_statements(node.orelse), config, helpers):
             sites.append(node)
     return sites
+
+
+def _direct_statements(body) -> list:
+    """The arm's own statements, with any nested branch's *body* removed.
+
+    ``_refusal_shape_of`` walks whatever it is handed, so handing it the arm unmodified
+    asks "can this arm reach a refusal?". The ratified question is narrower — "does this
+    arm refuse?" — so a nested ``If``/``Try``/loop contributes its test and its iterable
+    but not the suites hanging off it. A ``with`` or a bare block is not a branch: its
+    body always runs when the arm runs, so it stays.
+    """
+
+    direct = []
+    for statement in body:
+        if isinstance(statement, (ast.If, ast.Try, ast.For, ast.While, ast.Match)):
+            # Keep the parts that execute unconditionally with the arm, drop the arms.
+            for name in ("test", "iter", "subject"):
+                held = getattr(statement, name, None)
+                if isinstance(held, ast.AST):
+                    direct.append(ast.Expr(value=held))
+            continue
+        direct.append(statement)
+    return direct
 
 
 def _else_lineno(lines, node) -> int:

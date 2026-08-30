@@ -18,13 +18,26 @@ on:
       - "packages/capabilities/cloud-scaling-controller/**"
       - "packages/risk_authority/**"
       - "docs/architecture/ADR_CLOUD_SCALING_RISK_AUTHORITY_INTEGRATION_PHASE4.md"
+      - "docs/architecture/ADR_CLOUD_SCALING_GUARD_COVERAGE.md"
+      # The sweep engine. A change to an operator or a detector changes what this
+      # package's guard sweep measures without touching a byte inside the package, so
+      # a filter that omits it lets the engine drift past this gate unmeasured. An
+      # audit of the guard-coverage work found a real defect of exactly that shape:
+      # a bare-name match in `_raising_helpers` let a non-guard call be inventoried
+      # and scored KILLED, and no package-scoped filter would have re-run this sweep
+      # to catch it.
+      - "scripts/cloud_scaling/guard_sweep.py"
+      - "scripts/cloud_scaling/tests/**"
       - ".github/workflows/cloud-scaling-risk-integration-ci.yml"
   push:
     branches:
       - "claude/cloud-scaling-phase-4c-**"
       - "claude/setup-symbolu-monorepo-**"
+      - "claude/guard-coverage-**"
     paths:
       - "packages/integration/cloud-scaling-risk-integration/**"
+      - "scripts/cloud_scaling/guard_sweep.py"
+      - "scripts/cloud_scaling/tests/**"
       - ".github/workflows/cloud-scaling-risk-integration-ci.yml"
 
 defaults:
