@@ -1,0 +1,34 @@
+{
+ "eligibility": {
+  "n_seen": 424,
+  "n_eligible": 6,
+  "cohort_floor": 40,
+  "floor_met": false
+ },
+ "functions": [
+  {
+   "app_func": "5fb02cfeb979fec16df02d1ece227157238477b19fc6e37554e2e2af6018d3ba|8e5f533dbf1092f56ac6c7542ef3bdec4661bd442c9b5e7537fabc7b8c03f5a8",
+   "train_total": 17630
+  },
+  {
+   "app_func": "734272c01926d19690e5ec308bab64ef97950b75b1c7582283e0783fce1751d8|313c03f53a0d31f70aec25f62efb33e7dd779725ca4af579018452d1204beaad",
+   "train_total": 9988
+  },
+  {
+   "app_func": "734272c01926d19690e5ec308bab64ef97950b75b1c7582283e0783fce1751d8|9b61fd55aa093a2d172db1a68a60af5cf6cbfa7f5ea1fbc71846027a5954616d",
+   "train_total": 6141
+  },
+  {
+   "app_func": "a594f92f84072b4cd031fe5283d1781a6e98f430696dec0a8e3b02eadb5fc0b8|155e47f8e7f751d0c845049456d01832013c61336a8cd85901330ac821a71534",
+   "train_total": 334877
+  },
+  {
+   "app_func": "c8c43e1a911f29e5506460a2fbef61ff39723d672f3b3b67d12d4c236c6872f7|653cdbc309bc359f3289d3b4df21c4a8e478d22946b35cbfdab05377dcacd3e0",
+   "train_total": 2828
+  },
+  {
+   "app_func": "d27353c8ad7c924a609457eb5a53333a7e519bcf8efd884dcca7ffb908ca3fa6|905e6674359f6487df567fa2c8ca1c8641e7740f2e32d9fd26e9fe1ff7a4670d",
+   "train_total": 16329
+  }
+ ]
+}
