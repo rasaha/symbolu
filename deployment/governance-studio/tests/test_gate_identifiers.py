@@ -264,6 +264,38 @@ def test_no_correspondence_between_the_families(family, definition):
         assert not re.search(r"\bC\d+\b", json.dumps(body)), name
 
 
+def test_family_gate_and_obligation_definitions_may_not_name_a_historical_gate(
+        verifier, tmp_path):
+    """The disclaimer is enforced where a mapping could actually be smuggled in.
+
+    A canonical C-identifier is legal everywhere else, so this is the one place the
+    scanner rejects one: naming a historical gate inside a P3E-CTR gate body or an
+    evidence obligation would assert exactly the correspondence the record denies.
+    """
+    family = os.path.join(AUDIT, "CONTAINER_GATE_FAMILY.json")
+    for probe in (("gates", "P3E-CTR-06", "maps_to"),
+                  ("evidence_obligations", "obligations", "image-sbom", "supersedes")):
+        doc = json.load(open(family, encoding="utf-8"))
+        node = doc
+        for key in probe[:-1]:
+            node = node[key]
+        node[probe[-1]] = "C11"
+        copy = tmp_path / "CONTAINER_GATE_FAMILY.json"
+        json.dump(doc, open(copy, "w", encoding="utf-8"))
+        assert verifier.main(DEFINITION, [str(copy)]) == 1, probe
+
+
+def test_disclaimer_section_may_still_name_historical_gates(verifier, tmp_path):
+    """The relationship section states the disclaimer; it must remain able to."""
+    family = os.path.join(AUDIT, "CONTAINER_GATE_FAMILY.json")
+    doc = json.load(open(family, encoding="utf-8"))
+    statuses = doc["relationship_to_the_historical_C_family"]["historical_gate_statuses"]
+    assert {"C2", "C4"} <= set(statuses), "fixture no longer exercises the allowance"
+    copy = tmp_path / "CONTAINER_GATE_FAMILY.json"
+    json.dump(doc, open(copy, "w", encoding="utf-8"))
+    assert verifier.main(DEFINITION, [str(copy)]) == 0
+
+
 def test_ratified_family_is_not_referenced_by_any_ci_step():
     """A defined requirement set must not be silently enforced as a CI gate."""
     wf = open(os.path.join(REPO, ".github", "workflows",
