@@ -12,10 +12,20 @@ authorized by ``S2B-PF-G=B`` in
 not the resolver's **answer**: a resolver returning a structurally alien object raised
 ``AttributeError`` from whichever ratified field was read first, outside H2 entirely.
 The guard now spans the whole ratified response shape — the echo and the three fields
-the permission test and the advisory stamping go on to read — so the refusal is
-``CrossContractViolationError`` wherever the object is deficient, with the original
+the permission test and the advisory stamping go on to read — so a response **missing
+any ratified field** is refused as ``CrossContractViolationError``, with the original
 error preserved as ``__cause__``. `S2B-S1-Q8=A` is untouched: **no new exception
 type**, and H2 stays at five classes.
+
+`[G]` **What the guard establishes is field PRESENCE, not field shape**, and the
+difference is stated here rather than left to be discovered. A response carrying every
+ratified field but a type-alien value in one of them still escapes H2 downstream — a
+``permitted_strategies`` of ``5`` reaches the membership test and raises ``TypeError``
+— as does an attribute that answers the guard and then raises on a later read, since
+the callers re-read the response outside it. `[R]` These are a **different garbage
+class** from the one `0.3.0` disclosed and `S2B-PF-G=B` ruled on, and closing them
+would exceed that authorization; whether to close them is a new owner decision, not a
+defect in this one.
 
 `[R]` **The compatibility change, stated rather than implied.** A caller that
 previously caught ``AttributeError`` around a builder call to detect a malformed

@@ -263,11 +263,17 @@ def _resolve_strategy_policy(
     from the response is used.
 
     `S2B-PF-G=B` (`0.3.1`) widened this boundary from the resolver call to the whole
-    response: a resolver that answers with a structurally alien object is refused as
-    ``CrossContractViolationError`` here rather than escaping as ``AttributeError``
-    from wherever the first missing field happened to be read. The original error is
-    preserved as ``__cause__``. This changes a failure class, not the public surface,
-    and adds no exception type — H2 stays at five classes (`S2B-S1-Q8=A`).
+    response: a resolver that answers with an object **missing any ratified field** is
+    refused as ``CrossContractViolationError`` here rather than escaping as
+    ``AttributeError`` from wherever the first missing field happened to be read. The
+    original error is preserved as ``__cause__``. This changes a failure class, not the
+    public surface, and adds no exception type — H2 stays at five classes
+    (`S2B-S1-Q8=A`).
+
+    `[G]` **Presence, not shape.** The guard reads each ratified field once. A response
+    carrying every field but a type-alien value in one still escapes H2 downstream, as
+    does an attribute that answers here and raises on a later read. `[R]` That is a
+    different garbage class from the one `S2B-PF-G=B` ruled on, and is not closed here.
 
     `[R]` **The policy identity and version are package-stamped from this response**,
     never accepted as builder parameters. This is OD-7 part 5's selector-policy

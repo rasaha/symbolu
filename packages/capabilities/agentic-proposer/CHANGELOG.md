@@ -26,6 +26,15 @@ nothing adjacent to it.
   `__cause__`.** `S2B-S1-Q8=A` is untouched: **no new exception type**, H2 stays at five
   classes, and this release adds, removes and renames no public name.
 
+`[G]` **The guard establishes field presence, not field shape.** A response **missing**
+any ratified field is refused here; a response carrying every field but a type-alien
+value in one of them is not, and still escapes H2 downstream — a `permitted_strategies`
+of `5` reaches the membership test and raises `TypeError`, and an attribute that answers
+the guard then raises on a later read escapes the same way, since the callers re-read the
+response outside it. `[R]` That is a **different garbage class** from the one `0.3.0`
+disclosed and `S2B-PF-G=B` ruled on; closing it would exceed this authorization and is a
+new owner decision.
+
 `[R]` **Compatibility.** A caller that caught `AttributeError` around a builder call to
 detect a malformed resolver answer no longer sees one **from this path**; it sees an H2
 class. Nothing else in the builders is newly caught. A complete duck-typed response
