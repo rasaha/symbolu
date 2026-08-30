@@ -25,6 +25,7 @@ import copy
 
 import pytest
 
+from ugence_cloud_scaling_risk_integration import CloudScalingRiskAdapter
 from ugence_cloud_scaling_risk_integration import authenticity as _authenticity
 from ugence_cloud_scaling_risk_integration import outcomes as _outcomes
 from ugence_cloud_scaling_risk_integration import projection as _projection
@@ -33,8 +34,6 @@ from ugence_cloud_scaling_risk_integration.errors import (
     ProjectionError,
     RecommendationAuthenticityError,
 )
-
-from ugence_cloud_scaling_risk_integration import CloudScalingRiskAdapter
 
 from conftest import build_recommendation, fixed_clock, reference_seam, INSIDE_WINDOW
 
