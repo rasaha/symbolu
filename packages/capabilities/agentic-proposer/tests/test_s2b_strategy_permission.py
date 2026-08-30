@@ -421,6 +421,107 @@ def test_an_uncorrelated_echo_refuses_construction(world):
             **_builder_kwargs(world, strategy_policy_resolver=resolver))
 
 
+# --------------------------------------------------------------------------- #
+# `S2B-PF-G=B` (`0.3.1`) — the widened resolver boundary
+#
+# A resolver that answers with a structurally alien object used to escape the H2
+# surface as ``AttributeError`` from whichever field was read first. The boundary now
+# covers the WHOLE ratified response shape, so the refusal is an existing H2 class
+# wherever the object is deficient. `S2B-S1-Q8=A` still holds: no new exception type,
+# and the public surface is unchanged at fifty-one names.
+# --------------------------------------------------------------------------- #
+
+class _AlienResponse:
+    """Carries none of the ratified response fields."""
+
+
+class _EchoOnlyResponse:
+    """Carries the echo and nothing else.
+
+    This is the probe that makes the boundary's WIDTH testable rather than assumed: it
+    survives the echo comparison and is deficient three lines later, at
+    ``permitted_strategies``. A guard closing only the echo access would pass the test
+    above and still fail here.
+    """
+
+    strategy_policy_ref = spec.STRATEGY_POLICY_REF
+
+
+class _DuckTypedResponse:
+    """A lawful, complete response that is **not** a ``StrategyPolicyResponse``.
+
+    The widened guard reads fields; it does not narrow the protocol to one concrete
+    class. `S2B-S1-Q9=A` ratifies a Protocol, and this asserts the `0.3.1` change did
+    not quietly turn it into a nominal type test.
+    """
+
+    strategy_policy_id = spec.STRATEGY_POLICY_ID
+    strategy_policy_version = spec.STRATEGY_POLICY_VERSION
+    permitted_strategies = tuple(ap.ReasoningStrategy)
+    strategy_policy_ref = spec.STRATEGY_POLICY_REF
+
+
+def test_a_structurally_alien_response_refuses_construction(world):
+    """`S2B-PF-G=B`. Before `0.3.1` this raised ``AttributeError: 'Alien' object has no
+    attribute 'strategy_policy_ref'`` — outside H2 entirely."""
+    resolver = spec.StubStrategyPolicyResolver(returns=_AlienResponse())
+    with pytest.raises(ap.CrossContractViolationError):
+        ap.build_proposer_advisory(
+            **_builder_kwargs(world, strategy_policy_resolver=resolver))
+
+
+def test_a_response_carrying_only_the_echo_refuses_construction(world):
+    """The same defect at a different line, closed by the same guard."""
+    resolver = spec.StubStrategyPolicyResolver(returns=_EchoOnlyResponse())
+    with pytest.raises(ap.CrossContractViolationError):
+        ap.build_proposer_advisory(
+            **_builder_kwargs(world, strategy_policy_resolver=resolver))
+
+
+@pytest.mark.parametrize("missing", sorted(ap.StrategyPolicyResponse.model_fields))
+def test_every_ratified_response_field_is_covered_by_the_boundary(world, missing):
+    """Each field of the ratified shape, withheld on its own. The boundary is the whole
+    response, so no single field's absence can escape H2 — and this fails if a later
+    field is added to the contract but read outside the guard."""
+    lawful = {"strategy_policy_id": spec.STRATEGY_POLICY_ID,
+              "strategy_policy_version": spec.STRATEGY_POLICY_VERSION,
+              "permitted_strategies": tuple(ap.ReasoningStrategy),
+              "strategy_policy_ref": spec.STRATEGY_POLICY_REF}
+    assert set(lawful) == set(ap.StrategyPolicyResponse.model_fields), (
+        "the probe must cover exactly the ratified fields")
+    del lawful[missing]
+    deficient = type("DeficientResponse", (), dict(lawful))()
+    resolver = spec.StubStrategyPolicyResolver(returns=deficient)
+    with pytest.raises(ap.CrossContractViolationError):
+        ap.build_proposer_advisory(
+            **_builder_kwargs(world, strategy_policy_resolver=resolver))
+
+
+def test_the_original_attribute_error_survives_as_the_cause(world):
+    """The refusal does not swallow what went wrong. `[R]` The widened guard reports in
+    an H2 class and preserves the underlying error as ``__cause__``, so an operator
+    still sees which field the resolver failed to carry."""
+    resolver = spec.StubStrategyPolicyResolver(returns=_AlienResponse())
+    with pytest.raises(ap.CrossContractViolationError) as excinfo:
+        ap.build_proposer_advisory(
+            **_builder_kwargs(world, strategy_policy_resolver=resolver))
+    cause = excinfo.value.__cause__
+    assert isinstance(cause, AttributeError), (
+        f"the original error must survive as __cause__, not be swallowed: {cause!r}")
+    assert "strategy_policy_id" in str(cause)
+
+
+def test_the_widened_boundary_does_not_narrow_the_protocol_to_one_class(world):
+    """A complete duck-typed response still constructs. `0.3.1` routes a **deficient**
+    response into H2; it does not make ``StrategyPolicyResponse`` a nominal
+    requirement, which would be a second, unruled behaviour change."""
+    resolver = spec.StubStrategyPolicyResolver(returns=_DuckTypedResponse())
+    advisory = ap.build_proposer_advisory(
+        **_builder_kwargs(world, strategy_policy_resolver=resolver))
+    assert advisory.strategy_policy_id == spec.STRATEGY_POLICY_ID
+    assert advisory.strategy_policy_version == spec.STRATEGY_POLICY_VERSION
+
+
 def test_a_bare_string_declaration_is_a_plain_validation_error(world):
     """`S2B-S1-Q8=A`'s other half: a value failing its own field constraint is
     ``pydantic.ValidationError``. `S2B-R2-Q5=A` makes both ``declared_strategy`` fields
@@ -473,6 +574,10 @@ def test_no_new_exception_type_was_added(world):
     {"permitted": (ap.ReasoningStrategy.REVISED_ADVISORY,)},
     {"raises": RuntimeError("policy store down")},
     {"echo_ref": "policy-authority/something-else"},
+    # `S2B-PF-G=B` (`0.3.1`): the widened boundary's refusals are held to the same
+    # uppercased-substring rule as every other refusal on this path.
+    {"returns": _AlienResponse()},
+    {"returns": _EchoOnlyResponse()},
 ])
 def test_a_refused_construction_emits_no_disposition_and_no_authority_term(
         world, resolver_kwargs):

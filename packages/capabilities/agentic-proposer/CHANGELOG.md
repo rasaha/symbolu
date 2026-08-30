@@ -1,5 +1,55 @@
 # Changelog — ugence-agentic-proposer
 
+## 0.3.1 — resolver-boundary hardening
+
+A patch release: **one failure class changed, the public surface unchanged at fifty-one
+names.** `[R]` Authorized by `S2B-PF-G=B` in
+[`ADR_UGENCE_S2B_STRATEGY_PERMISSION_FAMILY_RATIFICATION.md`](../../../docs/architecture/ADR_UGENCE_S2B_STRATEGY_PERMISSION_FAMILY_RATIFICATION.md),
+which rules `§10` step 7 of
+[`S2B_STRATEGY_PERMISSION_POLICY_FAMILY_AND_RESOLVER_DESIGN.md`](../../../docs/architecture/S2B_STRATEGY_PERMISSION_POLICY_FAMILY_AND_RESOLVER_DESIGN.md)
+a **separate** change set, never bundled with the two new integration packages — and
+nothing adjacent to it.
+
+### Changed
+
+* **The resolver boundary now covers the resolver's answer, not only the call.**
+  `0.3.0` disclosed that in `_resolve_strategy_policy` the echo comparison sat outside
+  the `try` guarding `resolve(...)`, so a resolver returning a structurally alien object
+  raised `AttributeError: 'Alien' object has no attribute 'strategy_policy_ref'` rather
+  than an H2 class. The guard now spans **every field of the ratified
+  `StrategyPolicyResponse` shape** — the echo, and the `permitted_strategies` and
+  identity pair that `_require_declaration_is_permitted` and the advisory stamping go on
+  to read. Closing the echo access alone would have moved the same failure three lines
+  down; the boundary is drawn where the response crosses into this package. The field
+  names are read from the contract, so the guard cannot drift from the shape.
+* **The refusal is `CrossContractViolationError`, and the original error survives as
+  `__cause__`.** `S2B-S1-Q8=A` is untouched: **no new exception type**, H2 stays at five
+  classes, and this release adds, removes and renames no public name.
+
+`[G]` **The guard establishes field presence, not field shape.** A response **missing**
+any ratified field is refused here; a response carrying every field but a type-alien
+value in one of them is not, and still escapes H2 downstream — a `permitted_strategies`
+of `5` reaches the membership test and raises `TypeError`, and an attribute that answers
+the guard then raises on a later read escapes the same way, since the callers re-read the
+response outside it. `[R]` That is a **different garbage class** from the one `0.3.0`
+disclosed and `S2B-PF-G=B` ruled on; closing it would exceed this authorization and is a
+new owner decision.
+
+`[R]` **Compatibility.** A caller that caught `AttributeError` around a builder call to
+detect a malformed resolver answer no longer sees one **from this path**; it sees an H2
+class. Nothing else in the builders is newly caught. A complete duck-typed response
+still constructs: `S2B-S1-Q9=A` ratifies a Protocol, and the guard reads fields rather
+than testing for one concrete class.
+
+`verify_strategy_permission` is unaffected. It takes an already-typed
+`StrategyPolicyResponse`, issues no resolver call and never raises — it sits outside
+this boundary, and this release does not move it.
+
+`[G]` **What this does not change.** Execution end to end: no strategy-permission policy
+family is registered with Policy Authority by this release, and it registers none. Nor
+does it touch the four present-tense sites the design records at `§8.1`, or anything
+else the pinned design and its ratification record as deferred, ungranted or unruled.
+
 ## 0.3.0 — S2-B Reasoning Strategy Permission
 
 The S2-B first slice. `[R]` Authorized by the `§8` implementation gate, which **opened**
