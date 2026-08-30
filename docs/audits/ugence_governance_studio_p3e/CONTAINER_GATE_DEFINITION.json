@@ -47,7 +47,7 @@
     ],
     "finding": "The workflow, the deployment tests and the CI scripts contain no C-prefixed gate identifier at all. Gate definitions exist only in the markdown twins of the P3E audit records, and they define two gates individually and the rest only as a group.",
     "corroborating_finding": "verify_container.sh annotates its checks with section markers of a 'P3E completion' specification (sections 4, 6, 7, 8, 10, 11, 13). That specification is not present in the repository, and section numbers are a different numbering scheme from the C identifiers; they are recorded here as a lead, not as a mapping.",
-    "counting_check": "the container job carries 13 named steps, of which 12 predate the pin-conformance guard added alongside this definition, and two of those are setup rather than verification (install-e2e-driver-deps and the checkout/setup actions). That is fewer named steps than the 17 gate identifiers, so no positional or one-to-one correspondence can be derived either.",
+    "counting_check": "the container job carries 14 named steps, of which 12 predate the pin-conformance guard added alongside this definition, and three are setup or scaffolding rather than verification (evidence-dir-init, install-e2e-driver-deps and the checkout/setup actions). That is fewer named steps than the 17 gate identifiers, so no positional or one-to-one correspondence can be derived either.",
     "consequence": "C2 and C4 are DEFINED from the audit records. C5-C19 receive only a group property and remain individually UNKNOWN. No mapping was invented.",
     "correction_2026_08_29": "An earlier version of this file stated that no permitted source contained any C-prefixed identifier and that the gates were 'defined nowhere'. That was true of docs/, apps/, deployment/ and .github/, but false of the repository: the tracked Project_documentation/ mirror was not searched and does define C2 and C4. The claim is withdrawn and replaced by the findings below.",
     "completion_specification": {
@@ -68,7 +68,9 @@
         "PR #1323 uses C2-C5 for an unrelated P3D frontend gate family (controlled what-if, WCAG contrast classification, tracked-source integrity, decoder plan states), confirming that C identifiers are phase-local and reused with different meanings, so no cross-phase inference is available"
       ],
       "conclusion": "C5 through C19 have no recoverable definition. The search is complete for sources inside this repository and its pull request history."
-    }
+    },
+    "counting_check_superseded": "the container job carries 13 named steps, of which 12 predate the pin-conformance guard added alongside this definition, and two of those are setup rather than verification (install-e2e-driver-deps and the checkout/setup actions). That is fewer named steps than the 17 gate identifiers, so no positional or one-to-one correspondence can be derived either.",
+    "counting_check_correction_2026_08_30": "The superseded wording above said 13 named steps. It was written before evidence-dir-init was added by the evidence-manifest integrity fix, and is retained as provenance per this file's convention rather than overwritten. The conclusion is unchanged: the step count has never matched the identifier count, so no positional mapping is available."
   },
   "gates": {
     "C2": {

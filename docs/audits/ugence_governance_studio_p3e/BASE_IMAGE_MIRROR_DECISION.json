@@ -77,13 +77,24 @@
     "script": "deployment/governance-studio/ci/verify_ratified_pins.py",
     "blocking": true,
     "asserts": "every digest in deployment/governance-studio/base-images.json and every Dockerfile FROM pin equals the corresponding authoritative_digests entry in this record, every Dockerfile FROM is digest-pinned, and the per-image Dockerfile stage lists match",
-    "consequence": "a re-pin or an image substitution cannot land without editing this ratification record, which requires owner re-ratification",
+    "consequence": "a re-pin or an image substitution cannot land with green CI without editing this ratification record, which requires owner re-ratification",
     "runs_before": [
       "install (application job)",
       "base-image-digest-verification",
       "container-build"
     ],
-    "known_coverage_limit": "CLOSED by owner decision (rasaha, 2026-08-29): the check now also runs in the always-running application job, so it guards every push, and is retained as the first step of the container job."
+    "known_coverage_limit": "CLOSED by owner decision (rasaha, 2026-08-29): the check now also runs in the always-running application job, so it guards every push, and is retained as the first step of the container job.",
+    "consequence_superseded": "a re-pin or an image substitution cannot land without editing this ratification record, which requires owner re-ratification",
+    "consequence_correction_2026_08_30": "The superseded wording claimed such a change 'cannot land'. That overstated the control. The guard makes the application job fail, but nothing in the repository prevents a merge over a failing check unless that job is a required status check on the branch. The claim is therefore narrowed to what the guard actually delivers: it cannot land with green CI.",
+    "required_status_check": {
+      "status": "OPEN_OWNER_DECISION",
+      "owner": "rasaha",
+      "raised_on": "2026-08-30",
+      "question": "should the application job of governance-studio-p3e-private-hosted-ci be a required status check on the default branch?",
+      "effect_if_adopted": "the superseded wording becomes literally true: a re-pin or substitution could not be merged at all without editing this record",
+      "effect_if_declined": "the guard stays advisory-by-merge-policy - it reliably turns CI red, but a reviewer can still merge past it, so the narrowed wording above is the accurate description",
+      "note": "this is a branch-protection setting outside the repository contents; it cannot be established by any file in this PR"
+    }
   },
   "mirror": {
     "registry_host": null,
