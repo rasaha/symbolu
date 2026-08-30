@@ -8,12 +8,20 @@ swept in CI at all — and, since the guard-coverage ADR, to
 `cloud-scaling-capacity-bounds-policy`, a package that carries no authority but does carry a
 fail-closed admission invariant, which is exactly the thing a sweep can measure (ADR §2).
 
-**Not every decision point is an `if`.** The guard-coverage ADR ratified two additive
+**Not every decision point is an `if`.** The guard-coverage ADR ratified three additive
 classes the engine could not see in either direction — absent from the numerator *and* from
-the disclosed denominator: a statement-level call to a raising helper (§4.2, deleted rather
+the disclosed denominator: an `except` arm that returns a typed rejection (§4.1, its reason
+collapsed to a sentinel), a statement-level call to a raising helper (§4.2, deleted rather
 than disabled) and a terminal `else` that refuses (§4.3, replaced by `pass`). Each is opted
 into per package through `PackageConfig.decision_classes`, because enabling one changes what
 a package's checked-in inventory counts.
+
+**A guard in a loop is one site, not `n`.** A guard inside `for flag in _AUTHORITY_FLAGS:`
+decides as many invariants as the loop has iterations, and one mutation neutralises all of
+them together. §7.2 rules it inventoried as **one** static site carrying a recorded semantic
+multiplicity, read off the iterated constant rather than written down, with the burden of
+telling the members apart falling on the suite. `risk-integration` has four such sites — of
+multiplicity 7, 6, 8 and 9 — so its 101 static guards decide 127 invariants.
 
 Two things this had to get right that a copy of the existing script would have got wrong.
 
@@ -86,8 +94,9 @@ class PackageConfig:
     #: that silently re-points at a different guard is worse than no exclusion at all.
     exclusions: dict = field(default_factory=dict)
     #: Decision classes beyond the ``if``/``IfExp`` layer that this package inventories.
-    #: ``"helper-admission"`` (guard-coverage ADR §4.2, D-GC-4) and ``"else-arm"`` (§4.3,
-    #: D-GC-5). Opt-in per package rather than global, because the guard-coverage ADR §1
+    #: ``"except-arm"`` (guard-coverage ADR §4.1, D-GC-3), ``"helper-admission"`` (§4.2,
+    #: D-GC-4) and ``"else-arm"`` (§4.3, D-GC-5).
+    #: Opt-in per package rather than global, because the guard-coverage ADR §1
     #: states that nothing in it reclassifies a guard in ``authorization-contracts`` or
     #: ``policy-authenticity`` — those two keep every count and index §9 already settles
     #: for them, and switching a class on for them would renumber their checked-in
@@ -105,6 +114,52 @@ class PackageConfig:
     #: count is worse than a disclosed one, because a reader cannot tell which question
     #: the number answers.
     uncovered_mints: tuple = ()
+    #: D-GC-3's operator, per vocabulary: ``{vocabulary: (sentinel, alternate)}``.
+    #: Guard-coverage ADR §4.1 rules the operator to be "rewrite the member the arm
+    #: returns to a fixed sentinel member, **chosen so it is not the member the arm
+    #: already produces**". No single fixed member satisfies the second half for every
+    #: arm — ``risk-integration``'s ten arms name eight distinct members, and whichever
+    #: member is picked, the arms already producing it would be rewritten to themselves.
+    #: The audit's out-of-tree operator resolved that by *skipping* those arms, which
+    #: scores them ``UNSCORED``: the sweep would then report nothing at all about two of
+    #: the ten sites it just ratified as decision points. So the sentinel is declared as
+    #: a **pair** — both members fixed here rather than computed, and the operator takes
+    #: the alternate exactly when the arm already produces the sentinel. Every arm is
+    #: mutated, no mutation is a no-op, and which member each arm was collapsed to is
+    #: read back from the source rather than assumed.
+    #:
+    #: **Ratified by the owner, 2026-08-30**, on exactly this reading: each ``except`` arm
+    #: must be changed to a deterministic, *different* rejection reason, and the pair is
+    #: what makes that possible without a no-op. The ruling states what the operator
+    #: measures — whether the suite distinguishes typed reasons — rather than resting it
+    #: on the word "weakening", which is the honest framing: the sentinel carries §4.1's
+    #: general-for-specific direction, while for the two arms that already produce it the
+    #: alternate substitutes a different *specific* reason, a lateral swap. Both are
+    #: invisible to a suite that only asks whether something was rejected, which is the
+    #: contract under test either way.
+    #:
+    #: A vocabulary with no entry here has no operator, so an arm naming only members of
+    #: such a vocabulary is *not* silently mis-mutated into a different enum's member: it
+    #: is reported by ``undeclared_except_arms`` and fails the inventory run.
+    reason_collapse_sentinels: dict = field(default_factory=dict)
+    #: Whether this package's inventory *discloses* semantic multiplicity — guard-coverage
+    #: ADR §7.2, ruled at ratification. ``Guard.multiplicity`` is computed for every
+    #: package regardless, because a number the engine declines to compute is a number
+    #: nobody can check; this governs only whether the inventory reports it.
+    #:
+    #: Opt-in for the same reason the additive classes are. §7.2 was ruled inside the
+    #: guard-coverage ADR, and §1 of that ADR says nothing in it changes what
+    #: ``authorization-contracts`` or ``policy-authenticity`` record. Switching disclosure
+    #: on for a package rewrites its checked-in inventory, so it is the owner's call, not
+    #: a side effect of an engine fix.
+    #:
+    #: This is not hypothetical. Teaching the sizer to read annotated constants
+    #: (``_CARRIED_INSTANTS: Final = (...)``) revealed two real loop-guards in
+    #: ``policy-authenticity`` — ``verification.py:1026`` over six carried instants and
+    #: ``verification.py:1076`` over three occurrence facts — that no inventory has ever
+    #: disclosed. They are recorded here for the owner rather than published into a file
+    #: §1 reserves.
+    record_multiplicity: bool = False
 
     @property
     def src(self) -> Path:
@@ -240,6 +295,226 @@ PACKAGES = {
         uncovered_mints=(),
         recorded=(),
         exclusions={},
+    ),
+    "risk-integration": PackageConfig(
+        key="risk-integration",
+        package_dir="packages/integration/cloud-scaling-risk-integration",
+        dist_name="ugence_cloud_scaling_risk_integration",
+        # Guard-coverage ADR §5: ``project_recommendation`` is module-level and is a
+        # genuine mint — the projection is the artifact every later gate is about. It is
+        # not the package's *only* mint, and the two it does not cover are named in
+        # ``uncovered_mints`` rather than left for a reader to notice. §5 accepts partial
+        # coverage on exactly that condition.
+        mint_site="ugence_cloud_scaling_risk_integration.projection:project_recommendation",
+        # The order a value actually flows through the package: an identifier is frozen at
+        # import, an outcome type is declared, an input is authenticated, the authenticated
+        # input is projected, and only then does the adapter run its gates. Guard-coverage
+        # ADR §7.5 reconciles the ``if`` layer against this order — 3/14/28/18/11 — and this
+        # configuration reproduces that split exactly.
+        module_order=(
+            "identifiers.py",
+            "outcomes.py",
+            "authenticity.py",
+            "projection.py",
+            "adapter.py",
+        ),
+        # Phase 4C refuses in three shapes, not one. Most gates raise; the adapter's own
+        # gates *return* a typed outcome. Only ``_abstained`` does so from an ``if`` body
+        # — gate 2 at ``adapter.py:205`` — and declaring it names that idiom rather than
+        # reporting it as a generic call to something that happens to raise. Every one of
+        # the ten ``self._rejected(...)`` calls is inside an ``except`` arm, so on the
+        # ``if`` layer that name is inert; it is declared because it *is* this package's
+        # refusal call, and D-GC-3 reads the same vocabulary from the same sites. The
+        # ``if``-layer count is 74 under either declaration.
+        refusal_calls=frozenset({"_rejected", "_abstained"}),
+        # No ``(_Outcome.X, "…")`` tuple idiom here: this package returns a constructed
+        # ``CloudScalingRiskOutcome``, never a pair.
+        tuple_refusals=False,
+        # Guard-coverage ADR §3: this package publishes **three** parallel vocabularies,
+        # and the pair's second element is per-path, fully determined by
+        # ``CloudScalingRiskOutcome`` — ``AdapterRejectionReason`` on the rejection path,
+        # ``AdapterOutcomeStatus`` on the status path, and the controller-supplied
+        # ``abstention_reason`` string on the abstention path. The third is declared here
+        # for the same reason the other two are — a reader must be able to see all three
+        # the package publishes — while being honest that it contributes no enum member to
+        # the outcome column: an abstention's reason is a string the controller chose, not
+        # a member this package can name, so no operator can collapse it and none is
+        # declared for it below.
+        reason_vocabularies=frozenset(
+            {"AdapterRejectionReason", "AdapterOutcomeStatus", "abstention_reason"}
+        ),
+        # All three additive classes. This is the package the guard-coverage ADR measured
+        # every one of them against: §4.1's ten ``except``-arm rejections are the whole
+        # gate-1/3/4 structure and the production site of every ``AdapterRejectionReason``
+        # member, §4.2 finds 15 helper-admission calls here, and §4.3's single member in
+        # either candidate package lives in this one, at ``authenticity.py:432``. An empty
+        # class would still be enabled — a class that is off cannot report that it found
+        # nothing — but none of the three is empty here.
+        decision_classes=frozenset({"except-arm", "helper-admission", "else-arm"}),
+        # D-GC-3's operator. ``UNSUPPORTED_INPUT_TYPE`` is the sentinel because it is the
+        # *general* answer among the eight members these arms produce: collapsing a
+        # specific diagnosis to it is precisely "reports a general reason where a specific
+        # one was owed", which is §4.1's authority-weakening direction. Two of the ten arms
+        # already produce it, so those take the alternate — see
+        # ``reason_collapse_sentinels`` for why an arm is never rewritten to itself.
+        reason_collapse_sentinels={
+            "AdapterRejectionReason": ("UNSUPPORTED_INPUT_TYPE", "PROJECTION_FAILED"),
+        },
+        # §7.2's ruling is about this package's flag loops, so this package discloses them.
+        record_multiplicity=True,
+        # Partial, and disclosed. Guard-coverage ADR §5 accepts partial mint coverage only
+        # when the uncovered mints are named.
+        uncovered_mints=(
+            (
+                "ugence_cloud_scaling_risk_integration.authenticity:"
+                "authenticate_controller_output",
+                "the package's second module-level mint. `mint_site` names one function, "
+                "and the projection is the artifact the later gates are about, so the "
+                "authenticated token is counted only where it flows into a projection. A "
+                "guard that is the last obstacle before an *authenticated token* and not "
+                "before a projection is therefore not reported as minting.",
+            ),
+            (
+                "ugence_cloud_scaling_risk_integration.adapter:"
+                "CloudScalingRiskOutcome(status=RISK_DECISION, …) at adapter.py:276",
+                "the terminal decision mint, and an inline class construction rather than "
+                "a call to a name. ADR §5 rules it must **not** be wrapped: wrapping it "
+                "would break `isinstance` and the dataclass path, and a mint counter that "
+                "changes the program under test measures the instrumentation. The two "
+                "other constructions in this module, at lines 312 and 356, are the "
+                "rejection and abstention outcomes — refusals, not mints.",
+            ),
+        ),
+        # No prior inventory: this is the package's first.
+        recorded=(),
+        # Eight, every one written *after* a measured sweep rather than predicted before
+        # it. The owner ruled the survivors closed by isolating tests wherever an
+        # isolating input exists: 92 of the 100 sites are scored and killed, and these
+        # eight are the residue where the input does not exist and the reason is shown
+        # positively. Guard-coverage ADR §7.3's four `# pragma: no cover` candidates are
+        # *not* granted automatically — `authenticity.py:543` and `identifiers.py:68` are
+        # scored and killed, and only `identifiers.py:88` and `adapter.py:266` earned the
+        # exclusion the pragma hinted at.
+        exclusions={
+            # --- identifiers.py -----------------------------------------------------
+            ("identifiers.py", "value not in CANONICAL_ACTION_TYPES"): (
+                "unreachable-behind-earlier-guard",
+                "The value check can only fire for an `ActionKind` member whose value is "
+                "outside the ratified set, and the import-time drift guard 20 lines above "
+                "refuses to import at all when any such member exists. The `isinstance` "
+                "check on the line above has already established that the argument is a "
+                "genuine member, so between the two there is no input that reaches this "
+                "one with a value it would reject. The import guard itself is scored, and "
+                "killed by installing a controller resolution that renames a kind.",
+                "tests/test_guard_coverage.py::"
+                "test_every_ratified_action_kind_is_admitted_so_the_value_check_"
+                "cannot_fire",
+            ),
+            # --- projection.py ------------------------------------------------------
+            ("projection.py", "candidates[0][1] is None"): (
+                "diagnostic-only",
+                "Named successor: the `value is None` check inside the loop three lines "
+                "below, which raises the same `ProjectionError` for the same input — "
+                "`forecast_evidence_digest` is `candidates[0]`, so it is the first the "
+                "loop reaches. Measured: with the guard removed the message changes from "
+                "'required (ADR §6)' to 'required and must not be None' and nothing else "
+                "does. ADR Phase 5 §9.1 makes the message prose, so this is a positive "
+                "showing of diagnostic-only rather than an inference from a shared class.",
+                "tests/test_guard_coverage.py::"
+                "test_the_forecast_digest_guard_shares_its_outcome_with_the_loop_"
+                "below_it",
+            ),
+            # --- adapter.py: the two defensive revalidations -------------------------
+            # Keyed by enclosing function: both read `_validate_authenticated_output(
+            # authenticated)` in the same module, so the two-element key names two guards
+            # and `classify()` refuses to guess. Their reachability is identical, but the
+            # key has to say which is which.
+            (
+                "adapter.py",
+                "_validate_authenticated_output(authenticated)",
+                "CloudScalingRiskAdapter.project",
+            ): (
+                "unreachable-behind-earlier-guard",
+                "The token was produced by `authenticate_controller_output` on the line "
+                "above, and every token it returns is built by one of the two "
+                "`Authenticated*` constructors, each of which runs this same validation "
+                "in its own `__post_init__`. An invalid token therefore cannot come into "
+                "existence. `project` takes a *source*, never a token, so no "
+                "caller-supplied value reaches this call. The package's own comment says "
+                "as much — 'redundant *now* — which is the point' — and the guards inside "
+                "the function it calls are scored and killed, because a forged token does "
+                "reach *those*.",
+                "tests/test_guard_coverage.py::"
+                "test_no_invalid_authenticated_token_can_exist_to_reach_the_"
+                "revalidations",
+            ),
+            (
+                "adapter.py",
+                "_validate_authenticated_output(authenticated)",
+                "CloudScalingRiskAdapter.evaluate",
+            ): (
+                "unreachable-behind-earlier-guard",
+                "The same construction as the call in `project` above, inside gate 1's "
+                "`try` so a failure would produce a typed outcome rather than an escaping "
+                "exception. The token is produced two lines above by "
+                "`authenticate_controller_output`, so it has already been validated by "
+                "the constructor that built it.",
+                "tests/test_guard_coverage.py::"
+                "test_no_invalid_authenticated_token_can_exist_to_reach_the_"
+                "revalidations",
+            ),
+            # --- adapter.py: gate 3's two defence-in-depth handlers ------------------
+            ("adapter.py", "except RecommendationInputError: self._rejected(AdapterRejectionReason.UNSUPPORTED_INPUT_TYPE, str(exc), tenant_id=_safe_tenant(authenticated), subject_id=_safe_subject(authenticated), recommendation_digest=getattr(authenticated, 'recommendation_digest', None))"): (
+                "unreachable-behind-earlier-guard",
+                "`projection.py` raises no `RecommendationInputError` anywhere — measured "
+                "by AST over every `raise` in the module. The class is produced only by "
+                "authenticity's serialized-reconstruction paths, which gate 1 has already "
+                "run and which cannot run again inside `project_recommendation`. The arm "
+                "is kept because gate 3 re-runs the token check independently, and if the "
+                "two ever disagreed the stricter one must still produce a typed outcome.",
+                "tests/test_guard_coverage.py::"
+                "test_projection_raises_neither_input_nor_authenticity_errors_of_its_"
+                "own",
+            ),
+            ("adapter.py", "except RecommendationAuthenticityError: self._rejected(AdapterRejectionReason.RECOMMENDATION_DIGEST_MISMATCH, str(exc), tenant_id=_safe_tenant(authenticated), subject_id=_safe_subject(authenticated), recommendation_digest=getattr(authenticated, 'recommendation_digest', None))"): (
+                "unreachable-behind-earlier-guard",
+                "The same shape as the arm above. `projection.py` raises no "
+                "`RecommendationAuthenticityError` of its own; the only route to one is "
+                "`_validate_authenticated_recommendation`, which cannot fail on a token "
+                "that both the `Authenticated*` constructor and gate 1 have validated. "
+                "This is the site guard-coverage ADR §4.1 reports as the audit's single "
+                "survivor, and the sweep reproduces that survival exactly — the reason it "
+                "survives is reachability, not a gap in the suite.",
+                "tests/test_guard_coverage.py::"
+                "test_projection_raises_neither_input_nor_authenticity_errors_of_its_"
+                "own",
+            ),
+            # --- adapter.py: the trusted-time re-check and the seam-return check ------
+            ("adapter.py", "request.evaluation_time is not None"): (
+                "unreachable-behind-earlier-guard",
+                "`projection.py:139` refuses any projection whose request carries an "
+                "evaluation time, and the projection has no parameter through which to "
+                "supply one, so the request re-checked here is always one that guard "
+                "admitted. Kept as defence in depth: it is what stops a future refactor "
+                "quietly forwarding a caller's clock.",
+                "tests/test_guard_coverage.py::"
+                "test_every_projection_carries_no_evaluation_time",
+            ),
+            ("adapter.py", "not isinstance(decision, SubjectRiskDecision)"): (
+                "diagnostic-only",
+                "Named successor: `outcomes.py:131`, which raises the same "
+                "`NonExecutableInvariantError` for every value that would fail here — a "
+                "seam return that is not a `SubjectRiskDecision` cannot satisfy the "
+                "outcome's own check either. Measured: removing this guard changes the "
+                "diagnosis from 'the evaluation seam must return a canonical "
+                "SubjectRiskDecision' to 'a RISK_DECISION outcome requires a canonical "
+                "SubjectRiskDecision', and nothing else. Naming the seam is what tells an "
+                "integrator which collaborator broke its contract.",
+                "tests/test_guard_coverage.py::"
+                "test_the_seam_return_check_shares_its_outcome_with_the_outcome_"
+                "dataclass",
+            ),
+        },
     ),
     "policy-authenticity": PackageConfig(
         key="policy-authenticity",
@@ -385,6 +660,11 @@ class Guard:
     #: "else-arm" — the terminal ``else`` of a dispatch whose body refuses, neutralised
     #: by replacing that body with ``pass`` (guard-coverage ADR §4.3). An ``else`` has no
     #: header to rewrite, so ``if False:`` cannot reach it.
+    #: "except-arm" — an ``except`` handler whose body returns a typed rejection,
+    #: neutralised by collapsing the reason member it returns to a sentinel
+    #: (guard-coverage ADR §4.1). The refusal itself is left intact, so a test that only
+    #: asks "was something rejected?" cannot see the mutation; only a test that reads
+    #: *which* reason the caller was owed can.
     kind: str = "if"
     span: tuple = ()
     recorded_in: str = ""
@@ -392,6 +672,24 @@ class Guard:
     scored: bool = False
     excluded_because: str = ""
     killed_by: list = field(default_factory=list)
+    #: How many invariants this one static site decides — guard-coverage ADR §7.2, ruled
+    #: at ratification. A guard inside ``for flag in _AUTHORITY_FLAGS:`` is **one** site
+    #: with a recorded multiplicity, not seven scored sites: one mutation neutralises all
+    #: of them together, so a kill shows only that at least one is tested. The number is
+    #: read from the iterated constant rather than written down, because a multiplicity
+    #: nobody can re-derive is a multiplicity nobody can defend — and because the audit
+    #: that wrote "7" was reading one of the loops and generalising to the other.
+    #: The discrimination burden this leaves on the tests is §6's within-class criterion,
+    #: and it is what ``tests/test_authority_flag_multiplicity.py`` measures.
+    multiplicity: int = 1
+    #: For ``except-arm`` only: the vocabulary and member the arm returns, so ``mutate``
+    #: collapses within the arm's own enum and the inventory names what was collapsed.
+    collapse_vocabulary: str = ""
+    collapse_member: str = ""
+    #: The enclosing ``def`` (``Class.method`` where there is one), used *only* to
+    #: disambiguate an exclusion key. Deliberately not emitted: adding it to the
+    #: inventory would rewrite four checked-in files to disambiguate a handful of rows.
+    function: str = ""
 
 
 #: The vocabularies every package is read as publishing. A package that names its own
@@ -533,6 +831,255 @@ def _helper_admission_sites(tree, module_level_helpers: frozenset) -> list:
     return sites
 
 
+def _except_arm_members(handler, vocabularies: frozenset) -> list:
+    """Every ``(return, member)`` pair in this handler that names a reason member.
+
+    Returned in source order, so a handler whose body names more than one member has a
+    determinate first one rather than whichever ``ast.walk`` happened to reach first.
+    """
+
+    named = []
+    for statement in handler.body:
+        for inner in ast.walk(statement):
+            if not isinstance(inner, ast.Return) or inner.value is None:
+                continue
+            for member in ast.walk(inner.value):
+                if (
+                    isinstance(member, ast.Attribute)
+                    and isinstance(member.value, ast.Name)
+                    and member.value.id in vocabularies
+                ):
+                    named.append((inner, member))
+    return sorted(named, key=lambda row: (row[1].lineno, row[1].col_offset))
+
+
+def _except_arm_sites(tree, config: PackageConfig) -> tuple:
+    """``except`` arms that return a typed rejection — guard-coverage ADR §4.1 (D-GC-3).
+
+    *The class, decidable from the AST alone:* an ``except`` handler whose body contains a
+    ``return`` whose value names a member of the package's reason vocabulary. The member
+    need not *be* the returned value — ``return self._rejected(Reason.X, str(exc))`` names
+    it as an argument, which is the idiom every one of ``risk-integration``'s ten arms
+    uses — so the whole returned expression is searched.
+
+    *Why these are invisible in both directions today.* ``inventory()`` gives them no row
+    because they are not ``ast.If``; ``excluded()`` counts them zero times because it
+    discloses only ``except`` arms that **raise**, and none of the ten does. A site absent
+    from the numerator *and* from the disclosed denominator is not a conservative
+    omission — it is a coverage claim about gates nobody measured.
+
+    *Why an arm with no declared sentinel is refused rather than skipped.* Collapsing a
+    member of one vocabulary to a sentinel of another would not weaken the refusal, it
+    would change the program into one that cannot type-check its own outcome — and the
+    resulting failure would be scored as a kill the guard never earned. So an arm whose
+    only reason members belong to a vocabulary with no entry in
+    ``reason_collapse_sentinels`` is returned as *undeclared* and fails the inventory run,
+    where a reader can see the vocabulary that needs an operator.
+
+    *One row per handler.* Where a handler names more than one member, the first in source
+    order is the one collapsed, and the rest are not separately inventoried — the same
+    shape of limitation ``_else_arm_sites`` records, and latent for the same reason: no
+    handler in either configured package names two. ``_except_arm_members`` also walks a
+    nested ``def`` or ``lambda`` inside a handler, so a ``return`` from one would be
+    attributed to the enclosing handler; likewise latent, and likewise recorded rather
+    than narrowed here.
+
+    Returns ``(sites, undeclared)``.
+    """
+
+    vocabularies = _reason_vocabularies(config)
+    sites = []
+    undeclared = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ExceptHandler):
+            continue
+        named = _except_arm_members(node, vocabularies)
+        if not named:
+            continue
+        collapsible = [
+            row for row in named
+            if row[1].value.id in config.reason_collapse_sentinels
+        ]
+        if not collapsible:
+            undeclared.append((node.lineno, sorted({m.value.id for _, m in named})))
+            continue
+        statement, member = collapsible[0]
+        sites.append((node, statement, member))
+    return sites, undeclared
+
+
+def undeclared_except_arms(config: PackageConfig) -> list:
+    """``except`` arms in the class that no declared sentinel can collapse.
+
+    Reported by ``--inventory-only`` as a hard failure rather than counted as zero: the
+    alternative is a package that quietly inventories fewer arms than its own reason
+    vocabularies produce.
+    """
+
+    if "except-arm" not in config.decision_classes:
+        return []
+    found = []
+    for module in config.module_order:
+        tree = ast.parse((config.src / module).read_text(encoding="utf-8"))
+        _sites, undeclared = _except_arm_sites(tree, config)
+        found += [
+            f"{module}:{lineno} returns {', '.join(vocabularies)} — no sentinel declared"
+            for lineno, vocabularies in undeclared
+        ]
+    return sorted(found)
+
+
+def _enclosing_functions(tree) -> dict:
+    """``id(node)`` → the ``def`` it sits in, as ``Class.method`` or ``function``.
+
+    Exists for one job: telling two guards apart when their ``(module, condition)`` key
+    does not. ``adapter.py`` calls ``_validate_authenticated_output(authenticated)`` from
+    both ``project`` and ``evaluate``, so the key names two guards and ``classify()``
+    refuses to guess which an exclusion means — correctly, since silently covering both
+    is exactly the failure that check exists to prevent.
+
+    Not part of the key by default. Every package here has colliding keys, so qualifying
+    all of them would rewrite four checked-in inventories to disambiguate the few rows
+    anyone actually needs to name.
+    """
+
+    functions = {}
+
+    def descend(node, prefix: str, current: str) -> None:
+        for child in ast.iter_child_nodes(node):
+            inner = current
+            inner_prefix = prefix
+            if isinstance(child, ast.ClassDef):
+                inner_prefix = f"{prefix}{child.name}."
+            elif isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                inner = f"{prefix}{child.name}"
+                # A nested ``def`` qualifies further; a method does not re-qualify.
+                inner_prefix = ""
+            functions[id(child)] = inner
+            descend(child, inner_prefix, inner)
+
+    descend(tree, "", "")
+    return functions
+
+
+def _loop_multiplicity(tree) -> dict:
+    """``id(node)`` → how many times the enclosing loops run it — ADR §7.2's multiplicity.
+
+    Only loops over a **module-level name bound once to a literal sequence** count,
+    because only those have a length the engine can read off the source. ``for flag in
+    _AUTHORITY_FLAGS:`` qualifies; ``for row in rows:`` does not, and gets multiplicity 1
+    rather than a guess.
+
+    Nested qualifying loops multiply. A ``for``-``else`` arm does not: it runs once
+    regardless of the iterable's length.
+
+    Three ways this used to be wrong, each measured on a synthetic tree before being
+    closed. Two of them over-counted, which is the direction that matters: a multiplicity
+    is a claim about how many invariants one mutation neutralises, and an inflated one
+    credits a site with invariants it does not decide.
+
+    * **Annotated constants were invisible.** ``FLAGS: Final = ("a", "b")`` is an
+      ``AnnAssign``, not an ``Assign``, so a real constant read as multiplicity 1. This
+      package already writes ``PROJECTION_SCHEMA_VERSION: Final[str]``, so the shape is
+      one edit away from a flag tuple.
+    * **A rebound name kept its first length.** A name assigned twice at module level, or
+      extended with ``+=``, is not a constant this function can size, so any name bound
+      more than once is dropped rather than sized from whichever binding came first.
+    * **A local or parameter of the same name inherited the module's length.** The
+      function does not resolve scopes, so a ``def f(_AUTHORITY_FLAGS):`` shadowing the
+      module constant used to multiply by the module's length. Names bound anywhere
+      inside the enclosing function — parameter, assignment, ``for`` target, ``with`` or
+      comprehension target — are therefore dropped for that function's subtree.
+    """
+
+    counts = {}
+    annotated = []
+    for node in tree.body:
+        if isinstance(node, ast.Assign):
+            targets = [t for t in node.targets if isinstance(t, ast.Name)]
+            value = node.value
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            targets = [node.target]
+            value = node.value
+        elif isinstance(node, ast.AugAssign) and isinstance(node.target, ast.Name):
+            # ``FLAGS += (...)`` rebinds; the name is no longer a single literal.
+            counts[node.target.id] = counts.get(node.target.id, 0) + 2
+            continue
+        else:
+            continue
+        for target in targets:
+            counts[target.id] = counts.get(target.id, 0) + 1
+        annotated.append((targets, value))
+
+    sizes = {}
+    for targets, value in annotated:
+        if (
+            isinstance(value, ast.Call)
+            and getattr(value.func, "id", None) in {"frozenset", "tuple", "set", "list"}
+            and value.args
+        ):
+            value = value.args[0]
+        if not isinstance(value, (ast.Tuple, ast.List, ast.Set)) or not value.elts:
+            continue
+        if not all(isinstance(element, ast.Constant) for element in value.elts):
+            continue
+        for target in targets:
+            sizes[target.id] = len(value.elts)
+    # Bound more than once at module level: not a constant, whatever the first binding was.
+    sizes = {name: size for name, size in sizes.items() if counts.get(name) == 1}
+
+    multiplicity = {}
+
+    def descend(node, factor: int, visible: dict) -> None:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+            visible = {
+                name: size for name, size in visible.items()
+                if name not in _names_bound_in(node)
+            }
+        for name, value in ast.iter_fields(node):
+            children = value if isinstance(value, list) else [value]
+            inner = factor
+            if (
+                isinstance(node, ast.For)
+                and name == "body"
+                and isinstance(node.iter, ast.Name)
+            ):
+                inner = factor * visible.get(node.iter.id, 1)
+            for child in children:
+                if isinstance(child, ast.AST):
+                    multiplicity[id(child)] = inner
+                    descend(child, inner, visible)
+
+    descend(tree, 1, sizes)
+    return multiplicity
+
+
+def _names_bound_in(node) -> set:
+    """Every name this function binds — so a shadowed module constant stops being one.
+
+    Parameters included, because a parameter is the case that made this necessary: a
+    ``def f(_AUTHORITY_FLAGS):`` iterating its own argument was multiplied by the module
+    constant's length, crediting one static guard with seven invariants it never decided.
+    """
+
+    bound = set()
+    arguments = getattr(node, "args", None)
+    if isinstance(arguments, ast.arguments):
+        for group in (
+            arguments.posonlyargs, arguments.args, arguments.kwonlyargs,
+        ):
+            bound.update(argument.arg for argument in group)
+        for solo in (arguments.vararg, arguments.kwarg):
+            if solo is not None:
+                bound.add(solo.arg)
+    for inner in ast.walk(node):
+        if isinstance(inner, ast.Name) and isinstance(inner.ctx, (ast.Store, ast.Del)):
+            bound.add(inner.id)
+        elif isinstance(inner, (ast.Global, ast.Nonlocal)):
+            bound.update(inner.names)
+    return bound
+
+
 def _else_arm_sites(tree, config: PackageConfig, helpers: frozenset) -> list:
     """Terminal ``else`` arms whose body refuses — guard-coverage ADR §4.3 (D-GC-5).
 
@@ -543,24 +1090,55 @@ def _else_arm_sites(tree, config: PackageConfig, helpers: frozenset) -> list:
     ``elif`` chains are excluded: an ``elif`` is an ``If`` of its own and is already
     inventoried on the ``if`` layer with its own condition.
 
-    **Known limitation, latent in both swept packages.** A nested ``if/else`` inside an
-    ``else`` yields two rows whose spans nest, because the outer arm's body *reaches* the
-    inner refusal. Mutating the outer one deletes the inner dispatch with it, so one
-    refusal is counted and killed twice — denominator inflation, never a false kill. The
-    class has no such member here: ``capacity-bounds-policy`` has zero ``else-arm`` rows,
-    and the one member the ADR found in ``risk-integration`` (``authenticity.py:432``) is
-    a bare ``else: raise``. Narrowing the class to arms that refuse *directly* would fix
-    it, but that narrows a ratified definition, so it is recorded for the owner rather
-    than decided here.
+    **Direct refusal only — ruled by the owner, 2026-08-30.** An arm qualifies when its
+    *own* statements refuse. An arm that merely *contains* a nested ``if`` which refuses
+    does not, even though §9.1's reach language would admit it.
+
+    The ruling settled a real conflict rather than a stylistic one. Under the reach
+    reading this package had two members, and the second was ``outcomes.py:159``, whose
+    mutation span ``(160,12)-(171,17)`` contains guards ``outcomes.py:160``, ``164`` and
+    ``168`` — all separately inventoried. Measured before the narrowing, its mutant was
+    killed by the same two tests that kill 160 and 164: a row that inflated numerator and
+    denominator together and measured nothing the three inner rows did not already
+    measure. §8 item 3 named that exact site as not a member; the owner ruled with §8.3,
+    so the reach reading is narrowed here and the class has one member, as ratified.
+
+    ``elif`` chains stay excluded for the same reason they always were, and the nesting
+    limitation this docstring used to record is closed rather than disclosed: an arm whose
+    refusal is reached only through a nested dispatch is now outside the class, so no two
+    rows can have nesting spans.
     """
 
     sites = []
     for node in ast.walk(tree):
         if not isinstance(node, ast.If) or not node.orelse or _is_elif(node):
             continue
-        if _refusal_shape_of(node.orelse, config, helpers):
+        if _refusal_shape_of(_direct_statements(node.orelse), config, helpers):
             sites.append(node)
     return sites
+
+
+def _direct_statements(body) -> list:
+    """The arm's own statements, with any nested branch's *body* removed.
+
+    ``_refusal_shape_of`` walks whatever it is handed, so handing it the arm unmodified
+    asks "can this arm reach a refusal?". The ratified question is narrower — "does this
+    arm refuse?" — so a nested ``If``/``Try``/loop contributes its test and its iterable
+    but not the suites hanging off it. A ``with`` or a bare block is not a branch: its
+    body always runs when the arm runs, so it stays.
+    """
+
+    direct = []
+    for statement in body:
+        if isinstance(statement, (ast.If, ast.Try, ast.For, ast.While, ast.Match)):
+            # Keep the parts that execute unconditionally with the arm, drop the arms.
+            for name in ("test", "iter", "subject"):
+                held = getattr(statement, name, None)
+                if isinstance(held, ast.AST):
+                    direct.append(ast.Expr(value=held))
+            continue
+        direct.append(statement)
+    return direct
 
 
 def _else_lineno(lines, node) -> int:
@@ -747,8 +1325,15 @@ def inventory(config: PackageConfig) -> list:
                     found.append((node.lineno, node, shape))
             elif isinstance(node, ast.IfExp) and _selects_an_outcome(node):
                 found.append((node.lineno, node, "outcome selection"))
-        # The two additive decision classes, each enabled per package rather than
+        multiplicity = _loop_multiplicity(tree)
+        functions = _enclosing_functions(tree)
+        # The three additive decision classes, each enabled per package rather than
         # engine-wide — see ``PackageConfig.decision_classes`` for why.
+        if "except-arm" in config.decision_classes:
+            for handler, statement, member in _except_arm_sites(tree, config)[0]:
+                found.append(
+                    (handler.lineno, (handler, statement, member), "except-arm rejection")
+                )
         if "helper-admission" in config.decision_classes:
             for node in _helper_admission_sites(tree, module_level_helpers):
                 found.append((node.lineno, node, "helper-admission call"))
@@ -776,6 +1361,45 @@ def inventory(config: PackageConfig) -> list:
                             node.end_lineno,
                             node.end_col_offset,
                         ),
+                        multiplicity=multiplicity.get(id(node), 1),
+                        function=functions.get(id(node), ""),
+                    )
+                )
+                continue
+            if shape == "except-arm rejection":
+                handler, statement, member = node
+                guards.append(
+                    Guard(
+                        index=index,
+                        module=module,
+                        # The ``except`` line, which is where a reader looks for the arm.
+                        # The mutated span is the reason member several lines below it.
+                        lineno=handler.lineno,
+                        # Qualified by the whole returned expression, not just the handler
+                        # type and the member: ``adapter.evaluate`` catches
+                        # ``RecommendationAuthenticityError`` twice and returns
+                        # ``RECOMMENDATION_DIGEST_MISMATCH`` from both, so a shorter key
+                        # would name two arms at once and could not say which it meant.
+                        condition=(
+                            f"except {ast.unparse(handler.type) if handler.type else ''}: "
+                            f"{ast.unparse(statement.value)}"
+                        ),
+                        header_end=handler.lineno,
+                        is_elif=False,
+                        shape="typed-refusal return",
+                        recorded_in="",
+                        outcome=f"{member.value.id}.{member.attr}",
+                        kind="except-arm",
+                        span=(
+                            member.lineno,
+                            member.col_offset,
+                            member.end_lineno,
+                            member.end_col_offset,
+                        ),
+                        multiplicity=multiplicity.get(id(handler), 1),
+                                                function=functions.get(id(handler), ""),
+                        collapse_vocabulary=member.value.id,
+                        collapse_member=member.attr,
                     )
                 )
                 continue
@@ -796,6 +1420,8 @@ def inventory(config: PackageConfig) -> list:
                         outcome=", ".join(_outcome_names([node], config)),
                         kind="helper-admission",
                         span=_statement_span(node),
+                        multiplicity=multiplicity.get(id(node), 1),
+                        function=functions.get(id(node), ""),
                     )
                 )
                 continue
@@ -820,6 +1446,8 @@ def inventory(config: PackageConfig) -> list:
                             node.orelse[-1].end_lineno,
                             node.orelse[-1].end_col_offset,
                         ),
+                        multiplicity=multiplicity.get(id(node), 1),
+                        function=functions.get(id(node), ""),
                     )
                 )
                 continue
@@ -839,6 +1467,8 @@ def inventory(config: PackageConfig) -> list:
                     shape=shape,
                     recorded_in=recorded_in,
                     outcome=", ".join(_outcome_names(node.body, config)),
+                    multiplicity=multiplicity.get(id(node), 1),
+                    function=functions.get(id(node), ""),
                 )
             )
     return guards
@@ -927,9 +1557,24 @@ def mutate(config: PackageConfig, guard: Guard, workdir: Path) -> None:
     * ``else-arm`` — the ``else`` body is replaced by ``pass``, so an exact-type dispatch
       falls through silently instead of refusing: an unrecognised type is admitted rather
       than rejected (guard-coverage ADR §4.3).
+    * ``except-arm`` — the reason member the arm returns is collapsed to the sentinel
+      (guard-coverage ADR §4.1). The refusal is left intact and only its *reason* moves,
+      so this is authority-weakening in §9.4's sense — the caller is told something
+      general where a specific answer was owed — and a suite that only asserts "something
+      was rejected" cannot see it. That is the whole point: it measures the half of §9.1's
+      pair that a raise-or-not operator can never reach.
     """
 
     path = workdir / "src" / config.dist_name / guard.module
+    if guard.kind == "except-arm":
+        sentinel, alternate = config.reason_collapse_sentinels[guard.collapse_vocabulary]
+        # Never a no-op: an arm already producing the sentinel is collapsed to the
+        # alternate instead. A mutation that rewrote a member to itself would be scored
+        # SURVIVED and read as a coverage defect in a suite that has none.
+        target = sentinel if guard.collapse_member != sentinel else alternate
+        _replace_span(path, guard.span, f"{guard.collapse_vocabulary}.{target}")
+        return
+
     if guard.kind == "outcome-selection":
         lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
         # The ``else`` branch read back from the source, never reconstructed from the
@@ -1309,6 +1954,12 @@ def write_inventory(
             "",
         ]
         described = {
+            "except-arm": (
+                "`except` arms that return a typed rejection, neutralised by collapsing "
+                "the reason member to a sentinel (ADR §4.1). The refusal survives and "
+                "only the reason moves, so a suite that asks only whether *something* "
+                "was rejected cannot see the mutation"
+            ),
             "helper-admission": (
                 "statement-level calls to a raising helper, neutralised by deleting the call "
                 "(ADR §4.2). Neutralising the helper's own `if` proves the check works, not "
@@ -1322,6 +1973,37 @@ def write_inventory(
         for kind, count in counts.items():
             lines.append(f"* **{count} `{kind}`** — {described.get(kind, '')}.")
         lines.append("")
+    multiple = [g for g in guards if g.multiplicity > 1] if config.record_multiplicity else []
+    if multiple:
+        # Emitted only where a site actually carries more than one invariant, so a package
+        # with no such loop keeps a byte-identical inventory. The guard-coverage ADR §1
+        # forecloses renumbering the two Phase 5 inventories, and a section that appeared
+        # in every file saying "every multiplicity is 1" would rewrite all four.
+        lines += [
+            "## Static sites that decide more than one invariant",
+            "",
+            "Guard-coverage ADR §7.2, ruled at ratification: a guard inside a loop over a",
+            "fixed set of flags is **one** static site with a recorded semantic",
+            "multiplicity, not unrolled into one scored site per flag. One mutation",
+            "neutralises all of them together, so a kill shows only that *at least one* is",
+            "tested — the discrimination burden falls on the suite (§6's within-class",
+            "criterion), not on this count. Each multiplicity below is read from the",
+            "iterated constant in the source, not recorded by hand.",
+            "",
+            "| Module:line | Decides | Iterated over |",
+            "|---|---|---|",
+        ]
+        for g in multiple:
+            lines.append(
+                f"| `{g.module}:{g.lineno}` | {g.multiplicity} invariants | "
+                f"`{g.condition[:60]}` |"
+            )
+        lines += [
+            "",
+            f"So this package's {len(guards)} static guard sites decide "
+            f"{sum(g.multiplicity for g in guards)} invariants in total.",
+            "",
+        ]
     if config.uncovered_mints:
         lines += [
             "## Mint coverage, and what it does not cover",
@@ -1431,19 +2113,32 @@ def classify(config: PackageConfig, guards: list) -> dict:
     # but it is not unique. ``target.py`` carries three guards reading exactly
     # ``not isinstance(data, Mapping)``. An exclusion on such a key would silently cover
     # all three, so a key matching more than one guard is refused rather than resolved.
+    #
+    # A three-element key ``(module, condition, function)`` names the enclosing ``def``
+    # as well, for the case where the two-element one genuinely cannot say which guard is
+    # meant: ``adapter.py`` calls ``_validate_authenticated_output(authenticated)`` from
+    # both ``project`` and ``evaluate``, and the two have different reachability. This is
+    # a strict widening — every existing two-element key keeps its exact meaning, and the
+    # inventory is unchanged, because the function is used for matching only and is never
+    # emitted. Collision is still refused, now against whichever key length is declared.
     occupants = {}
     for guard in guards:
         occupants.setdefault((guard.module, guard.condition), []).append(guard.index)
+        occupants.setdefault(
+            (guard.module, guard.condition, guard.function), []
+        ).append(guard.index)
     colliding = sorted(
-        f"{module}: {condition} (guards {indices})"
-        for (module, condition), indices in occupants.items()
-        if len(indices) > 1 and (module, condition) in config.exclusions
+        f"{key[0]}: {key[1]} (guards {indices})"
+        for key, indices in occupants.items()
+        if len(indices) > 1 and key in config.exclusions
     )
 
     classified = {}
     matched = set()
     for guard in guards:
-        key = (guard.module, guard.condition)
+        key = (guard.module, guard.condition, guard.function)
+        if key not in config.exclusions:
+            key = (guard.module, guard.condition)
         if key in config.exclusions and len(occupants[key]) > 1:
             # Ambiguous: classified SCORED so the sweep still demands a kill, and reported
             # as invalid below so the run fails rather than quietly under-scoring.
@@ -1474,11 +2169,11 @@ def classify(config: PackageConfig, guards: list) -> dict:
                 "line": guard.lineno,
                 "condition": guard.condition,
             }
-    orphans = sorted(f"{module}: {condition}"
-                     for module, condition in set(config.exclusions) - matched)
+    orphans = sorted(f"{key[0]}: {key[1]}"
+                     for key in set(config.exclusions) - matched)
     invalid = sorted(
-        f"{module}: {condition}"
-        for (module, condition), (reason, detail, evidence) in config.exclusions.items()
+        f"{key[0]}: {key[1]}"
+        for key, (reason, detail, evidence) in config.exclusions.items()
         if reason not in EXCLUSION_REASONS or not detail.strip() or not evidence.strip()
     )
     return {
@@ -1596,6 +2291,14 @@ def main() -> int:
                     "shape": g.shape,
                     "recorded_in": g.recorded_in,
                     "outcome": g.outcome,
+                    # Present only where the package discloses multiplicity and the site
+                    # decides more than one invariant, so every other package keeps a
+                    # byte-identical inventory file.
+                    **(
+                        {"multiplicity": g.multiplicity}
+                        if config.record_multiplicity and g.multiplicity > 1
+                        else {}
+                    ),
                 }
                 for g in guards
             ],
@@ -1622,8 +2325,11 @@ def main() -> int:
             + "\n"
         )
         write_inventory(config, guards, agreement, leftout, verdict)
+        undeclared = undeclared_except_arms(config)
+        for problem in undeclared:
+            print(f"  EXCEPT ARM HAS NO COLLAPSE SENTINEL: {problem}", file=sys.stderr)
         if (verdict["orphan_exclusions"] or verdict["invalid_exclusions"]
-                or verdict["colliding_exclusions"]):
+                or verdict["colliding_exclusions"] or undeclared):
             for problem in verdict["colliding_exclusions"]:
                 print(f"  EXCLUSION KEY IS AMBIGUOUS: {problem}", file=sys.stderr)
             for problem in verdict["orphan_exclusions"]:

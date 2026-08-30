@@ -121,9 +121,22 @@ def test_the_package_declares_exactly_two_first_party_dependencies():
 def test_the_adapter_is_a_one_way_leaf():
     """Neither dependency may import this package back."""
 
+    import os
     import pathlib
 
-    repo = pathlib.Path(pkg.__file__).resolve().parents[5]
+    # ``UGENCE_REPO_ROOT`` first, then the level count. Counting levels from the package
+    # is correct in the repository and wrong everywhere else: under a guard-sweep copy at
+    # ``/tmp/ugence-sweep-<key>/<dir>`` the fifth parent resolves to ``/``, both trees
+    # below fail their ``.exists()`` assertion, and the whole sweep is voided by a red
+    # baseline. This is the same defect the guard-coverage ADR §7.1 fixed in this
+    # package's ``conftest.py``, in a test rather than in the conftest, and the override
+    # is the convention that fix adopted.
+    declared = os.environ.get("UGENCE_REPO_ROOT")
+    repo = (
+        pathlib.Path(declared).resolve()
+        if declared
+        else pathlib.Path(pkg.__file__).resolve().parents[5]
+    )
     for tree in (
         repo / "packages" / "capabilities" / "cloud-scaling-controller" / "src",
         repo / "packages" / "risk_authority" / "src",
@@ -137,14 +150,27 @@ def test_the_adapter_is_a_one_way_leaf():
 
 
 def test_the_controller_still_has_no_risk_authority_import():
-    """The controller must remain an advisory leaf (ADR acceptance invariant)."""
+    """The controller must remain an advisory leaf (ADR acceptance invariant).
 
+    Resolved the same way as ``test_the_adapter_is_a_one_way_leaf`` above, and for a
+    sharper reason: this one has no ``.exists()`` assertion, so under the level count
+    alone it did not fail in a guard-sweep copy — it *passed having asserted nothing*.
+    ``rglob`` over a directory that is not there yields no paths, so the loop body never
+    ran and the test contributed no killing power to any mutant. A test that fails open
+    is worse than one that fails closed, so the override comes with the assertion.
+    """
+
+    import os
     import pathlib
 
-    tree = (
-        pathlib.Path(pkg.__file__).resolve().parents[5]
-        / "packages" / "capabilities" / "cloud-scaling-controller" / "src"
+    declared = os.environ.get("UGENCE_REPO_ROOT")
+    repo = (
+        pathlib.Path(declared).resolve()
+        if declared
+        else pathlib.Path(pkg.__file__).resolve().parents[5]
     )
+    tree = repo / "packages" / "capabilities" / "cloud-scaling-controller" / "src"
+    assert tree.exists(), tree
     for path in tree.rglob("*.py"):
         source = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(source):
