@@ -37,9 +37,11 @@ type test.
 `[G]` **Nothing else about the `0.3.0` disclosure changes.** Execution end to end
 remains outside this package. `S2B-PF-G=B` authorizes this hardening and nothing
 adjacent to it, so the four present-tense sites at design `§8.1` were **not** touched
-by this release; they were corrected afterwards, under the separate owner ruling
-`STALE_SITES=ALL_FOUR`, which is why the `0.3.0` block below now reads as a record of
-that release rather than as a current fact.
+by the `0.3.1` release itself. They were **subsequently corrected by this
+documentation-only maintenance change** (`STALE_SITES=ALL_FOUR`), which is why the
+`0.3.0` block below now reads as a record of that release rather than as a current
+fact. That maintenance changed prose only: no behaviour, assertion, public name or
+version moved with it.
 
 0.3.0 is the S2-B Reasoning Strategy Permission release. It adds five names to the
 curated surface — ``ReasoningStrategy``, ``StrategyPolicyResolver``,
