@@ -119,12 +119,22 @@ jobs:
             default='${{ github.event.repository.default_branch }}'
             git fetch --no-tags origin \
               "+refs/heads/${default}:refs/remotes/origin/ratchet-base"
-            if [ "$(git rev-parse refs/remotes/origin/ratchet-base)" = "${head}" ]; then
+            if git merge-base --is-ancestor "${head}" refs/remotes/origin/ratchet-base; then
               # A push ON the default branch. `merge-base HEAD default` is HEAD itself here,
               # which is how this gate came to be vacuous on every default-branch merge before
               # 5B-3: runs 3, 11, 15 and 19 all reported no movement because they compared the
               # merged result against itself. The honest "before" is the commit this one landed
               # on top of — for a merge commit, its first parent, i.e. the previous default tip.
+              #
+              # Ancestor test, not equality. This arm used to require the fetched tip to EQUAL
+              # HEAD, so it recognised a default-branch push only while the ref had not moved
+              # again. Run 33317988740 (the PR #1516 merge) measured the race: PR #1515 landed
+              # on the branch four minutes later, the fetch above saw the newer tip, the
+              # equality test missed, and the merge-base fallback resolved to HEAD itself —
+              # tripping the vacuity guard below with zero tests run, identically on re-run. A
+              # HEAD that is an ancestor of (or equal to) the default tip is ON the default
+              # branch, however far the ref has advanced since, and its honest "before" is
+              # still its own first parent.
               base=$(git rev-parse "HEAD^1")
               source='first parent (push on the default branch)'
             else
