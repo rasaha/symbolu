@@ -22,10 +22,12 @@ the guard being narrowed to accommodate them.
 `[R]` **What none of this establishes.** Nothing here proves a model's private
 reasoning became deterministic, that the producer internally followed the token it
 declared, or that the declared procedure was *executed*. The S2-B ADR's §6 is the
-standard and this module does not widen it. `[G]` Execution end to end remains blocked
-regardless: no strategy-permission policy family is registered with Policy Authority,
-which is why every resolver here is a **stub** on the ``DomainEvaluationProvider``
-precedent.
+standard and this module does not widen it. Every resolver here is a **stub**, on the
+``DomainEvaluationProvider`` precedent, because this package owns the protocol and
+implements no resolver — not because none exists. A concrete resolver and a policy
+family now live in separate integration distributions outside this package, and the
+end-to-end proof belongs to them; nothing here depends on either, and these guards run
+with no policy authority present anywhere.
 """
 from __future__ import annotations
 

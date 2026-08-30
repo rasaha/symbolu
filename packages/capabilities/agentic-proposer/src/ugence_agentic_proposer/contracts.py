@@ -836,10 +836,14 @@ class DomainEvaluationProvider(Protocol):
 # plugin-loading mechanism of any kind, and imports no concrete resolver. The
 # injected object is a plain in-process callable, nothing more.
 #
-# `[G]` **Disclosed, and not this package's to fix: no strategy-permission policy
-# family is registered with Policy Authority**, so nothing here can EXECUTE end to
-# end today. That blocks execution, not implementation — the protocol is injected, on
-# the ``DomainEvaluationProvider`` precedent.
+# **Not this package's to supply, and no longer absent.** A strategy-permission policy
+# family and a concrete resolver now exist, as separate integration distributions
+# outside this package (`§10` steps 2-4 of
+# ``docs/architecture/S2B_STRATEGY_PERMISSION_POLICY_FAMILY_AND_RESOLVER_DESIGN.md``),
+# and end-to-end resolution is proven by their own tests rather than asserted here.
+# `[G]` **Whether any given deployment has one registered is outside this package and
+# unknowable from here**: the protocol is injected, on the ``DomainEvaluationProvider``
+# precedent, and this package registers nothing and holds no registry.
 # --------------------------------------------------------------------------- #
 
 

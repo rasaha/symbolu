@@ -48,11 +48,17 @@ the retyped ``ProposerProcessRecord.declared_strategy``, the changed builder
 signatures, the replay function and the tests (`S2B-S1-Q7=A`, on the I8 ordering OD-7
 part 8 established: never ahead of the code and tests it describes).
 
-`[G]` **Execution remains blocked, and this release does not unblock it**: no
-strategy-permission policy family is registered with Policy Authority. The
-``StrategyPolicyResolver`` protocol is injected and this package implements no
-resolver, on the ``DomainEvaluationProvider`` precedent, so the capability is
-implemented and testable against a stub but cannot run end to end today.
+`[G]` **Execution was blocked at this release, and this release did not unblock
+it**: no strategy-permission policy family was registered with Policy Authority when
+`0.3.0` shipped. The ``StrategyPolicyResolver`` protocol is injected and this package
+implements no resolver, on the ``DomainEvaluationProvider`` precedent, so at `0.3.0`
+the capability was implemented and testable against a stub but could not run end to
+end. **That statement is scoped to `0.3.0` and is no longer current**: the family
+package and the concrete resolver landed afterwards, outside this distribution, as
+`§10` steps 2–4 of
+``docs/architecture/S2B_STRATEGY_PERMISSION_POLICY_FAMILY_AND_RESOLVER_DESIGN.md``.
+This package still implements no resolver and registers nothing, which was never the
+blocker and has not changed.
 
 0.2.0 is the additive S2 public-surface release implementing OD-7, OD-8, OD-9 and
 OD-10 (``docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md``). It adds seven names to the
