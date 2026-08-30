@@ -1,0 +1,520 @@
+{
+  "schema": "p3e-container-gate-definition.v1",
+  "title": "Canonical P3E container gate definition",
+  "status": "RETIRED_SUPERSEDED",
+  "owner": "rasaha",
+  "owner_confirmed_on": "2026-08-29",
+  "published_on": "2026-08-29",
+  "purpose": "Establish the canonical identifier set for the P3E container gates and record, per gate, what can be established from evidence. This file defines gates only; it records no execution result. Gate execution state lives in CONTAINER_RUNTIME_CAPABILITY.json and CONTAINER_COMPLETION_LIVE_STATE.json.",
+  "scope": "exactly C2 and C4 through C19 (17 identifiers). C1 and C3 are deliberately out of scope: neither appears in any P3E record.",
+  "canonical_identifiers": [
+    "C2",
+    "C4",
+    "C5",
+    "C6",
+    "C7",
+    "C8",
+    "C9",
+    "C10",
+    "C11",
+    "C12",
+    "C13",
+    "C14",
+    "C15",
+    "C16",
+    "C17",
+    "C18",
+    "C19"
+  ],
+  "canonical_identifier_count": 17,
+  "deprecated_aliases": {
+    "C16-image": {
+      "canonical": "C16",
+      "status": "DEPRECATED_NONCANONICAL_ALIAS"
+    },
+    "C17-image": {
+      "canonical": "C17",
+      "status": "DEPRECATED_NONCANONICAL_ALIAS"
+    }
+  },
+  "alias_basis": "owner decision by rasaha on 2026-08-29: C16-image and C17-image are deprecated, noncanonical aliases of C16 and C17 and are not distinct additional gates. This is a ratified decision, not a reconstruction from evidence.",
+  "reconstruction_method": {
+    "permitted_evidence_sources": [
+      ".github/workflows/governance-studio-p3e-private-hosted-ci.yml",
+      "deployment/governance-studio/tests/",
+      "deployment/governance-studio/ci/ verification scripts",
+      "Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/ (tracked markdown twins of the P3E audit records; added to the permitted set by owner decision, rasaha, 2026-08-29)"
+    ],
+    "finding": "The workflow, the deployment tests and the CI scripts contain no C-prefixed gate identifier at all. Gate definitions exist only in the markdown twins of the P3E audit records, and they define two gates individually and the rest only as a group.",
+    "corroborating_finding": "verify_container.sh annotates its checks with section markers of a 'P3E completion' specification (sections 4, 6, 7, 8, 10, 11, 13). That specification is not present in the repository, and section numbers are a different numbering scheme from the C identifiers; they are recorded here as a lead, not as a mapping.",
+    "counting_check": "the container job carries 14 named steps, of which 12 predate the pin-conformance guard added alongside this definition, and two are scaffolding rather than verification (evidence-dir-init and install-e2e-driver-deps). The checkout and setup-python actions carry no name and are not among the 14. That is fewer named steps than the 17 gate identifiers, so no positional or one-to-one correspondence can be derived either.",
+    "consequence": "C2 and C4 are DEFINED from the audit records. C5-C19 receive only a group property and remain individually UNKNOWN. No mapping was invented.",
+    "correction_2026_08_29": "An earlier version of this file stated that no permitted source contained any C-prefixed identifier and that the gates were 'defined nowhere'. That was true of docs/, apps/, deployment/ and .github/, but false of the repository: the tracked Project_documentation/ mirror was not searched and does define C2 and C4. The claim is withdrawn and replaced by the findings below.",
+    "completion_specification": {
+      "status": "ABSENT_FROM_REPOSITORY",
+      "evidence": "verify_container.sh, packaged_e2e.py and several deployment modules cite sections of a 'P3E completion' specification (sections 2-9 in the audit records; 4, 6, 7, 8, 10, 11, 13 in verify_container.sh; 20, 21, 25 in test_container_artifacts.py). A full sweep of the repository - including all 22 files mentioning P3E and the whole Project_documentation tree - finds no document containing that specification.",
+      "consequence": "the per-gate requirements it would supply are unavailable; do not repeat this search without a new source outside the repository",
+      "searched_on": "2026-08-29"
+    },
+    "pull_request_history_search": {
+      "status": "NEGATIVE",
+      "searched_on": "2026-08-29",
+      "scope": "PRs #1323 and #1325: descriptions, issue comments, reviews, review threads, every commit message, and the full file-level diff of each PR's own commits including deletions, across deployment/, apps/ugence-governance-studio/, docs/audits/ugence_governance_studio_p3*/ and the Project_documentation mirror",
+      "findings": [
+        "neither PR has any review, issue comment or review thread (all empty)",
+        "no file was deleted from any governance-studio, deployment or P3E audit path in either PR",
+        "no document resembling a P3E completion specification was added by either PR",
+        "PR #1325's only definitional content about the P3E container gates is the two sentences already recorded in this file from CONTAINER_RUNTIME_CAPABILITY.md",
+        "PR #1323 uses C2-C5 for an unrelated P3D frontend gate family (controlled what-if, WCAG contrast classification, tracked-source integrity, decoder plan states), confirming that C identifiers are phase-local and reused with different meanings, so no cross-phase inference is available"
+      ],
+      "conclusion": "C5 through C19 have no recoverable definition. The search is complete for sources inside this repository and its pull request history."
+    },
+    "counting_check_superseded": "the container job carries 13 named steps, of which 12 predate the pin-conformance guard added alongside this definition, and two of those are setup rather than verification (install-e2e-driver-deps and the checkout/setup actions). That is fewer named steps than the 17 gate identifiers, so no positional or one-to-one correspondence can be derived either.",
+    "counting_check_correction_2026_08_30": "Two successive corrections. The original wording said 13 named steps, written before evidence-dir-init existed. The first correction updated the count to 14 but still described three scaffolding steps, counting 'the checkout/setup actions' among the named steps - they carry no name and are not in that set, so only two of the 14 are scaffolding. Both superseded wordings are retained as provenance. The conclusion is unchanged throughout: the step count has never matched the identifier count, so no positional mapping is available."
+  },
+  "gates": {
+    "C2": {
+      "definition_status": "DEFINED_HISTORICAL_GATE",
+      "requirement": "digest-pinned base images",
+      "workflow_step": null,
+      "supporting_test_or_script": null,
+      "requires_container_runtime": true,
+      "requires_container_runtime_basis": "recorded under blocked_gates in CONTAINER_RUNTIME_CAPABILITY.json, whose container_gates_executable is false; that record attributes the blockage to registry access, so each listed gate depends on an image that cannot be built without a container runtime",
+      "evidence_required_before_passed": {
+        "floor_applies_to_all_gates": true,
+        "floor": [
+          "a real 'docker buildx build' of deployment/governance-studio/Dockerfile at its ratified base-image digests completed in the container job",
+          "the blocking ratified-pin-conformance and base-image-digest-verification steps passed in the same run",
+          "the gate's own step exited zero in that run, with its log or uploaded artifact retained"
+        ],
+        "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
+        "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
+      },
+      "definition_source": "Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:37",
+      "definition_quote": "**C2** (digest-pinned base images), **C4** (image build), and every gate that requires a **built/running image** (**C5-C19**) cannot execute here.",
+      "candidate_workflow_step": {
+        "step": "base-image-digest-verification",
+        "basis": "INFERRED_BY_NAME_AND_PURPOSE_MATCH - not asserted by any source",
+        "asserted": false
+      },
+      "corroborating_evidence": "Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:41 groups C2 with C15 and C18 as 'no real distro base to pin or scan', consistent with C2 being the pinning gate",
+      "historical_note": "defined by the P3E audit records and preserved as a historical gate; not executed, and not superseded by any proposal"
+    },
+    "C4": {
+      "definition_status": "DEFINED_HISTORICAL_GATE",
+      "requirement": "image build",
+      "workflow_step": null,
+      "supporting_test_or_script": null,
+      "requires_container_runtime": true,
+      "requires_container_runtime_basis": "recorded under blocked_gates in CONTAINER_RUNTIME_CAPABILITY.json, whose container_gates_executable is false; that record attributes the blockage to registry access, so each listed gate depends on an image that cannot be built without a container runtime",
+      "evidence_required_before_passed": {
+        "floor_applies_to_all_gates": true,
+        "floor": [
+          "a real 'docker buildx build' of deployment/governance-studio/Dockerfile at its ratified base-image digests completed in the container job",
+          "the blocking ratified-pin-conformance and base-image-digest-verification steps passed in the same run",
+          "the gate's own step exited zero in that run, with its log or uploaded artifact retained"
+        ],
+        "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
+        "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
+      },
+      "definition_source": "Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:37",
+      "definition_quote": "**C2** (digest-pinned base images), **C4** (image build), and every gate that requires a **built/running image** (**C5-C19**) cannot execute here.",
+      "candidate_workflow_step": {
+        "step": "container-build",
+        "basis": "INFERRED_BY_NAME_AND_PURPOSE_MATCH - not asserted by any source",
+        "asserted": false
+      },
+      "historical_note": "defined by the P3E audit records and preserved as a historical gate; not executed, and not superseded by any proposal"
+    },
+    "C5": {
+      "definition_status": "UNDEFINED_HISTORICAL_GATE",
+      "requirement": null,
+      "workflow_step": null,
+      "supporting_test_or_script": null,
+      "requires_container_runtime": true,
+      "requires_container_runtime_basis": "recorded under blocked_gates in CONTAINER_RUNTIME_CAPABILITY.json, whose container_gates_executable is false; that record attributes the blockage to registry access, so each listed gate depends on an image that cannot be built without a container runtime",
+      "evidence_required_before_passed": {
+        "floor_applies_to_all_gates": true,
+        "floor": [
+          "a real 'docker buildx build' of deployment/governance-studio/Dockerfile at its ratified base-image digests completed in the container job",
+          "the blocking ratified-pin-conformance and base-image-digest-verification steps passed in the same run",
+          "the gate's own step exited zero in that run, with its log or uploaded artifact retained"
+        ],
+        "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
+        "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
+      },
+      "unknown_reason": "recorded as an identifier without ever being defined. The specification that would define it does not exist in the repository, and the pull request history search recorded above is negative. No individual definition is recoverable; only the C5-C19 group property is established.",
+      "group_property": "member of C5-C19, defined collectively at Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:38 as 'every gate that requires a built/running image'. That is a group property, not this gate's individual requirement."
+    },
+    "C6": {
+      "definition_status": "UNDEFINED_HISTORICAL_GATE",
+      "requirement": null,
+      "workflow_step": null,
+      "supporting_test_or_script": null,
+      "requires_container_runtime": true,
+      "requires_container_runtime_basis": "recorded under blocked_gates in CONTAINER_RUNTIME_CAPABILITY.json, whose container_gates_executable is false; that record attributes the blockage to registry access, so each listed gate depends on an image that cannot be built without a container runtime",
+      "evidence_required_before_passed": {
+        "floor_applies_to_all_gates": true,
+        "floor": [
+          "a real 'docker buildx build' of deployment/governance-studio/Dockerfile at its ratified base-image digests completed in the container job",
+          "the blocking ratified-pin-conformance and base-image-digest-verification steps passed in the same run",
+          "the gate's own step exited zero in that run, with its log or uploaded artifact retained"
+        ],
+        "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
+        "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
+      },
+      "unknown_reason": "recorded as an identifier without ever being defined. The specification that would define it does not exist in the repository, and the pull request history search recorded above is negative. No individual definition is recoverable; only the C5-C19 group property is established.",
+      "group_property": "member of C5-C19, defined collectively at Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:38 as 'every gate that requires a built/running image'. That is a group property, not this gate's individual requirement."
+    },
+    "C7": {
+      "definition_status": "UNDEFINED_HISTORICAL_GATE",
+      "requirement": null,
+      "workflow_step": null,
+      "supporting_test_or_script": null,
+      "requires_container_runtime": true,
+      "requires_container_runtime_basis": "recorded under blocked_gates in CONTAINER_RUNTIME_CAPABILITY.json, whose container_gates_executable is false; that record attributes the blockage to registry access, so each listed gate depends on an image that cannot be built without a container runtime",
+      "evidence_required_before_passed": {
+        "floor_applies_to_all_gates": true,
+        "floor": [
+          "a real 'docker buildx build' of deployment/governance-studio/Dockerfile at its ratified base-image digests completed in the container job",
+          "the blocking ratified-pin-conformance and base-image-digest-verification steps passed in the same run",
+          "the gate's own step exited zero in that run, with its log or uploaded artifact retained"
+        ],
+        "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
+        "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
+      },
+      "unknown_reason": "recorded as an identifier without ever being defined. The specification that would define it does not exist in the repository, and the pull request history search recorded above is negative. No individual definition is recoverable; only the C5-C19 group property is established.",
+      "group_property": "member of C5-C19, defined collectively at Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:38 as 'every gate that requires a built/running image'. That is a group property, not this gate's individual requirement."
+    },
+    "C8": {
+      "definition_status": "UNDEFINED_HISTORICAL_GATE",
+      "requirement": null,
+      "workflow_step": null,
+      "supporting_test_or_script": null,
+      "requires_container_runtime": true,
+      "requires_container_runtime_basis": "recorded under blocked_gates in CONTAINER_RUNTIME_CAPABILITY.json, whose container_gates_executable is false; that record attributes the blockage to registry access, so each listed gate depends on an image that cannot be built without a container runtime",
+      "evidence_required_before_passed": {
+        "floor_applies_to_all_gates": true,
+        "floor": [
+          "a real 'docker buildx build' of deployment/governance-studio/Dockerfile at its ratified base-image digests completed in the container job",
+          "the blocking ratified-pin-conformance and base-image-digest-verification steps passed in the same run",
+          "the gate's own step exited zero in that run, with its log or uploaded artifact retained"
+        ],
+        "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
+        "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
+      },
+      "unknown_reason": "recorded as an identifier without ever being defined. The specification that would define it does not exist in the repository, and the pull request history search recorded above is negative. No individual definition is recoverable; only the C5-C19 group property is established.",
+      "group_property": "member of C5-C19, defined collectively at Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:38 as 'every gate that requires a built/running image'. That is a group property, not this gate's individual requirement."
+    },
+    "C9": {
+      "definition_status": "UNDEFINED_HISTORICAL_GATE",
+      "requirement": null,
+      "workflow_step": null,
+      "supporting_test_or_script": null,
+      "requires_container_runtime": true,
+      "requires_container_runtime_basis": "recorded under blocked_gates in CONTAINER_RUNTIME_CAPABILITY.json, whose container_gates_executable is false; that record attributes the blockage to registry access, so each listed gate depends on an image that cannot be built without a container runtime",
+      "evidence_required_before_passed": {
+        "floor_applies_to_all_gates": true,
+        "floor": [
+          "a real 'docker buildx build' of deployment/governance-studio/Dockerfile at its ratified base-image digests completed in the container job",
+          "the blocking ratified-pin-conformance and base-image-digest-verification steps passed in the same run",
+          "the gate's own step exited zero in that run, with its log or uploaded artifact retained"
+        ],
+        "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
+        "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
+      },
+      "unknown_reason": "recorded as an identifier without ever being defined. The specification that would define it does not exist in the repository, and the pull request history search recorded above is negative. No individual definition is recoverable; only the C5-C19 group property is established.",
+      "group_property": "member of C5-C19, defined collectively at Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:38 as 'every gate that requires a built/running image'. That is a group property, not this gate's individual requirement."
+    },
+    "C10": {
+      "definition_status": "UNDEFINED_HISTORICAL_GATE",
+      "requirement": null,
+      "workflow_step": null,
+      "supporting_test_or_script": null,
+      "requires_container_runtime": true,
+      "requires_container_runtime_basis": "recorded under blocked_gates in CONTAINER_RUNTIME_CAPABILITY.json, whose container_gates_executable is false; that record attributes the blockage to registry access, so each listed gate depends on an image that cannot be built without a container runtime",
+      "evidence_required_before_passed": {
+        "floor_applies_to_all_gates": true,
+        "floor": [
+          "a real 'docker buildx build' of deployment/governance-studio/Dockerfile at its ratified base-image digests completed in the container job",
+          "the blocking ratified-pin-conformance and base-image-digest-verification steps passed in the same run",
+          "the gate's own step exited zero in that run, with its log or uploaded artifact retained"
+        ],
+        "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
+        "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
+      },
+      "unknown_reason": "recorded as an identifier without ever being defined. The specification that would define it does not exist in the repository, and the pull request history search recorded above is negative. No individual definition is recoverable; only the C5-C19 group property is established.",
+      "group_property": "member of C5-C19, defined collectively at Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:38 as 'every gate that requires a built/running image'. That is a group property, not this gate's individual requirement."
+    },
+    "C11": {
+      "definition_status": "UNDEFINED_HISTORICAL_GATE",
+      "requirement": null,
+      "workflow_step": null,
+      "supporting_test_or_script": null,
+      "requires_container_runtime": true,
+      "requires_container_runtime_basis": "recorded under blocked_gates in CONTAINER_RUNTIME_CAPABILITY.json, whose container_gates_executable is false; that record attributes the blockage to registry access, so each listed gate depends on an image that cannot be built without a container runtime",
+      "evidence_required_before_passed": {
+        "floor_applies_to_all_gates": true,
+        "floor": [
+          "a real 'docker buildx build' of deployment/governance-studio/Dockerfile at its ratified base-image digests completed in the container job",
+          "the blocking ratified-pin-conformance and base-image-digest-verification steps passed in the same run",
+          "the gate's own step exited zero in that run, with its log or uploaded artifact retained"
+        ],
+        "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
+        "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
+      },
+      "unknown_reason": "recorded as an identifier without ever being defined. The specification that would define it does not exist in the repository, and the pull request history search recorded above is negative. No individual definition is recoverable; only the C5-C19 group property is established.",
+      "group_property": "member of C5-C19, defined collectively at Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:38 as 'every gate that requires a built/running image'. That is a group property, not this gate's individual requirement."
+    },
+    "C12": {
+      "definition_status": "UNDEFINED_HISTORICAL_GATE",
+      "requirement": null,
+      "workflow_step": null,
+      "supporting_test_or_script": null,
+      "requires_container_runtime": true,
+      "requires_container_runtime_basis": "recorded under blocked_gates in CONTAINER_RUNTIME_CAPABILITY.json, whose container_gates_executable is false; that record attributes the blockage to registry access, so each listed gate depends on an image that cannot be built without a container runtime",
+      "evidence_required_before_passed": {
+        "floor_applies_to_all_gates": true,
+        "floor": [
+          "a real 'docker buildx build' of deployment/governance-studio/Dockerfile at its ratified base-image digests completed in the container job",
+          "the blocking ratified-pin-conformance and base-image-digest-verification steps passed in the same run",
+          "the gate's own step exited zero in that run, with its log or uploaded artifact retained"
+        ],
+        "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
+        "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
+      },
+      "unknown_reason": "recorded as an identifier without ever being defined. The specification that would define it does not exist in the repository, and the pull request history search recorded above is negative. No individual definition is recoverable; only the C5-C19 group property is established.",
+      "group_property": "member of C5-C19, defined collectively at Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:38 as 'every gate that requires a built/running image'. That is a group property, not this gate's individual requirement."
+    },
+    "C13": {
+      "definition_status": "UNDEFINED_HISTORICAL_GATE",
+      "requirement": null,
+      "workflow_step": null,
+      "supporting_test_or_script": null,
+      "requires_container_runtime": true,
+      "requires_container_runtime_basis": "recorded under blocked_gates in CONTAINER_RUNTIME_CAPABILITY.json, whose container_gates_executable is false; that record attributes the blockage to registry access, so each listed gate depends on an image that cannot be built without a container runtime",
+      "evidence_required_before_passed": {
+        "floor_applies_to_all_gates": true,
+        "floor": [
+          "a real 'docker buildx build' of deployment/governance-studio/Dockerfile at its ratified base-image digests completed in the container job",
+          "the blocking ratified-pin-conformance and base-image-digest-verification steps passed in the same run",
+          "the gate's own step exited zero in that run, with its log or uploaded artifact retained"
+        ],
+        "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
+        "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
+      },
+      "unknown_reason": "recorded as an identifier without ever being defined. The specification that would define it does not exist in the repository, and the pull request history search recorded above is negative. No individual definition is recoverable; only the C5-C19 group property is established.",
+      "group_property": "member of C5-C19, defined collectively at Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:38 as 'every gate that requires a built/running image'. That is a group property, not this gate's individual requirement."
+    },
+    "C14": {
+      "definition_status": "UNDEFINED_HISTORICAL_GATE",
+      "requirement": null,
+      "workflow_step": null,
+      "supporting_test_or_script": null,
+      "requires_container_runtime": true,
+      "requires_container_runtime_basis": "recorded under blocked_gates in CONTAINER_RUNTIME_CAPABILITY.json, whose container_gates_executable is false; that record attributes the blockage to registry access, so each listed gate depends on an image that cannot be built without a container runtime",
+      "evidence_required_before_passed": {
+        "floor_applies_to_all_gates": true,
+        "floor": [
+          "a real 'docker buildx build' of deployment/governance-studio/Dockerfile at its ratified base-image digests completed in the container job",
+          "the blocking ratified-pin-conformance and base-image-digest-verification steps passed in the same run",
+          "the gate's own step exited zero in that run, with its log or uploaded artifact retained"
+        ],
+        "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
+        "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
+      },
+      "unknown_reason": "recorded as an identifier without ever being defined. The specification that would define it does not exist in the repository, and the pull request history search recorded above is negative. No individual definition is recoverable; only the C5-C19 group property is established.",
+      "group_property": "member of C5-C19, defined collectively at Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:38 as 'every gate that requires a built/running image'. That is a group property, not this gate's individual requirement."
+    },
+    "C15": {
+      "definition_status": "UNDEFINED_HISTORICAL_GATE",
+      "requirement": null,
+      "workflow_step": null,
+      "supporting_test_or_script": null,
+      "requires_container_runtime": true,
+      "requires_container_runtime_basis": "recorded under blocked_gates in CONTAINER_RUNTIME_CAPABILITY.json, whose container_gates_executable is false; that record attributes the blockage to registry access, so each listed gate depends on an image that cannot be built without a container runtime",
+      "evidence_required_before_passed": {
+        "floor_applies_to_all_gates": true,
+        "floor": [
+          "a real 'docker buildx build' of deployment/governance-studio/Dockerfile at its ratified base-image digests completed in the container job",
+          "the blocking ratified-pin-conformance and base-image-digest-verification steps passed in the same run",
+          "the gate's own step exited zero in that run, with its log or uploaded artifact retained"
+        ],
+        "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
+        "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
+      },
+      "unknown_reason": "recorded as an identifier without ever being defined. The specification that would define it does not exist in the repository, and the pull request history search recorded above is negative. No individual definition is recoverable; only the C5-C19 group property is established.",
+      "group_property": "member of C5-C19, defined collectively at Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:38 as 'every gate that requires a built/running image'. That is a group property, not this gate's individual requirement.",
+      "corroborating_evidence": "Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:41 names C2, C15 and C18 together as gates a scratch image 'could not satisfy (no real distro base to pin or scan)', so C15 and C18 relate to pinning or scanning. The sentence does not say which is which, so neither is resolved individually."
+    },
+    "C16": {
+      "definition_status": "UNDEFINED_HISTORICAL_GATE",
+      "requirement": null,
+      "workflow_step": null,
+      "supporting_test_or_script": null,
+      "requires_container_runtime": true,
+      "requires_container_runtime_basis": "recorded under blocked_gates in CONTAINER_RUNTIME_CAPABILITY.json, whose container_gates_executable is false; that record attributes the blockage to registry access, so each listed gate depends on an image that cannot be built without a container runtime",
+      "evidence_required_before_passed": {
+        "floor_applies_to_all_gates": true,
+        "floor": [
+          "a real 'docker buildx build' of deployment/governance-studio/Dockerfile at its ratified base-image digests completed in the container job",
+          "the blocking ratified-pin-conformance and base-image-digest-verification steps passed in the same run",
+          "the gate's own step exited zero in that run, with its log or uploaded artifact retained"
+        ],
+        "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
+        "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
+      },
+      "unknown_reason": "recorded as an identifier without ever being defined. The specification that would define it does not exist in the repository, and the pull request history search recorded above is negative. No individual definition is recoverable; only the C5-C19 group property is established.",
+      "group_property": "member of C5-C19, defined collectively at Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:38 as 'every gate that requires a built/running image'. That is a group property, not this gate's individual requirement."
+    },
+    "C17": {
+      "definition_status": "UNDEFINED_HISTORICAL_GATE",
+      "requirement": null,
+      "workflow_step": null,
+      "supporting_test_or_script": null,
+      "requires_container_runtime": true,
+      "requires_container_runtime_basis": "recorded under blocked_gates in CONTAINER_RUNTIME_CAPABILITY.json, whose container_gates_executable is false; that record attributes the blockage to registry access, so each listed gate depends on an image that cannot be built without a container runtime",
+      "evidence_required_before_passed": {
+        "floor_applies_to_all_gates": true,
+        "floor": [
+          "a real 'docker buildx build' of deployment/governance-studio/Dockerfile at its ratified base-image digests completed in the container job",
+          "the blocking ratified-pin-conformance and base-image-digest-verification steps passed in the same run",
+          "the gate's own step exited zero in that run, with its log or uploaded artifact retained"
+        ],
+        "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
+        "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
+      },
+      "unknown_reason": "recorded as an identifier without ever being defined. The specification that would define it does not exist in the repository, and the pull request history search recorded above is negative. No individual definition is recoverable; only the C5-C19 group property is established.",
+      "group_property": "member of C5-C19, defined collectively at Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:38 as 'every gate that requires a built/running image'. That is a group property, not this gate's individual requirement."
+    },
+    "C18": {
+      "definition_status": "UNDEFINED_HISTORICAL_GATE",
+      "requirement": null,
+      "workflow_step": null,
+      "supporting_test_or_script": null,
+      "requires_container_runtime": true,
+      "requires_container_runtime_basis": "recorded under blocked_gates in CONTAINER_RUNTIME_CAPABILITY.json, whose container_gates_executable is false; that record attributes the blockage to registry access, so each listed gate depends on an image that cannot be built without a container runtime",
+      "evidence_required_before_passed": {
+        "floor_applies_to_all_gates": true,
+        "floor": [
+          "a real 'docker buildx build' of deployment/governance-studio/Dockerfile at its ratified base-image digests completed in the container job",
+          "the blocking ratified-pin-conformance and base-image-digest-verification steps passed in the same run",
+          "the gate's own step exited zero in that run, with its log or uploaded artifact retained"
+        ],
+        "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
+        "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
+      },
+      "unknown_reason": "recorded as an identifier without ever being defined. The specification that would define it does not exist in the repository, and the pull request history search recorded above is negative. No individual definition is recoverable; only the C5-C19 group property is established.",
+      "group_property": "member of C5-C19, defined collectively at Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:38 as 'every gate that requires a built/running image'. That is a group property, not this gate's individual requirement.",
+      "corroborating_evidence": "Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:41 names C2, C15 and C18 together as gates a scratch image 'could not satisfy (no real distro base to pin or scan)', so C15 and C18 relate to pinning or scanning. The sentence does not say which is which, so neither is resolved individually."
+    },
+    "C19": {
+      "definition_status": "UNDEFINED_HISTORICAL_GATE",
+      "requirement": null,
+      "workflow_step": null,
+      "supporting_test_or_script": null,
+      "requires_container_runtime": true,
+      "requires_container_runtime_basis": "recorded under blocked_gates in CONTAINER_RUNTIME_CAPABILITY.json, whose container_gates_executable is false; that record attributes the blockage to registry access, so each listed gate depends on an image that cannot be built without a container runtime",
+      "evidence_required_before_passed": {
+        "floor_applies_to_all_gates": true,
+        "floor": [
+          "a real 'docker buildx build' of deployment/governance-studio/Dockerfile at its ratified base-image digests completed in the container job",
+          "the blocking ratified-pin-conformance and base-image-digest-verification steps passed in the same run",
+          "the gate's own step exited zero in that run, with its log or uploaded artifact retained"
+        ],
+        "floor_basis": "the container job's own header comment in the workflow: 'the container gates never report as passed without a real build'",
+        "gate_specific_evidence": "UNKNOWN - cannot be stated until this gate's requirement is defined"
+      },
+      "unknown_reason": "recorded as an identifier without ever being defined. The specification that would define it does not exist in the repository, and the pull request history search recorded above is negative. No individual definition is recoverable; only the C5-C19 group property is established.",
+      "group_property": "member of C5-C19, defined collectively at Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md:38 as 'every gate that requires a built/running image'. That is a group property, not this gate's individual requirement."
+    }
+  },
+  "unassigned_candidate_evidence": {
+    "note": "Raw material for whoever defines these gates. NOTHING here is assigned to a gate identifier; the lists are inventories, not mappings, and must not be read as one.",
+    "container_job_steps": [
+      "install-e2e-driver-deps",
+      "ratified-pin-conformance",
+      "base-image-digest-verification",
+      "container-build",
+      "image-inspection",
+      "runtime-package-inventory",
+      "image-layer-secret-scan",
+      "container-runtime-verification",
+      "image-sbom",
+      "container-vulnerability-scan",
+      "evidence-manifest",
+      "clean-checkout-reproducibility",
+      "upload-evidence"
+    ],
+    "deployment_test_files": {
+      "deployment/governance-studio/tests/test_authentication.py": 9,
+      "deployment/governance-studio/tests/test_container_artifacts.py": 11,
+      "deployment/governance-studio/tests/test_egress.py": 2,
+      "deployment/governance-studio/tests/test_governance_boundary.py": 6,
+      "deployment/governance-studio/tests/test_https_tls.py": 4,
+      "deployment/governance-studio/tests/test_logging.py": 3,
+      "deployment/governance-studio/tests/test_middleware.py": 12,
+      "deployment/governance-studio/tests/test_packaged_e2e.py": 6,
+      "deployment/governance-studio/tests/test_passwords.py": 10,
+      "deployment/governance-studio/tests/test_startup_integrity.py": 16,
+      "deployment/governance-studio/tests/test_synthetic_boundary.py": 9
+    },
+    "deployment_test_count": 88,
+    "verification_scripts": [
+      "deployment/governance-studio/ci/packaged_e2e.py",
+      "deployment/governance-studio/ci/resolve_base_images.py",
+      "deployment/governance-studio/ci/scan_image_layers.py",
+      "deployment/governance-studio/ci/verify_container.sh",
+      "deployment/governance-studio/ci/verify_ratified_pins.py"
+    ]
+  },
+  "separation_of_concerns": {
+    "this_file": "gate definitions only - no gate carries an execution state here",
+    "execution_results": [
+      "docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.json",
+      "docs/audits/ugence_governance_studio_p3e/CONTAINER_COMPLETION_LIVE_STATE.json"
+    ],
+    "current_execution_state_of_every_gate": "NOT_EXECUTED (as recorded in the files above; restated here for the reader, not asserted by this file)"
+  },
+  "validation": {
+    "script": "deployment/governance-studio/ci/verify_gate_identifiers.py",
+    "asserts": "both audit records reference only canonical identifiers from this file; a deprecated alias anywhere is a failure, naming its canonical replacement",
+    "test": "deployment/governance-studio/tests/test_gate_identifiers.py",
+    "workflow_steps": [
+      "application/gate-identifier-conformance"
+    ]
+  },
+  "closes": {
+    "record": "docs/audits/ugence_governance_studio_p3e/BASE_IMAGE_MIRROR_DECISION.json",
+    "block": "gate_identifier_discrepancy"
+  },
+  "related_records": {
+    "note": "markdown twins of the two JSON audit records; the source of the gate definitions above. They express gate sets as ranges (C4-C19) rather than identifier lists, so they are not machine-validated by verify_gate_identifiers.py, which checks the JSON records.",
+    "files": [
+      "Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.md",
+      "Project_documentation/repository/docs/audits/ugence_governance_studio_p3e/CONTAINER_COMPLETION_LIVE_STATE.md"
+    ]
+  },
+  "historical_family_note": "This file is the immutable register of the retired historical C-family. Every gate in it remains NOT_EXECUTED. Active gating is defined by the ratified P3E-CTR family, which asserts no correspondence to any identifier here.",
+  "retirement": {
+    "status": "RETIRED_SUPERSEDED",
+    "retired_by": "rasaha",
+    "retired_on": "2026-08-29",
+    "superseded_by": {
+      "family": "P3E-CTR",
+      "file": "docs/audits/ugence_governance_studio_p3e/CONTAINER_GATE_FAMILY.json",
+      "status": "RATIFIED",
+      "gate_count": 13
+    },
+    "register_preservation": "IMMUTABLE - this file remains the historical register. Retirement removes the family from active use; it does not delete, rewrite or reinterpret any entry. C2 and C4 stay DEFINED_HISTORICAL_GATE, C5-C19 stay UNDEFINED_HISTORICAL_GATE, and every historical execution status stays NOT_EXECUTED.",
+    "correspondence_to_the_ratified_family": "NONE ASSERTED. No historical C identifier maps to or is equated with any P3E-CTR identifier, in either direction.",
+    "what_ratification_of_the_successor_means": "The successor family's ratification defines requirements only. It executes no gate and passes no gate, in either family."
+  },
+  "superseded_by": {
+    "file": "docs/audits/ugence_governance_studio_p3e/CONTAINER_GATE_FAMILY.json",
+    "family": "P3E-CTR",
+    "status": "RATIFIED",
+    "correspondence_to_this_family": "none asserted",
+    "gate_count": 13
+  }
+}

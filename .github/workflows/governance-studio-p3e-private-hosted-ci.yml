@@ -39,6 +39,20 @@ jobs:
           cache: "npm"
           cache-dependency-path: apps/ugence-governance-studio/frontend/package-lock.json
 
+      # Two stdlib-only static conformance checks, deliberately ahead of install so a
+      # violation fails fast. ratified-pin-conformance is ALSO the first step of the
+      # container job; it is repeated here because the container job only runs where a
+      # container runtime and registry access exist, so this job is the one that
+      # actually guards every push.
+      - name: ratified-pin-conformance
+        run: python deployment/governance-studio/ci/verify_ratified_pins.py
+
+      - name: gate-identifier-conformance
+        # The P3E audit records must reference only the canonical container-gate
+        # identifiers published in CONTAINER_GATE_DEFINITION.json (or a declared
+        # deprecated alias, and only inside a field that quotes a superseded list).
+        run: python deployment/governance-studio/ci/verify_gate_identifiers.py
+
       - name: install
         run: |
           pip install "pydantic>=2" "fastapi>=0.110" "uvicorn>=0.27" "starlette>=0.36" httpx pytest pip-audit
@@ -143,8 +157,35 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.11" }
+
+      - name: evidence-dir-init
+        # Runtime evidence is written OUTSIDE the checkout, to a fresh directory keyed by
+        # run id and attempt, so a committed or stale file can never be hashed as this run's
+        # evidence. Reference records live in reference-evidence/ and are never read.
+        # EVIDENCE_DIR is exported here rather than in job-level env: the runner context is
+        # not available there, and RUNNER_TEMP is only defined as a shell variable.
+        # Must be empty at creation: a pre-populated directory is a failure, not a base.
+        run: |
+          DIR="$RUNNER_TEMP/p3e-evidence-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          if [ -e "$DIR" ]; then echo "FAIL evidence dir already exists: $DIR"; exit 1; fi
+          mkdir -p "$DIR"
+          [ -z "$(ls -A "$DIR")" ] || { echo "FAIL evidence dir not empty"; exit 1; }
+          echo "EVIDENCE_DIR=$DIR" >> "$GITHUB_ENV"
+          echo "evidence dir initialised empty: $DIR"
+
       - name: install-e2e-driver-deps
         run: pip install -e packages/tooling/policy-workflow-compiler -e packages/capabilities/agent-workforce-composer -e apps/ugence-governance-studio/backend -e deployment/governance-studio
+
+      - name: ratified-pin-conformance
+        # BLOCKING, and deliberately ahead of every other container step. Asserts
+        # base-images.json == Dockerfile == the owner-ratified supply decision in
+        # docs/audits/ugence_governance_studio_p3e/BASE_IMAGE_MIRROR_DECISION.json.
+        # Combined with base-image-digest-verification below (live registry ==
+        # base-images.json), this makes the ratified digest the transitive
+        # authority for what is actually built: a re-pin or a substituted image
+        # cannot land without editing the ratification record, which requires
+        # owner re-ratification.
+        run: python deployment/governance-studio/ci/verify_ratified_pins.py
 
       - name: base-image-digest-verification
         run: |
@@ -184,15 +225,18 @@ jobs:
           for t in npm node tsc gcc cc; do if docker run --rm --entrypoint sh "$IMAGE" -c "command -v $t" 2>/dev/null; then echo "FAIL $t present in runtime"; exit 1; fi; done
           echo "no npm/node/compiler in runtime image"
       - name: runtime-package-inventory
-        run: docker run --rm --entrypoint python "$IMAGE" -m pip freeze | tee deployment/governance-studio/artifacts/runtime-image-packages.txt
+        id: runtime_package_inventory
+        run: docker run --rm --entrypoint python "$IMAGE" -m pip freeze | tee "$EVIDENCE_DIR/runtime-image-packages.txt"
 
       - name: image-layer-secret-scan
+        id: image_layer_secret_scan
         run: |
           # config/history first, then genuine per-layer CONTENT scan
           ! docker history --no-trunc "$IMAGE" | grep -Ei 'PASSWORD=|server\.key|BEGIN [A-Z ]*PRIVATE KEY|_TOKEN=|AWS_SECRET'
-          python deployment/governance-studio/ci/scan_image_layers.py "$IMAGE" deployment/governance-studio/artifacts/secret-scan.json
+          python deployment/governance-studio/ci/scan_image_layers.py "$IMAGE" "$EVIDENCE_DIR/secret-scan.json"
 
       - name: container-runtime-verification
+        id: container_runtime_verification
         run: |
           mkdir -p /tmp/tls
           openssl req -x509 -newkey rsa:2048 -nodes -keyout /tmp/tls/server.key -out /tmp/tls/server.crt -days 2 -subj "/CN=localhost" -addext "subjectAltName=IP:127.0.0.1" 2>/dev/null
@@ -201,44 +245,43 @@ jobs:
           deployment/governance-studio/ci/verify_container.sh "$IMAGE" /tmp/tls operator "demo-pass-123"
 
       - name: image-sbom
+        id: image_sbom
         # pinned SBOM action (Syft); binds the SBOM to the built image
         uses: anchore/sbom-action@v0.17.9
         with:
           image: governance-studio-private-hosted:ci
           format: cyclonedx-json
-          output-file: deployment/governance-studio/artifacts/sbom.image.cdx.json
+          output-file: ${{ env.EVIDENCE_DIR }}/sbom.image.cdx.json
 
       - name: container-vulnerability-scan
+        id: container_vulnerability_scan
         # pinned Trivy action; blocking on HIGH/CRITICAL, JSON evidence
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: governance-studio-private-hosted:ci
           severity: HIGH,CRITICAL
           exit-code: "1"
           format: json
-          output: deployment/governance-studio/artifacts/container-scan.json
+          output: ${{ env.EVIDENCE_DIR }}/container-scan.json
 
       - name: evidence-manifest
         if: always()
+        # Hashes ONLY artifacts this run's producer step created successfully. A producer
+        # that failed, was skipped or never ran yields a null hash and marks the manifest
+        # INCOMPLETE; there is no fallback to a pre-existing file. The manifest records the
+        # commit, run id, run attempt and the producing step for every entry.
         run: |
-          python - <<'PY'
-          import hashlib, json, os, subprocess
-          def sha(p): return hashlib.sha256(open(p,'rb').read()).hexdigest() if os.path.isfile(p) else None
-          A="deployment/governance-studio/artifacts"
-          man = {
-            "image_id": os.environ.get("IMAGE_ID"),
-            "image_tag": "governance-studio-private-hosted:ci",
-            "source_commit": subprocess.check_output(["git","rev-parse","HEAD"]).decode().strip(),
-            "dockerfile_sha256": os.environ.get("DOCKERFILE_SHA256"),
-            "base_images": json.load(open("deployment/governance-studio/base-images.json"))["base_images"],
-            "sbom_sha256": sha(f"{A}/sbom.image.cdx.json"),
-            "vuln_report_sha256": sha(f"{A}/container-scan.json"),
-            "secret_scan_sha256": sha(f"{A}/secret-scan.json"),
-            "egress_report_sha256": sha(f"{A}/runtime-egress-report.json"),
-          }
-          json.dump(man, open(f"{A}/evidence-manifest.json","w"), indent=2)
-          print(json.dumps(man, indent=2))
-          PY
+          python deployment/governance-studio/ci/build_evidence_manifest.py \
+            --evidence-dir "$EVIDENCE_DIR" \
+            --out "$EVIDENCE_DIR/evidence-manifest.json" \
+            --producers "$PRODUCERS"
+        env:
+          PRODUCERS: >-
+            {"runtime-package-inventory": "${{ steps.runtime_package_inventory.outcome }}",
+             "image-layer-secret-scan": "${{ steps.image_layer_secret_scan.outcome }}",
+             "image-sbom": "${{ steps.image_sbom.outcome }}",
+             "container-vulnerability-scan": "${{ steps.container_vulnerability_scan.outcome }}",
+             "container-runtime-verification": "${{ steps.container_runtime_verification.outcome }}"}
 
       - name: clean-checkout-reproducibility
         run: |
@@ -256,4 +299,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: p3e-container-evidence
-          path: deployment/governance-studio/artifacts/*
+          path: ${{ env.EVIDENCE_DIR }}/*
