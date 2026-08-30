@@ -6,6 +6,14 @@ policy-family and concrete-resolver design proposal. **No implementation is perf
 ADR, and none exists.** It does authorize implementation — see §3 — but authorization is not
 implementation, and nothing is built here.
 
+> **Superseded as a statement of current fact (2026-08-30, `ADDITIONAL_STALE_SITES=EXACT_FIVE`).**
+> "and none exists" is retained verbatim above as the record of what was true on this ADR's
+> own date. `[V]` It is **no longer true**: the family and runtime distributions landed
+> afterwards (`packages/integration/agentic-proposer-strategy-permission-policy` and
+> `…-runtime`), which is what §9's closing paragraph records. The rest of the sentence
+> stands unchanged — this ADR still performs no implementation, and authorization is still
+> not implementation. `[R]` This note records a fact, ratifies nothing, and reopens no ruling.
+
 **Date:** 2026-08-29.
 
 **Decision owner:** the repository owner, who is the sole ratifying authority for S2-B
@@ -358,6 +366,7 @@ decision record would lag rulings already executed against it.
 | `STALE_SITES=ALL_FOUR` | 2026-08-30 | Correct the four stale present-tense statements at design `§8.1` — `version.py` (the `0.3.0` block), `contracts.py`, `tests/test_s2b_strategy_permission.py` and `tests/s1_specification_mirror.py` — as one separate, non-behavioural change set after the `0.3.1` boundary hardening merged. Comments and docstrings only. |
 | `PR1515_SELF_REFERENCE=CORRECT_IN_PR` | 2026-08-30 | Correct, inside that same change set, the `version.py` `0.3.1` statement that the four `§8.1` sites "stay as they are" — made false by the change set itself. Adds authority over no other site. |
 | `ADDITIONAL_STALE_SITES=EXACT_FIVE` | 2026-08-30 | One further documentation-maintenance change covering exactly five sites in three files: `README.md` (two), `docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md` (two), and `verify_agentic_proposer_distribution.py` (one comment). Historical statements preserved as history and marked superseded; neither `CHANGELOG` rewritten. |
+| `RECORD_MAINTENANCE_RULINGS=YES` | 2026-08-30 | Record the three rulings above in this ADR as a dated prose-maintenance section — this §9. Recorded here so that §9's own authorization is not the one thing §9 leaves unrecorded. |
 
 `[R]` **What none of the three authorizes.** No source behaviour, assertion, contract,
 validator, public surface, version, package metadata, `public_api.json`, CI workflow,
@@ -372,8 +381,10 @@ ballot and that ruling. `STALE_SITES=ALL_FOUR` is a **later, separate** owner ru
 settles the question §6 left open; it does not amend `S2B-PF-G=B`, whose scope stays
 exactly what §2 and §3.1 record.
 
-`[I]` The distinction §7 draws still holds and is not softened here: the strategy-permission
-family and the concrete resolver now exist as repository facts, in separate integration
-distributions with their own end-to-end proof. That is not the same as any **given
+`[V]` The distinction §7 draws still holds and is not softened here: the strategy-permission
+family and the concrete resolver now exist as repository facts, in
+`packages/integration/agentic-proposer-strategy-permission-policy` and
+`packages/integration/agentic-proposer-strategy-permission-runtime`, each with its own
+end-to-end proof. That is not the same as any **given
 deployment** having a policy issued and configured, which remains outside this package and
 unknowable from it.
