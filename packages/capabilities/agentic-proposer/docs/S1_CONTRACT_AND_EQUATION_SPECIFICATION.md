@@ -116,6 +116,18 @@ strategy-permission policy family is implemented or registered**, so S2-B **cann
 execute end to end**; the protocol is injected, on the `DomainEvaluationProvider`
 precedent.
 
+> **Superseded as a statement of current fact (2026-08-30, `ADDITIONAL_STALE_SITES=EXACT_FIVE`).**
+> The `[G]` immediately above is retained verbatim as the record of what this
+> specification asserted when it was written. It is **no longer true**: a
+> strategy-permission policy family and a concrete `StrategyPolicyResolver` now exist as
+> separate integration distributions, and end-to-end resolution is proven by their own
+> tests. `[R]` Nothing else in the sentence's neighbourhood changes — this package still
+> implements no resolver, registers nothing and holds no registry; whether a **given
+> deployment** has a policy issued and configured is outside this specification and not
+> knowable from it; and permission still authorizes no compute, tools, evidence access or
+> consequential execution. This note records a fact, ratifies nothing, and reopens no
+> ruling.
+
 ---
 
 ## Supersession
@@ -3124,6 +3136,16 @@ Each item below is deliberately absent and is not a gap.
   `[G]` **No strategy-permission policy family is registered with Policy Authority**, so
   the mechanism cannot **execute** end to end; the resolver is injected and this package
   implements none.
+
+  > **Superseded as a statement of current fact (2026-08-30, `ADDITIONAL_STALE_SITES=EXACT_FIVE`).**
+  > The `[G]` immediately above is retained verbatim as history and is **no longer
+  > true**: the policy family and the concrete resolver now exist as separate
+  > integration distributions, which is what closed the execution gap. `[R]` The
+  > deferred items listed before it are **unaffected** and remain deferred — strategy
+  > composition or ordering, mandate-level narrowing, required strategies, a fourth
+  > vocabulary member, and a strategy-policy registry. Whether a **given deployment**
+  > has a policy issued and configured remains outside this specification. This note
+  > records a fact, ratifies nothing, and reopens no ruling.
 * **A disposition-to-outcome mapping.** None is ratified. R-2 constrains
   `terminal_outcome` structurally and computes nothing.
 * **The semantic auditor.** `SemanticAuditorFindingStatus` remains defined and

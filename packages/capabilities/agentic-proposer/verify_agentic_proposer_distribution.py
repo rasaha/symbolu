@@ -150,9 +150,10 @@ provider = _Stub()
 assert isinstance(provider, ap.DomainEvaluationProvider)
 # S2-B's injected resolver: a stub declared here, in the clean interpreter, for exactly
 # the reason the evaluator stub is. No strategy policy ships in this wheel and none may
-# — `S2B-D1=A` excludes this capability as an issuer — and no strategy-permission family
-# is registered with Policy Authority at all, which blocks execution end to end. The
-# protocol being injected is what lets the wheel still prove itself.
+# — `S2B-D1=A` excludes this capability as an issuer. A strategy-permission family and a
+# concrete resolver do exist, as separate integration distributions outside this wheel,
+# and whether a given deployment has a policy issued and configured is not knowable from
+# here. The protocol being injected is what lets the wheel prove itself with neither.
 class _PolicyStub:
     def resolve(self, *, request):
         return ap.StrategyPolicyResponse(

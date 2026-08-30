@@ -116,8 +116,9 @@ What this package still does **not** do, and does not intend to at this stage: i
 nothing here), **no substantive multi-candidate ranking** (deferred to a future ruling;
 more than one qualifying candidate produces no selection and `ABSTAIN`), **no**
 multi-provider evaluation, **no** semantic auditor, and **no strategy-permission policy**
-(the resolver is injected too, and no such family is registered with Policy Authority,
-which blocks S2-B execution end to end), **no** networking, storage,
+(the resolver is injected too; a policy family and a concrete resolver now exist as
+separate integration distributions outside this package, and whether a given deployment
+has an issued policy configured is not knowable from here), **no** networking, storage,
 service discovery, plugin loading, transport or HTTP surface — all deferred (Part J of
 the specification).
 
@@ -171,6 +172,8 @@ exercised against a real workload. What remains absent: **concrete domain evalua
 (the provider is supplied by the caller and this package embeds none), **substantive
 multi-candidate ranking** (deferred to a future ruling; more than one qualifying
 candidate produces no selection and `ABSTAIN`), the **semantic auditor** (Part J,
-deferred), and any **registered strategy-permission policy family** — S2-B is
-implemented and tested against a stubbed resolver, and cannot execute end to end until
-Policy Authority carries such a family.
+deferred), and any **strategy-permission policy issued for a given deployment** — this
+package embeds no resolver and is tested against a stubbed one. The policy family and
+the concrete resolver that S2-B needs to execute end to end now exist, as separate
+integration distributions whose own tests carry that proof; what remains absent here is
+any claim that a particular deployment has such a policy issued and configured.
