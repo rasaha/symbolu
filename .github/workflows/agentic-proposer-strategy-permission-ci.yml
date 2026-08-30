@@ -1,0 +1,122 @@
+name: agentic-proposer-strategy-permission-ci
+
+# Scoped CI for the two S2-B strategy-permission integration distributions:
+#
+#   * ugence-agentic-proposer-strategy-permission-policy  — the policy family and
+#     its Policy Authority adapter (the artifact side);
+#   * ugence-agentic-proposer-strategy-permission-runtime — the concrete
+#     StrategyPolicyResolver and the end-to-end proof (the runtime side).
+#
+# One workflow for both, because they are one integration: the runtime suite
+# imports the family, and a change to either can break the other. Both suites
+# drive the GENUINE pipeline — real issuance, real Ed25519 signing, the real
+# registry, real resolution, and the Agentic Proposer's own ratified builders and
+# six-check replay — so a green run here is evidence about the integration, not
+# about a stub.
+#
+# The neighbouring suites run too, and deliberately: the Agentic Proposer and
+# Policy Authority test trees each carry REPOSITORY-WIDE scans that these
+# packages' files must satisfy (the role-projection substring scan and the
+# authority-internals import scan). A change here can only break those, never see
+# them, so they run on this workflow's own triggers.
+
+on:
+  pull_request:
+    paths:
+      - "packages/integration/agentic-proposer-strategy-permission-policy/**"
+      - "packages/integration/agentic-proposer-strategy-permission-runtime/**"
+      - "packages/capabilities/agentic-proposer/**"
+      - "packages/policy-authority/**"
+      - "docs/architecture/S2B_STRATEGY_PERMISSION_POLICY_FAMILY_AND_RESOLVER_DESIGN.md"
+      - "docs/architecture/ADR_UGENCE_S2B_STRATEGY_PERMISSION_FAMILY_RATIFICATION.md"
+      - ".github/workflows/agentic-proposer-strategy-permission-ci.yml"
+  push:
+    branches:
+      - "claude/setup-symbolu-monorepo-**"
+      - "claude/s2b-strategy-permission-**"
+    paths:
+      - "packages/integration/agentic-proposer-strategy-permission-policy/**"
+      - "packages/integration/agentic-proposer-strategy-permission-runtime/**"
+      - "packages/capabilities/agentic-proposer/**"
+      - "packages/policy-authority/**"
+      - "docs/architecture/S2B_STRATEGY_PERMISSION_POLICY_FAMILY_AND_RESOLVER_DESIGN.md"
+      - "docs/architecture/ADR_UGENCE_S2B_STRATEGY_PERMISSION_FAMILY_RATIFICATION.md"
+      - ".github/workflows/agentic-proposer-strategy-permission-ci.yml"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  package-suites:
+    name: Strategy-permission family + runtime suites (source)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        # pydantic and ugence-jcs arrive transitively through the Agentic
+        # Proposer, which both packages depend on for the ratified vocabulary and
+        # the request/response shapes.
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest build pydantic
+          pip install packages/jcs
+      - name: Family suite (artifact, adapter, vocabulary binding, authority registration)
+        run: python -m pytest packages/integration/agentic-proposer-strategy-permission-policy/tests -q
+      - name: Runtime suite (resolution, fail-closed matrix, end-to-end proof)
+        run: python -m pytest packages/integration/agentic-proposer-strategy-permission-runtime/tests -q
+
+  neighbour-scans:
+    name: Repository-wide scans these packages must satisfy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pydantic
+          pip install packages/jcs
+      - name: Agentic Proposer suite (carries the role-projection scan)
+        run: python -m pytest packages/capabilities/agentic-proposer/tests -q
+      - name: Policy Authority suite (carries the authority-internals import scan)
+        run: python -m pytest packages/policy-authority/tests -q
+
+  isolated-install:
+    name: Wheel build + isolated installation verification (both distributions)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+      - name: Family distribution — build, install into a clean venv, exercise it
+        run: python packages/integration/agentic-proposer-strategy-permission-policy/verify_agentic_proposer_strategy_permission_policy_distribution.py
+      - name: Runtime distribution — build, install into a clean venv, exercise it
+        run: python packages/integration/agentic-proposer-strategy-permission-runtime/verify_agentic_proposer_strategy_permission_runtime_distribution.py
+
+  freeze:
+    name: Platform-freeze verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pydantic
+      - name: Freeze verification (blocking — frozen artifacts must be unchanged)
+        run: python -m platform_freeze.verify --manifest platform/PLATFORM_FREEZE_V1.json

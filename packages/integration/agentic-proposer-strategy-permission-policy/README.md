@@ -148,3 +148,16 @@ python -m pytest packages/integration/agentic-proposer-strategy-permission-polic
   no reserved authority term in any name or message, under the same
   uppercased-substring rule the Agentic Proposer's own guard applies.
 - `test_public_api.py` — the shipped snapshot equals the actual surface.
+
+## Distribution verification
+
+```
+python packages/integration/agentic-proposer-strategy-permission-policy/verify_agentic_proposer_strategy_permission_policy_distribution.py
+```
+
+Builds the wheel, installs it into a clean venv with no monorepo path, and there
+proves that the artifact constructs and binds its own digest, that every
+construction rule fires, that the accepted token set still equals
+`set(ReasoningStrategy)` from the *installed* proposer distribution, and that the
+family issues and resolves through the real shared authority while a body swap
+under the same coordinate fails closed.

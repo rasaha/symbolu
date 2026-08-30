@@ -55,6 +55,10 @@ distribution. Until it lands the capability still cannot execute end to end.
   the Agentic Proposer's own guard applies.
 - **`public_api.json`** — the curated surface, asserted by `tests/test_public_api.py`
   including dataclass field order and the exact value of every string constant.
+- **Distribution verification** (`verify_…_distribution.py`) — clean-venv build,
+  install and exercise, on the existing repository pattern. Added alongside the
+  runtime package, which is when the shared CI workflow covering both
+  distributions landed.
 
 ### Deliberately absent
 
