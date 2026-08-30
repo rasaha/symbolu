@@ -15,6 +15,12 @@ not assert it. Measurements were taken in a read-only audit at
 what did not survive re-verification, and every `[G]` not re-measured at ratification
 stays `[G]`.
 
+**Implemented and measured, 2026-08-30.** The doctrine is now in
+`scripts/cloud_scaling/guard_sweep.py` and `cloud-scaling-risk-integration` is swept in
+CI. Implementation put three questions back to the owner, all ruled the same day, and
+converted most of §8 item 5's `[G]` mutation results into measurements. **§9 records what
+was measured, and every figure below that it corrects or confirms is annotated in place.**
+
 ## §1. What this ADR does to Phase 5 §9
 
 The load-bearing question is whether §9 of `ADR_CLOUD_SCALING_AUTHORIZATION_PHASE5.md`
@@ -144,14 +150,28 @@ the package's 8 disclosed `except_arms` are 3 in `authenticity.py` and 5 in `pro
 
 *The operator — reason collapse.* Rewrite the `AdapterRejectionReason` member the arm
 returns to a fixed sentinel member, chosen so it is not the member the arm already produces.
+
+> **Ruled at implementation (2026-08-30): the sentinel is a fixed *pair*.** No single
+> member satisfies "not the member the arm already produces" across ten arms naming eight
+> members, and the audit's operator resolved that by skipping the arms already at its
+> sentinel — which scores them `UNSCORED`, reporting nothing about two of the ten sites
+> this class exists to measure. The rule is therefore: **each arm is rewritten to a
+> deterministic, different rejection reason**, using a declared `(sentinel, alternate)`
+> pair so no mutation is ever a no-op. What the operator measures is whether the suite
+> distinguishes typed reasons. The sentinel carries §9.4's general-for-specific direction;
+> for the two arms already at it the alternate is a lateral swap, and both are invisible
+> to a suite that only asks whether something was rejected. `[V: guard_sweep.py,
+> PackageConfig.reason_collapse_sentinels]`
 This is authority-weakening in §9.4's sense: it reports a general reason where a specific one
 was owed, and leaves the refusal itself intact, so a test that only asks "was something
 rejected?" cannot see it.
 
 *Evidence, cited to the audit and not re-run here.* An out-of-tree reason-collapse operator
 ran on 8 arms (2 were already at the sentinel), killed 7 and survived 1 — adapter.py:222, the
-gate-3 arm returning `RECOMMENDATION_DIGEST_MISMATCH` `[G: not reproduced at the working tip;
-see §8]`. The site and its returned member are verified `[V: adapter.py:222–229]`. The audit's
+gate-3 arm returning `RECOMMENDATION_DIGEST_MISMATCH`. **Reproduced exactly** at
+implementation: over the audit's 8 arms, 7 killed and 1 survived, and the survivor is
+adapter.py:222 `[V: §9]`. Over all 10, 8 killed and 2 survived; the extra survivor is
+adapter.py:211, one of the two the audit's operator skipped. The site and its returned member are verified `[V: adapter.py:222–229]`. The audit's
 reading — the suite does discriminate the reason half, and nothing enforces that it keeps
 doing so — is the reason this class is worth ratifying, and it is `[I]` until a sweep re-runs.
 
@@ -185,6 +205,17 @@ result is not].
 
 **Ruled: an implementation-only extension of §9.1, not a new class; the operator is else-arm
 deletion. The class has exactly one member in these two packages, not two.** `[R]`
+
+> **Clarified at implementation (2026-08-30): the class is *direct* refusals only.** An
+> arm qualifies when its own statements refuse; an arm that merely *reaches* a refusal
+> through a nested `if` does not. Implementing §9.1's reach language literally selected a
+> second member, `outcomes.py:159`, whose mutation span `(160,12)-(171,17)` contains
+> guards `outcomes.py:160`, `164` and `168` — all separately inventoried — so its mutant
+> deleted three inventoried guards at once and was killed by the same tests that kill two
+> of them: a row inflating numerator and denominator together while measuring nothing.
+> The owner ruled with §8 item 3, which names that exact site as not a member. The class
+> has one member, `authenticity.py:432`, and the inventory total is **100**, not 101.
+> `[V: guard_sweep.py, _else_arm_sites and _direct_statements]`
 
 §9.1 already governs these sites: "a body that can reach a refusal makes the `if` a guard",
 and a terminal `else` is the last arm of that same `if`. Only the operator was missing,
@@ -237,6 +268,16 @@ undisclosed partial count is worse than a disclosed one.
 
 The signal is live under either resolution: the audit reports 8 bounds mutants and 5 risk
 mutants minting more than baseline `[G: not re-run]`.
+
+> **Measured at implementation: 7 risk mutants, against a 374-test suite `[V: §9]`.** The
+> count is a property of the *suite*, not only of the package: a mint-signalling guard is
+> one whose removal lets the package mint more than the baseline did, so a suite that
+> exercises the mint path more can reveal more of them. Measured against the pre-existing
+> 287-test suite the figure is **6**, and it was still 6 at 318; the seventh,
+> `projection.py:357`, appeared once an isolating test drove `project_recommendation` with
+> a non-string correlation id. The audit's 5 is not reproduced at any suite size tried,
+> and `mint_site` here is `projection:project_recommendation` — §5 names two module-level
+> mints and does not say which the audit measured, so the difference is not resolvable.
 
 ## §6. D-GC-7 — Message-only attribution
 
@@ -315,6 +356,29 @@ sites, and the suite must exercise every member of `_AUTHORITY_FLAGS`** — the
 discrimination burden falls on the tests, per §6's within-class criterion, not on the
 inventory count.
 
+> **Corrected at implementation: there are four such loops, not two, and their
+> multiplicities are 7, 6, 8 and 9 — not 7 for both.** `[V: measured by AST off the
+> iterated constants; guard_sweep.py, _loop_multiplicity]`
+>
+> | site | iterates | multiplicity |
+> |---|---|---|
+> | `outcomes.py:118` | `_AUTHORITY_FLAGS` (7 members) | **7** — as recorded |
+> | `outcomes.py:136` | `_DECISION_FLAGS` (6) | **6** — not named above |
+> | `authenticity.py:267` | `_AUTHORITY_FLAGS` (8) | **8** — not named above |
+> | `projection.py:127` | `_AUTHORITY_FLAGS` (9) | **9** — recorded as 7 |
+>
+> The "7" above is `outcomes.py`'s tuple applied to both named loops; `projection.py:75`
+> holds nine flags and `authenticity.py:245` eight. So this package's 100 static guard
+> sites decide **127** invariants. The multiplicity is read off the iterated constant
+> rather than recorded by hand, for the reason this correction demonstrates.
+>
+> The suite obligation is discharged by
+> `tests/test_authority_flag_multiplicity.py`, which forces each member of each loop's
+> tuple `True` individually and requires the refusal to name that flag. It was not
+> previously satisfied: measured against the pre-existing suite, `projection.py:127`
+> **survived** — nothing exercised its nine members in a way that killed the loop
+> `[V: §9]`.
+
 ### §7.3 Pre-declared exclusion candidates `[V]`
 
 `capacity-bounds-policy` carries zero `# pragma: no cover`. `risk-integration` carries four:
@@ -325,7 +389,14 @@ against a value imported from a separately versioned distribution.
 ### §7.4 Sizing, so this is not read as expensive `[G: cited to the audit, not re-run]`
 
 Measured full sweeps: 3.38 min (23 guards, 8.80 s/mutant, 17 killed / 6 survived) and
-7.54 min (74 guards, 6.12 s/mutant, 41 killed / 33 survived); one shard each. Suites are 90
+7.54 min (74 guards, 6.12 s/mutant, 41 killed / 33 survived); one shard each.
+
+> **The risk half reproduces exactly.** Swept at implementation against the pre-existing
+> 287-test suite, the `if` layer measures **74 guards, 41 killed, 33 survived** — the
+> figure above, to the guard `[V: §9]`. This is the one mutation result of §8 item 5 that
+> came back identical, and it is what licenses reading the rest of §7.4 as sound rather
+> than as a number nobody could reproduce. The 23-guard bounds half was not re-run here;
+> it stays `[G]`. Suites are 90
 and 287 tests, green and stable across two clean runs. The 90 is confirmed `[V]`; the 287
 is measured at ratification — 287 collected, 287 passed in 6.82s at `b5b07bca` `[V]`. The
 timings and kill counts remain `[G]`.
@@ -370,3 +441,101 @@ The seven rulings stand or fall on the structural claims, which reproduce. The m
 results are corroboration, and the ratifying owner treated them as such: the conftest is
 fixed (§7.1, `b5b07bca`), and the first post-ratification sweep of `risk-integration` will
 convert them to measurements or corrections.
+
+## §9. Post-ratification measurement — `risk-integration`, 2026-08-30
+
+Ratification authorized the implementation and said so; this section records what the
+implementation measured. Every figure here is a first measurement of something §8 item 5
+left as `[G]`, taken with `scripts/cloud_scaling/guard_sweep.py risk-integration` against
+a green baseline. Where a measurement contradicts an audit-cited figure above, the
+contradiction is annotated at the figure rather than left for a reader to notice.
+
+*Subsections are lettered, not numbered.* `§9.1`-`§9.4` already mean the four
+subsections of Phase 5 §9 throughout this document, and reusing those labels here
+would make every cross-reference above ambiguous.
+
+### §9.a The inventory, and the three additive classes
+
+**100 outcome-bearing guards** `[V]`, and the `if` layer reconciles with §7.5 exactly:
+74 guards split 3/14/28/18/11 across `identifiers`, `outcomes`, `authenticity`,
+`projection`, `adapter`, with `excluded()` disclosing 8 raising `except` arms and 12
+boolean sub-terms — every number §7.5 states.
+
+| class | sites | measured |
+|---|---|---|
+| Phase 5 §9.1 `if`/`IfExp` layer | 74 | 70 killed, 4 excluded |
+| §4.1 D-GC-3 `except`-arm | 10 | 8 killed, 2 excluded |
+| §4.2 D-GC-4 helper-admission | 15 | 13 killed, 2 excluded |
+| §4.3 D-GC-5 `else`-arm | 1 | 1 killed |
+
+§4.1's ten arms are at the line numbers §4.1 enumerates, returning the members it names
+`[V]`. §4.2's risk half is 15 sites — 12 in `authenticity.py`, 3 in `adapter.py` — as
+stated; the 11-killed/18-survived figure there is over both packages and was never split,
+so the risk half's 13/2 is a first measurement, not a contradiction.
+
+### §9.b The sweep
+
+```
+100 guards, 92 killed, 0 survived, 8 declared unscorable, 0 unscored
+message-only kills: 0        baseline: 374 tests, green
+```
+
+**Zero surviving SCORED, zero unscored, zero message-only kills**, which is the bar the
+owner set for CI adoption. The 8 exclusions are declared in `PACKAGES`, each with a reason
+from the closed vocabulary and a test that measures the claim, and each written *after* a
+measured sweep rather than predicted before one:
+
+| site | reason |
+|---|---|
+| `identifiers.py:88` | `unreachable-behind-earlier-guard` — behind the import-time drift guard |
+| `projection.py:252` | `diagnostic-only` — the loop below it raises the same class |
+| `adapter.py:152`, `:186` | `unreachable-behind-earlier-guard` — the token's constructor already ran this validation |
+| `adapter.py:211`, `:222` | `unreachable-behind-earlier-guard` — `projection.py` raises neither class |
+| `adapter.py:266` | `unreachable-behind-earlier-guard` — behind `projection.py:139` |
+| `adapter.py:271` | `diagnostic-only` — `outcomes.py:131` raises the same class |
+
+*On §7.3's four pre-declared candidates.* Two of them — `authenticity.py:543` and
+`identifiers.py:68` — are **scored and killed**, so the pragma bought them nothing;
+`identifiers.py:68` is killed by installing a controller resolution that renames an action
+kind, which is Phase 5 §9.2's rule applied rather than quoted. Only `identifiers.py:88` and
+`adapter.py:266` earned the exclusion the pragma hinted at. A candidate is not a grant.
+
+*On the reason vocabulary.* Six of the eight are `unreachable-behind-earlier-guard`, which
+is a third closed-vocabulary reason beyond the equivalent/diagnostic-only pair. It is the
+accurate description of this adapter's defence-in-depth layer, and the distinction it
+draws is real: the two calls to `_validate_authenticated_output` are excluded because no
+caller-supplied token reaches them, while the three guards *inside* the function they call
+(`authenticity.py:429`, `:431`, `:432`) are scored and killed, because a forged token does
+reach those and the package's own `_assert_no_authority_fields` names forging as its
+threat model.
+
+### §9.c What discrimination cost
+
+Three sites could not be closed by asserting a substring of the refusal, because the
+*mutant's* message contained it too — a message-only kill, which §6 refuses and the owner's
+ruling forbids outright. `authenticity.py:581`/`:582` have a genuine typed-outcome input
+(an **unsupported source** with a malformed expectation yields a different exception class,
+because those two run before the exact-type admission); the other two had none and are the
+two `diagnostic-only` exclusions above, each on a positive showing measured by running the
+mutant rather than inferred from a shared class. This is §6's within-class criterion
+biting in practice, on a package that has a reason vocabulary.
+
+### §9.d Prerequisite, same class as §7.1
+
+§7.1's conftest fix was necessary but not sufficient. Two *tests* counted directory levels
+instead of honouring `UGENCE_REPO_ROOT`, so in a `_workdir`-shaped copy the baseline was
+red and `require_green` voided the sweep before it could run `[V]`. A third,
+`test_the_controller_still_has_no_risk_authority_import`, had no `.exists()` assertion and
+so passed *having asserted nothing* in every mutant run — a test failing open rather than
+closed, contributing no killing power. All three are fixed the way §7.1 was.
+
+### §9.e Carried forward, not decided here
+
+Teaching the multiplicity sizer to read annotated constants revealed **two loop-guards in
+`cloud-scaling-policy-authenticity` that no inventory has ever disclosed** —
+`verification.py:1026` over six carried instants and `verification.py:1076` over three
+occurrence facts `[V: measured]`. Disclosing them would rewrite an inventory §1 reserves,
+so multiplicity disclosure is a per-package opt-in, on for `risk-integration` alone, and
+these two are recorded here as a **Phase 5B follow-up requiring explicit ratification**
+before that package's inventory moves. A test pins both sites so the finding cannot be
+lost while it waits.

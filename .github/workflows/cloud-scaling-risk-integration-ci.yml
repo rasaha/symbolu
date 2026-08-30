@@ -140,3 +140,156 @@ jobs:
           name: cloud-scaling-risk-integration-dist
           path: packages/integration/cloud-scaling-risk-integration/dist/*
           if-no-files-found: warn
+
+  guard-sweep:
+    name: Guard inventory is re-derivable, and every scored site is killed
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install tooling + first-party packages (editable)
+        # numpy is not optional here: the controller's Phase-3 planning pipeline needs it,
+        # and the adapter suite builds every recommendation through that real pipeline. A
+        # runner without it does not fail the sweep, it fails *collection* — which the
+        # engine reports as an unscorable baseline rather than a red suite.
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest numpy
+          pip install -e packages/risk_authority
+          pip install -e packages/capabilities/cloud-scaling-controller
+          pip install -e packages/integration/cloud-scaling-risk-integration
+
+      - name: The checked-in inventory is regenerated, not hand-edited
+        # Runs before the sweep, deliberately: this is the cheap check that catches a guard
+        # added without a classification or removed without anyone noticing, and a stale
+        # inventory would make every number below answer a question about a different
+        # program. `--inventory-only` also fails on an exclusion that names no guard, one
+        # with a reason outside the closed vocabulary, one whose key is ambiguous, and an
+        # `except` arm whose reason vocabulary has no declared collapse sentinel.
+        run: |
+          python scripts/cloud_scaling/guard_sweep.py risk-integration --inventory-only
+          git diff --exit-code -- \
+            packages/integration/cloud-scaling-risk-integration/GUARD_INVENTORY.md \
+            packages/integration/cloud-scaling-risk-integration/guard_inventory.json \
+            packages/integration/cloud-scaling-risk-integration/guard_classification.json
+
+      - name: The sweep's own enforcement machinery is measured, not assumed
+        # This package is the only one that enables all three additive classes, so it is
+        # the only place D-GC-3's reason-collapse operator has a member at all. The sweep
+        # measures the *suite*; these tests measure the *mutation*, which a sweep cannot
+        # distinguish from a mutation that silently did nothing.
+        run: python -m pytest scripts/cloud_scaling/tests -q
+
+      - name: Sweep every site
+        # Refuses a red baseline outright (exit 2) rather than scoring against it: a test
+        # that was already failing satisfies "some test failed" without the mutation having
+        # done anything, which would credit every guard with a kill it did not earn. Also
+        # exits non-zero on a surviving scored guard or an unscored one.
+        run: python scripts/cloud_scaling/guard_sweep.py risk-integration --shard 1/1
+
+      - name: The tracked tree was not mutated
+        # The sweep works in a disposable copy outside the repository. This is what proves it.
+        run: git diff --exit-code
+        if: always()
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: risk-integration-guard-sweep-shard-1
+          path: /tmp/ugence-sweep-risk-integration/*.json
+          if-no-files-found: warn
+
+  guard-sweep-aggregate:
+    name: Every inventoried site produced exactly one result
+    runs-on: ubuntu-latest
+    needs: guard-sweep
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: risk-integration-guard-sweep-shard-*
+          merge-multiple: true
+          path: shards
+      - name: Prove the sweep was total, and block on every way it can be incomplete
+        # A single shard still has to prove totality: a job that died halfway produces no
+        # duplicate either, so absence is checked directly against the real inventory
+        # rather than inferred from the shard arithmetic. At `--shards 1` two of the
+        # aggregator's checks are vacuous and are not claimed here — `misassigned_guards`
+        # is always empty because `shard_of(i, 1)` is 1 for every i, and `baseline_agrees`
+        # is trivially true over one baseline value. The step below pins the baseline
+        # population instead.
+        run: |
+          python scripts/cloud_scaling/guard_sweep.py risk-integration \
+            --aggregate shards --shards 1
+      - name: The totals are the ones this package ratified
+        # The aggregator proves the sweep was well-formed; this asserts the *result*. The
+        # owner ruled on 2026-08-30 that Risk adopts CI only at zero surviving SCORED,
+        # zero unscored and zero message-only kills, with exclusions allowed solely where
+        # the reason is positively shown. A future change that quietly traded a killed
+        # site for an excluded one would pass every check above and fail here, where the
+        # closed exclusion vocabulary is not a decision CI may make on its own.
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import sys
+
+          report = json.load(
+              open(
+                  "packages/integration/cloud-scaling-risk-integration/"
+                  "guard_sweep_aggregate.json"
+              )
+          )
+          excluded = sorted(
+              f"{row['module']}:{row['line']}"
+              for row in report["classification"].values()
+              if row["status"] == "EXCLUDED"
+          )
+          print(
+              f"inventory={report['inventory_total']} killed={len(report['killed'])} "
+              f"survived={len(report['survived'])} unscored={len(report['unscored'])} "
+              f"excluded={len(excluded)} minting={len(report['minting_guards'])} "
+              f"message_only={len(report['message_only_kills'])} "
+              f"baselines={report['baselines']}"
+          )
+          problems = []
+          # The baseline population, pinned because `baseline_agrees` cannot check it at
+          # n=1. A sweep whose baseline collected a different number of tests is measuring
+          # a different suite, and every other check above would still pass.
+          if report["baselines"] != {"1": 374}:
+              problems.append(
+                  f"baseline collected {report['baselines']}, expected {{'1': 374}}"
+              )
+          if report["inventory_total"] != 100:
+              problems.append(f"inventory is {report['inventory_total']}, not 100")
+          if len(report["killed"]) != 92:
+              problems.append(f"{len(report['killed'])} sites killed, not 92")
+          # Named individually, not counted. An exclusion is a ratified statement about a
+          # specific site; a count would let one be swapped for another silently.
+          expected = [
+              "adapter.py:152",
+              "adapter.py:186",
+              "adapter.py:211",
+              "adapter.py:222",
+              "adapter.py:266",
+              "adapter.py:271",
+              "identifiers.py:88",
+              "projection.py:252",
+          ]
+          if excluded != expected:
+              problems.append(f"excluded sites are {excluded}, not {expected}")
+          if problems:
+              sys.exit("FAIL: " + "; ".join(problems))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: risk-integration-guard-sweep-aggregate
+          path: packages/integration/cloud-scaling-risk-integration/guard_sweep_aggregate.json
+          if-no-files-found: warn
