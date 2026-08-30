@@ -24,6 +24,15 @@ on:
       - "packages/uvi-policy-contracts/**"
       - "docs/architecture/ADR_CLOUD_SCALING_POLICY_AUTHENTICITY_PHASE5B0B.md"
       - "docs/architecture/ADR_CLOUD_SCALING_POLICY_AUTHENTICITY_PHASE5B0B_RATIFICATION.md"
+      # The sweep engine. A change to an operator or a detector changes what this
+      # package's guard sweep measures without touching a byte inside the package, so
+      # a filter that omits it lets the engine drift past this gate unmeasured. An
+      # audit of the guard-coverage work found a real defect of exactly that shape:
+      # a bare-name match in `_raising_helpers` let a non-guard call be inventoried
+      # and scored KILLED, and no package-scoped filter would have re-run this sweep
+      # to catch it.
+      - "scripts/cloud_scaling/guard_sweep.py"
+      - "scripts/cloud_scaling/tests/**"
       - ".github/workflows/cloud-scaling-policy-authenticity-ci.yml"
   push:
     branches:
@@ -43,6 +52,8 @@ on:
       # this one did not, so a Route-1-only change — one that edits the authority this package
       # delegates every trust decision to — triggered nothing on a push.
       - "packages/policy-authority/**"
+      - "scripts/cloud_scaling/guard_sweep.py"
+      - "scripts/cloud_scaling/tests/**"
       - ".github/workflows/cloud-scaling-policy-authenticity-ci.yml"
 
 defaults:
