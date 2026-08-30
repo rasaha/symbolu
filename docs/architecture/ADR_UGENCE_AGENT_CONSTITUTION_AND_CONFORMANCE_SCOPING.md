@@ -74,8 +74,10 @@ precedent: **where the conversation and this ADR differ, this ADR governs.**
 
 **Historical note on the provisional-baseline clause.** `[V]` The clause is historical:
 the S2-B stale-sites follow-up it names has since merged as PR #1517
-(`ADDITIONAL_STALE_SITES=EXACT_FIVE`, `RECORD_MAINTENANCE_RULINGS=YES`), which also
-superseded the duplicate PR #1520. The maintenance rulings are recorded at
+(`ADDITIONAL_STALE_SITES=EXACT_FIVE`, `RECORD_MAINTENANCE_RULINGS=YES`). `[V]` PR #1517
+also superseded the duplicate PR #1520 — evidenced by the GitHub PR record, not by git
+history: #1520 covers the same five stale sites and was closed unmerged on 2026-08-30,
+with #1517 carrying the work. The maintenance rulings are recorded at
 `ADR_UGENCE_S2B_STRATEGY_PERMISSION_FAMILY_RATIFICATION.md:356`, and the follow-up's
 merge commit `d5ffa8eb` is this ADR's baseline head. The rulings themselves carry
 forward unchanged; nothing in the follow-up touched the ballot's subject matter.
