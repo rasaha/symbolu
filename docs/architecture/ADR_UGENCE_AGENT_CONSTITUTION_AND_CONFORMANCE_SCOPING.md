@@ -36,7 +36,8 @@ platform-freeze change.** It changes architecture documentation only.
 - [`ADR_UGENCE_S2B_STRATEGY_PERMISSION_FAMILY_RATIFICATION.md`](ADR_UGENCE_S2B_STRATEGY_PERMISSION_FAMILY_RATIFICATION.md)
   — S2B-PF-BASE, S2B-PF-A … S2B-PF-H, S2B-PF-IMPL, and the §9 maintenance rulings.
 
-**Evidence labels.** `[V]` verified against this repository at the cited `file:line`;
+**Evidence labels.** `[V]` verified against the cited evidence — this repository at
+`file:line`, a commit, or a PR record, with the basis named where it is not `file:line`;
 `[I]` architectural inference; `[R]` an owner ruling; `[G]` an unresolved gap.
 
 > *This ADR changes **no** production source, test, package metadata, CHANGELOG,
