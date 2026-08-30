@@ -297,6 +297,16 @@ Unchanged by this declaration:
 
 ## 6. Gaps this declaration does not close `[G]`
 
+> `[R]` **MAINTENANCE NOTICE, 2026-08-30.** The four §8.1 sites below were corrected by
+> the documentation-only maintenance change merged as PR #1515, under the owner ruling
+> `STALE_SITES=ALL_FOUR`. Five residual present-tense sites outside §8.1's enumeration —
+> two in the Agentic Proposer `README.md`, two in
+> `docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md`, and one comment in
+> `verify_agentic_proposer_distribution.py` — are corrected, together with this record,
+> by the follow-up documentation-only maintenance change carrying this notice. The
+> section below records the position as it stood on 2026-08-29 and is retained as
+> history, not as current status.
+
 `[G]` **The four stale present-tense sites in Agentic Proposer**, recorded at §8.1 of the pinned
 artifact: `version.py:12-13` and `contracts.py:839-842` in source, and
 `tests/test_s2b_strategy_permission.py:26` and `tests/s1_specification_mirror.py:427` in the test

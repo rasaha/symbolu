@@ -116,8 +116,10 @@ What this package still does **not** do, and does not intend to at this stage: i
 nothing here), **no substantive multi-candidate ranking** (deferred to a future ruling;
 more than one qualifying candidate produces no selection and `ABSTAIN`), **no**
 multi-provider evaluation, **no** semantic auditor, and **no strategy-permission policy**
-(the resolver is injected too, and no such family is registered with Policy Authority,
-which blocks S2-B execution end to end), **no** networking, storage,
+(the resolver is injected too; the family and the concrete resolver live **outside this
+distribution** — §10 steps 2–4 of the S2-B family design, PRs #1505 and #1508 — and this
+package still implements no resolver, registers nothing, holds no registry and cannot
+know what a given deployment has registered), **no** networking, storage,
 service discovery, plugin loading, transport or HTTP surface — all deferred (Part J of
 the specification).
 
@@ -171,6 +173,7 @@ exercised against a real workload. What remains absent: **concrete domain evalua
 (the provider is supplied by the caller and this package embeds none), **substantive
 multi-candidate ranking** (deferred to a future ruling; more than one qualifying
 candidate produces no selection and `ABSTAIN`), the **semantic auditor** (Part J,
-deferred), and any **registered strategy-permission policy family** — S2-B is
-implemented and tested against a stubbed resolver, and cannot execute end to end until
-Policy Authority carries such a family.
+deferred), and any **in-package strategy-permission policy family or concrete
+resolver** — both landed outside this distribution (PRs #1505 and #1508); S2-B is
+tested here against a stubbed resolver because this package owns the protocol and
+implements none, which was never the execution blocker and has not changed.

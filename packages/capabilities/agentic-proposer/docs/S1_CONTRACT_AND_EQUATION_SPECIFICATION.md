@@ -111,10 +111,13 @@ a strategy authorizes additional compute, tools, evidence access or consequentia
 execution. A permission failure is **structural** — no artifact is constructed, replay
 returns `False` — and **no authority disposition and no reserved authority term is
 emitted**; mapping such a failure to an operational outcome is deliberately **not
-ruled**. `[G]` **No concrete `StrategyPolicyResolver` and no Policy Authority
-strategy-permission policy family is implemented or registered**, so S2-B **cannot
-execute end to end**; the protocol is injected, on the `DomainEvaluationProvider`
-precedent.
+ruled**. The protocol is injected, on the `DomainEvaluationProvider` precedent, and
+this package implements no resolver and registers nothing. At `0.3.0` no concrete
+`StrategyPolicyResolver` and no Policy Authority strategy-permission policy family
+existed, which blocked end-to-end execution; **that statement is scoped to `0.3.0` and
+is no longer current** — the family package and the concrete resolver landed
+afterwards, outside this distribution (§10 steps 2–4 of the S2-B family design, PRs
+#1505 and #1508).
 
 ---
 
@@ -3120,10 +3123,13 @@ Each item below is deliberately absent and is not a gap.
   permitted set. `[R]` What remains deferred and is **not** ratified by any of this:
   strategy **composition** or ordering (`S2B-D3=A`), **mandate-level** narrowing or
   per-invocation authorization (`S2B-D4=A`), **required** strategies, a fourth vocabulary
-  member, a strategy-policy **registry**, and registration of the policy family itself.
-  `[G]` **No strategy-permission policy family is registered with Policy Authority**, so
-  the mechanism cannot **execute** end to end; the resolver is injected and this package
-  implements none.
+  member, a strategy-policy **registry**, and registration of the policy family itself
+  — the last of these since ratified and implemented **separately and outside this
+  distribution** (`S2B-PF`, PRs #1505 and #1508), not by anything in this document.
+  At the time of this entry no strategy-permission policy family was registered with
+  Policy Authority, so the mechanism could not **execute** end to end; **that statement
+  is no longer current.** The resolver is injected and this package implements none,
+  which was never the blocker and has not changed.
 * **A disposition-to-outcome mapping.** None is ratified. R-2 constrains
   `terminal_outcome` structurally and computes nothing.
 * **The semantic auditor.** `SemanticAuditorFindingStatus` remains defined and
