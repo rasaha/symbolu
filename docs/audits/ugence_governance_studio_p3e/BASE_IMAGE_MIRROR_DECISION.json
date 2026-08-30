@@ -212,7 +212,7 @@
     "base_images_json": "deployment/governance-studio/base-images.json",
     "dockerfile": "deployment/governance-studio/Dockerfile"
   },
-  "verification_of_this_record": "digests above were read from deployment/governance-studio/base-images.json and confirmed against the three Dockerfile FROM lines on 2026-08-29; the ratified-pin-conformance guard was exercised against ten drift scenarios (base-images.json re-pin, Dockerfile re-pin, unpinned FROM, substituted image, extra unratified image, dropped ratified image, tampered amd64 child digest, tampered record digest, altered stage list, and the conforming tree) and blocks all nine drift cases while passing the current tree",
+  "verification_of_this_record": "digests above were read from deployment/governance-studio/base-images.json and confirmed against the three Dockerfile FROM lines on 2026-08-29. The ratified-pin guard is covered by deployment/governance-studio/tests/test_ratified_pins.py: eleven committed tests exercising the conforming tree, nine drift cases (base-images re-pin, Dockerfile re-pin, unpinned FROM, substituted image, extra unratified image, dropped ratified image, tampered amd64 child digest, tampered record digest, altered stage list), and the two-key property that a re-pin passes only when the ratification record is edited alongside the pins.",
   "validation": {
     "gate_identifiers": "deployment/governance-studio/ci/verify_gate_identifiers.py",
     "ratified_pins": "deployment/governance-studio/ci/verify_ratified_pins.py",
@@ -230,5 +230,7 @@
       "owner approval recorded BEFORE this record, base-images.json or the Dockerfile is changed"
     ],
     "ordering": "the ratification record is edited first; only then may base-images.json and the Dockerfile follow, so the pin-conformance guard never passes over an unratified digest"
-  }
+  },
+  "verification_of_this_record_superseded": "digests above were read from deployment/governance-studio/base-images.json and confirmed against the three Dockerfile FROM lines on 2026-08-29; the ratified-pin-conformance guard was exercised against ten drift scenarios (base-images.json re-pin, Dockerfile re-pin, unpinned FROM, substituted image, extra unratified image, dropped ratified image, tampered amd64 child digest, tampered record digest, altered stage list, and the conforming tree) and blocks all nine drift cases while passing the current tree",
+  "verification_claim_correction_2026_08_30": "The superseded wording said the guard 'was exercised against ten drift scenarios ... blocks all nine'. That described an ad-hoc run, not the repository: only the conforming-tree case was ever committed, so a regression in the guard would have gone undetected while the record implied durable coverage. Rather than weaken the claim, the nine negative cases are now committed tests, so the statement describes what the repository actually enforces. Raised by independent review."
 }

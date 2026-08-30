@@ -19,6 +19,10 @@ RECORDS = [
     "docs/audits/ugence_governance_studio_p3e/CONTAINER_RUNTIME_CAPABILITY.json",
     "docs/audits/ugence_governance_studio_p3e/CONTAINER_COMPLETION_LIVE_STATE.json",
     "docs/audits/ugence_governance_studio_p3e/BASE_IMAGE_MIRROR_DECISION.json",
+    # The ratified successor family must not name a historical identifier either:
+    # a stray C-number there would silently reintroduce the correspondence that
+    # both families' records explicitly disclaim.
+    "docs/audits/ugence_governance_studio_p3e/CONTAINER_GATE_FAMILY.json",
 ]
 # A gate identifier: C followed by digits, optionally a '-suffix' spelling.
 _IDENT = re.compile(r"^C\d+(?:-[a-z]+)?$")

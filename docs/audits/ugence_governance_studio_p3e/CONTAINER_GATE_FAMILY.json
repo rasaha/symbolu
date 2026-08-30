@@ -19,6 +19,7 @@
       "workflow_job": "container",
       "supporting_test_or_script": [
         "deployment/governance-studio/ci/verify_ratified_pins.py",
+        "deployment/governance-studio/tests/test_ratified_pins.py",
         "deployment/governance-studio/tests/test_gate_identifiers.py::test_ratified_pin_conformance_holds_on_the_committed_tree"
       ],
       "requires_container_runtime": false,
@@ -184,13 +185,17 @@
       "workflow": ".github/workflows/governance-studio-p3e-private-hosted-ci.yml",
       "workflow_job": "container",
       "supporting_test_or_script": [
-        "aquasecurity/trivy-action@0.28.0"
+        "aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 (v0.36.0)"
       ],
       "requires_container_runtime": true,
       "requires_registry_access": true,
       "non_compensatory": false,
       "evidence_required_before_passed": "this gate's step exits zero in a run whose container build succeeded from the ratified digests, with its log or uploaded artifact retained, and every mandatory evidence obligation attached to it satisfied",
-      "execution_state": "NOT_EXECUTED"
+      "execution_state": "NOT_EXECUTED",
+      "supporting_test_or_script_superseded": [
+        "aquasecurity/trivy-action@0.28.0"
+      ],
+      "citation_correction_2026_08_30": "This gate cited aquasecurity/trivy-action@0.28.0 - the malformed reference that never resolved and was re-pinned in commit 3ccff09c. The family was ratified before that re-pin and the citation was not carried forward. Corrected to the immutable SHA the workflow actually uses. The gate's requirement is unchanged."
     },
     "P3E-CTR-12": {
       "requirement": "the image rebuilds from a clean git archive of HEAD",
