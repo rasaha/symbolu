@@ -35,9 +35,11 @@ in the builders is newly caught, and a complete duck-typed response still constr
 type test.
 
 `[G]` **Nothing else about the `0.3.0` disclosure changes.** Execution end to end
-remains outside this package, and the four present-tense sites this release does not
-touch (design `§8.1`) stay as they are: `S2B-PF-G=B` authorizes this hardening and
-nothing adjacent to it.
+remains outside this package. `S2B-PF-G=B` authorizes this hardening and nothing
+adjacent to it, so the four present-tense sites at design `§8.1` were **not** touched
+by this release; they were corrected afterwards, under the separate owner ruling
+`STALE_SITES=ALL_FOUR`, which is why the `0.3.0` block below now reads as a record of
+that release rather than as a current fact.
 
 0.3.0 is the S2-B Reasoning Strategy Permission release. It adds five names to the
 curated surface — ``ReasoningStrategy``, ``StrategyPolicyResolver``,
