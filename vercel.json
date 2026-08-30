@@ -1,0 +1,15 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm --prefix apps/ugence-governance-studio/frontend ci && npm --prefix apps/ugence-governance-studio/frontend run build",
+  "outputDirectory": "apps/ugence-governance-studio/frontend/dist",
+  "functions": {
+    "api/index.py": {
+      "runtime": "@vercel/python@4.3.1",
+      "maxDuration": 30,
+      "includeFiles": "{apps/ugence-governance-studio/frontend/dist/**,apps/ugence-governance-studio/demo_data/**,apps/ugence-governance-studio/contracts/**,deployment/governance-studio/src/**,deployment/governance-studio/synthetic-scenarios-manifest.json,packages/capabilities/agent-workforce-composer/src/**,packages/tooling/policy-workflow-compiler/src/**,apps/ugence-governance-studio/backend/src/**}"
+    }
+  },
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/api/index" }
+  ]
+}

@@ -50,6 +50,11 @@ class DeploymentConfig:
     frontend_dir: str
     scenarios_root: str
     manifest_path: str
+    # "self": this process terminates TLS from tls_cert_file/tls_key_file (the container
+# deployment). "platform": TLS is terminated by the hosting platform in front of this
+# process, which then has no cert on disk; HTTPS is enforced per request from the
+# forwarded protocol instead of from a certificate. It is never optional, only relocated.
+    tls_termination: str = "self"
     trusted_proxy: bool = False
     bind_host: str = "0.0.0.0"
     port: int = APP_PORT
@@ -59,6 +64,11 @@ class DeploymentConfig:
     request_header_value: str = REQUEST_HEADER_VALUE
     enable_access_log: bool = False
     _errors: List[str] = field(default_factory=list, compare=False)
+
+    @property
+    def terminates_tls(self) -> bool:
+        """True when this process performs the TLS handshake itself."""
+        return self.tls_termination == "self"
 
     @property
     def is_production(self) -> bool:
@@ -78,6 +88,8 @@ class DeploymentConfig:
             password_hash=overrides.get("password_hash") or _env("UGENCE_STUDIO_PASSWORD_HASH") or "",
             tls_cert_file=overrides.get("tls_cert_file") or _env("UGENCE_STUDIO_TLS_CERT_FILE") or "",
             tls_key_file=overrides.get("tls_key_file") or _env("UGENCE_STUDIO_TLS_KEY_FILE") or "",
+            tls_termination=(overrides.get("tls_termination")
+                             or _env("UGENCE_STUDIO_TLS_TERMINATION") or "self").lower(),
             allowed_hosts=overrides.get("allowed_hosts") or _split_hosts(_env("UGENCE_STUDIO_ALLOWED_HOSTS")),
             frontend_dir=overrides.get("frontend_dir") or _env("UGENCE_STUDIO_FRONTEND_DIR") or "",
             scenarios_root=overrides.get("scenarios_root") or _env("UGENCE_STUDIO_SCENARIOS_ROOT") or "",
@@ -104,14 +116,27 @@ class DeploymentConfig:
         elif not is_valid_hash_format(self.password_hash):
             errors.append("UGENCE_STUDIO_PASSWORD_HASH has an invalid format")
 
-        # TLS material
-        for label, path in (("cert", self.tls_cert_file), ("key", self.tls_key_file)):
-            if not path:
-                errors.append(f"UGENCE_STUDIO_TLS_{label.upper()}_FILE is required")
-            elif not os.path.isfile(path):
-                errors.append(f"TLS {label} file not found: {path}")
-            elif not os.access(path, os.R_OK):
-                errors.append(f"TLS {label} file not readable: {path}")
+        # TLS material. HTTPS is mandatory either way; only the terminator differs.
+        if self.tls_termination not in ("self", "platform"):
+            errors.append(f"unknown UGENCE_STUDIO_TLS_TERMINATION {self.tls_termination!r}")
+        elif self.terminates_tls:
+            for label, path in (("cert", self.tls_cert_file), ("key", self.tls_key_file)):
+                if not path:
+                    errors.append(f"UGENCE_STUDIO_TLS_{label.upper()}_FILE is required")
+                elif not os.path.isfile(path):
+                    errors.append(f"TLS {label} file not found: {path}")
+                elif not os.access(path, os.R_OK):
+                    errors.append(f"TLS {label} file not readable: {path}")
+        else:
+            # Platform termination only makes sense behind a proxy whose forwarded
+            # protocol header we are willing to read; without that we cannot tell
+            # plaintext from TLS and must fail closed rather than assume HTTPS.
+            if not self.trusted_proxy:
+                errors.append("UGENCE_STUDIO_TLS_TERMINATION=platform requires "
+                              "UGENCE_STUDIO_TRUSTED_PROXY=1")
+            if self.tls_cert_file or self.tls_key_file:
+                errors.append("TLS cert/key files must not be set when the platform "
+                              "terminates TLS")
 
         # hosts
         if self.is_production and not self.allowed_hosts:

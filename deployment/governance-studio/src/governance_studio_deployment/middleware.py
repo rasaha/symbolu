@@ -51,6 +51,40 @@ class TrustedHostMiddleware:
         return await self.app(scope, receive, send)
 
 
+class ForwardedProtoGuardMiddleware:
+    """Enforce HTTPS when the platform, not this process, terminates TLS.
+
+    In the container deployment the TLS handshake happens here, so a plaintext
+    request is impossible by construction. Where a hosting platform terminates TLS
+    in front of this process there is no certificate to check, and the only signal
+    that the client leg was encrypted is the forwarded protocol. This middleware
+    makes that signal load-bearing: anything that is not ``https`` is refused.
+
+    It fails closed. A missing header is refused rather than assumed secure, so a
+    misconfigured proxy cannot silently serve the studio over plaintext. It is only
+    installed when the configuration says the platform terminates TLS AND the proxy
+    is trusted, because reading this header from an untrusted peer would let a
+    client assert its own transport security.
+    """
+
+    HEADER = "x-forwarded-proto"
+
+    def __init__(self, app: ASGIApp):
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+        headers = {k.decode().lower(): v.decode() for k, v in scope.get("headers", [])}
+        # A comma-joined chain means several proxies appended to it; the client leg
+        # is the first entry, and that is the one that has to have been TLS.
+        proto = headers.get(self.HEADER, "").split(",")[0].strip().lower()
+        if proto != "https":
+            resp = PlainTextResponse("HTTPS required", status_code=400)
+            return await resp(scope, receive, send)
+        return await self.app(scope, receive, send)
+
+
 class OriginGuardMiddleware:
     """Same-origin constraint for mutating requests + a deployment request header.
 

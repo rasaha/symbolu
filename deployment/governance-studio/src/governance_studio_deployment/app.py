@@ -26,6 +26,7 @@ from .access_control import AccessGate, FailureTracker
 from .config import DeploymentConfig
 from .middleware import (
     BodySizeLimitMiddleware,
+    ForwardedProtoGuardMiddleware,
     OriginGuardMiddleware,
     SecurityHeadersMiddleware,
     TrustedHostMiddleware,
@@ -96,6 +97,12 @@ def build_app(config: DeploymentConfig, *, readiness=None, tracker: Optional[Fai
     gate = AccessGate(config, tracker=tracker, sleep=sleep)
     app = BaseHTTPMiddleware(app, dispatch=gate.dispatch)
     app = TrustedHostMiddleware(app, config.allowed_hosts)
+    if not config.terminates_tls:
+        # The platform terminated TLS, so there is no handshake here to guarantee the
+        # client leg was encrypted. Enforce it from the forwarded protocol instead,
+        # outside the auth gate so a plaintext request is refused before credentials
+        # are read from it.
+        app = ForwardedProtoGuardMiddleware(app)
     app = SecurityHeadersMiddleware(app)  # outermost: headers on every response
     return app
 
