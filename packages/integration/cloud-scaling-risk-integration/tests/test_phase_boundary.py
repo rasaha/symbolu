@@ -121,9 +121,22 @@ def test_the_package_declares_exactly_two_first_party_dependencies():
 def test_the_adapter_is_a_one_way_leaf():
     """Neither dependency may import this package back."""
 
+    import os
     import pathlib
 
-    repo = pathlib.Path(pkg.__file__).resolve().parents[5]
+    # ``UGENCE_REPO_ROOT`` first, then the level count. Counting levels from the package
+    # is correct in the repository and wrong everywhere else: under a guard-sweep copy at
+    # ``/tmp/ugence-sweep-<key>/<dir>`` the fifth parent resolves to ``/``, both trees
+    # below fail their ``.exists()`` assertion, and the whole sweep is voided by a red
+    # baseline. This is the same defect the guard-coverage ADR §7.1 fixed in this
+    # package's ``conftest.py``, in a test rather than in the conftest, and the override
+    # is the convention that fix adopted.
+    declared = os.environ.get("UGENCE_REPO_ROOT")
+    repo = (
+        pathlib.Path(declared).resolve()
+        if declared
+        else pathlib.Path(pkg.__file__).resolve().parents[5]
+    )
     for tree in (
         repo / "packages" / "capabilities" / "cloud-scaling-controller" / "src",
         repo / "packages" / "risk_authority" / "src",

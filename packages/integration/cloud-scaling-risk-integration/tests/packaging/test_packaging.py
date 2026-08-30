@@ -12,6 +12,7 @@ proves the same public API and the same digests from site-packages with no repos
 from __future__ import annotations
 
 import ast
+import os
 import pathlib
 
 import tomllib
@@ -20,6 +21,15 @@ import ugence_cloud_scaling_risk_integration
 
 PKG = pathlib.Path(ugence_cloud_scaling_risk_integration.__file__).resolve().parent
 ROOT = pathlib.Path(__file__).resolve().parents[2]  # cloud-scaling-risk-integration/
+
+#: True when this suite is running inside a guard-sweep copy rather than in the
+#: repository. ``scripts/cloud_scaling/guard_sweep.py`` copies the package root to
+#: ``/tmp/ugence-sweep-<key>/<dir>``, keeping the package's own directory name but not
+#: its parent, and announces itself with this variable. Exactly one assertion below is
+#: about the parent directory, and in a copy it would measure the temporary directory
+#: rather than the package — see ``_workdir`` in the sweep for the same failure mode
+#: caught the other way round in Phase 5B.
+_IN_SWEEP_COPY = os.environ.get("UGENCE_GUARD_SWEEP") == "1"
 
 #: Import roots this integration package is allowed to reference.
 _ALLOWED_MONOREPO_ROOTS = {
@@ -112,7 +122,13 @@ def test_distribution_and_import_names_are_the_approved_ones():
         "ugence_cloud_scaling_risk_integration"
     )
     assert ROOT.name == "cloud-scaling-risk-integration"
-    assert ROOT.parent.name == "integration"
+    if not _IN_SWEEP_COPY:
+        # Where this package sits in the monorepo. Asserted, not skipped, everywhere the
+        # monorepo is what the suite is running against; a sweep copy has no monorepo
+        # parent to assert, and the test keeps its other three assertions there rather
+        # than skipping wholesale — a skipped test would still be *collected*, but it
+        # would stop measuring the distribution and import names during every mutant run.
+        assert ROOT.parent.name == "integration"
 
 
 def test_version_is_the_declared_initial_release():

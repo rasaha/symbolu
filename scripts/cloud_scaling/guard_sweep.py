@@ -8,12 +8,20 @@ swept in CI at all — and, since the guard-coverage ADR, to
 `cloud-scaling-capacity-bounds-policy`, a package that carries no authority but does carry a
 fail-closed admission invariant, which is exactly the thing a sweep can measure (ADR §2).
 
-**Not every decision point is an `if`.** The guard-coverage ADR ratified two additive
+**Not every decision point is an `if`.** The guard-coverage ADR ratified three additive
 classes the engine could not see in either direction — absent from the numerator *and* from
-the disclosed denominator: a statement-level call to a raising helper (§4.2, deleted rather
+the disclosed denominator: an `except` arm that returns a typed rejection (§4.1, its reason
+collapsed to a sentinel), a statement-level call to a raising helper (§4.2, deleted rather
 than disabled) and a terminal `else` that refuses (§4.3, replaced by `pass`). Each is opted
 into per package through `PackageConfig.decision_classes`, because enabling one changes what
 a package's checked-in inventory counts.
+
+**A guard in a loop is one site, not `n`.** A guard inside `for flag in _AUTHORITY_FLAGS:`
+decides as many invariants as the loop has iterations, and one mutation neutralises all of
+them together. §7.2 rules it inventoried as **one** static site carrying a recorded semantic
+multiplicity, read off the iterated constant rather than written down, with the burden of
+telling the members apart falling on the suite. `risk-integration` has four such sites — of
+multiplicity 7, 6, 8 and 9 — so its 101 static guards decide 127 invariants.
 
 Two things this had to get right that a copy of the existing script would have got wrong.
 
@@ -86,8 +94,9 @@ class PackageConfig:
     #: that silently re-points at a different guard is worse than no exclusion at all.
     exclusions: dict = field(default_factory=dict)
     #: Decision classes beyond the ``if``/``IfExp`` layer that this package inventories.
-    #: ``"helper-admission"`` (guard-coverage ADR §4.2, D-GC-4) and ``"else-arm"`` (§4.3,
-    #: D-GC-5). Opt-in per package rather than global, because the guard-coverage ADR §1
+    #: ``"except-arm"`` (guard-coverage ADR §4.1, D-GC-3), ``"helper-admission"`` (§4.2,
+    #: D-GC-4) and ``"else-arm"`` (§4.3, D-GC-5).
+    #: Opt-in per package rather than global, because the guard-coverage ADR §1
     #: states that nothing in it reclassifies a guard in ``authorization-contracts`` or
     #: ``policy-authenticity`` — those two keep every count and index §9 already settles
     #: for them, and switching a class on for them would renumber their checked-in
@@ -105,6 +114,24 @@ class PackageConfig:
     #: count is worse than a disclosed one, because a reader cannot tell which question
     #: the number answers.
     uncovered_mints: tuple = ()
+    #: D-GC-3's operator, per vocabulary: ``{vocabulary: (sentinel, alternate)}``.
+    #: Guard-coverage ADR §4.1 rules the operator to be "rewrite the member the arm
+    #: returns to a fixed sentinel member, **chosen so it is not the member the arm
+    #: already produces**". No single fixed member satisfies the second half for every
+    #: arm — ``risk-integration``'s ten arms name eight distinct members, and whichever
+    #: member is picked, the arms already producing it would be rewritten to themselves.
+    #: The audit's out-of-tree operator resolved that by *skipping* those arms, which
+    #: scores them ``UNSCORED``: the sweep would then report nothing at all about two of
+    #: the ten sites it just ratified as decision points. So the sentinel is declared as
+    #: a **pair** — both members fixed here rather than computed, and the operator takes
+    #: the alternate exactly when the arm already produces the sentinel. Every arm is
+    #: mutated, no mutation is a no-op, and which member each arm was collapsed to is
+    #: read back from the source rather than assumed.
+    #:
+    #: A vocabulary with no entry here has no operator, so an arm naming only members of
+    #: such a vocabulary is *not* silently mis-mutated into a different enum's member: it
+    #: is reported by ``undeclared_except_arms`` and fails the inventory run.
+    reason_collapse_sentinels: dict = field(default_factory=dict)
 
     @property
     def src(self) -> Path:
@@ -239,6 +266,102 @@ PACKAGES = {
         # Fully covered: this family's only mint is ``describe``, and it is wrapped.
         uncovered_mints=(),
         recorded=(),
+        exclusions={},
+    ),
+    "risk-integration": PackageConfig(
+        key="risk-integration",
+        package_dir="packages/integration/cloud-scaling-risk-integration",
+        dist_name="ugence_cloud_scaling_risk_integration",
+        # Guard-coverage ADR §5: ``project_recommendation`` is module-level and is a
+        # genuine mint — the projection is the artifact every later gate is about. It is
+        # not the package's *only* mint, and the two it does not cover are named in
+        # ``uncovered_mints`` rather than left for a reader to notice. §5 accepts partial
+        # coverage on exactly that condition.
+        mint_site="ugence_cloud_scaling_risk_integration.projection:project_recommendation",
+        # The order a value actually flows through the package: an identifier is frozen at
+        # import, an outcome type is declared, an input is authenticated, the authenticated
+        # input is projected, and only then does the adapter run its gates. Guard-coverage
+        # ADR §7.5 reconciles the ``if`` layer against this order — 3/14/28/18/11 — and this
+        # configuration reproduces that split exactly.
+        module_order=(
+            "identifiers.py",
+            "outcomes.py",
+            "authenticity.py",
+            "projection.py",
+            "adapter.py",
+        ),
+        # Phase 4C refuses in three shapes, not one. Most gates raise; the adapter's own
+        # gates *return* a typed outcome through ``self._rejected(...)`` or
+        # ``self._abstained(...)``. Declaring both names the real idiom at gate 2 rather
+        # than reporting it as a generic call to something that happens to raise; the
+        # ``if``-layer count is 74 either way, and it is the *shape* column that a reader
+        # checks a gate against.
+        refusal_calls=frozenset({"_rejected", "_abstained"}),
+        # No ``(_Outcome.X, "…")`` tuple idiom here: this package returns a constructed
+        # ``CloudScalingRiskOutcome``, never a pair.
+        tuple_refusals=False,
+        # Guard-coverage ADR §3: this package publishes **three** parallel vocabularies,
+        # and the pair's second element is per-path, fully determined by
+        # ``CloudScalingRiskOutcome`` — ``AdapterRejectionReason`` on the rejection path,
+        # ``AdapterOutcomeStatus`` on the status path, and the controller-supplied
+        # ``abstention_reason`` string on the abstention path. The third is declared here
+        # for the same reason the other two are — a reader must be able to see all three
+        # the package publishes — while being honest that it contributes no enum member to
+        # the outcome column: an abstention's reason is a string the controller chose, not
+        # a member this package can name, so no operator can collapse it and none is
+        # declared for it below.
+        reason_vocabularies=frozenset(
+            {"AdapterRejectionReason", "AdapterOutcomeStatus", "abstention_reason"}
+        ),
+        # All three additive classes. This is the package the guard-coverage ADR measured
+        # every one of them against: §4.1's ten ``except``-arm rejections are the whole
+        # gate-1/3/4 structure and the production site of every ``AdapterRejectionReason``
+        # member, §4.2 finds 15 helper-admission calls here, and §4.3's single member in
+        # either candidate package lives in this one, at ``authenticity.py:432``. An empty
+        # class would still be enabled — a class that is off cannot report that it found
+        # nothing — but none of the three is empty here.
+        decision_classes=frozenset({"except-arm", "helper-admission", "else-arm"}),
+        # D-GC-3's operator. ``UNSUPPORTED_INPUT_TYPE`` is the sentinel because it is the
+        # *general* answer among the eight members these arms produce: collapsing a
+        # specific diagnosis to it is precisely "reports a general reason where a specific
+        # one was owed", which is §4.1's authority-weakening direction. Two of the ten arms
+        # already produce it, so those take the alternate — see
+        # ``reason_collapse_sentinels`` for why an arm is never rewritten to itself.
+        reason_collapse_sentinels={
+            "AdapterRejectionReason": ("UNSUPPORTED_INPUT_TYPE", "PROJECTION_FAILED"),
+        },
+        # Partial, and disclosed. Guard-coverage ADR §5 accepts partial mint coverage only
+        # when the uncovered mints are named.
+        uncovered_mints=(
+            (
+                "ugence_cloud_scaling_risk_integration.authenticity:"
+                "authenticate_controller_output",
+                "the package's second module-level mint. `mint_site` names one function, "
+                "and the projection is the artifact the later gates are about, so the "
+                "authenticated token is counted only where it flows into a projection. A "
+                "guard that is the last obstacle before an *authenticated token* and not "
+                "before a projection is therefore not reported as minting.",
+            ),
+            (
+                "ugence_cloud_scaling_risk_integration.adapter:"
+                "CloudScalingRiskOutcome(status=RISK_DECISION, …) at adapter.py:276",
+                "the terminal decision mint, and an inline class construction rather than "
+                "a call to a name. ADR §5 rules it must **not** be wrapped: wrapping it "
+                "would break `isinstance` and the dataclass path, and a mint counter that "
+                "changes the program under test measures the instrumentation. The two "
+                "other constructions in this module, at lines 312 and 356, are the "
+                "rejection and abstention outcomes — refusals, not mints.",
+            ),
+        ),
+        # No prior inventory: this is the package's first.
+        recorded=(),
+        # None declared. Guard-coverage ADR §7.3 pre-declares four `# pragma: no cover`
+        # sites as exclusion *candidates* — `adapter.py:266`, `authenticity.py:543`,
+        # `identifiers.py:68` and `identifiers.py:88` — and says explicitly that each is a
+        # candidate only, with ADR Phase 5 §9.2's bar applying unchanged. An exclusion
+        # written before the sweep ran would be a prediction of a survivor, and "it
+        # survived" is not on the closed list of reasons. They are left scored, and what
+        # the sweep found is reported rather than pre-empted.
         exclusions={},
     ),
     "policy-authenticity": PackageConfig(
@@ -385,6 +508,11 @@ class Guard:
     #: "else-arm" — the terminal ``else`` of a dispatch whose body refuses, neutralised
     #: by replacing that body with ``pass`` (guard-coverage ADR §4.3). An ``else`` has no
     #: header to rewrite, so ``if False:`` cannot reach it.
+    #: "except-arm" — an ``except`` handler whose body returns a typed rejection,
+    #: neutralised by collapsing the reason member it returns to a sentinel
+    #: (guard-coverage ADR §4.1). The refusal itself is left intact, so a test that only
+    #: asks "was something rejected?" cannot see the mutation; only a test that reads
+    #: *which* reason the caller was owed can.
     kind: str = "if"
     span: tuple = ()
     recorded_in: str = ""
@@ -392,6 +520,20 @@ class Guard:
     scored: bool = False
     excluded_because: str = ""
     killed_by: list = field(default_factory=list)
+    #: How many invariants this one static site decides — guard-coverage ADR §7.2, ruled
+    #: at ratification. A guard inside ``for flag in _AUTHORITY_FLAGS:`` is **one** site
+    #: with a recorded multiplicity, not seven scored sites: one mutation neutralises all
+    #: of them together, so a kill shows only that at least one is tested. The number is
+    #: read from the iterated constant rather than written down, because a multiplicity
+    #: nobody can re-derive is a multiplicity nobody can defend — and because the audit
+    #: that wrote "7" was reading one of the loops and generalising to the other.
+    #: The discrimination burden this leaves on the tests is §6's within-class criterion,
+    #: and it is what ``tests/test_authority_flag_multiplicity.py`` measures.
+    multiplicity: int = 1
+    #: For ``except-arm`` only: the vocabulary and member the arm returns, so ``mutate``
+    #: collapses within the arm's own enum and the inventory names what was collapsed.
+    collapse_vocabulary: str = ""
+    collapse_member: str = ""
 
 
 #: The vocabularies every package is read as publishing. A package that names its own
@@ -531,6 +673,148 @@ def _helper_admission_sites(tree, module_level_helpers: frozenset) -> list:
         if isinstance(func, ast.Name) and func.id in module_level_helpers:
             sites.append(node)
     return sites
+
+
+def _except_arm_members(handler, vocabularies: frozenset) -> list:
+    """Every ``(return, member)`` pair in this handler that names a reason member.
+
+    Returned in source order, so a handler whose body names more than one member has a
+    determinate first one rather than whichever ``ast.walk`` happened to reach first.
+    """
+
+    named = []
+    for statement in handler.body:
+        for inner in ast.walk(statement):
+            if not isinstance(inner, ast.Return) or inner.value is None:
+                continue
+            for member in ast.walk(inner.value):
+                if (
+                    isinstance(member, ast.Attribute)
+                    and isinstance(member.value, ast.Name)
+                    and member.value.id in vocabularies
+                ):
+                    named.append((inner, member))
+    return sorted(named, key=lambda row: (row[1].lineno, row[1].col_offset))
+
+
+def _except_arm_sites(tree, config: PackageConfig) -> tuple:
+    """``except`` arms that return a typed rejection — guard-coverage ADR §4.1 (D-GC-3).
+
+    *The class, decidable from the AST alone:* an ``except`` handler whose body contains a
+    ``return`` whose value names a member of the package's reason vocabulary. The member
+    need not *be* the returned value — ``return self._rejected(Reason.X, str(exc))`` names
+    it as an argument, which is the idiom every one of ``risk-integration``'s ten arms
+    uses — so the whole returned expression is searched.
+
+    *Why these are invisible in both directions today.* ``inventory()`` gives them no row
+    because they are not ``ast.If``; ``excluded()`` counts them zero times because it
+    discloses only ``except`` arms that **raise**, and none of the ten does. A site absent
+    from the numerator *and* from the disclosed denominator is not a conservative
+    omission — it is a coverage claim about gates nobody measured.
+
+    *Why an arm with no declared sentinel is refused rather than skipped.* Collapsing a
+    member of one vocabulary to a sentinel of another would not weaken the refusal, it
+    would change the program into one that cannot type-check its own outcome — and the
+    resulting failure would be scored as a kill the guard never earned. So an arm whose
+    only reason members belong to a vocabulary with no entry in
+    ``reason_collapse_sentinels`` is returned as *undeclared* and fails the inventory run,
+    where a reader can see the vocabulary that needs an operator.
+
+    Returns ``(sites, undeclared)``.
+    """
+
+    vocabularies = _reason_vocabularies(config)
+    sites = []
+    undeclared = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ExceptHandler):
+            continue
+        named = _except_arm_members(node, vocabularies)
+        if not named:
+            continue
+        collapsible = [
+            row for row in named
+            if row[1].value.id in config.reason_collapse_sentinels
+        ]
+        if not collapsible:
+            undeclared.append((node.lineno, sorted({m.value.id for _, m in named})))
+            continue
+        statement, member = collapsible[0]
+        sites.append((node, statement, member))
+    return sites, undeclared
+
+
+def undeclared_except_arms(config: PackageConfig) -> list:
+    """``except`` arms in the class that no declared sentinel can collapse.
+
+    Reported by ``--inventory-only`` as a hard failure rather than counted as zero: the
+    alternative is a package that quietly inventories fewer arms than its own reason
+    vocabularies produce.
+    """
+
+    if "except-arm" not in config.decision_classes:
+        return []
+    found = []
+    for module in config.module_order:
+        tree = ast.parse((config.src / module).read_text(encoding="utf-8"))
+        _sites, undeclared = _except_arm_sites(tree, config)
+        found += [
+            f"{module}:{lineno} returns {', '.join(vocabularies)} — no sentinel declared"
+            for lineno, vocabularies in undeclared
+        ]
+    return sorted(found)
+
+
+def _loop_multiplicity(tree) -> dict:
+    """``id(node)`` → how many times the enclosing loops run it — ADR §7.2's multiplicity.
+
+    Only loops over a **module-level name bound to a literal sequence** count, because
+    only those have a length the engine can read off the source. ``for flag in
+    _AUTHORITY_FLAGS:`` qualifies; ``for row in rows:`` does not, and gets multiplicity 1
+    rather than a guess.
+
+    Nested qualifying loops multiply. A ``for``-``else`` arm does not: it runs once
+    regardless of the iterable's length.
+    """
+
+    sizes = {}
+    for node in tree.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        value = node.value
+        if (
+            isinstance(value, ast.Call)
+            and getattr(value.func, "id", None) in {"frozenset", "tuple", "set", "list"}
+            and value.args
+        ):
+            value = value.args[0]
+        if not isinstance(value, (ast.Tuple, ast.List, ast.Set)) or not value.elts:
+            continue
+        if not all(isinstance(element, ast.Constant) for element in value.elts):
+            continue
+        for target in node.targets:
+            if isinstance(target, ast.Name):
+                sizes[target.id] = len(value.elts)
+
+    multiplicity = {}
+
+    def descend(node, factor: int) -> None:
+        for name, value in ast.iter_fields(node):
+            children = value if isinstance(value, list) else [value]
+            inner = factor
+            if (
+                isinstance(node, ast.For)
+                and name == "body"
+                and isinstance(node.iter, ast.Name)
+            ):
+                inner = factor * sizes.get(node.iter.id, 1)
+            for child in children:
+                if isinstance(child, ast.AST):
+                    multiplicity[id(child)] = inner
+                    descend(child, inner)
+
+    descend(tree, 1)
+    return multiplicity
 
 
 def _else_arm_sites(tree, config: PackageConfig, helpers: frozenset) -> list:
@@ -747,8 +1031,14 @@ def inventory(config: PackageConfig) -> list:
                     found.append((node.lineno, node, shape))
             elif isinstance(node, ast.IfExp) and _selects_an_outcome(node):
                 found.append((node.lineno, node, "outcome selection"))
-        # The two additive decision classes, each enabled per package rather than
+        multiplicity = _loop_multiplicity(tree)
+        # The three additive decision classes, each enabled per package rather than
         # engine-wide — see ``PackageConfig.decision_classes`` for why.
+        if "except-arm" in config.decision_classes:
+            for handler, statement, member in _except_arm_sites(tree, config)[0]:
+                found.append(
+                    (handler.lineno, (handler, statement, member), "except-arm rejection")
+                )
         if "helper-admission" in config.decision_classes:
             for node in _helper_admission_sites(tree, module_level_helpers):
                 found.append((node.lineno, node, "helper-admission call"))
@@ -776,6 +1066,43 @@ def inventory(config: PackageConfig) -> list:
                             node.end_lineno,
                             node.end_col_offset,
                         ),
+                        multiplicity=multiplicity.get(id(node), 1),
+                    )
+                )
+                continue
+            if shape == "except-arm rejection":
+                handler, statement, member = node
+                guards.append(
+                    Guard(
+                        index=index,
+                        module=module,
+                        # The ``except`` line, which is where a reader looks for the arm.
+                        # The mutated span is the reason member several lines below it.
+                        lineno=handler.lineno,
+                        # Qualified by the whole returned expression, not just the handler
+                        # type and the member: ``adapter.evaluate`` catches
+                        # ``RecommendationAuthenticityError`` twice and returns
+                        # ``RECOMMENDATION_DIGEST_MISMATCH`` from both, so a shorter key
+                        # would name two arms at once and could not say which it meant.
+                        condition=(
+                            f"except {ast.unparse(handler.type) if handler.type else ''}: "
+                            f"{ast.unparse(statement.value)}"
+                        ),
+                        header_end=handler.lineno,
+                        is_elif=False,
+                        shape="typed-refusal return",
+                        recorded_in="",
+                        outcome=f"{member.value.id}.{member.attr}",
+                        kind="except-arm",
+                        span=(
+                            member.lineno,
+                            member.col_offset,
+                            member.end_lineno,
+                            member.end_col_offset,
+                        ),
+                        multiplicity=multiplicity.get(id(handler), 1),
+                        collapse_vocabulary=member.value.id,
+                        collapse_member=member.attr,
                     )
                 )
                 continue
@@ -796,6 +1123,7 @@ def inventory(config: PackageConfig) -> list:
                         outcome=", ".join(_outcome_names([node], config)),
                         kind="helper-admission",
                         span=_statement_span(node),
+                        multiplicity=multiplicity.get(id(node), 1),
                     )
                 )
                 continue
@@ -820,6 +1148,7 @@ def inventory(config: PackageConfig) -> list:
                             node.orelse[-1].end_lineno,
                             node.orelse[-1].end_col_offset,
                         ),
+                        multiplicity=multiplicity.get(id(node), 1),
                     )
                 )
                 continue
@@ -839,6 +1168,7 @@ def inventory(config: PackageConfig) -> list:
                     shape=shape,
                     recorded_in=recorded_in,
                     outcome=", ".join(_outcome_names(node.body, config)),
+                    multiplicity=multiplicity.get(id(node), 1),
                 )
             )
     return guards
@@ -927,9 +1257,24 @@ def mutate(config: PackageConfig, guard: Guard, workdir: Path) -> None:
     * ``else-arm`` — the ``else`` body is replaced by ``pass``, so an exact-type dispatch
       falls through silently instead of refusing: an unrecognised type is admitted rather
       than rejected (guard-coverage ADR §4.3).
+    * ``except-arm`` — the reason member the arm returns is collapsed to the sentinel
+      (guard-coverage ADR §4.1). The refusal is left intact and only its *reason* moves,
+      so this is authority-weakening in §9.4's sense — the caller is told something
+      general where a specific answer was owed — and a suite that only asserts "something
+      was rejected" cannot see it. That is the whole point: it measures the half of §9.1's
+      pair that a raise-or-not operator can never reach.
     """
 
     path = workdir / "src" / config.dist_name / guard.module
+    if guard.kind == "except-arm":
+        sentinel, alternate = config.reason_collapse_sentinels[guard.collapse_vocabulary]
+        # Never a no-op: an arm already producing the sentinel is collapsed to the
+        # alternate instead. A mutation that rewrote a member to itself would be scored
+        # SURVIVED and read as a coverage defect in a suite that has none.
+        target = sentinel if guard.collapse_member != sentinel else alternate
+        _replace_span(path, guard.span, f"{guard.collapse_vocabulary}.{target}")
+        return
+
     if guard.kind == "outcome-selection":
         lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
         # The ``else`` branch read back from the source, never reconstructed from the
@@ -1309,6 +1654,12 @@ def write_inventory(
             "",
         ]
         described = {
+            "except-arm": (
+                "`except` arms that return a typed rejection, neutralised by collapsing "
+                "the reason member to a sentinel (ADR §4.1). The refusal survives and "
+                "only the reason moves, so a suite that asks only whether *something* "
+                "was rejected cannot see the mutation"
+            ),
             "helper-admission": (
                 "statement-level calls to a raising helper, neutralised by deleting the call "
                 "(ADR §4.2). Neutralising the helper's own `if` proves the check works, not "
@@ -1322,6 +1673,37 @@ def write_inventory(
         for kind, count in counts.items():
             lines.append(f"* **{count} `{kind}`** — {described.get(kind, '')}.")
         lines.append("")
+    multiple = [g for g in guards if g.multiplicity > 1]
+    if multiple:
+        # Emitted only where a site actually carries more than one invariant, so a package
+        # with no such loop keeps a byte-identical inventory. The guard-coverage ADR §1
+        # forecloses renumbering the two Phase 5 inventories, and a section that appeared
+        # in every file saying "every multiplicity is 1" would rewrite all four.
+        lines += [
+            "## Static sites that decide more than one invariant",
+            "",
+            "Guard-coverage ADR §7.2, ruled at ratification: a guard inside a loop over a",
+            "fixed set of flags is **one** static site with a recorded semantic",
+            "multiplicity, not unrolled into one scored site per flag. One mutation",
+            "neutralises all of them together, so a kill shows only that *at least one* is",
+            "tested — the discrimination burden falls on the suite (§6's within-class",
+            "criterion), not on this count. Each multiplicity below is read from the",
+            "iterated constant in the source, not recorded by hand.",
+            "",
+            "| Module:line | Decides | Iterated over |",
+            "|---|---|---|",
+        ]
+        for g in multiple:
+            lines.append(
+                f"| `{g.module}:{g.lineno}` | {g.multiplicity} invariants | "
+                f"`{g.condition[:60]}` |"
+            )
+        lines += [
+            "",
+            f"So this package's {len(guards)} static guard sites decide "
+            f"{sum(g.multiplicity for g in guards)} invariants in total.",
+            "",
+        ]
     if config.uncovered_mints:
         lines += [
             "## Mint coverage, and what it does not cover",
@@ -1596,6 +1978,9 @@ def main() -> int:
                     "shape": g.shape,
                     "recorded_in": g.recorded_in,
                     "outcome": g.outcome,
+                    # Present only where the site decides more than one invariant, so a
+                    # package with no such loop keeps a byte-identical inventory file.
+                    **({"multiplicity": g.multiplicity} if g.multiplicity > 1 else {}),
                 }
                 for g in guards
             ],
@@ -1622,8 +2007,11 @@ def main() -> int:
             + "\n"
         )
         write_inventory(config, guards, agreement, leftout, verdict)
+        undeclared = undeclared_except_arms(config)
+        for problem in undeclared:
+            print(f"  EXCEPT ARM HAS NO COLLAPSE SENTINEL: {problem}", file=sys.stderr)
         if (verdict["orphan_exclusions"] or verdict["invalid_exclusions"]
-                or verdict["colliding_exclusions"]):
+                or verdict["colliding_exclusions"] or undeclared):
             for problem in verdict["colliding_exclusions"]:
                 print(f"  EXCLUSION KEY IS AMBIGUOUS: {problem}", file=sys.stderr)
             for problem in verdict["orphan_exclusions"]:

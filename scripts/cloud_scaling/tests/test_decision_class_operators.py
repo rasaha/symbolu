@@ -67,6 +67,35 @@ def dispatch(value):
         return "number"
     else:
         raise Refused("unsupported type")
+
+
+_FLAGS = ("alpha", "beta", "gamma")
+
+
+class Reason:
+    GENERAL = "GENERAL"
+    SPECIFIC = "SPECIFIC"
+    OTHER = "OTHER"
+
+
+def check(record):
+    for flag in _FLAGS:
+        if getattr(record, flag) is not False:
+            raise Refused(flag)
+    return None
+
+
+def evaluate(value):
+    try:
+        return admit(value)
+    except Refused as exc:
+        return _reject(Reason.SPECIFIC, str(exc))
+    except ValueError as exc:
+        return _reject(Reason.GENERAL, str(exc))
+
+
+def _reject(reason, detail):
+    return (reason, detail)
 '''
 
 
@@ -87,6 +116,8 @@ def _synthetic_config(tmp_path: Path, monkeypatch, **overrides):
         tuple_refusals=False,
         recorded=(),
     )
+    # ``Reason`` is already engine-wide (``_BASE_REASON_VOCABULARIES``), so the synthetic
+    # package needs only the operator, and only where a test asks for the class.
     fields.update(overrides)
     return guard_sweep.PackageConfig(**fields)
 
@@ -116,6 +147,123 @@ def test_call_deletion_replaces_the_call_and_leaves_the_bound_one_alone(
     mutated = (tmp_path / "pkg" / "src" / "synthetic" / "shapes.py").read_text()
     assert "    pass\n    bound = _require_thing(value)" in mutated
     compile(mutated, "shapes.py", "exec")
+
+
+# --- D-GC-3: except-arm typed rejection --------------------------------------------
+
+_COLLAPSE = {"Reason": ("GENERAL", "OTHER")}
+
+
+def test_an_except_arm_that_returns_a_reason_member_is_inventoried(tmp_path, monkeypatch):
+    """The class is decidable from the AST: a ``return`` *naming* a reason member.
+
+    The member is an argument here, not the returned value — ``return _reject(Reason.X,
+    …)`` is the idiom every one of ``risk-integration``'s ten arms uses — so a selector
+    that only looked at ``Return.value`` itself would find none of them.
+    """
+
+    config = _synthetic_config(
+        tmp_path,
+        monkeypatch,
+        decision_classes=frozenset({"except-arm"}),
+        reason_collapse_sentinels=_COLLAPSE,
+    )
+    arms = [g for g in guard_sweep.inventory(config) if g.kind == "except-arm"]
+    assert [g.outcome for g in arms] == ["Reason.SPECIFIC", "Reason.GENERAL"]
+    assert [g.collapse_member for g in arms] == ["SPECIFIC", "GENERAL"]
+
+
+def test_the_except_row_points_at_the_except_line(tmp_path, monkeypatch):
+    """A row pointing at the ``return`` is a row a reader cannot check against §4.1,
+    which enumerates the class by its handler lines."""
+
+    config = _synthetic_config(
+        tmp_path,
+        monkeypatch,
+        decision_classes=frozenset({"except-arm"}),
+        reason_collapse_sentinels=_COLLAPSE,
+    )
+    arm = next(g for g in guard_sweep.inventory(config) if g.kind == "except-arm")
+    line = SYNTHETIC.lstrip("\n").splitlines()[arm.lineno - 1]
+    assert line.strip().startswith("except ")
+
+
+def test_reason_collapse_rewrites_the_member_and_leaves_the_refusal_intact(
+    tmp_path, monkeypatch
+):
+    """The weakening direction: still rejected, but for a reason the caller was not owed.
+
+    A suite asserting only "something was rejected" cannot see this, which is exactly the
+    half of §9.1's pair a raise-or-not operator can never reach.
+    """
+
+    config = _synthetic_config(
+        tmp_path,
+        monkeypatch,
+        decision_classes=frozenset({"except-arm"}),
+        reason_collapse_sentinels=_COLLAPSE,
+    )
+    arm = next(
+        g for g in guard_sweep.inventory(config) if g.collapse_member == "SPECIFIC"
+    )
+    guard_sweep.mutate(config, arm, tmp_path / "pkg")
+    path = tmp_path / "pkg" / "src" / "synthetic" / "shapes.py"
+    mutated = path.read_text()
+    assert "return _reject(Reason.GENERAL, str(exc))" in mutated
+    namespace: dict = {}
+    exec(compile(mutated, "shapes.py", "exec"), namespace)  # noqa: S102 - our own source
+    reason, detail = namespace["evaluate"](3)
+    assert detail, "the refusal itself must survive; only its reason may move"
+    assert reason == "GENERAL", "the specific reason was collapsed to the sentinel"
+
+
+def test_an_arm_already_at_the_sentinel_takes_the_alternate(tmp_path, monkeypatch):
+    """Never a no-op. Rewriting a member to itself would be scored SURVIVED and read as
+    a coverage defect in a suite that has none — which is how the audit's operator came
+    to leave two of ``risk-integration``'s ten arms unmeasured."""
+
+    config = _synthetic_config(
+        tmp_path,
+        monkeypatch,
+        decision_classes=frozenset({"except-arm"}),
+        reason_collapse_sentinels=_COLLAPSE,
+    )
+    arm = next(
+        g for g in guard_sweep.inventory(config) if g.collapse_member == "GENERAL"
+    )
+    guard_sweep.mutate(config, arm, tmp_path / "pkg")
+    mutated = (tmp_path / "pkg" / "src" / "synthetic" / "shapes.py").read_text()
+    assert "return _reject(Reason.OTHER, str(exc))" in mutated
+
+
+def test_an_arm_with_no_declared_sentinel_is_refused_not_silently_dropped(
+    tmp_path, monkeypatch
+):
+    """A vocabulary with no operator must fail the inventory run rather than count zero.
+
+    Collapsing across vocabularies would not weaken the refusal — it would produce a
+    program that cannot type-check its own outcome, and the resulting failure would be
+    scored as a kill the guard never earned.
+    """
+
+    config = _synthetic_config(
+        tmp_path, monkeypatch, decision_classes=frozenset({"except-arm"})
+    )
+    assert [g for g in guard_sweep.inventory(config) if g.kind == "except-arm"] == []
+    problems = guard_sweep.undeclared_except_arms(config)
+    assert len(problems) == 2 and all("no sentinel declared" in p for p in problems)
+
+
+def test_the_ten_risk_integration_arms_are_the_ones_the_adr_enumerates():
+    """Guard-coverage ADR §4.1 names its ten sites by line. They are re-derived, not
+    trusted: an inventory that agreed with the ADR only because someone typed the same
+    numbers twice would reconcile with nothing."""
+
+    config = guard_sweep.PACKAGES["risk-integration"]
+    arms = [g for g in guard_sweep.inventory(config) if g.kind == "except-arm"]
+    assert [g.lineno for g in arms] == [187, 191, 195, 199, 211, 222, 230, 242, 248, 254]
+    assert {g.module for g in arms} == {"adapter.py"}
+    assert all(g.collapse_vocabulary == "AdapterRejectionReason" for g in arms)
 
 
 # --- D-GC-5: else-arm refusals -----------------------------------------------------
@@ -443,3 +591,82 @@ def test_it_mints_three_times():
         f"the patched {kind} broke the program under test:\n{result.stdout[-2000:]}"
     )
     assert json.loads(out.read_text(encoding="utf-8"))["mints"] == 3
+
+
+# --- ADR §7.2: loop granularity, ruled at ratification --------------------------------
+
+
+def test_a_guard_in_a_constant_loop_is_one_site_with_a_recorded_multiplicity(
+    tmp_path, monkeypatch
+):
+    """One static site, not three. The multiplicity is read from the iterated tuple."""
+
+    config = _synthetic_config(tmp_path, monkeypatch)
+    looped = [g for g in guard_sweep.inventory(config) if g.multiplicity > 1]
+    assert len(looped) == 1, "the loop is not unrolled into one scored site per flag"
+    assert looped[0].multiplicity == 3
+    assert looped[0].condition == "getattr(record, flag) is not False"
+
+
+def test_a_loop_over_something_the_engine_cannot_size_gets_multiplicity_one(
+    tmp_path, monkeypatch
+):
+    """No guessing: only a module-level name bound to a literal sequence has a length
+    the engine can read off the source, and everything else stays at 1."""
+
+    config = _synthetic_config(tmp_path, monkeypatch)
+    src = tmp_path / "pkg" / "src" / "synthetic" / "shapes.py"
+    src.write_text(
+        src.read_text().replace("for flag in _FLAGS:", "for flag in record.flags:"),
+        encoding="utf-8",
+    )
+    assert all(g.multiplicity == 1 for g in guard_sweep.inventory(config))
+
+
+def test_the_risk_integration_flag_loops_are_measured_not_transcribed():
+    """Guard-coverage ADR §7.2 records "multiplicity 7" for both loops it names, and
+    names two of the four this package has. Measured: ``outcomes.py:118`` is 7,
+    ``projection.py:127`` is **9**, and ``outcomes.py:136`` (6) and
+    ``authenticity.py:267`` (8) are loop-guards §7.2 does not mention. Pinned here so the
+    inventory's numbers stay re-derivable and the divergence stays visible."""
+
+    config = guard_sweep.PACKAGES["risk-integration"]
+    looped = {
+        f"{g.module}:{g.lineno}": g.multiplicity
+        for g in guard_sweep.inventory(config)
+        if g.multiplicity > 1
+    }
+    assert looped == {
+        "outcomes.py:118": 7,
+        "outcomes.py:136": 6,
+        "authenticity.py:267": 8,
+        "projection.py:127": 9,
+    }
+
+
+def test_no_other_package_carries_a_multiplicity_so_their_inventories_do_not_move():
+    """Guard-coverage ADR §1 forecloses renumbering the two Phase 5 inventories, and the
+    multiplicity section is emitted only where a site carries more than one invariant —
+    so this is the property that keeps the other three files byte-identical."""
+
+    for key in ("authorization-contracts", "policy-authenticity", "capacity-bounds-policy"):
+        guards = guard_sweep.inventory(guard_sweep.PACKAGES[key])
+        assert all(g.multiplicity == 1 for g in guards), key
+
+
+def test_risk_integration_declares_all_three_additive_classes():
+    config = guard_sweep.PACKAGES["risk-integration"]
+    assert config.decision_classes == frozenset(
+        {"except-arm", "helper-admission", "else-arm"}
+    )
+    assert config.mint_site == (
+        "ugence_cloud_scaling_risk_integration.projection:project_recommendation"
+    )
+    assert {v for v in config.reason_vocabularies} == {
+        "AdapterRejectionReason",
+        "AdapterOutcomeStatus",
+        "abstention_reason",
+    }
+    # ADR §5: partial mint coverage, both uncovered mints named.
+    assert len(config.uncovered_mints) == 2
+    assert any("adapter.py:276" in site for site, _why in config.uncovered_mints)
