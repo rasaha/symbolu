@@ -1,0 +1,79 @@
+{
+  "schema": "governance-studio-hosting-departure.v1",
+  "title": "Vercel public hosting of the Governance Studio (frontend + backend)",
+  "status": "RATIFIED",
+  "ratified_by": "rasaha",
+  "ratified_on": "2026-08-30",
+  "departs_from": {
+    "record": "apps/ugence-governance-studio/docs/p3e/LIMITATIONS.md",
+    "quote": "not a public-Internet SaaS deployment",
+    "note": "P3E is ratified as single-tenant, private-hosted demonstration hosting. Serving it from Vercel is a public-Internet deployment and therefore a departure from that ratified boundary, recorded here rather than made silently."
+  },
+  "what_is_deployed": "the frontend and the backend together, as one ASGI application, on Vercel",
+  "decisions": {
+    "tls_termination": {
+      "decision": "platform",
+      "rationale": "Vercel terminates TLS at the edge, so the process holds no certificate and the ratified certificate-file check cannot apply.",
+      "implementation": "DeploymentConfig gains an explicit tls_termination mode. In 'platform' mode the certificate-file checks are replaced by ForwardedProtoGuardMiddleware, which refuses any request whose forwarded client leg is not https.",
+      "not_a_relaxation": "HTTPS remains mandatory. Enforcement is relocated from a certificate to a per-request check, and fails closed: a missing forwarded-protocol header is refused rather than assumed secure.",
+      "guardrail": "'platform' mode is rejected in configuration unless the proxy is trusted, because reading that header from an untrusted peer would let a client assert its own transport security."
+    },
+    "spa_behind_auth": {
+      "decision": "route every request through the Python function",
+      "rationale": "the access gate is ASGI middleware; anything the CDN serves directly would bypass it",
+      "consequence": "the SPA, its assets and the API are all behind the same Basic-auth gate, as in the container. Cold starts are slower and there is no CDN caching; accepted for a demonstration deployment."
+    },
+    "brute_force_cooldown": {
+      "decision": "accept degradation, recorded",
+      "finding": "FailureTracker holds failure counts in memory. Serverless instances do not share memory, so an attacker landing on a fresh instance meets a zeroed counter.",
+      "consequence": "the bounded-cooldown property of gate P3E-CTR-08 DOES NOT HOLD in this deployment. It is materially weaker than the container deployment.",
+      "compensating_control": "none implemented. A durable shared store would restore it and was not built.",
+      "owner_advice_recorded": "credential strength is the effective defence here; provision a high-entropy password"
+    }
+  },
+  "preserved_from_p3e": [
+    "authenticated access to every path, including the SPA",
+    "no default credentials; Argon2id password hashing",
+    "trusted-host and cross-origin guards",
+    "strict security headers including HSTS and a CSP with no unsafe-* or wildcards",
+    "request body size cap",
+    "synthetic-data boundary: the pinned, hashed fixture manifest is verified at cold start and the application refuses to build on drift",
+    "no permission granting, no runtime provisioning, no agent execution, no business-action authorization"
+  ],
+  "weakened_or_inapplicable": {
+    "brute_force_cooldown": "WEAKENED - see decisions.brute_force_cooldown",
+    "p3e_ctr_gate_family": {
+      "status": "INAPPLICABLE_TO_THIS_DEPLOYMENT",
+      "reason": "all thirteen P3E-CTR gates verify a built OCI image - non-root uid, single exposed port, read-only root filesystem, image layer secret scan, image vulnerability scan, clean-checkout rebuild. Vercel does not run that image.",
+      "consequence": "this deployment carries NO container gate evidence. It is not gated by the P3E-CTR family, and no P3E-CTR gate may be described as passed, satisfied or waived on account of it. Every P3E-CTR gate remains NOT_EXECUTED.",
+      "not_a_retirement": "the P3E-CTR family and the container deployment it describes are unchanged by this record"
+    },
+    "startup_integrity_report": "the container's fail-closed startup integrity sequence and its written report are not reproduced; the entrypoint performs the configuration and synthetic-bundle checks only"
+  },
+  "unchanged": {
+    "synthetic_data_only": true,
+    "openapi_sha256": "dc309eab216e1a4c2f63f286887a4ef218a96ac34f8fa8614bff176db7c36656",
+    "base_images_json": "untouched",
+    "dockerfile": "untouched",
+    "base_image_digests": "untouched",
+    "mirror_credentials": "not implemented"
+  },
+  "not_claimed": [
+    "production certification",
+    "pilot validation",
+    "multitenancy, SSO, SCIM or RBAC",
+    "container gate evidence of any kind",
+    "suitability for real, customer or enterprise data"
+  ],
+  "verification_performed": {
+    "ratified_code_regression": "the full deployment suite passes unchanged after the config and middleware change",
+    "new_tests": "deployment/governance-studio/tests/test_platform_tls.py - twelve tests covering that the container mode still requires certificates, that platform mode is refused without a trusted proxy, that a missing or plaintext forwarded protocol is refused before the auth gate reads any credential, and that authentication still applies over https",
+    "end_to_end": "the Vercel entrypoint was built and exercised locally: unauthenticated SPA and API requests return 401, authenticated requests return 200 and serve all four scenarios, a request without a forwarded-protocol header returns 400, and HSTS, CSP and nosniff headers are present",
+    "not_verified": "no deployment to Vercel was performed or observed from this environment. The Vercel project configuration - build, function packaging, routing and dependency installation - is unverified against the platform."
+  },
+  "residual_risks": [
+    "the repository-root requirements.txt carries research and training dependencies; the function must install api/requirements.txt instead, and a build that picks up the root file will fail or bloat",
+    "cold start executes the synthetic-bundle verification on every new instance, adding latency",
+    "the deployment is publicly reachable, so the credential is the only barrier and the cooldown does not hold"
+  ]
+}
