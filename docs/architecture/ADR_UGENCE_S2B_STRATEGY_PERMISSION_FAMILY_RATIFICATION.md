@@ -342,3 +342,38 @@ supersedes it.
 The Agentic Proposer remains at `0.3.0` with fifty-one authorized public names, and Policy
 Authority at `0.1.0` with sixty-six, until the change sets `S2B-PF-IMPL` and `S2B-PF-G=B`
 authorize are themselves written.
+
+---
+
+## 9. Prose-maintenance rulings, recorded (2026-08-30) `[R]`
+
+**These are prose-maintenance authorizations only.** They assign **no new `OD` or `S2B-D`
+number**, reopen **no** prior ruling, and change nothing this ADR ratified. They exist
+because §6 above records four present-tense sites as a standing `[G]`, and because the
+owner has since ruled on correcting them; without this section the repository's own
+decision record would lag rulings already executed against it.
+
+| Ruling | Date | Scope |
+|---|---|---|
+| `STALE_SITES=ALL_FOUR` | 2026-08-30 | Correct the four stale present-tense statements at design `§8.1` — `version.py` (the `0.3.0` block), `contracts.py`, `tests/test_s2b_strategy_permission.py` and `tests/s1_specification_mirror.py` — as one separate, non-behavioural change set after the `0.3.1` boundary hardening merged. Comments and docstrings only. |
+| `PR1515_SELF_REFERENCE=CORRECT_IN_PR` | 2026-08-30 | Correct, inside that same change set, the `version.py` `0.3.1` statement that the four `§8.1` sites "stay as they are" — made false by the change set itself. Adds authority over no other site. |
+| `ADDITIONAL_STALE_SITES=EXACT_FIVE` | 2026-08-30 | One further documentation-maintenance change covering exactly five sites in three files: `README.md` (two), `docs/S1_CONTRACT_AND_EQUATION_SPECIFICATION.md` (two), and `verify_agentic_proposer_distribution.py` (one comment). Historical statements preserved as history and marked superseded; neither `CHANGELOG` rewritten. |
+
+`[R]` **What none of the three authorizes.** No source behaviour, assertion, contract,
+validator, public surface, version, package metadata, `public_api.json`, CI workflow,
+role-projection scan or platform-freeze artifact. Not the two garbage-response classes
+disclosed in the `0.3.1` prose — a type-alien field value, and an attribute that raises on
+a later read — which remain a different, unruled class. Not Agent Constitution work.
+
+`[R]` **§6's `[G]` is closed as to authorization, not re-opened as to substance.** §6
+recorded that whether to correct `contracts.py` "was deliberately not on this ballot" and
+was "**not** authorized by `S2B-PF-G=B`". Both statements remain accurate about that
+ballot and that ruling. `STALE_SITES=ALL_FOUR` is a **later, separate** owner ruling that
+settles the question §6 left open; it does not amend `S2B-PF-G=B`, whose scope stays
+exactly what §2 and §3.1 record.
+
+`[I]` The distinction §7 draws still holds and is not softened here: the strategy-permission
+family and the concrete resolver now exist as repository facts, in separate integration
+distributions with their own end-to-end proof. That is not the same as any **given
+deployment** having a policy issued and configured, which remains outside this package and
+unknowable from it.
