@@ -32,6 +32,7 @@ from _policy_fixtures import (
     verifier_for,
 )
 from ugence_cloud_scaling_policy_authenticity import PolicyAuthenticityOutcome as O
+from ugence_cloud_scaling_policy_authenticity.verification import _CARRIED_INSTANTS
 
 pytestmark = pytest.mark.skipif(
     phase5a_builders() is None,
@@ -60,17 +61,23 @@ class _Sneaky(dt.datetime):
 _BEFORE = dt.datetime(2026, 1, 1, 0, 5, 0, tzinfo=dt.timezone.utc)
 _AFTER = dt.datetime(2026, 1, 1, 0, 7, 0, tzinfo=dt.timezone.utc)
 
-#: Each of the six, with the value that isolates its own guard and the refusal an honest
-#: ``datetime`` at that value earns. Asserting the honest reason is what keeps each row
-#: measuring its own field rather than some sibling answering for it.
-CASES = (
-    ("subject_valid_from_fact", _AFTER, O.CANDIDATE_RECOMMENDATION_NOT_YET_VALID),
-    ("subject_valid_until_fact", _BEFORE, O.CANDIDATE_RECOMMENDATION_EXPIRED),
-    ("subject_asserted_at_fact", _AFTER, O.CANDIDATE_FACT_NOT_YET_OCCURRED),
-    ("decision_evaluated_at_fact", _AFTER, O.CANDIDATE_FACT_NOT_YET_OCCURRED),
-    ("decision_expires_at_fact", _BEFORE, O.CANDIDATE_DECISION_EXPIRED),
-    ("attestation_issued_at_fact", _AFTER, O.CANDIDATE_FACT_NOT_YET_OCCURRED),
-)
+#: For each carried instant, the value that isolates its own guard and the refusal an
+#: honest ``datetime`` at that value earns. Asserting the honest reason is what keeps each
+#: row measuring its own field rather than some sibling answering for it.
+#:
+#: Keyed by member name, consulted per production member: the behavioral parametrization
+#: below iterates ``_CARRIED_INSTANTS`` itself (guard-coverage ADR §7.2's suite burden,
+#: extended to this package by ADR §10), so an instant *added* to production fails here
+#: with a ``KeyError`` instead of going silently untested, and an instant *removed* fails
+#: the frozen-membership pin at the bottom of this module.
+CASE_BY_FIELD = {
+    "subject_valid_from_fact": (_AFTER, O.CANDIDATE_RECOMMENDATION_NOT_YET_VALID),
+    "subject_valid_until_fact": (_BEFORE, O.CANDIDATE_RECOMMENDATION_EXPIRED),
+    "subject_asserted_at_fact": (_AFTER, O.CANDIDATE_FACT_NOT_YET_OCCURRED),
+    "decision_evaluated_at_fact": (_AFTER, O.CANDIDATE_FACT_NOT_YET_OCCURRED),
+    "decision_expires_at_fact": (_BEFORE, O.CANDIDATE_DECISION_EXPIRED),
+    "attestation_issued_at_fact": (_AFTER, O.CANDIDATE_FACT_NOT_YET_OCCURRED),
+}
 
 
 def _forged(candidate, field, value):
@@ -134,10 +141,15 @@ def test_a_forged_but_exactly_typed_candidate_reaches_the_window_guards_unchange
 
 
 @pytest.mark.adversarial
-@pytest.mark.parametrize("field, value, honest_reason", CASES, ids=[c[0] for c in CASES])
-def test_a_lying_instant_cannot_satisfy_its_own_window(field, value, honest_reason):
-    """Each of the six, one at a time, with the honest control that proves it is not vacuous."""
+@pytest.mark.parametrize("field", _CARRIED_INSTANTS)
+def test_a_lying_instant_cannot_satisfy_its_own_window(field):
+    """Each of the six, one at a time, with the honest control that proves it is not vacuous.
 
+    Parametrized over the production tuple, so the six cannot drift from what the gate
+    actually iterates; ``CASE_BY_FIELD`` supplies each member's isolating value and reason.
+    """
+
+    value, honest_reason = CASE_BY_FIELD[field]
     authority, record, candidate = _chain()
 
     # Control: the same forgery carrying a plain ``datetime`` earns this field's own refusal.
@@ -158,8 +170,8 @@ def test_all_six_lying_at_once_are_refused_and_the_first_is_named():
 
     authority, record, candidate = _chain()
     forged = candidate
-    for field, value, _reason in CASES:
-        forged = _forged(forged, field, _lying(value))
+    for field in _CARRIED_INSTANTS:
+        forged = _forged(forged, field, _lying(CASE_BY_FIELD[field][0]))
 
     result = _verify(forged, authority, record)
     assert result.outcome is O.CANDIDATE_FACT_NOT_EXACT_INSTANT
@@ -191,6 +203,30 @@ def test_the_other_routes_past_post_init_are_refused_too(route):
     result = _verify(revived, authority, record)
     assert result.outcome is O.CANDIDATE_FACT_NOT_EXACT_INSTANT
     assert result.verified_policy is None
+
+
+@pytest.mark.invariant
+def test_the_carried_instant_membership_is_frozen():
+    """The independent half of deriving from production (guard-coverage ADR §10).
+
+    Parametrizing over ``_CARRIED_INSTANTS`` means an added member is exercised (or fails
+    ``CASE_BY_FIELD`` loudly) — but it also means a member *removed* from production would
+    silently remove its test. This pin names the exact expected six, so membership can
+    shrink only by failing here, and the disclosed multiplicity of ``verification.py:1026``
+    stays re-derivable: one static site, six carried-instant invariants.
+    """
+
+    assert _CARRIED_INSTANTS == (
+        "subject_valid_from_fact",
+        "subject_valid_until_fact",
+        "subject_asserted_at_fact",
+        "decision_evaluated_at_fact",
+        "decision_expires_at_fact",
+        "attestation_issued_at_fact",
+    )
+    assert tuple(CASE_BY_FIELD) == _CARRIED_INSTANTS, (
+        "every production member has exactly one isolating case, in declaration order"
+    )
 
 
 @pytest.mark.invariant

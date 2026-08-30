@@ -538,4 +538,42 @@ occurrence facts `[V: measured]`. Disclosing them would rewrite an inventory §1
 so multiplicity disclosure is a per-package opt-in, on for `risk-integration` alone, and
 these two are recorded here as a **Phase 5B follow-up requiring explicit ratification**
 before that package's inventory moves. A test pins both sites so the finding cannot be
-lost while it waits.
+lost while it waits. *(Ruled 2026-08-30 — §10.)*
+
+## §10. §9.e ruled — multiplicity disclosure for `policy-authenticity`, 2026-08-30
+
+**Ruled by the owner, 2026-08-30: §7.2's static-site multiplicity doctrine extends to
+`cloud-scaling-policy-authenticity`, for exactly the two sites §9.e carried forward.**
+This is the explicit ratification §9.e required before that package's inventory moved.
+§1's reservation is amended this far and no further: nothing else in what
+`authorization-contracts` or `policy-authenticity` record changes.
+
+* `verification.py:1026` remains one static guard site (inventory index 113) and
+  discloses multiplicity **6**, read off `_CARRIED_INSTANTS`.
+* `verification.py:1076` remains one static guard site (index 117) and discloses
+  multiplicity **3**, read off `_OCCURRENCE_FACTS`.
+* The package remains at **119 static guard sites** and now reports **126 protected
+  invariants** `[V: regenerated with --inventory-only; guard_classification.json
+  byte-identical]`.
+
+Disclosure-only, in §7.2's sense: neither loop is unrolled, and the sweep's denominator
+does not move — no guard index, condition, shape, kind, terminal classification, mutation
+operator, or refusal behavior changes. `record_multiplicity` stays a per-package opt-in;
+the ruled adopters are `risk-integration` (§7.2) and `policy-authenticity` (this section),
+and `scripts/cloud_scaling/tests/test_decision_class_operators.py` pins that set together
+with explicit negatives for the two packages that have no ruling.
+
+The suite burden §7.2 places on a disclosed loop was **measured discharged before this
+ruling**: each of the six carried instants and each of the three occurrence facts is
+forged or violated individually, and the refusal must name that member — 9/9 passed
+`[V: tests/test_candidate_instant_typing.py::test_a_lying_instant_cannot_satisfy_its_own_window ×6,
+tests/test_candidate_validity.py::test_every_occurrence_fact_is_enforced_not_just_the_first ×3]`.
+What changed at implementation is structural, matching `risk-integration`'s
+`test_authority_flag_multiplicity.py`: both parametrizations now iterate the production
+tuples themselves, and each tuple's exact membership is pinned independently
+(`test_the_carried_instant_membership_is_frozen`,
+`test_the_occurrence_fact_membership_is_frozen`), so a member added to production cannot
+go silently untested and a member removed cannot silently shrink the suite.
+
+Nothing else is decided here; in particular, no `else`-arm or nested-`if` classification
+question is reopened or resolved by this ruling.

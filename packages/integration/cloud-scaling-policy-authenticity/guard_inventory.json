@@ -1135,7 +1135,8 @@
       "kind": "if",
       "shape": "typed-refusal tuple",
       "recorded_in": "",
-      "outcome": "CANDIDATE_FACT_NOT_EXACT_INSTANT"
+      "outcome": "CANDIDATE_FACT_NOT_EXACT_INSTANT",
+      "multiplicity": 6
     },
     {
       "index": 114,
@@ -1175,7 +1176,8 @@
       "kind": "if",
       "shape": "typed-refusal tuple",
       "recorded_in": "",
-      "outcome": "CANDIDATE_FACT_NOT_YET_OCCURRED"
+      "outcome": "CANDIDATE_FACT_NOT_YET_OCCURRED",
+      "multiplicity": 3
     },
     {
       "index": 118,

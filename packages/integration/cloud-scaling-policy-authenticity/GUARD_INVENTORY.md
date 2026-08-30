@@ -10,6 +10,23 @@ below: Phase 5A raises; Phase 5B also returns `_refuse(...)` at a gate and
 another is not a stylistic choice — a raise-only reading of this package would miss
 49 of the guards below.
 
+## Static sites that decide more than one invariant
+
+Guard-coverage ADR §7.2, ruled at ratification: a guard inside a loop over a
+fixed set of flags is **one** static site with a recorded semantic
+multiplicity, not unrolled into one scored site per flag. One mutation
+neutralises all of them together, so a kill shows only that *at least one* is
+tested — the discrimination burden falls on the suite (§6's within-class
+criterion), not on this count. Each multiplicity below is read from the
+iterated constant in the source, not recorded by hand.
+
+| Module:line | Decides | Iterated over |
+|---|---|---|
+| `verification.py:1026` | 6 invariants | `type(value) is not datetime` |
+| `verification.py:1076` | 3 invariants | `instant < occurred_at` |
+
+So this package's 119 static guard sites decide 126 invariants in total.
+
 ## Reconciliation with the recorded inventories
 
 This package records no prior inventory; this is the first one.
