@@ -1,0 +1,60 @@
+# Vercel build context for the Governance Studio demo/serverless hosting profile.
+#
+# Allowlist, not a denylist: the repository is ~500 MB across 18k tracked files, and
+# only the paths the function serves and the frontend build needs belong in the
+# upload. Everything is excluded first, then the required paths are re-included.
+#
+# NOTE, deliberate: the repository-root requirements.txt is re-included below even
+# though the function must NOT be built from it. Excluding it here would silently
+# decide the dependency question by omission; it has to stay visible so the preview
+# build log shows which requirements file the platform actually chooses. The
+# entrypoint fails closed if that choice brings in a forbidden SDK.
+
+*
+
+# --- build + function entrypoint ---------------------------------------------
+!vercel.json
+!requirements.txt
+!api/
+!api/**
+
+# --- frontend: built by the Vercel build command ------------------------------
+!apps/
+!apps/ugence-governance-studio/
+!apps/ugence-governance-studio/frontend/
+!apps/ugence-governance-studio/frontend/**
+apps/ugence-governance-studio/frontend/node_modules/
+apps/ugence-governance-studio/frontend/test-results/
+apps/ugence-governance-studio/frontend/e2e/
+apps/ugence-governance-studio/frontend/tests/
+
+# --- synthetic scenarios + frozen contract served by the API ------------------
+!apps/ugence-governance-studio/demo_data/
+!apps/ugence-governance-studio/demo_data/**
+!apps/ugence-governance-studio/contracts/
+!apps/ugence-governance-studio/contracts/**
+!apps/ugence-governance-studio/backend/
+!apps/ugence-governance-studio/backend/src/
+!apps/ugence-governance-studio/backend/src/**
+
+# --- deployment wrapper + its pinned synthetic manifest ------------------------
+!deployment/
+!deployment/governance-studio/
+!deployment/governance-studio/src/
+!deployment/governance-studio/src/**
+!deployment/governance-studio/synthetic-scenarios-manifest.json
+
+# --- local packages the function imports --------------------------------------
+!packages/
+!packages/capabilities/
+!packages/capabilities/agent-workforce-composer/
+!packages/capabilities/agent-workforce-composer/src/
+!packages/capabilities/agent-workforce-composer/src/**
+!packages/tooling/
+!packages/tooling/policy-workflow-compiler/
+!packages/tooling/policy-workflow-compiler/src/
+!packages/tooling/policy-workflow-compiler/src/**
+
+# --- never ship compiled or cached artefacts ----------------------------------
+**/__pycache__/
+**/*.pyc

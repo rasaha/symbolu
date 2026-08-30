@@ -34,6 +34,43 @@ for _rel in (
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
+# Model and agent SDKs the P3E boundary forbids. Kept in step with
+# deployment/governance-studio/tests/test_egress.py::BANNED_SDKS, which asserts none
+# is *imported* at runtime. That check cannot see a package that is merely installed,
+# and the repository-root requirements.txt declares two of these, so if the platform
+# installs the wrong requirements file the SDKs would sit in the bundle and the SBOM
+# one import away while the runtime test stayed green. This guard closes that gap by
+# refusing to build at all when one is present.
+BANNED_MODEL_SDKS = ["openai", "anthropic", "google.generativeai", "cohere",
+                     "boto3", "litellm", "mistralai", "vertexai"]
+
+
+def assert_no_model_sdk_installed(banned=None):
+    """Fail closed if a forbidden SDK is importable in this environment.
+
+    Uses find_spec rather than import: presence is the violation, and executing a
+    third-party module to detect it would defeat the point.
+    """
+    import importlib.util
+
+    found = []
+    for name in (banned if banned is not None else BANNED_MODEL_SDKS):
+        top = name.split(".")[0]
+        try:
+            if importlib.util.find_spec(top) is not None:
+                found.append(name)
+        except (ImportError, ValueError):
+            continue
+    if found:
+        raise RuntimeError(
+            "MODEL_SDK_BOUNDARY_FAILED: forbidden SDK(s) present in the deployment "
+            f"environment: {sorted(set(found))}. The Governance Studio deployment must "
+            "not carry model or agent SDKs. The most likely cause is the platform "
+            "installing the repository-root requirements.txt instead of "
+            "api/requirements.txt; diagnose the build log rather than suppressing this."
+        )
+
+
 from governance_studio_deployment.app import build_app  # noqa: E402
 from governance_studio_deployment.config import DeploymentConfig  # noqa: E402
 from governance_studio_deployment.synthetic import (  # noqa: E402
@@ -47,6 +84,9 @@ MANIFEST = os.path.join(_ROOT, "deployment/governance-studio/synthetic-scenarios
 
 
 def _build():
+    # Before anything else: the deployment must not carry model or agent SDKs.
+    assert_no_model_sdk_installed()
+
     config = DeploymentConfig.from_env(
         mode="production",
         # Vercel terminates TLS and sets x-forwarded-proto; the guard enforces it.
