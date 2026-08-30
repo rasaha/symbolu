@@ -27,8 +27,29 @@
       "decision": "accept degradation, recorded",
       "finding": "FailureTracker holds failure counts in memory. Serverless instances do not share memory, so an attacker landing on a fresh instance meets a zeroed counter.",
       "consequence": "the bounded-cooldown property of gate P3E-CTR-08 DOES NOT HOLD in this deployment. It is materially weaker than the container deployment.",
-      "compensating_control": "none implemented. A durable shared store would restore it and was not built.",
-      "owner_advice_recorded": "credential strength is the effective defence here; provision a high-entropy password"
+      "compensating_control": {
+        "selected": "Vercel WAF rate limiting",
+        "selected_by": "rasaha",
+        "selected_on": "2026-08-30",
+        "scope": "per source IP, across the whole Python-routed application (every path, since all requests are rewritten to the function)",
+        "initial_threshold": "60 requests per minute, responding 429",
+        "validation_required_before_the_pr_is_ready": "confirm one authenticated page load followed by a full scenario walkthrough stays comfortably below 60 requests per minute, so the limit never fires during ordinary demonstration use",
+        "credential_requirement": "a cryptographically generated password of at least 32 random bytes",
+        "evidence_class": "EXTERNAL_DEPLOYMENT_EVIDENCE",
+        "evidence_class_note": "The WAF rule is platform configuration, not behaviour of this application, and it is recorded as such. It is NOT application behaviour and does NOT satisfy gate P3E-CTR-08, whose bounded per-source cooldown is an application property this deployment does not provide.",
+        "rejected_alternatives": [
+          {
+            "option": "IP allowlist",
+            "reason": "the demonstration must be shareable"
+          },
+          {
+            "option": "identity-provider integration",
+            "reason": "out of scope for this change; it would supersede the deployment access gate entirely and is a larger change than this branch"
+          }
+        ]
+      },
+      "owner_advice_recorded": "credential strength is the effective defence here; provision a high-entropy password",
+      "nonconformance_status": "REMAINS OPEN. The WAF rule mitigates the exposure; it does not restore the property. The ineffective cross-instance cooldown stays an explicit P3E nonconformance for as long as this deployment exists."
     }
   },
   "preserved_from_p3e": [
@@ -63,7 +84,8 @@
     "pilot validation",
     "multitenancy, SSO, SCIM or RBAC",
     "container gate evidence of any kind",
-    "suitability for real, customer or enterprise data"
+    "suitability for real, customer or enterprise data",
+    "that the WAF rate limit satisfies or substitutes for gate P3E-CTR-08"
   ],
   "verification_performed": {
     "ratified_code_regression": "the full deployment suite passes unchanged after the config and middleware change",
