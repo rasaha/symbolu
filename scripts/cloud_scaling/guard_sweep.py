@@ -128,10 +128,36 @@ class PackageConfig:
     #: mutated, no mutation is a no-op, and which member each arm was collapsed to is
     #: read back from the source rather than assumed.
     #:
+    #: Be exact about what the alternate does. The sentinel carries §4.1's weakening
+    #: direction — a *general* reason where a specific one was owed. The alternate does
+    #: not: for the arms that already produce the sentinel it substitutes a different
+    #: *specific* reason, which is a lateral swap. It is still only visible to a test that
+    #: reads the reason, so it measures the same contract; but "authority-weakening" is
+    #: true of the sentinel and not of the alternate, and a pair is not the single fixed
+    #: member §4.1 names. Recorded for the owner rather than asserted as ratified.
+    #:
     #: A vocabulary with no entry here has no operator, so an arm naming only members of
     #: such a vocabulary is *not* silently mis-mutated into a different enum's member: it
     #: is reported by ``undeclared_except_arms`` and fails the inventory run.
     reason_collapse_sentinels: dict = field(default_factory=dict)
+    #: Whether this package's inventory *discloses* semantic multiplicity — guard-coverage
+    #: ADR §7.2, ruled at ratification. ``Guard.multiplicity`` is computed for every
+    #: package regardless, because a number the engine declines to compute is a number
+    #: nobody can check; this governs only whether the inventory reports it.
+    #:
+    #: Opt-in for the same reason the additive classes are. §7.2 was ruled inside the
+    #: guard-coverage ADR, and §1 of that ADR says nothing in it changes what
+    #: ``authorization-contracts`` or ``policy-authenticity`` record. Switching disclosure
+    #: on for a package rewrites its checked-in inventory, so it is the owner's call, not
+    #: a side effect of an engine fix.
+    #:
+    #: This is not hypothetical. Teaching the sizer to read annotated constants
+    #: (``_CARRIED_INSTANTS: Final = (...)``) revealed two real loop-guards in
+    #: ``policy-authenticity`` — ``verification.py:1026`` over six carried instants and
+    #: ``verification.py:1076`` over three occurrence facts — that no inventory has ever
+    #: disclosed. They are recorded here for the owner rather than published into a file
+    #: §1 reserves.
+    record_multiplicity: bool = False
 
     @property
     def src(self) -> Path:
@@ -291,11 +317,13 @@ PACKAGES = {
             "adapter.py",
         ),
         # Phase 4C refuses in three shapes, not one. Most gates raise; the adapter's own
-        # gates *return* a typed outcome through ``self._rejected(...)`` or
-        # ``self._abstained(...)``. Declaring both names the real idiom at gate 2 rather
-        # than reporting it as a generic call to something that happens to raise; the
-        # ``if``-layer count is 74 either way, and it is the *shape* column that a reader
-        # checks a gate against.
+        # gates *return* a typed outcome. Only ``_abstained`` does so from an ``if`` body
+        # — gate 2 at ``adapter.py:205`` — and declaring it names that idiom rather than
+        # reporting it as a generic call to something that happens to raise. Every one of
+        # the ten ``self._rejected(...)`` calls is inside an ``except`` arm, so on the
+        # ``if`` layer that name is inert; it is declared because it *is* this package's
+        # refusal call, and D-GC-3 reads the same vocabulary from the same sites. The
+        # ``if``-layer count is 74 under either declaration.
         refusal_calls=frozenset({"_rejected", "_abstained"}),
         # No ``(_Outcome.X, "…")`` tuple idiom here: this package returns a constructed
         # ``CloudScalingRiskOutcome``, never a pair.
@@ -330,6 +358,8 @@ PACKAGES = {
         reason_collapse_sentinels={
             "AdapterRejectionReason": ("UNSUPPORTED_INPUT_TYPE", "PROJECTION_FAILED"),
         },
+        # §7.2's ruling is about this package's flag loops, so this package discloses them.
+        record_multiplicity=True,
         # Partial, and disclosed. Guard-coverage ADR §5 accepts partial mint coverage only
         # when the uncovered mints are named.
         uncovered_mints=(
@@ -720,6 +750,14 @@ def _except_arm_sites(tree, config: PackageConfig) -> tuple:
     ``reason_collapse_sentinels`` is returned as *undeclared* and fails the inventory run,
     where a reader can see the vocabulary that needs an operator.
 
+    *One row per handler.* Where a handler names more than one member, the first in source
+    order is the one collapsed, and the rest are not separately inventoried — the same
+    shape of limitation ``_else_arm_sites`` records, and latent for the same reason: no
+    handler in either configured package names two. ``_except_arm_members`` also walks a
+    nested ``def`` or ``lambda`` inside a handler, so a ``return`` from one would be
+    attributed to the enclosing handler; likewise latent, and likewise recorded rather
+    than narrowed here.
+
     Returns ``(sites, undeclared)``.
     """
 
@@ -768,20 +806,54 @@ def undeclared_except_arms(config: PackageConfig) -> list:
 def _loop_multiplicity(tree) -> dict:
     """``id(node)`` → how many times the enclosing loops run it — ADR §7.2's multiplicity.
 
-    Only loops over a **module-level name bound to a literal sequence** count, because
-    only those have a length the engine can read off the source. ``for flag in
+    Only loops over a **module-level name bound once to a literal sequence** count,
+    because only those have a length the engine can read off the source. ``for flag in
     _AUTHORITY_FLAGS:`` qualifies; ``for row in rows:`` does not, and gets multiplicity 1
     rather than a guess.
 
     Nested qualifying loops multiply. A ``for``-``else`` arm does not: it runs once
     regardless of the iterable's length.
+
+    Three ways this used to be wrong, each measured on a synthetic tree before being
+    closed. Two of them over-counted, which is the direction that matters: a multiplicity
+    is a claim about how many invariants one mutation neutralises, and an inflated one
+    credits a site with invariants it does not decide.
+
+    * **Annotated constants were invisible.** ``FLAGS: Final = ("a", "b")`` is an
+      ``AnnAssign``, not an ``Assign``, so a real constant read as multiplicity 1. This
+      package already writes ``PROJECTION_SCHEMA_VERSION: Final[str]``, so the shape is
+      one edit away from a flag tuple.
+    * **A rebound name kept its first length.** A name assigned twice at module level, or
+      extended with ``+=``, is not a constant this function can size, so any name bound
+      more than once is dropped rather than sized from whichever binding came first.
+    * **A local or parameter of the same name inherited the module's length.** The
+      function does not resolve scopes, so a ``def f(_AUTHORITY_FLAGS):`` shadowing the
+      module constant used to multiply by the module's length. Names bound anywhere
+      inside the enclosing function — parameter, assignment, ``for`` target, ``with`` or
+      comprehension target — are therefore dropped for that function's subtree.
     """
 
-    sizes = {}
+    counts = {}
+    annotated = []
     for node in tree.body:
-        if not isinstance(node, ast.Assign):
+        if isinstance(node, ast.Assign):
+            targets = [t for t in node.targets if isinstance(t, ast.Name)]
+            value = node.value
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            targets = [node.target]
+            value = node.value
+        elif isinstance(node, ast.AugAssign) and isinstance(node.target, ast.Name):
+            # ``FLAGS += (...)`` rebinds; the name is no longer a single literal.
+            counts[node.target.id] = counts.get(node.target.id, 0) + 2
             continue
-        value = node.value
+        else:
+            continue
+        for target in targets:
+            counts[target.id] = counts.get(target.id, 0) + 1
+        annotated.append((targets, value))
+
+    sizes = {}
+    for targets, value in annotated:
         if (
             isinstance(value, ast.Call)
             and getattr(value.func, "id", None) in {"frozenset", "tuple", "set", "list"}
@@ -792,13 +864,19 @@ def _loop_multiplicity(tree) -> dict:
             continue
         if not all(isinstance(element, ast.Constant) for element in value.elts):
             continue
-        for target in node.targets:
-            if isinstance(target, ast.Name):
-                sizes[target.id] = len(value.elts)
+        for target in targets:
+            sizes[target.id] = len(value.elts)
+    # Bound more than once at module level: not a constant, whatever the first binding was.
+    sizes = {name: size for name, size in sizes.items() if counts.get(name) == 1}
 
     multiplicity = {}
 
-    def descend(node, factor: int) -> None:
+    def descend(node, factor: int, visible: dict) -> None:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+            visible = {
+                name: size for name, size in visible.items()
+                if name not in _names_bound_in(node)
+            }
         for name, value in ast.iter_fields(node):
             children = value if isinstance(value, list) else [value]
             inner = factor
@@ -807,14 +885,40 @@ def _loop_multiplicity(tree) -> dict:
                 and name == "body"
                 and isinstance(node.iter, ast.Name)
             ):
-                inner = factor * sizes.get(node.iter.id, 1)
+                inner = factor * visible.get(node.iter.id, 1)
             for child in children:
                 if isinstance(child, ast.AST):
                     multiplicity[id(child)] = inner
-                    descend(child, inner)
+                    descend(child, inner, visible)
 
-    descend(tree, 1)
+    descend(tree, 1, sizes)
     return multiplicity
+
+
+def _names_bound_in(node) -> set:
+    """Every name this function binds — so a shadowed module constant stops being one.
+
+    Parameters included, because a parameter is the case that made this necessary: a
+    ``def f(_AUTHORITY_FLAGS):`` iterating its own argument was multiplied by the module
+    constant's length, crediting one static guard with seven invariants it never decided.
+    """
+
+    bound = set()
+    arguments = getattr(node, "args", None)
+    if isinstance(arguments, ast.arguments):
+        for group in (
+            arguments.posonlyargs, arguments.args, arguments.kwonlyargs,
+        ):
+            bound.update(argument.arg for argument in group)
+        for solo in (arguments.vararg, arguments.kwarg):
+            if solo is not None:
+                bound.add(solo.arg)
+    for inner in ast.walk(node):
+        if isinstance(inner, ast.Name) and isinstance(inner.ctx, (ast.Store, ast.Del)):
+            bound.add(inner.id)
+        elif isinstance(inner, (ast.Global, ast.Nonlocal)):
+            bound.update(inner.names)
+    return bound
 
 
 def _else_arm_sites(tree, config: PackageConfig, helpers: frozenset) -> list:
@@ -827,15 +931,26 @@ def _else_arm_sites(tree, config: PackageConfig, helpers: frozenset) -> list:
     ``elif`` chains are excluded: an ``elif`` is an ``If`` of its own and is already
     inventoried on the ``if`` layer with its own condition.
 
-    **Known limitation, latent in both swept packages.** A nested ``if/else`` inside an
+    **Known limitation, and it is no longer latent.** A nested ``if/else`` inside an
     ``else`` yields two rows whose spans nest, because the outer arm's body *reaches* the
     inner refusal. Mutating the outer one deletes the inner dispatch with it, so one
-    refusal is counted and killed twice — denominator inflation, never a false kill. The
-    class has no such member here: ``capacity-bounds-policy`` has zero ``else-arm`` rows,
-    and the one member the ADR found in ``risk-integration`` (``authenticity.py:432``) is
-    a bare ``else: raise``. Narrowing the class to arms that refuse *directly* would fix
-    it, but that narrows a ratified definition, so it is recorded for the owner rather
-    than decided here.
+    refusal is counted and killed twice — denominator inflation, never a false kill.
+
+    ``capacity-bounds-policy`` still has zero ``else-arm`` rows. ``risk-integration`` has
+    **two**, and the second is exactly this case: ``outcomes.py:159``, whose mutation span
+    ``(160,12)-(171,17)`` contains guards ``outcomes.py:160``, ``164`` and ``168``, all
+    separately inventoried. Measured, its mutant is killed by the same two tests that kill
+    ``outcomes.py:160`` and ``164`` — a row that inflates numerator and denominator
+    together and carries no information of its own.
+
+    That puts the engine and the ADR in conflict, and the conflict is the owner's to
+    settle rather than this function's. §4.3's operative text is a *reach* test — "a body
+    that can reach a refusal makes the ``if`` a guard" — and under it this site qualifies.
+    §8 item 3 is a later and more specific ruling that names this exact site as **not** a
+    member and calls it "the one correction that changes a ruling's scope". Narrowing the
+    class to arms that refuse *directly* would satisfy §8.3 and yield one member, but it
+    narrows a ratified definition. So the reach reading ships, the divergence is disclosed
+    here and in the generated inventory, and the choice is recorded for the owner.
     """
 
     sites = []
@@ -1673,7 +1788,7 @@ def write_inventory(
         for kind, count in counts.items():
             lines.append(f"* **{count} `{kind}`** — {described.get(kind, '')}.")
         lines.append("")
-    multiple = [g for g in guards if g.multiplicity > 1]
+    multiple = [g for g in guards if g.multiplicity > 1] if config.record_multiplicity else []
     if multiple:
         # Emitted only where a site actually carries more than one invariant, so a package
         # with no such loop keeps a byte-identical inventory. The guard-coverage ADR §1
@@ -1978,9 +2093,14 @@ def main() -> int:
                     "shape": g.shape,
                     "recorded_in": g.recorded_in,
                     "outcome": g.outcome,
-                    # Present only where the site decides more than one invariant, so a
-                    # package with no such loop keeps a byte-identical inventory file.
-                    **({"multiplicity": g.multiplicity} if g.multiplicity > 1 else {}),
+                    # Present only where the package discloses multiplicity and the site
+                    # decides more than one invariant, so every other package keeps a
+                    # byte-identical inventory file.
+                    **(
+                        {"multiplicity": g.multiplicity}
+                        if config.record_multiplicity and g.multiplicity > 1
+                        else {}
+                    ),
                 }
                 for g in guards
             ],

@@ -3,9 +3,12 @@
 Three of the four operators the ADR ratified cannot be checked by running the sweep over
 the packages in the tree:
 
-* **D-GC-5 (else-arm)** has exactly one member in the two candidate packages and it lives
-  in ``risk-integration``, which this change deliberately does not sweep. An operator with
-  no member in any swept package is an operator nothing exercises, so it is exercised here.
+* **D-GC-5 (else-arm)** was ratified on a count of one member across the two candidate
+  packages. Measured once ``risk-integration`` was configured, it has **two** —
+  ``authenticity.py:432`` and ``outcomes.py:159`` — because the engine implements §4.3's
+  operative *reach* test while §8 item 3 excludes the second site under a direct-refusal
+  reading. The divergence is disclosed in ``_else_arm_sites`` and recorded for the owner;
+  the operator itself is exercised here on a synthetic arm either way.
 * **D-GC-4 (helper-admission)** has 14 members in ``capacity-bounds-policy``, but the
   sweep measures the *suite*, not the mutation: a mutation that silently did nothing would
   report ten survivors just as convincingly as a correct one. These tests assert the
@@ -644,14 +647,17 @@ def test_the_risk_integration_flag_loops_are_measured_not_transcribed():
     }
 
 
-def test_no_other_package_carries_a_multiplicity_so_their_inventories_do_not_move():
-    """Guard-coverage ADR §1 forecloses renumbering the two Phase 5 inventories, and the
-    multiplicity section is emitted only where a site carries more than one invariant —
-    so this is the property that keeps the other three files byte-identical."""
+def test_the_other_three_packages_disclose_no_multiplicity():
+    """Guard-coverage ADR §1 forecloses changing what the two Phase 5 packages record.
+
+    This asserted that no other package *has* a loop-guard, which was true only because
+    the sizer could not read annotated constants. It does now, and ``policy-authenticity``
+    has two. The property that keeps those files byte-identical is therefore not the
+    absence of loop-guards — it is that disclosure is off unless the owner turns it on.
+    """
 
     for key in ("authorization-contracts", "policy-authenticity", "capacity-bounds-policy"):
-        guards = guard_sweep.inventory(guard_sweep.PACKAGES[key])
-        assert all(g.multiplicity == 1 for g in guards), key
+        assert not guard_sweep.PACKAGES[key].record_multiplicity, key
 
 
 def test_risk_integration_declares_all_three_additive_classes():
@@ -670,3 +676,109 @@ def test_risk_integration_declares_all_three_additive_classes():
     # ADR §5: partial mint coverage, both uncovered mints named.
     assert len(config.uncovered_mints) == 2
     assert any("adapter.py:276" in site for site, _why in config.uncovered_mints)
+
+
+# --- ADR §7.2: the sizer only sizes what it can actually read ------------------------
+
+_MULTIPLICITY_CASES = [
+    # (label, source, expected multiplicity of the single ``if``)
+    (
+        "a plain module-level tuple",
+        "F = (1, 2, 3)\ndef f(r):\n    for x in F:\n        if x: pass\n",
+        3,
+    ),
+    (
+        # `Final` constants are AnnAssign, not Assign. This shape is one edit away in
+        # every package here, and reading it as multiplicity 1 *under*-counts.
+        "an annotated constant",
+        "from typing import Final\nF: Final = (1, 2, 3)\ndef f(r):\n"
+        "    for x in F:\n        if x: pass\n",
+        3,
+    ),
+    (
+        # Over-counting is the direction that matters: a multiplicity is a claim about how
+        # many invariants one mutation neutralises, and this name is not a constant at all.
+        "a name rebound to a call",
+        "F = (1, 2, 3)\nF = compute()\ndef f(r):\n    for x in F:\n        if x: pass\n",
+        1,
+    ),
+    (
+        "a name extended with +=",
+        "F = (1, 2, 3)\nF += (4,)\ndef f(r):\n    for x in F:\n        if x: pass\n",
+        1,
+    ),
+    (
+        # The one that reached a real inventory: a parameter shadowing the module constant
+        # inherited its length, crediting one static guard with invariants it never decides.
+        "a parameter shadowing the constant",
+        "F = (1, 2, 3)\ndef f(F):\n    for x in F:\n        if x: pass\n",
+        1,
+    ),
+    (
+        "a local shadowing the constant",
+        "F = (1, 2, 3)\ndef f(r):\n    F = r\n    for x in F:\n        if x: pass\n",
+        1,
+    ),
+    (
+        "a for-else arm, which runs once whatever the length",
+        "F = (1, 2, 3)\ndef f(r):\n    for x in F:\n        pass\n    else:\n"
+        "        if r: pass\n",
+        1,
+    ),
+    (
+        "an iterable the engine cannot size",
+        "def f(rows):\n    for x in rows:\n        if x: pass\n",
+        1,
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    "source, expected",
+    [(source, expected) for _label, source, expected in _MULTIPLICITY_CASES],
+    ids=[label for label, _source, _expected in _MULTIPLICITY_CASES],
+)
+def test_the_sizer_reads_only_what_it_can_prove(source, expected):
+    import ast as _ast
+
+    tree = _ast.parse(source)
+    sizes = guard_sweep._loop_multiplicity(tree)
+    found = [sizes.get(id(n), 1) for n in _ast.walk(tree) if isinstance(n, _ast.If)]
+    assert found == [expected]
+
+
+def test_nested_qualifying_loops_multiply():
+    import ast as _ast
+
+    tree = _ast.parse(
+        "F = (1, 2)\nG = (1, 2, 3)\ndef f(r):\n    for a in F:\n"
+        "        for b in G:\n            if a: pass\n"
+    )
+    sizes = guard_sweep._loop_multiplicity(tree)
+    found = [sizes.get(id(n), 1) for n in _ast.walk(tree) if isinstance(n, _ast.If)]
+    assert found == [6]
+
+
+def test_multiplicity_is_computed_everywhere_but_disclosed_only_on_request():
+    """The engine always measures; the inventory reports only where the owner said to.
+
+    Guard-coverage ADR §1 reserves what the two Phase 5 packages record, and switching
+    disclosure on rewrites a checked-in file. So the sizer finding a loop-guard in one of
+    them is a finding for the owner, not a diff — and it did find two.
+    """
+
+    disclosed = {
+        key for key, config in guard_sweep.PACKAGES.items() if config.record_multiplicity
+    }
+    assert disclosed == {"risk-integration"}
+
+    authenticity = guard_sweep.PACKAGES["policy-authenticity"]
+    looped = {
+        f"{g.module}:{g.lineno}": g.multiplicity
+        for g in guard_sweep.inventory(authenticity)
+        if g.multiplicity > 1
+    }
+    assert looped == {"verification.py:1026": 6, "verification.py:1076": 3}, (
+        "measured, and undisclosed on purpose: enabling disclosure here would rewrite an "
+        "inventory ADR §1 reserves to the owner"
+    )
