@@ -142,7 +142,7 @@ def test_the_snapshot_carries_exactly_the_fifty_one_authorized_names():
     the residue to be exactly the forty-six that came before.
     """
     documented = json.loads(_PUBLIC_API_JSON.read_text())
-    assert documented["package_version"] == "0.3.0"
+    assert documented["package_version"] == "0.3.1"
     assert len(documented["symbols"]) == 51
     od7_added = {"DomainEvaluationOutcome", "DomainEvaluationProvider",
                  "DomainEvaluationRequest", "DomainEvaluationResponse",
@@ -156,6 +156,16 @@ def test_the_snapshot_carries_exactly_the_fifty_one_authorized_names():
     assert s2b_added <= set(documented["symbols"])
     assert len(set(documented["symbols"]) - s2b_added) == 46
     assert len(set(documented["symbols"]) - s2b_added - od7_added) == 39
+
+
+def test_the_recorded_version_symbol_agrees_with_the_package_version():
+    """`0.3.1`. The snapshot records the version twice — once as ``package_version``
+    and once as the value of the ``__version__`` symbol — and a patch release that
+    moved one and not the other would leave the file self-contradicting while every
+    count above still passed."""
+    documented = json.loads(_PUBLIC_API_JSON.read_text())
+    assert documented["symbols"]["__version__"]["value"] == ap.__version__
+    assert documented["package_version"] == ap.__version__
 
 
 def test_py_typed_marker_present():

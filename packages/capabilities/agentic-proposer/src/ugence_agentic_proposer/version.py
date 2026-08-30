@@ -1,5 +1,34 @@
 """Single source of truth for the ugence-agentic-proposer distribution version.
 
+0.3.1 is a patch release: **one failure class changed, no public name added, removed
+or renamed** — the curated surface stays at fifty-one and ``public_api.json``'s
+``symbols`` map is byte-identical to ``0.3.0``'s. It implements §10 step 7 of
+``docs/architecture/S2B_STRATEGY_PERMISSION_POLICY_FAMILY_AND_RESOLVER_DESIGN.md``,
+authorized by ``S2B-PF-G=B`` in
+``docs/architecture/ADR_UGENCE_S2B_STRATEGY_PERMISSION_FAMILY_RATIFICATION.md`` as a
+**separate** change set, never bundled with the two new integration packages.
+
+`0.3.0` disclosed that ``_resolve_strategy_policy`` guarded the resolver **call** but
+not the resolver's **answer**: a resolver returning a structurally alien object raised
+``AttributeError`` from whichever ratified field was read first, outside H2 entirely.
+The guard now spans the whole ratified response shape — the echo and the three fields
+the permission test and the advisory stamping go on to read — so the refusal is
+``CrossContractViolationError`` wherever the object is deficient, with the original
+error preserved as ``__cause__``. `S2B-S1-Q8=A` is untouched: **no new exception
+type**, and H2 stays at five classes.
+
+`[R]` **The compatibility change, stated rather than implied.** A caller that
+previously caught ``AttributeError`` around a builder call to detect a malformed
+resolver answer no longer sees one from this path; it sees an H2 class. Nothing else
+in the builders is newly caught, and a complete duck-typed response still constructs —
+`S2B-S1-Q9=A` ratifies a Protocol, and this release does not narrow it to a nominal
+type test.
+
+`[G]` **Nothing else about the `0.3.0` disclosure changes.** Execution end to end
+remains outside this package, and the four present-tense sites this release does not
+touch (design `§8.1`) stay as they are: `S2B-PF-G=B` authorizes this hardening and
+nothing adjacent to it.
+
 0.3.0 is the S2-B Reasoning Strategy Permission release. It adds five names to the
 curated surface — ``ReasoningStrategy``, ``StrategyPolicyResolver``,
 ``StrategyPolicyRequest``, ``StrategyPolicyResponse`` and
@@ -32,4 +61,4 @@ the four ratified constants. That surface remains exported unchanged; 0.2.0 remo
 name from it. See ``CHANGELOG.md`` for what this release implements and what remains
 deferred to a later ruling — substantive multi-candidate ranking above all.
 """
-__version__ = "0.3.0"
+__version__ = "0.3.1"

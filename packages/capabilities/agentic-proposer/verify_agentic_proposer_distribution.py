@@ -51,7 +51,7 @@ import sys
 from datetime import datetime, timezone
 import ugence_agentic_proposer as ap
 
-assert ap.__version__ == "0.3.0", ap.__version__
+assert ap.__version__ == "0.3.1", ap.__version__
 assert "site-packages" in ap.__file__, ap.__file__
 assert not any("/symbolu" in p for p in sys.path), sys.path
 
