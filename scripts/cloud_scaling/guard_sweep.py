@@ -387,14 +387,134 @@ PACKAGES = {
         ),
         # No prior inventory: this is the package's first.
         recorded=(),
-        # None declared. Guard-coverage ADR §7.3 pre-declares four `# pragma: no cover`
-        # sites as exclusion *candidates* — `adapter.py:266`, `authenticity.py:543`,
-        # `identifiers.py:68` and `identifiers.py:88` — and says explicitly that each is a
-        # candidate only, with ADR Phase 5 §9.2's bar applying unchanged. An exclusion
-        # written before the sweep ran would be a prediction of a survivor, and "it
-        # survived" is not on the closed list of reasons. They are left scored, and what
-        # the sweep found is reported rather than pre-empted.
-        exclusions={},
+        # Eight, every one written *after* a measured sweep rather than predicted before
+        # it. The owner ruled the survivors closed by isolating tests wherever an
+        # isolating input exists: 92 of the 100 sites are scored and killed, and these
+        # eight are the residue where the input does not exist and the reason is shown
+        # positively. Guard-coverage ADR §7.3's four `# pragma: no cover` candidates are
+        # *not* granted automatically — `authenticity.py:543` and `identifiers.py:68` are
+        # scored and killed, and only `identifiers.py:88` and `adapter.py:266` earned the
+        # exclusion the pragma hinted at.
+        exclusions={
+            # --- identifiers.py -----------------------------------------------------
+            ("identifiers.py", "value not in CANONICAL_ACTION_TYPES"): (
+                "unreachable-behind-earlier-guard",
+                "The value check can only fire for an `ActionKind` member whose value is "
+                "outside the ratified set, and the import-time drift guard 20 lines above "
+                "refuses to import at all when any such member exists. The `isinstance` "
+                "check on the line above has already established that the argument is a "
+                "genuine member, so between the two there is no input that reaches this "
+                "one with a value it would reject. The import guard itself is scored, and "
+                "killed by installing a controller resolution that renames a kind.",
+                "tests/test_guard_coverage.py::"
+                "test_every_ratified_action_kind_is_admitted_so_the_value_check_"
+                "cannot_fire",
+            ),
+            # --- projection.py ------------------------------------------------------
+            ("projection.py", "candidates[0][1] is None"): (
+                "diagnostic-only",
+                "Named successor: the `value is None` check inside the loop three lines "
+                "below, which raises the same `ProjectionError` for the same input — "
+                "`forecast_evidence_digest` is `candidates[0]`, so it is the first the "
+                "loop reaches. Measured: with the guard removed the message changes from "
+                "'required (ADR §6)' to 'required and must not be None' and nothing else "
+                "does. ADR Phase 5 §9.1 makes the message prose, so this is a positive "
+                "showing of diagnostic-only rather than an inference from a shared class.",
+                "tests/test_guard_coverage.py::"
+                "test_the_forecast_digest_guard_shares_its_outcome_with_the_loop_"
+                "below_it",
+            ),
+            # --- adapter.py: the two defensive revalidations -------------------------
+            # Keyed by enclosing function: both read `_validate_authenticated_output(
+            # authenticated)` in the same module, so the two-element key names two guards
+            # and `classify()` refuses to guess. Their reachability is identical, but the
+            # key has to say which is which.
+            (
+                "adapter.py",
+                "_validate_authenticated_output(authenticated)",
+                "CloudScalingRiskAdapter.project",
+            ): (
+                "unreachable-behind-earlier-guard",
+                "The token was produced by `authenticate_controller_output` on the line "
+                "above, and every token it returns is built by one of the two "
+                "`Authenticated*` constructors, each of which runs this same validation "
+                "in its own `__post_init__`. An invalid token therefore cannot come into "
+                "existence. `project` takes a *source*, never a token, so no "
+                "caller-supplied value reaches this call. The package's own comment says "
+                "as much — 'redundant *now* — which is the point' — and the guards inside "
+                "the function it calls are scored and killed, because a forged token does "
+                "reach *those*.",
+                "tests/test_guard_coverage.py::"
+                "test_no_invalid_authenticated_token_can_exist_to_reach_the_"
+                "revalidations",
+            ),
+            (
+                "adapter.py",
+                "_validate_authenticated_output(authenticated)",
+                "CloudScalingRiskAdapter.evaluate",
+            ): (
+                "unreachable-behind-earlier-guard",
+                "The same construction as the call in `project` above, inside gate 1's "
+                "`try` so a failure would produce a typed outcome rather than an escaping "
+                "exception. The token is produced two lines above by "
+                "`authenticate_controller_output`, so it has already been validated by "
+                "the constructor that built it.",
+                "tests/test_guard_coverage.py::"
+                "test_no_invalid_authenticated_token_can_exist_to_reach_the_"
+                "revalidations",
+            ),
+            # --- adapter.py: gate 3's two defence-in-depth handlers ------------------
+            ("adapter.py", "except RecommendationInputError: self._rejected(AdapterRejectionReason.UNSUPPORTED_INPUT_TYPE, str(exc), tenant_id=_safe_tenant(authenticated), subject_id=_safe_subject(authenticated), recommendation_digest=getattr(authenticated, 'recommendation_digest', None))"): (
+                "unreachable-behind-earlier-guard",
+                "`projection.py` raises no `RecommendationInputError` anywhere — measured "
+                "by AST over every `raise` in the module. The class is produced only by "
+                "authenticity's serialized-reconstruction paths, which gate 1 has already "
+                "run and which cannot run again inside `project_recommendation`. The arm "
+                "is kept because gate 3 re-runs the token check independently, and if the "
+                "two ever disagreed the stricter one must still produce a typed outcome.",
+                "tests/test_guard_coverage.py::"
+                "test_projection_raises_neither_input_nor_authenticity_errors_of_its_"
+                "own",
+            ),
+            ("adapter.py", "except RecommendationAuthenticityError: self._rejected(AdapterRejectionReason.RECOMMENDATION_DIGEST_MISMATCH, str(exc), tenant_id=_safe_tenant(authenticated), subject_id=_safe_subject(authenticated), recommendation_digest=getattr(authenticated, 'recommendation_digest', None))"): (
+                "unreachable-behind-earlier-guard",
+                "The same shape as the arm above. `projection.py` raises no "
+                "`RecommendationAuthenticityError` of its own; the only route to one is "
+                "`_validate_authenticated_recommendation`, which cannot fail on a token "
+                "that both the `Authenticated*` constructor and gate 1 have validated. "
+                "This is the site guard-coverage ADR §4.1 reports as the audit's single "
+                "survivor, and the sweep reproduces that survival exactly — the reason it "
+                "survives is reachability, not a gap in the suite.",
+                "tests/test_guard_coverage.py::"
+                "test_projection_raises_neither_input_nor_authenticity_errors_of_its_"
+                "own",
+            ),
+            # --- adapter.py: the trusted-time re-check and the seam-return check ------
+            ("adapter.py", "request.evaluation_time is not None"): (
+                "unreachable-behind-earlier-guard",
+                "`projection.py:139` refuses any projection whose request carries an "
+                "evaluation time, and the projection has no parameter through which to "
+                "supply one, so the request re-checked here is always one that guard "
+                "admitted. Kept as defence in depth: it is what stops a future refactor "
+                "quietly forwarding a caller's clock.",
+                "tests/test_guard_coverage.py::"
+                "test_every_projection_carries_no_evaluation_time",
+            ),
+            ("adapter.py", "not isinstance(decision, SubjectRiskDecision)"): (
+                "diagnostic-only",
+                "Named successor: `outcomes.py:131`, which raises the same "
+                "`NonExecutableInvariantError` for every value that would fail here — a "
+                "seam return that is not a `SubjectRiskDecision` cannot satisfy the "
+                "outcome's own check either. Measured: removing this guard changes the "
+                "diagnosis from 'the evaluation seam must return a canonical "
+                "SubjectRiskDecision' to 'a RISK_DECISION outcome requires a canonical "
+                "SubjectRiskDecision', and nothing else. Naming the seam is what tells an "
+                "integrator which collaborator broke its contract.",
+                "tests/test_guard_coverage.py::"
+                "test_the_seam_return_check_shares_its_outcome_with_the_outcome_"
+                "dataclass",
+            ),
+        },
     ),
     "policy-authenticity": PackageConfig(
         key="policy-authenticity",
@@ -566,6 +686,10 @@ class Guard:
     #: collapses within the arm's own enum and the inventory names what was collapsed.
     collapse_vocabulary: str = ""
     collapse_member: str = ""
+    #: The enclosing ``def`` (``Class.method`` where there is one), used *only* to
+    #: disambiguate an exclusion key. Deliberately not emitted: adding it to the
+    #: inventory would rewrite four checked-in files to disambiguate a handful of rows.
+    function: str = ""
 
 
 #: The vocabularies every package is read as publishing. A package that names its own
@@ -803,6 +927,39 @@ def undeclared_except_arms(config: PackageConfig) -> list:
             for lineno, vocabularies in undeclared
         ]
     return sorted(found)
+
+
+def _enclosing_functions(tree) -> dict:
+    """``id(node)`` → the ``def`` it sits in, as ``Class.method`` or ``function``.
+
+    Exists for one job: telling two guards apart when their ``(module, condition)`` key
+    does not. ``adapter.py`` calls ``_validate_authenticated_output(authenticated)`` from
+    both ``project`` and ``evaluate``, so the key names two guards and ``classify()``
+    refuses to guess which an exclusion means — correctly, since silently covering both
+    is exactly the failure that check exists to prevent.
+
+    Not part of the key by default. Every package here has colliding keys, so qualifying
+    all of them would rewrite four checked-in inventories to disambiguate the few rows
+    anyone actually needs to name.
+    """
+
+    functions = {}
+
+    def descend(node, prefix: str, current: str) -> None:
+        for child in ast.iter_child_nodes(node):
+            inner = current
+            inner_prefix = prefix
+            if isinstance(child, ast.ClassDef):
+                inner_prefix = f"{prefix}{child.name}."
+            elif isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                inner = f"{prefix}{child.name}"
+                # A nested ``def`` qualifies further; a method does not re-qualify.
+                inner_prefix = ""
+            functions[id(child)] = inner
+            descend(child, inner_prefix, inner)
+
+    descend(tree, "", "")
+    return functions
 
 
 def _loop_multiplicity(tree) -> dict:
@@ -1169,6 +1326,7 @@ def inventory(config: PackageConfig) -> list:
             elif isinstance(node, ast.IfExp) and _selects_an_outcome(node):
                 found.append((node.lineno, node, "outcome selection"))
         multiplicity = _loop_multiplicity(tree)
+        functions = _enclosing_functions(tree)
         # The three additive decision classes, each enabled per package rather than
         # engine-wide — see ``PackageConfig.decision_classes`` for why.
         if "except-arm" in config.decision_classes:
@@ -1204,6 +1362,7 @@ def inventory(config: PackageConfig) -> list:
                             node.end_col_offset,
                         ),
                         multiplicity=multiplicity.get(id(node), 1),
+                        function=functions.get(id(node), ""),
                     )
                 )
                 continue
@@ -1238,6 +1397,7 @@ def inventory(config: PackageConfig) -> list:
                             member.end_col_offset,
                         ),
                         multiplicity=multiplicity.get(id(handler), 1),
+                                                function=functions.get(id(handler), ""),
                         collapse_vocabulary=member.value.id,
                         collapse_member=member.attr,
                     )
@@ -1261,6 +1421,7 @@ def inventory(config: PackageConfig) -> list:
                         kind="helper-admission",
                         span=_statement_span(node),
                         multiplicity=multiplicity.get(id(node), 1),
+                        function=functions.get(id(node), ""),
                     )
                 )
                 continue
@@ -1286,6 +1447,7 @@ def inventory(config: PackageConfig) -> list:
                             node.orelse[-1].end_col_offset,
                         ),
                         multiplicity=multiplicity.get(id(node), 1),
+                        function=functions.get(id(node), ""),
                     )
                 )
                 continue
@@ -1306,6 +1468,7 @@ def inventory(config: PackageConfig) -> list:
                     recorded_in=recorded_in,
                     outcome=", ".join(_outcome_names(node.body, config)),
                     multiplicity=multiplicity.get(id(node), 1),
+                    function=functions.get(id(node), ""),
                 )
             )
     return guards
@@ -1950,19 +2113,32 @@ def classify(config: PackageConfig, guards: list) -> dict:
     # but it is not unique. ``target.py`` carries three guards reading exactly
     # ``not isinstance(data, Mapping)``. An exclusion on such a key would silently cover
     # all three, so a key matching more than one guard is refused rather than resolved.
+    #
+    # A three-element key ``(module, condition, function)`` names the enclosing ``def``
+    # as well, for the case where the two-element one genuinely cannot say which guard is
+    # meant: ``adapter.py`` calls ``_validate_authenticated_output(authenticated)`` from
+    # both ``project`` and ``evaluate``, and the two have different reachability. This is
+    # a strict widening — every existing two-element key keeps its exact meaning, and the
+    # inventory is unchanged, because the function is used for matching only and is never
+    # emitted. Collision is still refused, now against whichever key length is declared.
     occupants = {}
     for guard in guards:
         occupants.setdefault((guard.module, guard.condition), []).append(guard.index)
+        occupants.setdefault(
+            (guard.module, guard.condition, guard.function), []
+        ).append(guard.index)
     colliding = sorted(
-        f"{module}: {condition} (guards {indices})"
-        for (module, condition), indices in occupants.items()
-        if len(indices) > 1 and (module, condition) in config.exclusions
+        f"{key[0]}: {key[1]} (guards {indices})"
+        for key, indices in occupants.items()
+        if len(indices) > 1 and key in config.exclusions
     )
 
     classified = {}
     matched = set()
     for guard in guards:
-        key = (guard.module, guard.condition)
+        key = (guard.module, guard.condition, guard.function)
+        if key not in config.exclusions:
+            key = (guard.module, guard.condition)
         if key in config.exclusions and len(occupants[key]) > 1:
             # Ambiguous: classified SCORED so the sweep still demands a kill, and reported
             # as invalid below so the run fails rather than quietly under-scoring.
@@ -1993,11 +2169,11 @@ def classify(config: PackageConfig, guards: list) -> dict:
                 "line": guard.lineno,
                 "condition": guard.condition,
             }
-    orphans = sorted(f"{module}: {condition}"
-                     for module, condition in set(config.exclusions) - matched)
+    orphans = sorted(f"{key[0]}: {key[1]}"
+                     for key in set(config.exclusions) - matched)
     invalid = sorted(
-        f"{module}: {condition}"
-        for (module, condition), (reason, detail, evidence) in config.exclusions.items()
+        f"{key[0]}: {key[1]}"
+        for key, (reason, detail, evidence) in config.exclusions.items()
         if reason not in EXCLUSION_REASONS or not detail.strip() or not evidence.strip()
     )
     return {

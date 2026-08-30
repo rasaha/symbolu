@@ -51,13 +51,22 @@ This package records no prior inventory; this is the first one.
 
 ## Classification
 
-Every guard is classified: **100 `SCORED`** — the
+Every guard is classified: **92 `SCORED`** — the
 sweep neutralises it and the suite must fail — and
-**0 `EXCLUDED`**, each with a reason from a closed vocabulary and
+**8 `EXCLUDED`**, each with a reason from a closed vocabulary and
 a test that measures the reason. A guard is never excluded because it survived; a
 survivor with no prior declaration fails the sweep.
 
-No guard in this package is excluded: every one is scored.
+| Module:line | Reason | Why | Measured by |
+|---|---|---|---|
+| `identifiers.py:88` | `unreachable-behind-earlier-guard` | The value check can only fire for an `ActionKind` member whose value is outside the ratified set, and the import-time drift guard 20 lines above refuses to import at all when any such member exists. The `isinstance` check on the line above has already established that the argument is a genuine member, so between the two there is no input that reaches this one with a value it would reject. The import guard itself is scored, and killed by installing a controller resolution that renames a kind. | `tests/test_guard_coverage.py::test_every_ratified_action_kind_is_admitted_so_the_value_check_cannot_fire` |
+| `projection.py:252` | `diagnostic-only` | Named successor: the `value is None` check inside the loop three lines below, which raises the same `ProjectionError` for the same input — `forecast_evidence_digest` is `candidates[0]`, so it is the first the loop reaches. Measured: with the guard removed the message changes from 'required (ADR §6)' to 'required and must not be None' and nothing else does. ADR Phase 5 §9.1 makes the message prose, so this is a positive showing of diagnostic-only rather than an inference from a shared class. | `tests/test_guard_coverage.py::test_the_forecast_digest_guard_shares_its_outcome_with_the_loop_below_it` |
+| `adapter.py:152` | `unreachable-behind-earlier-guard` | The token was produced by `authenticate_controller_output` on the line above, and every token it returns is built by one of the two `Authenticated*` constructors, each of which runs this same validation in its own `__post_init__`. An invalid token therefore cannot come into existence. `project` takes a *source*, never a token, so no caller-supplied value reaches this call. The package's own comment says as much — 'redundant *now* — which is the point' — and the guards inside the function it calls are scored and killed, because a forged token does reach *those*. | `tests/test_guard_coverage.py::test_no_invalid_authenticated_token_can_exist_to_reach_the_revalidations` |
+| `adapter.py:186` | `unreachable-behind-earlier-guard` | The same construction as the call in `project` above, inside gate 1's `try` so a failure would produce a typed outcome rather than an escaping exception. The token is produced two lines above by `authenticate_controller_output`, so it has already been validated by the constructor that built it. | `tests/test_guard_coverage.py::test_no_invalid_authenticated_token_can_exist_to_reach_the_revalidations` |
+| `adapter.py:211` | `unreachable-behind-earlier-guard` | `projection.py` raises no `RecommendationInputError` anywhere — measured by AST over every `raise` in the module. The class is produced only by authenticity's serialized-reconstruction paths, which gate 1 has already run and which cannot run again inside `project_recommendation`. The arm is kept because gate 3 re-runs the token check independently, and if the two ever disagreed the stricter one must still produce a typed outcome. | `tests/test_guard_coverage.py::test_projection_raises_neither_input_nor_authenticity_errors_of_its_own` |
+| `adapter.py:222` | `unreachable-behind-earlier-guard` | The same shape as the arm above. `projection.py` raises no `RecommendationAuthenticityError` of its own; the only route to one is `_validate_authenticated_recommendation`, which cannot fail on a token that both the `Authenticated*` constructor and gate 1 have validated. This is the site guard-coverage ADR §4.1 reports as the audit's single survivor, and the sweep reproduces that survival exactly — the reason it survives is reachability, not a gap in the suite. | `tests/test_guard_coverage.py::test_projection_raises_neither_input_nor_authenticity_errors_of_its_own` |
+| `adapter.py:266` | `unreachable-behind-earlier-guard` | `projection.py:139` refuses any projection whose request carries an evaluation time, and the projection has no parameter through which to supply one, so the request re-checked here is always one that guard admitted. Kept as defence in depth: it is what stops a future refactor quietly forwarding a caller's clock. | `tests/test_guard_coverage.py::test_every_projection_carries_no_evaluation_time` |
+| `adapter.py:271` | `diagnostic-only` | Named successor: `outcomes.py:131`, which raises the same `NonExecutableInvariantError` for every value that would fail here — a seam return that is not a `SubjectRiskDecision` cannot satisfy the outcome's own check either. Measured: removing this guard changes the diagnosis from 'the evaluation seam must return a canonical SubjectRiskDecision' to 'a RISK_DECISION outcome requires a canonical SubjectRiskDecision', and nothing else. Naming the seam is what tells an integrator which collaborator broke its contract. | `tests/test_guard_coverage.py::test_the_seam_return_check_shares_its_outcome_with_the_outcome_dataclass` |
 
 ## Not counted, and why
 
@@ -73,7 +82,7 @@ No guard in this package is excluded: every one is scored.
 |---|---|---|---|---|---|---|
 | 1 | `identifiers.py:68` | if | raise | SCORED | — | `_CONTROLLER_ACTION_TYPES != CANONICAL_ACTION_TYPES` |
 | 2 | `identifiers.py:85` | if | raise | SCORED | — | `not isinstance(action_kind, ActionKind)` |
-| 3 | `identifiers.py:88` | if | raise | SCORED | — | `value not in CANONICAL_ACTION_TYPES` |
+| 3 | `identifiers.py:88` | if | raise | EXCLUDED | — | `value not in CANONICAL_ACTION_TYPES` |
 | 4 | `outcomes.py:118` | if | raise | SCORED | — | `getattr(self, flag) is not False` |
 | 5 | `outcomes.py:123` | if | raise | SCORED | — | `not isinstance(self.status, AdapterOutcomeStatus)` |
 | 6 | `outcomes.py:125` | if | raise | SCORED | — | `self.schema_version != ADAPTER_OUTCOME_SCHEMA_VERSION` |
@@ -142,7 +151,7 @@ No guard in this package is excluded: every one is scored.
 | 69 | `projection.py:202` | if | raise | SCORED | — | `not isinstance(value, datetime)` |
 | 70 | `projection.py:204` | if | raise | SCORED | — | `value.tzinfo is None or value.utcoffset() is None` |
 | 71 | `projection.py:213` | if | raise | SCORED | — | `not isinstance(value, str) or value == ''` |
-| 72 | `projection.py:252` | if | raise | SCORED | — | `candidates[0][1] is None` |
+| 72 | `projection.py:252` | if | raise | EXCLUDED | — | `candidates[0][1] is None` |
 | 73 | `projection.py:257` | if | raise | SCORED | — | `value is None` |
 | 74 | `projection.py:261` | if | raise | SCORED | — | `not isinstance(value, str) or not value.startswith('sha256:')` |
 | 75 | `projection.py:289` | if | raise | SCORED | — | `type(authenticated) is not AuthenticatedRecommendation` |
@@ -150,23 +159,23 @@ No guard in this package is excluded: every one is scored.
 | 77 | `adapter.py:113` | if | raise | SCORED | — | `seam is None` |
 | 78 | `adapter.py:118` | if | raise | SCORED | — | `not callable(getattr(seam, 'evaluate', None))` |
 | 79 | `adapter.py:122` | if | raise | SCORED | — | `clock is None or not callable(clock)` |
-| 80 | `adapter.py:152` | helper-admission | helper-admission call | SCORED | — | `_validate_authenticated_output(authenticated)` |
+| 80 | `adapter.py:152` | helper-admission | helper-admission call | EXCLUDED | — | `_validate_authenticated_output(authenticated)` |
 | 81 | `adapter.py:153` | if | raise | SCORED | — | `type(authenticated) is AuthenticatedAbstention` |
-| 82 | `adapter.py:186` | helper-admission | helper-admission call | SCORED | — | `_validate_authenticated_output(authenticated)` |
+| 82 | `adapter.py:186` | helper-admission | helper-admission call | EXCLUDED | — | `_validate_authenticated_output(authenticated)` |
 | 83 | `adapter.py:187` | except-arm | typed-refusal return | SCORED | — | `except UnsupportedRecommendationSourceError: self._rejected(AdapterRejectio…` |
 | 84 | `adapter.py:191` | except-arm | typed-refusal return | SCORED | — | `except RecommendationInputError: self._rejected(AdapterRejectionReason.MALF…` |
 | 85 | `adapter.py:195` | except-arm | typed-refusal return | SCORED | — | `except MissingIndependentDigestError: self._rejected(AdapterRejectionReason…` |
 | 86 | `adapter.py:199` | except-arm | typed-refusal return | SCORED | — | `except RecommendationAuthenticityError: self._rejected(AdapterRejectionReas…` |
 | 87 | `adapter.py:205` | if | typed-refusal call | SCORED | — | `type(authenticated) is AuthenticatedAbstention` |
-| 88 | `adapter.py:211` | except-arm | typed-refusal return | SCORED | — | `except RecommendationInputError: self._rejected(AdapterRejectionReason.UNSU…` |
-| 89 | `adapter.py:222` | except-arm | typed-refusal return | SCORED | — | `except RecommendationAuthenticityError: self._rejected(AdapterRejectionReas…` |
+| 88 | `adapter.py:211` | except-arm | typed-refusal return | EXCLUDED | — | `except RecommendationInputError: self._rejected(AdapterRejectionReason.UNSU…` |
+| 89 | `adapter.py:222` | except-arm | typed-refusal return | EXCLUDED | — | `except RecommendationAuthenticityError: self._rejected(AdapterRejectionReas…` |
 | 90 | `adapter.py:230` | except-arm | typed-refusal return | SCORED | — | `except ProjectionError: self._rejected(AdapterRejectionReason.PROJECTION_FA…` |
 | 91 | `adapter.py:242` | except-arm | typed-refusal return | SCORED | — | `except AdapterConfigurationError: self._rejected(AdapterRejectionReason.UNT…` |
 | 92 | `adapter.py:247` | helper-admission | helper-admission call | SCORED | — | `_require_within_validity(now, projection)` |
 | 93 | `adapter.py:248` | except-arm | typed-refusal return | SCORED | — | `except RecommendationNotYetValidError: self._rejected(AdapterRejectionReaso…` |
 | 94 | `adapter.py:254` | except-arm | typed-refusal return | SCORED | — | `except RecommendationValidityError: self._rejected(AdapterRejectionReason.R…` |
-| 95 | `adapter.py:266` | if | raise | SCORED | — | `request.evaluation_time is not None` |
-| 96 | `adapter.py:271` | if | raise | SCORED | — | `not isinstance(decision, SubjectRiskDecision)` |
+| 95 | `adapter.py:266` | if | raise | EXCLUDED | — | `request.evaluation_time is not None` |
+| 96 | `adapter.py:271` | if | raise | EXCLUDED | — | `not isinstance(decision, SubjectRiskDecision)` |
 | 97 | `adapter.py:289` | if | raise | SCORED | — | `not isinstance(now, datetime)` |
 | 98 | `adapter.py:291` | if | raise | SCORED | — | `now.tzinfo is None or now.utcoffset() is None` |
 | 99 | `adapter.py:379` | if | raise | SCORED | — | `now > projection.valid_until` |

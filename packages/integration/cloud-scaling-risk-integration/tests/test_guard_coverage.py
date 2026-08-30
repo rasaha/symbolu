@@ -645,3 +645,161 @@ def test_a_correlation_id_that_is_not_a_string_is_refused(token):
     )
     with pytest.raises(ProjectionError, match="correlation_id must be a string or None"):
         _projection.project_recommendation(forged_token)
+
+
+def test_a_malformed_expectation_is_refused_before_the_source_is_typed(recommendation):
+    """`authenticity.py:581` and `:582`, isolated on the **typed** half, not the message.
+
+    `_reconcile` checks the expectation's syntax too, so on the supported-source path
+    neutralising these two produces the same `RecommendationAuthenticityError` with
+    different prose — a message-only kill, which §9.1 does not accept as evidence that a
+    guard decided anything.
+
+    The isolating input is an *unsupported* source, because these two run **before** the
+    exact-type admission below them. With the guard the caller is told their expectation
+    is not a digest; without it, control reaches the type dispatch and they are told their
+    source is the wrong type. Different exception class, so the kill is attributable to
+    the typed refusal.
+    """
+
+    with pytest.raises(RecommendationAuthenticityError, match="canonical digest"):
+        _authenticity.authenticate_controller_output(
+            object(), expected_recommendation_digest="not-a-digest"
+        )
+
+
+# --- Declared unscorable: the tests that measure each exclusion's claim ---------------
+#
+# Each of these measures a claim made in `guard_sweep.py`'s `exclusions` for this
+# package. None of them asserts that a guard is untested — they assert *why* no isolating
+# input exists, which is what makes an exclusion checkable rather than an opinion.
+
+
+def test_no_invalid_authenticated_token_can_exist_to_reach_the_revalidations():
+    """`adapter.py:152` and `:186` — `unreachable-behind-earlier-guard`, measured.
+
+    Both re-run `_validate_authenticated_output` on a token
+    `authenticate_controller_output` has just produced. Every such token is built by one
+    of the two `Authenticated*` constructors, and each runs the same validation in its own
+    `__post_init__` (`authenticity.py:216,242`). So an invalid token cannot come into
+    existence, and no caller-supplied value reaches either call site: `project` and
+    `evaluate` both take a *source*, never a token.
+
+    This is what makes those two different from the guards *inside*
+    `_validate_authenticated_output` (`:429`/`:431`/`:432`), which are scored and killed —
+    there a forged token is a constructible input, because the function is reachable with
+    one.
+    """
+
+    from conftest import build_abstention
+
+    recommendation = build_recommendation()
+    for kwargs in ({"executable": True}, {"authority_granted": True}):
+        with pytest.raises(RecommendationAuthenticityError):
+            _authenticity.AuthenticatedRecommendation(
+                recommendation=recommendation,
+                recommendation_digest=recommendation.digest(),
+                expectation_source="caller-supplied-expectation",
+                **kwargs,
+            )
+        with pytest.raises(RecommendationAuthenticityError):
+            _authenticity.AuthenticatedAbstention(
+                abstention=build_abstention(), **kwargs
+            )
+
+
+def test_projection_raises_neither_input_nor_authenticity_errors_of_its_own(token):
+    """`adapter.py:211` and `:222` — `unreachable-behind-earlier-guard`, measured.
+
+    Gate 3 wraps `project_recommendation` in handlers for `RecommendationInputError` and
+    `RecommendationAuthenticityError`. Structurally, `projection.py` raises neither: it
+    raises `ProjectionError`, and the only route to a `RecommendationAuthenticityError` is
+    `_validate_authenticated_recommendation`, which cannot fail on a token that both the
+    constructor and gate 1 have already validated.
+
+    Measured two ways rather than argued: no `raise` of either class exists anywhere in
+    `projection.py`, and a genuine token projects without either being raised.
+    """
+
+    import ast
+    import pathlib
+
+    source = pathlib.Path(_projection.__file__).read_text(encoding="utf-8")
+    raised = {
+        node.exc.func.id
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.Raise)
+        and isinstance(node.exc, ast.Call)
+        and isinstance(node.exc.func, ast.Name)
+    }
+    assert "RecommendationInputError" not in raised
+    assert "RecommendationAuthenticityError" not in raised
+    assert _projection.project_recommendation(token) is not None
+
+
+def test_every_projection_carries_no_evaluation_time(token):
+    """`adapter.py:266` — `unreachable-behind-earlier-guard`, measured.
+
+    The adapter re-checks `request.evaluation_time is not None` immediately before
+    submission. `projection.py:139` already refuses any projection whose request carries
+    one, and the projection has no parameter through which to supply it, so the request
+    the adapter re-checks is always the one `projection.py:139` admitted.
+    """
+
+    projected = _projection.project_recommendation(token)
+    assert projected.request.evaluation_time is None
+    forged_request = _forge(
+        projected.request, evaluation_time=datetime(2026, 1, 1, tzinfo=timezone.utc)
+    )
+    with pytest.raises(ProjectionError, match="evaluation_time"):
+        _repost(_forge(projected, request=forged_request))
+
+
+def test_the_forecast_digest_guard_shares_its_outcome_with_the_loop_below_it(
+    recommendation,
+):
+    """`projection.py:252` — `diagnostic-only`, measured.
+
+    With the guard removed, a missing forecast digest falls through to the `value is None`
+    check inside the loop, which raises the **same** `ProjectionError` for the same input.
+    Only the prose moves — "required (ADR §6)" becomes "required and must not be None" —
+    and §9.1 makes the message prose. Scoring it would need a finer discriminator in the
+    pair, not a better test.
+    """
+
+    forged = _forge(recommendation)
+    object.__setattr__(forged, "forecast_evidence_digest", lambda: None)
+    with pytest.raises(ProjectionError) as first:
+        _projection._evidence_references(forged)
+
+    # The successor, reached directly by moving the same absence to a later candidate.
+    other = _forge(recommendation)
+    object.__setattr__(other, "cost_evidence_digest", lambda: None)
+    with pytest.raises(ProjectionError) as second:
+        _projection._evidence_references(other)
+
+    assert type(first.value) is type(second.value), (
+        "the successor produces the same typed outcome, so the guard changes the "
+        "diagnosis and not the answer"
+    )
+
+
+def test_the_seam_return_check_shares_its_outcome_with_the_outcome_dataclass(
+    recommendation,
+):
+    """`adapter.py:271` — `diagnostic-only`, measured.
+
+    A duck-typed seam return that gets past this check reaches
+    `CloudScalingRiskOutcome.__post_init__`, whose `outcomes.py:131` raises the same
+    `NonExecutableInvariantError` for every such value. The guard names the seam as the
+    culprit instead of the outcome, which is worth keeping and is not an authorization
+    answer.
+    """
+
+    class _LookAlike:
+        pass
+
+    with pytest.raises(NonExecutableInvariantError, match="requires a canonical"):
+        CloudScalingRiskOutcome(
+            status=AdapterOutcomeStatus.RISK_DECISION, decision=_LookAlike()
+        )
