@@ -423,11 +423,12 @@ class StubDomainEvaluationProvider:
 # This is a STUB, and it is test support, not a policy. It issues nothing, signs
 # nothing and verifies nothing: it returns whatever permitted set the test asked for.
 # That is the whole point of the boundary `S2B-D1=A` ratifies — the governing policy is
-# issued by Policy Authority, OUTSIDE this package, and `[G]` **no strategy-permission
-# family is registered there today**, which blocks execution end to end. The protocol
-# is injected, so these guards can still exercise resolution, the permission test, the
-# construction order and the replay without any policy authority being present anywhere
-# in the repository. This is the ``StubDomainEvaluationProvider`` precedent exactly.
+# issued by Policy Authority, OUTSIDE this package. A strategy-permission family and a
+# concrete resolver now exist as separate integration distributions, and their own
+# tests carry the end-to-end proof. The protocol is injected, so these guards exercise
+# resolution, the permission test, the construction order and the replay with no policy
+# authority present anywhere — which is why they remain stubs regardless of what exists
+# elsewhere. This is the ``StubDomainEvaluationProvider`` precedent exactly.
 # --------------------------------------------------------------------------- #
 
 #: The policy identity the fixtures resolve to. C5b tokens, compared by equality.
