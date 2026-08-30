@@ -156,9 +156,11 @@ class PackageConfig:
     #: This is not hypothetical. Teaching the sizer to read annotated constants
     #: (``_CARRIED_INSTANTS: Final = (...)``) revealed two real loop-guards in
     #: ``policy-authenticity`` — ``verification.py:1026`` over six carried instants and
-    #: ``verification.py:1076`` over three occurrence facts — that no inventory has ever
-    #: disclosed. They are recorded here for the owner rather than published into a file
-    #: §1 reserves.
+    #: ``verification.py:1076`` over three occurrence facts — that no inventory had
+    #: disclosed. Held here for the owner while it waited; the owner ratified disclosure
+    #: for that package on 2026-08-30 (ADR §10), so it now opts in alongside
+    #: ``risk-integration``. The opt-in discipline itself is unchanged: every other
+    #: package keeps a byte-identical inventory until its own ruling says otherwise.
     record_multiplicity: bool = False
 
     @property
@@ -635,6 +637,12 @@ PACKAGES = {
             ),
             # --- verification.py ---------------------------------------------------------
         },
+        # Guard-coverage ADR §7.2, extended to this package by the owner's ruling of
+        # 2026-08-30 (ADR §10): `verification.py:1026` and `:1076` stay one static site
+        # each and disclose multiplicities 6 and 3, read off `_CARRIED_INSTANTS` and
+        # `_OCCURRENCE_FACTS`. Disclosure-only — the sweep's denominator, indices and
+        # classification do not move.
+        record_multiplicity=True,
     ),
 }
 

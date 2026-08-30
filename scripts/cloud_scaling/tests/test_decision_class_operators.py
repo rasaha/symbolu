@@ -679,16 +679,18 @@ def test_the_risk_integration_flag_loops_are_measured_not_transcribed():
     }
 
 
-def test_the_other_three_packages_disclose_no_multiplicity():
-    """Guard-coverage ADR §1 forecloses changing what the two Phase 5 packages record.
+def test_the_packages_without_a_disclosure_ruling_disclose_no_multiplicity():
+    """Disclosure is off unless the owner turns it on — that is what keeps an inventory
+    byte-identical, not the absence of loop-guards.
 
-    This asserted that no other package *has* a loop-guard, which was true only because
-    the sizer could not read annotated constants. It does now, and ``policy-authenticity``
-    has two. The property that keeps those files byte-identical is therefore not the
-    absence of loop-guards — it is that disclosure is off unless the owner turns it on.
+    This once named ``policy-authenticity`` too; the owner's 2026-08-30 ruling (ADR §10)
+    turned its disclosure on, so it moved to the positive set in
+    ``test_multiplicity_is_computed_everywhere_but_disclosed_only_on_request``. The two
+    below have no ruling, and ``authorization-contracts`` is one of the Phase 5 packages
+    whose records ADR §1 reserves.
     """
 
-    for key in ("authorization-contracts", "policy-authenticity", "capacity-bounds-policy"):
+    for key in ("authorization-contracts", "capacity-bounds-policy"):
         assert not guard_sweep.PACKAGES[key].record_multiplicity, key
 
 
@@ -794,15 +796,26 @@ def test_nested_qualifying_loops_multiply():
 def test_multiplicity_is_computed_everywhere_but_disclosed_only_on_request():
     """The engine always measures; the inventory reports only where the owner said to.
 
-    Guard-coverage ADR §1 reserves what the two Phase 5 packages record, and switching
-    disclosure on rewrites a checked-in file. So the sizer finding a loop-guard in one of
-    them is a finding for the owner, not a diff — and it did find two.
+    Disclosure is a per-package ruling, never an engine side effect. §7.2 ruled it for
+    ``risk-integration`` at ratification; the owner's 2026-08-30 ruling (ADR §10) extended
+    it to ``policy-authenticity``'s two loop-guards after they were held here for
+    ratification. The set below is exactly the ruled adopters — a package appearing in it
+    without its own ruling is a defect this assertion exists to catch, and so is a ruled
+    adopter silently dropping out.
     """
 
     disclosed = {
         key for key, config in guard_sweep.PACKAGES.items() if config.record_multiplicity
     }
-    assert disclosed == {"risk-integration"}
+    assert disclosed == {"risk-integration", "policy-authenticity"}, (
+        "multiplicity disclosure is ruled per package: §7.2 for risk-integration, "
+        "ADR §10 for policy-authenticity, and nothing else"
+    )
+    # The negative half, named package by package rather than implied by the set above:
+    # neither Phase-5 vocabulary package nor capacity-bounds has a disclosure ruling, and
+    # enabling one of them would rewrite a checked-in inventory ADR §1 reserves.
+    assert guard_sweep.PACKAGES["authorization-contracts"].record_multiplicity is False
+    assert guard_sweep.PACKAGES["capacity-bounds-policy"].record_multiplicity is False
 
     authenticity = guard_sweep.PACKAGES["policy-authenticity"]
     looped = {
@@ -811,6 +824,6 @@ def test_multiplicity_is_computed_everywhere_but_disclosed_only_on_request():
         if g.multiplicity > 1
     }
     assert looped == {"verification.py:1026": 6, "verification.py:1076": 3}, (
-        "measured, and undisclosed on purpose: enabling disclosure here would rewrite an "
-        "inventory ADR §1 reserves to the owner"
+        "measured off _CARRIED_INSTANTS and _OCCURRENCE_FACTS, and disclosed under the "
+        "2026-08-30 ruling: each loop is one static site, 119 sites deciding 126 invariants"
     )
