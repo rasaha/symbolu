@@ -90,6 +90,12 @@ async def preflight(
         return {"configuration": f"INVALID: {exc}"}, False
     checks["configuration"] = "OK"
     checks["environment"] = settings.environment.value
+    # D-PL-1: the pilot runs under `qa` but must mirror production discipline.
+    # Surface which posture is actually enforcing, so "voluntary" is visible.
+    checks["pilot_mode"] = str(settings.pilot_mode)
+    checks["strict_config_guards"] = str(
+        settings.environment.is_production_like or settings.pilot_mode
+    )
     # Posture summary an operator should eyeball before a pilot start.
     checks["astrology_provider"] = settings.astrology_provider
     checks["push_transport"] = settings.push_transport

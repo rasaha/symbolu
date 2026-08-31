@@ -94,8 +94,27 @@ recorded in the decision log, not an operational toggle.
 
 ## 4. Backup and restore
 
-Backups use `pg_dump --format=custom` of the whole database. Validation (run
-against every backup procedure change, and periodically against real backups):
+Ratified pilot policy (DILCHAT-D-PL-5):
+
+| | |
+|---|---|
+| Schedule | daily automated **encrypted** database backup |
+| Retention | **35 days** |
+| Restore rehearsal | **monthly**, and again before any purge activation |
+
+35 days is deliberately longer than the 30-day purge-eligibility window
+(DEC-PR-3): backup retention must not be shorter than the application-level
+retention window, and the five-day margin gives operational overlap without
+turning backups into indefinite archival storage.
+
+A successful backup is **not** validated recovery. Recovery counts as validated
+only after an actual restore rehearsal. Backup failures must surface
+operationally, backups are encrypted at rest, access is restricted to authorized
+operators, and restoration procedures are documented here.
+
+Backups use `pg_dump --format=custom` of the whole database. Validation (run on
+every backup-procedure change, at the monthly rehearsal, and against real
+backups):
 
 ```bash
 SOURCE_URL=postgresql://…/dilchat \
@@ -118,8 +137,12 @@ Cautions:
   script refuses names that do not look disposable.
 - A dump contains **everything**, including message bodies and report
   evidence. Backup artifacts inherit the production data-protection posture:
-  encrypt at rest, restrict access, and delete on the same retention clock as
-  the database (final policy is a D-PR-3/legal item).
+  encrypt at rest, restrict access, and delete on the retention clock above.
+- **Backup retention is not a way around deletion policy.** An application-level
+  purge is not immediate physical disappearance from historical backups. Before
+  `retention_purge_enabled` may ever become true, the deletion design must state
+  how purged user data ages out of backups, and that question belongs to the
+  D-PR-3 privacy/legal retention review (DILCHAT-D-PL-5).
 
 ## 5. Retention (report-only — nothing is deleted)
 
