@@ -866,3 +866,320 @@ def test_an_allowed_step_below_one_is_refused():
             min_capacity=0,
             max_capacity=10,
         )
+
+
+# ======================================================================================= #
+# policy.py — RecommendationPolicy
+# ======================================================================================= #
+
+from ugence_cloud_scaling_controller.planning import (  # noqa: E402
+    FEATURE_NAMES,
+    PolicyError,
+    RecommendationPolicy,
+    ScoreBreakdown,
+)
+
+
+def test_a_policy_id_that_is_not_a_non_empty_string_is_refused():
+    with pytest.raises(PolicyError):
+        H.policy(policy_id="")
+
+
+def test_a_threshold_above_one_is_refused():
+    """Finite and non-negative, so only the [0, 1] range gate can refuse it."""
+
+    with pytest.raises(PolicyError):
+        H.policy(coverage_floor=2.0)
+
+
+def test_a_tie_epsilon_above_one_is_refused():
+    with pytest.raises(PolicyError):
+        H.policy(tie_epsilon=2.0)
+
+
+def test_a_policy_payload_that_is_not_a_mapping_is_refused():
+    """`["policy_id"]` passes the unknown-key set arithmetic; without the gate,
+    `dict.update` on it raises a plain ValueError, not the policy contract."""
+
+    with pytest.raises(PolicyError):
+        RecommendationPolicy.from_dict(["policy_id"])
+
+
+def test_a_policy_payload_carrying_an_unknown_field_is_refused():
+    with pytest.raises(PolicyError):
+        RecommendationPolicy.from_dict({"policy_id": "p", "w_speed": 1.0})
+
+
+# ======================================================================================= #
+# policy.py — ScoreBreakdown
+# ======================================================================================= #
+
+
+def _breakdown(**over):
+    fields = dict(
+        features={f: 0.0 for f in FEATURE_NAMES},
+        contributions={f: 0.0 for f in FEATURE_NAMES},
+        total_score=0.0,
+        policy_id="p",
+        policy_digest="sha256:d",
+    )
+    fields.update(over)
+    return ScoreBreakdown(**fields)
+
+
+def test_breakdown_features_that_are_not_a_mapping_are_refused():
+    with pytest.raises(PolicyError):
+        _breakdown(features=[("coverage", 0.0)])
+
+
+def test_an_unknown_feature_name_is_refused_as_a_policy_error():
+    """Evidence for the `diagnostic-only` exclusion of the per-key unknown-feature
+    gate: any key-set deviation it can see — replaced or added — is also refused by the
+    exact-cover gate below it, with the same class, and a wrong-typed value under the
+    bogus key is refused by the finiteness gate between them, again with the same
+    class. No input reaches one without the others."""
+
+    features = {f: 0.0 for f in FEATURE_NAMES}
+    features.pop("hold_bias")
+    features["bogus"] = 0.0
+    with pytest.raises(PolicyError):
+        _breakdown(features=features)
+
+
+def test_a_feature_set_that_does_not_cover_the_fixed_names_is_refused():
+    """A strict subset — no unknown key for the per-key gate, every value finite — so
+    the exact-cover gate alone refuses it; without it the canonical rebuild is a
+    KeyError on the missing name."""
+
+    features = {f: 0.0 for f in FEATURE_NAMES}
+    features.pop("hold_bias")
+    with pytest.raises(PolicyError):
+        _breakdown(features=features)
+
+
+def test_a_non_finite_total_score_is_refused():
+    """NaN is the probe: the recomputation gate's `abs(sum - NaN) > tol` is False, so
+    with the finiteness gate removed the breakdown constructs successfully."""
+
+    with pytest.raises(PolicyError):
+        _breakdown(total_score=float("nan"))
+
+
+def test_a_breakdown_payload_that_is_not_a_mapping_is_refused():
+    with pytest.raises(PolicyError):
+        ScoreBreakdown.from_dict(
+            ["policy_id", "policy_digest", "features", "contributions", "total_score"]
+        )
+
+
+def test_a_breakdown_payload_carrying_an_unknown_field_is_refused():
+    payload = _breakdown().to_canonical_dict()
+    payload["audited"] = True
+    with pytest.raises(PolicyError):
+        ScoreBreakdown.from_dict(payload)
+
+
+def test_a_breakdown_payload_missing_a_required_field_is_refused():
+    with pytest.raises(PolicyError):
+        ScoreBreakdown.from_dict({})
+
+
+# ======================================================================================= #
+# scoring.py — build_context / plan_cost_delta_minor
+# ======================================================================================= #
+
+from ugence_cloud_scaling_controller.canonical import (  # noqa: E402
+    CanonicalCapacityState,
+)
+from ugence_cloud_scaling_controller.planning import (  # noqa: E402
+    CostBook as _CostBook,
+    ScoringError,
+    build_context,
+    plan_cost_delta_minor,
+)
+
+
+def _ctx_inputs(**over):
+    subj = over.pop("subj", H.subject())
+    fields = dict(
+        forecast_evidence=H.build_forecast_evidence(8, subj=subj),
+        current_state=H.replicas_state(H.at(180.0), 6, subj=subj),
+        topology=None,
+        cost_book=H.cost_book(subj=subj),
+        constraints=H.constraints(),
+        recommendation_time=H.at(190.0),
+    )
+    fields.update(over)
+    return fields
+
+
+def _build_context(**over):
+    f = _ctx_inputs(**over)
+    return build_context(
+        f["forecast_evidence"], f["current_state"], f["topology"], f["cost_book"],
+        f["constraints"], recommendation_time=f["recommendation_time"],
+    )
+
+
+def test_context_from_an_abstained_forecast_is_refused():
+    """Without the point-forecast gate, `float(None)` on the absent point estimate is a
+    TypeError, not the scoring contract."""
+
+    with pytest.raises(ScoringError):
+        _build_context(forecast_evidence=H.build_abstained_forecast(subj=H.subject()))
+
+
+def test_context_from_a_non_planning_target_is_refused():
+    """A genuine CPU forecast: every later gate passes on it, so with the target gate
+    removed the context builds successfully."""
+
+    with pytest.raises(ScoringError):
+        _build_context(forecast_evidence=H.build_cpu_forecast_evidence(subj=H.subject()))
+
+
+def test_context_without_current_capacity_is_refused():
+    """A state with no capacity block: without the gate, reading `.running_replicas`
+    off None is an AttributeError."""
+
+    from ugence_cloud_scaling_controller.canonical import InfrastructureState, Measurement, Unit
+    bare = CanonicalCapacityState(
+        subject=H.subject(), observed_at=H.at(180.0),
+        infrastructure=InfrastructureState(cpu_utilization=Measurement(50.0, Unit.PERCENT)),
+    )
+    with pytest.raises(ScoringError):
+        _build_context(current_state=bare)
+
+
+def test_context_with_an_evidence_free_dependency_edge_is_refused():
+    """A capacity-bound edge with both evidence fields absent: without the gate,
+    `int(None)` on the missing downstream capacity is a TypeError."""
+
+    dep = H.subject(workload_id="db")
+    topo = H.topology(dependency=dep, downstream_current=None, required_per_upstream_unit=None)
+    with pytest.raises(ScoringError):
+        _build_context(topology=topo)
+
+
+def test_context_without_a_primary_unit_price_is_refused():
+    """An empty cost book: without the gate the baseline-cost multiply on None is a
+    TypeError."""
+
+    with pytest.raises(ScoringError):
+        _build_context(cost_book=_CostBook(subject=H.subject(), entries=()))
+
+
+def test_a_plan_cost_for_an_unpriced_resource_is_refused():
+    """The context prices only the primary; the plan changes a second subject. Without
+    the gate the cost multiply on None is a TypeError."""
+
+    ctx = H.make_ctx()
+    plan = CandidateActionPlan(
+        plan_id="p1",
+        action_kind=ActionKind.COORDINATED,
+        changes=(
+            _change(),
+            _change(subject=_subject(workload_id="db"), role="dependency",
+                    current_capacity=10, proposed_capacity=12),
+        ),
+    )
+    with pytest.raises(ScoringError):
+        plan_cost_delta_minor(plan, ctx)
+
+
+# ======================================================================================= #
+# pipeline.py — recommend_capacity_action argument gates
+# ======================================================================================= #
+
+from ugence_cloud_scaling_controller.planning import (  # noqa: E402
+    PipelineError,
+    RecommendationAbstention,
+    RecommendationAbstentionReason,
+    recommend_capacity_action,
+)
+
+
+def _recommend(**over):
+    subj = over.pop("subj", H.subject())
+    kw = dict(
+        forecast_evidence=H.build_forecast_evidence(8, subj=subj),
+        current_state=H.replicas_state(H.at(180.0), 6, subj=subj),
+        cost_book=H.cost_book(subj=subj),
+        constraints=H.constraints(),
+        policy=H.policy(),
+        recommendation_time=H.at(190.0),
+        validity_seconds=60.0,
+    )
+    kw.update(over)
+    return recommend_capacity_action(
+        kw.pop("forecast_evidence"), kw.pop("current_state"), kw.pop("cost_book"),
+        kw.pop("constraints"), kw.pop("policy"), **kw,
+    )
+
+
+def test_a_recommendation_time_that_is_not_a_datetime_is_refused():
+    with pytest.raises(PipelineError):
+        _recommend(recommendation_time="now")
+
+
+def test_a_policy_that_is_not_a_recommendation_policy_is_refused():
+    """Truthy, so the `policy or default` fallback keeps it; without the gate the first
+    policy read is an AttributeError on an int."""
+
+    with pytest.raises(PipelineError):
+        _recommend(policy=42)
+
+
+def test_a_current_state_that_is_not_canonical_is_refused():
+    """Not None — None is a typed MISSING_CANONICAL_STATE abstention, a different
+    contract this gate does not own."""
+
+    with pytest.raises(PipelineError):
+        _recommend(current_state="state")
+
+
+def test_a_forecast_evidence_that_is_not_typed_evidence_is_refused():
+    with pytest.raises(PipelineError):
+        _recommend(forecast_evidence="evidence")
+
+
+def test_constraints_that_are_not_operating_constraints_are_refused():
+    with pytest.raises(PipelineError):
+        _recommend(constraints="tight")
+
+
+def test_a_validity_seconds_that_is_not_a_positive_finite_number_is_refused():
+    """NaN: without the gate, `timedelta(seconds=NaN)` raises a plain ValueError, not
+    the pipeline contract."""
+
+    with pytest.raises(PipelineError):
+        _recommend(validity_seconds=float("nan"))
+
+
+def test_a_cost_book_that_is_not_a_cost_book_is_refused():
+    with pytest.raises(PipelineError):
+        _recommend(cost_book="book")
+
+
+def test_a_topology_that_is_not_a_dependency_topology_is_refused():
+    with pytest.raises(PipelineError):
+        _recommend(topology="topo")
+
+
+def test_every_scoring_failure_is_pre_gated_into_a_typed_abstention():
+    """Evidence for the `unreachable-behind-earlier-guard` exclusion of the pipeline's
+    ScoringError arm.
+
+    The same inputs that make `build_context` raise are abstained by the pipeline's own
+    pre-gates before the context is ever built: an abstained forecast is refused as
+    FORECAST_ABSTAINED here, and raises ScoringError only when the context build is
+    invoked directly. The arm is a jacket the pre-gates keep unreachable, so its
+    reason-collapse mutation has nothing to observe it.
+    """
+
+    subj = H.subject()
+    abstained = H.build_abstained_forecast(subj=subj)
+    out = _recommend(subj=subj, forecast_evidence=abstained)
+    assert isinstance(out, RecommendationAbstention)
+    assert out.reason is RecommendationAbstentionReason.FORECAST_ABSTAINED
+    with pytest.raises(ScoringError):
+        _build_context(forecast_evidence=abstained, subj=subj)

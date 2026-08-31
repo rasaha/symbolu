@@ -25,9 +25,9 @@ This package records no prior inventory; this is the first one.
 
 ## Classification
 
-Every guard is classified: **215 `SCORED`** — the
+Every guard is classified: **213 `SCORED`** — the
 sweep neutralises it and the suite must fail — and
-**4 `EXCLUDED`**, each with a reason from a closed vocabulary and
+**6 `EXCLUDED`**, each with a reason from a closed vocabulary and
 a test that measures the reason. A guard is never excluded because it survived; a
 survivor with no prior declaration fails the sweep.
 
@@ -37,6 +37,8 @@ survivor with no prior declaration fails the sweep.
 | `planning/constraints.py:58` | `diagnostic-only` | `_finite_number`'s None branch. No call site passes `allow_none=True` — all three call it bare — so for every reachable input the branch only chooses between the 'is required' and 'must be a finite number' messages, and both raise `ConstraintError`. The `allow_none` early return it also guards is dead at every call site; a caller that introduces one re-opens this exclusion by construction, because the sweep fails on a stale exclusion that gets killed. | `tests/planning/test_guard_coverage.py::test_a_none_cooldown_is_refused_as_a_constraint_error` |
 | `planning/candidates.py:112` | `diagnostic-only` | The empty-plan guard. With it removed, the primary-count gate two lines below refuses the same empty plan with the same `CandidateError` — an empty tuple has zero 'primary' roles — and emptiness is the only condition that reaches it, so no input distinguishes the two. Kept because 'requires at least one resource change' is the honest diagnosis for the empty case. | `tests/planning/test_guard_coverage.py::test_an_empty_plan_is_refused_as_a_candidate_error` |
 | `planning/candidates.py:233` | `diagnostic-only` | `generate_candidates`' current_capacity gate. The value flows unconditionally into the NO_CHANGE plan's `ResourceChange`, whose own validation refuses every value this gate refuses — bool, non-int and negative alike — with the same `CandidateError`. required_capacity's twin gate IS scored: required never lands in a ResourceChange, so its removal admits a fractional requirement outright. | `tests/planning/test_guard_coverage.py::test_an_invalid_current_capacity_is_refused_as_a_candidate_error` |
+| `planning/policy.py:175` | `diagnostic-only` | ScoreBreakdown's per-key unknown-feature gate. Every key-set deviation it can see — a replaced name or an added one — is also refused by the exact-cover gate below it (`set(features) != set(FEATURE_NAMES)`), and a wrong-typed value under a bogus key by the finiteness gate between them; all three raise `PolicyError`, and the class is this package's typed half. Kept because naming the offending key is the better diagnosis. | `tests/planning/test_guard_coverage.py::test_an_unknown_feature_name_is_refused_as_a_policy_error` |
+| `planning/pipeline.py:268` | `unreachable-behind-earlier-guard` | The pipeline's ScoringError arm around `build_context`. Every condition that makes the context build raise is abstained by the pipeline's own pre-gates before the build is reached: an abstained forecast as FORECAST_ABSTAINED, a non-planning target as UNSUPPORTED_FORECAST_TARGET, a missing point estimate as NON_FINITE_INPUT, missing capacity as MISSING_CURRENT_CAPACITY, an evidence-free dependency edge as MISSING_DEPENDENCY_CAPACITY and a missing price as MISSING_COST_EVIDENCE. The arm is the fail-closed jacket for a context build the pre-gates keep unreachable, so its reason-collapse mutation has no observer; the evidence test drives the same inputs down both paths and records the pairing. | `tests/planning/test_guard_coverage.py::test_every_scoring_failure_is_pre_gated_into_a_typed_abstention` |
 
 ## Not counted, and why
 
@@ -165,7 +167,7 @@ survivor with no prior declaration fails the sweep.
 | 113 | `planning/policy.py:135` | if | raise | SCORED | — | `not isinstance(data, Mapping)` |
 | 114 | `planning/policy.py:139` | if | raise | SCORED | — | `unknown` |
 | 115 | `planning/policy.py:172` | if | raise | SCORED | — | `not isinstance(m, Mapping)` |
-| 116 | `planning/policy.py:175` | if | raise | SCORED | — | `k not in FEATURE_NAMES` |
+| 116 | `planning/policy.py:175` | if | raise | EXCLUDED | — | `k not in FEATURE_NAMES` |
 | 117 | `planning/policy.py:177` | if | raise | SCORED | — | `isinstance(v, bool) or not isinstance(v, (int, float)) or (not math.isfinit…` |
 | 118 | `planning/policy.py:179` | if | raise | SCORED | — | `set(self.features) != set(FEATURE_NAMES) or set(self.contributions) != set(…` |
 | 119 | `planning/policy.py:181` | if | raise | SCORED | — | `isinstance(self.total_score, bool) or not isinstance(self.total_score, (int…` |
@@ -267,5 +269,5 @@ survivor with no prior declaration fails the sweep.
 | 215 | `planning/pipeline.py:180` | if | raise | SCORED | — | `isinstance(validity_seconds, bool) or not isinstance(validity_seconds, (int…` |
 | 216 | `planning/pipeline.py:200` | if | raise | SCORED | — | `not isinstance(cost_book, CostBook)` |
 | 217 | `planning/pipeline.py:230` | if | raise | SCORED | — | `not isinstance(topology, DependencyTopology)` |
-| 218 | `planning/pipeline.py:268` | except-arm | typed-refusal return | SCORED | — | `except ScoringError: abcost(R.CONTRADICTORY_EVIDENCE, f'inconsistent eviden…` |
+| 218 | `planning/pipeline.py:268` | except-arm | typed-refusal return | EXCLUDED | — | `except ScoringError: abcost(R.CONTRADICTORY_EVIDENCE, f'inconsistent eviden…` |
 | 219 | `planning/pipeline.py:296` | else-arm | raising-helper call | SCORED | — | `else of: violations` |

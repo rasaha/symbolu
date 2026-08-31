@@ -560,6 +560,38 @@ PACKAGES = {
                 "tests/planning/test_guard_coverage.py::"
                 "test_an_invalid_current_capacity_is_refused_as_a_candidate_error",
             ),
+            ("planning/policy.py", "k not in FEATURE_NAMES"): (
+                "diagnostic-only",
+                "ScoreBreakdown's per-key unknown-feature gate. Every key-set "
+                "deviation it can see — a replaced name or an added one — is also "
+                "refused by the exact-cover gate below it (`set(features) != "
+                "set(FEATURE_NAMES)`), and a wrong-typed value under a bogus key by "
+                "the finiteness gate between them; all three raise `PolicyError`, and "
+                "the class is this package's typed half. Kept because naming the "
+                "offending key is the better diagnosis.",
+                "tests/planning/test_guard_coverage.py::"
+                "test_an_unknown_feature_name_is_refused_as_a_policy_error",
+            ),
+            (
+                "planning/pipeline.py",
+                "except ScoringError: abcost(R.CONTRADICTORY_EVIDENCE, "
+                "f'inconsistent evidence: {exc}')",
+            ): (
+                "unreachable-behind-earlier-guard",
+                "The pipeline's ScoringError arm around `build_context`. Every "
+                "condition that makes the context build raise is abstained by the "
+                "pipeline's own pre-gates before the build is reached: an abstained "
+                "forecast as FORECAST_ABSTAINED, a non-planning target as "
+                "UNSUPPORTED_FORECAST_TARGET, a missing point estimate as "
+                "NON_FINITE_INPUT, missing capacity as MISSING_CURRENT_CAPACITY, an "
+                "evidence-free dependency edge as MISSING_DEPENDENCY_CAPACITY and a "
+                "missing price as MISSING_COST_EVIDENCE. The arm is the fail-closed "
+                "jacket for a context build the pre-gates keep unreachable, so its "
+                "reason-collapse mutation has no observer; the evidence test drives "
+                "the same inputs down both paths and records the pairing.",
+                "tests/planning/test_guard_coverage.py::"
+                "test_every_scoring_failure_is_pre_gated_into_a_typed_abstention",
+            ),
             ("planning/topology.py", "seen[key] != edge.kind"): (
                 "diagnostic-only",
                 "The guard chooses between two messages on a path that refuses either "

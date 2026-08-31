@@ -1,8 +1,8 @@
 {
   "package": "controller-planning",
   "total": 219,
-  "scored": 215,
-  "excluded": 4,
+  "scored": 213,
+  "excluded": 6,
   "classification": {
     "1": {
       "status": "SCORED",
@@ -707,7 +707,10 @@
       "condition": "not isinstance(m, Mapping)"
     },
     "116": {
-      "status": "SCORED",
+      "status": "EXCLUDED",
+      "reason": "diagnostic-only",
+      "detail": "ScoreBreakdown's per-key unknown-feature gate. Every key-set deviation it can see \u2014 a replaced name or an added one \u2014 is also refused by the exact-cover gate below it (`set(features) != set(FEATURE_NAMES)`), and a wrong-typed value under a bogus key by the finiteness gate between them; all three raise `PolicyError`, and the class is this package's typed half. Kept because naming the offending key is the better diagnosis.",
+      "evidence": "tests/planning/test_guard_coverage.py::test_an_unknown_feature_name_is_refused_as_a_policy_error",
       "module": "planning/policy.py",
       "line": 175,
       "condition": "k not in FEATURE_NAMES"
@@ -1319,7 +1322,10 @@
       "condition": "not isinstance(topology, DependencyTopology)"
     },
     "218": {
-      "status": "SCORED",
+      "status": "EXCLUDED",
+      "reason": "unreachable-behind-earlier-guard",
+      "detail": "The pipeline's ScoringError arm around `build_context`. Every condition that makes the context build raise is abstained by the pipeline's own pre-gates before the build is reached: an abstained forecast as FORECAST_ABSTAINED, a non-planning target as UNSUPPORTED_FORECAST_TARGET, a missing point estimate as NON_FINITE_INPUT, missing capacity as MISSING_CURRENT_CAPACITY, an evidence-free dependency edge as MISSING_DEPENDENCY_CAPACITY and a missing price as MISSING_COST_EVIDENCE. The arm is the fail-closed jacket for a context build the pre-gates keep unreachable, so its reason-collapse mutation has no observer; the evidence test drives the same inputs down both paths and records the pairing.",
+      "evidence": "tests/planning/test_guard_coverage.py::test_every_scoring_failure_is_pre_gated_into_a_typed_abstention",
       "module": "planning/pipeline.py",
       "line": 268,
       "condition": "except ScoringError: abcost(R.CONTRADICTORY_EVIDENCE, f'inconsistent evidence: {exc}')"
