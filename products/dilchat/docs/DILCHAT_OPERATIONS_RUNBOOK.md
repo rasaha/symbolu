@@ -7,6 +7,11 @@ the **internal pilot** target (D-PR-2). Deployment artifacts, pilot rollout,
 and incident runbooks are round PR-C; public production is a separate, later
 owner launch decision.
 
+Companion documents: [`DILCHAT_PILOT_CHECKLIST.md`](DILCHAT_PILOT_CHECKLIST.md)
+(what must be true before a pilot deploy) and
+[`DILCHAT_INCIDENT_RUNBOOK.md`](DILCHAT_INCIDENT_RUNBOOK.md) (what to do when
+something breaks). Deployment artifacts live in [`../deploy/`](../deploy).
+
 ## 1. Processes and roles
 
 | Process | Entry point | DB role | Notes |
@@ -18,7 +23,34 @@ owner launch decision.
 Roles (`dilchat_app`, `dilchat_worker`, `dilchat_readonly`, `dilchat_safety`,
 the SECURITY DEFINER function owner) are **cluster-level**: they are created by
 the RLS migrations and must exist in any cluster a dump is restored into
-(see §4).
+(see §4). The migrations create them `NOLOGIN` — they are RLS postures, not
+accounts — so a deployment grants each `LOGIN` and a password before first use.
+
+**Role separation is the deployment's job.** One image runs both processes
+(`deploy/Dockerfile`); what makes the web process unable to touch the outbox is
+the DSN it is given, not anything in the code. Verify it per process at start:
+
+```bash
+python -m ugence_dilchat.scripts_preflight --expect-role dilchat_app     # web
+python -m ugence_dilchat.scripts_preflight --expect-role dilchat_worker  # relay
+```
+
+Preflight also confirms the database is reachable and its Alembic revision
+matches the code's head, and prints the posture summary (environment, provider,
+push transport, purge flag). Exit 0 means safe to start. It never prints a DSN,
+key, or token. `deploy/docker-compose.pilot.yml` shows the whole shape —
+one-shot owner-role migration, then web and relay on their own DSNs.
+
+**Relay liveness.** The relay serves no HTTP surface, so it rewrites a heartbeat
+file (`DILCHAT_RELAY_HEARTBEAT_PATH`, an ISO timestamp only) each loop:
+
+```bash
+python -m ugence_dilchat.scripts_relay_health   # 0 fresh, 1 stale/missing, 2 not configured
+```
+
+The staleness bound (`DILCHAT_RELAY_HEARTBEAT_MAX_AGE_SECONDS`, default 120)
+must exceed the idle poll interval or a healthy idle relay would look dead;
+startup refuses a configuration where it does not.
 
 ## 2. Environment configuration
 

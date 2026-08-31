@@ -10,14 +10,42 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import os
+import pathlib
 import signal
+import tempfile
 
+from ..base import utcnow
 from ..config import Settings
 from ..db import get_sessionmaker, init_engine
 from .transports import build_transport
 from .worker import RelayService
 
 log = logging.getLogger("ugence_dilchat.relay")
+
+
+def write_heartbeat(path: str) -> None:
+    """Record liveness as an ISO timestamp — the relay's only health surface.
+
+    Content-free by construction: a timestamp, never an event, token, or
+    message. Written atomically (temp file + rename) so a reader never observes
+    a half-written stamp, and best-effort: a failing heartbeat must never take
+    down a relay that is otherwise delivering.
+    """
+    try:
+        target = pathlib.Path(path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=str(target.parent), prefix=".heartbeat-")
+        try:
+            with os.fdopen(fd, "w") as fh:
+                fh.write(utcnow().isoformat())
+            os.replace(tmp, target)
+        except BaseException:
+            with contextlib.suppress(OSError):
+                os.unlink(tmp)
+            raise
+    except OSError:
+        log.warning("relay heartbeat write failed")
 
 
 async def run(settings: Settings | None = None) -> None:
@@ -44,6 +72,8 @@ async def run(settings: Settings | None = None) -> None:
             if pruned:
                 log.info("relay pruned published_rows=%s", pruned)
             next_prune = now + settings.relay_prune_interval_seconds
+        if settings.relay_heartbeat_path:
+            write_heartbeat(settings.relay_heartbeat_path)
         if published == 0:
             with contextlib.suppress(asyncio.TimeoutError):
                 await asyncio.wait_for(
