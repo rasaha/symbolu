@@ -148,9 +148,15 @@ jobs:
         # pip-installed on purpose: an editable install of the repository would shadow
         # the disposable copy the sweep mutates, and every mutant would import unmutated
         # code.
+        #
+        # ``requests`` is the Cloud Scaling Controller's declared optional dependency,
+        # behind its read-only ``prometheus`` / ``shadow`` extras. This suite constructs
+        # a ProductionOrchestrator, which builds the controller's signal pipeline, which
+        # builds a PrometheusClient — so without it one boundary test fails on an
+        # ImportError rather than on a violation, and the sweep refuses the red baseline.
         run: |
           python -m pip install --upgrade pip
-          pip install pytest numpy
+          pip install pytest numpy "requests>=2.28.0"
 
       - name: The checked-in inventory is regenerated, not hand-edited
         # `--inventory-only` also fails on an exclusion that names no guard, one with a
