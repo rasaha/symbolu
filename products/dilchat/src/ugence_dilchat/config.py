@@ -117,6 +117,14 @@ class Settings(BaseSettings):
     # Message retention is untouched; unpublished work is never pruned (I8).
     outbox_prune_after_days: int = 30
     relay_prune_interval_seconds: int = 3600
+    # Liveness for the relay, which serves no HTTP surface (round PR-C): when set,
+    # each completed loop iteration rewrites this file with an ISO timestamp, so a
+    # container healthcheck can assert freshness. Content-free by construction —
+    # a timestamp only, never an event, token, or message. Unset = no heartbeat.
+    relay_heartbeat_path: str | None = None
+    # A heartbeat older than this many seconds means the relay is stuck or dead.
+    # Must exceed the poll interval or a healthy idle relay would look unhealthy.
+    relay_heartbeat_max_age_seconds: int = 120
 
     # Birth-time confidence defaults (propagate to calculation provenance).
     confidence_exact: float = 1.0
@@ -158,6 +166,14 @@ class Settings(BaseSettings):
             raise ValueError(
                 f"push_transport={self.push_transport!r} is not permitted; allowed: "
                 "null, expo (fail closed — no silent no-op transport)."
+            )
+        # A heartbeat that expires faster than the relay's idle poll interval
+        # would make a healthy, idle relay look dead. Fail closed at construction.
+        if self.relay_heartbeat_max_age_seconds <= self.relay_poll_interval_seconds:
+            raise ValueError(
+                "relay_heartbeat_max_age_seconds "
+                f"({self.relay_heartbeat_max_age_seconds}) must exceed "
+                f"relay_poll_interval_seconds ({self.relay_poll_interval_seconds})."
             )
         # DEC-PR-3: retention must outlast the bounded post-revocation reporting
         # right, or a conversation could be purged while a former participant may
