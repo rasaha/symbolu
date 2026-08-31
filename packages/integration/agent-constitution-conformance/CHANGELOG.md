@@ -44,7 +44,7 @@ operational outcome, and holds no authority of any kind.
   order not enforced. The presented-facts caveat is disclosed in the type's own
   documentation and pinned by a test: replay proves the presented facts only.
 - **§5.3 disposition-free failure taxonomy** — one root
-  (`AgentConstitutionConformanceError`), nine leaves, none naming a denial,
+  (`AgentConstitutionConformanceError`), eight leaves, none naming a denial,
   abstention, reserved authority term, terminal outcome or candidate
   disposition; a `PolicyResolutionReason` reaches a caller only through
   `ConstitutionUnresolvedError.reason`, never message text, and a test asserts
