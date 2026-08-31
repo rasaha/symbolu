@@ -164,7 +164,52 @@ gates (legal/privacy review of the period, purge implementation and
 preservation tests, dry-run evidence), governs activation. Until then, treat
 every backup as retaining everything.
 
-## 6. Migrations
+## 6. Moderation read-back (read-only; no adjudication)
+
+Reports are recorded and preserved, and a reviewer can now READ them. Nothing
+adjudicates them: reports stay `SUBMITTED` (DEC-3B-3), case state is never
+changed, and no enforcement path exists. Reading a case is not deciding it.
+
+**The database role is not the human.** `dilchat_safety` is an enforcement
+posture; each access requires an individual reviewer principal
+(`safety_reviewers`), and reviewers never connect to the database directly.
+There is no shared admin identity.
+
+Provision one reviewer per person (owner action; the key is shown **once**,
+stored only as an Argon2 hash, and is not recoverable):
+
+```bash
+python -m ugence_dilchat.scripts_moderation provision-reviewer --label reviewer-01
+python -m ugence_dilchat.scripts_moderation revoke-reviewer  --label reviewer-01
+```
+
+Reviewers authenticate through the environment — never as arguments, since argv
+is world-readable through the process table:
+
+```bash
+export DILCHAT_REVIEWER_LABEL=reviewer-01
+export DILCHAT_REVIEWER_KEY=…
+python -m ugence_dilchat.scripts_moderation list-cases    --reason PILOT_TRIAGE
+python -m ugence_dilchat.scripts_moderation read-case     --case-id <uuid>   --reason PILOT_TRIAGE
+python -m ugence_dilchat.scripts_moderation read-evidence --report-id <uuid> --reason PILOT_TRIAGE
+```
+
+Every read appends an immutable case event attributed to that individual
+(`actor_internal_id`), carrying the reviewer label, role, per-invocation session
+id, and the machine-style access reason. The audit records **that** a case or N
+evidence items were read, never what they said. The access reason must be a
+machine code (`A-Z0-9_`) — never free text about a person.
+
+Report descriptions and evidence bodies appear on the reviewer's terminal. That
+is the surface's purpose, and it is the ONLY place they may be read: the
+reporter-facing API still cannot read evidence back (DEC-3B-5), and neither the
+application role nor the reporting role can reach reviewers, cases, or evidence
+at all. Do not copy what you read into tickets, chat, or logs.
+
+Revoke a reviewer the moment a person no longer needs access; a revoked
+principal fails authentication indistinguishably from a wrong key.
+
+## 7. Migrations
 
 - Forward: `alembic upgrade head` with the owner role, before rolling
   processes onto a new version. Exactly one head is enforced.
@@ -182,7 +227,7 @@ DILCHAT_DATABASE_URL=postgresql+asyncpg://…/dilchat_validate \
   Destructive by design — point it only at a disposable database (the script
   refuses non-disposable-looking names).
 
-## 7. Standard procedures
+## 8. Standard procedures
 
 **Pre-upgrade (pilot):** take a `pg_dump -Fc` backup → run
 `validate_backup_restore.sh` against it (fresh disposable target) → `alembic

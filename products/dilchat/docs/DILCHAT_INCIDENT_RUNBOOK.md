@@ -98,8 +98,9 @@ become purge-eligible while the matter is open.
 ## F. What to escalate rather than fix
 
 - Anything requiring owner-role access to user data.
-- A safety report that needs human review — no moderation workflow exists yet
-  (DEC-3B-3; round PR-D adds only a minimal read-back).
+- A safety report that needs a **decision**. A provisioned reviewer may read
+  reports and evidence (operations runbook §6), but nothing adjudicates or
+  enforces: any outcome is the owner's call, not the operator's.
 - Any request to enable `retention_purge_enabled`, which is gated on decisions
   that are not the operator's to make.
 - Any request to disable a startup guard, RLS, or the content-freedom posture.
