@@ -1,0 +1,26 @@
+{
+  "document_ref": "ugence.roles/ugence/invoice-reconciler/v1",
+  "schema_version": "1.0",
+  "tenant_id": "ugence",
+  "created_at": "2026-08-31T00:00:00Z",
+  "role_contract_id": "invoice-reconciler",
+  "primary_function": "Reconcile supplier invoices against ledger records and route each outcome for human review.",
+  "permitted_tool_scopes": [
+    "invoice.read",
+    "ledger.read"
+  ],
+  "permitted_candidate_dispositions": [
+    "ESCALATE_EXCEPTION",
+    "RECOMMEND_MATCHED_FOR_APPROVAL",
+    "RECOMMEND_WITHHOLD",
+    "REQUEST_EVIDENCE"
+  ],
+  "permitted_review_actions": [
+    "CREATE_EXCEPTION_REVIEW_BUNDLE",
+    "ROUTE_APPROVAL_BUNDLE"
+  ],
+  "escalation_role_ref": "ugence.roles/ugence/exception-review-lead/v1",
+  "activation_status": "ACTIVE",
+  "strategy_policy_ref": "policy-authority/strategy-permission/reconciliation",
+  "constitution_ref": "ugence.agent-constitution/ugence/baseline/v1"
+}

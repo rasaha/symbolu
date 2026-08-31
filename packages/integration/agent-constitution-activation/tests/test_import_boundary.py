@@ -29,10 +29,15 @@ import pytest
 DIST_ROOT = pathlib.Path(__file__).resolve().parents[1]
 SRC = DIST_ROOT / "src" / "ugence_agent_constitution_activation"
 MODULES = sorted(SRC.glob("*.py"))
-ALL_PY = sorted(
+#: Every committed text file under the distribution — the `ACC-PR-IA-1`
+#: extension: the projection scan must reach the committed pilot declaration
+#: (and any future non-``.py`` file), not only Python source.
+ALL_TEXT = sorted(
     p
-    for p in DIST_ROOT.rglob("*.py")
-    if not any(part in {"build", "dist", ".venv", "__pycache__"} for part in p.parts)
+    for p in DIST_ROOT.rglob("*")
+    if p.is_file()
+    and p.suffix in {".py", ".json", ".md", ".toml", ".txt", ".cfg", ".typed"}
+    and not any(part in {"build", "dist", ".venv", "__pycache__"} for part in p.parts)
 )
 
 #: The only top-level modules the shipped source may import.
@@ -171,7 +176,7 @@ def test_the_source_never_imports_the_proposer(module):
         assert not name.startswith("ugence_agentic_proposer"), name
 
 
-@pytest.mark.parametrize("path", ALL_PY, ids=lambda p: p.name)
+@pytest.mark.parametrize("path", ALL_TEXT, ids=lambda p: p.name)
 def test_the_role_projection_never_appears_in_this_distribution(path):
     body = path.read_text(encoding="utf-8", errors="ignore")
     hits = [marker for marker in PROJECTION_MARKERS if marker in body]
