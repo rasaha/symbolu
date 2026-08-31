@@ -162,6 +162,21 @@ class PackageConfig:
     #: ``risk-integration``. The opt-in discipline itself is unchanged: every other
     #: package keeps a byte-identical inventory until its own ruling says otherwise.
     record_multiplicity: bool = False
+    #: Prose the generated ``GUARD_INVENTORY.md`` must carry verbatim, directly under its
+    #: header. Exists for ruled caveats a reader must not miss — the operations adoption
+    #: requires the reference-HMAC caveat to stay explicit in the published record — and
+    #: stays empty everywhere else, so every prior adopter's inventory is byte-identical.
+    inventory_note: str = ""
+    #: Whether a call to a ``refusal_calls`` name counts as a typed refusal *wherever it
+    #: appears in the guard's body*, not only as ``return f(...)``. Ruled with the
+    #: operations adoption (2026-08-31): that package's gates bind the typed receipt,
+    #: record it, and return the bound name —
+    #: ``r = self._receipt(..., ExecutionOutcome.DENIED, ...); self.outcomes.record(r);
+    #: return r`` — an idiom none of the ratified shapes could see, which would have left
+    #: the denial and duplicate gates of the very package whose authorization gates are
+    #: the point outside the inventory. Opt-in per package: under the default every
+    #: adopter's shape reading is byte-identical to before this field existed.
+    bound_refusal_calls: bool = False
     #: Production modules deliberately outside ``module_order``, each with a concrete
     #: reason: ``{relative path: reason}``. Ruled with the nested-module hardening
     #: (2026-08-31): every module ``_production_modules`` discovers must be either walked
@@ -331,6 +346,152 @@ PACKAGES = {
         },
         recorded=(),
         exclusions={},
+    ),
+    "operations": PackageConfig(
+        key="operations",
+        package_dir="packages/capabilities/cloud-scaling-operations",
+        dist_name="ugence_cloud_scaling_operations",
+        # The mint is the mutation itself: the backend replica write the tests exercise.
+        # For a CONTROLLED_EXECUTION package "removing this guard lets the package mint
+        # something the baseline refused" reads literally — a guard whose removal lets a
+        # replica write happen is the last obstacle before an infrastructure change.
+        mint_site="ugence_cloud_scaling_operations.executors:FakeScalingBackend.set_replicas",
+        # Ruled caveat (owner, 2026-08-31), carried into the generated inventory verbatim.
+        inventory_note=(
+            "**Reference-HMAC caveat (ruled 2026-08-31).** The authority gates this "
+            "inventory scores are verified against `ReferenceAuthorityVerifier`, a "
+            "deterministic HMAC for tests and local development — explicitly NOT a "
+            "production KMS (`authority.py`). Every kill therefore proves **gate "
+            "enforcement** — that the check is applied, discriminates its typed outcome, "
+            "and fails closed — and none proves production cryptographic strength, which "
+            "belongs to whatever verifier a deployment injects."
+        ),
+        # Every production module, in the order a request flows: contracts and
+        # configuration, the authority gate, replay protection and audit, the executors,
+        # the action layer, coordination, the recommend/shadow/observability periphery,
+        # and the process entrypoints last. All 33 modules are walked — the completeness
+        # gate holds with no exclusions — and modules whose decision points fall outside
+        # every ratified class simply contribute zero rows.
+        module_order=(
+            "__init__.py",
+            "version.py",
+            "contracts.py",
+            "config.py",
+            "authority.py",
+            "idempotency.py",
+            "audit.py",
+            "executors.py",
+            "gate_executor.py",
+            "k8s_executor.py",
+            "action/__init__.py",
+            "action/readiness.py",
+            "action/policy.py",
+            "action/gate_actuator.py",
+            "action/k8s_actuator.py",
+            "action/outcome.py",
+            "action/feedback.py",
+            "action/rollback.py",
+            "rollback_coordinator.py",
+            "orchestrator.py",
+            "recommend/__init__.py",
+            "recommend/engine.py",
+            "recommend/approval.py",
+            "recommend/webhook.py",
+            "shadow/__init__.py",
+            "shadow/live_efficiency.py",
+            "shadow/runner.py",
+            "observability/__init__.py",
+            "observability/exporter.py",
+            "observability/otel_exporter.py",
+            "observability/metrics_server.py",
+            "cli.py",
+            "main.py",
+        ),
+        excluded_modules={},
+        # This package's refusal is not one shape either (§9.1's lesson, again): most
+        # gates raise (`ExecutionDenied`, `ExecutionIntegrityError`), and the executor's
+        # own gates *bind* a typed receipt and return the name —
+        # `r = self._receipt(..., ExecutionOutcome.DENIED, ...); return r` — while the
+        # gate executor constructs a `GateOutcome` verdict. `bound_refusal_calls` is what
+        # lets those call sites count as the typed-refusal evidence they are.
+        refusal_calls=frozenset({"_receipt", "GateOutcome"}),
+        bound_refusal_calls=True,
+        tuple_refusals=False,
+        reason_vocabularies=frozenset({"ExecutionOutcome"}),
+        # All three additive classes. D-GC-4 selects exactly the package's two
+        # authority-application sites — the statement-level `verify_authorization(...)`
+        # calls in `executors.py` and `gate_executor.py` — plus the script entrypoint;
+        # D-GC-3 selects the executor's three bound-return arms (denial, concurrency
+        # conflict, backend failure). The 14 other returning `except` arms measured in
+        # the adoption audit return booleans or exit codes, never a vocabulary member,
+        # and are outside the ratified class — the re-derived denominator the owner
+        # asked for is 55, not the audit's provisional 46.
+        decision_classes=frozenset({"except-arm", "helper-admission", "else-arm"}),
+        # D-GC-3's operator. FAILED is the general answer among the members these arms
+        # produce — reporting a denial as a mere failure is precisely §9.4's
+        # general-for-specific weakening; the two arms already at FAILED take the
+        # lateral alternate DENIED.
+        reason_collapse_sentinels={
+            "ExecutionOutcome": ("FAILED", "DENIED"),
+        },
+        record_multiplicity=False,
+        # Partial, and disclosed (ADR §5): only the fake backend the suite injects is
+        # wrapped; the real mutation surfaces are named rather than counted.
+        uncovered_mints=(
+            (
+                "ugence_cloud_scaling_operations.k8s_executor:*.set_replicas",
+                "the production Kubernetes backend. The suite never mutates a real "
+                "cluster, so its write path cannot be exercised by a sweep; the "
+                "executor-level gates in front of it are scored against the fake "
+                "backend, which implements the same ScalingBackend surface.",
+            ),
+            (
+                "ugence_cloud_scaling_operations.action:GateActuator/K8sActuator apply paths",
+                "the action-layer actuators. Their decision points fall outside every "
+                "ratified class (returned verdict enums with no raise and no refusal "
+                "call), so their mutation surfaces are disclosed here rather than "
+                "counted; bringing them in needs an operator ruling, not a config entry.",
+            ),
+        ),
+        recorded=(),
+        # Four, all in the process-entrypoint layer, every one written *after* a measured
+        # sweep. Each decides how a console process boots, not whether an execution is
+        # admitted; the authority and executor gates they eventually wire are scored
+        # directly above them, and no imported test run can reach a `__main__` dispatch
+        # by Python's module-name semantics.
+        exclusions={
+            ("cli.py", "__name__ == '__main__'"): (
+                "outside-authority-bearing-definition",
+                "The console-script dispatch. It decides process bootstrap, not an "
+                "execution outcome, and is unreachable in any imported run of the suite "
+                "— the module imports under its own name.",
+                "tests/execution/test_guard_coverage.py::"
+                "test_the_console_entrypoints_do_not_run_on_import",
+            ),
+            ("main.py", "__name__ == '__main__'"): (
+                "outside-authority-bearing-definition",
+                "The same dispatch for the service entrypoint module.",
+                "tests/execution/test_guard_coverage.py::"
+                "test_the_console_entrypoints_do_not_run_on_import",
+            ),
+            ("main.py", "main()"): (
+                "outside-authority-bearing-definition",
+                "The statement the dispatch above guards — the call that boots the "
+                "long-running service. Deleting it changes nothing an imported test run "
+                "can observe, for the same module-name reason.",
+                "tests/execution/test_guard_coverage.py::"
+                "test_the_console_entrypoints_do_not_run_on_import",
+            ),
+            ("main.py", "args.config"): (
+                "outside-authority-bearing-definition",
+                "Config-source selection inside the service bootstrap: it picks where a "
+                "long-running process reads configuration from, and decides no admission "
+                "outcome. Exercising it means booting the service; the authority gates "
+                "the configuration feeds are scored directly.",
+                "tests/execution/test_guard_coverage.py::"
+                "test_the_console_entrypoints_do_not_run_on_import",
+            ),
+        },
     ),
     "producer-attestation": PackageConfig(
         key="producer-attestation",
@@ -1277,10 +1438,12 @@ def _except_arm_members(handler, vocabularies: frozenset) -> list:
     """
 
     named = []
+    returns = []
     for statement in handler.body:
         for inner in ast.walk(statement):
             if not isinstance(inner, ast.Return) or inner.value is None:
                 continue
+            returns.append(inner)
             for member in ast.walk(inner.value):
                 if (
                     isinstance(member, ast.Attribute)
@@ -1288,6 +1451,23 @@ def _except_arm_members(handler, vocabularies: frozenset) -> list:
                     and member.value.id in vocabularies
                 ):
                     named.append((inner, member))
+    if not named and returns:
+        # Bound-return fallback, ruled with the operations adoption (2026-08-31): an arm
+        # that *builds* its typed rejection and returns the binding —
+        # ``r = self._receipt(..., ExecutionOutcome.FAILED, ...); return r`` — names its
+        # member in the body rather than in the return expression. The member is still
+        # the mutation target; the arm is selected only when it actually returns a value,
+        # so a purely raising or falsy-returning handler stays outside the class. Arms
+        # whose member sits in the return value are selected exactly as before, so every
+        # prior adopter's inventory is unchanged.
+        for statement in handler.body:
+            for member in ast.walk(statement):
+                if (
+                    isinstance(member, ast.Attribute)
+                    and isinstance(member.value, ast.Name)
+                    and member.value.id in vocabularies
+                ):
+                    named.append((returns[0], member))
     return sorted(named, key=lambda row: (row[1].lineno, row[1].col_offset))
 
 
@@ -1635,6 +1815,11 @@ def _refusal_shape_of(body, config: PackageConfig, helpers=None) -> str:
                 name = getattr(inner.func, "id", None) or getattr(inner.func, "attr", None)
                 if name in helpers:
                     helper_call = True
+                # Bound-refusal idiom (``bound_refusal_calls`` — see PackageConfig): the
+                # refusal call constructs the typed outcome and a later statement returns
+                # the binding, so the call site rather than the return is the evidence.
+                if config.bound_refusal_calls and name in config.refusal_calls:
+                    call = True
             if isinstance(inner, ast.Return):
                 value = inner.value
                 if isinstance(value, ast.Call):
@@ -2389,6 +2574,7 @@ def write_inventory(
         "Generated by `scripts/cloud_scaling/guard_sweep.py --inventory-only`. Do not edit by",
         "hand: CI regenerates this and fails on any difference.",
         "",
+        *((config.inventory_note, "") if config.inventory_note else ()),
         f"**{len(guards)} outcome-bearing guards.** A guard is a decision point whose body can",
         "reach a refusal. What counts as a refusal differs by package and is recorded per guard",
         "below: Phase 5A raises; Phase 5B also returns `_refuse(...)` at a gate and",

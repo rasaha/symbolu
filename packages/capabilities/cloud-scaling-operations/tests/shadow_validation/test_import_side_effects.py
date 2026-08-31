@@ -7,11 +7,29 @@ import subprocess
 import sys
 
 
+def _advisory_src(pkg_root: str) -> str:
+    """The controller's src, located through the checkout rather than by `..` hops.
+
+    The sibling hop only resolves inside the repository; the guard sweep runs this suite
+    from a disposable copy outside it (guard-coverage ADR §7.1/§9.d — a test that counts
+    directory levels measures the wrong tree the moment it is copied). `UGENCE_REPO_ROOT`
+    is how the sweep tells a copy where the real checkout is; the sibling hop stays as
+    the in-repo fallback.
+    """
+
+    injected = os.environ.get("UGENCE_REPO_ROOT")
+    if injected:
+        return os.path.join(
+            injected, "packages", "capabilities", "cloud-scaling-controller", "src"
+        )
+    return os.path.abspath(os.path.join(pkg_root, "..", "cloud-scaling-controller", "src"))
+
+
 def _probe(snippet: str) -> dict:
     here = os.path.dirname(__file__)
     pkg_root = os.path.abspath(os.path.join(here, "..", ".."))
     ops = os.path.join(pkg_root, "src")
-    adv = os.path.abspath(os.path.join(pkg_root, "..", "cloud-scaling-controller", "src"))
+    adv = _advisory_src(pkg_root)
     prog = (
         "import sys, json\n"
         f"sys.path.insert(0, {pkg_root!r})\n"

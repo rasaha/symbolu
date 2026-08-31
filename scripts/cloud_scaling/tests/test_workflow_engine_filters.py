@@ -86,8 +86,8 @@ SHARED_ENGINE_WORKFLOWS = sorted(
 )
 
 
-def test_the_shared_engine_is_run_by_the_four_sweeps_this_expects():
-    """A floor, not an equality: a fifth adopter must not silently go unchecked."""
+def test_the_shared_engine_is_run_by_the_five_sweeps_this_expects():
+    """A floor, not an equality: a sixth adopter must not silently go unchecked."""
 
     names = {p.name for p in SHARED_ENGINE_WORKFLOWS}
     assert names >= {
@@ -95,6 +95,7 @@ def test_the_shared_engine_is_run_by_the_four_sweeps_this_expects():
         "cloud-scaling-policy-authenticity-ci.yml",
         "cloud-scaling-capacity-bounds-policy-ci.yml",
         "cloud-scaling-producer-attestation-ci.yml",
+        "cloud-scaling-operations-package-ci.yml",
     }, f"a sweep stopped invoking the shared engine, or moved: {sorted(names)}"
 
 
