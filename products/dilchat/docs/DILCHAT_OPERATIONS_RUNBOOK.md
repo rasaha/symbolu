@@ -8,7 +8,9 @@ and incident runbooks are round PR-C; public production is a separate, later
 owner launch decision.
 
 Companion documents: [`DILCHAT_PILOT_CHECKLIST.md`](DILCHAT_PILOT_CHECKLIST.md)
-(what must be true before a pilot deploy) and
+(what must be true before a pilot deploy),
+[`DILCHAT_PILOT_READINESS_REVIEW.md`](DILCHAT_PILOT_READINESS_REVIEW.md) (the
+standing assessment against that checklist), and
 [`DILCHAT_INCIDENT_RUNBOOK.md`](DILCHAT_INCIDENT_RUNBOOK.md) (what to do when
 something breaks). Deployment artifacts live in [`../deploy/`](../deploy).
 
