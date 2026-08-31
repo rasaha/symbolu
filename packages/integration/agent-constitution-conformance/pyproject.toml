@@ -1,0 +1,66 @@
+# The Agent Constitution CONFORMANCE distribution — the concrete resolver and the
+# first-slice structural conformance verifier, backed by the shared Ugence Policy
+# Authority.
+#
+# This is the conformance side; the family package is the artifact side. The
+# split is deliberate (ACC-S1-Q2): registering the policy family with the
+# authority should not drag a runtime resolver into the importing process.
+#
+# Three first-party dependencies and no third-party runtime dependency of its own:
+#
+#   * ugence-policy-authority — reached through its public api module ONLY, for
+#     resolve_policy and the family-neutral identity types. Every ...core /
+#     ...adapters module is internal and a repository-wide scan enforces that.
+#   * ugence-agentic-proposer — for CandidateDisposition and ReviewAction alone,
+#     as the single sources of truth for the closed-bound re-check. The
+#     dependency direction is one-way: the proposer imports nothing new, and its
+#     own suite bars it from importing the authority at all.
+#   * ugence-agent-constitution-policy — the artifact this resolver recognizes,
+#     and the guard-running registration helpers the composition helper wires.
+#
+# There is deliberately NO dependency on:
+#
+#   * the Risk Authority, ActionGate, Decision Authority or the Agent Runtime —
+#     this boundary authorizes no runtime action, and a conformance verifier must
+#     never drag an execution authority in behind it.
+#   * any networking, storage, service-discovery or plugin-loading library. The
+#     reachable coordinate set is injected configuration, not something this
+#     package resolves for itself.
+#
+# Build:  python -m build packages/integration/agent-constitution-conformance
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-agent-constitution-conformance"
+dynamic = ["version"]
+description = "Agent Constitution conformance — fail-closed constitution resolution through the shared Ugence Policy Authority and the ratified disposition-free structural conformance verifier."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["ugence", "agent-constitution", "policy", "conformance", "resolver", "governance"]
+dependencies = [
+    "ugence-policy-authority>=0.1.0",
+    "ugence-agentic-proposer>=0.3.0",
+    "ugence-agent-constitution-policy>=0.1.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+dev = ["pytest>=7.0", "build>=1.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_agent_constitution_conformance.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_agent_constitution_conformance*"]
+
+[tool.setuptools.package-data]
+ugence_agent_constitution_conformance = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
