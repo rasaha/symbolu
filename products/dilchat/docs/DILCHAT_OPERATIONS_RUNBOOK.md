@@ -87,7 +87,52 @@ Cautions:
   encrypt at rest, restrict access, and delete on the same retention clock as
   the database (final policy is a D-PR-3/legal item).
 
-## 5. Migrations
+## 5. Retention (report-only — nothing is deleted)
+
+DilChat implements **purge eligibility**, not purging. `DILCHAT_RETENTION_PURGE_ENABLED`
+stays `false`, and no destructive code path exists (pinned by
+`tests/security/test_retention_no_destructive_path.py`). A conversation is
+eligible only when every ratified DEC-PR-3 condition holds:
+
+| Condition | Blocking code when unmet |
+|---|---|
+| Purge enabled | `PURGE_DISABLED` |
+| ≥ `DILCHAT_CHAT_RETENTION_REVOKED_DAYS` (30) since `revoked_at` | `WITHIN_RETENTION_WINDOW` |
+| State is still `REVOKED_PENDING_POLICY` | `NOT_REVOKED_STATE` / `ALREADY_PURGED` |
+| No report preservation | `PRESERVED_FOR_REPORT` |
+| No legal/operational hold or policy exception | `LEGAL_HOLD` |
+| Revocation timestamp present | `MISSING_REVOCATION_TIMESTAMP` (fails closed) |
+
+`PRESERVED_FOR_REPORT` and a hold dominate unconditionally — at any age. The
+retention window may never undercut the post-revocation reporting window; a
+configuration that tries is refused at startup in every environment.
+
+**Dry-run report** (read-only, worker posture, safe at any time):
+
+```bash
+python -m ugence_dilchat.scripts_retention_report
+```
+
+It prints a content-free JSON summary — conversation ids, counts, and machine
+codes; never message, evidence, or report text — with `"deleted": 0` and
+`"mode": "REPORT_ONLY"`.
+
+**Placing a hold.** Set `hold_reason` (a short machine code such as
+`LEGAL_HOLD` or `POLICY_EXCEPTION`) and `hold_placed_at` on the conversation's
+`chat_conversation_retention` row. Both are set together or not at all (check
+constraint). Never record free text about a person in `hold_reason`.
+
+**Backup implications of any future purge.** Deleting rows from the live
+database does not delete them from backups: a restore of a pre-purge dump
+reinstates purged conversations, so a purge is not complete until the backup
+retention clock has also expired. Before `retention_purge_enabled` is ever
+turned on, the owner decision must state the backup retention period and how a
+restore interacts with purged data — that, together with the remaining D-PR-3
+gates (legal/privacy review of the period, purge implementation and
+preservation tests, dry-run evidence), governs activation. Until then, treat
+every backup as retaining everything.
+
+## 6. Migrations
 
 - Forward: `alembic upgrade head` with the owner role, before rolling
   processes onto a new version. Exactly one head is enforced.
@@ -105,7 +150,7 @@ DILCHAT_DATABASE_URL=postgresql+asyncpg://…/dilchat_validate \
   Destructive by design — point it only at a disposable database (the script
   refuses non-disposable-looking names).
 
-## 6. Standard procedures
+## 7. Standard procedures
 
 **Pre-upgrade (pilot):** take a `pg_dump -Fc` backup → run
 `validate_backup_restore.sh` against it (fresh disposable target) → `alembic

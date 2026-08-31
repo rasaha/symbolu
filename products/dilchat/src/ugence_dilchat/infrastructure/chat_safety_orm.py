@@ -217,6 +217,11 @@ class ChatConversationRetention(Base):
     state: Mapped[str] = mapped_column(
         sa.String(32), nullable=False, default=enums.RetentionState.ACTIVE.value, info=INTERNAL
     )
+    # Legal/operational hold (DEC-PR-3). A short machine-style code, never free
+    # text about a user and never content. NULL = no hold. A held row is never
+    # purge-eligible, whatever its age or state.
+    hold_reason: Mapped[str | None] = mapped_column(sa.String(64), info=INTERNAL)
+    hold_placed_at: Mapped[dt.datetime | None] = mapped_column(UTCDateTime, info=INTERNAL)
     updated_at: Mapped[dt.datetime] = mapped_column(
         UTCDateTime, nullable=False, default=utcnow, onupdate=utcnow
     )
@@ -225,6 +230,11 @@ class ChatConversationRetention(Base):
         sa.UniqueConstraint("conversation_id", name="uq_chat_retention_conversation"),
         _enum_check("state", enums.RetentionState),
         sa.Index("ix_chat_retention_state", "state"),
+        sa.CheckConstraint(
+            "(hold_reason IS NULL AND hold_placed_at IS NULL) "
+            "OR (hold_reason IS NOT NULL AND hold_placed_at IS NOT NULL)",
+            name="ck_chat_retention_hold_complete",
+        ),
     )
 
 
