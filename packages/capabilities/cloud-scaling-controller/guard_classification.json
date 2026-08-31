@@ -1,8 +1,8 @@
 {
   "package": "controller-planning",
   "total": 219,
-  "scored": 213,
-  "excluded": 6,
+  "scored": 203,
+  "excluded": 16,
   "classification": {
     "1": {
       "status": "SCORED",
@@ -968,7 +968,10 @@
       "condition": "isinstance(self.validity_seconds, bool) or not isinstance(self.validity_seconds, (int, float)) or (not math.isfinite(self.validity_seconds)) or (self.validity_seconds <= 0)"
     },
     "159": {
-      "status": "SCORED",
+      "status": "EXCLUDED",
+      "reason": "diagnostic-only",
+      "detail": "The empty-set guard. The canonical set-equality gate refuses an empty evaluated set with the same `RecommendationError` \u2014 the canonical generated set is never empty, NO_CHANGE always being in it \u2014 and emptiness is the only condition that reaches this guard.",
+      "evidence": "tests/planning/test_guard_coverage.py::test_the_candidate_set_gates_behind_the_canonical_binding_are_evidenced",
       "module": "planning/recommendation.py",
       "line": 216,
       "condition": "not self.evaluated_candidates"
@@ -1004,7 +1007,10 @@
       "condition": "cutoff > rec_time"
     },
     "165": {
-      "status": "SCORED",
+      "status": "EXCLUDED",
+      "reason": "unreachable-behind-earlier-guard",
+      "detail": "The forecasting layer's `ForecastHorizon` constructor is the earlier guard: it refuses a non-positive horizon with `WindowError` at construction, so no forecast the record can embed carries one. For a hand-built impostor the temporal pair around this gate leaves no admissible recommendation_time either \u2014 with a non-positive horizon, forecast_for <= cutoff, and rec_time cannot be both >= cutoff and < forecast_for.",
+      "evidence": "tests/planning/test_guard_coverage.py::test_a_non_positive_forecast_horizon_cannot_be_constructed_at_all",
       "module": "planning/recommendation.py",
       "line": 249,
       "condition": "not float(fc.horizon.seconds) > 0"
@@ -1016,7 +1022,10 @@
       "condition": "forecast_for_dt != canonical_forecast_for"
     },
     "167": {
-      "status": "SCORED",
+      "status": "EXCLUDED",
+      "reason": "diagnostic-only",
+      "detail": "The horizon-expiry guard. With it removed, the validity-window gate refuses every input this one refuses, with the same class: validity_seconds is validated > 0, so validity_end > rec_time >= forecast_for, and forecast_for is pinned to the canonical endpoint the validity gate compares against.",
+      "evidence": "tests/planning/test_guard_coverage.py::test_a_record_timed_at_or_past_the_forecast_horizon_is_refused_either_way",
       "module": "planning/recommendation.py",
       "line": 258,
       "condition": "forecast_for_dt <= rec_time"
@@ -1058,13 +1067,19 @@
       "condition": "validity_end_dt > canonical_forecast_for"
     },
     "174": {
-      "status": "SCORED",
+      "status": "EXCLUDED",
+      "reason": "equivalent-mutant",
+      "detail": "Defensive check on the record's own canonical regeneration, and the source comment says so. `generate_candidates` derives each plan_id from its target and never emits two plans with one id \u2014 measured across a spread of configurations \u2014 so the two lengths are equal on every reachable path and removal changes nothing.",
+      "evidence": "tests/planning/test_guard_coverage.py::test_canonical_candidate_generation_is_unique_by_construction",
       "module": "planning/recommendation.py",
       "line": 310,
       "condition": "len(canonical_by_id) != len(canonical_plans)"
     },
     "175": {
-      "status": "SCORED",
+      "status": "EXCLUDED",
+      "reason": "diagnostic-only",
+      "detail": "One half of a mutually jacketing pair with the recompute loop's duplicate guard: a duplicated candidate is refused by whichever of the two stands, with the same class, so neither guard's mutation is observable while the other exists. A duplicate with *different* content is refused by the set-equality gate instead, again with the same class.",
+      "evidence": "tests/planning/test_guard_coverage.py::test_the_candidate_set_gates_behind_the_canonical_binding_are_evidenced",
       "module": "planning/recommendation.py",
       "line": 314,
       "condition": "ec.plan.plan_id in evaluated_by_id"
@@ -1076,13 +1091,19 @@
       "condition": "evaluated_by_id != canonical_by_id"
     },
     "177": {
-      "status": "SCORED",
+      "status": "EXCLUDED",
+      "reason": "diagnostic-only",
+      "detail": "The other half of the mutually jacketing duplicate pair; see the by-id guard above. With that guard standing, no duplicate survives to reach this one.",
+      "evidence": "tests/planning/test_guard_coverage.py::test_the_candidate_set_gates_behind_the_canonical_binding_are_evidenced",
       "module": "planning/recommendation.py",
       "line": 332,
       "condition": "pid in seen_plan_ids"
     },
     "178": {
-      "status": "SCORED",
+      "status": "EXCLUDED",
+      "reason": "diagnostic-only",
+      "detail": "The feasibility-recompute guard interlocks with the violations-recompute guard and the candidate's own invariant: `feasible` is tied to the emptiness of `violations` at candidate construction, and expected feasibility is derived from expected violations \u2014 so any constructible forged flag carries a violations set the next gate refuses, with the same class. Both flip directions are measured in the evidence test.",
+      "evidence": "tests/planning/test_guard_coverage.py::test_a_forged_feasibility_flag_is_refused",
       "module": "planning/recommendation.py",
       "line": 341,
       "condition": "ec.feasible != exp_feasible"
@@ -1124,7 +1145,10 @@
       "condition": "abs(ec.score_breakdown.features[fname] - fval) > _TOL"
     },
     "185": {
-      "status": "SCORED",
+      "status": "EXCLUDED",
+      "reason": "unreachable-behind-earlier-guard",
+      "detail": "Canonical generation always emits the NO_CHANGE baseline, so an evaluated set without it fails the canonical set-equality gate before this baseline gate is reached.",
+      "evidence": "tests/planning/test_guard_coverage.py::test_the_candidate_set_gates_behind_the_canonical_binding_are_evidenced",
       "module": "planning/recommendation.py",
       "line": 360,
       "condition": "not has_no_change"
@@ -1136,13 +1160,19 @@
       "condition": "selected is None"
     },
     "187": {
-      "status": "SCORED",
+      "status": "EXCLUDED",
+      "reason": "diagnostic-only",
+      "detail": "The winner-identity gate two lines below draws the winner from feasible triples only, so a selected id pointing at an infeasible candidate can never equal the winner and is refused there with the same class.",
+      "evidence": "tests/planning/test_guard_coverage.py::test_the_candidate_set_gates_behind_the_canonical_binding_are_evidenced",
       "module": "planning/recommendation.py",
       "line": 364,
       "condition": "not selected.feasible"
     },
     "188": {
-      "status": "SCORED",
+      "status": "EXCLUDED",
+      "reason": "diagnostic-only",
+      "detail": "`select_best` answers (None, True) on a tie, and the winner-identity gate on the next line refuses None != selected_plan_id with the same class, for every ambiguous input.",
+      "evidence": "tests/planning/test_guard_coverage.py::test_an_all_tied_selection_is_refused_as_a_recommendation_error",
       "module": "planning/recommendation.py",
       "line": 372,
       "condition": "ambiguous"

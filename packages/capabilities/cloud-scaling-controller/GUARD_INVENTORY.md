@@ -25,9 +25,9 @@ This package records no prior inventory; this is the first one.
 
 ## Classification
 
-Every guard is classified: **213 `SCORED`** — the
+Every guard is classified: **203 `SCORED`** — the
 sweep neutralises it and the suite must fail — and
-**6 `EXCLUDED`**, each with a reason from a closed vocabulary and
+**16 `EXCLUDED`**, each with a reason from a closed vocabulary and
 a test that measures the reason. A guard is never excluded because it survived; a
 survivor with no prior declaration fails the sweep.
 
@@ -38,6 +38,16 @@ survivor with no prior declaration fails the sweep.
 | `planning/candidates.py:112` | `diagnostic-only` | The empty-plan guard. With it removed, the primary-count gate two lines below refuses the same empty plan with the same `CandidateError` — an empty tuple has zero 'primary' roles — and emptiness is the only condition that reaches it, so no input distinguishes the two. Kept because 'requires at least one resource change' is the honest diagnosis for the empty case. | `tests/planning/test_guard_coverage.py::test_an_empty_plan_is_refused_as_a_candidate_error` |
 | `planning/candidates.py:233` | `diagnostic-only` | `generate_candidates`' current_capacity gate. The value flows unconditionally into the NO_CHANGE plan's `ResourceChange`, whose own validation refuses every value this gate refuses — bool, non-int and negative alike — with the same `CandidateError`. required_capacity's twin gate IS scored: required never lands in a ResourceChange, so its removal admits a fractional requirement outright. | `tests/planning/test_guard_coverage.py::test_an_invalid_current_capacity_is_refused_as_a_candidate_error` |
 | `planning/policy.py:175` | `diagnostic-only` | ScoreBreakdown's per-key unknown-feature gate. Every key-set deviation it can see — a replaced name or an added one — is also refused by the exact-cover gate below it (`set(features) != set(FEATURE_NAMES)`), and a wrong-typed value under a bogus key by the finiteness gate between them; all three raise `PolicyError`, and the class is this package's typed half. Kept because naming the offending key is the better diagnosis. | `tests/planning/test_guard_coverage.py::test_an_unknown_feature_name_is_refused_as_a_policy_error` |
+| `planning/recommendation.py:216` | `diagnostic-only` | The empty-set guard. The canonical set-equality gate refuses an empty evaluated set with the same `RecommendationError` — the canonical generated set is never empty, NO_CHANGE always being in it — and emptiness is the only condition that reaches this guard. | `tests/planning/test_guard_coverage.py::test_the_candidate_set_gates_behind_the_canonical_binding_are_evidenced` |
+| `planning/recommendation.py:249` | `unreachable-behind-earlier-guard` | The forecasting layer's `ForecastHorizon` constructor is the earlier guard: it refuses a non-positive horizon with `WindowError` at construction, so no forecast the record can embed carries one. For a hand-built impostor the temporal pair around this gate leaves no admissible recommendation_time either — with a non-positive horizon, forecast_for <= cutoff, and rec_time cannot be both >= cutoff and < forecast_for. | `tests/planning/test_guard_coverage.py::test_a_non_positive_forecast_horizon_cannot_be_constructed_at_all` |
+| `planning/recommendation.py:258` | `diagnostic-only` | The horizon-expiry guard. With it removed, the validity-window gate refuses every input this one refuses, with the same class: validity_seconds is validated > 0, so validity_end > rec_time >= forecast_for, and forecast_for is pinned to the canonical endpoint the validity gate compares against. | `tests/planning/test_guard_coverage.py::test_a_record_timed_at_or_past_the_forecast_horizon_is_refused_either_way` |
+| `planning/recommendation.py:310` | `equivalent-mutant` | Defensive check on the record's own canonical regeneration, and the source comment says so. `generate_candidates` derives each plan_id from its target and never emits two plans with one id — measured across a spread of configurations — so the two lengths are equal on every reachable path and removal changes nothing. | `tests/planning/test_guard_coverage.py::test_canonical_candidate_generation_is_unique_by_construction` |
+| `planning/recommendation.py:314` | `diagnostic-only` | One half of a mutually jacketing pair with the recompute loop's duplicate guard: a duplicated candidate is refused by whichever of the two stands, with the same class, so neither guard's mutation is observable while the other exists. A duplicate with *different* content is refused by the set-equality gate instead, again with the same class. | `tests/planning/test_guard_coverage.py::test_the_candidate_set_gates_behind_the_canonical_binding_are_evidenced` |
+| `planning/recommendation.py:332` | `diagnostic-only` | The other half of the mutually jacketing duplicate pair; see the by-id guard above. With that guard standing, no duplicate survives to reach this one. | `tests/planning/test_guard_coverage.py::test_the_candidate_set_gates_behind_the_canonical_binding_are_evidenced` |
+| `planning/recommendation.py:341` | `diagnostic-only` | The feasibility-recompute guard interlocks with the violations-recompute guard and the candidate's own invariant: `feasible` is tied to the emptiness of `violations` at candidate construction, and expected feasibility is derived from expected violations — so any constructible forged flag carries a violations set the next gate refuses, with the same class. Both flip directions are measured in the evidence test. | `tests/planning/test_guard_coverage.py::test_a_forged_feasibility_flag_is_refused` |
+| `planning/recommendation.py:360` | `unreachable-behind-earlier-guard` | Canonical generation always emits the NO_CHANGE baseline, so an evaluated set without it fails the canonical set-equality gate before this baseline gate is reached. | `tests/planning/test_guard_coverage.py::test_the_candidate_set_gates_behind_the_canonical_binding_are_evidenced` |
+| `planning/recommendation.py:364` | `diagnostic-only` | The winner-identity gate two lines below draws the winner from feasible triples only, so a selected id pointing at an infeasible candidate can never equal the winner and is refused there with the same class. | `tests/planning/test_guard_coverage.py::test_the_candidate_set_gates_behind_the_canonical_binding_are_evidenced` |
+| `planning/recommendation.py:372` | `diagnostic-only` | `select_best` answers (None, True) on a tie, and the winner-identity gate on the next line refuses None != selected_plan_id with the same class, for every ambiguous input. | `tests/planning/test_guard_coverage.py::test_an_all_tied_selection_is_refused_as_a_recommendation_error` |
 | `planning/pipeline.py:268` | `unreachable-behind-earlier-guard` | The pipeline's ScoringError arm around `build_context`. Every condition that makes the context build raise is abstained by the pipeline's own pre-gates before the build is reached: an abstained forecast as FORECAST_ABSTAINED, a non-planning target as UNSUPPORTED_FORECAST_TARGET, a missing point estimate as NON_FINITE_INPUT, missing capacity as MISSING_CURRENT_CAPACITY, an evidence-free dependency edge as MISSING_DEPENDENCY_CAPACITY and a missing price as MISSING_COST_EVIDENCE. The arm is the fail-closed jacket for a context build the pre-gates keep unreachable, so its reason-collapse mutation has no observer; the evidence test drives the same inputs down both paths and records the pairing. | `tests/planning/test_guard_coverage.py::test_every_scoring_failure_is_pre_gated_into_a_typed_abstention` |
 
 ## Not counted, and why
@@ -210,36 +220,36 @@ survivor with no prior declaration fails the sweep.
 | 156 | `planning/recommendation.py:207` | if | raise | SCORED | — | `self.topology is not None and (not isinstance(self.topology, DependencyTopo…` |
 | 157 | `planning/recommendation.py:209` | if | raise | SCORED | — | `not isinstance(self.recommendation_time, datetime)` |
 | 158 | `planning/recommendation.py:211` | if | raise | SCORED | — | `isinstance(self.validity_seconds, bool) or not isinstance(self.validity_sec…` |
-| 159 | `planning/recommendation.py:216` | if | raise | SCORED | — | `not self.evaluated_candidates` |
+| 159 | `planning/recommendation.py:216` | if | raise | EXCLUDED | — | `not self.evaluated_candidates` |
 | 160 | `planning/recommendation.py:219` | if | raise | SCORED | — | `not isinstance(ec, EvaluatedCandidate)` |
 | 161 | `planning/recommendation.py:228` | if | raise | SCORED | — | `fc.subject != subject` |
 | 162 | `planning/recommendation.py:230` | if | raise | SCORED | — | `self.cost_book.subject != subject` |
 | 163 | `planning/recommendation.py:232` | if | raise | SCORED | — | `self.topology is not None and self.topology.subject != subject` |
 | 164 | `planning/recommendation.py:240` | if | raise | SCORED | — | `cutoff > rec_time` |
-| 165 | `planning/recommendation.py:249` | if | raise | SCORED | — | `not float(fc.horizon.seconds) > 0` |
+| 165 | `planning/recommendation.py:249` | if | raise | EXCLUDED | — | `not float(fc.horizon.seconds) > 0` |
 | 166 | `planning/recommendation.py:253` | if | raise | SCORED | — | `forecast_for_dt != canonical_forecast_for` |
-| 167 | `planning/recommendation.py:258` | if | raise | SCORED | — | `forecast_for_dt <= rec_time` |
+| 167 | `planning/recommendation.py:258` | if | raise | EXCLUDED | — | `forecast_for_dt <= rec_time` |
 | 168 | `planning/recommendation.py:261` | if | raise | SCORED | — | `_as_utc(self.current_state.observed_at) > rec_time` |
 | 169 | `planning/recommendation.py:264` | if | raise | SCORED | — | `self.topology is not None and _as_utc(self.topology.as_of) > rec_time` |
 | 170 | `planning/recommendation.py:269` | if | raise | SCORED | — | `not entry.is_effective_at(self.recommendation_time)` |
 | 171 | `planning/recommendation.py:272` | if | raise | SCORED | — | `self.constraints.forecast_validity_seconds is not None` |
 | 172 | `planning/recommendation.py:274` | if | raise | SCORED | — | `age > self.constraints.forecast_validity_seconds` |
 | 173 | `planning/recommendation.py:282` | if | raise | SCORED | — | `validity_end_dt > canonical_forecast_for` |
-| 174 | `planning/recommendation.py:310` | if | raise | SCORED | — | `len(canonical_by_id) != len(canonical_plans)` |
-| 175 | `planning/recommendation.py:314` | if | raise | SCORED | — | `ec.plan.plan_id in evaluated_by_id` |
+| 174 | `planning/recommendation.py:310` | if | raise | EXCLUDED | — | `len(canonical_by_id) != len(canonical_plans)` |
+| 175 | `planning/recommendation.py:314` | if | raise | EXCLUDED | — | `ec.plan.plan_id in evaluated_by_id` |
 | 176 | `planning/recommendation.py:317` | if | raise | SCORED | — | `evaluated_by_id != canonical_by_id` |
-| 177 | `planning/recommendation.py:332` | if | raise | SCORED | — | `pid in seen_plan_ids` |
-| 178 | `planning/recommendation.py:341` | if | raise | SCORED | — | `ec.feasible != exp_feasible` |
+| 177 | `planning/recommendation.py:332` | if | raise | EXCLUDED | — | `pid in seen_plan_ids` |
+| 178 | `planning/recommendation.py:341` | if | raise | EXCLUDED | — | `ec.feasible != exp_feasible` |
 | 179 | `planning/recommendation.py:343` | if | raise | SCORED | — | `set(ec.violations) != set(exp_violations)` |
 | 180 | `planning/recommendation.py:346` | if | raise | SCORED | — | `ec.cost_delta_minor != exp_cost` |
 | 181 | `planning/recommendation.py:348` | if | raise | SCORED | — | `exp_feasible` |
 | 182 | `planning/recommendation.py:350` | if | raise | SCORED | — | `ec.score_breakdown is None or abs(ec.score_breakdown.total_score - exp_scor…` |
 | 183 | `planning/recommendation.py:352` | if | raise | SCORED | — | `ec.score_breakdown.policy_digest != self.policy.digest()` |
 | 184 | `planning/recommendation.py:355` | if | raise | SCORED | — | `abs(ec.score_breakdown.features[fname] - fval) > _TOL` |
-| 185 | `planning/recommendation.py:360` | if | raise | SCORED | — | `not has_no_change` |
+| 185 | `planning/recommendation.py:360` | if | raise | EXCLUDED | — | `not has_no_change` |
 | 186 | `planning/recommendation.py:362` | if | raise | SCORED | — | `selected is None` |
-| 187 | `planning/recommendation.py:364` | if | raise | SCORED | — | `not selected.feasible` |
-| 188 | `planning/recommendation.py:372` | if | raise | SCORED | — | `ambiguous` |
+| 187 | `planning/recommendation.py:364` | if | raise | EXCLUDED | — | `not selected.feasible` |
+| 188 | `planning/recommendation.py:372` | if | raise | EXCLUDED | — | `ambiguous` |
 | 189 | `planning/recommendation.py:374` | if | raise | SCORED | — | `winner_id != self.selected_plan_id` |
 | 190 | `planning/recommendation.py:485` | if | raising-helper call | SCORED | — | `include_digest` |
 | 191 | `planning/recommendation.py:503` | if | raise | SCORED | — | `not isinstance(data, Mapping)` |

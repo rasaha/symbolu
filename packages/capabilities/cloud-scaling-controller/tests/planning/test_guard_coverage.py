@@ -1183,3 +1183,570 @@ def test_every_scoring_failure_is_pre_gated_into_a_typed_abstention():
     assert out.reason is RecommendationAbstentionReason.FORECAST_ABSTAINED
     with pytest.raises(ScoringError):
         _build_context(forecast_evidence=abstained, subj=subj)
+
+
+# ======================================================================================= #
+# recommendation.py — EvaluatedCandidate
+# ======================================================================================= #
+
+import dataclasses  # noqa: E402
+
+from ugence_cloud_scaling_controller.forecasting import ForecastHorizon  # noqa: E402
+from ugence_cloud_scaling_controller.forecasting.window import WindowError  # noqa: E402
+from ugence_cloud_scaling_controller.planning import (  # noqa: E402
+    CapacityActionRecommendation,
+    EvaluatedCandidate,
+    RecommendationError,
+    evaluate_feasibility,
+    generate_candidates,
+    score_candidate,
+)
+from ugence_cloud_scaling_controller.planning.scoring import select_best  # noqa: E402
+
+
+def _evaluated(**over):
+    fields = dict(
+        plan=_plan(),
+        feasible=True,
+        violations=(),
+        cost_delta_minor=1000,
+        score_breakdown=_breakdown(),
+    )
+    fields.update(over)
+    return EvaluatedCandidate(**fields)
+
+
+def test_an_evaluated_plan_that_is_not_a_candidate_plan_is_refused():
+    with pytest.raises(RecommendationError):
+        _evaluated(plan="plan")
+
+
+def test_a_feasible_flag_that_is_not_a_bool_is_refused():
+    """1 is truthy, so every feasible-branch invariant passes on it; only the type gate
+    can refuse it."""
+
+    with pytest.raises(RecommendationError):
+        _evaluated(feasible=1)
+
+
+def test_a_violation_that_is_not_a_non_empty_string_is_refused():
+    with pytest.raises(RecommendationError):
+        _evaluated(feasible=False, violations=("",), score_breakdown=None)
+
+
+def test_a_cost_delta_that_is_not_an_int_is_refused():
+    with pytest.raises(RecommendationError):
+        _evaluated(cost_delta_minor="0")
+
+
+def test_a_feasible_candidate_with_violations_is_refused():
+    with pytest.raises(RecommendationError):
+        _evaluated(violations=("below_min_capacity",))
+
+
+def test_a_feasible_candidate_without_a_score_is_refused():
+    with pytest.raises(RecommendationError):
+        _evaluated(score_breakdown=None)
+
+
+def test_an_infeasible_candidate_without_violations_is_refused():
+    with pytest.raises(RecommendationError):
+        _evaluated(feasible=False, violations=(), score_breakdown=None)
+
+
+def test_an_infeasible_candidate_with_a_score_is_refused():
+    with pytest.raises(RecommendationError):
+        _evaluated(feasible=False, violations=("below_min_capacity",))
+
+
+def test_an_evaluated_payload_that_is_not_a_mapping_is_refused():
+    with pytest.raises(RecommendationError):
+        EvaluatedCandidate.from_dict(["plan", "feasible", "violations", "cost_delta_minor"])
+
+
+def test_an_evaluated_payload_carrying_an_unknown_field_is_refused():
+    payload = _evaluated().to_canonical_dict()
+    payload["confidence"] = 1.0
+    with pytest.raises(RecommendationError):
+        EvaluatedCandidate.from_dict(payload)
+
+
+def test_an_evaluated_payload_missing_a_required_field_is_refused():
+    with pytest.raises(RecommendationError):
+        EvaluatedCandidate.from_dict({})
+
+
+# ======================================================================================= #
+# recommendation.py — CapacityActionRecommendation, perturbed from a genuine record
+# ======================================================================================= #
+
+
+class _Delegate:
+    """Not an instance of the declared type, but behaves exactly like one."""
+
+    def __init__(self, real):
+        object.__setattr__(self, "_real", real)
+
+    def __getattr__(self, name):
+        return getattr(object.__getattribute__(self, "_real"), name)
+
+
+@pytest.fixture(scope="module")
+def record():
+    """One genuine pipeline-built recommendation, perturbed per test via replace()."""
+
+    out = _recommend()
+    assert isinstance(out, CapacityActionRecommendation)
+    return out
+
+
+def _perturbed(record, **over):
+    return dataclasses.replace(record, **over)
+
+
+def test_a_recommendation_id_that_is_not_a_non_empty_string_is_refused(record):
+    with pytest.raises(RecommendationError):
+        _perturbed(record, recommendation_id="")
+
+
+def test_a_record_forecast_evidence_that_is_not_typed_evidence_is_refused(record):
+    with pytest.raises(RecommendationError):
+        _perturbed(record, forecast_evidence="fe")
+
+
+def test_a_record_state_that_is_not_canonical_is_refused(record):
+    with pytest.raises(RecommendationError):
+        _perturbed(record, current_state="state")
+
+
+def test_a_record_cost_book_that_is_not_a_cost_book_is_refused(record):
+    with pytest.raises(RecommendationError):
+        _perturbed(record, cost_book="book")
+
+
+def test_a_record_constraints_that_are_not_operating_constraints_are_refused(record):
+    """A delegating impostor, because a plain wrong-typed value dies inside the
+    context build whose except-jacket re-raises the same class. The impostor answers
+    every read the whole re-validation makes, so with the type gate removed the record
+    constructs successfully."""
+
+    with pytest.raises(RecommendationError):
+        _perturbed(record, constraints=_Delegate(record.constraints))
+
+
+def test_a_record_policy_that_is_not_a_recommendation_policy_is_refused(record):
+    with pytest.raises(RecommendationError):
+        _perturbed(record, policy="pol")
+
+
+def test_a_record_topology_that_is_not_a_dependency_topology_is_refused(record):
+    with pytest.raises(RecommendationError):
+        _perturbed(record, topology="topo")
+
+
+def test_a_record_time_that_is_not_a_datetime_is_refused(record):
+    with pytest.raises(RecommendationError):
+        _perturbed(record, recommendation_time="now")
+
+
+def test_a_record_validity_that_is_not_a_positive_finite_number_is_refused(record):
+    """NaN: the validity-window comparison downstream builds `timedelta(seconds=NaN)`,
+    a plain ValueError rather than the recommendation contract."""
+
+    with pytest.raises(RecommendationError):
+        _perturbed(record, validity_seconds=float("nan"))
+
+
+def test_a_record_candidate_that_is_not_evaluated_is_refused(record):
+    with pytest.raises(RecommendationError):
+        _perturbed(record, evaluated_candidates=record.evaluated_candidates + ("x",))
+
+
+def test_a_forecast_for_a_different_subject_is_refused(record):
+    """Numerically identical forecast bound to another tenant: nothing downstream keys
+    on the forecast's subject, so with the binding gate removed the record constructs."""
+
+    other = H.subject(tenant_id="tenant-2")
+    with pytest.raises(RecommendationError):
+        _perturbed(record, forecast_evidence=H.build_forecast_evidence(8, subj=other))
+
+
+def test_a_cost_book_for_a_different_subject_is_refused(record):
+    """Same workload, different tenant: the context prices by workload_id, so the
+    mutant finds the price and constructs."""
+
+    other = H.subject(tenant_id="tenant-2")
+    with pytest.raises(RecommendationError):
+        _perturbed(record, cost_book=H.cost_book(subj=other))
+
+
+def test_a_topology_for_a_different_subject_is_refused(record):
+    """Edge-free, so the context's dependency selection is untouched and only the
+    binding gate can refuse it."""
+
+    other = H.subject(tenant_id="tenant-2")
+    topo = DependencyTopology(subject=other, as_of=H.at(120.0), edges=())
+    with pytest.raises(RecommendationError):
+        _perturbed(record, topology=topo)
+
+
+# ======================================================================================= #
+# recommendation.py — temporal gates, via a manually assembled record
+# ======================================================================================= #
+
+
+def _manual_record(*, rec_time, policy=None, validity=60.0, selected=None):
+    """Assemble a record exactly the way the pipeline would, but without the pipeline's
+    own temporal pre-gates — the record's construction-time validation is the subject
+    under test, so the inputs must reach it."""
+
+    subj = H.subject()
+    pol = policy or H.policy()
+    fe = H.build_forecast_evidence(8, subj=subj)
+    st = H.replicas_state(H.at(100.0), 6, subj=subj)
+    cb = H.cost_book(subj=subj)
+    con = H.constraints()
+    ctx = build_context(fe, st, None, cb, con, recommendation_time=rec_time)
+    plans = generate_candidates(
+        ctx.primary_subject, ctx.current_capacity, ctx.required_capacity,
+        allowed_step=con.allowed_step, min_capacity=con.min_capacity,
+        max_capacity=con.effective_ceiling(), dependency=ctx.dependency_subject,
+        dependency_current=ctx.dependency_current, dependency_required=ctx.dependency_required,
+    )
+    ecs = []
+    for p in plans:
+        viol = tuple(v.value for v in evaluate_feasibility(p, ctx))
+        cost = plan_cost_delta_minor(p, ctx)
+        if viol:
+            ecs.append(EvaluatedCandidate(plan=p, feasible=False, violations=viol,
+                                          cost_delta_minor=cost))
+        else:
+            ecs.append(EvaluatedCandidate(plan=p, feasible=True, violations=(),
+                                          cost_delta_minor=cost,
+                                          score_breakdown=score_candidate(p, ctx, pol)))
+    triples = [(ec.plan.plan_id, ec.score_breakdown.features["coverage"], ec.total_score)
+               for ec in ecs if ec.feasible]
+    winner, _ambiguous = select_best(triples, pol)
+    sel = selected or winner or sorted(t[0] for t in triples)[0]
+    return CapacityActionRecommendation(
+        recommendation_id="manual-1", forecast_evidence=fe, current_state=st,
+        cost_book=cb, constraints=con, policy=pol, evaluated_candidates=tuple(ecs),
+        selected_plan_id=sel, recommendation_time=rec_time, validity_seconds=validity,
+    )
+
+
+def test_a_record_timed_before_the_forecast_cutoff_is_refused():
+    """State observed earlier still, so only the cutoff gate can refuse it; with the
+    gate removed every recomputation matches and the record constructs."""
+
+    with pytest.raises(RecommendationError):
+        _manual_record(rec_time=H.at(170.0))
+
+
+def test_a_record_timed_at_or_past_the_forecast_horizon_is_refused_either_way():
+    """Evidence for the `diagnostic-only` exclusion of the horizon-expiry gate: with it
+    removed, the validity-window gate refuses the same input with the same class —
+    validity_end > rec_time >= forecast_for, and forecast_for is pinned to the
+    canonical endpoint two gates above."""
+
+    with pytest.raises(RecommendationError):
+        _manual_record(rec_time=H.at(2000.0))
+
+
+def test_a_non_positive_forecast_horizon_cannot_be_constructed_at_all():
+    """Evidence for the `unreachable-behind-earlier-guard` exclusion of the record's
+    horizon-positivity gate: the forecasting layer's own constructor is the earlier
+    guard, so no forecast the record can embed carries a non-positive horizon."""
+
+    with pytest.raises(WindowError):
+        ForecastHorizon(seconds=0)
+    with pytest.raises(WindowError):
+        ForecastHorizon(seconds=-1.0)
+
+
+def test_an_all_tied_selection_is_refused_as_a_recommendation_error():
+    """Evidence for the `diagnostic-only` exclusion of the ambiguity gate: with every
+    weight zero all feasible candidates tie, `select_best` answers (None, True), and
+    with the gate removed the winner-identity gate refuses None != selected with the
+    same class."""
+
+    zero = H.policy(w_coverage=0.0, w_bottleneck_risk=0.0, w_reliability_risk=0.0,
+                    w_cost=0.0, w_change_magnitude=0.0, w_uncertainty=0.0, w_hold_bias=0.0)
+    with pytest.raises(RecommendationError):
+        _manual_record(rec_time=H.at(190.0), policy=zero, selected="plan-no-change")
+
+
+# ======================================================================================= #
+# recommendation.py — tamper detection, via forged evaluated candidates
+# ======================================================================================= #
+
+
+def _swap(record, plan_id, forged):
+    new = tuple(forged if ec.plan.plan_id == plan_id else ec
+                for ec in record.evaluated_candidates)
+    return dataclasses.replace(record, evaluated_candidates=new)
+
+
+def _capped_record():
+    """A record with a genuinely infeasible candidate: the +2 step exceeds the cost cap
+    while the +1 step stays under it."""
+
+    out = _recommend(constraints=H.constraints(max_cost_increase_minor=1500))
+    assert isinstance(out, CapacityActionRecommendation)
+    infeasible = [ec for ec in out.evaluated_candidates if not ec.feasible]
+    assert infeasible, "scenario must produce an infeasible candidate"
+    return out, infeasible[0]
+
+
+def test_a_forged_feasibility_flag_is_refused(record):
+    """Evidence for the `diagnostic-only` exclusion of the feasibility-recompute gate.
+
+    The gates interlock: a candidate's own invariant ties `feasible` to the emptiness
+    of `violations`, and the recompute derives expected feasibility from expected
+    violations — so any forged flag that can be constructed at all also carries a
+    violations set that mismatches the recomputation, and the violations gate refuses
+    it with the same class. Both flip directions are exercised here.
+    """
+
+    out, inf = _capped_record()
+    forged_up = EvaluatedCandidate(plan=inf.plan, feasible=True, violations=(),
+                                   cost_delta_minor=inf.cost_delta_minor,
+                                   score_breakdown=_breakdown())
+    with pytest.raises(RecommendationError):
+        _swap(out, inf.plan.plan_id, forged_up)
+
+    feas = next(ec for ec in record.evaluated_candidates
+                if ec.feasible and ec.plan.plan_id != record.selected_plan_id)
+    forged_down = EvaluatedCandidate(plan=feas.plan, feasible=False,
+                                     violations=("cooldown_active",),
+                                     cost_delta_minor=feas.cost_delta_minor)
+    with pytest.raises(RecommendationError):
+        _swap(record, feas.plan.plan_id, forged_down)
+
+
+def test_a_forged_violation_set_is_refused():
+    """Feasibility and cost kept truthful, the violation *names* swapped — only the
+    violations-recompute gate can see it, and with it removed the record constructs."""
+
+    out, inf = _capped_record()
+    forged = EvaluatedCandidate(plan=inf.plan, feasible=False,
+                                violations=("cooldown_active",),
+                                cost_delta_minor=inf.cost_delta_minor)
+    with pytest.raises(RecommendationError):
+        _swap(out, inf.plan.plan_id, forged)
+
+
+def _losing_feasible(record):
+    return next(ec for ec in record.evaluated_candidates
+                if ec.feasible and ec.plan.plan_id != record.selected_plan_id)
+
+
+def test_a_forged_total_score_is_refused(record):
+    """Lowered — never raised — on a losing candidate, so the selection outcome is
+    untouched and only the score-recompute gate can see the forgery. The contribution
+    moves with the total to keep the breakdown internally consistent."""
+
+    ec = _losing_feasible(record)
+    sb = ec.score_breakdown
+    contributions = dict(sb.contributions)
+    contributions["coverage"] -= 0.5
+    forged_sb = ScoreBreakdown(features=dict(sb.features), contributions=contributions,
+                               total_score=sb.total_score - 0.5, policy_id=sb.policy_id,
+                               policy_digest=sb.policy_digest)
+    forged = dataclasses.replace(ec, score_breakdown=forged_sb)
+    with pytest.raises(RecommendationError):
+        _swap(record, ec.plan.plan_id, forged)
+
+
+def test_a_score_bound_to_a_foreign_policy_digest_is_refused(record):
+    ec = _losing_feasible(record)
+    sb = ec.score_breakdown
+    forged_sb = ScoreBreakdown(features=dict(sb.features),
+                               contributions=dict(sb.contributions),
+                               total_score=sb.total_score, policy_id=sb.policy_id,
+                               policy_digest="sha256:" + "0" * 64)
+    forged = dataclasses.replace(ec, score_breakdown=forged_sb)
+    with pytest.raises(RecommendationError):
+        _swap(record, ec.plan.plan_id, forged)
+
+
+def test_a_forged_feature_value_is_refused(record):
+    """A non-coverage feature on a losing candidate, with contributions and total
+    untouched: the selection triple reads only coverage and the total, so nothing but
+    the per-feature recompute gate can see it."""
+
+    ec = _losing_feasible(record)
+    sb = ec.score_breakdown
+    features = dict(sb.features)
+    features["uncertainty"] += 0.5
+    forged_sb = ScoreBreakdown(features=features, contributions=dict(sb.contributions),
+                               total_score=sb.total_score, policy_id=sb.policy_id,
+                               policy_digest=sb.policy_digest)
+    forged = dataclasses.replace(ec, score_breakdown=forged_sb)
+    with pytest.raises(RecommendationError):
+        _swap(record, ec.plan.plan_id, forged)
+
+
+def test_the_candidate_set_gates_behind_the_canonical_binding_are_evidenced(record):
+    """Evidence for four exclusions in the candidate-set machinery, each measured:
+
+    - empty evaluated_candidates (`diagnostic-only`): the canonical set-equality gate
+      refuses an empty set with the same class, and the canonical set is never empty;
+    - the duplicate gates at the by-id build and the recompute loop (`diagnostic-only`,
+      mutually jacketing): a duplicated candidate is refused by whichever of the two
+      stands, with the same class, so neither's mutation is observable while the other
+      exists;
+    - a missing NO_CHANGE baseline (`unreachable-behind-earlier-guard`): canonical
+      generation always emits NO_CHANGE first, so its absence from the evaluated set
+      trips the set-equality gate before the baseline gate is reached;
+    - a selected id pointing at an infeasible candidate (`diagnostic-only`): the winner
+      is drawn from feasible triples only, so the winner-identity gate refuses the
+      mismatch with the same class.
+    """
+
+    with pytest.raises(RecommendationError):
+        dataclasses.replace(record, evaluated_candidates=())
+
+    dup = record.evaluated_candidates + (record.evaluated_candidates[0],)
+    with pytest.raises(RecommendationError):
+        dataclasses.replace(record, evaluated_candidates=dup)
+
+    sans_baseline = tuple(ec for ec in record.evaluated_candidates
+                          if ec.plan.action_kind is not ActionKind.NO_CHANGE)
+    with pytest.raises(RecommendationError):
+        dataclasses.replace(record, evaluated_candidates=sans_baseline)
+
+    out, inf = _capped_record()
+    with pytest.raises(RecommendationError):
+        dataclasses.replace(out, selected_plan_id=inf.plan.plan_id)
+
+
+def test_canonical_candidate_generation_is_unique_by_construction():
+    """Evidence for the `equivalent-mutant` exclusion of the defensive uniqueness gate:
+    across a spread of configurations, generation never emits two plans with one id."""
+
+    for cur, req, step in ((6, 8, 1), (6, 8, 2), (8, 2, 3), (5, 5, 1), (0, 20, 4)):
+        plans = generate_candidates(
+            H.subject(), current_capacity=cur, required_capacity=req,
+            allowed_step=step, min_capacity=0, max_capacity=20,
+        )
+        ids = [p.plan_id for p in plans]
+        assert len(ids) == len(set(ids))
+
+
+# ======================================================================================= #
+# recommendation.py — from_dict probes
+# ======================================================================================= #
+
+
+def test_a_recommendation_payload_that_is_not_a_mapping_is_refused():
+    """The full required-name list as a list: required-minus-set and surplus arithmetic
+    both pass on it, and the first string indexing is a TypeError."""
+
+    with pytest.raises(RecommendationError):
+        CapacityActionRecommendation.from_dict([
+            "recommendation_id", "forecast_evidence", "canonical_state", "cost_book",
+            "constraints", "policy", "evaluated_candidates", "selected_plan_id",
+            "recommendation_time", "validity_seconds",
+        ])
+
+
+def test_a_recommendation_payload_time_that_is_not_a_datetime_is_refused(record):
+    """The topology is malformed too: the reconstruction right after this gate parses
+    it through `DependencyTopology.from_dict`, whose `TopologyError` is a different
+    contract — so the typed refusal can only be this gate's."""
+
+    payload = dict(record.to_canonical_dict())
+    payload["recommendation_time"] = "now"
+    payload["topology"] = 123
+    with pytest.raises(RecommendationError):
+        CapacityActionRecommendation.from_dict(payload)
+
+
+def test_a_forecast_evidence_payload_that_is_not_a_mapping_is_refused():
+    """Without the gate, `.get` on the list is an AttributeError."""
+
+    from ugence_cloud_scaling_controller.planning.recommendation import (
+        _forecast_evidence_from_dict,
+    )
+    with pytest.raises(RecommendationError):
+        _forecast_evidence_from_dict(["forecast"])
+
+
+def test_an_embedded_forecast_that_is_not_a_mapping_is_refused():
+    from ugence_cloud_scaling_controller.planning.recommendation import (
+        _forecast_evidence_from_dict,
+    )
+    with pytest.raises(RecommendationError):
+        _forecast_evidence_from_dict({"forecast": "fc"})
+
+
+# ======================================================================================= #
+# recommendation.py — RecommendationAbstention
+# ======================================================================================= #
+
+
+def _abstention(**over):
+    fields = dict(
+        subject=H.subject(),
+        reason=RecommendationAbstentionReason.MISSING_FORECAST,
+        recommendation_time=T0,
+    )
+    fields.update(over)
+    return RecommendationAbstention(**fields)
+
+
+def test_an_abstention_subject_that_is_not_a_subject_is_refused():
+    with pytest.raises(RecommendationError):
+        _abstention(subject="app")
+
+
+def test_an_abstention_reason_that_is_not_the_typed_enum_is_refused():
+    """The member's own string value, which is not the member."""
+
+    with pytest.raises(RecommendationError):
+        _abstention(reason="missing_forecast")
+
+
+def test_an_abstention_time_that_is_not_a_datetime_is_refused():
+    with pytest.raises(RecommendationError):
+        _abstention(recommendation_time="now")
+
+
+def test_an_abstention_that_disclaims_advisory_only_is_refused():
+    with pytest.raises(RecommendationError):
+        _abstention(advisory_only=False)
+
+
+def test_an_abstention_claiming_actuation_is_refused():
+    with pytest.raises(RecommendationError):
+        _abstention(actuation_performed=True)
+
+
+def test_the_abstention_canonical_dict_carries_its_evidence_digest_by_default():
+    """The `include_digest` arm: the default serialization must embed the digest, and
+    the digest's own self-exclusion must omit it."""
+
+    ab = _abstention()
+    assert ab.to_canonical_dict()["evidence_digest"] == ab.digest()
+    assert "evidence_digest" not in ab.to_canonical_dict(include_digest=False)
+
+
+def test_an_abstention_payload_that_is_not_a_mapping_is_refused():
+    with pytest.raises(RecommendationError):
+        RecommendationAbstention.from_dict(["subject", "reason", "recommendation_time"])
+
+
+def test_an_abstention_payload_missing_a_required_field_is_refused():
+    with pytest.raises(RecommendationError):
+        RecommendationAbstention.from_dict({})
+
+
+def test_an_abstention_payload_time_that_is_not_a_datetime_is_refused():
+    """The subject is malformed too, so the mutant's fallback is the subject parser's
+    SubjectError — a different contract."""
+
+    with pytest.raises(RecommendationError):
+        RecommendationAbstention.from_dict(
+            {"subject": "x", "reason": "missing_forecast", "recommendation_time": "now"}
+        )
