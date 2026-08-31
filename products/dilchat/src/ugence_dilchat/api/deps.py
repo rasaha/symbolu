@@ -26,6 +26,7 @@ from ..repositories.couples import (
     InvitationRepository,
     MembershipRepository,
 )
+from ..repositories.devices import DeviceRepository
 from ..repositories.safety import (
     BlockRepository,
     RateLimitRepository,
@@ -38,6 +39,7 @@ from ..services.birth_profiles import BirthProfileService
 from ..services.chat import ChatService
 from ..services.consent import ConsentService
 from ..services.couples import CoupleService
+from ..services.devices import DeviceService
 from ..services.identity import IdentityService
 from ..services.natal import NatalService
 from ..services.ratelimit import RateLimiter
@@ -102,6 +104,7 @@ class ServiceRegistry:
     chat: ChatService
     blocks: BlockService
     reports: ReportService
+    devices: DeviceService
     membership_repo: MembershipRepository
     couple_repo: CoupleRepository
     birth_profile_repo: BirthProfileRepository
@@ -132,6 +135,7 @@ def get_services(
     report_repo = SafetyReportRepository(session)
     retention_repo = RetentionRepository(session)
     rate_limiter = RateLimiter(settings=settings, counters=RateLimitRepository(session))
+    device_repo = DeviceRepository(session)
 
     return ServiceRegistry(
         session=session,
@@ -185,6 +189,7 @@ def get_services(
             rate_limiter=rate_limiter,
             audit=audit,
         ),
+        devices=DeviceService(devices=device_repo, audit=audit),
         membership_repo=membership_repo,
         couple_repo=couple_repo,
         birth_profile_repo=bp_repo,

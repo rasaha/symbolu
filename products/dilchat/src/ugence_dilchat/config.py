@@ -87,6 +87,24 @@ class Settings(BaseSettings):
     # Retention / purge seam. Destructive scheduled purging is NOT run in Phase 3B.
     retention_purge_enabled: bool = False
 
+    # --- Outbox relay / push delivery (Phase 3C, DILCHAT-D3C-1..4) ---------- #
+    # Transport: "null" (accepts everything, sends nothing; dev/test default)
+    # or "expo" (Expo push service; pilot transport per D3C-1 — production
+    # APNs/FCM credentials remain a separate launch gate). Unknown values are
+    # refused at construction (fail closed).
+    push_transport: str = "null"
+    expo_push_url: str = "https://exp.host/--/api/v2/push/send"
+    relay_batch_size: int = 50
+    relay_poll_interval_seconds: float = 2.0
+    # At-least-once bookkeeping: bounded exponential backoff, then parked.
+    relay_max_attempts: int = 8
+    relay_backoff_base_seconds: int = 30
+    relay_backoff_cap_seconds: int = 3600
+    # D3C-3: PUBLISHED outbox rows only, this many days after published_at.
+    # Message retention is untouched; unpublished work is never pruned (I8).
+    outbox_prune_after_days: int = 30
+    relay_prune_interval_seconds: int = 3600
+
     # Birth-time confidence defaults (propagate to calculation provenance).
     confidence_exact: float = 1.0
     confidence_approximate: float = 0.5
@@ -123,6 +141,11 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _guard(self) -> Settings:
+        if self.push_transport not in {"null", "expo"}:
+            raise ValueError(
+                f"push_transport={self.push_transport!r} is not permitted; allowed: "
+                "null, expo (fail closed — no silent no-op transport)."
+            )
         permitted = self.permitted_providers()
         if self.astrology_provider not in permitted:
             allowed = sorted(permitted) or "none"
