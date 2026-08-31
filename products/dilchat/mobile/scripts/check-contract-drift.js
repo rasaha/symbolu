@@ -24,6 +24,10 @@ const REQUIRED = [
   ["POST", "/v1/couples/invitations/{token}/accept"],
   ["GET", "/v1/couples/current"],
   ["POST", "/v1/couples/{couple_id}/unpair"],
+  ["GET", "/v1/conversations/current"],
+  ["GET", "/v1/conversations/{conversation_id}/messages"],
+  ["POST", "/v1/conversations/{conversation_id}/messages"],
+  ["PUT", "/v1/conversations/{conversation_id}/read-state"],
 ];
 const BANNED_SUBSTRINGS = ["guna", "compatibility", "koota", "ashtakoot", "milan", "dosha"];
 

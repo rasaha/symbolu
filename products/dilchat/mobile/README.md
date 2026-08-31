@@ -1,13 +1,31 @@
-# DilChat Mobile (Phase 1 + Phase 2 hardening)
+# DilChat Mobile (Phase 1 + Phase 2 hardening + Phase 3D chat)
 
-Account, birth-profile, partner-invitation, pairing, and consent — the DilChat
-mobile vertical slice, with Phase 2 device/deep-link/lifecycle/privacy/native
-hardening.
+Account, birth-profile, partner-invitation, pairing, consent, and the minimal
+1:1 partner chat — the DilChat mobile vertical slice, with Phase 2
+device/deep-link/lifecycle/privacy/native hardening.
 
-> **This app provides account, profile, invitation, pairing, and consent only.
-> Guna Milan and compatibility analysis remain blocked and unavailable.** The app
-> shows no Guna score, Koota, compatibility report, astrology interpretation,
-> daily guidance, chat, or AI.
+> **This app provides account, profile, invitation, pairing, consent, and 1:1
+> text chat only. Guna Milan and compatibility analysis remain blocked and
+> unavailable.** The app shows no Guna score, Koota, compatibility report,
+> astrology interpretation, daily guidance, or AI.
+
+## Phase 3D — minimal 1:1 chat (`app/(app)/chat.tsx`, `src/chat/`)
+
+A text-only chat over the merged Phase 3A secure-chat REST backend; the client
+adds no backend surface and no realtime transport:
+
+- **History** — forward cursor pagination (ascending `server_sequence`; cursors
+  are opaque and server-minted), auto-paged to the tail, refreshed by
+  react-query **polling** (`CHAT_POLL_MS`); no WebSocket, no push.
+- **Sends** — optimistic pending bubbles keyed by a generated
+  `client_message_id` (`src/chat/clientMessageId.ts`); a failed send offers
+  Retry/Discard, and Retry replays the **same** key so the backend's idempotency
+  can never duplicate a message committed by a timed-out request.
+- **Read state** — forward-only, pushed only for sequences actually loaded on
+  screen; the backend ignores backward writes.
+- **Tombstones** — a deleted message keeps its row and renders "Message
+  deleted"; the client never shows a deleted body. (No delete UI this phase.)
+- **No media, no group chat, no typing/presence, no notifications.**
 
 ## Phase 2 hardening (device / deep-link / lifecycle / privacy / native)
 
