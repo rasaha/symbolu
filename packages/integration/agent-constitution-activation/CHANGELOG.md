@@ -1,5 +1,22 @@
 # Changelog — ugence-agent-constitution-activation
 
+## Repository act — the invoice-reconciler pilot (no release, no version move)
+
+The pilot change set authorized as `ACC-PR-IA-2` (see
+`docs/architecture/ADR_UGENCE_AGENT_CONSTITUTION_INVOICE_RECONCILER_PILOT_IMPLEMENTATION_AUTHORITY.md`,
+over the `ACC-PR-BASE`/`ACC-PR-1`..`ACC-PR-5` ratification): the first
+committed governed role declaration,
+`pilot/invoice-reconciler-role.v1.json` — the `ACC-PR-2` content under the
+ratified governed reference, data outside `src/`, never shipped in the wheel —
+with its three-leg proof (`tests/test_pilot_role_document.py`: document →
+contract equality; conformance with a widened-scope control and the two
+pinning assertions; the issue → activate → resolve → bind → conform chain
+re-driven over this role on ephemeral in-process keys, with a
+mismatched-reference refusal control), and the `ACC-PR-IA-1` extension of the
+role-projection scan to every committed text file under the distribution. The
+shipped wheel is byte-identical; the distribution remains `0.1.0`. No agent
+runs, is enrolled, or is claimed governed; no constitution is issued.
+
 ## 0.1.0 — first release (the `ACC-IA` round)
 
 The issuance & activation change set ratified as `ACC-IA-BASE` and
