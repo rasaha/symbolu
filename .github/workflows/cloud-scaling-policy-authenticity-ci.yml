@@ -386,8 +386,15 @@ jobs:
           pip install pytest numpy
           for pkg in $FIRST_PARTY; do pip install -e "$pkg"; done
       - name: Sweep this shard
-        # 115 guards against a 191s suite is six wall-clock hours in one job. Eight shards
-        # puts each at roughly three quarters of an hour.
+        # At adoption this was 115 guards against a 191s suite — six wall-clock hours in
+        # one job — and eight shards put each at roughly three quarters of an hour.
+        #
+        # The suite is now ~5x faster (measured, this branch): the reference Ed25519's
+        # modular inverse moved from Fermat's exponentiation to extended Euclid, and
+        # `builtins.pow` had been ~93% of every run. The shard count is deliberately
+        # UNCHANGED — see the note in the Phase 5A workflow: at this repository's
+        # effective runner concurrency, wall clock tracks total runner-minutes and not
+        # the division of work.
         env:
           UGENCE_RATCHET_BASE: ${{ github.event.pull_request.base.sha || github.sha }}
         run: python scripts/cloud_scaling/guard_sweep.py policy-authenticity --shard ${{ matrix.shard }}/8

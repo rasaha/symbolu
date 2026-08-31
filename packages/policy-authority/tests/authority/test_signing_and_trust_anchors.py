@@ -498,3 +498,18 @@ def test_malformed_key_material_is_refused():
             authority_id="a",
             entitlements=frozenset(),
         )
+
+
+def test_the_modular_inverse_agrees_with_fermat_on_every_input_including_zero():
+    """The same contract this package's own copy of the reference Ed25519 must meet.
+
+    `policy-authority` carries its own stdlib-only RFC 8032 implementation rather than
+    importing another authority's internals (ADR §21), so the extended-Euclid
+    optimisation had to be applied twice — and pinned twice. ``pow(0, -1, Q)`` raises
+    where Fermat's form returns 0, so the zero case is asserted explicitly.
+    """
+
+    from ugence_policy_authority.core.ed25519 import _Q, _inv
+
+    for x in (0, _Q, 2 * _Q, 1, 2, 121666, _Q - 1, _Q + 1, 2 ** 200):
+        assert _inv(x) == pow(x, _Q - 2, _Q), x

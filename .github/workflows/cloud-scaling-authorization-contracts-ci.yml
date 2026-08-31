@@ -331,9 +331,17 @@ jobs:
           pip install -e packages/integration/cloud-scaling-risk-integration
           pip install -e packages/integration/cloud-scaling-authorization-contracts
       - name: Sweep this shard
-        # Sharded because it cannot be anything else: 109 guards against a 138s suite is four
-        # wall-clock hours in one job. Eight shards puts each at roughly half an hour, which
-        # is the same order as the producer-attestation sweep this generalises.
+        # Sharded because it cannot be anything else. At adoption this was 109 guards
+        # against a 138s suite — four wall-clock hours in one job — and eight shards put
+        # each at roughly half an hour.
+        #
+        # The suite is now ~4.7x faster (measured, this branch): the reference Ed25519's
+        # modular inverse moved from Fermat's exponentiation to extended Euclid, and
+        # `builtins.pow` had been ~93% of every run. The shard count is deliberately
+        # UNCHANGED: at the effective runner concurrency this repository actually gets
+        # (~6.7 concurrent jobs, measured across a full fan-out), wall clock tracks total
+        # runner-minutes rather than how the work is divided, so re-sharding buys nothing
+        # while the pool is saturated. Fewer minutes is the whole win.
         env:
           UGENCE_RATCHET_BASE: ${{ github.event.pull_request.base.sha || github.sha }}
         run: python scripts/cloud_scaling/guard_sweep.py authorization-contracts --shard ${{ matrix.shard }}/8
