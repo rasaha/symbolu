@@ -52,3 +52,44 @@ async def test_audit_provenance_strips_unsafe_keys(ctx):
         assert row.provenance == {"provider_id": "fake", "ayanamsa": "lahiri"}
         assert "latitude" not in row.provenance
         assert "refresh_token" not in row.provenance
+
+
+def test_redaction_processor_covers_pr_a_additions():
+    """Round PR-A: push/device tokens, report evidence/description, message
+    bodies, identifiers, and DSNs are dropped by the structlog processor."""
+    event = {
+        "event": "device_registered",
+        "push_token": "ExponentPushToken[x]",
+        "device_token": "y",
+        "expo_push_token": "z",
+        "token": "t",
+        "evidence": "quoted message text",
+        "description": "reporter free text",
+        "message_body": "hello",
+        "body": "hello",
+        "email": "user@example.com",
+        "database_url": "postgresql+asyncpg://u:pw@h/db",
+        "device_id": "ok-to-log",
+    }
+    out = _redact(None, "info", dict(event))
+    for key in event:
+        if key in ("event", "device_id"):
+            assert out[key] == event[key]
+        else:
+            assert out[key] == "[REDACTED]", key
+
+
+def test_relay_error_code_clamp_is_strict():
+    from ugence_dilchat.relay.worker import _safe_error_code
+
+    assert _safe_error_code("EXPO_UNAVAILABLE") == "EXPO_UNAVAILABLE"
+    assert _safe_error_code("UNKNOWN_EVENT_TYPE") == "UNKNOWN_EVENT_TYPE"
+    for unsafe in (
+        "",
+        "provider said: 502",
+        "ExponentPushToken[abc]",
+        "lower_case",
+        "A" * 65,
+        "CODE WITH SPACE",
+    ):
+        assert _safe_error_code(unsafe) == "TRANSPORT_UNAVAILABLE", unsafe

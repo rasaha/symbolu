@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
+import re
 import uuid
 
 import sqlalchemy as sa
@@ -53,6 +54,16 @@ log = logging.getLogger("ugence_dilchat.relay")
 _HANDLED: frozenset[str] = frozenset(e.value for e in OutboxEventType)
 # The only event type that produces a user notification (D3C-2).
 _NOTIFYING = OutboxEventType.MESSAGE_CREATED.value
+
+# I7 by construction: last_error_code is stored and logged, so it may only ever
+# be a machine-style code. Anything else — a provider message, free text, a
+# token that leaked into an exception — is replaced wholesale, never truncated
+# into the row.
+_SAFE_ERROR_CODE = re.compile(r"^[A-Z0-9_]{1,64}$")
+
+
+def _safe_error_code(code: str) -> str:
+    return code if _SAFE_ERROR_CODE.fullmatch(code) else "TRANSPORT_UNAVAILABLE"
 
 
 class RelayService:
@@ -135,7 +146,7 @@ class RelayService:
     def _park(self, event: ChatOutbox, code: str) -> None:
         event.attempt_count += 1
         event.next_attempt_at = self._backoff(event.attempt_count)
-        event.last_error_code = code[:64]
+        event.last_error_code = _safe_error_code(code)
 
     async def _deliver_new_message(self, session: AsyncSession, event: ChatOutbox) -> None:
         payload = event.payload or {}

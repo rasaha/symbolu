@@ -137,17 +137,9 @@ jobs:
               sys.exit(1)
           asyncio.run(main())
           PY
-      - name: Migrations — upgrade base -> head
-        run: alembic upgrade head
-      - name: Confirm exactly one Alembic head
-        run: |
-          count=$(alembic heads | grep -c '(head)')
-          echo "alembic heads with (head): $count"
-          test "$count" -eq 1
-      - name: Migrations — downgrade to base then re-upgrade to head
-        run: |
-          alembic downgrade base
-          alembic upgrade head
+      - name: Migration cycle (upgrade / single head / downgrade / re-upgrade)
+        # Same script operators run against pre-production databases (round PR-A).
+        run: bash scripts/validate_migration_cycle.sh
       - name: Guard — PostgreSQL tests are genuinely collected (no silent skip)
         run: |
           out=$(pytest -m postgres --collect-only -q | tail -1)
@@ -168,6 +160,18 @@ jobs:
           if echo "$summary" | grep -qiE 'skipped|xfail'; then
             echo "FAIL: unexpected skipped/xfailed tests (all deps should be present in CI)"; exit 1
           fi
+      - name: Backup/restore validation (pg_dump -> pg_restore -> parity)
+        # Round PR-A: the post-suite database (real migrated schema + test data)
+        # must dump and restore with matching alembic stamp, table set, and row
+        # counts. Restores into the same cluster so the dilchat_* roles exist.
+        run: |
+          psql "postgresql://postgres:dilchat_ci_test_pw@localhost:5432/postgres" \
+            -v ON_ERROR_STOP=1 \
+            -c "DROP DATABASE IF EXISTS dilchat_restore_validate" \
+            -c "CREATE DATABASE dilchat_restore_validate"
+          SOURCE_URL="postgresql://postgres:dilchat_ci_test_pw@localhost:5432/dilchat_test" \
+          RESTORE_URL="postgresql://postgres:dilchat_ci_test_pw@localhost:5432/dilchat_restore_validate" \
+            bash scripts/validate_backup_restore.sh
       - name: Upload JUnit results
         if: always()
         uses: actions/upload-artifact@v4
