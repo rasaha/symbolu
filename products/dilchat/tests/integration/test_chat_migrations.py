@@ -109,7 +109,7 @@ async def _outbox_created(couple_id) -> int:
 def test_exactly_one_head():
     script = ScriptDirectory.from_config(_cfg())
     assert len(script.get_heads()) == 1
-    assert script.get_current_head() == "c3d4e5f6a7b8"
+    assert script.get_current_head() == "d4e5f6a7b8c9"
 
 
 def test_backfill_active_only_and_downgrade_reupgrade():

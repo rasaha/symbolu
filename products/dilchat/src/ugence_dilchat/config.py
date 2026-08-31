@@ -70,6 +70,23 @@ class Settings(BaseSettings):
     chat_page_default: int = 50
     chat_page_max: int = 100
 
+    # --- Chat safety (Phase 3B) policy constants --------------------------- #
+    # Operational defaults (not legal/behavioural judgements). Env-overridable via
+    # DILCHAT_* like every other setting; centralised so no layer hardcodes them.
+    safety_report_description_max_code_points: int = 1000
+    safety_evidence_window_default: int = 50
+    safety_evidence_window_max: int = 50
+    # A former participant may report only their own ended conversation for this
+    # many days after unpair/block/account deletion. Requires future legal review.
+    chat_report_after_revocation_days: int = 30
+    # PostgreSQL-backed fixed-window rate limits (concurrency-safe; no Redis).
+    ratelimit_send_per_minute: int = 30
+    ratelimit_send_per_hour: int = 300
+    ratelimit_report_per_day: int = 10
+    ratelimit_block_mutations_per_hour: int = 60
+    # Retention / purge seam. Destructive scheduled purging is NOT run in Phase 3B.
+    retention_purge_enabled: bool = False
+
     # Birth-time confidence defaults (propagate to calculation provenance).
     confidence_exact: float = 1.0
     confidence_approximate: float = 0.5
