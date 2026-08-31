@@ -1,0 +1,2201 @@
+{
+  "package": "controller-planning",
+  "total": 219,
+  "reconciliation": {},
+  "excluded": {
+    "except_arms": 5,
+    "boolean_subterms": 59
+  },
+  "guards": [
+    {
+      "index": 1,
+      "module": "planning/topology.py",
+      "line": 89,
+      "condition": "not isinstance(self.upstream, CapacitySubject)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 2,
+      "module": "planning/topology.py",
+      "line": 91,
+      "condition": "not isinstance(self.downstream, CapacitySubject)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 3,
+      "module": "planning/topology.py",
+      "line": 93,
+      "condition": "not isinstance(self.kind, DependencyKind)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 4,
+      "module": "planning/topology.py",
+      "line": 95,
+      "condition": "self.upstream == self.downstream",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 5,
+      "module": "planning/topology.py",
+      "line": 97,
+      "condition": "self.downstream_current_capacity is not None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 6,
+      "module": "planning/topology.py",
+      "line": 99,
+      "condition": "isinstance(v, bool) or not isinstance(v, int) or v < 0",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 7,
+      "module": "planning/topology.py",
+      "line": 101,
+      "condition": "self.required_per_upstream_unit is not None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 8,
+      "module": "planning/topology.py",
+      "line": 104,
+      "condition": "isinstance(v, bool) or not isinstance(v, (int, float)) or (not _math.isfinite(v)) or (v <= 0)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 9,
+      "module": "planning/topology.py",
+      "line": 106,
+      "condition": "self.kind is DependencyKind.INFORMATIONAL and (self.downstream_current_capacity is not None or self.required_per_upstream_unit is not None)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 10,
+      "module": "planning/topology.py",
+      "line": 136,
+      "condition": "not isinstance(data, Mapping)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 11,
+      "module": "planning/topology.py",
+      "line": 141,
+      "condition": "unknown",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 12,
+      "module": "planning/topology.py",
+      "line": 144,
+      "condition": "req not in data",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 13,
+      "module": "planning/topology.py",
+      "line": 171,
+      "condition": "not isinstance(self.subject, CapacitySubject)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 14,
+      "module": "planning/topology.py",
+      "line": 173,
+      "condition": "not isinstance(self.as_of, datetime)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 15,
+      "module": "planning/topology.py",
+      "line": 175,
+      "condition": "self.evidence_source is not None and (not isinstance(self.evidence_source, str) or self.evidence_source == '')",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 16,
+      "module": "planning/topology.py",
+      "line": 183,
+      "condition": "not isinstance(edge, DependencyEdge)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 17,
+      "module": "planning/topology.py",
+      "line": 187,
+      "condition": "not _subject_scope_compatible(edge.upstream, self.subject)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 18,
+      "module": "planning/topology.py",
+      "line": 189,
+      "condition": "not _subject_scope_compatible(edge.downstream, self.subject)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 19,
+      "module": "planning/topology.py",
+      "line": 192,
+      "condition": "key in seen",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 20,
+      "module": "planning/topology.py",
+      "line": 193,
+      "condition": "seen[key] != edge.kind",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 21,
+      "module": "planning/topology.py",
+      "line": 253,
+      "condition": "not isinstance(data, Mapping)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 22,
+      "module": "planning/topology.py",
+      "line": 257,
+      "condition": "unknown",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 23,
+      "module": "planning/topology.py",
+      "line": 260,
+      "condition": "req not in data",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 24,
+      "module": "planning/topology.py",
+      "line": 263,
+      "condition": "not isinstance(as_of, datetime)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 25,
+      "module": "planning/topology.py",
+      "line": 266,
+      "condition": "not isinstance(edges_raw, (list, tuple))",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 26,
+      "module": "planning/cost.py",
+      "line": 60,
+      "condition": "isinstance(self.amount_minor, bool) or not isinstance(self.amount_minor, int)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 27,
+      "module": "planning/cost.py",
+      "line": 62,
+      "condition": "not isinstance(self.currency, str) or len(self.currency) != 3 or (not self.currency.isalpha())",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 28,
+      "module": "planning/cost.py",
+      "line": 71,
+      "condition": "not isinstance(data, Mapping)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 29,
+      "module": "planning/cost.py",
+      "line": 74,
+      "condition": "unknown",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 30,
+      "module": "planning/cost.py",
+      "line": 76,
+      "condition": "'amount_minor' not in data or 'currency' not in data",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 31,
+      "module": "planning/cost.py",
+      "line": 94,
+      "condition": "not isinstance(self.subject, CapacitySubject)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 32,
+      "module": "planning/cost.py",
+      "line": 96,
+      "condition": "not isinstance(self.unit_price, Money)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 33,
+      "module": "planning/cost.py",
+      "line": 98,
+      "condition": "self.unit_price.amount_minor < 0",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 34,
+      "module": "planning/cost.py",
+      "line": 100,
+      "condition": "not isinstance(self.basis, CostBasis)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 35,
+      "module": "planning/cost.py",
+      "line": 102,
+      "condition": "not isinstance(self.effective_from, datetime) or not isinstance(self.effective_until, datetime)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 36,
+      "module": "planning/cost.py",
+      "line": 104,
+      "condition": "self.effective_until < self.effective_from",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 37,
+      "module": "planning/cost.py",
+      "line": 106,
+      "condition": "self.evidence_source is not None and (not isinstance(self.evidence_source, str) or self.evidence_source == '')",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 38,
+      "module": "planning/cost.py",
+      "line": 137,
+      "condition": "not isinstance(data, Mapping)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 39,
+      "module": "planning/cost.py",
+      "line": 142,
+      "condition": "unknown",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 40,
+      "module": "planning/cost.py",
+      "line": 145,
+      "condition": "req not in data",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 41,
+      "module": "planning/cost.py",
+      "line": 147,
+      "condition": "not isinstance(data['effective_from'], datetime) or not isinstance(data['effective_until'], datetime)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 42,
+      "module": "planning/cost.py",
+      "line": 173,
+      "condition": "not isinstance(self.subject, CapacitySubject)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 43,
+      "module": "planning/cost.py",
+      "line": 180,
+      "condition": "not isinstance(entry, CostEvidence)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 44,
+      "module": "planning/cost.py",
+      "line": 182,
+      "condition": "not _subject_scope_compatible(entry.subject, self.subject)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 45,
+      "module": "planning/cost.py",
+      "line": 185,
+      "condition": "key in seen",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 46,
+      "module": "planning/cost.py",
+      "line": 210,
+      "condition": "not isinstance(data, Mapping)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 47,
+      "module": "planning/cost.py",
+      "line": 214,
+      "condition": "unknown",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 48,
+      "module": "planning/cost.py",
+      "line": 216,
+      "condition": "'subject' not in data",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 49,
+      "module": "planning/cost.py",
+      "line": 219,
+      "condition": "not isinstance(entries_raw, (list, tuple))",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 50,
+      "module": "planning/constraints.py",
+      "line": 58,
+      "condition": "v is None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 51,
+      "module": "planning/constraints.py",
+      "line": 62,
+      "condition": "isinstance(v, bool) or not isinstance(v, (int, float)) or (not math.isfinite(v))",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 52,
+      "module": "planning/constraints.py",
+      "line": 89,
+      "condition": "isinstance(v, bool) or not isinstance(v, int)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 53,
+      "module": "planning/constraints.py",
+      "line": 91,
+      "condition": "self.min_capacity < 0",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 54,
+      "module": "planning/constraints.py",
+      "line": 93,
+      "condition": "self.max_capacity < self.min_capacity",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 55,
+      "module": "planning/constraints.py",
+      "line": 95,
+      "condition": "self.allowed_step < 1",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 56,
+      "module": "planning/constraints.py",
+      "line": 97,
+      "condition": "self.regional_quota is not None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 57,
+      "module": "planning/constraints.py",
+      "line": 98,
+      "condition": "isinstance(self.regional_quota, bool) or not isinstance(self.regional_quota, int) or self.regional_quota < 0",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 58,
+      "module": "planning/constraints.py",
+      "line": 100,
+      "condition": "_finite_number('cooldown_seconds', self.cooldown_seconds)",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 59,
+      "module": "planning/constraints.py",
+      "line": 101,
+      "condition": "self.cooldown_seconds < 0",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 60,
+      "module": "planning/constraints.py",
+      "line": 103,
+      "condition": "self.last_change_at is not None and (not isinstance(self.last_change_at, datetime))",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 61,
+      "module": "planning/constraints.py",
+      "line": 105,
+      "condition": "self.forecast_validity_seconds is not None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 62,
+      "module": "planning/constraints.py",
+      "line": 106,
+      "condition": "_finite_number('forecast_validity_seconds', self.forecast_validity_seconds)",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 63,
+      "module": "planning/constraints.py",
+      "line": 107,
+      "condition": "self.forecast_validity_seconds <= 0",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 64,
+      "module": "planning/constraints.py",
+      "line": 110,
+      "condition": "not isinstance(getattr(self, name), bool)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 65,
+      "module": "planning/constraints.py",
+      "line": 112,
+      "condition": "not isinstance(self.dependency_capacity_ceiling, Mapping)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 66,
+      "module": "planning/constraints.py",
+      "line": 115,
+      "condition": "not isinstance(k, str) or k == ''",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 67,
+      "module": "planning/constraints.py",
+      "line": 117,
+      "condition": "isinstance(v, bool) or not isinstance(v, int) or v < 0",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 68,
+      "module": "planning/constraints.py",
+      "line": 123,
+      "condition": "not isinstance(a, str) or a == ''",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 69,
+      "module": "planning/constraints.py",
+      "line": 125,
+      "condition": "self.max_cost_increase_minor is not None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 70,
+      "module": "planning/constraints.py",
+      "line": 126,
+      "condition": "isinstance(self.max_cost_increase_minor, bool) or not isinstance(self.max_cost_increase_minor, int) or self.max_cost_increase_minor < 0",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 71,
+      "module": "planning/constraints.py",
+      "line": 128,
+      "condition": "_finite_number('safety_margin_fraction', self.safety_margin_fraction)",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 72,
+      "module": "planning/constraints.py",
+      "line": 129,
+      "condition": "not 0.0 <= self.safety_margin_fraction <= 1.0",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 73,
+      "module": "planning/constraints.py",
+      "line": 166,
+      "condition": "not isinstance(data, Mapping)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 74,
+      "module": "planning/constraints.py",
+      "line": 175,
+      "condition": "unknown",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 75,
+      "module": "planning/constraints.py",
+      "line": 178,
+      "condition": "req not in data",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 76,
+      "module": "planning/candidates.py",
+      "line": 54,
+      "condition": "not isinstance(self.subject, CapacitySubject)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 77,
+      "module": "planning/candidates.py",
+      "line": 58,
+      "condition": "isinstance(v, bool) or not isinstance(v, int) or v < 0",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 78,
+      "module": "planning/candidates.py",
+      "line": 60,
+      "condition": "self.role not in ('primary', 'dependency')",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 79,
+      "module": "planning/candidates.py",
+      "line": 77,
+      "condition": "not isinstance(data, Mapping)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 80,
+      "module": "planning/candidates.py",
+      "line": 81,
+      "condition": "unknown",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 81,
+      "module": "planning/candidates.py",
+      "line": 84,
+      "condition": "req not in data",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 82,
+      "module": "planning/candidates.py",
+      "line": 106,
+      "condition": "not isinstance(self.plan_id, str) or self.plan_id == ''",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 83,
+      "module": "planning/candidates.py",
+      "line": 108,
+      "condition": "not isinstance(self.action_kind, ActionKind)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 84,
+      "module": "planning/candidates.py",
+      "line": 112,
+      "condition": "not self.changes",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 85,
+      "module": "planning/candidates.py",
+      "line": 115,
+      "condition": "roles.count('primary') != 1",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 86,
+      "module": "planning/candidates.py",
+      "line": 120,
+      "condition": "not isinstance(c, ResourceChange)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 87,
+      "module": "planning/candidates.py",
+      "line": 123,
+      "condition": "key in seen",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 88,
+      "module": "planning/candidates.py",
+      "line": 126,
+      "condition": "isinstance(self.timing_seconds, bool) or not isinstance(self.timing_seconds, (int, float))",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 89,
+      "module": "planning/candidates.py",
+      "line": 128,
+      "condition": "self.timing_seconds < 0",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 90,
+      "module": "planning/candidates.py",
+      "line": 133,
+      "condition": "self.action_kind is ActionKind.NO_CHANGE",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 91,
+      "module": "planning/candidates.py",
+      "line": 134,
+      "condition": "nonzero",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 92,
+      "module": "planning/candidates.py",
+      "line": 136,
+      "condition": "self.action_kind is ActionKind.SCALE_UP",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 93,
+      "module": "planning/candidates.py",
+      "line": 137,
+      "condition": "primary.delta <= 0",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 94,
+      "module": "planning/candidates.py",
+      "line": 139,
+      "condition": "len(nonzero) != 1",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 95,
+      "module": "planning/candidates.py",
+      "line": 141,
+      "condition": "self.action_kind is ActionKind.SCALE_DOWN",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 96,
+      "module": "planning/candidates.py",
+      "line": 142,
+      "condition": "primary.delta >= 0",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 97,
+      "module": "planning/candidates.py",
+      "line": 144,
+      "condition": "len(nonzero) != 1",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 98,
+      "module": "planning/candidates.py",
+      "line": 147,
+      "condition": "primary.delta == 0",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 99,
+      "module": "planning/candidates.py",
+      "line": 149,
+      "condition": "len(nonzero) < 2",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 100,
+      "module": "planning/candidates.py",
+      "line": 178,
+      "condition": "not isinstance(data, Mapping)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 101,
+      "module": "planning/candidates.py",
+      "line": 182,
+      "condition": "unknown",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 102,
+      "module": "planning/candidates.py",
+      "line": 185,
+      "condition": "req not in data",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 103,
+      "module": "planning/candidates.py",
+      "line": 192,
+      "condition": "not isinstance(changes_raw, (list, tuple))",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 104,
+      "module": "planning/candidates.py",
+      "line": 233,
+      "condition": "isinstance(current_capacity, bool) or not isinstance(current_capacity, int) or current_capacity < 0",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 105,
+      "module": "planning/candidates.py",
+      "line": 235,
+      "condition": "isinstance(required_capacity, bool) or not isinstance(required_capacity, int) or required_capacity < 0",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 106,
+      "module": "planning/candidates.py",
+      "line": 237,
+      "condition": "allowed_step < 1",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 107,
+      "module": "planning/policy.py",
+      "line": 51,
+      "condition": "isinstance(v, bool) or not isinstance(v, (int, float)) or (not math.isfinite(v))",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 108,
+      "module": "planning/policy.py",
+      "line": 53,
+      "condition": "v < 0",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 109,
+      "module": "planning/policy.py",
+      "line": 78,
+      "condition": "not isinstance(self.policy_id, str) or self.policy_id == ''",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 110,
+      "module": "planning/policy.py",
+      "line": 82,
+      "condition": "_finite_nonneg(name, getattr(self, name))",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 111,
+      "module": "planning/policy.py",
+      "line": 85,
+      "condition": "v > 1.0 + _TOL",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 112,
+      "module": "planning/policy.py",
+      "line": 87,
+      "condition": "_finite_nonneg('tie_epsilon', self.tie_epsilon) > 1.0",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 113,
+      "module": "planning/policy.py",
+      "line": 135,
+      "condition": "not isinstance(data, Mapping)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 114,
+      "module": "planning/policy.py",
+      "line": 139,
+      "condition": "unknown",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 115,
+      "module": "planning/policy.py",
+      "line": 172,
+      "condition": "not isinstance(m, Mapping)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 116,
+      "module": "planning/policy.py",
+      "line": 175,
+      "condition": "k not in FEATURE_NAMES",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 117,
+      "module": "planning/policy.py",
+      "line": 177,
+      "condition": "isinstance(v, bool) or not isinstance(v, (int, float)) or (not math.isfinite(v))",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 118,
+      "module": "planning/policy.py",
+      "line": 179,
+      "condition": "set(self.features) != set(FEATURE_NAMES) or set(self.contributions) != set(FEATURE_NAMES)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 119,
+      "module": "planning/policy.py",
+      "line": 181,
+      "condition": "isinstance(self.total_score, bool) or not isinstance(self.total_score, (int, float)) or (not math.isfinite(self.total_score))",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 120,
+      "module": "planning/policy.py",
+      "line": 184,
+      "condition": "abs(recomputed - self.total_score) > 1e-06",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 121,
+      "module": "planning/policy.py",
+      "line": 204,
+      "condition": "not isinstance(data, Mapping)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 122,
+      "module": "planning/policy.py",
+      "line": 208,
+      "condition": "unknown",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 123,
+      "module": "planning/policy.py",
+      "line": 211,
+      "condition": "req not in data",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 124,
+      "module": "planning/scoring.py",
+      "line": 136,
+      "condition": "not fc.is_forecast or fc.point_estimate is None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 125,
+      "module": "planning/scoring.py",
+      "line": 138,
+      "condition": "fc.target is not PLANNING_TARGET",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 126,
+      "module": "planning/scoring.py",
+      "line": 141,
+      "condition": "current_state.capacity is None or current_state.capacity.running_replicas is None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 127,
+      "module": "planning/scoring.py",
+      "line": 151,
+      "condition": "dep_edge is not None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 128,
+      "module": "planning/scoring.py",
+      "line": 152,
+      "condition": "not dep_edge.has_capacity_evidence",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 129,
+      "module": "planning/scoring.py",
+      "line": 165,
+      "condition": "primary_price is None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 130,
+      "module": "planning/scoring.py",
+      "line": 198,
+      "condition": "price is None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 131,
+      "module": "planning/scoring.py",
+      "line": 251,
+      "condition": "c.max_cost_increase_minor is not None",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": "MAX_COST_INCREASE_EXCEEDED"
+    },
+    {
+      "index": 132,
+      "module": "planning/recommendation.py",
+      "line": 87,
+      "condition": "not isinstance(self.plan, CandidateActionPlan)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 133,
+      "module": "planning/recommendation.py",
+      "line": 89,
+      "condition": "not isinstance(self.feasible, bool)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 134,
+      "module": "planning/recommendation.py",
+      "line": 94,
+      "condition": "not isinstance(v, str) or v == ''",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 135,
+      "module": "planning/recommendation.py",
+      "line": 96,
+      "condition": "isinstance(self.cost_delta_minor, bool) or not isinstance(self.cost_delta_minor, int)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 136,
+      "module": "planning/recommendation.py",
+      "line": 98,
+      "condition": "self.feasible",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 137,
+      "module": "planning/recommendation.py",
+      "line": 99,
+      "condition": "self.violations",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 138,
+      "module": "planning/recommendation.py",
+      "line": 101,
+      "condition": "not isinstance(self.score_breakdown, ScoreBreakdown)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 139,
+      "module": "planning/recommendation.py",
+      "line": 104,
+      "condition": "not self.violations",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 140,
+      "module": "planning/recommendation.py",
+      "line": 106,
+      "condition": "self.score_breakdown is not None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 141,
+      "module": "planning/recommendation.py",
+      "line": 125,
+      "condition": "not isinstance(data, Mapping)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 142,
+      "module": "planning/recommendation.py",
+      "line": 129,
+      "condition": "unknown",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 143,
+      "module": "planning/recommendation.py",
+      "line": 132,
+      "condition": "req not in data",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 144,
+      "module": "planning/recommendation.py",
+      "line": 182,
+      "condition": "self.advisory_only is not True or self.shadow_only is not True",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 145,
+      "module": "planning/recommendation.py",
+      "line": 184,
+      "condition": "self.actuation_performed is not False",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 146,
+      "module": "planning/recommendation.py",
+      "line": 186,
+      "condition": "self.authorization_performed is not False",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 147,
+      "module": "planning/recommendation.py",
+      "line": 188,
+      "condition": "self.effect_verified is not False",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 148,
+      "module": "planning/recommendation.py",
+      "line": 190,
+      "condition": "self.authority_class != AUTHORITY_CLASS_ADVISORY",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 149,
+      "module": "planning/recommendation.py",
+      "line": 192,
+      "condition": "self.execution_capability != EXECUTION_CAPABILITY_NONE",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 150,
+      "module": "planning/recommendation.py",
+      "line": 195,
+      "condition": "not isinstance(self.recommendation_id, str) or self.recommendation_id == ''",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 151,
+      "module": "planning/recommendation.py",
+      "line": 197,
+      "condition": "not isinstance(self.forecast_evidence, CapacityForecastEvidence)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 152,
+      "module": "planning/recommendation.py",
+      "line": 199,
+      "condition": "not isinstance(self.current_state, CanonicalCapacityState)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 153,
+      "module": "planning/recommendation.py",
+      "line": 201,
+      "condition": "not isinstance(self.cost_book, CostBook)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 154,
+      "module": "planning/recommendation.py",
+      "line": 203,
+      "condition": "not isinstance(self.constraints, OperatingConstraints)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 155,
+      "module": "planning/recommendation.py",
+      "line": 205,
+      "condition": "not isinstance(self.policy, RecommendationPolicy)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 156,
+      "module": "planning/recommendation.py",
+      "line": 207,
+      "condition": "self.topology is not None and (not isinstance(self.topology, DependencyTopology))",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 157,
+      "module": "planning/recommendation.py",
+      "line": 209,
+      "condition": "not isinstance(self.recommendation_time, datetime)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 158,
+      "module": "planning/recommendation.py",
+      "line": 211,
+      "condition": "isinstance(self.validity_seconds, bool) or not isinstance(self.validity_seconds, (int, float)) or (not math.isfinite(self.validity_seconds)) or (self.validity_seconds <= 0)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 159,
+      "module": "planning/recommendation.py",
+      "line": 216,
+      "condition": "not self.evaluated_candidates",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 160,
+      "module": "planning/recommendation.py",
+      "line": 219,
+      "condition": "not isinstance(ec, EvaluatedCandidate)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 161,
+      "module": "planning/recommendation.py",
+      "line": 228,
+      "condition": "fc.subject != subject",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 162,
+      "module": "planning/recommendation.py",
+      "line": 230,
+      "condition": "self.cost_book.subject != subject",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 163,
+      "module": "planning/recommendation.py",
+      "line": 232,
+      "condition": "self.topology is not None and self.topology.subject != subject",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 164,
+      "module": "planning/recommendation.py",
+      "line": 240,
+      "condition": "cutoff > rec_time",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 165,
+      "module": "planning/recommendation.py",
+      "line": 249,
+      "condition": "not float(fc.horizon.seconds) > 0",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 166,
+      "module": "planning/recommendation.py",
+      "line": 253,
+      "condition": "forecast_for_dt != canonical_forecast_for",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 167,
+      "module": "planning/recommendation.py",
+      "line": 258,
+      "condition": "forecast_for_dt <= rec_time",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 168,
+      "module": "planning/recommendation.py",
+      "line": 261,
+      "condition": "_as_utc(self.current_state.observed_at) > rec_time",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 169,
+      "module": "planning/recommendation.py",
+      "line": 264,
+      "condition": "self.topology is not None and _as_utc(self.topology.as_of) > rec_time",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 170,
+      "module": "planning/recommendation.py",
+      "line": 269,
+      "condition": "not entry.is_effective_at(self.recommendation_time)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 171,
+      "module": "planning/recommendation.py",
+      "line": 272,
+      "condition": "self.constraints.forecast_validity_seconds is not None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 172,
+      "module": "planning/recommendation.py",
+      "line": 274,
+      "condition": "age > self.constraints.forecast_validity_seconds",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 173,
+      "module": "planning/recommendation.py",
+      "line": 282,
+      "condition": "validity_end_dt > canonical_forecast_for",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 174,
+      "module": "planning/recommendation.py",
+      "line": 310,
+      "condition": "len(canonical_by_id) != len(canonical_plans)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 175,
+      "module": "planning/recommendation.py",
+      "line": 314,
+      "condition": "ec.plan.plan_id in evaluated_by_id",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 176,
+      "module": "planning/recommendation.py",
+      "line": 317,
+      "condition": "evaluated_by_id != canonical_by_id",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 177,
+      "module": "planning/recommendation.py",
+      "line": 332,
+      "condition": "pid in seen_plan_ids",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 178,
+      "module": "planning/recommendation.py",
+      "line": 341,
+      "condition": "ec.feasible != exp_feasible",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 179,
+      "module": "planning/recommendation.py",
+      "line": 343,
+      "condition": "set(ec.violations) != set(exp_violations)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 180,
+      "module": "planning/recommendation.py",
+      "line": 346,
+      "condition": "ec.cost_delta_minor != exp_cost",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 181,
+      "module": "planning/recommendation.py",
+      "line": 348,
+      "condition": "exp_feasible",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 182,
+      "module": "planning/recommendation.py",
+      "line": 350,
+      "condition": "ec.score_breakdown is None or abs(ec.score_breakdown.total_score - exp_score.total_score) > _TOL",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 183,
+      "module": "planning/recommendation.py",
+      "line": 352,
+      "condition": "ec.score_breakdown.policy_digest != self.policy.digest()",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 184,
+      "module": "planning/recommendation.py",
+      "line": 355,
+      "condition": "abs(ec.score_breakdown.features[fname] - fval) > _TOL",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 185,
+      "module": "planning/recommendation.py",
+      "line": 360,
+      "condition": "not has_no_change",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 186,
+      "module": "planning/recommendation.py",
+      "line": 362,
+      "condition": "selected is None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 187,
+      "module": "planning/recommendation.py",
+      "line": 364,
+      "condition": "not selected.feasible",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 188,
+      "module": "planning/recommendation.py",
+      "line": 372,
+      "condition": "ambiguous",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 189,
+      "module": "planning/recommendation.py",
+      "line": 374,
+      "condition": "winner_id != self.selected_plan_id",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 190,
+      "module": "planning/recommendation.py",
+      "line": 485,
+      "condition": "include_digest",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 191,
+      "module": "planning/recommendation.py",
+      "line": 503,
+      "condition": "not isinstance(data, Mapping)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 192,
+      "module": "planning/recommendation.py",
+      "line": 511,
+      "condition": "missing",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 193,
+      "module": "planning/recommendation.py",
+      "line": 526,
+      "condition": "surplus",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 194,
+      "module": "planning/recommendation.py",
+      "line": 529,
+      "condition": "not isinstance(rec_time, datetime)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 195,
+      "module": "planning/recommendation.py",
+      "line": 576,
+      "condition": "not isinstance(data, Mapping)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 196,
+      "module": "planning/recommendation.py",
+      "line": 579,
+      "condition": "not isinstance(fcd, Mapping)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 197,
+      "module": "planning/recommendation.py",
+      "line": 672,
+      "condition": "not isinstance(self.subject, CapacitySubject)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 198,
+      "module": "planning/recommendation.py",
+      "line": 674,
+      "condition": "not isinstance(self.reason, RecommendationAbstentionReason)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 199,
+      "module": "planning/recommendation.py",
+      "line": 676,
+      "condition": "not isinstance(self.recommendation_time, datetime)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 200,
+      "module": "planning/recommendation.py",
+      "line": 678,
+      "condition": "self.advisory_only is not True or self.shadow_only is not True",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 201,
+      "module": "planning/recommendation.py",
+      "line": 680,
+      "condition": "self.actuation_performed is not False",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 202,
+      "module": "planning/recommendation.py",
+      "line": 682,
+      "condition": "self.authority_class != AUTHORITY_CLASS_ADVISORY",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 203,
+      "module": "planning/recommendation.py",
+      "line": 684,
+      "condition": "self.execution_capability != EXECUTION_CAPABILITY_NONE",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 204,
+      "module": "planning/recommendation.py",
+      "line": 711,
+      "condition": "include_digest",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 205,
+      "module": "planning/recommendation.py",
+      "line": 722,
+      "condition": "not isinstance(data, Mapping)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 206,
+      "module": "planning/recommendation.py",
+      "line": 725,
+      "condition": "req not in data",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 207,
+      "module": "planning/recommendation.py",
+      "line": 737,
+      "condition": "surplus",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 208,
+      "module": "planning/recommendation.py",
+      "line": 740,
+      "condition": "not isinstance(rec_time, datetime)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 209,
+      "module": "planning/pipeline.py",
+      "line": 100,
+      "condition": "not isinstance(recommendation_time, datetime)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 210,
+      "module": "planning/pipeline.py",
+      "line": 103,
+      "condition": "not isinstance(policy, RecommendationPolicy)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 211,
+      "module": "planning/pipeline.py",
+      "line": 108,
+      "condition": "current_state is None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": "MISSING_CANONICAL_STATE"
+    },
+    {
+      "index": 212,
+      "module": "planning/pipeline.py",
+      "line": 117,
+      "condition": "not isinstance(current_state, CanonicalCapacityState)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 213,
+      "module": "planning/pipeline.py",
+      "line": 132,
+      "condition": "not isinstance(forecast_evidence, CapacityForecastEvidence)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 214,
+      "module": "planning/pipeline.py",
+      "line": 164,
+      "condition": "not isinstance(constraints, OperatingConstraints)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 215,
+      "module": "planning/pipeline.py",
+      "line": 180,
+      "condition": "isinstance(validity_seconds, bool) or not isinstance(validity_seconds, (int, float)) or (not math.isfinite(validity_seconds)) or (validity_seconds <= 0)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 216,
+      "module": "planning/pipeline.py",
+      "line": 200,
+      "condition": "not isinstance(cost_book, CostBook)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 217,
+      "module": "planning/pipeline.py",
+      "line": 230,
+      "condition": "not isinstance(topology, DependencyTopology)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 218,
+      "module": "planning/pipeline.py",
+      "line": 268,
+      "condition": "except ScoringError: abcost(R.CONTRADICTORY_EVIDENCE, f'inconsistent evidence: {exc}')",
+      "kind": "except-arm",
+      "shape": "typed-refusal return",
+      "recorded_in": "",
+      "outcome": "R.CONTRADICTORY_EVIDENCE"
+    },
+    {
+      "index": 219,
+      "module": "planning/pipeline.py",
+      "line": 296,
+      "condition": "else of: violations",
+      "kind": "else-arm",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    }
+  ]
+}

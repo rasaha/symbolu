@@ -230,6 +230,83 @@ EXCLUSION_REASONS = frozenset(
 )
 
 
+#: The Cloud Scaling Controller modules **outside** the ratified `planning/` phase, each
+#: with the number of ``raise`` statements measured in it at adoption. They are listed
+#: here rather than inline so the count beside each name is generated from the tree and
+#: cannot drift into a claim nobody re-measured. A module with a non-zero count is not a
+#: guard-free module — it is refusal surface this phase deliberately does not score, and
+#: a later phase must.
+_CONTROLLER_DEFERRED = (
+    ("__init__.py", 0),
+    ("api.py", 1),
+    ("canonical/__init__.py", 0),
+    ("canonical/evidence.py", 7),
+    ("canonical/identity.py", 6),
+    ("canonical/measurement.py", 12),
+    ("canonical/normalization.py", 16),
+    ("canonical/projection.py", 3),
+    ("canonical/provenance.py", 5),
+    ("canonical/serialization.py", 3),
+    ("canonical/sources.py", 3),
+    ("canonical/state.py", 39),
+    ("cli.py", 2),
+    ("config.py", 0),
+    ("contracts.py", 12),
+    ("controller.py", 0),
+    ("core/__init__.py", 0),
+    ("core/adaptive_gain.py", 0),
+    ("core/coherence.py", 0),
+    ("core/damping.py", 0),
+    ("core/identity_ema.py", 2),
+    ("core/plasticity_gate.py", 0),
+    ("core/replay_buffer.py", 0),
+    ("explain/__init__.py", 0),
+    ("explain/explainer.py", 0),
+    ("forecasting/__init__.py", 0),
+    ("forecasting/abstention.py", 0),
+    ("forecasting/evaluation.py", 34),
+    ("forecasting/evidence.py", 17),
+    ("forecasting/forecast.py", 10),
+    ("forecasting/forecasters.py", 3),
+    ("forecasting/replay.py", 3),
+    ("forecasting/series.py", 13),
+    ("forecasting/targets.py", 4),
+    ("forecasting/uncertainty.py", 4),
+    ("forecasting/window.py", 14),
+    ("observability/__init__.py", 0),
+    ("observability/benchmark.py", 0),
+    ("observability/decision_log.py", 0),
+    ("observability/edge_cases.py", 0),
+    ("observability/efficiency_estimator.py", 0),
+    ("observability/efficiency_observer.py", 0),
+    ("observability/scaling_report.py", 0),
+    ("recommend/__init__.py", 0),
+    ("recommend/confidence.py", 0),
+    ("recommend/safety.py", 0),
+    ("replay/__init__.py", 0),
+    ("replay/adapters/__init__.py", 0),
+    ("replay/adapters/alibaba_microservices.py", 1),
+    ("replay/adapters/azure_llm.py", 1),
+    ("replay/adapters/azure_vm_noise.py", 1),
+    ("replay/adapters/base.py", 1),
+    ("replay/adapters/google_borg.py", 1),
+    ("replay/adapters/partner_prometheus.py", 1),
+    ("replay/efficiency_observer.py", 0),
+    ("replay/harness.py", 0),
+    ("replay/replay_source.py", 0),
+    ("replay/report.py", 0),
+    ("replay/tier_a.py", 0),
+    ("shadow/__init__.py", 0),
+    ("shadow/divergence.py", 0),
+    ("shadow/hpa_watcher.py", 0),
+    ("shadow/reporter.py", 0),
+    ("signals/__init__.py", 0),
+    ("signals/normalizer.py", 0),
+    ("signals/pipeline.py", 1),
+    ("signals/prometheus.py", 1),
+    ("version.py", 0),
+)
+
 PACKAGES = {
     "authorization-contracts": PackageConfig(
         key="authorization-contracts",
@@ -344,6 +421,104 @@ PACKAGES = {
             "__init__.py": "re-exports only; measured zero guards and zero raises",
             "version.py": "the version constant; measured zero guards and zero raises",
         },
+        recorded=(),
+        exclusions={},
+    ),
+    "controller-planning": PackageConfig(
+        key="controller-planning",
+        package_dir="packages/capabilities/cloud-scaling-controller",
+        dist_name="ugence_cloud_scaling_controller",
+        # PHASE 1 OF A PHASED ADOPTION (owner ruling 3, 2026-08-31). This entry covers
+        # `planning/` only. It is NOT controller coverage, and the inventory it generates
+        # says so in its own words rather than leaving a reader to infer it from the
+        # module list.
+        #
+        # The mint is a recommendation that exists. `CapacityActionRecommendation` is the
+        # artifact this subpackage produces, and its `__post_init__` is where every
+        # validation gate that can refuse one fires; the counter increments only after a
+        # successful return, so "removing this guard mints something the baseline did not"
+        # reads literally — a capacity action was recommended where the baseline abstained
+        # or refused outright. Abstention is deliberately not a mint: declining to
+        # recommend is the safe outcome this package is built to produce.
+        mint_site=(
+            "ugence_cloud_scaling_controller.planning.recommendation:"
+            "CapacityActionRecommendation.__post_init__"
+        ),
+        # Ruled disclosure (owner, 2026-08-31): partial coverage reported honestly.
+        inventory_note=(
+            "**This is a phase, not controller coverage (ruled 2026-08-31).** This "
+            "inventory is defined over the `planning/` subpackage alone — 10 of the "
+            "Cloud Scaling Controller's 78 production modules, carrying 205 of its 426 "
+            "`raise` statements. The remaining 68 modules are *deferred to later "
+            "ratified phases*, not judged guard-free, and every one is named in this "
+            "package's `excluded_modules` with its measured refusal surface. Deferred "
+            "subpackages, by name: `forecasting/` (11 modules, 102 raises), "
+            "`canonical/` (10 modules, 94 raises), the top-level modules (7 modules, "
+            "15 raises), `replay/` (13 modules, 6 raises), `core/` (7 modules, 2 "
+            "raises), `signals/` (4 modules, 2 raises), `observability/` (7 modules), "
+            "`shadow/` (4 modules), `recommend/` (3 modules) and `explain/` (2 "
+            "modules). A reader must not read a green sweep here as evidence about any "
+            "of them."
+        ),
+        # `planning/` in the order a recommendation is actually built: the typed
+        # abstention vocabulary first, then the evidence layers each gate reads
+        # (topology, cost, constraints), then candidate generation, the policy and
+        # scoring that rank them, the recommendation artifact itself, and the pipeline
+        # entry point that ties them together.
+        module_order=(
+            "planning/__init__.py",
+            "planning/abstention.py",
+            "planning/topology.py",
+            "planning/cost.py",
+            "planning/constraints.py",
+            "planning/candidates.py",
+            "planning/policy.py",
+            "planning/scoring.py",
+            "planning/recommendation.py",
+            "planning/pipeline.py",
+        ),
+        # Every module outside the phase boundary, named individually with what was
+        # measured about it. These are NOT "no decision point here" exclusions of the
+        # producer-attestation kind — most of these modules carry substantial refusal
+        # surface, which is exactly why they need their own ratified phase rather than
+        # being swept in silently under this one.
+        excluded_modules={
+            **{
+                m: (
+                    "deferred to a later ratified controller phase; carries "
+                    f"{n} raise statements this phase does not score"
+                )
+                for m, n in _CONTROLLER_DEFERRED
+            },
+        },
+        # Eight typed refusal classes, all defined inside `planning/` and all
+        # `ValueError` subclasses, plus the typed abstention the pipeline returns
+        # instead of raising.
+        refusal_calls=frozenset(),
+        bound_refusal_calls=False,
+        tuple_refusals=False,
+        # Named as the *source* names them, which is the whole point of this field.
+        # `pipeline.py` does `from .abstention import RecommendationAbstentionReason as R`
+        # and then writes `R.CONTRADICTORY_EVIDENCE` at all 31 of its refusal sites;
+        # declaring the class's real name here reads the package as having no typed
+        # outcome at all and drops its one D-GC-3 arm from the denominator.
+        # `ConstraintViolationKind` is the second vocabulary — `scoring.py`'s typed
+        # reasons a candidate fails hard-constraint filtering. `RecommendationOutcome` is
+        # deliberately absent: it is a `Union[...]` type alias, not an enum, so it names
+        # no decision.
+        reason_vocabularies=frozenset({"R", "ConstraintViolationKind"}),
+        decision_classes=frozenset({"except-arm", "helper-admission", "else-arm"}),
+        # D-GC-3's operator. Exactly one `except` arm in the phase returns a vocabulary
+        # member — `pipeline.py`'s cost-scoring arm, which answers CONTRADICTORY_EVIDENCE
+        # — and because that arm already produces the sentinel it is collapsed to the
+        # lateral alternate. The other five arms re-raise a typed error rather than
+        # returning a member, so they are outside the class and are scored as the
+        # `raise` sites they are.
+        reason_collapse_sentinels={
+            "R": ("CONTRADICTORY_EVIDENCE", "NON_FINITE_INPUT"),
+        },
+        record_multiplicity=False,
+        uncovered_mints=(),
         recorded=(),
         exclusions={},
     ),
