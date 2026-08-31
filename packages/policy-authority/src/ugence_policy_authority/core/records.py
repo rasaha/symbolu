@@ -22,7 +22,11 @@ from typing import Any, Mapping, Optional
 from .adapters import PolicyCoordinate
 from .canonical import require_nfc, require_tzaware
 from .errors import PolicyAuthorityRequestError
-from .payload import issuance_signing_payload, revocation_signing_payload
+from .payload import (
+    issuance_signing_payload,
+    revocation_signing_payload,
+    supersession_signing_payload,
+)
 from .statuses import (
     AUTHORITY_PROTOCOL,
     AUTHORITY_PROTOCOL_VERSION,
@@ -31,7 +35,12 @@ from .statuses import (
     PolicyRevocationReasonCode,
 )
 
-__all__ = ["IssuedPolicyRecord", "PolicyRevocationRecord", "PolicyResolution"]
+__all__ = [
+    "IssuedPolicyRecord",
+    "PolicyRevocationRecord",
+    "PolicySupersessionRecord",
+    "PolicyResolution",
+]
 
 _HEX = frozenset("0123456789abcdef")
 
@@ -354,4 +363,70 @@ class PolicyResolution:
             requested_coordinate=requested_coordinate,
             as_of=as_of,
             detail=detail,
+        )
+
+
+@dataclass(frozen=True)
+class PolicySupersessionRecord:
+    """One version superseded by another — always signed (`ACC-LC-IA-2`).
+
+    Written by the *same* signed act that issues the successor (`ACC-LC-2`), and
+    stored in its own append-only store. It exists because an issued record is
+    immutable and its ``lifecycle_state`` is signed artifact content: nothing can
+    edit a predecessor into ``SUPERSEDED``, so the transition is expressed as an
+    append — exactly as revocation already is — and resolution consults it.
+
+    Both coordinates are complete, so a supersession can never reach a version it
+    does not name. This is **not** revocation: the predecessor is not withdrawn,
+    it is replaced, and it remains readable as history.
+    """
+
+    supersession_id: str
+    coordinate: PolicyCoordinate
+    successor_coordinate: PolicyCoordinate
+    superseding_authority_id: str
+    key_id: str
+    signature_alg: str
+    signature: bytes
+    superseded_at: datetime
+    detail: str = ""
+    authority_protocol: str = AUTHORITY_PROTOCOL
+    authority_protocol_version: str = AUTHORITY_PROTOCOL_VERSION
+
+    def __post_init__(self) -> None:
+        _require_nonempty(self.supersession_id, "PolicySupersessionRecord.supersession_id")
+        for name in ("coordinate", "successor_coordinate"):
+            if not isinstance(getattr(self, name), PolicyCoordinate):
+                raise PolicyAuthorityRequestError(
+                    f"PolicySupersessionRecord.{name} must be a PolicyCoordinate"
+                )
+        if self.coordinate == self.successor_coordinate:
+            raise PolicyAuthorityRequestError(
+                "PolicySupersessionRecord: a version cannot supersede itself"
+            )
+        _require_nonempty(
+            self.superseding_authority_id,
+            "PolicySupersessionRecord.superseding_authority_id",
+        )
+        _require_nonempty(self.key_id, "PolicySupersessionRecord.key_id")
+        _require_nonempty(self.signature_alg, "PolicySupersessionRecord.signature_alg")
+        if not isinstance(self.signature, (bytes, bytearray)) or not self.signature:
+            raise PolicyAuthorityRequestError(
+                "PolicySupersessionRecord.signature must be non-empty bytes — an "
+                "unsigned supersession is not 'supersession pending', it is invalid"
+            )
+        object.__setattr__(self, "signature", bytes(self.signature))
+        require_tzaware(self.superseded_at, path="PolicySupersessionRecord.superseded_at")
+
+    def signing_payload(self) -> bytes:
+        """Recompute the exact bytes this supersession's signature must cover."""
+
+        return supersession_signing_payload(
+            supersession_id=self.supersession_id,
+            coordinate=self.coordinate,
+            successor_coordinate=self.successor_coordinate,
+            superseding_authority_id=self.superseding_authority_id,
+            key_id=self.key_id,
+            signature_alg=self.signature_alg,
+            superseded_at=self.superseded_at,
         )

@@ -128,6 +128,14 @@ class PolicyResolutionReason(str, Enum):
     #: v0.1 refuses to issue such an artifact; a legacy or hand-assembled record
     #: that reaches resolution fails closed here rather than being guessed at.
     SUPERSESSION_REFERENCE_UNSUPPORTED = "SUPERSESSION_REFERENCE_UNSUPPORTED"
+    #: `ACC-LC-IA-2`. A verified supersession record names this version as the
+    #: predecessor of a successor issued over it. The record stays readable as
+    #: history; it simply no longer resolves.
+    SUPERSEDED = "SUPERSEDED"
+    #: A supersession record targeting this version exists but does not verify —
+    #: unsigned, wrong key, unauthorized signer, or tampered. Like its revocation
+    #: counterpart it fails closed rather than being ignored.
+    SUPERSESSION_INTEGRITY_INVALID = "SUPERSESSION_INTEGRITY_INVALID"
 
 
 class PolicyRevocationReasonCode(str, Enum):
