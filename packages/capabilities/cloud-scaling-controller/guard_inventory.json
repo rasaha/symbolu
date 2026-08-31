@@ -1,14 +1,2764 @@
 {
-  "package": "controller-planning",
-  "total": 219,
+  "package": "controller-evidence-planning",
+  "total": 494,
   "reconciliation": {},
   "excluded": {
-    "except_arms": 5,
-    "boolean_subterms": 59
+    "except_arms": 10,
+    "boolean_subterms": 146
   },
   "guards": [
     {
       "index": 1,
+      "module": "canonical/identity.py",
+      "line": 29,
+      "condition": "not isinstance(value, str)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 2,
+      "module": "canonical/identity.py",
+      "line": 31,
+      "condition": "value == ''",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 3,
+      "module": "canonical/identity.py",
+      "line": 60,
+      "condition": "not isinstance(self.workload_id, str) or self.workload_id == ''",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 4,
+      "module": "canonical/identity.py",
+      "line": 63,
+      "condition": "_opt_str(name, getattr(self, name))",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 5,
+      "module": "canonical/identity.py",
+      "line": 78,
+      "condition": "not isinstance(data, dict)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 6,
+      "module": "canonical/identity.py",
+      "line": 83,
+      "condition": "unknown",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 7,
+      "module": "canonical/identity.py",
+      "line": 85,
+      "condition": "'workload_id' not in data",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 8,
+      "module": "canonical/measurement.py",
+      "line": 95,
+      "condition": "not isinstance(unit, Unit)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 9,
+      "module": "canonical/measurement.py",
+      "line": 116,
+      "condition": "isinstance(self.value, bool) or not isinstance(self.value, (int, float))",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 10,
+      "module": "canonical/measurement.py",
+      "line": 121,
+      "condition": "math.isnan(fvalue) or math.isinf(fvalue)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 11,
+      "module": "canonical/measurement.py",
+      "line": 123,
+      "condition": "not isinstance(self.unit, Unit)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 12,
+      "module": "canonical/measurement.py",
+      "line": 126,
+      "condition": "self.unit in (Unit.RATIO, Unit.RATE) and (not 0.0 <= fvalue <= 1.0)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 13,
+      "module": "canonical/measurement.py",
+      "line": 130,
+      "condition": "self.unit is Unit.PERCENT and (not 0.0 <= fvalue <= 100.0)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 14,
+      "module": "canonical/measurement.py",
+      "line": 132,
+      "condition": "self.unit in _NON_NEGATIVE_UNITS and fvalue < 0.0",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 15,
+      "module": "canonical/measurement.py",
+      "line": 134,
+      "condition": "self.unit in (Unit.COUNT, Unit.CURRENCY_MINOR) and float(fvalue).is_integer() is False",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 16,
+      "module": "canonical/measurement.py",
+      "line": 148,
+      "condition": "not isinstance(data, dict)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 17,
+      "module": "canonical/measurement.py",
+      "line": 151,
+      "condition": "unknown",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 18,
+      "module": "canonical/measurement.py",
+      "line": 153,
+      "condition": "'value' not in data or 'unit' not in data",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 19,
+      "module": "canonical/provenance.py",
+      "line": 54,
+      "condition": "not isinstance(value, datetime)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 20,
+      "module": "canonical/provenance.py",
+      "line": 81,
+      "condition": "not isinstance(self.source_type, ObservationSourceType)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 21,
+      "module": "canonical/provenance.py",
+      "line": 83,
+      "condition": "_require_datetime('observed_at', self.observed_at)",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 22,
+      "module": "canonical/provenance.py",
+      "line": 84,
+      "condition": "self.collected_at is not None",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 23,
+      "module": "canonical/provenance.py",
+      "line": 85,
+      "condition": "_require_datetime('collected_at', self.collected_at)",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 24,
+      "module": "canonical/provenance.py",
+      "line": 88,
+      "condition": "v is not None and (not isinstance(v, str))",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 25,
+      "module": "canonical/provenance.py",
+      "line": 90,
+      "condition": "self.metric_window_seconds is not None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 26,
+      "module": "canonical/provenance.py",
+      "line": 91,
+      "condition": "isinstance(self.metric_window_seconds, bool) or not isinstance(self.metric_window_seconds, (int, float))",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 27,
+      "module": "canonical/provenance.py",
+      "line": 95,
+      "condition": "self.metric_window_seconds < 0",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 28,
+      "module": "canonical/serialization.py",
+      "line": 82,
+      "condition": "isinstance(value, float)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 29,
+      "module": "canonical/serialization.py",
+      "line": 83,
+      "condition": "math.isnan(value) or math.isinf(value)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 30,
+      "module": "canonical/serialization.py",
+      "line": 89,
+      "condition": "isinstance(value, Enum)",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 31,
+      "module": "canonical/serialization.py",
+      "line": 93,
+      "condition": "isinstance(value, dict)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 32,
+      "module": "canonical/serialization.py",
+      "line": 96,
+      "condition": "not isinstance(k, str)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 33,
+      "module": "canonical/serialization.py",
+      "line": 103,
+      "condition": "isinstance(value, (list, tuple))",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 34,
+      "module": "canonical/serialization.py",
+      "line": 105,
+      "condition": "isinstance(value, (set, frozenset))",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 35,
+      "module": "canonical/normalization.py",
+      "line": 87,
+      "condition": "not isinstance(self.policy_id, str) or self.policy_id == ''",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 36,
+      "module": "canonical/normalization.py",
+      "line": 89,
+      "condition": "not isinstance(self.method_by_signal, Mapping)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 37,
+      "module": "canonical/normalization.py",
+      "line": 92,
+      "condition": "not isinstance(name, str) or name == ''",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 38,
+      "module": "canonical/normalization.py",
+      "line": 94,
+      "condition": "not isinstance(method, NormalizationMethod)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 39,
+      "module": "canonical/normalization.py",
+      "line": 96,
+      "condition": "not isinstance(self.thresholds, Mapping)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 40,
+      "module": "canonical/normalization.py",
+      "line": 99,
+      "condition": "isinstance(thr, bool) or not isinstance(thr, (int, float))",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 41,
+      "module": "canonical/normalization.py",
+      "line": 101,
+      "condition": "math.isnan(thr) or math.isinf(thr)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 42,
+      "module": "canonical/normalization.py",
+      "line": 103,
+      "condition": "thr <= 0",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 43,
+      "module": "canonical/normalization.py",
+      "line": 105,
+      "condition": "self.clamp and (not self.clamp_low < self.clamp_high)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 44,
+      "module": "canonical/normalization.py",
+      "line": 171,
+      "condition": "method is None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 45,
+      "module": "canonical/normalization.py",
+      "line": 173,
+      "condition": "measurement.unit not in _METHOD_UNITS[method]",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 46,
+      "module": "canonical/normalization.py",
+      "line": 188,
+      "condition": "method in (NormalizationMethod.LATENCY_MS_TO_THRESHOLD, NormalizationMethod.LATENCY_S_TO_THRESHOLD, NormalizationMethod.QUEUE_TO_CAPACITY)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 47,
+      "module": "canonical/normalization.py",
+      "line": 191,
+      "condition": "name not in policy.thresholds",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 48,
+      "module": "canonical/normalization.py",
+      "line": 197,
+      "condition": "threshold <= 0",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 49,
+      "module": "canonical/normalization.py",
+      "line": 200,
+      "condition": "else of: method in (NormalizationMethod.LATENCY_MS_TO_THRESHOLD, NormalizationMethod.LATENCY_S_TO_THRESHOLD, NormalizationMethod.QUEUE_TO_CAPACITY)",
+      "kind": "else-arm",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 50,
+      "module": "canonical/normalization.py",
+      "line": 203,
+      "condition": "math.isnan(value) or math.isinf(value)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 51,
+      "module": "canonical/normalization.py",
+      "line": 214,
+      "condition": "not 0.0 <= value <= 1.0",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 52,
+      "module": "canonical/state.py",
+      "line": 53,
+      "condition": "kind == _MEASURE",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 53,
+      "module": "canonical/state.py",
+      "line": 54,
+      "condition": "not isinstance(value, Measurement)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 54,
+      "module": "canonical/state.py",
+      "line": 56,
+      "condition": "kind == _COUNT",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 55,
+      "module": "canonical/state.py",
+      "line": 57,
+      "condition": "isinstance(value, bool) or not isinstance(value, int)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 56,
+      "module": "canonical/state.py",
+      "line": 59,
+      "condition": "value < 0",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 57,
+      "module": "canonical/state.py",
+      "line": 61,
+      "condition": "kind == _BOOL",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 58,
+      "module": "canonical/state.py",
+      "line": 62,
+      "condition": "not isinstance(value, bool)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 59,
+      "module": "canonical/state.py",
+      "line": 64,
+      "condition": "kind == _STR",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 60,
+      "module": "canonical/state.py",
+      "line": 65,
+      "condition": "not isinstance(value, str) or value == ''",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 61,
+      "module": "canonical/state.py",
+      "line": 67,
+      "condition": "kind == _STR_TUPLE",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 62,
+      "module": "canonical/state.py",
+      "line": 68,
+      "condition": "not isinstance(value, tuple) or any((not isinstance(x, str) or x == '' for x in value))",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 63,
+      "module": "canonical/state.py",
+      "line": 77,
+      "condition": "_v(kinds[f.name], f.name, getattr(obj, f.name))",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 64,
+      "module": "canonical/state.py",
+      "line": 95,
+      "condition": "not isinstance(data, Mapping)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 65,
+      "module": "canonical/state.py",
+      "line": 99,
+      "condition": "unknown",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 66,
+      "module": "canonical/state.py",
+      "line": 106,
+      "condition": "kind == _MEASURE",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 67,
+      "module": "canonical/state.py",
+      "line": 108,
+      "condition": "kind == _STR_TUPLE",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 68,
+      "module": "canonical/state.py",
+      "line": 109,
+      "condition": "not isinstance(raw, (list, tuple))",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 69,
+      "module": "canonical/state.py",
+      "line": 132,
+      "condition": "_validate(self)",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 70,
+      "module": "canonical/state.py",
+      "line": 151,
+      "condition": "_validate(self)",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 71,
+      "module": "canonical/state.py",
+      "line": 171,
+      "condition": "_validate(self)",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 72,
+      "module": "canonical/state.py",
+      "line": 196,
+      "condition": "_validate(self)",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 73,
+      "module": "canonical/state.py",
+      "line": 197,
+      "condition": "self.min_replicas is not None and self.max_replicas is not None and (self.min_replicas > self.max_replicas)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 74,
+      "module": "canonical/state.py",
+      "line": 220,
+      "condition": "_validate(self)",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 75,
+      "module": "canonical/state.py",
+      "line": 239,
+      "condition": "_validate(self)",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 76,
+      "module": "canonical/state.py",
+      "line": 259,
+      "condition": "_validate(self)",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 77,
+      "module": "canonical/state.py",
+      "line": 280,
+      "condition": "_validate(self)",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 78,
+      "module": "canonical/state.py",
+      "line": 334,
+      "condition": "isinstance(v, bool) or not isinstance(v, (int, float))",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 79,
+      "module": "canonical/state.py",
+      "line": 336,
+      "condition": "self.horizon_seconds <= 0",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 80,
+      "module": "canonical/state.py",
+      "line": 340,
+      "condition": "v is not None and (isinstance(v, bool) or not isinstance(v, (int, float)))",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 81,
+      "module": "canonical/state.py",
+      "line": 342,
+      "condition": "self.confidence is not None and (not 0.0 <= self.confidence <= 1.0)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 82,
+      "module": "canonical/state.py",
+      "line": 344,
+      "condition": "self.lower_bound is not None and self.upper_bound is not None and (self.lower_bound > self.upper_bound)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 83,
+      "module": "canonical/state.py",
+      "line": 347,
+      "condition": "self.method is not None and (not isinstance(self.method, str) or self.method == '')",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 84,
+      "module": "canonical/state.py",
+      "line": 362,
+      "condition": "not isinstance(data, Mapping)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 85,
+      "module": "canonical/state.py",
+      "line": 367,
+      "condition": "unknown",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 86,
+      "module": "canonical/state.py",
+      "line": 369,
+      "condition": "'horizon_seconds' not in data or 'predicted_demand' not in data",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 87,
+      "module": "canonical/state.py",
+      "line": 430,
+      "condition": "self.schema_version not in SUPPORTED_CANONICAL_STATE_SCHEMA_VERSIONS",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 88,
+      "module": "canonical/state.py",
+      "line": 434,
+      "condition": "not isinstance(self.subject, CapacitySubject)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 89,
+      "module": "canonical/state.py",
+      "line": 436,
+      "condition": "not isinstance(self.observed_at, datetime)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 90,
+      "module": "canonical/state.py",
+      "line": 438,
+      "condition": "self.correlation_id is not None and (not isinstance(self.correlation_id, str))",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 91,
+      "module": "canonical/state.py",
+      "line": 440,
+      "condition": "self.time_phase is not None and (not isinstance(self.time_phase, str))",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 92,
+      "module": "canonical/state.py",
+      "line": 444,
+      "condition": "v is not None and (not isinstance(v, expected))",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 93,
+      "module": "canonical/state.py",
+      "line": 446,
+      "condition": "self.forecast is not None and (not isinstance(self.forecast, ForecastObservation))",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 94,
+      "module": "canonical/state.py",
+      "line": 448,
+      "condition": "self.provenance is not None and (not isinstance(self.provenance, ObservationProvenance))",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 95,
+      "module": "canonical/state.py",
+      "line": 450,
+      "condition": "not isinstance(self.measurement_provenance, Mapping)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 96,
+      "module": "canonical/state.py",
+      "line": 453,
+      "condition": "not isinstance(key, str) or key == ''",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 97,
+      "module": "canonical/state.py",
+      "line": 455,
+      "condition": "not isinstance(prov, ObservationProvenance)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 98,
+      "module": "canonical/state.py",
+      "line": 489,
+      "condition": "not isinstance(data, Mapping)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 99,
+      "module": "canonical/state.py",
+      "line": 492,
+      "condition": "unknown",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 100,
+      "module": "canonical/state.py",
+      "line": 494,
+      "condition": "'subject' not in data or 'observed_at' not in data",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 101,
+      "module": "canonical/state.py",
+      "line": 497,
+      "condition": "not isinstance(observed_at, datetime)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 102,
+      "module": "canonical/state.py",
+      "line": 508,
+      "condition": "data.get(name) is not None",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 103,
+      "module": "canonical/state.py",
+      "line": 510,
+      "condition": "data.get('forecast') is not None",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 104,
+      "module": "canonical/state.py",
+      "line": 512,
+      "condition": "data.get('provenance') is not None",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 105,
+      "module": "canonical/state.py",
+      "line": 514,
+      "condition": "data.get('measurement_provenance')",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 106,
+      "module": "canonical/state.py",
+      "line": 525,
+      "condition": "not isinstance(data, Mapping)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 107,
+      "module": "canonical/state.py",
+      "line": 530,
+      "condition": "unknown",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 108,
+      "module": "canonical/state.py",
+      "line": 532,
+      "condition": "'source_type' not in data or 'observed_at' not in data",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 109,
+      "module": "canonical/sources.py",
+      "line": 46,
+      "condition": "not isinstance(state, CanonicalCapacityState)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 110,
+      "module": "canonical/sources.py",
+      "line": 64,
+      "condition": "not isinstance(s, CanonicalCapacityState)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 111,
+      "module": "canonical/sources.py",
+      "line": 77,
+      "condition": "self._cursor >= len(self._states)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 112,
+      "module": "canonical/projection.py",
+      "line": 121,
+      "condition": "not isinstance(state, CanonicalCapacityState)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 113,
+      "module": "canonical/projection.py",
+      "line": 123,
+      "condition": "not isinstance(normalization_policy, NormalizationPolicy)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 114,
+      "module": "canonical/projection.py",
+      "line": 130,
+      "condition": "state.capacity is None or state.capacity.running_replicas is None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 115,
+      "module": "canonical/projection.py",
+      "line": 154,
+      "condition": "infra is not None and infra.cpu_utilization is not None",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 116,
+      "module": "canonical/projection.py",
+      "line": 158,
+      "condition": "infra is not None and infra.memory_utilization is not None",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 117,
+      "module": "canonical/projection.py",
+      "line": 165,
+      "condition": "perf is not None and perf.latency_p99 is not None",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 118,
+      "module": "canonical/projection.py",
+      "line": 167,
+      "condition": "perf is not None and perf.latency_p95 is not None and normalization_policy.allow_latency_p95_substitution",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 119,
+      "module": "canonical/projection.py",
+      "line": 179,
+      "condition": "rel is not None and rel.error_rate is not None",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 120,
+      "module": "canonical/projection.py",
+      "line": 186,
+      "condition": "wl is not None and wl.queue_depth is not None",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 121,
+      "module": "canonical/evidence.py",
+      "line": 119,
+      "condition": "self.advisory_only is not True",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 122,
+      "module": "canonical/evidence.py",
+      "line": 121,
+      "condition": "self.actuation_performed is not False",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 123,
+      "module": "canonical/evidence.py",
+      "line": 123,
+      "condition": "self.authority_class != AUTHORITY_CLASS_ADVISORY",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 124,
+      "module": "canonical/evidence.py",
+      "line": 125,
+      "condition": "self.execution_capability != EXECUTION_CAPABILITY_NONE",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 125,
+      "module": "canonical/evidence.py",
+      "line": 166,
+      "condition": "include_digest",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 126,
+      "module": "canonical/evidence.py",
+      "line": 205,
+      "condition": "not isinstance(recommendation, ScalingRecommendation)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 127,
+      "module": "canonical/evidence.py",
+      "line": 207,
+      "condition": "recommendation.advisory_only is not True or recommendation.actuation_performed is not False",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 128,
+      "module": "canonical/evidence.py",
+      "line": 209,
+      "condition": "not isinstance(evidence_produced_at, datetime)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 129,
+      "module": "forecasting/targets.py",
+      "line": 124,
+      "condition": "unit == REPLICAS_UNIT",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 130,
+      "module": "forecasting/targets.py",
+      "line": 165,
+      "condition": "not isinstance(state, CanonicalCapacityState)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 131,
+      "module": "forecasting/targets.py",
+      "line": 181,
+      "condition": "not isinstance(state, CanonicalCapacityState)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 132,
+      "module": "forecasting/targets.py",
+      "line": 183,
+      "condition": "not isinstance(target, ForecastTarget)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 133,
+      "module": "forecasting/series.py",
+      "line": 99,
+      "condition": "not isinstance(self.policy_id, str) or self.policy_id == ''",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 134,
+      "module": "forecasting/series.py",
+      "line": 101,
+      "condition": "not isinstance(self.ordering, OrderingPolicy)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 135,
+      "module": "forecasting/series.py",
+      "line": 103,
+      "condition": "not isinstance(self.duplicate_timestamp, DuplicateTimestampPolicy)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 136,
+      "module": "forecasting/series.py",
+      "line": 105,
+      "condition": "not isinstance(self.require_timezone_aware, bool)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 137,
+      "module": "forecasting/series.py",
+      "line": 150,
+      "condition": "not isinstance(policy, SeriesConstructionPolicy)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": "TYPE"
+    },
+    {
+      "index": 138,
+      "module": "forecasting/series.py",
+      "line": 155,
+      "condition": "not materialized",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": "EMPTY"
+    },
+    {
+      "index": 139,
+      "module": "forecasting/series.py",
+      "line": 159,
+      "condition": "not isinstance(s, CanonicalCapacityState)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": "TYPE"
+    },
+    {
+      "index": 140,
+      "module": "forecasting/series.py",
+      "line": 165,
+      "condition": "s.subject != subject",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": "CROSS_SUBJECT, CROSS_TENANT"
+    },
+    {
+      "index": 141,
+      "module": "forecasting/series.py",
+      "line": 166,
+      "condition": "s.subject.workload_id != subject.workload_id",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": "CROSS_SUBJECT"
+    },
+    {
+      "index": 142,
+      "module": "forecasting/series.py",
+      "line": 179,
+      "condition": "policy.require_timezone_aware",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": "NAIVE_TIMESTAMP"
+    },
+    {
+      "index": 143,
+      "module": "forecasting/series.py",
+      "line": 181,
+      "condition": "s.observed_at.tzinfo is None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": "NAIVE_TIMESTAMP"
+    },
+    {
+      "index": 144,
+      "module": "forecasting/series.py",
+      "line": 196,
+      "condition": "_as_utc(a.observed_at) > _as_utc(b.observed_at)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": "INVALID_TIME_ORDER"
+    },
+    {
+      "index": 145,
+      "module": "forecasting/series.py",
+      "line": 216,
+      "condition": "else of: len(group) == 1",
+      "kind": "else-arm",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": "CONFLICTING_DUPLICATE, DUPLICATE_TIMESTAMP"
+    },
+    {
+      "index": 146,
+      "module": "forecasting/series.py",
+      "line": 218,
+      "condition": "len(digests) > 1",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": "CONFLICTING_DUPLICATE"
+    },
+    {
+      "index": 147,
+      "module": "forecasting/series.py",
+      "line": 229,
+      "condition": "else of: policy.duplicate_timestamp is DuplicateTimestampPolicy.COLLAPSE_IDENTICAL",
+      "kind": "else-arm",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": "DUPLICATE_TIMESTAMP"
+    },
+    {
+      "index": 148,
+      "module": "forecasting/window.py",
+      "line": 89,
+      "condition": "isinstance(self.seconds, bool) or not isinstance(self.seconds, (int, float))",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 149,
+      "module": "forecasting/window.py",
+      "line": 91,
+      "condition": "not self.seconds > 0",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 150,
+      "module": "forecasting/window.py",
+      "line": 134,
+      "condition": "isinstance(v, bool) or not isinstance(v, (int, float)) or (not v > 0)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 151,
+      "module": "forecasting/window.py",
+      "line": 137,
+      "condition": "isinstance(t, bool) or not isinstance(t, (int, float)) or t < 0",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 152,
+      "module": "forecasting/window.py",
+      "line": 222,
+      "condition": "_as_utc(s.event_time) > c",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 153,
+      "module": "forecasting/window.py",
+      "line": 297,
+      "condition": "not isinstance(series, CanonicalCapacitySeries)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 154,
+      "module": "forecasting/window.py",
+      "line": 299,
+      "condition": "not isinstance(target, ForecastTarget)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 155,
+      "module": "forecasting/window.py",
+      "line": 301,
+      "condition": "not isinstance(horizon, ForecastHorizon)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 156,
+      "module": "forecasting/window.py",
+      "line": 303,
+      "condition": "not isinstance(cutoff, datetime)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 157,
+      "module": "forecasting/window.py",
+      "line": 305,
+      "condition": "not isinstance(forecast_space, ForecastValueSpace)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 158,
+      "module": "forecasting/window.py",
+      "line": 311,
+      "condition": "do_normalize",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 159,
+      "module": "forecasting/window.py",
+      "line": 312,
+      "condition": "signal is None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 160,
+      "module": "forecasting/window.py",
+      "line": 318,
+      "condition": "normalization_policy is None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 161,
+      "module": "forecasting/window.py",
+      "line": 323,
+      "condition": "normalization_policy.method_by_signal.get(signal) is None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 162,
+      "module": "forecasting/window.py",
+      "line": 345,
+      "condition": "do_normalize",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 163,
+      "module": "forecasting/uncertainty.py",
+      "line": 74,
+      "condition": "not isinstance(self.method, UncertaintyMethod)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 164,
+      "module": "forecasting/uncertainty.py",
+      "line": 76,
+      "condition": "not 0.0 < self.requested_coverage < 1.0",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 165,
+      "module": "forecasting/uncertainty.py",
+      "line": 78,
+      "condition": "isinstance(self.min_calibration_samples, bool) or not isinstance(self.min_calibration_samples, int) or self.min_calibration_samples < 1",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 166,
+      "module": "forecasting/uncertainty.py",
+      "line": 83,
+      "condition": "isinstance(t, bool) or not isinstance(t, (int, float)) or t < 0",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 167,
+      "module": "forecasting/forecasters.py",
+      "line": 88,
+      "condition": "not isinstance(window, ForecastInputWindow)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 168,
+      "module": "forecasting/forecasters.py",
+      "line": 136,
+      "condition": "mh < 2",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 169,
+      "module": "forecasting/forecast.py",
+      "line": 78,
+      "condition": "self.advisory_only is not True",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 170,
+      "module": "forecasting/forecast.py",
+      "line": 80,
+      "condition": "self.shadow_only is not True",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 171,
+      "module": "forecasting/forecast.py",
+      "line": 82,
+      "condition": "self.actuation_performed is not False",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 172,
+      "module": "forecasting/forecast.py",
+      "line": 84,
+      "condition": "self.authority_class != AUTHORITY_CLASS_ADVISORY",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 173,
+      "module": "forecasting/forecast.py",
+      "line": 86,
+      "condition": "self.execution_capability != EXECUTION_CAPABILITY_NONE",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 174,
+      "module": "forecasting/forecast.py",
+      "line": 88,
+      "condition": "self.status not in (FORECAST_STATUS_FORECAST, FORECAST_STATUS_ABSTAINED)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 175,
+      "module": "forecasting/forecast.py",
+      "line": 90,
+      "condition": "self.status == FORECAST_STATUS_FORECAST",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 176,
+      "module": "forecasting/forecast.py",
+      "line": 91,
+      "condition": "self.point_estimate is None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 177,
+      "module": "forecasting/forecast.py",
+      "line": 93,
+      "condition": "self.abstention_reason is not None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 178,
+      "module": "forecasting/forecast.py",
+      "line": 96,
+      "condition": "self.point_estimate is not None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 179,
+      "module": "forecasting/forecast.py",
+      "line": 98,
+      "condition": "not isinstance(self.abstention_reason, AbstentionReason)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 180,
+      "module": "forecasting/evidence.py",
+      "line": 99,
+      "condition": "not isinstance(self.policy_id, str) or self.policy_id == ''",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 181,
+      "module": "forecasting/evidence.py",
+      "line": 101,
+      "condition": "isinstance(self.min_history, bool) or not isinstance(self.min_history, int) or self.min_history < 1",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 182,
+      "module": "forecasting/evidence.py",
+      "line": 103,
+      "condition": "self.max_staleness_seconds is not None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 183,
+      "module": "forecasting/evidence.py",
+      "line": 105,
+      "condition": "isinstance(v, bool) or not isinstance(v, (int, float)) or v < 0",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 184,
+      "module": "forecasting/evidence.py",
+      "line": 107,
+      "condition": "not 0.0 <= self.max_missing_fraction <= 1.0",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 185,
+      "module": "forecasting/evidence.py",
+      "line": 109,
+      "condition": "isinstance(self.max_irregular_gaps, bool) or not isinstance(self.max_irregular_gaps, int) or self.max_irregular_gaps < 0",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 186,
+      "module": "forecasting/evidence.py",
+      "line": 171,
+      "condition": "not isinstance(series, CanonicalCapacitySeries)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 187,
+      "module": "forecasting/evidence.py",
+      "line": 173,
+      "condition": "not isinstance(forecaster, BaselineForecaster)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 188,
+      "module": "forecasting/evidence.py",
+      "line": 175,
+      "condition": "not isinstance(forecast_space, ForecastValueSpace)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 189,
+      "module": "forecasting/evidence.py",
+      "line": 222,
+      "condition": "expected_subject is not None",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": "SUBJECT_MISMATCH, TENANT_SCOPE_MISMATCH"
+    },
+    {
+      "index": 190,
+      "module": "forecasting/evidence.py",
+      "line": 223,
+      "condition": "series.subject.workload_id != expected_subject.workload_id",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": "SUBJECT_MISMATCH"
+    },
+    {
+      "index": 191,
+      "module": "forecasting/evidence.py",
+      "line": 225,
+      "condition": "series.subject != expected_subject",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": "TENANT_SCOPE_MISMATCH"
+    },
+    {
+      "index": 192,
+      "module": "forecasting/evidence.py",
+      "line": 228,
+      "condition": "not forecaster.supports_target(target)",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": "UNSUPPORTED_TARGET"
+    },
+    {
+      "index": 193,
+      "module": "forecasting/evidence.py",
+      "line": 230,
+      "condition": "not forecaster.supports_horizon(horizon)",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": "UNSUPPORTED_HORIZON"
+    },
+    {
+      "index": 194,
+      "module": "forecasting/evidence.py",
+      "line": 232,
+      "condition": "normalization_policy is None",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": "MISSING_NORMALIZATION_POLICY"
+    },
+    {
+      "index": 195,
+      "module": "forecasting/evidence.py",
+      "line": 234,
+      "condition": "not isinstance(normalization_policy, NormalizationPolicy)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 196,
+      "module": "forecasting/evidence.py",
+      "line": 238,
+      "condition": "len(probe.units_present) > 1",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": "INCONSISTENT_UNIT"
+    },
+    {
+      "index": 197,
+      "module": "forecasting/evidence.py",
+      "line": 240,
+      "condition": "any((not math.isfinite(v) for v in probe.values))",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": "INVALID_MEASUREMENT"
+    },
+    {
+      "index": 198,
+      "module": "forecasting/evidence.py",
+      "line": 246,
+      "condition": "not domain_for(s.unit).contains(s.value)",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": "INVALID_MEASUREMENT"
+    },
+    {
+      "index": 199,
+      "module": "forecasting/evidence.py",
+      "line": 250,
+      "condition": "probe.sample_count < effective_min",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": "INSUFFICIENT_HISTORY"
+    },
+    {
+      "index": 200,
+      "module": "forecasting/evidence.py",
+      "line": 253,
+      "condition": "admission_policy.max_staleness_seconds is not None and probe.last_event_time is not None",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": "STALE_HISTORY"
+    },
+    {
+      "index": 201,
+      "module": "forecasting/evidence.py",
+      "line": 255,
+      "condition": "staleness > admission_policy.max_staleness_seconds",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": "STALE_HISTORY"
+    },
+    {
+      "index": 202,
+      "module": "forecasting/evidence.py",
+      "line": 258,
+      "condition": "probe.missingness.missing_fraction > admission_policy.max_missing_fraction",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": "EXCESSIVE_MISSINGNESS"
+    },
+    {
+      "index": 203,
+      "module": "forecasting/evidence.py",
+      "line": 261,
+      "condition": "admission_policy.require_regular_cadence and probe.cadence.irregular_gap_count > admission_policy.max_irregular_gaps",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": "IRREGULAR_CADENCE"
+    },
+    {
+      "index": 204,
+      "module": "forecasting/evidence.py",
+      "line": 268,
+      "condition": "signal is not None",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": "INCONSISTENT_UNIT, MISSING_NORMALIZATION_POLICY"
+    },
+    {
+      "index": 205,
+      "module": "forecasting/evidence.py",
+      "line": 269,
+      "condition": "normalization_policy.method_by_signal.get(signal) is None",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": "MISSING_NORMALIZATION_POLICY"
+    },
+    {
+      "index": 206,
+      "module": "forecasting/evidence.py",
+      "line": 274,
+      "condition": "normalize_signal(signal, Measurement(s0.value, Unit(s0.unit)), normalization_policy)",
+      "kind": "helper-admission",
+      "shape": "helper-admission call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 207,
+      "module": "forecasting/evidence.py",
+      "line": 275,
+      "condition": "except (NormalizationError, ValueError): _abstain(AbstentionReason.INCONSISTENT_UNIT, probe)",
+      "kind": "except-arm",
+      "shape": "typed-refusal return",
+      "recorded_in": "",
+      "outcome": "AbstentionReason.INCONSISTENT_UNIT"
+    },
+    {
+      "index": 208,
+      "module": "forecasting/evidence.py",
+      "line": 277,
+      "condition": "forecast_space is ForecastValueSpace.NORMALIZED",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": "UNSUPPORTED_TARGET"
+    },
+    {
+      "index": 209,
+      "module": "forecasting/evidence.py",
+      "line": 287,
+      "condition": "except NormalizationApplicabilityError: _abstain(_APPLICABILITY_REASON.get(exc.reason, AbstentionReason.MISSING_NORMALIZATION_POLICY), probe)",
+      "kind": "except-arm",
+      "shape": "typed-refusal return",
+      "recorded_in": "",
+      "outcome": "AbstentionReason.MISSING_NORMALIZATION_POLICY"
+    },
+    {
+      "index": 210,
+      "module": "forecasting/evidence.py",
+      "line": 292,
+      "condition": "point is None",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": "INSUFFICIENT_HISTORY"
+    },
+    {
+      "index": 211,
+      "module": "forecasting/evidence.py",
+      "line": 294,
+      "condition": "not math.isfinite(point)",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": "INVALID_MEASUREMENT"
+    },
+    {
+      "index": 212,
+      "module": "forecasting/evidence.py",
+      "line": 302,
+      "condition": "domain is not None and (not domain.contains(point))",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": "FORECAST_OUTSIDE_DOMAIN"
+    },
+    {
+      "index": 213,
+      "module": "forecasting/evidence.py",
+      "line": 303,
+      "condition": "not admission_policy.allow_out_of_domain",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": "FORECAST_OUTSIDE_DOMAIN"
+    },
+    {
+      "index": 214,
+      "module": "forecasting/evidence.py",
+      "line": 313,
+      "condition": "uncertainty_config.method is not UncertaintyMethod.NONE and (not uncertainty.available) and uncertainty.insufficient_calibration and (not uncertainty_config.allow_point_only_when_uncalibrated)",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": "INSUFFICIENT_CALIBRATION_HISTORY"
+    },
+    {
+      "index": 215,
+      "module": "forecasting/evidence.py",
+      "line": 391,
+      "condition": "not isinstance(self.forecast, CapacityForecast)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 216,
+      "module": "forecasting/evidence.py",
+      "line": 393,
+      "condition": "self.advisory_only is not True or self.shadow_only is not True",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 217,
+      "module": "forecasting/evidence.py",
+      "line": 395,
+      "condition": "self.actuation_performed is not False",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 218,
+      "module": "forecasting/evidence.py",
+      "line": 397,
+      "condition": "self.authority_class != AUTHORITY_CLASS_ADVISORY",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 219,
+      "module": "forecasting/evidence.py",
+      "line": 399,
+      "condition": "self.execution_capability != EXECUTION_CAPABILITY_NONE",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 220,
+      "module": "forecasting/evidence.py",
+      "line": 426,
+      "condition": "include_digest",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 221,
+      "module": "forecasting/evidence.py",
+      "line": 481,
+      "condition": "not isinstance(produced_at, datetime)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 222,
+      "module": "forecasting/evidence.py",
+      "line": 585,
+      "condition": "not obs",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 223,
+      "module": "forecasting/evidence.py",
+      "line": 591,
+      "condition": "mapped is None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 224,
+      "module": "forecasting/evaluation.py",
+      "line": 124,
+      "condition": "not isinstance(self.status, EvaluationStatus)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 225,
+      "module": "forecasting/evaluation.py",
+      "line": 126,
+      "condition": "not isinstance(self.subject, CapacitySubject)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 226,
+      "module": "forecasting/evaluation.py",
+      "line": 132,
+      "condition": "not _finite(getattr(self, name))",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 227,
+      "module": "forecasting/evaluation.py",
+      "line": 136,
+      "condition": "self.actual_state is not None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 228,
+      "module": "forecasting/evaluation.py",
+      "line": 137,
+      "condition": "not isinstance(self.actual_state, CanonicalCapacityState)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 229,
+      "module": "forecasting/evaluation.py",
+      "line": 140,
+      "condition": "self.actual_state_digest != derived_digest",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 230,
+      "module": "forecasting/evaluation.py",
+      "line": 144,
+      "condition": "self.actual_event_time is not None and self.actual_event_time != self.actual_state.observed_at",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 231,
+      "module": "forecasting/evaluation.py",
+      "line": 147,
+      "condition": "self.actual_state_digest is not None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 232,
+      "module": "forecasting/evaluation.py",
+      "line": 154,
+      "condition": "self.status is EvaluationStatus.EVALUATED",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 233,
+      "module": "forecasting/evaluation.py",
+      "line": 155,
+      "condition": "self.actual_state is None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 234,
+      "module": "forecasting/evaluation.py",
+      "line": 158,
+      "condition": "self.actual_state.subject != self.subject",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 235,
+      "module": "forecasting/evaluation.py",
+      "line": 162,
+      "condition": "sample is None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 236,
+      "module": "forecasting/evaluation.py",
+      "line": 164,
+      "condition": "self.unit != sample.unit",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 237,
+      "module": "forecasting/evaluation.py",
+      "line": 166,
+      "condition": "self.actual_value is None or abs(self.actual_value - sample.value) > _TOL",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 238,
+      "module": "forecasting/evaluation.py",
+      "line": 168,
+      "condition": "self.point_forecast is None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 239,
+      "module": "forecasting/evaluation.py",
+      "line": 171,
+      "condition": "self.signed_error is None or abs(self.signed_error - expected_signed) > _TOL",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 240,
+      "module": "forecasting/evaluation.py",
+      "line": 173,
+      "condition": "self.absolute_error is None or abs(self.absolute_error - abs(expected_signed)) > _TOL",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 241,
+      "module": "forecasting/evaluation.py",
+      "line": 175,
+      "condition": "self.squared_error is None or abs(self.squared_error - expected_signed ** 2) > _TOL",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 242,
+      "module": "forecasting/evaluation.py",
+      "line": 177,
+      "condition": "self.match_delta_seconds is None or abs(self.match_delta_seconds) > self.match_tolerance_seconds + _TOL",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 243,
+      "module": "forecasting/evaluation.py",
+      "line": 181,
+      "condition": "has_lower != has_upper",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 244,
+      "module": "forecasting/evaluation.py",
+      "line": 183,
+      "condition": "has_lower",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 245,
+      "module": "forecasting/evaluation.py",
+      "line": 184,
+      "condition": "self.interval_upper < self.interval_lower - _TOL",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 246,
+      "module": "forecasting/evaluation.py",
+      "line": 187,
+      "condition": "self.interval_covered is not exp_cov",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 247,
+      "module": "forecasting/evaluation.py",
+      "line": 190,
+      "condition": "self.interval_width is None or abs(self.interval_width - exp_width) > _TOL",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 248,
+      "module": "forecasting/evaluation.py",
+      "line": 193,
+      "condition": "self.interval_covered is not None or self.interval_width is not None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 249,
+      "module": "forecasting/evaluation.py",
+      "line": 195,
+      "condition": "self.status is EvaluationStatus.SUBJECT_MISMATCH",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 250,
+      "module": "forecasting/evaluation.py",
+      "line": 196,
+      "condition": "self.actual_state is None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 251,
+      "module": "forecasting/evaluation.py",
+      "line": 198,
+      "condition": "self.actual_state.subject == self.subject",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 252,
+      "module": "forecasting/evaluation.py",
+      "line": 200,
+      "condition": "self.actual_value is not None or any((v is not None for v in scored_fields)) or any((v is not None for v in interval_fields))",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 253,
+      "module": "forecasting/evaluation.py",
+      "line": 202,
+      "condition": "self.reason is None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 254,
+      "module": "forecasting/evaluation.py",
+      "line": 204,
+      "condition": "self.status is EvaluationStatus.ABSTAINED",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 255,
+      "module": "forecasting/evaluation.py",
+      "line": 205,
+      "condition": "self.actual_value is not None or any((v is not None for v in scored_fields)) or any((v is not None for v in interval_fields))",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 256,
+      "module": "forecasting/evaluation.py",
+      "line": 207,
+      "condition": "self.reason is None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 257,
+      "module": "forecasting/evaluation.py",
+      "line": 210,
+      "condition": "self.actual_value is not None or any((v is not None for v in scored_fields)) or any((v is not None for v in interval_fields))",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 258,
+      "module": "forecasting/evaluation.py",
+      "line": 212,
+      "condition": "self.reason is None",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 259,
+      "module": "forecasting/evaluation.py",
+      "line": 242,
+      "condition": "include_digest",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 260,
+      "module": "forecasting/evaluation.py",
+      "line": 259,
+      "condition": "not isinstance(data, dict)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 261,
+      "module": "forecasting/evaluation.py",
+      "line": 335,
+      "condition": "status not in (EvaluationStatus.UNMATCHED, EvaluationStatus.SUBJECT_MISMATCH, EvaluationStatus.AMBIGUOUS)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 262,
+      "module": "forecasting/evaluation.py",
+      "line": 354,
+      "condition": "not isinstance(evidence, CapacityForecastEvidence)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 263,
+      "module": "forecasting/evaluation.py",
+      "line": 356,
+      "condition": "isinstance(match_tolerance_seconds, bool) or not isinstance(match_tolerance_seconds, (int, float)) or match_tolerance_seconds < 0",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 264,
+      "module": "forecasting/evaluation.py",
+      "line": 372,
+      "condition": "actual_state is None",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 265,
+      "module": "forecasting/evaluation.py",
+      "line": 377,
+      "condition": "actual_state.subject != fc.subject",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 266,
+      "module": "forecasting/evaluation.py",
+      "line": 383,
+      "condition": "sample is None",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 267,
+      "module": "forecasting/evaluation.py",
+      "line": 388,
+      "condition": "sample.unit != fc.unit",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 268,
+      "module": "forecasting/evaluation.py",
+      "line": 392,
+      "condition": "abs(delta) > match_tolerance_seconds",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 269,
+      "module": "forecasting/replay.py",
+      "line": 156,
+      "condition": "not observations",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 270,
+      "module": "forecasting/replay.py",
+      "line": 171,
+      "condition": "_as_utc(series.end_event_time) > _as_utc(cutoff)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 271,
+      "module": "forecasting/replay.py",
+      "line": 186,
+      "condition": "evidence.forecast.is_forecast",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 272,
+      "module": "forecasting/replay.py",
+      "line": 191,
+      "condition": "actual is not None and _as_utc(actual.observed_at) <= _as_utc(cutoff)",
+      "kind": "if",
+      "shape": "raise",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 273,
+      "module": "forecasting/replay.py",
+      "line": 193,
+      "condition": "kind == MATCH_AMBIGUOUS",
+      "kind": "if",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 274,
+      "module": "forecasting/replay.py",
+      "line": 198,
+      "condition": "else of: kind == MATCH_AMBIGUOUS",
+      "kind": "else-arm",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 275,
+      "module": "forecasting/replay.py",
+      "line": 200,
+      "condition": "else of: evidence.forecast.is_forecast",
+      "kind": "else-arm",
+      "shape": "raising-helper call",
+      "recorded_in": "",
+      "outcome": ""
+    },
+    {
+      "index": 276,
       "module": "planning/topology.py",
       "line": 89,
       "condition": "not isinstance(self.upstream, CapacitySubject)",
@@ -18,7 +2768,7 @@
       "outcome": ""
     },
     {
-      "index": 2,
+      "index": 277,
       "module": "planning/topology.py",
       "line": 91,
       "condition": "not isinstance(self.downstream, CapacitySubject)",
@@ -28,7 +2778,7 @@
       "outcome": ""
     },
     {
-      "index": 3,
+      "index": 278,
       "module": "planning/topology.py",
       "line": 93,
       "condition": "not isinstance(self.kind, DependencyKind)",
@@ -38,7 +2788,7 @@
       "outcome": ""
     },
     {
-      "index": 4,
+      "index": 279,
       "module": "planning/topology.py",
       "line": 95,
       "condition": "self.upstream == self.downstream",
@@ -48,7 +2798,7 @@
       "outcome": ""
     },
     {
-      "index": 5,
+      "index": 280,
       "module": "planning/topology.py",
       "line": 97,
       "condition": "self.downstream_current_capacity is not None",
@@ -58,7 +2808,7 @@
       "outcome": ""
     },
     {
-      "index": 6,
+      "index": 281,
       "module": "planning/topology.py",
       "line": 99,
       "condition": "isinstance(v, bool) or not isinstance(v, int) or v < 0",
@@ -68,7 +2818,7 @@
       "outcome": ""
     },
     {
-      "index": 7,
+      "index": 282,
       "module": "planning/topology.py",
       "line": 101,
       "condition": "self.required_per_upstream_unit is not None",
@@ -78,7 +2828,7 @@
       "outcome": ""
     },
     {
-      "index": 8,
+      "index": 283,
       "module": "planning/topology.py",
       "line": 104,
       "condition": "isinstance(v, bool) or not isinstance(v, (int, float)) or (not _math.isfinite(v)) or (v <= 0)",
@@ -88,7 +2838,7 @@
       "outcome": ""
     },
     {
-      "index": 9,
+      "index": 284,
       "module": "planning/topology.py",
       "line": 106,
       "condition": "self.kind is DependencyKind.INFORMATIONAL and (self.downstream_current_capacity is not None or self.required_per_upstream_unit is not None)",
@@ -98,7 +2848,7 @@
       "outcome": ""
     },
     {
-      "index": 10,
+      "index": 285,
       "module": "planning/topology.py",
       "line": 136,
       "condition": "not isinstance(data, Mapping)",
@@ -108,7 +2858,7 @@
       "outcome": ""
     },
     {
-      "index": 11,
+      "index": 286,
       "module": "planning/topology.py",
       "line": 141,
       "condition": "unknown",
@@ -118,7 +2868,7 @@
       "outcome": ""
     },
     {
-      "index": 12,
+      "index": 287,
       "module": "planning/topology.py",
       "line": 144,
       "condition": "req not in data",
@@ -128,7 +2878,7 @@
       "outcome": ""
     },
     {
-      "index": 13,
+      "index": 288,
       "module": "planning/topology.py",
       "line": 171,
       "condition": "not isinstance(self.subject, CapacitySubject)",
@@ -138,7 +2888,7 @@
       "outcome": ""
     },
     {
-      "index": 14,
+      "index": 289,
       "module": "planning/topology.py",
       "line": 173,
       "condition": "not isinstance(self.as_of, datetime)",
@@ -148,7 +2898,7 @@
       "outcome": ""
     },
     {
-      "index": 15,
+      "index": 290,
       "module": "planning/topology.py",
       "line": 175,
       "condition": "self.evidence_source is not None and (not isinstance(self.evidence_source, str) or self.evidence_source == '')",
@@ -158,7 +2908,7 @@
       "outcome": ""
     },
     {
-      "index": 16,
+      "index": 291,
       "module": "planning/topology.py",
       "line": 183,
       "condition": "not isinstance(edge, DependencyEdge)",
@@ -168,7 +2918,7 @@
       "outcome": ""
     },
     {
-      "index": 17,
+      "index": 292,
       "module": "planning/topology.py",
       "line": 187,
       "condition": "not _subject_scope_compatible(edge.upstream, self.subject)",
@@ -178,7 +2928,7 @@
       "outcome": ""
     },
     {
-      "index": 18,
+      "index": 293,
       "module": "planning/topology.py",
       "line": 189,
       "condition": "not _subject_scope_compatible(edge.downstream, self.subject)",
@@ -188,7 +2938,7 @@
       "outcome": ""
     },
     {
-      "index": 19,
+      "index": 294,
       "module": "planning/topology.py",
       "line": 192,
       "condition": "key in seen",
@@ -198,7 +2948,7 @@
       "outcome": ""
     },
     {
-      "index": 20,
+      "index": 295,
       "module": "planning/topology.py",
       "line": 193,
       "condition": "seen[key] != edge.kind",
@@ -208,7 +2958,7 @@
       "outcome": ""
     },
     {
-      "index": 21,
+      "index": 296,
       "module": "planning/topology.py",
       "line": 253,
       "condition": "not isinstance(data, Mapping)",
@@ -218,7 +2968,7 @@
       "outcome": ""
     },
     {
-      "index": 22,
+      "index": 297,
       "module": "planning/topology.py",
       "line": 257,
       "condition": "unknown",
@@ -228,7 +2978,7 @@
       "outcome": ""
     },
     {
-      "index": 23,
+      "index": 298,
       "module": "planning/topology.py",
       "line": 260,
       "condition": "req not in data",
@@ -238,7 +2988,7 @@
       "outcome": ""
     },
     {
-      "index": 24,
+      "index": 299,
       "module": "planning/topology.py",
       "line": 263,
       "condition": "not isinstance(as_of, datetime)",
@@ -248,7 +2998,7 @@
       "outcome": ""
     },
     {
-      "index": 25,
+      "index": 300,
       "module": "planning/topology.py",
       "line": 266,
       "condition": "not isinstance(edges_raw, (list, tuple))",
@@ -258,7 +3008,7 @@
       "outcome": ""
     },
     {
-      "index": 26,
+      "index": 301,
       "module": "planning/cost.py",
       "line": 60,
       "condition": "isinstance(self.amount_minor, bool) or not isinstance(self.amount_minor, int)",
@@ -268,7 +3018,7 @@
       "outcome": ""
     },
     {
-      "index": 27,
+      "index": 302,
       "module": "planning/cost.py",
       "line": 62,
       "condition": "not isinstance(self.currency, str) or len(self.currency) != 3 or (not self.currency.isalpha())",
@@ -278,7 +3028,7 @@
       "outcome": ""
     },
     {
-      "index": 28,
+      "index": 303,
       "module": "planning/cost.py",
       "line": 71,
       "condition": "not isinstance(data, Mapping)",
@@ -288,7 +3038,7 @@
       "outcome": ""
     },
     {
-      "index": 29,
+      "index": 304,
       "module": "planning/cost.py",
       "line": 74,
       "condition": "unknown",
@@ -298,7 +3048,7 @@
       "outcome": ""
     },
     {
-      "index": 30,
+      "index": 305,
       "module": "planning/cost.py",
       "line": 76,
       "condition": "'amount_minor' not in data or 'currency' not in data",
@@ -308,7 +3058,7 @@
       "outcome": ""
     },
     {
-      "index": 31,
+      "index": 306,
       "module": "planning/cost.py",
       "line": 94,
       "condition": "not isinstance(self.subject, CapacitySubject)",
@@ -318,7 +3068,7 @@
       "outcome": ""
     },
     {
-      "index": 32,
+      "index": 307,
       "module": "planning/cost.py",
       "line": 96,
       "condition": "not isinstance(self.unit_price, Money)",
@@ -328,7 +3078,7 @@
       "outcome": ""
     },
     {
-      "index": 33,
+      "index": 308,
       "module": "planning/cost.py",
       "line": 98,
       "condition": "self.unit_price.amount_minor < 0",
@@ -338,7 +3088,7 @@
       "outcome": ""
     },
     {
-      "index": 34,
+      "index": 309,
       "module": "planning/cost.py",
       "line": 100,
       "condition": "not isinstance(self.basis, CostBasis)",
@@ -348,7 +3098,7 @@
       "outcome": ""
     },
     {
-      "index": 35,
+      "index": 310,
       "module": "planning/cost.py",
       "line": 102,
       "condition": "not isinstance(self.effective_from, datetime) or not isinstance(self.effective_until, datetime)",
@@ -358,7 +3108,7 @@
       "outcome": ""
     },
     {
-      "index": 36,
+      "index": 311,
       "module": "planning/cost.py",
       "line": 104,
       "condition": "self.effective_until < self.effective_from",
@@ -368,7 +3118,7 @@
       "outcome": ""
     },
     {
-      "index": 37,
+      "index": 312,
       "module": "planning/cost.py",
       "line": 106,
       "condition": "self.evidence_source is not None and (not isinstance(self.evidence_source, str) or self.evidence_source == '')",
@@ -378,7 +3128,7 @@
       "outcome": ""
     },
     {
-      "index": 38,
+      "index": 313,
       "module": "planning/cost.py",
       "line": 137,
       "condition": "not isinstance(data, Mapping)",
@@ -388,7 +3138,7 @@
       "outcome": ""
     },
     {
-      "index": 39,
+      "index": 314,
       "module": "planning/cost.py",
       "line": 142,
       "condition": "unknown",
@@ -398,7 +3148,7 @@
       "outcome": ""
     },
     {
-      "index": 40,
+      "index": 315,
       "module": "planning/cost.py",
       "line": 145,
       "condition": "req not in data",
@@ -408,7 +3158,7 @@
       "outcome": ""
     },
     {
-      "index": 41,
+      "index": 316,
       "module": "planning/cost.py",
       "line": 147,
       "condition": "not isinstance(data['effective_from'], datetime) or not isinstance(data['effective_until'], datetime)",
@@ -418,7 +3168,7 @@
       "outcome": ""
     },
     {
-      "index": 42,
+      "index": 317,
       "module": "planning/cost.py",
       "line": 173,
       "condition": "not isinstance(self.subject, CapacitySubject)",
@@ -428,7 +3178,7 @@
       "outcome": ""
     },
     {
-      "index": 43,
+      "index": 318,
       "module": "planning/cost.py",
       "line": 180,
       "condition": "not isinstance(entry, CostEvidence)",
@@ -438,7 +3188,7 @@
       "outcome": ""
     },
     {
-      "index": 44,
+      "index": 319,
       "module": "planning/cost.py",
       "line": 182,
       "condition": "not _subject_scope_compatible(entry.subject, self.subject)",
@@ -448,7 +3198,7 @@
       "outcome": ""
     },
     {
-      "index": 45,
+      "index": 320,
       "module": "planning/cost.py",
       "line": 185,
       "condition": "key in seen",
@@ -458,7 +3208,7 @@
       "outcome": ""
     },
     {
-      "index": 46,
+      "index": 321,
       "module": "planning/cost.py",
       "line": 210,
       "condition": "not isinstance(data, Mapping)",
@@ -468,7 +3218,7 @@
       "outcome": ""
     },
     {
-      "index": 47,
+      "index": 322,
       "module": "planning/cost.py",
       "line": 214,
       "condition": "unknown",
@@ -478,7 +3228,7 @@
       "outcome": ""
     },
     {
-      "index": 48,
+      "index": 323,
       "module": "planning/cost.py",
       "line": 216,
       "condition": "'subject' not in data",
@@ -488,7 +3238,7 @@
       "outcome": ""
     },
     {
-      "index": 49,
+      "index": 324,
       "module": "planning/cost.py",
       "line": 219,
       "condition": "not isinstance(entries_raw, (list, tuple))",
@@ -498,7 +3248,7 @@
       "outcome": ""
     },
     {
-      "index": 50,
+      "index": 325,
       "module": "planning/constraints.py",
       "line": 58,
       "condition": "v is None",
@@ -508,7 +3258,7 @@
       "outcome": ""
     },
     {
-      "index": 51,
+      "index": 326,
       "module": "planning/constraints.py",
       "line": 62,
       "condition": "isinstance(v, bool) or not isinstance(v, (int, float)) or (not math.isfinite(v))",
@@ -518,7 +3268,7 @@
       "outcome": ""
     },
     {
-      "index": 52,
+      "index": 327,
       "module": "planning/constraints.py",
       "line": 89,
       "condition": "isinstance(v, bool) or not isinstance(v, int)",
@@ -528,7 +3278,7 @@
       "outcome": ""
     },
     {
-      "index": 53,
+      "index": 328,
       "module": "planning/constraints.py",
       "line": 91,
       "condition": "self.min_capacity < 0",
@@ -538,7 +3288,7 @@
       "outcome": ""
     },
     {
-      "index": 54,
+      "index": 329,
       "module": "planning/constraints.py",
       "line": 93,
       "condition": "self.max_capacity < self.min_capacity",
@@ -548,7 +3298,7 @@
       "outcome": ""
     },
     {
-      "index": 55,
+      "index": 330,
       "module": "planning/constraints.py",
       "line": 95,
       "condition": "self.allowed_step < 1",
@@ -558,7 +3308,7 @@
       "outcome": ""
     },
     {
-      "index": 56,
+      "index": 331,
       "module": "planning/constraints.py",
       "line": 97,
       "condition": "self.regional_quota is not None",
@@ -568,7 +3318,7 @@
       "outcome": ""
     },
     {
-      "index": 57,
+      "index": 332,
       "module": "planning/constraints.py",
       "line": 98,
       "condition": "isinstance(self.regional_quota, bool) or not isinstance(self.regional_quota, int) or self.regional_quota < 0",
@@ -578,7 +3328,7 @@
       "outcome": ""
     },
     {
-      "index": 58,
+      "index": 333,
       "module": "planning/constraints.py",
       "line": 100,
       "condition": "_finite_number('cooldown_seconds', self.cooldown_seconds)",
@@ -588,7 +3338,7 @@
       "outcome": ""
     },
     {
-      "index": 59,
+      "index": 334,
       "module": "planning/constraints.py",
       "line": 101,
       "condition": "self.cooldown_seconds < 0",
@@ -598,7 +3348,7 @@
       "outcome": ""
     },
     {
-      "index": 60,
+      "index": 335,
       "module": "planning/constraints.py",
       "line": 103,
       "condition": "self.last_change_at is not None and (not isinstance(self.last_change_at, datetime))",
@@ -608,7 +3358,7 @@
       "outcome": ""
     },
     {
-      "index": 61,
+      "index": 336,
       "module": "planning/constraints.py",
       "line": 105,
       "condition": "self.forecast_validity_seconds is not None",
@@ -618,7 +3368,7 @@
       "outcome": ""
     },
     {
-      "index": 62,
+      "index": 337,
       "module": "planning/constraints.py",
       "line": 106,
       "condition": "_finite_number('forecast_validity_seconds', self.forecast_validity_seconds)",
@@ -628,7 +3378,7 @@
       "outcome": ""
     },
     {
-      "index": 63,
+      "index": 338,
       "module": "planning/constraints.py",
       "line": 107,
       "condition": "self.forecast_validity_seconds <= 0",
@@ -638,7 +3388,7 @@
       "outcome": ""
     },
     {
-      "index": 64,
+      "index": 339,
       "module": "planning/constraints.py",
       "line": 110,
       "condition": "not isinstance(getattr(self, name), bool)",
@@ -648,7 +3398,7 @@
       "outcome": ""
     },
     {
-      "index": 65,
+      "index": 340,
       "module": "planning/constraints.py",
       "line": 112,
       "condition": "not isinstance(self.dependency_capacity_ceiling, Mapping)",
@@ -658,7 +3408,7 @@
       "outcome": ""
     },
     {
-      "index": 66,
+      "index": 341,
       "module": "planning/constraints.py",
       "line": 115,
       "condition": "not isinstance(k, str) or k == ''",
@@ -668,7 +3418,7 @@
       "outcome": ""
     },
     {
-      "index": 67,
+      "index": 342,
       "module": "planning/constraints.py",
       "line": 117,
       "condition": "isinstance(v, bool) or not isinstance(v, int) or v < 0",
@@ -678,7 +3428,7 @@
       "outcome": ""
     },
     {
-      "index": 68,
+      "index": 343,
       "module": "planning/constraints.py",
       "line": 123,
       "condition": "not isinstance(a, str) or a == ''",
@@ -688,7 +3438,7 @@
       "outcome": ""
     },
     {
-      "index": 69,
+      "index": 344,
       "module": "planning/constraints.py",
       "line": 125,
       "condition": "self.max_cost_increase_minor is not None",
@@ -698,7 +3448,7 @@
       "outcome": ""
     },
     {
-      "index": 70,
+      "index": 345,
       "module": "planning/constraints.py",
       "line": 126,
       "condition": "isinstance(self.max_cost_increase_minor, bool) or not isinstance(self.max_cost_increase_minor, int) or self.max_cost_increase_minor < 0",
@@ -708,7 +3458,7 @@
       "outcome": ""
     },
     {
-      "index": 71,
+      "index": 346,
       "module": "planning/constraints.py",
       "line": 128,
       "condition": "_finite_number('safety_margin_fraction', self.safety_margin_fraction)",
@@ -718,7 +3468,7 @@
       "outcome": ""
     },
     {
-      "index": 72,
+      "index": 347,
       "module": "planning/constraints.py",
       "line": 129,
       "condition": "not 0.0 <= self.safety_margin_fraction <= 1.0",
@@ -728,7 +3478,7 @@
       "outcome": ""
     },
     {
-      "index": 73,
+      "index": 348,
       "module": "planning/constraints.py",
       "line": 166,
       "condition": "not isinstance(data, Mapping)",
@@ -738,7 +3488,7 @@
       "outcome": ""
     },
     {
-      "index": 74,
+      "index": 349,
       "module": "planning/constraints.py",
       "line": 175,
       "condition": "unknown",
@@ -748,7 +3498,7 @@
       "outcome": ""
     },
     {
-      "index": 75,
+      "index": 350,
       "module": "planning/constraints.py",
       "line": 178,
       "condition": "req not in data",
@@ -758,7 +3508,7 @@
       "outcome": ""
     },
     {
-      "index": 76,
+      "index": 351,
       "module": "planning/candidates.py",
       "line": 54,
       "condition": "not isinstance(self.subject, CapacitySubject)",
@@ -768,7 +3518,7 @@
       "outcome": ""
     },
     {
-      "index": 77,
+      "index": 352,
       "module": "planning/candidates.py",
       "line": 58,
       "condition": "isinstance(v, bool) or not isinstance(v, int) or v < 0",
@@ -778,7 +3528,7 @@
       "outcome": ""
     },
     {
-      "index": 78,
+      "index": 353,
       "module": "planning/candidates.py",
       "line": 60,
       "condition": "self.role not in ('primary', 'dependency')",
@@ -788,7 +3538,7 @@
       "outcome": ""
     },
     {
-      "index": 79,
+      "index": 354,
       "module": "planning/candidates.py",
       "line": 77,
       "condition": "not isinstance(data, Mapping)",
@@ -798,7 +3548,7 @@
       "outcome": ""
     },
     {
-      "index": 80,
+      "index": 355,
       "module": "planning/candidates.py",
       "line": 81,
       "condition": "unknown",
@@ -808,7 +3558,7 @@
       "outcome": ""
     },
     {
-      "index": 81,
+      "index": 356,
       "module": "planning/candidates.py",
       "line": 84,
       "condition": "req not in data",
@@ -818,7 +3568,7 @@
       "outcome": ""
     },
     {
-      "index": 82,
+      "index": 357,
       "module": "planning/candidates.py",
       "line": 106,
       "condition": "not isinstance(self.plan_id, str) or self.plan_id == ''",
@@ -828,7 +3578,7 @@
       "outcome": ""
     },
     {
-      "index": 83,
+      "index": 358,
       "module": "planning/candidates.py",
       "line": 108,
       "condition": "not isinstance(self.action_kind, ActionKind)",
@@ -838,7 +3588,7 @@
       "outcome": ""
     },
     {
-      "index": 84,
+      "index": 359,
       "module": "planning/candidates.py",
       "line": 112,
       "condition": "not self.changes",
@@ -848,7 +3598,7 @@
       "outcome": ""
     },
     {
-      "index": 85,
+      "index": 360,
       "module": "planning/candidates.py",
       "line": 115,
       "condition": "roles.count('primary') != 1",
@@ -858,7 +3608,7 @@
       "outcome": ""
     },
     {
-      "index": 86,
+      "index": 361,
       "module": "planning/candidates.py",
       "line": 120,
       "condition": "not isinstance(c, ResourceChange)",
@@ -868,7 +3618,7 @@
       "outcome": ""
     },
     {
-      "index": 87,
+      "index": 362,
       "module": "planning/candidates.py",
       "line": 123,
       "condition": "key in seen",
@@ -878,7 +3628,7 @@
       "outcome": ""
     },
     {
-      "index": 88,
+      "index": 363,
       "module": "planning/candidates.py",
       "line": 126,
       "condition": "isinstance(self.timing_seconds, bool) or not isinstance(self.timing_seconds, (int, float))",
@@ -888,7 +3638,7 @@
       "outcome": ""
     },
     {
-      "index": 89,
+      "index": 364,
       "module": "planning/candidates.py",
       "line": 128,
       "condition": "self.timing_seconds < 0",
@@ -898,7 +3648,7 @@
       "outcome": ""
     },
     {
-      "index": 90,
+      "index": 365,
       "module": "planning/candidates.py",
       "line": 133,
       "condition": "self.action_kind is ActionKind.NO_CHANGE",
@@ -908,7 +3658,7 @@
       "outcome": ""
     },
     {
-      "index": 91,
+      "index": 366,
       "module": "planning/candidates.py",
       "line": 134,
       "condition": "nonzero",
@@ -918,7 +3668,7 @@
       "outcome": ""
     },
     {
-      "index": 92,
+      "index": 367,
       "module": "planning/candidates.py",
       "line": 136,
       "condition": "self.action_kind is ActionKind.SCALE_UP",
@@ -928,7 +3678,7 @@
       "outcome": ""
     },
     {
-      "index": 93,
+      "index": 368,
       "module": "planning/candidates.py",
       "line": 137,
       "condition": "primary.delta <= 0",
@@ -938,7 +3688,7 @@
       "outcome": ""
     },
     {
-      "index": 94,
+      "index": 369,
       "module": "planning/candidates.py",
       "line": 139,
       "condition": "len(nonzero) != 1",
@@ -948,7 +3698,7 @@
       "outcome": ""
     },
     {
-      "index": 95,
+      "index": 370,
       "module": "planning/candidates.py",
       "line": 141,
       "condition": "self.action_kind is ActionKind.SCALE_DOWN",
@@ -958,7 +3708,7 @@
       "outcome": ""
     },
     {
-      "index": 96,
+      "index": 371,
       "module": "planning/candidates.py",
       "line": 142,
       "condition": "primary.delta >= 0",
@@ -968,7 +3718,7 @@
       "outcome": ""
     },
     {
-      "index": 97,
+      "index": 372,
       "module": "planning/candidates.py",
       "line": 144,
       "condition": "len(nonzero) != 1",
@@ -978,7 +3728,7 @@
       "outcome": ""
     },
     {
-      "index": 98,
+      "index": 373,
       "module": "planning/candidates.py",
       "line": 147,
       "condition": "primary.delta == 0",
@@ -988,7 +3738,7 @@
       "outcome": ""
     },
     {
-      "index": 99,
+      "index": 374,
       "module": "planning/candidates.py",
       "line": 149,
       "condition": "len(nonzero) < 2",
@@ -998,7 +3748,7 @@
       "outcome": ""
     },
     {
-      "index": 100,
+      "index": 375,
       "module": "planning/candidates.py",
       "line": 178,
       "condition": "not isinstance(data, Mapping)",
@@ -1008,7 +3758,7 @@
       "outcome": ""
     },
     {
-      "index": 101,
+      "index": 376,
       "module": "planning/candidates.py",
       "line": 182,
       "condition": "unknown",
@@ -1018,7 +3768,7 @@
       "outcome": ""
     },
     {
-      "index": 102,
+      "index": 377,
       "module": "planning/candidates.py",
       "line": 185,
       "condition": "req not in data",
@@ -1028,7 +3778,7 @@
       "outcome": ""
     },
     {
-      "index": 103,
+      "index": 378,
       "module": "planning/candidates.py",
       "line": 192,
       "condition": "not isinstance(changes_raw, (list, tuple))",
@@ -1038,7 +3788,7 @@
       "outcome": ""
     },
     {
-      "index": 104,
+      "index": 379,
       "module": "planning/candidates.py",
       "line": 233,
       "condition": "isinstance(current_capacity, bool) or not isinstance(current_capacity, int) or current_capacity < 0",
@@ -1048,7 +3798,7 @@
       "outcome": ""
     },
     {
-      "index": 105,
+      "index": 380,
       "module": "planning/candidates.py",
       "line": 235,
       "condition": "isinstance(required_capacity, bool) or not isinstance(required_capacity, int) or required_capacity < 0",
@@ -1058,7 +3808,7 @@
       "outcome": ""
     },
     {
-      "index": 106,
+      "index": 381,
       "module": "planning/candidates.py",
       "line": 237,
       "condition": "allowed_step < 1",
@@ -1068,7 +3818,7 @@
       "outcome": ""
     },
     {
-      "index": 107,
+      "index": 382,
       "module": "planning/policy.py",
       "line": 51,
       "condition": "isinstance(v, bool) or not isinstance(v, (int, float)) or (not math.isfinite(v))",
@@ -1078,7 +3828,7 @@
       "outcome": ""
     },
     {
-      "index": 108,
+      "index": 383,
       "module": "planning/policy.py",
       "line": 53,
       "condition": "v < 0",
@@ -1088,7 +3838,7 @@
       "outcome": ""
     },
     {
-      "index": 109,
+      "index": 384,
       "module": "planning/policy.py",
       "line": 78,
       "condition": "not isinstance(self.policy_id, str) or self.policy_id == ''",
@@ -1098,7 +3848,7 @@
       "outcome": ""
     },
     {
-      "index": 110,
+      "index": 385,
       "module": "planning/policy.py",
       "line": 82,
       "condition": "_finite_nonneg(name, getattr(self, name))",
@@ -1108,7 +3858,7 @@
       "outcome": ""
     },
     {
-      "index": 111,
+      "index": 386,
       "module": "planning/policy.py",
       "line": 85,
       "condition": "v > 1.0 + _TOL",
@@ -1118,7 +3868,7 @@
       "outcome": ""
     },
     {
-      "index": 112,
+      "index": 387,
       "module": "planning/policy.py",
       "line": 87,
       "condition": "_finite_nonneg('tie_epsilon', self.tie_epsilon) > 1.0",
@@ -1128,7 +3878,7 @@
       "outcome": ""
     },
     {
-      "index": 113,
+      "index": 388,
       "module": "planning/policy.py",
       "line": 135,
       "condition": "not isinstance(data, Mapping)",
@@ -1138,7 +3888,7 @@
       "outcome": ""
     },
     {
-      "index": 114,
+      "index": 389,
       "module": "planning/policy.py",
       "line": 139,
       "condition": "unknown",
@@ -1148,7 +3898,7 @@
       "outcome": ""
     },
     {
-      "index": 115,
+      "index": 390,
       "module": "planning/policy.py",
       "line": 172,
       "condition": "not isinstance(m, Mapping)",
@@ -1158,7 +3908,7 @@
       "outcome": ""
     },
     {
-      "index": 116,
+      "index": 391,
       "module": "planning/policy.py",
       "line": 175,
       "condition": "k not in FEATURE_NAMES",
@@ -1168,7 +3918,7 @@
       "outcome": ""
     },
     {
-      "index": 117,
+      "index": 392,
       "module": "planning/policy.py",
       "line": 177,
       "condition": "isinstance(v, bool) or not isinstance(v, (int, float)) or (not math.isfinite(v))",
@@ -1178,7 +3928,7 @@
       "outcome": ""
     },
     {
-      "index": 118,
+      "index": 393,
       "module": "planning/policy.py",
       "line": 179,
       "condition": "set(self.features) != set(FEATURE_NAMES) or set(self.contributions) != set(FEATURE_NAMES)",
@@ -1188,7 +3938,7 @@
       "outcome": ""
     },
     {
-      "index": 119,
+      "index": 394,
       "module": "planning/policy.py",
       "line": 181,
       "condition": "isinstance(self.total_score, bool) or not isinstance(self.total_score, (int, float)) or (not math.isfinite(self.total_score))",
@@ -1198,7 +3948,7 @@
       "outcome": ""
     },
     {
-      "index": 120,
+      "index": 395,
       "module": "planning/policy.py",
       "line": 184,
       "condition": "abs(recomputed - self.total_score) > 1e-06",
@@ -1208,7 +3958,7 @@
       "outcome": ""
     },
     {
-      "index": 121,
+      "index": 396,
       "module": "planning/policy.py",
       "line": 204,
       "condition": "not isinstance(data, Mapping)",
@@ -1218,7 +3968,7 @@
       "outcome": ""
     },
     {
-      "index": 122,
+      "index": 397,
       "module": "planning/policy.py",
       "line": 208,
       "condition": "unknown",
@@ -1228,7 +3978,7 @@
       "outcome": ""
     },
     {
-      "index": 123,
+      "index": 398,
       "module": "planning/policy.py",
       "line": 211,
       "condition": "req not in data",
@@ -1238,7 +3988,7 @@
       "outcome": ""
     },
     {
-      "index": 124,
+      "index": 399,
       "module": "planning/scoring.py",
       "line": 136,
       "condition": "not fc.is_forecast or fc.point_estimate is None",
@@ -1248,7 +3998,7 @@
       "outcome": ""
     },
     {
-      "index": 125,
+      "index": 400,
       "module": "planning/scoring.py",
       "line": 138,
       "condition": "fc.target is not PLANNING_TARGET",
@@ -1258,7 +4008,7 @@
       "outcome": ""
     },
     {
-      "index": 126,
+      "index": 401,
       "module": "planning/scoring.py",
       "line": 141,
       "condition": "current_state.capacity is None or current_state.capacity.running_replicas is None",
@@ -1268,7 +4018,7 @@
       "outcome": ""
     },
     {
-      "index": 127,
+      "index": 402,
       "module": "planning/scoring.py",
       "line": 151,
       "condition": "dep_edge is not None",
@@ -1278,7 +4028,7 @@
       "outcome": ""
     },
     {
-      "index": 128,
+      "index": 403,
       "module": "planning/scoring.py",
       "line": 152,
       "condition": "not dep_edge.has_capacity_evidence",
@@ -1288,7 +4038,7 @@
       "outcome": ""
     },
     {
-      "index": 129,
+      "index": 404,
       "module": "planning/scoring.py",
       "line": 165,
       "condition": "primary_price is None",
@@ -1298,7 +4048,7 @@
       "outcome": ""
     },
     {
-      "index": 130,
+      "index": 405,
       "module": "planning/scoring.py",
       "line": 198,
       "condition": "price is None",
@@ -1308,7 +4058,7 @@
       "outcome": ""
     },
     {
-      "index": 131,
+      "index": 406,
       "module": "planning/scoring.py",
       "line": 251,
       "condition": "c.max_cost_increase_minor is not None",
@@ -1318,7 +4068,7 @@
       "outcome": "MAX_COST_INCREASE_EXCEEDED"
     },
     {
-      "index": 132,
+      "index": 407,
       "module": "planning/recommendation.py",
       "line": 87,
       "condition": "not isinstance(self.plan, CandidateActionPlan)",
@@ -1328,7 +4078,7 @@
       "outcome": ""
     },
     {
-      "index": 133,
+      "index": 408,
       "module": "planning/recommendation.py",
       "line": 89,
       "condition": "not isinstance(self.feasible, bool)",
@@ -1338,7 +4088,7 @@
       "outcome": ""
     },
     {
-      "index": 134,
+      "index": 409,
       "module": "planning/recommendation.py",
       "line": 94,
       "condition": "not isinstance(v, str) or v == ''",
@@ -1348,7 +4098,7 @@
       "outcome": ""
     },
     {
-      "index": 135,
+      "index": 410,
       "module": "planning/recommendation.py",
       "line": 96,
       "condition": "isinstance(self.cost_delta_minor, bool) or not isinstance(self.cost_delta_minor, int)",
@@ -1358,7 +4108,7 @@
       "outcome": ""
     },
     {
-      "index": 136,
+      "index": 411,
       "module": "planning/recommendation.py",
       "line": 98,
       "condition": "self.feasible",
@@ -1368,7 +4118,7 @@
       "outcome": ""
     },
     {
-      "index": 137,
+      "index": 412,
       "module": "planning/recommendation.py",
       "line": 99,
       "condition": "self.violations",
@@ -1378,7 +4128,7 @@
       "outcome": ""
     },
     {
-      "index": 138,
+      "index": 413,
       "module": "planning/recommendation.py",
       "line": 101,
       "condition": "not isinstance(self.score_breakdown, ScoreBreakdown)",
@@ -1388,7 +4138,7 @@
       "outcome": ""
     },
     {
-      "index": 139,
+      "index": 414,
       "module": "planning/recommendation.py",
       "line": 104,
       "condition": "not self.violations",
@@ -1398,7 +4148,7 @@
       "outcome": ""
     },
     {
-      "index": 140,
+      "index": 415,
       "module": "planning/recommendation.py",
       "line": 106,
       "condition": "self.score_breakdown is not None",
@@ -1408,7 +4158,7 @@
       "outcome": ""
     },
     {
-      "index": 141,
+      "index": 416,
       "module": "planning/recommendation.py",
       "line": 125,
       "condition": "not isinstance(data, Mapping)",
@@ -1418,7 +4168,7 @@
       "outcome": ""
     },
     {
-      "index": 142,
+      "index": 417,
       "module": "planning/recommendation.py",
       "line": 129,
       "condition": "unknown",
@@ -1428,7 +4178,7 @@
       "outcome": ""
     },
     {
-      "index": 143,
+      "index": 418,
       "module": "planning/recommendation.py",
       "line": 132,
       "condition": "req not in data",
@@ -1438,7 +4188,7 @@
       "outcome": ""
     },
     {
-      "index": 144,
+      "index": 419,
       "module": "planning/recommendation.py",
       "line": 182,
       "condition": "self.advisory_only is not True or self.shadow_only is not True",
@@ -1448,7 +4198,7 @@
       "outcome": ""
     },
     {
-      "index": 145,
+      "index": 420,
       "module": "planning/recommendation.py",
       "line": 184,
       "condition": "self.actuation_performed is not False",
@@ -1458,7 +4208,7 @@
       "outcome": ""
     },
     {
-      "index": 146,
+      "index": 421,
       "module": "planning/recommendation.py",
       "line": 186,
       "condition": "self.authorization_performed is not False",
@@ -1468,7 +4218,7 @@
       "outcome": ""
     },
     {
-      "index": 147,
+      "index": 422,
       "module": "planning/recommendation.py",
       "line": 188,
       "condition": "self.effect_verified is not False",
@@ -1478,7 +4228,7 @@
       "outcome": ""
     },
     {
-      "index": 148,
+      "index": 423,
       "module": "planning/recommendation.py",
       "line": 190,
       "condition": "self.authority_class != AUTHORITY_CLASS_ADVISORY",
@@ -1488,7 +4238,7 @@
       "outcome": ""
     },
     {
-      "index": 149,
+      "index": 424,
       "module": "planning/recommendation.py",
       "line": 192,
       "condition": "self.execution_capability != EXECUTION_CAPABILITY_NONE",
@@ -1498,7 +4248,7 @@
       "outcome": ""
     },
     {
-      "index": 150,
+      "index": 425,
       "module": "planning/recommendation.py",
       "line": 195,
       "condition": "not isinstance(self.recommendation_id, str) or self.recommendation_id == ''",
@@ -1508,7 +4258,7 @@
       "outcome": ""
     },
     {
-      "index": 151,
+      "index": 426,
       "module": "planning/recommendation.py",
       "line": 197,
       "condition": "not isinstance(self.forecast_evidence, CapacityForecastEvidence)",
@@ -1518,7 +4268,7 @@
       "outcome": ""
     },
     {
-      "index": 152,
+      "index": 427,
       "module": "planning/recommendation.py",
       "line": 199,
       "condition": "not isinstance(self.current_state, CanonicalCapacityState)",
@@ -1528,7 +4278,7 @@
       "outcome": ""
     },
     {
-      "index": 153,
+      "index": 428,
       "module": "planning/recommendation.py",
       "line": 201,
       "condition": "not isinstance(self.cost_book, CostBook)",
@@ -1538,7 +4288,7 @@
       "outcome": ""
     },
     {
-      "index": 154,
+      "index": 429,
       "module": "planning/recommendation.py",
       "line": 203,
       "condition": "not isinstance(self.constraints, OperatingConstraints)",
@@ -1548,7 +4298,7 @@
       "outcome": ""
     },
     {
-      "index": 155,
+      "index": 430,
       "module": "planning/recommendation.py",
       "line": 205,
       "condition": "not isinstance(self.policy, RecommendationPolicy)",
@@ -1558,7 +4308,7 @@
       "outcome": ""
     },
     {
-      "index": 156,
+      "index": 431,
       "module": "planning/recommendation.py",
       "line": 207,
       "condition": "self.topology is not None and (not isinstance(self.topology, DependencyTopology))",
@@ -1568,7 +4318,7 @@
       "outcome": ""
     },
     {
-      "index": 157,
+      "index": 432,
       "module": "planning/recommendation.py",
       "line": 209,
       "condition": "not isinstance(self.recommendation_time, datetime)",
@@ -1578,7 +4328,7 @@
       "outcome": ""
     },
     {
-      "index": 158,
+      "index": 433,
       "module": "planning/recommendation.py",
       "line": 211,
       "condition": "isinstance(self.validity_seconds, bool) or not isinstance(self.validity_seconds, (int, float)) or (not math.isfinite(self.validity_seconds)) or (self.validity_seconds <= 0)",
@@ -1588,7 +4338,7 @@
       "outcome": ""
     },
     {
-      "index": 159,
+      "index": 434,
       "module": "planning/recommendation.py",
       "line": 216,
       "condition": "not self.evaluated_candidates",
@@ -1598,7 +4348,7 @@
       "outcome": ""
     },
     {
-      "index": 160,
+      "index": 435,
       "module": "planning/recommendation.py",
       "line": 219,
       "condition": "not isinstance(ec, EvaluatedCandidate)",
@@ -1608,7 +4358,7 @@
       "outcome": ""
     },
     {
-      "index": 161,
+      "index": 436,
       "module": "planning/recommendation.py",
       "line": 228,
       "condition": "fc.subject != subject",
@@ -1618,7 +4368,7 @@
       "outcome": ""
     },
     {
-      "index": 162,
+      "index": 437,
       "module": "planning/recommendation.py",
       "line": 230,
       "condition": "self.cost_book.subject != subject",
@@ -1628,7 +4378,7 @@
       "outcome": ""
     },
     {
-      "index": 163,
+      "index": 438,
       "module": "planning/recommendation.py",
       "line": 232,
       "condition": "self.topology is not None and self.topology.subject != subject",
@@ -1638,7 +4388,7 @@
       "outcome": ""
     },
     {
-      "index": 164,
+      "index": 439,
       "module": "planning/recommendation.py",
       "line": 240,
       "condition": "cutoff > rec_time",
@@ -1648,7 +4398,7 @@
       "outcome": ""
     },
     {
-      "index": 165,
+      "index": 440,
       "module": "planning/recommendation.py",
       "line": 249,
       "condition": "not float(fc.horizon.seconds) > 0",
@@ -1658,7 +4408,7 @@
       "outcome": ""
     },
     {
-      "index": 166,
+      "index": 441,
       "module": "planning/recommendation.py",
       "line": 253,
       "condition": "forecast_for_dt != canonical_forecast_for",
@@ -1668,7 +4418,7 @@
       "outcome": ""
     },
     {
-      "index": 167,
+      "index": 442,
       "module": "planning/recommendation.py",
       "line": 258,
       "condition": "forecast_for_dt <= rec_time",
@@ -1678,7 +4428,7 @@
       "outcome": ""
     },
     {
-      "index": 168,
+      "index": 443,
       "module": "planning/recommendation.py",
       "line": 261,
       "condition": "_as_utc(self.current_state.observed_at) > rec_time",
@@ -1688,7 +4438,7 @@
       "outcome": ""
     },
     {
-      "index": 169,
+      "index": 444,
       "module": "planning/recommendation.py",
       "line": 264,
       "condition": "self.topology is not None and _as_utc(self.topology.as_of) > rec_time",
@@ -1698,7 +4448,7 @@
       "outcome": ""
     },
     {
-      "index": 170,
+      "index": 445,
       "module": "planning/recommendation.py",
       "line": 269,
       "condition": "not entry.is_effective_at(self.recommendation_time)",
@@ -1708,7 +4458,7 @@
       "outcome": ""
     },
     {
-      "index": 171,
+      "index": 446,
       "module": "planning/recommendation.py",
       "line": 272,
       "condition": "self.constraints.forecast_validity_seconds is not None",
@@ -1718,7 +4468,7 @@
       "outcome": ""
     },
     {
-      "index": 172,
+      "index": 447,
       "module": "planning/recommendation.py",
       "line": 274,
       "condition": "age > self.constraints.forecast_validity_seconds",
@@ -1728,7 +4478,7 @@
       "outcome": ""
     },
     {
-      "index": 173,
+      "index": 448,
       "module": "planning/recommendation.py",
       "line": 282,
       "condition": "validity_end_dt > canonical_forecast_for",
@@ -1738,7 +4488,7 @@
       "outcome": ""
     },
     {
-      "index": 174,
+      "index": 449,
       "module": "planning/recommendation.py",
       "line": 310,
       "condition": "len(canonical_by_id) != len(canonical_plans)",
@@ -1748,7 +4498,7 @@
       "outcome": ""
     },
     {
-      "index": 175,
+      "index": 450,
       "module": "planning/recommendation.py",
       "line": 314,
       "condition": "ec.plan.plan_id in evaluated_by_id",
@@ -1758,7 +4508,7 @@
       "outcome": ""
     },
     {
-      "index": 176,
+      "index": 451,
       "module": "planning/recommendation.py",
       "line": 317,
       "condition": "evaluated_by_id != canonical_by_id",
@@ -1768,7 +4518,7 @@
       "outcome": ""
     },
     {
-      "index": 177,
+      "index": 452,
       "module": "planning/recommendation.py",
       "line": 332,
       "condition": "pid in seen_plan_ids",
@@ -1778,7 +4528,7 @@
       "outcome": ""
     },
     {
-      "index": 178,
+      "index": 453,
       "module": "planning/recommendation.py",
       "line": 341,
       "condition": "ec.feasible != exp_feasible",
@@ -1788,7 +4538,7 @@
       "outcome": ""
     },
     {
-      "index": 179,
+      "index": 454,
       "module": "planning/recommendation.py",
       "line": 343,
       "condition": "set(ec.violations) != set(exp_violations)",
@@ -1798,7 +4548,7 @@
       "outcome": ""
     },
     {
-      "index": 180,
+      "index": 455,
       "module": "planning/recommendation.py",
       "line": 346,
       "condition": "ec.cost_delta_minor != exp_cost",
@@ -1808,7 +4558,7 @@
       "outcome": ""
     },
     {
-      "index": 181,
+      "index": 456,
       "module": "planning/recommendation.py",
       "line": 348,
       "condition": "exp_feasible",
@@ -1818,7 +4568,7 @@
       "outcome": ""
     },
     {
-      "index": 182,
+      "index": 457,
       "module": "planning/recommendation.py",
       "line": 350,
       "condition": "ec.score_breakdown is None or abs(ec.score_breakdown.total_score - exp_score.total_score) > _TOL",
@@ -1828,7 +4578,7 @@
       "outcome": ""
     },
     {
-      "index": 183,
+      "index": 458,
       "module": "planning/recommendation.py",
       "line": 352,
       "condition": "ec.score_breakdown.policy_digest != self.policy.digest()",
@@ -1838,7 +4588,7 @@
       "outcome": ""
     },
     {
-      "index": 184,
+      "index": 459,
       "module": "planning/recommendation.py",
       "line": 355,
       "condition": "abs(ec.score_breakdown.features[fname] - fval) > _TOL",
@@ -1848,7 +4598,7 @@
       "outcome": ""
     },
     {
-      "index": 185,
+      "index": 460,
       "module": "planning/recommendation.py",
       "line": 360,
       "condition": "not has_no_change",
@@ -1858,7 +4608,7 @@
       "outcome": ""
     },
     {
-      "index": 186,
+      "index": 461,
       "module": "planning/recommendation.py",
       "line": 362,
       "condition": "selected is None",
@@ -1868,7 +4618,7 @@
       "outcome": ""
     },
     {
-      "index": 187,
+      "index": 462,
       "module": "planning/recommendation.py",
       "line": 364,
       "condition": "not selected.feasible",
@@ -1878,7 +4628,7 @@
       "outcome": ""
     },
     {
-      "index": 188,
+      "index": 463,
       "module": "planning/recommendation.py",
       "line": 372,
       "condition": "ambiguous",
@@ -1888,7 +4638,7 @@
       "outcome": ""
     },
     {
-      "index": 189,
+      "index": 464,
       "module": "planning/recommendation.py",
       "line": 374,
       "condition": "winner_id != self.selected_plan_id",
@@ -1898,7 +4648,7 @@
       "outcome": ""
     },
     {
-      "index": 190,
+      "index": 465,
       "module": "planning/recommendation.py",
       "line": 485,
       "condition": "include_digest",
@@ -1908,7 +4658,7 @@
       "outcome": ""
     },
     {
-      "index": 191,
+      "index": 466,
       "module": "planning/recommendation.py",
       "line": 503,
       "condition": "not isinstance(data, Mapping)",
@@ -1918,7 +4668,7 @@
       "outcome": ""
     },
     {
-      "index": 192,
+      "index": 467,
       "module": "planning/recommendation.py",
       "line": 511,
       "condition": "missing",
@@ -1928,7 +4678,7 @@
       "outcome": ""
     },
     {
-      "index": 193,
+      "index": 468,
       "module": "planning/recommendation.py",
       "line": 526,
       "condition": "surplus",
@@ -1938,7 +4688,7 @@
       "outcome": ""
     },
     {
-      "index": 194,
+      "index": 469,
       "module": "planning/recommendation.py",
       "line": 529,
       "condition": "not isinstance(rec_time, datetime)",
@@ -1948,7 +4698,7 @@
       "outcome": ""
     },
     {
-      "index": 195,
+      "index": 470,
       "module": "planning/recommendation.py",
       "line": 576,
       "condition": "not isinstance(data, Mapping)",
@@ -1958,7 +4708,7 @@
       "outcome": ""
     },
     {
-      "index": 196,
+      "index": 471,
       "module": "planning/recommendation.py",
       "line": 579,
       "condition": "not isinstance(fcd, Mapping)",
@@ -1968,7 +4718,7 @@
       "outcome": ""
     },
     {
-      "index": 197,
+      "index": 472,
       "module": "planning/recommendation.py",
       "line": 672,
       "condition": "not isinstance(self.subject, CapacitySubject)",
@@ -1978,7 +4728,7 @@
       "outcome": ""
     },
     {
-      "index": 198,
+      "index": 473,
       "module": "planning/recommendation.py",
       "line": 674,
       "condition": "not isinstance(self.reason, RecommendationAbstentionReason)",
@@ -1988,7 +4738,7 @@
       "outcome": ""
     },
     {
-      "index": 199,
+      "index": 474,
       "module": "planning/recommendation.py",
       "line": 676,
       "condition": "not isinstance(self.recommendation_time, datetime)",
@@ -1998,7 +4748,7 @@
       "outcome": ""
     },
     {
-      "index": 200,
+      "index": 475,
       "module": "planning/recommendation.py",
       "line": 678,
       "condition": "self.advisory_only is not True or self.shadow_only is not True",
@@ -2008,7 +4758,7 @@
       "outcome": ""
     },
     {
-      "index": 201,
+      "index": 476,
       "module": "planning/recommendation.py",
       "line": 680,
       "condition": "self.actuation_performed is not False",
@@ -2018,7 +4768,7 @@
       "outcome": ""
     },
     {
-      "index": 202,
+      "index": 477,
       "module": "planning/recommendation.py",
       "line": 682,
       "condition": "self.authority_class != AUTHORITY_CLASS_ADVISORY",
@@ -2028,7 +4778,7 @@
       "outcome": ""
     },
     {
-      "index": 203,
+      "index": 478,
       "module": "planning/recommendation.py",
       "line": 684,
       "condition": "self.execution_capability != EXECUTION_CAPABILITY_NONE",
@@ -2038,7 +4788,7 @@
       "outcome": ""
     },
     {
-      "index": 204,
+      "index": 479,
       "module": "planning/recommendation.py",
       "line": 711,
       "condition": "include_digest",
@@ -2048,7 +4798,7 @@
       "outcome": ""
     },
     {
-      "index": 205,
+      "index": 480,
       "module": "planning/recommendation.py",
       "line": 722,
       "condition": "not isinstance(data, Mapping)",
@@ -2058,7 +4808,7 @@
       "outcome": ""
     },
     {
-      "index": 206,
+      "index": 481,
       "module": "planning/recommendation.py",
       "line": 725,
       "condition": "req not in data",
@@ -2068,7 +4818,7 @@
       "outcome": ""
     },
     {
-      "index": 207,
+      "index": 482,
       "module": "planning/recommendation.py",
       "line": 737,
       "condition": "surplus",
@@ -2078,7 +4828,7 @@
       "outcome": ""
     },
     {
-      "index": 208,
+      "index": 483,
       "module": "planning/recommendation.py",
       "line": 740,
       "condition": "not isinstance(rec_time, datetime)",
@@ -2088,7 +4838,7 @@
       "outcome": ""
     },
     {
-      "index": 209,
+      "index": 484,
       "module": "planning/pipeline.py",
       "line": 100,
       "condition": "not isinstance(recommendation_time, datetime)",
@@ -2098,7 +4848,7 @@
       "outcome": ""
     },
     {
-      "index": 210,
+      "index": 485,
       "module": "planning/pipeline.py",
       "line": 103,
       "condition": "not isinstance(policy, RecommendationPolicy)",
@@ -2108,7 +4858,7 @@
       "outcome": ""
     },
     {
-      "index": 211,
+      "index": 486,
       "module": "planning/pipeline.py",
       "line": 108,
       "condition": "current_state is None",
@@ -2118,7 +4868,7 @@
       "outcome": "MISSING_CANONICAL_STATE"
     },
     {
-      "index": 212,
+      "index": 487,
       "module": "planning/pipeline.py",
       "line": 117,
       "condition": "not isinstance(current_state, CanonicalCapacityState)",
@@ -2128,7 +4878,7 @@
       "outcome": ""
     },
     {
-      "index": 213,
+      "index": 488,
       "module": "planning/pipeline.py",
       "line": 132,
       "condition": "not isinstance(forecast_evidence, CapacityForecastEvidence)",
@@ -2138,7 +4888,7 @@
       "outcome": ""
     },
     {
-      "index": 214,
+      "index": 489,
       "module": "planning/pipeline.py",
       "line": 164,
       "condition": "not isinstance(constraints, OperatingConstraints)",
@@ -2148,7 +4898,7 @@
       "outcome": ""
     },
     {
-      "index": 215,
+      "index": 490,
       "module": "planning/pipeline.py",
       "line": 180,
       "condition": "isinstance(validity_seconds, bool) or not isinstance(validity_seconds, (int, float)) or (not math.isfinite(validity_seconds)) or (validity_seconds <= 0)",
@@ -2158,7 +4908,7 @@
       "outcome": ""
     },
     {
-      "index": 216,
+      "index": 491,
       "module": "planning/pipeline.py",
       "line": 200,
       "condition": "not isinstance(cost_book, CostBook)",
@@ -2168,7 +4918,7 @@
       "outcome": ""
     },
     {
-      "index": 217,
+      "index": 492,
       "module": "planning/pipeline.py",
       "line": 230,
       "condition": "not isinstance(topology, DependencyTopology)",
@@ -2178,7 +4928,7 @@
       "outcome": ""
     },
     {
-      "index": 218,
+      "index": 493,
       "module": "planning/pipeline.py",
       "line": 268,
       "condition": "except ScoringError: abcost(R.CONTRADICTORY_EVIDENCE, f'inconsistent evidence: {exc}')",
@@ -2188,7 +4938,7 @@
       "outcome": "R.CONTRADICTORY_EVIDENCE"
     },
     {
-      "index": 219,
+      "index": 494,
       "module": "planning/pipeline.py",
       "line": 296,
       "condition": "else of: violations",

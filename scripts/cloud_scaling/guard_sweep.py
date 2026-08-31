@@ -239,16 +239,6 @@ EXCLUSION_REASONS = frozenset(
 _CONTROLLER_DEFERRED = (
     ("__init__.py", 0),
     ("api.py", 1),
-    ("canonical/__init__.py", 0),
-    ("canonical/evidence.py", 7),
-    ("canonical/identity.py", 6),
-    ("canonical/measurement.py", 12),
-    ("canonical/normalization.py", 16),
-    ("canonical/projection.py", 3),
-    ("canonical/provenance.py", 5),
-    ("canonical/serialization.py", 3),
-    ("canonical/sources.py", 3),
-    ("canonical/state.py", 39),
     ("cli.py", 2),
     ("config.py", 0),
     ("contracts.py", 12),
@@ -262,17 +252,6 @@ _CONTROLLER_DEFERRED = (
     ("core/replay_buffer.py", 0),
     ("explain/__init__.py", 0),
     ("explain/explainer.py", 0),
-    ("forecasting/__init__.py", 0),
-    ("forecasting/abstention.py", 0),
-    ("forecasting/evaluation.py", 34),
-    ("forecasting/evidence.py", 17),
-    ("forecasting/forecast.py", 10),
-    ("forecasting/forecasters.py", 3),
-    ("forecasting/replay.py", 3),
-    ("forecasting/series.py", 13),
-    ("forecasting/targets.py", 4),
-    ("forecasting/uncertainty.py", 4),
-    ("forecasting/window.py", 14),
     ("observability/__init__.py", 0),
     ("observability/benchmark.py", 0),
     ("observability/decision_log.py", 0),
@@ -424,8 +403,8 @@ PACKAGES = {
         recorded=(),
         exclusions={},
     ),
-    "controller-planning": PackageConfig(
-        key="controller-planning",
+    "controller-evidence-planning": PackageConfig(
+        key="controller-evidence-planning",
         package_dir="packages/capabilities/cloud-scaling-controller",
         dist_name="ugence_cloud_scaling_controller",
         # PHASE 1 OF A PHASED ADOPTION (owner ruling 3, 2026-08-31). This entry covers
@@ -446,19 +425,19 @@ PACKAGES = {
         ),
         # Ruled disclosure (owner, 2026-08-31): partial coverage reported honestly.
         inventory_note=(
-            "**This is a phase, not controller coverage (ruled 2026-08-31).** This "
-            "inventory is defined over the `planning/` subpackage alone — 10 of the "
-            "Cloud Scaling Controller's 78 production modules, carrying 205 of its 426 "
-            "`raise` statements. The remaining 68 modules are *deferred to later "
-            "ratified phases*, not judged guard-free, and every one is named in this "
-            "package's `excluded_modules` with its measured refusal surface. Deferred "
-            "subpackages, by name: `forecasting/` (11 modules, 102 raises), "
-            "`canonical/` (10 modules, 94 raises), the top-level modules (7 modules, "
-            "15 raises), `replay/` (13 modules, 6 raises), `core/` (7 modules, 2 "
-            "raises), `signals/` (4 modules, 2 raises), `observability/` (7 modules), "
-            "`shadow/` (4 modules), `recommend/` (3 modules) and `explain/` (2 "
-            "modules). A reader must not read a green sweep here as evidence about any "
-            "of them."
+            "**This is a phase, not controller coverage (phase 2, ruled 2026-08-31).** "
+            "This inventory is defined over `canonical/`, `forecasting/` and `planning/` "
+            "— 31 of the Cloud Scaling Controller's 78 production modules, carrying 401 "
+            "of its 426 `raise` statements. The remaining 47 modules are *deferred to "
+            "later ratified phases*, not judged guard-free, and every one is named in "
+            "this package's `excluded_modules` with its measured refusal surface. "
+            "Deferred subpackages, by name: `replay/` (13 modules, 6 raises), the "
+            "top-level modules (7 modules, 15 raises), `core/` (7 modules, 2 raises), "
+            "`observability/` (7 modules), `signals/` (4 modules, 2 raises), `shadow/` "
+            "(4 modules), `recommend/` (3 modules) and `explain/` (2 modules). A reader "
+            "must not read a green sweep here as evidence about any of them. Phase 1 "
+            "covered `planning/` alone at 219 guards; those 219 are unchanged here, and "
+            "the widening added 275."
         ),
         # `planning/` in the order a recommendation is actually built: the typed
         # abstention vocabulary first, then the evidence layers each gate reads
@@ -466,6 +445,30 @@ PACKAGES = {
         # scoring that rank them, the recommendation artifact itself, and the pipeline
         # entry point that ties them together.
         module_order=(
+            # canonical/ — the observed-state layer every later layer reads.
+            "canonical/__init__.py",
+            "canonical/identity.py",
+            "canonical/measurement.py",
+            "canonical/provenance.py",
+            "canonical/serialization.py",
+            "canonical/normalization.py",
+            "canonical/state.py",
+            "canonical/sources.py",
+            "canonical/projection.py",
+            "canonical/evidence.py",
+            # forecasting/ — the forecast-evidence layer built on canonical state.
+            "forecasting/__init__.py",
+            "forecasting/abstention.py",
+            "forecasting/targets.py",
+            "forecasting/series.py",
+            "forecasting/window.py",
+            "forecasting/uncertainty.py",
+            "forecasting/forecasters.py",
+            "forecasting/forecast.py",
+            "forecasting/evidence.py",
+            "forecasting/evaluation.py",
+            "forecasting/replay.py",
+            # planning/ — the recommendation built from both (phase 1).
             "planning/__init__.py",
             "planning/abstention.py",
             "planning/topology.py",
@@ -506,7 +509,9 @@ PACKAGES = {
         # reasons a candidate fails hard-constraint filtering. `RecommendationOutcome` is
         # deliberately absent: it is a `Union[...]` type alias, not an enum, so it names
         # no decision.
-        reason_vocabularies=frozenset({"R", "ConstraintViolationKind"}),
+        reason_vocabularies=frozenset(
+            {"R", "ConstraintViolationKind", "AbstentionReason", "SeriesErrorReason"}
+        ),
         decision_classes=frozenset({"except-arm", "helper-admission", "else-arm"}),
         # D-GC-3's operator. Exactly one `except` arm in the phase returns a vocabulary
         # member — `pipeline.py`'s cost-scoring arm, which answers CONTRADICTORY_EVIDENCE
@@ -516,6 +521,14 @@ PACKAGES = {
         # `raise` sites they are.
         reason_collapse_sentinels={
             "R": ("CONTRADICTORY_EVIDENCE", "NON_FINITE_INPUT"),
+            # `forecasting/evidence.py`'s two abstaining `except` arms. INVALID_MEASUREMENT
+            # is the general answer among the reasons these arms produce — reporting a unit
+            # inconsistency or a missing normalization policy as a bare invalid measurement
+            # is §9.4's general-for-specific weakening exactly. Neither arm can already
+            # produce it (one is fixed at INCONSISTENT_UNIT, the other resolves through
+            # `_APPLICABILITY_REASON`, whose three values do not include it), so the
+            # alternate is the pair's formality rather than a live case.
+            "AbstentionReason": ("INVALID_MEASUREMENT", "FORECAST_OUTSIDE_DOMAIN"),
         },
         record_multiplicity=False,
         uncovered_mints=(),
