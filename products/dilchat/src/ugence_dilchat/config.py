@@ -91,8 +91,14 @@ class Settings(BaseSettings):
     ratelimit_send_per_hour: int = 300
     ratelimit_report_per_day: int = 10
     ratelimit_block_mutations_per_hour: int = 60
-    # Retention / purge seam. Destructive scheduled purging is NOT run in Phase 3B.
+    # Retention / purge seam. Destructive scheduled purging is NOT implemented:
+    # by ratified amendment (DEC-PR-3) the flag stays false until the remaining
+    # gates pass, and the only executable path is the read-only report.
     retention_purge_enabled: bool = False
+    # DEC-PR-3: a revoked conversation is retained at least this long after
+    # revocation before it can become purge-ELIGIBLE (never automatic deletion).
+    # Must never undercut chat_report_after_revocation_days — enforced below.
+    chat_retention_revoked_days: int = 30
 
     # --- Outbox relay / push delivery (Phase 3C, DILCHAT-D3C-1..4) ---------- #
     # Transport: "null" (accepts everything, sends nothing; dev/test default)
@@ -152,6 +158,16 @@ class Settings(BaseSettings):
             raise ValueError(
                 f"push_transport={self.push_transport!r} is not permitted; allowed: "
                 "null, expo (fail closed — no silent no-op transport)."
+            )
+        # DEC-PR-3: retention must outlast the bounded post-revocation reporting
+        # right, or a conversation could be purged while a former participant may
+        # still report it. Fail closed at construction, in every environment.
+        if self.chat_retention_revoked_days < self.chat_report_after_revocation_days:
+            raise ValueError(
+                "chat_retention_revoked_days "
+                f"({self.chat_retention_revoked_days}) must be >= "
+                f"chat_report_after_revocation_days ({self.chat_report_after_revocation_days}): "
+                "retention may never undercut the post-revocation reporting window."
             )
         permitted = self.permitted_providers()
         if self.astrology_provider not in permitted:
