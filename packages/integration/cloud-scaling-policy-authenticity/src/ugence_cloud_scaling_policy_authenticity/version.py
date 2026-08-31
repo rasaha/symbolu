@@ -23,4 +23,4 @@ __all__ = ["__version__"]
 #: This package's verification source is untouched: its occurrence gate reads candidate facts
 #: by name, and Phase 5A re-sourcing those facts from the digest-bound decision snapshot
 #: satisfies it without a change here. What moved is the Phase 5A mirror the suite pins.
-__version__: Final[str] = "0.8.0"
+__version__: Final[str] = "0.9.0"
