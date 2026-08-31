@@ -33,19 +33,28 @@ proposal.
 
 The ballot put is
 [`AGENT_CONSTITUTION_INVOICE_RECONCILER_PILOT_SCOPING_BALLOT.md`](AGENT_CONSTITUTION_INVOICE_RECONCILER_PILOT_SCOPING_BALLOT.md)
-**as that file stands at commit `3c00046f`**:
+**as that file stands at commit `f2ec22e5`**, the commit that authored it:
 
 | Identity value | Ratified value |
 |---|---|
 | File path | `docs/architecture/AGENT_CONSTITUTION_INVOICE_RECONCILER_PILOT_SCOPING_BALLOT.md` |
-| Commit | `3c00046f` (the merge of PR #1540) |
+| Authoring commit | `f2ec22e5` ("Draft the invoice-reconciler pilot scoping ballot") |
+| Merge commit | `3c00046f` (the merge of PR #1540, which brought `f2ec22e5` to the default branch) |
 | Document SHA-256 | `d971acfb9d08262a665e59c2c7f2c2b1060632217a397256aa31cee065ae68f3` |
 | Line count | 297 |
 | Ballot-block SHA-256 (`## 6.` heading through the `## 7.` heading, inclusive; 67 lines) | `5c2aa81975c75c860c62a335e3b813f6088fd7c1fc124ac0e37c28cb6dd6f522` |
 
-`[V]` **All five values were verified before this ADR was written**, by reading
-the file out of the named commit rather than out of a working copy; the working
-copy is byte-identical. `[V]` The six ballot rows are present in order
+`[V]` **All six values were verified**, by reading the file out of the named
+commits rather than out of a working copy; the working copy is byte-identical.
+`[V]` The document is byte-identical at both commits — SHA-256
+`d971acfb…68f3` at `f2ec22e5` and at `3c00046f` — and `f2ec22e5` is an ancestor
+of `3c00046f`, so the two citations name one text. `[R]` **The authoring commit
+is the citation of record**, on the `ACC-FC` precedent, which pinned its ballot
+at the commit that wrote it (`5b6adb88`) rather than at a merge; the merge
+commit is recorded alongside it because it is where the text reached the
+default branch. `[V]` This pairing was added by a later amendment; the original
+record cited `3c00046f` alone, which resolved to the identical text and was
+therefore sound — nothing ratified changes here. `[V]` The six ballot rows are present in order
 `PILOT_SURFACE`, `IR-1` … `IR-5` and match the wording the owner ruled over.
 `[R]` The ratified text is the version at `3c00046f`; should the file gain
 further commits, this declaration continues to govern the text at that commit.
