@@ -1,16 +1,21 @@
 name: agent-constitution-ci
 
-# Scoped CI for the two ACC-S1 Agent Constitution integration distributions:
+# Scoped CI for the Agent Constitution integration distributions:
 #
 #   * ugence-agent-constitution-policy      — the policy family, its Policy
 #     Authority adapter, and the ACC-S1-Q3 registration-time family-collision
 #     guard (the artifact side);
 #   * ugence-agent-constitution-conformance — the concrete fail-closed resolver,
 #     the structural conformance verifier, and the end-to-end proof (the
-#     conformance side).
+#     conformance side);
+#   * ugence-agent-constitution-activation  — the ACC-IA composition root,
+#     mutation-free preflight, governed reference-map derivation, receipts, and
+#     the issue -> activate -> resolve -> bind -> conform proof with the
+#     four-way fail-closed matrix (the orchestration side).
 #
-# One workflow for both, because they are one integration: the conformance suite
-# imports the family, and a change to either can break the other. Both suites
+# One workflow for all three, because they are one integration: the conformance
+# suite imports the family, the activation suite composes both, and a change to
+# any can break the others. The suites
 # drive the GENUINE pipeline — real issuance, real Ed25519 signing, the real
 # registry, real resolution, the guarded composition path, and the ratified
 # conformance predicate in both directions — so a green run here is evidence
@@ -27,10 +32,13 @@ on:
     paths:
       - "packages/integration/agent-constitution-policy/**"
       - "packages/integration/agent-constitution-conformance/**"
+      - "packages/integration/agent-constitution-activation/**"
       - "packages/capabilities/agentic-proposer/**"
       - "packages/policy-authority/**"
       - "docs/architecture/AGENT_CONSTITUTION_AND_CONFORMANCE_FIRST_SLICE_DESIGN_SPECIFICATION.md"
       - "docs/architecture/ADR_UGENCE_AGENT_CONSTITUTION_FIRST_SLICE_RATIFICATION.md"
+      - "docs/architecture/AGENT_CONSTITUTION_ISSUANCE_AND_ACTIVATION_DESIGN_SPECIFICATION.md"
+      - "docs/architecture/ADR_UGENCE_AGENT_CONSTITUTION_ISSUANCE_ACTIVATION_RATIFICATION.md"
       - ".github/workflows/agent-constitution-ci.yml"
   push:
     branches:
@@ -39,10 +47,13 @@ on:
     paths:
       - "packages/integration/agent-constitution-policy/**"
       - "packages/integration/agent-constitution-conformance/**"
+      - "packages/integration/agent-constitution-activation/**"
       - "packages/capabilities/agentic-proposer/**"
       - "packages/policy-authority/**"
       - "docs/architecture/AGENT_CONSTITUTION_AND_CONFORMANCE_FIRST_SLICE_DESIGN_SPECIFICATION.md"
       - "docs/architecture/ADR_UGENCE_AGENT_CONSTITUTION_FIRST_SLICE_RATIFICATION.md"
+      - "docs/architecture/AGENT_CONSTITUTION_ISSUANCE_AND_ACTIVATION_DESIGN_SPECIFICATION.md"
+      - "docs/architecture/ADR_UGENCE_AGENT_CONSTITUTION_ISSUANCE_ACTIVATION_RATIFICATION.md"
       - ".github/workflows/agent-constitution-ci.yml"
 
 defaults:
@@ -69,6 +80,8 @@ jobs:
         run: python -m pytest packages/integration/agent-constitution-policy/tests -q
       - name: Conformance suite (facts, predicate, resolution, end-to-end proof)
         run: python -m pytest packages/integration/agent-constitution-conformance/tests -q
+      - name: Activation suite (root, preflight, reference-map derivation, receipts, chain + matrix)
+        run: python -m pytest packages/integration/agent-constitution-activation/tests -q
 
   neighbour-scans:
     name: Repository-wide scans these packages must satisfy
@@ -100,12 +113,18 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install build
-      - name: Both distributions — build, install into a clean venv, exercise end to end
+      - name: Family + conformance — build, install into a clean venv, exercise end to end
         # One script covers the pair: the conformance wheel declares the family
         # wheel as a dependency, so the offline install proves both, and the
         # in-venv proof drives issuance, guarded composition, resolution and the
         # conformance predicate across the installed packaging boundary.
         run: python packages/integration/agent-constitution-conformance/verify_agent_constitution_conformance_distribution.py
+      - name: Activation — build, install into a clean venv, run the ACC-IA-5 proof
+        # The activation wheel declares both constitution wheels as dependencies,
+        # so this offline install proves all three, and the in-venv proof runs
+        # preflight -> issue -> activate -> resolve -> bind -> conform on
+        # ephemeral in-process keys plus the four-way fail-closed matrix.
+        run: python packages/integration/agent-constitution-activation/verify_agent_constitution_activation_distribution.py
 
   freeze:
     name: Platform-freeze verification
