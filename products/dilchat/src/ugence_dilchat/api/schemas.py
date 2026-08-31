@@ -236,3 +236,58 @@ class ReadStateResponse(BaseModel):
     user_id: uuid.UUID
     last_read_sequence: int
     updated_at: dt.datetime
+
+
+# --- chat safety (Phase 3B) ------------------------------------------------- #
+# Bounded, printable client idempotency key for reports (same shape as chat).
+_CLIENT_REPORT_ID_RE = r"^[A-Za-z0-9._:\-]{1,64}$"
+# Mirrors Settings.safety_report_description_max_code_points; the service
+# re-validates against configuration so the two never silently diverge.
+_REPORT_DESCRIPTION_MAX = 1000
+
+
+class BlockCreateRequest(BaseModel):
+    blocked_user_id: uuid.UUID
+
+
+class BlockResponse(BaseModel):
+    block_id: uuid.UUID
+    blocked_user_id: uuid.UUID
+    status: str
+    created_at: dt.datetime
+    revoked_at: dt.datetime | None
+
+
+class BlockListResponse(BaseModel):
+    blocks: list[BlockResponse]
+
+
+class ReportCreateRequest(BaseModel):
+    conversation_id: uuid.UUID
+    target_type: str
+    target_message_id: uuid.UUID | None = None
+    reason: str
+    # SENSITIVE: stored on the report row only; never echoed back, logged,
+    # audited, or copied into evidence/case events.
+    description: str | None = Field(default=None, max_length=_REPORT_DESCRIPTION_MAX)
+    client_report_id: str = Field(pattern=_CLIENT_REPORT_ID_RE)
+
+
+class ReportResponse(BaseModel):
+    """Reporter-visible acknowledgement only (DILCHAT-D3B-5).
+
+    Deliberately carries NO description echo, NO internal case id, NO case
+    state, and NO evidence — those live behind the INTERNAL safety boundary.
+    """
+
+    report_id: uuid.UUID
+    conversation_id: uuid.UUID
+    target_type: str
+    target_message_id: uuid.UUID | None
+    reason: str
+    status: str
+    created_at: dt.datetime
+
+
+class ReportListResponse(BaseModel):
+    reports: list[ReportResponse]
