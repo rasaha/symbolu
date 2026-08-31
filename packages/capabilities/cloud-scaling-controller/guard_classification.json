@@ -1,7 +1,7 @@
 {
   "package": "controller-evidence-planning",
-  "total": 494,
-  "scored": 478,
+  "total": 527,
+  "scored": 511,
   "excluded": 16,
   "classification": {
     "1": {
@@ -2968,40 +2968,220 @@
     "487": {
       "status": "SCORED",
       "module": "planning/pipeline.py",
+      "line": 111,
+      "condition": "isinstance(forecast_evidence, CapacityForecastEvidence)"
+    },
+    "488": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
       "line": 117,
       "condition": "not isinstance(current_state, CanonicalCapacityState)"
     },
-    "488": {
+    "489": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 126,
+      "condition": "_as_utc(current_state.observed_at) > rec_t"
+    },
+    "490": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 130,
+      "condition": "forecast_evidence is None"
+    },
+    "491": {
       "status": "SCORED",
       "module": "planning/pipeline.py",
       "line": 132,
       "condition": "not isinstance(forecast_evidence, CapacityForecastEvidence)"
     },
-    "489": {
+    "492": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 141,
+      "condition": "fc.subject != subject"
+    },
+    "493": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 143,
+      "condition": "fc.is_abstained"
+    },
+    "494": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 145,
+      "condition": "fc.target is not PLANNING_TARGET"
+    },
+    "495": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 147,
+      "condition": "fc.point_estimate is None or not math.isfinite(float(fc.point_estimate))"
+    },
+    "496": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 152,
+      "condition": "cutoff > rec_t"
+    },
+    "497": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 154,
+      "condition": "forecast_for <= rec_t"
+    },
+    "498": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 158,
+      "condition": "current_state.capacity is None or current_state.capacity.running_replicas is None"
+    },
+    "499": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 162,
+      "condition": "constraints is None"
+    },
+    "500": {
       "status": "SCORED",
       "module": "planning/pipeline.py",
       "line": 164,
       "condition": "not isinstance(constraints, OperatingConstraints)"
     },
-    "490": {
+    "501": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 174,
+      "condition": "constraints.forecast_validity_seconds is not None"
+    },
+    "502": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 176,
+      "condition": "age > constraints.forecast_validity_seconds"
+    },
+    "503": {
       "status": "SCORED",
       "module": "planning/pipeline.py",
       "line": 180,
       "condition": "isinstance(validity_seconds, bool) or not isinstance(validity_seconds, (int, float)) or (not math.isfinite(validity_seconds)) or (validity_seconds <= 0)"
     },
-    "491": {
+    "504": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 186,
+      "condition": "rec_t + timedelta(seconds=float(validity_seconds)) > forecast_for"
+    },
+    "505": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 190,
+      "condition": "_forecast_confidence(fc) < policy.min_forecast_confidence - _TOL"
+    },
+    "506": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 194,
+      "condition": "constraints.regional_quota is not None and constraints.regional_quota < constraints.min_capacity"
+    },
+    "507": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 198,
+      "condition": "cost_book is None"
+    },
+    "508": {
       "status": "SCORED",
       "module": "planning/pipeline.py",
       "line": 200,
       "condition": "not isinstance(cost_book, CostBook)"
     },
-    "492": {
+    "509": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 202,
+      "condition": "cost_book.subject != subject"
+    },
+    "510": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 213,
+      "condition": "primary_cost is None"
+    },
+    "511": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 215,
+      "condition": "primary_cost.basis is not CostBasis.PER_REPLICA_HOUR"
+    },
+    "512": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 218,
+      "condition": "len(currencies) > 1"
+    },
+    "513": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 221,
+      "condition": "not entry.is_effective_at(recommendation_time)"
+    },
+    "514": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 226,
+      "condition": "topology is None"
+    },
+    "515": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 227,
+      "condition": "require_topology"
+    },
+    "516": {
       "status": "SCORED",
       "module": "planning/pipeline.py",
       "line": 230,
       "condition": "not isinstance(topology, DependencyTopology)"
     },
-    "493": {
+    "517": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 232,
+      "condition": "topology.subject != subject"
+    },
+    "518": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 235,
+      "condition": "_as_utc(topology.as_of) > rec_t"
+    },
+    "519": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 241,
+      "condition": "max_topology_age_seconds is not None"
+    },
+    "520": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 242,
+      "condition": "(rec_t - _as_utc(topology.as_of)).total_seconds() > max_topology_age_seconds"
+    },
+    "521": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 248,
+      "condition": "topology.has_cycle()"
+    },
+    "522": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 256,
+      "condition": "not edge.has_capacity_evidence"
+    },
+    "523": {
       "status": "EXCLUDED",
       "reason": "unreachable-behind-earlier-guard",
       "detail": "The pipeline's ScoringError arm around `build_context`. Every condition that makes the context build raise is abstained by the pipeline's own pre-gates before the build is reached: an abstained forecast as FORECAST_ABSTAINED, a non-planning target as UNSUPPORTED_FORECAST_TARGET, a missing point estimate as NON_FINITE_INPUT, missing capacity as MISSING_CURRENT_CAPACITY, an evidence-free dependency edge as MISSING_DEPENDENCY_CAPACITY and a missing price as MISSING_COST_EVIDENCE. The arm is the fail-closed jacket for a context build the pre-gates keep unreachable, so its reason-collapse mutation has no observer; the evidence test drives the same inputs down both paths and records the pairing.",
@@ -3010,11 +3190,29 @@
       "line": 268,
       "condition": "except ScoringError: abcost(R.CONTRADICTORY_EVIDENCE, f'inconsistent evidence: {exc}')"
     },
-    "494": {
+    "524": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 272,
+      "condition": "ctx.dependency_subject is not None and cost_book.for_subject(ctx.dependency_subject) is None"
+    },
+    "525": {
       "status": "SCORED",
       "module": "planning/pipeline.py",
       "line": 296,
       "condition": "else of: violations"
+    },
+    "526": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 303,
+      "condition": "not feasible"
+    },
+    "527": {
+      "status": "SCORED",
+      "module": "planning/pipeline.py",
+      "line": 310,
+      "condition": "ambiguous"
     }
   }
 }

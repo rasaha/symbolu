@@ -1,10 +1,10 @@
 {
   "package": "controller-evidence-planning",
-  "total": 494,
+  "total": 527,
   "reconciliation": {},
   "excluded": {
     "except_arms": 10,
-    "boolean_subterms": 146
+    "boolean_subterms": 150
   },
   "guards": [
     {
@@ -1893,7 +1893,7 @@
       "line": 222,
       "condition": "expected_subject is not None",
       "kind": "if",
-      "shape": "raising-helper call",
+      "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "SUBJECT_MISMATCH, TENANT_SCOPE_MISMATCH"
     },
@@ -1903,7 +1903,7 @@
       "line": 223,
       "condition": "series.subject.workload_id != expected_subject.workload_id",
       "kind": "if",
-      "shape": "raising-helper call",
+      "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "SUBJECT_MISMATCH"
     },
@@ -1913,7 +1913,7 @@
       "line": 225,
       "condition": "series.subject != expected_subject",
       "kind": "if",
-      "shape": "raising-helper call",
+      "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "TENANT_SCOPE_MISMATCH"
     },
@@ -1923,7 +1923,7 @@
       "line": 228,
       "condition": "not forecaster.supports_target(target)",
       "kind": "if",
-      "shape": "raising-helper call",
+      "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "UNSUPPORTED_TARGET"
     },
@@ -1933,7 +1933,7 @@
       "line": 230,
       "condition": "not forecaster.supports_horizon(horizon)",
       "kind": "if",
-      "shape": "raising-helper call",
+      "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "UNSUPPORTED_HORIZON"
     },
@@ -1943,7 +1943,7 @@
       "line": 232,
       "condition": "normalization_policy is None",
       "kind": "if",
-      "shape": "raising-helper call",
+      "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "MISSING_NORMALIZATION_POLICY"
     },
@@ -1963,7 +1963,7 @@
       "line": 238,
       "condition": "len(probe.units_present) > 1",
       "kind": "if",
-      "shape": "raising-helper call",
+      "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "INCONSISTENT_UNIT"
     },
@@ -1973,7 +1973,7 @@
       "line": 240,
       "condition": "any((not math.isfinite(v) for v in probe.values))",
       "kind": "if",
-      "shape": "raising-helper call",
+      "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "INVALID_MEASUREMENT"
     },
@@ -1983,7 +1983,7 @@
       "line": 246,
       "condition": "not domain_for(s.unit).contains(s.value)",
       "kind": "if",
-      "shape": "raising-helper call",
+      "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "INVALID_MEASUREMENT"
     },
@@ -1993,7 +1993,7 @@
       "line": 250,
       "condition": "probe.sample_count < effective_min",
       "kind": "if",
-      "shape": "raising-helper call",
+      "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "INSUFFICIENT_HISTORY"
     },
@@ -2003,7 +2003,7 @@
       "line": 253,
       "condition": "admission_policy.max_staleness_seconds is not None and probe.last_event_time is not None",
       "kind": "if",
-      "shape": "raising-helper call",
+      "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "STALE_HISTORY"
     },
@@ -2013,7 +2013,7 @@
       "line": 255,
       "condition": "staleness > admission_policy.max_staleness_seconds",
       "kind": "if",
-      "shape": "raising-helper call",
+      "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "STALE_HISTORY"
     },
@@ -2023,7 +2023,7 @@
       "line": 258,
       "condition": "probe.missingness.missing_fraction > admission_policy.max_missing_fraction",
       "kind": "if",
-      "shape": "raising-helper call",
+      "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "EXCESSIVE_MISSINGNESS"
     },
@@ -2033,7 +2033,7 @@
       "line": 261,
       "condition": "admission_policy.require_regular_cadence and probe.cadence.irregular_gap_count > admission_policy.max_irregular_gaps",
       "kind": "if",
-      "shape": "raising-helper call",
+      "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "IRREGULAR_CADENCE"
     },
@@ -2043,7 +2043,7 @@
       "line": 268,
       "condition": "signal is not None",
       "kind": "if",
-      "shape": "raising-helper call",
+      "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "INCONSISTENT_UNIT, MISSING_NORMALIZATION_POLICY"
     },
@@ -2053,7 +2053,7 @@
       "line": 269,
       "condition": "normalization_policy.method_by_signal.get(signal) is None",
       "kind": "if",
-      "shape": "raising-helper call",
+      "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "MISSING_NORMALIZATION_POLICY"
     },
@@ -2083,7 +2083,7 @@
       "line": 277,
       "condition": "forecast_space is ForecastValueSpace.NORMALIZED",
       "kind": "if",
-      "shape": "raising-helper call",
+      "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "UNSUPPORTED_TARGET"
     },
@@ -2103,7 +2103,7 @@
       "line": 292,
       "condition": "point is None",
       "kind": "if",
-      "shape": "raising-helper call",
+      "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "INSUFFICIENT_HISTORY"
     },
@@ -2113,7 +2113,7 @@
       "line": 294,
       "condition": "not math.isfinite(point)",
       "kind": "if",
-      "shape": "raising-helper call",
+      "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "INVALID_MEASUREMENT"
     },
@@ -2123,7 +2123,7 @@
       "line": 302,
       "condition": "domain is not None and (not domain.contains(point))",
       "kind": "if",
-      "shape": "raising-helper call",
+      "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "FORECAST_OUTSIDE_DOMAIN"
     },
@@ -2133,7 +2133,7 @@
       "line": 303,
       "condition": "not admission_policy.allow_out_of_domain",
       "kind": "if",
-      "shape": "raising-helper call",
+      "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "FORECAST_OUTSIDE_DOMAIN"
     },
@@ -2143,7 +2143,7 @@
       "line": 313,
       "condition": "uncertainty_config.method is not UncertaintyMethod.NONE and (not uncertainty.available) and uncertainty.insufficient_calibration and (not uncertainty_config.allow_point_only_when_uncalibrated)",
       "kind": "if",
-      "shape": "raising-helper call",
+      "shape": "typed-refusal call",
       "recorded_in": "",
       "outcome": "INSUFFICIENT_CALIBRATION_HISTORY"
     },
@@ -2643,9 +2643,9 @@
       "line": 372,
       "condition": "actual_state is None",
       "kind": "if",
-      "shape": "raising-helper call",
+      "shape": "typed-refusal call",
       "recorded_in": "",
-      "outcome": ""
+      "outcome": "UNMATCHED"
     },
     {
       "index": 265,
@@ -2653,9 +2653,9 @@
       "line": 377,
       "condition": "actual_state.subject != fc.subject",
       "kind": "if",
-      "shape": "raising-helper call",
+      "shape": "typed-refusal call",
       "recorded_in": "",
-      "outcome": ""
+      "outcome": "SUBJECT_MISMATCH"
     },
     {
       "index": 266,
@@ -2663,9 +2663,9 @@
       "line": 383,
       "condition": "sample is None",
       "kind": "if",
-      "shape": "raising-helper call",
+      "shape": "typed-refusal call",
       "recorded_in": "",
-      "outcome": ""
+      "outcome": "UNMATCHED"
     },
     {
       "index": 267,
@@ -2673,9 +2673,9 @@
       "line": 388,
       "condition": "sample.unit != fc.unit",
       "kind": "if",
-      "shape": "raising-helper call",
+      "shape": "typed-refusal call",
       "recorded_in": "",
-      "outcome": ""
+      "outcome": "UNMATCHED"
     },
     {
       "index": 268,
@@ -2683,9 +2683,9 @@
       "line": 392,
       "condition": "abs(delta) > match_tolerance_seconds",
       "kind": "if",
-      "shape": "raising-helper call",
+      "shape": "typed-refusal call",
       "recorded_in": "",
-      "outcome": ""
+      "outcome": "UNMATCHED"
     },
     {
       "index": 269,
@@ -2715,7 +2715,7 @@
       "kind": "if",
       "shape": "raise",
       "recorded_in": "",
-      "outcome": ""
+      "outcome": "AMBIGUOUS"
     },
     {
       "index": 272,
@@ -2735,7 +2735,7 @@
       "kind": "if",
       "shape": "raising-helper call",
       "recorded_in": "",
-      "outcome": ""
+      "outcome": "AMBIGUOUS"
     },
     {
       "index": 274,
@@ -4870,6 +4870,16 @@
     {
       "index": 487,
       "module": "planning/pipeline.py",
+      "line": 111,
+      "condition": "isinstance(forecast_evidence, CapacityForecastEvidence)",
+      "kind": "if",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "MISSING_CANONICAL_STATE"
+    },
+    {
+      "index": 488,
+      "module": "planning/pipeline.py",
       "line": 117,
       "condition": "not isinstance(current_state, CanonicalCapacityState)",
       "kind": "if",
@@ -4878,7 +4888,27 @@
       "outcome": ""
     },
     {
-      "index": 488,
+      "index": 489,
+      "module": "planning/pipeline.py",
+      "line": 126,
+      "condition": "_as_utc(current_state.observed_at) > rec_t",
+      "kind": "if",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "FUTURE_DATA_LEAKAGE"
+    },
+    {
+      "index": 490,
+      "module": "planning/pipeline.py",
+      "line": 130,
+      "condition": "forecast_evidence is None",
+      "kind": "if",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "MISSING_FORECAST"
+    },
+    {
+      "index": 491,
       "module": "planning/pipeline.py",
       "line": 132,
       "condition": "not isinstance(forecast_evidence, CapacityForecastEvidence)",
@@ -4888,7 +4918,87 @@
       "outcome": ""
     },
     {
-      "index": 489,
+      "index": 492,
+      "module": "planning/pipeline.py",
+      "line": 141,
+      "condition": "fc.subject != subject",
+      "kind": "if",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "SUBJECT_SCOPE_MISMATCH"
+    },
+    {
+      "index": 493,
+      "module": "planning/pipeline.py",
+      "line": 143,
+      "condition": "fc.is_abstained",
+      "kind": "if",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "FORECAST_ABSTAINED"
+    },
+    {
+      "index": 494,
+      "module": "planning/pipeline.py",
+      "line": 145,
+      "condition": "fc.target is not PLANNING_TARGET",
+      "kind": "if",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "UNSUPPORTED_FORECAST_TARGET"
+    },
+    {
+      "index": 495,
+      "module": "planning/pipeline.py",
+      "line": 147,
+      "condition": "fc.point_estimate is None or not math.isfinite(float(fc.point_estimate))",
+      "kind": "if",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "NON_FINITE_INPUT"
+    },
+    {
+      "index": 496,
+      "module": "planning/pipeline.py",
+      "line": 152,
+      "condition": "cutoff > rec_t",
+      "kind": "if",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "FUTURE_DATA_LEAKAGE"
+    },
+    {
+      "index": 497,
+      "module": "planning/pipeline.py",
+      "line": 154,
+      "condition": "forecast_for <= rec_t",
+      "kind": "if",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "EXPIRED_FORECAST"
+    },
+    {
+      "index": 498,
+      "module": "planning/pipeline.py",
+      "line": 158,
+      "condition": "current_state.capacity is None or current_state.capacity.running_replicas is None",
+      "kind": "if",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "MISSING_CURRENT_CAPACITY"
+    },
+    {
+      "index": 499,
+      "module": "planning/pipeline.py",
+      "line": 162,
+      "condition": "constraints is None",
+      "kind": "if",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "MISSING_CONSTRAINTS"
+    },
+    {
+      "index": 500,
       "module": "planning/pipeline.py",
       "line": 164,
       "condition": "not isinstance(constraints, OperatingConstraints)",
@@ -4898,7 +5008,27 @@
       "outcome": ""
     },
     {
-      "index": 490,
+      "index": 501,
+      "module": "planning/pipeline.py",
+      "line": 174,
+      "condition": "constraints.forecast_validity_seconds is not None",
+      "kind": "if",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "EXPIRED_FORECAST"
+    },
+    {
+      "index": 502,
+      "module": "planning/pipeline.py",
+      "line": 176,
+      "condition": "age > constraints.forecast_validity_seconds",
+      "kind": "if",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "EXPIRED_FORECAST"
+    },
+    {
+      "index": 503,
       "module": "planning/pipeline.py",
       "line": 180,
       "condition": "isinstance(validity_seconds, bool) or not isinstance(validity_seconds, (int, float)) or (not math.isfinite(validity_seconds)) or (validity_seconds <= 0)",
@@ -4908,7 +5038,47 @@
       "outcome": ""
     },
     {
-      "index": 491,
+      "index": 504,
+      "module": "planning/pipeline.py",
+      "line": 186,
+      "condition": "rec_t + timedelta(seconds=float(validity_seconds)) > forecast_for",
+      "kind": "if",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "CONTRADICTORY_EVIDENCE"
+    },
+    {
+      "index": 505,
+      "module": "planning/pipeline.py",
+      "line": 190,
+      "condition": "_forecast_confidence(fc) < policy.min_forecast_confidence - _TOL",
+      "kind": "if",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "INSUFFICIENT_FORECAST_CONFIDENCE"
+    },
+    {
+      "index": 506,
+      "module": "planning/pipeline.py",
+      "line": 194,
+      "condition": "constraints.regional_quota is not None and constraints.regional_quota < constraints.min_capacity",
+      "kind": "if",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "QUOTA_CONFLICT"
+    },
+    {
+      "index": 507,
+      "module": "planning/pipeline.py",
+      "line": 198,
+      "condition": "cost_book is None",
+      "kind": "if",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "MISSING_COST_EVIDENCE"
+    },
+    {
+      "index": 508,
       "module": "planning/pipeline.py",
       "line": 200,
       "condition": "not isinstance(cost_book, CostBook)",
@@ -4918,7 +5088,77 @@
       "outcome": ""
     },
     {
-      "index": 492,
+      "index": 509,
+      "module": "planning/pipeline.py",
+      "line": 202,
+      "condition": "cost_book.subject != subject",
+      "kind": "if",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "SUBJECT_SCOPE_MISMATCH"
+    },
+    {
+      "index": 510,
+      "module": "planning/pipeline.py",
+      "line": 213,
+      "condition": "primary_cost is None",
+      "kind": "if",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "MISSING_COST_EVIDENCE"
+    },
+    {
+      "index": 511,
+      "module": "planning/pipeline.py",
+      "line": 215,
+      "condition": "primary_cost.basis is not CostBasis.PER_REPLICA_HOUR",
+      "kind": "if",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "INCOMPATIBLE_COST_EVIDENCE"
+    },
+    {
+      "index": 512,
+      "module": "planning/pipeline.py",
+      "line": 218,
+      "condition": "len(currencies) > 1",
+      "kind": "if",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "CURRENCY_MISMATCH"
+    },
+    {
+      "index": 513,
+      "module": "planning/pipeline.py",
+      "line": 221,
+      "condition": "not entry.is_effective_at(recommendation_time)",
+      "kind": "if",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "STALE_COST_EVIDENCE"
+    },
+    {
+      "index": 514,
+      "module": "planning/pipeline.py",
+      "line": 226,
+      "condition": "topology is None",
+      "kind": "if",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "MISSING_TOPOLOGY"
+    },
+    {
+      "index": 515,
+      "module": "planning/pipeline.py",
+      "line": 227,
+      "condition": "require_topology",
+      "kind": "if",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "MISSING_TOPOLOGY"
+    },
+    {
+      "index": 516,
       "module": "planning/pipeline.py",
       "line": 230,
       "condition": "not isinstance(topology, DependencyTopology)",
@@ -4928,7 +5168,67 @@
       "outcome": ""
     },
     {
-      "index": 493,
+      "index": 517,
+      "module": "planning/pipeline.py",
+      "line": 232,
+      "condition": "topology.subject != subject",
+      "kind": "if",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "SUBJECT_SCOPE_MISMATCH"
+    },
+    {
+      "index": 518,
+      "module": "planning/pipeline.py",
+      "line": 235,
+      "condition": "_as_utc(topology.as_of) > rec_t",
+      "kind": "if",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "FUTURE_DATA_LEAKAGE"
+    },
+    {
+      "index": 519,
+      "module": "planning/pipeline.py",
+      "line": 241,
+      "condition": "max_topology_age_seconds is not None",
+      "kind": "if",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "STALE_TOPOLOGY"
+    },
+    {
+      "index": 520,
+      "module": "planning/pipeline.py",
+      "line": 242,
+      "condition": "(rec_t - _as_utc(topology.as_of)).total_seconds() > max_topology_age_seconds",
+      "kind": "if",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "STALE_TOPOLOGY"
+    },
+    {
+      "index": 521,
+      "module": "planning/pipeline.py",
+      "line": 248,
+      "condition": "topology.has_cycle()",
+      "kind": "if",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "DEPENDENCY_CYCLE"
+    },
+    {
+      "index": 522,
+      "module": "planning/pipeline.py",
+      "line": 256,
+      "condition": "not edge.has_capacity_evidence",
+      "kind": "if",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "MISSING_DEPENDENCY_CAPACITY"
+    },
+    {
+      "index": 523,
       "module": "planning/pipeline.py",
       "line": 268,
       "condition": "except ScoringError: abcost(R.CONTRADICTORY_EVIDENCE, f'inconsistent evidence: {exc}')",
@@ -4938,7 +5238,17 @@
       "outcome": "R.CONTRADICTORY_EVIDENCE"
     },
     {
-      "index": 494,
+      "index": 524,
+      "module": "planning/pipeline.py",
+      "line": 272,
+      "condition": "ctx.dependency_subject is not None and cost_book.for_subject(ctx.dependency_subject) is None",
+      "kind": "if",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "MISSING_COST_EVIDENCE"
+    },
+    {
+      "index": 525,
       "module": "planning/pipeline.py",
       "line": 296,
       "condition": "else of: violations",
@@ -4946,6 +5256,26 @@
       "shape": "raising-helper call",
       "recorded_in": "",
       "outcome": ""
+    },
+    {
+      "index": 526,
+      "module": "planning/pipeline.py",
+      "line": 303,
+      "condition": "not feasible",
+      "kind": "if",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "NO_FEASIBLE_ACTION"
+    },
+    {
+      "index": 527,
+      "module": "planning/pipeline.py",
+      "line": 310,
+      "condition": "ambiguous",
+      "kind": "if",
+      "shape": "typed-refusal call",
+      "recorded_in": "",
+      "outcome": "AMBIGUOUS_BEST_PLAN"
     }
   ]
 }
