@@ -139,3 +139,26 @@ export interface ReadStateResponse {
   last_read_sequence: number;
   updated_at: string;
 }
+
+// --- push devices (Phase 3C mobile slice, DILCHAT-D3C-M1/M2) ---------------- //
+// A registration is a device installation owned by the user — never a session
+// credential. The push token is write-only: no response ever carries it back.
+
+export type DevicePlatform = "IOS" | "ANDROID" | "UNKNOWN";
+
+export interface DeviceRegisterRequest {
+  push_token: string; // SENSITIVE: never logged or displayed
+  platform: DevicePlatform;
+}
+
+export interface DeviceResponse {
+  device_id: string;
+  platform: string;
+  status: string;
+  created_at: string;
+  revoked_at: string | null;
+}
+
+export interface DeviceListResponse {
+  devices: DeviceResponse[];
+}

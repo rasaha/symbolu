@@ -278,10 +278,23 @@ jobs:
             echo "cleartext opt-in present"; exit 1
           fi
           for p in READ_EXTERNAL_STORAGE WRITE_EXTERNAL_STORAGE SYSTEM_ALERT_WINDOW VIBRATE; do
+            if ! grep -E "android.permission.${p}\"" "$M" | grep -q 'tools:node="remove"'; then
+              echo "permission ${p} lacks a tools:node=remove declaration"; exit 1
+            fi
             if grep -E "android.permission.${p}\"" "$M" | grep -qv 'tools:node="remove"'; then
               echo "permission ${p} is active (should be blocked)"; exit 1
             fi
           done
+          # Pinned ACTIVE permission set (DILCHAT-D3C-M1): exactly INTERNET at the
+          # app-manifest level. POST_NOTIFICATIONS is contributed by the
+          # expo-notifications LIBRARY manifest at Gradle merge time, by design.
+          ACTIVE="$(grep -oE '<uses-permission[^>]*/?>' "$M" \
+            | grep -v 'tools:node="remove"' \
+            | grep -oE 'android:name="[^"]+"' \
+            | sed -E 's/android:name="([^"]+)"/\1/' | sort -u)"
+          if [ "$ACTIVE" != "android.permission.INTERNET" ]; then
+            echo "active permission set drifted from pinned INTERNET-only:"; echo "$ACTIVE"; exit 1
+          fi
           echo "android manifest guard: OK"
 
       # Expo's generated gradle.properties defaults to -Xmx2048m, which can OOM

@@ -1,8 +1,9 @@
-# DilChat Mobile (Phase 1 + Phase 2 hardening + Phase 3D chat)
+# DilChat Mobile (Phase 1 + Phase 2 hardening + Phase 3D chat + Phase 3C push)
 
 Account, birth-profile, partner-invitation, pairing, consent, and the minimal
 1:1 partner chat — the DilChat mobile vertical slice, with Phase 2
-device/deep-link/lifecycle/privacy/native hardening.
+device/deep-link/lifecycle/privacy/native hardening and the Phase 3C
+config-gated push-registration slice.
 
 > **This app provides account, profile, invitation, pairing, consent, and 1:1
 > text chat only. Guna Milan and compatibility analysis remain blocked and
@@ -16,7 +17,8 @@ adds no backend surface and no realtime transport:
 
 - **History** — forward cursor pagination (ascending `server_sequence`; cursors
   are opaque and server-minted), auto-paged to the tail, refreshed by
-  react-query **polling** (`CHAT_POLL_MS`); no WebSocket, no push.
+  react-query **polling** (`CHAT_POLL_MS`); no WebSocket. Push (Phase 3C) is
+  advisory-only and never drives chat state.
 - **Sends** — optimistic pending bubbles keyed by a generated
   `client_message_id` (`src/chat/clientMessageId.ts`); a failed send offers
   Retry/Discard, and Retry replays the **same** key so the backend's idempotency
@@ -25,7 +27,35 @@ adds no backend surface and no realtime transport:
   screen; the backend ignores backward writes.
 - **Tombstones** — a deleted message keeps its row and renders "Message
   deleted"; the client never shows a deleted body. (No delete UI this phase.)
-- **No media, no group chat, no typing/presence, no notifications.**
+- **No media, no group chat, no typing/presence.** Chat correctness never
+  depends on push (see below): polling remains the delivery mechanism.
+
+## Phase 3C — config-gated push registration (`src/push/registration.ts`)
+
+An OPTIONAL delivery enhancement over the merged Phase 3C backend
+(`/v1/devices` + outbox relay). Push availability never determines messaging
+correctness — every failure path degrades silently to REST + polling.
+
+- **Config gate** — token acquisition happens ONLY when an EAS project id is
+  configured via `DILCHAT_EAS_PROJECT_ID` (→ `extra.eas.projectId`, never
+  hardcoded; `scripts/check-config.js` fails a baked-in id). Without it the app
+  never touches the push APIs and runs on polling alone (`skipped_no_config`,
+  distinguishable from `failed_transport` without exposing tokens).
+- **Permission** — requested at most once per launch, only from the OS
+  "undetermined" state; a user who declined is never re-prompted. The
+  permission covers content-free delivery notices only ("You have a new
+  message." — the notification never carries names, message content, or
+  relationship/astrology/safety information; that is the backend relay's
+  contract).
+- **Registration** — granted permission + acquired Expo token →
+  authenticated `POST /v1/devices`. The push token is SENSITIVE: never
+  logged, never displayed, never an authentication credential; logout
+  revocation is the backend's contract.
+- **Android permissions** — the generated app manifest stays pinned to
+  `INTERNET` only (`scripts/check-native-android.sh`); `POST_NOTIFICATIONS`
+  arrives from the expo-notifications library manifest at Gradle merge time
+  per the DEC-3C-M1 amendment. Storage/overlay/VIBRATE stay blocked;
+  `allowBackup=false` unchanged.
 
 ## Phase 2 hardening (device / deep-link / lifecycle / privacy / native)
 

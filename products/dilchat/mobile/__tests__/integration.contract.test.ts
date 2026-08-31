@@ -8,7 +8,7 @@
  * committed response shapes. It never hits a network.
  */
 import { HttpClient, type TokenProvider } from "@/api/client";
-import { AuthApi, BirthProfileApi, ChatApi, CoupleApi, UserApi } from "@/api/endpoints";
+import { AuthApi, BirthProfileApi, ChatApi, CoupleApi, DeviceApi, UserApi } from "@/api/endpoints";
 import { getApiBaseUrl } from "@/config/env";
 import type { BirthProfileCreateRequest } from "@/api/types";
 
@@ -210,5 +210,36 @@ describe("contract-level journey against a fetch mock", () => {
     expect(calls[base + 4]?.body).toEqual({ client_message_id: "client-key-1", body: "sent" });
     expect(calls[base + 5]).toMatchObject({ method: "PUT", path: "/v1/conversations/conv1/read-state", auth: "Bearer ACCESS" });
     expect(calls[base + 5]?.body).toEqual({ last_read_sequence: 3 });
+  });
+
+  it("device journey: register -> list (no token echo) -> revoke", async () => {
+    const base = calls.length;
+    const device = {
+      device_id: "d1",
+      platform: "IOS",
+      status: "ACTIVE",
+      created_at: "2026-01-01T00:00:00Z",
+      revoked_at: null,
+    };
+    reply(201, device);
+    const registered = await DeviceApi.register(client, {
+      push_token: "ExponentPushToken[wire]",
+      platform: "IOS",
+    });
+    expect(registered.device_id).toBe("d1");
+    expect("push_token" in registered).toBe(false); // token is write-only
+
+    reply(200, { devices: [device] });
+    const listed = await DeviceApi.list(client);
+    expect(listed.devices).toHaveLength(1);
+
+    reply(200, { ...device, status: "REVOKED", revoked_at: "2026-01-02T00:00:00Z" });
+    const revoked = await DeviceApi.revoke(client, "d1");
+    expect(revoked.status).toBe("REVOKED");
+
+    expect(calls[base + 0]).toMatchObject({ method: "POST", path: "/v1/devices", auth: "Bearer ACCESS" });
+    expect(calls[base + 0]?.body).toEqual({ push_token: "ExponentPushToken[wire]", platform: "IOS" });
+    expect(calls[base + 1]).toMatchObject({ method: "GET", path: "/v1/devices", auth: "Bearer ACCESS" });
+    expect(calls[base + 2]).toMatchObject({ method: "DELETE", path: "/v1/devices/d1", auth: "Bearer ACCESS" });
   });
 });
