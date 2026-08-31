@@ -265,3 +265,46 @@ class ChatRateLimit(Base):
         ),
         sa.CheckConstraint("count >= 0", name="ck_chat_rate_limit_count"),
     )
+
+
+class SafetyReviewer(Base):
+    """An INDIVIDUAL internal reviewer principal (DEC-PR-4).
+
+    The database role (``dilchat_safety``) is an enforcement posture, not a human
+    identity: every moderation access must be attributable to one of these rows,
+    never to a shared "admin" account and never to a raw database session. The
+    credential is stored as an Argon2 hash — the key itself exists only at
+    provisioning time, is shown once, and is never stored, logged, or echoed.
+
+    Deliberately minimal: no multiple roles, no case assignment, no workforce
+    management. Those belong to the later, separately-ratified moderation
+    product, not to the pilot's read-back surface.
+    """
+
+    __tablename__ = "safety_reviewers"
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    # Operational label (e.g. "reviewer-01"). Never user data, never a secret.
+    label: Mapped[str] = mapped_column(sa.String(64), nullable=False, info=INTERNAL)
+    credential_hash: Mapped[str] = mapped_column(sa.String(255), nullable=False, info=SENSITIVE)
+    role: Mapped[str] = mapped_column(
+        sa.String(32), nullable=False, default=enums.ReviewerRole.READ_ONLY_REVIEWER.value,
+        info=INTERNAL,
+    )
+    status: Mapped[str] = mapped_column(
+        sa.String(16), nullable=False, default=enums.ReviewerStatus.ACTIVE.value, info=INTERNAL
+    )
+    created_at: Mapped[dt.datetime] = mapped_column(UTCDateTime, nullable=False, default=utcnow)
+    last_authenticated_at: Mapped[dt.datetime | None] = mapped_column(UTCDateTime)
+    revoked_at: Mapped[dt.datetime | None] = mapped_column(UTCDateTime)
+
+    __table_args__ = (
+        sa.UniqueConstraint("label", name="uq_safety_reviewer_label"),
+        _enum_check("status", enums.ReviewerStatus),
+        _enum_check("role", enums.ReviewerRole),
+        sa.CheckConstraint(
+            "(status = 'ACTIVE' AND revoked_at IS NULL) "
+            "OR (status = 'REVOKED' AND revoked_at IS NOT NULL)",
+            name="ck_safety_reviewer_revocation_complete",
+        ),
+    )

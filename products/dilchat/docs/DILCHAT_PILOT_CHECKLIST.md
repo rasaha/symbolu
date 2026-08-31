@@ -30,7 +30,8 @@ owner/operator sign-off. Do not tick an item because it "should" hold.
 |---|---|---|
 | 2.1 | Participants are authorized and know this is a pilot | owner |
 | 2.2 | Distribution is non-public (internal build channel) | owner |
-| 2.3 | Participants informed that reports are recorded but **no moderation review workflow exists yet** (DEC-3B-3; the minimal read-back is round PR-D) | owner |
+| 2.3 | Participants informed that reports are recorded and **read by a named internal reviewer**, but that no adjudication or enforcement workflow exists yet (DEC-3B-3) | owner |
+| 2.3a | At least one individual reviewer principal provisioned, and a named person accountable for reading reports | `scripts_moderation provision-reviewer`; owner |
 | 2.4 | Push, if enabled, is disclosed as content-free delivery notices only | owner |
 | 2.5 | A named operator owns the pilot's incident response | owner |
 
@@ -58,6 +59,7 @@ owner/operator sign-off. Do not tick an item because it "should" hold.
 ## 5. Explicitly NOT part of pilot readiness
 
 - Public production launch (separate owner decision).
-- Moderation review workflow (round PR-D provides only a minimal read-back).
+- Moderation **adjudication**: reviewers can read reports and evidence, but
+  nothing resolves, dismisses, or enforces — that is a later ratified product.
 - Destructive retention purging (`retention_purge_enabled` stays `false`).
 - AI Assist, Guna execution, compatibility scoring (parked, DEC-PR-5).

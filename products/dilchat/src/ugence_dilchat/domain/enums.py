@@ -192,6 +192,10 @@ class SafetyCaseEventType(str, enum.Enum):
     EVIDENCE_ACCESSED = "EVIDENCE_ACCESSED"
     STATE_CHANGED = "STATE_CHANGED"
     ACTION_RECORDED = "ACTION_RECORDED"
+    # DEC-PR-4: a reviewer LOOKING at a case is itself an audited access, not
+    # only a change to it. Recorded per case, attributed to an individual
+    # reviewer principal — never a shared identity.
+    CASE_ACCESSED = "CASE_ACCESSED"
 
 
 class SafetyActorType(str, enum.Enum):
@@ -201,6 +205,23 @@ class SafetyActorType(str, enum.Enum):
     SAFETY = "SAFETY"
     SYSTEM = "SYSTEM"
     WORKER = "WORKER"
+
+
+class ReviewerStatus(str, enum.Enum):
+    """Lifecycle of an individual internal reviewer principal (DEC-PR-4)."""
+
+    ACTIVE = "ACTIVE"
+    REVOKED = "REVOKED"
+
+
+class ReviewerRole(str, enum.Enum):
+    """Reviewer capability. The pilot has exactly ONE: read-only review.
+
+    Adjudication, enforcement, appeals, and case assignment are deliberately
+    absent — they are the later, separately-ratified moderation product.
+    """
+
+    READ_ONLY_REVIEWER = "READ_ONLY_REVIEWER"
 
 
 class RetentionState(str, enum.Enum):
