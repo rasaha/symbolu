@@ -96,6 +96,25 @@ class OutboxEventType(str, enum.Enum):
     CONVERSATION_REVOKED = "CONVERSATION_REVOKED"
 
 
+class DevicePlatform(str, enum.Enum):
+    """Client platform of a registered push device (Phase 3C)."""
+
+    IOS = "IOS"
+    ANDROID = "ANDROID"
+    UNKNOWN = "UNKNOWN"
+
+
+class DeviceStatus(str, enum.Enum):
+    """Lifecycle of a push-device registration (Phase 3C).
+
+    REVOKED covers user removal, logout(-all), token displacement by a new
+    sign-in on the same device, and permanent provider rejection.
+    """
+
+    ACTIVE = "ACTIVE"
+    REVOKED = "REVOKED"
+
+
 class BlockStatus(str, enum.Enum):
     """Lifecycle of a directional user block (Phase 3B safety)."""
 
@@ -243,6 +262,8 @@ class AuditAction(str, enum.Enum):
     CONVERSATION_REVOKED = "CONVERSATION_REVOKED"
     MESSAGE_DELETED = "MESSAGE_DELETED"
     # Phase 3B safety (all body-free; no reporter description ever stored here).
+    DEVICE_REGISTERED = "DEVICE_REGISTERED"
+    DEVICE_REVOKED = "DEVICE_REVOKED"
     USER_BLOCK_CREATED = "USER_BLOCK_CREATED"
     USER_BLOCK_REVOKED = "USER_BLOCK_REVOKED"
     CHAT_REPORT_CREATED = "CHAT_REPORT_CREATED"

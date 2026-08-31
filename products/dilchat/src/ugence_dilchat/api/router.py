@@ -16,6 +16,7 @@ from .routes import (
     chat,
     consent,
     couples,
+    devices,
     health,
     natal,
     reports,
@@ -33,3 +34,4 @@ api_router.include_router(consent.router)
 api_router.include_router(chat.router)
 api_router.include_router(blocks.router)
 api_router.include_router(reports.router)
+api_router.include_router(devices.router)

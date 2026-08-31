@@ -291,3 +291,27 @@ class ReportResponse(BaseModel):
 
 class ReportListResponse(BaseModel):
     reports: list[ReportResponse]
+
+
+# --- push devices (Phase 3C) ------------------------------------------------ #
+
+
+class DeviceRegisterRequest(BaseModel):
+    # SENSITIVE: never logged, audited, or echoed back by any response.
+    push_token: str = Field(min_length=1, max_length=2048)
+    platform: str
+
+
+class DeviceResponse(BaseModel):
+    """Deliberately carries NO push token: the token is write-only through this
+    API and is never usable as an authentication credential."""
+
+    device_id: uuid.UUID
+    platform: str
+    status: str
+    created_at: dt.datetime
+    revoked_at: dt.datetime | None
+
+
+class DeviceListResponse(BaseModel):
+    devices: list[DeviceResponse]
