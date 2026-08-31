@@ -6,6 +6,15 @@ contract-amendment round specification. **No implementation is performed by
 this ADR, and none is authorized by it** — see §3: the implementation gate
 stands, and an authorization ruling was deliberately not part of this ballot.
 
+> **Superseded in part as to authorization (2026-08-31, `ACC-AM-IMPL=YES`).**
+> "none is authorized by it" is retained verbatim above as the record of what
+> was true of the six-item ballot this ADR records. `[R]` A **later, separate
+> ruling the same day** — recorded at §6, put over this ADR as it stood at
+> commit `1cc0a6e2ab4a7020e21a1909a169fe3f82311a66` — grants implementation
+> authority under §3's stated terms. The rest of the sentence stands unchanged:
+> this ADR still performs no implementation, and authorization is not
+> implementation.
+
 **Date:** 2026-08-31.
 
 **Decision owner:** the repository owner, ruling personally in conversation on
@@ -150,6 +159,10 @@ change set's act, and the change set is not authorized here.
 
 ## 3. Implementation gate — nothing is authorized by this ballot `[R]`
 
+*(Recorded as ruled on the six-item ballot; the gate this section describes was
+subsequently opened by the separate `ACC-AM-IMPL` ruling — see §6, which
+governs.)*
+
 **No amendment code may begin.** The ballot carried no authorization line by
 design, the owner's answer contains none, and this ADR grants none. `[I]` This
 is the standing discipline in the same position it held between `ACC-S1-BASE`
@@ -194,4 +207,46 @@ both constitution distributions at `0.1.0`.
 **Next steps after this ADR merges**, in the ratified sequencing: an explicit
 owner ruling on implementation authority for the amendment's change set (§3),
 then that change set itself. First release of the Agent Constitution first
-slice requires both.
+slice requires both. *(The first of these has since been ruled — §6; the
+change set remains gated on this ADR reaching the default branch.)*
+
+---
+
+## 6. `ACC-AM-IMPL` — implementation authority, recorded (2026-08-31) `[R]`
+
+**Ruled: YES**, by the repository owner personally, in conversation on
+2026-08-31, on a one-item ballot put **after** the six-item ballot §§1–2 record
+and **over this ADR as it stood at commit
+`1cc0a6e2ab4a7020e21a1909a169fe3f82311a66`**. `[V]` That commit was the branch
+head at ruling time, with a clean tree, and the substantive freeze digest
+reproduced unchanged
+(`d993093570bb8ee132d4ab58406a14dd8c9b774b9de2c6d7ac45d3dfd3fac036`).
+
+**Recorded exactly as ruled:** `ACC-AM-IMPL=YES`
+
+The ballot's operative text, in full: authorize implementation of the ratified
+contract amendment — one atomic change set to the Agentic Proposer alone,
+implementing `ACC-AM-BASE` and `ACC-AM-1`..`ACC-AM-5` exactly as recorded:
+required `constitution_ref` on the role-contract surface; required
+`constitution_policy_id`/`constitution_policy_version` `Token`s inside
+`P_unsigned` mirrored per G2, stamped from an injected constitution resolution;
+`advisory_version` held at `"1"`; version `0.3.1` → `0.4.0` with 51 exported
+names unchanged and the snapshot's field lists updated; suite, CHANGELOG and
+replay obligations updated accordingly; substantive freeze digest unchanged. It
+authorizes no departure from any `ACC-AM` ruling, no change to Policy Authority
+or either constitution distribution, and **only after this ratification ADR has
+merged** into the default branch.
+
+`[R]` **What this changes, precisely.** The §3 gate is opened **as a ruling**:
+the amendment is now specified, decided and authorized to be built — the
+position `ACC-S1-IMPL` occupied for the two distributions. `[G]` **It is not
+closed as a fact**: no field exists on any surface, and none may be described
+as existing until the change set lands. The merge precondition is part of the
+ruling: no implementation change set may begin ahead of this ADR reaching the
+default branch.
+
+`[R]` **Numbering.** `ACC-AM-IMPL` is scoped to this ADR like its §§1–2
+siblings; no standing series number is assigned, and no prior ruling is
+extended, narrowed or reopened. This section records one authorization and
+nothing else; §§3–5 stand as the record of the ballot that preceded it, read
+subject to this section.
