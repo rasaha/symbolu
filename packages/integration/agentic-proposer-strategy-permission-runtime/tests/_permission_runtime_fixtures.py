@@ -55,6 +55,22 @@ T_AFTER = datetime(2027, 6, 1, tzinfo=timezone.utc)
 TENANT = "tenant-1"
 CASE_REF = "case-1"
 STRATEGY_POLICY_REF = "policy-authority/strategy-permission/reconciliation"
+#: `ACC-AM-1`/`ACC-AM-2` (the OD-C1=B amendment, proposer 0.4.0). The role now
+#: bears a required constitution reference, and the advisory builders stamp the
+#: governing constitution's identity from an injected resolution. This fixture
+#: is TESTS-ONLY support for that packaging fact: a minimal local object carrying
+#: exactly the fields the proposer's stamping boundary reads. It resolves
+#: nothing and proves nothing about any constitution.
+CONSTITUTION_REF = "ugence.agent-constitution/tenant-1/baseline/v1"
+
+
+class _ConstitutionResolutionStub:
+    class _Metadata:
+        policy_id = "agent-constitution-baseline"
+        version = "1.0.0"
+
+    metadata = _Metadata()
+    agent_constitution_ref = CONSTITUTION_REF
 POLICY_ID = "agentic-proposer-strategy-permission"
 POLICY_VERSION = "1.0.0"
 
@@ -207,7 +223,8 @@ def make_world(*, resolver, declared=None, candidate_count: int = 1, provider=No
         permitted_candidate_dispositions=[ap.CandidateDisposition.RECOMMEND_WITHHOLD],
         permitted_review_actions=[ap.ReviewAction.ROUTE_APPROVAL_BUNDLE],
         escalation_role_ref="role-2", activation_status=ap.RoleActivationStatus.ACTIVE,
-        strategy_policy_ref=STRATEGY_POLICY_REF)
+        strategy_policy_ref=STRATEGY_POLICY_REF,
+        constitution_ref=CONSTITUTION_REF)
     mandate = ap.WorkMandate(
         schema_version="1.0", tenant_id=TENANT, created_at=ADVISORY_INSTANT,
         mandate_id="mandate-1", case_ref=CASE_REF,
@@ -257,6 +274,7 @@ def make_world(*, resolver, declared=None, candidate_count: int = 1, provider=No
         requested_review_destination_role_ref=(
             "role-approver" if candidate_count == 1 else None),
         strategy_policy_resolver=resolver,
+        constitution_resolution=_ConstitutionResolutionStub(),
         declared_strategy=declared or SINGLE)
     record = ap.build_proposer_process_record(
         process_record_id="rec-1", tenant_id=TENANT, case_ref=CASE_REF,

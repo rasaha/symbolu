@@ -598,9 +598,15 @@ than under C5b, because a C5b entry demands the C5b pattern and an enum field ca
 string constraint at all; that is a property of such a registry's scheme, not a
 reclassification of the field.
 
+`[V]` **Since the `OD-C1=B` amendment (`ACC-AM-2`):** `constitution_policy_id` and
+`constitution_policy_version` on `ProposerAdvisory`, on exactly the strategy pair's
+grounds — each is matched by equality against the resolved constitution's own identity,
+not carried and compared whole.
+
 `[R]` `CognitiveRoleContract.strategy_policy_ref` is **C5a, not C5b**: it is an opaque
 handle minted by an external issuer, carried and compared whole and never split or
-normalised, which is precisely the C5a/C5b distinction this section draws.
+normalised, which is precisely the C5a/C5b distinction this section draws — and
+`CognitiveRoleContract.constitution_ref` is **C5a on the same terms** (`ACC-AM-1`).
 
 ### C5c — Human-readable free text
 
@@ -862,9 +868,10 @@ validates it and never sets or changes it.
 
 ## D2 — `CognitiveRoleContract`
 
-**Cardinality: 11 fields** — the eight below plus the three C2 common fields (`schema_version`, `tenant_id`, `created_at`). Stated in D1's form so that I5's pinned registry can be checked
+**Cardinality: 12 fields** — the nine below plus the three C2 common fields (`schema_version`, `tenant_id`, `created_at`). Stated in D1's form so that I5's pinned registry can be checked
 for completeness by exact membership. `[V]` S2-B took this from 10 to 11 by adding
-`strategy_policy_ref` (`S2B-S1-Q2=A`, `S2B-R2-Q3=A`).
+`strategy_policy_ref` (`S2B-S1-Q2=A`, `S2B-R2-Q3=A`); the `OD-C1=B` amendment took it
+from 11 to 12 by adding `constitution_ref` (`ACC-AM-1`).
 
 D1 and D8: a proposer-local **v0** projection, never re-exported to any shared contract
 package, carrying no constitution-derived attribute, exposing no role lifecycle verb.
@@ -879,6 +886,16 @@ package, carrying no constitution-derived attribute, exposing no role lifecycle 
 | `escalation_role_ref` | `str` | yes | no | none | 1 | open | C5a | external role owner | no |
 | `activation_status` | `RoleActivationStatus` | yes | no | none | 1 | **closed**: `ACTIVE`, `INACTIVE` | enum membership | external role owner — **input fact, never computed** (D1) | no |
 | `strategy_policy_ref` | `str` | yes | **no** | none | 1 | open | C5a; a **reference only** to an externally issued, signed, versioned and revocable Policy Authority strategy-permission policy (`S2B-D1=A`) | external policy issuer | no |
+| `constitution_ref` | `str` | yes | **no** | none | 1 | open | C5a; a **reference only** to an externally issued, signed, versioned and revocable Policy Authority agent constitution, on `strategy_policy_ref`'s exact precedent (`ACC-AM-1`) | external constitution issuer | no |
+
+`[R]` **`constitution_ref` bears a reference and never the constitution's bounds.**
+`ACC-AM-1` adds it on `strategy_policy_ref`'s exact terms: resolving it to a
+constitution is an injected boundary outside this package, and the constitution's
+structural bounds never become role data. It is a reference the role bears, not a
+constitution-derived attribute; the readiness re-derivation obligation stands
+separately and unchanged (`ACC-AM-4`: re-derivation changes nothing yet, re-arming
+when clause content beyond the structural bounds is ratified), and nothing here should
+be read as the projection anticipating the constitution correctly.
 
 `[R]` **`strategy_policy_ref` bears a reference and never the permitted set.**
 `S2B-D1=A` rules that the permitted set is **not role data**: it is resolved at call time
@@ -1106,7 +1123,7 @@ identity field; identity is computed only through `ugence_jcs`; the eight barred
 `workflow_id`, `instance_id`, `task_id`) appear at no nesting depth; no exported name
 begins with `Proposal` or `Recommendation`.
 
-**Cardinality: 30 fields** — the twenty-seven below plus the three C2 common fields
+**Cardinality: 32 fields** — the twenty-nine below plus the three C2 common fields
 (`schema_version`, `tenant_id`, `created_at`). Stated in D1's form so that I5's pinned
 registry can be checked for completeness by exact membership. `[I]` OD-4(a) took the
 count to twenty-three by adding `candidates`, with `candidate_set_id` retained alongside
@@ -1114,7 +1131,8 @@ it rather than replaced by it; OD-7 part 5 took it to twenty-seven by mirroring
 `AdvisoryCandidateSet`'s evaluation-profile and selector-policy pairs, which is what
 puts them inside `P_unsigned`; `S2B-D6=B1` took it to **thirty** by binding the governing
 strategy-policy identity, its version and one scalar declared-strategy assertion into that
-same projection.
+same projection; the `OD-C1=B` amendment took it to **thirty-two** by binding the
+governing constitution's identity and version on the same terms (`ACC-AM-2`).
 
 **This contract carries its candidates and references every other input by identifier.**
 
@@ -1150,6 +1168,8 @@ R-1b binds the nested sequence to that set's `candidates`.
 | `strategy_policy_id` | `str` | yes | **no** | none | 1 | open | C5b; **package-stamped** from the injected resolver's correlated response, never a caller parameter (`S2B-D7=A`) | this package, from the resolved policy | **yes** |
 | `strategy_policy_version` | `str` | yes | **no** | none | 1 | open | C5b; a **string**, never a number (C3); package-stamped on the same terms | this package, from the resolved policy | **yes** |
 | `declared_strategy` | `ReasoningStrategy` | yes | **no** | none | 1 | **closed, `S2B-R2-Q1=A`** | enum membership, fail-closed at construction (`S2B-R2-Q5=A`); permitted-set membership tested **before** construction; shape correspondence tested at **replay** only | this package, **on the producer's word** | **yes** |
+| `constitution_policy_id` | `str` | yes | **no** | none | 1 | open | C5b; **package-stamped** from the injected constitution resolution after its signed `agent_constitution_ref` is checked equal to the role's `constitution_ref`, never a caller parameter (`ACC-AM-2`) | this package, from the resolved constitution | **yes** |
+| `constitution_policy_version` | `str` | yes | **no** | none | 1 | open | C5b; a **string**, never a number (C3); package-stamped on the same terms | this package, from the resolved constitution | **yes** |
 | `recommended_disposition` | `CandidateDisposition \| None` | yes (explicit) | yes | `None` | 0..1 | closed, D4 | R-1a, R-1b (B6) | this package | yes |
 | `requested_review_action` | `ReviewAction \| None` | yes (explicit) | yes | `None` | 0..1 | closed, B8 | R-1a, R-1b (B6) | this package | yes |
 | `requested_review_destination_role_ref` | `str \| None` | yes (explicit) | yes | `None` | 0..1 | open | C5a when non-null; R-1a, R-1b (B6) | this package | yes |
@@ -1196,6 +1216,16 @@ accepting them from a caller would let a caller label an advisory with a policy 
 not govern it. **The declared strategy is supplied by the producer and bound as an
 assertion, never as an authorization.** `[R]` A caller-supplied value is not
 authoritative merely because it is structured or digest-bound.
+
+`[R]` **`ACC-AM-2` — the constitution pair, on the same discipline.** The governing
+constitution's identity and version are **package-stamped from the injected
+constitution resolution**, never accepted as caller parameters, and stamped only after
+the resolution's signed `agent_constitution_ref` is checked **equal** to the role's
+`constitution_ref` — the binding the `OD-C1=B` amendment round ratified. That equality
+is a correlation check with the same disclosed ceiling every echo here carries: it is
+not a defence against a dishonest resolver, and nothing in this package verifies the
+constitution's issuer or signature — that is the Policy Authority resolution boundary
+outside it.
 
 `[R]` **Digest membership proves integrity after construction, never provenance.**
 Inclusion in the identity projection establishes that a value was not altered afterwards;
@@ -1931,11 +1961,12 @@ into the `advisory_digest=` keyword. The construction is therefore:
    `ProposerAdvisory` **except** `advisory_digest`, with identical types, defaults,
    validators and serializers. Call the validated instance `payload`.
 
-   `[V]` **Cardinality: 29** — `ProposerAdvisory`'s thirty minus `advisory_digest`. The
-   count is stated so the equivalence is checkable by exact membership, but the
+   `[V]` **Cardinality: 31** — `ProposerAdvisory`'s thirty-two minus `advisory_digest`.
+   The count is stated so the equivalence is checkable by exact membership, but the
    obligation is the **equality**, not the number: the payload's field set must equal
    `set(ProposerAdvisory.model_fields) - {"advisory_digest"}` exactly. `[I]` OD-7 part 5
-   took it from 22 to 26 and `S2B-D6=B1` from 26 to 29; on each occasion, omitting the
+   took it from 22 to 26, `S2B-D6=B1` from 26 to 29 and `ACC-AM-2` from 29 to 31; on
+   each occasion, omitting the
    new fields here would have placed them inside the advisory and **outside**
    `P_unsigned`, which for S2-B is precisely the weak linked-record shape `S2B-D6=B1`
    rejected. That is why the mirror is an obligation rather than a convenience.
@@ -1984,16 +2015,17 @@ into the `advisory_digest=` keyword. The construction is therefore:
    )
    ```
 
-   The **twenty-nine** pass-through keywords are the twenty-nine D7 fields other than
-   `advisory_digest`; `advisory_digest` is the **thirtieth** and is the one computed
+   The **thirty-one** pass-through keywords are the thirty-one D7 fields other than
+   `advisory_digest`; `advisory_digest` is the **thirty-second** and is the one computed
    here. **Explicit field pass-through is the normative spelling**, and the reason is
    given below: no `model_dump()` of any mode is a lawful constructor input for this
    model. `[V]` The block above is stated at the current field set: it gained OD-7 part
-   5's four mirrored evaluation and selector-policy fields and `S2B-D6=B1`'s three
-   strategy fields, and I7.16's structural test is what requires it to keep pace.
+   5's four mirrored evaluation and selector-policy fields, `S2B-D6=B1`'s three
+   strategy fields and `ACC-AM-2`'s constitution pair, and I7.16's structural test is
+   what requires it to keep pace.
 
    **The keyword set must equal the field set exactly, and this is checked
-   structurally.** `[V]` **Sixteen of the thirty** fields are declared with a default —
+   structurally.** `[V]` **Sixteen of the thirty-two** fields are declared with a default —
    `schema_version`, `kind`, `advisory_version`, `parent_advisory_digest`,
    `domain_evaluation_profile_id`, `domain_evaluation_profile_version`,
    `selected_candidate_id`, `selection_policy_id`, `selection_policy_version`,
@@ -2129,7 +2161,7 @@ that function and never surfaces as a field, so C3 is not weakened.
 There are four, and no field falls outside them. `[I]` The table below is a completeness
 statement about the *sources*; the corresponding completeness statement about the
 *construction call* is G2's, enforced by I7.16 — a field may not be omitted from the
-pass-through merely because it carries a default, and sixteen of the thirty do.
+pass-through merely because it carries a default, and sixteen of the thirty-two do.
 
 | Source | Fields |
 | --- | --- |
@@ -2261,6 +2293,7 @@ def build_proposer_advisory(
     requested_review_destination_role_ref: str | None,
     strategy_policy_resolver: StrategyPolicyResolver,
     declared_strategy: ReasoningStrategy,
+    constitution_resolution,
 ) -> ProposerAdvisory: ...
 
 
@@ -2284,6 +2317,7 @@ def build_advisory_revision(
     requested_review_destination_role_ref: str | None,
     strategy_policy_resolver: StrategyPolicyResolver,
     declared_strategy: ReasoningStrategy,
+    constitution_resolution,
 ) -> ProposerAdvisory: ...
 
 
@@ -2812,7 +2846,7 @@ temporary representative shapes rather than a declared contract module.
    narrowed to fewer fields without failing.
 
    `[V]` **Enforcement is behavioural first.** The guard constructs the bearer from a
-   complete valid fixture supplying all thirty fields and exercises the
+   complete valid fixture supplying all thirty-two fields and exercises the
    four coupling cases as live validation outcomes, keeps
    `CandidateAdvisory.requested_review_action` required and non-null, and proves the
    bearer-scoped rule does not reach a class merely sharing the field name. Static AST
@@ -3036,7 +3070,7 @@ introduces the first contract, to the full H3 surface, and not before.
     call — and not the builder's result, because the result is exactly what cannot
     distinguish an omission from a default.
 
-    `[V]` It is required because omission can be silent: sixteen of the thirty
+    `[V]` It is required because omission can be silent: sixteen of the thirty-two
     fields are declared with a default, and for **five** of them — `advisory_version`,
     `parent_advisory_digest`, `claim_summaries`, `observation_refs` and `uncertainties` —
     dropping one from the pass-through constructs successfully, silently carries the
@@ -3048,10 +3082,11 @@ introduces the first contract, to the full H3 surface, and not before.
     set and not of the rule.
 
     `[I]` The obligation is stated over the *field set*, not over a written list of
-    names, so that adding a thirty-first field to `ProposerAdvisory`
-    fails this test until the pass-through is updated. `[V]` It has now done so twice —
-    OD-7 part 5 took the set to twenty-seven and `S2B-D6=B1` to thirty — and on both
-    occasions the pass-through was updated in the same change set, which is the
+    names, so that adding a thirty-third field to `ProposerAdvisory`
+    fails this test until the pass-through is updated. `[V]` It has now done so three
+    times — OD-7 part 5 took the set to twenty-seven, `S2B-D6=B1` to thirty and
+    `ACC-AM-2` to thirty-two — and on each
+    occasion the pass-through was updated in the same change set, which is the
     behaviour this wording was chosen to force. A newly added defaulted
     identity-participating field is precisely the case that would otherwise enter
     `P_unsigned` through the payload while never being passed to the constructor.

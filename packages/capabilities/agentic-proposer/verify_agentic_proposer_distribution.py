@@ -51,7 +51,7 @@ import sys
 from datetime import datetime, timezone
 import ugence_agentic_proposer as ap
 
-assert ap.__version__ == "0.3.1", ap.__version__
+assert ap.__version__ == "0.4.0", ap.__version__
 assert "site-packages" in ap.__file__, ap.__file__
 assert not any("/symbolu" in p for p in sys.path), sys.path
 
@@ -120,7 +120,8 @@ role = ap.CognitiveRoleContract(
     permitted_candidate_dispositions=[ap.CandidateDisposition.RECOMMEND_WITHHOLD],
     permitted_review_actions=[ap.ReviewAction.ROUTE_APPROVAL_BUNDLE],
     escalation_role_ref="r2", activation_status=ap.RoleActivationStatus.ACTIVE,
-    strategy_policy_ref="policy-authority/strategy-permission/v0")
+    strategy_policy_ref="policy-authority/strategy-permission/v0",
+    constitution_ref="ugence.agent-constitution/t/baseline/v1")
 mandate = ap.WorkMandate(
     schema_version="1.0", tenant_id="t", created_at=NOW, mandate_id="m",
     case_ref="c", assigned_role_contract_id="r", purpose="reconcile",
@@ -182,6 +183,18 @@ candidate_set = ap.build_advisory_candidate_set(
     candidates=(candidate,), selected_candidate_id="cand",
     domain_evaluation_profile_id="profile.v0",
     domain_evaluation_profile_version="1.0.0")
+# --- ACC-AM-2: the injected constitution resolution the builders stamp from ---
+class _ConstitutionResolution:
+    class _Metadata:
+        policy_id = "agent-constitution-baseline"
+        version = "1.0.0"
+
+    metadata = _Metadata()
+    agent_constitution_ref = "ugence.agent-constitution/t/baseline/v1"
+
+
+constitution_resolution = _ConstitutionResolution()
+
 advisory = ap.build_proposer_advisory(
     tenant_id="t", case_ref="c", created_at=NOW, identity=identity, role=role,
     mandate=mandate, context=context, observations=[observation],
@@ -190,6 +203,7 @@ advisory = ap.build_proposer_advisory(
     expected_profile_id="profile.v0", expected_profile_version="1.0.0",
     requested_review_destination_role_ref="role-approver",
     strategy_policy_resolver=resolver,
+    constitution_resolution=constitution_resolution,
     declared_strategy=ap.ReasoningStrategy.SINGLE_CANDIDATE_UNREVISED)
 assert ap.verify_advisory_identity(advisory=advisory) is True
 assert advisory.selected_candidate_id == "cand"
@@ -220,6 +234,7 @@ try:
         expected_profile_id="profile.v0", expected_profile_version="1.0.0",
         requested_review_destination_role_ref="role-approver",
         strategy_policy_resolver=resolver,
+        constitution_resolution=constitution_resolution,
         declared_strategy=ap.ReasoningStrategy.SINGLE_CANDIDATE_UNREVISED)
 except ap.DomainEvaluationProviderError:
     pass
@@ -275,6 +290,7 @@ try:
         expected_profile_id="profile.v0", expected_profile_version="1.0.0",
         requested_review_destination_role_ref="role-approver",
         strategy_policy_resolver=_PermitsNothing(),
+        constitution_resolution=constitution_resolution,
         declared_strategy=ap.ReasoningStrategy.SINGLE_CANDIDATE_UNREVISED)
 except ap.CrossContractViolationError:
     pass

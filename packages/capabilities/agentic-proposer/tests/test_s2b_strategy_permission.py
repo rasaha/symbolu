@@ -60,7 +60,8 @@ def _world(*, provider=None, resolver=None, declared=None, parent=None):
         permitted_candidate_dispositions=[ap.CandidateDisposition.RECOMMEND_WITHHOLD],
         permitted_review_actions=[ap.ReviewAction.ROUTE_APPROVAL_BUNDLE],
         escalation_role_ref="role-2", activation_status=ap.RoleActivationStatus.ACTIVE,
-        strategy_policy_ref=spec.STRATEGY_POLICY_REF)
+        strategy_policy_ref=spec.STRATEGY_POLICY_REF,
+        constitution_ref=spec.CONSTITUTION_REF)
     mandate = ap.WorkMandate(
         schema_version="1.0", tenant_id="tenant-1", created_at=FIXED_INSTANT,
         mandate_id="mandate-1", case_ref="case-1", assigned_role_contract_id="role-1",
@@ -103,6 +104,7 @@ def _world(*, provider=None, resolver=None, declared=None, parent=None):
         expected_profile_version=spec.PROFILE_VERSION,
         requested_review_destination_role_ref="role-approver",
         strategy_policy_resolver=resolver,
+        constitution_resolution=spec.StubConstitutionResolution(),
         declared_strategy=(declared
                            or ap.ReasoningStrategy.SINGLE_CANDIDATE_UNREVISED))
     record = ap.build_proposer_process_record(
@@ -136,6 +138,7 @@ def _builder_kwargs(world, **overrides):
         expected_profile_version=spec.PROFILE_VERSION,
         requested_review_destination_role_ref="role-approver",
         strategy_policy_resolver=world["resolver"],
+        constitution_resolution=spec.StubConstitutionResolution(),
         declared_strategy=ap.ReasoningStrategy.SINGLE_CANDIDATE_UNREVISED)
     kwargs.update(overrides)
     return kwargs
@@ -261,25 +264,32 @@ def test_the_private_payload_mirrors_the_three_fields(world):
 # --------------------------------------------------------------------------- #
 
 def test_neither_advisory_builder_accepts_a_policy_identity_or_version_parameter():
-    """`S2B-D7=A` with `S2B-S1-Q5=A`: each builder gains **exactly two** keyword-only
-    parameters, and neither is a policy identity or version. Read off the signatures,
-    because a caller-supplied value is not authoritative merely because it is structured
-    or digest-bound — the whole point of OD-7 part 5's selector-policy precedent."""
+    """`S2B-D7=A` with `S2B-S1-Q5=A`: each builder gained **exactly two** keyword-only
+    parameters at `0.3.0`, and neither is a policy identity or version. Read off the
+    signatures, because a caller-supplied value is not authoritative merely because it
+    is structured or digest-bound — the whole point of OD-7 part 5's selector-policy
+    precedent. The `OD-C1=B` amendment (`ACC-AM-2`, `0.4.0`) added **exactly one**
+    more on the same discipline — ``constitution_resolution``, the injected resolved
+    constitution the identity pair is stamped from — and, like the strategy pair, the
+    constitution identity pair itself is barred from the signatures."""
     import inspect
 
     for builder, before in ((ap.build_proposer_advisory, 18),
                             (ap.build_advisory_revision, 16)):
         params = inspect.signature(builder).parameters
         assert all(p.kind is inspect.Parameter.KEYWORD_ONLY for p in params.values())
-        assert len(params) == before + 2, (
-            f"{builder.__name__} must gain exactly two parameters (S2B-S1-Q5=A)")
+        assert len(params) == before + 2 + 1, (
+            f"{builder.__name__} must carry S2B-S1-Q5=A's two additions plus "
+            "ACC-AM-2's one, and nothing further")
         assert "strategy_policy_resolver" in params
         assert "declared_strategy" in params
+        assert "constitution_resolution" in params
         for barred in ("strategy_policy_id", "strategy_policy_version",
-                       "permitted_strategies", "policy"):
+                       "permitted_strategies", "policy",
+                       "constitution_policy_id", "constitution_policy_version"):
             assert barred not in params, (
-                f"{builder.__name__} accepts {barred!r}; S2B-D7=A package-stamps it "
-                "from an independently resolved policy instead")
+                f"{builder.__name__} accepts {barred!r}; S2B-D7=A and ACC-AM-2 "
+                "package-stamp it from an independently resolved policy instead")
 
 
 def test_the_stamped_identity_comes_from_the_resolver_not_from_any_caller(world):
@@ -303,7 +313,8 @@ def test_the_stamped_version_is_a_string_never_a_number(world):
             strategy_policy_id=spec.STRATEGY_POLICY_ID,
             strategy_policy_version=1,  # noqa: the point of the probe
             permitted_strategies=(ap.ReasoningStrategy.REVISED_ADVISORY,),
-            strategy_policy_ref=spec.STRATEGY_POLICY_REF)
+            strategy_policy_ref=spec.STRATEGY_POLICY_REF,
+            constitution_ref=spec.CONSTITUTION_REF)
 
 
 def test_the_process_record_derives_both_values_from_the_advisory(world):
@@ -829,6 +840,7 @@ def test_a_revision_declares_and_replays_as_revised_advisory():
         expected_profile_version=spec.PROFILE_VERSION,
         requested_review_destination_role_ref="role-approver",
         strategy_policy_resolver=world["resolver"],
+        constitution_resolution=spec.StubConstitutionResolution(),
         declared_strategy=ap.ReasoningStrategy.REVISED_ADVISORY)
     assert revision.parent_advisory_digest == parent.advisory_digest
     assert revision.declared_strategy is ap.ReasoningStrategy.REVISED_ADVISORY
