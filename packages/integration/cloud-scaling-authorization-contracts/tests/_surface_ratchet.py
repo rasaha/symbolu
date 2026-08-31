@@ -172,17 +172,59 @@ def baseline_revision(repo: pathlib.Path) -> str:
             raise SurfaceRatchetBaselineUnavailable(
                 f"UGENCE_RATCHET_BASE={injected!r} does not resolve to a commit"
             )
-        return resolved.strip()
+        return _require_baseline_precedes_head(repo, resolved.strip(), source=repr(injected))
     for ref in _candidate_base_refs(repo):
         if _git(repo, "rev-parse", "--verify", f"{ref}^{{commit}}") is None:
             continue
         merge_base = _git(repo, "merge-base", "HEAD", ref)
         if merge_base:
-            return merge_base.strip()
+            return _require_baseline_precedes_head(
+                repo, merge_base.strip(), source=f"merge base with {ref}"
+            )
     raise SurfaceRatchetBaselineUnavailable(
         "no default-branch ref is available to take a merge base against; set "
         "UGENCE_RATCHET_BASE to the revision this change started from"
     )
+
+
+def _require_baseline_precedes_head(repo: pathlib.Path, revision: str, *, source: str) -> str:
+    """Refuse a baseline that already contains the change under test.
+
+    The docstring above claimed this module mirrors the partition ratchet "including the
+    refusal to fall back to HEAD" — but that guard covered only the *resolution* path, not
+    the answer. Both paths could still return a revision containing ``HEAD``, and then
+    :func:`ratchet_problems` reads the post-change allowlist on both sides: nothing added,
+    gate green, for every widening.
+
+    Not hypothetical, and worse than the partition ratchet's version of the same hole
+    because this one failed *open*: on every default-branch push the workflow computed
+    ``git merge-base HEAD <default>`` — HEAD itself — injected it as
+    ``UGENCE_RATCHET_BASE``, and the gate passed. Measured on run 33317988694 (the push of
+    merge commit ``a24d9c6b``): the job's environment shows the baseline equal to the head
+    SHA, and the job is green. A baseline that contains the change is therefore refused as
+    *unavailable* rather than used: no baseline is a visible skip (or a failure under
+    ``UGENCE_RATCHET_REQUIRED``), and a vacuous pass is neither.
+    """
+
+    head = _git(repo, "rev-parse", "--verify", "HEAD^{commit}")
+    if head is None:
+        raise SurfaceRatchetBaselineUnavailable("HEAD does not resolve to a commit")
+    head = head.strip()
+    if revision == head:
+        raise SurfaceRatchetBaselineUnavailable(
+            f"the baseline ({source}) resolved to HEAD itself ({head[:12]}). Comparing the "
+            "change against itself reports no growth for every widening on it, so the gate "
+            "would pass vacuously"
+        )
+    # ``--is-ancestor`` exits 0 when HEAD is an ancestor of ``revision``; ``_git`` maps a
+    # non-zero exit to None, so a non-None result means the baseline already contains HEAD.
+    if _git(repo, "merge-base", "--is-ancestor", head, revision) is not None:
+        raise SurfaceRatchetBaselineUnavailable(
+            f"the baseline ({source}) resolved to {revision[:12]}, which already contains "
+            f"HEAD ({head[:12]}). A baseline that includes the change under test carries the "
+            "post-change allowlist on both sides, so the gate would pass vacuously"
+        )
+    return revision
 
 
 def _candidate_base_refs(repo: pathlib.Path) -> "list[str]":

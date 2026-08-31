@@ -149,6 +149,60 @@ def test_an_unchanged_allowlist_is_not_asked_to_disclose_anything():
 # Against real history
 # ======================================================================================
 @pytest.mark.skipif(REPO is None, reason="no checkout: there is no history to ratchet against")
+def test_a_baseline_containing_head_is_refused_rather_than_compared():
+    """The vacuous-pass hole the partition ratchet closed at 5B-3, closed here too.
+
+    This module's version failed *open*: on every default-branch push the workflow
+    computed ``git merge-base HEAD <default>`` — HEAD itself — injected it, and the gate
+    passed green (measured on run 33317988694, whose environment shows
+    ``UGENCE_RATCHET_BASE`` equal to the head SHA). Injecting ``HEAD`` must now be refused
+    in the tested code, not only by the workflow's own guard.
+    """
+
+    previous = os.environ.get("UGENCE_RATCHET_BASE")
+    os.environ["UGENCE_RATCHET_BASE"] = "HEAD"
+    try:
+        with pytest.raises(SurfaceRatchetBaselineUnavailable) as excinfo:
+            baseline_revision(REPO)
+    finally:
+        if previous is None:
+            os.environ.pop("UGENCE_RATCHET_BASE", None)
+        else:
+            os.environ["UGENCE_RATCHET_BASE"] = previous
+    assert "vacuous" in str(excinfo.value)
+
+
+@pytest.mark.skipif(REPO is None, reason="no checkout: there is no history to ratchet against")
+def test_a_baseline_strictly_preceding_head_is_accepted():
+    """The positive control, so the refusal above cannot be passing by refusing everything.
+
+    ``HEAD^1`` is the exact baseline the fixed workflow injects on a default-branch push;
+    it strictly precedes HEAD, so the guard must let it through unchanged. Skips only in a
+    truncated clone where HEAD has no reachable parent to resolve.
+    """
+
+    import subprocess
+
+    probe = subprocess.run(
+        ["git", "rev-parse", "--verify", "HEAD^1^{commit}"],
+        cwd=str(REPO), capture_output=True, text=True,
+    )
+    if probe.returncode != 0:
+        pytest.skip("HEAD has no reachable parent in this clone")
+    parent = probe.stdout.strip()
+
+    previous = os.environ.get("UGENCE_RATCHET_BASE")
+    os.environ["UGENCE_RATCHET_BASE"] = "HEAD^1"
+    try:
+        assert baseline_revision(REPO) == parent
+    finally:
+        if previous is None:
+            os.environ.pop("UGENCE_RATCHET_BASE", None)
+        else:
+            os.environ["UGENCE_RATCHET_BASE"] = previous
+
+
+@pytest.mark.skipif(REPO is None, reason="no checkout: there is no history to ratchet against")
 def test_this_change_did_not_widen_the_surface_without_disclosing_it():
     """The gate itself. Skips only where there is no honest baseline, never silently passes."""
 
