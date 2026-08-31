@@ -374,6 +374,16 @@ python packages/integration/cloud-scaling-producer-attestation/scripts/verify_is
 python -m build packages/integration/cloud-scaling-producer-attestation
 ```
 
-`GUARD_SWEEP.md` publishes the canonical guard inventory and the mutation sweep:
-every security-relevant gate is neutralised independently in a disposable untracked copy,
-and every survivor is classified.
+`GUARD_INVENTORY.md` publishes the canonical guard inventory and classification, and the
+gate-removal mutation sweep runs through the shared Cloud Scaling engine:
+
+```bash
+python scripts/cloud_scaling/guard_sweep.py producer-attestation --inventory-only
+python scripts/cloud_scaling/guard_sweep.py producer-attestation --shard 1/1
+```
+
+Every decision point — the `if` layer plus the ratified additive classes (`except`-arm
+typed rejections, helper-admission calls, `else`-arm refusals) — is neutralised
+independently in a disposable untracked copy, and every site is either killed by the
+suite or carries a declared exclusion from the closed vocabulary in
+`scripts/cloud_scaling/guard_sweep.py`, each naming the test that measures its claim.

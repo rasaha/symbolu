@@ -208,7 +208,14 @@ def test_a_borrowed_capability_fails_the_separation_with_its_own_refusal(
     )
     with pytest.raises(ImportError) as excinfo:
         identifiers._assert_domain_separation()
-    assert expected_phrase in str(excinfo.value), str(excinfo.value)
+    # One statement asserting the typed pair: the refusal's exact class together with the
+    # phrase only this branch emits. The phrase is the branch's only discriminator — the
+    # catch-all raises the same class — and asserting it *with* the class in a single
+    # statement is what attributes a sweep kill to the typed refusal rather than to prose
+    # alone (ADR guard-coverage §6; the engine's message-only detector reads the failing
+    # statement).
+    err = excinfo.value
+    assert type(err) is ImportError and expected_phrase in str(err), str(err)
 
 
 def test_any_other_capability_fails_the_separation_as_drift(monkeypatch):
@@ -249,7 +256,7 @@ def test_the_catch_all_is_the_load_bearing_capability_separation():
     Asserted against the live enum rather than restated in a comment, so a future edit that
     made a borrowed capability the dedicated one — or that reordered the checks so an
     explicit branch became the only refusal for some value — would break this and force the
-    wording in ``GUARD_SWEEP.md`` to be revisited.
+    wording in ``GUARD_INVENTORY.md`` and this docstring to be revisited.
     """
 
     from ugence_cloud_scaling_producer_attestation import identifiers
@@ -273,8 +280,8 @@ def test_the_catch_all_is_the_load_bearing_capability_separation():
     named = {borrowed for borrowed, _label, _phrase in CAPABILITY_SEPARATIONS}
     assert set(TrustAnchorCapability) == named | {dedicated}, (
         "TEV's capability roster changed; a member outside the dedicated one and the two "
-        "named borrowed ones is refused by the catch-all alone, so GUARD_SWEEP.md's "
-        "scored-vs-load-bearing note must be re-checked against the new member"
+        "named borrowed ones is refused by the catch-all alone, so the guard inventory's "
+        "scored-vs-load-bearing reading must be re-checked against the new member"
     )
 
     class _UnratifiedCapability:

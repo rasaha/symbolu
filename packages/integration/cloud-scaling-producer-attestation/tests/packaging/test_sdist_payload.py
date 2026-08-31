@@ -47,6 +47,7 @@ REQUIRED_SDIST_PAYLOAD = (
     "tests/test_authenticity_laundering.py",
     "tests/test_capability_domain_separation.py",
     "tests/test_gate_isolation.py",
+    "tests/test_guard_coverage.py",
     "tests/test_no_placeholder_verifier.py",
     "tests/test_signer_boundary.py",
     "tests/test_time_authority.py",

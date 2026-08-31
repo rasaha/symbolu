@@ -162,6 +162,15 @@ class PackageConfig:
     #: ``risk-integration``. The opt-in discipline itself is unchanged: every other
     #: package keeps a byte-identical inventory until its own ruling says otherwise.
     record_multiplicity: bool = False
+    #: Extra environment for every suite run of this package, baseline and mutant alike.
+    #: Exists for exactly one ratified use so far: ``producer-attestation``'s packaging
+    #: properties build five distributions and a virtualenv per run, and its own suite
+    #: skips them under ``UGENCE_SKIP_SLOW_PACKAGING`` — a cost decision whose safety
+    #: condition is measured by that package's ``tests/test_property_ledger.py`` PL-6
+    #: (every module the sdist ships is also run directly, un-skipped, in the same run).
+    #: Declared here rather than exported by the workflow so a local sweep and CI run the
+    #: same suite; the engine's own variables still win over anything named here.
+    suite_env: dict = field(default_factory=dict)
 
     @property
     def src(self) -> Path:
@@ -297,6 +306,250 @@ PACKAGES = {
         uncovered_mints=(),
         recorded=(),
         exclusions={},
+    ),
+    "producer-attestation": PackageConfig(
+        key="producer-attestation",
+        package_dir="packages/integration/cloud-scaling-producer-attestation",
+        dist_name="ugence_cloud_scaling_producer_attestation",
+        # The package's one minting route (Phase 5B-0A): the module-level function every
+        # attestation flows out of. The verification-side mint,
+        # ``_mint_verified_artifact``'s caller, is an inline construction inside
+        # ``verify`` and is not wrapped, per guard-coverage ADR §5.
+        mint_site="ugence_cloud_scaling_producer_attestation.signing:"
+                  "mint_producer_attestation",
+        # The fork's flow order, kept verbatim: canonical primitives, frozen identifiers,
+        # the attestation value, the signing boundary, trust-anchor handling, the verified
+        # artifact, and only then the verifier.
+        module_order=(
+            "canonical.py",
+            "identifiers.py",
+            "attestation.py",
+            "signing.py",
+            "trust.py",
+            "verified.py",
+            "verification.py",
+        ),
+        # Phase 5B-0A refuses in two shapes: construction sites raise, and the verifier
+        # *returns* ``_refuse(_Outcome.X, detail)`` inside a ``ProducerAuthenticityResult``.
+        # The two result constructors are named alongside ``_refuse`` because a guard whose
+        # body returns one is deciding the same typed outcome.
+        refusal_calls=frozenset(
+            {"_refuse", "ProducerAuthenticityResult", "ProducerAttestationRefusal"}
+        ),
+        # No ``(_Outcome.X, "…")`` tuple idiom; the verifier returns constructed results.
+        tuple_refusals=False,
+        # ``_Outcome`` is the engine-wide base name and is what this package imports its
+        # ``ProducerAuthenticityOutcome`` as, so nothing extra is declared.
+        reason_vocabularies=frozenset(),
+        # All three additive classes, per the adoption ruling: D-GC-3 selects the four
+        # verifier ``except`` arms that return ``_refuse(...)``, D-GC-4 selects the
+        # ``require_*`` admission calls the fork's raise-only reading never inventoried,
+        # and D-GC-5 is enabled empty — a class that is off cannot report that it found
+        # nothing.
+        decision_classes=frozenset({"except-arm", "helper-admission", "else-arm"}),
+        # D-GC-3's operator. ``VERIFICATION_UNAVAILABLE`` is the general answer among the
+        # members these arms produce — three of the four arms already return it, so they
+        # take the alternate, a lateral swap to a different specific member; the fourth
+        # (gate 9's ``MALFORMED_SIGNATURE``) is collapsed to the sentinel, which is
+        # §9.4's general-for-specific direction.
+        reason_collapse_sentinels={
+            "_Outcome": ("VERIFICATION_UNAVAILABLE", "MALFORMED_SIGNATURE"),
+        },
+        # No §7.2/§10-style disclosure ruling exists for this package, and it carries no
+        # loop-guards to disclose; the inventory stays multiplicity-silent.
+        record_multiplicity=False,
+        # The suite skips its packaging-distribution properties during sweep runs — the
+        # fork's ratified cost decision, carried over. Safety is measured, not asserted:
+        # ``tests/test_property_ledger.py`` PL-6 requires every module the sdist ships to
+        # also run directly, un-skipped, in the same sweep run.
+        suite_env={"UGENCE_SKIP_SLOW_PACKAGING": "1"},
+        # Partial, and disclosed (guard-coverage ADR §5): the verified-artifact mint on the
+        # success path is an inline construction and must not be wrapped.
+        uncovered_mints=(
+            (
+                "ugence_cloud_scaling_producer_attestation.verification:"
+                "_mint_verified_artifact(...) on the verify success path",
+                "the verification-side mint. `mint_site` names the attestation mint, "
+                "which is the artifact every verifier gate is about; the verified "
+                "artifact is minted only after every gate has succeeded, and wrapping "
+                "its construction would change the program under test.",
+            ),
+        ),
+        # The fork's GUARD_SWEEP.md carried the prior inventory (92 `if` guards) as prose;
+        # this configuration's first inventory is the engine's own.
+        recorded=(),
+        # Fifteen, every one carried over from the fork's reviewed survivor
+        # classifications and re-verified against a measured 116-site sweep of this
+        # configuration, mapped onto the closed vocabulary. The fork's other survivors —
+        # every site with a constructible isolating input, including the reference
+        # signer's constructor checks, the trust-helper exact-type checks, the
+        # result-shape checks and gate 9's reason collapse — are closed by isolating
+        # tests in ``tests/test_guard_coverage.py`` rather than excluded.
+        exclusions={
+            # --- identifiers.py: the import-time separation call site --------------------
+            ("identifiers.py", "_assert_domain_separation()"): (
+                "unscorable-by-single-checkout-fixture",
+                "Deleting the module-level call disables the import-time drift check, "
+                "but every condition it tests compares constants that are frozen in this "
+                "checkout — several against values imported from separately versioned "
+                "distributions (TEV's capability enum, Phase 5A's identifiers) under "
+                "open-ended `>=` pins. The sweep fixture installs exactly one "
+                "resolution, in which every separation holds, so no input reaches the "
+                "call with anything to refuse. The guards *inside* the function are all "
+                "scored and killed, because the suite re-runs them with drifted values.",
+                "tests/test_guard_coverage.py::"
+                "test_the_import_time_separations_hold_for_the_installed_distributions",
+            ),
+            # --- attestation.py: the pre-decode type check -------------------------------
+            ("attestation.py", "type(self.signature) is not str"): (
+                "diagnostic-only",
+                "Named successor: the `decode_signature` call two lines below, whose "
+                "`except` arm raises the same ProducerAttestationCanonicalFieldError "
+                "with the same MALFORMED_SIGNATURE outcome for every non-str value. "
+                "Removing this guard changes which line refuses, and nothing a caller "
+                "may branch on.",
+                "tests/test_guard_coverage.py::"
+                "test_a_non_str_signature_is_refused_by_decode_with_the_same_typed_pair",
+            ),
+            # --- signing.py: content checks behind the issuance token --------------------
+            # The token guard at signing.py:121 runs first in `__post_init__` and refuses
+            # every caller-assembled signing input outright; the one supported route,
+            # `mint_producer_attestation`, passes `canonical_bytes()` output and the
+            # pinned profile constant. No constructible input reaches any of these five
+            # with a value it would reject.
+            ("signing.py", "type(self.signed_input) is not bytes"): (
+                "unreachable-behind-earlier-guard",
+                "Behind the issuance-token guard at signing.py:121. "
+                "mint_producer_attestation is the only route to a signing input and "
+                "always passes canonical_bytes(); a caller cannot construct one at all.",
+                "tests/test_guard_coverage.py::"
+                "test_the_token_guard_precedes_every_signing_input_content_check",
+            ),
+            ("signing.py", "len(self.signed_input) == 0"): (
+                "unreachable-behind-earlier-guard",
+                "Behind the issuance-token guard at signing.py:121; the minted payload "
+                "is never empty, and a caller-assembled input is refused before any "
+                "content check runs.",
+                "tests/test_guard_coverage.py::"
+                "test_the_token_guard_precedes_every_signing_input_content_check",
+            ),
+            (
+                "signing.py",
+                "require_canonical_identifier("
+                "'ProducerAttestationSigningInput.producer_id', self.producer_id)",
+            ): (
+                "unreachable-behind-earlier-guard",
+                "Behind the issuance-token guard at signing.py:121; the minting routine "
+                "validates the producer id before assembling the input, so the only "
+                "values that reach this call are already canonical.",
+                "tests/test_guard_coverage.py::"
+                "test_the_token_guard_precedes_every_signing_input_content_check",
+            ),
+            (
+                "signing.py",
+                "require_canonical_identifier("
+                "'ProducerAttestationSigningInput.issuer', self.issuer)",
+            ): (
+                "unreachable-behind-earlier-guard",
+                "The same construction as the producer_id call above.",
+                "tests/test_guard_coverage.py::"
+                "test_the_token_guard_precedes_every_signing_input_content_check",
+            ),
+            (
+                "signing.py",
+                "require_canonical_identifier("
+                "'ProducerAttestationSigningInput.producer_key_id', self.producer_key_id)",
+            ): (
+                "unreachable-behind-earlier-guard",
+                "The same construction as the producer_id call above.",
+                "tests/test_guard_coverage.py::"
+                "test_the_token_guard_precedes_every_signing_input_content_check",
+            ),
+            ("signing.py", "self.signature_profile != PRODUCER_ATTESTATION_SIGNATURE_PROFILE"): (
+                "unreachable-behind-earlier-guard",
+                "Behind the issuance-token guard at signing.py:121; the minting routine "
+                "passes the pinned constant, not a parameter, so there is no "
+                "caller-supplied profile to get wrong.",
+                "tests/test_guard_coverage.py::"
+                "test_the_token_guard_precedes_every_signing_input_content_check",
+            ),
+            # --- trust.py: the None short-circuit ----------------------------------------
+            ("trust.py", "resolver is None"): (
+                "diagnostic-only",
+                "Named successor: `None` fails the "
+                "`getattr(resolver, 'is_production_authoritative', False) is not True` "
+                "check at trust.py:238, which raises the same "
+                "ProducerAttestationConfigurationError with the same default outcome. "
+                "Removing this guard changes the message and nothing else; it is kept "
+                "because 'there is no resolver at all' is the more useful diagnosis.",
+                "tests/test_guard_coverage.py::"
+                "test_a_none_resolver_is_refused_by_the_authority_check_with_the_same_error",
+            ),
+            # --- verified.py: checks behind the verification token -----------------------
+            ("verified.py", "require_canonical_digest(name, getattr(self, name))"): (
+                "unreachable-behind-earlier-guard",
+                "Behind the construction-token guard at verified.py:238, which refuses "
+                "every caller construction outright; the one minting route passes "
+                "digests it computed itself. `object.__new__` fabrications bypass "
+                "`__post_init__` entirely, so they reach neither this call nor the "
+                "guard in front of it — they are refused by "
+                "require_verified_producer_attestation at every consumption boundary, "
+                "which is scored and killed.",
+                "tests/test_guard_coverage.py::"
+                "test_no_caller_construction_reaches_the_checks_behind_the_verification_token",
+            ),
+            ("verified.py", "self.artifact_digest != expected"): (
+                "unreachable-behind-earlier-guard",
+                "The same construction as the digest calls above: behind the "
+                "construction-token guard at verified.py:238, and the minting routine "
+                "computes the digest it passes. The consumption-boundary recomputation "
+                "of the same digest is scored and killed.",
+                "tests/test_guard_coverage.py::"
+                "test_no_caller_construction_reaches_the_checks_behind_the_verification_token",
+            ),
+            # --- verification.py: the None short-circuits --------------------------------
+            ("verification.py", "trust_anchor_resolver is None"): (
+                "diagnostic-only",
+                "Named successor: `hasattr(trust_anchor_resolver, 'resolve')` five lines "
+                "below, which refuses None with the same "
+                "ProducerAttestationConfigurationError and the same default outcome. "
+                "Removing this guard changes the message and nothing else.",
+                "tests/test_guard_coverage.py::"
+                "test_a_none_collaborator_is_refused_with_the_same_configuration_error",
+            ),
+            ("verification.py", "signature_verifier is None"): (
+                "diagnostic-only",
+                "The same shape as the resolver guard above: a None verifier always "
+                "fails `hasattr(signature_verifier, 'verify_producer_signature')` with "
+                "the same typed configuration error.",
+                "tests/test_guard_coverage.py::"
+                "test_a_none_collaborator_is_refused_with_the_same_configuration_error",
+            ),
+            # --- verification.py: gate 8's byte-equality half ----------------------------
+            ("verification.py", "recomputed_bytes != attestation.signed_bytes()"): (
+                "diagnostic-only",
+                "Named successor: the payload-digest comparison on the following line, "
+                "a digest over the same two byte strings, which refuses the identical "
+                "inputs with the identical PAYLOAD_MISMATCH outcome. Both are "
+                "additionally fronted by the reconciliation group. Deliberately kept: "
+                "it is the direct byte comparison the design specifies, and it would be "
+                "the only remaining check if a future edit made the digest comparison "
+                "cover a different projection of the payload.",
+                "tests/test_gate_isolation.py::"
+                "test_a_stale_payload_digest_fails_the_recomputation_gate",
+            ),
+            # --- verification.py: the anchor-record revalidation -------------------------
+            ("verification.py", "type(anchor) is not TrustAnchorRecord"): (
+                "unreachable-behind-earlier-guard",
+                "TrustAnchorResolution refuses at construction to carry anything but a "
+                "TrustAnchorRecord, and the resolution's own exact-type check at "
+                "verification.py:475 — scored and killed — rejects a non-resolution "
+                "before this line reads its anchor. This guard covers a resolver that "
+                "returns a genuine resolution subverted after construction.",
+                "tests/test_guard_coverage.py::"
+                "test_a_resolution_cannot_carry_a_non_anchor_record",
+            ),
+        },
     ),
     "risk-integration": PackageConfig(
         key="risk-integration",
@@ -1616,6 +1869,7 @@ def run_suite(
     suite_args: tuple = ("tests",),
     require_green: bool = False,
     mint_site: str = "",
+    extra_env: "dict | None" = None,
 ) -> dict:
     """Run the suite in the copy, and score it only if it collected the same population.
 
@@ -1636,6 +1890,9 @@ def run_suite(
         timeout=timeout,
         env={
             **os.environ,
+            # Package-declared additions first, so the engine's own variables below can
+            # never be overridden by a config entry.
+            **(extra_env or {}),
             # The copy lives outside the repository and cannot find the checkout by walking
             # upward.
             "UGENCE_REPO_ROOT": str(REPO),
@@ -1765,7 +2022,15 @@ def _workdir(config: PackageConfig) -> Path:
 #: changed the program under test would be measuring the instrumentation. Where that leaves
 #: a mint uncovered the package names it in ``uncovered_mints`` and the inventory discloses
 #: it.
-_MINT_PLUGIN = '''
+#: A RAW literal, and that is load-bearing: the plugin's detector regexes carry ``\b`` and
+#: ``\.``, and a non-raw triple-quote processed every ``\b`` into a backspace byte on the
+#: way into the copy — so ``\btype\s*\(``, ``\.outcome\b`` and ``\.\w*reason\b`` never
+#: matched at runtime, and every statement they exist to recognise as a typed read was
+#: flagged message-only. The engine's own detector tests compile the pattern from this
+#: *source* text, where the escapes are intact, which is exactly why they could not see
+#: it; ``test_the_plugin_literal_survives_escape_processing`` now checks the literal the
+#: copy actually receives.
+_MINT_PLUGIN = r'''
 import atexit
 import os
 import sys
@@ -2432,7 +2697,8 @@ def main() -> int:
 
     workdir = prepare_copy(config)
     baseline = run_suite(
-        workdir, suite_args=suite_args, require_green=True, mint_site=config.mint_site
+        workdir, suite_args=suite_args, require_green=True, mint_site=config.mint_site,
+        extra_env=config.suite_env,
     )
     if not baseline["scored"]:
         print(f"baseline is not scorable: {baseline['why']}", file=sys.stderr)
@@ -2449,6 +2715,7 @@ def main() -> int:
             baseline_collected=baseline["collected"],
             suite_args=suite_args,
             mint_site=config.mint_site,
+            extra_env=config.suite_env,
         )
         # Differential, not absolute. ``require_green`` already refuses a red baseline, so
         # this should never subtract anything — it is here because the failure it guards

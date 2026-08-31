@@ -86,23 +86,31 @@ SHARED_ENGINE_WORKFLOWS = sorted(
 )
 
 
-def test_the_shared_engine_is_run_by_the_three_sweeps_this_expects():
-    """A floor, not an equality: a fourth adopter must not silently go unchecked."""
+def test_the_shared_engine_is_run_by_the_four_sweeps_this_expects():
+    """A floor, not an equality: a fifth adopter must not silently go unchecked."""
 
     names = {p.name for p in SHARED_ENGINE_WORKFLOWS}
     assert names >= {
         "cloud-scaling-authorization-contracts-ci.yml",
         "cloud-scaling-policy-authenticity-ci.yml",
         "cloud-scaling-capacity-bounds-policy-ci.yml",
+        "cloud-scaling-producer-attestation-ci.yml",
     }, f"a sweep stopped invoking the shared engine, or moved: {sorted(names)}"
 
 
-def test_producer_attestation_is_not_in_scope():
-    """It runs its own in-package sweep script and must not be swept up by this rule."""
+def test_producer_attestation_adopted_the_shared_engine():
+    """The in-package fork is retired; the ruled adoption must not quietly regress.
+
+    This test used to assert the opposite — that the package's workflow ran its own
+    ``scripts/guard_sweep.py`` and was not in the shared engine's scope. The adoption
+    ruling retired the fork for the shared engine's ``producer-attestation`` entry, so a
+    workflow that reintroduced a package-local sweep script, or stopped invoking the
+    shared engine, would be un-ruling that decision.
+    """
 
     text = (WORKFLOWS / "cloud-scaling-producer-attestation-ci.yml").read_text(encoding="utf-8")
-    assert not _runs_the_shared_engine(text)
-    assert "cloud-scaling-producer-attestation/scripts/guard_sweep.py" in text
+    assert _runs_the_shared_engine(text)
+    assert "cloud-scaling-producer-attestation/scripts/guard_sweep.py" not in text
 
 
 @pytest.mark.parametrize(
