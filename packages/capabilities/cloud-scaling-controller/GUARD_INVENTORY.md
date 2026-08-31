@@ -25,15 +25,16 @@ This package records no prior inventory; this is the first one.
 
 ## Classification
 
-Every guard is classified: **218 `SCORED`** — the
+Every guard is classified: **217 `SCORED`** — the
 sweep neutralises it and the suite must fail — and
-**1 `EXCLUDED`**, each with a reason from a closed vocabulary and
+**2 `EXCLUDED`**, each with a reason from a closed vocabulary and
 a test that measures the reason. A guard is never excluded because it survived; a
 survivor with no prior declaration fails the sweep.
 
 | Module:line | Reason | Why | Measured by |
 |---|---|---|---|
 | `planning/topology.py:193` | `diagnostic-only` | The guard chooses between two messages on a path that refuses either way: it sits inside `if key in seen:`, and neutralising it falls through to the `duplicate dependency edge` refusal on the very next line. Both are `TopologyError`, and this package's typed half is the exception class, so no input can distinguish them — a contradictory pair and a duplicate pair are refused under one contract. It is kept because 'contradictory kind' is the more useful diagnosis of the two. | `tests/planning/test_guard_coverage.py::test_a_duplicate_pair_and_a_contradictory_pair_are_both_refused_as_topology_errors` |
+| `planning/constraints.py:58` | `diagnostic-only` | `_finite_number`'s None branch. No call site passes `allow_none=True` — all three call it bare — so for every reachable input the branch only chooses between the 'is required' and 'must be a finite number' messages, and both raise `ConstraintError`. The `allow_none` early return it also guards is dead at every call site; a caller that introduces one re-opens this exclusion by construction, because the sweep fails on a stale exclusion that gets killed. | `tests/planning/test_guard_coverage.py::test_a_none_cooldown_is_refused_as_a_constraint_error` |
 
 ## Not counted, and why
 
@@ -96,7 +97,7 @@ survivor with no prior declaration fails the sweep.
 | 47 | `planning/cost.py:214` | if | raise | SCORED | — | `unknown` |
 | 48 | `planning/cost.py:216` | if | raise | SCORED | — | `'subject' not in data` |
 | 49 | `planning/cost.py:219` | if | raise | SCORED | — | `not isinstance(entries_raw, (list, tuple))` |
-| 50 | `planning/constraints.py:58` | if | raise | SCORED | — | `v is None` |
+| 50 | `planning/constraints.py:58` | if | raise | EXCLUDED | — | `v is None` |
 | 51 | `planning/constraints.py:62` | if | raise | SCORED | — | `isinstance(v, bool) or not isinstance(v, (int, float)) or (not math.isfinit…` |
 | 52 | `planning/constraints.py:89` | if | raise | SCORED | — | `isinstance(v, bool) or not isinstance(v, int)` |
 | 53 | `planning/constraints.py:91` | if | raise | SCORED | — | `self.min_capacity < 0` |

@@ -1,8 +1,8 @@
 {
   "package": "controller-planning",
   "total": 219,
-  "scored": 218,
-  "excluded": 1,
+  "scored": 217,
+  "excluded": 2,
   "classification": {
     "1": {
       "status": "SCORED",
@@ -302,7 +302,10 @@
       "condition": "not isinstance(entries_raw, (list, tuple))"
     },
     "50": {
-      "status": "SCORED",
+      "status": "EXCLUDED",
+      "reason": "diagnostic-only",
+      "detail": "`_finite_number`'s None branch. No call site passes `allow_none=True` \u2014 all three call it bare \u2014 so for every reachable input the branch only chooses between the 'is required' and 'must be a finite number' messages, and both raise `ConstraintError`. The `allow_none` early return it also guards is dead at every call site; a caller that introduces one re-opens this exclusion by construction, because the sweep fails on a stale exclusion that gets killed.",
+      "evidence": "tests/planning/test_guard_coverage.py::test_a_none_cooldown_is_refused_as_a_constraint_error",
       "module": "planning/constraints.py",
       "line": 58,
       "condition": "v is None"

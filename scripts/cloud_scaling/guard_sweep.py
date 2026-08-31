@@ -522,6 +522,18 @@ PACKAGES = {
         recorded=(),
         # Written after a measured sweep, never before one.
         exclusions={
+            ("planning/constraints.py", "v is None"): (
+                "diagnostic-only",
+                "`_finite_number`'s None branch. No call site passes `allow_none=True` "
+                "— all three call it bare — so for every reachable input the branch "
+                "only chooses between the 'is required' and 'must be a finite number' "
+                "messages, and both raise `ConstraintError`. The `allow_none` early "
+                "return it also guards is dead at every call site; a caller that "
+                "introduces one re-opens this exclusion by construction, because the "
+                "sweep fails on a stale exclusion that gets killed.",
+                "tests/planning/test_guard_coverage.py::"
+                "test_a_none_cooldown_is_refused_as_a_constraint_error",
+            ),
             ("planning/topology.py", "seen[key] != edge.kind"): (
                 "diagnostic-only",
                 "The guard chooses between two messages on a path that refuses either "
