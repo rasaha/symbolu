@@ -6,6 +6,9 @@
 import type { HttpClient } from "@/api/client";
 import type {
   BirthProfileCreateRequest,
+  DeviceListResponse,
+  DeviceRegisterRequest,
+  DeviceResponse,
   BirthProfileResponse,
   ConversationResponse,
   CoupleResponse,
@@ -83,4 +86,12 @@ export const ChatApi = {
       `/v1/conversations/${encodeURIComponent(conversationId)}/read-state`,
       { last_read_sequence },
     ),
+};
+
+export const DeviceApi = {
+  register: (c: HttpClient, body: DeviceRegisterRequest) =>
+    c.post<DeviceResponse>("/v1/devices", body),
+  list: (c: HttpClient) => c.get<DeviceListResponse>("/v1/devices"),
+  revoke: (c: HttpClient, deviceId: string) =>
+    c.delete<DeviceResponse>(`/v1/devices/${encodeURIComponent(deviceId)}`),
 };

@@ -3,10 +3,15 @@
 // the app falls back to a LOCAL dev URL (see src/config/env.ts); a real build
 // must supply DILCHAT_API_BASE_URL.
 //
-// Phase 2 hardening:
-// - Android permissions are minimized: only INTERNET is needed. Expo/RN default
-//   templates add READ/WRITE_EXTERNAL_STORAGE, SYSTEM_ALERT_WINDOW, and VIBRATE
-//   which this app does not use — they are explicitly blocked.
+// Phase 2 hardening (amended by DILCHAT-D3C-M1):
+// - Android permissions stay minimized to what the ratified feature set
+//   demonstrably requires. Phase 3C adds expo-notifications for the approved
+//   content-free push capability, which brings POST_NOTIFICATIONS on supported
+//   Android versions. Unrelated Expo/RN template permissions
+//   (READ/WRITE_EXTERNAL_STORAGE, SYSTEM_ALERT_WINDOW) remain blocked, and
+//   VIBRATE stays blocked: the pinned expo-notifications build functions
+//   without it and least privilege governs (see scripts/check-native-android.sh,
+//   which pins the expected generated-manifest permission set).
 // - Android auto-backup is disabled (defense in depth; auth tokens already live
 //   in the Keystore via expo-secure-store with WHEN_UNLOCKED_THIS_DEVICE_ONLY,
 //   excluded from backups/sync).
@@ -42,9 +47,15 @@ module.exports = () => ({
         "android.permission.VIBRATE",
       ],
     },
-    plugins: ["expo-router", "expo-secure-store"],
+    plugins: ["expo-router", "expo-secure-store", "expo-notifications"],
     extra: {
       apiBaseUrl: process.env.DILCHAT_API_BASE_URL || undefined,
+      // EAS project id: deployment configuration for Expo push-token
+      // acquisition (DILCHAT-D3C-M2). Absent => the app NEVER attempts token
+      // acquisition and runs on REST + polling alone. Never hardcoded.
+      eas: process.env.DILCHAT_EAS_PROJECT_ID
+        ? { projectId: process.env.DILCHAT_EAS_PROJECT_ID }
+        : undefined,
       // HTTPS hosts allowed to carry an invitation universal link. Empty in this
       // phase: only the app's own dilchat:// scheme is honored (anti open-redirect).
       invitationLinkHosts: [],

@@ -1,12 +1,20 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Redirect, Stack } from "expo-router";
 import { useAuth } from "@/auth/AuthContext";
+import { maybeRegisterForPush } from "@/push/registration";
 import { Loading, Screen } from "@/ui/components";
 
 /** Authenticated area. Unauthenticated users are sent to sign-in; an expired
  * session (detected by the client) flips status to signed-out and redirects. */
 export default function AppLayout(): React.ReactElement {
-  const { status } = useAuth();
+  const { status, client } = useAuth();
+
+  // Push is an optional delivery enhancement (DILCHAT-D3C-M2): fire-and-forget
+  // on entering the signed-in area; every outcome short of "registered"
+  // degrades silently to REST + polling and never blocks navigation or auth.
+  useEffect(() => {
+    if (status === "signed-in") void maybeRegisterForPush(client);
+  }, [status, client]);
   if (status === "loading") {
     return (
       <Screen scroll={false}>

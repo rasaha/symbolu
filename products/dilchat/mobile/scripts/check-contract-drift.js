@@ -28,6 +28,9 @@ const REQUIRED = [
   ["GET", "/v1/conversations/{conversation_id}/messages"],
   ["POST", "/v1/conversations/{conversation_id}/messages"],
   ["PUT", "/v1/conversations/{conversation_id}/read-state"],
+  ["POST", "/v1/devices"],
+  ["GET", "/v1/devices"],
+  ["DELETE", "/v1/devices/{device_id}"],
 ];
 const BANNED_SUBSTRINGS = ["guna", "compatibility", "koota", "ashtakoot", "milan", "dosha"];
 
