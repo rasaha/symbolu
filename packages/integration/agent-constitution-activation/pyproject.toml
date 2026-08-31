@@ -1,0 +1,61 @@
+# The Agent Constitution ISSUANCE & ACTIVATION distribution — the composition
+# root that wires the shared Policy Authority, the constitution family, the
+# conformance resolver and the governed reference-map derivation into one
+# deployment seam (ACC-IA-1..ACC-IA-5).
+#
+# Orchestration, not authority: every issuance, resolution or revocation act is
+# the Policy Authority's, under trust the operator injects already constructed.
+# This package can neither mint nor read key material — its own suite proves
+# that over the source — and no signing key, trust root or approval artifact
+# exists anywhere in this repository.
+#
+# Three first-party dependencies and no third-party runtime dependency of its own:
+#
+#   * ugence-policy-authority — reached through its public api module ONLY, for
+#     issue_policy and the family-neutral identity, approval and record types.
+#   * ugence-agent-constitution-policy — the family whose artifact is issued and
+#     whose registration guard every composition path runs.
+#   * ugence-agent-constitution-conformance — the resolver this root assembles,
+#     and the composition-module seam the ruled scope names for guarded adapter
+#     registration.
+#
+# There is deliberately NO dependency on any key-management, networking, storage
+# or plugin-loading library: custody stays outside the repository (ACC-IA-2).
+#
+# Build:  python -m build packages/integration/agent-constitution-activation
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ugence-agent-constitution-activation"
+dynamic = ["version"]
+description = "Agent Constitution issuance & activation — the composition root, mutation-free preflight, governed reference-map derivation and key-material-free receipts over the shared Ugence Policy Authority."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Rakesh Mohan" }]
+keywords = ["ugence", "agent-constitution", "policy", "issuance", "activation", "governance"]
+dependencies = [
+    "ugence-policy-authority>=0.1.0",
+    "ugence-agent-constitution-policy>=0.1.0",
+    "ugence-agent-constitution-conformance>=0.1.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+dev = ["pytest>=7.0", "build>=1.0"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ugence_agent_constitution_activation.version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ugence_agent_constitution_activation*"]
+
+[tool.setuptools.package-data]
+ugence_agent_constitution_activation = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
